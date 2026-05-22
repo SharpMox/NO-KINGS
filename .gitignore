@@ -1,0 +1,33 @@
+# Noodle runtime state
+.noodle/
+
+# Generated agent-tool proxies — regenerate via tools/refresh-agent-skill-links.sh
+.adal/
+.agent/
+.augment/
+.claude/
+.codebuddy/
+.commandcode/
+.continue/
+.cortex/
+.crush/
+.factory/
+.goose/
+.iflow/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.vibe/
+.windsurf/
+.zencoder/

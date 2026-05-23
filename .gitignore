@@ -1,6 +1,3 @@
-# Noodle runtime state
-.noodle/
-
 # Generated agent-tool proxies — regenerate via tools/refresh-agent-skill-links.sh
 .adal/
 .agent/

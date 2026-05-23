@@ -14,7 +14,7 @@ TOOLS="adal agent augment claude codebuddy commandcode continue cortex crush \
 factory goose iflow junie kilocode kiro kode mcpjam mux neovate openhands \
 pi pochi qoder qwen roo trae vibe windsurf zencoder"
 
-SKILLS="godot-best-practices godot-gdscript-patterns godot-ui"
+SKILLS="godot-best-practices godot-gdscript-patterns godot-ui godot-mcp"
 
 tools_count=0
 skills_count=0

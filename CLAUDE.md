@@ -15,7 +15,7 @@ Pre-bootstrap. Noodle framework is configured but no Godot project exists yet �
 ## Non-negotiables for any agent touching this repo
 
 - **Worktree-first.** Never edit files on `main`. Use `noodle worktree create <name>` and either absolute paths or `noodle worktree exec`. Never `cd` into a worktree — if it's pruned mid-session, the shell dies.
-- **Load the relevant Godot skill before writing GDScript.** `godot-best-practices`, `godot-gdscript-patterns`, `godot-ui`. When in doubt, load all three.
+- **Load the relevant Godot skill before writing GDScript.** `godot-best-practices`, `godot-gdscript-patterns`, `godot-ui`, `godot-mcp`. When in doubt, load all four.
 - **Autonomous execution.** The `execute` skill operates without user prompts. Track work with Tasks; emit `stage_yield` when the deliverable is done.
 - **Scope discipline.** No defensive code, no speculative features, no backwards-compat shims. Out-of-scope discoveries go in quality review notes.
 
@@ -47,9 +47,28 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. One commit per logica
 - `.noodle.toml` — runtime config (mode, routing defaults, skills paths, adapter scripts).
 - `todos.md` — backlog (next-id tracked in an HTML comment).
 - `skills-lock.json` — installed external skills with content hashes.
-- `.agents/skills/` — canonical skill location. `noodle`, `schedule`, `execute`, plus the three `godot-*` domain skills.
+- `.agents/skills/` — canonical skill location. `noodle`, `schedule`, `execute`, plus the four `godot-*` domain skills.
 - `adapters/backlog-{add,sync,done,edit}` — POSIX-sh shims Noodle calls to read/write `todos.md`.
 - `tools/refresh-agent-skill-links.sh` — regenerates the `.<tool>/skills/` symlink farms (one proxy per agent CLI) pointing at `.agents/skills/`. Run after fresh clone or after adding a tool/skill.
+
+## Godot agent tools (MCP)
+
+Agents drive the live Godot editor via the [Godot AI](https://github.com/hi-godot/godot-ai) MCP server (MIT, ~120 ops / 39 tools). Load the `godot-mcp` skill before any task that touches scenes, nodes, signals, materials, animations, particles, UI containers, cameras, or environments. Hand-edit `.tscn`/`.gd` files only for pure GDScript function bodies; everything structural goes through the MCP.
+
+**Status:** the addon is **not yet installed** — `project.godot` doesn't exist (see `todos.md` #1). Once the Godot project is bootstrapped:
+
+```sh
+# 1. Install uv if missing: https://docs.astral.sh/uv/getting-started/installation/
+# 2. Vendor the addon
+git clone https://github.com/hi-godot/godot-ai.git /tmp/godot-ai
+cp -r /tmp/godot-ai/plugin/addons/godot_ai addons/
+# 3. Enable in Project Settings > Plugins
+# 4. Open the Godot AI dock and press "Configure all" to wire every detected MCP client
+```
+
+Until then, the `godot-mcp` skill loads cleanly but reports "tools unavailable — bootstrap first" and falls back to file edits only when explicitly authorized.
+
+Deferred (not now): GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-mcp (subsumed by Godot AI).
 
 ## Agent-tool proxies
 

@@ -19,8 +19,9 @@ This is a Godot 4 mobile game project. Always load these domain skills before im
 - **godot-best-practices** — Godot 4.x coding standards, scene organization, signals, resources, state machines, performance
 - **godot-gdscript-patterns** — GDScript architecture patterns, signals, scenes, optimization
 - **godot-ui** — Godot UI system, Control nodes, themes, responsive layouts, menus, HUDs
+- **godot-mcp** — Drive the live Godot editor via the Godot AI MCP server instead of hand-editing `.tscn`/scenes/nodes/signals. Load whenever the task touches Godot project files (structural changes); skip only for pure GDScript text edits where no editor state is involved.
 
-Load the relevant domain skill(s) for the task at hand. When in doubt, load all three.
+Load the relevant domain skill(s) for the task at hand. When in doubt, load all four.
 
 ## Execution Flow
 

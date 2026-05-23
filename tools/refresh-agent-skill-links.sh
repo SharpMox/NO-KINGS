@@ -6,7 +6,7 @@ set -eu
 # adding a tool or skill.
 #
 # Edit TOOLS to add/remove an agent CLI proxy. Edit SKILLS to change which
-# skills are exposed. noodle/execute/schedule stay internal to .agents/skills/.
+# skills are exposed.
 
 cd "$(dirname "$0")/.."
 
@@ -14,7 +14,7 @@ TOOLS="adal agent augment claude codebuddy commandcode continue cortex crush \
 factory goose iflow junie kilocode kiro kode mcpjam mux neovate openhands \
 pi pochi qoder qwen roo trae vibe windsurf zencoder"
 
-SKILLS="godot-best-practices godot-gdscript-patterns godot-ui"
+SKILLS="godot-best-practices godot-gdscript-patterns godot-ui godot-mcp"
 
 tools_count=0
 skills_count=0

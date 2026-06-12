@@ -165,6 +165,7 @@ const html = `<!doctype html>
   <nav class="site-nav" aria-label="Site sections">
     <div class="site-nav-inner">
       <a href="codex.html">Codex</a>
+      <a href="graph.html">Graph</a>
       <a href="promotion.html">Promotions</a>
       <a href="fusion.html">Fusions</a>
       <a href="inversion.html" class="active">Inversions</a>
@@ -203,7 +204,7 @@ const html = `<!doctype html>
   <footer>
     <p class="footer-page-line">The inverted form of each piece — a 45° ortho ↔ diagonal swap of every atomic component.</p>
     <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-    <p>Companion pages: <a href="codex.html">codex</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
+    <p>Companion pages: <a href="codex.html">codex</a> · <a href="graph.html">graph</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
   </footer>
 
   <script>

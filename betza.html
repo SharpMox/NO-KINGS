@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ralph Betza's funny notation reference with a live sandbox that renders any Betza string as a movement diagram.">
   <title>Fairy Chess — Betza notation</title>
   <style>
     :root {
@@ -116,6 +117,19 @@
     .sandbox-key:active { background: var(--bg); }
     .sandbox-key.is-clear { color: var(--text-soft); }
     .sandbox-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-soft); font-size: 12px; font-style: italic; }
+
+    /* ============== A11y additions (keep at bottom for clean merges) ============== */
+    /* Screen-reader-only utility for visually-hidden labels. */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    /* Visible keyboard-focus ring. Pointer focus stays UA-default to preserve visual identity. */
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .site-nav a:focus-visible { outline-offset: 4px; }
+    .theme-toggle:focus-visible, .sandbox-key:focus-visible, .sandbox-preset:focus-visible { outline-offset: 2px; }
+    .betza-table tr[data-token]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* Honour user motion preferences. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -127,7 +141,7 @@
       <a href="inversion.html">Inversions</a>
       <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
       <a href="betza.html" class="active">Betza</a>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
           <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
         </svg>
@@ -137,21 +151,23 @@
 
   <main class="betza-layout">
     <section class="sandbox" aria-label="Betza sandbox">
-      <div class="sandbox-board" id="sandbox-board"></div>
-      <div class="sandbox-presets" id="sandbox-presets"></div>
+      <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
+      <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings"></div>
       <div class="sandbox-controls">
+        <label class="sr-only" for="sandbox-input">Betza notation</label>
         <input type="text" id="sandbox-input" class="sandbox-input"
                placeholder="e.g. WAD · R · NN · mfWcfFimfnD · t[FR]"
-               autocomplete="off" spellcheck="false" autocapitalize="none">
-        <p class="sandbox-error" id="sandbox-error"></p>
-        <div class="sandbox-keyboard" id="sandbox-keyboard"></div>
+               autocomplete="off" spellcheck="false" autocapitalize="none"
+               aria-label="Betza notation" aria-describedby="sandbox-error">
+        <p class="sandbox-error" id="sandbox-error" role="status" aria-live="polite"></p>
+        <div class="sandbox-keyboard" id="sandbox-keyboard" aria-label="Betza notation keyboard"></div>
       </div>
     </section>
 
     <section class="notation">
       <h2>Betza notation</h2>
       <p class="intro">Ralph Betza's letter notation, used on every card in this site.</p>
-      <aside class="betza-active" id="betza-active" hidden>
+      <aside class="betza-active" id="betza-active" aria-label="Active notations" aria-live="polite" hidden>
         <div class="betza-active-label">Active</div>
         <ul id="betza-active-list"></ul>
       </aside>
@@ -756,7 +772,8 @@
       btn.type = 'button';
       btn.className = 'sandbox-preset';
       btn.title = preset.name + ' — click to load ' + preset.betza;
-      btn.innerHTML = preset.betza + '<span class="sandbox-preset-name">· ' + preset.name + '</span>';
+      btn.setAttribute('aria-label', 'Load ' + preset.name + ' (' + preset.betza + ')');
+      btn.innerHTML = preset.betza + '<span class="sandbox-preset-name" aria-hidden="true">· ' + preset.name + '</span>';
       btn.addEventListener('click', () => {
         sandboxInput.value = preset.betza;
         sandboxInput.focus();
@@ -781,6 +798,8 @@
         const expandBtn = document.createElement('button');
         expandBtn.type = 'button';
         expandBtn.className = 'sandbox-preset is-expand';
+        expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
+        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more presets');
         expandBtn.textContent = presetsExpanded
           ? '− less'
           : '+ ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more';
@@ -792,16 +811,32 @@
       }
     }
     buildPresets();
+    // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
+    const KEY_LABELS = {
+      W: 'Wazir', F: 'Ferz', D: 'Dabbaba', A: 'Alfil', N: 'Knight',
+      C: 'Camel', Z: 'Zebra', H: 'Threeleaper', G: 'Tripper',
+      K: 'King', R: 'Rook', B: 'Bishop', Q: 'Queen',
+      f: 'forward', b: 'backward', l: 'left', r: 'right', s: 'sideways', v: 'vertical',
+      m: 'move-only', c: 'capture-only', e: 'en-passant', i: 'initial move',
+      n: 'non-jumping', j: 'jumping',
+      p: 'Pao-hop', g: 'Grasshopper-hop', z: 'zigzag bend', t: 'bent rider',
+      '[': 'open bracket', ']': 'close bracket', '(': 'open paren', ')': 'close paren',
+      ',': 'comma', '2': 'two', '3': 'three', '4': 'four'
+    };
     // Build keyboard
     for (const group of SANDBOX_KEYS) {
       const row = document.createElement('div');
       row.className = 'sandbox-key-row';
-      row.innerHTML = `<span class="sandbox-key-group-label">${group.label}</span>`;
+      row.innerHTML = `<span class="sandbox-key-group-label" aria-hidden="true">${group.label}</span>`;
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', group.label);
       for (const key of group.keys) {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'sandbox-key';
         btn.textContent = key;
+        const labelName = KEY_LABELS[key];
+        btn.setAttribute('aria-label', labelName ? 'Insert ' + key + ' (' + labelName + ')' : 'Insert ' + key);
         btn.addEventListener('click', () => {
           sandboxInput.value += key;
           sandboxInput.focus();
@@ -814,12 +849,16 @@
     // Append a Clear / Backspace control
     const utilRow = document.createElement('div');
     utilRow.className = 'sandbox-key-row';
-    utilRow.innerHTML = `<span class="sandbox-key-group-label">Edit</span>`;
+    utilRow.setAttribute('role', 'group');
+    utilRow.setAttribute('aria-label', 'Edit');
+    utilRow.innerHTML = `<span class="sandbox-key-group-label" aria-hidden="true">Edit</span>`;
     const bsBtn = document.createElement('button');
     bsBtn.type = 'button'; bsBtn.className = 'sandbox-key is-clear'; bsBtn.textContent = '⌫';
+    bsBtn.setAttribute('aria-label', 'Backspace');
     bsBtn.addEventListener('click', () => { sandboxInput.value = sandboxInput.value.slice(0,-1); sandboxInput.focus(); renderSandbox(); });
     const clrBtn = document.createElement('button');
     clrBtn.type = 'button'; clrBtn.className = 'sandbox-key is-clear'; clrBtn.textContent = 'Clear';
+    clrBtn.setAttribute('aria-label', 'Clear input');
     clrBtn.addEventListener('click', () => { sandboxInput.value = ''; sandboxInput.focus(); renderSandbox(); });
     utilRow.appendChild(bsBtn);
     utilRow.appendChild(clrBtn);
@@ -966,10 +1005,23 @@
     document.querySelectorAll('.betza-table tr[data-token]').forEach(tr => {
       const token = tr.dataset.token;
       const insert = INSERT_FOR_TOKEN[token] || token;
-      tr.addEventListener('click', () => {
+      // Make the row keyboard-reachable and announce its interaction model to assistive tech.
+      tr.setAttribute('tabindex', '0');
+      tr.setAttribute('role', 'button');
+      const codeCell = tr.querySelector('code');
+      const codeText = codeCell ? codeCell.textContent.trim() : token;
+      tr.setAttribute('aria-label', 'Insert ' + insert + ' (' + codeText + ')');
+      const activate = () => {
         sandboxInput.value += insert;
         sandboxInput.focus();
         renderSandbox();
+      };
+      tr.addEventListener('click', activate);
+      tr.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          activate();
+        }
       });
     });
   }
@@ -979,6 +1031,7 @@
   function setTheme(t) {
     if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
+    if (themeToggle) themeToggle.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
     try { localStorage.setItem('fp-theme', t); } catch (e) {}
   }
   themeToggle.addEventListener('click', () => {
@@ -989,6 +1042,7 @@
     const saved = localStorage.getItem('fp-theme');
     if (saved) setTheme(saved);
     else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+    else setTheme('light');
   } catch (e) {}
   </script>
 </body>

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="14 ortho-to-diagonal inversion pairs plus self-inverse fairy-chess pieces in NO-KINGS.">
   <title>Fairy Chess — Inversions</title>
   <style>
     :root {
@@ -96,6 +97,14 @@
       .inversion-op { font-size: 22px; }
       .inversion-table { border-spacing: 4px; }
     }
+
+    /* ============== A11y additions (keep at bottom for clean merges) ============== */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .site-nav a:focus-visible { outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -107,7 +116,7 @@
       <a href="inversion.html" class="active">Inversions</a>
       <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
       <a href="betza.html">Betza</a>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
           <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
         </svg>
@@ -1309,7 +1318,7 @@
   }
 
   function renderMiniCard(piece, invented) {
-    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox">${piece.betza}</a>` : '';
+    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${piece.betza} in sandbox">${piece.betza}</a>` : '';
     return `<div class="mini-card${invented ? ' invented' : ''}">
       ${renderBoard(piece)}
       <div class="mini-name">${piece.name}</div>
@@ -1354,6 +1363,7 @@
   function setTheme(t) {
     if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     else document.documentElement.removeAttribute('data-theme');
+    if (themeToggle) themeToggle.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
     try { localStorage.setItem('fp-theme', t); } catch (e) {}
   }
   themeToggle.addEventListener('click', () => {
@@ -1364,6 +1374,7 @@
     const saved = localStorage.getItem('fp-theme');
     if (saved) setTheme(saved);
     else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+    else setTheme('light');
   } catch (e) {}
   </script>
 </body>

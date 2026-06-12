@@ -87,6 +87,7 @@ codexHtml = codexHtml.replace(
   `<nav class="site-nav" aria-label="Site sections">
     <div class="site-nav-inner">
       <a href="codex.html" class="active">Codex</a>
+      <a href="graph.html">Graph</a>
       <a href="promotion.html">Promotions</a>
       <a href="fusion.html">Fusions</a>
       <a href="inversion.html">Inversions</a>

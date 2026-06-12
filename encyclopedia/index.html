@@ -712,24 +712,8 @@
     document.getElementById('count-all').textContent = visibleAll;
   });
 
-  // Theme
-  const themeToggle = document.getElementById('theme-toggle');
-  function setTheme(t) {
-    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-    if (themeToggle) themeToggle.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
-    try { localStorage.setItem('fp-theme', t); } catch (e) {}
-  }
-  themeToggle.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
-  try {
-    const saved = localStorage.getItem('fp-theme');
-    if (saved) setTheme(saved);
-    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-    else setTheme('light');
-  } catch (e) {}
   </script>
+  <!-- Shared theme JS (cached across pages). See ../assets/theme.js. -->
+  <script src="../assets/theme.js"></script>
 </body>
 </html>

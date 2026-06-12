@@ -356,10 +356,22 @@
     ]}
   };
 
+  // Memoize: renderBetzaIcon(spec) is pure per key — every page-load call for the
+  // same key returns identical HTML, so cache by key and skip the SVG rebuild work.
+  const BETZA_ICON_HTML_CACHE = new Map();
+  function renderBetzaIconCached(key) {
+    let html = BETZA_ICON_HTML_CACHE.get(key);
+    if (html === undefined) {
+      const spec = BETZA_ICONS[key];
+      html = spec ? renderBetzaIcon(spec) : '';
+      BETZA_ICON_HTML_CACHE.set(key, html);
+    }
+    return html;
+  }
+
   document.querySelectorAll('[data-betza-icon]').forEach(el => {
-    const key = el.dataset.betzaIcon;
-    const spec = BETZA_ICONS[key];
-    if (spec) el.innerHTML = renderBetzaIcon(spec);
+    const html = renderBetzaIconCached(el.dataset.betzaIcon);
+    if (html) el.innerHTML = html;
   });
 
   /* ===========================================================
@@ -730,18 +742,16 @@
 
   if (sandboxInput && sandboxBoard && sandboxKeyboard) {
     let presetsExpanded = false;
+    // Build a preset button without a per-button listener — clicks are delegated
+    // at the container below. The button carries its preset string in data-preset.
     function makePresetButton(preset) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sandbox-preset';
       btn.title = preset.name + ' — click to load ' + preset.betza;
       btn.setAttribute('aria-label', 'Load ' + preset.name + ' (' + preset.betza + ')');
+      btn.dataset.preset = preset.betza;
       btn.innerHTML = preset.betza + '<span class="sandbox-preset-name" aria-hidden="true">· ' + preset.name + '</span>';
-      btn.addEventListener('click', () => {
-        sandboxInput.value = preset.betza;
-        sandboxInput.focus();
-        renderSandbox();
-      });
       return btn;
     }
     function buildPresets() {
@@ -763,15 +773,28 @@
         expandBtn.className = 'sandbox-preset is-expand';
         expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
         expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more presets');
+        expandBtn.dataset.expand = '1';
         expandBtn.textContent = presetsExpanded
           ? '− less'
           : '+ ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more';
-        expandBtn.addEventListener('click', () => {
-          presetsExpanded = !presetsExpanded;
-          buildPresets();
-        });
         sandboxPresets.appendChild(expandBtn);
       }
+    }
+    if (sandboxPresets) {
+      sandboxPresets.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button.sandbox-preset');
+        if (!btn) return;
+        if (btn.dataset.expand === '1') {
+          presetsExpanded = !presetsExpanded;
+          buildPresets();
+          return;
+        }
+        const preset = btn.dataset.preset;
+        if (preset === undefined) return;
+        sandboxInput.value = preset;
+        sandboxInput.focus();
+        renderSandbox();
+      });
     }
     buildPresets();
     // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
@@ -786,7 +809,10 @@
       '[': 'open bracket', ']': 'close bracket', '(': 'open paren', ')': 'close paren',
       ',': 'comma', '2': 'two', '3': 'three', '4': 'four'
     };
-    // Build keyboard
+    // Build keyboard. We attach a single delegated click handler at the keyboard
+    // container instead of one listener per button (saves ~45 handlers on init,
+    // plus avoids per-button closure allocations). Buttons carry the key in
+    // data-key (or data-edit for Clear/Backspace).
     for (const group of SANDBOX_KEYS) {
       const row = document.createElement('div');
       row.className = 'sandbox-key-row';
@@ -800,11 +826,7 @@
         btn.textContent = key;
         const labelName = KEY_LABELS[key];
         btn.setAttribute('aria-label', labelName ? 'Insert ' + key + ' (' + labelName + ')' : 'Insert ' + key);
-        btn.addEventListener('click', () => {
-          sandboxInput.value += key;
-          sandboxInput.focus();
-          renderSandbox();
-        });
+        btn.dataset.key = key;
         row.appendChild(btn);
       }
       sandboxKeyboard.appendChild(row);
@@ -818,14 +840,24 @@
     const bsBtn = document.createElement('button');
     bsBtn.type = 'button'; bsBtn.className = 'sandbox-key is-clear'; bsBtn.textContent = '⌫';
     bsBtn.setAttribute('aria-label', 'Backspace');
-    bsBtn.addEventListener('click', () => { sandboxInput.value = sandboxInput.value.slice(0,-1); sandboxInput.focus(); renderSandbox(); });
+    bsBtn.dataset.edit = 'backspace';
     const clrBtn = document.createElement('button');
     clrBtn.type = 'button'; clrBtn.className = 'sandbox-key is-clear'; clrBtn.textContent = 'Clear';
     clrBtn.setAttribute('aria-label', 'Clear input');
-    clrBtn.addEventListener('click', () => { sandboxInput.value = ''; sandboxInput.focus(); renderSandbox(); });
+    clrBtn.dataset.edit = 'clear';
     utilRow.appendChild(bsBtn);
     utilRow.appendChild(clrBtn);
     sandboxKeyboard.appendChild(utilRow);
+    sandboxKeyboard.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button.sandbox-key');
+      if (!btn) return;
+      if (btn.dataset.edit === 'backspace') sandboxInput.value = sandboxInput.value.slice(0, -1);
+      else if (btn.dataset.edit === 'clear') sandboxInput.value = '';
+      else if (btn.dataset.key !== undefined) sandboxInput.value += btn.dataset.key;
+      else return;
+      sandboxInput.focus();
+      renderSandbox();
+    });
 
     const TOKEN_MATCHERS = {
       W: s => /W/.test(s), F: s => /F/.test(s), D: s => /D/.test(s), A: s => /A/.test(s),
@@ -845,6 +877,30 @@
       K: ['W','F'], R: ['W'], B: ['F'], Q: ['R','B'],
       NN: ['N'], CC: ['C'], AA: ['A'], DD: ['D'],
     };
+    // Cache the notation-table row NodeList once: the tables are static, so
+    // re-querying on every keystroke wastes ~30 DOM walks per debounce.
+    const ACTIVE_TOKEN_ROWS = Array.from(document.querySelectorAll('.betza-table tr[data-token]'));
+    // Cache per-token <li> nodes so re-renders just toggle hidden, not rebuild the DOM.
+    const ACTIVE_LI_CACHE = new Map();
+    function buildActiveLi(tr) {
+      const cells = tr.children;
+      const codeHtml = cells[0].innerHTML;
+      const hasIcon = cells[1] && cells[1].hasAttribute('data-betza-icon');
+      const iconKey = hasIcon ? cells[1].getAttribute('data-betza-icon') : null;
+      // When there's an icon column, the human label is in cells[2]; otherwise it's cells[1].
+      const nameText = (hasIcon ? cells[2] : cells[1]).textContent;
+      const iconHtml = iconKey
+        ? '<span class="betza-active-icon">' + renderBetzaIconCached(iconKey) + '</span>'
+        : '<span class="betza-active-icon"></span>';
+      const li = document.createElement('li');
+      if (!iconKey) li.classList.add('is-iconless');
+      li.innerHTML =
+        '<span class="betza-active-code">' + codeHtml + '</span>' +
+        iconHtml +
+        '<span class="betza-active-name">' + nameText + '</span>';
+      return li;
+    }
+    const TOKEN_MATCHER_ENTRIES = Object.entries(TOKEN_MATCHERS);
     function updateActive(input) {
       // In t[XY], the second token Y describes the outward direction from
       // the first leap, not a standalone X-piece move. So Y is still listed
@@ -855,7 +911,7 @@
       const nonOutward = input.replace(/t\[([A-Z]\d*)([A-Z]\d*)\]/g, 't[$1]');
       const active = new Set();
       const outwardOnly = new Set();
-      for (const [key, matcher] of Object.entries(TOKEN_MATCHERS)) {
+      for (const [key, matcher] of TOKEN_MATCHER_ENTRIES) {
         if (matcher(input)) {
           active.add(key);
           if (!matcher(nonOutward)) outwardOnly.add(key);
@@ -876,43 +932,48 @@
           }
         }
       }
-      const items = [];
-      document.querySelectorAll('.betza-table tr[data-token]').forEach(tr => {
-        if (active.has(tr.dataset.token)) {
-          tr.classList.add('is-active');
-          items.push(tr);
-        } else {
-          tr.classList.remove('is-active');
-        }
-      });
       const panel = document.getElementById('betza-active');
       const list  = document.getElementById('betza-active-list');
       if (!panel || !list) return;
-      list.innerHTML = '';
-      if (items.length === 0) { panel.hidden = true; return; }
-      panel.hidden = false;
-      for (const tr of items) {
-        const cells = tr.children;
-        const codeHtml = cells[0].innerHTML;
-        const hasIcon = cells[1] && cells[1].hasAttribute('data-betza-icon');
-        const iconKey = hasIcon ? cells[1].getAttribute('data-betza-icon') : null;
-        // When there's an icon column, the human label is in cells[2]; otherwise it's cells[1].
-        const nameText = (hasIcon ? cells[2] : cells[1]).textContent;
-        const iconHtml = iconKey
-          ? '<span class="betza-active-icon" data-betza-icon="' + iconKey + '"></span>'
-          : '<span class="betza-active-icon"></span>';
-        const li = document.createElement('li');
-        if (!iconKey) li.classList.add('is-iconless');
-        li.innerHTML =
-          '<span class="betza-active-code">' + codeHtml + '</span>' +
-          iconHtml +
-          '<span class="betza-active-name">' + nameText + '</span>';
-        list.appendChild(li);
+      // Single pass: toggle the row's is-active class and collect active rows in document order.
+      const activeRows = [];
+      for (const tr of ACTIVE_TOKEN_ROWS) {
+        if (active.has(tr.dataset.token)) {
+          tr.classList.add('is-active');
+          activeRows.push(tr);
+        } else {
+          tr.classList.remove('is-active');
+        }
       }
-      list.querySelectorAll('[data-betza-icon]').forEach(el => {
-        const spec = BETZA_ICONS[el.dataset.betzaIcon];
-        if (spec) el.innerHTML = renderBetzaIcon(spec);
-      });
+      if (activeRows.length === 0) { panel.hidden = true; list.textContent = ''; return; }
+      panel.hidden = false;
+      // Diff the current <li> set against the desired set.
+      // Build the new ordered list of <li> nodes (creating any missing ones via the cache),
+      // then sync by replacing list.children only when the order/membership actually changes.
+      const desired = [];
+      for (const tr of activeRows) {
+        const token = tr.dataset.token;
+        let li = ACTIVE_LI_CACHE.get(token);
+        if (!li) {
+          li = buildActiveLi(tr);
+          ACTIVE_LI_CACHE.set(token, li);
+        }
+        desired.push(li);
+      }
+      // Detach any current children not in desired, then append desired in order.
+      // The browser's appendChild moves existing children, so this is O(n) with no innerHTML churn.
+      const current = list.children;
+      let needsUpdate = current.length !== desired.length;
+      if (!needsUpdate) {
+        for (let i = 0; i < desired.length; i++) {
+          if (current[i] !== desired[i]) { needsUpdate = true; break; }
+        }
+      }
+      if (needsUpdate) {
+        // Remove stragglers, then append the desired sequence (appendChild moves existing nodes).
+        while (list.firstChild) list.removeChild(list.firstChild);
+        for (const li of desired) list.appendChild(li);
+      }
     }
 
     const URL_PARAM = 'b';
@@ -959,54 +1020,46 @@
     renderSandbox();
 
     // Click any reference-table row to append its notation to the input.
+    // Delegate at document level instead of attaching ~30 per-row listeners.
     const INSERT_FOR_TOKEN = {
       n_prefix: 'n',
       rangeSlider: '2',
       explicitLeaper: '(1,2)',
       brackets: '[]',
     };
+    document.addEventListener('click', (ev) => {
+      const tr = ev.target.closest('.betza-table tr[data-token]');
+      if (!tr) return;
+      const token = tr.dataset.token;
+      const insert = INSERT_FOR_TOKEN[token] || token;
+      sandboxInput.value += insert;
+      sandboxInput.focus();
+      renderSandbox();
+    });
+    // One-time a11y setup: make every notation row keyboard-reachable and labelled.
     document.querySelectorAll('.betza-table tr[data-token]').forEach(tr => {
       const token = tr.dataset.token;
       const insert = INSERT_FOR_TOKEN[token] || token;
-      // Make the row keyboard-reachable and announce its interaction model to assistive tech.
       tr.setAttribute('tabindex', '0');
       tr.setAttribute('role', 'button');
       const codeCell = tr.querySelector('code');
       const codeText = codeCell ? codeCell.textContent.trim() : token;
       tr.setAttribute('aria-label', 'Insert ' + insert + ' (' + codeText + ')');
-      const activate = () => {
-        sandboxInput.value += insert;
-        sandboxInput.focus();
-        renderSandbox();
-      };
-      tr.addEventListener('click', activate);
-      tr.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          activate();
-        }
-      });
+    });
+    // Enter/Space on a focused row triggers a synthetic click via the delegated handler.
+    document.addEventListener('keydown', (ev) => {
+      const tr = ev.target.closest('.betza-table tr[data-token]');
+      if (!tr) return;
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        tr.click();
+      }
     });
   }
 
-  // Theme toggle (shared across pages)
-  const themeToggle = document.getElementById('theme-toggle');
-  function setTheme(t) {
-    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-    if (themeToggle) themeToggle.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
-    try { localStorage.setItem('fp-theme', t); } catch (e) {}
-  }
-  themeToggle.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-    setTheme(current === 'dark' ? 'light' : 'dark');
-  });
-  try {
-    const saved = localStorage.getItem('fp-theme');
-    if (saved) setTheme(saved);
-    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-    else setTheme('light');
-  } catch (e) {}
+
   </script>
+  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+  <script src="assets/theme.js"></script>
 </body>
 </html>

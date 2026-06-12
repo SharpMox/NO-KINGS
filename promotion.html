@@ -45,19 +45,6 @@
       --accent: #7ec6ff;
     }
 
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.55;
-      transition: background 0.2s ease, color 0.2s ease;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: var(--accent); }
-    a:hover { text-decoration: underline; }
-
     header {
       max-width: 1280px;
       margin: 0 auto;
@@ -212,15 +199,6 @@
       line-height: 1;
     }
 
-    footer {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 32px 24px 48px;
-      color: var(--text-soft);
-      font-size: 13px;
-      border-top: 1px solid var(--border);
-    }
-
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
       .controls { gap: 8px; }
@@ -230,17 +208,9 @@
       .chain-title { font-size: 10.5px; padding-right: 8px !important; }
       .chains-table { border-spacing: 4px; }
     }
-    .site-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
-    .site-nav-inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
-    .site-nav a { color: var(--text-soft); font-size: 14px; font-weight: 500; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
-    .site-nav a:hover { color: var(--text); text-decoration: none; }
-    .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
-    .site-nav .nav-encyclopedia { margin-left: auto; }
-    .site-nav .theme-toggle { width: 32px; height: 32px; margin-left: 0; }
-    footer p { margin: 0 0 8px 0; }
-    footer p:last-child { margin-bottom: 0; }
-    .footer-page-line { color: var(--text); font-size: 14px; }
   </style>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/board.js"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Site sections">
@@ -708,175 +678,6 @@
     ]
   }
 ];
-
-  /* ============================================================
-   *  Rendering (duplicated from index.html)
-   * ============================================================ */
-  const N = 9;
-  const SQ = 36;
-  const SIZE = N * SQ;
-
-  function svgCenter(x, y) {
-    return { cx: (x + 4) * SQ + SQ / 2, cy: (4 - y) * SQ + SQ / 2 };
-  }
-  function squareRect(x, y) {
-    return { sx: (x + 4) * SQ, sy: (4 - y) * SQ };
-  }
-
-  function describeMoves(piece) {
-    const parts = [];
-    for (const m of piece.moves) {
-      if (m.kind === 'dots')   parts.push(`${m.squares.length} leap targets`);
-      if (m.kind === 'rings')  parts.push(`${m.squares.length} move-only squares`);
-      if (m.kind === 'xs')     parts.push(`${m.squares.length} capture-only squares`);
-      if (m.kind === 'rays')   parts.push(`slides in ${m.dirs.length} directions`);
-      if (m.kind === 'rider')  parts.push('rider continues past the diagram');
-      if (m.kind === 'hop' || m.kind === 'capture-hop') parts.push('hops over a hurdle');
-    }
-    return `${piece.name}: ${parts.join('; ')}.`;
-  }
-
-  function renderBoard(piece) {
-    let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="board" role="img" aria-label="${piece.name} movement diagram">`;
-    svg += `<title>${piece.name} — movement diagram</title>`;
-    svg += `<desc>${describeMoves(piece)} ${piece.description}</desc>`;
-    for (let r = 0; r < N; r++) {
-      for (let c = 0; c < N; c++) {
-        const isLight = (r + c) % 2 === 0;
-        const fill = isLight ? 'var(--sq-light)' : 'var(--sq-dark)';
-        svg += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${fill}"/>`;
-      }
-    }
-    for (const move of piece.moves) svg += renderMove(move);
-    const piecePos = piece.piece_at || [0, 0];
-    const { cx, cy } = svgCenter(piecePos[0], piecePos[1]);
-    if (piece.glyph) {
-      svg += `<text x="${cx}" y="${cy + SQ*0.04}" text-anchor="middle" dominant-baseline="central" font-size="${SQ*0.85}" fill="var(--text)" style="font-family: 'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2',serif;">${piece.glyph}</text>`;
-    } else {
-      const r = SQ * 0.36;
-      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--piece-disc)"/>`;
-      const len = (piece.letter || '?').length;
-      const fontSize = len >= 2 ? SQ*0.30 : (piece.letter && piece.letter.charCodeAt(0) > 0x2E00 ? SQ*0.46 : SQ*0.48);
-      svg += `<text x="${cx}" y="${cy + SQ*0.02}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}" font-weight="700" fill="var(--piece-disc-text)" style="font-family: 'Hiragino Sans','Noto Sans CJK JP',-apple-system,sans-serif;">${piece.letter || ''}</text>`;
-    }
-    svg += `</svg>`;
-    return svg;
-  }
-
-  function renderMove(move) {
-    switch (move.kind) {
-      case 'dots':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="var(--move-color)"/>`;
-        }).join('');
-      case 'rings':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="none" stroke="var(--move-color)" stroke-width="2.5"/>`;
-        }).join('');
-      case 'xs':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          const r = SQ * 0.22;
-          return `<line x1="${cx-r}" y1="${cy-r}" x2="${cx+r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
-                 `<line x1="${cx+r}" y1="${cy-r}" x2="${cx-r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
-        }).join('');
-      case 'rays': {
-        const fromSq = move.from || [0, 0];
-        const maxRange = move.maxRange || Infinity;
-        return move.dirs.map(([dx, dy]) => {
-          let lastX = fromSq[0], lastY = fromSq[1];
-          let stepX = fromSq[0], stepY = fromSq[1];
-          let steps = 0;
-          while (steps < maxRange) {
-            stepX += dx; stepY += dy;
-            if (Math.abs(stepX) > 4 || Math.abs(stepY) > 4) break;
-            lastX = stepX; lastY = stepY;
-            steps++;
-          }
-          if (lastX === fromSq[0] && lastY === fromSq[1]) return '';
-          const start = svgCenter(fromSq[0], fromSq[1]);
-          const end   = svgCenter(lastX, lastY);
-          const angle = Math.atan2(end.cy - start.cy, end.cx - start.cx);
-          const lineStart = {
-            x: start.cx + Math.cos(angle) * SQ * 0.42,
-            y: start.cy + Math.sin(angle) * SQ * 0.42
-          };
-          const tip = { x: end.cx, y: end.cy };
-          const arrowLen = SQ * 0.30;
-          const arrowWidth = SQ * 0.16;
-          const base = { x: tip.x - Math.cos(angle) * arrowLen, y: tip.y - Math.sin(angle) * arrowLen };
-          const perp = { x: -Math.sin(angle) * arrowWidth, y: Math.cos(angle) * arrowWidth };
-          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="var(--ray-color)" stroke-width="3.4" stroke-linecap="round"/>` +
-                 `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="var(--ray-color)"/>`;
-        }).join('');
-      }
-      case 'rider': {
-        const start = svgCenter(0, 0);
-        const points = [{ cx: start.cx, cy: start.cy }, ...move.dots.map(([x, y]) => svgCenter(x, y))];
-        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
-        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.65"/>`;
-        const dots = move.dots.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
-        }).join('');
-        const lastP = points[points.length - 1];
-        const p2 = points[points.length - 2] || start;
-        const dxx = lastP.cx - p2.cx;
-        const dyy = lastP.cy - p2.cy;
-        const len = Math.hypot(dxx, dyy) || 1;
-        const dirX = dxx / len, dirY = dyy / len;
-        const tipX = lastP.cx + dirX * SQ * 0.40;
-        const tipY = lastP.cy + dirY * SQ * 0.40;
-        let arrow = '';
-        if (tipX >= 4 && tipX <= SIZE - 4 && tipY >= 4 && tipY <= SIZE - 4) {
-          const arrowLen = SQ * 0.22;
-          const arrowWidth = SQ * 0.13;
-          const baseX = tipX - dirX * arrowLen;
-          const baseY = tipY - dirY * arrowLen;
-          const perpX = -dirY * arrowWidth;
-          const perpY = dirX * arrowWidth;
-          arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--rider-color)" opacity="0.85"/>`;
-        }
-        return line + dots + arrow;
-      }
-      case 'hop': {
-        const start = svgCenter(0, 0);
-        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
-        const t = svgCenter(move.target[0], move.target[1]);
-        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
-        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
-        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
-        const r = SQ * 0.24;
-        const target = `<polygon points="${t.cx},${t.cy-r} ${t.cx+r},${t.cy} ${t.cx},${t.cy+r} ${t.cx-r},${t.cy}" fill="var(--hop-target)"/>`;
-        return path + hurdleRect + target;
-      }
-      case 'capture-hop': {
-        const start = svgCenter(0, 0);
-        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
-        const t = svgCenter(move.target[0], move.target[1]);
-        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--capture-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
-        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
-        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
-        const r = SQ * 0.22;
-        const xMark = `<line x1="${t.cx-r}" y1="${t.cy-r}" x2="${t.cx+r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
-                      `<line x1="${t.cx+r}" y1="${t.cy-r}" x2="${t.cx-r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
-        return path + hurdleRect + xMark;
-      }
-      case 'move-hop': {
-        const start = svgCenter(0, 0);
-        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
-        const t = svgCenter(move.target[0], move.target[1]);
-        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
-        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
-        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
-        const target = `<circle cx="${t.cx}" cy="${t.cy}" r="${SQ*0.22}" fill="none" stroke="var(--hop-target)" stroke-width="2.5"/>`;
-        return path + hurdleRect + target;
-      }
-      default: return '';
-    }
-  }
 
   /* ============================================================
    *  Chain rendering

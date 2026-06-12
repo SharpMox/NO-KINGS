@@ -454,7 +454,12 @@
         if (close === -1) return { ok: false, error: "Unclosed '[' after 't'" };
         const inner = str.slice(i+2, close);
         if (inner.length < 2) return { ok: false, error: "t[X..] needs at least 2 letters" };
-        const stepLetter = inner[0], slideLetter = inner[1];
+        // Inner must be exactly [step-letter][opt digits][slide-letter][opt digits].
+        // Without this, t[FRR], t[FRX], t[FR3] silently parsed as t[FR] and dropped
+        // the trailing character, while updateActive's tail-strip regex saw a
+        // different shape — keep parser and active-panel in sync by rejecting.
+        if (!/^[A-Z]\d*[A-Z]\d*$/.test(inner)) return { ok: false, error: "t[XY] inner must be one atomic + one slider letter (each optionally followed by a range)" };
+        const stepLetter = inner[0], slideLetter = inner.match(/^[A-Z]\d*([A-Z])/)[1];
         if (!ATOMIC_OFFSETS[stepLetter]) return { ok: false, error: "Step in t[X..] must be an atomic letter (W/F/D/A/N/C/Z/H/G)" };
         const slideDirs = SLIDER_DIRS[slideLetter];
         if (!slideDirs) return { ok: false, error: "Outward in t[..Y] must be R/B/Q" };

@@ -4,32 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fairy Chess — Inversions</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/board.js"></script>
   <style>
-    :root {
-      --bg: #eef0f3; --surface: #ffffff; --text: #161a20; --text-soft: #5b6573;
-      --border: #d8dce3; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
-      --sq-light: #d8dce3; --sq-dark: #8c95a3;
-      --piece-disc: #161a20; --piece-disc-text: #ffffff;
-      --move-color: #2e7bd6; --capture-color: #c84545;
-      --hurdle-color: #8a4ea8; --hop-target: #2da06b;
-      --ray-color: #3a7ec4; --rider-color: #da802a; --accent: #2659a8;
-    }
-    [data-theme="dark"] {
-      --bg: #0f1a2e; --surface: #18243d; --text: #dce4f0; --text-soft: #7a8aa0;
-      --border: #2a3a55; --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
-      --sq-light: #3a4a68; --sq-dark: #1e2a44;
-      --piece-disc: #dce4f0; --piece-disc-text: #0f1a2e;
-      --move-color: #6ab1ff; --capture-color: #ff7878;
-      --hurdle-color: #c890e8; --hop-target: #6dd6a8;
-      --ray-color: #6ab1ff; --rider-color: #ffae5c; --accent: #7ec6ff;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg); color: var(--text); line-height: 1.55;
-      transition: background 0.2s ease, color 0.2s ease; -webkit-font-smoothing: antialiased; }
-    a { color: var(--accent); }
-    a:hover { text-decoration: underline; }
     header { max-width: 1280px; margin: 0 auto; padding: 32px 24px 16px; }
     h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
     .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
@@ -73,20 +50,6 @@
 
     .unaffected-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 8px 0; }
     .unaffected-note { color: var(--text-soft); font-size: 14px; max-width: 760px; margin: 0 0 20px 0; }
-
-    footer { max-width: 1280px; margin: 0 auto; padding: 32px 24px 48px;
-      color: var(--text-soft); font-size: 13px; border-top: 1px solid var(--border); }
-
-    .site-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
-    .site-nav-inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
-    .site-nav a { color: var(--text-soft); font-size: 14px; font-weight: 500; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
-    .site-nav a:hover { color: var(--text); text-decoration: none; }
-    .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
-    .site-nav .nav-encyclopedia { margin-left: auto; }
-    .site-nav .theme-toggle { width: 32px; height: 32px; margin-left: 0; }
-    footer p { margin: 0 0 8px 0; }
-    footer p:last-child { margin-bottom: 0; }
-    .footer-page-line { color: var(--text); font-size: 14px; }
 
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
@@ -157,7 +120,7 @@
       behaviors: ['direction-restricted', 'promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[0,1],[0,2]] },
-        { kind: 'xs',    squares: [[1,1],[-1,1]] }
+        { kind: 'xs', squares: [[1,1],[-1,1]] }
       ]
     },
     {
@@ -172,7 +135,7 @@
       behaviors: ['capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,0],[-1,0],[0,1],[0,-1]] },
-        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+        { kind: 'xs', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
       ]
     },
     {
@@ -187,7 +150,7 @@
       behaviors: ['promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]] },
-        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+        { kind: 'xs', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
       ]
     },
     {
@@ -287,10 +250,7 @@
       description: 'Combines Ferz (1,1) and Dabbaba (2,0) — four diagonal one-step plus four orthogonal two-square leaps. Colour-bound, since both components preserve square colour. Appears in Chu Shōgi.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,1],[-1,1],[1,-1],[-1,-1],
-          [2,0],[-2,0],[0,2],[0,-2]
-        ] }
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]] }
       ]
     },
     {
@@ -304,10 +264,7 @@
       description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,1],[-1,1],[1,-1],[-1,-1],
-          [2,2],[-2,2],[2,-2],[-2,-2]
-        ] }
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2]] }
       ]
     },
     {
@@ -321,10 +278,7 @@
       description: 'Combines Wazir (1,0) and Dabbaba (2,0) — leaps one or exactly two squares orthogonally. Eight reachable squares, all on ranks and files.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,0],[-1,0],[0,1],[0,-1],
-          [2,0],[-2,0],[0,2],[0,-2]
-        ] }
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]] }
       ]
     },
     {
@@ -365,14 +319,10 @@
       letter: 'Ki+',
       betza: 'FDC',
       origin: 'Invented',
-      description: 'Promoted form of the Kirin. Adds the Camel (1,3) L-leap to the Kirin\'s Ferz and Dabbaba moves — sixteen reachable squares. Stays fully colour-bound.',
+      description: 'Promoted form of the Kirin. Adds the Camel (1,3) L-leap to the Kirin\'s Ferz and Dabbaba moves — sixteen reachable squares. Stays fully colour-bound: every component has an even dx+dy (1+1, 2+0, 1+3), so the piece never changes square colour.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,1],[-1,1],[1,-1],[-1,-1],
-          [2,0],[-2,0],[0,2],[0,-2],
-          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1]
-        ] }
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2],[1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1]] }
       ]
     },
     {
@@ -386,11 +336,7 @@
       description: 'Combines Wazir (1,0), Alfil (2,2), and Dabbaba (2,0) — 12 reachable squares: a one-step orthogonal "ring" plus all eight squares of the second ring at corner and edge positions. One of the two new pieces in Omega Chess.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,0],[-1,0],[0,1],[0,-1],
-          [2,2],[-2,2],[2,-2],[-2,-2],
-          [2,0],[-2,0],[0,2],[0,-2]
-        ] }
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
       ]
     },
     {
@@ -404,11 +350,7 @@
       description: 'Combines the Ferz (1,1), Alfil (2,2), and Knight (1,2) leaps — 16 reachable squares at short range. Not colour-bound, because the Knight component breaks the otherwise diagonal palette.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,1],[-1,1],[1,-1],[-1,-1],
-          [2,2],[-2,2],[2,-2],[-2,-2],
-          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
-        ] }
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2],[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
       ]
     },
     {
@@ -422,11 +364,7 @@
       description: 'Combines Knight (1,2), Alfil (2,2), and Dabbaba (2,0) leaps. Reaches every square exactly two squares away from the piece (the full "second ring" at Chebyshev distance 2) — 16 squares in total: eight knight-leap targets, four diagonal corners, and four orthogonal edge-midpoints.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
-          [2,2],[-2,2],[2,-2],[-2,-2],
-          [2,0],[-2,0],[0,2],[0,-2]
-        ] }
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
       ]
     },
     {
@@ -441,12 +379,12 @@
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
-        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
-        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
-        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
-        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
-        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
-        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
         { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
         { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
       ]
@@ -463,12 +401,12 @@
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
-        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
-        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
-        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
-        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
-        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
-        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
         { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
         { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
       ]
@@ -481,17 +419,10 @@
       letter: 'Ki++',
       betza: 'FADCG + 4L',
       origin: 'Invented',
-      description: 'Final form of the Kirin promotion chain. Twenty-eight leap targets — F, A, D, C, G, 4L. Every component is colour-bound.',
+      description: 'Final form of the Kirin promotion chain. Twenty-eight leap targets: Ferz (1,1), Alfil (2,2), Dabbaba (2,0), Camel (1,3), Tripper (3,3), and Fourleaper (4,0). Every component is colour-bound.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,1],[-1,1],[1,-1],[-1,-1],
-          [2,2],[-2,2],[2,-2],[-2,-2],
-          [2,0],[-2,0],[0,2],[0,-2],
-          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1],
-          [3,3],[-3,3],[3,-3],[-3,-3],
-          [4,0],[-4,0],[0,4],[0,-4]
-        ] }
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2],[1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1],[3,3],[-3,3],[3,-3],[-3,-3],[4,0],[-4,0],[0,4],[0,-4]] }
       ]
     },
     {
@@ -505,14 +436,14 @@
       description: 'A bent slider: takes one diagonal step (Ferz), then continues as a Rook outwards — moving orthogonally away from its starting square. The pivot square is itself a valid stopping square. Originated in Grant Acedrex, the 13th-century Castilian variant.',
       behaviors: ['long-range'],
       moves: [
-        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
-        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
-        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
-        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
-        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
-        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
-        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
-        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] }
+        { kind: 'bent-rider', pivot: [1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [1,1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [-1,0] }
       ]
     },
     {
@@ -526,14 +457,14 @@
       description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Gryphon. Pivot square is itself a valid stopping square.',
       behaviors: ['long-range'],
       moves: [
-        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
-        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
-        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
-        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
-        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
-        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
-        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
-        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+        { kind: 'bent-rider', pivot: [0,1], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,-1] }
       ]
     },
     {
@@ -548,7 +479,7 @@
       behaviors: ['direction-restricted', 'promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,1],[-1,1],[2,2],[-2,2]] },
-        { kind: 'xs',    squares: [[0,1]] }
+        { kind: 'xs', squares: [[0,1]] }
       ]
     },
     {
@@ -606,12 +537,12 @@
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
-        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
-        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
-        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
-        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
-        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
-        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
         { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
         { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
       ]
@@ -628,10 +559,7 @@
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
-        { kind: 'dots', squares: [
-          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
-          [1,0],[-1,0],[0,1],[0,-1]
-        ] }
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],[1,0],[-1,0],[0,1],[0,-1]] }
       ]
     },
     {
@@ -645,10 +573,7 @@
       description: 'Combines the Alfil (2,2) and Dabbaba (2,0) leaps into a single piece — eight reachable squares forming the "second ring" along ranks, files, and diagonals. The single-leap counterpart of the Alibabarider. Heavily colour-bound, since both components preserve square colour.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
-        { kind: 'dots', squares: [
-          [2,2],[-2,2],[2,-2],[-2,-2],
-          [2,0],[-2,0],[0,2],[0,-2]
-        ] }
+        { kind: 'dots', squares: [[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
       ]
     },
     {
@@ -676,10 +601,7 @@
       description: 'Combines the Knight (1,2) and Camel (1,3) leaps — 16 reachable squares, all at short range.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
-          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]
-        ] }
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],[1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]] }
       ]
     },
     {
@@ -693,11 +615,7 @@
       description: 'Camel + Zebra + Knight fused — 24 reachable squares. The largest of the standard short-range leaper compounds.',
       behaviors: ['compound', 'leaper'],
       moves: [
-        { kind: 'dots', squares: [
-          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1],
-          [2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2],
-          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
-        ] }
+        { kind: 'dots', squares: [[1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1],[2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2],[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
       ]
     },
     {
@@ -711,391 +629,81 @@
       description: 'A double bent-rider that combines the Gryphon (Ferz + outward Rook) and the Manticore (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Gryphon-style (diagonal pivot, orthogonal slide) and eight Manticore-style (orthogonal pivot, diagonal slide).',
       behaviors: ['compound', 'long-range'],
       moves: [
-        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
-        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
-        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
-        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
-        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
-        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
-        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
-        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] },
-        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
-        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
-        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
-        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
-        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
-        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
-        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
-        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+        { kind: 'bent-rider', pivot: [1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [1,1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,-1] }
       ]
     },
     {
-          "id": "inv-sergeant",
-          "family": "pawn-like",
-          "name": "Void Ranger",
-          "aliases": [],
-          "letter": "iSg",
-          "betza": "mFcW",
-          "origin": "Invented (inversion)",
-          "behaviors": [
-                "pawn-like",
-                "color-bound"
-          ],
-          "description": "Inversion of the Sergeant: swap the move-direction set (Wazir) with the capture-direction set (Ferz). Moves one diagonal step in any direction; captures one orthogonal step in any direction.",
-          "moves": [
-                {
-                      "kind": "rings",
-                      "squares": [
-                            [
-                                  1,
-                                  1
-                            ],
-                            [
-                                  -1,
-                                  1
-                            ],
-                            [
-                                  1,
-                                  -1
-                            ],
-                            [
-                                  -1,
-                                  -1
-                            ]
-                      ]
-                },
-                {
-                      "kind": "xs",
-                      "squares": [
-                            [
-                                  1,
-                                  0
-                            ],
-                            [
-                                  -1,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  1
-                            ],
-                            [
-                                  0,
-                                  -1
-                            ]
-                      ]
-                }
-          ]
+      id: 'inv-sergeant',
+      family: 'pawn-like',
+      name: 'Void Ranger',
+      aliases: [],
+      letter: 'iSg',
+      betza: 'mFcW',
+      origin: 'Invented',
+      description: 'Inversion of the Sergeant (mWcF): swap the move-direction set with the capture-direction set, then apply ortho ↔ diag rotation. Moves one diagonal step (Ferz, move-only) and captures one orthogonal step (Wazir, capture-only).',
+      behaviors: ['pawn-like', 'color-bound'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'xs', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
     },
     {
-          "id": "inv-arrow-pawn",
-          "family": "pawn-like",
-          "name": "Void Archer",
-          "aliases": [],
-          "letter": "iAP",
-          "betza": "mF2cW",
-          "origin": "Invented (inversion)",
-          "behaviors": [
-                "pawn-like",
-                "color-bound"
-          ],
-          "description": "Inversion of the Arrow Pawn: moves 1 or 2 diagonal squares (move-only Bishop, capped at 2); captures one orthogonal step.",
-          "moves": [
-                {
-                      "kind": "rings",
-                      "squares": [
-                            [
-                                  1,
-                                  1
-                            ],
-                            [
-                                  -1,
-                                  1
-                            ],
-                            [
-                                  1,
-                                  -1
-                            ],
-                            [
-                                  -1,
-                                  -1
-                            ],
-                            [
-                                  2,
-                                  2
-                            ],
-                            [
-                                  -2,
-                                  2
-                            ],
-                            [
-                                  2,
-                                  -2
-                            ],
-                            [
-                                  -2,
-                                  -2
-                            ]
-                      ]
-                },
-                {
-                      "kind": "xs",
-                      "squares": [
-                            [
-                                  1,
-                                  0
-                            ],
-                            [
-                                  -1,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  1
-                            ],
-                            [
-                                  0,
-                                  -1
-                            ]
-                      ]
-                }
-          ]
+      id: 'inv-arrow-pawn',
+      family: 'pawn-like',
+      name: 'Void Archer',
+      aliases: [],
+      letter: 'iAP',
+      betza: 'mF2cW',
+      origin: 'Invented',
+      description: 'Inversion of the Arrow Pawn (mW2cF). Moves one or two diagonal squares (move-only Bishop capped at 2) and captures one orthogonal step.',
+      behaviors: ['pawn-like', 'color-bound'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2]] },
+        { kind: 'xs', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
     },
     {
-          "id": "inv-kirin-plus",
-          "family": "leapers",
-          "name": "Void Kirin",
-          "aliases": [],
-          "letter": "iKi+",
-          "betza": "WNH",
-          "origin": "Invented (inversion)",
-          "behaviors": [
-                "compound",
-                "leaper",
-                "color-changing"
-          ],
-          "description": "Inversion of Kirin+ (FDC). Strictly colour-changing — every destination is on the opposite square colour. Combines Wazir (1,0) at the closest ring, Knight (1,2) inside, and Threeleaper (3,0) as the four diamond-point cardinal leaps. 16 leap targets forming a lozenge silhouette.",
-          "moves": [
-                {
-                      "kind": "dots",
-                      "squares": [
-                            [
-                                  1,
-                                  0
-                            ],
-                            [
-                                  -1,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  1
-                            ],
-                            [
-                                  0,
-                                  -1
-                            ],
-                            [
-                                  1,
-                                  2
-                            ],
-                            [
-                                  -1,
-                                  2
-                            ],
-                            [
-                                  1,
-                                  -2
-                            ],
-                            [
-                                  -1,
-                                  -2
-                            ],
-                            [
-                                  2,
-                                  1
-                            ],
-                            [
-                                  -2,
-                                  1
-                            ],
-                            [
-                                  2,
-                                  -1
-                            ],
-                            [
-                                  -2,
-                                  -1
-                            ],
-                            [
-                                  3,
-                                  0
-                            ],
-                            [
-                                  -3,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  3
-                            ],
-                            [
-                                  0,
-                                  -3
-                            ]
-                      ]
-                }
-          ]
+      id: 'inv-kirin-plus',
+      family: 'leapers',
+      name: 'Void Kirin',
+      aliases: [],
+      letter: 'iKi+',
+      betza: 'WNH',
+      origin: 'Invented',
+      description: 'Inversion of Kirin+ (FDC). Strictly colour-changing — every destination has the opposite square colour from the start. Combines Wazir (1,0) at the closest ring, Knight (1,2) inside, and Threeleaper (3,0) as the four diamond-point cardinal leaps.',
+      behaviors: ['compound', 'leaper', 'color-changing'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[1,2],[-1,2],[1,-2],[-1,-2],[2,1],[-2,1],[2,-1],[-2,-1],[3,0],[-3,0],[0,3],[0,-3]] }
+      ]
     },
     {
-          "id": "inv-kirin-plus-plus",
-          "family": "leapers",
-          "name": "Void Celestial Kirin",
-          "aliases": [],
-          "letter": "iKi++",
-          "betza": "WNH + Giraffe + Zebra",
-          "origin": "Invented (inversion)",
-          "behaviors": [
-                "compound",
-                "leaper",
-                "color-changing"
-          ],
-          "description": "Extends Inv Kirin+ (W + N + H) outward with two more colour-changing rings: Giraffe (1,4) near the outer cardinal extremes, and Zebra (2,3) filling the gaps between H and Giraffe. All 32 leap targets are strictly colour-changing — every dx+dy is odd. Forms a fully filled lozenge silhouette.",
-          "moves": [
-                {
-                      "kind": "dots",
-                      "squares": [
-                            [
-                                  1,
-                                  0
-                            ],
-                            [
-                                  -1,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  1
-                            ],
-                            [
-                                  0,
-                                  -1
-                            ],
-                            [
-                                  1,
-                                  2
-                            ],
-                            [
-                                  -1,
-                                  2
-                            ],
-                            [
-                                  1,
-                                  -2
-                            ],
-                            [
-                                  -1,
-                                  -2
-                            ],
-                            [
-                                  2,
-                                  1
-                            ],
-                            [
-                                  -2,
-                                  1
-                            ],
-                            [
-                                  2,
-                                  -1
-                            ],
-                            [
-                                  -2,
-                                  -1
-                            ],
-                            [
-                                  3,
-                                  0
-                            ],
-                            [
-                                  -3,
-                                  0
-                            ],
-                            [
-                                  0,
-                                  3
-                            ],
-                            [
-                                  0,
-                                  -3
-                            ],
-                            [
-                                  1,
-                                  4
-                            ],
-                            [
-                                  4,
-                                  1
-                            ],
-                            [
-                                  -1,
-                                  4
-                            ],
-                            [
-                                  -4,
-                                  1
-                            ],
-                            [
-                                  1,
-                                  -4
-                            ],
-                            [
-                                  4,
-                                  -1
-                            ],
-                            [
-                                  -1,
-                                  -4
-                            ],
-                            [
-                                  -4,
-                                  -1
-                            ],
-                            [
-                                  2,
-                                  3
-                            ],
-                            [
-                                  3,
-                                  2
-                            ],
-                            [
-                                  -2,
-                                  3
-                            ],
-                            [
-                                  -3,
-                                  2
-                            ],
-                            [
-                                  2,
-                                  -3
-                            ],
-                            [
-                                  3,
-                                  -2
-                            ],
-                            [
-                                  -2,
-                                  -3
-                            ],
-                            [
-                                  -3,
-                                  -2
-                            ]
-                      ]
-                }
-          ]
+      id: 'inv-kirin-plus-plus',
+      family: 'leapers',
+      name: 'Void Celestial Kirin',
+      aliases: [],
+      letter: 'iKi++',
+      betza: 'WNH + Giraffe + Zebra',
+      origin: 'Invented',
+      description: 'Extends Inv Kirin+ outward with two more colour-changing rings: Giraffe (1,4) near the outer cardinal extremes, and Zebra (2,3) filling the gaps between H and Giraffe. All 32 leap targets are strictly colour-changing.',
+      behaviors: ['compound', 'leaper', 'color-changing'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[1,2],[-1,2],[1,-2],[-1,-2],[2,1],[-2,1],[2,-1],[-2,-1],[3,0],[-3,0],[0,3],[0,-3],[1,4],[-1,4],[1,-4],[-1,-4],[4,1],[-4,1],[4,-1],[-4,-1],[2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2]] }
+      ]
     }
   ];
   const INVERSIONS = [
@@ -1157,156 +765,9 @@
   }
 ];
 
-  const N = 9;
-  const SQ = 36;
-  const SIZE = N * SQ;
-
-  function svgCenter(x, y) {
-    return { cx: (x + 4) * SQ + SQ / 2, cy: (4 - y) * SQ + SQ / 2 };
-  }
-  function describeMoves(piece) {
-    const parts = [];
-    for (const m of piece.moves) {
-      if (m.kind === 'dots')   parts.push(`${m.squares.length} leap targets`);
-      if (m.kind === 'rings')  parts.push(`${m.squares.length} move-only squares`);
-      if (m.kind === 'xs')     parts.push(`${m.squares.length} capture-only squares`);
-      if (m.kind === 'rays')   parts.push(`slides in ${m.dirs.length} directions`);
-      if (m.kind === 'rider')  parts.push('rider continues past the diagram');
-      if (m.kind === 'hop' || m.kind === 'capture-hop') parts.push('hops over a hurdle');
-    }
-    return `${piece.name}: ${parts.join('; ')}.`;
-  }
-  function renderBoard(piece) {
-    let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="board" role="img" aria-label="${piece.name} movement diagram">`;
-    svg += `<title>${piece.name} — movement diagram</title>`;
-    svg += `<desc>${describeMoves(piece)} ${piece.description}</desc>`;
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-      const isLight = (r + c) % 2 === 0;
-      const fill = isLight ? 'var(--sq-light)' : 'var(--sq-dark)';
-      svg += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${fill}"/>`;
-    }
-    for (const move of piece.moves) svg += renderMove(move);
-    const piecePos = piece.piece_at || [0, 0];
-    const { cx, cy } = svgCenter(piecePos[0], piecePos[1]);
-    if (piece.glyph) {
-      svg += `<text x="${cx}" y="${cy + SQ*0.04}" text-anchor="middle" dominant-baseline="central" font-size="${SQ*0.85}" fill="var(--text)" style="font-family: 'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2',serif;">${piece.glyph}</text>`;
-    } else {
-      const r = SQ * 0.36;
-      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--piece-disc)"/>`;
-      const len = (piece.letter || '?').length;
-      const fontSize = len >= 3 ? SQ*0.22 : (len >= 2 ? SQ*0.30 : SQ*0.48);
-      svg += `<text x="${cx}" y="${cy + SQ*0.02}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}" font-weight="700" fill="var(--piece-disc-text)" style="font-family: -apple-system,sans-serif;">${piece.letter || ''}</text>`;
-    }
-    svg += `</svg>`;
-    return svg;
-  }
-  function renderMove(move) {
-    switch (move.kind) {
-      case 'dots':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="var(--move-color)"/>`;
-        }).join('');
-      case 'rings':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="none" stroke="var(--move-color)" stroke-width="2.5"/>`;
-        }).join('');
-      case 'xs':
-        return move.squares.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          const r = SQ * 0.22;
-          return `<line x1="${cx-r}" y1="${cy-r}" x2="${cx+r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
-                 `<line x1="${cx+r}" y1="${cy-r}" x2="${cx-r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
-        }).join('');
-      case 'rays': {
-        const fromSq = move.from || [0, 0];
-        const maxRange = move.maxRange || Infinity;
-        return move.dirs.map(([dx, dy]) => {
-          let lastX = fromSq[0], lastY = fromSq[1];
-          let stepX = fromSq[0], stepY = fromSq[1];
-          let steps = 0;
-          while (steps < maxRange) {
-            stepX += dx; stepY += dy;
-            if (Math.abs(stepX) > 4 || Math.abs(stepY) > 4) break;
-            lastX = stepX; lastY = stepY;
-            steps++;
-          }
-          if (lastX === fromSq[0] && lastY === fromSq[1]) return '';
-          const start = svgCenter(fromSq[0], fromSq[1]);
-          const end   = svgCenter(lastX, lastY);
-          const angle = Math.atan2(end.cy - start.cy, end.cx - start.cx);
-          const lineStart = { x: start.cx + Math.cos(angle) * SQ * 0.42, y: start.cy + Math.sin(angle) * SQ * 0.42 };
-          const tip = { x: end.cx, y: end.cy };
-          const arrowLen = SQ * 0.30, arrowWidth = SQ * 0.16;
-          const base = { x: tip.x - Math.cos(angle) * arrowLen, y: tip.y - Math.sin(angle) * arrowLen };
-          const perp = { x: -Math.sin(angle) * arrowWidth, y: Math.cos(angle) * arrowWidth };
-          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="var(--ray-color)" stroke-width="3.4" stroke-linecap="round"/>` +
-                 `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="var(--ray-color)"/>`;
-        }).join('');
-      }
-      case 'rider': {
-        const start = svgCenter(0, 0);
-        const points = [{ cx: start.cx, cy: start.cy }, ...move.dots.map(([x, y]) => svgCenter(x, y))];
-        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
-        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.65"/>`;
-        const dots = move.dots.map(([x, y]) => {
-          const { cx, cy } = svgCenter(x, y);
-          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
-        }).join('');
-        const lastP = points[points.length - 1];
-        const p2 = points[points.length - 2] || start;
-        const dxx = lastP.cx - p2.cx;
-        const dyy = lastP.cy - p2.cy;
-        const len = Math.hypot(dxx, dyy) || 1;
-        const dirX = dxx / len, dirY = dyy / len;
-        const tipX = lastP.cx + dirX * SQ * 0.40;
-        const tipY = lastP.cy + dirY * SQ * 0.40;
-        let arrow = '';
-        if (tipX >= 4 && tipX <= SIZE - 4 && tipY >= 4 && tipY <= SIZE - 4) {
-          const arrowLen = SQ * 0.22;
-          const arrowWidth = SQ * 0.13;
-          const baseX = tipX - dirX * arrowLen;
-          const baseY = tipY - dirY * arrowLen;
-          const perpX = -dirY * arrowWidth;
-          const perpY = dirX * arrowWidth;
-          arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--rider-color)" opacity="0.85"/>`;
-        }
-        return line + dots + arrow;
-      }
-      case 'bent-rider': {
-        const start = svgCenter(0, 0);
-        const pivotC = svgCenter(move.pivot[0], move.pivot[1]);
-        const [bdx, bdy] = move.dir;
-        let lastX = move.pivot[0], lastY = move.pivot[1];
-        while (true) {
-          const nx = lastX + bdx, ny = lastY + bdy;
-          if (Math.abs(nx) > 4 || Math.abs(ny) > 4) break;
-          lastX = nx; lastY = ny;
-        }
-        const leapAngle = Math.atan2(pivotC.cy - start.cy, pivotC.cx - start.cx);
-        const leapStart = { x: start.cx + Math.cos(leapAngle) * SQ * 0.42, y: start.cy + Math.sin(leapAngle) * SQ * 0.42 };
-        const leapLine = `<line x1="${leapStart.x}" y1="${leapStart.y}" x2="${pivotC.cx}" y2="${pivotC.cy}" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round" opacity="0.85"/>`;
-        if (lastX === move.pivot[0] && lastY === move.pivot[1]) {
-          const dot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.18}" fill="var(--ray-color)"/>`;
-          return leapLine + dot;
-        }
-        const endC = svgCenter(lastX, lastY);
-        const slideAngle = Math.atan2(endC.cy - pivotC.cy, endC.cx - pivotC.cx);
-        const arrowLen = SQ * 0.28, arrowWidth = SQ * 0.14;
-        const tipX = endC.cx, tipY = endC.cy;
-        const baseX = tipX - Math.cos(slideAngle) * arrowLen;
-        const baseY = tipY - Math.sin(slideAngle) * arrowLen;
-        const perpX = -Math.sin(slideAngle) * arrowWidth;
-        const perpY =  Math.cos(slideAngle) * arrowWidth;
-        const slideLine = `<line x1="${pivotC.cx}" y1="${pivotC.cy}" x2="${baseX}" y2="${baseY}" stroke="var(--ray-color)" stroke-width="2.8" stroke-linecap="round"/>`;
-        const arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
-        const pivotDot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.10}" fill="var(--ray-color)"/>`;
-        return leapLine + pivotDot + slideLine + arrow;
-      }
-      default: return '';
-    }
-  }
+  /* ============================================================
+   *  Inversion rendering (renderBoard/renderMove live in assets/board.js)
+   * ============================================================ */
 
   function renderMiniCard(piece, invented) {
     const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox">${piece.betza}</a>` : '';

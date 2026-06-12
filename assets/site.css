@@ -1,0 +1,86 @@
+/* ============================================================
+ *  site.css — shared baseline used by every NO-KINGS page.
+ *  Contains the palette (light + dark), base typography, the
+ *  sticky site navigation, the theme toggle and the footer.
+ *
+ *  Page-specific styles (card grids, fusion/inversion tables,
+ *  betza sandbox, etc.) stay inline on each page so the live
+ *  page can be edited without round-tripping through this file.
+ * ============================================================ */
+
+/* ============== Theme ============== */
+:root {
+  --bg: #eef0f3;
+  --surface: #ffffff;
+  --text: #161a20;
+  --text-soft: #5b6573;
+  --border: #d8dce3;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
+  --sq-light: #d8dce3;
+  --sq-dark: #8c95a3;
+  --piece-disc: #161a20;
+  --piece-disc-text: #ffffff;
+  --move-color: #2e7bd6;
+  --capture-color: #c84545;
+  --hurdle-color: #8a4ea8;
+  --hop-target: #2da06b;
+  --ray-color: #3a7ec4;
+  --rider-color: #da802a;
+  --accent: #2659a8;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1a2e;
+  --surface: #18243d;
+  --text: #dce4f0;
+  --text-soft: #7a8aa0;
+  --border: #2a3a55;
+  --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
+  --sq-light: #3a4a68;
+  --sq-dark: #1e2a44;
+  --piece-disc: #dce4f0;
+  --piece-disc-text: #0f1a2e;
+  --move-color: #6ab1ff;
+  --capture-color: #ff7878;
+  --hurdle-color: #c890e8;
+  --hop-target: #6dd6a8;
+  --ray-color: #6ab1ff;
+  --rider-color: #ffae5c;
+  --accent: #7ec6ff;
+}
+
+/* ============== Base ============== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  transition: background 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+a:hover { text-decoration: underline; }
+
+/* ============== Site nav (shared across every page) ============== */
+.site-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.site-nav-inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+.site-nav a { color: var(--text-soft); font-size: 14px; font-weight: 500; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
+.site-nav a:hover { color: var(--text); text-decoration: none; }
+.site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+.site-nav .nav-encyclopedia { margin-left: auto; }
+.site-nav .theme-toggle { width: 32px; height: 32px; margin-left: 0; }
+
+/* ============== Footer ============== */
+footer {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  color: var(--text-soft);
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+footer p { margin: 0 0 8px 0; }
+footer p:last-child { margin-bottom: 0; }
+.footer-page-line { color: var(--text); font-size: 14px; }

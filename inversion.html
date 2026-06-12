@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fairy Chess — Inversions</title>
+  <style>
+    :root {
+      --bg: #eef0f3; --surface: #ffffff; --text: #161a20; --text-soft: #5b6573;
+      --border: #d8dce3; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
+      --sq-light: #d8dce3; --sq-dark: #8c95a3;
+      --piece-disc: #161a20; --piece-disc-text: #ffffff;
+      --move-color: #2e7bd6; --capture-color: #c84545;
+      --hurdle-color: #8a4ea8; --hop-target: #2da06b;
+      --ray-color: #3a7ec4; --rider-color: #da802a; --accent: #2659a8;
+    }
+    [data-theme="dark"] {
+      --bg: #0f1a2e; --surface: #18243d; --text: #dce4f0; --text-soft: #7a8aa0;
+      --border: #2a3a55; --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
+      --sq-light: #3a4a68; --sq-dark: #1e2a44;
+      --piece-disc: #dce4f0; --piece-disc-text: #0f1a2e;
+      --move-color: #6ab1ff; --capture-color: #ff7878;
+      --hurdle-color: #c890e8; --hop-target: #6dd6a8;
+      --ray-color: #6ab1ff; --rider-color: #ffae5c; --accent: #7ec6ff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.55;
+      transition: background 0.2s ease, color 0.2s ease; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); }
+    a:hover { text-decoration: underline; }
+    header { max-width: 1280px; margin: 0 auto; padding: 32px 24px 16px; }
+    h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+    .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
+    .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+    .back-link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+      color: var(--accent); font-weight: 500; font-size: 14px; padding: 8px 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+    .back-link:hover { text-decoration: none; border-color: var(--accent); }
+    .theme-toggle { appearance: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; width: 38px; height: 38px; cursor: pointer; color: var(--text);
+      display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
+    .theme-toggle:hover { color: var(--accent); }
+
+    main { max-width: 1280px; margin: 0 auto; padding: 0 24px 64px; }
+    .inversion-table { border-collapse: separate; border-spacing: 8px; width: 100%; }
+    .inversion-table td { vertical-align: middle; padding: 0; }
+    .inversion-table tbody td { padding-top: 48px; }
+    .inversion-table tbody tr:first-child td { padding-top: 0; }
+    .inversion-op { text-align: center; font-size: 32px; color: var(--text-soft); font-weight: 300; width: 1%; user-select: none; }
+
+    .mini-card { display: flex; flex-direction: column; align-items: center; gap: 6px;
+      width: 280px; padding: 8px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; box-shadow: var(--shadow); margin: 0 auto; }
+    .mini-card .board { width: 100%; height: auto; display: block; border-radius: 4px;
+      overflow: hidden; background: var(--sq-light); }
+    .mini-name { font-size: 13px; font-weight: 500; text-align: center; color: var(--text); line-height: 1.2; }
+    .mini-betza { font-size: 11px; color: var(--text-soft); font-family: 'SF Mono','Menlo',monospace; text-align: center; line-height: 1.2; }
+    a.mini-betza { display: block; text-decoration: none; cursor: pointer; transition: color 0.12s ease; }
+    a.mini-betza:hover { color: var(--accent); }
+    .mini-card.invented { border-style: dashed; }
+    .mini-card.invented .mini-name::after { content: '  · invented'; color: var(--text-soft); font-size: 11px; font-style: italic; }
+
+    .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
+    .tab-btn { appearance: none; background: transparent; border: 0; padding: 8px 16px; font-size: 14px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-radius: 7px; font-family: inherit; transition: color 0.15s ease, background 0.15s ease; }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn[aria-selected="true"] { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+    .tab-count { display: inline-block; margin-left: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600; color: var(--text-soft); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; line-height: 1.4; }
+    .tab-btn[aria-selected="true"] .tab-count { background: var(--surface); color: var(--text); }
+    section[role="tabpanel"] { display: none; }
+    section[role="tabpanel"].active { display: block; }
+
+    .unaffected-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 8px 0; }
+    .unaffected-note { color: var(--text-soft); font-size: 14px; max-width: 760px; margin: 0 0 20px 0; }
+
+    footer { max-width: 1280px; margin: 0 auto; padding: 32px 24px 48px;
+      color: var(--text-soft); font-size: 13px; border-top: 1px solid var(--border); }
+
+    .site-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+    .site-nav-inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+    .site-nav a { color: var(--text-soft); font-size: 14px; font-weight: 500; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
+    .site-nav a:hover { color: var(--text); text-decoration: none; }
+    .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+    .site-nav .nav-encyclopedia { margin-left: auto; }
+    .site-nav .theme-toggle { width: 32px; height: 32px; margin-left: 0; }
+    footer p { margin: 0 0 8px 0; }
+    footer p:last-child { margin-bottom: 0; }
+    .footer-page-line { color: var(--text); font-size: 14px; }
+
+    @media (max-width: 720px) {
+      h1 { font-size: 24px; }
+      .controls { gap: 8px; }
+      .theme-toggle { margin-left: 0; }
+      .mini-card { width: 140px; padding: 6px; }
+      .inversion-op { font-size: 22px; }
+      .inversion-table { border-spacing: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site sections">
+    <div class="site-nav-inner">
+      <a href="codex.html">Codex</a>
+      <a href="promotion.html">Promotions</a>
+      <a href="fusion.html">Fusions</a>
+      <a href="inversion.html" class="active">Inversions</a>
+      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
+      <a href="betza.html">Betza</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+  <header>
+    <h1>Inversions</h1>
+    <p class="intro">
+      A reference of the <strong>14 inversion pairs</strong> in NO-KINGS.
+    </p>
+    <div class="controls">
+      <div class="tabs" role="tablist" aria-label="Inversion view">
+        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-inversions" id="tabbtn-inversions">Inversions <span class="tab-count" id="count-inversions"></span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-unaffected" id="tabbtn-unaffected">Unaffected <span class="tab-count" id="count-unaffected"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section role="tabpanel" id="tab-inversions" aria-labelledby="tabbtn-inversions" class="active">
+      <div id="inversion-table"></div>
+    </section>
+    <section role="tabpanel" id="tab-unaffected" aria-labelledby="tabbtn-unaffected">
+      <p class="unaffected-note">These pieces look the same after a 45° ortho ↔ diagonal swap (or are otherwise self-inverse), so they have no distinct inverted form. They're listed here for completeness.</p>
+      <div class="unaffected-grid" id="unaffected-grid"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">The inverted form of each piece — a 45° ortho ↔ diagonal swap of every atomic component.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+    <p>Companion pages: <a href="codex.html">codex</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
+  </footer>
+
+  <script>
+  const PIECES = [
+    {
+      id: 'pawn',
+      family: 'pawn-like',
+      name: 'Pawn',
+      aliases: [],
+      glyph: '♟',
+      betza: 'mfWcfFimfnD',
+      origin: 'Standard',
+      description: 'Moves one square forward (no capture). Captures one square diagonally forward. May move two squares forward on its first move, and can capture en passant. Promotes upon reaching the last rank.',
+      behaviors: ['direction-restricted', 'promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[0,1],[0,2]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1]] }
+      ]
+    },
+    {
+      id: 'sergeant',
+      family: 'pawn-like',
+      name: 'Ranger',
+      aliases: [],
+      letter: 'SG',
+      betza: 'mWcF',
+      origin: 'Extended Pawn variant',
+      description: 'Moves one square orthogonally in any of the four directions (move only) and captures one square diagonally in any of the four directions. Move-vs-capture asymmetry is its only pawn-like trait — it is fully symmetric in direction.',
+      behaviors: ['capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'arrow-pawn',
+      family: 'pawn-like',
+      name: 'Archer',
+      aliases: ['Persson Pawn'],
+      letter: 'AP',
+      betza: 'mW2cF',
+      origin: 'Arrow Pawn Chess (Persson, 1938)',
+      description: 'Moves one or two squares orthogonally in any direction (move only), and captures one square diagonally in any direction. Unlike a standard pawn, it is not direction-restricted — only its move/capture asymmetry makes it pawn-like.',
+      behaviors: ['promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'ferz',
+      family: 'leapers',
+      name: 'Seer',
+      aliases: ['Fers', 'Counsellor', 'Mantri'],
+      letter: 'F',
+      betza: 'F',
+      origin: 'Shatranj',
+      description: 'Steps one square diagonally. The historical Shatranj precursor to the modern Queen; colour-bound to its starting square colour.',
+      behaviors: ['leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'wazir',
+      family: 'leapers',
+      name: 'Mage',
+      aliases: ['Vizir', 'Wezir'],
+      letter: 'W',
+      betza: 'W',
+      origin: 'Shatranj',
+      description: 'Steps one square orthogonally. A "short Rook" — the orthogonal counterpart of the Ferz.',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'bishop',
+      family: 'sliders',
+      name: 'Bishop',
+      aliases: [],
+      glyph: '♝',
+      betza: 'B',
+      origin: 'Standard',
+      description: 'Slides any number of squares diagonally. Each bishop is locked to one square colour for the entire game — a King + 2 same-colour Bishops cannot deliver mate.',
+      behaviors: ['long-range', 'color-bound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'rook',
+      family: 'sliders',
+      name: 'Rook',
+      aliases: ['Castle'],
+      glyph: '♜',
+      betza: 'R',
+      origin: 'Standard',
+      description: 'Slides any number of squares along ranks or files. Participates with the King in castling.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'dragon-horse',
+      family: 'compounds',
+      name: 'Paladin',
+      aliases: ['Promoted Bishop', 'Ryūma'],
+      letter: '馬',
+      betza: 'BW',
+      origin: 'Shōgi',
+      description: 'A Bishop that also steps one square orthogonally. Created when a Shōgi Bishop is promoted. No longer colour-bound.',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'dragon-king',
+      family: 'compounds',
+      name: 'Drake',
+      aliases: ['Promoted Rook', 'Ryūō'],
+      letter: '龍',
+      betza: 'RF',
+      origin: 'Shōgi',
+      description: 'A Rook that also steps one square diagonally. Created when a Shōgi Rook is promoted in the opponent’s last three ranks.',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'kirin',
+      family: 'leapers',
+      name: 'Kirin',
+      aliases: [],
+      letter: 'Ki',
+      betza: 'FD',
+      origin: 'Chu Shōgi',
+      description: 'Combines Ferz (1,1) and Dabbaba (2,0) — four diagonal one-step plus four orthogonal two-square leaps. Colour-bound, since both components preserve square colour. Appears in Chu Shōgi.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'elephant-modern',
+      family: 'leapers',
+      name: 'Mystic',
+      aliases: ['Modern Elephant'],
+      letter: 'EM',
+      betza: 'FA',
+      origin: 'Modern variants',
+      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'war-machine',
+      family: 'leapers',
+      name: 'Sorcerer',
+      aliases: [],
+      letter: 'WM',
+      betza: 'WD',
+      origin: 'Problem chess',
+      description: 'Combines Wazir (1,0) and Dabbaba (2,0) — leaps one or exactly two squares orthogonally. Eight reachable squares, all on ranks and files.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'archbishop',
+      family: 'compounds',
+      name: 'Archbishop',
+      aliases: ['Princess', 'Cardinal', 'Janus'],
+      letter: 'AR',
+      betza: 'BN',
+      origin: 'Modern',
+      description: 'Bishop + Knight combined. Crucially colour-complete: King + Archbishop alone can force mate, unlike King + Bishop or King + Knight on their own.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'chancellor',
+      family: 'compounds',
+      name: 'Dragonlord',
+      aliases: ['Marshall', 'Marshal', 'Empress', 'Concubine'],
+      letter: 'CH',
+      betza: 'RN',
+      origin: 'Modern',
+      description: 'Rook + Knight combined. Roughly equal in value to a Queen in most computer studies.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'kirin-plus',
+      family: 'leapers',
+      name: 'Sacred Kirin',
+      aliases: [],
+      letter: 'Ki+',
+      betza: 'FDC',
+      origin: 'Invented',
+      description: 'Promoted form of the Kirin. Adds the Camel (1,3) L-leap to the Kirin\'s Ferz and Dabbaba moves — sixteen reachable squares. Stays fully colour-bound.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,0],[-2,0],[0,2],[0,-2],
+          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'champion',
+      family: 'leapers',
+      name: 'Archmage',
+      aliases: [],
+      letter: 'Ch',
+      betza: 'WAD',
+      origin: 'Omega Chess',
+      description: 'Combines Wazir (1,0), Alfil (2,2), and Dabbaba (2,0) — 12 reachable squares: a one-step orthogonal "ring" plus all eight squares of the second ring at corner and edge positions. One of the two new pieces in Omega Chess.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'high-priestess',
+      family: 'leapers',
+      name: 'High Priestess',
+      aliases: [],
+      letter: 'HP',
+      betza: 'FAN',
+      origin: 'Problem chess',
+      description: 'Combines the Ferz (1,1), Alfil (2,2), and Knight (1,2) leaps — 16 reachable squares at short range. Not colour-bound, because the Knight component breaks the otherwise diagonal palette.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'squirrel',
+      family: 'leapers',
+      name: 'Faerie',
+      aliases: [],
+      letter: 'Sq',
+      betza: 'NAD',
+      origin: 'Problem chess',
+      description: 'Combines Knight (1,2), Alfil (2,2), and Dabbaba (2,0) leaps. Reaches every square exactly two squares away from the piece (the full "second ring" at Chebyshev distance 2) — 16 squares in total: eight knight-leap targets, four diagonal corners, and four orthogonal edge-midpoints.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'banshee',
+      family: 'compounds',
+      name: 'Banshee',
+      aliases: [],
+      letter: 'Bn',
+      betza: 'BNN',
+      origin: 'Problem chess',
+      description: 'Combines Bishop and Nightrider — slides diagonally any distance AND makes any number of knight leaps in a straight line. The diagonal counterpart of the Raven (Rook + Nightrider).',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'raven',
+      family: 'compounds',
+      name: 'Raven',
+      aliases: ['Waran'],
+      letter: 'Rv',
+      betza: 'RNN',
+      origin: 'Problem chess',
+      description: 'Combines Rook slides with Nightrider chains — orthogonal sliding plus any number of knight leaps in a straight line. The rook counterpart of the Banshee (BNN).',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'kirin-plus-plus',
+      family: 'leapers',
+      name: 'Celestial Kirin',
+      aliases: [],
+      letter: 'Ki++',
+      betza: 'FADCG + 4L',
+      origin: 'Invented',
+      description: 'Final form of the Kirin promotion chain. Twenty-eight leap targets — F, A, D, C, G, 4L. Every component is colour-bound.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2],
+          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1],
+          [3,3],[-3,3],[3,-3],[-3,-3],
+          [4,0],[-4,0],[0,4],[0,-4]
+        ] }
+      ]
+    },
+    {
+      id: 'gryphon',
+      family: 'others',
+      name: 'Gryphon',
+      aliases: ['Aanca', 'Eagle (Grant Acedrex)'],
+      letter: 'GP',
+      betza: 't[FR]',
+      origin: 'Grant Acedrex (1283)',
+      description: 'A bent slider: takes one diagonal step (Ferz), then continues as a Rook outwards — moving orthogonally away from its starting square. The pivot square is itself a valid stopping square. Originated in Grant Acedrex, the 13th-century Castilian variant.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] }
+      ]
+    },
+    {
+      id: 'manticore',
+      family: 'others',
+      name: 'Manticore',
+      aliases: ['Anchorite', 'Acromantula', 'Rhinoceros', 'Spider', 'Unicorn'],
+      letter: 'MN',
+      betza: 't[WB]',
+      origin: 'Modern variants (Betza, Gilman, Cazaux)',
+      description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Gryphon. Pivot square is itself a valid stopping square.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+      ]
+    },
+    {
+      id: 'berolina',
+      family: 'pawn-like',
+      name: 'Void Pawn',
+      aliases: ['Berlin Pawn'],
+      letter: 'BP',
+      betza: 'mfFcfWimfnA',
+      origin: 'Modern',
+      description: 'The Pawn’s mirror: moves one square diagonally forward (or two on its first move), captures one square straight forward. En passant and promotion apply as for the standard pawn.',
+      behaviors: ['direction-restricted', 'promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[2,2],[-2,2]] },
+        { kind: 'xs',    squares: [[0,1]] }
+      ]
+    },
+    {
+      id: 'knight',
+      family: 'leapers',
+      name: 'Knight',
+      aliases: ['Horse'],
+      glyph: '♞',
+      betza: 'N',
+      origin: 'Standard',
+      description: 'Leaps in an L: two squares in one direction, then one perpendicular. The only standard piece that ignores intervening pieces.',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'queen',
+      family: 'sliders',
+      name: 'Queen',
+      aliases: [],
+      glyph: '♛',
+      betza: 'Q',
+      origin: 'Standard',
+      description: 'Slides any number of squares along ranks, files, or diagonals. The most powerful standard piece — Rook + Bishop combined.',
+      behaviors: ['long-range', 'compound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'amazon',
+      family: 'compounds',
+      name: 'Amazon',
+      aliases: ['Angel', 'Commander', 'Wyvern'],
+      letter: 'A',
+      betza: 'QN',
+      origin: 'Modern',
+      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single fairy piece in common use.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'amazonrider',
+      family: 'compounds',
+      name: 'Valkyrie',
+      aliases: [],
+      letter: 'Am',
+      betza: 'QNN',
+      origin: 'Problem chess',
+      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'crown-princess',
+      family: 'compounds',
+      name: 'Crown Princess',
+      aliases: ['Popess'],
+      letter: 'CP',
+      betza: 'BNW',
+      origin: 'Modern variants',
+      description: 'Archbishop + Wazir — combines Bishop slides, Knight leaps, and one-step orthogonal moves. A short-step extension of the Princess/Archbishop, similar in spirit to Dragon Horse but with the Knight added.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [1,0],[-1,0],[0,1],[0,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'alibaba',
+      family: 'leapers',
+      name: 'Wanderer',
+      aliases: [],
+      letter: 'AD',
+      betza: 'AD',
+      origin: 'Problem chess',
+      description: 'Combines the Alfil (2,2) and Dabbaba (2,0) leaps into a single piece — eight reachable squares forming the "second ring" along ranks, files, and diagonals. The single-leap counterpart of the Alibabarider. Heavily colour-bound, since both components preserve square colour.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'bodyguard',
+      family: 'sliders',
+      name: 'Praetorian',
+      aliases: ['Hia'],
+      letter: 'BG',
+      betza: 'Q2',
+      origin: 'Hiashatar (Mongolian decimal chess)',
+      description: 'Slides like a Queen but only one or two squares in any of the eight directions. Has a defensive aura in Hiashatar: any opposing sliding piece must stop the moment it moves within a King\'s-move radius of the Bodyguard, so it cannot pass by without being challenged.',
+      behaviors: ['direction-restricted'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]], maxRange: 2 }
+      ]
+    },
+    {
+      id: 'gnu',
+      family: 'leapers',
+      name: 'Hippogriff',
+      aliases: ['Unicorn'],
+      letter: 'GU',
+      betza: 'NC',
+      origin: 'Problem chess',
+      description: 'Combines the Knight (1,2) and Camel (1,3) leaps — 16 reachable squares, all at short range.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'buffalo',
+      family: 'leapers',
+      name: 'Behemoth',
+      aliases: [],
+      letter: 'BF',
+      betza: 'CZN',
+      origin: 'Problem chess',
+      description: 'Camel + Zebra + Knight fused — 24 reachable squares. The largest of the standard short-range leaper compounds.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1],
+          [2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2],
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'godzilla',
+      family: 'others',
+      name: 'Godzilla',
+      aliases: [],
+      letter: 'GZ',
+      betza: 't[FR]t[WB]',
+      origin: 'Modern variants',
+      description: 'A double bent-rider that combines the Gryphon (Ferz + outward Rook) and the Manticore (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Gryphon-style (diagonal pivot, orthogonal slide) and eight Manticore-style (orthogonal pivot, diagonal slide).',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+      ]
+    },
+    {
+          "id": "inv-sergeant",
+          "family": "pawn-like",
+          "name": "Void Ranger",
+          "aliases": [],
+          "letter": "iSg",
+          "betza": "mFcW",
+          "origin": "Invented (inversion)",
+          "behaviors": [
+                "pawn-like",
+                "color-bound"
+          ],
+          "description": "Inversion of the Sergeant: swap the move-direction set (Wazir) with the capture-direction set (Ferz). Moves one diagonal step in any direction; captures one orthogonal step in any direction.",
+          "moves": [
+                {
+                      "kind": "rings",
+                      "squares": [
+                            [
+                                  1,
+                                  1
+                            ],
+                            [
+                                  -1,
+                                  1
+                            ],
+                            [
+                                  1,
+                                  -1
+                            ],
+                            [
+                                  -1,
+                                  -1
+                            ]
+                      ]
+                },
+                {
+                      "kind": "xs",
+                      "squares": [
+                            [
+                                  1,
+                                  0
+                            ],
+                            [
+                                  -1,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  1
+                            ],
+                            [
+                                  0,
+                                  -1
+                            ]
+                      ]
+                }
+          ]
+    },
+    {
+          "id": "inv-arrow-pawn",
+          "family": "pawn-like",
+          "name": "Void Archer",
+          "aliases": [],
+          "letter": "iAP",
+          "betza": "mF2cW",
+          "origin": "Invented (inversion)",
+          "behaviors": [
+                "pawn-like",
+                "color-bound"
+          ],
+          "description": "Inversion of the Arrow Pawn: moves 1 or 2 diagonal squares (move-only Bishop, capped at 2); captures one orthogonal step.",
+          "moves": [
+                {
+                      "kind": "rings",
+                      "squares": [
+                            [
+                                  1,
+                                  1
+                            ],
+                            [
+                                  -1,
+                                  1
+                            ],
+                            [
+                                  1,
+                                  -1
+                            ],
+                            [
+                                  -1,
+                                  -1
+                            ],
+                            [
+                                  2,
+                                  2
+                            ],
+                            [
+                                  -2,
+                                  2
+                            ],
+                            [
+                                  2,
+                                  -2
+                            ],
+                            [
+                                  -2,
+                                  -2
+                            ]
+                      ]
+                },
+                {
+                      "kind": "xs",
+                      "squares": [
+                            [
+                                  1,
+                                  0
+                            ],
+                            [
+                                  -1,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  1
+                            ],
+                            [
+                                  0,
+                                  -1
+                            ]
+                      ]
+                }
+          ]
+    },
+    {
+          "id": "inv-kirin-plus",
+          "family": "leapers",
+          "name": "Void Kirin",
+          "aliases": [],
+          "letter": "iKi+",
+          "betza": "WNH",
+          "origin": "Invented (inversion)",
+          "behaviors": [
+                "compound",
+                "leaper",
+                "color-changing"
+          ],
+          "description": "Inversion of Kirin+ (FDC). Strictly colour-changing — every destination is on the opposite square colour. Combines Wazir (1,0) at the closest ring, Knight (1,2) inside, and Threeleaper (3,0) as the four diamond-point cardinal leaps. 16 leap targets forming a lozenge silhouette.",
+          "moves": [
+                {
+                      "kind": "dots",
+                      "squares": [
+                            [
+                                  1,
+                                  0
+                            ],
+                            [
+                                  -1,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  1
+                            ],
+                            [
+                                  0,
+                                  -1
+                            ],
+                            [
+                                  1,
+                                  2
+                            ],
+                            [
+                                  -1,
+                                  2
+                            ],
+                            [
+                                  1,
+                                  -2
+                            ],
+                            [
+                                  -1,
+                                  -2
+                            ],
+                            [
+                                  2,
+                                  1
+                            ],
+                            [
+                                  -2,
+                                  1
+                            ],
+                            [
+                                  2,
+                                  -1
+                            ],
+                            [
+                                  -2,
+                                  -1
+                            ],
+                            [
+                                  3,
+                                  0
+                            ],
+                            [
+                                  -3,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  3
+                            ],
+                            [
+                                  0,
+                                  -3
+                            ]
+                      ]
+                }
+          ]
+    },
+    {
+          "id": "inv-kirin-plus-plus",
+          "family": "leapers",
+          "name": "Void Celestial Kirin",
+          "aliases": [],
+          "letter": "iKi++",
+          "betza": "WNH + Giraffe + Zebra",
+          "origin": "Invented (inversion)",
+          "behaviors": [
+                "compound",
+                "leaper",
+                "color-changing"
+          ],
+          "description": "Extends Inv Kirin+ (W + N + H) outward with two more colour-changing rings: Giraffe (1,4) near the outer cardinal extremes, and Zebra (2,3) filling the gaps between H and Giraffe. All 32 leap targets are strictly colour-changing — every dx+dy is odd. Forms a fully filled lozenge silhouette.",
+          "moves": [
+                {
+                      "kind": "dots",
+                      "squares": [
+                            [
+                                  1,
+                                  0
+                            ],
+                            [
+                                  -1,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  1
+                            ],
+                            [
+                                  0,
+                                  -1
+                            ],
+                            [
+                                  1,
+                                  2
+                            ],
+                            [
+                                  -1,
+                                  2
+                            ],
+                            [
+                                  1,
+                                  -2
+                            ],
+                            [
+                                  -1,
+                                  -2
+                            ],
+                            [
+                                  2,
+                                  1
+                            ],
+                            [
+                                  -2,
+                                  1
+                            ],
+                            [
+                                  2,
+                                  -1
+                            ],
+                            [
+                                  -2,
+                                  -1
+                            ],
+                            [
+                                  3,
+                                  0
+                            ],
+                            [
+                                  -3,
+                                  0
+                            ],
+                            [
+                                  0,
+                                  3
+                            ],
+                            [
+                                  0,
+                                  -3
+                            ],
+                            [
+                                  1,
+                                  4
+                            ],
+                            [
+                                  4,
+                                  1
+                            ],
+                            [
+                                  -1,
+                                  4
+                            ],
+                            [
+                                  -4,
+                                  1
+                            ],
+                            [
+                                  1,
+                                  -4
+                            ],
+                            [
+                                  4,
+                                  -1
+                            ],
+                            [
+                                  -1,
+                                  -4
+                            ],
+                            [
+                                  -4,
+                                  -1
+                            ],
+                            [
+                                  2,
+                                  3
+                            ],
+                            [
+                                  3,
+                                  2
+                            ],
+                            [
+                                  -2,
+                                  3
+                            ],
+                            [
+                                  -3,
+                                  2
+                            ],
+                            [
+                                  2,
+                                  -3
+                            ],
+                            [
+                                  3,
+                                  -2
+                            ],
+                            [
+                                  -2,
+                                  -3
+                            ],
+                            [
+                                  -3,
+                                  -2
+                            ]
+                      ]
+                }
+          ]
+    }
+  ];
+  const INVERSIONS = [
+  {
+    "lhs": "wazir",
+    "rhs": "ferz"
+  },
+  {
+    "lhs": "bishop",
+    "rhs": "rook"
+  },
+  {
+    "lhs": "pawn",
+    "rhs": "berolina"
+  },
+  {
+    "lhs": "sergeant",
+    "rhs": "inv-sergeant"
+  },
+  {
+    "lhs": "arrow-pawn",
+    "rhs": "inv-arrow-pawn"
+  },
+  {
+    "lhs": "dragon-horse",
+    "rhs": "dragon-king"
+  },
+  {
+    "lhs": "kirin",
+    "rhs": "squirrel"
+  },
+  {
+    "lhs": "elephant-modern",
+    "rhs": "war-machine"
+  },
+  {
+    "lhs": "archbishop",
+    "rhs": "chancellor"
+  },
+  {
+    "lhs": "kirin-plus",
+    "rhs": "inv-kirin-plus"
+  },
+  {
+    "lhs": "high-priestess",
+    "rhs": "champion"
+  },
+  {
+    "lhs": "banshee",
+    "rhs": "raven"
+  },
+  {
+    "lhs": "kirin-plus-plus",
+    "rhs": "inv-kirin-plus-plus"
+  },
+  {
+    "lhs": "gryphon",
+    "rhs": "manticore"
+  }
+];
+
+  const N = 9;
+  const SQ = 36;
+  const SIZE = N * SQ;
+
+  function svgCenter(x, y) {
+    return { cx: (x + 4) * SQ + SQ / 2, cy: (4 - y) * SQ + SQ / 2 };
+  }
+  function describeMoves(piece) {
+    const parts = [];
+    for (const m of piece.moves) {
+      if (m.kind === 'dots')   parts.push(`${m.squares.length} leap targets`);
+      if (m.kind === 'rings')  parts.push(`${m.squares.length} move-only squares`);
+      if (m.kind === 'xs')     parts.push(`${m.squares.length} capture-only squares`);
+      if (m.kind === 'rays')   parts.push(`slides in ${m.dirs.length} directions`);
+      if (m.kind === 'rider')  parts.push('rider continues past the diagram');
+      if (m.kind === 'hop' || m.kind === 'capture-hop') parts.push('hops over a hurdle');
+    }
+    return `${piece.name}: ${parts.join('; ')}.`;
+  }
+  function renderBoard(piece) {
+    let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="board" role="img" aria-label="${piece.name} movement diagram">`;
+    svg += `<title>${piece.name} — movement diagram</title>`;
+    svg += `<desc>${describeMoves(piece)} ${piece.description}</desc>`;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const isLight = (r + c) % 2 === 0;
+      const fill = isLight ? 'var(--sq-light)' : 'var(--sq-dark)';
+      svg += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${fill}"/>`;
+    }
+    for (const move of piece.moves) svg += renderMove(move);
+    const piecePos = piece.piece_at || [0, 0];
+    const { cx, cy } = svgCenter(piecePos[0], piecePos[1]);
+    if (piece.glyph) {
+      svg += `<text x="${cx}" y="${cy + SQ*0.04}" text-anchor="middle" dominant-baseline="central" font-size="${SQ*0.85}" fill="var(--text)" style="font-family: 'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2',serif;">${piece.glyph}</text>`;
+    } else {
+      const r = SQ * 0.36;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--piece-disc)"/>`;
+      const len = (piece.letter || '?').length;
+      const fontSize = len >= 3 ? SQ*0.22 : (len >= 2 ? SQ*0.30 : SQ*0.48);
+      svg += `<text x="${cx}" y="${cy + SQ*0.02}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}" font-weight="700" fill="var(--piece-disc-text)" style="font-family: -apple-system,sans-serif;">${piece.letter || ''}</text>`;
+    }
+    svg += `</svg>`;
+    return svg;
+  }
+  function renderMove(move) {
+    switch (move.kind) {
+      case 'dots':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="var(--move-color)"/>`;
+        }).join('');
+      case 'rings':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="none" stroke="var(--move-color)" stroke-width="2.5"/>`;
+        }).join('');
+      case 'xs':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          const r = SQ * 0.22;
+          return `<line x1="${cx-r}" y1="${cy-r}" x2="${cx+r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
+                 `<line x1="${cx+r}" y1="${cy-r}" x2="${cx-r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
+        }).join('');
+      case 'rays': {
+        const fromSq = move.from || [0, 0];
+        const maxRange = move.maxRange || Infinity;
+        return move.dirs.map(([dx, dy]) => {
+          let lastX = fromSq[0], lastY = fromSq[1];
+          let stepX = fromSq[0], stepY = fromSq[1];
+          let steps = 0;
+          while (steps < maxRange) {
+            stepX += dx; stepY += dy;
+            if (Math.abs(stepX) > 4 || Math.abs(stepY) > 4) break;
+            lastX = stepX; lastY = stepY;
+            steps++;
+          }
+          if (lastX === fromSq[0] && lastY === fromSq[1]) return '';
+          const start = svgCenter(fromSq[0], fromSq[1]);
+          const end   = svgCenter(lastX, lastY);
+          const angle = Math.atan2(end.cy - start.cy, end.cx - start.cx);
+          const lineStart = { x: start.cx + Math.cos(angle) * SQ * 0.42, y: start.cy + Math.sin(angle) * SQ * 0.42 };
+          const tip = { x: end.cx, y: end.cy };
+          const arrowLen = SQ * 0.30, arrowWidth = SQ * 0.16;
+          const base = { x: tip.x - Math.cos(angle) * arrowLen, y: tip.y - Math.sin(angle) * arrowLen };
+          const perp = { x: -Math.sin(angle) * arrowWidth, y: Math.cos(angle) * arrowWidth };
+          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="var(--ray-color)" stroke-width="3.4" stroke-linecap="round"/>` +
+                 `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="var(--ray-color)"/>`;
+        }).join('');
+      }
+      case 'rider': {
+        const start = svgCenter(0, 0);
+        const points = [{ cx: start.cx, cy: start.cy }, ...move.dots.map(([x, y]) => svgCenter(x, y))];
+        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.65"/>`;
+        const dots = move.dots.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
+        }).join('');
+        const lastP = points[points.length - 1];
+        const p2 = points[points.length - 2] || start;
+        const dxx = lastP.cx - p2.cx;
+        const dyy = lastP.cy - p2.cy;
+        const len = Math.hypot(dxx, dyy) || 1;
+        const dirX = dxx / len, dirY = dyy / len;
+        const tipX = lastP.cx + dirX * SQ * 0.40;
+        const tipY = lastP.cy + dirY * SQ * 0.40;
+        let arrow = '';
+        if (tipX >= 4 && tipX <= SIZE - 4 && tipY >= 4 && tipY <= SIZE - 4) {
+          const arrowLen = SQ * 0.22;
+          const arrowWidth = SQ * 0.13;
+          const baseX = tipX - dirX * arrowLen;
+          const baseY = tipY - dirY * arrowLen;
+          const perpX = -dirY * arrowWidth;
+          const perpY = dirX * arrowWidth;
+          arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--rider-color)" opacity="0.85"/>`;
+        }
+        return line + dots + arrow;
+      }
+      case 'bent-rider': {
+        const start = svgCenter(0, 0);
+        const pivotC = svgCenter(move.pivot[0], move.pivot[1]);
+        const [bdx, bdy] = move.dir;
+        let lastX = move.pivot[0], lastY = move.pivot[1];
+        while (true) {
+          const nx = lastX + bdx, ny = lastY + bdy;
+          if (Math.abs(nx) > 4 || Math.abs(ny) > 4) break;
+          lastX = nx; lastY = ny;
+        }
+        const leapAngle = Math.atan2(pivotC.cy - start.cy, pivotC.cx - start.cx);
+        const leapStart = { x: start.cx + Math.cos(leapAngle) * SQ * 0.42, y: start.cy + Math.sin(leapAngle) * SQ * 0.42 };
+        const leapLine = `<line x1="${leapStart.x}" y1="${leapStart.y}" x2="${pivotC.cx}" y2="${pivotC.cy}" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round" opacity="0.85"/>`;
+        if (lastX === move.pivot[0] && lastY === move.pivot[1]) {
+          const dot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.18}" fill="var(--ray-color)"/>`;
+          return leapLine + dot;
+        }
+        const endC = svgCenter(lastX, lastY);
+        const slideAngle = Math.atan2(endC.cy - pivotC.cy, endC.cx - pivotC.cx);
+        const arrowLen = SQ * 0.28, arrowWidth = SQ * 0.14;
+        const tipX = endC.cx, tipY = endC.cy;
+        const baseX = tipX - Math.cos(slideAngle) * arrowLen;
+        const baseY = tipY - Math.sin(slideAngle) * arrowLen;
+        const perpX = -Math.sin(slideAngle) * arrowWidth;
+        const perpY =  Math.cos(slideAngle) * arrowWidth;
+        const slideLine = `<line x1="${pivotC.cx}" y1="${pivotC.cy}" x2="${baseX}" y2="${baseY}" stroke="var(--ray-color)" stroke-width="2.8" stroke-linecap="round"/>`;
+        const arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
+        const pivotDot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.10}" fill="var(--ray-color)"/>`;
+        return leapLine + pivotDot + slideLine + arrow;
+      }
+      default: return '';
+    }
+  }
+
+  function renderMiniCard(piece, invented) {
+    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox">${piece.betza}</a>` : '';
+    return `<div class="mini-card${invented ? ' invented' : ''}">
+      ${renderBoard(piece)}
+      <div class="mini-name">${piece.name}</div>
+      ${betzaLine}
+    </div>`;
+  }
+
+  function renderRow(inv) {
+    const left  = PIECES.find(p => p.id === inv.lhs);
+    const right = PIECES.find(p => p.id === inv.rhs);
+    const leftHtml  = left  ? renderMiniCard(left, inv.lhs.startsWith('inv-')) : `<div class="mini-card"><em>missing: ${inv.lhs}</em></div>`;
+    const rightHtml = right ? renderMiniCard(right, inv.rhs.startsWith('inv-')) : `<div class="mini-card"><em>missing: ${inv.rhs}</em></div>`;
+    return `<tr><td>${leftHtml}</td><td class="inversion-op">↔</td><td>${rightHtml}</td></tr>`;
+  }
+
+  document.getElementById('inversion-table').innerHTML = `<table class="inversion-table"><tbody>${INVERSIONS.map(renderRow).join('')}</tbody></table>`;
+  document.getElementById('count-inversions').textContent = INVERSIONS.length;
+
+  const UNAFFECTED_IDS = ["knight","queen","amazon","amazonrider","crown-princess","alibaba","bodyguard","gnu","buffalo","godzilla"];
+  const unaffectedGrid = document.getElementById('unaffected-grid');
+  unaffectedGrid.innerHTML = UNAFFECTED_IDS.map(id => {
+    const p = PIECES.find(x => x.id === id);
+    return p ? renderMiniCard(p, false) : `<div class="mini-card"><em>missing: ${id}</em></div>`;
+  }).join('');
+  document.getElementById('count-unaffected').textContent = UNAFFECTED_IDS.length;
+
+  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+  function activateTab(panelId) {
+    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
+    tabBtns.forEach(b => {
+      const sel = b.getAttribute('aria-controls') === panelId;
+      b.setAttribute('aria-selected', sel ? 'true' : 'false');
+      b.setAttribute('tabindex', sel ? '0' : '-1');
+    });
+    history.replaceState(null, '', '#' + panelId);
+  }
+  tabBtns.forEach(btn => btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls'))));
+  if (location.hash === '#tab-unaffected') activateTab('tab-unaffected');
+
+  const themeToggle = document.getElementById('theme-toggle');
+  function setTheme(t) {
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('fp-theme', t); } catch (e) {}
+  }
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+  try {
+    const saved = localStorage.getItem('fp-theme');
+    if (saved) setTheme(saved);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+  } catch (e) {}
+  </script>
+</body>
+</html>

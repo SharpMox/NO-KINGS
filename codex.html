@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fairy Chess — Codex</title>
+  <style>
+    /* ============== Theme ============== */
+    :root {
+      --bg: #eef0f3;
+      --surface: #ffffff;
+      --text: #161a20;
+      --text-soft: #5b6573;
+      --border: #d8dce3;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
+      --sq-light: #d8dce3;
+      --sq-dark: #8c95a3;
+      --piece-disc: #161a20;
+      --piece-disc-text: #ffffff;
+      --move-color: #2e7bd6;
+      --capture-color: #c84545;
+      --hurdle-color: #8a4ea8;
+      --hop-target: #2da06b;
+      --ray-color: #3a7ec4;
+      --rider-color: #da802a;
+      --accent: #2659a8;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f1a2e;
+      --surface: #18243d;
+      --text: #dce4f0;
+      --text-soft: #7a8aa0;
+      --border: #2a3a55;
+      --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
+      --sq-light: #3a4a68;
+      --sq-dark: #1e2a44;
+      --piece-disc: #dce4f0;
+      --piece-disc-text: #0f1a2e;
+      --move-color: #6ab1ff;
+      --capture-color: #ff7878;
+      --hurdle-color: #c890e8;
+      --hop-target: #6dd6a8;
+      --ray-color: #6ab1ff;
+      --rider-color: #ffae5c;
+      --accent: #7ec6ff;
+    }
+
+    /* ============== Base ============== */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      transition: background 0.2s ease, color 0.2s ease;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    a:hover { text-decoration: underline; }
+
+    /* ============== Header ============== */
+    header {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .intro {
+      color: var(--text-soft);
+      max-width: 760px;
+      margin: 0 0 24px 0;
+      font-size: 15px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      flex-wrap: wrap;
+    }
+    .tabs { width: 100%; }
+    .tab-btn.is-empty { display: none; }
+
+    /* ============== Site nav (shared header across all pages) ============== */
+    .site-nav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+    .site-nav-inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+    .site-nav a { color: var(--text-soft); font-size: 14px; font-weight: 500; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; transition: color 0.15s ease, border-color 0.15s ease; }
+    .site-nav a:hover { color: var(--text); text-decoration: none; }
+    .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+    .site-nav .nav-encyclopedia { margin-left: auto; }
+    .site-nav .theme-toggle { width: 32px; height: 32px; }
+    .tab-btn {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-radius: 7px;
+      font-family: inherit;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn[aria-selected="true"] {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .filter-input {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: var(--text);
+      width: 260px;
+      font-family: inherit;
+    }
+    .filter-input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .theme-toggle {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .theme-toggle:hover { color: var(--accent); }
+    .evolution-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 500;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-left: auto;
+    }
+    .evolution-link:hover {
+      text-decoration: none;
+      border-color: var(--accent);
+    }
+
+    /* ============== Legend ============== */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--text-soft);
+      margin-bottom: 24px;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-swatch {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ============== Main ============== */
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+    section[role="tabpanel"] { display: none; }
+    section[role="tabpanel"].active { display: block; }
+
+    /* ============== Card grid ============== */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-margin-top: 24px;
+    }
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-name {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .original-name { font-size: 12px; color: var(--text-soft); margin-top: 2px; font-style: italic; }
+    .card-aliases {
+      font-size: 12px;
+      color: var(--text-soft);
+      font-style: italic;
+      display: block;
+      margin-top: -4px;
+    }
+    .card-board {
+      align-self: center;
+      width: 100%;
+      max-width: 280px;
+    }
+    .board {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--sq-light);
+    }
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .betza-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    a.betza-chip { text-decoration: none; cursor: pointer; transition: border-color 0.12s ease, color 0.12s ease; }
+    a.betza-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .betza-chip-label {
+      color: var(--text-soft);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .origin-tag {
+      font-size: 10px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      font-weight: 600;
+    }
+    
+    /* Relations block on codex cards */
+    .relations { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+    .relation-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+    .relation-label { color: var(--text-soft); width: 80px; flex-shrink: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; }
+    .relation-target { display: flex; align-items: center; gap: 8px; }
+    .relation-mini { width: 64px; height: 64px; flex-shrink: 0; border-radius: 3px; overflow: hidden; background: var(--sq-light); border: 1px solid var(--border); }
+    .relation-mini svg { display: block; width: 100%; height: 100%; }
+    .relation-name { font-weight: 500; color: var(--text); }
+
+    .card-desc {
+      font-size: 14px;
+      color: var(--text);
+      margin: 0;
+    }
+    .behavior-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+    .badge-color-bound  { color: #8a4ea8; border-color: #c2a3d0; }
+    .badge-leaper       { color: #2e7bd6; border-color: #a9c8eb; }
+    .badge-hopper       { color: #2da06b; border-color: #a0d6bc; }
+    .badge-royal        { color: #c84545; border-color: #e8a8a8; }
+    .badge-long-range   { color: #c45821; border-color: #e8b497; }
+    .badge-promotes     { color: #b88500; border-color: #e6cb8a; }
+    .badge-capture-only { color: #c84545; border-color: #e8a8a8; }
+    .badge-direction-restricted { color: #6b6258; border-color: var(--border); }
+    .badge-compound     { color: #2a8378; border-color: #95c5be; }
+    .badge-capture-different { color: #8a4ea8; border-color: #c2a3d0; }
+    [data-theme="dark"] .badge-color-bound  { color: #c890e8; border-color: #5d4072; }
+    [data-theme="dark"] .badge-leaper       { color: #6ab1ff; border-color: #3a5378; }
+    [data-theme="dark"] .badge-hopper       { color: #6dd6a8; border-color: #2f5a44; }
+    [data-theme="dark"] .badge-royal        { color: #ff7878; border-color: #6e3030; }
+    [data-theme="dark"] .badge-long-range   { color: #ff9050; border-color: #6e4530; }
+    [data-theme="dark"] .badge-promotes     { color: #e8c060; border-color: #6e5a30; }
+    [data-theme="dark"] .badge-capture-only { color: #ff7878; border-color: #6e3030; }
+    [data-theme="dark"] .badge-compound     { color: #6ed4c2; border-color: #2f6056; }
+    [data-theme="dark"] .badge-capture-different { color: #c890e8; border-color: #5d4072; }
+
+    .card.highlight {
+      outline: 3px solid var(--accent);
+      outline-offset: 4px;
+      animation: pulse 1.5s ease-out;
+    }
+    @keyframes pulse {
+      0%   { outline-color: var(--accent); }
+      100% { outline-color: transparent; }
+    }
+
+    /* ============== Tab count chip + empty-tab state ============== */
+    .tabs { flex-wrap: wrap; }
+    .tab-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      margin-left: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-soft);
+      line-height: 1;
+    }
+    .tab-btn[aria-selected="true"] .tab-count {
+      background: var(--surface);
+      color: var(--text);
+    }
+    .empty-tab {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-soft);
+      font-style: italic;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+
+    /* ============== Footer ============== */
+    footer {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+      color: var(--text-soft);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    footer p { margin: 0 0 8px 0; }
+    footer p:last-child { margin-bottom: 0; }
+    .footer-page-line { color: var(--text); font-size: 14px; }
+
+    /* ============== Responsive ============== */
+    @media (max-width: 720px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .filter-input { flex: 1 1 100%; width: auto; }
+      h1 { font-size: 26px; }
+      .controls { gap: 8px; }
+      .theme-toggle { margin-left: 0; }
+    }
+
+    /* ============== Print ============== */
+    @media print {
+      body { background: white; color: black; }
+      .controls, .theme-toggle, .filter-input, .tabs { display: none; }
+      section[role="tabpanel"] { display: block !important; page-break-before: always; }
+      .card { break-inside: avoid; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site sections">
+    <div class="site-nav-inner">
+      <a href="codex.html" class="active">Codex</a>
+      <a href="promotion.html">Promotions</a>
+      <a href="fusion.html">Fusions</a>
+      <a href="inversion.html">Inversions</a>
+      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
+      <a href="betza.html">Betza</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+  <header>
+    <h1>Codex</h1>
+    <p class="intro">A filterable reference of the <strong>38 pieces</strong> used across NO-KINGS.</p>
+    <div class="controls">
+      <div class="tabs" role="tablist" aria-label="Movement type">
+        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-all"         id="tabbtn-all">All pieces <span class="tab-count" id="count-all">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-pawn-like"   id="tabbtn-pawn-like">Pawn-like <span class="tab-count" id="count-pawn-like">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-sliders"     id="tabbtn-sliders">Sliders <span class="tab-count" id="count-sliders">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leapers"     id="tabbtn-leapers">Leapers <span class="tab-count" id="count-leapers">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leap-riders" id="tabbtn-leap-riders">Leap-Riders <span class="tab-count" id="count-leap-riders">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-compounds"   id="tabbtn-compounds">Compounds <span class="tab-count" id="count-compounds">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-hoppers"     id="tabbtn-hoppers">Hoppers <span class="tab-count" id="count-hoppers">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-others"      id="tabbtn-others">Others <span class="tab-count" id="count-others">0</span></button>
+      </div>
+      <div class="tabs origin-tabs" role="tablist" aria-label="Category">
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-new" id="tabbtn-cat-new">New <span class="tab-count" id="count-cat-new">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-base" id="tabbtn-cat-base">Base <span class="tab-count" id="count-cat-base">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-mid" id="tabbtn-cat-mid">Mid <span class="tab-count" id="count-cat-mid">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-end" id="tabbtn-cat-end">End <span class="tab-count" id="count-cat-end">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-invert" id="tabbtn-cat-invert">Invert <span class="tab-count" id="count-cat-invert">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-fusion" id="tabbtn-cat-fusion">Fusion <span class="tab-count" id="count-cat-fusion">0</span></button>
+      </div>
+      <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
+    </div>
+    <div class="legend" aria-label="Diagram legend">
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg></span> Slide any distance</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><rect x="4.5" y="4.5" width="15" height="15" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/></svg></span> Hurdle (piece to jump)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
+    </div>
+  </header>
+
+  <main>
+    <section role="tabpanel" id="tab-all"         aria-labelledby="tabbtn-all" class="active">
+      <div class="card-grid" id="grid-all"></div>
+    </section>
+    <section role="tabpanel" id="tab-pawn-like"   aria-labelledby="tabbtn-pawn-like">
+      <div class="card-grid" id="grid-pawn-like"></div>
+    </section>
+    <section role="tabpanel" id="tab-sliders"     aria-labelledby="tabbtn-sliders">
+      <div class="card-grid" id="grid-sliders"></div>
+    </section>
+    <section role="tabpanel" id="tab-leapers"     aria-labelledby="tabbtn-leapers">
+      <div class="card-grid" id="grid-leapers"></div>
+    </section>
+    <section role="tabpanel" id="tab-leap-riders" aria-labelledby="tabbtn-leap-riders">
+      <div class="card-grid" id="grid-leap-riders"></div>
+    </section>
+    <section role="tabpanel" id="tab-compounds"   aria-labelledby="tabbtn-compounds">
+      <div class="card-grid" id="grid-compounds"></div>
+    </section>
+    <section role="tabpanel" id="tab-hoppers"     aria-labelledby="tabbtn-hoppers">
+      <div class="card-grid" id="grid-hoppers"></div>
+    </section>
+    <section role="tabpanel" id="tab-others"      aria-labelledby="tabbtn-others">
+      <div class="card-grid" id="grid-others"></div>
+    </section>
+    <section role="tabpanel" id="tab-cat-new" aria-labelledby="tabbtn-cat-new"> <div class="card-grid" id="grid-cat-new"></div> </section>
+    <section role="tabpanel" id="tab-cat-base" aria-labelledby="tabbtn-cat-base"> <div class="card-grid" id="grid-cat-base"></div> </section>
+    <section role="tabpanel" id="tab-cat-mid" aria-labelledby="tabbtn-cat-mid"> <div class="card-grid" id="grid-cat-mid"></div> </section>
+    <section role="tabpanel" id="tab-cat-end" aria-labelledby="tabbtn-cat-end"> <div class="card-grid" id="grid-cat-end"></div> </section>
+    <section role="tabpanel" id="tab-cat-invert" aria-labelledby="tabbtn-cat-invert"> <div class="card-grid" id="grid-cat-invert"></div> </section>
+    <section role="tabpanel" id="tab-cat-fusion" aria-labelledby="tabbtn-cat-fusion"> <div class="card-grid" id="grid-cat-fusion"></div> </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">A curated codex of 38 pieces — every piece referenced in the promotions, fusions and inversions pages.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+    <p>Companion pages: <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="inversion.html">inversions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
+  </footer>
+
+  <script>
+  /* ============================================================
+   *  Data
+   * ============================================================ */
+  const PIECES = [
+    {
+      id: 'pawn',
+      family: 'pawn-like',
+      name: 'Pawn',
+      original_name: 'Pawn',
+      aliases: [],
+      glyph: '♟',
+      betza: 'mfWcfFimfnD',
+      origin: 'Standard',
+      description: 'fmW (forward move), fcF (forward capture), ifmW2 (initial forward).',
+      behaviors: ['direction-restricted', 'promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[0,1],[0,2]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1]] }
+      ]
+    },
+    {
+      id: 'berolina',
+      family: 'pawn-like',
+      name: 'Void Pawn',
+      original_name: 'Berolina Pawn',
+      aliases: ['Berlin Pawn'],
+      letter: 'BP',
+      betza: 'mfFcfWimfnA',
+      origin: 'Modern',
+      description: 'fmF (forward move), fcW (forward capture), ifmF2 (initial forward).',
+      behaviors: ['direction-restricted', 'promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[2,2],[-2,2]] },
+        { kind: 'xs',    squares: [[0,1]] }
+      ]
+    },
+    {
+      id: 'sergeant',
+      family: 'pawn-like',
+      name: 'Ranger',
+      original_name: 'Sergeant',
+      aliases: [],
+      letter: 'SG',
+      betza: 'mWcF',
+      origin: 'Extended Pawn variant',
+      description: 'mW (move), cF (capture).',
+      behaviors: ['capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'inv-sergeant',
+      family: 'pawn-like',
+      name: 'Void Ranger',
+      original_name: 'Inv Sergeant',
+      aliases: [],
+      letter: 'iSg',
+      betza: 'mFcW',
+      origin: 'Invented',
+      description: 'mF (move), cW (capture).',
+      behaviors: ['pawn-like', 'color-bound'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'xs',    squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'arrow-pawn',
+      family: 'pawn-like',
+      name: 'Archer',
+      original_name: 'Arrow Pawn',
+      aliases: ['Persson Pawn'],
+      letter: 'AP',
+      betza: 'mW2cF',
+      origin: 'Arrow Pawn Chess (Persson, 1938)',
+      description: 'mW2 (move up to 2), cF (capture).',
+      behaviors: ['promotes', 'capture-different'],
+      moves: [
+        { kind: 'rings', squares: [[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]] },
+        { kind: 'xs',    squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'inv-arrow-pawn',
+      family: 'pawn-like',
+      name: 'Void Archer',
+      original_name: 'Inv Arrow Pawn',
+      aliases: [],
+      letter: 'iAP',
+      betza: 'mF2cW',
+      origin: 'Invented',
+      description: 'mF2 (move up to 2), cW (capture).',
+      behaviors: ['pawn-like', 'color-bound'],
+      moves: [
+        { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2]] },
+        { kind: 'xs',    squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'ferz',
+      family: 'leapers',
+      name: 'Seer',
+      original_name: 'Ferz',
+      aliases: ['Fers', 'Counsellor', 'Mantri'],
+      letter: 'F',
+      betza: 'F',
+      origin: 'Shatranj',
+      description: 'F (1-step diagonal).',
+      behaviors: ['leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'elephant-modern',
+      family: 'leapers',
+      name: 'Mystic',
+      original_name: 'Elephant (Modern)',
+      aliases: ['Modern Elephant'],
+      letter: 'EM',
+      betza: 'FA',
+      origin: 'Modern variants',
+      description: 'F + A (1-step + (2,2) leap diagonal).',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'high-priestess',
+      family: 'leapers',
+      name: 'High Priestess',
+      original_name: 'High Priestess',
+      aliases: [],
+      letter: 'HP',
+      betza: 'FAN',
+      origin: 'Problem chess',
+      description: 'F + A + N.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'wazir',
+      family: 'leapers',
+      name: 'Mage',
+      original_name: 'Wazir',
+      aliases: ['Vizir', 'Wezir'],
+      letter: 'W',
+      betza: 'W',
+      origin: 'Shatranj',
+      description: 'W (1-step orthogonal).',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'war-machine',
+      family: 'leapers',
+      name: 'Sorcerer',
+      original_name: 'War Machine',
+      aliases: [],
+      letter: 'WM',
+      betza: 'WD',
+      origin: 'Problem chess',
+      description: 'W + D (1-step + (0,2) leap orthogonal).',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'champion',
+      family: 'leapers',
+      name: 'Archmage',
+      original_name: 'Champion',
+      aliases: [],
+      letter: 'Ch',
+      betza: 'WAD',
+      origin: 'Omega Chess',
+      description: 'W + A + D.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'bishop',
+      family: 'sliders',
+      name: 'Bishop',
+      original_name: 'Bishop',
+      aliases: [],
+      glyph: '♝',
+      betza: 'B',
+      origin: 'Standard',
+      description: 'B (diagonal slide).',
+      behaviors: ['long-range', 'color-bound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'dragon-horse',
+      family: 'compounds',
+      name: 'Paladin',
+      original_name: 'Dragon Horse',
+      aliases: ['Promoted Bishop', 'Ryūma'],
+      letter: '馬',
+      betza: 'BW',
+      origin: 'Shōgi',
+      description: 'B + W (diagonal slide + 1-step orthogonal).',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'archbishop',
+      family: 'compounds',
+      name: 'Archbishop',
+      original_name: 'Archbishop',
+      aliases: ['Princess', 'Cardinal', 'Janus'],
+      letter: 'AR',
+      betza: 'BN',
+      origin: 'Modern',
+      description: 'B + N (diagonal slide + (1,2) leap).',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'rook',
+      family: 'sliders',
+      name: 'Rook',
+      original_name: 'Rook',
+      aliases: ['Castle'],
+      glyph: '♜',
+      betza: 'R',
+      origin: 'Standard',
+      description: 'R (orthogonal slide).',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'dragon-king',
+      family: 'compounds',
+      name: 'Drake',
+      original_name: 'Dragon King',
+      aliases: ['Promoted Rook', 'Ryūō'],
+      letter: '龍',
+      betza: 'RF',
+      origin: 'Shōgi',
+      description: 'R + F (orthogonal slide + 1-step diagonal).',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'chancellor',
+      family: 'compounds',
+      name: 'Dragonlord',
+      original_name: 'Chancellor',
+      aliases: ['Marshall', 'Marshal', 'Empress', 'Concubine'],
+      letter: 'CH',
+      betza: 'RN',
+      origin: 'Modern',
+      description: 'R + N (orthogonal slide + (1,2) leap).',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'knight',
+      family: 'leapers',
+      name: 'Knight',
+      original_name: 'Knight',
+      aliases: ['Horse'],
+      glyph: '♞',
+      betza: 'N',
+      origin: 'Standard',
+      description: 'N ((1,2) leap).',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'gnu',
+      family: 'leapers',
+      name: 'Hippogriff',
+      original_name: 'Gnu',
+      aliases: ['Unicorn'],
+      letter: 'GU',
+      betza: 'NC',
+      origin: 'Problem chess',
+      description: 'N + C ((1,2) + (1,3) leaps).',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'buffalo',
+      family: 'leapers',
+      name: 'Behemoth',
+      original_name: 'Buffalo',
+      aliases: [],
+      letter: 'BF',
+      betza: 'CZN',
+      origin: 'Problem chess',
+      description: 'C + Z + N ((1,3) + (2,3) + (1,2) leaps).',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1],
+          [2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2],
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'kirin',
+      family: 'leapers',
+      name: 'Kirin',
+      original_name: 'Kirin',
+      aliases: [],
+      letter: 'Ki',
+      betza: 'FD',
+      origin: 'Chu Shōgi',
+      description: 'F + D (1-step diagonal + (0,2) leap).',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'kirin-plus',
+      family: 'leapers',
+      name: 'Sacred Kirin',
+      original_name: 'Kirin+',
+      aliases: [],
+      letter: 'Ki+',
+      betza: 'FDC',
+      origin: 'Invented',
+      description: 'Promoted form of the Kirin. Adds the Camel (1,3) L-leap to the Kirin\'s Ferz and Dabbaba moves — sixteen reachable squares. Stays fully colour-bound: every component has an even dx+dy (1+1, 2+0, 1+3), so the piece never changes square colour.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,0],[-2,0],[0,2],[0,-2],
+          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'inv-kirin-plus',
+      family: 'leapers',
+      name: 'Void Kirin',
+      original_name: 'Inv Kirin+',
+      aliases: [],
+      letter: 'iKi+',
+      betza: 'WNH',
+      origin: 'Invented',
+      description: 'W + N + H.',
+      behaviors: ['compound', 'leaper', 'color-changing'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [1,2],[-1,2],[1,-2],[-1,-2],[2,1],[-2,1],[2,-1],[-2,-1],
+          [3,0],[-3,0],[0,3],[0,-3]
+        ] }
+      ]
+    },
+    {
+      id: 'kirin-plus-plus',
+      family: 'leapers',
+      name: 'Celestial Kirin',
+      original_name: 'Kirin++',
+      aliases: [],
+      letter: 'Ki++',
+      betza: 'FADCG + 4L',
+      origin: 'Invented',
+      description: 'F + A + D + C + G + (1,4) leap.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,1],[-1,1],[1,-1],[-1,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2],
+          [1,3],[-1,3],[1,-3],[-1,-3],[3,1],[-3,1],[3,-1],[-3,-1],
+          [3,3],[-3,3],[3,-3],[-3,-3],
+          [4,0],[-4,0],[0,4],[0,-4]
+        ] }
+      ]
+    },
+    {
+      id: 'inv-kirin-plus-plus',
+      family: 'leapers',
+      name: 'Void Celestial Kirin',
+      original_name: 'Inv Kirin++',
+      aliases: [],
+      letter: 'iKi++',
+      betza: 'WNH + Giraffe + Zebra',
+      origin: 'Invented',
+      description: 'W + N + H + (1,4) leap + (2,3) leap.',
+      behaviors: ['compound', 'leaper', 'color-changing'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,0],[-1,0],[0,1],[0,-1],
+          [1,2],[-1,2],[1,-2],[-1,-2],[2,1],[-2,1],[2,-1],[-2,-1],
+          [3,0],[-3,0],[0,3],[0,-3],
+          [1,4],[-1,4],[1,-4],[-1,-4],[4,1],[-4,1],[4,-1],[-4,-1],
+          [2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'alibaba',
+      family: 'leapers',
+      name: 'Wanderer',
+      original_name: 'Alibaba',
+      aliases: [],
+      letter: 'AD',
+      betza: 'AD',
+      origin: 'Problem chess',
+      description: 'A + D ((2,2) leap + (0,2) leap).',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'bodyguard',
+      family: 'sliders',
+      name: 'Praetorian',
+      original_name: 'Bodyguard',
+      aliases: ['Hia'],
+      letter: 'BG',
+      betza: 'Q2',
+      origin: 'Hiashatar (Mongolian decimal chess)',
+      description: 'Slides like a Queen but only one or two squares in any of the eight directions. Has a defensive aura in Hiashatar: any opposing sliding piece must stop the moment it moves within a King\'s-move radius of the Bodyguard, so it cannot pass by without being challenged.',
+      behaviors: ['direction-restricted'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]], maxRange: 2 }
+      ]
+    },
+    {
+      id: 'queen',
+      family: 'sliders',
+      name: 'Queen',
+      original_name: 'Queen',
+      aliases: [],
+      glyph: '♛',
+      betza: 'Q',
+      origin: 'Standard',
+      description: 'Q = R + B.',
+      behaviors: ['long-range', 'compound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'squirrel',
+      family: 'leapers',
+      name: 'Faerie',
+      original_name: 'Squirrel',
+      aliases: [],
+      letter: 'Sq',
+      betza: 'NAD',
+      origin: 'Problem chess',
+      description: 'N + A + D.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [2,2],[-2,2],[2,-2],[-2,-2],
+          [2,0],[-2,0],[0,2],[0,-2]
+        ] }
+      ]
+    },
+    {
+      id: 'crown-princess',
+      family: 'compounds',
+      name: 'Crown Princess',
+      original_name: 'Crown Princess',
+      aliases: ['Popess'],
+      letter: 'CP',
+      betza: 'BNW',
+      origin: 'Modern variants',
+      description: 'B + N + W.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [
+          [1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],
+          [1,0],[-1,0],[0,1],[0,-1]
+        ] }
+      ]
+    },
+    {
+      id: 'amazon',
+      family: 'compounds',
+      name: 'Amazon',
+      original_name: 'Amazon',
+      aliases: ['Angel', 'Commander', 'Wyvern'],
+      letter: 'A',
+      betza: 'QN',
+      origin: 'Modern',
+      description: 'Q + N.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'gryphon',
+      family: 'others',
+      name: 'Gryphon',
+      original_name: 'Gryphon',
+      aliases: ['Aanca', 'Eagle (Grant Acedrex)'],
+      letter: 'GP',
+      betza: 't[FR]',
+      origin: 'Grant Acedrex (1283)',
+      description: 't[FR] (1 F step, then R outward).',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] }
+      ]
+    },
+    {
+      id: 'manticore',
+      family: 'others',
+      name: 'Manticore',
+      original_name: 'Manticore',
+      aliases: ['Anchorite', 'Acromantula', 'Rhinoceros', 'Spider', 'Unicorn'],
+      letter: 'MN',
+      betza: 't[WB]',
+      origin: 'Modern variants (Betza, Gilman, Cazaux)',
+      description: 't[WB] (1 W step, then B outward).',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+      ]
+    },
+    {
+      id: 'godzilla',
+      family: 'others',
+      name: 'Godzilla',
+      original_name: 'Godzilla',
+      aliases: [],
+      letter: 'GZ',
+      betza: 't[FR]t[WB]',
+      origin: 'Modern variants',
+      description: 't[FR] + t[WB] (two bent riders).',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [1,  1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [0,  1] },
+        { kind: 'bent-rider', pivot: [-1, 1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [1, -1],  dir: [1,  0] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [0, -1] },
+        { kind: 'bent-rider', pivot: [-1,-1],  dir: [-1, 0] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [0,  1],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1,  1] },
+        { kind: 'bent-rider', pivot: [1,  0],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [1, -1] },
+        { kind: 'bent-rider', pivot: [0, -1],  dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1, 1] },
+        { kind: 'bent-rider', pivot: [-1, 0],  dir: [-1,-1] }
+      ]
+    },
+    {
+      id: 'banshee',
+      family: 'compounds',
+      name: 'Banshee',
+      original_name: 'Banshee',
+      aliases: [],
+      letter: 'Bn',
+      betza: 'BNN',
+      origin: 'Problem chess',
+      description: 'B + NN (diagonal slide + N rider).',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'raven',
+      family: 'compounds',
+      name: 'Raven',
+      original_name: 'Raven',
+      aliases: ['Waran'],
+      letter: 'Rv',
+      betza: 'RNN',
+      origin: 'Problem chess',
+      description: 'R + NN (orthogonal slide + N rider).',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'amazonrider',
+      family: 'compounds',
+      name: 'Valkyrie',
+      original_name: 'Amazonrider',
+      aliases: [],
+      letter: 'Am',
+      betza: 'QNN',
+      origin: 'Problem chess',
+      description: 'Q + NN.',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,  2], dots: [[1,2], [2,4]] },
+        { kind: 'rider', step: [2,  1], dots: [[2,1], [4,2]] },
+        { kind: 'rider', step: [-1, 2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2, 1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1, -2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2, -1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    }
+  ];
+
+  const FAMILY_ORDER = ['pawn-like', 'sliders', 'leapers', 'leap-riders', 'compounds', 'hoppers', 'others'];
+
+  // Per-tab ordering by rough complexity (familiar → unusual → compound → complex).
+  // Pieces not listed here fall to the end of their tab.
+  const PIECE_ORDER = {
+    'pawn-like': [
+      'pawn', 'chinese-pawn', 'korean-pawn', 'berolina',
+      'hiashatar-pawn', 'torpedo-pawn', 'corporal',
+      'berolina-plus', 'arrow-pawn', 'sergeant'
+    ],
+    'sliders': [
+      'rook', 'bishop', 'queen',
+      'lance', 'bodyguard', 'edgehog',
+      'reflecting-bishop', 'hunter'
+    ],
+    'leapers': [
+      // Standard short leapers
+      'wazir', 'ferz', 'dabbaba', 'alfil', 'knight',
+      // Larger single (m,n) leapers, ascending in distance
+      'threeleaper', 'fourleaper', 'camel', 'zebra', 'giraffe',
+      'tripper', 'stag', 'antelope', 'commuter',
+      // Blockable / direction-restricted variants
+      'mao',
+      // King-move family (4–8 directions, one step)
+      'king', 'mann', 'anti-king', 'prince',
+      'xiangqi-general', 'advisor',
+      'silver-general', 'gold-general',
+      // 2-component leaper compounds (small components)
+      'phoenix', 'kirin', 'war-machine', 'elephant-modern',
+      'alibaba', 'gnu', 'centaur', 'kangaroo', 'mounted-king',
+      // 2-component leaper compounds (longer-range components)
+      'bison', 'roc', 'newt', 'leon',
+      'auroch', 'okapi', 'impala', 'pegasus',
+      // 3+ component compounds
+      'high-priestess', 'champion', 'squirrel', 'buffalo'
+    ],
+    'leap-riders': [
+      'nightrider', 'camelrider', 'alfilrider', 'dabbabarider',
+      'alibabarider', 'gnurider'
+    ],
+    'compounds': [
+      // Classic slider+leaper compounds
+      'amazon', 'archbishop', 'chancellor',
+      // Shōgi-derived promoted-piece compounds
+      'dragon-king', 'dragon-horse',
+      // Royal compound versions
+      'maharaja',
+      // Slider + leaper variants
+      'caliph', 'canvasser', 'crown-princess',
+      // Slider + leap-rider variants
+      'raven', 'banshee', 'amazonrider',
+      // Most complex / direction-asymmetric
+      'eagle'
+    ],
+    'hoppers': [
+      // Foundational hopper
+      'grasshopper',
+      // Variants of grasshopper-style hopping
+      'equihopper', 'lion',
+      // Capture-only hopper
+      'locust',
+      // Cannon family (move-and-capture differ)
+      'cannon', 'vao', 'leo', 'nao',
+      // Restricted-line grasshoppers
+      'bishopper', 'nightriderhopper',
+      // Inverse cannons (capture freely, move by hop)
+      'faro', 'loco'
+    ],
+    'others': [
+      // Zigzag (90° turn after each step)
+      'boyscout', 'girlscout',
+      // Single-bend riders
+      'gryphon', 'manticore', 'astrologer',
+      // Closed-cycle nightrider
+      'quintessence',
+      // Compound bent rider
+      'godzilla'
+    ]
+  };
+
+  
+  const PROMOTE_OF = {"pawn":"sergeant","sergeant":"arrow-pawn","ferz":"elephant-modern","elephant-modern":"high-priestess","wazir":"war-machine","war-machine":"champion","bishop":"dragon-horse","dragon-horse":"archbishop","rook":"dragon-king","dragon-king":"chancellor","knight":"gnu","gnu":"buffalo","kirin":"kirin-plus","kirin-plus":"kirin-plus-plus","alibaba":"bodyguard","bodyguard":"queen"};
+  const DEMOTE_OF = {"sergeant":"pawn","arrow-pawn":"sergeant","elephant-modern":"ferz","high-priestess":"elephant-modern","war-machine":"wazir","champion":"war-machine","dragon-horse":"bishop","archbishop":"dragon-horse","dragon-king":"rook","chancellor":"dragon-king","gnu":"knight","buffalo":"gnu","kirin-plus":"kirin","kirin-plus-plus":"kirin-plus","bodyguard":"alibaba","queen":"bodyguard"};
+  const INVERT_OF = {"wazir":"ferz","ferz":"wazir","bishop":"rook","rook":"bishop","pawn":"berolina","berolina":"pawn","sergeant":"inv-sergeant","inv-sergeant":"sergeant","arrow-pawn":"inv-arrow-pawn","inv-arrow-pawn":"arrow-pawn","dragon-horse":"dragon-king","dragon-king":"dragon-horse","kirin":"squirrel","squirrel":"kirin","elephant-modern":"war-machine","war-machine":"elephant-modern","archbishop":"chancellor","chancellor":"archbishop","kirin-plus":"inv-kirin-plus","inv-kirin-plus":"kirin-plus","high-priestess":"champion","champion":"high-priestess","banshee":"raven","raven":"banshee","kirin-plus-plus":"inv-kirin-plus-plus","inv-kirin-plus-plus":"kirin-plus-plus","gryphon":"manticore","manticore":"gryphon"};
+  function renderMiniRelation(targetId, label) {
+    const target = PIECES.find(p => p.id === targetId);
+    if (!target) return '';
+    return `<div class="relation-row">
+      <span class="relation-label">${label}</span>
+      <div class="relation-target">
+        <div class="relation-mini">${renderBoard(target)}</div>
+        <span class="relation-name">${target.name}</span>
+      </div>
+    </div>`;
+  }
+  function renderRelations(piece) {
+    const promote = PROMOTE_OF[piece.id];
+    const demote = DEMOTE_OF[piece.id];
+    const invert = INVERT_OF[piece.id];
+    if (!promote && !demote && !invert) return '';
+    const rows = [
+      demote ? renderMiniRelation(demote, 'Demote to') : '',
+      promote ? renderMiniRelation(promote, 'Promote to') : '',
+      invert ? renderMiniRelation(invert, 'Invert to') : ''
+    ].filter(Boolean).join('');
+    return '<div class="relations">' + rows + '</div>';
+  }
+
+/* ============================================================
+   *  Rendering
+   * ============================================================ */
+  const N = 9;
+  const SQ = 36;
+  const SIZE = N * SQ;
+
+  function svgCenter(x, y) {
+    return { cx: (x + 4) * SQ + SQ / 2, cy: (4 - y) * SQ + SQ / 2 };
+  }
+  function squareRect(x, y) {
+    return { sx: (x + 4) * SQ, sy: (4 - y) * SQ };
+  }
+
+  function describeMoves(piece) {
+    const parts = [];
+    for (const m of piece.moves) {
+      if (m.kind === 'dots')   parts.push(`${m.squares.length} leap targets`);
+      if (m.kind === 'rings')  parts.push(`${m.squares.length} move-only squares`);
+      if (m.kind === 'xs')     parts.push(`${m.squares.length} capture-only squares`);
+      if (m.kind === 'rays')   parts.push(`slides in ${m.dirs.length} directions`);
+      if (m.kind === 'rider')  parts.push('rider continues past the diagram');
+      if (m.kind === 'hop' || m.kind === 'capture-hop') parts.push('hops over a hurdle');
+    }
+    return `${piece.name}: ${parts.join('; ')}.`;
+  }
+
+  function renderBoard(piece) {
+    let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="board" role="img" aria-label="${piece.name} movement diagram">`;
+    svg += `<title>${piece.name} — movement diagram</title>`;
+    svg += `<desc>${describeMoves(piece)} ${piece.description}</desc>`;
+
+    // Squares
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        const isLight = (r + c) % 2 === 0;
+        const fill = isLight ? 'var(--sq-light)' : 'var(--sq-dark)';
+        svg += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${fill}"/>`;
+      }
+    }
+
+    // Moves
+    for (const move of piece.moves) {
+      svg += renderMove(move);
+    }
+
+    // Piece glyph at centre (or piece_at if set)
+    const piecePos = piece.piece_at || [0, 0];
+    const { cx, cy } = svgCenter(piecePos[0], piecePos[1]);
+    if (piece.glyph) {
+      svg += `<text x="${cx}" y="${cy + SQ*0.04}" text-anchor="middle" dominant-baseline="central" font-size="${SQ*0.85}" fill="var(--text)" style="font-family: 'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2',serif;">${piece.glyph}</text>`;
+    } else {
+      const r = SQ * 0.36;
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--piece-disc)"/>`;
+      const len = (piece.letter || '?').length;
+      const fontSize = len >= 2 ? SQ*0.30 : (piece.letter && piece.letter.charCodeAt(0) > 0x2E00 ? SQ*0.46 : SQ*0.48);
+      svg += `<text x="${cx}" y="${cy + SQ*0.02}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}" font-weight="700" fill="var(--piece-disc-text)" style="font-family: 'Hiragino Sans','Noto Sans CJK JP',-apple-system,sans-serif;">${piece.letter || ''}</text>`;
+    }
+    svg += `</svg>`;
+    return svg;
+  }
+
+  function renderMove(move) {
+    switch (move.kind) {
+      case 'dots':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="var(--move-color)"/>`;
+        }).join('');
+
+      case 'rings':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="none" stroke="var(--move-color)" stroke-width="2.5"/>`;
+        }).join('');
+
+      case 'xs':
+        return move.squares.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          const r = SQ * 0.22;
+          return `<line x1="${cx-r}" y1="${cy-r}" x2="${cx+r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
+                 `<line x1="${cx+r}" y1="${cy-r}" x2="${cx-r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
+        }).join('');
+
+      case 'rays': {
+        const fromSq = move.from || [0, 0];
+        const maxRange = move.maxRange || Infinity;
+        return move.dirs.map(([dx, dy]) => {
+          let lastX = fromSq[0], lastY = fromSq[1];
+          let stepX = fromSq[0], stepY = fromSq[1];
+          let steps = 0;
+          while (steps < maxRange) {
+            stepX += dx; stepY += dy;
+            if (Math.abs(stepX) > 4 || Math.abs(stepY) > 4) break;
+            lastX = stepX; lastY = stepY;
+            steps++;
+          }
+          if (lastX === fromSq[0] && lastY === fromSq[1]) return '';
+          const start = svgCenter(fromSq[0], fromSq[1]);
+          const end   = svgCenter(lastX, lastY);
+          const angle = Math.atan2(end.cy - start.cy, end.cx - start.cx);
+          const lineStart = {
+            x: start.cx + Math.cos(angle) * SQ * 0.42,
+            y: start.cy + Math.sin(angle) * SQ * 0.42
+          };
+          const tip = { x: end.cx, y: end.cy };
+          const arrowLen = SQ * 0.30;
+          const arrowWidth = SQ * 0.16;
+          const base = {
+            x: tip.x - Math.cos(angle) * arrowLen,
+            y: tip.y - Math.sin(angle) * arrowLen
+          };
+          const perp = { x: -Math.sin(angle) * arrowWidth, y: Math.cos(angle) * arrowWidth };
+          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="var(--ray-color)" stroke-width="3.4" stroke-linecap="round"/>` +
+                 `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="var(--ray-color)"/>`;
+        }).join('');
+      }
+
+      case 'rider': {
+        const start = svgCenter(0, 0);
+        const points = [{ cx: start.cx, cy: start.cy }, ...move.dots.map(([x, y]) => svgCenter(x, y))];
+        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.65"/>`;
+        const dots = move.dots.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
+        }).join('');
+        // Arrow at last point in step direction
+        const lastP = points[points.length - 1];
+        const p2 = points[points.length - 2] || start;
+        const dxx = lastP.cx - p2.cx;
+        const dyy = lastP.cy - p2.cy;
+        const len = Math.hypot(dxx, dyy) || 1;
+        const dirX = dxx / len, dirY = dyy / len;
+        // Don't draw arrow if it would land off-board
+        const tipX = lastP.cx + dirX * SQ * 0.40;
+        const tipY = lastP.cy + dirY * SQ * 0.40;
+        let arrow = '';
+        if (tipX >= 4 && tipX <= SIZE - 4 && tipY >= 4 && tipY <= SIZE - 4) {
+          const arrowLen = SQ * 0.22;
+          const arrowWidth = SQ * 0.13;
+          const baseX = tipX - dirX * arrowLen;
+          const baseY = tipY - dirY * arrowLen;
+          const perpX = -dirY * arrowWidth;
+          const perpY = dirX * arrowWidth;
+          arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--rider-color)" opacity="0.85"/>`;
+        }
+        return line + dots + arrow;
+      }
+
+      case 'hop': {
+        const start = svgCenter(0, 0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
+        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
+        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
+        const r = SQ * 0.24;
+        const target = `<polygon points="${t.cx},${t.cy-r} ${t.cx+r},${t.cy} ${t.cx},${t.cy+r} ${t.cx-r},${t.cy}" fill="var(--hop-target)"/>`;
+        return path + hurdleRect + target;
+      }
+
+      case 'capture-hop': {
+        const start = svgCenter(0, 0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--capture-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
+        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
+        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
+        const r = SQ * 0.22;
+        const xMark = `<line x1="${t.cx-r}" y1="${t.cy-r}" x2="${t.cx+r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
+                      `<line x1="${t.cx+r}" y1="${t.cy-r}" x2="${t.cx-r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
+        return path + hurdleRect + xMark;
+      }
+
+      case 'move-hop': {
+        // Like hop, but the landing square is move-only (ring outline, not filled diamond).
+        const start = svgCenter(0, 0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const path = `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>`;
+        const { sx, sy } = squareRect(move.hurdle[0], move.hurdle[1]);
+        const hurdleRect = `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>`;
+        const target = `<circle cx="${t.cx}" cy="${t.cy}" r="${SQ*0.22}" fill="none" stroke="var(--hop-target)" stroke-width="2.5"/>`;
+        return path + hurdleRect + target;
+      }
+
+      case 'zigzag': {
+        // Bent-path rider: draws a polyline from center through the listed squares,
+        // each square also gets a rider dot. The path bends at every square.
+        const start = svgCenter(0, 0);
+        const pts = [start, ...move.points.map(([x, y]) => svgCenter(x, y))];
+        const pathD = `M ${pts.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" fill="none" opacity="0.75"/>`;
+        const dots = move.points.map(([x, y]) => {
+          const { cx, cy } = svgCenter(x, y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.16}" fill="var(--rider-color)"/>`;
+        }).join('');
+        return line + dots;
+      }
+
+      case 'bent-rider': {
+        // One-step leap to `pivot`, then continues as a ray in `dir` outward.
+        // The pivot square is itself reachable (the piece can stop there).
+        const start = svgCenter(0, 0);
+        const pivotC = svgCenter(move.pivot[0], move.pivot[1]);
+        const [bdx, bdy] = move.dir;
+        let lastX = move.pivot[0], lastY = move.pivot[1];
+        while (true) {
+          const nx = lastX + bdx, ny = lastY + bdy;
+          if (Math.abs(nx) > 4 || Math.abs(ny) > 4) break;
+          lastX = nx; lastY = ny;
+        }
+        // Leap segment: short line from origin square to pivot
+        const leapAngle = Math.atan2(pivotC.cy - start.cy, pivotC.cx - start.cx);
+        const leapStart = {
+          x: start.cx + Math.cos(leapAngle) * SQ * 0.42,
+          y: start.cy + Math.sin(leapAngle) * SQ * 0.42
+        };
+        const leapLine = `<line x1="${leapStart.x}" y1="${leapStart.y}" x2="${pivotC.cx}" y2="${pivotC.cy}" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round" opacity="0.85"/>`;
+        // If the slide can't move, just put a dot at the pivot
+        if (lastX === move.pivot[0] && lastY === move.pivot[1]) {
+          const dot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.18}" fill="var(--ray-color)"/>`;
+          return leapLine + dot;
+        }
+        // Slide segment: from pivot to base-of-arrow at endC
+        const endC = svgCenter(lastX, lastY);
+        const slideAngle = Math.atan2(endC.cy - pivotC.cy, endC.cx - pivotC.cx);
+        const arrowLen = SQ * 0.28;
+        const arrowWidth = SQ * 0.14;
+        const tipX = endC.cx, tipY = endC.cy;
+        const baseX = tipX - Math.cos(slideAngle) * arrowLen;
+        const baseY = tipY - Math.sin(slideAngle) * arrowLen;
+        const perpX = -Math.sin(slideAngle) * arrowWidth;
+        const perpY =  Math.cos(slideAngle) * arrowWidth;
+        const slideLine = `<line x1="${pivotC.cx}" y1="${pivotC.cy}" x2="${baseX}" y2="${baseY}" stroke="var(--ray-color)" stroke-width="2.8" stroke-linecap="round"/>`;
+        const arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
+        // Small dot at pivot to emphasise it is a valid stopping square
+        const pivotDot = `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.10}" fill="var(--ray-color)"/>`;
+        return leapLine + pivotDot + slideLine + arrow;
+      }
+
+      case 'reflecting-ray': {
+        // Trace a billiard-style ray from `move.from` in `move.dir`, bouncing off
+        // board edges (max coord ±4). Limit to maxSteps squares.
+        const maxSteps = move.maxSteps || 10;
+        const visited = [];
+        let [px, py] = move.from;
+        let [dx, dy] = move.dir;
+        for (let i = 0; i < maxSteps; i++) {
+          let nx = px + dx;
+          let ny = py + dy;
+          if (nx > 4 || nx < -4) { dx = -dx; nx = px + dx; }
+          if (ny > 4 || ny < -4) { dy = -dy; ny = py + dy; }
+          if (nx > 4 || nx < -4 || ny > 4 || ny < -4) break;
+          visited.push([nx, ny]);
+          px = nx; py = ny;
+        }
+        if (visited.length === 0) return '';
+        const startC = svgCenter(move.from[0], move.from[1]);
+        const points = [startC, ...visited.map(([x, y]) => svgCenter(x, y))];
+        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        const line = `<path d="${pathD}" stroke="var(--ray-color)" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round" fill="none" opacity="0.85"/>`;
+        // Arrow at end pointing in current direction
+        const lastP = points[points.length - 1];
+        const p2 = points[points.length - 2];
+        const ddx = lastP.cx - p2.cx;
+        const ddy = lastP.cy - p2.cy;
+        const len = Math.hypot(ddx, ddy) || 1;
+        const ux = ddx / len, uy = ddy / len;
+        const arrowLen = SQ * 0.24;
+        const arrowWidth = SQ * 0.14;
+        const tipX = lastP.cx, tipY = lastP.cy;
+        const baseX = tipX - ux * arrowLen;
+        const baseY = tipY - uy * arrowLen;
+        const perpX = -uy * arrowWidth;
+        const perpY =  ux * arrowWidth;
+        const arrow = `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
+        return line + arrow;
+      }
+
+      default: return '';
+    }
+  }
+
+  function renderCard(piece) {
+    const aliases = piece.aliases && piece.aliases.length
+      ? `<span class="card-aliases">aka ${piece.aliases.join(', ')}</span>` : '';
+    const betza = piece.betza
+      ? `<a class="betza-chip" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox"><span class="betza-chip-label">Betza</span>${piece.betza}</a>`
+      : '';
+    const badges = (piece.behaviors || []).map(b =>
+      `<span class="badge badge-${b}">${b.replace(/-/g, ' ')}</span>`
+    ).join('');
+    const searchHaystack = [
+      piece.name,
+      (piece.aliases || []).join(' '),
+      piece.betza || '',
+      (piece.behaviors || []).join(' '),
+      piece.origin,
+      piece.description
+    ].join(' ').toLowerCase();
+
+    const idSuffix = piece._idSuffix || '';
+    return `
+      <article class="card" id="piece-${piece.id}${idSuffix}" data-search="${escapeAttr(searchHaystack)}">
+        <div class="card-header">
+          <div>
+            <h2 class="card-name">${piece.name}</h2>
+            ${piece.original_name && piece.original_name !== piece.name ? '<div class="original-name">originally <em>' + piece.original_name + '</em></div>' : ''}
+            ${aliases}
+          </div>
+        </div>
+        <div class="card-board">${renderBoard(piece)}</div>
+        ${renderRelations(piece)}
+        <div class="card-meta">
+          ${betza}
+        </div>
+        <p class="card-desc">${piece.description}</p>
+        ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
+      </article>
+    `;
+  }
+
+
+  function escapeAttr(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ============================================================
+   *  Init
+   * ============================================================ */
+
+  // Bucket pieces by family and render each tab's grid.
+  const grouped = Object.fromEntries(FAMILY_ORDER.map(f => [f, []]));
+  for (const p of PIECES) {
+    if (!grouped[p.family]) {
+      console.warn('Unknown family for piece', p.id, p.family);
+      grouped['others'].push(p);
+    } else {
+      grouped[p.family].push(p);
+    }
+  }
+  // Sort each family by its PIECE_ORDER. Unlisted pieces fall to the end.
+  for (const f of FAMILY_ORDER) {
+    const order = PIECE_ORDER[f] || [];
+    grouped[f].sort((a, b) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+  for (const f of FAMILY_ORDER) {
+    const grid = document.getElementById('grid-' + f);
+    if (grouped[f].length) {
+      grid.innerHTML = grouped[f].map(renderCard).join('');
+    } else {
+      grid.innerHTML = '<p class="empty-tab">No pieces here yet — reserved for pieces whose defining feature isn’t one of the five movement families.</p>';
+    }
+    document.getElementById('count-' + f).textContent = grouped[f].length;
+    const fbtn = document.getElementById('tabbtn-' + f);
+    if (fbtn && grouped[f].length === 0) fbtn.classList.add('is-empty');
+  }
+
+  // Render the "All pieces" tab: flat grid of every piece, ordered by family then PIECE_ORDER.
+  const allOrdered = FAMILY_ORDER.flatMap(f => grouped[f]);
+  document.getElementById('grid-all').innerHTML = allOrdered.map(p => renderCard({ ...p, _idSuffix: '--all' })).join('');
+  document.getElementById('count-all').textContent = allOrdered.length;
+
+  // Codex second-row categories (multi-membership).
+  const ROW2_CATEGORIES = [
+  {
+    "id": "new",
+    "label": "New",
+    "members": [
+      "kirin-plus",
+      "kirin-plus-plus",
+      "inv-sergeant",
+      "inv-arrow-pawn",
+      "inv-kirin-plus",
+      "inv-kirin-plus-plus"
+    ]
+  },
+  {
+    "id": "base",
+    "label": "Base",
+    "members": [
+      "pawn",
+      "ferz",
+      "wazir",
+      "bishop",
+      "rook",
+      "knight",
+      "kirin",
+      "alibaba"
+    ]
+  },
+  {
+    "id": "mid",
+    "label": "Mid",
+    "members": [
+      "sergeant",
+      "elephant-modern",
+      "war-machine",
+      "dragon-horse",
+      "dragon-king",
+      "gnu",
+      "kirin-plus",
+      "bodyguard"
+    ]
+  },
+  {
+    "id": "end",
+    "label": "End",
+    "members": [
+      "arrow-pawn",
+      "high-priestess",
+      "champion",
+      "archbishop",
+      "chancellor",
+      "buffalo",
+      "kirin-plus-plus",
+      "queen"
+    ]
+  },
+  {
+    "id": "invert",
+    "label": "Invert",
+    "members": [
+      "berolina",
+      "inv-sergeant",
+      "inv-arrow-pawn",
+      "inv-kirin-plus",
+      "inv-kirin-plus-plus"
+    ]
+  },
+  {
+    "id": "fusion",
+    "label": "Fusion",
+    "members": [
+      "crown-princess",
+      "amazon",
+      "gryphon",
+      "manticore",
+      "banshee",
+      "raven",
+      "amazonrider",
+      "godzilla",
+      "squirrel"
+    ]
+  }
+];
+  for (const c of ROW2_CATEGORIES) {
+    const members = c.members.map(id => PIECES.find(p => p.id === id)).filter(Boolean);
+    const grid = document.getElementById('grid-cat-' + c.id);
+    if (grid) {
+      if (members.length) {
+        grid.innerHTML = members.map(p => renderCard({ ...p, _idSuffix: '--cat-' + c.id })).join('');
+      } else {
+        grid.innerHTML = '<p class="empty-tab">No pieces in this category yet.</p>';
+      }
+      document.getElementById('count-cat-' + c.id).textContent = members.length;
+      const btn = document.getElementById('tabbtn-cat-' + c.id);
+      if (btn && members.length === 0) btn.classList.add('is-empty');
+    }
+  }
+
+  // Tabs
+  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+  function activateTab(panelId, opts = {}) {
+    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
+    tabBtns.forEach(b => {
+      const sel = b.getAttribute('aria-controls') === panelId;
+      b.setAttribute('aria-selected', sel ? 'true' : 'false');
+      b.setAttribute('tabindex', sel ? '0' : '-1');
+    });
+    if (!opts.skipHash) history.replaceState(null, '', '#' + panelId);
+  }
+
+  tabBtns.forEach((btn, i) => {
+    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
+        tabBtns[next].focus();
+        activateTab(tabBtns[next].getAttribute('aria-controls'));
+      }
+    });
+  });
+
+  // Hash routing: honor any #tab-<family> on load.
+  if (location.hash.startsWith('#tab-')) {
+    const wantedId = location.hash.slice(1);
+    if (document.getElementById(wantedId)) {
+      activateTab(wantedId, { skipHash: true });
+    }
+  }
+
+  // Filter: scope across every card grid so switching tabs preserves the filter.
+  const filterInput = document.getElementById('filter');
+  filterInput.addEventListener('input', () => {
+    const q = filterInput.value.trim().toLowerCase();
+    const visibleFamily = Object.fromEntries(FAMILY_ORDER.map(f => [f, 0]));
+    const visibleCat = Object.fromEntries(ROW2_CATEGORIES.map(c => [c.id, 0]));
+    let visibleAll = 0;
+    document.querySelectorAll('.card-grid .card').forEach(card => {
+      const haystack = card.dataset.search || '';
+      const show = !q || haystack.includes(q);
+      card.style.display = show ? '' : 'none';
+      if (show) {
+        const grid = card.closest('.card-grid');
+        const gid = grid && grid.id;
+        if (gid === 'grid-all') {
+          visibleAll++;
+        } else if (gid && gid.startsWith('grid-cat-')) {
+          const c = gid.replace('grid-cat-', '');
+          if (visibleCat[c] !== undefined) visibleCat[c]++;
+        } else if (gid) {
+          const f = gid.replace(/^grid-/, '');
+          if (visibleFamily[f] !== undefined) visibleFamily[f]++;
+        }
+      }
+    });
+    for (const f of FAMILY_ORDER) {
+      document.getElementById('count-' + f).textContent = visibleFamily[f];
+    }
+    for (const c of ROW2_CATEGORIES) {
+      document.getElementById('count-cat-' + c.id).textContent = visibleCat[c.id];
+    }
+    document.getElementById('count-all').textContent = visibleAll;
+  });
+
+  // Theme
+  const themeToggle = document.getElementById('theme-toggle');
+  function setTheme(t) {
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('fp-theme', t); } catch (e) {}
+  }
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  });
+  try {
+    const saved = localStorage.getItem('fp-theme');
+    if (saved) setTheme(saved);
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+  } catch (e) {}
+  </script>
+</body>
+</html>

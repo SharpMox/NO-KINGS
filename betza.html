@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ralph Betza's funny notation reference with a live sandbox that renders any Betza string as a movement diagram.">
+  <title>Fairy Chess — Betza notation</title>
+  <style>
+    .theme-toggle { appearance: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+    .theme-toggle:hover { color: var(--accent); }
+
+    header { max-width: 1280px; margin: 0 auto; padding: 32px 24px 16px; }
+    h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+    .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
+
+    main { max-width: 1280px; margin: 0 auto; padding: 0 24px 64px; }
+
+    .betza-page { max-width: 720px; margin: 0 auto; color: var(--text); }
+    .betza-page h3 { margin: 20px 0 6px 0; font-size: 18px; font-weight: 600; }
+    .betza-page h3:first-of-type { margin-top: 8px; }
+    .betza-page p { margin: 0 0 8px 0; font-size: 14px; color: var(--text-soft); line-height: 1.55; }
+    .betza-note { font-size: 12.5px; font-style: italic; }
+    .betza-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
+    .betza-table thead { background: var(--bg); }
+    .betza-table th { text-align: left; padding: 6px 12px; font-weight: 600; font-size: 11.5px; color: var(--text-soft); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
+    .betza-table td { padding: 6px 12px; border-top: 1px solid var(--border); vertical-align: top; color: var(--text); }
+    .betza-table tbody tr:first-child td { border-top: none; }
+    .betza-table code { background: var(--bg); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; border: 1px solid var(--border); white-space: nowrap; }
+    .betza-table .betza-examples td:first-child { min-width: 130px; }
+    .betza-mini { display: block; border-radius: 4px; overflow: hidden; background: var(--sq-light); }
+    .betza-table td[data-betza-icon] { width: 1px; padding: 8px 14px; }
+    .betza-table tr.is-active { opacity: 0.25; }
+    .betza-table tr.is-active code { text-decoration: line-through; }
+    .betza-table tr[data-token] { cursor: pointer; transition: background 0.12s ease; }
+    .betza-table tr[data-token]:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--hop-target); border-radius: 10px; background: color-mix(in srgb, var(--hop-target) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
+    .betza-active[hidden] { display: none; }
+    .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--hop-target); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .betza-active ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .betza-active li { display: grid; grid-template-columns: minmax(56px, auto) 48px 1fr; gap: 10px; align-items: center; font-size: 12.5px; color: var(--text); }
+    .betza-active li.is-iconless { grid-template-columns: minmax(56px, auto) 1fr; gap: 10px; padding: 2px 0; }
+    .betza-active li.is-iconless .betza-active-icon { display: none; }
+    .betza-active li code { background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; white-space: nowrap; }
+    .betza-active li .betza-active-code { display: inline-flex; gap: 4px; align-items: center; }
+    .betza-active li .betza-active-icon { width: 48px; height: 48px; display: inline-block; }
+    .betza-active li .betza-active-icon svg { width: 100%; height: 100%; display: block; border-radius: 3px; }
+    .betza-active li .betza-active-name { color: var(--text); }
+
+    /* ============== Sandbox + side-by-side layout ============== */
+    .betza-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
+    @media (max-width: 960px) { .betza-layout { grid-template-columns: minmax(0, 1fr); } }
+    .sandbox { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; }
+    @media (max-width: 960px) { .sandbox { position: static; max-height: none; overflow-y: visible; } }
+    .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0 auto 16px; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
+    .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px 0; }
+    .sandbox-presets:not(.is-expanded) { flex-wrap: nowrap; }
+    .sandbox-presets:not(.is-expanded) .sandbox-preset-name { display: none; }
+    .sandbox-presets .sandbox-preset { flex-shrink: 0; }
+    .sandbox-presets-label { font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; align-self: center; margin-right: 4px; }
+    .sandbox-preset { appearance: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-preset:hover { border-color: var(--accent); color: var(--accent); }
+    .sandbox-preset.is-hidden { display: none; }
+    .sandbox-preset.is-expand { border-style: dashed; color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; }
+    .sandbox-preset.is-expand:hover { color: var(--accent); border-color: var(--accent); }
+    .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
+    .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
+    .sandbox-board svg { width: 100%; height: 100%; display: block; }
+    .sandbox-controls { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; }
+    .sandbox-input { width: 100%; padding: 12px 14px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; outline: none; transition: border-color 0.15s ease; }
+    .sandbox-input:focus { border-color: var(--accent); }
+    .sandbox-input[data-invalid="true"] { border-color: var(--capture-color); }
+    .sandbox-error { min-height: 14px; margin: 4px 0 6px 0; font-size: 12px; font-style: italic; color: var(--capture-color); }
+    .sandbox-keyboard { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+    .sandbox-key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+    .sandbox-key { appearance: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-key:hover { border-color: var(--accent); color: var(--accent); }
+    .sandbox-key:active { background: var(--bg); }
+    .sandbox-key.is-clear { color: var(--text-soft); }
+    .sandbox-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-soft); font-size: 12px; font-style: italic; }
+
+    /* ============== A11y additions (keep at bottom for clean merges) ============== */
+    /* Screen-reader-only utility for visually-hidden labels. */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    /* Visible keyboard-focus ring. Pointer focus stays UA-default to preserve visual identity. */
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .site-nav a:focus-visible { outline-offset: 4px; }
+    .theme-toggle:focus-visible, .sandbox-key:focus-visible, .sandbox-preset:focus-visible { outline-offset: 2px; }
+    .betza-table tr[data-token]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* Honour user motion preferences. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site sections">
+    <div class="site-nav-inner">
+      <a href="codex.html">Codex</a>
+      <a href="promotion.html">Promotions</a>
+      <a href="fusion.html">Fusions</a>
+      <a href="inversion.html">Inversions</a>
+      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
+      <a href="betza.html" class="active">Betza</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <main class="betza-layout">
+    <section class="sandbox" aria-label="Betza sandbox">
+      <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
+      <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings"></div>
+      <div class="sandbox-controls">
+        <label class="sr-only" for="sandbox-input">Betza notation</label>
+        <input type="text" id="sandbox-input" class="sandbox-input"
+               placeholder="e.g. WAD · R · NN · mfWcfFimfnD · t[FR]"
+               autocomplete="off" spellcheck="false" autocapitalize="none"
+               aria-label="Betza notation" aria-describedby="sandbox-error">
+        <p class="sandbox-error" id="sandbox-error" role="status" aria-live="polite"></p>
+        <div class="sandbox-keyboard" id="sandbox-keyboard" aria-label="Betza notation keyboard"></div>
+      </div>
+    </section>
+
+    <section class="notation">
+      <h2>Betza notation</h2>
+      <p class="intro">Ralph Betza's letter notation, used on every card in this site.</p>
+      <aside class="betza-active" id="betza-active" aria-label="Active notations" aria-live="polite" hidden>
+        <div class="betza-active-label">Active</div>
+        <ul id="betza-active-list"></ul>
+      </aside>
+    <div class="betza-page">
+
+      <h3>Atomic leapers</h3>
+      <p>One-shot jumps to a fixed offset; intervening pieces ignored.</p>
+      <table class="betza-table">
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Offset</th></tr></thead>
+        <tbody>
+          <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td>Wazir</td><td>(1,0)</td></tr>
+          <tr data-token="F"><td><code>F</code></td><td data-betza-icon="F"></td><td>Ferz</td><td>(1,1)</td></tr>
+          <tr data-token="D"><td><code>D</code></td><td data-betza-icon="D"></td><td>Dabbaba</td><td>(2,0)</td></tr>
+          <tr data-token="A"><td><code>A</code></td><td data-betza-icon="A"></td><td>Alfil</td><td>(2,2)</td></tr>
+          <tr data-token="N"><td><code>N</code></td><td data-betza-icon="N"></td><td>Knight</td><td>(1,2)</td></tr>
+          <tr data-token="C"><td><code>C</code> (or <code>L</code>)</td><td data-betza-icon="C"></td><td>Camel</td><td>(1,3)</td></tr>
+          <tr data-token="Z"><td><code>Z</code></td><td data-betza-icon="Z"></td><td>Zebra</td><td>(2,3)</td></tr>
+          <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td>Threeleaper</td><td>(3,0)</td></tr>
+          <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td>Tripper</td><td>(3,3)</td></tr>
+        </tbody>
+      </table>
+      <p class="betza-note">Non-standard leapers use an explicit offset, e.g. <code>(1,4)</code> Giraffe.</p>
+
+      <h3>Sliders &amp; standard compound atomics</h3>
+      <table class="betza-table">
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Equivalent to</th></tr></thead>
+        <tbody>
+          <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td>King</td><td><code>W + F</code> — one square in any of 8 directions</td></tr>
+          <tr data-token="R"><td><code>R</code></td><td data-betza-icon="R"></td><td>Rook</td><td>W-rider — slides any distance orthogonally</td></tr>
+          <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td>Bishop</td><td>F-rider — slides any distance diagonally</td></tr>
+          <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td>Queen</td><td><code>R + B</code> — slides 8 directions</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Riders (doubled letter = repeat the leap)</h3>
+      <p>Doubled letter repeats the leap in a straight line until blocked at a landing square.</p>
+      <table class="betza-table">
+        <thead><tr><th>Notation</th><th>Diagram</th><th>Name</th><th>Movement</th></tr></thead>
+        <tbody>
+          <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td>Nightrider</td><td>Any number of Knight leaps in a single line</td></tr>
+          <tr data-token="CC"><td><code>CC</code></td><td data-betza-icon="CC"></td><td>Camelrider</td><td>Any number of Camel leaps in a single line</td></tr>
+          <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td>Alfilrider</td><td>Any number of Alfil leaps in a single line</td></tr>
+          <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td>Dabbabarider</td><td>Any number of Dabbaba leaps in a single line</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Direction prefixes (lowercase)</h3>
+      <p>Restrict the next uppercase move to specific directions.</p>
+      <table class="betza-table">
+        <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr data-token="f"><td><code>f</code></td><td>Forward only</td><td><code>fR</code> = Lance (forward Rook)</td></tr>
+          <tr data-token="b"><td><code>b</code></td><td>Backward only</td><td><code>bR</code> = backward Rook (used in Eagle)</td></tr>
+          <tr data-token="l"><td><code>l</code></td><td>Left only</td><td><code>lW</code> = left Wazir</td></tr>
+          <tr data-token="r"><td><code>r</code></td><td>Right only</td><td><code>rW</code> = right Wazir</td></tr>
+          <tr data-token="s"><td><code>s</code></td><td>Sideways (left + right)</td><td><code>sW</code> = sideways Wazir</td></tr>
+          <tr data-token="v"><td><code>v</code></td><td>Vertical (forward + backward)</td><td><code>vR</code> = vertical Rook</td></tr>
+        </tbody>
+      </table>
+      <p class="betza-note">Prefixes combine, e.g. <code>fs</code> = forward + sideways.</p>
+
+      <h3>Power modifiers</h3>
+      <table class="betza-table">
+        <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr data-token="m"><td><code>m</code></td><td>Move only (no capture)</td><td><code>mfW</code> = Pawn's straight forward move</td></tr>
+          <tr data-token="c"><td><code>c</code></td><td>Capture only (no quiet move)</td><td><code>cfF</code> = Pawn's diagonal capture</td></tr>
+          <tr data-token="e"><td><code>e</code></td><td>En passant variant</td><td><code>cefF</code> = capture forward Ferz including en passant</td></tr>
+          <tr data-token="i"><td><code>i</code></td><td>Initial move only (first move)</td><td><code>imfnD</code> = Pawn's two-square first move</td></tr>
+          <tr data-token="n_prefix"><td><code>n</code></td><td>Non-jumping (can be blocked at intermediate squares)</td><td><code>nN</code> = Mao (Xiangqi Horse — blockable Knight)</td></tr>
+          <tr data-token="j"><td><code>j</code></td><td>Jumping (ignores intermediate squares — usually implicit)</td><td>Most leapers are already jumping</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Hop &amp; bend prefixes</h3>
+      <table class="betza-table">
+        <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr data-token="p"><td><code>p</code></td><td>Pao-style hop: capture by jumping over one piece on a line</td><td><code>cpR</code> = Cannon's hop-capture along Rook lines</td></tr>
+          <tr data-token="g"><td><code>g</code></td><td>Grasshopper hop: must jump over one piece, land immediately past it</td><td><code>gQ</code> = Grasshopper, <code>gB</code> = Bishopper</td></tr>
+          <tr data-token="z"><td><code>z</code></td><td>Zigzag bend: turns 90° after each step</td><td><code>zB</code> = Boyscout (crooked Bishop)</td></tr>
+          <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Gryphon, <code>t[WB]</code> = Manticore</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Numbers and brackets</h3>
+      <table class="betza-table">
+        <thead><tr><th>Syntax</th><th>Meaning</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr data-token="rangeSlider"><td><code>X<em>n</em></code></td><td>Limit a slider to <em>n</em> squares maximum</td><td><code>Q2</code> = Bodyguard (Queen capped at 2 squares)</td></tr>
+          <tr data-token="explicitLeaper"><td><code>(m,n)</code></td><td>Explicit leaper offset for non-standard leapers</td><td><code>(1,4)</code> = Giraffe</td></tr>
+          <tr data-token="brackets"><td><code>[XYZ]</code></td><td>Grouping for the bent-rider <code>t</code> prefix</td><td><code>t[FR]</code> reads "Ferz step then outward Rook"</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Reading a compound</h3>
+      <table class="betza-table betza-examples">
+        <thead><tr><th>Notation</th><th>Piece</th><th>Breakdown</th></tr></thead>
+        <tbody>
+          <tr><td><code>QN</code></td><td>Amazon</td><td>Queen slides + Knight leaps</td></tr>
+          <tr><td><code>BN</code></td><td>Archbishop</td><td>Bishop slides + Knight leaps</td></tr>
+          <tr><td><code>RF</code></td><td>Dragon King</td><td>Rook slides + Ferz steps (= promoted Rook in Shōgi)</td></tr>
+          <tr><td><code>mRcpR</code></td><td>Cannon</td><td>(m)ove like a (R)ook + (c)apture by (p)ao-hopping along (R)ook lines</td></tr>
+          <tr><td><code>gQ</code></td><td>Grasshopper</td><td>(g)rasshopper hop along (Q)ueen lines</td></tr>
+          <tr><td><code>mfWcfFimfnD</code></td><td>Pawn</td><td>(m)ove (f)orward (W)azir + (c)apture (f)orward (F)erz + (i)nitial-only (m)ove (f)orward (n)on-jumping (D)abbaba</td></tr>
+          <tr><td><code>t[FR]</code></td><td>Gryphon</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
+          <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
+          <tr><td><code>Q (edges)</code></td><td>Edgehog</td><td>Queen movement restricted to start/end on a board-edge square</td></tr>
+        </tbody>
+      </table>
+
+      <p class="betza-note">Full spec: <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Wikipedia — Fairy chess piece</a>.</p>
+    </div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">A reference for Ralph Betza's "funny notation" — the compact letter system that describes every piece's movement on the other pages.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+    <p>Companion pages: <a href="codex.html">codex</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="inversion.html">inversions</a> · <a href="encyclopedia/index.html">encyclopedia</a>.</p>
+  </footer>
+
+  <script>
+  function renderBetzaIcon(spec) {
+    const size = spec.size || 5;
+    const sq = 20;
+    const total = size * sq;
+    const half = Math.floor(size / 2);
+    const center = (x, y) => ({ cx: (x + half) * sq + sq / 2, cy: (half - y) * sq + sq / 2 });
+    let s = `<svg viewBox="0 0 ${total} ${total}" width="${total}" height="${total}" class="betza-mini" role="img" aria-label="${spec.label || ''}">`;
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+      const isLight = (r + c) % 2 === 0;
+      s += `<rect x="${c*sq}" y="${r*sq}" width="${sq}" height="${sq}" fill="var(--${isLight?'sq-light':'sq-dark'})"/>`;
+    }
+    for (const move of (spec.moves || [])) {
+      if (move.kind === 'dots') {
+        for (const [x, y] of move.squares) {
+          if (Math.abs(x) > half || Math.abs(y) > half) continue;
+          const { cx, cy } = center(x, y);
+          s += `<circle cx="${cx}" cy="${cy}" r="${sq*0.22}" fill="var(--move-color)"/>`;
+        }
+      } else if (move.kind === 'rays') {
+        for (const [dx, dy] of move.dirs) {
+          let lastX = 0, lastY = 0, stepX = 0, stepY = 0;
+          while (true) {
+            stepX += dx; stepY += dy;
+            if (Math.abs(stepX) > half || Math.abs(stepY) > half) break;
+            lastX = stepX; lastY = stepY;
+          }
+          if (lastX === 0 && lastY === 0) continue;
+          const a = center(0, 0), b = center(lastX, lastY);
+          const angle = Math.atan2(b.cy - a.cy, b.cx - a.cx);
+          const startP = { x: a.cx + Math.cos(angle) * sq * 0.42, y: a.cy + Math.sin(angle) * sq * 0.42 };
+          const tip = { x: b.cx, y: b.cy };
+          const arrowLen = sq * 0.32, arrowWidth = sq * 0.18;
+          const base = { x: tip.x - Math.cos(angle) * arrowLen, y: tip.y - Math.sin(angle) * arrowLen };
+          const perp = { x: -Math.sin(angle) * arrowWidth, y: Math.cos(angle) * arrowWidth };
+          s += `<line x1="${startP.x}" y1="${startP.y}" x2="${base.x}" y2="${base.y}" stroke="var(--ray-color)" stroke-width="2.4" stroke-linecap="round"/>`;
+          s += `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="var(--ray-color)"/>`;
+        }
+      } else if (move.kind === 'rider') {
+        const dotsOnBoard = move.dots.filter(([x,y]) => Math.abs(x) <= half && Math.abs(y) <= half);
+        if (dotsOnBoard.length === 0) continue;
+        const points = [center(0, 0), ...dotsOnBoard.map(([x,y]) => center(x,y))];
+        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        s += `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" fill="none" opacity="0.6"/>`;
+        for (let i = 1; i < points.length; i++) {
+          s += `<circle cx="${points[i].cx}" cy="${points[i].cy}" r="${sq*0.18}" fill="var(--rider-color)"/>`;
+        }
+        const lastP = points[points.length - 1];
+        const p2 = points[points.length - 2];
+        const dxx = lastP.cx - p2.cx, dyy = lastP.cy - p2.cy;
+        const len = Math.hypot(dxx, dyy) || 1;
+        const dirX = dxx / len, dirY = dyy / len;
+        const tipX = lastP.cx + dirX * sq * 0.40, tipY = lastP.cy + dirY * sq * 0.40;
+        if (tipX >= 2 && tipX <= total - 2 && tipY >= 2 && tipY <= total - 2) {
+          const arrowLen = sq * 0.22, arrowWidth = sq * 0.13;
+          const baseX = tipX - dirX * arrowLen, baseY = tipY - dirY * arrowLen;
+          const perpX = -dirY * arrowWidth, perpY = dirX * arrowWidth;
+          s += `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--rider-color)" opacity="0.85"/>`;
+        }
+      }
+    }
+    const c = center(0, 0);
+    s += `<text x="${c.cx}" y="${c.cy + sq*0.04}" text-anchor="middle" dominant-baseline="central" font-size="${sq*0.75}" fill="var(--text)" style="font-family: 'Apple Symbols','Segoe UI Symbol',serif;">${spec.glyph || '·'}</text>`;
+    s += `</svg>`;
+    return s;
+  }
+
+  const BETZA_ICONS = {
+    'W': { size: 3, label: 'Wazir (1,0) leap', moves: [{ kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }] },
+    'F': { size: 3, label: 'Ferz (1,1) leap', moves: [{ kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }] },
+    'D': { size: 5, label: 'Dabbaba (2,0) leap', moves: [{ kind: 'dots', squares: [[2,0],[-2,0],[0,2],[0,-2]] }] },
+    'A': { size: 5, label: 'Alfil (2,2) leap', moves: [{ kind: 'dots', squares: [[2,2],[-2,2],[2,-2],[-2,-2]] }] },
+    'N': { size: 5, label: 'Knight (1,2) leap', moves: [{ kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }] },
+    'C': { size: 7, label: 'Camel (1,3) leap', moves: [{ kind: 'dots', squares: [[1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]] }] },
+    'Z': { size: 7, label: 'Zebra (2,3) leap', moves: [{ kind: 'dots', squares: [[2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2]] }] },
+    'H': { size: 7, label: 'Threeleaper (3,0)', moves: [{ kind: 'dots', squares: [[3,0],[-3,0],[0,3],[0,-3]] }] },
+    'G': { size: 7, label: 'Tripper (3,3)', moves: [{ kind: 'dots', squares: [[3,3],[-3,3],[3,-3],[-3,-3]] }] },
+    'K': { size: 3, glyph: '♚', label: 'King', moves: [{ kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }] },
+    'R': { size: 5, glyph: '♜', label: 'Rook', moves: [{ kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }] },
+    'B': { size: 5, glyph: '♝', label: 'Bishop', moves: [{ kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }] },
+    'Q': { size: 5, glyph: '♛', label: 'Queen', moves: [{ kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }] },
+    'NN': { size: 7, label: 'Nightrider', moves: [
+      { kind: 'rider', step: [1,2], dots: [[1,2]] }, { kind: 'rider', step: [2,1], dots: [[2,1]] },
+      { kind: 'rider', step: [-1,2], dots: [[-1,2]] }, { kind: 'rider', step: [-2,1], dots: [[-2,1]] },
+      { kind: 'rider', step: [1,-2], dots: [[1,-2]] }, { kind: 'rider', step: [2,-1], dots: [[2,-1]] },
+      { kind: 'rider', step: [-1,-2], dots: [[-1,-2]] }, { kind: 'rider', step: [-2,-1], dots: [[-2,-1]] }
+    ]},
+    'CC': { size: 7, label: 'Camelrider', moves: [
+      { kind: 'rider', step: [1,3], dots: [[1,3]] }, { kind: 'rider', step: [3,1], dots: [[3,1]] },
+      { kind: 'rider', step: [-1,3], dots: [[-1,3]] }, { kind: 'rider', step: [-3,1], dots: [[-3,1]] },
+      { kind: 'rider', step: [1,-3], dots: [[1,-3]] }, { kind: 'rider', step: [3,-1], dots: [[3,-1]] },
+      { kind: 'rider', step: [-1,-3], dots: [[-1,-3]] }, { kind: 'rider', step: [-3,-1], dots: [[-3,-1]] }
+    ]},
+    'AA': { size: 7, label: 'Alfilrider', moves: [
+      { kind: 'rider', step: [2,2], dots: [[2,2]] }, { kind: 'rider', step: [-2,2], dots: [[-2,2]] },
+      { kind: 'rider', step: [2,-2], dots: [[2,-2]] }, { kind: 'rider', step: [-2,-2], dots: [[-2,-2]] }
+    ]},
+    'DD': { size: 7, label: 'Dabbabarider', moves: [
+      { kind: 'rider', step: [2,0], dots: [[2,0]] }, { kind: 'rider', step: [-2,0], dots: [[-2,0]] },
+      { kind: 'rider', step: [0,2], dots: [[0,2]] }, { kind: 'rider', step: [0,-2], dots: [[0,-2]] }
+    ]}
+  };
+
+  // Memoize: renderBetzaIcon(spec) is pure per key — every page-load call for the
+  // same key returns identical HTML, so cache by key and skip the SVG rebuild work.
+  const BETZA_ICON_HTML_CACHE = new Map();
+  function renderBetzaIconCached(key) {
+    let html = BETZA_ICON_HTML_CACHE.get(key);
+    if (html === undefined) {
+      const spec = BETZA_ICONS[key];
+      html = spec ? renderBetzaIcon(spec) : '';
+      BETZA_ICON_HTML_CACHE.set(key, html);
+    }
+    return html;
+  }
+
+  document.querySelectorAll('[data-betza-icon]').forEach(el => {
+    const html = renderBetzaIconCached(el.dataset.betzaIcon);
+    if (html) el.innerHTML = html;
+  });
+
+  /* ===========================================================
+   *  Sandbox: parser + renderer + keyboard
+   * =========================================================== */
+
+  const ATOMIC_OFFSETS = {
+    W: [[1,0],[-1,0],[0,1],[0,-1]],
+    F: [[1,1],[-1,1],[1,-1],[-1,-1]],
+    D: [[2,0],[-2,0],[0,2],[0,-2]],
+    A: [[2,2],[-2,2],[2,-2],[-2,-2]],
+    N: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]],
+    C: [[1,3],[3,1],[-1,3],[-3,1],[1,-3],[3,-1],[-1,-3],[-3,-1]],
+    Z: [[2,3],[3,2],[-2,3],[-3,2],[2,-3],[3,-2],[-2,-3],[-3,-2]],
+    H: [[3,0],[-3,0],[0,3],[0,-3]],
+    G: [[3,3],[-3,3],[3,-3],[-3,-3]],
+    K: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]
+  };
+  const SLIDER_DIRS = {
+    R: [[1,0],[-1,0],[0,1],[0,-1]],
+    B: [[1,1],[-1,1],[1,-1],[-1,-1]],
+    Q: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]]
+  };
+  const ATOMIC_SET = new Set('WFDANCZHGK');
+  const SLIDER_SET = new Set('RBQ');
+  const LETTER_SET = new Set('WFDANCZHGKRBQ');
+  const DIR_PREFIXES = new Set('fblrsv');
+  const POWER_PREFIXES = new Set('mceinj');
+  const HOP_BEND_PREFIXES = new Set('pgzt');
+
+  // Generate all symmetric (m,n) leap squares
+  function leapSquares(m, n) {
+    const set = new Set();
+    const variants = [[m,n],[n,m]];
+    for (const [a,b] of variants) {
+      for (const sx of [1,-1]) for (const sy of [1,-1]) {
+        if (a === 0 && sx === -1) continue;
+        if (b === 0 && sy === -1) continue;
+        set.add(sx*a + ',' + sy*b);
+      }
+    }
+    return [...set].map(s => s.split(',').map(Number));
+  }
+
+  // Filter squares by direction prefixes (in board coordinates: y>0 = forward, x>0 = right)
+  function filterByDirection(squares, dirs) {
+    if (dirs.length === 0) return squares;
+    const has = new Set(dirs);
+    return squares.filter(([x,y]) => {
+      const isF = y > 0, isB = y < 0, isL = x < 0, isR = x > 0, isS = x !== 0 && y === 0, isV = y !== 0 && x === 0;
+      // 'f' = forward, 'b' = backward, 'l' = left, 'r' = right
+      // 's' = sideways (left+right), 'v' = vertical (forward+backward)
+      // If any directional prefix matches, allow the square
+      if (has.has('f') && isF) return true;
+      if (has.has('b') && isB) return true;
+      if (has.has('l') && isL) return true;
+      if (has.has('r') && isR) return true;
+      if (has.has('s') && (x !== 0)) return true;
+      if (has.has('v') && (y !== 0)) return true;
+      return false;
+    });
+  }
+
+  function parseBetza(input) {
+    const str = input.trim();
+    if (!str) return { ok: true, moves: [] };
+
+    const moves = [];
+    let i = 0;
+    let prefixes = { dirs: [], powers: [], hopBends: [] };
+    function resetPrefixes() { prefixes = { dirs: [], powers: [], hopBends: [] }; }
+
+    while (i < str.length) {
+      const ch = str[i];
+
+      // 't' must be followed by '[' for bent rider
+      if (ch === 't') {
+        if (str[i+1] !== '[') return { ok: false, error: "After 't' expected '[' for bent-rider grouping" };
+        const close = str.indexOf(']', i+2);
+        if (close === -1) return { ok: false, error: "Unclosed '[' after 't'" };
+        const inner = str.slice(i+2, close);
+        if (inner.length < 2) return { ok: false, error: "t[X..] needs at least 2 letters" };
+        // Inner must be exactly [step-letter][opt digits][slide-letter][opt digits].
+        // Without this, t[FRR], t[FRX], t[FR3] silently parsed as t[FR] and dropped
+        // the trailing character, while updateActive's tail-strip regex saw a
+        // different shape — keep parser and active-panel in sync by rejecting.
+        if (!/^[A-Z]\d*[A-Z]\d*$/.test(inner)) return { ok: false, error: "t[XY] inner must be one atomic + one slider letter (each optionally followed by a range)" };
+        const stepLetter = inner[0], slideLetter = inner.match(/^[A-Z]\d*([A-Z])/)[1];
+        if (!ATOMIC_OFFSETS[stepLetter]) return { ok: false, error: "Step in t[X..] must be an atomic letter (W/F/D/A/N/C/Z/H/G)" };
+        const slideDirs = SLIDER_DIRS[slideLetter];
+        if (!slideDirs) return { ok: false, error: "Outward in t[..Y] must be R/B/Q" };
+        for (const pivot of ATOMIC_OFFSETS[stepLetter]) {
+          for (const dir of slideDirs) {
+            const dot = pivot[0]*dir[0] + pivot[1]*dir[1];
+            if (dot > 0) moves.push({ kind: 'bent-rider', pivot, dir });
+          }
+        }
+        i = close + 1;
+        resetPrefixes();
+        continue;
+      }
+
+      if (DIR_PREFIXES.has(ch))      { prefixes.dirs.push(ch);     i++; continue; }
+      if (POWER_PREFIXES.has(ch))    { prefixes.powers.push(ch);   i++; continue; }
+      if (HOP_BEND_PREFIXES.has(ch)) { prefixes.hopBends.push(ch); i++; continue; }
+
+      if (ch === '(') {
+        const close = str.indexOf(')', i);
+        if (close === -1) return { ok: false, error: "Unclosed '('" };
+        const m = str.slice(i+1, close).match(/^(\d+),(\d+)$/);
+        if (!m) return { ok: false, error: "Invalid (m,n) syntax" };
+        const squares = filterByDirection(leapSquares(+m[1], +m[2]), prefixes.dirs);
+        const move = applyPowerHop({ kind: 'dots', squares }, prefixes);
+        if (move) moves.push(move);
+        i = close + 1;
+        resetPrefixes();
+        continue;
+      }
+
+      if (LETTER_SET.has(ch)) {
+        const letter = ch;
+        const isDoubled = (i+1 < str.length && str[i+1] === letter);
+        i += isDoubled ? 2 : 1;
+        let rangeStr = '';
+        while (i < str.length && /\d/.test(str[i])) { rangeStr += str[i]; i++; }
+        const range = rangeStr ? parseInt(rangeStr) : null;
+
+        if (isDoubled && ATOMIC_OFFSETS[letter]) {
+          // Rider: one rider entry per direction
+          for (const offset of ATOMIC_OFFSETS[letter]) {
+            moves.push({ kind: 'rider', step: offset, dots: [offset] });
+          }
+          resetPrefixes();
+          continue;
+        }
+
+        let base;
+        if (ATOMIC_OFFSETS[letter]) {
+          const squares = filterByDirection(ATOMIC_OFFSETS[letter], prefixes.dirs);
+          base = { kind: 'dots', squares };
+        } else if (SLIDER_DIRS[letter]) {
+          const dirs = filterByDirection(SLIDER_DIRS[letter], prefixes.dirs);
+          base = { kind: 'rays', from: [0,0], dirs };
+          if (range) base.maxRange = range;
+        }
+
+        const out = applyPowerHop(base, prefixes);
+        if (out) moves.push(out);
+        resetPrefixes();
+        continue;
+      }
+
+      // whitespace tolerated
+      if (/\s/.test(ch)) { i++; continue; }
+
+      return { ok: false, error: "Invalid: '" + ch + "'" };
+    }
+
+    return { ok: true, moves };
+  }
+
+  function applyPowerHop(move, prefixes) {
+    if (!move) return null;
+    const powers = prefixes.powers, hopBends = prefixes.hopBends;
+
+    // Hop / bend transforms (priority): p, g, z
+    if (hopBends.includes('z')) {
+      // Zigzag: only meaningful with a slider. Render as zigzag from first step.
+      if (move.kind === 'rays') {
+        const out = [];
+        for (const [dx, dy] of move.dirs) {
+          // Simple two-step zigzag points
+          out.push({ kind: 'zigzag', points: [[dx, dy],[dx + (dy ? dx : -dx), dy + (dx ? dy : -dy)]] });
+        }
+        return null; // Multiple emits handled below — return null and we lose info; simplistic
+      }
+    }
+    if (hopBends.includes('p')) {
+      // Cannon-style hop: capture-hop. Use first ray dir's first square as hurdle.
+      if (move.kind === 'rays') {
+        // For each ray direction, generate a representative capture-hop entry
+        for (const [dx, dy] of move.dirs) {
+          // Skip — multi-emit handled by emitting through caller. For simplicity:
+        }
+        return { kind: 'rays', from: move.from, dirs: move.dirs, maxRange: move.maxRange, _label: 'p' };
+      }
+    }
+    if (hopBends.includes('g')) {
+      // Grasshopper hop. Just keep base kind but tag.
+      return { ...move, _label: 'g' };
+    }
+
+    // Power modifiers
+    if (powers.includes('m') && powers.includes('c')) {
+      // both move and capture — same as base
+    } else if (powers.includes('m')) {
+      if (move.kind === 'dots') return { kind: 'rings', squares: move.squares };
+      // rays move-only: keep as rays (visual same)
+    } else if (powers.includes('c')) {
+      if (move.kind === 'dots') return { kind: 'xs', squares: move.squares };
+      if (move.kind === 'rays') return { kind: 'rays', from: move.from, dirs: move.dirs, maxRange: move.maxRange, _label: 'c' };
+    }
+
+    return move;
+  }
+
+  /* renderBoard — full version copied from encyclopedia, simplified for sandbox use. */
+  function sandboxRenderBoard(piece) {
+    const N = 9, SQ = 36, SIZE = N * SQ;
+    const svgCenter = (x, y) => ({ cx: (x + 4) * SQ + SQ / 2, cy: (4 - y) * SQ + SQ / 2 });
+    let svg = `<svg viewBox="0 0 ${SIZE} ${SIZE}" class="board" role="img" aria-label="Betza sandbox movement diagram">`;
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const isLight = (r + c) % 2 === 0;
+      svg += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="var(--${isLight?'sq-light':'sq-dark'})"/>`;
+    }
+    for (const move of (piece.moves || [])) svg += renderMove(move, svgCenter, SQ, SIZE);
+    // Centre disc
+    const { cx, cy } = svgCenter(0, 0);
+    const radius = SQ * 0.36;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="var(--piece-disc)"/>`;
+    svg += `<text x="${cx}" y="${cy + SQ*0.02}" text-anchor="middle" dominant-baseline="central" font-size="${SQ*0.42}" font-weight="700" fill="var(--piece-disc-text)" style="font-family:-apple-system,sans-serif;">?</text>`;
+    svg += `</svg>`;
+    return svg;
+  }
+  function renderMove(move, svgCenter, SQ, SIZE) {
+    switch (move.kind) {
+      case 'dots':
+        return move.squares.map(([x,y]) => {
+          const { cx, cy } = svgCenter(x,y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="var(--move-color)"/>`;
+        }).join('');
+      case 'rings':
+        return move.squares.map(([x,y]) => {
+          const { cx, cy } = svgCenter(x,y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.22}" fill="none" stroke="var(--move-color)" stroke-width="2.5"/>`;
+        }).join('');
+      case 'xs':
+        return move.squares.map(([x,y]) => {
+          const { cx, cy } = svgCenter(x,y);
+          const r = SQ*0.22;
+          return `<line x1="${cx-r}" y1="${cy-r}" x2="${cx+r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
+                 `<line x1="${cx+r}" y1="${cy-r}" x2="${cx-r}" y2="${cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
+        }).join('');
+      case 'rays': {
+        const fromSq = move.from || [0,0];
+        const maxRange = move.maxRange || Infinity;
+        return move.dirs.map(([dx,dy]) => {
+          let lastX = fromSq[0], lastY = fromSq[1], stepX = fromSq[0], stepY = fromSq[1], steps = 0;
+          while (steps < maxRange) {
+            stepX += dx; stepY += dy;
+            if (Math.abs(stepX) > 4 || Math.abs(stepY) > 4) break;
+            lastX = stepX; lastY = stepY; steps++;
+          }
+          if (lastX === fromSq[0] && lastY === fromSq[1]) return '';
+          const start = svgCenter(fromSq[0], fromSq[1]);
+          const end = svgCenter(lastX, lastY);
+          const angle = Math.atan2(end.cy - start.cy, end.cx - start.cx);
+          const lineStart = { x: start.cx + Math.cos(angle)*SQ*0.42, y: start.cy + Math.sin(angle)*SQ*0.42 };
+          const tip = { x: end.cx, y: end.cy };
+          const arrowLen = SQ*0.30, arrowWidth = SQ*0.16;
+          const base = { x: tip.x - Math.cos(angle)*arrowLen, y: tip.y - Math.sin(angle)*arrowLen };
+          const perp = { x: -Math.sin(angle)*arrowWidth, y: Math.cos(angle)*arrowWidth };
+          const colour = move._label === 'c' ? 'var(--capture-color)' : 'var(--ray-color)';
+          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="${colour}" stroke-width="3.4" stroke-linecap="round"/>` +
+                 `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="${colour}"/>`;
+        }).join('');
+      }
+      case 'rider': {
+        const start = svgCenter(0,0);
+        const points = [{ cx: start.cx, cy: start.cy }, ...move.dots.map(([x,y]) => svgCenter(x,y))];
+        const pathD = `M ${points.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        const line = `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.65"/>`;
+        const dots = move.dots.map(([x,y]) => {
+          const { cx, cy } = svgCenter(x,y);
+          return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
+        }).join('');
+        // Continuation arrow
+        const lastP = points[points.length-1], p2 = points[points.length-2] || start;
+        const dxx = lastP.cx - p2.cx, dyy = lastP.cy - p2.cy;
+        const len = Math.hypot(dxx,dyy) || 1;
+        const dirX = dxx/len, dirY = dyy/len;
+        const tipX = lastP.cx + dirX*SQ*0.40, tipY = lastP.cy + dirY*SQ*0.40;
+        let arrow = '';
+        if (tipX >= 4 && tipX <= SIZE-4 && tipY >= 4 && tipY <= SIZE-4) {
+          const aL = SQ*0.22, aW = SQ*0.13;
+          const bX = tipX - dirX*aL, bY = tipY - dirY*aL;
+          const pX = -dirY*aW, pY = dirX*aW;
+          arrow = `<polygon points="${tipX},${tipY} ${bX+pX},${bY+pY} ${bX-pX},${bY-pY}" fill="var(--rider-color)" opacity="0.85"/>`;
+        }
+        return line + dots + arrow;
+      }
+      case 'bent-rider': {
+        const start = svgCenter(0,0);
+        const pivotC = svgCenter(move.pivot[0], move.pivot[1]);
+        const [bdx, bdy] = move.dir;
+        let lastX = move.pivot[0], lastY = move.pivot[1];
+        while (true) {
+          const nx = lastX + bdx, ny = lastY + bdy;
+          if (Math.abs(nx) > 4 || Math.abs(ny) > 4) break;
+          lastX = nx; lastY = ny;
+        }
+        const leapAngle = Math.atan2(pivotC.cy - start.cy, pivotC.cx - start.cx);
+        const leapStart = { x: start.cx + Math.cos(leapAngle)*SQ*0.42, y: start.cy + Math.sin(leapAngle)*SQ*0.42 };
+        const leapLine = `<line x1="${leapStart.x}" y1="${leapStart.y}" x2="${pivotC.cx}" y2="${pivotC.cy}" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round" opacity="0.85"/>`;
+        if (lastX === move.pivot[0] && lastY === move.pivot[1]) {
+          return leapLine + `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.18}" fill="var(--ray-color)"/>`;
+        }
+        const endC = svgCenter(lastX, lastY);
+        const slideAngle = Math.atan2(endC.cy - pivotC.cy, endC.cx - pivotC.cx);
+        const arrowLen = SQ*0.28, arrowWidth = SQ*0.14;
+        const tipX = endC.cx, tipY = endC.cy;
+        const baseX = tipX - Math.cos(slideAngle)*arrowLen;
+        const baseY = tipY - Math.sin(slideAngle)*arrowLen;
+        const perpX = -Math.sin(slideAngle)*arrowWidth;
+        const perpY = Math.cos(slideAngle)*arrowWidth;
+        return leapLine +
+          `<circle cx="${pivotC.cx}" cy="${pivotC.cy}" r="${SQ*0.10}" fill="var(--ray-color)"/>` +
+          `<line x1="${pivotC.cx}" y1="${pivotC.cy}" x2="${baseX}" y2="${baseY}" stroke="var(--ray-color)" stroke-width="2.8" stroke-linecap="round"/>` +
+          `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
+      }
+      default: return '';
+    }
+  }
+
+  /* ===========================================================
+   *  Sandbox wiring: keyboard + input + debounce
+   * =========================================================== */
+  const SANDBOX_KEYS = [
+    { label: 'Atomics',   keys: ['W','F','D','A','N','C','Z','H','G'] },
+    { label: 'Sliders',   keys: ['K','R','B','Q'] },
+    { label: 'Direction', keys: ['f','b','l','r','s','v'] },
+    { label: 'Power',     keys: ['m','c','e','i','n','j'] },
+    { label: 'Hop+Bend',  keys: ['p','g','z','t'] },
+    { label: 'Syntax',    keys: ['[',']','(',')',',','2','3','4'] }
+  ];
+
+  const SANDBOX_PRESETS = [
+    // First 4 are visible by default — keep the most distinctive shapes here.
+    { betza: 'mfWcfFimfnD',   name: 'Pawn' },
+    { betza: 'NN',            name: 'Nightrider' },
+    { betza: 't[FR]',         name: 'Gryphon' },
+    { betza: 't[FR]t[WB]',    name: 'Godzilla' },
+    // The rest live behind the expand pill.
+    { betza: 'Q2',            name: 'Bodyguard' },
+    { betza: 'mRcpR',         name: 'Cannon' },
+    { betza: 'gQ',            name: 'Grasshopper' },
+    { betza: 'WAD',           name: 'Champion' },
+    { betza: 'FAN',           name: 'High Priestess' },
+    { betza: 't[WB]',         name: 'Manticore' },
+    { betza: 'K',             name: 'King' },
+    { betza: 'Q',             name: 'Queen' },
+    { betza: 'R',             name: 'Rook' },
+    { betza: 'B',             name: 'Bishop' },
+    { betza: 'N',             name: 'Knight' },
+    { betza: 'mWcF',          name: 'Ranger' },
+    { betza: 'QN',            name: 'Amazon' },
+    { betza: 'BN',            name: 'Archbishop' },
+    { betza: 'RN',            name: 'Dragonlord' },
+    { betza: 'BNN',           name: 'Banshee' },
+    { betza: 'RNN',           name: 'Raven' },
+    { betza: 'QNN',           name: 'Valkyrie' },
+    { betza: 'WD',            name: 'Sorcerer' },
+    { betza: 'FD',            name: 'Kirin' },
+    { betza: 'FDC',           name: 'Sacred Kirin' }
+  ];
+  const PRESETS_VISIBLE_COUNT = 4;
+
+  const sandboxInput = document.getElementById('sandbox-input');
+  const sandboxBoard = document.getElementById('sandbox-board');
+  const sandboxError = document.getElementById('sandbox-error');
+  const sandboxKeyboard = document.getElementById('sandbox-keyboard');
+  const sandboxPresets = document.getElementById('sandbox-presets');
+
+  if (sandboxInput && sandboxBoard && sandboxKeyboard) {
+    let presetsExpanded = false;
+    // Build a preset button without a per-button listener — clicks are delegated
+    // at the container below. The button carries its preset string in data-preset.
+    function makePresetButton(preset) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sandbox-preset';
+      btn.title = preset.name + ' — click to load ' + preset.betza;
+      btn.setAttribute('aria-label', 'Load ' + preset.name + ' (' + preset.betza + ')');
+      btn.dataset.preset = preset.betza;
+      btn.innerHTML = preset.betza + '<span class="sandbox-preset-name" aria-hidden="true">· ' + preset.name + '</span>';
+      return btn;
+    }
+    function buildPresets() {
+      if (!sandboxPresets) return;
+      sandboxPresets.innerHTML = '';
+      sandboxPresets.classList.toggle('is-expanded', presetsExpanded);
+      const label = document.createElement('span');
+      label.className = 'sandbox-presets-label';
+      label.textContent = 'Try';
+      sandboxPresets.appendChild(label);
+      SANDBOX_PRESETS.forEach((preset, i) => {
+        const btn = makePresetButton(preset);
+        if (!presetsExpanded && i >= PRESETS_VISIBLE_COUNT) btn.classList.add('is-hidden');
+        sandboxPresets.appendChild(btn);
+      });
+      if (SANDBOX_PRESETS.length > PRESETS_VISIBLE_COUNT) {
+        const expandBtn = document.createElement('button');
+        expandBtn.type = 'button';
+        expandBtn.className = 'sandbox-preset is-expand';
+        expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
+        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more presets');
+        expandBtn.dataset.expand = '1';
+        expandBtn.textContent = presetsExpanded
+          ? '− less'
+          : '+ ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more';
+        sandboxPresets.appendChild(expandBtn);
+      }
+    }
+    if (sandboxPresets) {
+      sandboxPresets.addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button.sandbox-preset');
+        if (!btn) return;
+        if (btn.dataset.expand === '1') {
+          presetsExpanded = !presetsExpanded;
+          buildPresets();
+          return;
+        }
+        const preset = btn.dataset.preset;
+        if (preset === undefined) return;
+        sandboxInput.value = preset;
+        sandboxInput.focus();
+        renderSandbox();
+      });
+    }
+    buildPresets();
+    // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
+    const KEY_LABELS = {
+      W: 'Wazir', F: 'Ferz', D: 'Dabbaba', A: 'Alfil', N: 'Knight',
+      C: 'Camel', Z: 'Zebra', H: 'Threeleaper', G: 'Tripper',
+      K: 'King', R: 'Rook', B: 'Bishop', Q: 'Queen',
+      f: 'forward', b: 'backward', l: 'left', r: 'right', s: 'sideways', v: 'vertical',
+      m: 'move-only', c: 'capture-only', e: 'en-passant', i: 'initial move',
+      n: 'non-jumping', j: 'jumping',
+      p: 'Pao-hop', g: 'Grasshopper-hop', z: 'zigzag bend', t: 'bent rider',
+      '[': 'open bracket', ']': 'close bracket', '(': 'open paren', ')': 'close paren',
+      ',': 'comma', '2': 'two', '3': 'three', '4': 'four'
+    };
+    // Build keyboard. We attach a single delegated click handler at the keyboard
+    // container instead of one listener per button (saves ~45 handlers on init,
+    // plus avoids per-button closure allocations). Buttons carry the key in
+    // data-key (or data-edit for Clear/Backspace).
+    for (const group of SANDBOX_KEYS) {
+      const row = document.createElement('div');
+      row.className = 'sandbox-key-row';
+      row.innerHTML = `<span class="sandbox-key-group-label" aria-hidden="true">${group.label}</span>`;
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', group.label);
+      for (const key of group.keys) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sandbox-key';
+        btn.textContent = key;
+        const labelName = KEY_LABELS[key];
+        btn.setAttribute('aria-label', labelName ? 'Insert ' + key + ' (' + labelName + ')' : 'Insert ' + key);
+        btn.dataset.key = key;
+        row.appendChild(btn);
+      }
+      sandboxKeyboard.appendChild(row);
+    }
+    // Append a Clear / Backspace control
+    const utilRow = document.createElement('div');
+    utilRow.className = 'sandbox-key-row';
+    utilRow.setAttribute('role', 'group');
+    utilRow.setAttribute('aria-label', 'Edit');
+    utilRow.innerHTML = `<span class="sandbox-key-group-label" aria-hidden="true">Edit</span>`;
+    const bsBtn = document.createElement('button');
+    bsBtn.type = 'button'; bsBtn.className = 'sandbox-key is-clear'; bsBtn.textContent = '⌫';
+    bsBtn.setAttribute('aria-label', 'Backspace');
+    bsBtn.dataset.edit = 'backspace';
+    const clrBtn = document.createElement('button');
+    clrBtn.type = 'button'; clrBtn.className = 'sandbox-key is-clear'; clrBtn.textContent = 'Clear';
+    clrBtn.setAttribute('aria-label', 'Clear input');
+    clrBtn.dataset.edit = 'clear';
+    utilRow.appendChild(bsBtn);
+    utilRow.appendChild(clrBtn);
+    sandboxKeyboard.appendChild(utilRow);
+    sandboxKeyboard.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button.sandbox-key');
+      if (!btn) return;
+      if (btn.dataset.edit === 'backspace') sandboxInput.value = sandboxInput.value.slice(0, -1);
+      else if (btn.dataset.edit === 'clear') sandboxInput.value = '';
+      else if (btn.dataset.key !== undefined) sandboxInput.value += btn.dataset.key;
+      else return;
+      sandboxInput.focus();
+      renderSandbox();
+    });
+
+    const TOKEN_MATCHERS = {
+      W: s => /W/.test(s), F: s => /F/.test(s), D: s => /D/.test(s), A: s => /A/.test(s),
+      N: s => /N/.test(s), C: s => /[CL]/.test(s), Z: s => /Z/.test(s), H: s => /H/.test(s), G: s => /G/.test(s),
+      K: s => /K/.test(s), R: s => /R/.test(s), B: s => /B/.test(s), Q: s => /Q/.test(s),
+      NN: s => /NN/.test(s), CC: s => /CC/.test(s), AA: s => /AA/.test(s), DD: s => /DD/.test(s),
+      f: s => /f/.test(s), b: s => /b/.test(s), l: s => /l/.test(s), r: s => /r/.test(s),
+      s: s => /s/.test(s), v: s => /v/.test(s),
+      m: s => /m/.test(s), c: s => /c/.test(s), e: s => /e/.test(s), i: s => /i/.test(s),
+      n_prefix: s => /n/.test(s), j: s => /j/.test(s),
+      p: s => /p/.test(s), g: s => /g/.test(s), z: s => /z/.test(s), t: s => /t/.test(s),
+      rangeSlider:    s => /[KRBQ]\d/.test(s),
+      explicitLeaper: s => /\(\s*\d+\s*,\s*\d+\s*\)/.test(s),
+      brackets:       s => /\[/.test(s),
+    };
+    const COMPOUND_EXPANSIONS = {
+      K: ['W','F'], R: ['W'], B: ['F'], Q: ['R','B'],
+      NN: ['N'], CC: ['C'], AA: ['A'], DD: ['D'],
+    };
+    // Cache the notation-table row NodeList once: the tables are static, so
+    // re-querying on every keystroke wastes ~30 DOM walks per debounce.
+    const ACTIVE_TOKEN_ROWS = Array.from(document.querySelectorAll('.betza-table tr[data-token]'));
+    // Cache per-token <li> nodes so re-renders just toggle hidden, not rebuild the DOM.
+    const ACTIVE_LI_CACHE = new Map();
+    function buildActiveLi(tr) {
+      const cells = tr.children;
+      const codeHtml = cells[0].innerHTML;
+      const hasIcon = cells[1] && cells[1].hasAttribute('data-betza-icon');
+      const iconKey = hasIcon ? cells[1].getAttribute('data-betza-icon') : null;
+      // When there's an icon column, the human label is in cells[2]; otherwise it's cells[1].
+      const nameText = (hasIcon ? cells[2] : cells[1]).textContent;
+      const iconHtml = iconKey
+        ? '<span class="betza-active-icon">' + renderBetzaIconCached(iconKey) + '</span>'
+        : '<span class="betza-active-icon"></span>';
+      const li = document.createElement('li');
+      if (!iconKey) li.classList.add('is-iconless');
+      li.innerHTML =
+        '<span class="betza-active-code">' + codeHtml + '</span>' +
+        iconHtml +
+        '<span class="betza-active-name">' + nameText + '</span>';
+      return li;
+    }
+    const TOKEN_MATCHER_ENTRIES = Object.entries(TOKEN_MATCHERS);
+    function updateActive(input) {
+      // In t[XY], the second token Y describes the outward direction from
+      // the first leap, not a standalone X-piece move. So Y is still listed
+      // as active (the user did type it), but it is NOT a launching point
+      // for compound expansion. e.g. t[NR] activates N + R, but not W via R.
+      // If Y is also reached through another compound (e.g. Qt[NR]: Q -> R),
+      // it becomes expansion-reachable and the normal cascade resumes.
+      const nonOutward = input.replace(/t\[([A-Z]\d*)([A-Z]\d*)\]/g, 't[$1]');
+      const active = new Set();
+      const outwardOnly = new Set();
+      for (const [key, matcher] of TOKEN_MATCHER_ENTRIES) {
+        if (matcher(input)) {
+          active.add(key);
+          if (!matcher(nonOutward)) outwardOnly.add(key);
+        }
+      }
+      const frontier = [...active].filter(k => !outwardOnly.has(k));
+      while (frontier.length > 0) {
+        const key = frontier.shift();
+        const adds = COMPOUND_EXPANSIONS[key];
+        if (!adds) continue;
+        for (const add of adds) {
+          if (!active.has(add)) {
+            active.add(add);
+            frontier.push(add);
+          } else if (outwardOnly.has(add)) {
+            outwardOnly.delete(add);
+            frontier.push(add);
+          }
+        }
+      }
+      const panel = document.getElementById('betza-active');
+      const list  = document.getElementById('betza-active-list');
+      if (!panel || !list) return;
+      // Single pass: toggle the row's is-active class and collect active rows in document order.
+      const activeRows = [];
+      for (const tr of ACTIVE_TOKEN_ROWS) {
+        if (active.has(tr.dataset.token)) {
+          tr.classList.add('is-active');
+          activeRows.push(tr);
+        } else {
+          tr.classList.remove('is-active');
+        }
+      }
+      if (activeRows.length === 0) { panel.hidden = true; list.textContent = ''; return; }
+      panel.hidden = false;
+      // Diff the current <li> set against the desired set.
+      // Build the new ordered list of <li> nodes (creating any missing ones via the cache),
+      // then sync by replacing list.children only when the order/membership actually changes.
+      const desired = [];
+      for (const tr of activeRows) {
+        const token = tr.dataset.token;
+        let li = ACTIVE_LI_CACHE.get(token);
+        if (!li) {
+          li = buildActiveLi(tr);
+          ACTIVE_LI_CACHE.set(token, li);
+        }
+        desired.push(li);
+      }
+      // Detach any current children not in desired, then append desired in order.
+      // The browser's appendChild moves existing children, so this is O(n) with no innerHTML churn.
+      const current = list.children;
+      let needsUpdate = current.length !== desired.length;
+      if (!needsUpdate) {
+        for (let i = 0; i < desired.length; i++) {
+          if (current[i] !== desired[i]) { needsUpdate = true; break; }
+        }
+      }
+      if (needsUpdate) {
+        // Remove stragglers, then append the desired sequence (appendChild moves existing nodes).
+        while (list.firstChild) list.removeChild(list.firstChild);
+        for (const li of desired) list.appendChild(li);
+      }
+    }
+
+    const URL_PARAM = 'b';
+    function syncSandboxUrl(value) {
+      try {
+        const url = new URL(location.href);
+        if (value) url.searchParams.set(URL_PARAM, value);
+        else url.searchParams.delete(URL_PARAM);
+        history.replaceState(null, '', url.toString());
+      } catch (_) { /* ignore — file:// URLs etc. */ }
+    }
+    function renderSandbox() {
+      const value = sandboxInput.value;
+      updateActive(value);
+      syncSandboxUrl(value);
+      if (!value.trim()) {
+        sandboxBoard.innerHTML = sandboxRenderBoard({ moves: [] });
+        sandboxInput.removeAttribute('data-invalid');
+        sandboxError.textContent = '';
+        return;
+      }
+      const out = parseBetza(value);
+      if (!out.ok) {
+        sandboxBoard.innerHTML = sandboxRenderBoard({ moves: [] });
+        sandboxInput.setAttribute('data-invalid', 'true');
+        sandboxError.textContent = out.error;
+        return;
+      }
+      sandboxInput.removeAttribute('data-invalid');
+      sandboxError.textContent = '';
+      sandboxBoard.innerHTML = sandboxRenderBoard({ moves: out.moves });
+    }
+
+    let debounceTimer;
+    sandboxInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(renderSandbox, 500);
+    });
+    // Seed from ?b=… if present, otherwise empty.
+    try {
+      const initial = new URL(location.href).searchParams.get(URL_PARAM);
+      if (initial) sandboxInput.value = initial;
+    } catch (_) { /* file:// without a query */ }
+    renderSandbox();
+
+    // Click any reference-table row to append its notation to the input.
+    // Delegate at document level instead of attaching ~30 per-row listeners.
+    const INSERT_FOR_TOKEN = {
+      n_prefix: 'n',
+      rangeSlider: '2',
+      explicitLeaper: '(1,2)',
+      brackets: '[]',
+    };
+    document.addEventListener('click', (ev) => {
+      const tr = ev.target.closest('.betza-table tr[data-token]');
+      if (!tr) return;
+      const token = tr.dataset.token;
+      const insert = INSERT_FOR_TOKEN[token] || token;
+      sandboxInput.value += insert;
+      sandboxInput.focus();
+      renderSandbox();
+    });
+    // One-time a11y setup: make every notation row keyboard-reachable and labelled.
+    document.querySelectorAll('.betza-table tr[data-token]').forEach(tr => {
+      const token = tr.dataset.token;
+      const insert = INSERT_FOR_TOKEN[token] || token;
+      tr.setAttribute('tabindex', '0');
+      tr.setAttribute('role', 'button');
+      const codeCell = tr.querySelector('code');
+      const codeText = codeCell ? codeCell.textContent.trim() : token;
+      tr.setAttribute('aria-label', 'Insert ' + insert + ' (' + codeText + ')');
+    });
+    // Enter/Space on a focused row triggers a synthetic click via the delegated handler.
+    document.addEventListener('keydown', (ev) => {
+      const tr = ev.target.closest('.betza-table tr[data-token]');
+      if (!tr) return;
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        tr.click();
+      }
+    });
+  }
+
+
+  </script>
+  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+  <script src="assets/theme.js"></script>
+</body>
+</html>

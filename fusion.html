@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="30 fairy-chess piece fusions in NO-KINGS: additive and synergistic combinations of two pieces into a third.">
+  <title>Fairy Chess — Fusions</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/board.js"></script>
+  <style>
+    header {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .intro {
+      color: var(--text-soft);
+      max-width: 760px;
+      margin: 0 0 24px 0;
+      font-size: 15px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 500;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .back-link:hover { text-decoration: none; border-color: var(--accent); }
+    .theme-toggle {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: auto;
+    }
+    .theme-toggle:hover { color: var(--accent); }
+
+    .tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+    }
+    .tab-btn {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-radius: 7px;
+      font-family: inherit;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn[aria-selected="true"] {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .tab-count {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-soft);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      line-height: 1.4;
+    }
+    .tab-btn[aria-selected="true"] .tab-count {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+    section[role="tabpanel"] { display: none; }
+    section[role="tabpanel"].active { display: block; }
+
+    .fusion-table {
+      border-collapse: separate;
+      border-spacing: 8px;
+      width: 100%;
+    }
+    .fusion-table td,
+    .fusion-table th {
+      padding: 0;
+      vertical-align: middle;
+    }
+    .fusion-table tbody td {
+      padding-top: 48px;
+    }
+    .fusion-table tbody tr:first-child td {
+      padding-top: 0;
+    }
+    .fusion-op {
+      text-align: center;
+      font-size: 32px;
+      color: var(--text-soft);
+      font-weight: 300;
+      width: 1%;
+      user-select: none;
+    }
+    .mini-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 280px;
+      padding: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      margin: 0 auto;
+    }
+    .mini-card .board {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--sq-light);
+    }
+    .mini-betza { font-size: 11px; color: var(--text-soft); font-family: 'SF Mono','Menlo',monospace; text-align: center; line-height: 1.2; }
+    a.mini-betza { display: block; text-decoration: none; cursor: pointer; transition: color 0.12s ease; }
+    a.mini-betza:hover { color: var(--accent); }
+    .mini-name {
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    @media (max-width: 720px) {
+      h1 { font-size: 24px; }
+      .controls { gap: 8px; }
+      .theme-toggle { margin-left: 0; }
+      .mini-card { width: 140px; padding: 6px; }
+      .fusion-op { font-size: 22px; }
+      .fusion-table { border-spacing: 4px; }
+    }
+
+    /* ============== A11y additions (keep at bottom for clean merges) ============== */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .site-nav a:focus-visible { outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site sections">
+    <div class="site-nav-inner">
+      <a href="codex.html">Codex</a>
+      <a href="promotion.html">Promotions</a>
+      <a href="fusion.html" class="active">Fusions</a>
+      <a href="inversion.html">Inversions</a>
+      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
+      <a href="betza.html">Betza</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+  <header>
+    <h1>Fusions</h1>
+    <p class="intro">
+      A reference of the <strong>30 fusions</strong> in NO-KINGS.
+    </p>
+    <div class="controls">
+      <div class="tabs" role="tablist" aria-label="Fusion type">
+        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-additive"    id="tabbtn-additive">Additive <span class="tab-count" id="count-additive"></span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-synergistic" id="tabbtn-synergistic">Synergistic <span class="tab-count" id="count-synergistic"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section role="tabpanel" id="tab-additive"    aria-labelledby="tabbtn-additive" class="active">
+      <div id="additive-table"></div>
+    </section>
+    <section role="tabpanel" id="tab-synergistic" aria-labelledby="tabbtn-synergistic">
+      <div id="synergistic-table"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">Pairs of pieces whose movement schemes combine into a third piece — additive (set-equality) and synergistic (emergent bent rider) flavours.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+    <p>Companion pages: <a href="codex.html">codex</a> · <a href="promotion.html">promotions</a> · <a href="inversion.html">inversions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
+  </footer>
+
+  <script>
+  const PIECES = [
+    {
+      id: 'rook',
+      family: 'sliders',
+      name: 'Rook',
+      aliases: ['Castle'],
+      glyph: '♜',
+      betza: 'R',
+      origin: 'Standard',
+      description: 'Slides any number of squares along ranks or files. Participates with the King in castling.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'bishop',
+      family: 'sliders',
+      name: 'Bishop',
+      aliases: [],
+      glyph: '♝',
+      betza: 'B',
+      origin: 'Standard',
+      description: 'Slides any number of squares diagonally. Each bishop is locked to one square colour for the entire game — a King + 2 same-colour Bishops cannot deliver mate.',
+      behaviors: ['long-range', 'color-bound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'queen',
+      family: 'sliders',
+      name: 'Queen',
+      aliases: [],
+      glyph: '♛',
+      betza: 'Q',
+      origin: 'Standard',
+      description: 'Slides any number of squares along ranks, files, or diagonals. The most powerful standard piece — Rook + Bishop combined.',
+      behaviors: ['long-range', 'compound'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'knight',
+      family: 'leapers',
+      name: 'Knight',
+      aliases: ['Horse'],
+      glyph: '♞',
+      betza: 'N',
+      origin: 'Standard',
+      description: 'Leaps in an L: two squares in one direction, then one perpendicular. The only standard piece that ignores intervening pieces.',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'archbishop',
+      family: 'compounds',
+      name: 'Archbishop',
+      aliases: ['Princess', 'Cardinal', 'Janus'],
+      letter: 'AR',
+      betza: 'BN',
+      origin: 'Modern',
+      description: 'Bishop + Knight combined. Crucially colour-complete: King + Archbishop alone can force mate, unlike King + Bishop or King + Knight on their own.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'alibaba',
+      family: 'leapers',
+      name: 'Wanderer',
+      aliases: [],
+      letter: 'AD',
+      betza: 'AD',
+      origin: 'Problem chess',
+      description: 'Combines the Alfil (2,2) and Dabbaba (2,0) leaps into a single piece — eight reachable squares forming the "second ring" along ranks, files, and diagonals. The single-leap counterpart of the Alibabarider. Heavily colour-bound, since both components preserve square colour.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
+      ]
+    },
+    {
+      id: 'squirrel',
+      family: 'leapers',
+      name: 'Faerie',
+      aliases: [],
+      letter: 'Sq',
+      betza: 'NAD',
+      origin: 'Problem chess',
+      description: 'Combines Knight (1,2), Alfil (2,2), and Dabbaba (2,0) leaps. Reaches every square exactly two squares away from the piece (the full "second ring" at Chebyshev distance 2) — 16 squares in total: eight knight-leap targets, four diagonal corners, and four orthogonal edge-midpoints.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
+      ]
+    },
+    {
+      id: 'ferz',
+      family: 'leapers',
+      name: 'Seer',
+      aliases: ['Fers', 'Counsellor', 'Mantri'],
+      letter: 'F',
+      betza: 'F',
+      origin: 'Shatranj',
+      description: 'Steps one square diagonally. The historical Shatranj precursor to the modern Queen; colour-bound to its starting square colour.',
+      behaviors: ['leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'gryphon',
+      family: 'others',
+      name: 'Gryphon',
+      aliases: ['Aanca', 'Eagle (Grant Acedrex)'],
+      letter: 'GP',
+      betza: 't[FR]',
+      origin: 'Grant Acedrex (1283)',
+      description: 'A bent slider: takes one diagonal step (Ferz), then continues as a Rook outwards — moving orthogonally away from its starting square. The pivot square is itself a valid stopping square. Originated in Grant Acedrex, the 13th-century Castilian variant.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [1,1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [-1,0] }
+      ]
+    },
+    {
+      id: 'wazir',
+      family: 'leapers',
+      name: 'Mage',
+      aliases: ['Vizir', 'Wezir'],
+      letter: 'W',
+      betza: 'W',
+      origin: 'Shatranj',
+      description: 'Steps one square orthogonally. A "short Rook" — the orthogonal counterpart of the Ferz.',
+      behaviors: ['leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'manticore',
+      family: 'others',
+      name: 'Manticore',
+      aliases: ['Anchorite', 'Acromantula', 'Rhinoceros', 'Spider', 'Unicorn'],
+      letter: 'MN',
+      betza: 't[WB]',
+      origin: 'Modern variants (Betza, Gilman, Cazaux)',
+      description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Gryphon. Pivot square is itself a valid stopping square.',
+      behaviors: ['long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [0,1], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,-1] }
+      ]
+    },
+    {
+      id: 'godzilla',
+      family: 'others',
+      name: 'Godzilla',
+      aliases: [],
+      letter: 'GZ',
+      betza: 't[FR]t[WB]',
+      origin: 'Modern variants',
+      description: 'A double bent-rider that combines the Gryphon (Ferz + outward Rook) and the Manticore (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Gryphon-style (diagonal pivot, orthogonal slide) and eight Manticore-style (orthogonal pivot, diagonal slide).',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'bent-rider', pivot: [1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [1,1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [0,1] },
+        { kind: 'bent-rider', pivot: [-1,1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [1,-1], dir: [1,0] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [0,-1] },
+        { kind: 'bent-rider', pivot: [-1,-1], dir: [-1,0] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [0,1], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,1] },
+        { kind: 'bent-rider', pivot: [1,0], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [1,-1] },
+        { kind: 'bent-rider', pivot: [0,-1], dir: [-1,-1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,1] },
+        { kind: 'bent-rider', pivot: [-1,0], dir: [-1,-1] }
+      ]
+    },
+    {
+      id: 'dragon-king',
+      family: 'compounds',
+      name: 'Drake',
+      aliases: ['Promoted Rook', 'Ryūō'],
+      letter: '龍',
+      betza: 'RF',
+      origin: 'Shōgi',
+      description: 'A Rook that also steps one square diagonally. Created when a Shōgi Rook is promoted in the opponent’s last three ranks.',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
+      ]
+    },
+    {
+      id: 'dragon-horse',
+      family: 'compounds',
+      name: 'Paladin',
+      aliases: ['Promoted Bishop', 'Ryūma'],
+      letter: '馬',
+      betza: 'BW',
+      origin: 'Shōgi',
+      description: 'A Bishop that also steps one square orthogonally. Created when a Shōgi Bishop is promoted. No longer colour-bound.',
+      behaviors: ['compound', 'long-range'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'elephant-modern',
+      family: 'leapers',
+      name: 'Mystic',
+      aliases: ['Modern Elephant'],
+      letter: 'EM',
+      betza: 'FA',
+      origin: 'Modern variants',
+      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2]] }
+      ]
+    },
+    {
+      id: 'war-machine',
+      family: 'leapers',
+      name: 'Sorcerer',
+      aliases: [],
+      letter: 'WM',
+      betza: 'WD',
+      origin: 'Problem chess',
+      description: 'Combines Wazir (1,0) and Dabbaba (2,0) — leaps one or exactly two squares orthogonally. Eight reachable squares, all on ranks and files.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]] }
+      ]
+    },
+    {
+      id: 'chancellor',
+      family: 'compounds',
+      name: 'Dragonlord',
+      aliases: ['Marshall', 'Marshal', 'Empress', 'Concubine'],
+      letter: 'CH',
+      betza: 'RN',
+      origin: 'Modern',
+      description: 'Rook + Knight combined. Roughly equal in value to a Queen in most computer studies.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'champion',
+      family: 'leapers',
+      name: 'Archmage',
+      aliases: [],
+      letter: 'Ch',
+      betza: 'WAD',
+      origin: 'Omega Chess',
+      description: 'Combines Wazir (1,0), Alfil (2,2), and Dabbaba (2,0) — 12 reachable squares: a one-step orthogonal "ring" plus all eight squares of the second ring at corner and edge positions. One of the two new pieces in Omega Chess.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[2,2],[-2,2],[2,-2],[-2,-2],[2,0],[-2,0],[0,2],[0,-2]] }
+      ]
+    },
+    {
+      id: 'high-priestess',
+      family: 'leapers',
+      name: 'High Priestess',
+      aliases: [],
+      letter: 'HP',
+      betza: 'FAN',
+      origin: 'Problem chess',
+      description: 'Combines the Ferz (1,1), Alfil (2,2), and Knight (1,2) leaps — 16 reachable squares at short range. Not colour-bound, because the Knight component breaks the otherwise diagonal palette.',
+      behaviors: ['compound', 'leaper'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2],[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'kirin',
+      family: 'leapers',
+      name: 'Kirin',
+      aliases: [],
+      letter: 'Ki',
+      betza: 'FD',
+      origin: 'Chu Shōgi',
+      description: 'Combines Ferz (1,1) and Dabbaba (2,0) — four diagonal one-step plus four orthogonal two-square leaps. Colour-bound, since both components preserve square colour. Appears in Chu Shōgi.',
+      behaviors: ['compound', 'leaper', 'color-bound'],
+      moves: [
+        { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,0],[-2,0],[0,2],[0,-2]] }
+      ]
+    },
+    {
+      id: 'crown-princess',
+      family: 'compounds',
+      name: 'Crown Princess',
+      aliases: ['Popess'],
+      letter: 'CP',
+      betza: 'BNW',
+      origin: 'Modern variants',
+      description: 'Archbishop + Wazir — combines Bishop slides, Knight leaps, and one-step orthogonal moves. A short-step extension of the Princess/Archbishop, similar in spirit to Dragon Horse but with the Knight added.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1],[1,0],[-1,0],[0,1],[0,-1]] }
+      ]
+    },
+    {
+      id: 'amazon',
+      family: 'compounds',
+      name: 'Amazon',
+      aliases: ['Angel', 'Commander', 'Wyvern'],
+      letter: 'A',
+      betza: 'QN',
+      origin: 'Modern',
+      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single fairy piece in common use.',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
+      ]
+    },
+    {
+      id: 'banshee',
+      family: 'compounds',
+      name: 'Banshee',
+      aliases: [],
+      letter: 'Bn',
+      betza: 'BNN',
+      origin: 'Problem chess',
+      description: 'Combines Bishop and Nightrider — slides diagonally any distance AND makes any number of knight leaps in a straight line. The diagonal counterpart of the Raven (Rook + Nightrider).',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'raven',
+      family: 'compounds',
+      name: 'Raven',
+      aliases: ['Waran'],
+      letter: 'Rv',
+      betza: 'RNN',
+      origin: 'Problem chess',
+      description: 'Combines Rook slides with Nightrider chains — orthogonal sliding plus any number of knight leaps in a straight line. The rook counterpart of the Banshee (BNN).',
+      behaviors: ['compound', 'long-range', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    },
+    {
+      id: 'amazonrider',
+      family: 'compounds',
+      name: 'Valkyrie',
+      aliases: [],
+      letter: 'Am',
+      betza: 'QNN',
+      origin: 'Problem chess',
+      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
+      behaviors: ['long-range', 'compound', 'leaper'],
+      moves: [
+        { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
+        { kind: 'rider', step: [1,2], dots: [[1,2],[2,4]] },
+        { kind: 'rider', step: [2,1], dots: [[2,1],[4,2]] },
+        { kind: 'rider', step: [-1,2], dots: [[-1,2],[-2,4]] },
+        { kind: 'rider', step: [-2,1], dots: [[-2,1],[-4,2]] },
+        { kind: 'rider', step: [1,-2], dots: [[1,-2],[2,-4]] },
+        { kind: 'rider', step: [2,-1], dots: [[2,-1],[4,-2]] },
+        { kind: 'rider', step: [-1,-2], dots: [[-1,-2],[-2,-4]] },
+        { kind: 'rider', step: [-2,-1], dots: [[-2,-1],[-4,-2]] }
+      ]
+    }
+  ];
+
+  const FUSIONS = {
+  "additive": [
+    {
+      "lhs": "alibaba",
+      "rhs": "war-machine",
+      "out": "champion"
+    },
+    {
+      "lhs": "knight",
+      "rhs": "elephant-modern",
+      "out": "high-priestess"
+    },
+    {
+      "lhs": "knight",
+      "rhs": "alibaba",
+      "out": "squirrel"
+    },
+    {
+      "lhs": "rook",
+      "rhs": "kirin",
+      "out": "dragon-king"
+    },
+    {
+      "lhs": "bishop",
+      "rhs": "knight",
+      "out": "archbishop"
+    },
+    {
+      "lhs": "bishop",
+      "rhs": "high-priestess",
+      "out": "archbishop"
+    },
+    {
+      "lhs": "knight",
+      "rhs": "rook",
+      "out": "chancellor"
+    },
+    {
+      "lhs": "bishop",
+      "rhs": "rook",
+      "out": "queen"
+    },
+    {
+      "lhs": "bishop",
+      "rhs": "dragon-king",
+      "out": "queen"
+    },
+    {
+      "lhs": "rook",
+      "rhs": "dragon-horse",
+      "out": "queen"
+    },
+    {
+      "lhs": "dragon-horse",
+      "rhs": "dragon-king",
+      "out": "queen"
+    },
+    {
+      "lhs": "bishop",
+      "rhs": "chancellor",
+      "out": "amazon"
+    },
+    {
+      "lhs": "knight",
+      "rhs": "queen",
+      "out": "amazon"
+    },
+    {
+      "lhs": "rook",
+      "rhs": "archbishop",
+      "out": "amazon"
+    },
+    {
+      "lhs": "archbishop",
+      "rhs": "chancellor",
+      "out": "amazon"
+    },
+    {
+      "lhs": "archbishop",
+      "rhs": "dragon-king",
+      "out": "amazon"
+    },
+    {
+      "lhs": "archbishop",
+      "rhs": "queen",
+      "out": "amazon"
+    },
+    {
+      "lhs": "chancellor",
+      "rhs": "dragon-horse",
+      "out": "amazon"
+    },
+    {
+      "lhs": "chancellor",
+      "rhs": "queen",
+      "out": "amazon"
+    },
+    {
+      "lhs": "queen",
+      "rhs": "high-priestess",
+      "out": "amazon"
+    },
+    {
+      "lhs": "knight",
+      "rhs": "dragon-horse",
+      "out": "crown-princess"
+    },
+    {
+      "lhs": "wazir",
+      "rhs": "archbishop",
+      "out": "crown-princess"
+    },
+    {
+      "lhs": "archbishop",
+      "rhs": "dragon-horse",
+      "out": "crown-princess"
+    },
+    {
+      "lhs": "dragon-horse",
+      "rhs": "high-priestess",
+      "out": "crown-princess"
+    }
+  ],
+  "synergistic": [
+    {
+      "lhs": "ferz",
+      "rhs": "rook",
+      "out": "gryphon"
+    },
+    {
+      "lhs": "wazir",
+      "rhs": "bishop",
+      "out": "manticore"
+    },
+    {
+      "lhs": "archbishop",
+      "rhs": "knight",
+      "out": "banshee"
+    },
+    {
+      "lhs": "chancellor",
+      "rhs": "knight",
+      "out": "raven"
+    },
+    {
+      "lhs": "amazon",
+      "rhs": "knight",
+      "out": "amazonrider"
+    },
+    {
+      "lhs": "manticore",
+      "rhs": "gryphon",
+      "out": "godzilla"
+    }
+  ]
+};
+
+  /* ============================================================
+   *  Fusion rendering (renderBoard/renderMove live in assets/board.js)
+   * ============================================================ */
+
+  function renderMiniCard(piece) {
+    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${piece.betza} in sandbox">${piece.betza}</a>` : '';
+    return `<div class="mini-card">
+      ${renderBoard(piece)}
+      <div class="mini-name">${piece.name}</div>
+      ${betzaLine}
+    </div>`;
+  }
+
+  function renderFusion(f) {
+    const card = id => {
+      const p = PIECES.find(x => x.id === id);
+      return p ? renderMiniCard(p) : `<div class="mini-card"><em>missing: ${id}</em></div>`;
+    };
+    return `<tr>
+      <td>${card(f.lhs)}</td>
+      <td class="fusion-op">+</td>
+      <td>${card(f.rhs)}</td>
+      <td class="fusion-op">=</td>
+      <td>${card(f.out)}</td>
+    </tr>`;
+  }
+
+  function renderTable(rows) {
+    return `<table class="fusion-table"><tbody>${rows.map(renderFusion).join('')}</tbody></table>`;
+  }
+
+  document.getElementById('additive-table').innerHTML = renderTable(FUSIONS.additive);
+  document.getElementById('synergistic-table').innerHTML = renderTable(FUSIONS.synergistic);
+  document.getElementById('count-additive').textContent = FUSIONS.additive.length;
+  document.getElementById('count-synergistic').textContent = FUSIONS.synergistic.length;
+
+  /* ============================================================
+   *  Tab switching
+   * ============================================================ */
+  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+  function activateTab(panelId) {
+    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
+    tabBtns.forEach(b => {
+      const sel = b.getAttribute('aria-controls') === panelId;
+      b.setAttribute('aria-selected', sel ? 'true' : 'false');
+      b.setAttribute('tabindex', sel ? '0' : '-1');
+    });
+    history.replaceState(null, '', '#' + panelId);
+  }
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
+  });
+  if (location.hash === '#tab-synergistic') activateTab('tab-synergistic');
+
+  </script>
+  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+  <script src="assets/theme.js"></script>
+</body>
+</html>

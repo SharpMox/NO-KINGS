@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Visual movement reference for 100 fairy chess pieces, grouped by movement family, with Betza notation and SVG diagrams.">
+  <title>Fairy Chess Pieces — Visual Movement Reference</title>
+  <style>
+    /* ============== Header ============== */
+    header {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .intro {
+      color: var(--text-soft);
+      max-width: 760px;
+      margin: 0 0 24px 0;
+      font-size: 15px;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+      flex-wrap: wrap;
+    }
+    .tabs { width: 100%; }
+    .tab-btn.is-empty { display: none; }
+
+    .tab-btn {
+      appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      cursor: pointer;
+      border-radius: 7px;
+      font-family: inherit;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn[aria-selected="true"] {
+      background: var(--bg);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+    .filter-input {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: var(--text);
+      width: 260px;
+      font-family: inherit;
+    }
+    .filter-input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .theme-toggle {
+      appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      cursor: pointer;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .theme-toggle:hover { color: var(--accent); }
+    .evolution-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 500;
+      font-size: 14px;
+      padding: 8px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-left: auto;
+    }
+    .evolution-link:hover {
+      text-decoration: none;
+      border-color: var(--accent);
+    }
+
+    /* ============== Legend ============== */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--text-soft);
+      margin-bottom: 24px;
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-swatch {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ============== Main ============== */
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+    section[role="tabpanel"] { display: none; }
+    section[role="tabpanel"].active { display: block; }
+
+    /* ============== Card grid ============== */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-margin-top: 24px;
+    }
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-name {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .card-aliases {
+      font-size: 12px;
+      color: var(--text-soft);
+      font-style: italic;
+      display: block;
+      margin-top: -4px;
+    }
+    .card-board {
+      align-self: center;
+      width: 100%;
+      max-width: 280px;
+    }
+    .board {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--sq-light);
+    }
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .betza-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+    .betza-chip-label {
+      color: var(--text-soft);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .origin-tag {
+      font-size: 10px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      font-weight: 600;
+    }
+    .card-desc {
+      font-size: 14px;
+      color: var(--text);
+      margin: 0;
+    }
+    .behavior-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+    .badge-color-bound  { color: #8a4ea8; border-color: #c2a3d0; }
+    .badge-leaper       { color: #2e7bd6; border-color: #a9c8eb; }
+    .badge-hopper       { color: #2da06b; border-color: #a0d6bc; }
+    .badge-royal        { color: #c84545; border-color: #e8a8a8; }
+    .badge-long-range   { color: #c45821; border-color: #e8b497; }
+    .badge-promotes     { color: #b88500; border-color: #e6cb8a; }
+    .badge-capture-only { color: #c84545; border-color: #e8a8a8; }
+    .badge-direction-restricted { color: #6b6258; border-color: var(--border); }
+    .badge-compound     { color: #2a8378; border-color: #95c5be; }
+    .badge-capture-different { color: #8a4ea8; border-color: #c2a3d0; }
+    [data-theme="dark"] .badge-color-bound  { color: #c890e8; border-color: #5d4072; }
+    [data-theme="dark"] .badge-leaper       { color: #6ab1ff; border-color: #3a5378; }
+    [data-theme="dark"] .badge-hopper       { color: #6dd6a8; border-color: #2f5a44; }
+    [data-theme="dark"] .badge-royal        { color: #ff7878; border-color: #6e3030; }
+    [data-theme="dark"] .badge-long-range   { color: #ff9050; border-color: #6e4530; }
+    [data-theme="dark"] .badge-promotes     { color: #e8c060; border-color: #6e5a30; }
+    [data-theme="dark"] .badge-capture-only { color: #ff7878; border-color: #6e3030; }
+    [data-theme="dark"] .badge-compound     { color: #6ed4c2; border-color: #2f6056; }
+    [data-theme="dark"] .badge-capture-different { color: #c890e8; border-color: #5d4072; }
+
+    .card.highlight {
+      outline: 3px solid var(--accent);
+      outline-offset: 4px;
+      animation: pulse 1.5s ease-out;
+    }
+    @keyframes pulse {
+      0%   { outline-color: var(--accent); }
+      100% { outline-color: transparent; }
+    }
+
+    /* ============== Tab count chip + empty-tab state ============== */
+    .tabs { flex-wrap: wrap; }
+    .tab-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      margin-left: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-soft);
+      line-height: 1;
+    }
+    .tab-btn[aria-selected="true"] .tab-count {
+      background: var(--surface);
+      color: var(--text);
+    }
+    .empty-tab {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-soft);
+      font-style: italic;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+
+    /* ============== Responsive ============== */
+    @media (max-width: 720px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .filter-input { flex: 1 1 100%; width: auto; }
+      h1 { font-size: 26px; }
+      .controls { gap: 8px; }
+      .theme-toggle { margin-left: 0; }
+    }
+
+    /* ============== Print ============== */
+    @media print {
+      body { background: white; color: black; }
+      .controls, .theme-toggle, .filter-input, .tabs { display: none; }
+      section[role="tabpanel"] { display: block !important; page-break-before: always; }
+      .card { break-inside: avoid; box-shadow: none; }
+    }
+
+    /* ============== A11y additions (keep at bottom for clean merges) ============== */
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+    .site-nav a:focus-visible { outline-offset: 4px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+    }
+  </style>
+  <link rel="stylesheet" href="../assets/site.css">
+  <script src="../assets/board.js"></script>
+  <script src="../data/pieces-encyclopedia.js"></script>
+</head>
+<body>
+  <nav class="site-nav" aria-label="Site sections">
+    <div class="site-nav-inner">
+      <a href="../codex.html">Codex</a>
+      <a href="../promotion.html">Promotions</a>
+      <a href="../fusion.html">Fusions</a>
+      <a href="../inversion.html">Inversions</a>
+      <a href="index.html" class="nav-encyclopedia active">Encyclopedia</a>
+      <a href="../betza.html">Betza</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+  <header>
+    <h1>Fairy Chess Pieces</h1>
+    <p class="intro">
+      A visual reference for the movement of <em>fairy chess pieces</em> — non-standard pieces used in chess variants and chess-problem composition.
+      Pieces are grouped by how they move: pick a tab to explore each family.
+      Sourced from <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia's <em>List of fairy chess pieces</em></a>.
+    </p>
+    <div class="controls">
+      <div class="tabs" role="tablist" aria-label="Movement type">
+        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-all"         id="tabbtn-all">All pieces <span class="tab-count" id="count-all">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-pawn-like"   id="tabbtn-pawn-like">Pawn-like <span class="tab-count" id="count-pawn-like">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-sliders"     id="tabbtn-sliders">Sliders <span class="tab-count" id="count-sliders">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leapers"     id="tabbtn-leapers">Leapers <span class="tab-count" id="count-leapers">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leap-riders" id="tabbtn-leap-riders">Leap-Riders <span class="tab-count" id="count-leap-riders">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-compounds"   id="tabbtn-compounds">Compounds <span class="tab-count" id="count-compounds">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-hoppers"     id="tabbtn-hoppers">Hoppers <span class="tab-count" id="count-hoppers">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-others"      id="tabbtn-others">Others <span class="tab-count" id="count-others">0</span></button>
+      </div>
+      <div class="tabs origin-tabs" role="tablist" aria-label="Origin">
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-standard"   id="tabbtn-origin-standard">Standard <span class="tab-count" id="count-origin-standard">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-modern"     id="tabbtn-origin-modern">Modern <span class="tab-count" id="count-origin-modern">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-problem"    id="tabbtn-origin-problem">Problem <span class="tab-count" id="count-origin-problem">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-shogi"      id="tabbtn-origin-shogi">Shōgi <span class="tab-count" id="count-origin-shogi">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-xiangqi"    id="tabbtn-origin-xiangqi">Xiangqi <span class="tab-count" id="count-origin-xiangqi">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-shatranj"   id="tabbtn-origin-shatranj">Shatranj <span class="tab-count" id="count-origin-shatranj">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-tamerlane"  id="tabbtn-origin-tamerlane">Tamerlane <span class="tab-count" id="count-origin-tamerlane">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-historical" id="tabbtn-origin-historical">Other historical <span class="tab-count" id="count-origin-historical">0</span></button>
+      </div>
+      <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
+    </div>
+    <div class="legend" aria-label="Diagram legend">
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg></span> Slide any distance</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><rect x="4.5" y="4.5" width="15" height="15" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/></svg></span> Hurdle (piece to jump)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
+    </div>
+  </header>
+
+  <main>
+    <section role="tabpanel" id="tab-all"         aria-labelledby="tabbtn-all" class="active">
+      <div class="card-grid" id="grid-all"></div>
+    </section>
+    <section role="tabpanel" id="tab-pawn-like"   aria-labelledby="tabbtn-pawn-like">
+      <div class="card-grid" id="grid-pawn-like"></div>
+    </section>
+    <section role="tabpanel" id="tab-sliders"     aria-labelledby="tabbtn-sliders">
+      <div class="card-grid" id="grid-sliders"></div>
+    </section>
+    <section role="tabpanel" id="tab-leapers"     aria-labelledby="tabbtn-leapers">
+      <div class="card-grid" id="grid-leapers"></div>
+    </section>
+    <section role="tabpanel" id="tab-leap-riders" aria-labelledby="tabbtn-leap-riders">
+      <div class="card-grid" id="grid-leap-riders"></div>
+    </section>
+    <section role="tabpanel" id="tab-compounds"   aria-labelledby="tabbtn-compounds">
+      <div class="card-grid" id="grid-compounds"></div>
+    </section>
+    <section role="tabpanel" id="tab-hoppers"     aria-labelledby="tabbtn-hoppers">
+      <div class="card-grid" id="grid-hoppers"></div>
+    </section>
+    <section role="tabpanel" id="tab-others"      aria-labelledby="tabbtn-others">
+      <div class="card-grid" id="grid-others"></div>
+    </section>
+
+    <section role="tabpanel" id="tab-origin-standard"   aria-labelledby="tabbtn-origin-standard">  <div class="card-grid" id="grid-origin-standard"></div>   </section>
+    <section role="tabpanel" id="tab-origin-modern"     aria-labelledby="tabbtn-origin-modern">    <div class="card-grid" id="grid-origin-modern"></div>     </section>
+    <section role="tabpanel" id="tab-origin-problem"    aria-labelledby="tabbtn-origin-problem">   <div class="card-grid" id="grid-origin-problem"></div>    </section>
+    <section role="tabpanel" id="tab-origin-shogi"      aria-labelledby="tabbtn-origin-shogi">     <div class="card-grid" id="grid-origin-shogi"></div>      </section>
+    <section role="tabpanel" id="tab-origin-xiangqi"    aria-labelledby="tabbtn-origin-xiangqi">   <div class="card-grid" id="grid-origin-xiangqi"></div>    </section>
+    <section role="tabpanel" id="tab-origin-shatranj"   aria-labelledby="tabbtn-origin-shatranj">  <div class="card-grid" id="grid-origin-shatranj"></div>   </section>
+    <section role="tabpanel" id="tab-origin-tamerlane"  aria-labelledby="tabbtn-origin-tamerlane"> <div class="card-grid" id="grid-origin-tamerlane"></div>  </section>
+    <section role="tabpanel" id="tab-origin-historical" aria-labelledby="tabbtn-origin-historical"><div class="card-grid" id="grid-origin-historical"></div> </section>
+  </main>
+
+  <footer>
+    <p class="footer-page-line">A visual reference of <strong>100 fairy chess pieces</strong>, organised by movement family and by historical origin.</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+    <p>Companion pages: <a href="../codex.html">codex</a> · <a href="../promotion.html">promotions</a> · <a href="../fusion.html">fusions</a> · <a href="../inversion.html">inversions</a> · <a href="../betza.html">Betza</a>.</p>
+  </footer>
+
+  <script>
+  /* ============================================================
+   *  Data
+   * ============================================================ */
+  const PIECES = PIECES_ENCYCLOPEDIA;
+
+  const FAMILY_ORDER = ['pawn-like', 'sliders', 'leapers', 'leap-riders', 'compounds', 'hoppers', 'others'];
+
+  // Per-tab ordering by rough complexity (familiar → unusual → compound → complex).
+  // Pieces not listed here fall to the end of their tab.
+  const PIECE_ORDER = {
+    'pawn-like': [
+      'pawn', 'chinese-pawn', 'korean-pawn', 'berolina',
+      'hiashatar-pawn', 'torpedo-pawn', 'corporal',
+      'berolina-plus', 'arrow-pawn', 'sergeant'
+    ],
+    'sliders': [
+      'rook', 'bishop', 'queen',
+      'lance', 'bodyguard', 'edgehog',
+      'reflecting-bishop', 'hunter'
+    ],
+    'leapers': [
+      // Standard short leapers
+      'wazir', 'ferz', 'dabbaba', 'alfil', 'knight',
+      // Larger single (m,n) leapers, ascending in distance
+      'threeleaper', 'fourleaper', 'camel', 'zebra', 'giraffe',
+      'tripper', 'stag', 'antelope', 'commuter',
+      // Blockable / direction-restricted variants
+      'mao',
+      // King-move family (4–8 directions, one step)
+      'king', 'mann', 'anti-king', 'prince',
+      'xiangqi-general', 'advisor',
+      'silver-general', 'gold-general',
+      // 2-component leaper compounds (small components)
+      'phoenix', 'kirin', 'war-machine', 'elephant-modern',
+      'alibaba', 'gnu', 'centaur', 'kangaroo', 'mounted-king',
+      // 2-component leaper compounds (longer-range components)
+      'bison', 'roc', 'newt', 'leon',
+      'auroch', 'okapi', 'impala', 'pegasus',
+      // 3+ component compounds
+      'high-priestess', 'champion', 'squirrel', 'buffalo'
+    ],
+    'leap-riders': [
+      'nightrider', 'camelrider', 'alfilrider', 'dabbabarider',
+      'alibabarider', 'gnurider'
+    ],
+    'compounds': [
+      // Classic slider+leaper compounds
+      'amazon', 'archbishop', 'chancellor',
+      // Shōgi-derived promoted-piece compounds
+      'dragon-king', 'dragon-horse',
+      // Royal compound versions
+      'maharaja',
+      // Slider + leaper variants
+      'caliph', 'canvasser', 'crown-princess',
+      // Slider + leap-rider variants
+      'raven', 'banshee', 'amazonrider',
+      // Most complex / direction-asymmetric
+      'eagle'
+    ],
+    'hoppers': [
+      // Foundational hopper
+      'grasshopper',
+      // Variants of grasshopper-style hopping
+      'equihopper', 'lion',
+      // Capture-only hopper
+      'locust',
+      // Cannon family (move-and-capture differ)
+      'cannon', 'vao', 'leo', 'nao',
+      // Restricted-line grasshoppers
+      'bishopper', 'nightriderhopper',
+      // Inverse cannons (capture freely, move by hop)
+      'faro', 'loco'
+    ],
+    'others': [
+      // Zigzag (90° turn after each step)
+      'boyscout', 'girlscout',
+      // Single-bend riders
+      'gryphon', 'manticore', 'astrologer',
+      // Closed-cycle nightrider
+      'quintessence',
+      // Compound bent rider
+      'godzilla'
+    ]
+  };
+
+  function renderCard(piece) {
+    const aliases = piece.aliases && piece.aliases.length
+      ? `<span class="card-aliases">aka ${piece.aliases.join(', ')}</span>` : '';
+    const betza = piece.betza
+      ? `<span class="betza-chip"><span class="betza-chip-label">Betza</span>${piece.betza}</span>`
+      : '';
+    const badges = (piece.behaviors || []).map(b =>
+      `<span class="badge badge-${b}">${b.replace(/-/g, ' ')}</span>`
+    ).join('');
+    const searchHaystack = [
+      piece.name,
+      (piece.aliases || []).join(' '),
+      piece.betza || '',
+      (piece.behaviors || []).join(' '),
+      piece.origin,
+      piece.description
+    ].join(' ').toLowerCase();
+
+    const idSuffix = piece._idSuffix || '';
+    return `
+      <article class="card" id="piece-${piece.id}${idSuffix}" data-search="${escapeAttr(searchHaystack)}">
+        <div class="card-header">
+          <div>
+            <h2 class="card-name">${piece.name}</h2>
+            ${aliases}
+          </div>
+          <span class="origin-tag">${piece.origin}</span>
+        </div>
+        <div class="card-board">${renderBoard(piece)}</div>
+        <div class="card-meta">
+          ${betza}
+        </div>
+        <p class="card-desc">${piece.description}</p>
+        ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
+      </article>
+    `;
+  }
+
+
+  function escapeAttr(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ============================================================
+   *  Init
+   * ============================================================ */
+
+  // Bucket pieces by family and render each tab's grid.
+  const grouped = Object.fromEntries(FAMILY_ORDER.map(f => [f, []]));
+  for (const p of PIECES) {
+    if (!grouped[p.family]) {
+      console.warn('Unknown family for piece', p.id, p.family);
+      grouped['others'].push(p);
+    } else {
+      grouped[p.family].push(p);
+    }
+  }
+  // Sort each family by its PIECE_ORDER. Unlisted pieces fall to the end.
+  for (const f of FAMILY_ORDER) {
+    const order = PIECE_ORDER[f] || [];
+    grouped[f].sort((a, b) => {
+      const ai = order.indexOf(a.id);
+      const bi = order.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+  for (const f of FAMILY_ORDER) {
+    const grid = document.getElementById('grid-' + f);
+    if (grouped[f].length) {
+      grid.innerHTML = grouped[f].map(renderCard).join('');
+    } else {
+      grid.innerHTML = '<p class="empty-tab">No pieces here yet — reserved for pieces whose defining feature isn’t one of the five movement families.</p>';
+    }
+    document.getElementById('count-' + f).textContent = grouped[f].length;
+    const fbtn = document.getElementById('tabbtn-' + f);
+    if (fbtn && grouped[f].length === 0) fbtn.classList.add('is-empty');
+  }
+
+  // Render the "All pieces" tab: flat grid of every piece, ordered by family then PIECE_ORDER.
+  const allOrdered = FAMILY_ORDER.flatMap(f => grouped[f]);
+  document.getElementById('grid-all').innerHTML = allOrdered.map(p => renderCard({ ...p, _idSuffix: '--all' })).join('');
+  document.getElementById('count-all').textContent = allOrdered.length;
+
+  // Bucket pieces by origin and render each origin tab's grid.
+  const ORIGIN_BUCKETS = [
+    { id: 'standard',   origins: ['Standard'] },
+    { id: 'modern',     origins: ['Modern', 'Modern variants', 'Modern variants (Betza, Gilman, Cazaux)', 'Omega Chess', 'Maharajah and the Sepoys'] },
+    { id: 'problem',    origins: ['Problem chess'] },
+    { id: 'shogi',      origins: ['Shōgi', 'Chu Shōgi', 'Tori Shōgi'] },
+    { id: 'xiangqi',    origins: ['Xiangqi', 'Xiangqi-derived'] },
+    { id: 'shatranj',   origins: ['Shatranj'] },
+    { id: 'tamerlane',  origins: ['Tamerlane chess', 'Tamerlane Chess'] },
+    { id: 'historical', origins: ['Janggi (Korean chess)', 'Hiashatar (Mongolian decimal chess)', 'Courier chess', 'Grant Acedrex (1283)', 'Edgehog Chess (Driver, 1966)', 'Berolina Plus', 'Improved Pawn variant', 'Extended Pawn variant', 'Arrow Pawn Chess (Persson, 1938)', 'Torpedo Chess / Metamachy / Gigachess', 'The Ouroboros King'] }
+  ];
+  const originToBucket = new Map();
+  for (const b of ORIGIN_BUCKETS) for (const o of b.origins) originToBucket.set(o, b.id);
+  const byOrigin = Object.fromEntries(ORIGIN_BUCKETS.map(b => [b.id, []]));
+  for (const p of PIECES) {
+    const bucketId = originToBucket.get(p.origin);
+    if (bucketId) byOrigin[bucketId].push(p);
+    else console.warn('Unbucketed origin:', p.origin, 'on piece', p.id);
+  }
+  for (const b of ORIGIN_BUCKETS) {
+    const grid = document.getElementById('grid-origin-' + b.id);
+    if (byOrigin[b.id].length) {
+      grid.innerHTML = byOrigin[b.id].map(p => renderCard({ ...p, _idSuffix: '--origin' })).join('');
+    } else {
+      grid.innerHTML = '<p class="empty-tab">No pieces in this origin yet.</p>';
+    }
+    document.getElementById('count-origin-' + b.id).textContent = byOrigin[b.id].length;
+    const obtn = document.getElementById('tabbtn-origin-' + b.id);
+    if (obtn && byOrigin[b.id].length === 0) obtn.classList.add('is-empty');
+  }
+
+  // Tabs
+  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
+  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+  function activateTab(panelId, opts = {}) {
+    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
+    tabBtns.forEach(b => {
+      const sel = b.getAttribute('aria-controls') === panelId;
+      b.setAttribute('aria-selected', sel ? 'true' : 'false');
+      b.setAttribute('tabindex', sel ? '0' : '-1');
+    });
+    if (!opts.skipHash) history.replaceState(null, '', '#' + panelId);
+  }
+
+  tabBtns.forEach((btn, i) => {
+    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
+        tabBtns[next].focus();
+        activateTab(tabBtns[next].getAttribute('aria-controls'));
+      }
+    });
+  });
+
+  // Hash routing: honor any #tab-<family> on load.
+  if (location.hash.startsWith('#tab-')) {
+    const wantedId = location.hash.slice(1);
+    if (document.getElementById(wantedId)) {
+      activateTab(wantedId, { skipHash: true });
+    }
+  }
+
+  // Filter: scope across every card grid so switching tabs preserves the filter.
+  const filterInput = document.getElementById('filter');
+  filterInput.addEventListener('input', () => {
+    const q = filterInput.value.trim().toLowerCase();
+    const visibleFamily = Object.fromEntries(FAMILY_ORDER.map(f => [f, 0]));
+    const visibleOrigin = Object.fromEntries(ORIGIN_BUCKETS.map(b => [b.id, 0]));
+    let visibleAll = 0;
+    document.querySelectorAll('.card-grid .card').forEach(card => {
+      const haystack = card.dataset.search || '';
+      const show = !q || haystack.includes(q);
+      card.style.display = show ? '' : 'none';
+      if (show) {
+        const grid = card.closest('.card-grid');
+        const gid = grid && grid.id;
+        if (gid === 'grid-all') {
+          visibleAll++;
+        } else if (gid && gid.startsWith('grid-origin-')) {
+          const b = gid.replace('grid-origin-', '');
+          if (visibleOrigin[b] !== undefined) visibleOrigin[b]++;
+        } else if (gid) {
+          const f = gid.replace(/^grid-/, '');
+          if (visibleFamily[f] !== undefined) visibleFamily[f]++;
+        }
+      }
+    });
+    for (const f of FAMILY_ORDER) {
+      document.getElementById('count-' + f).textContent = visibleFamily[f];
+    }
+    for (const b of ORIGIN_BUCKETS) {
+      document.getElementById('count-origin-' + b.id).textContent = visibleOrigin[b.id];
+    }
+    document.getElementById('count-all').textContent = visibleAll;
+  });
+
+  </script>
+  <!-- Shared theme JS (cached across pages). See ../assets/theme.js. -->
+  <script src="../assets/theme.js"></script>
+</body>
+</html>

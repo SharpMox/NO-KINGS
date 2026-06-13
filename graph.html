@@ -164,128 +164,7 @@
     .toggle-chip.is-all::before          { display: none; }
 
     /* ============================================================
-     *  Tab 1: Pieces — flat sortable table.
-     * ============================================================ */
-    #pieces-table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      font-size: 13px;
-    }
-    #pieces-table th, #pieces-table td {
-      text-align: left;
-      padding: 8px 12px;
-      vertical-align: middle;
-      border-top: 1px solid var(--border);
-    }
-    #pieces-table thead th {
-      background: var(--bg);
-      font-weight: 600;
-      font-size: 11.5px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-soft);
-      border-top: 0;
-      border-bottom: 1px solid var(--border);
-      cursor: pointer;
-      user-select: none;
-      white-space: nowrap;
-    }
-    #pieces-table thead th .sort-mark {
-      margin-left: 4px;
-      opacity: 0.4;
-      font-size: 10px;
-    }
-    #pieces-table thead th[data-sort-dir="asc"]  .sort-mark,
-    #pieces-table thead th[data-sort-dir="desc"] .sort-mark { opacity: 1; color: var(--accent); }
-    #pieces-table tbody tr.piece-row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
-    .pieces-diagram { width: 64px; height: 64px; }
-    .pieces-diagram svg { width: 100%; height: 100%; display: block; }
-    #pieces-table th:first-child, #pieces-table td:first-child {
-      padding: 0;
-      width: 64px;
-      vertical-align: middle;
-    }
-    .pieces-name { font-weight: 600; }
-    .pieces-orig { color: var(--text-soft); }
-    .pieces-betza {
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      font-size: 10.5px;
-      color: var(--text);
-      max-width: 80px;
-      overflow-wrap: anywhere;
-      word-break: break-all;
-      line-height: 1.25;
-    }
-    .pieces-betza-link { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; word-break: break-all; }
-    .pieces-betza-link:hover { text-decoration: underline; }
-    .pieces-behaviors, .pieces-aliases {
-      display: flex; flex-wrap: wrap; gap: 4px;
-    }
-    .behavior-badge {
-      display: inline-block;
-      padding: 1px 7px;
-      border-radius: 999px;
-      font-size: 10.5px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text-soft);
-    }
-    .alias-pill {
-      display: inline-block;
-      padding: 1px 7px;
-      border-radius: 4px;
-      font-size: 11px;
-      background: var(--bg);
-      color: var(--text-soft);
-    }
-    .pieces-rel-empty { color: var(--text-soft); }
-    /* Per-relation column tint matching the Graph tab colours.
-       Headers keep the default --bg so the row of column titles stays uniform. */
-    #pieces-table td.col-prom      { background: color-mix(in srgb, var(--hop-target)   8%, var(--surface)); }
-    #pieces-table td.col-fuse-with { background: color-mix(in srgb, var(--accent)       8%, var(--surface)); }
-    #pieces-table td.col-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 8%, var(--surface)); }
-    #pieces-table td.col-invert    { background: color-mix(in srgb, var(--text-soft)    8%, var(--surface)); }
-    #pieces-table tbody tr.piece-row:hover td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-    /* Pills for relation cells. "A + B" combinations stay in a single pill. */
-    .pieces-pill {
-      display: inline-block;
-      padding: 1px 9px;
-      margin: 1px 2px;
-      border-radius: 999px;
-      font-size: 11.5px;
-      white-space: nowrap;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-    }
-    .pieces-pill.is-promotion { background: color-mix(in srgb, var(--hop-target)   16%, var(--surface)); border-color: color-mix(in srgb, var(--hop-target)   45%, var(--border)); }
-    .pieces-pill.is-fuse-with { background: color-mix(in srgb, var(--accent)       16%, var(--surface)); border-color: color-mix(in srgb, var(--accent)       45%, var(--border)); }
-    .pieces-pill.is-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)); border-color: color-mix(in srgb, var(--hurdle-color) 45%, var(--border)); }
-    .pieces-pill.is-inversion { background: color-mix(in srgb, var(--text-soft)    16%, var(--surface)); border-color: color-mix(in srgb, var(--text-soft)    45%, var(--border)); }
-    /* Fuse-with pill split: blue partner -> purple output. */
-    .pieces-pill.is-fusion-pair {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: linear-gradient(110deg,
-        color-mix(in srgb, var(--accent)       16%, var(--surface)) 0% 45%,
-        color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)) 55% 100%);
-      border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-    }
-    .pp-partner { color: var(--accent); font-weight: 500; }
-    .pp-arrow   { color: var(--text-soft); font-size: 10.5px; }
-    .pp-output  { color: var(--hurdle-color); font-weight: 500; }
-    /* Behaviors is the rightmost column — give it room to wrap. */
-    #pieces-table th:last-child, #pieces-table td:last-child { min-width: 220px; }
-
-    /* ============================================================
-     *  Tab 2: Matrix — existing 29x29 grid.
-     *  (Unchanged from the previous implementation.)
+     *  Tab 1: Matrix — existing 29x29 grid.
      * ============================================================ */
     #graph-wrap {
       overflow-x: auto;
@@ -579,39 +458,15 @@
 
   <header>
     <h1>Graph</h1>
-    <p class="intro">Three views on the codex pieces — a flat reference table, the merge/fusion matrix, and a force-directed network of every relationship.</p>
+    <p class="intro">Two views on the codex pieces — the merge/fusion matrix and a force-directed network of every relationship. (For a flat list of every piece, see the Codex page's List view.)</p>
     <div class="tabs" role="tablist" aria-label="Graph view">
       <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-graph"  id="tabbtn-graph">Graph</button>
-      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-pieces" id="tabbtn-pieces">Pieces <span class="tab-count" id="count-pieces"></span></button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-matrix" id="tabbtn-matrix">Matrix</button>
     </div>
   </header>
 
   <main>
-    <!-- =========== Tab 1: Pieces =========== -->
-    <section role="tabpanel" id="tab-pieces" aria-labelledby="tabbtn-pieces">
-      <div class="controls">
-        <input type="search" id="pieces-filter" class="filter-input" placeholder="Filter pieces…" aria-label="Filter pieces">
-      </div>
-      <table id="pieces-table">
-        <thead>
-          <tr>
-            <th data-col="diagram"></th>
-            <th data-col="name" data-sortable="true">Name <span class="sort-mark">▾</span></th>
-            <th data-col="promotes_from" class="col-prom">Prom. from</th>
-            <th data-col="promotes_to"   class="col-prom">Prom. to</th>
-            <th data-col="fuse_with"     class="col-fuse-with">Fuse with</th>
-            <th data-col="fuse_from"     class="col-fuse-from">Fuse from</th>
-            <th data-col="invert"        class="col-invert">Invert</th>
-            <th data-col="betza" data-sortable="true">Betza <span class="sort-mark">▾</span></th>
-            <th data-col="behaviors">Behaviors</th>
-          </tr>
-        </thead>
-        <tbody id="pieces-tbody"></tbody>
-      </table>
-    </section>
-
-    <!-- =========== Tab 2: Matrix =========== -->
+    <!-- =========== Tab 1: Matrix =========== -->
     <section role="tabpanel" id="tab-matrix" aria-labelledby="tabbtn-matrix">
       <div class="controls">
         <input type="search" id="matrix-filter" class="filter-input" placeholder="Filter rows…" aria-label="Filter rows by piece name">
@@ -710,11 +565,10 @@
    * ============================================================ */
   const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
   const panels     = Array.from(document.querySelectorAll('section[role="tabpanel"]'));
-  const built = { pieces: false, matrix: false, graph: false };
+  const built = { matrix: false, graph: false };
   function activateTab(panelId) {
     panels.forEach(p => p.classList.toggle('active', p.id === panelId));
     tabButtons.forEach(b => b.setAttribute('aria-selected', b.getAttribute('aria-controls') === panelId ? 'true' : 'false'));
-    if (panelId === 'tab-pieces' && !built.pieces) { buildPiecesTab(); built.pieces = true; }
     if (panelId === 'tab-matrix' && !built.matrix) { buildMatrixTab(); built.matrix = true; }
     if (panelId === 'tab-graph'  && !built.graph)  { buildGraphTab();  built.graph  = true; }
     if (panelId === 'tab-graph') { graphResumeIfBuilt(); }
@@ -730,148 +584,7 @@
   });
 
   /* ============================================================
-   *  Tab 1: Pieces — sortable + filterable flat table
-   * ============================================================ */
-  let piecesSortCol = null;
-  let piecesSortDir = 'asc';
-  function buildPiecesTab() {
-    document.getElementById('count-pieces').textContent = ALL_PIECES_INCL_VOID.length;
-    renderPiecesRows(ALL_PIECES_INCL_VOID);
-    wirePiecesSort();
-    wirePiecesFilter();
-    wirePiecesRowClick();
-  }
-  // Resolve a piece id to its display name; falls back to the id if missing.
-  function pieceName(id) { const p = byId.get(id); return p ? p.name : id; }
-  // Compute the five relation cells for a piece.
-  function computeRelationCells(pieceId) {
-    const promotesFrom = [];
-    const promotesTo = [];
-    for (const chain of PROMOTION_CHAINS) {
-      const idx = chain.ids.indexOf(pieceId);
-      if (idx === -1) continue;
-      if (idx > 0)                       promotesFrom.push(chain.ids[idx - 1]);
-      if (idx < chain.ids.length - 1)    promotesTo.push(chain.ids[idx + 1]);
-    }
-    // fuseWith stores { partner, output } pairs so each pill shows "A -> B"
-    // where A is the partner this piece fuses with and B is the resulting piece.
-    const fuseWith = [];
-    const fuseFrom = [];
-    for (const kind of ['additive', 'synergistic']) {
-      for (const { lhs, rhs, out } of FUSIONS[kind]) {
-        if (lhs === pieceId) fuseWith.push({ partner: pieceName(rhs), output: pieceName(out) });
-        if (rhs === pieceId) fuseWith.push({ partner: pieceName(lhs), output: pieceName(out) });
-        if (out === pieceId) fuseFrom.push(pieceName(lhs) + ' + ' + pieceName(rhs));
-      }
-    }
-    const invert = [];
-    for (const [a, b] of INVERSION_PAIRS) {
-      if (a === pieceId) invert.push(b);
-      if (b === pieceId) invert.push(a);
-    }
-    return {
-      promotesFrom: promotesFrom.map(pieceName),
-      promotesTo:   promotesTo.map(pieceName),
-      fuseWith:     fuseWith,
-      fuseFrom:     fuseFrom,
-      invert:       invert.map(pieceName)
-    };
-  }
-  function renderPills(items, kindClass) {
-    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
-    return items.map(s => '<span class="pieces-pill ' + kindClass + '">' + escapeHtml(s) + '</span>').join('');
-  }
-  // Fuse-with column: each pill renders "<Partner> -> <Output>" with the
-  // partner in blue (fuse-with side) and the output in purple (fuse-into side).
-  function renderFuseWithPills(items) {
-    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
-    return items.map(({ partner, output }) =>
-      '<span class="pieces-pill is-fusion-pair">' +
-        '<span class="pp-partner">' + escapeHtml(partner) + '</span>' +
-        '<span class="pp-arrow">→</span>' +
-        '<span class="pp-output">'  + escapeHtml(output)  + '</span>' +
-      '</span>'
-    ).join('');
-  }
-  function renderPiecesRows(pieces) {
-    const tbody = document.getElementById('pieces-tbody');
-    tbody.innerHTML = '';
-    for (const p of pieces) {
-      const rel = computeRelationCells(p.id);
-      const fuseWithSearch = rel.fuseWith.map(x => x.partner + ' ' + x.output).join(' ');
-      const haystack = [
-        p.name, p.original_name, p.betza,
-        (p.behaviors || []).join(' '),
-        rel.promotesFrom.join(' '), rel.promotesTo.join(' '),
-        fuseWithSearch,             rel.fuseFrom.join(' '),
-        rel.invert.join(' ')
-      ].filter(Boolean).join(' ').toLowerCase();
-      const row = document.createElement('tr');
-      row.className = 'piece-row';
-      row.dataset.pieceId = p.id;
-      row.dataset.search = haystack;
-      const behaviors = (p.behaviors || []).map(b => '<span class="behavior-badge">' + escapeHtml(b) + '</span>').join('');
-      const betzaLink = p.betza
-        ? '<a class="pieces-betza-link" href="betza.html?b=' + encodeURIComponent(p.betza) + '" target="_blank" rel="noopener">' + escapeHtml(p.betza) + '</a>'
-        : '<span class="pieces-betza">—</span>';
-      row.innerHTML =
-        '<td><div class="pieces-diagram">' + zoomedBoard(p) + '</div></td>' +
-        '<td><span class="pieces-name">' + escapeHtml(p.name) + '</span></td>' +
-        '<td class="col-prom">'      + renderPills(rel.promotesFrom, 'is-promotion') + '</td>' +
-        '<td class="col-prom">'      + renderPills(rel.promotesTo,   'is-promotion') + '</td>' +
-        '<td class="col-fuse-with">' + renderFuseWithPills(rel.fuseWith) + '</td>' +
-        '<td class="col-fuse-from">' + renderPills(rel.fuseFrom,     'is-fuse-from') + '</td>' +
-        '<td class="col-invert">'    + renderPills(rel.invert,       'is-inversion') + '</td>' +
-        '<td class="pieces-betza">' + betzaLink + '</td>' +
-        '<td><div class="pieces-behaviors">' + (behaviors || '<span class="behavior-badge">—</span>') + '</div></td>';
-      tbody.appendChild(row);
-    }
-  }
-  function wirePiecesSort() {
-    document.querySelectorAll('#pieces-table thead th[data-sortable="true"]').forEach(th => {
-      th.addEventListener('click', () => {
-        const col = th.dataset.col;
-        const dir = (piecesSortCol === col && piecesSortDir === 'asc') ? 'desc' : 'asc';
-        piecesSortCol = col;
-        piecesSortDir = dir;
-        const sorted = ALL_PIECES_INCL_VOID.slice().sort((a, b) => {
-          const av = (a[col] || '').toString().toLowerCase();
-          const bv = (b[col] || '').toString().toLowerCase();
-          if (av === bv) return 0;
-          return (av < bv ? -1 : 1) * (dir === 'asc' ? 1 : -1);
-        });
-        renderPiecesRows(sorted);
-        // Re-apply the current filter after re-render.
-        document.getElementById('pieces-filter').dispatchEvent(new Event('input'));
-        // Update sort marks.
-        document.querySelectorAll('#pieces-table thead th').forEach(h => h.removeAttribute('data-sort-dir'));
-        th.setAttribute('data-sort-dir', dir);
-      });
-    });
-  }
-  function wirePiecesFilter() {
-    const input = document.getElementById('pieces-filter');
-    input.addEventListener('input', () => {
-      const q = input.value.trim().toLowerCase();
-      for (const row of document.querySelectorAll('#pieces-tbody tr.piece-row')) {
-        const show = !q || row.dataset.search.includes(q);
-        row.style.display = show ? '' : 'none';
-      }
-    });
-  }
-  function wirePiecesRowClick() {
-    // Double-click a Pieces row to open codex.
-    document.getElementById('pieces-tbody').addEventListener('dblclick', (ev) => {
-      const row = ev.target.closest('tr.piece-row');
-      if (!row) return;
-      const piece = byId.get(row.dataset.pieceId);
-      if (!piece) return;
-      window.open('codex.html?q=' + encodeURIComponent(piece.name), '_blank', 'noopener');
-    });
-  }
-
-  /* ============================================================
-   *  Tab 2: Matrix (29x29) — moved into its tab; built lazily.
+   *  Tab 1: Matrix (29x29) — built lazily.
    * ============================================================ */
   function buildMatrixTab() {
     buildMatrixTable();

@@ -399,9 +399,13 @@
       grid-template-columns: auto auto auto 1fr;
     }
     .nt-rel-fusion-verb { color: var(--accent); font-weight: 500; }
+    .nt-rel-fusion-conn { color: var(--text-soft); font-weight: 500; }
     .nt-rel-partner { color: var(--accent); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .nt-rel-fusion-arrow { color: var(--text-soft); font-weight: 600; padding: 0 4px; }
     .nt-rel-output  { color: var(--hurdle-color); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Second arrow injected before the piece name on incoming relations
+       (prom. from / made from). Same grey as the leading column arrow. */
+    .nt-rel-piece-arrow { color: var(--text-soft); font-weight: 600; margin-right: 4px; }
 
     /* ============================================================
      *  Footer
@@ -921,14 +925,17 @@
     const gEdges = document.createElementNS(NET_SVG_NS, 'g');
     gEdges.setAttribute('id', 'net-edges');
     for (const e of NET.edges) {
-      const ln = document.createElementNS(NET_SVG_NS, 'line');
-      ln.setAttribute('class', 'net-edge is-' + e.kind);
-      if (e.directed) ln.setAttribute('marker-end', 'url(#arrow-' + e.kind + ')');
-      ln.dataset.from = e.from;
-      ln.dataset.to = e.to;
-      ln.dataset.kind = e.kind;
-      e.el = ln;
-      gEdges.appendChild(ln);
+      // Promotion edges curve outward so they don't paint on top of any
+      // fuse-with / fuse-into / inversion edges that share the same endpoints.
+      const tag = e.kind === 'promotion' ? 'path' : 'line';
+      const el = document.createElementNS(NET_SVG_NS, tag);
+      el.setAttribute('class', 'net-edge is-' + e.kind);
+      if (e.directed) el.setAttribute('marker-end', 'url(#arrow-' + e.kind + ')');
+      el.dataset.from = e.from;
+      el.dataset.to = e.to;
+      el.dataset.kind = e.kind;
+      e.el = el;
+      gEdges.appendChild(el);
     }
     const gNodes = document.createElementNS(NET_SVG_NS, 'g');
     gNodes.setAttribute('id', 'net-nodes');
@@ -960,6 +967,10 @@
     for (const n of NET.nodes) {
       n.el.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
     }
+    // Center of the SVG — used to decide which side of the chord a curved
+    // edge bows toward. Computed once per frame, not per edge.
+    const svgRect = document.getElementById('network-svg').getBoundingClientRect();
+    const CX = svgRect.width / 2, CY = svgRect.height / 2;
     for (const e of NET.edges) {
       const a = NET.nodeById.get(e.from);
       const b = NET.nodeById.get(e.to);
@@ -971,10 +982,24 @@
       const inset = NODE_W / 2 + 4;
       const x1 = a.x + ux * inset, y1 = a.y + uy * inset;
       const x2 = b.x - ux * inset, y2 = b.y - uy * inset;
-      e.el.setAttribute('x1', x1);
-      e.el.setAttribute('y1', y1);
-      e.el.setAttribute('x2', x2);
-      e.el.setAttribute('y2', y2);
+      if (e.kind === 'promotion') {
+        // Quadratic-bezier control point offset perpendicular to the chord,
+        // always bowing OUTWARD from the SVG center. The sign is chosen from
+        // geometry (not A->B ordering) so every arrow curves the same way.
+        const CURVE = Math.min(40, dist * 0.22);
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        let perpx = uy, perpy = -ux;
+        const dot = perpx * (CX - mx) + perpy * (CY - my);
+        if (dot > 0) { perpx = -perpx; perpy = -perpy; }
+        const cpx = mx + perpx * CURVE;
+        const cpy = my + perpy * CURVE;
+        e.el.setAttribute('d', 'M ' + x1 + ',' + y1 + ' Q ' + cpx + ',' + cpy + ' ' + x2 + ',' + y2);
+      } else {
+        e.el.setAttribute('x1', x1);
+        e.el.setAttribute('y1', y1);
+        e.el.setAttribute('x2', x2);
+        e.el.setAttribute('y2', y2);
+      }
     }
   }
   /* Force simulation params */
@@ -1111,16 +1136,20 @@
   function renderRelationRow(r) {
     if (r.shape === 'fusion-input') {
       return '<div class="nt-rel is-fusion-input">' +
-        '<span class="nt-rel-fusion-verb">fuses with</span>' +
+        '<span class="nt-rel-fusion-verb">fuses <span class="nt-rel-fusion-conn">with</span></span>' +
         '<span class="nt-rel-partner">' + escapeHtml(r.partner) + '</span>' +
         '<span class="nt-rel-fusion-arrow">→</span>' +
         '<span class="nt-rel-output">'  + escapeHtml(r.output)  + '</span>' +
       '</div>';
     }
+    // Incoming relations (prom. from / made from) get a second leading arrow
+    // before the piece name so the row reads "<- prom. from <- A" instead of
+    // having the piece float orphaned in the third column.
+    const piecePrefix = r.arrow === '←' ? '<span class="nt-rel-piece-arrow">←</span>' : '';
     return '<div class="nt-rel">' +
       '<span class="nt-rel-arrow">' + r.arrow + '</span>' +
       '<span class="nt-rel-kind is-' + r.kind + '">' + r.verb + '</span>' +
-      '<span class="nt-rel-piece">' + escapeHtml(r.right) + '</span>' +
+      '<span class="nt-rel-piece">' + piecePrefix + escapeHtml(r.right) + '</span>' +
     '</div>';
   }
   function showNetTooltipContent(node) {

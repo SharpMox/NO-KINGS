@@ -82,8 +82,6 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 8px;
-      width: 38px;
-      height: 38px;
       cursor: pointer;
       color: var(--text);
       display: inline-flex;
@@ -486,13 +484,7 @@
     .pp-output  { color: var(--hurdle-color); font-weight: 500; }
     #pieces-table th:last-child, #pieces-table td:last-child { min-width: 220px; }
 
-    /* ============== A11y additions (keep at bottom for clean merges) ============== */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .site-nav a:focus-visible { outline-offset: 4px; }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-    }
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/board.js"></script>
@@ -808,9 +800,9 @@
 
   function renderCard(piece) {
     const aliases = piece.aliases && piece.aliases.length
-      ? `<span class="card-aliases">aka ${piece.aliases.join(', ')}</span>` : '';
+      ? `<span class="card-aliases">aka ${escapeAttr(piece.aliases.join(', '))}</span>` : '';
     const betza = piece.betza
-      ? `<a class="betza-chip" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${piece.betza} in sandbox"><span class="betza-chip-label" aria-hidden="true">Betza</span>${piece.betza}</a>`
+      ? `<a class="betza-chip" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${escapeAttr(piece.betza)} in sandbox"><span class="betza-chip-label" aria-hidden="true">Betza</span>${escapeAttr(piece.betza)}</a>`
       : '';
     const badges = (piece.behaviors || []).map(b =>
       `<span class="badge badge-${b}">${b.replace(/-/g, ' ')}</span>`
@@ -829,8 +821,8 @@
       <article class="card" id="piece-${piece.id}${idSuffix}" data-search="${escapeAttr(searchHaystack)}">
         <div class="card-header">
           <div>
-            <h2 class="card-name">${piece.name}</h2>
-            ${piece.original_name && piece.original_name !== piece.name ? '<div class="original-name">originally <em>' + piece.original_name + '</em></div>' : ''}
+            <h2 class="card-name">${escapeAttr(piece.name)}</h2>
+            ${piece.original_name && piece.original_name !== piece.name ? '<div class="original-name">originally <em>' + escapeAttr(piece.original_name) + '</em></div>' : ''}
             ${aliases}
           </div>
         </div>
@@ -838,7 +830,7 @@
         <div class="card-meta">
           ${betza}
         </div>
-        <p class="card-desc">${piece.description}</p>
+        <p class="card-desc">${escapeAttr(piece.description)}</p>
         ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
         ${renderRelations(piece)}
       </article>
@@ -1005,14 +997,17 @@
     if (!opts.skipHash) history.replaceState(null, '', '#' + panelId);
   }
 
-  tabBtns.forEach((btn, i) => {
+  tabBtns.forEach((btn) => {
     btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
     btn.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         e.preventDefault();
-        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
-        tabBtns[next].focus();
-        activateTab(tabBtns[next].getAttribute('aria-controls'));
+        // Keep arrow navigation within the same tablist (WAI-ARIA tabs pattern).
+        const siblings = Array.from(btn.closest('[role="tablist"]').querySelectorAll('.tab-btn'));
+        const i = siblings.indexOf(btn);
+        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + siblings.length) % siblings.length;
+        siblings[next].focus();
+        activateTab(siblings[next].getAttribute('aria-controls'));
       }
     });
   });

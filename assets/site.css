@@ -33,7 +33,7 @@
   --bg: #0f1a2e;
   --surface: #18243d;
   --text: #dce4f0;
-  --text-soft: #7a8aa0;
+  --text-soft: #8fa0b8;
   --border: #2a3a55;
   --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
   --sq-light: #3a4a68;
@@ -84,3 +84,14 @@ footer {
 footer p { margin: 0 0 8px 0; }
 footer p:last-child { margin-bottom: 0; }
 .footer-page-line { color: var(--text); font-size: 14px; }
+
+/* ============== A11y (shared across every page) ============== */
+/* Screen-reader-only utility for visually-hidden labels. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Visible keyboard-focus ring. Pointer focus stays UA-default to preserve visual identity. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.site-nav a:focus-visible { outline-offset: 4px; }
+/* Honour user motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

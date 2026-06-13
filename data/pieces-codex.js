@@ -434,7 +434,6 @@ var PIECES_CODEX = [
       origin: 'Invented',
       description: 'Inversion of Kirin+ (FDC). Strictly colour-changing — every destination has the opposite square colour from the start. Combines Wazir (1,0) at the closest ring, Knight (1,2) inside, and Threeleaper (3,0) as the four diamond-point cardinal leaps.',
       description_codex: 'Steps one square orthogonally, makes a two-by-one L-shaped jump, or leaps three squares orthogonally.',
-      description_codex: 'Steps one square diagonally, leaps two squares orthogonally, or makes a three-by-one L-shaped jump. Promotes from Kirin to Celestial Kirin.',
       behaviors: ['compound', 'leaper', 'color-changing'],
       moves: [
         { kind: 'dots', squares: [

@@ -114,6 +114,10 @@
     section[role="tabpanel"] { display: none; }
     section[role="tabpanel"].active { display: block; }
 
+    .table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
     .fusion-table {
       border-collapse: separate;
       border-spacing: 8px;
@@ -179,13 +183,7 @@
       .fusion-table { border-spacing: 4px; }
     }
 
-    /* ============== A11y additions (keep at bottom for clean merges) ============== */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .site-nav a:focus-visible { outline-offset: 4px; }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-    }
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
 </head>
 <body>
@@ -831,7 +829,7 @@
   }
 
   function renderTable(rows) {
-    return `<table class="fusion-table"><tbody>${rows.map(renderFusion).join('')}</tbody></table>`;
+    return `<div class="table-scroll"><table class="fusion-table"><tbody>${rows.map(renderFusion).join('')}</tbody></table></div>`;
   }
 
   document.getElementById('additive-table').innerHTML = renderTable(FUSIONS.additive);
@@ -853,8 +851,16 @@
     });
     history.replaceState(null, '', '#' + panelId);
   }
-  tabBtns.forEach(btn => {
+  tabBtns.forEach((btn, i) => {
     btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
+        tabBtns[next].focus();
+        activateTab(tabBtns[next].getAttribute('aria-controls'));
+      }
+    });
   });
   if (location.hash === '#tab-synergistic') activateTab('tab-synergistic');
 

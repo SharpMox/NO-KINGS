@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Visual movement reference for 100 fairy chess pieces, grouped by movement family, with Betza notation and SVG diagrams.">
-  <title>Fairy Chess Pieces — Visual Movement Reference</title>
+  <title>Fairy Chess — Encyclopedia</title>
   <style>
     /* ============== Header ============== */
     header {
@@ -264,6 +264,7 @@
     [data-theme="dark"] .badge-long-range   { color: #ff9050; border-color: #6e4530; }
     [data-theme="dark"] .badge-promotes     { color: #e8c060; border-color: #6e5a30; }
     [data-theme="dark"] .badge-capture-only { color: #ff7878; border-color: #6e3030; }
+    [data-theme="dark"] .badge-direction-restricted { color: #b8aa98; border-color: var(--border); }
     [data-theme="dark"] .badge-compound     { color: #6ed4c2; border-color: #2f6056; }
     [data-theme="dark"] .badge-capture-different { color: #c890e8; border-color: #5d4072; }
 
@@ -329,13 +330,7 @@
       .card { break-inside: avoid; box-shadow: none; }
     }
 
-    /* ============== A11y additions (keep at bottom for clean merges) ============== */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .site-nav a:focus-visible { outline-offset: 4px; }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-    }
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
   <link rel="stylesheet" href="../assets/site.css">
   <script src="../assets/board.js"></script>
@@ -345,6 +340,7 @@
   <nav class="site-nav" aria-label="Site sections">
     <div class="site-nav-inner">
       <a href="../codex.html">Codex</a>
+      <a href="../graph.html">Graph</a>
       <a href="../promotion.html">Promotions</a>
       <a href="../fusion.html">Fusions</a>
       <a href="../inversion.html">Inversions</a>

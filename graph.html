@@ -141,7 +141,7 @@
       background: var(--surface);
       transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
     }
-    .toggle-chip[aria-pressed="false"] { opacity: 0.45; }
+    .toggle-chip[aria-pressed="false"] { opacity: 0.7; }
     .toggle-chip::before {
       content: '';
       display: inline-block;
@@ -343,7 +343,9 @@
       cursor: grab;
       transition: opacity 0.15s ease;
     }
-    .net-node:focus, .net-node:focus-visible { outline: none; }
+    .net-node:focus { outline: none; }
+    .net-node:focus-visible { outline: none; }
+    .net-node:focus-visible .net-node-bg { stroke: var(--accent); stroke-width: 2.5px; }
     .net-node.is-pinned .net-node-bg { stroke: var(--accent); }
     .net-node-bg {
       fill: var(--surface);
@@ -407,34 +409,13 @@
        (prom. from / made from). Same grey as the leading column arrow. */
     .nt-rel-piece-arrow { color: var(--text-soft); font-weight: 600; margin-right: 4px; }
 
-    /* ============================================================
-     *  Footer
-     * ============================================================ */
-    footer {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 24px 24px 48px;
-      color: var(--text-soft);
-      font-size: 13px;
-      border-top: 1px solid var(--border);
-    }
-    footer p { margin: 0 0 8px 0; }
-    footer p:last-child { margin-bottom: 0; }
-    .footer-page-line { color: var(--text); font-size: 14px; }
-
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
       .filter-input { width: 100%; }
       .controls { gap: 8px; }
     }
 
-    /* ============== A11y additions (keep at bottom for clean merges) ============== */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .site-nav a:focus-visible { outline-offset: 4px; }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-    }
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/board.js"></script>
@@ -594,6 +575,7 @@
     buildMatrixTable();
     ensureMatrixTooltip();
     wireMatrixHoverHighlight();
+    wireMatrixKeyboard();
     wireMatrixFilter();
   }
   function buildMatrixTable() {
@@ -608,6 +590,7 @@
     table.appendChild(colgroup);
     const thead = document.createElement('thead');
     const headRow = document.createElement('tr');
+    headRow.setAttribute('role', 'row');
     const corner = document.createElement('th');
     corner.className = 'corner';
     corner.setAttribute('aria-label', 'row piece × column piece');
@@ -630,8 +613,10 @@
     thead.appendChild(headRow);
     table.appendChild(thead);
     const tbody = document.createElement('tbody');
+    let firstGridCell = null;
     for (const rowPiece of PIECES) {
       const tr = document.createElement('tr');
+      tr.setAttribute('role', 'row');
       tr.dataset.id = rowPiece.id;
       const rowTh = document.createElement('th');
       rowTh.scope = 'row';
@@ -642,6 +627,11 @@
       tr.appendChild(rowTh);
       for (const colPiece of PIECES) {
         const td = document.createElement('td');
+        td.setAttribute('role', 'gridcell');
+        // Roving tabindex: only the first cell is in the Tab order; arrow keys
+        // move focus between cells (wired in wireMatrixKeyboard).
+        td.tabIndex = -1;
+        if (!firstGridCell) { td.tabIndex = 0; firstGridCell = td; }
         td.dataset.row = rowPiece.id;
         td.dataset.col = colPiece.id;
         const cell = cellFor(rowPiece.id, colPiece.id);
@@ -720,19 +710,57 @@
       hideMatrixTooltip();
     });
     table.addEventListener('dblclick', (ev) => {
-      const td = ev.target.closest('td');
-      const th = ev.target.closest('th');
-      let pieceId = null;
-      if (td && td.classList.contains('is-filled')) {
-        const cell = cellFor(td.dataset.row, td.dataset.col);
-        if (cell) pieceId = cell.result;
-      } else if (th && (th.classList.contains('col-header') || th.classList.contains('row-header'))) {
-        pieceId = th.dataset.id;
+      openMatrixTarget(ev.target.closest('td'), ev.target.closest('th'));
+    });
+  }
+  // Shared navigation used by both the matrix dblclick and keyboard activation.
+  function openMatrixTarget(td, th) {
+    let pieceId = null;
+    if (td && td.classList.contains('is-filled')) {
+      const cell = cellFor(td.dataset.row, td.dataset.col);
+      if (cell) pieceId = cell.result;
+    } else if (th && (th.classList.contains('col-header') || th.classList.contains('row-header'))) {
+      pieceId = th.dataset.id;
+    }
+    if (!pieceId) return;
+    const piece = byId.get(pieceId);
+    if (!piece) return;
+    window.open('codex.html?q=' + encodeURIComponent(piece.name), '_blank', 'noopener');
+  }
+  // Roving-tabindex keyboard navigation for the role="grid" matrix: arrow keys
+  // move focus between cells, Enter/Space opens the cell's piece in the codex.
+  function wireMatrixKeyboard() {
+    const table = document.getElementById('graph-table');
+    function cellAt(rowEl, colIdx) {
+      const cells = rowEl ? rowEl.querySelectorAll('td') : [];
+      return cells[colIdx] || null;
+    }
+    table.addEventListener('keydown', (ev) => {
+      const td = ev.target.closest && ev.target.closest('td');
+      if (!td) return;
+      if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') {
+        ev.preventDefault();
+        openMatrixTarget(td, null);
+        return;
       }
-      if (!pieceId) return;
-      const piece = byId.get(pieceId);
-      if (!piece) return;
-      window.open('codex.html?q=' + encodeURIComponent(piece.name), '_blank', 'noopener');
+      const dirs = { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] };
+      const d = dirs[ev.key];
+      if (!d) return;
+      ev.preventDefault();
+      const tr = td.parentElement;
+      const rowCells = Array.from(tr.querySelectorAll('td'));
+      const colIdx = rowCells.indexOf(td);
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      const rowIdx = rows.indexOf(tr);
+      const nRows = rows.length, nCols = rowCells.length;
+      if (!nRows || !nCols) return;
+      const nextRowIdx = Math.min(nRows - 1, Math.max(0, rowIdx + d[0]));
+      const nextColIdx = Math.min(nCols - 1, Math.max(0, colIdx + d[1]));
+      const next = cellAt(rows[nextRowIdx], nextColIdx);
+      if (!next || next === td) return;
+      td.tabIndex = -1;
+      next.tabIndex = 0;
+      next.focus();
     });
   }
   let matrixTooltip;
@@ -754,9 +782,20 @@
       '<div class="tt-betza"></div>';
     document.body.appendChild(matrixTooltip);
   }
-  function hideMatrixTooltip() { if (matrixTooltip) matrixTooltip.hidden = true; }
+  let lastTooltipRow = null, lastTooltipCol = null;
+  function hideMatrixTooltip() {
+    if (matrixTooltip) matrixTooltip.hidden = true;
+    lastTooltipRow = lastTooltipCol = null;
+  }
   const KIND_LABEL = { promotion: 'Promotion', additive: 'Additive fusion', synergistic: 'Synergistic fusion' };
   function updateMatrixTooltip(td, ev) {
+    // mousemove fires continuously while the cursor sits on one cell; only
+    // rebuild the (expensive) three SVG boards when the cell actually changes.
+    if (td.classList.contains('is-filled') &&
+        td.dataset.row === lastTooltipRow && td.dataset.col === lastTooltipCol) {
+      positionFloating(matrixTooltip, ev);
+      return;
+    }
     if (!td.classList.contains('is-filled')) { hideMatrixTooltip(); return; }
     const cell = cellFor(td.dataset.row, td.dataset.col);
     if (!cell) { hideMatrixTooltip(); return; }
@@ -776,6 +815,8 @@
     matrixTooltip.querySelector('.tt-betza').textContent = piece.betza || '';
     matrixTooltip.className = 'is-' + cell.kind;
     matrixTooltip.hidden = false;
+    lastTooltipRow = td.dataset.row;
+    lastTooltipCol = td.dataset.col;
     positionFloating(matrixTooltip, ev);
   }
   function positionFloating(el, ev) {
@@ -900,7 +941,12 @@
   }
   function renderGraphScene() {
     const svg = document.getElementById('network-svg');
-    svg.setAttribute('viewBox', '0 0 ' + (svg.getBoundingClientRect().width || 1024) + ' ' + (svg.getBoundingClientRect().height || 720));
+    const vbW = svg.getBoundingClientRect().width || 1024;
+    const vbH = svg.getBoundingClientRect().height || 720;
+    svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
+    // viewBox dimensions are fixed once set; cache the user-space size/center so
+    // the per-frame draw loop never has to force a layout via getBoundingClientRect.
+    NET.viewW = vbW; NET.viewH = vbH;
     // Arrow markers per directed edge kind.
     const defs = document.createElementNS(NET_SVG_NS, 'defs');
     for (const [kind, color] of [
@@ -943,6 +989,7 @@
       const g = document.createElementNS(NET_SVG_NS, 'g');
       g.setAttribute('class', 'net-node');
       g.setAttribute('tabindex', '0');
+      g.setAttribute('role', 'button');
       g.setAttribute('aria-label', n.piece.name);
       g.dataset.id = n.id;
       const HALF = NODE_W / 2;
@@ -967,10 +1014,10 @@
     for (const n of NET.nodes) {
       n.el.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
     }
-    // Center of the SVG — used to decide which side of the chord a curved
-    // edge bows toward. Computed once per frame, not per edge.
-    const svgRect = document.getElementById('network-svg').getBoundingClientRect();
-    const CX = svgRect.width / 2, CY = svgRect.height / 2;
+    // Center of the SVG (user space) — used to decide which side of the chord a
+    // curved edge bows toward. Read from the cached viewBox size so this hot
+    // loop never forces a synchronous layout via getBoundingClientRect.
+    const CX = (NET.viewW || 1024) / 2, CY = (NET.viewH || 720) / 2;
     for (const e of NET.edges) {
       const a = NET.nodeById.get(e.from);
       const b = NET.nodeById.get(e.to);
@@ -1010,9 +1057,10 @@
   const DT = 1;              // discrete frame step
   const ENERGY_EPS = 0.05;
   function graphStep() {
-    const svg = document.getElementById('network-svg');
-    const r = svg.getBoundingClientRect();
-    const W = r.width, H = r.height;
+    // Node coordinates live in viewBox user space, so clamp against the cached
+    // viewBox size (not the live rendered rect, which diverges on resize and
+    // would force a layout read every frame).
+    const W = NET.viewW || 1024, H = NET.viewH || 720;
     // No forces at all — nodes stay put unless physically dragged.
     // The sim loop only runs to redraw positions during a drag interaction.
     for (const n of NET.nodes) { n.fx = 0; n.fy = 0; }
@@ -1302,12 +1350,22 @@
       }
       clearSelection();
     });
-    svg.addEventListener('dblclick', (ev) => {
-      const g = ev.target.closest('.net-node');
+    function openNodeInCodex(g) {
       if (!g) return;
       const n = NET.nodeById.get(g.dataset.id);
       if (!n) return;
       window.open('codex.html?q=' + encodeURIComponent(n.piece.name), '_blank', 'noopener');
+    }
+    svg.addEventListener('dblclick', (ev) => {
+      openNodeInCodex(ev.target.closest('.net-node'));
+    });
+    // Keyboard activation for focused nodes (Enter / Space) mirrors dblclick.
+    svg.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+      const g = ev.target.closest && ev.target.closest('.net-node');
+      if (!g) return;
+      ev.preventDefault();
+      openNodeInCodex(g);
     });
     // Filter chips:
     //   "All" is exclusive — turning it on deactivates every other chip.
@@ -1356,6 +1414,17 @@
     });
   }
   function svgPoint(svg, ev) {
+    // Map screen pixels into SVG user space so dragging stays accurate even
+    // when the rendered size diverges from the fixed viewBox (container resize,
+    // width:100% + aspect-ratio). getScreenCTM accounts for the viewBox scale.
+    const ctm = svg.getScreenCTM();
+    if (ctm) {
+      const pt = svg.createSVGPoint();
+      pt.x = ev.clientX;
+      pt.y = ev.clientY;
+      const u = pt.matrixTransform(ctm.inverse());
+      return { x: u.x, y: u.y };
+    }
     const r = svg.getBoundingClientRect();
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }

@@ -80,18 +80,10 @@
     .sandbox-key.is-clear { color: var(--text-soft); }
     .sandbox-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-soft); font-size: 12px; font-style: italic; }
 
-    /* ============== A11y additions (keep at bottom for clean merges) ============== */
-    /* Screen-reader-only utility for visually-hidden labels. */
-    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-    /* Visible keyboard-focus ring. Pointer focus stays UA-default to preserve visual identity. */
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-    .site-nav a:focus-visible { outline-offset: 4px; }
+    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+    /* Page-specific focus rings kept here: */
     .theme-toggle:focus-visible, .sandbox-key:focus-visible, .sandbox-preset:focus-visible { outline-offset: 2px; }
-    .betza-table tr[data-token]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-    /* Honour user motion preferences. */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { transition: none !important; animation: none !important; }
-    }
+    .betza-table tr[data-token] code[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
   <link rel="stylesheet" href="assets/site.css">
 </head>
@@ -486,6 +478,7 @@
         if (!m) return { ok: false, error: "Invalid (m,n) syntax" };
         const squares = filterByDirection(leapSquares(+m[1], +m[2]), prefixes.dirs);
         const move = applyPowerHop({ kind: 'dots', squares }, prefixes);
+        if (move && move._error) return { ok: false, error: move._error };
         if (move) moves.push(move);
         i = close + 1;
         resetPrefixes();
@@ -494,16 +487,30 @@
 
       if (LETTER_SET.has(ch)) {
         const letter = ch;
-        const isDoubled = (i+1 < str.length && str[i+1] === letter);
+        // Only an atomic letter forms a rider when doubled (e.g. NN). Doubling a
+        // slider (RR) has no rider meaning; if we treated it as doubled we would
+        // pre-consume the second letter and silently drop it, so leave isDoubled
+        // false there and let the second letter be parsed on its own pass.
+        const isDoubled = (i+1 < str.length && str[i+1] === letter && !!ATOMIC_OFFSETS[letter]);
         i += isDoubled ? 2 : 1;
         let rangeStr = '';
         while (i < str.length && /\d/.test(str[i])) { rangeStr += str[i]; i++; }
         const range = rangeStr ? parseInt(rangeStr) : null;
 
-        if (isDoubled && ATOMIC_OFFSETS[letter]) {
-          // Rider: one rider entry per direction
-          for (const offset of ATOMIC_OFFSETS[letter]) {
-            moves.push({ kind: 'rider', step: offset, dots: [offset] });
+        if (isDoubled) {
+          // Rider: one rider entry per direction, honouring direction prefixes
+          // and any range cap (number of leaps drawn along each line).
+          const offsets = filterByDirection(ATOMIC_OFFSETS[letter], prefixes.dirs);
+          for (const offset of offsets) {
+            const dots = [];
+            const maxLeaps = range || 4;
+            for (let k = 1; k <= maxLeaps; k++) {
+              const sx = offset[0]*k, sy = offset[1]*k;
+              if (Math.abs(sx) > 4 || Math.abs(sy) > 4) break;
+              dots.push([sx, sy]);
+            }
+            if (dots.length === 0) continue;
+            moves.push({ kind: 'rider', step: offset, dots, maxRange: range || null });
           }
           resetPrefixes();
           continue;
@@ -520,6 +527,7 @@
         }
 
         const out = applyPowerHop(base, prefixes);
+        if (out && out._error) return { ok: false, error: out._error };
         if (out) moves.push(out);
         resetPrefixes();
         continue;
@@ -540,29 +548,20 @@
 
     // Hop / bend transforms (priority): p, g, z
     if (hopBends.includes('z')) {
-      // Zigzag: only meaningful with a slider. Render as zigzag from first step.
-      if (move.kind === 'rays') {
-        const out = [];
-        for (const [dx, dy] of move.dirs) {
-          // Simple two-step zigzag points
-          out.push({ kind: 'zigzag', points: [[dx, dy],[dx + (dy ? dx : -dx), dy + (dx ? dy : -dy)]] });
-        }
-        return null; // Multiple emits handled below — return null and we lose info; simplistic
-      }
+      // Zigzag (Boyscout / crooked slider) is not yet renderable in the sandbox.
+      // Returning a move here would silently draw the wrong (or a blank) diagram,
+      // so surface an explicit error instead of dropping the move.
+      return { _error: "zigzag (z) is not yet supported in the sandbox" };
     }
     if (hopBends.includes('p')) {
-      // Cannon-style hop: capture-hop. Use first ray dir's first square as hurdle.
-      if (move.kind === 'rays') {
-        // For each ray direction, generate a representative capture-hop entry
-        for (const [dx, dy] of move.dirs) {
-          // Skip — multi-emit handled by emitting through caller. For simplicity:
-        }
-        return { kind: 'rays', from: move.from, dirs: move.dirs, maxRange: move.maxRange, _label: 'p' };
-      }
+      // Pao-style hop is not yet renderable as a distinct hop in the sandbox;
+      // drawing it as a plain slide would misrepresent the piece, so reject it.
+      return { _error: "hop (p) is not yet supported in the sandbox" };
     }
     if (hopBends.includes('g')) {
-      // Grasshopper hop. Just keep base kind but tag.
-      return { ...move, _label: 'g' };
+      // Grasshopper hop is not yet renderable as a distinct hop in the sandbox;
+      // drawing it as a plain move would misrepresent the piece, so reject it.
+      return { _error: "grasshopper hop (g) is not yet supported in the sandbox" };
     }
 
     // Power modifiers
@@ -570,7 +569,9 @@
       // both move and capture — same as base
     } else if (powers.includes('m')) {
       if (move.kind === 'dots') return { kind: 'rings', squares: move.squares };
-      // rays move-only: keep as rays (visual same)
+      // rays move-only: tag so the renderer can distinguish them from a
+      // move+capture slide, mirroring the dots→rings treatment.
+      if (move.kind === 'rays') return { kind: 'rays', from: move.from, dirs: move.dirs, maxRange: move.maxRange, _label: 'm' };
     } else if (powers.includes('c')) {
       if (move.kind === 'dots') return { kind: 'xs', squares: move.squares };
       if (move.kind === 'rays') return { kind: 'rays', from: move.from, dirs: move.dirs, maxRange: move.maxRange, _label: 'c' };
@@ -636,7 +637,10 @@
           const base = { x: tip.x - Math.cos(angle)*arrowLen, y: tip.y - Math.sin(angle)*arrowLen };
           const perp = { x: -Math.sin(angle)*arrowWidth, y: Math.cos(angle)*arrowWidth };
           const colour = move._label === 'c' ? 'var(--capture-color)' : 'var(--ray-color)';
-          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="${colour}" stroke-width="3.4" stroke-linecap="round"/>` +
+          // Move-only rays are drawn dashed to distinguish them from a
+          // move+capture slide (mirrors the dots→rings move-only treatment).
+          const dash = move._label === 'm' ? ' stroke-dasharray="6 4"' : '';
+          return `<line x1="${lineStart.x}" y1="${lineStart.y}" x2="${base.x}" y2="${base.y}" stroke="${colour}" stroke-width="3.4" stroke-linecap="round"${dash}/>` +
                  `<polygon points="${tip.x},${tip.y} ${base.x+perp.x},${base.y+perp.y} ${base.x-perp.x},${base.y-perp.y}" fill="${colour}"/>`;
         }).join('');
       }
@@ -649,14 +653,15 @@
           const { cx, cy } = svgCenter(x,y);
           return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.18}" fill="var(--rider-color)"/>`;
         }).join('');
-        // Continuation arrow
+        // Continuation arrow — only for uncapped riders; a range-capped rider
+        // stops after its last leap and must not imply it continues outward.
         const lastP = points[points.length-1], p2 = points[points.length-2] || start;
         const dxx = lastP.cx - p2.cx, dyy = lastP.cy - p2.cy;
         const len = Math.hypot(dxx,dyy) || 1;
         const dirX = dxx/len, dirY = dyy/len;
         const tipX = lastP.cx + dirX*SQ*0.40, tipY = lastP.cy + dirY*SQ*0.40;
         let arrow = '';
-        if (tipX >= 4 && tipX <= SIZE-4 && tipY >= 4 && tipY <= SIZE-4) {
+        if (!move.maxRange && tipX >= 4 && tipX <= SIZE-4 && tipY >= 4 && tipY <= SIZE-4) {
           const aL = SQ*0.22, aW = SQ*0.13;
           const bX = tipX - dirX*aL, bY = tipY - dirY*aL;
           const pX = -dirY*aW, pY = dirX*aW;
@@ -1043,14 +1048,19 @@
       renderSandbox();
     });
     // One-time a11y setup: make every notation row keyboard-reachable and labelled.
+    // The interactive control lives on the inner <code> element (which carries no
+    // implicit table semantics) rather than the <tr> — putting role="button" on a
+    // row would strip its implicit row role and break the table's row/cell
+    // structure for screen readers navigating in table mode.
     document.querySelectorAll('.betza-table tr[data-token]').forEach(tr => {
       const token = tr.dataset.token;
       const insert = INSERT_FOR_TOKEN[token] || token;
-      tr.setAttribute('tabindex', '0');
-      tr.setAttribute('role', 'button');
       const codeCell = tr.querySelector('code');
+      const control = codeCell || tr;
       const codeText = codeCell ? codeCell.textContent.trim() : token;
-      tr.setAttribute('aria-label', 'Insert ' + insert + ' (' + codeText + ')');
+      control.setAttribute('tabindex', '0');
+      control.setAttribute('role', 'button');
+      control.setAttribute('aria-label', 'Insert ' + insert + ' (' + codeText + ')');
     });
     // Enter/Space on a focused row triggers a synthetic click via the delegated handler.
     document.addEventListener('keydown', (ev) => {

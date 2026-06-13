@@ -64,6 +64,12 @@
     .sandbox-preset.is-expand { border-style: dashed; color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; }
     .sandbox-preset.is-expand:hover { color: var(--accent); border-color: var(--accent); }
     .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
+    /* Phones: the collapsed single-row preset strip is wider than the screen,
+       so let it scroll horizontally instead of pushing the page. Desktop
+       (>560px) keeps the original nowrap row. */
+    @media (max-width: 560px) {
+      .sandbox-presets:not(.is-expanded) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
     .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
     .sandbox-board svg { width: 100%; height: 100%; display: block; }
     .sandbox-controls { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; }
@@ -131,7 +137,7 @@
 
       <h3>Atomic leapers</h3>
       <p>One-shot jumps to a fixed offset; intervening pieces ignored.</p>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Offset</th></tr></thead>
         <tbody>
           <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td>Wazir</td><td>(1,0)</td></tr>
@@ -144,11 +150,11 @@
           <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td>Threeleaper</td><td>(3,0)</td></tr>
           <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td>Tripper</td><td>(3,3)</td></tr>
         </tbody>
-      </table>
+      </table></div>
       <p class="betza-note">Non-standard leapers use an explicit offset, e.g. <code>(1,4)</code> Giraffe.</p>
 
       <h3>Sliders &amp; standard compound atomics</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Equivalent to</th></tr></thead>
         <tbody>
           <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td>King</td><td><code>W + F</code> — one square in any of 8 directions</td></tr>
@@ -156,11 +162,11 @@
           <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td>Bishop</td><td>F-rider — slides any distance diagonally</td></tr>
           <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td>Queen</td><td><code>R + B</code> — slides 8 directions</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Riders (doubled letter = repeat the leap)</h3>
       <p>Doubled letter repeats the leap in a straight line until blocked at a landing square.</p>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Notation</th><th>Diagram</th><th>Name</th><th>Movement</th></tr></thead>
         <tbody>
           <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td>Nightrider</td><td>Any number of Knight leaps in a single line</td></tr>
@@ -168,11 +174,11 @@
           <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td>Alfilrider</td><td>Any number of Alfil leaps in a single line</td></tr>
           <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td>Dabbabarider</td><td>Any number of Dabbaba leaps in a single line</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Direction prefixes (lowercase)</h3>
       <p>Restrict the next uppercase move to specific directions.</p>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="f"><td><code>f</code></td><td>Forward only</td><td><code>fR</code> = Lance (forward Rook)</td></tr>
@@ -182,11 +188,11 @@
           <tr data-token="s"><td><code>s</code></td><td>Sideways (left + right)</td><td><code>sW</code> = sideways Wazir</td></tr>
           <tr data-token="v"><td><code>v</code></td><td>Vertical (forward + backward)</td><td><code>vR</code> = vertical Rook</td></tr>
         </tbody>
-      </table>
+      </table></div>
       <p class="betza-note">Prefixes combine, e.g. <code>fs</code> = forward + sideways.</p>
 
       <h3>Power modifiers</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="m"><td><code>m</code></td><td>Move only (no capture)</td><td><code>mfW</code> = Pawn's straight forward move</td></tr>
@@ -196,10 +202,10 @@
           <tr data-token="n_prefix"><td><code>n</code></td><td>Non-jumping (can be blocked at intermediate squares)</td><td><code>nN</code> = Mao (Xiangqi Horse — blockable Knight)</td></tr>
           <tr data-token="j"><td><code>j</code></td><td>Jumping (ignores intermediate squares — usually implicit)</td><td>Most leapers are already jumping</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Hop &amp; bend prefixes</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="p"><td><code>p</code></td><td>Pao-style hop: capture by jumping over one piece on a line</td><td><code>cpR</code> = Cannon's hop-capture along Rook lines</td></tr>
@@ -207,20 +213,20 @@
           <tr data-token="z"><td><code>z</code></td><td>Zigzag bend: turns 90° after each step</td><td><code>zB</code> = Boyscout (crooked Bishop)</td></tr>
           <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Gryphon, <code>t[WB]</code> = Manticore</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Numbers and brackets</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Syntax</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="rangeSlider"><td><code>X<em>n</em></code></td><td>Limit a slider to <em>n</em> squares maximum</td><td><code>Q2</code> = Bodyguard (Queen capped at 2 squares)</td></tr>
           <tr data-token="explicitLeaper"><td><code>(m,n)</code></td><td>Explicit leaper offset for non-standard leapers</td><td><code>(1,4)</code> = Giraffe</td></tr>
           <tr data-token="brackets"><td><code>[XYZ]</code></td><td>Grouping for the bent-rider <code>t</code> prefix</td><td><code>t[FR]</code> reads "Ferz step then outward Rook"</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Reading a compound</h3>
-      <table class="betza-table betza-examples">
+      <div class="table-scroll"><table class="betza-table betza-examples">
         <thead><tr><th>Notation</th><th>Piece</th><th>Breakdown</th></tr></thead>
         <tbody>
           <tr><td><code>QN</code></td><td>Amazon</td><td>Queen slides + Knight leaps</td></tr>
@@ -234,7 +240,7 @@
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
           <tr><td><code>Q (edges)</code></td><td>Edgehog</td><td>Queen movement restricted to start/end on a board-edge square</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <p class="betza-note">Full spec: <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Wikipedia — Fairy chess piece</a>.</p>
     </div>

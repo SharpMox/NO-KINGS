@@ -668,7 +668,7 @@
     return `<tr>${cells.join('<td class="chain-arrow-cell">→</td>')}</tr>`;
   }
 
-  document.getElementById('chains').innerHTML = `<table class="chains-table">
+  document.getElementById('chains').innerHTML = `<div class="table-scroll"><table class="chains-table">
       <thead>
         <tr>
           <th class="stage-header">Base</th>
@@ -679,7 +679,7 @@
         </tr>
       </thead>
       <tbody>${CHAINS.map(renderChain).join('')}</tbody>
-    </table>`;
+    </table></div>`;
 
   </script>
   <!-- Shared theme JS (cached across pages). See assets/theme.js. -->

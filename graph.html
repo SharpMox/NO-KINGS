@@ -329,6 +329,14 @@
       touch-action: none;
     }
     #network-svg.is-dragging { cursor: grabbing; }
+    /* Phones: the network would squish into an unreadable square at viewport
+       width, so render it at a usable fixed size inside a horizontal-scroll
+       container and let the reader swipe to pan. The matrix's #graph-wrap
+       already scrolls (overflow-x:auto). Desktop (>560px) is untouched. */
+    @media (max-width: 560px) {
+      #network-wrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+      #network-svg { min-width: 560px; touch-action: auto; }
+    }
     .net-edge {
       stroke-width: 1.5;
       fill: none;
@@ -461,6 +469,7 @@
           <span class="legend-chip is-synergistic">Synergistic fusion</span>
         </div>
       </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="graph-wrap">
         <table id="graph-table" class="graph-grid" role="grid" aria-label="Merge and fusion matrix"></table>
       </div>
@@ -474,6 +483,7 @@
         <button type="button" class="toggle-chip is-promotion"  data-kind="promotion"  aria-pressed="false">Promotion</button>
         <button type="button" class="toggle-chip is-inversion"  data-kind="inversion"  aria-pressed="false">Inversion</button>
       </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="network-wrap">
         <svg id="network-svg" xmlns="http://www.w3.org/2000/svg" aria-label="Force-directed network of piece relationships"></svg>
       </div>

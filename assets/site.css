@@ -95,3 +95,84 @@ footer p:last-child { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ============== Mobile (phones) ==============
+   Phone-only refinements. Everything here is gated behind the 560px phone
+   breakpoint (the one codex/encyclopedia already use), so desktop rendering is
+   completely untouched. Rules target the control class names shared across
+   pages; site.css loads after each page's inline <style>, so these win. */
+/* The "swipe to explore" hint is hidden by default; the phone block shows it.
+   Declared before the @media so source order lets the mobile rule win. */
+.mobile-hint { display: none; }
+@media (max-width: 560px) {
+  /* Comfortable, non-overlapping wrapped nav with ≥44px tap targets. */
+  .site-nav-inner { gap: 14px 18px; padding: 12px 16px; }
+  .site-nav a { padding: 9px 2px; }                 /* ~44px tall hit area */
+  .site-nav .theme-toggle { width: 44px; height: 44px; }
+
+  /* Standalone controls / chips / pills shared across pages → ≥44px targets. */
+  .tab-btn,
+  .toggle-chip,
+  .legend-chip,
+  .evolution-link,
+  .back-link,
+  .view-btn,
+  .sandbox-key,
+  .sandbox-preset {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .filter-input { min-height: 44px; }
+  /* Chip-style links/pills that are their own line item. */
+  a.betza-chip,
+  .badge {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* mini-betza is the label under a card — make it span the card (a big
+     horizontal target) with a 44px-tall centred box. Scoped to .mini-card so
+     it outranks the pages' inline `a.mini-betza{display:block}` even on
+     fusion/inversion, where site.css happens to load before the inline CSS. */
+  .mini-card a.mini-betza {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Clickable notation tokens in the betza reference, and codex's relation
+     "+N more" toggles. */
+  .betza-table code[role="button"] {
+    display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+  .relation-toggle { min-height: 44px; }
+
+  /* Footer links read as list rows on a phone — give them a real tap box. */
+  footer p a {
+    display: inline-block;
+    min-height: 44px;
+    line-height: 44px;
+  }
+  /* Inline prose links can't be a 44px-tall box without breaking text flow;
+     enlarge the hit area with padding + roomier line spacing instead. */
+  .intro { line-height: 1.7; }
+  .intro a { padding: 4px 0; }
+
+  /* Horizontal-scroll wrapper for wide tables (shared name with fusion.html). */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* "swipe to explore" affordance for horizontally-scrollable widgets. */
+  .mobile-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--text-soft);
+    margin: 0 0 6px 0;
+    text-align: center;
+  }
+}

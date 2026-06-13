@@ -27,7 +27,7 @@ var PIECES_CODEX = [
       betza: 'mfWcfFimfnD',
       origin: 'Standard',
       description: 'Moves one square forward (no capture). Captures one square diagonally forward. May move two squares forward on its first move, and can capture en passant. Promotes upon reaching the last rank.',
-      description_codex: 'fmW (forward move), fcF (forward capture), ifmW2 (initial forward).',
+      description_codex: 'Moves one square forward. Captures one square diagonally forward. May move two squares forward on its first move; may capture en passant. Promotes to Ranger.',
       behaviors: ['direction-restricted', 'promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[0,1],[0,2]] },
@@ -44,7 +44,7 @@ var PIECES_CODEX = [
       betza: 'mfFcfWimfnA',
       origin: 'Modern',
       description: 'The Pawn’s mirror: moves one square diagonally forward (or two on its first move), captures one square straight forward. En passant and promotion apply as for the standard pawn.',
-      description_codex: 'fmF (forward move), fcW (forward capture), ifmF2 (initial forward).',
+      description_codex: 'Moves one square diagonally forward. Captures one square straight forward. May move two squares diagonally forward on its first move.',
       behaviors: ['direction-restricted', 'promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,1],[-1,1],[2,2],[-2,2]] },
@@ -61,7 +61,7 @@ var PIECES_CODEX = [
       betza: 'mWcF',
       origin: 'Extended Pawn variant',
       description: 'Moves one square orthogonally in any of the four directions (move only) and captures one square diagonally in any of the four directions. Move-vs-capture asymmetry is its only pawn-like trait — it is fully symmetric in direction.',
-      description_codex: 'mW (move), cF (capture).',
+      description_codex: 'Moves one square orthogonally. Captures one square diagonally. Promotes from Pawn to Archer.',
       behaviors: ['capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -78,6 +78,7 @@ var PIECES_CODEX = [
       betza: 'mFcW',
       origin: 'Invented',
       description: 'Inversion of the Sergeant (mWcF): swap the move-direction set with the capture-direction set, then apply ortho ↔ diag rotation. Moves one diagonal step (Ferz, move-only) and captures one orthogonal step (Wazir, capture-only).',
+      description_codex: 'Moves one square diagonally. Captures one square orthogonally.',
       behaviors: ['pawn-like', 'color-bound'],
       moves: [
         { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -94,7 +95,7 @@ var PIECES_CODEX = [
       betza: 'mW2cF',
       origin: 'Arrow Pawn Chess (Persson, 1938)',
       description: 'Moves one or two squares orthogonally in any direction (move only), and captures one square diagonally in any direction. Unlike a standard pawn, it is not direction-restricted — only its move/capture asymmetry makes it pawn-like.',
-      description_codex: 'mW2 (move up to 2), cF (capture).',
+      description_codex: 'Moves one or two squares orthogonally. Captures one square diagonally. Promotes from Ranger.',
       behaviors: ['promotes', 'capture-different'],
       moves: [
         { kind: 'rings', squares: [[1,0],[2,0],[-1,0],[-2,0],[0,1],[0,2],[0,-1],[0,-2]] },
@@ -111,6 +112,7 @@ var PIECES_CODEX = [
       betza: 'mF2cW',
       origin: 'Invented',
       description: 'Inversion of the Arrow Pawn (mW2cF). Moves one or two diagonal squares (move-only Bishop capped at 2) and captures one orthogonal step.',
+      description_codex: 'Moves one or two squares diagonally. Captures one square orthogonally.',
       behaviors: ['pawn-like', 'color-bound'],
       moves: [
         { kind: 'rings', squares: [[1,1],[-1,1],[1,-1],[-1,-1],[2,2],[-2,2],[2,-2],[-2,-2]] },
@@ -127,7 +129,7 @@ var PIECES_CODEX = [
       betza: 'F',
       origin: 'Shatranj',
       description: 'Steps one square diagonally. The historical Shatranj precursor to the modern Queen; colour-bound to its starting square colour.',
-      description_codex: 'F (1-step diagonal).',
+      description_codex: 'Steps one square diagonally. Promotes to Mystic. Fuses with Rook to form Gryphon.',
       behaviors: ['leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -143,7 +145,7 @@ var PIECES_CODEX = [
       betza: 'FA',
       origin: 'Modern variants',
       description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
-      description_codex: 'F + A (1-step + (2,2) leap diagonal).',
+      description_codex: 'Leaps one or two squares diagonally — eight reachable squares. Promotes from Seer to High Priestess. Fuses with Knight to form High Priestess.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [
@@ -162,7 +164,7 @@ var PIECES_CODEX = [
       betza: 'FAN',
       origin: 'Problem chess',
       description: 'Combines the Ferz (1,1), Alfil (2,2), and Knight (1,2) leaps — 16 reachable squares at short range. Not colour-bound, because the Knight component breaks the otherwise diagonal palette.',
-      description_codex: 'F + A + N.',
+      description_codex: 'Leaps one or two squares diagonally, or makes a two-by-one L-shaped jump. Promotes from Mystic. Formed by fusing Knight and Mystic. Fuses with several partners to form Archbishop, Amazon, and Crown Princess.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -182,7 +184,7 @@ var PIECES_CODEX = [
       betza: 'W',
       origin: 'Shatranj',
       description: 'Steps one square orthogonally. A "short Rook" — the orthogonal counterpart of the Ferz.',
-      description_codex: 'W (1-step orthogonal).',
+      description_codex: 'Steps one square orthogonally. Promotes to Sorcerer. Fuses with Archbishop to form Crown Princess, or with Bishop to form Manticore.',
       behaviors: ['leaper'],
       moves: [
         { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1]] }
@@ -198,7 +200,7 @@ var PIECES_CODEX = [
       betza: 'WD',
       origin: 'Problem chess',
       description: 'Combines Wazir (1,0) and Dabbaba (2,0) — leaps one or exactly two squares orthogonally. Eight reachable squares, all on ranks and files.',
-      description_codex: 'W + D (1-step + (0,2) leap orthogonal).',
+      description_codex: 'Leaps one or two squares orthogonally — eight reachable squares. Promotes from Mage to Archmage. Fuses with Wanderer to form Archmage.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -217,7 +219,7 @@ var PIECES_CODEX = [
       betza: 'WAD',
       origin: 'Omega Chess',
       description: 'Combines Wazir (1,0), Alfil (2,2), and Dabbaba (2,0) — 12 reachable squares: a one-step orthogonal "ring" plus all eight squares of the second ring at corner and edge positions. One of the two new pieces in Omega Chess.',
-      description_codex: 'W + A + D.',
+      description_codex: 'Leaps one or two squares orthogonally, or two squares diagonally. Promotes from Sorcerer. Formed by fusing Wanderer and Sorcerer.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -237,7 +239,7 @@ var PIECES_CODEX = [
       betza: 'B',
       origin: 'Standard',
       description: 'Slides any number of squares diagonally. Each bishop is locked to one square colour for the entire game — a King + 2 same-colour Bishops cannot deliver mate.',
-      description_codex: 'B (diagonal slide).',
+      description_codex: 'Slides any distance diagonally. Promotes to Paladin. Fuses with several partners to form Archbishop, Queen, and Amazon, among others.',
       behaviors: ['long-range', 'color-bound'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -253,7 +255,7 @@ var PIECES_CODEX = [
       betza: 'BW',
       origin: 'Shōgi',
       description: 'A Bishop that also steps one square orthogonally. Created when a Shōgi Bishop is promoted. No longer colour-bound.',
-      description_codex: 'B + W (diagonal slide + 1-step orthogonal).',
+      description_codex: 'Slides any distance diagonally; also steps one square orthogonally. Promotes from Bishop to Archbishop. Fuses with several partners to form Queen, Amazon, and Crown Princess.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -270,7 +272,7 @@ var PIECES_CODEX = [
       betza: 'BN',
       origin: 'Modern',
       description: 'Bishop + Knight combined. Crucially colour-complete: King + Archbishop alone can force mate, unlike King + Bishop or King + Knight on their own.',
-      description_codex: 'B + N (diagonal slide + (1,2) leap).',
+      description_codex: 'Slides any distance diagonally; also makes a two-by-one L-shaped jump. Promotes from Paladin. Formed by fusing Bishop + Knight or Bishop + High Priestess. Fuses with several partners to form Amazon, Crown Princess, and Banshee.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -287,7 +289,7 @@ var PIECES_CODEX = [
       betza: 'R',
       origin: 'Standard',
       description: 'Slides any number of squares along ranks or files. Participates with the King in castling.',
-      description_codex: 'R (orthogonal slide).',
+      description_codex: 'Slides any distance along ranks and files. Promotes to Drake. Fuses with several partners to form Drake, Dragonlord, and Queen, among others.',
       behaviors: ['long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] }
@@ -303,7 +305,7 @@ var PIECES_CODEX = [
       betza: 'RF',
       origin: 'Shōgi',
       description: 'A Rook that also steps one square diagonally. Created when a Shōgi Rook is promoted in the opponent’s last three ranks.',
-      description_codex: 'R + F (orthogonal slide + 1-step diagonal).',
+      description_codex: 'Slides any distance orthogonally; also steps one square diagonally. Promotes from Rook to Dragonlord. Formed by fusing Rook and Kirin. Fuses with several partners to form Queen and Amazon.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -320,7 +322,7 @@ var PIECES_CODEX = [
       betza: 'RN',
       origin: 'Modern',
       description: 'Rook + Knight combined. Roughly equal in value to a Queen in most computer studies.',
-      description_codex: 'R + N (orthogonal slide + (1,2) leap).',
+      description_codex: 'Slides any distance orthogonally; also makes a two-by-one L-shaped jump. Promotes from Drake. Formed by fusing Knight and Rook. Fuses with several partners to form Amazon and Raven.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -337,7 +339,7 @@ var PIECES_CODEX = [
       betza: 'N',
       origin: 'Standard',
       description: 'Leaps in an L: two squares in one direction, then one perpendicular. The only standard piece that ignores intervening pieces.',
-      description_codex: 'N ((1,2) leap).',
+      description_codex: 'Makes a two-by-one L-shaped jump — two squares in one direction and one perpendicular. Promotes to Hippogriff. Fuses with several partners to form High Priestess, Faerie, and Archbishop, among others.',
       behaviors: ['leaper'],
       moves: [
         { kind: 'dots', squares: [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]] }
@@ -353,7 +355,7 @@ var PIECES_CODEX = [
       betza: 'NC',
       origin: 'Problem chess',
       description: 'Combines the Knight (1,2) and Camel (1,3) leaps — 16 reachable squares, all at short range.',
-      description_codex: 'N + C ((1,2) + (1,3) leaps).',
+      description_codex: 'Makes a two-by-one or three-by-one L-shaped jump. Promotes from Knight to Behemoth.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -372,7 +374,7 @@ var PIECES_CODEX = [
       betza: 'CZN',
       origin: 'Problem chess',
       description: 'Camel + Zebra + Knight fused — 24 reachable squares. The largest of the standard short-range leaper compounds.',
-      description_codex: 'C + Z + N ((1,3) + (2,3) + (1,2) leaps).',
+      description_codex: 'Makes a two-by-one, three-by-one, or three-by-two L-shaped jump. Promotes from Hippogriff.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -392,7 +394,7 @@ var PIECES_CODEX = [
       betza: 'FD',
       origin: 'Chu Shōgi',
       description: 'Combines Ferz (1,1) and Dabbaba (2,0) — four diagonal one-step plus four orthogonal two-square leaps. Colour-bound, since both components preserve square colour. Appears in Chu Shōgi.',
-      description_codex: 'F + D (1-step diagonal + (0,2) leap).',
+      description_codex: 'Steps one square diagonally, or leaps two squares orthogonally. Promotes to Sacred Kirin. Fuses with Rook to form Drake.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [
@@ -411,6 +413,7 @@ var PIECES_CODEX = [
       betza: 'FDC',
       origin: 'Invented',
       description: 'Promoted form of the Kirin. Adds the Camel (1,3) L-leap to the Kirin\'s Ferz and Dabbaba moves — sixteen reachable squares. Stays fully colour-bound: every component has an even dx+dy (1+1, 2+0, 1+3), so the piece never changes square colour.',
+      description_codex: 'Steps one square diagonally, leaps two squares orthogonally, or makes a three-by-one L-shaped jump. Promotes from Kirin to Celestial Kirin.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [
@@ -430,6 +433,8 @@ var PIECES_CODEX = [
       betza: 'WNH',
       origin: 'Invented',
       description: 'Inversion of Kirin+ (FDC). Strictly colour-changing — every destination has the opposite square colour from the start. Combines Wazir (1,0) at the closest ring, Knight (1,2) inside, and Threeleaper (3,0) as the four diamond-point cardinal leaps.',
+      description_codex: 'Steps one square orthogonally, makes a two-by-one L-shaped jump, or leaps three squares orthogonally.',
+      description_codex: 'Steps one square diagonally, leaps two squares orthogonally, or makes a three-by-one L-shaped jump. Promotes from Kirin to Celestial Kirin.',
       behaviors: ['compound', 'leaper', 'color-changing'],
       moves: [
         { kind: 'dots', squares: [
@@ -449,6 +454,7 @@ var PIECES_CODEX = [
       betza: 'FADCG + 4L',
       origin: 'Invented',
       description: 'Final form of the Kirin promotion chain. Twenty-eight leap targets: Ferz (1,1), Alfil (2,2), Dabbaba (2,0), Camel (1,3), Tripper (3,3), and Fourleaper (4,0). Every component is colour-bound.',
+      description_codex: 'Reaches 28 colour-bound squares — leaping one or two squares diagonally, two squares orthogonally, a three-by-one or three-by-three jump, or four squares orthogonally. Promotes from Sacred Kirin.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [
@@ -471,6 +477,7 @@ var PIECES_CODEX = [
       betza: 'WNH + Giraffe + Zebra',
       origin: 'Invented',
       description: 'Extends Inv Kirin+ outward with two more colour-changing rings: Giraffe (1,4) near the outer cardinal extremes, and Zebra (2,3) filling the gaps between H and Giraffe. All 32 leap targets are strictly colour-changing.',
+      description_codex: 'Reaches 32 colour-switching squares — leaping one square orthogonally, a two-by-one or two-by-three jump, three squares orthogonally, or a four-by-one jump.',
       behaviors: ['compound', 'leaper', 'color-changing'],
       moves: [
         { kind: 'dots', squares: [
@@ -492,7 +499,7 @@ var PIECES_CODEX = [
       betza: 'AD',
       origin: 'Problem chess',
       description: 'Combines the Alfil (2,2) and Dabbaba (2,0) leaps into a single piece — eight reachable squares forming the "second ring" along ranks, files, and diagonals. The single-leap counterpart of the Alibabarider. Heavily colour-bound, since both components preserve square colour.',
-      description_codex: 'A + D ((2,2) leap + (0,2) leap).',
+      description_codex: 'Leaps two squares diagonally, or two squares orthogonally. Promotes to Praetorian. Fuses with Sorcerer to form Archmage, or with Knight to form Faerie.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [
@@ -511,7 +518,7 @@ var PIECES_CODEX = [
       betza: 'Q2',
       origin: 'Hiashatar (Mongolian decimal chess)',
       description: 'Slides like a Queen but only one or two squares in any of the eight directions. Has a defensive aura in Hiashatar: any opposing sliding piece must stop the moment it moves within a King\'s-move radius of the Bodyguard, so it cannot pass by without being challenged.',
-      description_codex: 'Q2 (Q slide capped at 2 squares).',
+      description_codex: 'Moves one or two squares in any of the eight directions. Promotes from Wanderer to Queen.',
       behaviors: ['direction-restricted'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]], maxRange: 2 }
@@ -527,7 +534,7 @@ var PIECES_CODEX = [
       betza: 'Q',
       origin: 'Standard',
       description: 'Slides any number of squares along ranks, files, or diagonals. The most powerful standard piece — Rook + Bishop combined.',
-      description_codex: 'Q = R + B.',
+      description_codex: 'Slides any distance in any of the eight directions. Promotes from Praetorian. Formed by several fusions, including Bishop + Rook and Bishop + Drake. Fuses with several partners to form Amazon.',
       behaviors: ['long-range', 'compound'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -543,7 +550,7 @@ var PIECES_CODEX = [
       betza: 'NAD',
       origin: 'Problem chess',
       description: 'Combines Knight (1,2), Alfil (2,2), and Dabbaba (2,0) leaps. Reaches every square exactly two squares away from the piece (the full "second ring" at Chebyshev distance 2) — 16 squares in total: eight knight-leap targets, four diagonal corners, and four orthogonal edge-midpoints.',
-      description_codex: 'N + A + D.',
+      description_codex: 'Jumps two squares orthogonally, two squares diagonally, or makes a two-by-one L-shaped jump. Formed by fusing Knight and Wanderer.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -563,7 +570,7 @@ var PIECES_CODEX = [
       betza: 'BNW',
       origin: 'Modern variants',
       description: 'Archbishop + Wazir — combines Bishop slides, Knight leaps, and one-step orthogonal moves. A short-step extension of the Princess/Archbishop, similar in spirit to Dragon Horse but with the Knight added.',
-      description_codex: 'B + N + W.',
+      description_codex: 'Slides any distance diagonally, steps one square orthogonally, or makes a two-by-one L-shaped jump. Formed by several fusions, including Knight + Paladin and Mage + Archbishop.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -583,7 +590,7 @@ var PIECES_CODEX = [
       betza: 'QN',
       origin: 'Modern',
       description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single fairy piece in common use.',
-      description_codex: 'Q + N.',
+      description_codex: 'Slides any distance in any of the eight directions; also makes a two-by-one L-shaped jump. Formed by several fusions, including Bishop + Dragonlord and Knight + Queen. Fuses with Knight to form Valkyrie.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -600,7 +607,7 @@ var PIECES_CODEX = [
       betza: 't[FR]',
       origin: 'Grant Acedrex (1283)',
       description: 'A bent slider: takes one diagonal step (Ferz), then continues as a Rook outwards — moving orthogonally away from its starting square. The pivot square is itself a valid stopping square. Originated in Grant Acedrex, the 13th-century Castilian variant.',
-      description_codex: 't[FR] (1 F step, then R outward).',
+      description_codex: 'Steps one square diagonally, then continues sliding outward orthogonally for any distance. Formed by fusing Seer and Rook. Fuses with Manticore to form Godzilla.',
       behaviors: ['long-range'],
       moves: [
         { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
@@ -623,7 +630,7 @@ var PIECES_CODEX = [
       betza: 't[WB]',
       origin: 'Modern variants (Betza, Gilman, Cazaux)',
       description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Gryphon. Pivot square is itself a valid stopping square.',
-      description_codex: 't[WB] (1 W step, then B outward).',
+      description_codex: 'Steps one square orthogonally, then continues sliding outward diagonally for any distance. Formed by fusing Mage and Bishop. Fuses with Gryphon to form Godzilla.',
       behaviors: ['long-range'],
       moves: [
         { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
@@ -646,7 +653,7 @@ var PIECES_CODEX = [
       betza: 't[FR]t[WB]',
       origin: 'Modern variants',
       description: 'A double bent-rider that combines the Gryphon (Ferz + outward Rook) and the Manticore (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Gryphon-style (diagonal pivot, orthogonal slide) and eight Manticore-style (orthogonal pivot, diagonal slide).',
-      description_codex: 't[FR] + t[WB] (two bent riders).',
+      description_codex: 'Either steps one square diagonally and continues orthogonally outward, or steps one square orthogonally and continues diagonally outward. Formed by fusing Manticore and Gryphon.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },
@@ -677,7 +684,7 @@ var PIECES_CODEX = [
       betza: 'BNN',
       origin: 'Problem chess',
       description: 'Combines Bishop and Nightrider — slides diagonally any distance AND makes any number of knight leaps in a straight line. The diagonal counterpart of the Raven (Rook + Nightrider).',
-      description_codex: 'B + NN (diagonal slide + N rider).',
+      description_codex: 'Slides any distance diagonally, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Archbishop and Knight.',
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -701,7 +708,7 @@ var PIECES_CODEX = [
       betza: 'RNN',
       origin: 'Problem chess',
       description: 'Combines Rook slides with Nightrider chains — orthogonal sliding plus any number of knight leaps in a straight line. The rook counterpart of the Banshee (BNN).',
-      description_codex: 'R + NN (orthogonal slide + N rider).',
+      description_codex: 'Slides any distance orthogonally, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Dragonlord and Knight.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -725,7 +732,7 @@ var PIECES_CODEX = [
       betza: 'QNN',
       origin: 'Problem chess',
       description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
-      description_codex: 'Q + NN.',
+      description_codex: 'Slides any distance in any of the eight directions, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Amazon and Knight.',
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },

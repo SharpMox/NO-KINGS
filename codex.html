@@ -229,14 +229,106 @@
       font-weight: 600;
     }
     
-    /* Relations block on codex cards */
-    .relations { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+    /* Relations block on codex cards — stack of colored sections at the bottom. */
+    .relations { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0 0; }
+    .relation-section {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .relation-section-head {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-soft);
+      margin-bottom: 2px;
+    }
+    .relation-section.is-promotion {
+      border-color: color-mix(in srgb, var(--hop-target) 55%, var(--border));
+      background: color-mix(in srgb, var(--hop-target) 6%, var(--surface));
+    }
+    .relation-section.is-promotion .relation-section-head { color: var(--hop-target); }
+    .relation-section.is-fuse-from {
+      border-color: color-mix(in srgb, var(--hurdle-color) 55%, var(--border));
+      background: color-mix(in srgb, var(--hurdle-color) 6%, var(--surface));
+    }
+    .relation-section.is-fuse-from .relation-section-head { color: var(--hurdle-color); }
+    .relation-section.is-fuse-with-into {
+      border-image: linear-gradient(110deg, var(--accent) 0%, var(--hurdle-color) 100%) 1;
+      border-style: solid;
+      border-width: 1.5px;
+      border-radius: 0;            /* border-image only renders without radius */
+      background: linear-gradient(110deg,
+        color-mix(in srgb, var(--accent)       6%, var(--surface)) 0% 45%,
+        color-mix(in srgb, var(--hurdle-color) 6%, var(--surface)) 55% 100%);
+    }
+    .relation-section.is-fuse-with-into .relation-section-head {
+      background: linear-gradient(110deg, var(--accent), var(--hurdle-color));
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+    }
+    .relation-section.is-inversion {
+      border-color: color-mix(in srgb, var(--text-soft) 45%, var(--border));
+      background: color-mix(in srgb, var(--text-soft) 5%, var(--surface));
+    }
+    .relation-section.is-inversion .relation-section-head { color: var(--text-soft); }
     .relation-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
     .relation-label { color: var(--text-soft); width: 80px; flex-shrink: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; }
     .relation-target { display: flex; align-items: center; gap: 8px; }
     .relation-mini { width: 64px; height: 64px; flex-shrink: 0; border-radius: 3px; overflow: hidden; background: var(--sq-light); border: 1px solid var(--border); }
     .relation-mini svg { display: block; width: 100%; height: 100%; }
     .relation-name { font-weight: 500; color: var(--text); }
+    /* Fusion rows: name UNDER diagram; diagrams across rows line up vertically. */
+    .relation-row.is-fusion-pair, .relation-row.is-fusion-into {
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .relation-row.is-fusion-pair .relation-target,
+    .relation-row.is-fusion-into  .relation-target {
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      width: 64px;
+    }
+    .relation-row.is-fusion-pair .relation-name,
+    .relation-row.is-fusion-into  .relation-name {
+      font-size: 11px;
+      text-align: center;
+      line-height: 1.2;
+    }
+    .relation-op {
+      font-size: 20px; font-weight: 500;
+      color: var(--text-soft);
+      flex-shrink: 0;
+      /* Center vertically on the 64 px diagram, not on the diagram + name block. */
+      align-self: flex-start;
+      margin-top: 20px;
+    }
+    /* Collapsible section toggle: hide rows past the third while collapsed. */
+    .relation-section { position: relative; }
+    .relation-section.is-collapsed .relation-row.is-extra { display: none; }
+    .relation-toggle {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      appearance: none;
+      background: var(--surface);
+      border: 1.5px solid currentColor;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 12px;
+      font-family: inherit;
+      color: var(--text-soft);
+      line-height: 1.3;
+    }
+    .relation-toggle:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .relation-section.is-fuse-from      .relation-toggle { color: var(--hurdle-color); }
+    .relation-section.is-fuse-with-into .relation-toggle { color: var(--accent); }
+    .relation-section.is-collapsed .when-expanded,
+    .relation-section:not(.is-collapsed) .when-collapsed { display: none; }
 
     .card-desc {
       font-size: 14px;
@@ -342,6 +434,57 @@
       .card { break-inside: avoid; box-shadow: none; }
     }
 
+    /* ============== View toggle (Cards / List) ============== */
+    .view-toggle { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-left: auto; }
+    .view-btn { appearance: none; background: transparent; border: 0; padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-radius: 7px; font-family: inherit; }
+    .view-btn:hover { color: var(--text); }
+    .view-btn[aria-pressed="true"] { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+    /* In list view, hide the legend and the card tabpanels (tabs + filter
+       input stay visible and drive the list's row visibility). */
+    body[data-view="list"] .legend { display: none; }
+    body[data-view="list"] section[role="tabpanel"] { display: none; }
+    body[data-view="cards"] #list-view { display: none; }
+
+    /* ============== Pieces flat table (List view) ============== */
+    #pieces-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+    #pieces-table th, #pieces-table td { text-align: left; padding: 8px 12px; vertical-align: middle; border-top: 1px solid var(--border); }
+    #pieces-table thead th { background: var(--bg); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-soft); border-top: 0; border-bottom: 1px solid var(--border); cursor: default; user-select: none; white-space: nowrap; }
+    #pieces-table thead th[data-sortable="true"] { cursor: pointer; }
+    #pieces-table thead th .sort-mark { margin-left: 4px; opacity: 0.4; font-size: 10px; }
+    #pieces-table thead th[data-sort-dir="asc"] .sort-mark,
+    #pieces-table thead th[data-sort-dir="desc"] .sort-mark { opacity: 1; color: var(--accent); }
+    #pieces-table tbody tr.piece-row:hover td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    .pieces-diagram { width: 64px; height: 64px; }
+    .pieces-diagram svg { width: 100%; height: 100%; display: block; }
+    #pieces-table th:first-child, #pieces-table td:first-child { padding: 0; width: 64px; vertical-align: middle; }
+    .pieces-name { font-weight: 600; }
+    .pieces-betza { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10.5px; color: var(--text); max-width: 80px; overflow-wrap: anywhere; word-break: break-all; line-height: 1.25; }
+    .pieces-betza-link { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; word-break: break-all; }
+    .pieces-betza-link:hover { text-decoration: underline; }
+    .pieces-rel-empty { color: var(--text-soft); }
+    /* Column tints on td cells only — headers stay default. */
+    #pieces-table td.col-prom      { background: color-mix(in srgb, var(--hop-target)   8%, var(--surface)); }
+    #pieces-table td.col-fuse-with { background: color-mix(in srgb, var(--accent)       8%, var(--surface)); }
+    #pieces-table td.col-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 8%, var(--surface)); }
+    #pieces-table td.col-invert    { background: color-mix(in srgb, var(--text-soft)    8%, var(--surface)); }
+    /* Relation pills. */
+    .pieces-pill { display: inline-block; padding: 1px 9px; margin: 1px 2px; border-radius: 999px; font-size: 11.5px; white-space: nowrap; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .pieces-pill.is-promotion { background: color-mix(in srgb, var(--hop-target)   16%, var(--surface)); border-color: color-mix(in srgb, var(--hop-target)   45%, var(--border)); }
+    .pieces-pill.is-fuse-with { background: color-mix(in srgb, var(--accent)       16%, var(--surface)); border-color: color-mix(in srgb, var(--accent)       45%, var(--border)); }
+    .pieces-pill.is-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)); border-color: color-mix(in srgb, var(--hurdle-color) 45%, var(--border)); }
+    .pieces-pill.is-inversion { background: color-mix(in srgb, var(--text-soft)    16%, var(--surface)); border-color: color-mix(in srgb, var(--text-soft)    45%, var(--border)); }
+    .pieces-pill.is-fusion-pair {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: linear-gradient(110deg,
+        color-mix(in srgb, var(--accent)       16%, var(--surface)) 0% 45%,
+        color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)) 55% 100%);
+      border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    }
+    .pp-partner { color: var(--accent); font-weight: 500; }
+    .pp-arrow   { color: var(--text-soft); font-size: 10.5px; }
+    .pp-output  { color: var(--hurdle-color); font-weight: 500; }
+    #pieces-table th:last-child, #pieces-table td:last-child { min-width: 220px; }
+
     /* ============== A11y additions (keep at bottom for clean merges) ============== */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -353,6 +496,8 @@
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
+  <script src="data/promotions.js"></script>
+  <script src="data/fusions.js"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Site sections">
@@ -394,6 +539,10 @@
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-fusion" id="tabbtn-cat-fusion">Fusion <span class="tab-count" id="count-cat-fusion">0</span></button>
       </div>
       <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
+      <div class="view-toggle" role="group" aria-label="View mode">
+        <button type="button" class="view-btn" data-view="cards" aria-pressed="true">Cards</button>
+        <button type="button" class="view-btn" data-view="list"  aria-pressed="false">List</button>
+      </div>
     </div>
     <div class="legend" aria-label="Diagram legend">
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
@@ -438,6 +587,26 @@
     <section role="tabpanel" id="tab-cat-end" aria-labelledby="tabbtn-cat-end"> <div class="card-grid" id="grid-cat-end"></div> </section>
     <section role="tabpanel" id="tab-cat-invert" aria-labelledby="tabbtn-cat-invert"> <div class="card-grid" id="grid-cat-invert"></div> </section>
     <section role="tabpanel" id="tab-cat-fusion" aria-labelledby="tabbtn-cat-fusion"> <div class="card-grid" id="grid-cat-fusion"></div> </section>
+    <!-- List view: flat sortable table of all pieces with their relations.
+         Filter input + tabs in the page header drive BOTH views. -->
+    <div id="list-view" hidden>
+      <table id="pieces-table">
+        <thead>
+          <tr>
+            <th data-col="diagram"></th>
+            <th data-col="name" data-sortable="true">Name <span class="sort-mark">▾</span></th>
+            <th data-col="promotes_from" class="col-prom">Prom. from</th>
+            <th data-col="promotes_to"   class="col-prom">Prom. to</th>
+            <th data-col="fuse_with"     class="col-fuse-with">Fuse with</th>
+            <th data-col="fuse_from"     class="col-fuse-from">Fuse from</th>
+            <th data-col="invert"        class="col-invert">Invert</th>
+            <th data-col="betza" data-sortable="true">Betza <span class="sort-mark">▾</span></th>
+            <th data-col="behaviors">Behaviors</th>
+          </tr>
+        </thead>
+        <tbody id="pieces-tbody"></tbody>
+      </table>
+    </div>
   </main>
 
   <footer>
@@ -547,17 +716,93 @@
       </div>
     </div>`;
   }
+  // One mini piece (board + name) inside a fusion row.
+  function relationMini(targetId) {
+    const target = PIECES.find(p => p.id === targetId);
+    if (!target) return '';
+    return `<div class="relation-target">
+      <div class="relation-mini">${renderBoard(target)}</div>
+      <span class="relation-name">${target.name}</span>
+    </div>`;
+  }
+  // Build the two fusion lookups by walking FUSIONS.
+  // fuseWithInto[pieceId]  -> [{partnerId, outputId}, ...]
+  // fuseFromInputs[pieceId] -> [{lhsId, rhsId}, ...]
+  const FUSE_WITH_INTO = {};
+  const FUSE_FROM = {};
+  for (const kind of ['additive', 'synergistic']) {
+    for (const { lhs, rhs, out } of (FUSIONS[kind] || [])) {
+      (FUSE_WITH_INTO[lhs] = FUSE_WITH_INTO[lhs] || []).push({ partner: rhs, output: out });
+      (FUSE_WITH_INTO[rhs] = FUSE_WITH_INTO[rhs] || []).push({ partner: lhs, output: out });
+      (FUSE_FROM[out] = FUSE_FROM[out] || []).push({ lhs, rhs });
+    }
+  }
   function renderRelations(piece) {
     const promote = PROMOTE_OF[piece.id];
     const demote = DEMOTE_OF[piece.id];
     const invert = INVERT_OF[piece.id];
-    if (!promote && !demote && !invert) return '';
-    const rows = [
-      demote ? renderMiniRelation(demote, 'Demote to') : '',
-      promote ? renderMiniRelation(promote, 'Promote to') : '',
-      invert ? renderMiniRelation(invert, 'Invert to') : ''
-    ].filter(Boolean).join('');
-    return '<div class="relations">' + rows + '</div>';
+    const fwi    = FUSE_WITH_INTO[piece.id] || [];
+    const ff     = FUSE_FROM[piece.id] || [];
+    if (!promote && !demote && !invert && !fwi.length && !ff.length) return '';
+
+    const sections = [];
+
+    // Invert — grey box. Shown first at the top of the relations stack.
+    if (invert) {
+      sections.push(`<div class="relation-section is-inversion"><div class="relation-section-head">Invert</div>${renderMiniRelation(invert, 'Invert to')}</div>`);
+    }
+
+    // Promote / Demote — green box (two stacked rows when both apply).
+    if (promote || demote) {
+      const rows = [
+        demote  ? renderMiniRelation(demote,  'Demote to')  : '',
+        promote ? renderMiniRelation(promote, 'Promote to') : ''
+      ].filter(Boolean).join('');
+      sections.push(`<div class="relation-section is-promotion"><div class="relation-section-head">Promotion</div>${rows}</div>`);
+    }
+
+    // Collapse rows beyond the third into a "Show N more" toggle. Sections
+    // with 3 or fewer rows render fully, no toggle.
+    const VISIBLE = 3;
+    function collapsibleSection(kindClass, head, rowsArr) {
+      const hidden = Math.max(0, rowsArr.length - VISIBLE);
+      const collapseClass = hidden > 0 ? ' is-collapsed' : '';
+      const rows = rowsArr.map((html, i) => i >= VISIBLE
+        ? html.replace(/^(\s*<div class="relation-row )/, '$1is-extra ')
+        : html).join('');
+      const toggle = hidden > 0
+        ? `<button type="button" class="relation-toggle" aria-expanded="false">
+             <span class="when-collapsed">+${hidden} more</span>
+             <span class="when-expanded">Show less</span>
+           </button>`
+        : '';
+      return `<div class="relation-section ${kindClass}${collapseClass}"><div class="relation-section-head">${head}</div>${toggle}${rows}</div>`;
+    }
+
+    // Fuse from — purple box, "A + B" pairs that produce this piece.
+    if (ff.length) {
+      const rows = ff.map(({ lhs, rhs }) => `
+        <div class="relation-row is-fusion-pair">
+          ${relationMini(lhs)}
+          <span class="relation-op">+</span>
+          ${relationMini(rhs)}
+        </div>`);
+      sections.push(collapsibleSection('is-fuse-from', 'Fuse from', rows));
+    }
+
+    // Fuse with into — blue→purple box, partner → output for each fusion this
+    // piece takes part in as an input.
+    if (fwi.length) {
+      const rows = fwi.map(({ partner, output }) => `
+        <div class="relation-row is-fusion-into">
+          ${relationMini(partner)}
+          <span class="relation-op">→</span>
+          ${relationMini(output)}
+        </div>`);
+      sections.push(collapsibleSection('is-fuse-with-into', 'Fuse with → into', rows));
+    }
+
+    return '<div class="relations">' + sections.join('') + '</div>';
   }
 
   function renderCard(piece) {
@@ -589,12 +834,12 @@
           </div>
         </div>
         <div class="card-board">${renderBoard(piece)}</div>
-        ${renderRelations(piece)}
         <div class="card-meta">
           ${betza}
         </div>
         <p class="card-desc">${piece.description}</p>
         ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
+        ${renderRelations(piece)}
       </article>
     `;
   }
@@ -811,6 +1056,12 @@
       document.getElementById('count-cat-' + c.id).textContent = visibleCat[c.id];
     }
     document.getElementById('count-all').textContent = visibleAll;
+    // Also re-apply to the List view's table (whether or not it is currently visible).
+    if (typeof filterListRows === 'function') filterListRows();
+  });
+  // Switching tabs in any mode also re-applies the List view's row filter.
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => { if (typeof filterListRows === 'function') filterListRows(); });
   });
 
   // Seed the filter from ?q=<query> on page load (used by graph.html dblclick → codex).
@@ -821,6 +1072,205 @@
       filterInput.dispatchEvent(new Event('input'));
     }
   } catch (_) { /* file:// without a query */ }
+
+  /* ============================================================
+   *  List view: flat sortable + filterable table of all pieces
+   *  with their promotion / fusion / inversion relations.
+   * ============================================================ */
+  const INVERSION_PAIRS = [
+    ['wazir',           'ferz'],
+    ['bishop',          'rook'],
+    ['pawn',            'berolina'],
+    ['sergeant',        'inv-sergeant'],
+    ['arrow-pawn',      'inv-arrow-pawn'],
+    ['dragon-horse',    'dragon-king'],
+    ['kirin',           'squirrel'],
+    ['elephant-modern', 'war-machine'],
+    ['archbishop',      'chancellor'],
+    ['kirin-plus',      'inv-kirin-plus'],
+    ['high-priestess',  'champion'],
+    ['banshee',         'raven'],
+    ['kirin-plus-plus', 'inv-kirin-plus-plus'],
+    ['gryphon',         'manticore']
+  ];
+  const listById = new Map(PIECES_CODEX.map(p => [p.id, p]));
+  function listPieceName(id) { const p = listById.get(id); return p ? p.name : id; }
+  function listEscape(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function listZoomedBoard(piece) {
+    return renderBoard(piece).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
+  }
+  function computeListRelations(pieceId) {
+    const promotesFrom = [], promotesTo = [];
+    for (const chain of PROMOTION_CHAINS) {
+      const idx = chain.ids.indexOf(pieceId);
+      if (idx === -1) continue;
+      if (idx > 0)                    promotesFrom.push(chain.ids[idx - 1]);
+      if (idx < chain.ids.length - 1) promotesTo.push(chain.ids[idx + 1]);
+    }
+    const fuseWith = [], fuseFrom = [];
+    for (const kind of ['additive', 'synergistic']) {
+      for (const { lhs, rhs, out } of FUSIONS[kind]) {
+        if (lhs === pieceId) fuseWith.push({ partner: listPieceName(rhs), output: listPieceName(out) });
+        if (rhs === pieceId) fuseWith.push({ partner: listPieceName(lhs), output: listPieceName(out) });
+        if (out === pieceId) fuseFrom.push(listPieceName(lhs) + ' + ' + listPieceName(rhs));
+      }
+    }
+    const invert = [];
+    for (const [a, b] of INVERSION_PAIRS) {
+      if (a === pieceId) invert.push(b);
+      if (b === pieceId) invert.push(a);
+    }
+    return {
+      promotesFrom: promotesFrom.map(listPieceName),
+      promotesTo:   promotesTo.map(listPieceName),
+      fuseWith:     fuseWith,
+      fuseFrom:     fuseFrom,
+      invert:       invert.map(listPieceName)
+    };
+  }
+  function listPills(items, kindClass) {
+    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
+    return items.map(s => '<span class="pieces-pill ' + kindClass + '">' + listEscape(s) + '</span>').join('');
+  }
+  function listFuseWithPills(items) {
+    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
+    return items.map(({ partner, output }) =>
+      '<span class="pieces-pill is-fusion-pair">' +
+        '<span class="pp-partner">' + listEscape(partner) + '</span>' +
+        '<span class="pp-arrow">→</span>' +
+        '<span class="pp-output">'  + listEscape(output)  + '</span>' +
+      '</span>'
+    ).join('');
+  }
+  let listSortCol = null, listSortDir = 'asc';
+  function renderListRows(pieces) {
+    const tbody = document.getElementById('pieces-tbody');
+    tbody.innerHTML = '';
+    for (const p of pieces) {
+      const rel = computeListRelations(p.id);
+      const fuseWithSearch = rel.fuseWith.map(x => x.partner + ' ' + x.output).join(' ');
+      const haystack = [
+        p.name, p.original_name, p.betza, (p.behaviors || []).join(' '),
+        rel.promotesFrom.join(' '), rel.promotesTo.join(' '),
+        fuseWithSearch, rel.fuseFrom.join(' '), rel.invert.join(' ')
+      ].filter(Boolean).join(' ').toLowerCase();
+      const row = document.createElement('tr');
+      row.className = 'piece-row';
+      row.dataset.pieceId = p.id;
+      row.dataset.search = haystack;
+      const behaviors = (p.behaviors || []).map(b =>
+        '<span class="badge badge-' + listEscape(b) + '">' + listEscape(b) + '</span>'
+      ).join('');
+      const betzaLink = p.betza
+        ? '<a class="pieces-betza-link" href="betza.html?b=' + encodeURIComponent(p.betza) + '" target="_blank" rel="noopener">' + listEscape(p.betza) + '</a>'
+        : '<span class="pieces-betza">—</span>';
+      row.innerHTML =
+        '<td><div class="pieces-diagram">' + listZoomedBoard(p) + '</div></td>' +
+        '<td><span class="pieces-name">' + listEscape(p.name) + '</span></td>' +
+        '<td class="col-prom">'      + listPills(rel.promotesFrom, 'is-promotion') + '</td>' +
+        '<td class="col-prom">'      + listPills(rel.promotesTo,   'is-promotion') + '</td>' +
+        '<td class="col-fuse-with">' + listFuseWithPills(rel.fuseWith)             + '</td>' +
+        '<td class="col-fuse-from">' + listPills(rel.fuseFrom,     'is-fuse-from') + '</td>' +
+        '<td class="col-invert">'    + listPills(rel.invert,       'is-inversion') + '</td>' +
+        '<td class="pieces-betza">' + betzaLink + '</td>' +
+        '<td><div class="behavior-badges">' + (behaviors || '<span class="badge">—</span>') + '</div></td>';
+      tbody.appendChild(row);
+    }
+  }
+  let listBuilt = false;
+  // Compute the active tab's filter for the list view.
+  function activeTabListFilter() {
+    const activeBtn = document.querySelector('.tab-btn[aria-selected="true"]');
+    if (!activeBtn) return null;
+    const id = activeBtn.getAttribute('aria-controls');
+    if (id === 'tab-all') return null;
+    if (id.startsWith('tab-cat-')) {
+      const catId = id.replace('tab-cat-', '');
+      const cat = ROW2_CATEGORIES.find(c => c.id === catId);
+      return cat ? { kind: 'category', members: new Set(cat.members) } : null;
+    }
+    return { kind: 'family', value: id.replace('tab-', '') };
+  }
+  // Apply the page's filter input AND the active tab to the list table.
+  function filterListRows() {
+    const q = (filterInput.value || '').trim().toLowerCase();
+    const tabF = activeTabListFilter();
+    for (const row of document.querySelectorAll('#pieces-tbody tr.piece-row')) {
+      const pid = row.dataset.pieceId;
+      const p = listById.get(pid);
+      let tabOk = true;
+      if (tabF && p) {
+        if (tabF.kind === 'family')        tabOk = p.family === tabF.value;
+        else if (tabF.kind === 'category') tabOk = tabF.members.has(pid);
+      }
+      const searchOk = !q || row.dataset.search.includes(q);
+      row.style.display = (tabOk && searchOk) ? '' : 'none';
+    }
+  }
+  function buildList() {
+    renderListRows(PIECES_CODEX);
+    document.querySelectorAll('#pieces-table thead th[data-sortable="true"]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        const dir = (listSortCol === col && listSortDir === 'asc') ? 'desc' : 'asc';
+        listSortCol = col;
+        listSortDir = dir;
+        const sorted = PIECES_CODEX.slice().sort((a, b) => {
+          const av = (a[col] || '').toString().toLowerCase();
+          const bv = (b[col] || '').toString().toLowerCase();
+          if (av === bv) return 0;
+          return (av < bv ? -1 : 1) * (dir === 'asc' ? 1 : -1);
+        });
+        renderListRows(sorted);
+        filterListRows();   // re-apply current filter state after re-render
+        document.querySelectorAll('#pieces-table thead th').forEach(h => h.removeAttribute('data-sort-dir'));
+        th.setAttribute('data-sort-dir', dir);
+      });
+    });
+    // Double-click a row to open the same codex page anchored at the piece's card.
+    document.getElementById('pieces-tbody').addEventListener('dblclick', (ev) => {
+      const row = ev.target.closest('tr.piece-row');
+      if (!row) return;
+      const piece = listById.get(row.dataset.pieceId);
+      if (!piece) return;
+      // Switch to cards view and scroll to the card.
+      setView('cards');
+      const card = document.getElementById('piece-' + piece.id);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    // Apply the current filter state immediately so the first visit reflects it.
+    filterListRows();
+  }
+  function setView(view) {
+    document.body.setAttribute('data-view', view);
+    document.querySelectorAll('.view-btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'));
+    const listEl = document.getElementById('list-view');
+    if (view === 'list') {
+      if (!listBuilt) { buildList(); listBuilt = true; }
+      listEl.hidden = false;
+    } else {
+      listEl.hidden = true;
+    }
+    try { localStorage.setItem('nokings-view:codex', view); } catch (_) {}
+  }
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => setView(btn.dataset.view));
+  });
+  // Restore saved view on load.
+  try {
+    const saved = localStorage.getItem('nokings-view:codex');
+    setView(saved === 'list' ? 'list' : 'cards');
+  } catch (_) { setView('cards'); }
+
+  // Delegated handler for collapsible Fuse from / Fuse with into sections.
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.relation-toggle');
+    if (!btn) return;
+    const section = btn.closest('.relation-section');
+    if (!section) return;
+    section.classList.toggle('is-collapsed');
+    btn.setAttribute('aria-expanded', section.classList.contains('is-collapsed') ? 'false' : 'true');
+  });
 
   </script>
   <!-- Shared theme JS (cached across pages). See assets/theme.js. -->

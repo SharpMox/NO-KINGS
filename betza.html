@@ -228,6 +228,7 @@
           <tr><td><code>RF</code></td><td>Dragon King</td><td>Rook slides + Ferz steps (= promoted Rook in Shōgi)</td></tr>
           <tr><td><code>mRcpR</code></td><td>Cannon</td><td>(m)ove like a (R)ook + (c)apture by (p)ao-hopping along (R)ook lines</td></tr>
           <tr><td><code>gQ</code></td><td>Grasshopper</td><td>(g)rasshopper hop along (Q)ueen lines</td></tr>
+          <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag crooked (B)ishop — diagonal steps that bend 90° each move</td></tr>
           <tr><td><code>mfWcfFimfnD</code></td><td>Pawn</td><td>(m)ove (f)orward (W)azir + (c)apture (f)orward (F)erz + (i)nitial-only (m)ove (f)orward (n)on-jumping (D)abbaba</td></tr>
           <tr><td><code>t[FR]</code></td><td>Gryphon</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
@@ -479,7 +480,8 @@
         const squares = filterByDirection(leapSquares(+m[1], +m[2]), prefixes.dirs);
         const move = applyPowerHop({ kind: 'dots', squares }, prefixes);
         if (move && move._error) return { ok: false, error: move._error };
-        if (move) moves.push(move);
+        if (Array.isArray(move)) moves.push(...move);
+        else if (move) moves.push(move);
         i = close + 1;
         resetPrefixes();
         continue;
@@ -528,7 +530,8 @@
 
         const out = applyPowerHop(base, prefixes);
         if (out && out._error) return { ok: false, error: out._error };
-        if (out) moves.push(out);
+        if (Array.isArray(out)) moves.push(...out);
+        else if (out) moves.push(out);
         resetPrefixes();
         continue;
       }
@@ -542,26 +545,74 @@
     return { ok: true, moves };
   }
 
+  // Build the zigzag (crooked-rider) rays for the `z` prefix from a slider's
+  // direction set. A diagonal base nets orthogonal travel; an orthogonal base
+  // nets diagonal travel. Direction prefixes are honoured upstream (the dirs
+  // passed in are already filtered), so a net is only emitted when BOTH of its
+  // component steps survive — e.g. fzB yields just the forward (net-N) zigzag.
+  function crookedRays(dirs, range) {
+    const key = ([x, y]) => x + ',' + y;
+    const present = new Set(dirs.map(key));
+    const maxSteps = range ? range : 16;   // the board edge caps it well before 16
+    const out = [];
+    const build = (comps) => {
+      const pts = [];
+      let pos = [0, 0];
+      for (let k = 0; k < maxSteps; k++) {
+        const s = comps[k % 2];
+        pos = [pos[0] + s[0], pos[1] + s[1]];
+        if (Math.abs(pos[0]) > 4 || Math.abs(pos[1]) > 4) break;
+        pts.push([pos[0], pos[1]]);
+      }
+      if (pts.length) out.push({ kind: 'zigzag', points: pts });
+    };
+    const tryNets = (nets, candidates) => {
+      for (const n of nets) {
+        const comps = candidates.filter(d => d[0]*n[0] + d[1]*n[1] > 0);
+        if (comps.length === 2 && comps.every(d => present.has(key(d)))) {
+          comps.sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+          build(comps);
+        }
+      }
+    };
+    tryNets([[0,1],[0,-1],[1,0],[-1,0]], [[1,1],[-1,1],[1,-1],[-1,-1]]);  // diagonal base → orthogonal nets
+    tryNets([[1,1],[1,-1],[-1,1],[-1,-1]], [[1,0],[-1,0],[0,1],[0,-1]]);  // orthogonal base → diagonal nets
+    return out;
+  }
+
   function applyPowerHop(move, prefixes) {
     if (!move) return null;
     const powers = prefixes.powers, hopBends = prefixes.hopBends;
 
-    // Hop / bend transforms (priority): p, g, z
-    if (hopBends.includes('z')) {
-      // Zigzag (Boyscout / crooked slider) is not yet renderable in the sandbox.
-      // Returning a move here would silently draw the wrong (or a blank) diagram,
-      // so surface an explicit error instead of dropping the move.
-      return { _error: "zigzag (z) is not yet supported in the sandbox" };
-    }
-    if (hopBends.includes('p')) {
-      // Pao-style hop is not yet renderable as a distinct hop in the sandbox;
-      // drawing it as a plain slide would misrepresent the piece, so reject it.
-      return { _error: "hop (p) is not yet supported in the sandbox" };
-    }
-    if (hopBends.includes('g')) {
-      // Grasshopper hop is not yet renderable as a distinct hop in the sandbox;
-      // drawing it as a plain move would misrepresent the piece, so reject it.
-      return { _error: "grasshopper hop (g) is not yet supported in the sandbox" };
+    // Hop / bend transforms (z, p, g). All three only make sense on a slider
+    // base (R/B/Q lines); on a leaper or (m,n) base, surface an explicit error
+    // rather than inventing geometry or silently dropping the move.
+    const hb = hopBends.find(h => h === 'z' || h === 'p' || h === 'g');
+    if (hb) {
+      const names = { z: "zigzag (z)", p: "hop (p)", g: "grasshopper hop (g)" };
+      if (move.kind !== 'rays' || !move.dirs) {
+        return { _error: names[hb] + " needs a slider base (R, B, or Q)" };
+      }
+      const dirs = move.dirs;
+      if (hb === 'z') {
+        const rays = crookedRays(dirs, move.maxRange);
+        if (!rays.length) return { _error: "zigzag (z) needs two slider directions to bend between (try zB, zR, or zQ)" };
+        return rays;
+      }
+      // p (pao/cannon) and g (grasshopper) each draw one representative hop per
+      // line. m → move-only landing, c → capture-only, neither → move+capture.
+      // Grasshopper lands immediately past a near screen; the cannon hops a
+      // further screen — mirroring the encyclopedia Grasshopper and Cannon/Vao.
+      const hopKind = (powers.includes('m') && !powers.includes('c')) ? 'move-hop'
+                    : (powers.includes('c') && !powers.includes('m')) ? 'capture-hop'
+                    : 'hop';
+      const hd = hb === 'g' ? 2 : 3;
+      const inB = v => Math.abs(v) <= 4;
+      const hops = dirs
+        .map(([dx, dy]) => ({ kind: hopKind, hurdle: [dx*hd, dy*hd], target: [dx*(hd+1), dy*(hd+1)] }))
+        .filter(m => inB(m.target[0]) && inB(m.target[1]));
+      if (!hops.length) return { _error: names[hb] + " has no on-board landing in that direction" };
+      return hops;
     }
 
     // Power modifiers
@@ -698,6 +749,46 @@
           `<line x1="${pivotC.cx}" y1="${pivotC.cy}" x2="${baseX}" y2="${baseY}" stroke="var(--ray-color)" stroke-width="2.8" stroke-linecap="round"/>` +
           `<polygon points="${tipX},${tipY} ${baseX+perpX},${baseY+perpY} ${baseX-perpX},${baseY-perpY}" fill="var(--ray-color)"/>`;
       }
+      // Hop family (p/g prefixes): dashed piece→screen→landing path, a dashed
+      // hurdle square at the screen, and a landing glyph — diamond (move+capture),
+      // ring (move-only) or X (capture-only). Drawn to match assets/board.js.
+      case 'hop': {
+        const start = svgCenter(0,0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const sx = (move.hurdle[0]+4)*SQ, sy = (4-move.hurdle[1])*SQ, r = SQ*0.24;
+        return `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>` +
+               `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>` +
+               `<polygon points="${t.cx},${t.cy-r} ${t.cx+r},${t.cy} ${t.cx},${t.cy+r} ${t.cx-r},${t.cy}" fill="var(--hop-target)"/>`;
+      }
+      case 'capture-hop': {
+        const start = svgCenter(0,0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const sx = (move.hurdle[0]+4)*SQ, sy = (4-move.hurdle[1])*SQ, r = SQ*0.22;
+        return `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--capture-color)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>` +
+               `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>` +
+               `<line x1="${t.cx-r}" y1="${t.cy-r}" x2="${t.cx+r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>` +
+               `<line x1="${t.cx+r}" y1="${t.cy-r}" x2="${t.cx-r}" y2="${t.cy+r}" stroke="var(--capture-color)" stroke-width="3" stroke-linecap="round"/>`;
+      }
+      case 'move-hop': {
+        const start = svgCenter(0,0);
+        const h = svgCenter(move.hurdle[0], move.hurdle[1]);
+        const t = svgCenter(move.target[0], move.target[1]);
+        const sx = (move.hurdle[0]+4)*SQ, sy = (4-move.hurdle[1])*SQ;
+        return `<path d="M ${start.cx} ${start.cy} L ${h.cx} ${h.cy} L ${t.cx} ${t.cy}" stroke="var(--hop-target)" stroke-width="1.4" stroke-dasharray="3 3" fill="none" opacity="0.55"/>` +
+               `<rect x="${sx+3}" y="${sy+3}" width="${SQ-6}" height="${SQ-6}" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/>` +
+               `<circle cx="${t.cx}" cy="${t.cy}" r="${SQ*0.22}" fill="none" stroke="var(--hop-target)" stroke-width="2.5"/>`;
+      }
+      // Zigzag (z prefix / crooked rider): solid bent polyline through the
+      // alternating-step path plus a dot at each cell. Matches assets/board.js.
+      case 'zigzag': {
+        const start = svgCenter(0,0);
+        const pts = [start, ...move.points.map(([x,y]) => svgCenter(x,y))];
+        const pathD = `M ${pts.map(p => `${p.cx} ${p.cy}`).join(' L ')}`;
+        return `<path d="${pathD}" stroke="var(--rider-color)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" fill="none" opacity="0.75"/>` +
+               move.points.map(([x,y]) => { const { cx, cy } = svgCenter(x,y); return `<circle cx="${cx}" cy="${cy}" r="${SQ*0.16}" fill="var(--rider-color)"/>`; }).join('');
+      }
       default: return '';
     }
   }
@@ -724,6 +815,7 @@
     { betza: 'Q2',            name: 'Bodyguard' },
     { betza: 'mRcpR',         name: 'Cannon' },
     { betza: 'gQ',            name: 'Grasshopper' },
+    { betza: 'zB',            name: 'Boyscout' },
     { betza: 'WAD',           name: 'Champion' },
     { betza: 'FAN',           name: 'High Priestess' },
     { betza: 't[WB]',         name: 'Manticore' },

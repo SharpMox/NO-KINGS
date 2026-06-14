@@ -27,7 +27,8 @@ var FUSIONS = {
     { lhs: "knight",       rhs: "dragon-horse",   out: "crown-princess" },
     { lhs: "wazir",        rhs: "archbishop",     out: "crown-princess" },
     { lhs: "archbishop",   rhs: "dragon-horse",   out: "crown-princess" },
-    { lhs: "dragon-horse", rhs: "high-priestess", out: "crown-princess" }
+    { lhs: "dragon-horse", rhs: "high-priestess", out: "crown-princess" },
+    { lhs: "raven",        rhs: "banshee",        out: "amazonrider" }
   ],
   synergistic: [
     { lhs: "ferz",       rhs: "rook",      out: "gryphon" },

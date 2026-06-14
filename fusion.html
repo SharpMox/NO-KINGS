@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="30 fairy-chess piece fusions in NO-KINGS: additive and synergistic combinations of two pieces into a third.">
+  <meta name="description" content="31 fairy-chess piece fusions in NO-KINGS: additive and synergistic combinations of two pieces into a third.">
   <title>Fairy Chess — Fusions</title>
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/board.js"></script>
+  <script src="data/fusions.js"></script>
   <style>
     header {
       max-width: 1280px;
@@ -206,7 +207,7 @@
   <header>
     <h1>Fusions</h1>
     <p class="intro">
-      A reference of the <strong>30 fusions</strong> in NO-KINGS.
+      A reference of the <strong>31 fusions</strong> in NO-KINGS.
     </p>
     <div class="controls">
       <div class="tabs" role="tablist" aria-label="Fusion type">
@@ -226,7 +227,7 @@
   </main>
 
   <footer>
-    <p class="footer-page-line">30 Pairs of pieces whose movement schemes combine into a third piece — additive (set-equality) and synergistic (emergent bent rider) flavours.</p>
+    <p class="footer-page-line">31 Pairs of pieces whose movement schemes combine into a third piece — additive (set-equality) and synergistic (emergent bent rider) flavours.</p>
     <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
   </footer>
 
@@ -643,162 +644,7 @@
     }
   ];
 
-  const FUSIONS = {
-  "additive": [
-    {
-      "lhs": "alibaba",
-      "rhs": "war-machine",
-      "out": "champion"
-    },
-    {
-      "lhs": "knight",
-      "rhs": "elephant-modern",
-      "out": "high-priestess"
-    },
-    {
-      "lhs": "knight",
-      "rhs": "alibaba",
-      "out": "squirrel"
-    },
-    {
-      "lhs": "rook",
-      "rhs": "kirin",
-      "out": "dragon-king"
-    },
-    {
-      "lhs": "bishop",
-      "rhs": "knight",
-      "out": "archbishop"
-    },
-    {
-      "lhs": "bishop",
-      "rhs": "high-priestess",
-      "out": "archbishop"
-    },
-    {
-      "lhs": "knight",
-      "rhs": "rook",
-      "out": "chancellor"
-    },
-    {
-      "lhs": "bishop",
-      "rhs": "rook",
-      "out": "queen"
-    },
-    {
-      "lhs": "bishop",
-      "rhs": "dragon-king",
-      "out": "queen"
-    },
-    {
-      "lhs": "rook",
-      "rhs": "dragon-horse",
-      "out": "queen"
-    },
-    {
-      "lhs": "dragon-horse",
-      "rhs": "dragon-king",
-      "out": "queen"
-    },
-    {
-      "lhs": "bishop",
-      "rhs": "chancellor",
-      "out": "amazon"
-    },
-    {
-      "lhs": "knight",
-      "rhs": "queen",
-      "out": "amazon"
-    },
-    {
-      "lhs": "rook",
-      "rhs": "archbishop",
-      "out": "amazon"
-    },
-    {
-      "lhs": "archbishop",
-      "rhs": "chancellor",
-      "out": "amazon"
-    },
-    {
-      "lhs": "archbishop",
-      "rhs": "dragon-king",
-      "out": "amazon"
-    },
-    {
-      "lhs": "archbishop",
-      "rhs": "queen",
-      "out": "amazon"
-    },
-    {
-      "lhs": "chancellor",
-      "rhs": "dragon-horse",
-      "out": "amazon"
-    },
-    {
-      "lhs": "chancellor",
-      "rhs": "queen",
-      "out": "amazon"
-    },
-    {
-      "lhs": "queen",
-      "rhs": "high-priestess",
-      "out": "amazon"
-    },
-    {
-      "lhs": "knight",
-      "rhs": "dragon-horse",
-      "out": "crown-princess"
-    },
-    {
-      "lhs": "wazir",
-      "rhs": "archbishop",
-      "out": "crown-princess"
-    },
-    {
-      "lhs": "archbishop",
-      "rhs": "dragon-horse",
-      "out": "crown-princess"
-    },
-    {
-      "lhs": "dragon-horse",
-      "rhs": "high-priestess",
-      "out": "crown-princess"
-    }
-  ],
-  "synergistic": [
-    {
-      "lhs": "ferz",
-      "rhs": "rook",
-      "out": "gryphon"
-    },
-    {
-      "lhs": "wazir",
-      "rhs": "bishop",
-      "out": "manticore"
-    },
-    {
-      "lhs": "archbishop",
-      "rhs": "knight",
-      "out": "banshee"
-    },
-    {
-      "lhs": "chancellor",
-      "rhs": "knight",
-      "out": "raven"
-    },
-    {
-      "lhs": "amazon",
-      "rhs": "knight",
-      "out": "amazonrider"
-    },
-    {
-      "lhs": "manticore",
-      "rhs": "gryphon",
-      "out": "godzilla"
-    }
-  ]
-};
+  // FUSIONS is loaded from data/fusions.js (shared with graph + codex).
 
   /* ============================================================
    *  Fusion rendering (renderBoard/renderMove live in assets/board.js)

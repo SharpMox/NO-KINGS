@@ -161,41 +161,41 @@
       <h3>Atomic leapers</h3>
       <p>One-shot jumps to a fixed offset; intervening pieces ignored.</p>
       <div class="table-scroll"><table class="betza-table">
-        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Offset</th></tr></thead>
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Offset</th></tr></thead>
         <tbody>
-          <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td>Wazir</td><td>(1,0)</td></tr>
-          <tr data-token="F"><td><code>F</code></td><td data-betza-icon="F"></td><td>Ferz</td><td>(1,1)</td></tr>
-          <tr data-token="D"><td><code>D</code></td><td data-betza-icon="D"></td><td>Dabbaba</td><td>(2,0)</td></tr>
-          <tr data-token="A"><td><code>A</code></td><td data-betza-icon="A"></td><td>Alfil</td><td>(2,2)</td></tr>
-          <tr data-token="N"><td><code>N</code></td><td data-betza-icon="N"></td><td>Knight</td><td>(1,2)</td></tr>
-          <tr data-token="C"><td><code>C</code> (or <code>L</code>)</td><td data-betza-icon="C"></td><td>Camel</td><td>(1,3)</td></tr>
-          <tr data-token="Z"><td><code>Z</code></td><td data-betza-icon="Z"></td><td>Zebra</td><td>(2,3)</td></tr>
-          <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td>Threeleaper</td><td>(3,0)</td></tr>
-          <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td>Tripper</td><td>(3,3)</td></tr>
+          <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td><strong>Wazir</strong><br>(1,0)</td></tr>
+          <tr data-token="F"><td><code>F</code></td><td data-betza-icon="F"></td><td><strong>Ferz</strong><br>(1,1)</td></tr>
+          <tr data-token="D"><td><code>D</code></td><td data-betza-icon="D"></td><td><strong>Dabbaba</strong><br>(2,0)</td></tr>
+          <tr data-token="A"><td><code>A</code></td><td data-betza-icon="A"></td><td><strong>Alfil</strong><br>(2,2)</td></tr>
+          <tr data-token="N"><td><code>N</code></td><td data-betza-icon="N"></td><td><strong>Knight</strong><br>(1,2)</td></tr>
+          <tr data-token="C"><td><code>C</code> (or <code>L</code>)</td><td data-betza-icon="C"></td><td><strong>Camel</strong><br>(1,3)</td></tr>
+          <tr data-token="Z"><td><code>Z</code></td><td data-betza-icon="Z"></td><td><strong>Zebra</strong><br>(2,3)</td></tr>
+          <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td><strong>Threeleaper</strong><br>(3,0)</td></tr>
+          <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td><strong>Tripper</strong><br>(3,3)</td></tr>
         </tbody>
       </table></div>
       <p class="betza-note">Non-standard leapers use an explicit offset, e.g. <code>(1,4)</code> Giraffe.</p>
 
       <h3>Sliders &amp; standard compound atomics</h3>
       <div class="table-scroll"><table class="betza-table">
-        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Equivalent to</th></tr></thead>
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Equivalent to</th></tr></thead>
         <tbody>
-          <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td>King</td><td><code>W + F</code> — one square in any of 8 directions</td></tr>
-          <tr data-token="R"><td><code>R</code></td><td data-betza-icon="R"></td><td>Rook</td><td>W-rider — slides any distance orthogonally</td></tr>
-          <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td>Bishop</td><td>F-rider — slides any distance diagonally</td></tr>
-          <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td>Queen</td><td><code>R + B</code> — slides 8 directions</td></tr>
+          <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td><strong>King</strong><br><code>W + F</code> — one square in any of 8 directions</td></tr>
+          <tr data-token="R"><td><code>R</code></td><td data-betza-icon="R"></td><td><strong>Rook</strong><br>W-rider — slides any distance orthogonally</td></tr>
+          <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td><strong>Bishop</strong><br>F-rider — slides any distance diagonally</td></tr>
+          <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td><strong>Queen</strong><br><code>R + B</code> — slides 8 directions</td></tr>
         </tbody>
       </table></div>
 
       <h3>Riders (doubled letter = repeat the leap)</h3>
       <p>Doubled letter repeats the leap in a straight line until blocked at a landing square.</p>
       <div class="table-scroll"><table class="betza-table">
-        <thead><tr><th>Notation</th><th>Diagram</th><th>Name</th><th>Movement</th></tr></thead>
+        <thead><tr><th>Notation</th><th>Diagram</th><th>Movement</th></tr></thead>
         <tbody>
-          <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td>Nightrider</td><td>Any number of Knight leaps in a single line</td></tr>
-          <tr data-token="CC"><td><code>CC</code></td><td data-betza-icon="CC"></td><td>Camelrider</td><td>Any number of Camel leaps in a single line</td></tr>
-          <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td>Alfilrider</td><td>Any number of Alfil leaps in a single line</td></tr>
-          <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td>Dabbabarider</td><td>Any number of Dabbaba leaps in a single line</td></tr>
+          <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td><strong>Nightrider</strong><br>Any number of Knight leaps in a single line</td></tr>
+          <tr data-token="CC"><td><code>CC</code></td><td data-betza-icon="CC"></td><td><strong>Camelrider</strong><br>Any number of Camel leaps in a single line</td></tr>
+          <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td><strong>Alfilrider</strong><br>Any number of Alfil leaps in a single line</td></tr>
+          <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td><strong>Dabbabarider</strong><br>Any number of Dabbaba leaps in a single line</td></tr>
         </tbody>
       </table></div>
 

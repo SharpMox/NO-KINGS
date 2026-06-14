@@ -5,6 +5,7 @@
 var FUSIONS = {
   additive: [
     { lhs: "alibaba",      rhs: "war-machine",    out: "champion" },
+    { lhs: "wazir",        rhs: "alibaba",        out: "champion" },
     { lhs: "knight",       rhs: "elephant-modern",out: "high-priestess" },
     { lhs: "knight",       rhs: "alibaba",        out: "squirrel" },
     { lhs: "rook",         rhs: "kirin",          out: "dragon-king" },
@@ -28,7 +29,11 @@ var FUSIONS = {
     { lhs: "wazir",        rhs: "archbishop",     out: "crown-princess" },
     { lhs: "archbishop",   rhs: "dragon-horse",   out: "crown-princess" },
     { lhs: "dragon-horse", rhs: "high-priestess", out: "crown-princess" },
-    { lhs: "raven",        rhs: "banshee",        out: "amazonrider" }
+    { lhs: "raven",        rhs: "banshee",        out: "amazonrider" },
+    { lhs: "bishop",       rhs: "raven",          out: "amazonrider" },
+    { lhs: "rook",         rhs: "banshee",        out: "amazonrider" },
+    { lhs: "queen",        rhs: "banshee",        out: "amazonrider" },
+    { lhs: "queen",        rhs: "raven",          out: "amazonrider" }
   ],
   synergistic: [
     { lhs: "ferz",       rhs: "rook",      out: "gryphon" },

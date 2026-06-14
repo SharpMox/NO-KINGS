@@ -105,10 +105,13 @@ footer p:last-child { margin-bottom: 0; }
    Declared before the @media so source order lets the mobile rule win. */
 .mobile-hint { display: none; }
 @media (max-width: 560px) {
-  /* Comfortable, non-overlapping wrapped nav with ≥44px tap targets. */
-  .site-nav-inner { gap: 14px 18px; padding: 12px 16px; }
-  .site-nav a { padding: 9px 2px; }                 /* ~44px tall hit area */
-  .site-nav .theme-toggle { width: 44px; height: 44px; }
+  /* One-row header: all 7 links + toggle stay on a single line. Font is fluid
+     so the row keeps fitting as the screen narrows (≈9.5px at 390px down to a
+     7px floor near 320px) instead of re-wrapping or needing a scroll. */
+  .site-nav-inner { flex-wrap: nowrap; gap: 4px; padding: 8px 12px; justify-content: space-between; }
+  .site-nav a { font-size: clamp(7px, 2.4vw, 9.5px); padding: 9px 1px; white-space: nowrap; letter-spacing: -0.1px; }
+  .site-nav .nav-encyclopedia { margin-left: 0; }   /* margin-auto would break the nowrap row */
+  .site-nav .theme-toggle { width: 34px; height: 34px; flex: 0 0 auto; }
 
   /* Standalone controls / chips / pills shared across pages → ≥44px targets. */
   .tab-btn,

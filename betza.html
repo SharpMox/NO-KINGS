@@ -90,9 +90,21 @@
        wide). Placed AFTER the base .sandbox-key rules so it wins on source
        order (media queries add no specificity). */
     @media (max-width: 560px) {
-      .sandbox-key-row { gap: 4px; }
-      .sandbox-key { font-size: 11px; padding: 4px 5px; min-width: 22px; }
-      .sandbox-key-group-label { min-width: 56px; font-size: 9px; }
+      .sandbox-key-row { gap: 3px; }
+      /* Square notation keys. Scoped past site.css's shared
+         `.sandbox-key { min-height: 44px }`; 26px is the largest square that
+         keeps the 9-key Atomics row on one line in the ~320px keyboard. */
+      .sandbox-key-row .sandbox-key:not(.is-clear) {
+        width: 26px; height: 26px; min-width: 0; min-height: 0; padding: 0;
+        font-size: 11px;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      /* Backspace / Clear keep their text width but match the square height. */
+      .sandbox-key-row .sandbox-key.is-clear {
+        height: 26px; min-height: 0; padding: 0 8px; font-size: 11px;
+        display: inline-flex; align-items: center;
+      }
+      .sandbox-key-group-label { min-width: 50px; font-size: 9px; }
     }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */

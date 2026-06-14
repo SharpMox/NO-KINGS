@@ -396,13 +396,13 @@
       text-transform: uppercase; letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
-    /* Row: [verb conn] [arrow] [pieces]. Fixed label + arrow columns so the
-       arrows and piece lists line up across rows. */
-    .nt-rel { display: grid; grid-template-columns: 80px 14px 1fr; gap: 6px; font-size: 11.5px; align-items: baseline; margin: 3px 0; }
+    /* Row: [verb conn] [arrow] [pieces] flowing inline — the arrow sits right
+       after each label (no fixed columns, so arrows are not aligned). */
+    .nt-rel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: 11.5px; margin: 3px 0; }
     .nt-rel-label { white-space: nowrap; }
     .nt-rel-verb { font-weight: 600; }
     .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
-    .nt-rel-arrow { color: var(--text-soft); font-weight: 600; text-align: center; line-height: 1; }
+    .nt-rel-arrow { color: var(--text-soft); font-weight: 600; line-height: 1; }
     .nt-rel-sep { color: var(--text-soft); padding: 0 3px; }  /* "→" / "+" between pieces — grey */
     .nt-rel-piece { white-space: nowrap; }
     /* Verb + piece names take the relation colour. */
@@ -412,6 +412,8 @@
     .nt-rel.is-fusion .nt-rel-piece { color: var(--accent); }
     .nt-rel.is-inversion .nt-rel-verb,
     .nt-rel.is-inversion .nt-rel-piece { color: var(--text-soft); }
+    /* The resulting piece of a "fuses with" line is purple (fuse-into colour). */
+    .nt-rel.is-fusion .nt-rel-piece.is-output { color: var(--hurdle-color); }
 
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
@@ -1123,7 +1125,7 @@
   //   inputs) are grey.
   function buildRelations(node) {
     const rows = [];
-    const piece = name => ({ type: 'piece', text: name });
+    const piece = (name, role) => ({ type: 'piece', text: name, role });
     const sep   = s    => ({ type: 'sep',   text: s });
 
     // Promotion (NET.edges): this→other = "promote to", other→this = "promote from".
@@ -1153,7 +1155,7 @@
             if (!partner || !output) continue;
             rows.push({
               section: 1, kind: 'fusion', verb: 'fuses', conn: 'with', arrow: '→',
-              pieces: [ piece(partner.name), sep('→'), piece(output.name) ],
+              pieces: [ piece(partner.name), sep('→'), piece(output.name, 'output') ],
               sortKey: partner.name
             });
           } else if (out === node.id) {
@@ -1189,7 +1191,7 @@
   function renderRelationRow(r) {
     const pieces = r.pieces.map(pp => pp.type === 'sep'
       ? '<span class="nt-rel-sep">' + escapeHtml(pp.text) + '</span>'
-      : '<span class="nt-rel-piece">' + escapeHtml(pp.text) + '</span>'
+      : '<span class="nt-rel-piece' + (pp.role === 'output' ? ' is-output' : '') + '">' + escapeHtml(pp.text) + '</span>'
     ).join('');
     return '<div class="nt-rel is-' + r.kind + '">' +
       '<span class="nt-rel-label"><span class="nt-rel-verb">' + r.verb + '</span> ' +

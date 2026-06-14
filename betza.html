@@ -64,6 +64,10 @@
     @media (max-width: 960px) { .betza-layout { grid-template-columns: minmax(0, 1fr); } }
     .sandbox { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; }
     @media (max-width: 960px) { .sandbox { position: static; max-height: none; overflow-y: visible; } }
+    /* The mobile header is two rows (~94px) vs ~57px on desktop, so the sticky
+       Active panel must sit lower to clear it. Placed after the base rule so it
+       wins on source order. */
+    @media (max-width: 560px) { .betza-active { top: 100px; } }
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0 auto 16px; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px 0; }

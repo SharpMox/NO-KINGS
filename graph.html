@@ -396,28 +396,22 @@
       text-transform: uppercase; letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
-    .nt-rel { display: grid; grid-template-columns: 14px 78px 1fr; gap: 6px; font-size: 11.5px; align-items: center; margin: 3px 0; }
+    /* Row: [verb conn] [arrow] [pieces]. Fixed label + arrow columns so the
+       arrows and piece lists line up across rows. */
+    .nt-rel { display: grid; grid-template-columns: 80px 14px 1fr; gap: 6px; font-size: 11.5px; align-items: baseline; margin: 3px 0; }
+    .nt-rel-label { white-space: nowrap; }
+    .nt-rel-verb { font-weight: 600; }
+    .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
     .nt-rel-arrow { color: var(--text-soft); font-weight: 600; text-align: center; line-height: 1; }
-    .nt-rel-kind { font-weight: 500; }
-    .nt-rel-kind.is-promotion { color: var(--hop-target); }
-    .nt-rel-kind.is-fuse-with { color: var(--accent); }
-    .nt-rel-kind.is-fuse-into,
-    .nt-rel-kind.is-fusion-into { color: var(--hurdle-color); }
-    .nt-rel-kind.is-inversion { color: var(--text-soft); }
-    .nt-rel-piece { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Fusion-input rows pair the partner (fuses-with color) with the output
-       (fuses-into color) on one line: "fuses with <Partner> -> <Output>". */
-    .nt-rel.is-fusion-input {
-      grid-template-columns: auto auto auto 1fr;
-    }
-    .nt-rel-fusion-verb { color: var(--accent); font-weight: 500; }
-    .nt-rel-fusion-conn { color: var(--text-soft); font-weight: 500; }
-    .nt-rel-partner { color: var(--accent); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .nt-rel-fusion-arrow { color: var(--text-soft); font-weight: 600; padding: 0 4px; }
-    .nt-rel-output  { color: var(--hurdle-color); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Second arrow injected before the piece name on incoming relations
-       (prom. from / made from). Same grey as the leading column arrow. */
-    .nt-rel-piece-arrow { color: var(--text-soft); font-weight: 600; margin-right: 4px; }
+    .nt-rel-sep { color: var(--text-soft); padding: 0 3px; }  /* "→" / "+" between pieces — grey */
+    .nt-rel-piece { white-space: nowrap; }
+    /* Verb + piece names take the relation colour. */
+    .nt-rel.is-promotion .nt-rel-verb,
+    .nt-rel.is-promotion .nt-rel-piece { color: var(--hop-target); }
+    .nt-rel.is-fusion .nt-rel-verb,
+    .nt-rel.is-fusion .nt-rel-piece { color: var(--accent); }
+    .nt-rel.is-inversion .nt-rel-verb,
+    .nt-rel.is-inversion .nt-rel-piece { color: var(--text-soft); }
 
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
@@ -1122,9 +1116,17 @@
   //   - Fusion: pair the partner (fuse-with) and the output (fuse-into) in a
   //     single row when the node is an INPUT. When the node is the OUTPUT,
   //     show one row per fusion as "made from <lhs> + <rhs>".
+  // Each relation row reads: <verb> <conn>  <arrow>  <pieces…>
+  //   verb is relation-coloured, conn ("from"/"to"/"with") is grey, the arrow
+  //   glyph is grey, piece names take the relation colour, and the inner
+  //   separators ("→" between a fuse partner+output, "+" between fused-from
+  //   inputs) are grey.
   function buildRelations(node) {
     const rows = [];
-    // Promotion (NET.edges)
+    const piece = name => ({ type: 'piece', text: name });
+    const sep   = s    => ({ type: 'sep',   text: s });
+
+    // Promotion (NET.edges): this→other = "promote to", other→this = "promote from".
     if (NET.kinds.has('promotion')) {
       for (const e of NET.edges) {
         if (e.kind !== 'promotion') continue;
@@ -1133,10 +1135,11 @@
         const other = NET.nodeById.get(isFrom ? e.to : e.from);
         if (!other) continue;
         rows.push({
-          shape: 'standard', kind: 'promotion',
+          section: 0, kind: 'promotion', verb: 'promote',
+          conn: isFrom ? 'to' : 'from',
           arrow: isFrom ? '→' : '←',
-          verb: isFrom ? 'prom. to' : 'prom. from',
-          right: other.piece.name
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
         });
       }
     }
@@ -1149,24 +1152,23 @@
             const output  = byId.get(out);
             if (!partner || !output) continue;
             rows.push({
-              shape: 'fusion-input', kind: 'fusion',
-              partner: partner.name,
-              output:  output.name
+              section: 1, kind: 'fusion', verb: 'fuses', conn: 'with', arrow: '→',
+              pieces: [ piece(partner.name), sep('→'), piece(output.name) ],
+              sortKey: partner.name
             });
           } else if (out === node.id) {
             const a = byId.get(lhs), b = byId.get(rhs);
             if (!a || !b) continue;
             rows.push({
-              shape: 'standard', kind: 'fusion-into',
-              arrow: '←',
-              verb: 'made from',
-              right: a.name + ' + ' + b.name
+              section: 1, kind: 'fusion', verb: 'fused', conn: 'from', arrow: '←',
+              pieces: [ piece(a.name), sep('+'), piece(b.name) ],
+              sortKey: a.name
             });
           }
         }
       }
     }
-    // Inversion (NET.edges)
+    // Inversion (NET.edges).
     if (NET.kinds.has('inversion')) {
       for (const e of NET.edges) {
         if (e.kind !== 'inversion') continue;
@@ -1175,40 +1177,25 @@
         const other = NET.nodeById.get(isFrom ? e.to : e.from);
         if (!other) continue;
         rows.push({
-          shape: 'standard', kind: 'inversion',
-          arrow: '↔',
-          verb: 'inverts',
-          right: other.piece.name
+          section: 2, kind: 'inversion', verb: 'inverts', conn: 'to', arrow: '↔',
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
         });
       }
     }
-    // Stable sort by section.
-    const sectionOrder = { promotion: 0, fusion: 1, 'fusion-into': 1, inversion: 2 };
-    rows.sort((a, b) => {
-      const sa = sectionOrder[a.kind] ?? 9;
-      const sb = sectionOrder[b.kind] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return (a.right || a.output || '').localeCompare(b.right || b.output || '');
-    });
+    rows.sort((a, b) => a.section - b.section || a.sortKey.localeCompare(b.sortKey));
     return rows;
   }
   function renderRelationRow(r) {
-    if (r.shape === 'fusion-input') {
-      return '<div class="nt-rel is-fusion-input">' +
-        '<span class="nt-rel-fusion-verb">fuses <span class="nt-rel-fusion-conn">with</span></span>' +
-        '<span class="nt-rel-partner">' + escapeHtml(r.partner) + '</span>' +
-        '<span class="nt-rel-fusion-arrow">→</span>' +
-        '<span class="nt-rel-output">'  + escapeHtml(r.output)  + '</span>' +
-      '</div>';
-    }
-    // Incoming relations (prom. from / made from) get a second leading arrow
-    // before the piece name so the row reads "<- prom. from <- A" instead of
-    // having the piece float orphaned in the third column.
-    const piecePrefix = r.arrow === '←' ? '<span class="nt-rel-piece-arrow">←</span>' : '';
-    return '<div class="nt-rel">' +
+    const pieces = r.pieces.map(pp => pp.type === 'sep'
+      ? '<span class="nt-rel-sep">' + escapeHtml(pp.text) + '</span>'
+      : '<span class="nt-rel-piece">' + escapeHtml(pp.text) + '</span>'
+    ).join('');
+    return '<div class="nt-rel is-' + r.kind + '">' +
+      '<span class="nt-rel-label"><span class="nt-rel-verb">' + r.verb + '</span> ' +
+        '<span class="nt-rel-conn">' + r.conn + '</span></span>' +
       '<span class="nt-rel-arrow">' + r.arrow + '</span>' +
-      '<span class="nt-rel-kind is-' + r.kind + '">' + r.verb + '</span>' +
-      '<span class="nt-rel-piece">' + piecePrefix + escapeHtml(r.right) + '</span>' +
+      '<span class="nt-rel-pieces">' + pieces + '</span>' +
     '</div>';
   }
   function showNetTooltipContent(node) {

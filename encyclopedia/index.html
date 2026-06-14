@@ -322,6 +322,20 @@
       .theme-toggle { margin-left: 0; }
     }
 
+    /* Phones: compact the filter block (matches the codex page). `.controls`-
+       scoped so these outrank site.css's shared 44px tap targets. */
+    @media (max-width: 560px) {
+      .controls { gap: 6px; }
+      /* Lay the filter pills out in a 3-column grid so they align row-to-row
+         (equal-width cells), instead of an uneven flex wrap. */
+      .controls .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+      .controls .tab-btn { min-height: 28px; padding: 4px 5px; font-size: 11px; justify-content: center; text-align: center; }
+      .controls .tab-btn .tab-count { font-size: 10px; }
+      .controls .filter-input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 28px; padding: 5px 10px; font-size: 11px; }
+      /* Two-row mobile header (~94px) — deep-linked cards must clear it. */
+      .card { scroll-margin-top: 100px; }
+    }
+
     /* ============== Print ============== */
     @media print {
       body { background: white; color: black; }
@@ -379,7 +393,7 @@
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-xiangqi"    id="tabbtn-origin-xiangqi">Xiangqi <span class="tab-count" id="count-origin-xiangqi">0</span></button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-shatranj"   id="tabbtn-origin-shatranj">Shatranj <span class="tab-count" id="count-origin-shatranj">0</span></button>
         <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-tamerlane"  id="tabbtn-origin-tamerlane">Tamerlane <span class="tab-count" id="count-origin-tamerlane">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-historical" id="tabbtn-origin-historical">Other historical <span class="tab-count" id="count-origin-historical">0</span></button>
+        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-historical" id="tabbtn-origin-historical">Others <span class="tab-count" id="count-origin-historical">0</span></button>
       </div>
       <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
     </div>
@@ -434,7 +448,6 @@
   <footer>
     <p class="footer-page-line">A visual reference of <strong>100 fairy chess pieces</strong>, organised by movement family and by historical origin.</p>
     <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-    <p>Companion pages: <a href="../codex.html">codex</a> · <a href="../graph.html">graph</a> · <a href="../promotion.html">promotions</a> · <a href="../fusion.html">fusions</a> · <a href="../inversion.html">inversions</a> · <a href="../betza.html">Betza</a>.</p>
   </footer>
 
   <script>

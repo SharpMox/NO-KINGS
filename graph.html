@@ -335,9 +335,9 @@
        already scrolls (overflow-x:auto). Desktop (>560px) is untouched. */
     @media (max-width: 560px) {
       #network-wrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
-      /* Render the graph large on phones (820² square) so nodes + labels read
+      /* Render the graph large on phones (1000² square) so nodes + labels read
          clearly; the container scrolls horizontally to pan. */
-      #network-svg { min-width: 820px; touch-action: auto; }
+      #network-svg { min-width: 1000px; touch-action: auto; }
     }
     .net-edge {
       stroke-width: 1.5;

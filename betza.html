@@ -85,6 +85,15 @@
     .sandbox-key:active { background: var(--bg); }
     .sandbox-key.is-clear { color: var(--text-soft); }
     .sandbox-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-soft); font-size: 12px; font-style: italic; }
+    /* Phones: shrink the keyboard keys + group labels so each key row fits on
+       one line (the widest is Atomics: 9 keys; the keyboard area is only ~320px
+       wide). Placed AFTER the base .sandbox-key rules so it wins on source
+       order (media queries add no specificity). */
+    @media (max-width: 560px) {
+      .sandbox-key-row { gap: 4px; }
+      .sandbox-key { font-size: 11px; padding: 4px 5px; min-width: 22px; }
+      .sandbox-key-group-label { min-width: 56px; font-size: 9px; }
+    }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
     /* Page-specific focus rings kept here: */

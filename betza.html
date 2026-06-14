@@ -876,7 +876,9 @@
     { betza: 'FD',            name: 'Kirin' },
     { betza: 'FDC',           name: 'Sacred Kirin' }
   ];
-  const PRESETS_VISIBLE_COUNT = 4;
+  // Fewer presets stay visible on phones so the collapsed row fits without a
+  // horizontal scroll; the rest live behind the "+N more" pill.
+  const presetsVisibleCount = () => window.matchMedia('(max-width: 560px)').matches ? 3 : 4;
 
   const sandboxInput = document.getElementById('sandbox-input');
   const sandboxBoard = document.getElementById('sandbox-board');
@@ -900,27 +902,24 @@
     }
     function buildPresets() {
       if (!sandboxPresets) return;
+      const visible = presetsVisibleCount();
       sandboxPresets.innerHTML = '';
       sandboxPresets.classList.toggle('is-expanded', presetsExpanded);
-      const label = document.createElement('span');
-      label.className = 'sandbox-presets-label';
-      label.textContent = 'Try';
-      sandboxPresets.appendChild(label);
       SANDBOX_PRESETS.forEach((preset, i) => {
         const btn = makePresetButton(preset);
-        if (!presetsExpanded && i >= PRESETS_VISIBLE_COUNT) btn.classList.add('is-hidden');
+        if (!presetsExpanded && i >= visible) btn.classList.add('is-hidden');
         sandboxPresets.appendChild(btn);
       });
-      if (SANDBOX_PRESETS.length > PRESETS_VISIBLE_COUNT) {
+      if (SANDBOX_PRESETS.length > visible) {
         const expandBtn = document.createElement('button');
         expandBtn.type = 'button';
         expandBtn.className = 'sandbox-preset is-expand';
         expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
-        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more presets');
+        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - visible) + ' more presets');
         expandBtn.dataset.expand = '1';
         expandBtn.textContent = presetsExpanded
           ? '− less'
-          : '+ ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more';
+          : '+ ' + (SANDBOX_PRESETS.length - visible) + ' more';
         sandboxPresets.appendChild(expandBtn);
       }
     }
@@ -941,6 +940,8 @@
       });
     }
     buildPresets();
+    // Rebuild when crossing the phone breakpoint so the visible-count changes.
+    window.matchMedia('(max-width: 560px)').addEventListener('change', buildPresets);
     // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
     const KEY_LABELS = {
       W: 'Wazir', F: 'Ferz', D: 'Dabbaba', A: 'Alfil', N: 'Knight',

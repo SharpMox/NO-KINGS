@@ -105,13 +105,12 @@ footer p:last-child { margin-bottom: 0; }
    Declared before the @media so source order lets the mobile rule win. */
 .mobile-hint { display: none; }
 @media (max-width: 560px) {
-  /* One-row header: all 7 links + toggle stay on a single line. Font is fluid
-     so the row keeps fitting as the screen narrows (≈9.5px at 390px down to a
-     7px floor near 320px) instead of re-wrapping or needing a scroll. */
-  .site-nav-inner { flex-wrap: nowrap; gap: 4px; padding: 8px 12px; justify-content: space-between; }
-  .site-nav a { font-size: clamp(7px, 2.4vw, 9.5px); padding: 9px 1px; white-space: nowrap; letter-spacing: -0.1px; }
-  .site-nav .nav-encyclopedia { margin-left: 0; }   /* margin-auto would break the nowrap row */
-  .site-nav .theme-toggle { width: 34px; height: 34px; flex: 0 0 auto; }
+  /* Two-row header at a readable 11px. Row 1 packs left; the base
+     `.nav-encyclopedia { margin-left: auto }` keeps Encyclopedia/Betza/toggle
+     right-aligned on row 2, as before. */
+  .site-nav-inner { flex-wrap: wrap; gap: 8px 14px; padding: 10px 16px; }
+  .site-nav a { font-size: 11px; padding: 6px 1px; white-space: nowrap; }
+  .site-nav .theme-toggle { width: 34px; height: 34px; }
 
   /* Standalone controls / chips / pills shared across pages → ≥44px targets. */
   .tab-btn,
@@ -156,16 +155,16 @@ footer p:last-child { margin-bottom: 0; }
   }
   .relation-toggle { min-height: 44px; }
 
-  /* Footer links read as list rows on a phone — give them a real tap box. */
-  footer p a {
-    display: inline-block;
-    min-height: 44px;
-    line-height: 44px;
-  }
-  /* Inline prose links can't be a 44px-tall box without breaking text flow;
-     enlarge the hit area with padding + roomier line spacing instead. */
+  /* Compact footer on phones. With the companion-pages line gone, the only
+     footer links left are inline prose (Wikipedia sources) — keep them inline
+     (a 44px-tall box would wreck the paragraph) and lean on roomier line
+     spacing for the hit area. */
+  footer { padding: 20px 16px 28px; font-size: 12px; }
+  footer p { margin: 0 0 6px 0; line-height: 1.7; }
+  .footer-page-line { font-size: 12.5px; }
+  /* Inline prose links keep a comfortable hit area via line spacing. */
   .intro { line-height: 1.7; }
-  .intro a { padding: 4px 0; }
+  .intro a, footer p a { padding: 2px 0; }
 
   /* Horizontal-scroll wrapper for wide tables (shared name with fusion.html). */
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

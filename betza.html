@@ -33,6 +33,19 @@
     .betza-table tr.is-active code { text-decoration: line-through; }
     .betza-table tr[data-token] { cursor: pointer; transition: background 0.12s ease; }
     .betza-table tr[data-token]:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    /* Phones: the first (Letter/Notation) column wraps a single token but keeps
+       the full 12px side padding — shave it so the column is tight and the
+       movement column gets the room. Placed after the base td rule so it wins
+       on source order. */
+    @media (max-width: 560px) {
+      /* width:1px shrinks the column to its content (auto table layout otherwise
+         hands it spare width); the last column soaks up the slack instead. */
+      .betza-table th:first-child,
+      .betza-table td:first-child { width: 1px; padding-left: 6px; padding-right: 5px; }
+      .betza-table td:first-child code { padding-left: 4px; padding-right: 4px; }
+      .betza-table th:last-child,
+      .betza-table td:last-child { width: 100%; }
+    }
     .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--hop-target); border-radius: 10px; background: color-mix(in srgb, var(--hop-target) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
     .betza-active[hidden] { display: none; }
     .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--hop-target); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }

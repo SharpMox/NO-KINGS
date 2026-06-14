@@ -500,12 +500,14 @@
    *  Shared data + lookup maps
    * ============================================================ */
   const VOID_IDS = new Set(['berolina','inv-sergeant','inv-arrow-pawn','inv-kirin-plus','inv-kirin-plus-plus']);
-  const RESULT_ONLY_IDS = new Set(['godzilla','banshee','raven','amazonrider']);
+  // Output-only pieces (never a fusion input) are dropped from the matrix axes.
+  // Raven + Banshee are now inputs (Raven + Banshee = Valkyrie), so they stay.
+  const RESULT_ONLY_IDS = new Set(['godzilla','amazonrider']);
   const ALL_PIECES = PIECES_CODEX.filter(p => !VOID_IDS.has(p.id));      // 33 non-Void for Matrix tab
   const ALL_PIECES_INCL_VOID = PIECES_CODEX;                              // 38 for Pieces + Graph tabs
   const byId = new Map(ALL_PIECES_INCL_VOID.map(p => [p.id, p]));
   // Matrix axes drop pieces that don't appear on a row/column with any interaction.
-  const PIECES = ALL_PIECES.filter(p => !RESULT_ONLY_IDS.has(p.id));     // 29 axis pieces
+  const PIECES = ALL_PIECES.filter(p => !RESULT_ONLY_IDS.has(p.id));     // 31 axis pieces
 
   // Self-merge → next stage in its chain (if any).
   const promotionMap = new Map();

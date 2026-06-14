@@ -33,6 +33,19 @@
     .betza-table tr.is-active code { text-decoration: line-through; }
     .betza-table tr[data-token] { cursor: pointer; transition: background 0.12s ease; }
     .betza-table tr[data-token]:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+    /* Phones: the first (Letter/Notation) column wraps a single token but keeps
+       the full 12px side padding — shave it so the column is tight and the
+       movement column gets the room. Placed after the base td rule so it wins
+       on source order. */
+    @media (max-width: 560px) {
+      /* width:1px shrinks the column to its content (auto table layout otherwise
+         hands it spare width); the last column soaks up the slack instead. */
+      .betza-table th:first-child,
+      .betza-table td:first-child { width: 1px; padding-left: 6px; padding-right: 5px; }
+      .betza-table td:first-child code { padding-left: 4px; padding-right: 4px; }
+      .betza-table th:last-child,
+      .betza-table td:last-child { width: 100%; }
+    }
     .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--hop-target); border-radius: 10px; background: color-mix(in srgb, var(--hop-target) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
     .betza-active[hidden] { display: none; }
     .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--hop-target); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
@@ -51,6 +64,10 @@
     @media (max-width: 960px) { .betza-layout { grid-template-columns: minmax(0, 1fr); } }
     .sandbox { position: sticky; top: 80px; align-self: start; max-height: calc(100vh - 96px); overflow-y: auto; }
     @media (max-width: 960px) { .sandbox { position: static; max-height: none; overflow-y: visible; } }
+    /* The mobile header is two rows (~94px) vs ~57px on desktop, so the sticky
+       Active panel must sit lower to clear it. Placed after the base rule so it
+       wins on source order. */
+    @media (max-width: 560px) { .betza-active { top: 100px; } }
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0 auto 16px; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px 0; }
@@ -64,6 +81,12 @@
     .sandbox-preset.is-expand { border-style: dashed; color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; }
     .sandbox-preset.is-expand:hover { color: var(--accent); border-color: var(--accent); }
     .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
+    /* Phones: the collapsed single-row preset strip is wider than the screen,
+       so let it scroll horizontally instead of pushing the page. Desktop
+       (>560px) keeps the original nowrap row. */
+    @media (max-width: 560px) {
+      .sandbox-presets:not(.is-expanded) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    }
     .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
     .sandbox-board svg { width: 100%; height: 100%; display: block; }
     .sandbox-controls { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; }
@@ -79,6 +102,29 @@
     .sandbox-key:active { background: var(--bg); }
     .sandbox-key.is-clear { color: var(--text-soft); }
     .sandbox-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-soft); font-size: 12px; font-style: italic; }
+    /* Phones: shrink the keyboard keys + group labels so each key row fits on
+       one line (the widest is Atomics: 9 keys; the keyboard area is only ~320px
+       wide). Placed AFTER the base .sandbox-key rules so it wins on source
+       order (media queries add no specificity). */
+    @media (max-width: 560px) {
+      .sandbox-key-row { gap: 3px; }
+      /* Square notation keys. Scoped past site.css's shared
+         `.sandbox-key { min-height: 44px }`; 26px is the largest square that
+         keeps the 9-key Atomics row on one line in the ~320px keyboard. */
+      .sandbox-key-row .sandbox-key:not(.is-clear) {
+        width: 26px; height: 26px; min-width: 0; min-height: 0; padding: 0;
+        font-size: 11px;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      /* Backspace / Clear keep their text width but match the square height. */
+      .sandbox-key-row .sandbox-key.is-clear {
+        height: 26px; min-height: 0; padding: 0 8px; font-size: 11px;
+        display: inline-flex; align-items: center;
+      }
+      /* Label pinned to the left; margin-right:auto pushes the key group to
+         the right edge of the row. */
+      .sandbox-key-group-label { min-width: 50px; font-size: 9px; margin-right: auto; }
+    }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
     /* Page-specific focus rings kept here: */
@@ -131,48 +177,48 @@
 
       <h3>Atomic leapers</h3>
       <p>One-shot jumps to a fixed offset; intervening pieces ignored.</p>
-      <table class="betza-table">
-        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Offset</th></tr></thead>
+      <div class="table-scroll"><table class="betza-table">
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Offset</th></tr></thead>
         <tbody>
-          <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td>Wazir</td><td>(1,0)</td></tr>
-          <tr data-token="F"><td><code>F</code></td><td data-betza-icon="F"></td><td>Ferz</td><td>(1,1)</td></tr>
-          <tr data-token="D"><td><code>D</code></td><td data-betza-icon="D"></td><td>Dabbaba</td><td>(2,0)</td></tr>
-          <tr data-token="A"><td><code>A</code></td><td data-betza-icon="A"></td><td>Alfil</td><td>(2,2)</td></tr>
-          <tr data-token="N"><td><code>N</code></td><td data-betza-icon="N"></td><td>Knight</td><td>(1,2)</td></tr>
-          <tr data-token="C"><td><code>C</code> (or <code>L</code>)</td><td data-betza-icon="C"></td><td>Camel</td><td>(1,3)</td></tr>
-          <tr data-token="Z"><td><code>Z</code></td><td data-betza-icon="Z"></td><td>Zebra</td><td>(2,3)</td></tr>
-          <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td>Threeleaper</td><td>(3,0)</td></tr>
-          <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td>Tripper</td><td>(3,3)</td></tr>
+          <tr data-token="W"><td><code>W</code></td><td data-betza-icon="W"></td><td><strong>Wazir</strong><br>(1,0)</td></tr>
+          <tr data-token="F"><td><code>F</code></td><td data-betza-icon="F"></td><td><strong>Ferz</strong><br>(1,1)</td></tr>
+          <tr data-token="D"><td><code>D</code></td><td data-betza-icon="D"></td><td><strong>Dabbaba</strong><br>(2,0)</td></tr>
+          <tr data-token="A"><td><code>A</code></td><td data-betza-icon="A"></td><td><strong>Alfil</strong><br>(2,2)</td></tr>
+          <tr data-token="N"><td><code>N</code></td><td data-betza-icon="N"></td><td><strong>Knight</strong><br>(1,2)</td></tr>
+          <tr data-token="C"><td><code>C</code> (or <code>L</code>)</td><td data-betza-icon="C"></td><td><strong>Camel</strong><br>(1,3)</td></tr>
+          <tr data-token="Z"><td><code>Z</code></td><td data-betza-icon="Z"></td><td><strong>Zebra</strong><br>(2,3)</td></tr>
+          <tr data-token="H"><td><code>H</code></td><td data-betza-icon="H"></td><td><strong>Threeleaper</strong><br>(3,0)</td></tr>
+          <tr data-token="G"><td><code>G</code></td><td data-betza-icon="G"></td><td><strong>Tripper</strong><br>(3,3)</td></tr>
         </tbody>
-      </table>
+      </table></div>
       <p class="betza-note">Non-standard leapers use an explicit offset, e.g. <code>(1,4)</code> Giraffe.</p>
 
       <h3>Sliders &amp; standard compound atomics</h3>
-      <table class="betza-table">
-        <thead><tr><th>Letter</th><th>Diagram</th><th>Name</th><th>Equivalent to</th></tr></thead>
+      <div class="table-scroll"><table class="betza-table">
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Equivalent to</th></tr></thead>
         <tbody>
-          <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td>King</td><td><code>W + F</code> — one square in any of 8 directions</td></tr>
-          <tr data-token="R"><td><code>R</code></td><td data-betza-icon="R"></td><td>Rook</td><td>W-rider — slides any distance orthogonally</td></tr>
-          <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td>Bishop</td><td>F-rider — slides any distance diagonally</td></tr>
-          <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td>Queen</td><td><code>R + B</code> — slides 8 directions</td></tr>
+          <tr data-token="K"><td><code>K</code></td><td data-betza-icon="K"></td><td><strong>King</strong><br><code>W + F</code> — one square in any of 8 directions</td></tr>
+          <tr data-token="R"><td><code>R</code></td><td data-betza-icon="R"></td><td><strong>Rook</strong><br>W-rider — slides any distance orthogonally</td></tr>
+          <tr data-token="B"><td><code>B</code></td><td data-betza-icon="B"></td><td><strong>Bishop</strong><br>F-rider — slides any distance diagonally</td></tr>
+          <tr data-token="Q"><td><code>Q</code></td><td data-betza-icon="Q"></td><td><strong>Queen</strong><br><code>R + B</code> — slides 8 directions</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Riders (doubled letter = repeat the leap)</h3>
       <p>Doubled letter repeats the leap in a straight line until blocked at a landing square.</p>
-      <table class="betza-table">
-        <thead><tr><th>Notation</th><th>Diagram</th><th>Name</th><th>Movement</th></tr></thead>
+      <div class="table-scroll"><table class="betza-table">
+        <thead><tr><th>Letter</th><th>Diagram</th><th>Movement</th></tr></thead>
         <tbody>
-          <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td>Nightrider</td><td>Any number of Knight leaps in a single line</td></tr>
-          <tr data-token="CC"><td><code>CC</code></td><td data-betza-icon="CC"></td><td>Camelrider</td><td>Any number of Camel leaps in a single line</td></tr>
-          <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td>Alfilrider</td><td>Any number of Alfil leaps in a single line</td></tr>
-          <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td>Dabbabarider</td><td>Any number of Dabbaba leaps in a single line</td></tr>
+          <tr data-token="NN"><td><code>NN</code></td><td data-betza-icon="NN"></td><td><strong>Nightrider</strong><br>Any number of Knight leaps in a single line</td></tr>
+          <tr data-token="CC"><td><code>CC</code></td><td data-betza-icon="CC"></td><td><strong>Camelrider</strong><br>Any number of Camel leaps in a single line</td></tr>
+          <tr data-token="AA"><td><code>AA</code></td><td data-betza-icon="AA"></td><td><strong>Alfilrider</strong><br>Any number of Alfil leaps in a single line</td></tr>
+          <tr data-token="DD"><td><code>DD</code></td><td data-betza-icon="DD"></td><td><strong>Dabbabarider</strong><br>Any number of Dabbaba leaps in a single line</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Direction prefixes (lowercase)</h3>
       <p>Restrict the next uppercase move to specific directions.</p>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="f"><td><code>f</code></td><td>Forward only</td><td><code>fR</code> = Lance (forward Rook)</td></tr>
@@ -182,11 +228,11 @@
           <tr data-token="s"><td><code>s</code></td><td>Sideways (left + right)</td><td><code>sW</code> = sideways Wazir</td></tr>
           <tr data-token="v"><td><code>v</code></td><td>Vertical (forward + backward)</td><td><code>vR</code> = vertical Rook</td></tr>
         </tbody>
-      </table>
+      </table></div>
       <p class="betza-note">Prefixes combine, e.g. <code>fs</code> = forward + sideways.</p>
 
       <h3>Power modifiers</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="m"><td><code>m</code></td><td>Move only (no capture)</td><td><code>mfW</code> = Pawn's straight forward move</td></tr>
@@ -196,10 +242,10 @@
           <tr data-token="n_prefix"><td><code>n</code></td><td>Non-jumping (can be blocked at intermediate squares)</td><td><code>nN</code> = Mao (Xiangqi Horse — blockable Knight)</td></tr>
           <tr data-token="j"><td><code>j</code></td><td>Jumping (ignores intermediate squares — usually implicit)</td><td>Most leapers are already jumping</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Hop &amp; bend prefixes</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="p"><td><code>p</code></td><td>Pao-style hop: capture by jumping over one piece on a line</td><td><code>cpR</code> = Cannon's hop-capture along Rook lines</td></tr>
@@ -207,20 +253,20 @@
           <tr data-token="z"><td><code>z</code></td><td>Zigzag bend: turns 90° after each step</td><td><code>zB</code> = Boyscout (crooked Bishop)</td></tr>
           <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Gryphon, <code>t[WB]</code> = Manticore</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Numbers and brackets</h3>
-      <table class="betza-table">
+      <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Syntax</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
           <tr data-token="rangeSlider"><td><code>X<em>n</em></code></td><td>Limit a slider to <em>n</em> squares maximum</td><td><code>Q2</code> = Bodyguard (Queen capped at 2 squares)</td></tr>
           <tr data-token="explicitLeaper"><td><code>(m,n)</code></td><td>Explicit leaper offset for non-standard leapers</td><td><code>(1,4)</code> = Giraffe</td></tr>
           <tr data-token="brackets"><td><code>[XYZ]</code></td><td>Grouping for the bent-rider <code>t</code> prefix</td><td><code>t[FR]</code> reads "Ferz step then outward Rook"</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <h3>Reading a compound</h3>
-      <table class="betza-table betza-examples">
+      <div class="table-scroll"><table class="betza-table betza-examples">
         <thead><tr><th>Notation</th><th>Piece</th><th>Breakdown</th></tr></thead>
         <tbody>
           <tr><td><code>QN</code></td><td>Amazon</td><td>Queen slides + Knight leaps</td></tr>
@@ -234,7 +280,7 @@
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
           <tr><td><code>Q (edges)</code></td><td>Edgehog</td><td>Queen movement restricted to start/end on a board-edge square</td></tr>
         </tbody>
-      </table>
+      </table></div>
 
       <p class="betza-note">Full spec: <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Wikipedia — Fairy chess piece</a>.</p>
     </div>
@@ -244,7 +290,6 @@
   <footer>
     <p class="footer-page-line">A reference for Ralph Betza's "funny notation" — the compact letter system that describes every piece's movement on the other pages.</p>
     <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-    <p>Companion pages: <a href="codex.html">codex</a> · <a href="graph.html">graph</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="inversion.html">inversions</a> · <a href="encyclopedia/index.html">encyclopedia</a>.</p>
   </footer>
 
   <script>
@@ -835,7 +880,9 @@
     { betza: 'FD',            name: 'Kirin' },
     { betza: 'FDC',           name: 'Sacred Kirin' }
   ];
-  const PRESETS_VISIBLE_COUNT = 4;
+  // Fewer presets stay visible on phones so the collapsed row fits without a
+  // horizontal scroll; the rest live behind the "+N more" pill.
+  const presetsVisibleCount = () => window.matchMedia('(max-width: 560px)').matches ? 3 : 4;
 
   const sandboxInput = document.getElementById('sandbox-input');
   const sandboxBoard = document.getElementById('sandbox-board');
@@ -859,27 +906,24 @@
     }
     function buildPresets() {
       if (!sandboxPresets) return;
+      const visible = presetsVisibleCount();
       sandboxPresets.innerHTML = '';
       sandboxPresets.classList.toggle('is-expanded', presetsExpanded);
-      const label = document.createElement('span');
-      label.className = 'sandbox-presets-label';
-      label.textContent = 'Try';
-      sandboxPresets.appendChild(label);
       SANDBOX_PRESETS.forEach((preset, i) => {
         const btn = makePresetButton(preset);
-        if (!presetsExpanded && i >= PRESETS_VISIBLE_COUNT) btn.classList.add('is-hidden');
+        if (!presetsExpanded && i >= visible) btn.classList.add('is-hidden');
         sandboxPresets.appendChild(btn);
       });
-      if (SANDBOX_PRESETS.length > PRESETS_VISIBLE_COUNT) {
+      if (SANDBOX_PRESETS.length > visible) {
         const expandBtn = document.createElement('button');
         expandBtn.type = 'button';
         expandBtn.className = 'sandbox-preset is-expand';
         expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
-        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more presets');
+        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - visible) + ' more presets');
         expandBtn.dataset.expand = '1';
         expandBtn.textContent = presetsExpanded
           ? '− less'
-          : '+ ' + (SANDBOX_PRESETS.length - PRESETS_VISIBLE_COUNT) + ' more';
+          : '+ ' + (SANDBOX_PRESETS.length - visible) + ' more';
         sandboxPresets.appendChild(expandBtn);
       }
     }
@@ -900,6 +944,8 @@
       });
     }
     buildPresets();
+    // Rebuild when crossing the phone breakpoint so the visible-count changes.
+    window.matchMedia('(max-width: 560px)').addEventListener('change', buildPresets);
     // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
     const KEY_LABELS = {
       W: 'Wazir', F: 'Ferz', D: 'Dabbaba', A: 'Alfil', N: 'Knight',

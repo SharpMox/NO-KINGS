@@ -329,6 +329,16 @@
       touch-action: none;
     }
     #network-svg.is-dragging { cursor: grabbing; }
+    /* Phones: the network would squish into an unreadable square at viewport
+       width, so render it at a usable fixed size inside a horizontal-scroll
+       container and let the reader swipe to pan. The matrix's #graph-wrap
+       already scrolls (overflow-x:auto). Desktop (>560px) is untouched. */
+    @media (max-width: 560px) {
+      #network-wrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+      /* Render the graph large on phones (1000² square) so nodes + labels read
+         clearly; the container scrolls horizontally to pan. */
+      #network-svg { min-width: 1000px; touch-action: auto; }
+    }
     .net-edge {
       stroke-width: 1.5;
       fill: none;
@@ -386,28 +396,26 @@
       text-transform: uppercase; letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
-    .nt-rel { display: grid; grid-template-columns: 14px 78px 1fr; gap: 6px; font-size: 11.5px; align-items: center; margin: 3px 0; }
-    .nt-rel-arrow { color: var(--text-soft); font-weight: 600; text-align: center; line-height: 1; }
-    .nt-rel-kind { font-weight: 500; }
-    .nt-rel-kind.is-promotion { color: var(--hop-target); }
-    .nt-rel-kind.is-fuse-with { color: var(--accent); }
-    .nt-rel-kind.is-fuse-into,
-    .nt-rel-kind.is-fusion-into { color: var(--hurdle-color); }
-    .nt-rel-kind.is-inversion { color: var(--text-soft); }
-    .nt-rel-piece { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Fusion-input rows pair the partner (fuses-with color) with the output
-       (fuses-into color) on one line: "fuses with <Partner> -> <Output>". */
-    .nt-rel.is-fusion-input {
-      grid-template-columns: auto auto auto 1fr;
-    }
-    .nt-rel-fusion-verb { color: var(--accent); font-weight: 500; }
-    .nt-rel-fusion-conn { color: var(--text-soft); font-weight: 500; }
-    .nt-rel-partner { color: var(--accent); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .nt-rel-fusion-arrow { color: var(--text-soft); font-weight: 600; padding: 0 4px; }
-    .nt-rel-output  { color: var(--hurdle-color); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Second arrow injected before the piece name on incoming relations
-       (prom. from / made from). Same grey as the leading column arrow. */
-    .nt-rel-piece-arrow { color: var(--text-soft); font-weight: 600; margin-right: 4px; }
+    /* Row: [verb conn] [arrow] [pieces] flowing inline — the arrow sits right
+       after each label (no fixed columns, so arrows are not aligned). */
+    .nt-rel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; margin: 3px 0; }
+    .nt-rel-label { white-space: nowrap; }
+    .nt-rel-verb { font-weight: 600; text-transform: capitalize; }   /* "Promote" / "Fuses" / "Fused" / "Inverts" */
+    .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
+    .nt-rel-arrow { color: var(--text-soft); font-weight: 600; line-height: 1; font-size: 1.15em; }   /* relation glyph, enlarged */
+    .nt-rel-sep { color: var(--text-soft); padding: 0 3px; font-size: 1.15em; }  /* "→" / "+" between pieces — grey, enlarged to match */
+    .nt-rel-sep.is-plus { font-size: 1.5em; line-height: 1; }  /* "+" draws smaller than the arrow glyphs, so size it up to match */
+    .nt-rel-piece { white-space: nowrap; }
+    /* Verb + piece names take the relation colour. */
+    .nt-rel.is-promotion .nt-rel-verb,
+    .nt-rel.is-promotion .nt-rel-piece { color: var(--hop-target); }
+    .nt-rel.is-fusion .nt-rel-verb,
+    .nt-rel.is-fusion .nt-rel-piece { color: var(--accent); }
+    /* Inversion verb + piece use the normal text colour (white in dark mode). */
+    .nt-rel.is-inversion .nt-rel-verb,
+    .nt-rel.is-inversion .nt-rel-piece { color: var(--text); }
+    /* The resulting piece of a "fuses with" line is purple (fuse-into colour). */
+    .nt-rel.is-fusion .nt-rel-piece.is-output { color: var(--hurdle-color); }
 
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
@@ -443,7 +451,7 @@
 
   <header>
     <h1>Graph</h1>
-    <p class="intro">Two views on the codex pieces — the merge/fusion matrix and a force-directed network of every relationship. (For a flat list of every piece, see the Codex page's List view.)</p>
+    <p class="intro">Two views on the codex pieces — the merge/fusion matrix and a force-directed network of every relationship.</p>
     <div class="tabs" role="tablist" aria-label="Graph view">
       <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-graph"  id="tabbtn-graph">Graph</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-matrix" id="tabbtn-matrix">Matrix</button>
@@ -461,6 +469,7 @@
           <span class="legend-chip is-synergistic">Synergistic fusion</span>
         </div>
       </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="graph-wrap">
         <table id="graph-table" class="graph-grid" role="grid" aria-label="Merge and fusion matrix"></table>
       </div>
@@ -474,6 +483,7 @@
         <button type="button" class="toggle-chip is-promotion"  data-kind="promotion"  aria-pressed="false">Promotion</button>
         <button type="button" class="toggle-chip is-inversion"  data-kind="inversion"  aria-pressed="false">Inversion</button>
       </div>
+      <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="network-wrap">
         <svg id="network-svg" xmlns="http://www.w3.org/2000/svg" aria-label="Force-directed network of piece relationships"></svg>
       </div>
@@ -481,9 +491,8 @@
   </main>
 
   <footer>
-    <p class="footer-page-line">Three views on the codex: Pieces is a flat reference table, Matrix is the combinatorial merge grid, Graph is a network of every promotion / fusion / inversion link.</p>
-    <p>Tip: double-click any cell, header, or graph node to open the corresponding piece in the codex.</p>
-    <p>Companion pages: <a href="codex.html">codex</a> · <a href="promotion.html">promotions</a> · <a href="fusion.html">fusions</a> · <a href="inversion.html">inversions</a> · <a href="encyclopedia/index.html">encyclopedia</a> · <a href="betza.html">Betza</a>.</p>
+    <p class="footer-page-line">Visual Graphs of the Promotions, Fusions &amp; Inversions relations of all the Codex pieces</p>
+    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
   </footer>
 
   <script>
@@ -1111,9 +1120,17 @@
   //   - Fusion: pair the partner (fuse-with) and the output (fuse-into) in a
   //     single row when the node is an INPUT. When the node is the OUTPUT,
   //     show one row per fusion as "made from <lhs> + <rhs>".
+  // Each relation row reads: <verb> <conn>  <arrow>  <pieces…>
+  //   verb is relation-coloured, conn ("from"/"to"/"with") is grey, the arrow
+  //   glyph is grey, piece names take the relation colour, and the inner
+  //   separators ("→" between a fuse partner+output, "+" between fused-from
+  //   inputs) are grey.
   function buildRelations(node) {
     const rows = [];
-    // Promotion (NET.edges)
+    const piece = (name, role) => ({ type: 'piece', text: name, role });
+    const sep   = s    => ({ type: 'sep',   text: s });
+
+    // Promotion (NET.edges): this→other = "promote to", other→this = "promote from".
     if (NET.kinds.has('promotion')) {
       for (const e of NET.edges) {
         if (e.kind !== 'promotion') continue;
@@ -1122,10 +1139,11 @@
         const other = NET.nodeById.get(isFrom ? e.to : e.from);
         if (!other) continue;
         rows.push({
-          shape: 'standard', kind: 'promotion',
+          section: 0, kind: 'promotion', verb: 'promote',
+          conn: isFrom ? 'to' : 'from',
           arrow: isFrom ? '→' : '←',
-          verb: isFrom ? 'prom. to' : 'prom. from',
-          right: other.piece.name
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
         });
       }
     }
@@ -1138,24 +1156,23 @@
             const output  = byId.get(out);
             if (!partner || !output) continue;
             rows.push({
-              shape: 'fusion-input', kind: 'fusion',
-              partner: partner.name,
-              output:  output.name
+              section: 1, kind: 'fusion', verb: 'fuses', conn: 'with', arrow: '→',
+              pieces: [ piece(partner.name), sep('→'), piece(output.name, 'output') ],
+              sortKey: partner.name
             });
           } else if (out === node.id) {
             const a = byId.get(lhs), b = byId.get(rhs);
             if (!a || !b) continue;
             rows.push({
-              shape: 'standard', kind: 'fusion-into',
-              arrow: '←',
-              verb: 'made from',
-              right: a.name + ' + ' + b.name
+              section: 1, kind: 'fusion', verb: 'fused', conn: 'from', arrow: '←',
+              pieces: [ piece(a.name), sep('+'), piece(b.name) ],
+              sortKey: a.name
             });
           }
         }
       }
     }
-    // Inversion (NET.edges)
+    // Inversion (NET.edges).
     if (NET.kinds.has('inversion')) {
       for (const e of NET.edges) {
         if (e.kind !== 'inversion') continue;
@@ -1164,40 +1181,25 @@
         const other = NET.nodeById.get(isFrom ? e.to : e.from);
         if (!other) continue;
         rows.push({
-          shape: 'standard', kind: 'inversion',
-          arrow: '↔',
-          verb: 'inverts',
-          right: other.piece.name
+          section: 2, kind: 'inversion', verb: 'inverts', conn: 'to', arrow: '↔',
+          pieces: [ piece(other.piece.name) ],
+          sortKey: other.piece.name
         });
       }
     }
-    // Stable sort by section.
-    const sectionOrder = { promotion: 0, fusion: 1, 'fusion-into': 1, inversion: 2 };
-    rows.sort((a, b) => {
-      const sa = sectionOrder[a.kind] ?? 9;
-      const sb = sectionOrder[b.kind] ?? 9;
-      if (sa !== sb) return sa - sb;
-      return (a.right || a.output || '').localeCompare(b.right || b.output || '');
-    });
+    rows.sort((a, b) => a.section - b.section || a.sortKey.localeCompare(b.sortKey));
     return rows;
   }
   function renderRelationRow(r) {
-    if (r.shape === 'fusion-input') {
-      return '<div class="nt-rel is-fusion-input">' +
-        '<span class="nt-rel-fusion-verb">fuses <span class="nt-rel-fusion-conn">with</span></span>' +
-        '<span class="nt-rel-partner">' + escapeHtml(r.partner) + '</span>' +
-        '<span class="nt-rel-fusion-arrow">→</span>' +
-        '<span class="nt-rel-output">'  + escapeHtml(r.output)  + '</span>' +
-      '</div>';
-    }
-    // Incoming relations (prom. from / made from) get a second leading arrow
-    // before the piece name so the row reads "<- prom. from <- A" instead of
-    // having the piece float orphaned in the third column.
-    const piecePrefix = r.arrow === '←' ? '<span class="nt-rel-piece-arrow">←</span>' : '';
-    return '<div class="nt-rel">' +
+    const pieces = r.pieces.map(pp => pp.type === 'sep'
+      ? '<span class="nt-rel-sep' + (pp.text === '+' ? ' is-plus' : '') + '">' + escapeHtml(pp.text) + '</span>'
+      : '<span class="nt-rel-piece' + (pp.role === 'output' ? ' is-output' : '') + '">' + escapeHtml(pp.text) + '</span>'
+    ).join('');
+    return '<div class="nt-rel is-' + r.kind + '">' +
+      '<span class="nt-rel-label"><span class="nt-rel-verb">' + r.verb + '</span> ' +
+        '<span class="nt-rel-conn">' + r.conn + '</span></span>' +
       '<span class="nt-rel-arrow">' + r.arrow + '</span>' +
-      '<span class="nt-rel-kind is-' + r.kind + '">' + r.verb + '</span>' +
-      '<span class="nt-rel-piece">' + piecePrefix + escapeHtml(r.right) + '</span>' +
+      '<span class="nt-rel-pieces">' + pieces + '</span>' +
     '</div>';
   }
   function showNetTooltipContent(node) {

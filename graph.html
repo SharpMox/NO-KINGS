@@ -400,7 +400,7 @@
        after each label (no fixed columns, so arrows are not aligned). */
     .nt-rel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: 11.5px; margin: 3px 0; }
     .nt-rel-label { white-space: nowrap; }
-    .nt-rel-verb { font-weight: 600; }
+    .nt-rel-verb { font-weight: 600; text-transform: capitalize; }   /* "Promote" / "Fuses" / "Fused" / "Inverts" */
     .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
     .nt-rel-arrow { color: var(--text-soft); font-weight: 600; line-height: 1; }
     .nt-rel-sep { color: var(--text-soft); padding: 0 3px; }  /* "→" / "+" between pieces — grey */
@@ -410,8 +410,9 @@
     .nt-rel.is-promotion .nt-rel-piece { color: var(--hop-target); }
     .nt-rel.is-fusion .nt-rel-verb,
     .nt-rel.is-fusion .nt-rel-piece { color: var(--accent); }
+    /* Inversion verb + piece use the normal text colour (white in dark mode). */
     .nt-rel.is-inversion .nt-rel-verb,
-    .nt-rel.is-inversion .nt-rel-piece { color: var(--text-soft); }
+    .nt-rel.is-inversion .nt-rel-piece { color: var(--text); }
     /* The resulting piece of a "fuses with" line is purple (fuse-into colour). */
     .nt-rel.is-fusion .nt-rel-piece.is-output { color: var(--hurdle-color); }
 

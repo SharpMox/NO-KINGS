@@ -404,6 +404,7 @@
     .nt-rel-conn { color: var(--text-soft); }                 /* "from" / "to" / "with" — grey */
     .nt-rel-arrow { color: var(--text-soft); font-weight: 600; line-height: 1; font-size: 1.15em; }   /* relation glyph, enlarged */
     .nt-rel-sep { color: var(--text-soft); padding: 0 3px; font-size: 1.15em; }  /* "→" / "+" between pieces — grey, enlarged to match */
+    .nt-rel-sep.is-plus { font-size: 1.5em; line-height: 1; }  /* "+" draws smaller than the arrow glyphs, so size it up to match */
     .nt-rel-piece { white-space: nowrap; }
     /* Verb + piece names take the relation colour. */
     .nt-rel.is-promotion .nt-rel-verb,
@@ -1191,7 +1192,7 @@
   }
   function renderRelationRow(r) {
     const pieces = r.pieces.map(pp => pp.type === 'sep'
-      ? '<span class="nt-rel-sep">' + escapeHtml(pp.text) + '</span>'
+      ? '<span class="nt-rel-sep' + (pp.text === '+' ? ' is-plus' : '') + '">' + escapeHtml(pp.text) + '</span>'
       : '<span class="nt-rel-piece' + (pp.role === 'output' ? ' is-output' : '') + '">' + escapeHtml(pp.text) + '</span>'
     ).join('');
     return '<div class="nt-rel is-' + r.kind + '">' +

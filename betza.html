@@ -104,7 +104,9 @@
         height: 26px; min-height: 0; padding: 0 8px; font-size: 11px;
         display: inline-flex; align-items: center;
       }
-      .sandbox-key-group-label { min-width: 50px; font-size: 9px; }
+      /* Label pinned to the left; margin-right:auto pushes the key group to
+         the right edge of the row. */
+      .sandbox-key-group-label { min-width: 50px; font-size: 9px; margin-right: auto; }
     }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */

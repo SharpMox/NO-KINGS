@@ -1,6 +1,14 @@
 # NO-KINGS
 
-Godot 4 mobile game (Android + iOS), driven by AI agents working from Linear issues.
+A fairy-chess project in two parts:
+
+1. **The reference site** — what lives in this repo right now: a static HTML/CSS/JS
+   site documenting every piece in NO-KINGS (a filterable codex, a relationship
+   graph + merge matrix, promotion/fusion/inversion references, a Betza-notation
+   sandbox, and a 100-piece encyclopedia).
+2. **The game** *(planned)* — a Godot 4 mobile game (Android + iOS) of the same
+   fairy-chess system, built by AI agents driven from Linear. Not bootstrapped yet
+   (no `project.godot`, no `.gd` scripts).
 
 > ## ⚠️ Always ship changes via a pull request — never push to `main`
 > **Every change goes on a branch off `main` and lands through a PR.** No direct
@@ -9,58 +17,68 @@ Godot 4 mobile game (Android + iOS), driven by AI agents working from Linear iss
 > `gh pr create`. Do not run `git push origin main` or fast-forward `main` locally.
 > If the user explicitly asks to push to `main`, confirm that's what they want first.
 
-## Repo state
+---
 
-Pre-bootstrap. No Godot project exists yet — no `project.godot`, no `.gd` scripts. The first Linear issue covers initializing the mobile project.
+## The reference site (current work)
 
-## How work flows
+Pure static **HTML + vanilla JS** — no build step, no framework, no bundler, no
+tests, no servers. Deployed as plain static files (note the `.nojekyll`).
 
-1. **Backlog lives in Linear.** Use the `mcp__linear__*` tools (`list_issues`, `get_issue`, `save_issue`, `save_comment`, etc.) to read, update, and close work. Each issue is one unit of work.
-2. **One issue, one branch, one PR.** Branch off `main`, implement against the issue, open a PR that closes it. No local scheduler dispatches agents — the user (or an AFK / cloud agent) picks up an issue and works it.
-3. **Skills live in `.agents/skills/`** and are surfaced to every agent CLI via symlinks under each `.<tool>/skills/` directory. Don't duplicate skill content — edit the canonical copy in `.agents/skills/`.
+**Pages** — each is a self-contained HTML file with inline `<style>` + `<script>`:
 
-## Non-negotiables for any agent touching this repo
+- `index.html` — redirects to the codex.
+- `codex.html` — the 38 curated pieces; card + list views, filters, piece relations.
+- `graph.html` — two tabs: a force-directed relationship **Graph** and a merge/fusion **Matrix**.
+- `promotion.html` · `fusion.html` · `inversion.html` — the 8 promotion chains, the fusions, and the inversion pairs.
+- `betza.html` — Betza "funny notation" reference + a live sandbox that renders any string.
+- `encyclopedia/index.html` — 100-piece visual reference, grouped by family/origin.
 
-- **Worktree-first.** Never edit files on `main`. Use `git worktree add ../no-kings-<slug> <branch>` for isolation — keeps experimental work and parallel investigations from polluting the main checkout, and lets you switch contexts without stashing. Never `cd` into a worktree from your primary shell — if it's pruned while the shell is inside, the session dies. Use absolute paths or `git -C <worktree>` instead.
-- **Load the relevant Godot skill before writing GDScript.** `godot-best-practices`, `godot-gdscript-patterns`, `godot-ui`, `godot-mcp`. When in doubt, load all four.
-- **Scope discipline.** No defensive code, no speculative features, no backwards-compat shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the current change.
+**Shared code** lives in `assets/`: `site.css` (palette, sticky nav, footer, base +
+shared a11y), `board.js` (SVG board / movement-diagram renderer), `theme.js` (light/dark
+toggle, `fp-theme` in localStorage), `tabs.js` (per-page tab persistence).
 
-## Working method
+**Data is the single source of truth** in `data/`: `pieces-codex.js` (38 pieces),
+`pieces-encyclopedia.js` (100), `promotions.js` (8 chains), `fusions.js` (additive +
+synergistic). Pages load these via `<script src>` and derive everything (graph edges,
+matrix cells, card relations, counts) from them. **Do not keep inline copies of this
+data** — past bugs came from pages duplicating `PIECES`/`FUSIONS` inline and drifting;
+load the shared file instead.
 
-- **Grill before building — almost always.** For any new feature, refactor, design change, or non-trivial decision, start with the `grill-with-docs` skill (or `grill-me` for non-code planning). Skip only when the task is mechanical (renames, formatting, applying an already-grilled plan) or when the user explicitly says "just do it" / "skip the grilling". When in doubt, grill.
-- **Always cite sources.** Every factual claim, recommendation, or design decision must name where it came from: a specific file + line, a skill name, a doc URL, a commit, an issue, or a direct user instruction in this conversation. "I think" / "usually" / "in general" without a pointer is not acceptable. If you don't have a source, say "no source — assumption" so the user can challenge it.
-- **Prioritise trusted sources.** When sources disagree, rank them in this order:
-  1. **Explicit user instructions in this conversation** — highest.
-  2. **This `CLAUDE.md`, project docs, ADRs, and `.agents/skills/*/SKILL.md`** — the repo's codified intent.
-  3. **The codebase itself** — `git log`, current file contents, tests.
-  4. **Official upstream docs** — Godot, Linear API, language/runtime docs from their canonical domains.
-  5. **Locked external skills** (`skills-lock.json`) — vetted but third-party.
-  6. **General training-data knowledge / blog posts / Stack Overflow** — lowest; treat as a hypothesis to verify, not a fact.
-  Never let a lower-tier source override a higher-tier one without flagging the conflict to the user.
+### Conventions
 
-## Commits
+- **Mobile-friendly without breaking desktop.** Put phone-only CSS behind
+  `@media (max-width: 560px)` (the established breakpoint). Prove desktop is untouched
+  with a before/after pixel-diff at 1280px (target **0px**); anything intentionally
+  site-wide is the exception and should be called out.
+- **Verify in a real browser.** Serve with `python3 -m http.server` and drive Playwright
+  (installed under `/tmp/node_modules`) to check: every page returns 200, zero console
+  errors in light + dark, no horizontal overflow on mobile, plus visual spot-checks.
+  Run `node --check` on extracted inline scripts after editing JS.
+- **Match the surrounding page.** Styles/scripts are inline per page — keep edits in the
+  same idiom and density as the file you're touching.
 
-```
-<type>(<scope>): <description>
+---
 
-Refs: <linear-issue-id>
-```
+## The game (planned — Godot)
 
-Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. One commit per logical change. `Refs:` carries the Linear issue identifier (e.g., `Refs: ENG-42`) when an issue drives the work.
+Not started yet. When it is, this is the intended setup:
 
-## Key files
+- **Backlog lives in Linear.** Use the `mcp__linear__*` tools (`list_issues`, `get_issue`,
+  `save_issue`, `save_comment`, …). Each issue is one unit of work; one issue → one branch → one PR.
+- **Load the relevant Godot skill before writing GDScript:** `godot-best-practices`,
+  `godot-gdscript-patterns`, `godot-ui`, `godot-mcp`. When in doubt, load all four.
+- **Scope discipline.** No defensive code, speculative features, or backwards-compat
+  shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the change.
 
-- `skills-lock.json` — installed external skills with content hashes.
-- `.agents/skills/` — canonical skill location. The four `godot-*` domain skills (best-practices, gdscript-patterns, ui, mcp).
-- `tools/refresh-agent-skill-links.sh` — regenerates the `.<tool>/skills/` symlink farms (one proxy per agent CLI) pointing at `.agents/skills/`. Run after fresh clone or after adding a tool/skill.
-- `CONTEXT.md` — domain glossary (Godot terms + GitNexus-fork terms).
-- `docs/adr/` — architecture decision records.
+### Godot agent tools (MCP)
 
-## Godot agent tools (MCP)
+Agents drive the live Godot editor via the [Godot AI](https://github.com/hi-godot/godot-ai)
+MCP server (MIT, ~120 ops / 39 tools). Load the `godot-mcp` skill before any task that
+touches scenes, nodes, signals, materials, animations, particles, UI, cameras, or
+environments. Hand-edit `.tscn`/`.gd` only for pure GDScript function bodies; everything
+structural goes through the MCP.
 
-Agents drive the live Godot editor via the [Godot AI](https://github.com/hi-godot/godot-ai) MCP server (MIT, ~120 ops / 39 tools). Load the `godot-mcp` skill before any task that touches scenes, nodes, signals, materials, animations, particles, UI containers, cameras, or environments. Hand-edit `.tscn`/`.gd` files only for pure GDScript function bodies; everything structural goes through the MCP.
-
-**Status:** the addon is **not yet installed** — `project.godot` doesn't exist (see the Linear issue for initializing the Godot mobile project). Once the Godot project is bootstrapped:
+**Status: not installed** — `project.godot` doesn't exist. Once the project is bootstrapped:
 
 ```sh
 # 1. Install uv if missing: https://docs.astral.sh/uv/getting-started/installation/
@@ -71,25 +89,59 @@ cp -r /tmp/godot-ai/plugin/addons/godot_ai addons/
 # 4. Open the Godot AI dock and press "Configure all" to wire every detected MCP client
 ```
 
-Until then, the `godot-mcp` skill loads cleanly but reports "tools unavailable — bootstrap first" and falls back to file edits only when explicitly authorized.
+Until then the `godot-mcp` skill loads but reports "tools unavailable — bootstrap first".
+Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-mcp
+(subsumed by Godot AI).
 
-Deferred (not now): GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-mcp (subsumed by Godot AI).
+---
 
-## Agent-tool proxies
+## Working method (both parts)
 
-The repo exposes the canonical Godot skills to ~29 agent CLIs via `.<tool>/skills/` symlinks (`.claude/`, `.roo/`, `.continue/`, `.goose/`, etc.). These directories are **gitignored and generated** — never hand-edit them. To regenerate:
+- **Grill before building — almost always.** For any new feature, refactor, design
+  change, or non-trivial decision, start with `grill-with-docs` (or `grill-me` for
+  non-code planning). Skip only for mechanical work (renames, formatting, applying an
+  already-grilled plan) or when the user says "just do it" / "skip the grilling".
+- **Always cite sources.** Every factual claim or design decision names where it came
+  from: a file + line, a skill, a doc URL, a commit, an issue, or a direct user
+  instruction. No "I think" / "usually" without a pointer — say "no source — assumption"
+  so it can be challenged.
+- **Prioritise trusted sources**, highest first:
+  1. Explicit user instructions in this conversation.
+  2. This `CLAUDE.md`, project docs, ADRs, `.agents/skills/*/SKILL.md`.
+  3. The codebase itself (`git log`, current file contents).
+  4. Official upstream docs (Godot, Linear API, MDN/web platform from canonical domains).
+  5. Locked external skills (`skills-lock.json`).
+  6. General training-data knowledge / blogs / Stack Overflow — lowest; a hypothesis to verify.
+  Never let a lower tier override a higher one without flagging the conflict.
+
+## Commits
+
+```
+<type>(<scope>): <description>
+```
+
+Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`. One commit per logical
+change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
+(e.g. `Refs: ENG-42`); reference-site changes don't need one.
+
+## Agent tooling
+
+Skills live in `.agents/skills/` (the canonical copy — edit there, never duplicate) and
+are surfaced to ~29 agent CLIs via generated `.<tool>/skills/` symlinks (`.claude/`,
+`.roo/`, `.continue/`, `.goose/`, …). Those `.<tool>/` dirs are **gitignored and
+generated — never hand-edit them**. Regenerate with:
 
 ```sh
 ./tools/refresh-agent-skill-links.sh
 ```
 
-To add a tool, append its name to `TOOLS` in that script. To expose a new skill across all tools, append its directory name to `SKILLS`.
+Add a tool by appending to `TOOLS` in that script; expose a new skill by appending its
+directory to `SKILLS`.
 
 ## Pointers
 
-- Godot AI MCP usage: `.agents/skills/godot-mcp/SKILL.md`.
-- Godot best practices: `.agents/skills/godot-best-practices/SKILL.md`.
-- GDScript architecture patterns: `.agents/skills/godot-gdscript-patterns/SKILL.md`.
-- Godot UI system: `.agents/skills/godot-ui/SKILL.md`.
-- Domain glossary: `CONTEXT.md`.
-- Architecture decisions: `docs/adr/`.
+- `data/` — the canonical piece / promotion / fusion data for the reference site.
+- `CONTEXT.md` — domain glossary (Godot + GitNexus-fork terms, for the game).
+- `docs/adr/` — architecture decision records.
+- `skills-lock.json` — installed external skills with content hashes.
+- Godot skills: `.agents/skills/godot-{best-practices,gdscript-patterns,ui,mcp}/SKILL.md`.

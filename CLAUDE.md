@@ -2,6 +2,13 @@
 
 Godot 4 mobile game (Android + iOS), driven by AI agents working from Linear issues.
 
+> ## ⚠️ Always ship changes via a pull request — never push to `main`
+> **Every change goes on a branch off `main` and lands through a PR.** No direct
+> commits or pushes to `main` — not for one-line fixes, content edits, follow-ups,
+> or "tiny" tweaks. The flow is always: branch → commit → push the branch →
+> `gh pr create`. Do not run `git push origin main` or fast-forward `main` locally.
+> If the user explicitly asks to push to `main`, confirm that's what they want first.
+
 ## Repo state
 
 Pre-bootstrap. No Godot project exists yet — no `project.godot`, no `.gd` scripts. The first Linear issue covers initializing the mobile project.

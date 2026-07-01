@@ -391,7 +391,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		_refresh()
 	else:
 		selected = Vector2i(-1, -1)
-		legal_dests = []
+		legal_dests.clear()
 		_refresh()
 
 
@@ -416,7 +416,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	board.erase(from)
 	moves_left -= 1
 	selected = Vector2i(-1, -1)
-	legal_dests = []
+	legal_dests.clear()
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
 		return _win()
 	_refresh()

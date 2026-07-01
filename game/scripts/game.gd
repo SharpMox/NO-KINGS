@@ -18,6 +18,7 @@ const COL_MOVE := Color(0.2, 0.6, 0.3, 0.55)
 const COL_SELECT := Color(0.95, 0.85, 0.2, 0.6)
 
 var defs: Dictionary
+var textures := {} # id -> Texture2D; missing ids fall back to glyph text
 var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
@@ -55,6 +56,10 @@ var overlay := PanelContainer.new()
 func _ready() -> void:
 	autoplay = OS.get_cmdline_user_args().has("--autoplay")
 	defs = Rules.load_pieces()
+	for id in defs:
+		var path := "res://assets/pieces/%s.png" % id
+		if ResourceLoader.exists(path):
+			textures[id] = load(path)
 	stock = Tuning.STARTING_STOCK.duplicate()
 	rng.randomize()
 	_build_hud()
@@ -472,11 +477,15 @@ func _draw() -> void:
 			draw_circle(_tile_px(t) + Vector2(TILE, TILE) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
 	for pos in board:
 		var p: Dictionary = board[pos]
-		var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
-		var glyph: String = defs[p.id].glyph
-		var size := 40 if glyph.length() <= 1 else 22
 		var px := _tile_px(pos)
-		draw_string(font, px + Vector2(0, TILE * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, TILE, size, col)
+		if textures.has(p.id):
+			var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
+			draw_texture_rect(textures[p.id], Rect2(px + Vector2(4, 4), Vector2(TILE - 8, TILE - 8)), false, tint)
+		else: # ponytail: glyph fallback so a missing PNG never breaks the board
+			var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
+			var glyph: String = defs[p.id].glyph
+			var size := 40 if glyph.length() <= 1 else 22
+			draw_string(font, px + Vector2(0, TILE * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, TILE, size, col)
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

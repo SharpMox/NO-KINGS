@@ -33,8 +33,7 @@ var placements_left := 0
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
-var drag_from := Vector2i(-1, -1) # board drag in progress
-var drag_pos := Vector2.ZERO
+var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
 var merge_sel: Array[int] = [] # indices into the combined pool
@@ -42,6 +41,7 @@ var rng := RandomNumberGenerator.new()
 
 var autoplay := false
 var autoplay_turns := 0
+var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
 var hud := CanvasLayer.new()
@@ -60,7 +60,11 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	if args.has("--screenshot"):
-		_screenshot_and_quit(args[args.find("--screenshot") + 1])
+		screenshot_dir = args[args.find("--screenshot") + 1]
+		if not autoplay: # with --autoplay, the end screen is captured instead
+			_screenshot_and_quit(screenshot_dir)
+	if args.has("--clock"): # debug: short clock to reach the end screen fast
+		clock_ms = float(args[args.find("--clock") + 1]) * 1000.0
 	defs = Rules.load_pieces()
 	for id in defs:
 		var path := "res://assets/pieces/%s.png" % id
@@ -120,6 +124,9 @@ func _build_hud() -> void:
 
 	overlay.visible = false
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var dim := StyleBoxFlat.new()
+	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
+	overlay.add_theme_stylebox_override("panel", dim)
 	hud.add_child(overlay)
 
 
@@ -134,13 +141,17 @@ func _pool_take(index: int) -> String:
 	return captured.pop_at(index - stock.size())
 
 
+func _clock_text() -> String:
+	return "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
+
+
 func _refresh() -> void:
-	clock_label.text = "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
+	clock_label.text = _clock_text()
 	score_label.text = "★ %d" % score
 	wave_label.text = "wave %d/%d" % [wave, Waves.WAVES.size()]
 	match state:
 		State.SETUP:
-			turn_label.text = "Place your army (%d left), then PASS" % stock.size()
+			turn_label.text = "Place army (%d left) → PASS" % stock.size()
 		State.PLAYER_TURN:
 			var next_in := _cadence() - turns_since_wave
 			var wave_txt := "King wave!" if _king_alive() else ("wave in %d" % maxi(next_in, 0)) if wave < Waves.WAVES.size() else "no more waves"
@@ -222,11 +233,7 @@ func _on_pass() -> void:
 func _process(delta: float) -> void:
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
-		var open: Array[Vector2i] = []
-		for x in Tuning.BOARD_W:
-			for y in Tuning.PLAYER_ZONE_ROWS:
-				if not board.has(Vector2i(x, y)):
-					open.append(Vector2i(x, y))
+		var open := _setup_open_tiles()
 		if stock.is_empty() or open.is_empty():
 			_on_pass()
 		else:
@@ -237,7 +244,7 @@ func _process(delta: float) -> void:
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
-		clock_label.text = "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
+		clock_label.text = _clock_text()
 		if autoplay:
 			_autoplay_step()
 
@@ -262,6 +269,8 @@ func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	selected = Vector2i(-1, -1)
 	placing_index = -1
+	merge_sel.clear()
+	merge_button.button_pressed = false # also resets merge_mode via its toggle
 	_refresh()
 	turns_since_wave += 1
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
@@ -321,6 +330,15 @@ func _spawn_pending() -> void:
 		board[tile] = {"id": pending_spawn.pop_front(), "owner": Rules.ENEMY}
 
 
+func _setup_open_tiles() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in Tuning.BOARD_W:
+		for y in Tuning.PLAYER_ZONE_ROWS:
+			if not board.has(Vector2i(x, y)):
+				out.append(Vector2i(x, y))
+	return out
+
+
 func _any_enemy() -> bool:
 	for pos in board:
 		if board[pos].owner == Rules.ENEMY:
@@ -342,16 +360,28 @@ func _game_over(won: bool, reason: String) -> void:
 	_refresh()
 	if autoplay:
 		print("AUTOPLAY RESULT: %s — %s (wave %d, score %d, %d turns)" % ["WIN" if won else "LOSS", reason, wave, score, autoplay_turns])
-		get_tree().quit(0)
+		if screenshot_dir != "":
+			_end_shot() # fire-and-forget: capture the end screen, then quit
+		else:
+			get_tree().quit(0)
+
+
+func _end_shot() -> void:
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(screenshot_dir.path_join("gameover.png"))
+	get_tree().quit()
 
 
 func _show_overlay(won: bool, reason: String) -> void:
 	for c in overlay.get_children():
 		c.queue_free()
+	var center := CenterContainer.new()
+	overlay.add_child(center)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
-	overlay.add_child(box)
+	center.add_child(box)
 	var title := Label.new()
 	title.text = "VICTORY — the King has fallen" if won else "GAME OVER"
 	title.add_theme_font_size_override("font_size", 34)
@@ -382,7 +412,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		drag_from = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion and drag_from.x >= 0:
-		drag_pos = event.position
 		queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var tile := _tile_at(event.position)
@@ -392,7 +421,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			# a fresh selection of an own piece also starts a potential drag
 			if selected == tile and tile.x >= 0:
 				drag_from = tile
-				drag_pos = event.position
 		elif drag_from.x >= 0: # release ends a drag
 			var t := _tile_at(event.position)
 			var from := drag_from
@@ -507,10 +535,15 @@ func _autoplay_merge() -> bool:
 		counts[pool[i]] = counts.get(pool[i], []) + [i]
 	for want in [3, 2]:
 		for id in counts:
-			if counts[id].size() >= want:
-				merge_sel.assign(counts[id].slice(0, want))
-				_on_confirm_merge()
-				return true
+			if counts[id].size() < want:
+				continue
+			# a 2-same merge yields 1 of the same piece — only worth it when it
+			# converts a captured (unplaceable) piece into stock
+			if want == 2 and counts[id].slice(0, want).all(func(i: int) -> bool: return i < stock.size()):
+				continue
+			merge_sel.assign(counts[id].slice(0, want))
+			_on_confirm_merge()
+			return true
 	return false
 
 
@@ -518,10 +551,7 @@ func _autoplay_merge() -> bool:
 ## Used by the agent for visual verification (windowed run required).
 func _screenshot_and_quit(dir: String) -> void:
 	await get_tree().process_frame # let _ready finish first
-	var open: Array[Vector2i] = []
-	for x in Tuning.BOARD_W:
-		for y in Tuning.PLAYER_ZONE_ROWS:
-			open.append(Vector2i(x, y))
+	var open := _setup_open_tiles()
 	while not stock.is_empty() and not open.is_empty():
 		_place(rng.randi() % stock.size(), open.pop_at(rng.randi() % open.size()))
 	_on_pass()
@@ -547,12 +577,7 @@ func _draw() -> void:
 	for d in legal_dests:
 		draw_circle(_tile_px(d) + Vector2(TILE, TILE) / 2, 10, COL_MOVE)
 	if placing_index >= 0:
-		var tiles := Rules.placement_tiles(board) if state != State.SETUP else []
-		if state == State.SETUP:
-			for x in Tuning.BOARD_W:
-				for y in Tuning.PLAYER_ZONE_ROWS:
-					if not board.has(Vector2i(x, y)):
-						tiles.append(Vector2i(x, y))
+		var tiles := _setup_open_tiles() if state == State.SETUP else Rules.placement_tiles(board)
 		for t in tiles:
 			draw_circle(_tile_px(t) + Vector2(TILE, TILE) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
 	for pos in board:
@@ -572,7 +597,7 @@ func _draw() -> void:
 			draw_string(font, px + Vector2(0, TILE * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, TILE, size, col)
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(textures[board[drag_from].id],
-			Rect2(drag_pos - Vector2(TILE, TILE) * 0.5, Vector2(TILE, TILE)), false, Color(1, 1, 1, 0.85))
+			Rect2(get_global_mouse_position() - Vector2(TILE, TILE) * 0.5, Vector2(TILE, TILE)), false, Color(1, 1, 1, 0.85))
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

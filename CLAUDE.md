@@ -6,9 +6,10 @@ A fairy-chess project in two parts:
    site documenting every piece in NO-KINGS (a filterable codex, a relationship
    graph + merge matrix, promotion/fusion/inversion references, a Betza-notation
    sandbox, and a 100-piece encyclopedia).
-2. **The game** *(planned)* — a Godot 4 mobile game (Android + iOS) of the same
-   fairy-chess system, built by AI agents driven from Linear. Not bootstrapped yet
-   (no `project.godot`, no `.gd` scripts).
+2. **The game** *(in progress)* — a Godot 4 mobile game (Android + iOS) of the same
+   fairy-chess system, bootstrapped in `game/` (Godot 4.6, portrait 480×800). The MVP
+   is being built desktop-first from the plan-file spec; the Notion GDD is the design
+   source of truth.
 
 > ## ⚠️ Always ship changes via a pull request — never push to `main`
 > **Every change goes on a branch off `main` and lands through a PR.** No direct
@@ -78,18 +79,10 @@ touches scenes, nodes, signals, materials, animations, particles, UI, cameras, o
 environments. Hand-edit `.tscn`/`.gd` only for pure GDScript function bodies; everything
 structural goes through the MCP.
 
-**Status: not installed** — `project.godot` doesn't exist. Once the project is bootstrapped:
-
-```sh
-# 1. Install uv if missing: https://docs.astral.sh/uv/getting-started/installation/
-# 2. Vendor the addon
-git clone https://github.com/hi-godot/godot-ai.git /tmp/godot-ai
-cp -r /tmp/godot-ai/plugin/addons/godot_ai addons/
-# 3. Enable in Project Settings > Plugins
-# 4. Open the Godot AI dock and press "Configure all" to wire every detected MCP client
-```
-
-Until then the `godot-mcp` skill loads but reports "tools unavailable — bootstrap first".
+**Status: vendored** — the addon lives at `game/addons/godot_ai/` and is enabled in
+`game/project.godot` (it self-disables in headless runs). Remaining one-time setup, in
+the editor: open the Godot AI dock and press "Configure all" to wire every detected MCP
+client (requires `uv`: https://docs.astral.sh/uv/getting-started/installation/).
 Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-mcp
 (subsumed by Godot AI).
 

@@ -28,3 +28,6 @@
 .vibe/
 .windsurf/
 .zencoder/
+
+# Godot editor cache (game/)
+game/.godot/

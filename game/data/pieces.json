@@ -1,0 +1,1432 @@
+{
+ "pawn": {
+  "id": "pawn",
+  "name": "Pawn",
+  "glyph": "♟",
+  "value": 1,
+  "next": "sergeant",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      0,
+      1
+     ]
+    ],
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
+ "sergeant": {
+  "id": "sergeant",
+  "name": "Ranger",
+  "glyph": "SG",
+  "value": 2,
+  "next": "arrow-pawn",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
+ "arrow-pawn": {
+  "id": "arrow-pawn",
+  "name": "Archer",
+  "glyph": "AP",
+  "value": 3,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "range": 2,
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
+ "ferz": {
+  "id": "ferz",
+  "name": "Seer",
+  "glyph": "F",
+  "value": 2,
+  "next": "elephant-modern",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "elephant-modern": {
+  "id": "elephant-modern",
+  "name": "Mystic",
+  "glyph": "EM",
+  "value": 3,
+  "next": "high-priestess",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      -2,
+      2
+     ],
+     [
+      2,
+      -2
+     ],
+     [
+      -2,
+      -2
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "high-priestess": {
+  "id": "high-priestess",
+  "name": "High Priestess",
+  "glyph": "HP",
+  "value": 5,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      -2,
+      2
+     ],
+     [
+      2,
+      -2
+     ],
+     [
+      -2,
+      -2
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "wazir": {
+  "id": "wazir",
+  "name": "Mage",
+  "glyph": "W",
+  "value": 2,
+  "next": "war-machine",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "war-machine": {
+  "id": "war-machine",
+  "name": "Sorcerer",
+  "glyph": "WM",
+  "value": 3,
+  "next": "champion",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "champion": {
+  "id": "champion",
+  "name": "Archmage",
+  "glyph": "Ch",
+  "value": 5,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      -2,
+      2
+     ],
+     [
+      2,
+      -2
+     ],
+     [
+      -2,
+      -2
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "bishop": {
+  "id": "bishop",
+  "name": "Bishop",
+  "glyph": "♝",
+  "value": 3,
+  "next": "dragon-horse",
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   }
+  ]
+ },
+ "dragon-horse": {
+  "id": "dragon-horse",
+  "name": "Paladin",
+  "glyph": "馬",
+  "value": 5,
+  "next": "archbishop",
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "archbishop": {
+  "id": "archbishop",
+  "name": "Archbishop",
+  "glyph": "AR",
+  "value": 7,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "rook": {
+  "id": "rook",
+  "name": "Rook",
+  "glyph": "♜",
+  "value": 5,
+  "next": "dragon-king",
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   }
+  ]
+ },
+ "dragon-king": {
+  "id": "dragon-king",
+  "name": "Drake",
+  "glyph": "龍",
+  "value": 7,
+  "next": "chancellor",
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "chancellor": {
+  "id": "chancellor",
+  "name": "Dragonlord",
+  "glyph": "CH",
+  "value": 8,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "knight": {
+  "id": "knight",
+  "name": "Knight",
+  "glyph": "♞",
+  "value": 3,
+  "next": "gnu",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "gnu": {
+  "id": "gnu",
+  "name": "Hippogriff",
+  "glyph": "GU",
+  "value": 5,
+  "next": "buffalo",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      -1,
+      3
+     ],
+     [
+      -3,
+      1
+     ],
+     [
+      1,
+      -3
+     ],
+     [
+      3,
+      -1
+     ],
+     [
+      -1,
+      -3
+     ],
+     [
+      -3,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "buffalo": {
+  "id": "buffalo",
+  "name": "Behemoth",
+  "glyph": "BF",
+  "value": 7,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      3
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      -1,
+      3
+     ],
+     [
+      -3,
+      1
+     ],
+     [
+      1,
+      -3
+     ],
+     [
+      3,
+      -1
+     ],
+     [
+      -1,
+      -3
+     ],
+     [
+      -3,
+      -1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      3,
+      2
+     ],
+     [
+      -2,
+      3
+     ],
+     [
+      -3,
+      2
+     ],
+     [
+      2,
+      -3
+     ],
+     [
+      3,
+      -2
+     ],
+     [
+      -2,
+      -3
+     ],
+     [
+      -3,
+      -2
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      -2,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "kirin": {
+  "id": "kirin",
+  "name": "Kirin",
+  "glyph": "Ki",
+  "value": 3,
+  "next": "kirin-plus",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "kirin-plus": {
+  "id": "kirin-plus",
+  "name": "Sacred Kirin",
+  "glyph": "Ki+",
+  "value": 5,
+  "next": "kirin-plus-plus",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      -1,
+      3
+     ],
+     [
+      1,
+      -3
+     ],
+     [
+      -1,
+      -3
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      -3,
+      1
+     ],
+     [
+      3,
+      -1
+     ],
+     [
+      -3,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "kirin-plus-plus": {
+  "id": "kirin-plus-plus",
+  "name": "Celestial Kirin",
+  "glyph": "Ki++",
+  "value": 8,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ],
+     [
+      2,
+      2
+     ],
+     [
+      -2,
+      2
+     ],
+     [
+      2,
+      -2
+     ],
+     [
+      -2,
+      -2
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      -1,
+      3
+     ],
+     [
+      1,
+      -3
+     ],
+     [
+      -1,
+      -3
+     ],
+     [
+      3,
+      1
+     ],
+     [
+      -3,
+      1
+     ],
+     [
+      3,
+      -1
+     ],
+     [
+      -3,
+      -1
+     ],
+     [
+      3,
+      3
+     ],
+     [
+      -3,
+      3
+     ],
+     [
+      3,
+      -3
+     ],
+     [
+      -3,
+      -3
+     ],
+     [
+      4,
+      0
+     ],
+     [
+      -4,
+      0
+     ],
+     [
+      0,
+      4
+     ],
+     [
+      0,
+      -4
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "alibaba": {
+  "id": "alibaba",
+  "name": "Wanderer",
+  "glyph": "AD",
+  "value": 2,
+  "next": "bodyguard",
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      2,
+      2
+     ],
+     [
+      -2,
+      2
+     ],
+     [
+      2,
+      -2
+     ],
+     [
+      -2,
+      -2
+     ],
+     [
+      2,
+      0
+     ],
+     [
+      -2,
+      0
+     ],
+     [
+      0,
+      2
+     ],
+     [
+      0,
+      -2
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "bodyguard": {
+  "id": "bodyguard",
+  "name": "Praetorian",
+  "glyph": "BG",
+  "value": 5,
+  "next": "queen",
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 2,
+    "mode": "both"
+   }
+  ]
+ },
+ "queen": {
+  "id": "queen",
+  "name": "Queen",
+  "glyph": "♛",
+  "value": 9,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   }
+  ]
+ },
+ "king": {
+  "id": "king",
+  "name": "King",
+  "glyph": "♚",
+  "value": 4,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ }
+}

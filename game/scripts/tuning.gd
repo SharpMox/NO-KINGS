@@ -8,6 +8,7 @@ const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 
 const MOVES_PER_TURN := 2          # grilled 2026-07-02 (GDD leaves TBD)
 const PLACEMENTS_PER_TURN := 1     # grilled 2026-07-02
+const MERGES_PER_TURN := 3         # playtest round 4
 const ENEMY_ACTIONS_PER_TURN := 1  # playtest override 2026-07-02 (GDD says 2)
 
 const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count

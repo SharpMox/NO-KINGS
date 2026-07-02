@@ -18,6 +18,16 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+func _click_button_in(node: Node, text: String) -> bool:
+	if node is Button and node.text == text and node.is_visible_in_tree():
+		_click(node.get_global_rect().get_center())
+		return true
+	for c in node.get_children():
+		if await _click_button_in(c, text):
+			return true
+	return false
+
+
 func _click(at: Vector2) -> void:
 	for pressed in [true, false]:
 		var ev := InputEventMouseButton.new()
@@ -71,6 +81,25 @@ func _init() -> void:
 	_click(game.pass_button.get_global_rect().get_center())
 	await create_timer(1.0).timeout # enemy turn runs (animated path)
 	check(game.state == game.State.PLAYER_TURN, "PASS cycles through the enemy turn")
+
+	# long-press on the queen opens the piece preview; Close dismisses it
+	var at: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = at
+	press.global_position = at
+	root.push_input(press)
+	await create_timer(0.7).timeout
+	check(game.preview_open, "long-press opens the piece preview")
+	var release: InputEventMouseButton = press.duplicate()
+	release.pressed = false
+	root.push_input(release)
+	await process_frame
+	check(game.preview_open, "release while previewing does not close it")
+	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable")
+	await process_frame
+	check(not game.preview_open, "Close dismisses the preview")
 
 	print("---")
 	if fails == 0:

@@ -1,6 +1,12 @@
 ## Designed waves 1–50, transcribed from the GDD Wave Catalog (Draft v1).
-## Box-buff and tariff flags are omitted — both systems are out of MVP scope.
 ## Wave 50 is the King wave: spawn cadence pauses until the King is checkmated.
+
+## Waves whose spawn includes ONE box-carrying enemy (GDD buff flags): the value
+## names which spawned piece type carries the box (opens Box Pick on capture).
+const BUFFS := {
+	3: "pawn", 7: "bishop", 12: "bishop", 17: "knight", 22: "knight",
+	28: "rook", 34: "rook", 40: "bishop", 45: "knight", 49: "rook",
+}
 
 const WAVES: Array = [
 	["pawn"],                                              # 1

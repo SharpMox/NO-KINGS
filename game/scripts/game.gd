@@ -898,12 +898,12 @@ func _capture_score(victim_id: String) -> int:
 		match t.key:
 			"greed":
 				if victim_id == "pawn":
-					pts += 1
+					pts += 10
 			"score":
-				pts += 1
+				pts += 10
 			"bounty":
-				if base >= 5:
-					pts += 3
+				if base >= 50:
+					pts += 30
 			"lifesteal":
 				clock_ms += 2000
 			"first_capture_extra":

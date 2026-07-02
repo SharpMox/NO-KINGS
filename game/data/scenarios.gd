@@ -16,7 +16,7 @@ const ZONE_PAWNS := [["pawn", 0, 1, 0], ["pawn", 0, 4, 0]]
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
-		"board": ZONE_PAWNS, "stock": [base, base, mid, mid], "score": 50}}
+		"board": ZONE_PAWNS, "stock": [base, base, mid, mid], "score": 500}}
 
 
 static func all() -> Array:
@@ -31,7 +31,7 @@ static func all() -> Array:
 		{"name": "King wave (checkmate to win)", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
 				["king", 1, 3, 10], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],
-			"wave": 50, "score": 100}},
+			"wave": 50, "score": 1000}},
 		# --- merging ---
 		{"name": "Merge: promotion pair (pool)", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"]}},
@@ -58,7 +58,7 @@ static func all() -> Array:
 				"surprise_attack", "suppressing_fire", "tactical_reposition", "drone_strike",
 				"cluster_bomb", "conscription", "bombing_run", "rapid_deployment", "decoy_swap",
 				"forced_march", "field_orders", "asset_recovery", "resupply_drop", "counter_intel"],
-			"stock": ["pawn", "pawn"], "score": 50, "wave": 1}},
+			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		{"name": "Trinkets: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"trinkets": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
@@ -68,17 +68,17 @@ static func all() -> Array:
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5, "buff"], ["bishop", 1, 4, 5]],
 			"tariffs": ["move_cost", "capture_cost", "deploy_cost", "pass_cost",
 				"long_range_cost", "ability_cost", "fuse_cost", "box_cost"],
-			"items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 100}},
+			"items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
 		{"name": "Tariffs: all persistent", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],
 			"tariffs": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],
-			"stock": ["pawn", "pawn", "rook"], "captured": ["pawn", "pawn"], "wave": 8, "score": 100}},
+			"stock": ["pawn", "pawn", "rook"], "captured": ["pawn", "pawn"], "wave": 8, "score": 1000}},
 		{"name": "One-off: Forced Audit", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "queen", "pawn"], "oneoffs": ["forced_audit"]}},
 		{"name": "One-off: Asset Seizure", "cfg": {
 			"board": ZONE_PAWNS, "stock": ["rook", "queen", "pawn"], "oneoffs": ["asset_seizure"]}},
 		{"name": "One-off: Asset Freeze", "cfg": {
-			"board": ZONE_PAWNS, "score": 100, "oneoffs": ["asset_freeze"]}},
+			"board": ZONE_PAWNS, "score": 1000, "oneoffs": ["asset_freeze"]}},
 		{"name": "One-off: Hostile Takeover", "cfg": {
 			"board": ZONE_PAWNS + [["rook", 0, 2, 1], ["bishop", 0, 3, 1]], "oneoffs": ["hostile_takeover"]}},
 		{"name": "One-off: JD Vance", "cfg": {

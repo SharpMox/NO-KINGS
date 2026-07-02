@@ -55,17 +55,17 @@ const TRINKET_EFFECTS: Array = [
 	{"key": "first_capture_extra", "name": "First-Capture Extra Action",
 		"description": "If your first move of a turn is a capture, gain an extra move."},
 	{"key": "greed", "name": "Greed",
-		"description": "+1 score per Pawn captured."},
+		"description": "+10 score per Pawn captured."},
 	{"key": "move", "name": "Move",
 		"description": "+1 move per turn."},
 	{"key": "lifesteal", "name": "Lifesteal",
 		"description": "Captures restore 2s of clock."},
 	{"key": "score", "name": "Score",
-		"description": "+1 score on every capture."},
+		"description": "+10 score on every capture."},
 	{"key": "timer", "name": "Timer",
 		"description": "Milestone clock refills give +5s more."},
 	{"key": "bounty", "name": "Bounty",
-		"description": "+3 score when capturing a piece worth 5+."},
+		"description": "+30 score when capturing a piece worth 50+."},
 ]
 
 ## Excluded from MVP (reason):

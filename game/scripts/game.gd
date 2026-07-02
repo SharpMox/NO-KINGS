@@ -6,6 +6,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
+const Tariffs := preload("res://data/tariffs.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -55,6 +56,10 @@ var ceasefire_turns := 0 # Cease Fire: clock paused while > 0
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
 var recent_place_costs: Array = [] # last 3 paid placement costs (Resupply Drop)
+var tariffs_active: Array = [] # action + persistent tariffs, run-long
+var tariffs_seen: Array = [] # every activation, for the end screens
+var sanctioned_id := "" # Sanctions: piece type barred from placement
+var counter_intel_turns := 0 # Counter-Intel: tariffs suppressed while > 0
 var rng := RandomNumberGenerator.new()
 
 var autoplay := false
@@ -68,6 +73,7 @@ var score_label := Label.new()
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
+var tariff_label := Label.new()
 var merge_button := Button.new()
 var confirm_button := Button.new()
 var pool_box := HBoxContainer.new()
@@ -115,6 +121,13 @@ func _build_hud() -> void:
 	turn_label.size = Vector2(348, 26)
 	turn_label.clip_text = true # PASS button sits to the right
 	hud.add_child(turn_label)
+	tariff_label.position = Vector2(24, 72)
+	tariff_label.add_theme_font_size_override("font_size", 13)
+	tariff_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5))
+	tariff_label.custom_minimum_size = Vector2(432, 0)
+	tariff_label.size = Vector2(432, 20)
+	tariff_label.clip_text = true
+	hud.add_child(tariff_label)
 
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 24)
@@ -195,6 +208,11 @@ func _refresh() -> void:
 			turn_label.text = "enemy turn…"
 		State.GAME_OVER:
 			turn_label.text = ""
+	var names := []
+	for t in tariffs_active:
+		names.append(t.name.trim_prefix("Tariff on "))
+	tariff_label.text = "" if names.is_empty() else "⚠ " + ", ".join(names) \
+			+ (" (suppressed)" if counter_intel_turns > 0 else "")
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
 	confirm_button.visible = merge_mode and Rules.merge_result(_merge_ids(), defs) != ""
@@ -228,6 +246,8 @@ func _rebuild_pool_strip() -> void:
 			btn.modulate = Color(1.2, 1.1, 0.4)
 		elif placing_index == i:
 			btn.modulate = Color(0.6, 1.2, 0.6)
+		elif not from_captured and pool[i] == sanctioned_id and _tariff_on("sanctions"):
+			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		btn.pressed.connect(_on_pool_pressed.bind(i))
 		pool_box.add_child(btn)
 
@@ -252,6 +272,8 @@ func _on_pool_pressed(index: int) -> void:
 		# placement: only stock pieces are placeable (captured merge in first)
 		if index >= stock.size():
 			return
+		if stock[index] == sanctioned_id and _tariff_on("sanctions"):
+			return
 		var can_place: bool = state == State.SETUP or placements_left > 0
 		placing_index = index if placing_index != index and can_place else -1
 		selected = Vector2i(-1, -1)
@@ -262,6 +284,9 @@ func _on_confirm_merge() -> void:
 	var result := Rules.merge_result(_merge_ids(), defs)
 	if result == "":
 		return
+	if _tariff_on("regulation") and _merge_ids().has("pawn"):
+		return # Regulation: pawns can't be merged
+	_charge("fuse_cost")
 	# if any source stood on the board, the result appears on the LAST-selected
 	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
 	var result_tile := Vector2i(-1, -1)
@@ -291,6 +316,7 @@ func _on_pass() -> void:
 		_spawn_wave(1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
+		_charge("pass_cost")
 		_enemy_turn()
 
 
@@ -330,6 +356,7 @@ func _begin_player_turn() -> void:
 	placements_left = Tuning.PLACEMENTS_PER_TURN
 	moved_this_turn.clear()
 	turn_action_count = 0
+	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		_queue_wave(wave + 1)
@@ -360,7 +387,10 @@ func _enemy_turn() -> void:
 
 
 func _run_enemy_actions() -> void:
-	for i in Tuning.ENEMY_ACTIONS_PER_TURN:
+	var actions := Tuning.ENEMY_ACTIONS_PER_TURN
+	if _tariff_on("filibuster"):
+		actions += 1
+	for i in actions:
 		var act := Rules.ai_action(board, defs)
 		if act.is_empty():
 			return
@@ -411,19 +441,28 @@ func _queue_wave(n: int) -> void:
 	wave = n
 	turns_since_wave = 0
 	var buff_id: String = Waves.BUFFS.get(n, "")
-	for id in Waves.WAVES[n - 1]:
+	var roster: Array = Waves.WAVES[n - 1].duplicate()
+	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
+		roster.append(roster[rng.randi() % roster.size()])
+	for id in roster:
 		var entry := {"id": id}
 		if id == buff_id: # first spawned piece of the flagged type carries the box
 			entry.buff = true
 			buff_id = ""
 		pending_spawn.append(entry)
+	if n == 2:
+		_activate_tariff_by_key("inflation") # T0, GDD: fires after wave 1
+	elif Tariffs.SCHEDULE.has(n):
+		_activate_tariff(Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
 		var refill: float = Tuning.CLOCK_REFILL_MS
 		for t in trinkets:
 			if t.key == "timer":
 				refill += 5000
+		if _tariff_on("recession"):
+			refill *= 0.5
 		clock_ms += refill
-		score += Tuning.MILESTONE_SCORE_BONUS
+		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
 
 
 func _spawn_wave(n: int) -> void:
@@ -507,7 +546,7 @@ func _show_overlay(won: bool, reason: String) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "%s\nScore %d · Deepest wave %d" % [reason, score, wave]
+	detail.text = "%s\nScore %d · Deepest wave %d · Tariffs %d" % [reason, score, wave, tariffs_seen.size()]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -599,9 +638,12 @@ func _place(pool_index: int, tile: Vector2i) -> void:
 		placements_left -= 1
 		turn_action_count += 1
 		var cost := Tuning.PLACEMENT_SCORE_COST
+		if _tariff_on("austerity"):
+			cost *= 2
 		if free_placements > 0: # Field Orders
 			free_placements -= 1
 			cost = 0
+		_charge("deploy_cost")
 		score = maxi(score - cost, 0)
 		recent_place_costs.append(cost)
 		if recent_place_costs.size() > 3:
@@ -613,12 +655,17 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		score += _capture_score(victim.id)
+		score += _gain(_capture_score(victim.id))
+		_charge("capture_cost")
 		if victim.id == "king":
 			return _win()
 		captured.append(victim.id)
 		boxed = victim.get("buff", false)
 		_add_pop(to)
+	_charge("move_cost")
+	if board[from].id in ["bishop", "rook"]:
+		var d := to - from
+		_charge("long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
@@ -665,6 +712,82 @@ func _win() -> void:
 	_game_over(true, "Wave-%d King checkmated" % wave)
 
 
+# --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
+
+func _activate_tariff(tier: String) -> void:
+	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
+		if t.tier != tier:
+			return false
+		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
+		return tier == "Mild" or not tariffs_seen.has(t.name))
+	if pool.is_empty():
+		return
+	_apply_tariff(pool[rng.randi() % pool.size()])
+
+
+func _activate_tariff_by_key(key: String) -> void:
+	for t in Tariffs.TARIFFS:
+		if t.key == key:
+			return _apply_tariff(t)
+
+
+func _apply_tariff(t: Dictionary) -> void:
+	tariffs_seen.append(t.name)
+	if t.kind == "oneoff":
+		match t.key:
+			"forced_audit":
+				captured.clear()
+			"asset_seizure":
+				stock.clear()
+			"asset_freeze":
+				score /= 2
+			"hostile_takeover":
+				var mine := _player_pieces()
+				if not mine.is_empty():
+					board[mine[rng.randi() % mine.size()]].owner = Rules.ENEMY
+			"jd_vance":
+				var best := Vector2i(-1, -1)
+				for pos in _player_pieces():
+					if best.x < 0 or defs[board[pos].id].value > defs[board[best].id].value:
+						best = pos
+				if best.x >= 0:
+					_destroy(best)
+		return
+	tariffs_active.append(t)
+	if t.key == "sanctions": # fix the barred type at trigger time
+		var types := {}
+		for id in stock + captured:
+			types[id] = true
+		if not types.is_empty():
+			sanctioned_id = types.keys()[rng.randi() % types.size()]
+
+
+func _tariff_on(key: String) -> bool:
+	if counter_intel_turns > 0:
+		return false
+	for t in tariffs_active:
+		if t.key == key:
+			return true
+	return false
+
+
+## Score cost charged when a tariffed action happens.
+func _charge(key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
+	if _tariff_on(key):
+		score = maxi(score - amount, 0)
+
+
+## Score gains pass through Inflation (-10% per stack, rounded down).
+func _gain(amount: int) -> int:
+	if counter_intel_turns > 0:
+		return amount
+	var out := float(amount)
+	for t in tariffs_active:
+		if t.key == "inflation":
+			out *= 0.9
+	return int(out)
+
+
 # --- items (single-use actives from the Items catalog) ---
 
 func _use_item(index: int) -> void:
@@ -675,6 +798,7 @@ func _use_item(index: int) -> void:
 		_refresh()
 		return
 	var it: Dictionary = items[index]
+	_charge("ability_cost")
 	if it.target == "":
 		items.remove_at(index)
 		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
@@ -803,6 +927,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			for c in recent_place_costs:
 				score += c
 			recent_place_costs.clear()
+		"counter_intel":
+			counter_intel_turns += 2
 		"demote":
 			board[b].id = "pawn"
 		"air_strike", "sniper":
@@ -844,6 +970,7 @@ func _destroy(pos: Vector2i) -> void:
 
 func _open_box_pick() -> void:
 	box_open = true
+	_charge("box_cost")
 	if autoplay: # bot: random box, random content — exercises every branch
 		var kinds := ["item", "trinket", "score"]
 		_box_step2(kinds[rng.randi() % kinds.size()], true)
@@ -916,7 +1043,7 @@ func _box_add_skip(box: VBoxContainer) -> void:
 	var skip := Button.new()
 	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
 	skip.pressed.connect(func() -> void:
-		score += Tuning.BOX_SKIP_CONSOLATION
+		score += _gain(Tuning.BOX_SKIP_CONSOLATION)
 		_box_close())
 	box.add_child(skip)
 
@@ -928,7 +1055,7 @@ func _box_choose(kind: String, opt: Dictionary) -> void:
 		"trinket":
 			trinkets.append(opt)
 		"score":
-			score += opt.value
+			score += _gain(opt.value)
 	_box_close()
 
 

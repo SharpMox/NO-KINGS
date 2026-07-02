@@ -44,6 +44,8 @@ const ITEMS: Array = [
 		"description": "Refund the score cost of your last 3 placements."},
 	{"key": "forced_march", "name": "Forced March", "tier": "Strategic", "target": "pair",
 		"description": "Move any piece up to 3 squares in a straight clear line."},
+	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
+		"description": "Disable all tariffs for the next 2 turns."},
 ]
 
 ## Trinkets: run-long passives. `key` is matched in game.gd hooks.
@@ -70,6 +72,5 @@ const TRINKET_EFFECTS: Array = [
 ## - Promote (Item): placeholder Description upstream in Notion — no effect defined.
 ## - Buff Box (Item): depends on the Piece Buffs system, cut from MVP.
 ## - Radar Jamming (Item): enemies have no abilities in MVP — dead effect.
-## - Counter-Intel (Item): lands with the Tariffs PR (disables tariffs 2 turns).
 ## - Capture Everything (Trinket): scope TBD upstream.
 ## - Obstacle (Trinket): no obstacle system in MVP.

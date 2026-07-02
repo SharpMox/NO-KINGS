@@ -22,6 +22,11 @@ const WIN_SCORE_BONUS := 100       # wave-50 checkmate (GDD, amount TBD)
 const BOX_SKIP_CONSOLATION := 2    # GDD: small consolation, amount TBD
 const SCORE_BOX_CHUNKS: Array = [5, 8, 10, 12, 15, 20]  # score-box contents pool
 
+# Tariff costs: upstream says 200/500/1000 but assumes a ~100x larger score
+# economy — scaled down here, needs a design pass (flagged 2026-07-02)
+const TARIFF_ACTION_COST := 2      # per tariffed action
+const TARIFF_LR_PER_SQUARE := 1    # Tariff on Long-Range, per square moved
+
 # Starting Stock (12 = fills the placement zone exactly). Fairy bases included
 # because enemies only field pawn/bishop/knight/rook — see plan, grilled 2026-07-02.
 const STARTING_STOCK: Array = [

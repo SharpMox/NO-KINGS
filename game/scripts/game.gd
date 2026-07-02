@@ -96,9 +96,13 @@ func _ready() -> void:
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
 	defs = Rules.load_pieces()
 	for id in defs:
-		var path := "res://assets/pieces/%s.png" % id
-		if ResourceLoader.exists(path):
-			textures[id] = load(path)
+		# png wins if present (drop painted art in anytime); svg is the
+		# generated vector set (tools/generate-piece-art.py)
+		for ext in ["png", "svg"]:
+			var path := "res://assets/pieces/%s.%s" % [id, ext]
+			if ResourceLoader.exists(path):
+				textures[id] = load(path)
+				break
 	stock = Tuning.STARTING_STOCK.duplicate()
 	rng.randomize()
 	_build_hud()

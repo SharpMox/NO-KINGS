@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100">
-<circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/>
-<g transform="translate(50 50) scale(1.16) translate(-50 -50)">
-<path d="M 30 23 L 32.4 26 L 30 29 L 27.6 26 Z" fill="#c9a227"/><path d="M 40 17 L 42.4 20 L 40 23 L 37.6 20 Z" fill="#c9a227"/><path d="M 50 15 L 52.4 18 L 50 21 L 47.6 18 Z" fill="#c9a227"/><path d="M 60 17 L 62.4 20 L 60 23 L 57.6 20 Z" fill="#c9a227"/><path d="M 70 23 L 72.4 26 L 70 29 L 67.6 26 Z" fill="#c9a227"/><path d="M 40 80 L 42 60 Q 34 54 38 44 Q 44 34 56 34 L 54 28 L 62 34 Q 70 40 68 52 L 64 80 Z" fill="#2a2118"/><path d="M 50 34 Q 44 22 34 20 Q 40 30 46 34 Z" fill="#c9a227"/><path d="M 56 32 Q 56 20 48 14 Q 52 24 52 32 Z" fill="#c9a227"/><circle cx="55" cy="42" r="2.5" fill="#c9a227"/>
-</g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/><g transform="translate(-8 -8)scale(1.16)"><path fill="#c9a227" d="m30 23 2.4 3-2.4 3-2.4-3ZM40 17l2.4 3-2.4 3-2.4-3ZM50 15l2.4 3-2.4 3-2.4-3ZM60 17l2.4 3-2.4 3-2.4-3ZM70 23l2.4 3-2.4 3-2.4-3Z"/><path fill="#2a2118" d="m40 80 2-20q-8-6-4-16 6-10 18-10l-2-6 8 6q8 6 6 18l-4 28Z"/><path fill="#c9a227" d="M50 34q-6-12-16-14 6 10 12 14ZM56 32q0-12-8-18 4 10 4 18Z"/><circle cx="55" cy="42" r="2.5" fill="#c9a227"/></g></svg>

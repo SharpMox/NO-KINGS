@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100">
-<circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/>
-<g transform="translate(50 50) scale(1.16) translate(-50 -50)">
-<line x1="50" y1="84" x2="50" y2="46" stroke="#2a2118" stroke-width="5" stroke-linecap="round"/><path d="M 42 46 Q 50 38 58 46" fill="none" stroke="#2a2118" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="32" r="9" fill="#c9a227" stroke="#2a2118" stroke-width="3"/><line x1="50" y1="14" x2="50" y2="20" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/><line x1="34" y1="24" x2="39" y2="27" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/><line x1="66" y1="24" x2="61" y2="27" stroke="#c9a227" stroke-width="3" stroke-linecap="round"/>
-</g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/><g transform="translate(-8 -8)scale(1.16)"><path stroke="#2a2118" stroke-linecap="round" stroke-width="5" d="M50 84V46"/><path fill="none" stroke="#2a2118" stroke-linecap="round" stroke-width="4" d="M42 46q8-8 16 0"/><circle cx="50" cy="32" r="9" fill="#c9a227" stroke="#2a2118" stroke-width="3"/><path stroke="#c9a227" stroke-linecap="round" stroke-width="3" d="M50 14v6M34 24l5 3M66 24l-5 3"/></g></svg>

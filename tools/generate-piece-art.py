@@ -1,7 +1,8 @@
 # Generates the 25 piece illustrations as SVG (Godot imports SVG natively via
 # ThorVG). Each piece = shared token frame (ivory disc + dark ring) + a
 # hand-designed vector emblem. Chains share a motif that gains ornament per
-# rank. Rerun after edits:  python3 tools/generate-piece-art.py
+# rank. Rerun after edits, then minify:
+#   python3 tools/generate-piece-art.py && npx --yes svgo --folder game/assets/pieces --quiet
 # ponytail: vector programmer-art — drop painted PNGs with the same basenames
 # into game/assets/pieces/ anytime to override (loader prefers png at parity).
 from pathlib import Path
@@ -212,6 +213,25 @@ EMBLEMS = {
         f'<path d="M 30 66 L 70 66 L 73 76 L 27 76 Z" fill="{INK}"/>'
         f'<circle cx="50" cy="71" r="3" fill="{GOLD}"/>'
     ),
+    # ---- Fusion-only pieces ----
+    "squirrel": (  # Faerie: winged sprite
+        f'<path d="M 50 34 L 62 52 L 50 72 L 38 52 Z" fill="{INK}"/>'
+        f'<circle cx="50" cy="30" r="7" fill="{INK}"/>'
+        f'<path d="M 38 46 Q 20 34 16 20 Q 34 28 42 40 Z" fill="{GOLD}"/>'
+        f'<path d="M 62 46 Q 80 34 84 20 Q 66 28 58 40 Z" fill="{GOLD}"/>'
+        f'<circle cx="50" cy="52" r="3" fill="{GOLD}"/>'
+    ),
+    "crown-princess": (  # coronet over a flowing veil
+        f'<path d="M 36 34 L 34 20 L 43 28 L 50 16 L 57 28 L 66 20 L 64 34 Z" fill="{GOLD}"/>'
+        f'<circle cx="50" cy="44" r="8" fill="{INK}"/>'
+        f'<path d="M 40 52 Q 50 48 60 52 L 68 80 L 32 80 Z" fill="{INK}"/>'
+        f'<line x1="50" y1="56" x2="50" y2="76" stroke="{IVORY}" stroke-width="2.5"/>'
+    ),
+    "amazon": (  # Queen + Knight: horse head wearing the coronet
+        f'<path d="M 38 78 L 40 54 Q 31 50 33 40 Q 37 27 52 25 L 50 19 L 58 25 Q 69 31 69 46 L 65 78 Z" fill="{INK}"/>'
+        f'<circle cx="52" cy="34" r="2.6" fill="{IVORY}"/>'
+        f'<path d="M 40 24 L 38 12 L 46 19 L 52 10 L 56 20 L 64 14 L 61 24 Q 50 18 40 24 Z" fill="{GOLD}"/>'
+    ),
     # ---- The enemy King: oversized jagged crown, red gem ----
     "king": (
         f'<path d="M 26 64 L 22 30 L 36 44 L 44 24 L 50 42 L 56 24 L 64 44 L 78 30 L 74 64 Z" fill="{INK}"/>'
@@ -227,7 +247,7 @@ def main() -> None:
     for pid, body in EMBLEMS.items():
         (OUT / f"{pid}.svg").write_text(svg(body) + "\n")
     print(f"wrote {len(EMBLEMS)} SVGs to {OUT}")
-    assert len(EMBLEMS) == 25, f"expected 25, got {len(EMBLEMS)}"
+    assert len(EMBLEMS) == 28, f"expected 28, got {len(EMBLEMS)}"
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@
 ## the rest are MVP placeholders to adjust after playtests.
 
 const BOARD_W := 6                 # GDD Board
-const BOARD_H := 8                 # GDD Board
+const BOARD_H := 11                # GDD said 8; +3 rows playtest 2026-07-02
 const PLAYER_ZONE_ROWS := 2        # GDD Board — bottom rows, placement zone
-const SPAWN_ROW := 7               # top row; waves spill to next turn if full
+const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 
 const MOVES_PER_TURN := 2          # grilled 2026-07-02 (GDD leaves TBD)
 const PLACEMENTS_PER_TURN := 1     # grilled 2026-07-02

@@ -8,14 +8,18 @@ const Waves := preload("res://data/waves.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
-const TILE := 72
-const BOARD_PX := Vector2(24, 120) # top-left of the board on screen
 const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 const COL_MOVE := Color(0.2, 0.6, 0.3, 0.55)
+const COL_CAPTURE := Color(0.85, 0.15, 0.15)
 const COL_SELECT := Color(0.95, 0.85, 0.2, 0.6)
+const ANIM_TIME := 0.12 # seconds per move slide / capture pop
+
+# board layout, computed from the viewport in _ready so any BOARD_W/H fits
+var tile := 72
+var board_px := Vector2(24, 120)
 
 var defs: Dictionary
 var textures := {} # id -> Texture2D; missing ids fall back to glyph text
@@ -36,7 +40,8 @@ var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
-var merge_sel: Array[int] = [] # indices into the combined pool
+var merge_sel: Array = [] # int = combined-pool index, Vector2i = board tile
+var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var rng := RandomNumberGenerator.new()
 
 var autoplay := false
@@ -65,6 +70,9 @@ func _ready() -> void:
 			_screenshot_and_quit(screenshot_dir)
 	if args.has("--clock"): # debug: short clock to reach the end screen fast
 		clock_ms = float(args[args.find("--clock") + 1]) * 1000.0
+	var vp := get_viewport_rect().size
+	tile = int(minf((vp.x - 48.0) / Tuning.BOARD_W, (vp.y - 224.0) / Tuning.BOARD_H))
+	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
 	defs = Rules.load_pieces()
 	for id in defs:
 		var path := "res://assets/pieces/%s.png" % id
@@ -107,6 +115,8 @@ func _build_hud() -> void:
 		merge_mode = on
 		merge_sel.clear()
 		placing_index = -1
+		selected = Vector2i(-1, -1)
+		legal_dests.clear()
 		_refresh())
 	hud.add_child(merge_button)
 
@@ -186,8 +196,8 @@ func _rebuild_pool_strip() -> void:
 func _merge_ids() -> Array:
 	var pool := _pool()
 	var ids := []
-	for i in merge_sel:
-		ids.append(pool[i])
+	for ref in merge_sel:
+		ids.append(board[ref].id if ref is Vector2i else pool[ref])
 	return ids
 
 
@@ -213,11 +223,24 @@ func _on_confirm_merge() -> void:
 	var result := Rules.merge_result(_merge_ids(), defs)
 	if result == "":
 		return
-	merge_sel.sort()
-	merge_sel.reverse()
-	for i in merge_sel:
+	# if any source stood on the board, the result appears on the LAST-selected
+	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
+	var result_tile := Vector2i(-1, -1)
+	var pool_refs: Array[int] = []
+	for ref in merge_sel:
+		if ref is Vector2i:
+			result_tile = ref # later selections win
+			board.erase(ref)
+		else:
+			pool_refs.append(ref)
+	pool_refs.sort()
+	pool_refs.reverse() # remove high indices first so the rest stay valid
+	for i in pool_refs:
 		_pool_take(i)
-	stock.append(result)
+	if result_tile.x >= 0:
+		board[result_tile] = {"id": result, "owner": Rules.PLAYER}
+	else:
+		stock.append(result)
 	merge_sel.clear()
 	_refresh()
 
@@ -247,6 +270,11 @@ func _process(delta: float) -> void:
 		clock_label.text = _clock_text()
 		if autoplay:
 			_autoplay_step()
+	if not anims.is_empty():
+		for a in anims:
+			a.t += delta / ANIM_TIME
+		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
+		queue_redraw()
 
 
 # --- turn flow ---
@@ -287,11 +315,26 @@ func _run_enemy_actions() -> void:
 			return
 		if not autoplay:
 			await get_tree().create_timer(0.35).timeout
+		if board.has(act.to):
+			_add_pop(act.to)
+		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
 		board.erase(act.from)
 		queue_redraw()
 		if _back_row_breached():
 			return _game_over(false, "Back-row breach")
+
+
+func _add_slide(from: Vector2i, to: Vector2i) -> void:
+	if autoplay:
+		return
+	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0})
+
+
+func _add_pop(at: Vector2i) -> void:
+	if autoplay:
+		return
+	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0})
 
 
 ## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;
@@ -444,15 +487,23 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _tile_at(screen: Vector2) -> Vector2i:
-	var local := screen - BOARD_PX
+	var local := screen - board_px
 	if local.x < 0 or local.y < 0:
 		return Vector2i(-1, -1)
-	var x := int(local.x / TILE)
-	var y := Tuning.BOARD_H - 1 - int(local.y / TILE)
+	var x := int(local.x / tile)
+	var y := Tuning.BOARD_H - 1 - int(local.y / tile)
 	return Vector2i(x, y) if Rules.in_bounds(Vector2i(x, y)) else Vector2i(-1, -1)
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:
+	if merge_mode: # board clicks select merge sources, nothing else
+		if board.has(tile) and board[tile].owner == Rules.PLAYER:
+			if merge_sel.has(tile):
+				merge_sel.erase(tile)
+			elif merge_sel.size() < 3:
+				merge_sel.append(tile)
+			_refresh()
+		return
 	if placing_index >= 0:
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
 		if ok and not board.has(tile):
@@ -490,6 +541,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		if victim.id == "king":
 			return _win()
 		captured.append(victim.id)
+		_add_pop(to)
+	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
 	moves_left -= 1
@@ -580,19 +633,32 @@ func _draw() -> void:
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:
 			var pos := Vector2i(x, y)
-			var rect := Rect2(_tile_px(pos), Vector2(TILE, TILE))
+			var rect := Rect2(_tile_px(pos), Vector2(tile, tile))
 			draw_rect(rect, COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
 			if y < Tuning.PLAYER_ZONE_ROWS and state == State.SETUP and not board.has(pos):
 				draw_rect(rect, Color(0.2, 0.5, 0.9, 0.25))
 	if selected.x >= 0:
-		draw_rect(Rect2(_tile_px(selected), Vector2(TILE, TILE)), COL_SELECT)
+		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)), COL_SELECT)
+	for ref in merge_sel: # board pieces picked as merge sources
+		if ref is Vector2i:
+			draw_rect(Rect2(_tile_px(ref), Vector2(tile, tile)), COL_SELECT)
 	for d in legal_dests:
-		draw_circle(_tile_px(d) + Vector2(TILE, TILE) / 2, 10, COL_MOVE)
+		if board.has(d): # capturable target: red tile tint + ring around the piece
+			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE, 0.3))
+			draw_arc(_tile_px(d) + Vector2(tile, tile) / 2, tile * 0.44, 0, TAU, 32, COL_CAPTURE, 3.0)
+		else:
+			draw_circle(_tile_px(d) + Vector2(tile, tile) / 2, 10, COL_MOVE)
 	if placing_index >= 0:
 		var tiles := _setup_open_tiles() if state == State.SETUP else Rules.placement_tiles(board)
 		for t in tiles:
-			draw_circle(_tile_px(t) + Vector2(TILE, TILE) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
+			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
+	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
+	for a in anims:
+		if a.kind == "move":
+			sliding[a.to] = a
 	for pos in board:
+		if sliding.has(pos):
+			continue
 		var p: Dictionary = board[pos]
 		var px := _tile_px(pos)
 		var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
@@ -600,17 +666,28 @@ func _draw() -> void:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
-		if textures.has(p.id):
-			draw_texture_rect(textures[p.id], Rect2(px + Vector2(4, 4), Vector2(TILE - 8, TILE - 8)), false, tint)
-		else: # ponytail: glyph fallback so a missing PNG never breaks the board
-			var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
-			var glyph: String = defs[p.id].glyph
-			var size := 40 if glyph.length() <= 1 else 22
-			draw_string(font, px + Vector2(0, TILE * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, TILE, size, col)
+		_draw_piece(font, p, px, tint)
+	for a in anims:
+		if a.kind == "move" and board.has(a.to):
+			var mp: Dictionary = board[a.to]
+			var mtint := Color(0.72, 0.85, 1.25) if mp.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
+			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), mtint)
+		elif a.kind == "pop":
+			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(textures[board[drag_from].id],
-			Rect2(get_global_mouse_position() - Vector2(TILE, TILE) * 0.5, Vector2(TILE, TILE)), false, Color(1, 1, 1, 0.85))
+			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
+
+
+func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color) -> void:
+	if textures.has(p.id):
+		draw_texture_rect(textures[p.id], Rect2(px + Vector2(4, 4), Vector2(tile - 8, tile - 8)), false, tint)
+	else: # ponytail: glyph fallback so a missing PNG never breaks the board
+		var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
+		var glyph: String = defs[p.id].glyph
+		var size := 40 if glyph.length() <= 1 else 22
+		draw_string(font, px + Vector2(0, tile * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, tile, size, col)
 
 
 func _tile_px(pos: Vector2i) -> Vector2:
-	return BOARD_PX + Vector2(pos.x * TILE, (Tuning.BOARD_H - 1 - pos.y) * TILE)
+	return board_px + Vector2(pos.x * tile, (Tuning.BOARD_H - 1 - pos.y) * tile)

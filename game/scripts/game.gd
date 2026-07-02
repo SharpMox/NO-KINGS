@@ -327,7 +327,7 @@ func _clock_text() -> String:
 
 func _refresh() -> void:
 	clock_label.text = _clock_text()
-	score_label.text = "★ %d" % score
+	score_label.text = "Score %d" % score
 	wave_label.text = "wave %d/%d" % [wave, Waves.WAVES.size()]
 	match state:
 		State.SETUP:

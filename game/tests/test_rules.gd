@@ -93,17 +93,19 @@ func _init() -> void:
 	check(not tiles.has(Vector2i(0, 4)), "tile adjacent only to enemy not placeable")
 
 	# --- check / checkmate ---
-	# Enemy king cornered at (5,7); player queen on (4,6) covers everything, rook guards row 7.
+	var top := Rules.Tuning.BOARD_H - 1
+	# Enemy king in the top corner; player queen one diagonal below covers
+	# everything, rook guards the top row.
 	b = {
-		Vector2i(5, 7): piece("king", Rules.ENEMY),
-		Vector2i(4, 6): piece("queen", Rules.PLAYER),
-		Vector2i(3, 6): piece("rook", Rules.PLAYER),
+		Vector2i(5, top): piece("king", Rules.ENEMY),
+		Vector2i(4, top - 1): piece("queen", Rules.PLAYER),
+		Vector2i(3, top - 1): piece("rook", Rules.PLAYER),
 	}
 	check(Rules.is_checkmate(b, Rules.ENEMY, defs), "back-corner queen mate detected")
 	# Same but queen unprotected and adjacent: king can capture it -> not mate.
 	b = {
-		Vector2i(5, 7): piece("king", Rules.ENEMY),
-		Vector2i(4, 6): piece("queen", Rules.PLAYER),
+		Vector2i(5, top): piece("king", Rules.ENEMY),
+		Vector2i(4, top - 1): piece("queen", Rules.PLAYER),
 	}
 	check(not Rules.is_checkmate(b, Rules.ENEMY, defs), "king can take unprotected queen: not mate")
 	check(Rules.legal_moves(b, Rules.ENEMY, defs).size() == 1, "check leaves exactly the capture")

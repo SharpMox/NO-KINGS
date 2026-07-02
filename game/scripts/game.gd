@@ -29,13 +29,24 @@ var tile := 72
 var board_px := Vector2(24, 120)
 
 var defs: Dictionary
+var fusions: Dictionary # unordered pair "a+b" -> result id
 var textures := {} # id -> Texture2D; missing ids fall back to glyph text
 var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
 var turns_since_wave := 0
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
-var score := 0
+var score := 0:
+	set(value): # every gain/loss anywhere pops floating feedback (round 4)
+		if value != score and is_node_ready() and not autoplay:
+			var d := value - score
+			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
+				"text": ("+%d" if d > 0 else "%d") % d,
+				"at_px": score_label.get_global_rect().end + Vector2(6, 0),
+				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
+			queue_redraw()
+		score = value
+var merges_left := 0
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
@@ -45,9 +56,15 @@ var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
+var press_tile := Vector2i(-1, -1) # candidate long-press (piece preview)
+var press_ms := 0
+var pool_press_id := "" # candidate long-press on a pool button
+var pool_press_ms := 0
+var preview_open := false
 var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
 var merge_sel: Array = [] # int = combined-pool index, Vector2i = board tile
+var merge_highlights := {} # ids that can merge right now (merge-mode UX)
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
 var trinkets: Array = [] # run-long passive effects
@@ -85,6 +102,7 @@ var confirm_button := Button.new()
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var box_panel := PanelContainer.new() # box-pick modal
+var preview_panel := PanelContainer.new() # long-press piece preview
 var overlay := PanelContainer.new()
 
 
@@ -103,6 +121,7 @@ func _ready() -> void:
 	tile = int(minf((vp.x - 48.0) / Tuning.BOARD_W, (vp.y - 224.0) / Tuning.BOARD_H))
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
 	defs = Rules.load_pieces()
+	fusions = Rules.load_fusions()
 	for id in defs:
 		# png wins if present (drop painted art in anytime); svg is the
 		# generated vector set (tools/generate-piece-art.py)
@@ -115,6 +134,7 @@ func _ready() -> void:
 	_build_hud()
 	if args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
+	merges_left = Tuning.MERGES_PER_TURN
 	if next_config.is_empty():
 		stock = Tuning.STARTING_STOCK.duplicate()
 	else:
@@ -166,6 +186,9 @@ func _build_hud() -> void:
 	add_child(hud)
 	for l: Label in [clock_label, score_label, wave_label, turn_label]:
 		l.add_theme_font_size_override("font_size", 20)
+	turn_label.add_theme_font_size_override("font_size", 17) # 4 counters + wave fit
+	score_label.add_theme_font_size_override("font_size", 24) # score front & center
+	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	var top := HBoxContainer.new()
 	top.position = Vector2(24, 12)
 	top.custom_minimum_size = Vector2(432, 0)
@@ -230,6 +253,13 @@ func _build_hud() -> void:
 	box_panel.add_theme_stylebox_override("panel", box_bg)
 	hud.add_child(box_panel)
 
+	preview_panel.visible = false
+	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var pv_bg := StyleBoxFlat.new()
+	pv_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
+	preview_panel.add_theme_stylebox_override("panel", pv_bg)
+	hud.add_child(preview_panel)
+
 	overlay.visible = false
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var dim := StyleBoxFlat.new()
@@ -263,11 +293,12 @@ func _refresh() -> void:
 		State.PLAYER_TURN:
 			var next_in := _cadence() - turns_since_wave
 			var wave_txt := "King wave!" if _king_alive() else ("wave in %d" % maxi(next_in, 0)) if wave < Waves.WAVES.size() else "no more waves"
-			turn_label.text = "moves %d · place %d · %s" % [moves_left, placements_left, wave_txt]
+			turn_label.text = "moves %d · place %d · merge %d · %s" % [moves_left, placements_left, merges_left, wave_txt]
 		State.ENEMY_TURN:
 			turn_label.text = "enemy turn…"
 		State.GAME_OVER:
 			turn_label.text = ""
+	merge_highlights = _merge_highlight_ids() if merge_mode else {}
 	var names := []
 	for t in tariffs_active:
 		names.append(t.name.trim_prefix("Tariff on "))
@@ -275,7 +306,8 @@ func _refresh() -> void:
 			+ (" (suppressed)" if counter_intel_turns > 0 else "")
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
-	confirm_button.visible = merge_mode and Rules.merge_result(_merge_ids(), defs) != ""
+	confirm_button.visible = merge_mode and merges_left > 0 \
+			and Rules.merge_result(_merge_ids(), defs, fusions) != ""
 	queue_redraw()
 
 
@@ -299,17 +331,58 @@ func _rebuild_pool_strip() -> void:
 	for i in pool.size():
 		var btn := Button.new()
 		var from_captured: bool = i >= stock.size()
-		btn.text = ("[%s]" if from_captured else "%s") % defs[pool[i]].glyph
-		btn.tooltip_text = defs[pool[i]].name + (" (captured)" if from_captured else "")
-		btn.add_theme_font_size_override("font_size", 22)
+		var id: String = pool[i]
+		if textures.has(id): # piece icon instead of glyph text (round 3)
+			btn.icon = textures[id]
+			btn.expand_icon = true
+			btn.custom_minimum_size = Vector2(46, 46)
+		else:
+			btn.text = defs[id].glyph
+			btn.add_theme_font_size_override("font_size", 22)
+		btn.tooltip_text = defs[id].name + (" (captured)" if from_captured else "")
 		if merge_mode and merge_sel.has(i):
-			btn.modulate = Color(1.2, 1.1, 0.4)
+			btn.modulate = Color(1.3, 1.15, 0.4)
+		elif merge_mode: # mergeable pieces pop; the rest dim
+			btn.modulate = Color(1.2, 1.05, 0.55) if merge_highlights.has(id) else Color(0.5, 0.5, 0.5)
 		elif placing_index == i:
 			btn.modulate = Color(0.6, 1.2, 0.6)
-		elif not from_captured and pool[i] == sanctioned_id and _tariff_on("sanctions"):
+		elif not from_captured and id == sanctioned_id and _tariff_on("sanctions"):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
+		elif from_captured:
+			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
 		btn.pressed.connect(_on_pool_pressed.bind(i))
+		btn.button_down.connect(func() -> void:
+			pool_press_id = id
+			pool_press_ms = Time.get_ticks_msec())
+		btn.button_up.connect(func() -> void: pool_press_id = "")
 		pool_box.add_child(btn)
+
+
+## Ids that can participate in a merge right now: with nothing selected, any id
+## with a valid partner among the player's pieces (pool + board); with one
+## selected, only ids completing a merge with it.
+func _merge_highlight_ids() -> Dictionary:
+	var all: Array = _pool()
+	for pos in _player_pieces():
+		all.append(board[pos].id)
+	var out := {}
+	if merge_sel.size() == 1:
+		var sel: String = _merge_ids()[0]
+		var counts := {}
+		for id in all:
+			counts[id] = counts.get(id, 0) + 1
+		for id in all:
+			if id == sel and counts[id] < 2:
+				continue # a self-pair needs a second copy
+			if Rules.merge_result([sel, id], defs, fusions) != "":
+				out[id] = true
+	elif merge_sel.is_empty():
+		for i in all.size():
+			for j in range(i + 1, all.size()):
+				if Rules.merge_result([all[i], all[j]], defs, fusions) != "":
+					out[all[i]] = true
+					out[all[j]] = true
+	return out
 
 
 func _merge_ids() -> Array:
@@ -321,12 +394,12 @@ func _merge_ids() -> Array:
 
 
 func _on_pool_pressed(index: int) -> void:
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or preview_open:
 		return
 	if merge_mode:
 		if merge_sel.has(index):
 			merge_sel.erase(index)
-		elif merge_sel.size() < 3:
+		elif merge_sel.size() < 2:
 			merge_sel.append(index)
 	else:
 		# placement: only stock pieces are placeable (captured merge in first)
@@ -341,11 +414,14 @@ func _on_pool_pressed(index: int) -> void:
 
 
 func _on_confirm_merge() -> void:
-	var result := Rules.merge_result(_merge_ids(), defs)
+	if merges_left <= 0:
+		return
+	var result := Rules.merge_result(_merge_ids(), defs, fusions)
 	if result == "":
 		return
 	if _tariff_on("regulation") and _merge_ids().has("pawn"):
 		return # Regulation: pawns can't be merged
+	merges_left -= 1
 	_charge("fuse_cost")
 	# if any source stood on the board, the result appears on the LAST-selected
 	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
@@ -366,6 +442,7 @@ func _on_confirm_merge() -> void:
 	else:
 		stock.append(result)
 	merge_sel.clear()
+	merge_button.button_pressed = false # merge done -> mode off (round 3)
 	_refresh()
 
 
@@ -400,9 +477,21 @@ func _process(delta: float) -> void:
 			_autoplay_step()
 	if not anims.is_empty():
 		for a in anims:
-			a.t += delta / ANIM_TIME
+			a.t += delta / a.get("dur", ANIM_TIME)
 		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
 		queue_redraw()
+	if press_tile.x >= 0 and not preview_open \
+			and Time.get_ticks_msec() - press_ms > 500: # long-press -> preview
+		var id: String = board[press_tile].id if board.has(press_tile) else ""
+		press_tile = Vector2i(-1, -1)
+		drag_from = Vector2i(-1, -1)
+		if id != "":
+			_show_preview(id)
+	if pool_press_id != "" and not preview_open \
+			and Time.get_ticks_msec() - pool_press_ms > 500:
+		var id := pool_press_id
+		pool_press_id = ""
+		_show_preview(id) # the release lands while preview_open and is swallowed
 
 
 # --- turn flow ---
@@ -414,6 +503,7 @@ func _begin_player_turn() -> void:
 		if t.key == "move":
 			moves_left += 1
 	placements_left = Tuning.PLACEMENTS_PER_TURN
+	merges_left = Tuning.MERGES_PER_TURN
 	moved_this_turn.clear()
 	turn_action_count = 0
 	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
@@ -421,7 +511,7 @@ func _begin_player_turn() -> void:
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		_queue_wave(wave + 1)
 	_spawn_pending()
-	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool()):
+	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
 	_refresh()
 
@@ -626,27 +716,39 @@ func _show_overlay(won: bool, reason: String) -> void:
 # --- input ---
 
 func _unhandled_input(event: InputEvent) -> void:
+	if preview_open:
+		return # the preview's Close button handles dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		drag_from = Vector2i(-1, -1)
+		press_tile = Vector2i(-1, -1)
 		return
-	if event is InputEventMouseMotion and drag_from.x >= 0:
-		queue_redraw()
+	if event is InputEventMouseMotion:
+		if press_tile.x >= 0 and event.button_mask & MOUSE_BUTTON_MASK_LEFT \
+				and event.position.distance_to(_tile_px(press_tile) + Vector2(tile, tile) / 2) > tile:
+			press_tile = Vector2i(-1, -1) # dragged away while held: not a long-press
+		if drag_from.x >= 0:
+			queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var tile := _tile_at(event.position)
+		var at := _tile_at(event.position)
 		if event.pressed:
-			if tile.x >= 0:
-				_on_tile_clicked(tile)
+			if at.x >= 0 and board.has(at): # any piece: candidate long-press preview
+				press_tile = at
+				press_ms = Time.get_ticks_msec()
+			if at.x >= 0:
+				_on_tile_clicked(at)
 			# a fresh selection of an own piece also starts a potential drag
-			if selected == tile and tile.x >= 0:
-				drag_from = tile
-		elif drag_from.x >= 0: # release ends a drag
-			var t := _tile_at(event.position)
-			var from := drag_from
-			drag_from = Vector2i(-1, -1)
-			if t != from and legal_dests.has(t):
-				_move_player(from, t)
-			else: # release on origin = plain select; elsewhere = cancel ghost only
-				queue_redraw()
+			if selected == at and at.x >= 0:
+				drag_from = at
+		else:
+			press_tile = Vector2i(-1, -1)
+			if drag_from.x >= 0: # release ends a drag
+				var t := _tile_at(event.position)
+				var from := drag_from
+				drag_from = Vector2i(-1, -1)
+				if t != from and legal_dests.has(t):
+					_move_player(from, t)
+				else: # release on origin = plain select; elsewhere = cancel ghost only
+					queue_redraw()
 
 
 func _tile_at(screen: Vector2) -> Vector2i:
@@ -666,7 +768,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		if board.has(tile) and board[tile].owner == Rules.PLAYER:
 			if merge_sel.has(tile):
 				merge_sel.erase(tile)
-			elif merge_sel.size() < 3:
+			elif merge_sel.size() < 2:
 				merge_sel.append(tile)
 			_refresh()
 		return
@@ -770,6 +872,116 @@ func _capture_score(victim_id: String) -> int:
 func _win() -> void:
 	score += Tuning.WIN_SCORE_BONUS
 	_game_over(true, "Wave-%d King checkmated" % wave)
+
+
+# --- piece preview (long-press a piece anywhere) ---
+
+func _show_preview(id: String) -> void:
+	preview_open = true
+	for c in preview_panel.get_children():
+		c.queue_free()
+	preview_panel.visible = true
+	var center := CenterContainer.new()
+	preview_panel.add_child(center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	center.add_child(box)
+
+	var title := Label.new()
+	title.text = defs[id].name
+	title.add_theme_font_size_override("font_size", 30)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+
+	var dia := Control.new()
+	var cells := 9 # covers the longest leap (Celestial Kirin's 4)
+	var cell := 30
+	dia.custom_minimum_size = Vector2(cells, cells) * cell
+	dia.draw.connect(_draw_preview_diagram.bind(dia, id, cells, cell))
+	box.add_child(dia)
+
+	var legend := Label.new()
+	legend.text = "● move + capture      ○ move only      ✕ capture only"
+	legend.add_theme_font_size_override("font_size", 13)
+	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(legend)
+
+	var chain := _chain_of(id)
+	if chain.size() > 1:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 8)
+		for i in chain.size():
+			if i > 0:
+				var arrow := Label.new()
+				arrow.text = "→"
+				arrow.add_theme_font_size_override("font_size", 22)
+				row.add_child(arrow)
+			var tr := TextureRect.new()
+			tr.texture = textures.get(chain[i])
+			tr.custom_minimum_size = Vector2(48, 48)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			if chain[i] != id:
+				tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
+			row.add_child(tr)
+		box.add_child(row)
+
+	var close := Button.new()
+	close.text = "Close"
+	close.add_theme_font_size_override("font_size", 20)
+	close.pressed.connect(_close_preview)
+	box.add_child(close)
+
+
+func _close_preview() -> void:
+	preview_open = false
+	preview_panel.visible = false
+
+
+## The promotion chain containing `id` (base -> ... -> end), or [id].
+func _chain_of(id: String) -> Array:
+	var prev := {}
+	for pid in defs:
+		if defs[pid].next != null:
+			prev[defs[pid].next] = pid
+	var base := id
+	while prev.has(base):
+		base = prev[base]
+	var chain := [base]
+	while defs[chain[-1]].next != null:
+		chain.append(defs[chain[-1]].next)
+	return chain
+
+
+func _draw_preview_diagram(dia: Control, id: String, cells: int, cell: int) -> void:
+	var c := cells / 2
+	for x in cells:
+		for y in cells:
+			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
+				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
+	if textures.has(id):
+		dia.draw_texture_rect(textures[id],
+			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
+	for m in defs[id].moves:
+		for dir in m.dirs:
+			var reach: int = int(m.get("range", 0)) if m.type == "ride" else 1
+			if reach == 0:
+				reach = cells # unbounded ride: to the diagram edge
+			for s in range(1, reach + 1):
+				var gx: int = c + int(dir[0]) * s
+				var gy: int = c - int(dir[1]) * s # board +y is up; screen is down
+				if gx < 0 or gx >= cells or gy < 0 or gy >= cells:
+					break
+				var pc := Vector2(gx, gy) * cell + Vector2(cell, cell) / 2
+				match m.mode:
+					"both":
+						dia.draw_circle(pc, cell * 0.17, Color(0.22, 0.55, 0.28))
+					"move":
+						dia.draw_arc(pc, cell * 0.17, 0, TAU, 16, Color(0.22, 0.55, 0.28), 2.5)
+					"capture":
+						var d := cell * 0.13
+						dia.draw_line(pc - Vector2(d, d), pc + Vector2(d, d), Color(0.8, 0.2, 0.2), 3.0)
+						dia.draw_line(pc + Vector2(d, -d), pc - Vector2(d, -d), Color(0.8, 0.2, 0.2), 3.0)
 
 
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
@@ -1184,23 +1396,15 @@ func _autoplay_use_item() -> void:
 	_item_apply(it, a, targets[rng.randi() % targets.size()])
 
 
-## Execute one available merge (3-same preferred, else 2-same). Returns true if merged.
+## Execute one available pair merge (promotion or fusion). Returns true if merged.
 func _autoplay_merge() -> bool:
 	var pool := _pool()
-	var counts := {}
 	for i in pool.size():
-		counts[pool[i]] = counts.get(pool[i], []) + [i]
-	for want in [3, 2]:
-		for id in counts:
-			if counts[id].size() < want:
-				continue
-			# a 2-same merge yields 1 of the same piece — only worth it when it
-			# converts a captured (unplaceable) piece into stock
-			if want == 2 and counts[id].slice(0, want).all(func(i: int) -> bool: return i < stock.size()):
-				continue
-			merge_sel.assign(counts[id].slice(0, want))
-			_on_confirm_merge()
-			return true
+		for j in range(i + 1, pool.size()):
+			if Rules.merge_result([pool[i], pool[j]], defs, fusions) != "":
+				merge_sel.assign([i, j])
+				_on_confirm_merge()
+				return true
 	return false
 
 
@@ -1234,6 +1438,12 @@ func _draw() -> void:
 	for ref in merge_sel: # board pieces picked as merge sources
 		if ref is Vector2i:
 			draw_rect(Rect2(_tile_px(ref), Vector2(tile, tile)), COL_SELECT)
+	if merge_mode: # gold ring on board pieces that can merge right now
+		for pos in board:
+			if board[pos].owner == Rules.PLAYER and merge_highlights.has(board[pos].id) \
+					and not merge_sel.has(pos):
+				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
+					Color(0.95, 0.8, 0.2), 3.0)
 	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
 		for t in item_targets:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)
@@ -1273,6 +1483,9 @@ func _draw() -> void:
 			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), mtint)
 		elif a.kind == "pop":
 			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
+		elif a.kind == "text": # score gains/losses float up and fade
+			draw_string(font, a.at_px + Vector2(0, -20.0 * a.t), a.text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(textures[board[drag_from].id],
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))

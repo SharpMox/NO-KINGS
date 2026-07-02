@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100">
-<circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/>
-<g transform="translate(50 50) scale(1.16) translate(-50 -50)">
-<path d="M 36 40 Q 50 30 64 40 L 62 62 Q 50 74 38 62 Z" fill="#2a2118"/><path d="M 36 42 Q 20 38 18 24 Q 32 26 40 36 Z" fill="#2a2118"/><path d="M 64 42 Q 80 38 82 24 Q 68 26 60 36 Z" fill="#2a2118"/><circle cx="44" cy="48" r="2.8" fill="#8b2020"/><circle cx="56" cy="48" r="2.8" fill="#8b2020"/><path d="M 46 64 Q 50 68 54 64 L 54 70 L 46 70 Z" fill="#c9a227"/>
-</g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#eee4cd" stroke="#2a2118" stroke-width="3"/><g transform="translate(-8 -8)scale(1.16)"><path fill="#2a2118" d="M36 40q14-10 28 0l-2 22q-12 12-24 0Z"/><path fill="#2a2118" d="M36 42q-16-4-18-18 14 2 22 12ZM64 42q16-4 18-18-14 2-22 12Z"/><circle cx="44" cy="48" r="2.8" fill="#8b2020"/><circle cx="56" cy="48" r="2.8" fill="#8b2020"/><path fill="#c9a227" d="M46 64q4 4 8 0v6h-8Z"/></g></svg>

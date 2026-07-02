@@ -16,7 +16,7 @@ const ZONE_PAWNS := [["pawn", 0, 1, 0], ["pawn", 0, 4, 0]]
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
-		"board": ZONE_PAWNS, "stock": [base, base, base, mid, mid, mid], "score": 50}}
+		"board": ZONE_PAWNS, "stock": [base, base, mid, mid], "score": 50}}
 
 
 static func all() -> Array:
@@ -33,12 +33,13 @@ static func all() -> Array:
 				["king", 1, 3, 10], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],
 			"wave": 50, "score": 100}},
 		# --- merging ---
-		{"name": "Merge: 2-same (pool)", "cfg": {
+		{"name": "Merge: promotion pair (pool)", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"]}},
-		{"name": "Merge: 3-different (pool)", "cfg": {
-			"board": ZONE_PAWNS, "captured": ["rook", "knight", "pawn", "bishop", "ferz"]}},
+		{"name": "Merge: fusions (bishop+rook, knight+rook, ...)", "cfg": {
+			"board": ZONE_PAWNS, "captured": ["rook", "rook", "bishop", "knight", "kirin"],
+			"stock": ["alibaba", "wazir"]}},
 		{"name": "Merge: on the board", "cfg": {
-			"board": ZONE_PAWNS + [["ferz", 0, 2, 1], ["ferz", 0, 3, 1], ["ferz", 0, 4, 1]]}},
+			"board": ZONE_PAWNS + [["ferz", 0, 2, 1], ["ferz", 0, 3, 1], ["bishop", 0, 4, 1], ["rook", 0, 5, 1]]}},
 		_chain("Pawn chain", "pawn", "sergeant"),
 		_chain("Seer chain", "ferz", "elephant-modern"),
 		_chain("Mage chain", "wazir", "war-machine"),

@@ -22,7 +22,9 @@ func piece(id: String, owner: int) -> Dictionary:
 
 func _init() -> void:
 	var defs := Rules.load_pieces()
-	check(defs.size() == 25, "25 piece defs load")
+	check(defs.size() == 28, "28 piece defs load")
+	var fus := Rules.load_fusions()
+	check(fus.size() >= 20, "fusion table loads")
 
 	# --- move-gen: pawn asymmetry + enemy mirroring ---
 	var b := {Vector2i(2, 2): piece("pawn", Rules.PLAYER)}
@@ -70,19 +72,25 @@ func _init() -> void:
 	check(Rules.moves_for(b, Vector2i(3, 3), defs).has(Vector2i(4, 4)),
 		"archer captures diagonally (capture-only squares)")
 
-	# --- merges ---
-	check(Rules.merge_result(["ferz", "ferz"], defs) == "ferz", "2 same -> 1 of same")
-	check(Rules.merge_result(["ferz", "ferz", "ferz"], defs) == "elephant-modern",
-		"3 same -> next chain stage")
-	check(Rules.merge_result(["queen", "queen", "queen"], defs) == "queen",
-		"3 same at chain end -> same piece")
-	check(Rules.merge_result(["rook", "knight", "pawn"], defs) == "pawn",
-		"3 different -> lowest value")
-	check(Rules.merge_result(["rook", "rook", "pawn"], defs) == "", "2+1 is not a valid merge")
-	check(Rules.merge_result(["rook", "knight"], defs) == "", "2 different is not a valid merge")
-	check(Rules.has_merge(["pawn", "pawn"]), "has_merge: pair")
-	check(Rules.has_merge(["pawn", "rook", "ferz"]), "has_merge: 3 distinct")
-	check(not Rules.has_merge(["pawn", "rook"]), "has_merge: 2 distinct is dead")
+	# --- merges: pairs only (round 3) ---
+	check(Rules.merge_result(["ferz", "ferz"], defs, fus) == "elephant-modern",
+		"2 same -> next chain stage")
+	check(Rules.merge_result(["queen", "queen"], defs, fus) == "",
+		"chain-end pair does not merge")
+	check(Rules.merge_result(["bishop", "rook"], defs, fus) == "queen",
+		"fusion pair -> fusion result")
+	check(Rules.merge_result(["rook", "bishop"], defs, fus) == "queen",
+		"fusion is order-agnostic")
+	check(Rules.merge_result(["knight", "alibaba"], defs, fus) == "squirrel",
+		"fusion can produce fusion-only pieces")
+	check(Rules.merge_result(["pawn", "rook"], defs, fus) == "",
+		"non-fusion pair does not merge")
+	check(Rules.merge_result(["pawn", "pawn", "pawn"], defs, fus) == "",
+		"3-piece selections are invalid")
+	check(Rules.has_merge(["pawn", "pawn"], defs, fus), "has_merge: promotion pair")
+	check(Rules.has_merge(["bishop", "rook"], defs, fus), "has_merge: fusion pair")
+	check(not Rules.has_merge(["pawn", "rook"], defs, fus), "has_merge: dead pair")
+	check(not Rules.has_merge(["queen", "queen"], defs, fus), "has_merge: chain end is dead")
 
 	# --- placement tiles ---
 	b = {Vector2i(3, 3): piece("rook", Rules.PLAYER), Vector2i(0, 5): piece("rook", Rules.ENEMY)}
@@ -94,18 +102,19 @@ func _init() -> void:
 
 	# --- check / checkmate ---
 	var top := Rules.Tuning.BOARD_H - 1
-	# Enemy king in the top corner; player queen one diagonal below covers
+	var right := Rules.Tuning.BOARD_W - 1
+	# Enemy king in the top-right corner; player queen one diagonal below covers
 	# everything, rook guards the top row.
 	b = {
-		Vector2i(5, top): piece("king", Rules.ENEMY),
-		Vector2i(4, top - 1): piece("queen", Rules.PLAYER),
-		Vector2i(3, top - 1): piece("rook", Rules.PLAYER),
+		Vector2i(right, top): piece("king", Rules.ENEMY),
+		Vector2i(right - 1, top - 1): piece("queen", Rules.PLAYER),
+		Vector2i(right - 2, top - 1): piece("rook", Rules.PLAYER),
 	}
 	check(Rules.is_checkmate(b, Rules.ENEMY, defs), "back-corner queen mate detected")
 	# Same but queen unprotected and adjacent: king can capture it -> not mate.
 	b = {
-		Vector2i(5, top): piece("king", Rules.ENEMY),
-		Vector2i(4, top - 1): piece("queen", Rules.PLAYER),
+		Vector2i(right, top): piece("king", Rules.ENEMY),
+		Vector2i(right - 1, top - 1): piece("queen", Rules.PLAYER),
 	}
 	check(not Rules.is_checkmate(b, Rules.ENEMY, defs), "king can take unprotected queen: not mate")
 	check(Rules.legal_moves(b, Rules.ENEMY, defs).size() == 1, "check leaves exactly the capture")

@@ -101,6 +101,17 @@ func _init() -> void:
 	await process_frame
 	check(not game.preview_open, "Close dismisses the preview")
 
+	# in-game menu: opens, pauses the clock, Resume returns
+	check(await _click_button_in(game.hud, "☰"), "menu button clickable")
+	await process_frame
+	check(game.game_menu_open, "menu opens")
+	var frozen: float = game.clock_ms
+	await create_timer(0.4).timeout
+	check(game.clock_ms == frozen, "clock pauses while the menu is open")
+	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable")
+	await process_frame
+	check(not game.game_menu_open, "Resume closes the menu")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

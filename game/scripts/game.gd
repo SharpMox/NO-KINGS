@@ -7,8 +7,13 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
 const Tariffs := preload("res://data/tariffs.gd")
+const Scenarios := preload("res://data/scenarios.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
+
+## Boot config for the next Game scene (menu sets it; Restart replays it).
+## Shape documented in data/scenarios.gd — this is the future save format.
+static var next_config := {}
 
 const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
@@ -64,6 +69,7 @@ var rng := RandomNumberGenerator.new()
 
 var autoplay := false
 var autoplay_turns := 0
+var autoplay_cap := 2000 # --steps N overrides, for short scenario sweeps
 var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
@@ -91,6 +97,8 @@ func _ready() -> void:
 			_screenshot_and_quit(screenshot_dir)
 	if args.has("--clock"): # debug: short clock to reach the end screen fast
 		clock_ms = float(args[args.find("--clock") + 1]) * 1000.0
+	if args.has("--steps"): # debug: shorter autoplay cap for scenario sweeps
+		autoplay_cap = int(args[args.find("--steps") + 1])
 	var vp := get_viewport_rect().size
 	tile = int(minf((vp.x - 48.0) / Tuning.BOARD_W, (vp.y - 224.0) / Tuning.BOARD_H))
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
@@ -103,10 +111,55 @@ func _ready() -> void:
 			if ResourceLoader.exists(path):
 				textures[id] = load(path)
 				break
-	stock = Tuning.STARTING_STOCK.duplicate()
 	rng.randomize()
 	_build_hud()
+	if args.has("--scenario"): # headless/CLI scenario boot, by index
+		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
+	if next_config.is_empty():
+		stock = Tuning.STARTING_STOCK.duplicate()
+	else:
+		_apply_config(next_config)
+	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
+		await get_tree().process_frame
+		await get_tree().process_frame
+		print("SCENARIO OK")
+		get_tree().quit()
 	_refresh()
+
+
+## Start the game from a config Dictionary instead of the normal SETUP flow.
+## Every field of run state is settable — the same mechanism a saved game
+## will restore from.
+func _apply_config(cfg: Dictionary) -> void:
+	stock = cfg.get("stock", []).duplicate()
+	captured = cfg.get("captured", []).duplicate()
+	score = cfg.get("score", 0)
+	clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
+	# default: all designed waves done, so nothing spawns into the sandbox
+	wave = cfg.get("wave", Waves.WAVES.size())
+	turns_since_wave = cfg.get("turns_since_wave", 0)
+	for p in cfg.get("board", []):
+		var piece := {"id": p[0], "owner": int(p[1])}
+		if p.size() > 4 and p[4] == "buff":
+			piece.buff = true
+		board[Vector2i(int(p[2]), int(p[3]))] = piece
+	for key in cfg.get("items", []):
+		for it in Items.ITEMS:
+			if it.key == key:
+				items.append(it)
+	for key in cfg.get("trinkets", []):
+		for t in Items.TRINKET_EFFECTS:
+			if t.key == key:
+				trinkets.append(t)
+	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
+		_activate_tariff_by_key(key)
+	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
+		sanctioned_id = cfg.sanctioned_id
+	# ponytail: not yet in the config shape — mid-turn state (moves/placements
+	# left, moved_this_turn) and item counters (free_placements, ceasefire,
+	# skip_enemy_turns, counter_intel_turns, recent_place_costs). Add when the
+	# save system lands; scenario boots always start at a fresh turn.
+	_begin_player_turn()
 
 
 func _build_hud() -> void:
@@ -164,8 +217,11 @@ func _build_hud() -> void:
 	scroll.add_child(pool_box)
 	hud.add_child(scroll)
 
-	item_box.position = Vector2(200, 752)
-	hud.add_child(item_box)
+	var item_scroll := ScrollContainer.new()
+	item_scroll.position = Vector2(210, 748)
+	item_scroll.custom_minimum_size = Vector2(246, 50)
+	item_scroll.add_child(item_box)
+	hud.add_child(item_scroll)
 
 	box_panel.visible = false
 	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -1077,9 +1133,9 @@ func _box_close() -> void:
 
 func _autoplay_step() -> void:
 	autoplay_turns += 1
-	if autoplay_turns > 2000:
+	if autoplay_turns > autoplay_cap:
 		# not a failure: the bot surviving this long just means no crash surfaced
-		print("AUTOPLAY CAP: alive after 2000 steps (wave %d, score %d)" % [wave, score])
+		print("AUTOPLAY CAP: alive after %d steps (wave %d, score %d)" % [autoplay_cap, wave, score])
 		get_tree().quit(0)
 		return
 	# One random legal action per frame, then pass when spent.

@@ -7,8 +7,13 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
 const Tariffs := preload("res://data/tariffs.gd")
+const Scenarios := preload("res://data/scenarios.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
+
+## Boot config for the next Game scene (menu sets it; Restart replays it).
+## Shape documented in data/scenarios.gd — this is the future save format.
+static var next_config := {}
 
 const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
@@ -103,10 +108,48 @@ func _ready() -> void:
 			if ResourceLoader.exists(path):
 				textures[id] = load(path)
 				break
-	stock = Tuning.STARTING_STOCK.duplicate()
 	rng.randomize()
 	_build_hud()
+	if args.has("--scenario"): # headless/CLI scenario boot, by index
+		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
+	if next_config.is_empty():
+		stock = Tuning.STARTING_STOCK.duplicate()
+	else:
+		_apply_config(next_config)
+	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
+		await get_tree().process_frame
+		await get_tree().process_frame
+		print("SCENARIO OK")
+		get_tree().quit()
 	_refresh()
+
+
+## Start the game from a config Dictionary instead of the normal SETUP flow.
+## Every field of run state is settable — the same mechanism a saved game
+## will restore from.
+func _apply_config(cfg: Dictionary) -> void:
+	stock = cfg.get("stock", []).duplicate()
+	captured = cfg.get("captured", []).duplicate()
+	score = cfg.get("score", 0)
+	clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
+	# default: all designed waves done, so nothing spawns into the sandbox
+	wave = cfg.get("wave", Waves.WAVES.size())
+	for p in cfg.get("board", []):
+		var piece := {"id": p[0], "owner": int(p[1])}
+		if p.size() > 4 and p[4] == "buff":
+			piece.buff = true
+		board[Vector2i(int(p[2]), int(p[3]))] = piece
+	for key in cfg.get("items", []):
+		for it in Items.ITEMS:
+			if it.key == key:
+				items.append(it)
+	for key in cfg.get("trinkets", []):
+		for t in Items.TRINKET_EFFECTS:
+			if t.key == key:
+				trinkets.append(t)
+	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
+		_activate_tariff_by_key(key)
+	_begin_player_turn()
 
 
 func _build_hud() -> void:
@@ -164,8 +207,11 @@ func _build_hud() -> void:
 	scroll.add_child(pool_box)
 	hud.add_child(scroll)
 
-	item_box.position = Vector2(200, 752)
-	hud.add_child(item_box)
+	var item_scroll := ScrollContainer.new()
+	item_scroll.position = Vector2(210, 748)
+	item_scroll.custom_minimum_size = Vector2(246, 50)
+	item_scroll.add_child(item_box)
+	hud.add_child(item_scroll)
 
 	box_panel.visible = false
 	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)

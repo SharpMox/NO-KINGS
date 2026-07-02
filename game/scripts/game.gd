@@ -5,6 +5,8 @@ extends Node2D
 const Rules := preload("res://scripts/rules.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
+const Items := preload("res://data/items.gd")
+const Tariffs := preload("res://data/tariffs.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -42,6 +44,22 @@ var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
 var merge_sel: Array = [] # int = combined-pool index, Vector2i = board tile
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
+var items: Array = [] # held Items (single-use actives), max HUD row
+var trinkets: Array = [] # run-long passive effects
+var box_open := false # box-pick modal showing; blocks all other input
+var pass_after_box := false # auto-pass deferred until the pick resolves
+var item_active := -1 # items[] index being targeted, -1 = none
+var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
+var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
+var free_placements := 0 # Field Orders
+var ceasefire_turns := 0 # Cease Fire: clock paused while > 0
+var skip_enemy_turns := 0 # Surprise Attack
+var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
+var recent_place_costs: Array = [] # last 3 paid placement costs (Resupply Drop)
+var tariffs_active: Array = [] # action + persistent tariffs, run-long
+var tariffs_seen: Array = [] # every activation, for the end screens
+var sanctioned_id := "" # Sanctions: piece type barred from placement
+var counter_intel_turns := 0 # Counter-Intel: tariffs suppressed while > 0
 var rng := RandomNumberGenerator.new()
 
 var autoplay := false
@@ -55,9 +73,12 @@ var score_label := Label.new()
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
+var tariff_label := Label.new()
 var merge_button := Button.new()
 var confirm_button := Button.new()
 var pool_box := HBoxContainer.new()
+var item_box := HBoxContainer.new() # held-items strip
+var box_panel := PanelContainer.new() # box-pick modal
 var overlay := PanelContainer.new()
 
 
@@ -100,6 +121,13 @@ func _build_hud() -> void:
 	turn_label.size = Vector2(348, 26)
 	turn_label.clip_text = true # PASS button sits to the right
 	hud.add_child(turn_label)
+	tariff_label.position = Vector2(24, 72)
+	tariff_label.add_theme_font_size_override("font_size", 13)
+	tariff_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5))
+	tariff_label.custom_minimum_size = Vector2(432, 0)
+	tariff_label.size = Vector2(432, 20)
+	tariff_label.clip_text = true
+	hud.add_child(tariff_label)
 
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 24)
@@ -131,6 +159,16 @@ func _build_hud() -> void:
 	scroll.custom_minimum_size = Vector2(432, 52)
 	scroll.add_child(pool_box)
 	hud.add_child(scroll)
+
+	item_box.position = Vector2(200, 752)
+	hud.add_child(item_box)
+
+	box_panel.visible = false
+	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var box_bg := StyleBoxFlat.new()
+	box_bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
+	box_panel.add_theme_stylebox_override("panel", box_bg)
+	hud.add_child(box_panel)
 
 	overlay.visible = false
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -170,9 +208,28 @@ func _refresh() -> void:
 			turn_label.text = "enemy turn…"
 		State.GAME_OVER:
 			turn_label.text = ""
+	var names := []
+	for t in tariffs_active:
+		names.append(t.name.trim_prefix("Tariff on "))
+	tariff_label.text = "" if names.is_empty() else "⚠ " + ", ".join(names) \
+			+ (" (suppressed)" if counter_intel_turns > 0 else "")
 	_rebuild_pool_strip()
+	_rebuild_item_strip()
 	confirm_button.visible = merge_mode and Rules.merge_result(_merge_ids(), defs) != ""
 	queue_redraw()
+
+
+func _rebuild_item_strip() -> void:
+	for c in item_box.get_children():
+		c.queue_free()
+	for i in items.size():
+		var btn := Button.new()
+		btn.text = "✦" + items[i].name
+		btn.tooltip_text = "%s (%s)\n%s" % [items[i].name, items[i].tier, items[i].description]
+		if item_active == i:
+			btn.modulate = Color(0.5, 1.3, 1.3)
+		btn.pressed.connect(_use_item.bind(i))
+		item_box.add_child(btn)
 
 
 func _rebuild_pool_strip() -> void:
@@ -189,6 +246,8 @@ func _rebuild_pool_strip() -> void:
 			btn.modulate = Color(1.2, 1.1, 0.4)
 		elif placing_index == i:
 			btn.modulate = Color(0.6, 1.2, 0.6)
+		elif not from_captured and pool[i] == sanctioned_id and _tariff_on("sanctions"):
+			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		btn.pressed.connect(_on_pool_pressed.bind(i))
 		pool_box.add_child(btn)
 
@@ -202,7 +261,7 @@ func _merge_ids() -> Array:
 
 
 func _on_pool_pressed(index: int) -> void:
-	if state == State.GAME_OVER or state == State.ENEMY_TURN:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		return
 	if merge_mode:
 		if merge_sel.has(index):
@@ -212,6 +271,8 @@ func _on_pool_pressed(index: int) -> void:
 	else:
 		# placement: only stock pieces are placeable (captured merge in first)
 		if index >= stock.size():
+			return
+		if stock[index] == sanctioned_id and _tariff_on("sanctions"):
 			return
 		var can_place: bool = state == State.SETUP or placements_left > 0
 		placing_index = index if placing_index != index and can_place else -1
@@ -223,6 +284,9 @@ func _on_confirm_merge() -> void:
 	var result := Rules.merge_result(_merge_ids(), defs)
 	if result == "":
 		return
+	if _tariff_on("regulation") and _merge_ids().has("pawn"):
+		return # Regulation: pawns can't be merged
+	_charge("fuse_cost")
 	# if any source stood on the board, the result appears on the LAST-selected
 	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
 	var result_tile := Vector2i(-1, -1)
@@ -246,10 +310,13 @@ func _on_confirm_merge() -> void:
 
 
 func _on_pass() -> void:
+	if box_open:
+		return
 	if state == State.SETUP:
 		_spawn_wave(1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
+		_charge("pass_cost")
 		_enemy_turn()
 
 
@@ -263,7 +330,8 @@ func _process(delta: float) -> void:
 			_place(rng.randi() % stock.size(), open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		clock_ms -= delta * 1000.0
+		if ceasefire_turns <= 0: # Cease Fire pauses the drain
+			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
@@ -282,8 +350,13 @@ func _process(delta: float) -> void:
 func _begin_player_turn() -> void:
 	state = State.PLAYER_TURN
 	moves_left = Tuning.MOVES_PER_TURN
+	for t in trinkets:
+		if t.key == "move":
+			moves_left += 1
 	placements_left = Tuning.PLACEMENTS_PER_TURN
 	moved_this_turn.clear()
+	turn_action_count = 0
+	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		_queue_wave(wave + 1)
@@ -297,19 +370,27 @@ func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	selected = Vector2i(-1, -1)
 	placing_index = -1
+	_item_reset()
 	merge_sel.clear()
 	merge_button.button_pressed = false # also resets merge_mode via its toggle
 	_refresh()
 	turns_since_wave += 1
+	ceasefire_turns = maxi(ceasefire_turns - 1, 0)
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
 		_queue_wave(wave + 1)
-	await _run_enemy_actions()
+	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
+		skip_enemy_turns -= 1
+	else:
+		await _run_enemy_actions()
 	if state != State.GAME_OVER:
 		_begin_player_turn()
 
 
 func _run_enemy_actions() -> void:
-	for i in Tuning.ENEMY_ACTIONS_PER_TURN:
+	var actions := Tuning.ENEMY_ACTIONS_PER_TURN
+	if _tariff_on("filibuster"):
+		actions += 1
+	for i in actions:
 		var act := Rules.ai_action(board, defs)
 		if act.is_empty():
 			return
@@ -359,10 +440,29 @@ func _king_alive() -> bool:
 func _queue_wave(n: int) -> void:
 	wave = n
 	turns_since_wave = 0
-	pending_spawn.append_array(Waves.WAVES[n - 1])
+	var buff_id: String = Waves.BUFFS.get(n, "")
+	var roster: Array = Waves.WAVES[n - 1].duplicate()
+	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
+		roster.append(roster[rng.randi() % roster.size()])
+	for id in roster:
+		var entry := {"id": id}
+		if id == buff_id: # first spawned piece of the flagged type carries the box
+			entry.buff = true
+			buff_id = ""
+		pending_spawn.append(entry)
+	if n == 2:
+		_activate_tariff_by_key("inflation") # T0, GDD: fires after wave 1
+	elif Tariffs.SCHEDULE.has(n):
+		_activate_tariff(Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
-		clock_ms += Tuning.CLOCK_REFILL_MS
-		score += Tuning.MILESTONE_SCORE_BONUS
+		var refill: float = Tuning.CLOCK_REFILL_MS
+		for t in trinkets:
+			if t.key == "timer":
+				refill += 5000
+		if _tariff_on("recession"):
+			refill *= 0.5
+		clock_ms += refill
+		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
 
 
 func _spawn_wave(n: int) -> void:
@@ -381,8 +481,11 @@ func _spawn_pending() -> void:
 				open.append(pos)
 		if open.is_empty():
 			return # row full of enemies — spill to next player turn
-		var tile: Vector2i = open[rng.randi() % open.size()]
-		board[tile] = {"id": pending_spawn.pop_front(), "owner": Rules.ENEMY}
+		var spot: Vector2i = open[rng.randi() % open.size()]
+		var entry: Dictionary = pending_spawn.pop_front()
+		board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
+		if entry.get("buff", false):
+			board[spot].buff = true
 
 
 func _setup_open_tiles() -> Array[Vector2i]:
@@ -443,7 +546,7 @@ func _show_overlay(won: bool, reason: String) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "%s\nScore %d · Deepest wave %d" % [reason, score, wave]
+	detail.text = "%s\nScore %d · Deepest wave %d · Tariffs %d" % [reason, score, wave, tariffs_seen.size()]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -463,7 +566,7 @@ func _show_overlay(won: bool, reason: String) -> void:
 # --- input ---
 
 func _unhandled_input(event: InputEvent) -> void:
-	if state == State.GAME_OVER or state == State.ENEMY_TURN:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		drag_from = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion and drag_from.x >= 0:
@@ -496,6 +599,9 @@ func _tile_at(screen: Vector2) -> Vector2i:
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:
+	if item_active >= 0: # an item is targeting; board clicks feed it
+		_item_click(tile)
+		return
 	if merge_mode: # board clicks select merge sources, nothing else
 		if board.has(tile) and board[tile].owner == Rules.PLAYER:
 			if merge_sel.has(tile):
@@ -530,35 +636,437 @@ func _place(pool_index: int, tile: Vector2i) -> void:
 	placing_index = -1
 	if state == State.PLAYER_TURN:
 		placements_left -= 1
-		score = maxi(score - Tuning.PLACEMENT_SCORE_COST, 0)
+		turn_action_count += 1
+		var cost := Tuning.PLACEMENT_SCORE_COST
+		if _tariff_on("austerity"):
+			cost *= 2
+		if free_placements > 0: # Field Orders
+			free_placements -= 1
+			cost = 0
+		_charge("deploy_cost")
+		score = maxi(score - cost, 0)
+		recent_place_costs.append(cost)
+		if recent_place_costs.size() > 3:
+			recent_place_costs.pop_front()
 	_refresh()
 
 
 func _move_player(from: Vector2i, to: Vector2i) -> void:
+	var boxed := false
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		score += defs[victim.id].value
+		score += _gain(_capture_score(victim.id))
+		_charge("capture_cost")
 		if victim.id == "king":
 			return _win()
 		captured.append(victim.id)
+		boxed = victim.get("buff", false)
 		_add_pop(to)
+	_charge("move_cost")
+	if board[from].id in ["bishop", "rook"]:
+		var d := to - from
+		_charge("long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
 	moves_left -= 1
+	turn_action_count += 1
 	moved_this_turn.append(to)
 	selected = Vector2i(-1, -1)
 	legal_dests.clear()
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
 		return _win()
 	if moves_left == 0 and state == State.PLAYER_TURN:
-		return _on_pass() # last move auto-passes (playtest 2026-07-02)
+		if boxed: # resolve the box first; the pick UI defers the auto-pass
+			pass_after_box = true
+		else:
+			return _on_pass() # last move auto-passes (playtest 2026-07-02)
+	if boxed:
+		return _open_box_pick()
 	_refresh()
+
+
+func _capture_score(victim_id: String) -> int:
+	var base: int = defs[victim_id].value
+	var pts := base
+	for t in trinkets: # run-long passives (stack per copy)
+		match t.key:
+			"greed":
+				if victim_id == "pawn":
+					pts += 1
+			"score":
+				pts += 1
+			"bounty":
+				if base >= 5:
+					pts += 3
+			"lifesteal":
+				clock_ms += 2000
+			"first_capture_extra":
+				if turn_action_count == 0:
+					moves_left += 1
+	return pts
 
 
 func _win() -> void:
 	score += Tuning.WIN_SCORE_BONUS
 	_game_over(true, "Wave-%d King checkmated" % wave)
+
+
+# --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
+
+func _activate_tariff(tier: String) -> void:
+	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
+		if t.tier != tier:
+			return false
+		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
+		return tier == "Mild" or not tariffs_seen.has(t.name))
+	if pool.is_empty():
+		return
+	_apply_tariff(pool[rng.randi() % pool.size()])
+
+
+func _activate_tariff_by_key(key: String) -> void:
+	for t in Tariffs.TARIFFS:
+		if t.key == key:
+			return _apply_tariff(t)
+
+
+func _apply_tariff(t: Dictionary) -> void:
+	tariffs_seen.append(t.name)
+	if t.kind == "oneoff":
+		match t.key:
+			"forced_audit":
+				captured.clear()
+			"asset_seizure":
+				stock.clear()
+			"asset_freeze":
+				score /= 2
+			"hostile_takeover":
+				var mine := _player_pieces()
+				if not mine.is_empty():
+					board[mine[rng.randi() % mine.size()]].owner = Rules.ENEMY
+			"jd_vance":
+				var best := Vector2i(-1, -1)
+				for pos in _player_pieces():
+					if best.x < 0 or defs[board[pos].id].value > defs[board[best].id].value:
+						best = pos
+				if best.x >= 0:
+					_destroy(best)
+		return
+	tariffs_active.append(t)
+	if t.key == "sanctions": # fix the barred type at trigger time
+		var types := {}
+		for id in stock + captured:
+			types[id] = true
+		if not types.is_empty():
+			sanctioned_id = types.keys()[rng.randi() % types.size()]
+
+
+func _tariff_on(key: String) -> bool:
+	if counter_intel_turns > 0:
+		return false
+	for t in tariffs_active:
+		if t.key == key:
+			return true
+	return false
+
+
+## Score cost charged when a tariffed action happens.
+func _charge(key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
+	if _tariff_on(key):
+		score = maxi(score - amount, 0)
+
+
+## Score gains pass through Inflation (-10% per stack, rounded down).
+func _gain(amount: int) -> int:
+	if counter_intel_turns > 0:
+		return amount
+	var out := float(amount)
+	for t in tariffs_active:
+		if t.key == "inflation":
+			out *= 0.9
+	return int(out)
+
+
+# --- items (single-use actives from the Items catalog) ---
+
+func _use_item(index: int) -> void:
+	if state != State.PLAYER_TURN or box_open:
+		return
+	if item_active == index: # tap again to cancel targeting
+		_item_reset()
+		_refresh()
+		return
+	var it: Dictionary = items[index]
+	_charge("ability_cost")
+	if it.target == "":
+		items.remove_at(index)
+		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
+		return
+	item_active = index
+	item_stage_a = Vector2i(-1, -1)
+	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
+	selected = Vector2i(-1, -1)
+	legal_dests.clear()
+	placing_index = -1
+	_refresh()
+
+
+func _item_reset() -> void:
+	item_active = -1
+	item_stage_a = Vector2i(-1, -1)
+	item_targets = []
+
+
+## Valid tiles for the active item; `a` = first pick for "pair" items, or (-1,-1).
+func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in Tuning.BOARD_W:
+		for y in Tuning.BOARD_H:
+			var pos := Vector2i(x, y)
+			if _item_tile_valid(it.key, a, pos):
+				out.append(pos)
+	return out
+
+
+func _item_tile_valid(key: String, a: Vector2i, pos: Vector2i) -> bool:
+	var occupied := board.has(pos)
+	var enemy: bool = occupied and board[pos].owner == Rules.ENEMY
+	var own: bool = occupied and board[pos].owner == Rules.PLAYER
+	var king: bool = occupied and board[pos].id == "king"
+	if a.x < 0: # stage A (or single-tile items)
+		match key:
+			"demote":
+				return occupied and not king
+			"air_strike":
+				return enemy and not king
+			"sniper":
+				return enemy and not king and Rules.is_attacked(board, pos, Rules.PLAYER, defs)
+			"extraction":
+				return own
+			"drone_strike", "bombing_run":
+				return true
+			"tactical_reposition", "decoy_swap", "forced_march":
+				return occupied and not king
+			"rapid_deployment":
+				return own
+	else: # stage B of a pair
+		match key:
+			"tactical_reposition":
+				return not occupied and pos.distance_to(a) < 1.5 and pos != a
+			"rapid_deployment":
+				return not occupied
+			"decoy_swap":
+				return occupied and not king and pos != a
+			"forced_march":
+				var d := pos - a
+				if pos == a or occupied:
+					return false
+				var steps := maxi(absi(d.x), absi(d.y))
+				if steps > 3 or (d.x != 0 and d.y != 0 and absi(d.x) != absi(d.y)):
+					return false
+				var step := d.sign()
+				for s in range(1, steps): # path must be clear
+					if board.has(a + step * s):
+						return false
+				return true
+	return false
+
+
+func _item_click(tile: Vector2i) -> void:
+	if not item_targets.has(tile):
+		return
+	var it: Dictionary = items[item_active]
+	if it.target == "pair" and item_stage_a.x < 0:
+		item_stage_a = tile
+		item_targets = _item_stage_targets(it, tile)
+		_refresh()
+		return
+	items.remove_at(item_active)
+	var a := item_stage_a
+	_item_reset()
+	_item_apply(it, a, tile)
+
+
+func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
+	match it.key:
+		"blitz":
+			moves_left += 1
+		"asset_recovery":
+			if not captured.is_empty():
+				captured.append(captured[rng.randi() % captured.size()])
+		"field_orders":
+			free_placements += 2
+		"cease_fire":
+			ceasefire_turns += 2
+		"surprise_attack":
+			skip_enemy_turns += 1
+		"suppressing_fire":
+			turns_since_wave -= 3
+		"cluster_bomb":
+			var foes: Array[Vector2i] = []
+			for pos in board:
+				if board[pos].owner == Rules.ENEMY and board[pos].id != "king":
+					foes.append(pos)
+			foes.shuffle()
+			for pos in foes.slice(0, 3):
+				_destroy(pos)
+		"conscription":
+			var pawns: Array[Vector2i] = []
+			for pos in board:
+				if board[pos].owner == Rules.PLAYER and board[pos].id == "pawn":
+					pawns.append(pos)
+			pawns.sort_custom(func(p: Vector2i, q: Vector2i) -> bool: return p.y > q.y)
+			for pos in pawns:
+				var ahead := pos + Vector2i(0, 1)
+				if Rules.in_bounds(ahead) and not board.has(ahead):
+					_add_slide(pos, ahead)
+					board[ahead] = board[pos]
+					board.erase(pos)
+		"resupply_drop":
+			for c in recent_place_costs:
+				score += c
+			recent_place_costs.clear()
+		"counter_intel":
+			counter_intel_turns += 2
+		"demote":
+			board[b].id = "pawn"
+		"air_strike", "sniper":
+			_destroy(b)
+		"extraction":
+			stock.append(board[b].id)
+			board.erase(b)
+		"drone_strike":
+			for dx in [0, 1]:
+				for dy in [0, 1]:
+					var pos := b + Vector2i(dx, dy)
+					if board.has(pos) and board[pos].id != "king":
+						_destroy(pos)
+		"bombing_run":
+			for x in Tuning.BOARD_W:
+				var pos := Vector2i(x, b.y)
+				if board.has(pos) and board[pos].id != "king":
+					_destroy(pos)
+		"tactical_reposition", "rapid_deployment", "forced_march":
+			_add_slide(a, b)
+			board[b] = board[a]
+			board.erase(a)
+		"decoy_swap":
+			var tmp: Dictionary = board[a]
+			board[a] = board[b]
+			board[b] = tmp
+	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
+		return _win()
+	_refresh()
+
+
+## Item destruction: piece leaves the board — no score, no captured stock.
+func _destroy(pos: Vector2i) -> void:
+	_add_pop(pos)
+	board.erase(pos)
+
+
+# --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---
+
+func _open_box_pick() -> void:
+	box_open = true
+	_charge("box_cost")
+	if autoplay: # bot: random box, random content — exercises every branch
+		var kinds := ["item", "trinket", "score"]
+		_box_step2(kinds[rng.randi() % kinds.size()], true)
+		return
+	_box_step1()
+
+
+func _box_clear() -> void:
+	for c in box_panel.get_children():
+		c.queue_free()
+
+
+func _box_vbox(title_text: String) -> VBoxContainer:
+	_box_clear()
+	box_panel.visible = true
+	var center := CenterContainer.new()
+	box_panel.add_child(center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	center.add_child(box)
+	var title := Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 26)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	return box
+
+
+func _box_step1() -> void:
+	var box := _box_vbox("📦 The enemy dropped a box!")
+	for kind_label in [["item", "Item Box — a single-use ability"], ["trinket", "Trinket Box — a passive for the run"], ["score", "Score Box — points, now"]]:
+		var b := Button.new()
+		b.text = kind_label[1]
+		b.add_theme_font_size_override("font_size", 20)
+		b.pressed.connect(_box_step2.bind(kind_label[0], false))
+		box.add_child(b)
+	_box_add_skip(box)
+
+
+func _box_step2(kind: String, bot_pick: bool) -> void:
+	var options := []
+	match kind:
+		"item":
+			var pool := Items.ITEMS.duplicate()
+			pool.shuffle()
+			options = pool.slice(0, 5)
+		"trinket":
+			var pool := Items.TRINKET_EFFECTS.duplicate()
+			pool.shuffle()
+			options = pool.slice(0, 5)
+		"score":
+			var pool := Tuning.SCORE_BOX_CHUNKS.duplicate()
+			pool.shuffle()
+			for v in pool.slice(0, 5):
+				options.append({"name": "+%d score" % v, "value": v})
+	if bot_pick:
+		return _box_choose(kind, options[rng.randi() % options.size()])
+	var box := _box_vbox("Pick one:")
+	for opt in options:
+		var b := Button.new()
+		b.text = opt.name
+		b.tooltip_text = opt.get("description", "")
+		b.add_theme_font_size_override("font_size", 18)
+		b.pressed.connect(_box_choose.bind(kind, opt))
+		box.add_child(b)
+	_box_add_skip(box)
+
+
+func _box_add_skip(box: VBoxContainer) -> void:
+	var skip := Button.new()
+	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
+	skip.pressed.connect(func() -> void:
+		score += _gain(Tuning.BOX_SKIP_CONSOLATION)
+		_box_close())
+	box.add_child(skip)
+
+
+func _box_choose(kind: String, opt: Dictionary) -> void:
+	match kind:
+		"item":
+			items.append(opt)
+		"trinket":
+			trinkets.append(opt)
+		"score":
+			score += _gain(opt.value)
+	_box_close()
+
+
+func _box_close() -> void:
+	box_open = false
+	box_panel.visible = false
+	if pass_after_box:
+		pass_after_box = false
+		_on_pass()
+	else:
+		_refresh()
 
 
 # --- autoplay bot (headless verification) ---
@@ -571,6 +1079,9 @@ func _autoplay_step() -> void:
 		get_tree().quit(0)
 		return
 	# One random legal action per frame, then pass when spent.
+	if not items.is_empty() and rng.randf() < 0.3: # exercise item paths
+		_autoplay_use_item()
+		return
 	if placements_left > 0 and not stock.is_empty():
 		var tiles := Rules.placement_tiles(board)
 		if not tiles.is_empty():
@@ -590,6 +1101,27 @@ func _autoplay_step() -> void:
 			_move_player(m.from, m.to)
 			return
 	_on_pass()
+
+
+func _autoplay_use_item() -> void:
+	var index := rng.randi() % items.size()
+	var it: Dictionary = items[index]
+	if it.target == "":
+		_use_item(index)
+		return
+	var a := Vector2i(-1, -1)
+	var targets := _item_stage_targets(it, a)
+	if targets.is_empty():
+		items.remove_at(index) # discard unusable (e.g. sniper with no valid mark)
+		return
+	if it.target == "pair":
+		a = targets[rng.randi() % targets.size()]
+		targets = _item_stage_targets(it, a)
+		if targets.is_empty():
+			items.remove_at(index)
+			return
+	items.remove_at(index)
+	_item_apply(it, a, targets[rng.randi() % targets.size()])
 
 
 ## Execute one available merge (3-same preferred, else 2-same). Returns true if merged.
@@ -642,6 +1174,11 @@ func _draw() -> void:
 	for ref in merge_sel: # board pieces picked as merge sources
 		if ref is Vector2i:
 			draw_rect(Rect2(_tile_px(ref), Vector2(tile, tile)), COL_SELECT)
+	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
+		for t in item_targets:
+			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)
+		if item_stage_a.x >= 0:
+			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
 	for d in legal_dests:
 		if board.has(d): # capturable target: red tile tint + ring around the piece
 			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE, 0.3))
@@ -667,6 +1204,8 @@ func _draw() -> void:
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		_draw_piece(font, p, px, tint)
+		if p.get("buff", false): # box carrier: gold badge
+			draw_circle(px + Vector2(tile - 9, 9), 6, Color(0.95, 0.78, 0.15))
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]

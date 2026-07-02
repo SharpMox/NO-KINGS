@@ -61,7 +61,9 @@ func _init() -> void:
 	check(game.confirm_button.visible, "valid pair shows Confirm")
 	_click(game.confirm_button.get_global_rect().get_center())
 	await process_frame
-	check(game.stock.size() == 1 and game.captured.is_empty(), "Confirm merges 2 pawns into stock")
+	check(game.stock == ["sergeant"] and game.captured.is_empty(),
+		"Confirm promotes the pawn pair into a Ranger in stock")
+	check(not game.merge_mode, "merge mode auto-deactivates after a merge")
 	_click(game.merge_button.get_global_rect().get_center()) # merge mode off
 	await process_frame
 

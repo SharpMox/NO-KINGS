@@ -29,6 +29,7 @@ var tile := 72
 var board_px := Vector2(24, 120)
 
 var defs: Dictionary
+var fusions: Dictionary # unordered pair "a+b" -> result id
 var textures := {} # id -> Texture2D; missing ids fall back to glyph text
 var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
@@ -48,6 +49,7 @@ var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mo
 var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
 var merge_sel: Array = [] # int = combined-pool index, Vector2i = board tile
+var merge_highlights := {} # ids that can merge right now (merge-mode UX)
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
 var trinkets: Array = [] # run-long passive effects
@@ -103,6 +105,7 @@ func _ready() -> void:
 	tile = int(minf((vp.x - 48.0) / Tuning.BOARD_W, (vp.y - 224.0) / Tuning.BOARD_H))
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
 	defs = Rules.load_pieces()
+	fusions = Rules.load_fusions()
 	for id in defs:
 		# png wins if present (drop painted art in anytime); svg is the
 		# generated vector set (tools/generate-piece-art.py)
@@ -268,6 +271,7 @@ func _refresh() -> void:
 			turn_label.text = "enemy turn…"
 		State.GAME_OVER:
 			turn_label.text = ""
+	merge_highlights = _merge_highlight_ids() if merge_mode else {}
 	var names := []
 	for t in tariffs_active:
 		names.append(t.name.trim_prefix("Tariff on "))
@@ -275,7 +279,7 @@ func _refresh() -> void:
 			+ (" (suppressed)" if counter_intel_turns > 0 else "")
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
-	confirm_button.visible = merge_mode and Rules.merge_result(_merge_ids(), defs) != ""
+	confirm_button.visible = merge_mode and Rules.merge_result(_merge_ids(), defs, fusions) != ""
 	queue_redraw()
 
 
@@ -299,17 +303,54 @@ func _rebuild_pool_strip() -> void:
 	for i in pool.size():
 		var btn := Button.new()
 		var from_captured: bool = i >= stock.size()
-		btn.text = ("[%s]" if from_captured else "%s") % defs[pool[i]].glyph
-		btn.tooltip_text = defs[pool[i]].name + (" (captured)" if from_captured else "")
-		btn.add_theme_font_size_override("font_size", 22)
+		var id: String = pool[i]
+		if textures.has(id): # piece icon instead of glyph text (round 3)
+			btn.icon = textures[id]
+			btn.expand_icon = true
+			btn.custom_minimum_size = Vector2(46, 46)
+		else:
+			btn.text = defs[id].glyph
+			btn.add_theme_font_size_override("font_size", 22)
+		btn.tooltip_text = defs[id].name + (" (captured)" if from_captured else "")
 		if merge_mode and merge_sel.has(i):
-			btn.modulate = Color(1.2, 1.1, 0.4)
+			btn.modulate = Color(1.3, 1.15, 0.4)
+		elif merge_mode: # mergeable pieces pop; the rest dim
+			btn.modulate = Color(1.2, 1.05, 0.55) if merge_highlights.has(id) else Color(0.5, 0.5, 0.5)
 		elif placing_index == i:
 			btn.modulate = Color(0.6, 1.2, 0.6)
-		elif not from_captured and pool[i] == sanctioned_id and _tariff_on("sanctions"):
+		elif not from_captured and id == sanctioned_id and _tariff_on("sanctions"):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
+		elif from_captured:
+			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
 		btn.pressed.connect(_on_pool_pressed.bind(i))
 		pool_box.add_child(btn)
+
+
+## Ids that can participate in a merge right now: with nothing selected, any id
+## with a valid partner among the player's pieces (pool + board); with one
+## selected, only ids completing a merge with it.
+func _merge_highlight_ids() -> Dictionary:
+	var all: Array = _pool()
+	for pos in _player_pieces():
+		all.append(board[pos].id)
+	var out := {}
+	if merge_sel.size() == 1:
+		var sel: String = _merge_ids()[0]
+		var counts := {}
+		for id in all:
+			counts[id] = counts.get(id, 0) + 1
+		for id in all:
+			if id == sel and counts[id] < 2:
+				continue # a self-pair needs a second copy
+			if Rules.merge_result([sel, id], defs, fusions) != "":
+				out[id] = true
+	elif merge_sel.is_empty():
+		for i in all.size():
+			for j in range(i + 1, all.size()):
+				if Rules.merge_result([all[i], all[j]], defs, fusions) != "":
+					out[all[i]] = true
+					out[all[j]] = true
+	return out
 
 
 func _merge_ids() -> Array:
@@ -326,7 +367,7 @@ func _on_pool_pressed(index: int) -> void:
 	if merge_mode:
 		if merge_sel.has(index):
 			merge_sel.erase(index)
-		elif merge_sel.size() < 3:
+		elif merge_sel.size() < 2:
 			merge_sel.append(index)
 	else:
 		# placement: only stock pieces are placeable (captured merge in first)
@@ -341,7 +382,7 @@ func _on_pool_pressed(index: int) -> void:
 
 
 func _on_confirm_merge() -> void:
-	var result := Rules.merge_result(_merge_ids(), defs)
+	var result := Rules.merge_result(_merge_ids(), defs, fusions)
 	if result == "":
 		return
 	if _tariff_on("regulation") and _merge_ids().has("pawn"):
@@ -366,6 +407,7 @@ func _on_confirm_merge() -> void:
 	else:
 		stock.append(result)
 	merge_sel.clear()
+	merge_button.button_pressed = false # merge done -> mode off (round 3)
 	_refresh()
 
 
@@ -421,7 +463,7 @@ func _begin_player_turn() -> void:
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		_queue_wave(wave + 1)
 	_spawn_pending()
-	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool()):
+	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
 	_refresh()
 
@@ -666,7 +708,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		if board.has(tile) and board[tile].owner == Rules.PLAYER:
 			if merge_sel.has(tile):
 				merge_sel.erase(tile)
-			elif merge_sel.size() < 3:
+			elif merge_sel.size() < 2:
 				merge_sel.append(tile)
 			_refresh()
 		return
@@ -1184,23 +1226,15 @@ func _autoplay_use_item() -> void:
 	_item_apply(it, a, targets[rng.randi() % targets.size()])
 
 
-## Execute one available merge (3-same preferred, else 2-same). Returns true if merged.
+## Execute one available pair merge (promotion or fusion). Returns true if merged.
 func _autoplay_merge() -> bool:
 	var pool := _pool()
-	var counts := {}
 	for i in pool.size():
-		counts[pool[i]] = counts.get(pool[i], []) + [i]
-	for want in [3, 2]:
-		for id in counts:
-			if counts[id].size() < want:
-				continue
-			# a 2-same merge yields 1 of the same piece — only worth it when it
-			# converts a captured (unplaceable) piece into stock
-			if want == 2 and counts[id].slice(0, want).all(func(i: int) -> bool: return i < stock.size()):
-				continue
-			merge_sel.assign(counts[id].slice(0, want))
-			_on_confirm_merge()
-			return true
+		for j in range(i + 1, pool.size()):
+			if Rules.merge_result([pool[i], pool[j]], defs, fusions) != "":
+				merge_sel.assign([i, j])
+				_on_confirm_merge()
+				return true
 	return false
 
 
@@ -1234,6 +1268,12 @@ func _draw() -> void:
 	for ref in merge_sel: # board pieces picked as merge sources
 		if ref is Vector2i:
 			draw_rect(Rect2(_tile_px(ref), Vector2(tile, tile)), COL_SELECT)
+	if merge_mode: # gold ring on board pieces that can merge right now
+		for pos in board:
+			if board[pos].owner == Rules.PLAYER and merge_highlights.has(board[pos].id) \
+					and not merge_sel.has(pos):
+				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
+					Color(0.95, 0.8, 0.2), 3.0)
 	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
 		for t in item_targets:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)

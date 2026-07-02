@@ -13,6 +13,11 @@ static func load_pieces() -> Dictionary:
 	return JSON.parse_string(text)
 
 
+static func load_fusions() -> Dictionary:
+	var text := FileAccess.get_file_as_string("res://data/fusions.json")
+	return JSON.parse_string(text)
+
+
 static func in_bounds(p: Vector2i) -> bool:
 	return p.x >= 0 and p.x < Tuning.BOARD_W and p.y >= 0 and p.y < Tuning.BOARD_H
 
@@ -102,35 +107,29 @@ static func is_checkmate(board: Dictionary, owner: int, defs: Dictionary) -> boo
 	return legal_moves(board, owner, defs).is_empty()
 
 
-## Merge result for 2 or 3 selected piece ids (from the combined Stock +
-## Captured pool), or "" if the selection is not a valid merge.
-## 2 identical -> 1 of the same; 3 identical -> next chain stage (same id at
-## chain end); 3 different -> lowest-value of the three. (Rules grilled 2026-07-02.)
-static func merge_result(ids: Array, defs: Dictionary) -> String:
-	if ids.size() == 2 and ids[0] == ids[1]:
-		return ids[0]
-	if ids.size() == 3:
-		if ids[0] == ids[1] and ids[1] == ids[2]:
-			var next = defs[ids[0]].next
-			return next if next != null else ids[0]
-		if ids[0] != ids[1] and ids[1] != ids[2] and ids[0] != ids[2]:
-			var lowest: String = ids[0]
-			for id in ids:
-				if defs[id].value < defs[lowest].value:
-					lowest = id
-			return lowest
-	return ""
+## Merge result for exactly 2 selected piece ids, or "" if invalid.
+## 2 identical -> next promotion-chain stage (chain-end pairs don't merge);
+## 2 different -> the pair's fusion result, if the Fusions catalog has one.
+## (Rules: playtest round 3, 2026-07-02.)
+static func merge_result(ids: Array, defs: Dictionary, fusions: Dictionary) -> String:
+	if ids.size() != 2:
+		return ""
+	if ids[0] == ids[1]:
+		var next = defs[ids[0]].next
+		return next if next != null else ""
+	var pair: Array = [ids[0], ids[1]]
+	pair.sort()
+	return fusions.get("+".join(pair), "")
 
 
-## Any valid merge available in the combined pool? (Part of the resource-
-## starvation loss check: 2-of-a-kind, or 3 distinct ids.)
-static func has_merge(pool: Array) -> bool:
-	var counts := {}
-	for id in pool:
-		counts[id] = counts.get(id, 0) + 1
-		if counts[id] >= 2:
-			return true
-	return counts.size() >= 3
+## Any valid merge available in the pool? (Part of the resource-starvation
+## loss check.)
+static func has_merge(pool: Array, defs: Dictionary, fusions: Dictionary) -> bool:
+	for i in pool.size():
+		for j in range(i + 1, pool.size()):
+			if merge_result([pool[i], pool[j]], defs, fusions) != "":
+				return true
+	return false
 
 
 ## Empty tiles where the player may place: bottom zone rows, or adjacent

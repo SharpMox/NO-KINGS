@@ -1,8 +1,8 @@
 ## Every tunable constant in one place. GDD-sourced values note their page;
 ## the rest are MVP placeholders to adjust after playtests.
 
-const BOARD_W := 6                 # GDD Board
-const BOARD_H := 11                # GDD said 8; +3 rows playtest 2026-07-02
+const BOARD_W := 8                 # GDD said 6; +2 cols playtest round 3
+const BOARD_H := 14                # GDD said 8; +3 rows twice (rounds 2 and 3)
 const PLAYER_ZONE_ROWS := 2        # GDD Board — bottom rows, placement zone
 const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 

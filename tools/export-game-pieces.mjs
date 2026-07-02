@@ -11,6 +11,12 @@ const require = createRequire(import.meta.url);
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PIECES = require(join(root, "data/pieces-codex.js"));
 const CHAINS = require(join(root, "data/promotions.js"));
+const FUSIONS = require(join(root, "data/fusions.js"));
+
+// Fusion results reachable by the move interpreter (leap/ride only) that are
+// not chain pieces. Bent-riders and nightriders (gryphon, manticore, godzilla,
+// banshee, raven, amazonrider) stay out until the interpreter supports them.
+const EXTRA_IDS = ["squirrel", "crown-princess", "amazon"];
 
 // Game-side point values (codex has none). Used for capture score, AI trade
 // decisions, and the 3-different-merge "lowest value" rule.
@@ -23,6 +29,7 @@ const VALUES = {
   knight: 3, gnu: 5, buffalo: 7,
   kirin: 3, "kirin-plus": 5, "kirin-plus-plus": 8,
   alibaba: 2, bodyguard: 5, queen: 9,
+  squirrel: 5, "crown-princess": 8, amazon: 12,
   king: 4,
 };
 
@@ -63,7 +70,7 @@ for (const chain of CHAINS) {
   next[mid] = end;
 }
 
-const mvpIds = new Set(CHAINS.flatMap((c) => c.ids));
+const mvpIds = new Set(CHAINS.flatMap((c) => c.ids).concat(EXTRA_IDS));
 const out = {};
 for (const p of PIECES) {
   if (!mvpIds.has(p.id)) continue;
@@ -83,7 +90,21 @@ out.king = { // not in the codex (the game is NO-KINGS; only the enemy fields on
 
 const missing = Object.values(out).filter((p) => p.value == null);
 if (missing.length) throw new Error("missing values: " + missing.map((p) => p.id));
-if (Object.keys(out).length !== 25) throw new Error(`expected 25 defs, got ${Object.keys(out).length}`);
+if (Object.keys(out).length !== 28) throw new Error(`expected 28 defs, got ${Object.keys(out).length}`);
 
 writeFileSync(join(root, "game/data/pieces.json"), JSON.stringify(out, null, 1) + "\n");
 console.log(`wrote game/data/pieces.json (${Object.keys(out).length} pieces)`);
+
+// Fusions: unordered pair -> result, filtered to pieces the game defines.
+// Key = the two ids sorted and joined with "+".
+const fusions = {};
+let skipped = 0;
+for (const f of FUSIONS.additive.concat(FUSIONS.synergistic)) {
+  if (out[f.lhs] && out[f.rhs] && out[f.out]) {
+    fusions[[f.lhs, f.rhs].sort().join("+")] = f.out;
+  } else {
+    skipped++;
+  }
+}
+writeFileSync(join(root, "game/data/fusions.json"), JSON.stringify(fusions, null, 1) + "\n");
+console.log(`wrote game/data/fusions.json (${Object.keys(fusions).length} fusions, ${skipped} skipped: inputs/results outside the game set)`);

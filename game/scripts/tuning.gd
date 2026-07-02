@@ -19,6 +19,8 @@ const MILESTONE_WAVES := 10             # GDD Reward Economy
 const PLACEMENT_SCORE_COST := 2    # placing mid-turn costs score (GDD, amount TBD)
 const MILESTONE_SCORE_BONUS := 10  # every 10 waves (GDD, amount TBD)
 const WIN_SCORE_BONUS := 100       # wave-50 checkmate (GDD, amount TBD)
+const BOX_SKIP_CONSOLATION := 2    # GDD: small consolation, amount TBD
+const SCORE_BOX_CHUNKS: Array = [5, 8, 10, 12, 15, 20]  # score-box contents pool
 
 # Starting Stock (12 = fills the placement zone exactly). Fairy bases included
 # because enemies only field pawn/bishop/knight/rook — see plan, grilled 2026-07-02.

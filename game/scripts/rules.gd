@@ -73,14 +73,18 @@ static func is_attacked(board: Dictionary, target: Vector2i, by_owner: int, defs
 
 ## All {from, to} moves for `owner`; when that side has a King on the board,
 ## moves that leave it attacked are excluded (GDD: "protect the King at all cost").
-static func legal_moves(board: Dictionary, owner: int, defs: Dictionary) -> Array[Dictionary]:
+## strict=false skips the self-check simulation for NON-king pieces — pins are
+## ignored. ponytail: the full sim is O(pieces² × moves) and made late-game AI
+## turns take minutes on crowded boards; the greedy AI keeps full safety for
+## king moves and for check resolution (callers pass strict=true there).
+static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict := true) -> Array[Dictionary]:
 	var king := find_king(board, owner)
 	var out: Array[Dictionary] = []
 	for pos in board:
 		if board[pos].owner != owner:
 			continue
 		for to in moves_for(board, pos, defs):
-			if king.x >= 0:
+			if king.x >= 0 and (strict or pos == king):
 				var sim := board.duplicate(true)
 				sim[to] = sim[pos]
 				sim.erase(pos)
@@ -157,11 +161,14 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 ## resolve check (prefer capture) > best trade (max target value, min attacker
 ## value) > advance the most advanced non-King piece toward the player row.
 static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
-	var moves := legal_moves(board, ENEMY, defs)
+	var king := find_king(board, ENEMY)
+	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
+	# full legality only when in check (must not miss a resolving move);
+	# otherwise the fast path — king moves stay safety-checked, pins ignored
+	var moves := legal_moves(board, ENEMY, defs, in_check)
 	if moves.is_empty():
 		return {}
-	var king := find_king(board, ENEMY)
-	if king.x >= 0 and is_attacked(board, king, PLAYER, defs):
+	if in_check:
 		# legal_moves already filtered to check-resolving moves; prefer a capture.
 		return _best_capture(board, moves, defs) if _has_capture(board, moves) else moves[0]
 	if _has_capture(board, moves):

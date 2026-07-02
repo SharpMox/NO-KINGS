@@ -103,6 +103,8 @@ var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var box_panel := PanelContainer.new() # box-pick modal
 var preview_panel := PanelContainer.new() # long-press piece preview
+var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
+var game_menu_open := false
 var overlay := PanelContainer.new()
 
 
@@ -215,6 +217,46 @@ func _build_hud() -> void:
 	pass_button.position = Vector2(380, 36)
 	pass_button.pressed.connect(_on_pass)
 	hud.add_child(pass_button)
+
+	var menu_btn := Button.new()
+	menu_btn.text = "☰"
+	menu_btn.add_theme_font_size_override("font_size", 20)
+	menu_btn.position = Vector2(444, 6)
+	menu_btn.pressed.connect(func() -> void:
+		game_menu_open = true
+		game_menu.move_to_front() # above every other HUD control
+		game_menu.visible = true)
+	hud.add_child(menu_btn)
+
+	game_menu.visible = false
+	game_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var gm_bg := StyleBoxFlat.new()
+	gm_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
+	game_menu.add_theme_stylebox_override("panel", gm_bg)
+	var gm_center := CenterContainer.new()
+	game_menu.add_child(gm_center)
+	var gm_box := VBoxContainer.new()
+	gm_box.add_theme_constant_override("separation", 20)
+	gm_center.add_child(gm_box)
+	var gm_title := Label.new()
+	gm_title.text = "Paused" # menu open = clock frozen (GDD pause)
+	gm_title.add_theme_font_size_override("font_size", 32)
+	gm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	gm_box.add_child(gm_title)
+	var resume := Button.new()
+	resume.text = "Resume"
+	resume.add_theme_font_size_override("font_size", 26)
+	resume.pressed.connect(func() -> void:
+		game_menu_open = false
+		game_menu.visible = false)
+	gm_box.add_child(resume)
+	var to_menu := Button.new()
+	to_menu.text = "Main Menu"
+	to_menu.add_theme_font_size_override("font_size", 20)
+	to_menu.pressed.connect(func() -> void:
+		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
+	gm_box.add_child(to_menu)
+	hud.add_child(game_menu)
 
 	merge_button.text = "Merge"
 	merge_button.toggle_mode = true
@@ -394,7 +436,8 @@ func _merge_ids() -> Array:
 
 
 func _on_pool_pressed(index: int) -> void:
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or preview_open:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
+			or preview_open or game_menu_open:
 		return
 	if merge_mode:
 		if merge_sel.has(index):
@@ -447,7 +490,7 @@ func _on_confirm_merge() -> void:
 
 
 func _on_pass() -> void:
-	if box_open:
+	if box_open or game_menu_open:
 		return
 	if state == State.SETUP:
 		_spawn_wave(1)
@@ -467,7 +510,7 @@ func _process(delta: float) -> void:
 			_place(rng.randi() % stock.size(), open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if ceasefire_turns <= 0: # Cease Fire pauses the drain
+		if ceasefire_turns <= 0 and not game_menu_open: # menu open = paused
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -716,8 +759,8 @@ func _show_overlay(won: bool, reason: String) -> void:
 # --- input ---
 
 func _unhandled_input(event: InputEvent) -> void:
-	if preview_open:
-		return # the preview's Close button handles dismissal
+	if preview_open or game_menu_open:
+		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		drag_from = Vector2i(-1, -1)
 		press_tile = Vector2i(-1, -1)

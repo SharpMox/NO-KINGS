@@ -290,8 +290,18 @@ func _run_enemy_actions() -> void:
 		board[act.to] = board[act.from]
 		board.erase(act.from)
 		queue_redraw()
-		if act.to.y == 0:
+		if _back_row_breached():
 			return _game_over(false, "Back-row breach")
+
+
+## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;
+## a single enemy reaching row 0 no longer ends the run).
+func _back_row_breached() -> bool:
+	for x in Tuning.BOARD_W:
+		var t := Vector2i(x, 0)
+		if not board.has(t) or board[t].owner != Rules.ENEMY:
+			return false
+	return true
 
 
 func _cadence() -> int:
@@ -319,13 +329,15 @@ func _spawn_wave(n: int) -> void:
 
 func _spawn_pending() -> void:
 	while not pending_spawn.is_empty():
+		# spawns land on any top-row tile not held by an enemy; a friendly piece
+		# there is captured by the arrival (so the spawn row can't be blockaded)
 		var open: Array[Vector2i] = []
 		for x in Tuning.BOARD_W:
 			var pos := Vector2i(x, Tuning.SPAWN_ROW)
-			if not board.has(pos):
+			if not board.has(pos) or board[pos].owner == Rules.PLAYER:
 				open.append(pos)
 		if open.is_empty():
-			return # row full — spill to next player turn (per plan)
+			return # row full of enemies — spill to next player turn
 		var tile: Vector2i = open[rng.randi() % open.size()]
 		board[tile] = {"id": pending_spawn.pop_front(), "owner": Rules.ENEMY}
 

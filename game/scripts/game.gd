@@ -1100,7 +1100,8 @@ func _gain(amount: int) -> int:
 	for t in tariffs_active:
 		if t.key == "inflation":
 			out *= 0.9
-	return int(out)
+	# round, don't truncate: int() zeroed out pawn captures (1 * 0.9 -> 0)
+	return roundi(out)
 
 
 # --- items (single-use actives from the Items catalog) ---

@@ -6,7 +6,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 
 var main_box: VBoxContainer
-var test_box: VBoxContainer
+var test_scroll: ScrollContainer
 
 
 func _ready() -> void:
@@ -31,19 +31,20 @@ func _ready() -> void:
 	_button(main_box, "TEST", 24, _show_tests)
 	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
 
-	# scenario submenu: scrollable list, hidden until TEST
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.offset_left = 60
-	scroll.offset_top = 30
-	scroll.offset_right = -60
-	scroll.offset_bottom = -30
-	add_child(scroll)
-	test_box = VBoxContainer.new()
+	# scenario submenu: scrollable list, hidden until TEST — hide the SCROLL
+	# itself: a visible full-rect ScrollContainer eats every click beneath it
+	test_scroll = ScrollContainer.new()
+	test_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	test_scroll.offset_left = 60
+	test_scroll.offset_top = 30
+	test_scroll.offset_right = -60
+	test_scroll.offset_bottom = -30
+	test_scroll.visible = false
+	add_child(test_scroll)
+	var test_box := VBoxContainer.new()
 	test_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	test_box.add_theme_constant_override("separation", 6)
-	test_box.visible = false
-	scroll.add_child(test_box)
+	test_scroll.add_child(test_box)
 	var head := Label.new()
 	head.text = "Test scenarios"
 	head.add_theme_font_size_override("font_size", 28)
@@ -53,7 +54,7 @@ func _ready() -> void:
 			GameScript.next_config = s.cfg
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(test_box, "← Back", 20, func() -> void:
-		test_box.visible = false
+		test_scroll.visible = false
 		main_box.visible = true)
 
 	if args.has("--screenshot"):
@@ -66,7 +67,7 @@ func _ready() -> void:
 
 func _show_tests() -> void:
 	main_box.visible = false
-	test_box.visible = true
+	test_scroll.visible = true
 
 
 func _button(parent: Container, text: String, size: int, on_press: Callable) -> void:

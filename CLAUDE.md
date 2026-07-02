@@ -70,6 +70,12 @@ Not started yet. When it is, this is the intended setup:
   `godot-gdscript-patterns`, `godot-ui`, `godot-mcp`. When in doubt, load all four.
 - **Scope discipline.** No defensive code, speculative features, or backwards-compat
   shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the change.
+- **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the
+  headless sweeps: `godot --path game -s tests/test_menu_clicks.gd` and
+  `-s tests/test_game_clicks.gd` (windowed — Godot 4.6 headless drops GUI picking).
+  The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
+  layer entirely; they once green-lit a fully dead main menu. Extend the probes when
+  adding buttons/flows.
 
 ### Godot agent tools (MCP)
 

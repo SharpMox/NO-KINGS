@@ -7,7 +7,8 @@ const Rules := preload("res://scripts/rules.gd")
 func _init() -> void:
 	var missing := []
 	for id in Rules.load_pieces():
-		if not FileAccess.file_exists("res://assets/pieces/%s.png" % id):
+		if not FileAccess.file_exists("res://assets/pieces/%s.png" % id) \
+				and not FileAccess.file_exists("res://assets/pieces/%s.svg" % id):
 			missing.append(id)
 	if missing.is_empty():
 		print("ALL %d TOKENS PRESENT" % Rules.load_pieces().size())

@@ -101,7 +101,37 @@ func _init() -> void:
 	await process_frame
 	check(GameScript.next_army == "Wild Hunt", "army click stages its stock")
 
+	# Scores opens the local high-score list (fresh menu again: the army
+	# click above changed the scene)
+	menu.queue_free()
+	await process_frame
+	var f := FileAccess.open(GameScript.SCORES_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify([{"score": 512, "wave": 7, "kings": 0}]))
+	f = null
+	menu = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	check(await _click_button(menu, "Scores"), "Scores button clickable")
+	await process_frame
+	check(_find_label(menu, "512") != null, "score list shows the stored run")
+	check(await _click_button(menu, "← Back"), "scores Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "scores Back restores the main menu")
+	DirAccess.remove_absolute(GameScript.SCORES_PATH)
+
 	print("---")
 	if fails == 0:
 		print("ALL MENU CLICKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## First visible Label whose text contains `needle`.
+func _find_label(node: Node, needle: String) -> Label:
+	if node is Label and needle in node.text and node.is_visible_in_tree():
+		return node
+	for c in node.get_children():
+		var hit := _find_label(c, needle)
+		if hit:
+			return hit
+	return null

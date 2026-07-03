@@ -44,6 +44,11 @@ func _init() -> void:
 	check(a.clock_ms >= 100_000 + Tuning.KING_CLOCK_REFILL_MS,
 		"recurring King: clock refilled")
 	check(Rules.find_king(a.board, Rules.ENEMY).x < 0, "recurring King: king off the board")
+	check(a.lost_enemy == 1, "captured King counts as an enemy loss")
+	a._destroy(Vector2i(2, 3)) # item-style destruction of the player's queen
+	a._destroy(Vector2i(7, 12)) # and of the enemy rook
+	check(a.lost_player == 1 and a.lost_enemy == 2,
+		"destruction feeds the loss counters for both sides")
 	a.queue_free()
 	await process_frame
 

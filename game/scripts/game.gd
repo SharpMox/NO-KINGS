@@ -44,6 +44,8 @@ var wave := 0            # last spawned wave number
 var turns_since_wave := 0
 var kings_defeated := 0  # 1 = endless unlocked; end screens show it
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
+var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
+var lost_enemy := 0
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var score := 0:
 	set(value): # every gain/loss anywhere pops floating feedback (round 4)
@@ -169,6 +171,8 @@ func _apply_config(cfg: Dictionary) -> void:
 	wave = int(cfg.get("wave", Waves.WAVES.size()))
 	turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	kings_defeated = int(cfg.get("kings_defeated", 0))
+	lost_player = int(cfg.get("lost_player", 0))
+	lost_enemy = int(cfg.get("lost_enemy", 0))
 	pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
@@ -220,6 +224,7 @@ func _to_config() -> Dictionary:
 		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
 		"wave": wave, "turns_since_wave": turns_since_wave,
 		"kings_defeated": kings_defeated,
+		"lost_player": lost_player, "lost_enemy": lost_enemy,
 		"pending": pending_spawn.duplicate(true),
 		"score": score, "clock_s": clock_ms / 1000.0,
 		"sanctioned_id": sanctioned_id,
@@ -660,6 +665,7 @@ func _run_enemy_actions() -> void:
 		if not autoplay:
 			await get_tree().create_timer(0.35).timeout
 		if board.has(act.to):
+			lost_player += 1
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
@@ -746,6 +752,8 @@ func _spawn_pending() -> void:
 			return # row full of enemies — spill to next player turn
 		var spot: Vector2i = open[rng.randi() % open.size()]
 		var entry: Dictionary = pending_spawn.pop_front()
+		if board.has(spot): # arrival captures a friendly blockading the row
+			lost_player += 1
 		board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
 		if entry.get("buff", false):
 			board[spot].buff = true
@@ -811,8 +819,8 @@ func _show_overlay(won: bool, reason: String) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "%s\nScore %d · Deepest wave %d · Kings %d · Tariffs %d" \
-		% [reason, score, wave, kings_defeated, tariffs_seen.size()]
+	detail.text = "%s\nScore %d · Deepest wave %d · Kings %d · Tariffs %d\nPieces lost %d · Enemies slain %d" \
+		% [reason, score, wave, kings_defeated, tariffs_seen.size(), lost_player, lost_enemy]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -848,8 +856,8 @@ func _show_win_screen() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "Score %d · Wave %d · Tariffs %d\nContinue into endless waves?" \
-		% [score, wave, tariffs_seen.size()]
+	detail.text = "Score %d · Wave %d · Tariffs %d\nPieces lost %d · Enemies slain %d\nContinue into endless waves?" \
+		% [score, wave, tariffs_seen.size(), lost_player, lost_enemy]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -978,6 +986,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		var victim: Dictionary = board[to]
 		score += _gain(_capture_score(victim.id))
 		_charge("capture_cost")
+		lost_enemy += 1
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
 		else:
@@ -1429,6 +1438,10 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 
 ## Item destruction: piece leaves the board — no score, no captured stock.
 func _destroy(pos: Vector2i) -> void:
+	if board[pos].owner == Rules.PLAYER:
+		lost_player += 1
+	else:
+		lost_enemy += 1
 	_add_pop(pos)
 	board.erase(pos)
 

@@ -60,12 +60,10 @@ var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
-var press_tile := Vector2i(-1, -1) # candidate long-press (piece preview)
-var press_ms := 0
-var pool_press_id := "" # candidate long-press on a pool button
-var pool_press_ms := 0
+var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
+var pool_click_ms := 0
 var preview_open := false
-var placing_index := -1  # stock index being placed, -1 = none
+var placing_id := ""  # stock piece id being placed, "" = none
 var merge_mode := false
 var merge_sel: Array = [] # int = combined-pool index, Vector2i = board tile
 var merge_highlights := {} # ids that can merge right now (merge-mode UX)
@@ -304,7 +302,7 @@ func _build_hud() -> void:
 	merge_button.toggled.connect(func(on: bool) -> void:
 		merge_mode = on
 		merge_sel.clear()
-		placing_index = -1
+		placing_id = ""
 		selected = Vector2i(-1, -1)
 		legal_dests.clear()
 		_refresh())
@@ -355,10 +353,16 @@ func _pool() -> Array:
 	return stock + captured
 
 
-func _pool_take(index: int) -> String:
-	if index < stock.size():
-		return stock.pop_at(index)
-	return captured.pop_at(index - stock.size())
+func _stacks() -> Array:
+	# pool grouped for display/selection: stock stacks first, then captured
+	var out := []
+	for cap in [false, true]:
+		var counts := {}
+		for id in (captured if cap else stock):
+			counts[id] = counts.get(id, 0) + 1
+		for id in counts:
+			out.append({"id": id, "cap": cap, "count": counts[id]})
+	return out
 
 
 func _clock_text() -> String:
@@ -381,6 +385,10 @@ func _refresh() -> void:
 		State.GAME_OVER:
 			turn_label.text = ""
 	merge_highlights = _merge_highlight_ids() if merge_mode else {}
+	var all_ids: Array = _pool()
+	for pos in _player_pieces():
+		all_ids.append(board[pos].id)
+	merge_button.disabled = merges_left <= 0 or not Rules.has_merge(all_ids, defs, fusions)
 	var names := []
 	for t in tariffs_active:
 		names.append(t.name.trim_prefix("Tariff on "))
@@ -409,11 +417,10 @@ func _rebuild_item_strip() -> void:
 func _rebuild_pool_strip() -> void:
 	for c in pool_box.get_children():
 		c.queue_free()
-	var pool := _pool()
-	for i in pool.size():
+	for st in _stacks():
 		var btn := Button.new()
-		var from_captured: bool = i >= stock.size()
-		var id: String = pool[i]
+		var id: String = st.id
+		var sel_units := _sel_units(id, st.cap)
 		if textures.has(id): # piece icon instead of glyph text (round 3)
 			btn.icon = textures[id]
 			btn.expand_icon = true
@@ -421,23 +428,40 @@ func _rebuild_pool_strip() -> void:
 		else:
 			btn.text = defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)
-		btn.tooltip_text = defs[id].name + (" (captured)" if from_captured else "")
-		if merge_mode and merge_sel.has(i):
+		if st.count > 1 or (merge_mode and sel_units > 0):
+			# corner badge keeps the icon full-size (no inline text)
+			var badge := Label.new()
+			badge.text = "%d/%d" % [sel_units, st.count] if merge_mode and sel_units > 0 else str(st.count)
+			badge.add_theme_font_size_override("font_size", 11)
+			badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+			badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+			badge.add_theme_constant_override("outline_size", 4)
+			badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			badge.offset_left = -16
+			badge.offset_bottom = 12
+			btn.add_child(badge)
+		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
+		if merge_mode and sel_units > 0:
 			btn.modulate = Color(1.3, 1.15, 0.4)
 		elif merge_mode: # mergeable pieces pop; the rest dim
 			btn.modulate = Color(1.2, 1.05, 0.55) if merge_highlights.has(id) else Color(0.5, 0.5, 0.5)
-		elif placing_index == i:
+		elif placing_id == id and not st.cap:
 			btn.modulate = Color(0.6, 1.2, 0.6)
-		elif not from_captured and id == sanctioned_id and _tariff_on("sanctions"):
+		elif not st.cap and id == sanctioned_id and _tariff_on("sanctions"):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
-		elif from_captured:
+		elif st.cap:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
-		btn.pressed.connect(_on_pool_pressed.bind(i))
-		btn.button_down.connect(func() -> void:
-			pool_press_id = id
-			pool_press_ms = Time.get_ticks_msec())
-		btn.button_up.connect(func() -> void: pool_press_id = "")
+		btn.pressed.connect(_on_stack_pressed.bind(id, st.cap, st.count))
 		pool_box.add_child(btn)
+
+
+## Units of a stack currently in the merge selection.
+func _sel_units(id: String, cap: bool) -> int:
+	var n := 0
+	for ref in merge_sel:
+		if ref is Dictionary and ref.id == id and ref.cap == cap:
+			n += 1
+	return n
 
 
 ## Ids that can participate in a merge right now: with nothing selected, any id
@@ -468,30 +492,43 @@ func _merge_highlight_ids() -> Dictionary:
 
 
 func _merge_ids() -> Array:
-	var pool := _pool()
 	var ids := []
 	for ref in merge_sel:
-		ids.append(board[ref].id if ref is Vector2i else pool[ref])
+		ids.append(board[ref].id if ref is Vector2i else ref.id)
 	return ids
 
 
-func _on_pool_pressed(index: int) -> void:
+func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
 			or preview_open or game_menu_open:
 		return
+	# double-tap on the same stack: piece info (except in merge mode, where
+	# repeated taps pick units from the stack)
+	var key := id + ("!" if cap else "")
+	var now := Time.get_ticks_msec()
+	if not merge_mode and key == pool_click_key and now - pool_click_ms < 400:
+		pool_click_key = ""
+		return _show_preview(id)
+	pool_click_key = key
+	pool_click_ms = now
 	if merge_mode:
-		if merge_sel.has(index):
-			merge_sel.erase(index)
-		elif merge_sel.size() < 2:
-			merge_sel.append(index)
+		var entry := {"id": id, "cap": cap}
+		var units := _sel_units(id, cap)
+		if units > 0 and (units >= count or merge_sel.size() >= 2):
+			while merge_sel.has(entry): # tap a fully-selected stack: deselect
+				merge_sel.erase(entry)
+		elif merge_sel.size() < 2 and merge_highlights.has(id):
+			# only pieces with a live merge partner are selectable; with one
+			# selected, only its valid completions are
+			merge_sel.append(entry)
 	else:
-		# placement: only stock pieces are placeable (captured merge in first)
-		if index >= stock.size():
+		# placement: only stock stacks are placeable (captured merge in first)
+		if cap:
 			return
-		if stock[index] == sanctioned_id and _tariff_on("sanctions"):
+		if id == sanctioned_id and _tariff_on("sanctions"):
 			return
 		var can_place: bool = state == State.SETUP or placements_left > 0
-		placing_index = index if placing_index != index and can_place else -1
+		placing_id = id if placing_id != id and can_place else ""
 		selected = Vector2i(-1, -1)
 	_refresh()
 
@@ -509,17 +546,12 @@ func _on_confirm_merge() -> void:
 	# if any source stood on the board, the result appears on the LAST-selected
 	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
 	var result_tile := Vector2i(-1, -1)
-	var pool_refs: Array[int] = []
 	for ref in merge_sel:
 		if ref is Vector2i:
 			result_tile = ref # later selections win
 			board.erase(ref)
-		else:
-			pool_refs.append(ref)
-	pool_refs.sort()
-	pool_refs.reverse() # remove high indices first so the rest stay valid
-	for i in pool_refs:
-		_pool_take(i)
+		else: # a unit from a stack: remove one copy by value
+			(captured if ref.cap else stock).erase(ref.id)
 	if result_tile.x >= 0:
 		board[result_tile] = {"id": result, "owner": Rules.PLAYER}
 	else:
@@ -547,7 +579,7 @@ func _process(delta: float) -> void:
 		if stock.is_empty() or open.is_empty():
 			_on_pass()
 		else:
-			_place(rng.randi() % stock.size(), open[rng.randi() % open.size()])
+			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
 		if ceasefire_turns <= 0 and not game_menu_open: # menu open = paused
@@ -563,18 +595,6 @@ func _process(delta: float) -> void:
 			a.t += delta / a.get("dur", ANIM_TIME)
 		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
 		queue_redraw()
-	if press_tile.x >= 0 and not preview_open \
-			and Time.get_ticks_msec() - press_ms > 500: # long-press -> preview
-		var id: String = board[press_tile].id if board.has(press_tile) else ""
-		press_tile = Vector2i(-1, -1)
-		drag_from = Vector2i(-1, -1)
-		if id != "":
-			_show_preview(id)
-	if pool_press_id != "" and not preview_open \
-			and Time.get_ticks_msec() - pool_press_ms > 500:
-		var id := pool_press_id
-		pool_press_id = ""
-		_show_preview(id) # the release lands while preview_open and is swallowed
 
 
 # --- turn flow ---
@@ -605,7 +625,7 @@ func _begin_player_turn() -> void:
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	selected = Vector2i(-1, -1)
-	placing_index = -1
+	placing_id = ""
 	_item_reset()
 	merge_sel.clear()
 	merge_button.button_pressed = false # also resets merge_mode via its toggle
@@ -808,27 +828,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		drag_from = Vector2i(-1, -1)
-		press_tile = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion:
-		if press_tile.x >= 0 and event.button_mask & MOUSE_BUTTON_MASK_LEFT \
-				and event.position.distance_to(_tile_px(press_tile) + Vector2(tile, tile) / 2) > tile:
-			press_tile = Vector2i(-1, -1) # dragged away while held: not a long-press
 		if drag_from.x >= 0:
 			queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
-			if at.x >= 0 and board.has(at): # any piece: candidate long-press preview
-				press_tile = at
-				press_ms = Time.get_ticks_msec()
+			if event.double_click and at.x >= 0 and board.has(at) and not merge_mode:
+				drag_from = Vector2i(-1, -1)
+				return _show_preview(board[at].id) # double-tap: piece info
 			if at.x >= 0:
 				_on_tile_clicked(at)
 			# a fresh selection of an own piece also starts a potential drag
 			if selected == at and at.x >= 0:
 				drag_from = at
 		else:
-			press_tile = Vector2i(-1, -1)
 			if drag_from.x >= 0: # release ends a drag
 				var t := _tile_at(event.position)
 				var from := drag_from
@@ -856,14 +871,14 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		if board.has(tile) and board[tile].owner == Rules.PLAYER:
 			if merge_sel.has(tile):
 				merge_sel.erase(tile)
-			elif merge_sel.size() < 2:
-				merge_sel.append(tile)
+			elif merge_sel.size() < 2 and merge_highlights.has(board[tile].id):
+				merge_sel.append(tile) # only pieces with a live merge partner
 			_refresh()
 		return
-	if placing_index >= 0:
+	if placing_id != "":
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
 		if ok and not board.has(tile):
-			_place(placing_index, tile)
+			_place(placing_id, tile)
 		return
 	if state != State.PLAYER_TURN:
 		return
@@ -880,10 +895,10 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		_refresh()
 
 
-func _place(pool_index: int, tile: Vector2i) -> void:
-	var id := _pool_take(pool_index)
+func _place(id: String, tile: Vector2i) -> void:
+	stock.erase(id)
 	board[tile] = {"id": id, "owner": Rules.PLAYER}
-	placing_index = -1
+	placing_id = ""
 	if state == State.PLAYER_TURN:
 		placements_left -= 1
 		turn_action_count += 1
@@ -1169,7 +1184,7 @@ func _use_item(index: int) -> void:
 	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
 	selected = Vector2i(-1, -1)
 	legal_dests.clear()
-	placing_index = -1
+	placing_id = ""
 	_refresh()
 
 
@@ -1446,8 +1461,7 @@ func _autoplay_step() -> void:
 	if placements_left > 0 and not stock.is_empty():
 		var tiles := Rules.placement_tiles(board)
 		if not tiles.is_empty():
-			placing_index = rng.randi() % stock.size()
-			_place(placing_index, tiles[rng.randi() % tiles.size()])
+			_place(stock[rng.randi() % stock.size()], tiles[rng.randi() % tiles.size()])
 			return
 	if _autoplay_merge():
 		return
@@ -1487,11 +1501,15 @@ func _autoplay_use_item() -> void:
 
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.
 func _autoplay_merge() -> bool:
-	var pool := _pool()
-	for i in pool.size():
-		for j in range(i + 1, pool.size()):
-			if Rules.merge_result([pool[i], pool[j]], defs, fusions) != "":
-				merge_sel.assign([i, j])
+	var units := []
+	for id in stock:
+		units.append({"id": id, "cap": false})
+	for id in captured:
+		units.append({"id": id, "cap": true})
+	for i in units.size():
+		for j in range(i + 1, units.size()):
+			if Rules.merge_result([units[i].id, units[j].id], defs, fusions) != "":
+				merge_sel.assign([units[i], units[j]])
 				_on_confirm_merge()
 				return true
 	return false
@@ -1503,7 +1521,7 @@ func _screenshot_and_quit(dir: String) -> void:
 	await get_tree().process_frame # let _ready finish first
 	var open := _setup_open_tiles()
 	while not stock.is_empty() and not open.is_empty():
-		_place(rng.randi() % stock.size(), open.pop_at(rng.randi() % open.size()))
+		_place(stock[rng.randi() % stock.size()], open.pop_at(rng.randi() % open.size()))
 	_on_pass()
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
@@ -1544,7 +1562,7 @@ func _draw() -> void:
 			draw_arc(_tile_px(d) + Vector2(tile, tile) / 2, tile * 0.44, 0, TAU, 32, COL_CAPTURE, 3.0)
 		else:
 			draw_circle(_tile_px(d) + Vector2(tile, tile) / 2, 10, COL_MOVE)
-	if placing_index >= 0:
+	if placing_id != "":
 		var tiles := _setup_open_tiles() if state == State.SETUP else Rules.placement_tiles(board)
 		for t in tiles:
 			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
@@ -1560,6 +1578,9 @@ func _draw() -> void:
 		var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
 		if pos == drag_from:
 			tint.a = 0.35 # ghost follows the cursor instead
+		elif merge_mode and p.owner == Rules.PLAYER and not merge_highlights.has(p.id) \
+				and not merge_sel.has(pos):
+			tint = Color(0.55, 0.55, 0.55) # not mergeable right now
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		_draw_piece(font, p, px, tint)

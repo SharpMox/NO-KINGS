@@ -138,6 +138,20 @@ func _init() -> void:
 	b = {Vector2i(2, 7): piece("king", Rules.ENEMY), Vector2i(4, 5): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
 	check(act.from == Vector2i(4, 5), "King stays put; escort advances")
+	# Back-row commitment: a lone rook at row 1 holds out of row 0...
+	b = {Vector2i(3, 1): piece("rook", Rules.ENEMY)}
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty() or act.to.y != 0, "lone enemy does not enter the back row")
+	# ...but with enough massed to fill every column, entering row 0 is on.
+	b = {}
+	for x in Rules.Tuning.BOARD_W:
+		b[Vector2i(x, 1)] = piece("pawn", Rules.ENEMY)
+	act = Rules.ai_action(b, defs)
+	check(not act.is_empty() and act.to.y == 0, "a full-width swarm commits to the back row")
+	# one short of full width still holds
+	b.erase(Vector2i(0, 1))
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty() or act.to.y != 0, "one short of full width still holds")
 
 	print("---")
 	if fails == 0:

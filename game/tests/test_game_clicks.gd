@@ -60,11 +60,11 @@ func _init() -> void:
 	_click(game.merge_button.get_global_rect().get_center())
 	await process_frame
 	check(game.merge_mode, "Merge button toggles merge mode")
-	check(game.pool_box.get_child_count() == 2, "pool strip shows the 2 captured pawns")
-	for i in 2: # strip rebuilds after each click — re-fetch, never cache
+	check(game.pool_box.get_child_count() == 1, "2 captured pawns show as one stack")
+	for i in 2: # two taps on the stack pick two units; strip rebuilds each time
 		var live: Array = game.pool_box.get_children().filter(
 			func(b: Node) -> bool: return not b.is_queued_for_deletion())
-		_click(live[i].get_global_rect().get_center())
+		_click(live[0].get_global_rect().get_center())
 		await process_frame
 		await process_frame
 	check(game.merge_sel.size() == 2, "pool clicks select merge sources")
@@ -82,21 +82,22 @@ func _init() -> void:
 	await create_timer(1.0).timeout # enemy turn runs (animated path)
 	check(game.state == game.State.PLAYER_TURN, "PASS cycles through the enemy turn")
 
-	# long-press on the queen opens the piece preview; Close dismisses it
+	# double-tap on the queen opens the piece preview; Close dismisses it
 	var at: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
+	_click(at)
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
+	press.double_click = true
 	press.position = at
 	press.global_position = at
 	root.push_input(press)
-	await create_timer(0.7).timeout
-	check(game.preview_open, "long-press opens the piece preview")
 	var release: InputEventMouseButton = press.duplicate()
 	release.pressed = false
+	release.double_click = false
 	root.push_input(release)
 	await process_frame
-	check(game.preview_open, "release while previewing does not close it")
+	check(game.preview_open, "double-tap opens the piece preview")
 	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable")
 	await process_frame
 	check(not game.preview_open, "Close dismisses the preview")

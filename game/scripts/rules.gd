@@ -172,16 +172,30 @@ static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
 		return _best_capture(board, moves, defs) if _has_capture(board, moves) else moves[0]
 	if _has_capture(board, moves):
 		return _best_capture(board, moves, defs)
+	# only commit pieces INTO the back row once enough force is massed nearby —
+	# trickling in one at a time just feeds the player captures
+	var near := 0
+	for pos in board:
+		if board[pos].owner == ENEMY and pos.y <= Tuning.BACKROW_NEAR_ROWS:
+			near += 1
+	var commit := near >= Tuning.BACKROW_COMMIT_COUNT
 	var best := {}
 	var best_key := Vector2i(Tuning.BOARD_H, Tuning.BOARD_H)
 	for m in moves:
 		if board[m.from].id == "king":
 			continue # the King never advances voluntarily
+		if not commit and m.to.y == 0:
+			continue # hold at row 1 until the swarm is big enough
 		var key := Vector2i(m.to.y, m.from.y) # min dest row, then most advanced piece
 		if m.to.y < m.from.y and key < best_key:
 			best_key = key
 			best = m
-	return best if not best.is_empty() else moves[0]
+	if not best.is_empty():
+		return best
+	for m in moves: # fallback shuffle also respects the back-row hold
+		if commit or m.to.y != 0:
+			return m
+	return {} # nothing but back-row entries available: hold this action
 
 
 static func _has_capture(board: Dictionary, moves: Array[Dictionary]) -> bool:

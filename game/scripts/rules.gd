@@ -33,6 +33,23 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 	for m in def.moves:
 		if mode_filter != "" and m.mode != "both" and m.mode != mode_filter:
 			continue
+		if m.type == "bent": # one step to the pivot, then ride outward from it
+			var pivot := from + Vector2i(int(m.pivot[0]), int(m.pivot[1]) * mirror)
+			if not in_bounds(pivot):
+				continue
+			_add_dest(board, from, pivot, piece.owner, m.mode, out)
+			if board.has(pivot):
+				continue # anything on the pivot blocks the continuation
+			var bstep := Vector2i(int(m.dir[0]), int(m.dir[1]) * mirror)
+			var bpos := pivot
+			while true:
+				bpos += bstep
+				if not in_bounds(bpos):
+					break
+				_add_dest(board, from, bpos, piece.owner, m.mode, out)
+				if board.has(bpos):
+					break
+			continue
 		for dir in m.dirs:
 			var step := Vector2i(int(dir[0]), int(dir[1]) * mirror)
 			if m.type == "leap":

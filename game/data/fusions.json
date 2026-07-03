@@ -23,5 +23,16 @@
  "dragon-horse+knight": "crown-princess",
  "archbishop+wazir": "crown-princess",
  "archbishop+dragon-horse": "crown-princess",
- "dragon-horse+high-priestess": "crown-princess"
+ "dragon-horse+high-priestess": "crown-princess",
+ "banshee+raven": "amazonrider",
+ "bishop+raven": "amazonrider",
+ "banshee+rook": "amazonrider",
+ "banshee+queen": "amazonrider",
+ "queen+raven": "amazonrider",
+ "ferz+rook": "gryphon",
+ "bishop+wazir": "manticore",
+ "archbishop+knight": "banshee",
+ "chancellor+knight": "raven",
+ "amazon+knight": "amazonrider",
+ "gryphon+manticore": "godzilla"
 }

@@ -12,8 +12,12 @@ const Scenarios := preload("res://data/scenarios.gd")
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
 ## Boot config for the next Game scene (menu sets it; Restart replays it).
-## Shape documented in data/scenarios.gd — this is the future save format.
+## Shape documented in data/scenarios.gd — the save file uses the same format.
 static var next_config := {}
+## TEST-menu / CLI scenario runs never autosave over the real run.
+static var is_scenario := false
+
+const SAVE_PATH := "user://save.json"
 
 const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
@@ -136,6 +140,7 @@ func _ready() -> void:
 	_build_hud()
 	if args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
+		is_scenario = true
 	merges_left = Tuning.MERGES_PER_TURN
 	if next_config.is_empty():
 		stock = Tuning.STARTING_STOCK.duplicate()
@@ -155,11 +160,12 @@ func _ready() -> void:
 func _apply_config(cfg: Dictionary) -> void:
 	stock = cfg.get("stock", []).duplicate()
 	captured = cfg.get("captured", []).duplicate()
-	score = cfg.get("score", 0)
+	score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
 	clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
 	# default: all designed waves done, so nothing spawns into the sandbox
-	wave = cfg.get("wave", Waves.WAVES.size())
-	turns_since_wave = cfg.get("turns_since_wave", 0)
+	wave = int(cfg.get("wave", Waves.WAVES.size()))
+	turns_since_wave = int(cfg.get("turns_since_wave", 0))
+	pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
 		if p.size() > 4 and p[4] == "buff":
@@ -177,11 +183,45 @@ func _apply_config(cfg: Dictionary) -> void:
 		_activate_tariff_by_key(key)
 	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
 		sanctioned_id = cfg.sanctioned_id
-	# ponytail: not yet in the config shape — mid-turn state (moves/placements
-	# left, moved_this_turn) and item counters (free_placements, ceasefire,
-	# skip_enemy_turns, counter_intel_turns, recent_place_costs). Add when the
-	# save system lands; scenario boots always start at a fresh turn.
+	if cfg.has("tariffs_seen"): # activation above re-logged; restore the truth
+		tariffs_seen = cfg.tariffs_seen.duplicate()
 	_begin_player_turn()
+	# item-effect counters restore AFTER the turn reset (a save is always taken
+	# at a turn start, so move/place/merge budgets are simply fresh)
+	free_placements = int(cfg.get("free_placements", 0))
+	ceasefire_turns = int(cfg.get("ceasefire_turns", 0))
+	skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
+	counter_intel_turns = int(cfg.get("counter_intel_turns", 0))
+	recent_place_costs.clear()
+	for c in cfg.get("recent_place_costs", []):
+		recent_place_costs.append(int(c)) # JSON numbers arrive as floats
+
+
+## The inverse of _apply_config: the live run as a JSON-safe config Dictionary.
+func _to_config() -> Dictionary:
+	var b := []
+	for pos in board:
+		var row := [board[pos].id, board[pos].owner, pos.x, pos.y]
+		if board[pos].get("buff", false):
+			row.append("buff")
+		b.append(row)
+	var keys_of := func(arr: Array) -> Array:
+		var out := []
+		for e in arr:
+			out.append(e.key)
+		return out
+	return {
+		"board": b, "stock": stock.duplicate(), "captured": captured.duplicate(),
+		"items": keys_of.call(items), "trinkets": keys_of.call(trinkets),
+		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
+		"wave": wave, "turns_since_wave": turns_since_wave,
+		"pending": pending_spawn.duplicate(true),
+		"score": score, "clock_s": clock_ms / 1000.0,
+		"sanctioned_id": sanctioned_id,
+		"free_placements": free_placements, "ceasefire_turns": ceasefire_turns,
+		"skip_enemy_turns": skip_enemy_turns, "counter_intel_turns": counter_intel_turns,
+		"recent_place_costs": recent_place_costs.duplicate(),
+	}
 
 
 func _build_hud() -> void:
@@ -556,6 +596,9 @@ func _begin_player_turn() -> void:
 	_spawn_pending()
 	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
+	if not autoplay and not is_scenario: # autosave at every turn start
+		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+		f.store_string(JSON.stringify(_to_config()))
 	_refresh()
 
 
@@ -707,6 +750,8 @@ func _player_pieces() -> Array[Vector2i]:
 
 func _game_over(won: bool, reason: String) -> void:
 	state = State.GAME_OVER
+	if not is_scenario and FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
 	_show_overlay(won, reason)
 	_refresh()
 	if autoplay:

@@ -25,8 +25,15 @@ func _ready() -> void:
 	title.text = "NO KINGS"
 	title.add_theme_font_size_override("font_size", 48)
 	main_box.add_child(title)
+	if FileAccess.file_exists(GameScript.SAVE_PATH):
+		_button(main_box, "Continue", 32, func() -> void:
+			GameScript.next_config = JSON.parse_string(
+				FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+			GameScript.is_scenario = false
+			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "Play", 32, func() -> void:
 		GameScript.next_config = {}
+		GameScript.is_scenario = false
 		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "TEST", 24, _show_tests)
 	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
@@ -52,6 +59,7 @@ func _ready() -> void:
 	for s in Scenarios.all():
 		_button(test_box, s.name, 17, func() -> void:
 			GameScript.next_config = s.cfg
+			GameScript.is_scenario = true # scenarios never autosave
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false

@@ -142,13 +142,16 @@ func _init() -> void:
 	b = {Vector2i(3, 1): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
 	check(act.is_empty() or act.to.y != 0, "lone enemy does not enter the back row")
-	# ...but with a swarm massed near the bottom, entering row 0 is on.
+	# ...but with enough massed to fill every column, entering row 0 is on.
 	b = {}
-	for x in 5:
+	for x in Rules.Tuning.BOARD_W:
 		b[Vector2i(x, 1)] = piece("pawn", Rules.ENEMY)
-	b[Vector2i(5, 2)] = piece("rook", Rules.ENEMY)
 	act = Rules.ai_action(b, defs)
-	check(not act.is_empty() and act.to.y == 0, "massed enemies commit to the back row")
+	check(not act.is_empty() and act.to.y == 0, "a full-width swarm commits to the back row")
+	# one short of full width still holds
+	b.erase(Vector2i(0, 1))
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty() or act.to.y != 0, "one short of full width still holds")
 
 	print("---")
 	if fails == 0:

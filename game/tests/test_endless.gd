@@ -52,6 +52,23 @@ func _init() -> void:
 	a.queue_free()
 	await process_frame
 
+	# --- review bug 2: Trade War's +1 piece must never duplicate the King ---
+	var tw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]], "wave": 99,
+		"tariffs": ["trade_war"]})
+	await process_frame
+	var double_king := false
+	for i in 200:
+		tw.pending_spawn.clear()
+		tw._queue_wave(100)
+		var kings := 0
+		for e in tw.pending_spawn:
+			if e.id == "king":
+				kings += 1
+		double_king = double_king or kings > 1
+	check(not double_king, "Trade War never queues a second King (200 rolls)")
+	tw.queue_free()
+	await process_frame
+
 	# --- wave-50 first King: win screen pauses the run; Continue = endless ---
 	var b := _boot(_king_cfg(50, 0))
 	await process_frame

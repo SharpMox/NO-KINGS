@@ -60,11 +60,11 @@ func _init() -> void:
 	_click(game.merge_button.get_global_rect().get_center())
 	await process_frame
 	check(game.merge_mode, "Merge button toggles merge mode")
-	check(game.pool_box.get_child_count() == 2, "pool strip shows the 2 captured pawns")
-	for i in 2: # strip rebuilds after each click — re-fetch, never cache
+	check(game.pool_box.get_child_count() == 1, "2 captured pawns show as one stack")
+	for i in 2: # two taps on the stack pick two units; strip rebuilds each time
 		var live: Array = game.pool_box.get_children().filter(
 			func(b: Node) -> bool: return not b.is_queued_for_deletion())
-		_click(live[i].get_global_rect().get_center())
+		_click(live[0].get_global_rect().get_center())
 		await process_frame
 		await process_frame
 	check(game.merge_sel.size() == 2, "pool clicks select merge sources")

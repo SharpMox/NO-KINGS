@@ -19,7 +19,8 @@ func check(cond: bool, label: String) -> void:
 
 
 func _find_button(node: Node, text: String) -> Button:
-	if node is Button and node.text == text:
+	# visible-first: "← Back" exists in both the TEST and army submenus
+	if node is Button and node.text == text and node.is_visible_in_tree():
 		return node
 	for c in node.get_children():
 		var hit := _find_button(c, text)
@@ -63,14 +64,13 @@ func _init() -> void:
 	# the hidden submenu's ScrollContainer swallowed every mouse event)
 	check(await _click_button(menu, "TEST"), "TEST button visible")
 	await process_frame
-	check(_find_button(menu, "← Back") != null and _find_button(menu, "← Back").is_visible_in_tree(),
-		"TEST opens the scenario list")
+	check(_find_button(menu, "← Back") != null, "TEST opens the scenario list")
 
 	# Back returns to the main menu
 	check(await _click_button(menu, "← Back"), "Back button clickable")
 	await process_frame
-	check(_find_button(menu, "Play").is_visible_in_tree(), "Back restores the main menu")
-	check(not _find_button(menu, "← Back").is_visible_in_tree(), "scenario list hidden again")
+	check(_find_button(menu, "Play") != null, "Back restores the main menu")
+	check(_find_button(menu, "← Back") == null, "scenario list hidden again")
 
 	# a scenario button loads its config into the game boot slot
 	await _click_button(menu, "TEST")
@@ -79,6 +79,27 @@ func _init() -> void:
 	check(await _click_button(menu, "King wave (checkmate to win)"), "scenario button clickable")
 	await process_frame
 	check(not GameScript.next_config.is_empty(), "scenario click stages its config")
+
+	# Play opens the army select; picking an army stages a fresh run.
+	# Fresh menu: the scenario click above tried to change the scene.
+	menu.queue_free()
+	await process_frame
+	menu = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	check(await _click_button(menu, "Play"), "Play button clickable")
+	await process_frame
+	check(_find_button(menu, "Crown") != null, "Play opens the army select")
+	check(await _click_button(menu, "← Back"), "army Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "army Back restores the main menu")
+	await _click_button(menu, "Play")
+	await process_frame
+	GameScript.next_army = ""
+	check(await _click_button(menu, "Wild Hunt"), "army button clickable")
+	await process_frame
+	check(GameScript.next_army == "Wild Hunt", "army click stages its stock")
 
 	print("---")
 	if fails == 0:

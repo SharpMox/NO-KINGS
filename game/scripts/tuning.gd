@@ -34,9 +34,20 @@ const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 const TARIFF_ACTION_COST := 20     # per tariffed action
 const TARIFF_LR_PER_SQUARE := 10   # Tariff on Long-Range, per square moved
 
-# Starting Stock (12 = fills the placement zone exactly). Fairy bases included
-# because enemies only field pawn/bishop/knight/rook — see plan, grilled 2026-07-02.
-const STARTING_STOCK: Array = [
-	"pawn", "pawn", "knight", "bishop", "rook",
-	"ferz", "ferz", "ferz", "wazir", "wazir", "kirin", "alibaba",
-]
+# Armies (grilled 2026-07-03, replaces the fixed STARTING_STOCK): three
+# 12-piece starting stocks, chain-base pieces only, totals roughly equal and
+# below the old stock's 280 ("too strong"). Each army's identity is its
+# signature piece and merge chain — the GDD's "unique Queen", trimmed: team
+# abilities and Piece Cases are deferred upstream gaps.
+const ARMIES := {
+	"Crown": [ # classic chess — signature rook (260)
+		"pawn", "pawn", "pawn", "pawn", "pawn",
+		"bishop", "bishop", "knight", "knight", "rook", "ferz", "wazir"],
+	"Wild Hunt": [ # leapers — signature kirin (250)
+		"pawn", "pawn", "pawn", "knight", "knight",
+		"kirin", "kirin", "alibaba", "alibaba", "ferz", "ferz", "wazir"],
+	"Old Guard": [ # fairy walkers, fastest merge fodder — signature ferz (220)
+		"ferz", "ferz", "ferz", "ferz", "wazir", "wazir", "wazir", "wazir",
+		"berolina", "berolina", "alibaba", "alibaba"],
+}
+const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu

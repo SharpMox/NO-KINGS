@@ -22,9 +22,9 @@ func piece(id: String, owner: int) -> Dictionary:
 
 func _init() -> void:
 	var defs := Rules.load_pieces()
-	check(defs.size() == 28, "28 piece defs load")
+	check(defs.size() == 39, "39 piece defs load")
 	var fus := Rules.load_fusions()
-	check(fus.size() >= 20, "fusion table loads")
+	check(fus.size() == 36, "full fusion table loads")
 
 	# --- move-gen: pawn asymmetry + enemy mirroring ---
 	var b := {Vector2i(2, 2): piece("pawn", Rules.PLAYER)}
@@ -72,6 +72,24 @@ func _init() -> void:
 	check(Rules.moves_for(b, Vector2i(3, 3), defs).has(Vector2i(4, 4)),
 		"archer captures diagonally (capture-only squares)")
 
+	# --- move-gen: nightrider chains (Banshee/Raven/Valkyrie) ---
+	b = {Vector2i(3, 3): piece("banshee", Rules.PLAYER)}
+	var nr := Rules.moves_for(b, Vector2i(3, 3), defs)
+	check(nr.has(Vector2i(4, 5)) and nr.has(Vector2i(5, 7)), "nightrider rides repeated leaps")
+	b[Vector2i(4, 5)] = piece("pawn", Rules.PLAYER)
+	nr = Rules.moves_for(b, Vector2i(3, 3), defs)
+	check(not nr.has(Vector2i(5, 7)), "a blocker on the chain stops the nightrider")
+
+	# --- move-gen: bent-riders (Gryphon) ---
+	b = {Vector2i(2, 2): piece("gryphon", Rules.PLAYER)}
+	var gm := Rules.moves_for(b, Vector2i(2, 2), defs)
+	check(gm.has(Vector2i(3, 3)), "gryphon can stop on the pivot")
+	check(gm.has(Vector2i(3, 6)), "gryphon rides outward beyond the pivot")
+	check(not gm.has(Vector2i(4, 4)), "gryphon does not continue diagonally")
+	b[Vector2i(3, 3)] = piece("pawn", Rules.PLAYER)
+	gm = Rules.moves_for(b, Vector2i(2, 2), defs)
+	check(not gm.has(Vector2i(3, 5)), "a piece on the pivot blocks the whole branch")
+
 	# --- merges: pairs only (round 3) ---
 	check(Rules.merge_result(["ferz", "ferz"], defs, fus) == "elephant-modern",
 		"2 same -> next chain stage")
@@ -83,6 +101,8 @@ func _init() -> void:
 		"fusion is order-agnostic")
 	check(Rules.merge_result(["knight", "alibaba"], defs, fus) == "squirrel",
 		"fusion can produce fusion-only pieces")
+	check(Rules.merge_result(["ferz", "rook"], defs, fus) == "gryphon",
+		"bent-rider fusions are live (Seer + Rook -> Gryphon)")
 	check(Rules.merge_result(["pawn", "rook"], defs, fus) == "",
 		"non-fusion pair does not merge")
 	check(Rules.merge_result(["pawn", "pawn", "pawn"], defs, fus) == "",

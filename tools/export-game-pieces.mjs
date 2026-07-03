@@ -1,5 +1,5 @@
-// Exports the 25 MVP piece defs (8 promotion chains × 3 stages + King) from the
-// canonical codex data into game/data/pieces.json for the Godot game.
+// Exports ALL codex pieces (38) + the King into game/data/pieces.json for the
+// Godot game, plus the full fusion table.
 // Run manually after editing data/pieces-codex.js or data/promotions.js:
 //   node tools/export-game-pieces.mjs
 import { createRequire } from "node:module";
@@ -13,10 +13,6 @@ const PIECES = require(join(root, "data/pieces-codex.js"));
 const CHAINS = require(join(root, "data/promotions.js"));
 const FUSIONS = require(join(root, "data/fusions.js"));
 
-// Fusion results reachable by the move interpreter (leap/ride only) that are
-// not chain pieces. Bent-riders and nightriders (gryphon, manticore, godzilla,
-// banshee, raven, amazonrider) stay out until the interpreter supports them.
-const EXTRA_IDS = ["squirrel", "crown-princess", "amazon"];
 
 // Game-side point values (codex has none). Used for capture score, AI trade
 // decisions, and the 3-different-merge "lowest value" rule.
@@ -31,6 +27,11 @@ const VALUES = {
   kirin: 30, "kirin-plus": 50, "kirin-plus-plus": 80,
   alibaba: 20, bodyguard: 50, queen: 90,
   squirrel: 50, "crown-princess": 80, amazon: 120,
+  // full-set additions (2026-07-03): void pieces + riders and bent-riders
+  berolina: 10, "inv-sergeant": 20, "inv-arrow-pawn": 30,
+  "inv-kirin-plus": 50, "inv-kirin-plus-plus": 80,
+  gryphon: 60, manticore: 60, godzilla: 110,
+  banshee: 80, raven: 90, amazonrider: 140,
   king: 40,
 };
 
@@ -48,6 +49,16 @@ const OVERRIDES = {
     { type: "ride", dirs: [[1, 0], [-1, 0], [0, 1], [0, -1]], range: 2, mode: "move" },
     { type: "leap", dirs: [[1, 1], [-1, 1], [1, -1], [-1, -1]], mode: "capture" },
   ],
+  // mfFcfWimfnA: the Pawn's mirror; drop the double-step like the pawn's.
+  berolina: [
+    { type: "leap", dirs: [[1, 1], [-1, 1]], mode: "move" },
+    { type: "leap", dirs: [[0, 1]], mode: "capture" },
+  ],
+  // mF2cW: the Void Archer's F2 slides diagonally (can't jump).
+  "inv-arrow-pawn": [
+    { type: "ride", dirs: [[1, 1], [-1, 1], [1, -1], [-1, -1]], range: 2, mode: "move" },
+    { type: "leap", dirs: [[1, 0], [-1, 0], [0, 1], [0, -1]], mode: "capture" },
+  ],
 };
 
 const KIND_TO_MODE = { dots: "both", rings: "move", xs: "capture" };
@@ -57,6 +68,12 @@ function convertMoves(piece) {
   return piece.moves.map((m) => {
     if (m.kind === "rays") {
       return { type: "ride", dirs: m.dirs, range: m.maxRange ?? 0, mode: "both" };
+    }
+    if (m.kind === "rider") { // nightrider chains: a ride whose step is a leap
+      return { type: "ride", dirs: [m.step], range: 0, mode: "both" };
+    }
+    if (m.kind === "bent-rider") { // one step to pivot, then ride outward
+      return { type: "bent", pivot: m.pivot, dir: m.dir, mode: "both" };
     }
     const mode = KIND_TO_MODE[m.kind];
     if (!mode) throw new Error(`${piece.id}: unhandled move kind "${m.kind}"`);
@@ -71,10 +88,8 @@ for (const chain of CHAINS) {
   next[mid] = end;
 }
 
-const mvpIds = new Set(CHAINS.flatMap((c) => c.ids).concat(EXTRA_IDS));
 const out = {};
 for (const p of PIECES) {
-  if (!mvpIds.has(p.id)) continue;
   out[p.id] = {
     id: p.id,
     name: p.name,
@@ -91,7 +106,7 @@ out.king = { // not in the codex (the game is NO-KINGS; only the enemy fields on
 
 const missing = Object.values(out).filter((p) => p.value == null);
 if (missing.length) throw new Error("missing values: " + missing.map((p) => p.id));
-if (Object.keys(out).length !== 28) throw new Error(`expected 28 defs, got ${Object.keys(out).length}`);
+if (Object.keys(out).length !== 39) throw new Error(`expected 39 defs, got ${Object.keys(out).length}`);
 
 writeFileSync(join(root, "game/data/pieces.json"), JSON.stringify(out, null, 1) + "\n");
 console.log(`wrote game/data/pieces.json (${Object.keys(out).length} pieces)`);

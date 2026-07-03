@@ -3,7 +3,7 @@
   "id": "pawn",
   "name": "Pawn",
   "glyph": "♟",
-  "value": 1,
+  "value": 10,
   "next": "sergeant",
   "moves": [
    {
@@ -36,7 +36,7 @@
   "id": "sergeant",
   "name": "Ranger",
   "glyph": "SG",
-  "value": 2,
+  "value": 20,
   "next": "arrow-pawn",
   "moves": [
    {
@@ -89,7 +89,7 @@
   "id": "arrow-pawn",
   "name": "Archer",
   "glyph": "AP",
-  "value": 3,
+  "value": 30,
   "next": null,
   "moves": [
    {
@@ -143,7 +143,7 @@
   "id": "ferz",
   "name": "Seer",
   "glyph": "F",
-  "value": 2,
+  "value": 20,
   "next": "elephant-modern",
   "moves": [
    {
@@ -174,7 +174,7 @@
   "id": "elephant-modern",
   "name": "Mystic",
   "glyph": "EM",
-  "value": 3,
+  "value": 30,
   "next": "high-priestess",
   "moves": [
    {
@@ -221,7 +221,7 @@
   "id": "high-priestess",
   "name": "High Priestess",
   "glyph": "HP",
-  "value": 5,
+  "value": 50,
   "next": null,
   "moves": [
    {
@@ -300,7 +300,7 @@
   "id": "wazir",
   "name": "Mage",
   "glyph": "W",
-  "value": 2,
+  "value": 20,
   "next": "war-machine",
   "moves": [
    {
@@ -331,7 +331,7 @@
   "id": "war-machine",
   "name": "Sorcerer",
   "glyph": "WM",
-  "value": 3,
+  "value": 30,
   "next": "champion",
   "moves": [
    {
@@ -378,7 +378,7 @@
   "id": "champion",
   "name": "Archmage",
   "glyph": "Ch",
-  "value": 5,
+  "value": 50,
   "next": null,
   "moves": [
    {
@@ -441,7 +441,7 @@
   "id": "bishop",
   "name": "Bishop",
   "glyph": "♝",
-  "value": 3,
+  "value": 30,
   "next": "dragon-horse",
   "moves": [
    {
@@ -473,7 +473,7 @@
   "id": "dragon-horse",
   "name": "Paladin",
   "glyph": "馬",
-  "value": 5,
+  "value": 50,
   "next": "archbishop",
   "moves": [
    {
@@ -527,7 +527,7 @@
   "id": "archbishop",
   "name": "Archbishop",
   "glyph": "AR",
-  "value": 7,
+  "value": 70,
   "next": null,
   "moves": [
    {
@@ -597,7 +597,7 @@
   "id": "rook",
   "name": "Rook",
   "glyph": "♜",
-  "value": 5,
+  "value": 50,
   "next": "dragon-king",
   "moves": [
    {
@@ -629,7 +629,7 @@
   "id": "dragon-king",
   "name": "Drake",
   "glyph": "龍",
-  "value": 7,
+  "value": 70,
   "next": "chancellor",
   "moves": [
    {
@@ -683,7 +683,7 @@
   "id": "chancellor",
   "name": "Dragonlord",
   "glyph": "CH",
-  "value": 8,
+  "value": 80,
   "next": null,
   "moves": [
    {
@@ -753,7 +753,7 @@
   "id": "knight",
   "name": "Knight",
   "glyph": "♞",
-  "value": 3,
+  "value": 30,
   "next": "gnu",
   "moves": [
    {
@@ -800,7 +800,7 @@
   "id": "gnu",
   "name": "Hippogriff",
   "glyph": "GU",
-  "value": 5,
+  "value": 50,
   "next": "buffalo",
   "moves": [
    {
@@ -879,7 +879,7 @@
   "id": "buffalo",
   "name": "Behemoth",
   "glyph": "BF",
-  "value": 7,
+  "value": 70,
   "next": null,
   "moves": [
    {
@@ -990,7 +990,7 @@
   "id": "kirin",
   "name": "Kirin",
   "glyph": "Ki",
-  "value": 3,
+  "value": 30,
   "next": "kirin-plus",
   "moves": [
    {
@@ -1037,7 +1037,7 @@
   "id": "kirin-plus",
   "name": "Sacred Kirin",
   "glyph": "Ki+",
-  "value": 5,
+  "value": 50,
   "next": "kirin-plus-plus",
   "moves": [
    {
@@ -1116,7 +1116,7 @@
   "id": "kirin-plus-plus",
   "name": "Celestial Kirin",
   "glyph": "Ki++",
-  "value": 8,
+  "value": 80,
   "next": null,
   "moves": [
    {
@@ -1243,7 +1243,7 @@
   "id": "alibaba",
   "name": "Wanderer",
   "glyph": "AD",
-  "value": 2,
+  "value": 20,
   "next": "bodyguard",
   "moves": [
    {
@@ -1290,7 +1290,7 @@
   "id": "bodyguard",
   "name": "Praetorian",
   "glyph": "BG",
-  "value": 5,
+  "value": 50,
   "next": "queen",
   "moves": [
    {
@@ -1338,7 +1338,7 @@
   "id": "queen",
   "name": "Queen",
   "glyph": "♛",
-  "value": 9,
+  "value": 90,
   "next": null,
   "moves": [
    {
@@ -1386,7 +1386,7 @@
   "id": "squirrel",
   "name": "Faerie",
   "glyph": "Sq",
-  "value": 5,
+  "value": 50,
   "next": null,
   "moves": [
    {
@@ -1465,7 +1465,7 @@
   "id": "crown-princess",
   "name": "Crown Princess",
   "glyph": "CP",
-  "value": 8,
+  "value": 80,
   "next": null,
   "moves": [
    {
@@ -1551,7 +1551,7 @@
   "id": "amazon",
   "name": "Amazon",
   "glyph": "A",
-  "value": 12,
+  "value": 120,
   "next": null,
   "moves": [
    {
@@ -1637,7 +1637,7 @@
   "id": "king",
   "name": "King",
   "glyph": "♚",
-  "value": 4,
+  "value": 40,
   "next": null,
   "moves": [
    {

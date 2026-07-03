@@ -9,6 +9,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
 var army_center: CenterContainer
+var scores_center: CenterContainer
 
 
 func _ready() -> void:
@@ -34,6 +35,7 @@ func _ready() -> void:
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "Play", 32, _show_armies)
+	_button(main_box, "Scores", 24, _show_scores)
 	_button(main_box, "TEST", 24, _show_tests)
 	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
 
@@ -108,6 +110,38 @@ func _show_tests() -> void:
 func _show_armies() -> void:
 	main_box.visible = false
 	army_center.visible = true
+
+
+func _show_scores() -> void:
+	main_box.visible = false
+	# rebuilt on every open so fresh runs show up without a restart
+	if scores_center:
+		scores_center.queue_free()
+	scores_center = CenterContainer.new()
+	scores_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scores_center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	scores_center.add_child(box)
+	var head := Label.new()
+	head.text = "High scores"
+	head.add_theme_font_size_override("font_size", 28)
+	box.add_child(head)
+	var scores := GameScript.load_scores()
+	if scores.is_empty():
+		var none := Label.new()
+		none.text = "No runs yet"
+		box.add_child(none)
+	for i in scores.size():
+		var e: Dictionary = scores[i]
+		var row := Label.new()
+		row.text = "%2d.  %5d — wave %d · %d king%s" % [i + 1, int(e.score),
+			int(e.wave), int(e.kings), "" if int(e.kings) == 1 else "s"]
+		row.add_theme_font_size_override("font_size", 18)
+		box.add_child(row)
+	_button(box, "← Back", 20, func() -> void:
+		scores_center.visible = false
+		main_box.visible = true)
 
 
 func _army_summary(army: Array) -> String:

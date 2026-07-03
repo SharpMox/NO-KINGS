@@ -21,6 +21,15 @@ static var is_scenario := false
 static var next_army: String = Tuning.DEFAULT_ARMY
 
 const SAVE_PATH := "user://save.json"
+const SCORES_PATH := "user://scores.json"
+
+
+## Local high scores, best first: [{score, wave, kings}], top 10 kept.
+static func load_scores() -> Array:
+	if not FileAccess.file_exists(SCORES_PATH):
+		return []
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SCORES_PATH))
+	return parsed if parsed is Array else []
 
 const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
@@ -787,7 +796,10 @@ func _game_over(won: bool, reason: String) -> void:
 	state = State.GAME_OVER
 	if not is_scenario and FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
-	_show_overlay(won, reason)
+	var rank := 0 # scenario/bot runs stay off the local leaderboard
+	if not is_scenario and not autoplay:
+		rank = _record_score()
+	_show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay:
 		print("AUTOPLAY RESULT: %s — %s (wave %d, score %d, %d turns)" % ["WIN" if won else "LOSS", reason, wave, score, autoplay_turns])
@@ -797,6 +809,22 @@ func _game_over(won: bool, reason: String) -> void:
 			get_tree().quit(0)
 
 
+## Persist the finished run to the local high scores; returns its all-time
+## rank (1-based; ties rank behind older entries).
+func _record_score() -> int:
+	var scores := load_scores()
+	var rank := 1
+	for e in scores:
+		if int(e.score) >= score:
+			rank += 1
+	scores.append({"score": score, "wave": wave, "kings": kings_defeated})
+	scores.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+		return int(x.score) > int(y.score))
+	var f := FileAccess.open(SCORES_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify(scores.slice(0, 10)))
+	return rank
+
+
 func _end_shot() -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
@@ -804,7 +832,7 @@ func _end_shot() -> void:
 	get_tree().quit()
 
 
-func _show_overlay(won: bool, reason: String) -> void:
+func _show_overlay(won: bool, reason: String, rank := 0) -> void:
 	for c in overlay.get_children():
 		c.queue_free()
 	var center := CenterContainer.new()
@@ -821,6 +849,8 @@ func _show_overlay(won: bool, reason: String) -> void:
 	var detail := Label.new()
 	detail.text = "%s\nScore %d · Deepest wave %d · Kings %d · Tariffs %d\nPieces lost %d · Enemies slain %d" \
 		% [reason, score, wave, kings_defeated, tariffs_seen.size(), lost_player, lost_enemy]
+	if rank > 0:
+		detail.text += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -856,8 +886,12 @@ func _show_win_screen() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "Score %d · Wave %d · Tariffs %d\nPieces lost %d · Enemies slain %d\nContinue into endless waves?" \
-		% [score, wave, tariffs_seen.size(), lost_player, lost_enemy]
+	var preview := 1 # GDD "ranking preview": where the score would land now
+	for e in load_scores():
+		if int(e.score) >= score:
+			preview += 1
+	detail.text = "Score %d (rank #%d if ended now) · Wave %d · Tariffs %d\nPieces lost %d · Enemies slain %d\nContinue into endless waves?" \
+		% [score, preview, wave, tariffs_seen.size(), lost_player, lost_enemy]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)

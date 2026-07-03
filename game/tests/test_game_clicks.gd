@@ -82,21 +82,22 @@ func _init() -> void:
 	await create_timer(1.0).timeout # enemy turn runs (animated path)
 	check(game.state == game.State.PLAYER_TURN, "PASS cycles through the enemy turn")
 
-	# long-press on the queen opens the piece preview; Close dismisses it
+	# double-tap on the queen opens the piece preview; Close dismisses it
 	var at: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
+	_click(at)
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true
+	press.double_click = true
 	press.position = at
 	press.global_position = at
 	root.push_input(press)
-	await create_timer(0.7).timeout
-	check(game.preview_open, "long-press opens the piece preview")
 	var release: InputEventMouseButton = press.duplicate()
 	release.pressed = false
+	release.double_click = false
 	root.push_input(release)
 	await process_frame
-	check(game.preview_open, "release while previewing does not close it")
+	check(game.preview_open, "double-tap opens the piece preview")
 	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable")
 	await process_frame
 	check(not game.preview_open, "Close dismisses the preview")

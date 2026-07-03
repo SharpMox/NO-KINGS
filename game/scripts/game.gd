@@ -60,10 +60,8 @@ var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
-var press_tile := Vector2i(-1, -1) # candidate long-press (piece preview)
-var press_ms := 0
-var pool_press_id := "" # candidate long-press on a pool button
-var pool_press_ms := 0
+var pool_click_i := -1 # double-tap detection on pool buttons (piece preview)
+var pool_click_ms := 0
 var preview_open := false
 var placing_index := -1  # stock index being placed, -1 = none
 var merge_mode := false
@@ -433,10 +431,6 @@ func _rebuild_pool_strip() -> void:
 		elif from_captured:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
 		btn.pressed.connect(_on_pool_pressed.bind(i))
-		btn.button_down.connect(func() -> void:
-			pool_press_id = id
-			pool_press_ms = Time.get_ticks_msec())
-		btn.button_up.connect(func() -> void: pool_press_id = "")
 		pool_box.add_child(btn)
 
 
@@ -479,6 +473,13 @@ func _on_pool_pressed(index: int) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
 			or preview_open or game_menu_open:
 		return
+	# double-tap on the same pool button: piece info
+	var now := Time.get_ticks_msec()
+	if index == pool_click_i and now - pool_click_ms < 400:
+		pool_click_i = -1
+		return _show_preview(_pool()[index])
+	pool_click_i = index
+	pool_click_ms = now
 	if merge_mode:
 		if merge_sel.has(index):
 			merge_sel.erase(index)
@@ -563,18 +564,6 @@ func _process(delta: float) -> void:
 			a.t += delta / a.get("dur", ANIM_TIME)
 		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
 		queue_redraw()
-	if press_tile.x >= 0 and not preview_open \
-			and Time.get_ticks_msec() - press_ms > 500: # long-press -> preview
-		var id: String = board[press_tile].id if board.has(press_tile) else ""
-		press_tile = Vector2i(-1, -1)
-		drag_from = Vector2i(-1, -1)
-		if id != "":
-			_show_preview(id)
-	if pool_press_id != "" and not preview_open \
-			and Time.get_ticks_msec() - pool_press_ms > 500:
-		var id := pool_press_id
-		pool_press_id = ""
-		_show_preview(id) # the release lands while preview_open and is swallowed
 
 
 # --- turn flow ---
@@ -808,27 +797,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
 		drag_from = Vector2i(-1, -1)
-		press_tile = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion:
-		if press_tile.x >= 0 and event.button_mask & MOUSE_BUTTON_MASK_LEFT \
-				and event.position.distance_to(_tile_px(press_tile) + Vector2(tile, tile) / 2) > tile:
-			press_tile = Vector2i(-1, -1) # dragged away while held: not a long-press
 		if drag_from.x >= 0:
 			queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
-			if at.x >= 0 and board.has(at): # any piece: candidate long-press preview
-				press_tile = at
-				press_ms = Time.get_ticks_msec()
+			if event.double_click and at.x >= 0 and board.has(at):
+				drag_from = Vector2i(-1, -1)
+				return _show_preview(board[at].id) # double-tap: piece info
 			if at.x >= 0:
 				_on_tile_clicked(at)
 			# a fresh selection of an own piece also starts a potential drag
 			if selected == at and at.x >= 0:
 				drag_from = at
 		else:
-			press_tile = Vector2i(-1, -1)
 			if drag_from.x >= 0: # release ends a drag
 				var t := _tile_at(event.position)
 				var from := drag_from

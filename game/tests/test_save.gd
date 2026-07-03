@@ -31,6 +31,7 @@ func _init() -> void:
 		"items": ["blitz", "sniper"], "trinkets": ["greed", "greed", "move"],
 		"tariffs": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
+		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
 		"score": 470, "clock_s": 812.5,
 		"free_placements": 1, "ceasefire_turns": 2, "counter_intel_turns": 1,
@@ -58,6 +59,7 @@ func _init() -> void:
 	check(b.score == 470, "score restored")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
+	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")
 	check(b.trinkets.size() == 3, "trinket stacks restored")
 	check(b.tariffs_active.size() == 3, "tariff stacks restored")
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")

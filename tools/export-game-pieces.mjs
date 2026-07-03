@@ -20,17 +20,18 @@ const EXTRA_IDS = ["squirrel", "crown-princess", "amazon"];
 
 // Game-side point values (codex has none). Used for capture score, AI trade
 // decisions, and the 3-different-merge "lowest value" rule.
+// x10 economy (2026-07-03): room for percentage effects like Inflation.
 const VALUES = {
-  pawn: 1, sergeant: 2, "arrow-pawn": 3,
-  ferz: 2, "elephant-modern": 3, "high-priestess": 5,
-  wazir: 2, "war-machine": 3, champion: 5,
-  bishop: 3, "dragon-horse": 5, archbishop: 7,
-  rook: 5, "dragon-king": 7, chancellor: 8,
-  knight: 3, gnu: 5, buffalo: 7,
-  kirin: 3, "kirin-plus": 5, "kirin-plus-plus": 8,
-  alibaba: 2, bodyguard: 5, queen: 9,
-  squirrel: 5, "crown-princess": 8, amazon: 12,
-  king: 4,
+  pawn: 10, sergeant: 20, "arrow-pawn": 30,
+  ferz: 20, "elephant-modern": 30, "high-priestess": 50,
+  wazir: 20, "war-machine": 30, champion: 50,
+  bishop: 30, "dragon-horse": 50, archbishop: 70,
+  rook: 50, "dragon-king": 70, chancellor: 80,
+  knight: 30, gnu: 50, buffalo: 70,
+  kirin: 30, "kirin-plus": 50, "kirin-plus-plus": 80,
+  alibaba: 20, bodyguard: 50, queen: 90,
+  squirrel: 50, "crown-princess": 80, amazon: 120,
+  king: 40,
 };
 
 // Codex `moves` are movement-diagram data; kinds map mechanically to game moves

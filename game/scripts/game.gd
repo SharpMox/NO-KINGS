@@ -16,6 +16,9 @@ enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 static var next_config := {}
 ## TEST-menu / CLI scenario runs never autosave over the real run.
 static var is_scenario := false
+## Starting stock for a fresh run (menu's army select sets it; saves carry
+## their stock in next_config instead, so this only matters when empty).
+static var next_army: String = Tuning.DEFAULT_ARMY
 
 const SAVE_PATH := "user://save.json"
 
@@ -143,7 +146,7 @@ func _ready() -> void:
 		is_scenario = true
 	merges_left = Tuning.MERGES_PER_TURN
 	if next_config.is_empty():
-		stock = Tuning.STARTING_STOCK.duplicate()
+		stock = Tuning.ARMIES[next_army].duplicate()
 	else:
 		_apply_config(next_config)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe

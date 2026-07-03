@@ -113,6 +113,29 @@ func _init() -> void:
 	await process_frame
 	check(not game.game_menu_open, "Resume closes the menu")
 
+	# wave-50 King capture opens the win screen; Continue resumes the run
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 50,
+		"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 12]]}
+	GameScript.is_scenario = true # keep the probe off the real save file
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.win_open, "capturing the wave-50 King opens the win screen")
+	_click(game._tile_px(Vector2i(7, 12)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected != Vector2i(7, 12), "win screen blocks board clicks")
+	check(await _click_button_in(game.overlay, "Continue"), "Continue clickable")
+	await process_frame
+	check(not game.win_open and game.state == game.State.PLAYER_TURN,
+		"Continue resumes the run into endless")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

@@ -30,7 +30,7 @@ func _init() -> void:
 		"stock": ["pawn", "ferz"], "captured": ["knight", "knight", "bishop"],
 		"items": ["blitz", "sniper"], "trinkets": ["greed", "greed", "move"],
 		"tariffs": ["inflation", "inflation", "austerity"],
-		"oneoffs": [], "wave": 23, "turns_since_wave": 4,
+		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
 		"score": 470, "clock_s": 812.5,
 		"free_placements": 1, "ceasefire_turns": 2, "counter_intel_turns": 1,
@@ -57,6 +57,7 @@ func _init() -> void:
 			print("DIFF %s: %s -> %s" % [k, JSON.stringify(saved[k]), JSON.stringify(again.get(k))])
 	check(b.score == 470, "score restored")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
+	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.trinkets.size() == 3, "trinket stacks restored")
 	check(b.tariffs_active.size() == 3, "tariff stacks restored")
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")

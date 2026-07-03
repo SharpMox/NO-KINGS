@@ -428,13 +428,21 @@ func _rebuild_pool_strip() -> void:
 		else:
 			btn.text = defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)
-		if st.count > 1:
-			btn.text = "x%d" % st.count
+		if st.count > 1 or (merge_mode and sel_units > 0):
+			# corner badge keeps the icon full-size (no inline text)
+			var badge := Label.new()
+			badge.text = "%d/%d" % [sel_units, st.count] if merge_mode and sel_units > 0 else str(st.count)
+			badge.add_theme_font_size_override("font_size", 11)
+			badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+			badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+			badge.add_theme_constant_override("outline_size", 4)
+			badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			badge.offset_left = -16
+			badge.offset_bottom = 12
+			btn.add_child(badge)
 		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
 		if merge_mode and sel_units > 0:
 			btn.modulate = Color(1.3, 1.15, 0.4)
-			if sel_units > 1:
-				btn.text = "x%d (2)" % st.count
 		elif merge_mode: # mergeable pieces pop; the rest dim
 			btn.modulate = Color(1.2, 1.05, 0.55) if merge_highlights.has(id) else Color(0.5, 0.5, 0.5)
 		elif placing_id == id and not st.cap:
@@ -509,8 +517,10 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 		if units > 0 and (units >= count or merge_sel.size() >= 2):
 			while merge_sel.has(entry): # tap a fully-selected stack: deselect
 				merge_sel.erase(entry)
-		elif merge_sel.size() < 2:
-			merge_sel.append(entry) # each tap adds one unit from the stack
+		elif merge_sel.size() < 2 and merge_highlights.has(id):
+			# only pieces with a live merge partner are selectable; with one
+			# selected, only its valid completions are
+			merge_sel.append(entry)
 	else:
 		# placement: only stock stacks are placeable (captured merge in first)
 		if cap:
@@ -861,8 +871,8 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		if board.has(tile) and board[tile].owner == Rules.PLAYER:
 			if merge_sel.has(tile):
 				merge_sel.erase(tile)
-			elif merge_sel.size() < 2:
-				merge_sel.append(tile)
+			elif merge_sel.size() < 2 and merge_highlights.has(board[tile].id):
+				merge_sel.append(tile) # only pieces with a live merge partner
 			_refresh()
 		return
 	if placing_id != "":
@@ -1568,6 +1578,9 @@ func _draw() -> void:
 		var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
 		if pos == drag_from:
 			tint.a = 0.35 # ghost follows the cursor instead
+		elif merge_mode and p.owner == Rules.PLAYER and not merge_highlights.has(p.id) \
+				and not merge_sel.has(pos):
+			tint = Color(0.55, 0.55, 0.55) # not mergeable right now
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		_draw_piece(font, p, px, tint)

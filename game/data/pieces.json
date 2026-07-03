@@ -32,6 +32,39 @@
    }
   ]
  },
+ "berolina": {
+  "id": "berolina",
+  "name": "Void Pawn",
+  "glyph": "BP",
+  "value": 10,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ]
+    ],
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      0,
+      1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
  "sergeant": {
   "id": "sergeant",
   "name": "Ranger",
@@ -78,6 +111,59 @@
      ],
      [
       -1,
+      -1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
+ "inv-sergeant": {
+  "id": "inv-sergeant",
+  "name": "Void Ranger",
+  "glyph": "iSg",
+  "value": 20,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
       -1
      ]
     ],
@@ -132,6 +218,60 @@
      ],
      [
       -1,
+      -1
+     ]
+    ],
+    "mode": "capture"
+   }
+  ]
+ },
+ "inv-arrow-pawn": {
+  "id": "inv-arrow-pawn",
+  "name": "Void Archer",
+  "glyph": "iAP",
+  "value": 30,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 2,
+    "mode": "move"
+   },
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
       -1
      ]
     ],
@@ -1112,6 +1252,85 @@
    }
   ]
  },
+ "inv-kirin-plus": {
+  "id": "inv-kirin-plus",
+  "name": "Void Kirin",
+  "glyph": "iKi+",
+  "value": 50,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -2,
+      -1
+     ],
+     [
+      3,
+      0
+     ],
+     [
+      -3,
+      0
+     ],
+     [
+      0,
+      3
+     ],
+     [
+      0,
+      -3
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
  "kirin-plus-plus": {
   "id": "kirin-plus-plus",
   "name": "Celestial Kirin",
@@ -1233,6 +1452,149 @@
      [
       0,
       -4
+     ]
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "inv-kirin-plus-plus": {
+  "id": "inv-kirin-plus-plus",
+  "name": "Void Celestial Kirin",
+  "glyph": "iKi++",
+  "value": 80,
+  "next": null,
+  "moves": [
+   {
+    "type": "leap",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      -1,
+      2
+     ],
+     [
+      1,
+      -2
+     ],
+     [
+      -1,
+      -2
+     ],
+     [
+      2,
+      1
+     ],
+     [
+      -2,
+      1
+     ],
+     [
+      2,
+      -1
+     ],
+     [
+      -2,
+      -1
+     ],
+     [
+      3,
+      0
+     ],
+     [
+      -3,
+      0
+     ],
+     [
+      0,
+      3
+     ],
+     [
+      0,
+      -3
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      -1,
+      4
+     ],
+     [
+      1,
+      -4
+     ],
+     [
+      -1,
+      -4
+     ],
+     [
+      4,
+      1
+     ],
+     [
+      -4,
+      1
+     ],
+     [
+      4,
+      -1
+     ],
+     [
+      -4,
+      -1
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      3,
+      2
+     ],
+     [
+      -2,
+      3
+     ],
+     [
+      -3,
+      2
+     ],
+     [
+      2,
+      -3
+     ],
+     [
+      3,
+      -2
+     ],
+     [
+      -2,
+      -3
+     ],
+     [
+      -3,
+      -2
      ]
     ],
     "mode": "both"
@@ -1629,6 +1991,793 @@
       -1
      ]
     ],
+    "mode": "both"
+   }
+  ]
+ },
+ "gryphon": {
+  "id": "gryphon",
+  "name": "Gryphon",
+  "glyph": "GP",
+  "value": 60,
+  "next": null,
+  "moves": [
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     1
+    ],
+    "dir": [
+     0,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     1
+    ],
+    "dir": [
+     1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     1
+    ],
+    "dir": [
+     0,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     1
+    ],
+    "dir": [
+     -1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     -1
+    ],
+    "dir": [
+     0,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     -1
+    ],
+    "dir": [
+     1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     -1
+    ],
+    "dir": [
+     0,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     -1
+    ],
+    "dir": [
+     -1,
+     0
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "manticore": {
+  "id": "manticore",
+  "name": "Manticore",
+  "glyph": "MN",
+  "value": 60,
+  "next": null,
+  "moves": [
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     1
+    ],
+    "dir": [
+     1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     1
+    ],
+    "dir": [
+     -1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     0
+    ],
+    "dir": [
+     1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     0
+    ],
+    "dir": [
+     1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     -1
+    ],
+    "dir": [
+     1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     -1
+    ],
+    "dir": [
+     -1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     0
+    ],
+    "dir": [
+     -1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     0
+    ],
+    "dir": [
+     -1,
+     -1
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "godzilla": {
+  "id": "godzilla",
+  "name": "Godzilla",
+  "glyph": "GZ",
+  "value": 110,
+  "next": null,
+  "moves": [
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     1
+    ],
+    "dir": [
+     0,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     1
+    ],
+    "dir": [
+     1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     1
+    ],
+    "dir": [
+     0,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     1
+    ],
+    "dir": [
+     -1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     -1
+    ],
+    "dir": [
+     0,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     -1
+    ],
+    "dir": [
+     1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     -1
+    ],
+    "dir": [
+     0,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     -1
+    ],
+    "dir": [
+     -1,
+     0
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     1
+    ],
+    "dir": [
+     1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     1
+    ],
+    "dir": [
+     -1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     0
+    ],
+    "dir": [
+     1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     1,
+     0
+    ],
+    "dir": [
+     1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     -1
+    ],
+    "dir": [
+     1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     0,
+     -1
+    ],
+    "dir": [
+     -1,
+     -1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     0
+    ],
+    "dir": [
+     -1,
+     1
+    ],
+    "mode": "both"
+   },
+   {
+    "type": "bent",
+    "pivot": [
+     -1,
+     0
+    ],
+    "dir": [
+     -1,
+     -1
+    ],
+    "mode": "both"
+   }
+  ]
+ },
+ "banshee": {
+  "id": "banshee",
+  "name": "Banshee",
+  "glyph": "Bn",
+  "value": 80,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   }
+  ]
+ },
+ "raven": {
+  "id": "raven",
+  "name": "Raven",
+  "glyph": "Rv",
+  "value": 90,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   }
+  ]
+ },
+ "amazonrider": {
+  "id": "amazonrider",
+  "name": "Valkyrie",
+  "glyph": "Am",
+  "value": 140,
+  "next": null,
+  "moves": [
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      0
+     ],
+     [
+      -1,
+      0
+     ],
+     [
+      0,
+      1
+     ],
+     [
+      0,
+      -1
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      -1,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      2,
+      -1
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -1,
+      -2
+     ]
+    ],
+    "range": 0,
+    "mode": "both"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      -2,
+      -1
+     ]
+    ],
+    "range": 0,
     "mode": "both"
    }
   ]

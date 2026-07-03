@@ -83,6 +83,14 @@ static func all() -> Array:
 			"board": ZONE_PAWNS + [["rook", 0, 2, 1], ["bishop", 0, 3, 1]], "oneoffs": ["hostile_takeover"]}},
 		{"name": "One-off: JD Vance", "cfg": {
 			"board": ZONE_PAWNS + [["queen", 0, 3, 1]], "oneoffs": ["jd_vance"]}},
+		# --- full piece set ---
+		{"name": "Showcase: riders & voids", "cfg": {
+			"board": [["gryphon", 0, 0, 1], ["manticore", 0, 2, 1], ["godzilla", 0, 4, 1],
+				["banshee", 0, 6, 1], ["raven", 0, 1, 0], ["amazonrider", 0, 3, 0],
+				["berolina", 0, 5, 0], ["inv-sergeant", 0, 7, 0], ["inv-arrow-pawn", 0, 7, 1],
+				["inv-kirin-plus", 0, 6, 0], ["inv-kirin-plus-plus", 0, 0, 0],
+				["pawn", 1, 3, 12], ["rook", 1, 5, 12]],
+			"captured": ["ferz", "rook", "wazir", "bishop"], "score": 500}},
 		# --- loss conditions ---
 		{"name": "Loss: clock-out (10s)", "cfg": {
 			"board": ZONE_PAWNS, "clock_s": 10.0}},

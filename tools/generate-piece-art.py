@@ -232,6 +232,80 @@ EMBLEMS = {
         f'<circle cx="52" cy="34" r="2.6" fill="{IVORY}"/>'
         f'<path d="M 40 24 L 38 12 L 46 19 L 52 10 L 56 20 L 64 14 L 61 24 Q 50 18 40 24 Z" fill="{GOLD}"/>'
     ),
+    # ---- Void pieces: hollow-outline mirrors of their counterparts ----
+    "berolina": (  # Void Pawn: hollow pawn
+        f'<g fill="none" stroke="{INK}" stroke-width="3.5" transform="translate(50 52)">'
+        f'<circle cx="0" cy="-14" r="9"/>'
+        f'<path d="M -7 -6 Q 0 -1 7 -6 L 10 12 Q 0 16 -10 12 Z"/>'
+        f'<path d="M -13 13 L 13 13 L 15 20 L -15 20 Z"/></g>'
+    ),
+    "inv-sergeant": (  # Void Ranger: hollow hood + crossed daggers
+        f'<g fill="none" stroke="{INK}" stroke-width="3.5">'
+        f'<path d="M 50 22 L 62 40 L 58 42 Q 50 36 42 42 L 38 40 Z"/>'
+        f'<circle cx="50" cy="42" r="7"/>'
+        f'<path d="M 32 74 L 62 44 L 66 48 L 36 78 Z"/>'
+        f'<path d="M 68 74 L 38 44 L 34 48 L 64 78 Z"/></g>'
+    ),
+    "inv-arrow-pawn": (  # Void Archer: hollow bow, arrow reversed
+        f'<g fill="none" stroke="{INK}" stroke-width="4">'
+        f'<path d="M 64 22 Q 34 50 64 78" stroke-linecap="round"/>'
+        f'<line x1="64" y1="22" x2="64" y2="78" stroke-width="2.5"/>'
+        f'<line x1="64" y1="50" x2="28" y2="50"/></g>'
+        f'<path d="M 28 50 L 38 44 L 35 50 L 38 56 Z" fill="none" stroke="{INK}" stroke-width="2.5"/>'
+    ),
+    "inv-kirin-plus": (  # Void Kirin: hollow kirin head
+        f'<g fill="none" stroke="{INK}" stroke-width="3.5">'
+        f'<path d="M 40 78 L 42 58 Q 34 52 38 42 Q 44 32 56 32 L 54 26 L 62 32 Q 70 38 68 50 L 64 78 Z"/>'
+        f'<path d="M 50 32 Q 44 20 34 18 Q 40 28 46 32 Z"/>'
+        f'<path d="M 56 30 Q 56 18 48 12 Q 52 22 52 30 Z"/></g>'
+    ),
+    "inv-kirin-plus-plus": (  # Void Celestial Kirin: hollow + hollow stars
+        f'<g fill="none" stroke="{INK}" stroke-width="3.5">'
+        f'<path d="M 40 80 L 42 60 Q 34 54 38 44 Q 44 34 56 34 L 54 28 L 62 34 Q 70 40 68 52 L 64 80 Z"/>'
+        f'<path d="M 50 34 Q 44 22 34 20 Q 40 30 46 34 Z"/>'
+        f'<path d="M 56 32 Q 56 20 48 14 Q 52 24 52 32 Z"/>'
+        f'<path d="M 30 23 L 32.4 26 L 30 29 L 27.6 26 Z"/>'
+        f'<path d="M 50 15 L 52.4 18 L 50 21 L 47.6 18 Z"/>'
+        f'<path d="M 70 23 L 72.4 26 L 70 29 L 67.6 26 Z"/></g>'
+    ),
+    # ---- Bent-riders and nightriders ----
+    "gryphon": (  # eagle head + lion forepaw
+        f'<path d="M 30 52 Q 32 34 50 30 Q 64 26 72 36 L 80 40 L 70 44 Q 68 54 56 56 Q 40 60 30 52 Z" fill="{INK}"/>'
+        f'<circle cx="60" cy="38" r="2.8" fill="{IVORY}"/>'
+        f'<path d="M 72 36 L 82 34 L 74 42 Z" fill="{GOLD}"/>'
+        f'<path d="M 36 58 Q 30 70 36 80 L 42 78 Q 38 68 42 60 Z" fill="{INK}"/>'
+        f'<path d="M 50 60 Q 46 72 52 82 L 58 80 Q 54 70 56 60 Z" fill="{INK}"/>'
+    ),
+    "manticore": (  # maned face + scorpion tail
+        f'<circle cx="46" cy="48" r="14" fill="{INK}"/>'
+        f'<path d="M 46 30 Q 30 30 24 44 Q 30 62 46 66 Q 36 56 36 48 Q 36 38 46 30 Z" fill="{GOLD}"/>'
+        f'<circle cx="42" cy="45" r="2.4" fill="{IVORY}"/><circle cx="51" cy="45" r="2.4" fill="{IVORY}"/>'
+        f'<path d="M 58 60 Q 74 58 76 42 Q 80 30 72 24" fill="none" stroke="{INK}" stroke-width="4.5" stroke-linecap="round"/>'
+        f'<path d="M 72 24 L 64 20 L 70 30 Z" fill="{RED}"/>'
+    ),
+    "godzilla": (  # kaiju head with dorsal plates
+        f'<path d="M 30 60 Q 30 40 46 34 Q 62 30 72 40 L 78 46 L 66 48 Q 66 58 54 62 L 58 72 L 44 66 Q 32 68 30 60 Z" fill="{INK}"/>'
+        f'<circle cx="58" cy="44" r="2.8" fill="{RED}"/>'
+        f'<path d="M 34 34 L 40 22 L 44 32 Z" fill="{INK}"/>'
+        f'<path d="M 44 30 L 50 18 L 54 28 Z" fill="{INK}"/>'
+        f'<path d="M 54 28 L 62 20 L 63 29 Z" fill="{INK}"/>'
+    ),
+    "banshee": (  # wailing spirit, flowing veil
+        f'<path d="M 38 30 Q 50 22 62 30 L 62 48 Q 66 66 58 80 Q 54 68 50 66 Q 46 68 42 80 Q 34 66 38 48 Z" fill="{INK}"/>'
+        f'<circle cx="45" cy="40" r="3" fill="{IVORY}"/><circle cx="55" cy="40" r="3" fill="{IVORY}"/>'
+        f'<ellipse cx="50" cy="50" rx="4" ry="6" fill="{IVORY}"/>'
+    ),
+    "raven": (  # perched raven silhouette
+        f'<path d="M 36 66 Q 34 46 48 38 Q 58 32 66 38 L 74 40 L 66 44 Q 68 56 58 62 L 62 76 Q 52 72 48 66 Q 40 70 36 66 Z" fill="{INK}"/>'
+        f'<circle cx="60" cy="41" r="2.4" fill="{IVORY}"/>'
+        f'<line x1="42" y1="72" x2="60" y2="72" stroke="{INK}" stroke-width="3.5" stroke-linecap="round"/>'
+    ),
+    "amazonrider": (  # Valkyrie: winged crowned horse head
+        f'<path d="M 40 78 L 42 54 Q 33 50 35 40 Q 39 28 53 26 L 51 20 L 59 26 Q 69 32 69 46 L 66 78 Z" fill="{INK}"/>'
+        f'<circle cx="53" cy="35" r="2.5" fill="{IVORY}"/>'
+        f'<path d="M 42 24 L 40 12 L 48 19 L 54 10 L 58 20 L 66 14 L 63 24 Q 52 18 42 24 Z" fill="{GOLD}"/>'
+        f'<path d="M 64 52 Q 84 44 88 28 Q 72 32 61 44 Z" fill="{GOLD}"/>'
+    ),
     # ---- The enemy King: oversized jagged crown, red gem ----
     "king": (
         f'<path d="M 26 64 L 22 30 L 36 44 L 44 24 L 50 42 L 56 24 L 64 44 L 78 30 L 74 64 Z" fill="{INK}"/>'
@@ -247,7 +321,7 @@ def main() -> None:
     for pid, body in EMBLEMS.items():
         (OUT / f"{pid}.svg").write_text(svg(body) + "\n")
     print(f"wrote {len(EMBLEMS)} SVGs to {OUT}")
-    assert len(EMBLEMS) == 28, f"expected 28, got {len(EMBLEMS)}"
+    assert len(EMBLEMS) == 39, f"expected 28, got {len(EMBLEMS)}"
 
 
 if __name__ == "__main__":

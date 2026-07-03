@@ -721,7 +721,9 @@ func _queue_wave(n: int) -> void:
 	var buff_id: String = Waves.BUFFS.get(n, "")
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
-		roster.append(roster[rng.randi() % roster.size()])
+		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
+		if not extras.is_empty(): # never duplicate the King (review 2026-07-03)
+			roster.append(extras[rng.randi() % extras.size()])
 	for id in roster:
 		var entry := {"id": id}
 		if id == buff_id: # first spawned piece of the flagged type carries the box
@@ -1028,7 +1030,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			boxed = victim.get("buff", false)
 		_add_pop(to)
 	_charge("move_cost")
-	if board[from].id in ["bishop", "rook"]:
+	if _is_long_range(board[from].id):
 		var d := to - from
 		_charge("long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
 	_add_slide(from, to)
@@ -1050,6 +1052,15 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if boxed:
 		return _open_box_pick()
 	_refresh()
+
+
+## Long-range = any non-leap move (ride or bent ride) — the Tariff on
+## Long-Range covers every rider, not just bishop/rook (review 2026-07-03).
+func _is_long_range(id: String) -> bool:
+	for m in defs[id].moves:
+		if m.type != "leap":
+			return true
+	return false
 
 
 func _capture_score(victim_id: String) -> int:
@@ -1306,8 +1317,12 @@ func _use_item(index: int) -> void:
 		_item_reset()
 		_refresh()
 		return
+	# an item can remove a merge-selected piece — drop the selection first,
+	# not just via the button toggle (review 2026-07-03)
+	merge_button.button_pressed = false
+	merge_mode = false
+	merge_sel.clear()
 	var it: Dictionary = items[index]
-	_charge("ability_cost")
 	if it.target == "":
 		items.remove_at(index)
 		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
@@ -1398,6 +1413,7 @@ func _item_click(tile: Vector2i) -> void:
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
+	_charge("ability_cost") # on use — a cancelled targeting costs nothing
 	match it.key:
 		"blitz":
 			moves_left += 1

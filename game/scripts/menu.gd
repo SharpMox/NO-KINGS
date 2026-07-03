@@ -4,9 +4,11 @@ extends Control
 
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
+var army_center: CenterContainer
 
 
 func _ready() -> void:
@@ -31,10 +33,7 @@ func _ready() -> void:
 				FileAccess.get_file_as_string(GameScript.SAVE_PATH))
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
-	_button(main_box, "Play", 32, func() -> void:
-		GameScript.next_config = {}
-		GameScript.is_scenario = false
-		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "TEST", 24, _show_tests)
 	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
 
@@ -65,6 +64,34 @@ func _ready() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
 
+	# army select: Play goes here; each army is a button + composition line
+	army_center = CenterContainer.new()
+	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	army_center.visible = false
+	add_child(army_center)
+	var army_box := VBoxContainer.new()
+	army_box.add_theme_constant_override("separation", 12)
+	army_center.add_child(army_box)
+	var pick := Label.new()
+	pick.text = "Choose your army"
+	pick.add_theme_font_size_override("font_size", 28)
+	army_box.add_child(pick)
+	for army_name in Tuning.ARMIES:
+		_button(army_box, army_name, 26, func() -> void:
+			GameScript.next_army = army_name
+			GameScript.next_config = {}
+			GameScript.is_scenario = false
+			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		var roster := Label.new()
+		roster.text = _army_summary(Tuning.ARMIES[army_name])
+		roster.add_theme_font_size_override("font_size", 13)
+		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		roster.modulate = Color(1, 1, 1, 0.7)
+		army_box.add_child(roster)
+	_button(army_box, "← Back", 20, func() -> void:
+		army_center.visible = false
+		main_box.visible = true)
+
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]
 		await RenderingServer.frame_post_draw
@@ -76,6 +103,21 @@ func _ready() -> void:
 func _show_tests() -> void:
 	main_box.visible = false
 	test_scroll.visible = true
+
+
+func _show_armies() -> void:
+	main_box.visible = false
+	army_center.visible = true
+
+
+func _army_summary(army: Array) -> String:
+	var counts := {} # insertion-ordered, so the summary follows the army list
+	for id in army:
+		counts[id] = counts.get(id, 0) + 1
+	var parts := []
+	for id in counts:
+		parts.append(("%d× %s" % [counts[id], id]) if counts[id] > 1 else id)
+	return " · ".join(parts)
 
 
 func _button(parent: Container, text: String, size: int, on_press: Callable) -> void:

@@ -4,6 +4,25 @@ A Godot 4 mobile game built by AI agents driven from Linear (issues are the unit
 
 ## Language
 
+### Game domain (No Kings rules)
+
+**Endless mode**:
+The post-win phase of a run, entered via **Continue** on the Win screen after the wave-50 King checkmate. Waves 51–150 come from the designed Wave Catalog; the run ends at the wave-150 full clear (grilled 2026-07-03: no procedural generator — diverges from the GDD's TBD sketch).
+_Avoid_: "new game+", "second loop"
+
+**Recurring King**:
+The wave-100 King wave. Checkmate awards a score bonus + clock refill and the run continues — no Win screen (that shows once, at wave 50).
+
+**Full clear**:
+Checkmating the wave-150 King. Ends the run immediately with a win-flavored end screen; the score is locked.
+
+**Army**:
+One of three preset 12-piece starting stocks chosen on the army-select screen before a run: **Crown** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (fairy walkers, signature ferz/wazir). Chain-base pieces only, totals balanced roughly equal (grilled 2026-07-03). Replaces the fixed `STARTING_STOCK`.
+_Avoid_: "team", "deck", "loadout"
+
+**Signature piece**:
+The piece (and its merge chain) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
+
 ### Godot domain
 
 **Scene**:

@@ -39,6 +39,8 @@ var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
 var turns_since_wave := 0
+var kings_defeated := 0  # 1 = endless unlocked; end screens show it
+var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var score := 0:
 	set(value): # every gain/loss anywhere pops floating feedback (round 4)
@@ -163,6 +165,7 @@ func _apply_config(cfg: Dictionary) -> void:
 	# default: all designed waves done, so nothing spawns into the sandbox
 	wave = int(cfg.get("wave", Waves.WAVES.size()))
 	turns_since_wave = int(cfg.get("turns_since_wave", 0))
+	kings_defeated = int(cfg.get("kings_defeated", 0))
 	pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
@@ -213,6 +216,7 @@ func _to_config() -> Dictionary:
 		"items": keys_of.call(items), "trinkets": keys_of.call(trinkets),
 		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
 		"wave": wave, "turns_since_wave": turns_since_wave,
+		"kings_defeated": kings_defeated,
 		"pending": pending_spawn.duplicate(true),
 		"score": score, "clock_s": clock_ms / 1000.0,
 		"sanctioned_id": sanctioned_id,
@@ -500,7 +504,7 @@ func _merge_ids() -> Array:
 
 func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
-			or preview_open or game_menu_open:
+			or preview_open or game_menu_open or win_open:
 		return
 	# double-tap on the same stack: piece info (except in merge mode, where
 	# repeated taps pick units from the stack)
@@ -562,7 +566,7 @@ func _on_confirm_merge() -> void:
 
 
 func _on_pass() -> void:
-	if box_open or game_menu_open:
+	if box_open or game_menu_open or win_open:
 		return
 	if state == State.SETUP:
 		_spawn_wave(1)
@@ -582,7 +586,7 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if ceasefire_turns <= 0 and not game_menu_open: # menu open = paused
+		if ceasefire_turns <= 0 and not game_menu_open and not win_open: # paused
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -804,7 +808,8 @@ func _show_overlay(won: bool, reason: String) -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var detail := Label.new()
-	detail.text = "%s\nScore %d · Deepest wave %d · Tariffs %d" % [reason, score, wave, tariffs_seen.size()]
+	detail.text = "%s\nScore %d · Deepest wave %d · Kings %d · Tariffs %d" \
+		% [reason, score, wave, kings_defeated, tariffs_seen.size()]
 	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	detail.add_theme_font_size_override("font_size", 22)
 	box.add_child(detail)
@@ -821,12 +826,59 @@ func _show_overlay(won: bool, reason: String) -> void:
 	overlay.visible = true
 
 
+## Wave-50 win screen: the run pauses on top of the board; Continue enters
+## endless mode, End Run locks the score in (GDD Game Over & Winner Screens,
+## trimmed 2026-07-03: no leaderboard rank / pieces-lost summary yet).
+func _show_win_screen() -> void:
+	win_open = true
+	for c in overlay.get_children():
+		c.queue_free()
+	var center := CenterContainer.new()
+	overlay.add_child(center)
+	var box := VBoxContainer.new()
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 16)
+	center.add_child(box)
+	var title := Label.new()
+	title.text = "VICTORY — the King has fallen"
+	title.add_theme_font_size_override("font_size", 34)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var detail := Label.new()
+	detail.text = "Score %d · Wave %d · Tariffs %d\nContinue into endless waves?" \
+		% [score, wave, tariffs_seen.size()]
+	detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail.add_theme_font_size_override("font_size", 22)
+	box.add_child(detail)
+	var cont := Button.new()
+	cont.text = "Continue"
+	cont.add_theme_font_size_override("font_size", 26)
+	cont.pressed.connect(_on_win_continue)
+	box.add_child(cont)
+	var end := Button.new()
+	end.text = "End Run"
+	end.pressed.connect(func() -> void:
+		win_open = false
+		_game_over(true, "Wave-%d King checkmated" % wave))
+	box.add_child(end)
+	overlay.visible = true
+
+
+func _on_win_continue() -> void:
+	win_open = false
+	overlay.visible = false
+	clock_ms += Tuning.CONTINUE_CLOCK_REFILL_MS # one-time endless bonus
+	if moves_left == 0 and state == State.PLAYER_TURN:
+		return _on_pass() # the checkmate spent the last move — resume the flow
+	_refresh()
+
+
 # --- input ---
 
 func _unhandled_input(event: InputEvent) -> void:
 	if preview_open or game_menu_open:
 		return # the panels' own buttons handle dismissal
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or win_open:
 		drag_from = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion:
@@ -918,14 +970,16 @@ func _place(id: String, tile: Vector2i) -> void:
 
 func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
+	var king_captured := false
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		score += _gain(_capture_score(victim.id))
 		_charge("capture_cost")
-		if victim.id == "king":
-			return _win()
-		captured.append(victim.id)
-		boxed = victim.get("buff", false)
+		if victim.id == "king": # boss piece — never enters Captured Stock
+			king_captured = true
+		else:
+			captured.append(victim.id)
+			boxed = victim.get("buff", false)
 		_add_pop(to)
 	_charge("move_cost")
 	if board[from].id in ["bishop", "rook"]:
@@ -939,8 +993,9 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	moved_this_turn.append(to)
 	selected = Vector2i(-1, -1)
 	legal_dests.clear()
-	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
-		return _win()
+	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
+		if _king_down():
+			return
 	if moves_left == 0 and state == State.PLAYER_TURN:
 		if boxed: # resolve the box first; the pick UI defers the auto-pass
 			pass_after_box = true
@@ -972,9 +1027,28 @@ func _capture_score(victim_id: String) -> int:
 	return pts
 
 
-func _win() -> void:
+## A King fell (captured or checkmated). First King → win screen (Continue /
+## End Run), recurring King (wave 100) → bonus + refill and the run continues,
+## last designed King (wave 150) → full clear. Returns true when the caller
+## must stop the turn flow (screen showing or game over).
+func _king_down() -> bool:
+	kings_defeated += 1
 	score += Tuning.WIN_SCORE_BONUS
-	_game_over(true, "Wave-%d King checkmated" % wave)
+	var k := Rules.find_king(board, Rules.ENEMY)
+	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
+		board.erase(k)
+	if wave >= Waves.WAVES.size():
+		_game_over(true, "FULL CLEAR — every King has fallen")
+		return true
+	if kings_defeated == 1:
+		if autoplay: # nobody to press Continue; end the run as a win
+			_game_over(true, "Wave-%d King checkmated" % wave)
+			return true
+		_show_win_screen()
+		return true
+	clock_ms += Tuning.KING_CLOCK_REFILL_MS # recurring King
+	_refresh()
+	return false
 
 
 # --- piece preview (long-press a piece anywhere) ---
@@ -1345,7 +1419,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[a] = board[b]
 			board[b] = tmp
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
-		return _win()
+		if _king_down():
+			return
 	_refresh()
 
 

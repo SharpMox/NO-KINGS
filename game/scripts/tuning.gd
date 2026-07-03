@@ -26,7 +26,9 @@ const MILESTONE_WAVES := 10             # GDD Reward Economy
 # x10 economy (2026-07-03): pawn = 10 points, queen = 90, amazon = 120
 const PLACEMENT_SCORE_COST := 20   # placing mid-turn costs score (GDD, amount TBD)
 const MILESTONE_SCORE_BONUS := 100 # every 10 waves (GDD, amount TBD)
-const WIN_SCORE_BONUS := 1000      # wave-50 checkmate (GDD, amount TBD)
+const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
+const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)
+const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless
 const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
 const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 

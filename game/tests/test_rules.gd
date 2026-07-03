@@ -138,6 +138,17 @@ func _init() -> void:
 	b = {Vector2i(2, 7): piece("king", Rules.ENEMY), Vector2i(4, 5): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
 	check(act.from == Vector2i(4, 5), "King stays put; escort advances")
+	# Back-row commitment: a lone rook at row 1 holds out of row 0...
+	b = {Vector2i(3, 1): piece("rook", Rules.ENEMY)}
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty() or act.to.y != 0, "lone enemy does not enter the back row")
+	# ...but with a swarm massed near the bottom, entering row 0 is on.
+	b = {}
+	for x in 5:
+		b[Vector2i(x, 1)] = piece("pawn", Rules.ENEMY)
+	b[Vector2i(5, 2)] = piece("rook", Rules.ENEMY)
+	act = Rules.ai_action(b, defs)
+	check(not act.is_empty() and act.to.y == 0, "massed enemies commit to the back row")
 
 	print("---")
 	if fails == 0:

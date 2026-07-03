@@ -13,6 +13,11 @@ const ENEMY_ACTIONS_PER_TURN := 1  # playtest override 2026-07-02 (GDD says 2)
 
 const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
 
+# AI holds out of the player's back row until this many enemies sit within
+# the bottom NEAR_ROWS rows — then it commits to filling it (round 5)
+const BACKROW_COMMIT_COUNT := 5
+const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
+
 const CLOCK_START_MS := 30 * 60 * 1000  # GDD example value, TBD upstream
 const CLOCK_REFILL_MS := 30 * 1000      # every 10 waves; GDD example value
 const MILESTONE_WAVES := 10             # GDD Reward Economy

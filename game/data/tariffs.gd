@@ -54,7 +54,11 @@ const TARIFFS: Array = [
 ## Excluded: Tariff on Promotion (last-rank promotion is cut from MVP — merges
 ## are covered by Tariff on Fuse).
 
-## Tariff slots for waves 1-50 (GDD Wave Catalog cycle 1). T0 fires when wave 2
-## arrives and is always Inflation. Mild slots may repeat a tariff; Moderate and
-## Severe picks are run-unique.
-const SCHEDULE := {10: "Mild", 20: "Mild", 30: "Mild", 40: "Moderate", 50: "Severe"}
+## Tariff slots for waves 1-150 (GDD Wave Catalog cycles 1-3, escalating). T0
+## fires when wave 2 arrives and is always Inflation. Mild slots may repeat a
+## tariff; Moderate and Severe picks are run-unique.
+const SCHEDULE := {
+	10: "Mild", 20: "Mild", 30: "Mild", 40: "Moderate", 50: "Severe",
+	60: "Mild", 70: "Mild", 80: "Moderate", 90: "Moderate", 100: "Severe",
+	110: "Mild", 120: "Moderate", 130: "Moderate", 140: "Severe", 150: "Severe",
+}

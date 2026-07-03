@@ -31,3 +31,6 @@
 
 # Godot editor cache (game/)
 game/.godot/
+
+# Export artifacts (godot --export-debug Android)
+build/

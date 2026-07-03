@@ -22,7 +22,7 @@ func piece(id: String, owner: int) -> Dictionary:
 
 func _init() -> void:
 	var defs := Rules.load_pieces()
-	check(defs.size() == 39, "39 piece defs load")
+	check(defs.size() == 39, "38 codex pieces + the enemy King load")
 	var fus := Rules.load_fusions()
 	check(fus.size() == 36, "full fusion table loads")
 

@@ -1,5 +1,6 @@
-// Exports ALL codex pieces (38) + the King into game/data/pieces.json for the
-// Godot game, plus the full fusion table.
+// Exports the 38 codex pieces into game/data/pieces.json for the Godot game,
+// plus the full fusion table. The enemy King rides along as a 39th def but is
+// a boss ENTITY, not a roster piece: no chain, no fusions, never obtainable.
 // Run manually after editing data/pieces-codex.js or data/promotions.js:
 //   node tools/export-game-pieces.mjs
 import { createRequire } from "node:module";
@@ -106,10 +107,10 @@ out.king = { // not in the codex (the game is NO-KINGS; only the enemy fields on
 
 const missing = Object.values(out).filter((p) => p.value == null);
 if (missing.length) throw new Error("missing values: " + missing.map((p) => p.id));
-if (Object.keys(out).length !== 39) throw new Error(`expected 39 defs, got ${Object.keys(out).length}`);
+if (Object.keys(out).length !== 39) throw new Error(`expected 38 pieces + the King, got ${Object.keys(out).length}`);
 
 writeFileSync(join(root, "game/data/pieces.json"), JSON.stringify(out, null, 1) + "\n");
-console.log(`wrote game/data/pieces.json (${Object.keys(out).length} pieces)`);
+console.log(`wrote game/data/pieces.json (38 pieces + the King)`);
 
 // Fusions: unordered pair -> result, filtered to pieces the game defines.
 // Key = the two ids sorted and joined with "+".

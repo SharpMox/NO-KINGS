@@ -11,7 +11,7 @@ func _init() -> void:
 				and not FileAccess.file_exists("res://assets/pieces/%s.svg" % id):
 			missing.append(id)
 	if missing.is_empty():
-		print("ALL %d TOKENS PRESENT" % Rules.load_pieces().size())
+		print("ALL %d TOKENS PRESENT (38 pieces + the King)" % Rules.load_pieces().size())
 		quit(0)
 	else:
 		push_error("missing tokens: " + ", ".join(missing))

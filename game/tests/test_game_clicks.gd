@@ -136,7 +136,44 @@ func _init() -> void:
 	check(not game.win_open and game.state == game.State.PLAYER_TURN,
 		"Continue resumes the run into endless")
 
+	# capturing a box carrier opens the randomized one-step box; an option
+	# button applies its reward and closes the panel
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 12]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.box_open, "capturing a box carrier opens the box")
+	var opt_btn := _first_option_button(game.box_panel)
+	check(opt_btn != null and "\n" in opt_btn.text,
+		"box options describe themselves (two-line label)")
+	var loot_before: int = game.items.size() + game.trinkets.size()
+	var score_before: int = game.score
+	_click(opt_btn.get_global_rect().get_center())
+	await process_frame
+	check(not game.box_open, "picking an option closes the box")
+	check(game.items.size() + game.trinkets.size() > loot_before
+		or game.score > score_before, "the picked reward is applied")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## First reward button in the box panel (options precede the Skip button).
+func _first_option_button(node: Node) -> Button:
+	if node is Button and not node.text.begins_with("Skip"):
+		return node
+	for c in node.get_children():
+		var hit := _first_option_button(c)
+		if hit:
+			return hit
+	return null

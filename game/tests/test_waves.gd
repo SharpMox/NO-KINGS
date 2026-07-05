@@ -27,7 +27,7 @@ func _init() -> void:
 			check(has_king, "wave %d is a King wave" % n)
 		elif has_king:
 			check(false, "unexpected king in wave %d" % n)
-	check(Waves.WAVES[49].size() == 4, "wave 50: King + 3 escorts")
+	check(Waves.WAVES[49].size() == 5, "wave 50: King + 4 escorts")
 	check(Waves.WAVES[99].size() == 5, "wave 100: King + 4 escorts")
 	check(Waves.WAVES[149].size() == 6, "wave 150: King + 5 escorts")
 

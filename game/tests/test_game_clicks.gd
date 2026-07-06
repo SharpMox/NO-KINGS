@@ -162,6 +162,59 @@ func _init() -> void:
 	check(game.items.size() + game.trinkets.size() > loot_before
 		or game.score > score_before, "the picked reward is applied")
 
+	# SETUP: the pass button reads START, and a stock piece can be dragged
+	# from the pool strip onto a zone tile (game-feel pass 2026-07-06)
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {} # fresh run -> SETUP placement phase
+	GameScript.next_army = "Crown"
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(game.state == game.State.SETUP, "empty config boots into SETUP")
+	check(game.pass_button.text == "START", "setup shows START instead of PASS")
+	var stack_btn: Button = game.pool_box.get_child(0)
+	var stock_before: int = game.stock.size()
+	var d_press := InputEventMouseButton.new()
+	d_press.button_index = MOUSE_BUTTON_LEFT
+	d_press.pressed = true
+	d_press.position = stack_btn.get_global_rect().get_center()
+	d_press.global_position = d_press.position
+	root.push_input(d_press)
+	await process_frame
+	var zone_px: Vector2 = game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2
+	var d_motion := InputEventMouseMotion.new()
+	d_motion.position = zone_px
+	d_motion.global_position = zone_px
+	root.push_input(d_motion)
+	await process_frame
+	var d_release := InputEventMouseButton.new()
+	d_release.button_index = MOUSE_BUTTON_LEFT
+	d_release.pressed = false
+	d_release.position = zone_px
+	d_release.global_position = zone_px
+	root.push_input(d_release)
+	await process_frame
+	check(game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before - 1,
+		"drag from the stock strip places the piece on the zone tile")
+
+	# clearing the last enemy auto-passes the turn
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await create_timer(1.2).timeout # auto-pass runs the enemy turn (animated)
+	check(game.state == game.State.PLAYER_TURN and game.wave == 4,
+		"capturing the last enemy auto-passes into the next wave")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

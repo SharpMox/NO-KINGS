@@ -56,13 +56,16 @@ var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
+var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
-	set(value): # every gain/loss anywhere pops floating feedback (round 4)
+	set(value): # every gain/loss anywhere pops floating feedback (round 4);
+		# popups anchor to the piece/effect that caused them (game-feel pass)
 		if value != score and is_node_ready() and not autoplay:
 			var d := value - score
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
-				"at_px": score_label.get_global_rect().end + Vector2(6, 0),
+				"at_px": fx_at if fx_at != Vector2.ZERO
+					else Vector2(score_label.get_global_rect().end) + Vector2(6, 0),
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
@@ -78,6 +81,7 @@ var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
 var pool_click_ms := 0
+var pool_drag_id := "" # stock piece mid-drag from the strip (game-feel pass)
 var preview_open := false
 var placing_id := ""  # stock piece id being placed, "" = none
 var merge_mode := false
@@ -398,9 +402,13 @@ func _refresh() -> void:
 	score_label.text = "Score %d" % score
 	wave_label.text = "wave %d/%d" % [wave, Waves.WAVES.size()]
 	match state:
-		State.SETUP:
-			turn_label.text = "Place army (%d left) → PASS" % stock.size()
+		State.SETUP: # the pass button doubles as the explicit start trigger
+			turn_label.text = "Place your army (%d left), then START" % stock.size()
+			pass_button.text = "START"
+			pass_button.modulate = Color(0.55, 1.0, 0.55)
 		State.PLAYER_TURN:
+			pass_button.text = "PASS"
+			pass_button.modulate = Color(1, 0.5, 0.5)
 			var next_in := _cadence() - turns_since_wave
 			var wave_txt := "King wave!" if _king_alive() else ("wave in %d" % maxi(next_in, 0)) if wave < Waves.WAVES.size() else "no more waves"
 			turn_label.text = "moves %d · place %d · merge %d · %s" % [moves_left, placements_left, merges_left, wave_txt]
@@ -476,6 +484,8 @@ func _rebuild_pool_strip() -> void:
 		elif st.cap:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
 		btn.pressed.connect(_on_stack_pressed.bind(id, st.cap, st.count))
+		if not st.cap: # stock stacks can also be drag-placed (game-feel pass)
+			btn.button_down.connect(_on_stack_drag_start.bind(id))
 		pool_box.add_child(btn)
 
 
@@ -566,6 +576,7 @@ func _on_confirm_merge() -> void:
 	if _tariff_on("regulation") and _merge_ids().has("pawn"):
 		return # Regulation: pawns can't be merged
 	merges_left -= 1
+	fx_at = Vector2(confirm_button.get_global_rect().get_center())
 	_charge("fuse_cost")
 	# if any source stood on the board, the result appears on the LAST-selected
 	# board tile (grilled 2026-07-02); pool-only merges send it to Stock
@@ -592,6 +603,7 @@ func _on_pass() -> void:
 		_spawn_wave(1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
+		fx_at = Vector2(pass_button.get_global_rect().get_center())
 		_charge("pass_cost")
 		_enemy_turn()
 
@@ -623,7 +635,24 @@ func _process(delta: float) -> void:
 
 # --- turn flow ---
 
+## Turn/wave transition feedback: board-outline glow + a sliding banner
+## (game-feel pass 2026-07-06). Stacked banners offset so they never overlap.
+func _add_turn_fx(text: String, color: Color) -> void:
+	if autoplay:
+		return
+	var slot := 0
+	for a in anims:
+		if a.kind == "banner":
+			slot += 1
+	anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": color})
+	anims.append({"kind": "banner", "t": 0.0, "dur": 1.1, "text": text,
+		"color": color, "slot": slot})
+	queue_redraw()
+
+
 func _begin_player_turn() -> void:
+	if state == State.ENEMY_TURN: # skip on the SETUP->first-turn transition
+		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
 	state = State.PLAYER_TURN
 	moves_left = Tuning.MOVES_PER_TURN
 	for t in trinkets:
@@ -648,8 +677,10 @@ func _begin_player_turn() -> void:
 
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
+	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
 	selected = Vector2i(-1, -1)
 	placing_id = ""
+	pool_drag_id = ""
 	_item_reset()
 	merge_sel.clear()
 	merge_button.button_pressed = false # also resets merge_mode via its toggle
@@ -723,6 +754,8 @@ func _queue_wave(n: int) -> void:
 	turns_since_wave = 0
 	var buff_id: String = Waves.BUFFS.get(n, "")
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
+	_add_turn_fx("KING WAVE!" if roster.has("king") else "WAVE %d" % n,
+		Color(1.0, 0.8, 0.3))
 	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
 		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
 		if not extras.is_empty(): # never duplicate the King (review 2026-07-03)
@@ -745,6 +778,7 @@ func _queue_wave(n: int) -> void:
 		if _tariff_on("recession"):
 			refill *= 0.5
 		clock_ms += refill
+		fx_at = Vector2(wave_label.get_global_rect().get_center())
 		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
 		# reinforcement drip from the army's own mix (balance 2026-07-06:
 		# starvation was 100% of bot deaths — nothing replenished Stock)
@@ -930,6 +964,41 @@ func _on_win_continue() -> void:
 
 # --- input ---
 
+## Press-drag from a stock stack: the piece follows the cursor and drops onto
+## a valid placement tile. Tapping (release back on the button) still selects.
+func _on_stack_drag_start(id: String) -> void:
+	if merge_mode or box_open or win_open or game_menu_open or preview_open:
+		return
+	if id == sanctioned_id and _tariff_on("sanctions"):
+		return
+	if state != State.SETUP and (state != State.PLAYER_TURN or placements_left <= 0):
+		return
+	pool_drag_id = id
+	queue_redraw()
+
+
+## Buttons capture the click, so the drag's release lands here, not in
+## _unhandled_input.
+func _input(event: InputEvent) -> void:
+	if pool_drag_id == "":
+		return
+	if event is InputEventMouseMotion:
+		queue_redraw()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+			and not event.pressed:
+		var t := _tile_at(event.position)
+		var id := pool_drag_id
+		pool_drag_id = ""
+		var placeable: bool = t.x >= 0 and not board.has(t) \
+			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
+				else Rules.placement_tiles(board).has(t))
+		if placeable and (state == State.SETUP
+				or (state == State.PLAYER_TURN and placements_left > 0)):
+			_place(id, t)
+		else: # dropped elsewhere (incl. back on the button = plain tap)
+			queue_redraw()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if preview_open or game_menu_open:
 		return # the panels' own buttons handle dismissal
@@ -1003,6 +1072,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 
 
 func _place(id: String, tile: Vector2i) -> void:
+	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
 	stock.erase(id)
 	board[tile] = {"id": id, "owner": Rules.PLAYER}
 	placing_id = ""
@@ -1026,6 +1096,7 @@ func _place(id: String, tile: Vector2i) -> void:
 func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
 	var king_captured := false
+	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		score += _gain(_capture_score(victim.id))
@@ -1052,14 +1123,21 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
 		if _king_down():
 			return
-	if moves_left == 0 and state == State.PLAYER_TURN:
+	# last move auto-passes (playtest 2026-07-02); so does clearing the board's
+	# last enemy — no point sitting on an empty board (game-feel 2026-07-06)
+	if (moves_left == 0 or _board_cleared()) and state == State.PLAYER_TURN:
 		if boxed: # resolve the box first; the pick UI defers the auto-pass
 			pass_after_box = true
 		else:
-			return _on_pass() # last move auto-passes (playtest 2026-07-02)
+			return _on_pass()
 	if boxed:
 		return _open_box_pick()
 	_refresh()
+
+
+## No enemy left, nothing incoming, and more waves to come — the turn is over.
+func _board_cleared() -> bool:
+	return not _any_enemy() and pending_spawn.is_empty() and wave < Waves.WAVES.size()
 
 
 ## Long-range = any non-leap move (ride or bent ride) — the Tariff on
@@ -1098,6 +1176,7 @@ func _capture_score(victim_id: String) -> int:
 ## must stop the turn flow (screen showing or game over).
 func _king_down() -> bool:
 	kings_defeated += 1
+	fx_at = Vector2(wave_label.get_global_rect().get_center())
 	score += Tuning.WIN_SCORE_BONUS
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
@@ -1421,6 +1500,8 @@ func _item_click(tile: Vector2i) -> void:
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
+	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
+		else Vector2(item_box.get_global_rect().get_center())
 	_charge("ability_cost") # on use — a cancelled targeting costs nothing
 	match it.key:
 		"blitz":
@@ -1491,6 +1572,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
 		if _king_down():
 			return
+	if state == State.PLAYER_TURN and _board_cleared():
+		return _on_pass() # the item cleared the last enemy (game-feel 2026-07-06)
 	_refresh()
 
 
@@ -1598,12 +1681,14 @@ func _box_add_skip(box: VBoxContainer) -> void:
 	var skip := Button.new()
 	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
 	skip.pressed.connect(func() -> void:
+		fx_at = get_viewport_rect().size / 2.0
 		score += _gain(Tuning.BOX_SKIP_CONSOLATION)
 		_box_close())
 	box.add_child(skip)
 
 
 func _box_choose(opt: Dictionary) -> void:
+	fx_at = get_viewport_rect().size / 2.0
 	match opt.kind:
 		"item":
 			items.append(opt.payload)
@@ -1719,6 +1804,14 @@ func _draw() -> void:
 			draw_rect(rect, COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
 			if y < Tuning.PLAYER_ZONE_ROWS and state == State.SETUP and not board.has(pos):
 				draw_rect(rect, Color(0.2, 0.5, 0.9, 0.25))
+	# whose-turn outline around the board (game-feel pass 2026-07-06)
+	var oc := Color(0.5, 0.5, 0.5)
+	if state == State.PLAYER_TURN:
+		oc = Color(0.45, 0.7, 1.0)
+	elif state == State.ENEMY_TURN:
+		oc = Color(1.0, 0.42, 0.35)
+	var bsize := Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile
+	draw_rect(Rect2(board_px - Vector2(4, 4), bsize + Vector2(8, 8)), oc, false, 3.0)
 	if selected.x >= 0:
 		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)), COL_SELECT)
 	for ref in merge_sel: # board pieces picked as merge sources
@@ -1741,7 +1834,7 @@ func _draw() -> void:
 			draw_arc(_tile_px(d) + Vector2(tile, tile) / 2, tile * 0.44, 0, TAU, 32, COL_CAPTURE, 3.0)
 		else:
 			draw_circle(_tile_px(d) + Vector2(tile, tile) / 2, 10, COL_MOVE)
-	if placing_id != "":
+	if placing_id != "" or pool_drag_id != "":
 		var tiles := _setup_open_tiles() if state == State.SETUP else Rules.placement_tiles(board)
 		for t in tiles:
 			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, Color(0.2, 0.5, 0.9, 0.6))
@@ -1775,8 +1868,26 @@ func _draw() -> void:
 		elif a.kind == "text": # score gains/losses float up and fade
 			draw_string(font, a.at_px + Vector2(0, -20.0 * a.t), a.text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
+		elif a.kind == "outline": # turn-switch glow expanding off the border
+			var grow: float = 4.0 + 12.0 * a.t
+			draw_rect(Rect2(board_px - Vector2(grow, grow),
+				Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile + Vector2(grow, grow) * 2),
+				Color(a.color, 1.0 - a.t), false, 5.0)
+		elif a.kind == "banner": # turn/wave strip: slides in, holds, fades out
+			var bw: float = Tuning.BOARD_W * tile
+			var by: float = board_px.y + tile * 3.0 + a.get("slot", 0) * 52.0
+			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
+			var slide: float = ease(minf(a.t * 4.0, 1.0), 0.3)
+			var bx: float = board_px.x - (1.0 - slide) * bw
+			draw_rect(Rect2(Vector2(bx, by), Vector2(bw, 44)),
+				Color(0.06, 0.06, 0.09, 0.78 * alpha))
+			draw_string(font, Vector2(bx, by + 31), a.text,
+				HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(textures[board[drag_from].id],
+			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
+	if pool_drag_id != "" and textures.has(pool_drag_id): # stock drag ghost
+		draw_texture_rect(textures[pool_drag_id],
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 
 

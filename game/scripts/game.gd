@@ -137,6 +137,8 @@ func _ready() -> void:
 		clock_ms = float(args[args.find("--clock") + 1]) * 1000.0
 	if args.has("--steps"): # debug: shorter autoplay cap for scenario sweeps
 		autoplay_cap = int(args[args.find("--steps") + 1])
+	if args.has("--army"): # balance fleets: run the bot with a specific army
+		next_army = args[args.find("--army") + 1]
 	var vp := get_viewport_rect().size
 	tile = int(minf((vp.x - 48.0) / Tuning.BOARD_W, (vp.y - 224.0) / Tuning.BOARD_H))
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), 100)
@@ -180,6 +182,7 @@ func _apply_config(cfg: Dictionary) -> void:
 	wave = int(cfg.get("wave", Waves.WAVES.size()))
 	turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	kings_defeated = int(cfg.get("kings_defeated", 0))
+	next_army = str(cfg.get("army", next_army)) # milestone drip draws from it
 	lost_player = int(cfg.get("lost_player", 0))
 	lost_enemy = int(cfg.get("lost_enemy", 0))
 	pending_spawn = cfg.get("pending", []).duplicate(true)
@@ -232,7 +235,7 @@ func _to_config() -> Dictionary:
 		"items": keys_of.call(items), "trinkets": keys_of.call(trinkets),
 		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
 		"wave": wave, "turns_since_wave": turns_since_wave,
-		"kings_defeated": kings_defeated,
+		"kings_defeated": kings_defeated, "army": next_army,
 		"lost_player": lost_player, "lost_enemy": lost_enemy,
 		"pending": pending_spawn.duplicate(true),
 		"score": score, "clock_s": clock_ms / 1000.0,
@@ -743,6 +746,11 @@ func _queue_wave(n: int) -> void:
 			refill *= 0.5
 		clock_ms += refill
 		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
+		# reinforcement drip from the army's own mix (balance 2026-07-06:
+		# starvation was 100% of bot deaths — nothing replenished Stock)
+		var mix: Array = Tuning.ARMIES.get(next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
+		for i in Tuning.MILESTONE_STOCK_DRIP:
+			stock.append(mix[rng.randi() % mix.size()])
 
 
 func _spawn_wave(n: int) -> void:
@@ -1501,11 +1509,13 @@ func _destroy(pos: Vector2i) -> void:
 func _open_box_pick() -> void:
 	box_open = true
 	_charge("box_cost")
-	if autoplay: # bot: random box, random content — exercises every branch
-		var kinds := ["item", "trinket", "score"]
-		_box_step2(kinds[rng.randi() % kinds.size()], true)
-		return
-	_box_step1()
+	var options := _box_options()
+	if autoplay: # bot: random pick (or skip) — exercises every branch
+		if rng.randf() < 0.1:
+			score += _gain(Tuning.BOX_SKIP_CONSOLATION)
+			return _box_close()
+		return _box_choose(options[rng.randi() % options.size()])
+	_box_show(options)
 
 
 func _box_clear() -> void:
@@ -1529,42 +1539,57 @@ func _box_vbox(title_text: String) -> VBoxContainer:
 	return box
 
 
-func _box_step1() -> void:
-	var box := _box_vbox("📦 The enemy dropped a box!")
-	for kind_label in [["item", "Item Box — a single-use ability"], ["trinket", "Trinket Box — a passive for the run"], ["score", "Score Box — points, now"]]:
-		var b := Button.new()
-		b.text = kind_label[1]
-		b.add_theme_font_size_override("font_size", 20)
-		b.pressed.connect(_box_step2.bind(kind_label[0], false))
-		box.add_child(b)
-	_box_add_skip(box)
+## One randomized offer (goal rework 2026-07-06, diverges from the GDD's
+## two-step pick): 3 options rolled independently — Item 40% / Trinket 30% /
+## Score 30% — never repeating within the offer. Each is self-describing:
+## {kind, name, description, tier?, value?, payload?}.
+func _box_options() -> Array:
+	var out := []
+	var taken := {}
+	for i in 3:
+		var r := rng.randf()
+		var kind := "item" if r < 0.4 else ("trinket" if r < 0.7 else "score")
+		var opt := {}
+		match kind:
+			"item":
+				var pool := Items.ITEMS.filter(func(e: Dictionary) -> bool:
+					return not taken.has(e.name))
+				var e: Dictionary = pool[rng.randi() % pool.size()]
+				opt = {"kind": "item", "name": e.name, "tier": e.tier,
+					"description": e.description, "payload": e}
+			"trinket":
+				var pool := Items.TRINKET_EFFECTS.filter(func(e: Dictionary) -> bool:
+					return not taken.has(e.name))
+				var e: Dictionary = pool[rng.randi() % pool.size()]
+				opt = {"kind": "trinket", "name": e.name,
+					"description": e.description, "payload": e}
+			"score":
+				var pool := Tuning.SCORE_BOX_CHUNKS.filter(func(v: int) -> bool:
+					return not taken.has("+%d score" % v))
+				var v: int = pool[rng.randi() % pool.size()]
+				opt = {"kind": "score", "name": "+%d score" % v, "value": v,
+					"description": "Banked immediately."}
+		taken[opt.name] = true
+		out.append(opt)
+	return out
 
 
-func _box_step2(kind: String, bot_pick: bool) -> void:
-	var options := []
-	match kind:
-		"item":
-			var pool := Items.ITEMS.duplicate()
-			pool.shuffle()
-			options = pool.slice(0, 5)
-		"trinket":
-			var pool := Items.TRINKET_EFFECTS.duplicate()
-			pool.shuffle()
-			options = pool.slice(0, 5)
-		"score":
-			var pool := Tuning.SCORE_BOX_CHUNKS.duplicate()
-			pool.shuffle()
-			for v in pool.slice(0, 5):
-				options.append({"name": "+%d score" % v, "value": v})
-	if bot_pick:
-		return _box_choose(kind, options[rng.randi() % options.size()])
-	var box := _box_vbox("Pick one:")
+func _box_show(options: Array) -> void:
+	var box := _box_vbox("📦 The enemy dropped a box! Pick one:")
 	for opt in options:
 		var b := Button.new()
-		b.text = opt.name
-		b.tooltip_text = opt.get("description", "")
-		b.add_theme_font_size_override("font_size", 18)
-		b.pressed.connect(_box_choose.bind(kind, opt))
+		var header := ""
+		match opt.kind:
+			"item":
+				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
+			"trinket":
+				header = "◈ %s — Trinket · passive, rest of the run" % opt.name
+			"score":
+				header = "★ %s" % opt.name
+		b.text = header + "\n" + opt.description
+		b.add_theme_font_size_override("font_size", 16)
+		b.custom_minimum_size = Vector2(420, 0)
+		b.pressed.connect(_box_choose.bind(opt))
 		box.add_child(b)
 	_box_add_skip(box)
 
@@ -1578,12 +1603,12 @@ func _box_add_skip(box: VBoxContainer) -> void:
 	box.add_child(skip)
 
 
-func _box_choose(kind: String, opt: Dictionary) -> void:
-	match kind:
+func _box_choose(opt: Dictionary) -> void:
+	match opt.kind:
 		"item":
-			items.append(opt)
+			items.append(opt.payload)
 		"trinket":
-			trinkets.append(opt)
+			trinkets.append(opt.payload)
 		"score":
 			score += _gain(opt.value)
 	_box_close()

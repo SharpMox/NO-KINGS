@@ -22,6 +22,9 @@ const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
 const CLOCK_START_MS := 30 * 60 * 1000  # GDD example value, TBD upstream
 const CLOCK_REFILL_MS := 30 * 1000      # every 10 waves; GDD example value
 const MILESTONE_WAVES := 10             # GDD Reward Economy
+const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone
+                                        # (balance 2026-07-06: starvation valve —
+                                        # income, not wave pressure, is what kills)
 
 # x10 economy (2026-07-03): pawn = 10 points, queen = 90, amazon = 120
 const PLACEMENT_SCORE_COST := 20   # placing mid-turn costs score (GDD, amount TBD)
@@ -32,9 +35,11 @@ const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless
 const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
 const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 
-# Tariff costs: upstream catalog says 200/500/1000 — now a clean /10 scale
-const TARIFF_ACTION_COST := 20     # per tariffed action
-const TARIFF_LR_PER_SQUARE := 10   # Tariff on Long-Range, per square moved
+# Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
+# halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most
+# captures earn (fleet data: Crown median score 30 at run end)
+const TARIFF_ACTION_COST := 10     # per tariffed action
+const TARIFF_LR_PER_SQUARE := 5    # Tariff on Long-Range, per square moved
 
 # Armies (grilled 2026-07-03, replaces the fixed STARTING_STOCK): three
 # 12-piece starting stocks, chain-base pieces only, totals roughly equal and
@@ -48,8 +53,10 @@ const ARMIES := {
 	"Wild Hunt": [ # leapers — signature kirin (250)
 		"pawn", "pawn", "pawn", "knight", "knight",
 		"kirin", "kirin", "alibaba", "alibaba", "ferz", "ferz", "wazir"],
-	"Old Guard": [ # fairy walkers, fastest merge fodder — signature ferz (220)
-		"ferz", "ferz", "ferz", "ferz", "wazir", "wazir", "wazir", "wazir",
-		"berolina", "berolina", "alibaba", "alibaba"],
+	"Old Guard": [ # fairy walkers + a knight pair for reach — signature ferz
+		# (260; reworked 2026-07-06: pure walkers starved by wave 16 in 10/12
+		# fleet runs — range-1 pieces can't capture, and captures are income)
+		"ferz", "ferz", "ferz", "ferz", "ferz",
+		"wazir", "wazir", "wazir", "knight", "knight", "alibaba", "alibaba"],
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu

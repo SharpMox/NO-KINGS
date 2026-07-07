@@ -264,6 +264,10 @@ func _init() -> void:
 		"drag from the stock strip places the piece on the zone tile")
 
 	# setup free repositioning: tap the placed piece, tap another zone tile
+	# (the drawer overlays the zone now — an outside tap closes it first)
+	_click(game._tile_px(Vector2i(4, 8)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.drawer_open == "", "an outside tap closes the drawer")
 	_click(game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
@@ -280,7 +284,7 @@ func _init() -> void:
 
 	# and dragging a placed piece onto the stock strip takes it back
 	var piece_px: Vector2 = game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2
-	var strip_px: Vector2 = (game.pool_box.get_parent() as Control).get_global_rect().get_center()
+	var strip_px: Vector2 = (game.drawer_buttons["stock"] as Control).get_global_rect().get_center()
 	var b_press := InputEventMouseButton.new()
 	b_press.button_index = MOUSE_BUTTON_LEFT
 	b_press.pressed = true
@@ -301,16 +305,25 @@ func _init() -> void:
 	root.push_input(b_release)
 	await process_frame
 	check(not game.board.has(Vector2i(2, 1)) and game.stock.size() == stock_before,
-		"setup: drop on the stock strip returns the piece to stock")
+		"setup: drop on the Stock button returns the piece to stock")
 
 	# tap-to-place regression (2026-07-07): strip rebuilds on press/release used
 	# to free the button before its arming tap fired
+	check(await _click_button_in(game.hud, "Stock %d" % stock_before),
+		"Stock button reopens the drawer")
+	await process_frame
 	var live_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
 	_click(live_stack.get_global_rect().get_center())
 	await process_frame
 	await process_frame
 	check(game.placing_id != "", "setup: tapping a stack arms placement")
+	check(not game.drawer_buttons["stock"].icon == null,
+		"the armed piece shows on the Stock button")
+	_click(game._tile_px(Vector2i(6, 8)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.placing_id != "" and game.drawer_open == "",
+		"outside tap closes the drawer but keeps the armed piece")
 	_click(game._tile_px(Vector2i(6, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
@@ -333,6 +346,8 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	check(game.placing_id == "rook" and game.placing_cap, "captured stack arms placement")
+	_click(game._tile_px(Vector2i(5, 6)) + Vector2(game.tile, game.tile) / 2) # close drawer
+	await process_frame
 	_click(game._tile_px(Vector2i(5, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(5, 0)) and game.captured.is_empty(),
@@ -348,7 +363,8 @@ func _init() -> void:
 	# shapes with the selection, or arrows keep drawing from _tile_px(-1,-1)
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]]}
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]],
+		"tariffs": ["move_cost"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -360,6 +376,14 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(Vector2i(4, 4)) and game.legal_paths.is_empty(),
 		"moving clears the movement-shape overlay")
+
+	# tariff button in the top row opens the detail overlay
+	check(await _click_button_in(game.hud, "⚠1"), "tariff button clickable")
+	await process_frame
+	check(game.tariff_panel != null and game.tariff_panel.visible, "tariff overlay opens")
+	check(await _click_button_in(game.tariff_panel, "Close"), "tariff Close clickable")
+	await process_frame
+	check(not game.tariff_panel.visible, "tariff overlay closes")
 
 	print("---")
 	if fails == 0:

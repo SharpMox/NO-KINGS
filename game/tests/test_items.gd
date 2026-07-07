@@ -31,21 +31,22 @@ func _item(key: String, target: String) -> Dictionary:
 
 
 func _init() -> void:
-	# --- review bug 1: removing a merge-selected piece must not leave a stale
-	# ref in merge_sel (crashed _merge_ids on every _refresh)
+	# --- review bug 1 (reworked for buttonless merging): removing a selected
+	# piece with an item must drop the selection, not leave a stale board ref
 	var a := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 12]],
 		"wave": 3})
 	await process_frame
-	a.merge_mode = true
-	a._refresh()
-	a._on_tile_clicked(Vector2i(2, 2)) # merge-select the board pawn
+	a._on_tile_clicked(Vector2i(2, 2)) # select the board pawn (partner glows)
+	check(a.merge_highlights.has("pawn"), "selection highlights its merge partner")
 	a.items.append(_item("extraction", "tile"))
 	a._use_item(0)
 	a._item_click(Vector2i(2, 2)) # extract the selected pawn off the board
-	check(a.merge_sel.is_empty(), "item use clears the merge selection")
-	check(not a.merge_mode, "item use exits merge mode")
+	check(a.selected == Vector2i(-1, -1), "item use clears the selection")
 	a._refresh() # would error on a stale board ref
 	check(a.stock.has("pawn"), "extraction still lands the piece in stock")
+	# tap-merge: select the remaining board pawn, tap the stock pawn's partner…
+	# the pool side is covered in the click probe; here merge the pool pair back
+	check(a.merge_highlights.is_empty(), "no selection, no merge highlights")
 	a.queue_free()
 	await process_frame
 

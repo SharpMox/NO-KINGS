@@ -76,6 +76,11 @@ Not started yet. When it is, this is the intended setup:
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.
+- **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
+  first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
+  TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
+  New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
+  sandbox + swept automatically) and, if it's clickable UI, a probe check too.
 
 ### Godot agent tools (MCP)
 

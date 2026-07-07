@@ -36,11 +36,15 @@ const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
-const BOARD_TOP := 44.0 # below the condensed top bar + tariff strip
+const BOARD_TOP := 30.0 # below the condensed top bar
 const DRAWER_H := 68.0  # stock / items / trinkets drawer height
-const COL_MOVE := Color(0.2, 0.6, 0.3, 0.55)
+# Palette rule (2026-07-07): everything player-side is a shade of blue —
+# selection, moves, placement, merge partners; everything enemy-side is red —
+# enemy pieces, threats, capture targets, recon.
+const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)
-const COL_SELECT := Color(0.95, 0.85, 0.2, 0.6)
+const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
+const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
@@ -135,7 +139,8 @@ var trinket_box := HBoxContainer.new()
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
-var tariff_label := Label.new()
+var tariff_button := Button.new() # top-row tariff count; opens the overlay
+var tariff_panel: PanelContainer # tariff detail overlay
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var box_panel := PanelContainer.new() # box-pick modal
@@ -266,11 +271,11 @@ func _to_config() -> Dictionary:
 	}
 
 
-## Board fills everything between the top bar and the bottom UI; an open
-## drawer pushes it up so no tile is ever hidden.
+## Board fills everything between the top bar and the bottom UI. Drawers
+## overlay it (user call 2026-07-07) — outside-clicks close them to reveal it.
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
-	var limit: float = vp.y - 70.0 - (DRAWER_H if drawer_open != "" else 0.0)
+	var limit: float = vp.y - 70.0
 	tile = int(minf((vp.x - 8.0) / Tuning.BOARD_W, (limit - BOARD_TOP) / Tuning.BOARD_H))
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), BOARD_TOP)
 	queue_redraw()
@@ -302,13 +307,10 @@ func _build_hud() -> void:
 	for l in [clock_label, score_label, wave_label, foes_label]:
 		top.add_child(l)
 	hud.add_child(top)
-	tariff_label.position = Vector2(10, 28)
-	tariff_label.add_theme_font_size_override("font_size", 13)
-	tariff_label.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5))
-	tariff_label.custom_minimum_size = Vector2(vp.x - 20, 0)
-	tariff_label.size = Vector2(vp.x - 20, 16)
-	tariff_label.clip_text = true
-	hud.add_child(tariff_label)
+	tariff_button.add_theme_font_size_override("font_size", 14)
+	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
+	tariff_button.pressed.connect(_show_tariffs)
+	top.add_child(tariff_button)
 
 	var menu_btn := Button.new()
 	menu_btn.text = "☰"
@@ -336,6 +338,8 @@ func _build_hud() -> void:
 		b.text = name.capitalize()
 		b.add_theme_font_size_override("font_size", 17)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.expand_icon = true # armed-piece icon on Stock stays button-sized
+		b.add_theme_constant_override("icon_max_width", 26)
 		b.pressed.connect(_set_drawer.bind(name))
 		drawer_buttons[name] = b
 		bar.add_child(b)
@@ -492,15 +496,15 @@ func _refresh() -> void:
 		State.GAME_OVER:
 			turn_label.text = ""
 			pass_count.text = ""
-	drawer_buttons["stock"].text = "Stock %d" % _pool().size()
+	var sb: Button = drawer_buttons["stock"]
+	sb.text = "Stock %d" % _pool().size()
+	# an armed stack stays visible on the button while the drawer is closed
+	sb.icon = textures.get(placing_id) if placing_id != "" else null
 	drawer_buttons["items"].text = "Items %d" % items.size()
 	drawer_buttons["trinkets"].text = "Trinkets %d" % trinkets.size()
 	merge_highlights = _merge_partner_ids()
-	var names := []
-	for t in tariffs_active:
-		names.append(t.name.trim_prefix("Tariff on "))
-	tariff_label.text = "" if names.is_empty() else "⚠ " + ", ".join(names) \
-			+ (" (suppressed)" if counter_intel_turns > 0 else "")
+	tariff_button.text = "⚠%d" % tariffs_active.size() \
+			+ ("·off" if counter_intel_turns > 0 and not tariffs_active.is_empty() else "")
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
 	_rebuild_trinket_strip()
@@ -594,9 +598,9 @@ func _rebuild_pool_strip() -> void:
 			var promote := Button.new()
 			promote.text = "▲"
 			promote.add_theme_font_size_override("font_size", 11)
-			promote.add_theme_color_override("font_color", Color(0.12, 0.1, 0.04))
+			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
 			var round := StyleBoxFlat.new()
-			round.bg_color = Color(0.95, 0.8, 0.25) # merge gold
+			round.bg_color = Color(0.3, 0.6, 1.0) # player blue
 			round.set_corner_radius_all(9)
 			for style in ["normal", "hover", "pressed"]:
 				promote.add_theme_stylebox_override(style, round)
@@ -611,9 +615,9 @@ func _rebuild_pool_strip() -> void:
 			btn.add_child(promote)
 		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
 		if placing_id == id and placing_cap == st.cap:
-			btn.modulate = Color(0.6, 1.2, 0.6) # armed: placement / merge origin
+			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 		elif merge_highlights.has(id):
-			btn.modulate = Color(1.2, 1.05, 0.55) # completes a merge — tap or drop
+			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
 		elif not st.cap and id == sanctioned_id and _tariff_on("sanctions"):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		elif st.cap:
@@ -869,6 +873,8 @@ func _on_pass() -> void:
 
 
 func _process(delta: float) -> void:
+	if selected.x >= 0 and not autoplay:
+		queue_redraw() # the selection outline pulses every frame
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
 		var open := _setup_open_tiles()
@@ -1252,7 +1258,7 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	merge_highlights = _merge_partner_ids()
 	for c in pool_box.get_children():
 		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
-			c.modulate = Color(1.2, 1.05, 0.55)
+			c.modulate = Color(0.8, 1.1, 1.4)
 	queue_redraw()
 
 
@@ -1262,7 +1268,7 @@ func _input(event: InputEvent) -> void:
 	if pool_drag_id == "":
 		return
 	if event is InputEventMouseMotion:
-		if state == State.PLAYER_TURN and drawer_open != "" and not \
+		if drawer_open != "" and not \
 				(drawers[drawer_open] as Control).get_global_rect().has_point(event.position):
 			_set_drawer("") # dragged out toward the board: give it back
 		queue_redraw()
@@ -1314,10 +1320,16 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
-			# a board press outside the drawer gives the board back (the tile
-			# was computed against the pushed-up layout, so it stays valid)
-			if drawer_open != "" and state != State.SETUP and at.x >= 0:
+			# any press outside an open drawer closes it to reveal the board
+			if drawer_open != "" and not (drawers[drawer_open] as Control) \
+					.get_global_rect().has_point(event.position):
 				_set_drawer("")
+			if at.x < 0: # dead UI space: a no-interaction press drops selection
+				if selected.x >= 0 or placing_id != "":
+					placing_id = ""
+					placing_cap = false
+					_clear_selection()
+					_refresh()
 			if event.double_click and at.x >= 0 and board.has(at):
 				drag_from = Vector2i(-1, -1)
 				return _show_preview(board[at].id) # double-tap: piece info
@@ -1345,10 +1357,12 @@ func _unhandled_input(event: InputEvent) -> void:
 						and board.has(t) and board[t].owner == Rules.PLAYER \
 						and board.has(from) and merge_highlights.has(board[t].id):
 					_do_merge(from, t) # dragged onto a partner: merge onto its tile
-				elif state == State.SETUP and t.x < 0 and pool_box.is_visible_in_tree() \
-						and (pool_box.get_parent() as Control) \
-						.get_global_rect().has_point(event.position):
-					_setup_to_stock(from) # dropped on the stock drawer: take it back
+				elif state == State.SETUP and t.x < 0 and (
+						(pool_box.is_visible_in_tree() and (pool_box.get_parent() as Control)
+							.get_global_rect().has_point(event.position))
+						or (drawer_buttons["stock"] as Control)
+							.get_global_rect().has_point(event.position)):
+					_setup_to_stock(from) # dropped on the drawer or Stock button
 				elif t == from and (drag_moved or drag_reselect):
 					# dragged away and dropped back home (no action taken), or a
 					# completed re-click on an already-selected piece: deselect
@@ -1466,6 +1480,8 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 			recent_place_costs.pop_front()
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
+	elif state == State.SETUP and not stock.is_empty() and drawer_open != "stock":
+		_set_drawer("stock") # keep the placement flow going
 	_refresh()
 
 
@@ -1728,8 +1744,64 @@ func _activate_tariff_by_key(key: String) -> void:
 			return _apply_tariff(t)
 
 
+## Overlay listing every active tariff (name, tier, effect) — opened from the
+## top-bar warning button; purely informational, Close dismisses.
+func _show_tariffs() -> void:
+	if tariff_panel:
+		tariff_panel.queue_free()
+	tariff_panel = PanelContainer.new()
+	tariff_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
+	tariff_panel.add_theme_stylebox_override("panel", bg)
+	var center := CenterContainer.new()
+	tariff_panel.add_child(center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	center.add_child(box)
+	var title := Label.new()
+	title.text = "Active tariffs"
+	title.add_theme_font_size_override("font_size", 26)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	if counter_intel_turns > 0:
+		var off := Label.new()
+		off.text = "Counter-Intel: all tariffs suppressed for %d turns" % counter_intel_turns
+		off.add_theme_font_size_override("font_size", 14)
+		off.modulate = Color(0.6, 1.0, 0.8)
+		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(off)
+	if tariffs_active.is_empty():
+		var none := Label.new()
+		none.text = "none yet — they land every 10th wave"
+		none.modulate = Color(1, 1, 1, 0.6)
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(none)
+	for t in tariffs_active:
+		var name := Label.new()
+		name.text = "%s  (%s)" % [t.name, t.tier]
+		name.add_theme_font_size_override("font_size", 17)
+		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
+		box.add_child(name)
+		var desc := Label.new()
+		desc.text = t.description
+		desc.add_theme_font_size_override("font_size", 13)
+		desc.modulate = Color(1, 1, 1, 0.75)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.custom_minimum_size = Vector2(get_viewport_rect().size.x - 96, 0)
+		box.add_child(desc)
+	var close := Button.new()
+	close.text = "Close"
+	close.add_theme_font_size_override("font_size", 20)
+	close.pressed.connect(func() -> void: tariff_panel.visible = false)
+	box.add_child(close)
+	hud.add_child(tariff_panel)
+	tariff_panel.move_to_front()
+
+
 func _apply_tariff(t: Dictionary) -> void:
 	tariffs_seen.append(t.name)
+	_add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
 	if t.kind == "oneoff":
 		match t.key:
 			"forced_audit":
@@ -2203,23 +2275,23 @@ func _draw() -> void:
 		oc = Color(1.0, 0.42, 0.35)
 	var bsize := Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile
 	draw_rect(Rect2(board_px - Vector2(4, 4), bsize + Vector2(8, 8)), oc, false, 3.0)
-	if selected.x >= 0:
-		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)), COL_SELECT)
-	if not merge_highlights.is_empty(): # gold ring: merges with the selection
+	var recon: bool = selected.x >= 0 and board.has(selected) \
+			and board[selected].owner == Rules.ENEMY
+	if selected.x >= 0: # enemy recon selections tint red, own selections blue
+		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)),
+			Color(COL_CAPTURE, 0.3) if recon else COL_SELECT)
+	if not merge_highlights.is_empty(): # cyan ring: merges with the selection
 		for pos in board:
 			if board[pos].owner == Rules.PLAYER and pos != selected \
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-					Color(0.95, 0.8, 0.2), 3.0)
+					COL_MERGE, 3.0)
 	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
 		for t in item_targets:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)
 		if item_stage_a.x >= 0:
 			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
-	# enemy recon selection: its reachable tiles draw in enemy red instead of
-	# the player's move green (threatened pieces keep the capture ring)
-	var recon: bool = selected.x >= 0 and board.has(selected) \
-			and board[selected].owner == Rules.ENEMY
+	# recon (enemy) paths draw red; the player's draw blue (palette rule)
 	var half := Vector2(tile, tile) / 2
 	for d in legal_dests:
 		if board.has(d): # capturable target: red tile tint + ring around the piece
@@ -2264,9 +2336,17 @@ func _draw() -> void:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
-		_draw_piece(font, p, px, tint)
+		# the selected piece draws bigger, with a pulsing outline (below)
+		_draw_piece(font, p, px, tint, 0.0 if pos == selected else 4.0)
 		if p.get("buff", false): # box carrier: gold badge
 			draw_circle(px + Vector2(tile - 9, 9), 6, Color(0.95, 0.78, 0.15))
+	if selected.x >= 0 and board.has(selected): # animated pulse on the selection
+		var t := Time.get_ticks_msec() / 1000.0
+		var pulse := 0.5 + 0.5 * sin(t * 5.0)
+		var pc := Color(COL_CAPTURE, 0.45 + 0.4 * pulse) if recon \
+				else Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse)
+		draw_arc(_tile_px(selected) + half, tile * (0.46 + 0.035 * pulse), 0, TAU, 40,
+			pc, 3.0 + 1.5 * pulse)
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
@@ -2300,9 +2380,10 @@ func _draw() -> void:
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 
 
-func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color) -> void:
+func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4.0) -> void:
 	if textures.has(p.id):
-		draw_texture_rect(textures[p.id], Rect2(px + Vector2(4, 4), Vector2(tile - 8, tile - 8)), false, tint)
+		draw_texture_rect(textures[p.id],
+			Rect2(px + Vector2(inset, inset), Vector2(tile - inset * 2, tile - inset * 2)), false, tint)
 	else: # ponytail: glyph fallback so a missing PNG never breaks the board
 		var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
 		var glyph: String = defs[p.id].glyph

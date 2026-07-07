@@ -173,6 +173,37 @@ func _init() -> void:
 	act = Rules.ai_action(b, defs)
 	check(act.is_empty() or act.to.y != 0, "one short of full width still holds")
 
+	# --- move_paths (display shapes) must flatten to exactly moves_for ---
+	# every piece def, alone and in a crowded scene, both owners
+	var crowd := {
+		Vector2i(3, 6): piece("pawn", Rules.PLAYER), Vector2i(5, 8): piece("rook", Rules.ENEMY),
+		Vector2i(2, 9): piece("knight", Rules.ENEMY), Vector2i(4, 5): piece("bishop", Rules.PLAYER),
+	}
+	var mismatches := 0
+	for id in defs:
+		for owner in [Rules.PLAYER, Rules.ENEMY]:
+			for base in [{}, crowd]:
+				var scene: Dictionary = base.duplicate()
+				var at := Vector2i(3, 7)
+				scene[at] = piece(id, owner)
+				var flat := {}
+				for p in Rules.move_paths(scene, at, defs):
+					if p.kind == "leap":
+						flat[p.to] = true
+					else:
+						for t in p.line:
+							flat[t] = true
+				var dests := Rules.moves_for(scene, at, defs)
+				if flat.size() != dests.size():
+					mismatches += 1
+					continue
+				for d in dests:
+					if not flat.has(d):
+						mismatches += 1
+						break
+	check(mismatches == 0,
+		"move_paths flattens to moves_for for all %d pieces (%d mismatches)" % [defs.size(), mismatches])
+
 	print("---")
 	if fails == 0:
 		print("ALL TESTS PASSED")

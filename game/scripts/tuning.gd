@@ -6,10 +6,12 @@ const BOARD_H := 14                # GDD said 8; +3 rows twice (rounds 2 and 3)
 const PLAYER_ZONE_ROWS := 2        # GDD Board — bottom rows, placement zone
 const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 
-const MOVES_PER_TURN := 2          # grilled 2026-07-02 (GDD leaves TBD)
-const PLACEMENTS_PER_TURN := 1     # grilled 2026-07-02
-const MERGES_PER_TURN := 3         # playtest round 4
+const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
+                                   # move/capture, place, merge/fuse, item use
+                                   # each cost 1 action (was 2 moves + 1 place
+                                   # + 3 merges; 3 actions → 2 on 2026-07-07)
 const ENEMY_ACTIONS_PER_TURN := 1  # playtest override 2026-07-02 (GDD says 2)
+const ENEMY_TURN_PAUSE := 0.4      # beat before/after the enemy acts (feel 2026-07-06)
 
 const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
 
@@ -19,7 +21,12 @@ const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
 const BACKROW_COMMIT_COUNT := BOARD_W
 const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
 
-const CLOCK_START_MS := 30 * 60 * 1000  # GDD example value, TBD upstream
+const CLOCK_START_MS := 5 * 60 * 1000   # 30 min → 5 (user call 2026-07-07)
+const TURN_END_CLOCK_BONUS_MS := 5 * 1000 # +5s for finishing a turn (2026-07-07)
+# Early wave clear (2026-07-07): board emptied N turns before the next wave
+# spawns → +N× these. Amounts are playtest assumptions on the ×10 economy.
+const EARLY_CLEAR_SCORE_PER_TURN := 10
+const EARLY_CLEAR_CLOCK_MS_PER_TURN := 2000
 const CLOCK_REFILL_MS := 30 * 1000      # every 10 waves; GDD example value
 const MILESTONE_WAVES := 10             # GDD Reward Economy
 const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone

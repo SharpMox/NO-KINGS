@@ -6,6 +6,8 @@ const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 
+static var window_sized := false # once per launch, not on every return to menu
+
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
 var army_center: CenterContainer
@@ -13,6 +15,15 @@ var scores_center: CenterContainer
 
 
 func _ready() -> void:
+	# real boots only — the click probes instantiate the menu by hand and inject
+	# clicks at 480×800 coords, which a mid-probe resize would break
+	if not window_sized and DisplayServer.get_name() != "headless" \
+			and get_tree().current_scene == self:
+		window_sized = true
+		var usable := DisplayServer.screen_get_usable_rect()
+		var h: int = usable.size.y - 40 # title-bar allowance
+		get_window().size = Vector2i(int(h * 480.0 / 800.0), h) # keep portrait aspect
+		get_window().move_to_center()
 	var args := OS.get_cmdline_user_args()
 	if args.has("--autoplay") or args.has("--scenario"):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")

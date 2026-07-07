@@ -7,7 +7,7 @@
 
 const ITEMS: Array = [
 	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "",
-		"description": "Gain an additional move action this turn."},
+		"description": "Gain 2 actions this turn."},
 	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "",
 		"description": "Duplicate a random piece in your Captured Stock."},
 	{"key": "field_orders", "name": "Field Orders", "tier": "Tactical", "target": "",
@@ -53,11 +53,11 @@ const ITEMS: Array = [
 ## assumptions to tune, noted per entry.
 const TRINKET_EFFECTS: Array = [
 	{"key": "first_capture_extra", "name": "First-Capture Extra Action",
-		"description": "If your first move of a turn is a capture, gain an extra move."},
+		"description": "If your first action of a turn is a capture, gain an extra action."},
 	{"key": "greed", "name": "Greed",
 		"description": "+10 score per Pawn captured."},
 	{"key": "move", "name": "Move",
-		"description": "+1 move per turn."},
+		"description": "+1 action per turn."},
 	{"key": "lifesteal", "name": "Lifesteal",
 		"description": "Captures restore 2s of clock."},
 	{"key": "score", "name": "Score",

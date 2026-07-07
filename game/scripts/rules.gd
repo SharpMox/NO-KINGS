@@ -69,6 +69,73 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 	return out
 
 
+## Display-annotated variant of moves_for — same legality, grouped by shape so
+## the board can draw leaps as dots, rides as arrows, and bent rides as linked
+## dots. Kept structurally parallel to moves_for; test_rules asserts the
+## flattened destination set matches exactly.
+static func move_paths(board: Dictionary, from: Vector2i, defs: Dictionary) -> Array[Dictionary]:
+	var piece: Dictionary = board[from]
+	var def: Dictionary = defs[piece.id]
+	var mirror := -1 if piece.owner == ENEMY else 1
+	var out: Array[Dictionary] = []
+	for m in def.moves:
+		if m.type == "bent": # one step to the pivot, then ride outward from it
+			var pivot := from + Vector2i(int(m.pivot[0]), int(m.pivot[1]) * mirror)
+			if not in_bounds(pivot):
+				continue
+			var bline: Array[Vector2i] = []
+			_path_dest(board, pivot, piece.owner, m.mode, bline)
+			if not board.has(pivot):
+				var bstep := Vector2i(int(m.dir[0]), int(m.dir[1]) * mirror)
+				var bpos := pivot
+				while true:
+					bpos += bstep
+					if not in_bounds(bpos):
+						break
+					_path_dest(board, bpos, piece.owner, m.mode, bline)
+					if board.has(bpos):
+						break
+			if not bline.is_empty():
+				out.append({"kind": "bent", "line": bline})
+			continue
+		for dir in m.dirs:
+			var step := Vector2i(int(dir[0]), int(dir[1]) * mirror)
+			if m.type == "leap":
+				var hop: Array[Vector2i] = []
+				_path_dest(board, from + step, piece.owner, m.mode, hop)
+				if not hop.is_empty():
+					out.append({"kind": "leap", "to": hop[0]})
+			else: # ride
+				var range_limit: int = int(m.get("range", 0))
+				var pos := from
+				var steps := 0
+				var line: Array[Vector2i] = []
+				while true:
+					pos += step
+					steps += 1
+					if not in_bounds(pos) or (range_limit > 0 and steps > range_limit):
+						break
+					_path_dest(board, pos, piece.owner, m.mode, line)
+					if board.has(pos):
+						break # rides stop at the first occupied square
+				if not line.is_empty():
+					# a ride whose step is itself a leap (nightrider-style, e.g.
+					# the Valkyrie) hops down the line rather than sliding
+					out.append({"kind": "ride", "line": line,
+						"hop": absi(step.x) > 1 or absi(step.y) > 1})
+	return out
+
+
+static func _path_dest(board: Dictionary, to: Vector2i, owner: int, mode: String, line: Array[Vector2i]) -> void:
+	if not in_bounds(to):
+		return
+	if board.has(to):
+		if board[to].owner != owner and mode != "move":
+			line.append(to)
+	elif mode != "capture":
+		line.append(to)
+
+
 static func _add_dest(board: Dictionary, _from: Vector2i, to: Vector2i, owner: int, mode: String, out: Array[Vector2i]) -> void:
 	if not in_bounds(to) or out.has(to):
 		return

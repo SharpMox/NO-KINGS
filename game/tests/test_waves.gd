@@ -5,6 +5,8 @@ extends SceneTree
 
 const Waves := preload("res://data/waves.gd")
 const Tariffs := preload("res://data/tariffs.gd")
+const GameScript := preload("res://scripts/game.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -56,6 +58,33 @@ func _init() -> void:
 	check(Tariffs.SCHEDULE.size() == 15, "15 tariff waves")
 	for n in tiers:
 		check(Tariffs.SCHEDULE.get(n) == tiers[n], "wave %d tariff is %s" % [n, tiers[n]])
+
+	# --- early-clear bonus: emptying the board before the next wave pays out
+	# score + clock scaled by the turns to spare, once per wave (2026-07-07) ---
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
+		"wave": 2}
+	GameScript.is_scenario = true
+	var g: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(g)
+	await process_frame
+	await process_frame
+	var clock0: float = g.clock_ms
+	g._move_player(Vector2i(2, 2), Vector2i(2, 4)) # capture the last enemy
+	var early: int = g._cadence() # cleared with the whole cadence to spare
+	check(g.early_clear_awarded, "clearing before the wave flags the bonus")
+	check(g.score == 10 + early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
+		"early clear pays +%d score on top of the capture" \
+		% (early * Tuning.EARLY_CLEAR_SCORE_PER_TURN))
+	check(g.clock_ms >= clock0 + early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN \
+		+ Tuning.TURN_END_CLOCK_BONUS_MS - 500,
+		"early clear refills the clock per spare turn")
+	while g.state != GameScript.State.PLAYER_TURN: # let the enemy turn finish
+		await create_timer(0.1).timeout
+	var score_after: int = g.score
+	g._on_pass()
+	check(g.score == score_after, "the bonus pays only once per wave")
+	g.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

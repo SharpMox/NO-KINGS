@@ -28,6 +28,31 @@ static func all() -> Array:
 			"board": [["queen", 0, 2, 2], ["knight", 0, 4, 2], ["pawn", 1, 2, 5], ["bishop", 1, 3, 4], ["rook", 1, 5, 3]]}},
 		{"name": "Waves & cadence", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1]], "wave": 1, "stock": ["pawn", "pawn"]}},
+		{"name": "Spawn overflow: full top row (friendly capture + spillover)", "cfg": {
+			"board": [["queen", 0, 2, 1],
+				["pawn", 0, 0, 13], ["pawn", 0, 1, 13], ["pawn", 0, 2, 13], ["pawn", 0, 3, 13],
+				["pawn", 0, 4, 13], ["pawn", 0, 5, 13], ["pawn", 0, 6, 13], ["pawn", 0, 7, 13]],
+			"wave": 1, "score": 500}},
+		{"name": "Captured stock: deploy (score cost) & merge", "cfg": {
+			"board": ZONE_PAWNS, "captured": ["rook", "rook", "knight", "pawn"],
+			"stock": ["pawn"], "score": 500, "wave": 5}},
+		{"name": "Early clear: bonus for beating the cadence", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
+			"wave": 2, "stock": ["pawn"], "score": 100}},
+		{"name": "Economy: Blitz + First-Capture bonus actions", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
+			"items": ["blitz"], "trinkets": ["first_capture_extra"], "score": 200, "wave": 3}},
+		# win-screen tests: King one queen-move away, capture it to trigger the
+		# screen — wave 50 = Continue/End Run, wave >= 150 = FULL CLEAR game over
+		{"name": "Win screen: wave 50 (capture King)", "cfg": {
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
+			"wave": 50, "score": 1000}},
+		{"name": "Win screen: full clear @ wave 200 (capture King)", "cfg": {
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
+			"wave": 200, "score": 5000}},
+		{"name": "Recurring King (wave 100: bonus + refill, run continues)", "cfg": {
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10], ["rook", 1, 2, 12]],
+			"wave": 100, "kings_defeated": 1, "score": 3000}},
 		{"name": "King wave (checkmate to win)", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
 				["king", 1, 3, 10], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],

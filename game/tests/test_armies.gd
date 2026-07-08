@@ -1,7 +1,7 @@
 extends SceneTree
-## Army data sanity: three 12-piece starting stocks (grilled 2026-07-03) —
-## known piece ids, signature piece present, totals roughly equal and below
-## the old 280-value STARTING_STOCK ("too strong").
+## Army data sanity: three 11-piece starting stocks (slimmed 2026-07-08:
+## 8 base pieces + 3 specials) — known ids, signature present, totals roughly
+## equal and below the old 280-value STARTING_STOCK ("too strong").
 ## Run headless:  godot --headless --path game -s tests/test_armies.gd
 
 const Tuning := preload("res://scripts/tuning.gd")
@@ -27,7 +27,7 @@ func _init() -> void:
 	var totals := []
 	for name in Tuning.ARMIES:
 		var army: Array = Tuning.ARMIES[name]
-		check(army.size() == 12, "%s: 12 pieces" % name)
+		check(army.size() == 11, "%s: 11 pieces" % name)
 		check(army.has(signatures[name]), "%s: signature %s present" % [name, signatures[name]])
 		var total := 0
 		var ids_ok := true

@@ -181,7 +181,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 50,
-		"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 12]]}
+		"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 10]]}
 	GameScript.is_scenario = true # keep the probe off the real save file
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -192,9 +192,9 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.win_open, "capturing the wave-50 King opens the win screen")
-	_click(game._tile_px(Vector2i(7, 12)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	check(game.selected != Vector2i(7, 12), "win screen blocks board clicks")
+	check(game.selected != Vector2i(7, 10), "win screen blocks board clicks")
 	check(await _click_button_in(game.overlay, "Continue"), "Continue clickable")
 	await process_frame
 	check(not game.win_open and game.state == game.State.PLAYER_TURN,
@@ -205,7 +205,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 3,
-		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 12]]}
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -240,6 +240,7 @@ func _init() -> void:
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
 	var stack_btn: Button = game.pool_box.get_child(0)
 	var stock_before: int = game.stock.size()
+	# releasing INSIDE the open drawer must never place under it (2026-07-08)
 	var d_press := InputEventMouseButton.new()
 	d_press.button_index = MOUSE_BUTTON_LEFT
 	d_press.pressed = true
@@ -248,20 +249,62 @@ func _init() -> void:
 	root.push_input(d_press)
 	await process_frame
 	var zone_px: Vector2 = game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2
-	var d_motion := InputEventMouseMotion.new()
-	d_motion.position = zone_px
-	d_motion.global_position = zone_px
-	root.push_input(d_motion)
-	await process_frame
-	var d_release := InputEventMouseButton.new()
+	var zone_motion := InputEventMouseMotion.new()
+	zone_motion.position = zone_px
+	zone_motion.global_position = zone_px
+	root.push_input(zone_motion) # real pointers move before releasing —
+	await process_frame           # without this the button still thinks it's
+	var d_release := InputEventMouseButton.new() # hovered and fires a tap
 	d_release.button_index = MOUSE_BUTTON_LEFT
 	d_release.pressed = false
 	d_release.position = zone_px
 	d_release.global_position = zone_px
 	root.push_input(d_release)
 	await process_frame
+	check(not game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before,
+		"a drop inside the open drawer places nothing (misinput guard)")
+
+	# dragging OUT closes the drawer; the drop then lands on the revealed tile
+	root.push_input(d_press.duplicate())
+	await process_frame
+	var high_px: Vector2 = game._tile_px(Vector2i(4, 6)) + Vector2(game.tile, game.tile) / 2
+	var d_motion := InputEventMouseMotion.new()
+	d_motion.position = high_px
+	d_motion.global_position = high_px
+	root.push_input(d_motion)
+	await process_frame
+	check(game.drawer_open == "", "dragging out of the drawer closes it")
+	root.push_input(zone_motion.duplicate())
+	await process_frame
+	root.push_input(d_release.duplicate())
+	await process_frame
 	check(game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before - 1,
 		"drag from the stock strip places the piece on the zone tile")
+
+	# a CANCELLED drag (invalid drop spot) reopens the drawer it auto-closed
+	var live2: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
+		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
+	var l2_press: InputEventMouseButton = d_press.duplicate()
+	l2_press.position = live2.get_global_rect().get_center()
+	l2_press.global_position = l2_press.position
+	root.push_input(l2_press)
+	await process_frame
+	root.push_input(d_motion.duplicate()) # out of the drawer: closes it
+	await process_frame
+	check(game.drawer_open == "", "drag-out closed the drawer again")
+	var bad_motion: InputEventMouseMotion = d_motion.duplicate()
+	bad_motion.position = Vector2(240, 10) # top bar: nowhere to drop
+	bad_motion.global_position = bad_motion.position
+	root.push_input(bad_motion)
+	await process_frame
+	var bad_release: InputEventMouseButton = d_release.duplicate()
+	bad_release.position = bad_motion.position
+	bad_release.global_position = bad_motion.position
+	root.push_input(bad_release)
+	await process_frame
+	await process_frame
+	check(game.drawer_open == "stock" and game.stock.size() == stock_before - 1,
+		"a cancelled drop reopens the drawer, placing nothing")
 
 	# setup free repositioning: tap the placed piece, tap another zone tile
 	# (the drawer overlays the zone now — an outside tap closes it first)
@@ -318,8 +361,9 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	check(game.placing_id != "", "setup: tapping a stack arms placement")
-	check(not game.drawer_buttons["stock"].icon == null,
-		"the armed piece shows on the Stock button")
+	check(game.placing_id != "" and game.textures.has(game.placing_id) \
+			and game.stock_armed.get_parent() == game.drawer_buttons["stock"],
+		"the armed piece rides the Stock button overlay")
 	_click(game._tile_px(Vector2i(6, 8)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.placing_id != "" and game.drawer_open == "",
@@ -363,7 +407,7 @@ func _init() -> void:
 	# shapes with the selection, or arrows keep drawing from _tile_px(-1,-1)
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]],
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"tariffs": ["move_cost"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)

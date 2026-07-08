@@ -20,7 +20,7 @@ func _init() -> void:
 	DirAccess.remove_absolute(GameScript.SCORES_PATH) # clean slate
 
 	# the enemy rook keeps the boot from queueing the next wave (board-cleared rule)
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]], "wave": 3}
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3}
 	GameScript.is_scenario = true
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)

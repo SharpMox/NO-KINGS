@@ -30,8 +30,8 @@ static func all() -> Array:
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1]], "wave": 1, "stock": ["pawn", "pawn"]}},
 		{"name": "Spawn overflow: full top row (friendly capture + spillover)", "cfg": {
 			"board": [["queen", 0, 2, 1],
-				["pawn", 0, 0, 13], ["pawn", 0, 1, 13], ["pawn", 0, 2, 13], ["pawn", 0, 3, 13],
-				["pawn", 0, 4, 13], ["pawn", 0, 5, 13], ["pawn", 0, 6, 13], ["pawn", 0, 7, 13]],
+				["pawn", 0, 0, 11], ["pawn", 0, 1, 11], ["pawn", 0, 2, 11], ["pawn", 0, 3, 11],
+				["pawn", 0, 4, 11], ["pawn", 0, 5, 11], ["pawn", 0, 6, 11], ["pawn", 0, 7, 11]],
 			"wave": 1, "score": 500}},
 		{"name": "Captured stock: deploy (score cost) & merge", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "rook", "knight", "pawn"],
@@ -51,7 +51,7 @@ static func all() -> Array:
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
 			"wave": 200, "score": 5000}},
 		{"name": "Recurring King (wave 100: bonus + refill, run continues)", "cfg": {
-			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10], ["rook", 1, 2, 12]],
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10], ["rook", 1, 2, 10]],
 			"wave": 100, "kings_defeated": 1, "score": 3000}},
 		{"name": "King wave (checkmate to win)", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
@@ -114,7 +114,7 @@ static func all() -> Array:
 				["banshee", 0, 6, 1], ["raven", 0, 1, 0], ["amazonrider", 0, 3, 0],
 				["berolina", 0, 5, 0], ["inv-sergeant", 0, 7, 0], ["inv-arrow-pawn", 0, 7, 1],
 				["inv-kirin-plus", 0, 6, 0], ["inv-kirin-plus-plus", 0, 0, 0],
-				["pawn", 1, 3, 12], ["rook", 1, 5, 12]],
+				["pawn", 1, 3, 10], ["rook", 1, 5, 10]],
 			"captured": ["ferz", "rook", "wazir", "bishop"], "score": 500}},
 		# --- loss conditions ---
 		{"name": "Loss: clock-out (10s)", "cfg": {

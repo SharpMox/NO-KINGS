@@ -18,7 +18,7 @@ func check(cond: bool, label: String) -> void:
 
 
 func _init() -> void:
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]], "wave": 3}
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3}
 	GameScript.is_scenario = true
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)

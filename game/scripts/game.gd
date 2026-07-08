@@ -81,6 +81,8 @@ var captured: Array = []
 var actions_left := 0 # unified: move, place, merge, item — 1 action each
 var actions_max := 0  # granted this turn (base + trinket/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
+var pending_reinforce := false # shop due at the next player-turn start
+var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
 var selected := Vector2i(-1, -1) # selected board piece
@@ -206,6 +208,7 @@ func _apply_config(cfg: Dictionary) -> void:
 	wave = int(cfg.get("wave", Waves.WAVES.size()))
 	turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
+	pending_reinforce = bool(cfg.get("pending_reinforce", false))
 	kings_defeated = int(cfg.get("kings_defeated", 0))
 	next_army = str(cfg.get("army", next_army)) # milestone drip draws from it
 	lost_player = int(cfg.get("lost_player", 0))
@@ -261,6 +264,7 @@ func _to_config() -> Dictionary:
 		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
 		"wave": wave, "turns_since_wave": turns_since_wave,
 		"early_clear_awarded": early_clear_awarded,
+		"pending_reinforce": pending_reinforce,
 		"kings_defeated": kings_defeated, "army": next_army,
 		"lost_player": lost_player, "lost_enemy": lost_enemy,
 		"pending": pending_spawn.duplicate(true),
@@ -988,6 +992,12 @@ func _begin_player_turn() -> void:
 		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 		f.store_string(JSON.stringify(_to_config()))
 	_refresh()
+	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
+		if autoplay:
+			pending_reinforce = false
+			_autoplay_reinforce()
+		else:
+			_show_reinforce()
 
 
 func _enemy_turn() -> void:
@@ -1074,6 +1084,8 @@ func _queue_wave(n: int) -> void:
 	wave = n
 	turns_since_wave = 0
 	early_clear_awarded = false # the new wave can earn its own clear bonus
+	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
+		pending_reinforce = true
 	var buff_id: String = Waves.BUFFS.get(n, "")
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	_add_turn_fx("KING WAVE!" if roster.has("king") else "WAVE %d" % n,
@@ -1814,6 +1826,102 @@ func _activate_tariff_by_key(key: String) -> void:
 	for t in Tariffs.TARIFFS:
 		if t.key == key:
 			return _apply_tariff(t)
+
+
+## The army's reinforcement selection: its starter piece types, in order.
+func _reinforce_ids() -> Array:
+	var seen := {}
+	var out := []
+	for id in Tuning.ARMIES.get(next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY]):
+		if not seen.has(id):
+			seen[id] = true
+			out.append(id)
+	return out
+
+
+## Reinforcement shop (end of waves 10/20/30/40): buy any number of pieces
+## from the army's starter selection into Stock, at catalog value. Done (or
+## running dry) hands the turn back; the pending flag survives saves.
+func _show_reinforce() -> void:
+	if reinforce_panel:
+		reinforce_panel.queue_free()
+	reinforce_panel = PanelContainer.new()
+	reinforce_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
+	reinforce_panel.add_theme_stylebox_override("panel", bg)
+	var center := CenterContainer.new()
+	reinforce_panel.add_child(center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	center.add_child(box)
+	var title := Label.new()
+	title.text = "REINFORCEMENTS"
+	title.add_theme_font_size_override("font_size", 26)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var sub := Label.new()
+	sub.text = "Wave %d cleared — spend score on your army's reserve\n★%d available" % [wave - 1, score]
+	sub.add_theme_font_size_override("font_size", 15)
+	sub.modulate = Color(1, 1, 1, 0.8)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(sub)
+	for id in _reinforce_ids():
+		var cost: int = int(defs[id].value)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		if textures.has(id):
+			var tex := TextureRect.new()
+			tex.texture = textures[id]
+			tex.custom_minimum_size = Vector2(34, 34)
+			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			row.add_child(tex)
+		var what := Label.new()
+		what.text = "%s — %d★" % [defs[id].name, cost]
+		what.add_theme_font_size_override("font_size", 17)
+		what.custom_minimum_size = Vector2(190, 0)
+		row.add_child(what)
+		var buy := Button.new()
+		buy.text = "Buy"
+		buy.add_theme_font_size_override("font_size", 17)
+		buy.disabled = score < cost
+		buy.pressed.connect(func() -> void:
+			if score >= cost:
+				score -= cost
+				stock.append(id)
+				_show_reinforce()) # rebuild: fresh score line + affordability
+		row.add_child(buy)
+		box.add_child(row)
+	var done := Button.new()
+	done.text = "Done"
+	done.add_theme_font_size_override("font_size", 22)
+	done.pressed.connect(func() -> void:
+		pending_reinforce = false
+		reinforce_panel.visible = false
+		_refresh())
+	box.add_child(done)
+	hud.add_child(reinforce_panel)
+	reinforce_panel.move_to_front()
+
+
+## Bot version: cheapest pieces first, keeping a 100-score reserve, max 4.
+func _autoplay_reinforce() -> void:
+	var ids := _reinforce_ids()
+	ids.sort_custom(func(a: String, b: String) -> bool:
+		return int(defs[a].value) < int(defs[b].value))
+	for i in 4:
+		var bought := false
+		for id in ids:
+			var cost: int = int(defs[id].value)
+			if score - cost >= 100:
+				score -= cost
+				stock.append(id)
+				bought = true
+				break
+		if not bought:
+			return
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the

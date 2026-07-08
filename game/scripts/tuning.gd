@@ -29,6 +29,10 @@ const EARLY_CLEAR_SCORE_PER_TURN := 10
 const EARLY_CLEAR_CLOCK_MS_PER_TURN := 2000
 const CLOCK_REFILL_MS := 30 * 1000      # every 10 waves; GDD example value
 const MILESTONE_WAVES := 10             # GDD Reward Economy
+const REINFORCE_WAVES := [10, 20, 30, 40]  # reinforcement shop opens when the
+                                        # next wave queues ("end of" these);
+                                        # prices = catalog piece values, the
+                                        # selection = the army's starter mix
 const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone
                                         # (balance 2026-07-06: starvation valve —
                                         # income, not wave pressure, is what kills)

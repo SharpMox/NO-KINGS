@@ -86,6 +86,29 @@ func _init() -> void:
 	g.queue_free()
 	await process_frame
 
+	# --- reinforcement shop: queues after waves 10/20/30/40, bot buys in ---
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 10, "score": 300}
+	GameScript.is_scenario = true
+	var r: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(r)
+	await process_frame
+	await process_frame
+	r._queue_wave(11)
+	check(r.pending_reinforce, "clearing wave 10 pends the reinforcement shop")
+	r.autoplay = true # bot path: buys cheapest, keeps a reserve
+	var stock0: int = r.stock.size()
+	var score0: int = r.score
+	r._begin_player_turn()
+	check(not r.pending_reinforce, "the bot consumes the pending shop")
+	check(r.stock.size() > stock0 and r.score < score0,
+		"the bot bought reinforcements (stock +%d, score %d->%d)" \
+		% [r.stock.size() - stock0, score0, r.score])
+	r._queue_wave(12)
+	check(not r.pending_reinforce, "non-milestone waves pend no shop")
+	r.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL WAVE CHECKS OK")

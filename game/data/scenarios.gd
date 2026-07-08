@@ -39,6 +39,9 @@ static func all() -> Array:
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 			"wave": 2, "stock": ["pawn"], "score": 100}},
+		{"name": "Reinforcements: post-wave-10 shop", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"wave": 11, "score": 300, "stock": ["pawn"], "pending_reinforce": true}},
 		{"name": "Economy: Blitz + First-Capture bonus actions", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
 			"items": ["blitz"], "trinkets": ["first_capture_extra"], "score": 200, "wave": 3}},

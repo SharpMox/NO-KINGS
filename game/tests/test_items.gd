@@ -33,7 +33,7 @@ func _item(key: String, target: String) -> Dictionary:
 func _init() -> void:
 	# --- review bug 1 (reworked for buttonless merging): removing a selected
 	# piece with an item must drop the selection, not leave a stale board ref
-	var a := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 12]],
+	var a := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
 		"wave": 3})
 	await process_frame
 	a._on_tile_clicked(Vector2i(2, 2)) # select the board pawn (partner glows)
@@ -52,7 +52,7 @@ func _init() -> void:
 
 	# --- review bug 4: ability tariff charges when the item is USED, once —
 	# cancelling a targeted item costs nothing
-	var b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]],
+	var b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["ability_cost"]})
 	await process_frame
 	b.items.append(_item("extraction", "tile"))
@@ -68,7 +68,7 @@ func _init() -> void:
 
 	# --- review bug 3: Long-Range tariff covers every rider, not just
 	# bishop/rook; leapers stay exempt
-	var c := _boot({"board": [["queen", 0, 2, 2], ["knight", 0, 5, 2], ["rook", 1, 7, 12]],
+	var c := _boot({"board": [["queen", 0, 2, 2], ["knight", 0, 5, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["long_range_cost"]})
 	await process_frame
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares

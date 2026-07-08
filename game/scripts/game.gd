@@ -36,7 +36,6 @@ const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
-const BOARD_TOP := 30.0 # below the condensed top bar
 const DRAWER_H := 68.0  # stock / items / trinkets drawer height
 # Palette rule (2026-07-07): everything player-side is a shade of blue —
 # selection, moves, placement, merge partners; everything enemy-side is red —
@@ -98,6 +97,7 @@ var preview_open := false
 var placing_id := ""  # stock piece id being placed, "" = none
 var placing_cap := false # the armed stack is captured stock (merge-only origin)
 var pool_drag_cap := false # the mid-drag stack is captured stock
+var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
 var merge_highlights := {} # ids that complete a merge with the current selection
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
@@ -135,6 +135,7 @@ var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var pending_merge: Array = [] # the two sources awaiting confirmation
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
+var stock_armed := Control.new() # draws the armed piece on the Stock button
 var trinket_box := HBoxContainer.new()
 var wave_label := Label.new()
 var turn_label := Label.new()
@@ -275,15 +276,37 @@ func _to_config() -> Dictionary:
 ## overlay it (user call 2026-07-07) — outside-clicks close them to reveal it.
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
-	var limit: float = vp.y - 70.0
-	tile = int(minf((vp.x - 8.0) / Tuning.BOARD_W, (limit - BOARD_TOP) / Tuning.BOARD_H))
-	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), BOARD_TOP)
+	var top := 26.0 # below the condensed top bar
+	var bottom: float = vp.y - 46.0 # the button bar
+	tile = int(minf((vp.x - 8.0) / Tuning.BOARD_W, (bottom - top) / Tuning.BOARD_H))
+	# centered in the span so the top and bottom gaps match (2026-07-08)
+	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0),
+		roundf(top + (bottom - top - tile * Tuning.BOARD_H) / 2.0))
 	queue_redraw()
+
+
+## The armed stack piece rides on the Stock button styled like a selection:
+## player-blue tint plus the same pulsing outline as a selected board piece.
+func _draw_stock_armed() -> void:
+	# only while the drawer is closed — open, the armed stack itself is visible
+	if placing_id == "" or drawer_open == "stock" or not textures.has(placing_id):
+		return
+	var c := Vector2(19.0, stock_armed.size.y / 2.0)
+	var t := Time.get_ticks_msec() / 1000.0
+	var pulse := 0.5 + 0.5 * sin(t * 5.0)
+	stock_armed.draw_texture_rect(textures[placing_id],
+		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false, Color(0.72, 0.85, 1.25))
+	stock_armed.draw_arc(c, 14.0 + 2.0 * pulse, 0, TAU, 24,
+		Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse), 2.0 + pulse)
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
 func _set_drawer(which: String) -> void:
 	drawer_open = "" if drawer_open == which else which
+	if drawer_open != "": # opening a drawer drops any selection (2026-07-08);
+		placing_id = ""   # closing keeps it (outside-tap flow places next tap)
+		placing_cap = false
+		_clear_selection()
 	for name in drawers:
 		drawers[name].visible = drawer_open == name
 	_layout_board()
@@ -307,16 +330,30 @@ func _build_hud() -> void:
 	for l in [clock_label, score_label, wave_label, foes_label]:
 		top.add_child(l)
 	hud.add_child(top)
-	tariff_button.add_theme_font_size_override("font_size", 14)
+	tariff_button.add_theme_font_size_override("font_size", 13)
 	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	tariff_button.pressed.connect(_show_tariffs)
 	top.add_child(tariff_button)
 
 	var menu_btn := Button.new()
 	menu_btn.text = "☰"
-	menu_btn.add_theme_font_size_override("font_size", 18)
-	menu_btn.position = Vector2(vp.x - 36, 2)
+	menu_btn.add_theme_font_size_override("font_size", 15)
+	menu_btn.position = Vector2(vp.x - 34, 3)
+	# both top-row buttons get flat compact styling so they fit inside the
+	# top strip without overflowing onto the board (2026-07-08)
+	for b: Button in [tariff_button, menu_btn]:
+		var compact := StyleBoxFlat.new()
+		compact.bg_color = Color(0.22, 0.22, 0.26)
+		compact.set_corner_radius_all(4)
+		compact.content_margin_left = 7
+		compact.content_margin_right = 7
+		compact.content_margin_top = 1
+		compact.content_margin_bottom = 1
+		for style in ["normal", "hover", "pressed"]:
+			b.add_theme_stylebox_override(style, compact)
 	menu_btn.pressed.connect(func() -> void:
+		placing_id = ""
+		placing_cap = false
 		_clear_selection()
 		game_menu_open = true
 		game_menu.move_to_front() # above every other HUD control
@@ -328,6 +365,9 @@ func _build_hud() -> void:
 	turn_label.custom_minimum_size = Vector2(vp.x, 0)
 	turn_label.add_theme_font_size_override("font_size", 14)
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# it floats over the board's bottom edge now — outline for readability
+	turn_label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.1))
+	turn_label.add_theme_constant_override("outline_size", 6)
 	hud.add_child(turn_label)
 	var bar := HBoxContainer.new()
 	bar.position = Vector2(4, vp.y - 46)
@@ -338,11 +378,14 @@ func _build_hud() -> void:
 		b.text = name.capitalize()
 		b.add_theme_font_size_override("font_size", 17)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.expand_icon = true # armed-piece icon on Stock stays button-sized
-		b.add_theme_constant_override("icon_max_width", 26)
 		b.pressed.connect(_set_drawer.bind(name))
 		drawer_buttons[name] = b
 		bar.add_child(b)
+	# the armed stack rides on the Stock button, styled like a selection
+	stock_armed.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stock_armed.draw.connect(_draw_stock_armed)
+	drawer_buttons["stock"].add_child(stock_armed)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
 	# self_modulate: the red tint must not bleed into the blue counter child
@@ -399,13 +442,14 @@ func _build_hud() -> void:
 	hud.add_child(game_menu)
 
 	# drawers above the button row: Stock opens from the bottom-left, Items
-	# from the bottom (center), Trinkets from the bottom-right; one at a time,
-	# the board shrinks to stay fully visible while one is open
+	# one at a time, overlaying the board, all identical (2026-07-08): full
+	# width, running to the screen bottom; the button bar re-fronts below so
+	# it stays visible and clickable over them.
 	trinket_box.add_theme_constant_override("separation", 16)
-	var drawer_specs := [
-		["stock", pool_box, 0.0, vp.x],
-		["items", item_box, (vp.x - 340.0) / 2.0, 340.0],
-		["trinkets", trinket_box, vp.x - 340.0, 340.0],
+	var drawer_specs := [ # name, content, x, width, height
+		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
+		["items", item_box, 0.0, vp.x, DRAWER_H + 70.0],
+		["trinkets", trinket_box, 0.0, vp.x, DRAWER_H + 70.0],
 	]
 	for spec in drawer_specs:
 		var panel := PanelContainer.new()
@@ -413,16 +457,16 @@ func _build_hud() -> void:
 		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
 		panel.add_theme_stylebox_override("panel", bg)
 		panel.position = Vector2(spec[2], vp.y - 70.0 - DRAWER_H)
-		panel.custom_minimum_size = Vector2(spec[3], DRAWER_H)
+		panel.custom_minimum_size = Vector2(spec[3], spec[4])
 		panel.visible = false
 		var sc := ScrollContainer.new()
-		sc.custom_minimum_size = Vector2(spec[3] - 8, DRAWER_H - 8)
-		if spec[0] == "stock": # the ▲ promote badge overhangs the drawer top
-			sc.clip_contents = false
+		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
+		sc.clip_contents = false # the ▲ promote badge overhangs the drawer top
 		sc.add_child(spec[1])
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		hud.add_child(panel)
+	bar.move_to_front() # the button bar stays visible over the stock drawer
 
 	box_panel.visible = false
 	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -496,10 +540,8 @@ func _refresh() -> void:
 		State.GAME_OVER:
 			turn_label.text = ""
 			pass_count.text = ""
-	var sb: Button = drawer_buttons["stock"]
-	sb.text = "Stock %d" % _pool().size()
-	# an armed stack stays visible on the button while the drawer is closed
-	sb.icon = textures.get(placing_id) if placing_id != "" else null
+	drawer_buttons["stock"].text = "Stock %d" % _pool().size()
+	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["items"].text = "Items %d" % items.size()
 	drawer_buttons["trinkets"].text = "Trinkets %d" % trinkets.size()
 	merge_highlights = _merge_partner_ids()
@@ -705,6 +747,12 @@ func _clear_selection() -> void:
 
 
 func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
+	if pool_drag_id != "":
+		# mid-drag: hiding the drawer (drag-out close) force-releases the held
+		# button, which fires a spurious tap inside the visibility cascade and
+		# corrupts the strip rebuild (found 2026-07-08). Real taps clear the
+		# drag in _input before this signal arrives.
+		return
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
 			or preview_open or game_menu_open or win_open:
 		return
@@ -873,8 +921,9 @@ func _on_pass() -> void:
 
 
 func _process(delta: float) -> void:
-	if selected.x >= 0 and not autoplay:
+	if (selected.x >= 0 or placing_id != "") and not autoplay:
 		queue_redraw() # the selection outline pulses every frame
+		stock_armed.queue_redraw()
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
 		var open := _setup_open_tiles()
@@ -1252,6 +1301,7 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	_clear_selection()
 	pool_drag_id = id
 	pool_drag_cap = cap
+	drawer_autoclosed = ""
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
@@ -1264,12 +1314,24 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 
 ## Buttons capture the click, so the drag's release lands here, not in
 ## _unhandled_input.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_MOUSE_EXIT and pool_drag_id != "":
+		# the cursor left the window mid-drag: cancel and restore the drawer
+		pool_drag_id = ""
+		pool_drag_cap = false
+		if drawer_autoclosed != "":
+			_set_drawer.call_deferred(drawer_autoclosed)
+			drawer_autoclosed = ""
+		queue_redraw()
+
+
 func _input(event: InputEvent) -> void:
 	if pool_drag_id == "":
 		return
 	if event is InputEventMouseMotion:
 		if drawer_open != "" and not \
 				(drawers[drawer_open] as Control).get_global_rect().has_point(event.position):
+			drawer_autoclosed = drawer_open # reopen if this drag cancels
 			_set_drawer("") # dragged out toward the board: give it back
 		queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
@@ -1279,10 +1341,16 @@ func _input(event: InputEvent) -> void:
 		var cap := pool_drag_cap
 		pool_drag_id = ""
 		pool_drag_cap = false
+		# a release inside the open drawer must never hit the board tiles
+		# hidden beneath it — that reads as a misinput (2026-07-08). Dragging
+		# out closes the drawer, so real board drops arrive uncovered.
+		var covered: bool = drawer_open != "" and (drawers[drawer_open] as Control) \
+				.get_global_rect().has_point(event.position)
 		# drop on a friendly partner piece: merge into its tile
-		if state == State.PLAYER_TURN and t.x >= 0 and board.has(t) \
+		if not covered and state == State.PLAYER_TURN and t.x >= 0 and board.has(t) \
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
 			get_viewport().set_input_as_handled()
+			drawer_autoclosed = ""
 			return _do_merge({"id": id, "cap": cap}, t)
 		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
 		# back on the same stack is a plain tap (arms placement) — same-stack
@@ -1294,13 +1362,17 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return _do_merge({"id": id, "cap": cap},
 				{"id": target.get_meta("id"), "cap": target.get_meta("cap")})
-		var placeable: bool = t.x >= 0 and not board.has(t) \
+		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
 				else Rules.placement_tiles(board).has(t))
 		if placeable and (state == State.SETUP
 				or (state == State.PLAYER_TURN and actions_left > 0)):
+			drawer_autoclosed = ""
 			_place(id, t, cap)
 		else: # dropped elsewhere (incl. back on the button = plain tap)
+			if drawer_autoclosed != "": # the drag closed it, nothing happened:
+				_set_drawer.call_deferred(drawer_autoclosed) # give it back
+				drawer_autoclosed = ""
 			# deferred: an immediate rebuild frees the button before its
 			# release-tap (pressed) fires, killing tap-to-place (2026-07-07)
 			_refresh.call_deferred()
@@ -1747,6 +1819,9 @@ func _activate_tariff_by_key(key: String) -> void:
 ## Overlay listing every active tariff (name, tier, effect) — opened from the
 ## top-bar warning button; purely informational, Close dismisses.
 func _show_tariffs() -> void:
+	placing_id = "" # opening an overlay deselects, like menus and drawers
+	placing_cap = false
+	_clear_selection()
 	if tariff_panel:
 		tariff_panel.queue_free()
 	tariff_panel = PanelContainer.new()

@@ -29,7 +29,7 @@ func _boot(cfg: Dictionary) -> Node2D:
 ## A player queen at (2,2) one step below the enemy king at (2,3), plus a far
 ## rook so the board isn't cleared by the kill.
 func _king_cfg(wave: int, kings: int) -> Dictionary:
-	return {"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 12]],
+	return {"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 10]],
 		"wave": wave, "kings_defeated": kings, "clock_s": 100.0, "score": 0}
 
 
@@ -46,14 +46,14 @@ func _init() -> void:
 	check(Rules.find_king(a.board, Rules.ENEMY).x < 0, "recurring King: king off the board")
 	check(a.lost_enemy == 1, "captured King counts as an enemy loss")
 	a._destroy(Vector2i(2, 3)) # item-style destruction of the player's queen
-	a._destroy(Vector2i(7, 12)) # and of the enemy rook
+	a._destroy(Vector2i(7, 10)) # and of the enemy rook
 	check(a.lost_player == 1 and a.lost_enemy == 2,
 		"destruction feeds the loss counters for both sides")
 	a.queue_free()
 	await process_frame
 
 	# --- review bug 2: Trade War's +1 piece must never duplicate the King ---
-	var tw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 12]], "wave": 99,
+	var tw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 99,
 		"tariffs": ["trade_war"]})
 	await process_frame
 	var double_king := false

@@ -2,7 +2,7 @@
 ## the rest are MVP placeholders to adjust after playtests.
 
 const BOARD_W := 8                 # GDD said 6; +2 cols playtest round 3
-const BOARD_H := 14                # GDD said 8; +3 rows twice (rounds 2 and 3)
+const BOARD_H := 12                # GDD said 8; +3 rows twice, -2 (user call 2026-07-08)
 const PLAYER_ZONE_ROWS := 2        # GDD Board — bottom rows, placement zone
 const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 
@@ -48,22 +48,21 @@ const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 const TARIFF_ACTION_COST := 10     # per tariffed action
 const TARIFF_LR_PER_SQUARE := 5    # Tariff on Long-Range, per square moved
 
-# Armies (grilled 2026-07-03, replaces the fixed STARTING_STOCK): three
-# 12-piece starting stocks, chain-base pieces only, totals roughly equal and
-# below the old stock's 280 ("too strong"). Each army's identity is its
-# signature piece and merge chain — the GDD's "unique Queen", trimmed: team
-# abilities and Piece Cases are deferred upstream gaps.
+# Armies (grilled 2026-07-03; slimmed 2026-07-08 — "too many pieces"): three
+# 11-piece starting stocks, one shape: 8 cheap base pieces + 3 specials.
+# Each army's identity is its signature piece and merge chain — the GDD's
+# "unique Queen", trimmed: team abilities and Piece Cases are deferred.
 const ARMIES := {
-	"Crown": [ # classic chess — signature rook (260)
-		"pawn", "pawn", "pawn", "pawn", "pawn",
-		"bishop", "bishop", "knight", "knight", "rook", "ferz", "wazir"],
-	"Wild Hunt": [ # leapers — signature kirin (250)
-		"pawn", "pawn", "pawn", "knight", "knight",
-		"kirin", "kirin", "alibaba", "alibaba", "ferz", "ferz", "wazir"],
-	"Old Guard": [ # fairy walkers + a knight pair for reach — signature ferz
-		# (260; reworked 2026-07-06: pure walkers starved by wave 16 in 10/12
-		# fleet runs — range-1 pieces can't capture, and captures are income)
-		"ferz", "ferz", "ferz", "ferz", "ferz",
-		"wazir", "wazir", "wazir", "knight", "knight", "alibaba", "alibaba"],
+	"Crown": [ # classic chess: 8 pawns + rook, bishop, knight (190)
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
+		"rook", "bishop", "knight"],
+	"Wild Hunt": [ # leapers: 8 pawns + the kirin pair + a knight (170)
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
+		"kirin", "kirin", "knight"],
+	"Old Guard": [ # walkers: 8 ferz/wazir + 3 leapers for income (230;
+		# 2026-07-06 insight — range-1 walkers can't capture, and captures
+		# are income; alibaba leaps 2 so it earns too)
+		"ferz", "ferz", "ferz", "ferz", "wazir", "wazir", "wazir", "wazir",
+		"knight", "alibaba", "alibaba"],
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu

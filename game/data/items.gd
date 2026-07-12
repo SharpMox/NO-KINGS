@@ -14,6 +14,10 @@ const ITEMS: Array = [
 		"description": "Your next 2 piece placements cost no score."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",
 		"description": "Convert a target piece (ally or enemy) to a Pawn."},
+	{"key": "promote", "name": "Promote", "tier": "Tactical", "target": "tile",
+		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
+	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",
+		"description": "Invert a target piece's move/capture pattern (only pieces with a defined inverse)."},
 	{"key": "air_strike", "name": "Air Strike", "tier": "Strategic", "target": "tile",
 		"description": "Destroy a target enemy piece; no score, no capture. Not the King."},
 	{"key": "sniper", "name": "Sniper", "tier": "Strategic", "target": "tile",
@@ -69,7 +73,6 @@ const TRINKET_EFFECTS: Array = [
 ]
 
 ## Excluded from MVP (reason):
-## - Promote (Item): placeholder Description upstream in Notion — no effect defined.
 ## - Buff Box (Item): depends on the Piece Buffs system, cut from MVP.
 ## - Radar Jamming (Item): enemies have no abilities in MVP — dead effect.
 ## - Capture Everything (Trinket): scope TBD upstream.

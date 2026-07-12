@@ -80,6 +80,26 @@ func _init() -> void:
 	c.queue_free()
 	await process_frame
 
+	# --- promote: advances a piece with a next tier, no-op target otherwise
+	var d := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	d.items.append(_item("promote", "tile"))
+	d._use_item(0)
+	d._item_click(Vector2i(2, 2))
+	check(d.board[Vector2i(2, 2)].id == "sergeant", "promote advances a pawn to its next tier")
+	d.queue_free()
+	await process_frame
+
+	# --- invert: swaps a piece for its inv- counterpart when one is defined
+	var e := _boot({"board": [["sergeant", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	e.items.append(_item("invert", "tile"))
+	e._use_item(0)
+	e._item_click(Vector2i(2, 2))
+	check(e.board[Vector2i(2, 2)].id == "inv-sergeant", "invert swaps a piece for its inv- counterpart")
+	e.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

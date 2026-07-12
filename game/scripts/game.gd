@@ -2092,6 +2092,10 @@ func _item_tile_valid(key: String, a: Vector2i, pos: Vector2i) -> bool:
 		match key:
 			"demote":
 				return occupied and not king
+			"promote":
+				return own and not king and defs[board[pos].id].next != null
+			"invert":
+				return occupied and not king and defs.has("inv-" + board[pos].id)
 			"air_strike":
 				return enemy and not king
 			"sniper":
@@ -2191,6 +2195,10 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			counter_intel_turns += 2
 		"demote":
 			board[b].id = "pawn"
+		"promote":
+			board[b].id = defs[board[b].id].next
+		"invert":
+			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
 			_destroy(b)
 		"extraction":

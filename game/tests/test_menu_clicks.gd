@@ -55,6 +55,12 @@ func _click_button(menu: Node, text: String) -> bool:
 
 
 func _init() -> void:
+	# Watchdog: a SCRIPT ERROR mid-run kills this coroutine and quit() below
+	# never fires, leaving the window open until a human closes it (user
+	# report 2026-07-12). Force-quit instead; normal runs finish long before.
+	create_timer(120.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: probe still running after 120s — force quit")
+		quit(1))
 	var menu: Node = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(menu)
 	await process_frame

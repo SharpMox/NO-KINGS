@@ -1,6 +1,10 @@
 extends Node2D
 ## The whole run: SETUP placement -> PLAYER_TURN <-> ENEMY_TURN -> GAME_OVER.
-## All UI is built in code; rules.gd holds every game-logic decision.
+## This node owns run state, the turn state machine, input, and board
+## painting. Everything else is split out (all UI still built in code):
+## rules.gd (move legality) · wave_logic/economy/merge_logic/save_config/
+## item_logic/box (domain logic, statics over this node) · hud.gd + modals.gd
+## (child UI layers — signals up, calls down) · autoplay.gd (headless bot).
 
 const Rules := preload("res://scripts/rules.gd")
 const Box := preload("res://scripts/box.gd")
@@ -923,11 +927,6 @@ func _king_down() -> bool:
 
 # --- piece preview (long-press a piece anywhere) ---
 
-
-
-func _close_preview() -> void:
-	preview_open = false
-	preview_panel.visible = false
 
 
 ## The promotion chain containing `id` (base -> ... -> end), or [id].

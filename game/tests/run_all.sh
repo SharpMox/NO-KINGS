@@ -9,12 +9,21 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 GODOT="${GODOT:-godot}"
+TIMEOUT="${TIMEOUT:-300}" # per-step cap: a crashed probe must not block forever
 fails=""
 
 run() {
 	name="$1"; shift
-	out=$("$GODOT" --path . "$@" 2>&1)
+	outfile=$(mktemp)
+	"$GODOT" --path . "$@" >"$outfile" 2>&1 &
+	pid=$!
+	( sleep "$TIMEOUT"; kill "$pid" 2>/dev/null ) &
+	watchdog=$!
+	wait "$pid"
 	code=$?
+	kill "$watchdog" 2>/dev/null
+	wait "$watchdog" 2>/dev/null
+	out=$(cat "$outfile"); rm -f "$outfile"
 	if [ "$code" -ne 0 ] || printf '%s' "$out" | grep -q "SCRIPT ERROR"; then
 		fails="$fails $name"
 		echo "FAIL: $name (exit $code)"

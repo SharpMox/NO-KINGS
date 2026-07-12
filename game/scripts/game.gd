@@ -88,7 +88,6 @@ var actions_left := 0 # unified: move, place, merge, item — 1 action each
 var actions_max := 0  # granted this turn (base + trinket/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
-var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
@@ -147,13 +146,20 @@ var drawer_buttons: Dictionary:
 	get: return hud.drawer_buttons
 var stock_armed: Control:
 	get: return hud.stock_armed
-var merge_panel: PanelContainer # merge confirmation (shows the result piece)
+var modals := preload("res://scripts/modals.gd").new()
+# modal panels forwarded read-only for the click probes (scripts/modals.gd)
+var box_panel: PanelContainer:
+	get: return modals.box_panel
+var overlay: PanelContainer:
+	get: return modals.overlay
+var preview_panel: PanelContainer:
+	get: return modals.preview_panel
+var reinforce_panel: PanelContainer:
+	get: return modals.reinforce_panel
+var tariff_panel: PanelContainer:
+	get: return modals.tariff_panel
 var pending_merge: Array = [] # the two sources awaiting confirmation
-var tariff_panel: PanelContainer # tariff detail overlay
-var box_panel := PanelContainer.new() # box-pick modal
-var preview_panel := PanelContainer.new() # long-press piece preview
 var game_menu_open := false
-var overlay := PanelContainer.new()
 
 
 func _ready() -> void:
@@ -185,7 +191,9 @@ func _ready() -> void:
 	add_child(hud)
 	hud.build(self)
 	_connect_hud()
-	_build_modals()
+	add_child(modals)
+	modals.build(self)
+	_connect_modals()
 	if args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
@@ -295,55 +303,6 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 
 
 
-func _show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
-	if merge_panel:
-		merge_panel.queue_free()
-	merge_panel = PanelContainer.new()
-	merge_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
-	merge_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	merge_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
-	center.add_child(box)
-	if textures.has(result):
-		var tex := TextureRect.new()
-		tex.texture = textures[result]
-		tex.custom_minimum_size = Vector2(96, 96)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		box.add_child(tex)
-	var what := Label.new()
-	what.text = "%s + %s → %s" % [defs[a_id].name, defs[b_id].name, defs[result].name]
-	what.add_theme_font_size_override("font_size", 20)
-	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(what)
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	var yes := Button.new()
-	yes.text = "Merge"
-	yes.add_theme_font_size_override("font_size", 22)
-	yes.pressed.connect(func() -> void:
-		var p := pending_merge
-		pending_merge = []
-		merge_panel.visible = false
-		MergeLogic.commit_merge(self, p[0], p[1]))
-	row.add_child(yes)
-	var no := Button.new()
-	no.text = "Cancel"
-	no.add_theme_font_size_override("font_size", 22)
-	no.pressed.connect(func() -> void:
-		pending_merge = []
-		merge_panel.visible = false
-		_refresh())
-	row.add_child(no)
-	box.add_child(row)
-	hud.add_child(merge_panel)
-	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
 
@@ -447,7 +406,7 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
-			_show_reinforce()
+			modals.show_reinforce()
 
 
 func _enemy_turn() -> void:
@@ -567,7 +526,7 @@ func _game_over(won: bool, reason: String) -> void:
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
 		rank = Economy.record_score(self)
-	_show_overlay(won, reason, rank)
+	modals.show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay_exit:
 		print("AUTOPLAY RESULT: %s — %s (wave %d, score %d, %d turns)" % ["WIN" if won else "LOSS", reason, wave, score, autoplay_turns])
@@ -586,82 +545,8 @@ func _end_shot() -> void:
 	get_tree().quit()
 
 
-## Width-capped, wrapping, centered label — end/win screens must never
-## overflow the 480px design width (fixed 2026-07-07).
-func _overlay_label(text: String, size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(get_viewport_rect().size.x - 48, 0)
-	return l
 
 
-func _show_overlay(won: bool, reason: String, rank := 0) -> void:
-	for c in overlay.get_children():
-		c.queue_free()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", 32))
-	box.add_child(_overlay_label(reason, 18))
-	var stats := "Score %d · Deepest wave %d\nKings %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
-		% [score, wave, kings_defeated, tariffs_seen.size(), lost_player, lost_enemy]
-	if rank > 0:
-		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
-	box.add_child(_overlay_label(stats, 19))
-	var restart := Button.new()
-	restart.text = "Restart"
-	restart.add_theme_font_size_override("font_size", 26)
-	restart.pressed.connect(func() -> void: get_tree().reload_current_scene())
-	box.add_child(restart)
-	var menu := Button.new()
-	menu.text = "Main Menu"
-	menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
-	box.add_child(menu)
-	overlay.visible = true
-
-
-## Wave-50 win screen: the run pauses on top of the board; Continue enters
-## endless mode, End Run locks the score in (GDD Game Over & Winner Screens,
-## trimmed 2026-07-03: no leaderboard rank / pieces-lost summary yet).
-func _show_win_screen() -> void:
-	win_open = true
-	for c in overlay.get_children():
-		c.queue_free()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY", 32))
-	box.add_child(_overlay_label("The wave-%d King has fallen" % wave, 18))
-	var preview := 1 # GDD "ranking preview": where the score would land now
-	for e in load_scores():
-		if int(e.score) >= score:
-			preview += 1
-	box.add_child(_overlay_label(
-		"Score %d · rank #%d if ended now\nWave %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
-		% [score, preview, wave, tariffs_seen.size(), lost_player, lost_enemy], 19))
-	box.add_child(_overlay_label("Continue into endless waves?", 20))
-	var cont := Button.new()
-	cont.text = "Continue"
-	cont.add_theme_font_size_override("font_size", 26)
-	cont.pressed.connect(_on_win_continue)
-	box.add_child(cont)
-	var end := Button.new()
-	end.text = "End Run"
-	end.pressed.connect(func() -> void:
-		win_open = false
-		_game_over(true, "Wave-%d King checkmated" % wave))
-	box.add_child(end)
-	overlay.visible = true
 
 
 func _on_win_continue() -> void:
@@ -1038,61 +923,6 @@ func _king_down() -> bool:
 
 # --- piece preview (long-press a piece anywhere) ---
 
-func _show_preview(id: String) -> void:
-	preview_open = true
-	for c in preview_panel.get_children():
-		c.queue_free()
-	preview_panel.visible = true
-	var center := CenterContainer.new()
-	preview_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-
-	var title := Label.new()
-	title.text = defs[id].name
-	title.add_theme_font_size_override("font_size", 30)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-
-	var dia := Control.new()
-	var cells := 9 # covers the longest leap (Celestial Kirin's 4)
-	var cell := 30
-	dia.custom_minimum_size = Vector2(cells, cells) * cell
-	dia.draw.connect(_draw_preview_diagram.bind(dia, id, cells, cell))
-	box.add_child(dia)
-
-	var legend := Label.new()
-	legend.text = "● move + capture      ○ move only      ✕ capture only"
-	legend.add_theme_font_size_override("font_size", 13)
-	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(legend)
-
-	var chain := _chain_of(id)
-	if chain.size() > 1:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 8)
-		for i in chain.size():
-			if i > 0:
-				var arrow := Label.new()
-				arrow.text = "→"
-				arrow.add_theme_font_size_override("font_size", 22)
-				row.add_child(arrow)
-			var tr := TextureRect.new()
-			tr.texture = textures.get(chain[i])
-			tr.custom_minimum_size = Vector2(48, 48)
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			if chain[i] != id:
-				tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
-			row.add_child(tr)
-		box.add_child(row)
-
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(_close_preview)
-	box.add_child(close)
 
 
 func _close_preview() -> void:
@@ -1169,129 +999,6 @@ func _reinforce_ids() -> Array:
 	return out
 
 
-## Reinforcement shop (end of waves 10/20/30/40): buy any number of pieces
-## from the army's starter selection into Stock, at catalog value. Done (or
-## running dry) hands the turn back; the pending flag survives saves.
-func _show_reinforce() -> void:
-	if reinforce_panel:
-		reinforce_panel.queue_free()
-	reinforce_panel = PanelContainer.new()
-	reinforce_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
-	reinforce_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	reinforce_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = "REINFORCEMENTS"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Wave %d cleared — spend score on your army's reserve\n★%d available" % [wave - 1, score]
-	sub.add_theme_font_size_override("font_size", 15)
-	sub.modulate = Color(1, 1, 1, 0.8)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
-	for id in _reinforce_ids():
-		var cost: int = int(defs[id].value)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		if textures.has(id):
-			var tex := TextureRect.new()
-			tex.texture = textures[id]
-			tex.custom_minimum_size = Vector2(34, 34)
-			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(tex)
-		var what := Label.new()
-		what.text = "%s — %d★" % [defs[id].name, cost]
-		what.add_theme_font_size_override("font_size", 17)
-		what.custom_minimum_size = Vector2(190, 0)
-		row.add_child(what)
-		var buy := Button.new()
-		buy.text = "Buy"
-		buy.add_theme_font_size_override("font_size", 17)
-		buy.disabled = score < cost
-		buy.pressed.connect(func() -> void:
-			if score >= cost:
-				score -= cost
-				stock.append(id)
-				_show_reinforce()) # rebuild: fresh score line + affordability
-		row.add_child(buy)
-		box.add_child(row)
-	var done := Button.new()
-	done.text = "Done"
-	done.add_theme_font_size_override("font_size", 22)
-	done.pressed.connect(func() -> void:
-		pending_reinforce = false
-		reinforce_panel.visible = false
-		_refresh())
-	box.add_child(done)
-	hud.add_child(reinforce_panel)
-	reinforce_panel.move_to_front()
-
-
-## Overlay listing every active tariff (name, tier, effect) — opened from the
-## top-bar warning button; purely informational, Close dismisses.
-func _show_tariffs() -> void:
-	placing_id = "" # opening an overlay deselects, like menus and drawers
-	placing_cap = false
-	_clear_selection()
-	if tariff_panel:
-		tariff_panel.queue_free()
-	tariff_panel = PanelContainer.new()
-	tariff_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
-	tariff_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	tariff_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = "Active tariffs"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	if counter_intel_turns > 0:
-		var off := Label.new()
-		off.text = "Counter-Intel: all tariffs suppressed for %d turns" % counter_intel_turns
-		off.add_theme_font_size_override("font_size", 14)
-		off.modulate = Color(0.6, 1.0, 0.8)
-		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(off)
-	if tariffs_active.is_empty():
-		var none := Label.new()
-		none.text = "none yet — they land every 10th wave"
-		none.modulate = Color(1, 1, 1, 0.6)
-		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(none)
-	for t in tariffs_active:
-		var name := Label.new()
-		name.text = "%s  (%s)" % [t.name, t.tier]
-		name.add_theme_font_size_override("font_size", 17)
-		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-		box.add_child(name)
-		var desc := Label.new()
-		desc.text = t.description
-		desc.add_theme_font_size_override("font_size", 13)
-		desc.modulate = Color(1, 1, 1, 0.75)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(get_viewport_rect().size.x - 96, 0)
-		box.add_child(desc)
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void: tariff_panel.visible = false)
-	box.add_child(close)
-	hud.add_child(tariff_panel)
-	tariff_panel.move_to_front()
 
 
 
@@ -1453,64 +1160,17 @@ func _open_box_pick() -> void:
 			score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
 			return _box_close()
 		return _box_choose(options[rng.randi() % options.size()])
-	_box_show(options)
+	modals.show_box(options)
 
 
-func _box_clear() -> void:
-	for c in box_panel.get_children():
-		c.queue_free()
 
 
-func _box_vbox(title_text: String) -> VBoxContainer:
-	_box_clear()
-	box_panel.visible = true
-	var center := CenterContainer.new()
-	box_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	return box
-
-
-## Roll shim — the offer logic lives in scripts/box.gd; tests and
-## _open_box_pick both come through here.
 func _box_options() -> Array:
 	return Box.roll_options(rng)
 
 
-func _box_show(options: Array) -> void:
-	var box := _box_vbox("📦 The enemy dropped a box! Pick one:")
-	for opt in options:
-		var b := Button.new()
-		var header := ""
-		match opt.kind:
-			"item":
-				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
-			"trinket":
-				header = "◈ %s — Trinket · passive, rest of the run" % opt.name
-			"score":
-				header = "★ %s" % opt.name
-		b.text = header + "\n" + opt.description
-		b.add_theme_font_size_override("font_size", 16)
-		b.custom_minimum_size = Vector2(420, 0)
-		b.pressed.connect(_box_choose.bind(opt))
-		box.add_child(b)
-	_box_add_skip(box)
 
 
-func _box_add_skip(box: VBoxContainer) -> void:
-	var skip := Button.new()
-	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
-	skip.pressed.connect(func() -> void:
-		fx_at = get_viewport_rect().size / 2.0
-		score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
-		_box_close())
-	box.add_child(skip)
 
 
 func _box_choose(opt: Dictionary) -> void:
@@ -1739,32 +1399,60 @@ func _after_drawer_change() -> void:
 	_refresh()
 
 
-## Modal/overlay scaffolding parents to the HUD layer so it sits above the
-## board; the modals themselves are shown by their _show_* builders.
-func _build_modals() -> void:
-	box_panel.visible = false
-	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box_bg := StyleBoxFlat.new()
-	box_bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
-	box_panel.add_theme_stylebox_override("panel", box_bg)
-	hud.add_child(box_panel)
-
-	preview_panel.visible = false
-	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var pv_bg := StyleBoxFlat.new()
-	pv_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
-	preview_panel.add_theme_stylebox_override("panel", pv_bg)
-	hud.add_child(preview_panel)
-
-	overlay.visible = false
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
-	overlay.add_theme_stylebox_override("panel", dim)
-	hud.add_child(overlay)
 
 
 func _refresh() -> void:
 	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
 	hud.refresh()
 	queue_redraw()
+
+
+# --- modal wiring (widgets live in scripts/modals.gd; signals up, calls down) ---
+
+func _connect_modals() -> void:
+	modals.merge_confirmed.connect(func() -> void:
+		var p := pending_merge
+		pending_merge = []
+		MergeLogic.commit_merge(self, p[0], p[1]))
+	modals.merge_cancelled.connect(func() -> void:
+		pending_merge = []
+		_refresh())
+	modals.box_chosen.connect(_box_choose)
+	modals.box_skipped.connect(_on_box_skipped)
+	modals.win_continue_pressed.connect(_on_win_continue)
+	modals.win_end_pressed.connect(func() -> void:
+		win_open = false
+		_game_over(true, "Wave-%d King checkmated" % wave))
+	modals.reinforce_buy_pressed.connect(func(id: String, cost: int) -> void:
+		if score >= cost:
+			score -= cost
+			stock.append(id)
+			modals.show_reinforce()) # rebuild: fresh score line + affordability
+	modals.reinforce_done_pressed.connect(func() -> void:
+		pending_reinforce = false
+		_refresh())
+	modals.preview_closed.connect(func() -> void: preview_open = false)
+
+
+func _show_win_screen() -> void:
+	win_open = true
+	modals.show_win_screen()
+
+
+func _show_preview(id: String) -> void:
+	preview_open = true
+	modals.show_preview(id)
+
+
+## Opening the tariff overlay deselects, like menus and drawers.
+func _show_tariffs() -> void:
+	placing_id = ""
+	placing_cap = false
+	_clear_selection()
+	modals.show_tariffs()
+
+
+func _on_box_skipped() -> void:
+	fx_at = get_viewport_rect().size / 2.0
+	score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
+	_box_close()

@@ -62,7 +62,7 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 	if g.autoplay:
 		return commit_merge(g, a, b)
 	g.pending_merge = [a, b]
-	g._show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions))
+	g.modals.show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions))
 
 
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap

@@ -5,6 +5,7 @@ extends Node2D
 const Rules := preload("res://scripts/rules.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const AutoplayBot := preload("res://scripts/autoplay.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
@@ -946,7 +947,7 @@ func _process(delta: float) -> void:
 			return _game_over(false, "Clock out")
 		clock_label.text = _clock_text()
 		if autoplay:
-			_autoplay_step()
+			AutoplayBot.step(self)
 	if not anims.is_empty():
 		for a in anims:
 			a.t += delta / a.get("dur", ANIM_TIME)
@@ -997,7 +998,7 @@ func _begin_player_turn() -> void:
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
 		if autoplay:
 			pending_reinforce = false
-			_autoplay_reinforce()
+			AutoplayBot.reinforce(self)
 		else:
 			_show_reinforce()
 
@@ -1908,24 +1909,6 @@ func _show_reinforce() -> void:
 	reinforce_panel.move_to_front()
 
 
-## Bot version: cheapest pieces first, keeping a 100-score reserve, max 4.
-func _autoplay_reinforce() -> void:
-	var ids := _reinforce_ids()
-	ids.sort_custom(func(a: String, b: String) -> bool:
-		return int(defs[a].value) < int(defs[b].value))
-	for i in 4:
-		var bought := false
-		for id in ids:
-			var cost: int = int(defs[id].value)
-			if score - cost >= 100:
-				score -= cost
-				stock.append(id)
-				bought = true
-				break
-		if not bought:
-			return
-
-
 ## Overlay listing every active tariff (name, tier, effect) — opened from the
 ## top-bar warning button; purely informational, Close dismisses.
 func _show_tariffs() -> void:
@@ -2281,76 +2264,6 @@ func _box_close() -> void:
 		_on_pass()
 	else:
 		_refresh()
-
-
-# --- autoplay bot (headless verification) ---
-
-func _autoplay_step() -> void:
-	autoplay_turns += 1
-	if autoplay_turns > autoplay_cap:
-		# not a failure: the bot surviving this long just means no crash surfaced
-		if autoplay_exit:
-			print("AUTOPLAY CAP: alive after %d steps (wave %d, score %d)" % [autoplay_cap, wave, score])
-			get_tree().quit(0)
-		return
-	# One random legal action per frame (everything costs one), pass when spent.
-	if actions_left > 0:
-		if not items.is_empty() and rng.randf() < 0.3: # exercise item paths
-			_autoplay_use_item()
-			return
-		if turn_action_count == 0 and not stock.is_empty(): # ≤1 placement/turn,
-			var tiles := Rules.placement_tiles(board)      # like the old economy
-			if not tiles.is_empty():
-				_place(stock[rng.randi() % stock.size()], tiles[rng.randi() % tiles.size()])
-				return
-		if _autoplay_merge():
-			return
-		var moves := Rules.legal_moves(board, Rules.PLAYER, defs)
-		moves = moves.filter(func(m: Dictionary) -> bool: return not moved_this_turn.has(m.from))
-		if not moves.is_empty():
-			# greedy: prefer captures so runs go deep enough to exercise waves/merges
-			var caps := moves.filter(func(m: Dictionary) -> bool: return board.has(m.to))
-			var pick: Array[Dictionary] = caps if not caps.is_empty() else moves
-			var m: Dictionary = pick[rng.randi() % pick.size()]
-			_move_player(m.from, m.to)
-			return
-	_on_pass()
-
-
-func _autoplay_use_item() -> void:
-	var index := rng.randi() % items.size()
-	var it: Dictionary = items[index]
-	if it.target == "":
-		_use_item(index)
-		return
-	var a := Vector2i(-1, -1)
-	var targets := _item_stage_targets(it, a)
-	if targets.is_empty():
-		items.remove_at(index) # discard unusable (e.g. sniper with no valid mark)
-		return
-	if it.target == "pair":
-		a = targets[rng.randi() % targets.size()]
-		targets = _item_stage_targets(it, a)
-		if targets.is_empty():
-			items.remove_at(index)
-			return
-	items.remove_at(index)
-	_item_apply(it, a, targets[rng.randi() % targets.size()])
-
-
-## Execute one available pair merge (promotion or fusion). Returns true if merged.
-func _autoplay_merge() -> bool:
-	var units := []
-	for id in stock:
-		units.append({"id": id, "cap": false})
-	for id in captured:
-		units.append({"id": id, "cap": true})
-	for i in units.size():
-		for j in range(i + 1, units.size()):
-			if _pair_ok(units[i].id, units[j].id):
-				_do_merge(units[i], units[j])
-				return true
-	return false
 
 
 ## Debug: place the army, spawn wave 1, save a PNG of the board, quit.

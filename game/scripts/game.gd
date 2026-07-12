@@ -5,6 +5,10 @@ extends Node2D
 const Rules := preload("res://scripts/rules.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const WaveLogic := preload("res://scripts/wave_logic.gd")
+const Economy := preload("res://scripts/economy.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
@@ -190,7 +194,7 @@ func _ready() -> void:
 		stock = Tuning.ARMIES[next_army].duplicate()
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
-		_apply_config(next_config)
+		SaveConfig.apply(self, next_config)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -199,88 +203,6 @@ func _ready() -> void:
 	_refresh()
 
 
-## Start the game from a config Dictionary instead of the normal SETUP flow.
-## Every field of run state is settable — the same mechanism a saved game
-## will restore from.
-func _apply_config(cfg: Dictionary) -> void:
-	stock = cfg.get("stock", []).duplicate()
-	captured = cfg.get("captured", []).duplicate()
-	score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
-	clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
-	# default: all designed waves done, so nothing spawns into the sandbox
-	wave = int(cfg.get("wave", Waves.WAVES.size()))
-	turns_since_wave = int(cfg.get("turns_since_wave", 0))
-	early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
-	pending_reinforce = bool(cfg.get("pending_reinforce", false))
-	kings_defeated = int(cfg.get("kings_defeated", 0))
-	next_army = str(cfg.get("army", next_army)) # milestone drip draws from it
-	lost_player = int(cfg.get("lost_player", 0))
-	lost_enemy = int(cfg.get("lost_enemy", 0))
-	pending_spawn = cfg.get("pending", []).duplicate(true)
-	for p in cfg.get("board", []):
-		var piece := {"id": p[0], "owner": int(p[1])}
-		if p.size() > 4 and p[4] == "buff":
-			piece.buff = true
-		board[Vector2i(int(p[2]), int(p[3]))] = piece
-	for key in cfg.get("items", []):
-		for it in Items.ITEMS:
-			if it.key == key:
-				items.append(it)
-	for key in cfg.get("trinkets", []):
-		for t in Items.TRINKET_EFFECTS:
-			if t.key == key:
-				trinkets.append(t)
-	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
-		_activate_tariff_by_key(key)
-	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
-		sanctioned_id = cfg.sanctioned_id
-	if cfg.has("tariffs_seen"): # activation above re-logged; restore the truth
-		tariffs_seen = cfg.tariffs_seen.duplicate()
-	_begin_player_turn()
-	# item-effect counters restore AFTER the turn reset (a save is always taken
-	# at a turn start, so move/place/merge budgets are simply fresh)
-	free_placements = int(cfg.get("free_placements", 0))
-	ceasefire_turns = int(cfg.get("ceasefire_turns", 0))
-	skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
-	counter_intel_turns = int(cfg.get("counter_intel_turns", 0))
-	recent_place_costs.clear()
-	for c in cfg.get("recent_place_costs", []):
-		recent_place_costs.append(int(c)) # JSON numbers arrive as floats
-
-
-## The inverse of _apply_config: the live run as a JSON-safe config Dictionary.
-func _to_config() -> Dictionary:
-	var b := []
-	for pos in board:
-		var row := [board[pos].id, board[pos].owner, pos.x, pos.y]
-		if board[pos].get("buff", false):
-			row.append("buff")
-		b.append(row)
-	var keys_of := func(arr: Array) -> Array:
-		var out := []
-		for e in arr:
-			out.append(e.key)
-		return out
-	return {
-		"board": b, "stock": stock.duplicate(), "captured": captured.duplicate(),
-		"items": keys_of.call(items), "trinkets": keys_of.call(trinkets),
-		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
-		"wave": wave, "turns_since_wave": turns_since_wave,
-		"early_clear_awarded": early_clear_awarded,
-		"pending_reinforce": pending_reinforce,
-		"kings_defeated": kings_defeated, "army": next_army,
-		"lost_player": lost_player, "lost_enemy": lost_enemy,
-		"pending": pending_spawn.duplicate(true),
-		"score": score, "clock_s": clock_ms / 1000.0,
-		"sanctioned_id": sanctioned_id,
-		"free_placements": free_placements, "ceasefire_turns": ceasefire_turns,
-		"skip_enemy_turns": skip_enemy_turns, "counter_intel_turns": counter_intel_turns,
-		"recent_place_costs": recent_place_costs.duplicate(),
-	}
-
-
-## Board fills everything between the top bar and the bottom UI. Drawers
-## overlay it (user call 2026-07-07) — outside-clicks close them to reveal it.
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
 	var top := 26.0 # below the condensed top bar
@@ -551,7 +473,7 @@ func _refresh() -> void:
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["items"].text = "Items %d" % items.size()
 	drawer_buttons["trinkets"].text = "Trinkets %d" % trinkets.size()
-	merge_highlights = _merge_partner_ids()
+	merge_highlights = MergeLogic.partner_ids(self)
 	tariff_button.text = "⚠%d" % tariffs_active.size() \
 			+ ("·off" if counter_intel_turns > 0 and not tariffs_active.is_empty() else "")
 	_rebuild_pool_strip()
@@ -619,7 +541,7 @@ func _rebuild_pool_strip() -> void:
 			btn.text = defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)
 		var show_promote: bool = placing_id == id and placing_cap == st.cap \
-				and st.count >= 2 and _pair_ok(id, id) \
+				and st.count >= 2 and MergeLogic.pair_ok(self, id, id) \
 				and state == State.PLAYER_TURN and actions_left > 0
 		if st.count > 1:
 			# corner badge keeps the icon full-size (no inline text); it yields
@@ -660,14 +582,14 @@ func _rebuild_pool_strip() -> void:
 			promote.offset_top = -9
 			promote.offset_bottom = 9
 			promote.pressed.connect(func() -> void:
-				_do_merge({"id": id, "cap": st.cap}, {"id": id, "cap": st.cap}))
+				MergeLogic.do_merge(self, {"id": id, "cap": st.cap}, {"id": id, "cap": st.cap}))
 			btn.add_child(promote)
 		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
 		if placing_id == id and placing_cap == st.cap:
 			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 		elif merge_highlights.has(id):
 			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-		elif not st.cap and id == sanctioned_id and _tariff_on("sanctions"):
+		elif not st.cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		elif st.cap:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
@@ -691,49 +613,6 @@ func _rebuild_pool_strip() -> void:
 		pool_box.add_child(slot)
 
 
-## The piece the current selection would merge FROM: an armed pool stack
-## (placing_id, stock or captured), a mid-drag stack, or the selected board
-## piece. "" when nothing is selected.
-func _merge_origin_id() -> String:
-	if pool_drag_id != "":
-		return pool_drag_id
-	if placing_id != "":
-		return placing_id
-	if selected.x >= 0 and board.has(selected) and board[selected].owner == Rules.PLAYER:
-		return board[selected].id
-	return ""
-
-
-## Valid pair under the current tariffs (Regulation blocks pawn merges).
-func _pair_ok(a: String, b: String) -> bool:
-	if _tariff_on("regulation") and (a == "pawn" or b == "pawn"):
-		return false
-	return Rules.merge_result([a, b], defs, fusions) != ""
-
-
-## Ids that complete a merge with the current selection — drives the gold
-## highlights on pool stacks and board pieces. Empty outside the player turn,
-## with no selection, or with no action left to pay for the merge.
-func _merge_partner_ids() -> Dictionary:
-	var out := {}
-	var origin := _merge_origin_id()
-	if origin == "" or state != State.PLAYER_TURN or actions_left <= 0:
-		return out
-	var all: Array = _pool()
-	for pos in _player_pieces():
-		all.append(board[pos].id)
-	var counts := {}
-	for id in all:
-		counts[id] = counts.get(id, 0) + 1
-	for id in all:
-		if id == origin and counts[id] < 2:
-			continue # a self-pair needs a second copy
-		if _pair_ok(origin, id):
-			out[id] = true
-	return out
-
-
-## The pool-strip stack button under a screen point (drag drop target).
 func _stack_button_at(screen: Vector2) -> Button:
 	if not pool_box.is_visible_in_tree(): # stock drawer closed: no targets
 		return null
@@ -777,9 +656,9 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	if not same_stack and merge_highlights.has(id):
 		var unit := {"id": id, "cap": cap}
 		if placing_id != "":
-			return _do_merge({"id": placing_id, "cap": placing_cap}, unit)
+			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, unit)
 		if selected.x >= 0:
-			return _do_merge(selected, unit)
+			return MergeLogic.do_merge(self, selected, unit)
 	# select / deselect the stack: arms placement + merging (captured stock
 	# deploys too since 2026-07-07 — GDD Captured Stock rule, turn only)
 	if same_stack:
@@ -788,7 +667,7 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	else:
 		if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 			return # captured only merges, and a merge needs a turn action
-		if not cap and id == sanctioned_id and _tariff_on("sanctions"):
+		if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 			return
 		if not cap and not (state == State.SETUP or actions_left > 0):
 			return
@@ -798,21 +677,6 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	_refresh()
 
 
-## Merge entry point: validates the pair, then asks for confirmation showing
-## the result piece (the bot skips straight to the commit). Cancel keeps the
-## origin selected so another partner can be picked.
-func _do_merge(a: Variant, b: Variant) -> void:
-	if state != State.PLAYER_TURN or actions_left <= 0:
-		return
-	var ids := []
-	for ref in [a, b]:
-		ids.append(board[ref].id if ref is Vector2i else ref.id)
-	if not _pair_ok(ids[0], ids[1]):
-		return
-	if autoplay:
-		return _commit_merge(a, b)
-	pending_merge = [a, b]
-	_show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, defs, fusions))
 
 
 func _show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
@@ -851,7 +715,7 @@ func _show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 		var p := pending_merge
 		pending_merge = []
 		merge_panel.visible = false
-		_commit_merge(p[0], p[1]))
+		MergeLogic.commit_merge(self, p[0], p[1]))
 	row.add_child(yes)
 	var no := Button.new()
 	no.text = "Cancel"
@@ -866,39 +730,6 @@ func _show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
-## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
-## target wins); pool-only merges go to Stock.
-func _commit_merge(a: Variant, b: Variant) -> void:
-	if state != State.PLAYER_TURN or actions_left <= 0:
-		return
-	var ids := []
-	for ref in [a, b]:
-		ids.append(board[ref].id if ref is Vector2i else ref.id)
-	if not _pair_ok(ids[0], ids[1]):
-		return
-	var result := Rules.merge_result(ids, defs, fusions)
-	actions_left -= 1
-	turn_action_count += 1
-	var result_tile := Vector2i(-1, -1)
-	for ref in [a, b]:
-		if ref is Vector2i:
-			result_tile = ref # later selections win
-			board.erase(ref)
-		else: # a unit from a stack: remove one copy by value
-			(captured if ref.cap else stock).erase(ref.id)
-	if result_tile.x >= 0:
-		board[result_tile] = {"id": result, "owner": Rules.PLAYER}
-		fx_at = _tile_px(result_tile) + Vector2(tile, tile) / 2
-	else:
-		stock.append(result)
-		fx_at = Vector2((pool_box.get_parent() as Control).get_global_rect().get_center())
-	_charge("fuse_cost")
-	placing_id = ""
-	placing_cap = false
-	_clear_selection()
-	if actions_left == 0 or _board_cleared(): # last action spent on the merge
-		return _on_pass()
-	_refresh()
 
 
 func _on_pass() -> void:
@@ -907,11 +738,11 @@ func _on_pass() -> void:
 	if state == State.SETUP:
 		if drawer_open != "": # setup done: full board for the run
 			_set_drawer("")
-		_spawn_wave(1)
+		WaveLogic.spawn(self, 1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
 		fx_at = Vector2(pass_button.get_global_rect().get_center())
-		_charge("pass_cost")
+		Economy.charge(self, "pass_cost")
 		if not early_clear_awarded and _board_cleared():
 			# wave beaten with turns to spare: score + clock scale with the lead
 			early_clear_awarded = true
@@ -987,13 +818,13 @@ func _begin_player_turn() -> void:
 	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
-		_queue_wave(wave + 1)
-	_spawn_pending()
+		WaveLogic.queue(self, wave + 1)
+	WaveLogic.spawn_pending(self)
 	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
 	if not autoplay and not is_scenario: # autosave at every turn start
 		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-		f.store_string(JSON.stringify(_to_config()))
+		f.store_string(JSON.stringify(SaveConfig.to_config(self)))
 	_refresh()
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
 		if autoplay:
@@ -1018,7 +849,7 @@ func _enemy_turn() -> void:
 	turns_since_wave += 1
 	ceasefire_turns = maxi(ceasefire_turns - 1, 0)
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
-		_queue_wave(wave + 1)
+		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1
 	else:
@@ -1033,7 +864,7 @@ func _enemy_turn() -> void:
 
 func _run_enemy_actions() -> void:
 	var actions := Tuning.ENEMY_ACTIONS_PER_TURN
-	if _tariff_on("filibuster"):
+	if Economy.tariff_on(self, "filibuster"):
 		actions += 1
 	for i in actions:
 		var act := Rules.ai_action(board, defs)
@@ -1083,70 +914,10 @@ func _king_alive() -> bool:
 	return Rules.find_king(board, Rules.ENEMY).x >= 0
 
 
-func _queue_wave(n: int) -> void:
-	wave = n
-	turns_since_wave = 0
-	early_clear_awarded = false # the new wave can earn its own clear bonus
-	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
-		pending_reinforce = true
-	var buff_id: String = Waves.BUFFS.get(n, "")
-	var roster: Array = Waves.WAVES[n - 1].duplicate()
-	_add_turn_fx("KING WAVE!" if roster.has("king") else "WAVE %d" % n,
-		Color(1.0, 0.8, 0.3))
-	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
-		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
-		if not extras.is_empty(): # never duplicate the King (review 2026-07-03)
-			roster.append(extras[rng.randi() % extras.size()])
-	for id in roster:
-		var entry := {"id": id}
-		if id == buff_id: # first spawned piece of the flagged type carries the box
-			entry.buff = true
-			buff_id = ""
-		pending_spawn.append(entry)
-	if n == 2:
-		_activate_tariff_by_key("inflation") # T0, GDD: fires after wave 1
-	elif Tariffs.SCHEDULE.has(n):
-		_activate_tariff(Tariffs.SCHEDULE[n])
-	if n % Tuning.MILESTONE_WAVES == 0:
-		var refill: float = Tuning.CLOCK_REFILL_MS
-		for t in trinkets:
-			if t.key == "timer":
-				refill += 5000
-		if _tariff_on("recession"):
-			refill *= 0.5
-		clock_ms += refill
-		fx_at = Vector2(wave_label.get_global_rect().get_center())
-		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
-		# reinforcement drip from the army's own mix (balance 2026-07-06:
-		# starvation was 100% of bot deaths — nothing replenished Stock)
-		var mix: Array = Tuning.ARMIES.get(next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
-		for i in Tuning.MILESTONE_STOCK_DRIP:
-			stock.append(mix[rng.randi() % mix.size()])
 
 
-func _spawn_wave(n: int) -> void:
-	_queue_wave(n)
-	_spawn_pending()
 
 
-func _spawn_pending() -> void:
-	while not pending_spawn.is_empty():
-		# spawns land on any top-row tile not held by an enemy; a friendly piece
-		# there is captured by the arrival (so the spawn row can't be blockaded)
-		var open: Array[Vector2i] = []
-		for x in Tuning.BOARD_W:
-			var pos := Vector2i(x, Tuning.SPAWN_ROW)
-			if not board.has(pos) or board[pos].owner == Rules.PLAYER:
-				open.append(pos)
-		if open.is_empty():
-			return # row full of enemies — spill to next player turn
-		var spot: Vector2i = open[rng.randi() % open.size()]
-		var entry: Dictionary = pending_spawn.pop_front()
-		if board.has(spot): # arrival captures a friendly blockading the row
-			lost_player += 1
-		board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
-		if entry.get("buff", false):
-			board[spot].buff = true
 
 
 func _setup_open_tiles() -> Array[Vector2i]:
@@ -1179,7 +950,7 @@ func _game_over(won: bool, reason: String) -> void:
 		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
-		rank = _record_score()
+		rank = Economy.record_score(self)
 	_show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay_exit:
@@ -1190,20 +961,6 @@ func _game_over(won: bool, reason: String) -> void:
 			get_tree().quit(0)
 
 
-## Persist the finished run to the local high scores; returns its all-time
-## rank (1-based; ties rank behind older entries).
-func _record_score() -> int:
-	var scores := load_scores()
-	var rank := 1
-	for e in scores:
-		if int(e.score) >= score:
-			rank += 1
-	scores.append({"score": score, "wave": wave, "kings": kings_defeated})
-	scores.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
-		return int(x.score) > int(y.score))
-	var f := FileAccess.open(SCORES_PATH, FileAccess.WRITE)
-	f.store_string(JSON.stringify(scores.slice(0, 10)))
-	return rank
 
 
 func _end_shot() -> void:
@@ -1307,7 +1064,7 @@ func _on_win_continue() -> void:
 func _on_stack_drag_start(id: String, cap: bool) -> void:
 	if box_open or win_open or game_menu_open or preview_open:
 		return
-	if not cap and id == sanctioned_id and _tariff_on("sanctions"):
+	if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 		return
 	if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 		return # captured drags only merge, and a merge needs a turn action
@@ -1320,7 +1077,7 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
-	merge_highlights = _merge_partner_ids()
+	merge_highlights = MergeLogic.partner_ids(self)
 	for c in pool_box.get_children():
 		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
 			c.modulate = Color(0.8, 1.1, 1.4)
@@ -1366,7 +1123,7 @@ func _input(event: InputEvent) -> void:
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
 			get_viewport().set_input_as_handled()
 			drawer_autoclosed = ""
-			return _do_merge({"id": id, "cap": cap}, t)
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap}, t)
 		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
 		# back on the same stack is a plain tap (arms placement) — same-stack
 		# promotion goes through the ▲ badge instead (2026-07-07)
@@ -1375,7 +1132,7 @@ func _input(event: InputEvent) -> void:
 				and merge_highlights.has(target.get_meta("id")) \
 				and not (target.get_meta("id") == id and target.get_meta("cap") == cap):
 			get_viewport().set_input_as_handled()
-			return _do_merge({"id": id, "cap": cap},
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap},
 				{"id": target.get_meta("id"), "cap": target.get_meta("cap")})
 		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
@@ -1443,7 +1200,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif state == State.PLAYER_TURN and t.x >= 0 and t != from \
 						and board.has(t) and board[t].owner == Rules.PLAYER \
 						and board.has(from) and merge_highlights.has(board[t].id):
-					_do_merge(from, t) # dragged onto a partner: merge onto its tile
+					MergeLogic.do_merge(self, from, t) # dragged onto a partner: merge onto its tile
 				elif state == State.SETUP and t.x < 0 and (
 						(pool_box.is_visible_in_tree() and (pool_box.get_parent() as Control)
 							.get_global_rect().has_point(event.position))
@@ -1499,7 +1256,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		# into it (result on that tile)
 		if board.has(tile) and board[tile].owner == Rules.PLAYER \
 				and merge_highlights.has(board[tile].id):
-			return _do_merge({"id": placing_id, "cap": placing_cap}, tile)
+			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, tile)
 		# captured stock deploys like stock (GDD Captured Stock, wired 2026-07-07)
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
 		if ok and not board.has(tile):
@@ -1523,7 +1280,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		_move_player(selected, tile)
 	elif selected.x >= 0 and tile != selected and board.has(tile) \
 			and board[tile].owner == Rules.PLAYER and merge_highlights.has(board[tile].id):
-		_do_merge(selected, tile) # second pick completes the merge on its tile
+		MergeLogic.do_merge(self, selected, tile) # second pick completes the merge on its tile
 	elif board.has(tile) and board[tile].owner == Rules.PLAYER and actions_left > 0 \
 			and not moved_this_turn.has(tile):
 		selected = tile
@@ -1555,12 +1312,12 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 		actions_left -= 1
 		turn_action_count += 1
 		var cost := Tuning.PLACEMENT_SCORE_COST
-		if _tariff_on("austerity"):
+		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
 		if free_placements > 0: # Field Orders
 			free_placements -= 1
 			cost = 0
-		_charge("deploy_cost")
+		Economy.charge(self, "deploy_cost")
 		score = maxi(score - cost, 0)
 		recent_place_costs.append(cost)
 		if recent_place_costs.size() > 3:
@@ -1593,8 +1350,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		score += _gain(_capture_score(victim.id))
-		_charge("capture_cost")
+		score += Economy.gain(self, Economy.capture_score(self, victim.id))
+		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
@@ -1602,10 +1359,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			captured.append(victim.id)
 			boxed = victim.get("buff", false)
 		_add_pop(to)
-	_charge("move_cost")
+	Economy.charge(self, "move_cost")
 	if _is_long_range(board[from].id):
 		var d := to - from
-		_charge("long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
+		Economy.charge(self, "long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
@@ -1642,32 +1399,6 @@ func _is_long_range(id: String) -> bool:
 	return false
 
 
-func _capture_score(victim_id: String) -> int:
-	var base: int = defs[victim_id].value
-	var pts := base
-	for t in trinkets: # run-long passives (stack per copy)
-		match t.key:
-			"greed":
-				if victim_id == "pawn":
-					pts += 10
-			"score":
-				pts += 10
-			"bounty":
-				if base >= 50:
-					pts += 30
-			"lifesteal":
-				clock_ms += 2000
-			"first_capture_extra":
-				if turn_action_count == 0:
-					actions_left += 1
-					actions_max += 1
-	return pts
-
-
-## A King fell (captured or checkmated). First King → win screen (Continue /
-## End Run), recurring King (wave 100) → bonus + refill and the run continues,
-## last designed King (wave 150) → full clear. Returns true when the caller
-## must stop the turn flow (screen showing or game over).
 func _king_down() -> bool:
 	kings_defeated += 1
 	fx_at = Vector2(wave_label.get_global_rect().get_center())
@@ -1812,26 +1543,6 @@ func _diagram_mark(dia: Control, c: int, cell: int, dx: int, dy: int, mode: Stri
 			dia.draw_line(pc + Vector2(d, -d), pc - Vector2(d, -d), Color(0.8, 0.2, 0.2), 3.0)
 
 
-# --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
-
-func _activate_tariff(tier: String) -> void:
-	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
-		if t.tier != tier:
-			return false
-		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
-		return tier == "Mild" or not tariffs_seen.has(t.name))
-	if pool.is_empty():
-		return
-	_apply_tariff(pool[rng.randi() % pool.size()])
-
-
-func _activate_tariff_by_key(key: String) -> void:
-	for t in Tariffs.TARIFFS:
-		if t.key == key:
-			return _apply_tariff(t)
-
-
-## The army's reinforcement selection: its starter piece types, in order.
 func _reinforce_ids() -> Array:
 	var seen := {}
 	var out := []
@@ -1967,66 +1678,8 @@ func _show_tariffs() -> void:
 	tariff_panel.move_to_front()
 
 
-func _apply_tariff(t: Dictionary) -> void:
-	tariffs_seen.append(t.name)
-	_add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
-	if t.kind == "oneoff":
-		match t.key:
-			"forced_audit":
-				captured.clear()
-			"asset_seizure":
-				stock.clear()
-			"asset_freeze":
-				score /= 2
-			"hostile_takeover":
-				var mine := _player_pieces()
-				if not mine.is_empty():
-					board[mine[rng.randi() % mine.size()]].owner = Rules.ENEMY
-			"jd_vance":
-				var best := Vector2i(-1, -1)
-				for pos in _player_pieces():
-					if best.x < 0 or defs[board[pos].id].value > defs[board[best].id].value:
-						best = pos
-				if best.x >= 0:
-					_destroy(best)
-		return
-	tariffs_active.append(t)
-	if t.key == "sanctions": # fix the barred type at trigger time
-		var types := {}
-		for id in stock + captured:
-			types[id] = true
-		if not types.is_empty():
-			sanctioned_id = types.keys()[rng.randi() % types.size()]
 
 
-func _tariff_on(key: String) -> bool:
-	if counter_intel_turns > 0:
-		return false
-	for t in tariffs_active:
-		if t.key == key:
-			return true
-	return false
-
-
-## Score cost charged when a tariffed action happens.
-func _charge(key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
-	if _tariff_on(key):
-		score = maxi(score - amount, 0)
-
-
-## Score gains pass through Inflation (-10% per stack, rounded down).
-func _gain(amount: int) -> int:
-	if counter_intel_turns > 0:
-		return amount
-	var out := float(amount)
-	for t in tariffs_active:
-		if t.key == "inflation":
-			out *= 0.9
-	# round, don't truncate: int() zeroed out pawn captures (1 * 0.9 -> 0)
-	return roundi(out)
-
-
-# --- items (single-use actives from the Items catalog) ---
 
 func _use_item(index: int) -> void:
 	if state != State.PLAYER_TURN or box_open:
@@ -2081,7 +1734,7 @@ func _item_click(tile: Vector2i) -> void:
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
 		else Vector2(item_box.get_global_rect().get_center())
-	_charge("ability_cost") # on use — a cancelled targeting costs nothing
+	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
 	actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
 	match it.key:
@@ -2177,11 +1830,11 @@ func _destroy(pos: Vector2i) -> void:
 
 func _open_box_pick() -> void:
 	box_open = true
-	_charge("box_cost")
+	Economy.charge(self, "box_cost")
 	var options := _box_options()
 	if autoplay: # bot: random pick (or skip) — exercises every branch
 		if rng.randf() < 0.1:
-			score += _gain(Tuning.BOX_SKIP_CONSOLATION)
+			score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
 			return _box_close()
 		return _box_choose(options[rng.randi() % options.size()])
 	_box_show(options)
@@ -2239,7 +1892,7 @@ func _box_add_skip(box: VBoxContainer) -> void:
 	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
 	skip.pressed.connect(func() -> void:
 		fx_at = get_viewport_rect().size / 2.0
-		score += _gain(Tuning.BOX_SKIP_CONSOLATION)
+		score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
 		_box_close())
 	box.add_child(skip)
 
@@ -2252,7 +1905,7 @@ func _box_choose(opt: Dictionary) -> void:
 		"trinket":
 			trinkets.append(opt.payload)
 		"score":
-			score += _gain(opt.value)
+			score += Economy.gain(self, opt.value)
 	_box_close()
 
 
@@ -2417,3 +2070,17 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4
 
 func _tile_px(pos: Vector2i) -> Vector2:
 	return board_px + Vector2(pos.x * tile, (Tuning.BOARD_H - 1 - pos.y) * tile)
+
+
+# --- module shims (test-facing seams; logic lives in scripts/*.gd) ---
+
+func _queue_wave(n: int) -> void:
+	WaveLogic.queue(self, n)
+
+
+func _to_config() -> Dictionary:
+	return SaveConfig.to_config(self)
+
+
+func _record_score() -> int:
+	return Economy.record_score(self)

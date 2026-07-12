@@ -3,6 +3,7 @@
 ## bot deliberately pokes game internals, it is test glue, not game logic).
 
 const Rules := preload("res://scripts/rules.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 
 static func step(g) -> void:
@@ -67,8 +68,8 @@ static func try_merge(g) -> bool:
 		units.append({"id": id, "cap": true})
 	for i in units.size():
 		for j in range(i + 1, units.size()):
-			if g._pair_ok(units[i].id, units[j].id):
-				g._do_merge(units[i], units[j])
+			if MergeLogic.pair_ok(g, units[i].id, units[j].id):
+				MergeLogic.do_merge(g, units[i], units[j])
 				return true
 	return false
 

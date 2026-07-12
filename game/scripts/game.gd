@@ -1,10 +1,18 @@
 extends Node2D
 ## The whole run: SETUP placement -> PLAYER_TURN <-> ENEMY_TURN -> GAME_OVER.
-## All UI is built in code; rules.gd holds every game-logic decision.
+## This node owns run state, the turn state machine, input, and board
+## painting. Everything else is split out (all UI still built in code):
+## rules.gd (move legality) · wave_logic/economy/merge_logic/save_config/
+## item_logic/box (domain logic, statics over this node) · hud.gd + modals.gd
+## (child UI layers — signals up, calls down) · autoplay.gd (headless bot).
 
 const Rules := preload("res://scripts/rules.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const WaveLogic := preload("res://scripts/wave_logic.gd")
+const Economy := preload("res://scripts/economy.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
@@ -39,7 +47,6 @@ const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
-const DRAWER_H := 68.0  # stock / items / trinkets drawer height
 # Palette rule (2026-07-07): everything player-side is a shade of blue —
 # selection, moves, placement, merge partners; everything enemy-side is red —
 # enemy pieces, threats, capture targets, recon.
@@ -74,7 +81,7 @@ var score := 0:
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
 				"at_px": fx_at if fx_at != Vector2.ZERO
-					else Vector2(score_label.get_global_rect().end) + Vector2(6, 0),
+					else Vector2(hud.score_label.get_global_rect().end) + Vector2(6, 0),
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
@@ -85,9 +92,6 @@ var actions_left := 0 # unified: move, place, merge, item — 1 action each
 var actions_max := 0  # granted this turn (base + trinket/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
-var reinforce_panel: PanelContainer # the reinforcement shop overlay
-var pass_count := Label.new() # blue N/M action counter on the PASS button
-var pass_label := Label.new() # the "PASS" word next to the counter
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
@@ -131,29 +135,35 @@ var autoplay_cap := 2000 # --steps N overrides, for short scenario sweeps
 var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
-var hud := CanvasLayer.new()
-var clock_label := Label.new()
-var score_label := Label.new()
-var foes_label := Label.new() # enemies on board (+ incoming spillover)
-var drawer_open := "" # "", "stock", "items", "trinkets"
-var merge_panel: PanelContainer # merge confirmation (shows the result piece)
+var hud := preload("res://scripts/hud.gd").new()
+# HUD state forwarded read-only for the click probes and saves
+# (the widgets themselves live in scripts/hud.gd)
+var drawer_open: String:
+	get: return hud.drawer_open
+var pool_box: HBoxContainer:
+	get: return hud.pool_box
+var pass_button: Button:
+	get: return hud.pass_button
+var game_menu: PanelContainer:
+	get: return hud.game_menu
+var drawer_buttons: Dictionary:
+	get: return hud.drawer_buttons
+var stock_armed: Control:
+	get: return hud.stock_armed
+var modals := preload("res://scripts/modals.gd").new()
+# modal panels forwarded read-only for the click probes (scripts/modals.gd)
+var box_panel: PanelContainer:
+	get: return modals.box_panel
+var overlay: PanelContainer:
+	get: return modals.overlay
+var preview_panel: PanelContainer:
+	get: return modals.preview_panel
+var reinforce_panel: PanelContainer:
+	get: return modals.reinforce_panel
+var tariff_panel: PanelContainer:
+	get: return modals.tariff_panel
 var pending_merge: Array = [] # the two sources awaiting confirmation
-var drawers := {} # name -> PanelContainer
-var drawer_buttons := {} # name -> Button (count text updates)
-var stock_armed := Control.new() # draws the armed piece on the Stock button
-var trinket_box := HBoxContainer.new()
-var wave_label := Label.new()
-var turn_label := Label.new()
-var pass_button := Button.new()
-var tariff_button := Button.new() # top-row tariff count; opens the overlay
-var tariff_panel: PanelContainer # tariff detail overlay
-var pool_box := HBoxContainer.new()
-var item_box := HBoxContainer.new() # held-items strip
-var box_panel := PanelContainer.new() # box-pick modal
-var preview_panel := PanelContainer.new() # long-press piece preview
-var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 var game_menu_open := false
-var overlay := PanelContainer.new()
 
 
 func _ready() -> void:
@@ -182,7 +192,12 @@ func _ready() -> void:
 				textures[id] = load(path)
 				break
 	rng.randomize()
-	_build_hud()
+	add_child(hud)
+	hud.build(self)
+	_connect_hud()
+	add_child(modals)
+	modals.build(self)
+	_connect_modals()
 	if args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
@@ -190,7 +205,7 @@ func _ready() -> void:
 		stock = Tuning.ARMIES[next_army].duplicate()
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
-		_apply_config(next_config)
+		SaveConfig.apply(self, next_config)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -199,88 +214,6 @@ func _ready() -> void:
 	_refresh()
 
 
-## Start the game from a config Dictionary instead of the normal SETUP flow.
-## Every field of run state is settable — the same mechanism a saved game
-## will restore from.
-func _apply_config(cfg: Dictionary) -> void:
-	stock = cfg.get("stock", []).duplicate()
-	captured = cfg.get("captured", []).duplicate()
-	score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
-	clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
-	# default: all designed waves done, so nothing spawns into the sandbox
-	wave = int(cfg.get("wave", Waves.WAVES.size()))
-	turns_since_wave = int(cfg.get("turns_since_wave", 0))
-	early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
-	pending_reinforce = bool(cfg.get("pending_reinforce", false))
-	kings_defeated = int(cfg.get("kings_defeated", 0))
-	next_army = str(cfg.get("army", next_army)) # milestone drip draws from it
-	lost_player = int(cfg.get("lost_player", 0))
-	lost_enemy = int(cfg.get("lost_enemy", 0))
-	pending_spawn = cfg.get("pending", []).duplicate(true)
-	for p in cfg.get("board", []):
-		var piece := {"id": p[0], "owner": int(p[1])}
-		if p.size() > 4 and p[4] == "buff":
-			piece.buff = true
-		board[Vector2i(int(p[2]), int(p[3]))] = piece
-	for key in cfg.get("items", []):
-		for it in Items.ITEMS:
-			if it.key == key:
-				items.append(it)
-	for key in cfg.get("trinkets", []):
-		for t in Items.TRINKET_EFFECTS:
-			if t.key == key:
-				trinkets.append(t)
-	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
-		_activate_tariff_by_key(key)
-	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
-		sanctioned_id = cfg.sanctioned_id
-	if cfg.has("tariffs_seen"): # activation above re-logged; restore the truth
-		tariffs_seen = cfg.tariffs_seen.duplicate()
-	_begin_player_turn()
-	# item-effect counters restore AFTER the turn reset (a save is always taken
-	# at a turn start, so move/place/merge budgets are simply fresh)
-	free_placements = int(cfg.get("free_placements", 0))
-	ceasefire_turns = int(cfg.get("ceasefire_turns", 0))
-	skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
-	counter_intel_turns = int(cfg.get("counter_intel_turns", 0))
-	recent_place_costs.clear()
-	for c in cfg.get("recent_place_costs", []):
-		recent_place_costs.append(int(c)) # JSON numbers arrive as floats
-
-
-## The inverse of _apply_config: the live run as a JSON-safe config Dictionary.
-func _to_config() -> Dictionary:
-	var b := []
-	for pos in board:
-		var row := [board[pos].id, board[pos].owner, pos.x, pos.y]
-		if board[pos].get("buff", false):
-			row.append("buff")
-		b.append(row)
-	var keys_of := func(arr: Array) -> Array:
-		var out := []
-		for e in arr:
-			out.append(e.key)
-		return out
-	return {
-		"board": b, "stock": stock.duplicate(), "captured": captured.duplicate(),
-		"items": keys_of.call(items), "trinkets": keys_of.call(trinkets),
-		"tariffs": keys_of.call(tariffs_active), "tariffs_seen": tariffs_seen.duplicate(),
-		"wave": wave, "turns_since_wave": turns_since_wave,
-		"early_clear_awarded": early_clear_awarded,
-		"pending_reinforce": pending_reinforce,
-		"kings_defeated": kings_defeated, "army": next_army,
-		"lost_player": lost_player, "lost_enemy": lost_enemy,
-		"pending": pending_spawn.duplicate(true),
-		"score": score, "clock_s": clock_ms / 1000.0,
-		"sanctioned_id": sanctioned_id,
-		"free_placements": free_placements, "ceasefire_turns": ceasefire_turns,
-		"skip_enemy_turns": skip_enemy_turns, "counter_intel_turns": counter_intel_turns,
-		"recent_place_costs": recent_place_costs.duplicate(),
-	}
-
-
-## Board fills everything between the top bar and the bottom UI. Drawers
-## overlay it (user call 2026-07-07) — outside-clicks close them to reveal it.
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
 	var top := 26.0 # below the condensed top bar
@@ -292,272 +225,18 @@ func _layout_board() -> void:
 	queue_redraw()
 
 
-## The armed stack piece rides on the Stock button styled like a selection:
-## player-blue tint plus the same pulsing outline as a selected board piece.
-func _draw_stock_armed() -> void:
-	# only while the drawer is closed — open, the armed stack itself is visible
-	if placing_id == "" or drawer_open == "stock" or not textures.has(placing_id):
-		return
-	var c := Vector2(19.0, stock_armed.size.y / 2.0)
-	var t := Time.get_ticks_msec() / 1000.0
-	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	stock_armed.draw_texture_rect(textures[placing_id],
-		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false, Color(0.72, 0.85, 1.25))
-	stock_armed.draw_arc(c, 14.0 + 2.0 * pulse, 0, TAU, 24,
-		Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse), 2.0 + pulse)
 
 
-## Open one drawer (closing the others) or toggle it shut; "" closes all.
-func _set_drawer(which: String) -> void:
-	drawer_open = "" if drawer_open == which else which
-	if drawer_open != "": # opening a drawer drops any selection (2026-07-08);
-		placing_id = ""   # closing keeps it (outside-tap flow places next tap)
-		placing_cap = false
-		_clear_selection()
-	for name in drawers:
-		drawers[name].visible = drawer_open == name
-	_layout_board()
-	_refresh()
-
-
-func _build_hud() -> void:
-	add_child(hud)
-	var vp := get_viewport_rect().size
-	# condensed top bar: clock · score · wave · foes, menu at the right corner
-	clock_label.add_theme_font_size_override("font_size", 17)
-	score_label.add_theme_font_size_override("font_size", 18)
-	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	for l: Label in [wave_label, foes_label]:
-		l.add_theme_font_size_override("font_size", 15)
-		l.modulate = Color(1, 1, 1, 0.85)
-	var top := HBoxContainer.new()
-	top.position = Vector2(10, 4)
-	top.custom_minimum_size = Vector2(vp.x - 56, 0)
-	top.add_theme_constant_override("separation", 14)
-	for l in [clock_label, score_label, wave_label, foes_label]:
-		top.add_child(l)
-	hud.add_child(top)
-	tariff_button.add_theme_font_size_override("font_size", 13)
-	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-	tariff_button.pressed.connect(_show_tariffs)
-	top.add_child(tariff_button)
-
-	var menu_btn := Button.new()
-	menu_btn.text = "☰"
-	menu_btn.add_theme_font_size_override("font_size", 15)
-	menu_btn.position = Vector2(vp.x - 34, 3)
-	# both top-row buttons get flat compact styling so they fit inside the
-	# top strip without overflowing onto the board (2026-07-08)
-	for b: Button in [tariff_button, menu_btn]:
-		var compact := StyleBoxFlat.new()
-		compact.bg_color = Color(0.22, 0.22, 0.26)
-		compact.set_corner_radius_all(4)
-		compact.content_margin_left = 7
-		compact.content_margin_right = 7
-		compact.content_margin_top = 1
-		compact.content_margin_bottom = 1
-		for style in ["normal", "hover", "pressed"]:
-			b.add_theme_stylebox_override(style, compact)
-	menu_btn.pressed.connect(func() -> void:
-		placing_id = ""
-		placing_cap = false
-		_clear_selection()
-		game_menu_open = true
-		game_menu.move_to_front() # above every other HUD control
-		game_menu.visible = true)
-	hud.add_child(menu_btn)
-
-	# bottom: action count above a 4-button row (Stock / Items / Trinkets / PASS)
-	turn_label.position = Vector2(0, vp.y - 70)
-	turn_label.custom_minimum_size = Vector2(vp.x, 0)
-	turn_label.add_theme_font_size_override("font_size", 14)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# it floats over the board's bottom edge now — outline for readability
-	turn_label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.1))
-	turn_label.add_theme_constant_override("outline_size", 6)
-	hud.add_child(turn_label)
-	var bar := HBoxContainer.new()
-	bar.position = Vector2(4, vp.y - 46)
-	bar.custom_minimum_size = Vector2(vp.x - 8, 42)
-	bar.add_theme_constant_override("separation", 4)
-	for name in ["stock", "items", "trinkets"]:
-		var b := Button.new()
-		b.text = name.capitalize()
-		b.add_theme_font_size_override("font_size", 17)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(_set_drawer.bind(name))
-		drawer_buttons[name] = b
-		bar.add_child(b)
-	# the armed stack rides on the Stock button, styled like a selection
-	stock_armed.set_anchors_preset(Control.PRESET_FULL_RECT)
-	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stock_armed.draw.connect(_draw_stock_armed)
-	drawer_buttons["stock"].add_child(stock_armed)
-	pass_button.text = "PASS"
-	pass_button.add_theme_font_size_override("font_size", 17)
-	# self_modulate: the red tint must not bleed into the blue counter child
-	pass_button.self_modulate = Color(1, 0.5, 0.5)
-	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pass_button.pressed.connect(_on_pass)
-	# "2/2 PASS", both vertically centered — the button's own text is only
-	# used for START (setup); in-turn the label pair takes over
-	var pass_box := HBoxContainer.new()
-	pass_box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pass_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	pass_box.add_theme_constant_override("separation", 7)
-	pass_box.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
-	pass_count.add_theme_font_size_override("font_size", 15)
-	pass_count.add_theme_color_override("font_color", Color(0.45, 0.7, 1.0))
-	pass_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pass_box.add_child(pass_count)
-	pass_label.text = "PASS"
-	pass_label.add_theme_font_size_override("font_size", 17)
-	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pass_box.add_child(pass_label)
-	pass_button.add_child(pass_box)
-	bar.add_child(pass_button)
-	hud.add_child(bar)
-
-	game_menu.visible = false
-	game_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var gm_bg := StyleBoxFlat.new()
-	gm_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
-	game_menu.add_theme_stylebox_override("panel", gm_bg)
-	var gm_center := CenterContainer.new()
-	game_menu.add_child(gm_center)
-	var gm_box := VBoxContainer.new()
-	gm_box.add_theme_constant_override("separation", 20)
-	gm_center.add_child(gm_box)
-	var gm_title := Label.new()
-	gm_title.text = "Paused" # menu open = clock frozen (GDD pause)
-	gm_title.add_theme_font_size_override("font_size", 32)
-	gm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	gm_box.add_child(gm_title)
-	var resume := Button.new()
-	resume.text = "Resume"
-	resume.add_theme_font_size_override("font_size", 26)
-	resume.pressed.connect(func() -> void:
-		game_menu_open = false
-		game_menu.visible = false)
-	gm_box.add_child(resume)
-	var to_menu := Button.new()
-	to_menu.text = "Main Menu"
-	to_menu.add_theme_font_size_override("font_size", 20)
-	to_menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
-	gm_box.add_child(to_menu)
-	hud.add_child(game_menu)
-
-	# drawers above the button row: Stock opens from the bottom-left, Items
-	# one at a time, overlaying the board, all identical (2026-07-08): full
-	# width, running to the screen bottom; the button bar re-fronts below so
-	# it stays visible and clickable over them.
-	trinket_box.add_theme_constant_override("separation", 16)
-	var drawer_specs := [ # name, content, x, width, height
-		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["items", item_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["trinkets", trinket_box, 0.0, vp.x, DRAWER_H + 70.0],
-	]
-	for spec in drawer_specs:
-		var panel := PanelContainer.new()
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
-		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - 70.0 - DRAWER_H)
-		panel.custom_minimum_size = Vector2(spec[3], spec[4])
-		panel.visible = false
-		var sc := ScrollContainer.new()
-		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
-		sc.clip_contents = false # the ▲ promote badge overhangs the drawer top
-		sc.add_child(spec[1])
-		panel.add_child(sc)
-		drawers[spec[0]] = panel
-		hud.add_child(panel)
-	bar.move_to_front() # the button bar stays visible over the stock drawer
-
-	box_panel.visible = false
-	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box_bg := StyleBoxFlat.new()
-	box_bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
-	box_panel.add_theme_stylebox_override("panel", box_bg)
-	hud.add_child(box_panel)
-
-	preview_panel.visible = false
-	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var pv_bg := StyleBoxFlat.new()
-	pv_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
-	preview_panel.add_theme_stylebox_override("panel", pv_bg)
-	hud.add_child(preview_panel)
-
-	overlay.visible = false
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
-	overlay.add_theme_stylebox_override("panel", dim)
-	hud.add_child(overlay)
-
-
-## Combined pool the player can act on: stock first, then captured.
 func _pool() -> Array:
 	return stock + captured
 
 
-func _stacks() -> Array:
-	# pool grouped for display/selection: stock stacks first, then captured
-	var out := []
-	for cap in [false, true]:
-		var counts := {}
-		for id in (captured if cap else stock):
-			counts[id] = counts.get(id, 0) + 1
-		for id in counts:
-			out.append({"id": id, "cap": cap, "count": counts[id]})
-	return out
 
 
 func _clock_text() -> String:
 	return "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
 
 
-func _refresh() -> void:
-	clock_label.text = _clock_text()
-	score_label.text = "★%d" % score
-	var next_in := _cadence() - turns_since_wave
-	var wave_txt := "King!" if _king_alive() \
-		else ("in %d" % maxi(next_in, 0)) if wave < Waves.WAVES.size() else "done"
-	wave_label.text = "wave %d/%d · %s" % [wave, Waves.WAVES.size(), wave_txt]
-	var incoming := pending_spawn.size()
-	foes_label.text = "%d foes" % _enemy_count() + (" +%d" % incoming if incoming > 0 else "")
-	match state:
-		State.SETUP: # the pass button doubles as the explicit start trigger
-			turn_label.text = "Place your army (%d left), then START" % stock.size()
-			pass_button.text = "START"
-			pass_button.self_modulate = Color(0.55, 1.0, 0.55)
-			pass_count.text = ""
-			pass_label.text = ""
-		State.PLAYER_TURN:
-			pass_button.text = ""
-			pass_button.self_modulate = Color(1, 0.5, 0.5)
-			pass_count.text = "%d/%d" % [actions_left, actions_max]
-			pass_label.text = "PASS"
-			turn_label.text = ""
-		State.ENEMY_TURN:
-			turn_label.text = "enemy turn…"
-			pass_count.text = ""
-			pass_label.text = "PASS"
-		State.GAME_OVER:
-			turn_label.text = ""
-			pass_count.text = ""
-	drawer_buttons["stock"].text = "Stock %d" % _pool().size()
-	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["items"].text = "Items %d" % items.size()
-	drawer_buttons["trinkets"].text = "Trinkets %d" % trinkets.size()
-	merge_highlights = _merge_partner_ids()
-	tariff_button.text = "⚠%d" % tariffs_active.size() \
-			+ ("·off" if counter_intel_turns > 0 and not tariffs_active.is_empty() else "")
-	_rebuild_pool_strip()
-	_rebuild_item_strip()
-	_rebuild_trinket_strip()
-	queue_redraw()
 
 
 func _enemy_count() -> int:
@@ -568,184 +247,12 @@ func _enemy_count() -> int:
 	return n
 
 
-func _rebuild_trinket_strip() -> void:
-	for c in trinket_box.get_children():
-		c.queue_free()
-	if trinkets.is_empty():
-		var none := Label.new()
-		none.text = "no trinkets yet"
-		none.modulate = Color(1, 1, 1, 0.6)
-		trinket_box.add_child(none)
-		return
-	var counts := {}
-	for t in trinkets: # stack copies: one entry per kind
-		counts[t.key] = counts.get(t.key, 0) + 1
-	var seen := {}
-	for t in trinkets:
-		if seen.has(t.key):
-			continue
-		seen[t.key] = true
-		var l := Label.new()
-		l.text = "◈%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
-		l.tooltip_text = t.description
-		l.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
-		trinket_box.add_child(l)
 
 
-func _rebuild_item_strip() -> void:
-	for c in item_box.get_children():
-		c.queue_free()
-	for i in items.size():
-		var btn := Button.new()
-		btn.text = "✦" + items[i].name
-		btn.tooltip_text = "%s (%s)\n%s" % [items[i].name, items[i].tier, items[i].description]
-		if item_active == i:
-			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(_use_item.bind(i))
-		item_box.add_child(btn)
 
 
-func _rebuild_pool_strip() -> void:
-	for c in pool_box.get_children():
-		c.queue_free()
-	for st in _stacks():
-		var btn := Button.new()
-		var id: String = st.id
-		if textures.has(id): # piece icon instead of glyph text (round 3)
-			btn.icon = textures[id]
-			btn.expand_icon = true
-			btn.custom_minimum_size = Vector2(46, 46)
-		else:
-			btn.text = defs[id].glyph
-			btn.add_theme_font_size_override("font_size", 22)
-		var show_promote: bool = placing_id == id and placing_cap == st.cap \
-				and st.count >= 2 and _pair_ok(id, id) \
-				and state == State.PLAYER_TURN and actions_left > 0
-		if st.count > 1:
-			# corner badge keeps the icon full-size (no inline text); it yields
-			# the top-right corner to the ▲ promote button when that shows
-			var badge := Label.new()
-			badge.text = str(st.count)
-			badge.add_theme_font_size_override("font_size", 11)
-			badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-			badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-			badge.add_theme_constant_override("outline_size", 4)
-			if show_promote:
-				badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-				badge.offset_left = 3
-				badge.offset_right = 16
-				badge.offset_bottom = 12
-			else:
-				badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-				badge.offset_left = -16
-				badge.offset_bottom = 12
-			btn.add_child(badge)
-		if show_promote:
-			# round ▲ badge floating over the stack's top-right corner: it
-			# overhangs the drawer's top edge and pokes out a little to the
-			# right of the icon (the stock scroll doesn't clip)
-			var promote := Button.new()
-			promote.text = "▲"
-			promote.add_theme_font_size_override("font_size", 11)
-			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
-			var round := StyleBoxFlat.new()
-			round.bg_color = Color(0.3, 0.6, 1.0) # player blue
-			round.set_corner_radius_all(9)
-			for style in ["normal", "hover", "pressed"]:
-				promote.add_theme_stylebox_override(style, round)
-			promote.tooltip_text = "Promote: merge two into one"
-			promote.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-			promote.offset_left = -14
-			promote.offset_right = 4
-			promote.offset_top = -9
-			promote.offset_bottom = 9
-			promote.pressed.connect(func() -> void:
-				_do_merge({"id": id, "cap": st.cap}, {"id": id, "cap": st.cap}))
-			btn.add_child(promote)
-		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
-		if placing_id == id and placing_cap == st.cap:
-			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-		elif merge_highlights.has(id):
-			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-		elif not st.cap and id == sanctioned_id and _tariff_on("sanctions"):
-			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
-		elif st.cap:
-			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
-		btn.set_meta("id", id) # drop-target lookup for drag merges
-		btn.set_meta("cap", st.cap)
-		btn.pressed.connect(_on_stack_pressed.bind(id, st.cap, st.count))
-		btn.button_down.connect(_on_stack_drag_start.bind(id, st.cap))
-		pool_box.add_child(btn)
-	if state == State.SETUP and selected.x >= 0:
-		# empty slot: tap it (or drop the dragged piece on the strip) to take
-		# the selected board piece back into stock
-		var slot := Button.new()
-		slot.text = "+"
-		slot.custom_minimum_size = Vector2(46, 46)
-		slot.add_theme_font_size_override("font_size", 22)
-		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
-		slot.tooltip_text = "Put the piece back into stock"
-		slot.pressed.connect(func() -> void:
-			if selected.x >= 0 and board.has(selected):
-				_setup_to_stock(selected))
-		pool_box.add_child(slot)
 
 
-## The piece the current selection would merge FROM: an armed pool stack
-## (placing_id, stock or captured), a mid-drag stack, or the selected board
-## piece. "" when nothing is selected.
-func _merge_origin_id() -> String:
-	if pool_drag_id != "":
-		return pool_drag_id
-	if placing_id != "":
-		return placing_id
-	if selected.x >= 0 and board.has(selected) and board[selected].owner == Rules.PLAYER:
-		return board[selected].id
-	return ""
-
-
-## Valid pair under the current tariffs (Regulation blocks pawn merges).
-func _pair_ok(a: String, b: String) -> bool:
-	if _tariff_on("regulation") and (a == "pawn" or b == "pawn"):
-		return false
-	return Rules.merge_result([a, b], defs, fusions) != ""
-
-
-## Ids that complete a merge with the current selection — drives the gold
-## highlights on pool stacks and board pieces. Empty outside the player turn,
-## with no selection, or with no action left to pay for the merge.
-func _merge_partner_ids() -> Dictionary:
-	var out := {}
-	var origin := _merge_origin_id()
-	if origin == "" or state != State.PLAYER_TURN or actions_left <= 0:
-		return out
-	var all: Array = _pool()
-	for pos in _player_pieces():
-		all.append(board[pos].id)
-	var counts := {}
-	for id in all:
-		counts[id] = counts.get(id, 0) + 1
-	for id in all:
-		if id == origin and counts[id] < 2:
-			continue # a self-pair needs a second copy
-		if _pair_ok(origin, id):
-			out[id] = true
-	return out
-
-
-## The pool-strip stack button under a screen point (drag drop target).
-func _stack_button_at(screen: Vector2) -> Button:
-	if not pool_box.is_visible_in_tree(): # stock drawer closed: no targets
-		return null
-	for c in pool_box.get_children():
-		if c is Button and not c.is_queued_for_deletion() and c.has_meta("id") \
-				and (c as Button).get_global_rect().has_point(screen):
-			return c
-	return null
-
-
-## Any new interaction (menu, stock tap/drag, pass, item) drops the board
-## selection so stale highlights never survive into the next action.
 func _clear_selection() -> void:
 	selected = Vector2i(-1, -1)
 	legal_dests.clear()
@@ -777,9 +284,9 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	if not same_stack and merge_highlights.has(id):
 		var unit := {"id": id, "cap": cap}
 		if placing_id != "":
-			return _do_merge({"id": placing_id, "cap": placing_cap}, unit)
+			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, unit)
 		if selected.x >= 0:
-			return _do_merge(selected, unit)
+			return MergeLogic.do_merge(self, selected, unit)
 	# select / deselect the stack: arms placement + merging (captured stock
 	# deploys too since 2026-07-07 — GDD Captured Stock rule, turn only)
 	if same_stack:
@@ -788,7 +295,7 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	else:
 		if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 			return # captured only merges, and a merge needs a turn action
-		if not cap and id == sanctioned_id and _tariff_on("sanctions"):
+		if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 			return
 		if not cap and not (state == State.SETUP or actions_left > 0):
 			return
@@ -798,120 +305,23 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	_refresh()
 
 
-## Merge entry point: validates the pair, then asks for confirmation showing
-## the result piece (the bot skips straight to the commit). Cancel keeps the
-## origin selected so another partner can be picked.
-func _do_merge(a: Variant, b: Variant) -> void:
-	if state != State.PLAYER_TURN or actions_left <= 0:
-		return
-	var ids := []
-	for ref in [a, b]:
-		ids.append(board[ref].id if ref is Vector2i else ref.id)
-	if not _pair_ok(ids[0], ids[1]):
-		return
-	if autoplay:
-		return _commit_merge(a, b)
-	pending_merge = [a, b]
-	_show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, defs, fusions))
 
 
-func _show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
-	if merge_panel:
-		merge_panel.queue_free()
-	merge_panel = PanelContainer.new()
-	merge_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
-	merge_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	merge_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 14)
-	center.add_child(box)
-	if textures.has(result):
-		var tex := TextureRect.new()
-		tex.texture = textures[result]
-		tex.custom_minimum_size = Vector2(96, 96)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		box.add_child(tex)
-	var what := Label.new()
-	what.text = "%s + %s → %s" % [defs[a_id].name, defs[b_id].name, defs[result].name]
-	what.add_theme_font_size_override("font_size", 20)
-	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(what)
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	var yes := Button.new()
-	yes.text = "Merge"
-	yes.add_theme_font_size_override("font_size", 22)
-	yes.pressed.connect(func() -> void:
-		var p := pending_merge
-		pending_merge = []
-		merge_panel.visible = false
-		_commit_merge(p[0], p[1]))
-	row.add_child(yes)
-	var no := Button.new()
-	no.text = "Cancel"
-	no.add_theme_font_size_override("font_size", 22)
-	no.pressed.connect(func() -> void:
-		pending_merge = []
-		merge_panel.visible = false
-		_refresh())
-	row.add_child(no)
-	box.add_child(row)
-	hud.add_child(merge_panel)
-	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
-## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
-## target wins); pool-only merges go to Stock.
-func _commit_merge(a: Variant, b: Variant) -> void:
-	if state != State.PLAYER_TURN or actions_left <= 0:
-		return
-	var ids := []
-	for ref in [a, b]:
-		ids.append(board[ref].id if ref is Vector2i else ref.id)
-	if not _pair_ok(ids[0], ids[1]):
-		return
-	var result := Rules.merge_result(ids, defs, fusions)
-	actions_left -= 1
-	turn_action_count += 1
-	var result_tile := Vector2i(-1, -1)
-	for ref in [a, b]:
-		if ref is Vector2i:
-			result_tile = ref # later selections win
-			board.erase(ref)
-		else: # a unit from a stack: remove one copy by value
-			(captured if ref.cap else stock).erase(ref.id)
-	if result_tile.x >= 0:
-		board[result_tile] = {"id": result, "owner": Rules.PLAYER}
-		fx_at = _tile_px(result_tile) + Vector2(tile, tile) / 2
-	else:
-		stock.append(result)
-		fx_at = Vector2((pool_box.get_parent() as Control).get_global_rect().get_center())
-	_charge("fuse_cost")
-	placing_id = ""
-	placing_cap = false
-	_clear_selection()
-	if actions_left == 0 or _board_cleared(): # last action spent on the merge
-		return _on_pass()
-	_refresh()
 
 
 func _on_pass() -> void:
 	if box_open or game_menu_open or win_open:
 		return
 	if state == State.SETUP:
-		if drawer_open != "": # setup done: full board for the run
+		if hud.drawer_open != "": # setup done: full board for the run
 			_set_drawer("")
-		_spawn_wave(1)
+		WaveLogic.spawn(self, 1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
-		fx_at = Vector2(pass_button.get_global_rect().get_center())
-		_charge("pass_cost")
+		fx_at = Vector2(hud.pass_button.get_global_rect().get_center())
+		Economy.charge(self, "pass_cost")
 		if not early_clear_awarded and _board_cleared():
 			# wave beaten with turns to spare: score + clock scale with the lead
 			early_clear_awarded = true
@@ -930,7 +340,7 @@ func _on_pass() -> void:
 func _process(delta: float) -> void:
 	if (selected.x >= 0 or placing_id != "") and not autoplay:
 		queue_redraw() # the selection outline pulses every frame
-		stock_armed.queue_redraw()
+		hud.stock_armed.queue_redraw()
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
 		var open := _setup_open_tiles()
@@ -945,7 +355,7 @@ func _process(delta: float) -> void:
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
-		clock_label.text = _clock_text()
+		hud.clock_label.text = _clock_text()
 		if autoplay:
 			AutoplayBot.step(self)
 	if not anims.is_empty():
@@ -987,26 +397,26 @@ func _begin_player_turn() -> void:
 	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
-		_queue_wave(wave + 1)
-	_spawn_pending()
+		WaveLogic.queue(self, wave + 1)
+	WaveLogic.spawn_pending(self)
 	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
 	if not autoplay and not is_scenario: # autosave at every turn start
 		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-		f.store_string(JSON.stringify(_to_config()))
+		f.store_string(JSON.stringify(SaveConfig.to_config(self)))
 	_refresh()
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
 		if autoplay:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
-			_show_reinforce()
+			modals.show_reinforce()
 
 
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
-	if drawer_open != "": # full board while the enemy plays
+	if hud.drawer_open != "": # full board while the enemy plays
 		_set_drawer("")
 	_clear_selection()
 	placing_id = ""
@@ -1018,7 +428,7 @@ func _enemy_turn() -> void:
 	turns_since_wave += 1
 	ceasefire_turns = maxi(ceasefire_turns - 1, 0)
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
-		_queue_wave(wave + 1)
+		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1
 	else:
@@ -1033,7 +443,7 @@ func _enemy_turn() -> void:
 
 func _run_enemy_actions() -> void:
 	var actions := Tuning.ENEMY_ACTIONS_PER_TURN
-	if _tariff_on("filibuster"):
+	if Economy.tariff_on(self, "filibuster"):
 		actions += 1
 	for i in actions:
 		var act := Rules.ai_action(board, defs)
@@ -1083,70 +493,10 @@ func _king_alive() -> bool:
 	return Rules.find_king(board, Rules.ENEMY).x >= 0
 
 
-func _queue_wave(n: int) -> void:
-	wave = n
-	turns_since_wave = 0
-	early_clear_awarded = false # the new wave can earn its own clear bonus
-	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
-		pending_reinforce = true
-	var buff_id: String = Waves.BUFFS.get(n, "")
-	var roster: Array = Waves.WAVES[n - 1].duplicate()
-	_add_turn_fx("KING WAVE!" if roster.has("king") else "WAVE %d" % n,
-		Color(1.0, 0.8, 0.3))
-	if _tariff_on("trade_war"): # +1 piece per wave, drawn from the wave's own mix
-		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
-		if not extras.is_empty(): # never duplicate the King (review 2026-07-03)
-			roster.append(extras[rng.randi() % extras.size()])
-	for id in roster:
-		var entry := {"id": id}
-		if id == buff_id: # first spawned piece of the flagged type carries the box
-			entry.buff = true
-			buff_id = ""
-		pending_spawn.append(entry)
-	if n == 2:
-		_activate_tariff_by_key("inflation") # T0, GDD: fires after wave 1
-	elif Tariffs.SCHEDULE.has(n):
-		_activate_tariff(Tariffs.SCHEDULE[n])
-	if n % Tuning.MILESTONE_WAVES == 0:
-		var refill: float = Tuning.CLOCK_REFILL_MS
-		for t in trinkets:
-			if t.key == "timer":
-				refill += 5000
-		if _tariff_on("recession"):
-			refill *= 0.5
-		clock_ms += refill
-		fx_at = Vector2(wave_label.get_global_rect().get_center())
-		score += _gain(Tuning.MILESTONE_SCORE_BONUS)
-		# reinforcement drip from the army's own mix (balance 2026-07-06:
-		# starvation was 100% of bot deaths — nothing replenished Stock)
-		var mix: Array = Tuning.ARMIES.get(next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
-		for i in Tuning.MILESTONE_STOCK_DRIP:
-			stock.append(mix[rng.randi() % mix.size()])
 
 
-func _spawn_wave(n: int) -> void:
-	_queue_wave(n)
-	_spawn_pending()
 
 
-func _spawn_pending() -> void:
-	while not pending_spawn.is_empty():
-		# spawns land on any top-row tile not held by an enemy; a friendly piece
-		# there is captured by the arrival (so the spawn row can't be blockaded)
-		var open: Array[Vector2i] = []
-		for x in Tuning.BOARD_W:
-			var pos := Vector2i(x, Tuning.SPAWN_ROW)
-			if not board.has(pos) or board[pos].owner == Rules.PLAYER:
-				open.append(pos)
-		if open.is_empty():
-			return # row full of enemies — spill to next player turn
-		var spot: Vector2i = open[rng.randi() % open.size()]
-		var entry: Dictionary = pending_spawn.pop_front()
-		if board.has(spot): # arrival captures a friendly blockading the row
-			lost_player += 1
-		board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
-		if entry.get("buff", false):
-			board[spot].buff = true
 
 
 func _setup_open_tiles() -> Array[Vector2i]:
@@ -1179,8 +529,8 @@ func _game_over(won: bool, reason: String) -> void:
 		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
-		rank = _record_score()
-	_show_overlay(won, reason, rank)
+		rank = Economy.record_score(self)
+	modals.show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay_exit:
 		print("AUTOPLAY RESULT: %s — %s (wave %d, score %d, %d turns)" % ["WIN" if won else "LOSS", reason, wave, score, autoplay_turns])
@@ -1190,20 +540,6 @@ func _game_over(won: bool, reason: String) -> void:
 			get_tree().quit(0)
 
 
-## Persist the finished run to the local high scores; returns its all-time
-## rank (1-based; ties rank behind older entries).
-func _record_score() -> int:
-	var scores := load_scores()
-	var rank := 1
-	for e in scores:
-		if int(e.score) >= score:
-			rank += 1
-	scores.append({"score": score, "wave": wave, "kings": kings_defeated})
-	scores.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
-		return int(x.score) > int(y.score))
-	var f := FileAccess.open(SCORES_PATH, FileAccess.WRITE)
-	f.store_string(JSON.stringify(scores.slice(0, 10)))
-	return rank
 
 
 func _end_shot() -> void:
@@ -1213,82 +549,8 @@ func _end_shot() -> void:
 	get_tree().quit()
 
 
-## Width-capped, wrapping, centered label — end/win screens must never
-## overflow the 480px design width (fixed 2026-07-07).
-func _overlay_label(text: String, size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(get_viewport_rect().size.x - 48, 0)
-	return l
 
 
-func _show_overlay(won: bool, reason: String, rank := 0) -> void:
-	for c in overlay.get_children():
-		c.queue_free()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", 32))
-	box.add_child(_overlay_label(reason, 18))
-	var stats := "Score %d · Deepest wave %d\nKings %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
-		% [score, wave, kings_defeated, tariffs_seen.size(), lost_player, lost_enemy]
-	if rank > 0:
-		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
-	box.add_child(_overlay_label(stats, 19))
-	var restart := Button.new()
-	restart.text = "Restart"
-	restart.add_theme_font_size_override("font_size", 26)
-	restart.pressed.connect(func() -> void: get_tree().reload_current_scene())
-	box.add_child(restart)
-	var menu := Button.new()
-	menu.text = "Main Menu"
-	menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
-	box.add_child(menu)
-	overlay.visible = true
-
-
-## Wave-50 win screen: the run pauses on top of the board; Continue enters
-## endless mode, End Run locks the score in (GDD Game Over & Winner Screens,
-## trimmed 2026-07-03: no leaderboard rank / pieces-lost summary yet).
-func _show_win_screen() -> void:
-	win_open = true
-	for c in overlay.get_children():
-		c.queue_free()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY", 32))
-	box.add_child(_overlay_label("The wave-%d King has fallen" % wave, 18))
-	var preview := 1 # GDD "ranking preview": where the score would land now
-	for e in load_scores():
-		if int(e.score) >= score:
-			preview += 1
-	box.add_child(_overlay_label(
-		"Score %d · rank #%d if ended now\nWave %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
-		% [score, preview, wave, tariffs_seen.size(), lost_player, lost_enemy], 19))
-	box.add_child(_overlay_label("Continue into endless waves?", 20))
-	var cont := Button.new()
-	cont.text = "Continue"
-	cont.add_theme_font_size_override("font_size", 26)
-	cont.pressed.connect(_on_win_continue)
-	box.add_child(cont)
-	var end := Button.new()
-	end.text = "End Run"
-	end.pressed.connect(func() -> void:
-		win_open = false
-		_game_over(true, "Wave-%d King checkmated" % wave))
-	box.add_child(end)
-	overlay.visible = true
 
 
 func _on_win_continue() -> void:
@@ -1307,7 +569,7 @@ func _on_win_continue() -> void:
 func _on_stack_drag_start(id: String, cap: bool) -> void:
 	if box_open or win_open or game_menu_open or preview_open:
 		return
-	if not cap and id == sanctioned_id and _tariff_on("sanctions"):
+	if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 		return
 	if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 		return # captured drags only merge, and a merge needs a turn action
@@ -1320,8 +582,8 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
-	merge_highlights = _merge_partner_ids()
-	for c in pool_box.get_children():
+	merge_highlights = MergeLogic.partner_ids(self)
+	for c in hud.pool_box.get_children():
 		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
 			c.modulate = Color(0.8, 1.1, 1.4)
 	queue_redraw()
@@ -1344,9 +606,9 @@ func _input(event: InputEvent) -> void:
 	if pool_drag_id == "":
 		return
 	if event is InputEventMouseMotion:
-		if drawer_open != "" and not \
-				(drawers[drawer_open] as Control).get_global_rect().has_point(event.position):
-			drawer_autoclosed = drawer_open # reopen if this drag cancels
+		if hud.drawer_open != "" and not \
+				(hud.drawers[hud.drawer_open] as Control).get_global_rect().has_point(event.position):
+			drawer_autoclosed = hud.drawer_open # reopen if this drag cancels
 			_set_drawer("") # dragged out toward the board: give it back
 		queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
@@ -1359,23 +621,23 @@ func _input(event: InputEvent) -> void:
 		# a release inside the open drawer must never hit the board tiles
 		# hidden beneath it — that reads as a misinput (2026-07-08). Dragging
 		# out closes the drawer, so real board drops arrive uncovered.
-		var covered: bool = drawer_open != "" and (drawers[drawer_open] as Control) \
+		var covered: bool = hud.drawer_open != "" and (hud.drawers[hud.drawer_open] as Control) \
 				.get_global_rect().has_point(event.position)
 		# drop on a friendly partner piece: merge into its tile
 		if not covered and state == State.PLAYER_TURN and t.x >= 0 and board.has(t) \
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
 			get_viewport().set_input_as_handled()
 			drawer_autoclosed = ""
-			return _do_merge({"id": id, "cap": cap}, t)
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap}, t)
 		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
 		# back on the same stack is a plain tap (arms placement) — same-stack
 		# promotion goes through the ▲ badge instead (2026-07-07)
-		var target := _stack_button_at(event.position)
+		var target := hud.stack_button_at(event.position)
 		if state == State.PLAYER_TURN and target != null \
 				and merge_highlights.has(target.get_meta("id")) \
 				and not (target.get_meta("id") == id and target.get_meta("cap") == cap):
 			get_viewport().set_input_as_handled()
-			return _do_merge({"id": id, "cap": cap},
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap},
 				{"id": target.get_meta("id"), "cap": target.get_meta("cap")})
 		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
@@ -1408,7 +670,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var at := _tile_at(event.position)
 		if event.pressed:
 			# any press outside an open drawer closes it to reveal the board
-			if drawer_open != "" and not (drawers[drawer_open] as Control) \
+			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
 				_set_drawer("")
 			if at.x < 0: # dead UI space: a no-interaction press drops selection
@@ -1443,11 +705,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				elif state == State.PLAYER_TURN and t.x >= 0 and t != from \
 						and board.has(t) and board[t].owner == Rules.PLAYER \
 						and board.has(from) and merge_highlights.has(board[t].id):
-					_do_merge(from, t) # dragged onto a partner: merge onto its tile
+					MergeLogic.do_merge(self, from, t) # dragged onto a partner: merge onto its tile
 				elif state == State.SETUP and t.x < 0 and (
-						(pool_box.is_visible_in_tree() and (pool_box.get_parent() as Control)
+						(hud.pool_box.is_visible_in_tree() and (hud.pool_box.get_parent() as Control)
 							.get_global_rect().has_point(event.position))
-						or (drawer_buttons["stock"] as Control)
+						or (hud.drawer_buttons["stock"] as Control)
 							.get_global_rect().has_point(event.position)):
 					_setup_to_stock(from) # dropped on the drawer or Stock button
 				elif t == from and (drag_moved or drag_reselect):
@@ -1499,7 +761,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		# into it (result on that tile)
 		if board.has(tile) and board[tile].owner == Rules.PLAYER \
 				and merge_highlights.has(board[tile].id):
-			return _do_merge({"id": placing_id, "cap": placing_cap}, tile)
+			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, tile)
 		# captured stock deploys like stock (GDD Captured Stock, wired 2026-07-07)
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
 		if ok and not board.has(tile):
@@ -1523,7 +785,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		_move_player(selected, tile)
 	elif selected.x >= 0 and tile != selected and board.has(tile) \
 			and board[tile].owner == Rules.PLAYER and merge_highlights.has(board[tile].id):
-		_do_merge(selected, tile) # second pick completes the merge on its tile
+		MergeLogic.do_merge(self, selected, tile) # second pick completes the merge on its tile
 	elif board.has(tile) and board[tile].owner == Rules.PLAYER and actions_left > 0 \
 			and not moved_this_turn.has(tile):
 		selected = tile
@@ -1555,19 +817,19 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 		actions_left -= 1
 		turn_action_count += 1
 		var cost := Tuning.PLACEMENT_SCORE_COST
-		if _tariff_on("austerity"):
+		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
 		if free_placements > 0: # Field Orders
 			free_placements -= 1
 			cost = 0
-		_charge("deploy_cost")
+		Economy.charge(self, "deploy_cost")
 		score = maxi(score - cost, 0)
 		recent_place_costs.append(cost)
 		if recent_place_costs.size() > 3:
 			recent_place_costs.pop_front()
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
-	elif state == State.SETUP and not stock.is_empty() and drawer_open != "stock":
+	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
 		_set_drawer("stock") # keep the placement flow going
 	_refresh()
 
@@ -1593,8 +855,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		score += _gain(_capture_score(victim.id))
-		_charge("capture_cost")
+		score += Economy.gain(self, Economy.capture_score(self, victim.id))
+		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
@@ -1602,10 +864,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			captured.append(victim.id)
 			boxed = victim.get("buff", false)
 		_add_pop(to)
-	_charge("move_cost")
+	Economy.charge(self, "move_cost")
 	if _is_long_range(board[from].id):
 		var d := to - from
-		_charge("long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
+		Economy.charge(self, "long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
@@ -1642,35 +904,9 @@ func _is_long_range(id: String) -> bool:
 	return false
 
 
-func _capture_score(victim_id: String) -> int:
-	var base: int = defs[victim_id].value
-	var pts := base
-	for t in trinkets: # run-long passives (stack per copy)
-		match t.key:
-			"greed":
-				if victim_id == "pawn":
-					pts += 10
-			"score":
-				pts += 10
-			"bounty":
-				if base >= 50:
-					pts += 30
-			"lifesteal":
-				clock_ms += 2000
-			"first_capture_extra":
-				if turn_action_count == 0:
-					actions_left += 1
-					actions_max += 1
-	return pts
-
-
-## A King fell (captured or checkmated). First King → win screen (Continue /
-## End Run), recurring King (wave 100) → bonus + refill and the run continues,
-## last designed King (wave 150) → full clear. Returns true when the caller
-## must stop the turn flow (screen showing or game over).
 func _king_down() -> bool:
 	kings_defeated += 1
-	fx_at = Vector2(wave_label.get_global_rect().get_center())
+	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
 	score += Tuning.WIN_SCORE_BONUS
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
@@ -1691,66 +927,6 @@ func _king_down() -> bool:
 
 # --- piece preview (long-press a piece anywhere) ---
 
-func _show_preview(id: String) -> void:
-	preview_open = true
-	for c in preview_panel.get_children():
-		c.queue_free()
-	preview_panel.visible = true
-	var center := CenterContainer.new()
-	preview_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-
-	var title := Label.new()
-	title.text = defs[id].name
-	title.add_theme_font_size_override("font_size", 30)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-
-	var dia := Control.new()
-	var cells := 9 # covers the longest leap (Celestial Kirin's 4)
-	var cell := 30
-	dia.custom_minimum_size = Vector2(cells, cells) * cell
-	dia.draw.connect(_draw_preview_diagram.bind(dia, id, cells, cell))
-	box.add_child(dia)
-
-	var legend := Label.new()
-	legend.text = "● move + capture      ○ move only      ✕ capture only"
-	legend.add_theme_font_size_override("font_size", 13)
-	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(legend)
-
-	var chain := _chain_of(id)
-	if chain.size() > 1:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 8)
-		for i in chain.size():
-			if i > 0:
-				var arrow := Label.new()
-				arrow.text = "→"
-				arrow.add_theme_font_size_override("font_size", 22)
-				row.add_child(arrow)
-			var tr := TextureRect.new()
-			tr.texture = textures.get(chain[i])
-			tr.custom_minimum_size = Vector2(48, 48)
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			if chain[i] != id:
-				tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
-			row.add_child(tr)
-		box.add_child(row)
-
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(_close_preview)
-	box.add_child(close)
-
-
-func _close_preview() -> void:
-	preview_open = false
-	preview_panel.visible = false
 
 
 ## The promotion chain containing `id` (base -> ... -> end), or [id].
@@ -1812,26 +988,6 @@ func _diagram_mark(dia: Control, c: int, cell: int, dx: int, dy: int, mode: Stri
 			dia.draw_line(pc + Vector2(d, -d), pc - Vector2(d, -d), Color(0.8, 0.2, 0.2), 3.0)
 
 
-# --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
-
-func _activate_tariff(tier: String) -> void:
-	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
-		if t.tier != tier:
-			return false
-		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
-		return tier == "Mild" or not tariffs_seen.has(t.name))
-	if pool.is_empty():
-		return
-	_apply_tariff(pool[rng.randi() % pool.size()])
-
-
-func _activate_tariff_by_key(key: String) -> void:
-	for t in Tariffs.TARIFFS:
-		if t.key == key:
-			return _apply_tariff(t)
-
-
-## The army's reinforcement selection: its starter piece types, in order.
 func _reinforce_ids() -> Array:
 	var seen := {}
 	var out := []
@@ -1842,191 +998,10 @@ func _reinforce_ids() -> Array:
 	return out
 
 
-## Reinforcement shop (end of waves 10/20/30/40): buy any number of pieces
-## from the army's starter selection into Stock, at catalog value. Done (or
-## running dry) hands the turn back; the pending flag survives saves.
-func _show_reinforce() -> void:
-	if reinforce_panel:
-		reinforce_panel.queue_free()
-	reinforce_panel = PanelContainer.new()
-	reinforce_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
-	reinforce_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	reinforce_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = "REINFORCEMENTS"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Wave %d cleared — spend score on your army's reserve\n★%d available" % [wave - 1, score]
-	sub.add_theme_font_size_override("font_size", 15)
-	sub.modulate = Color(1, 1, 1, 0.8)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
-	for id in _reinforce_ids():
-		var cost: int = int(defs[id].value)
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		if textures.has(id):
-			var tex := TextureRect.new()
-			tex.texture = textures[id]
-			tex.custom_minimum_size = Vector2(34, 34)
-			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(tex)
-		var what := Label.new()
-		what.text = "%s — %d★" % [defs[id].name, cost]
-		what.add_theme_font_size_override("font_size", 17)
-		what.custom_minimum_size = Vector2(190, 0)
-		row.add_child(what)
-		var buy := Button.new()
-		buy.text = "Buy"
-		buy.add_theme_font_size_override("font_size", 17)
-		buy.disabled = score < cost
-		buy.pressed.connect(func() -> void:
-			if score >= cost:
-				score -= cost
-				stock.append(id)
-				_show_reinforce()) # rebuild: fresh score line + affordability
-		row.add_child(buy)
-		box.add_child(row)
-	var done := Button.new()
-	done.text = "Done"
-	done.add_theme_font_size_override("font_size", 22)
-	done.pressed.connect(func() -> void:
-		pending_reinforce = false
-		reinforce_panel.visible = false
-		_refresh())
-	box.add_child(done)
-	hud.add_child(reinforce_panel)
-	reinforce_panel.move_to_front()
 
 
-## Overlay listing every active tariff (name, tier, effect) — opened from the
-## top-bar warning button; purely informational, Close dismisses.
-func _show_tariffs() -> void:
-	placing_id = "" # opening an overlay deselects, like menus and drawers
-	placing_cap = false
-	_clear_selection()
-	if tariff_panel:
-		tariff_panel.queue_free()
-	tariff_panel = PanelContainer.new()
-	tariff_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
-	tariff_panel.add_theme_stylebox_override("panel", bg)
-	var center := CenterContainer.new()
-	tariff_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = "Active tariffs"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	if counter_intel_turns > 0:
-		var off := Label.new()
-		off.text = "Counter-Intel: all tariffs suppressed for %d turns" % counter_intel_turns
-		off.add_theme_font_size_override("font_size", 14)
-		off.modulate = Color(0.6, 1.0, 0.8)
-		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(off)
-	if tariffs_active.is_empty():
-		var none := Label.new()
-		none.text = "none yet — they land every 10th wave"
-		none.modulate = Color(1, 1, 1, 0.6)
-		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(none)
-	for t in tariffs_active:
-		var name := Label.new()
-		name.text = "%s  (%s)" % [t.name, t.tier]
-		name.add_theme_font_size_override("font_size", 17)
-		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-		box.add_child(name)
-		var desc := Label.new()
-		desc.text = t.description
-		desc.add_theme_font_size_override("font_size", 13)
-		desc.modulate = Color(1, 1, 1, 0.75)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(get_viewport_rect().size.x - 96, 0)
-		box.add_child(desc)
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void: tariff_panel.visible = false)
-	box.add_child(close)
-	hud.add_child(tariff_panel)
-	tariff_panel.move_to_front()
 
 
-func _apply_tariff(t: Dictionary) -> void:
-	tariffs_seen.append(t.name)
-	_add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
-	if t.kind == "oneoff":
-		match t.key:
-			"forced_audit":
-				captured.clear()
-			"asset_seizure":
-				stock.clear()
-			"asset_freeze":
-				score /= 2
-			"hostile_takeover":
-				var mine := _player_pieces()
-				if not mine.is_empty():
-					board[mine[rng.randi() % mine.size()]].owner = Rules.ENEMY
-			"jd_vance":
-				var best := Vector2i(-1, -1)
-				for pos in _player_pieces():
-					if best.x < 0 or defs[board[pos].id].value > defs[board[best].id].value:
-						best = pos
-				if best.x >= 0:
-					_destroy(best)
-		return
-	tariffs_active.append(t)
-	if t.key == "sanctions": # fix the barred type at trigger time
-		var types := {}
-		for id in stock + captured:
-			types[id] = true
-		if not types.is_empty():
-			sanctioned_id = types.keys()[rng.randi() % types.size()]
-
-
-func _tariff_on(key: String) -> bool:
-	if counter_intel_turns > 0:
-		return false
-	for t in tariffs_active:
-		if t.key == key:
-			return true
-	return false
-
-
-## Score cost charged when a tariffed action happens.
-func _charge(key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
-	if _tariff_on(key):
-		score = maxi(score - amount, 0)
-
-
-## Score gains pass through Inflation (-10% per stack, rounded down).
-func _gain(amount: int) -> int:
-	if counter_intel_turns > 0:
-		return amount
-	var out := float(amount)
-	for t in tariffs_active:
-		if t.key == "inflation":
-			out *= 0.9
-	# round, don't truncate: int() zeroed out pawn captures (1 * 0.9 -> 0)
-	return roundi(out)
-
-
-# --- items (single-use actives from the Items catalog) ---
 
 func _use_item(index: int) -> void:
 	if state != State.PLAYER_TURN or box_open:
@@ -2035,7 +1010,7 @@ func _use_item(index: int) -> void:
 		_item_reset()
 		_refresh()
 		return
-	if drawer_open != "": # using an item hands the board back (targeting)
+	if hud.drawer_open != "": # using an item hands the board back (targeting)
 		_set_drawer("")
 	var it: Dictionary = items[index]
 	if it.target == "":
@@ -2080,8 +1055,8 @@ func _item_click(tile: Vector2i) -> void:
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
-		else Vector2(item_box.get_global_rect().get_center())
-	_charge("ability_cost") # on use — a cancelled targeting costs nothing
+		else Vector2(hud.item_box.get_global_rect().get_center())
+	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
 	actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
 	match it.key:
@@ -2177,71 +1152,24 @@ func _destroy(pos: Vector2i) -> void:
 
 func _open_box_pick() -> void:
 	box_open = true
-	_charge("box_cost")
+	Economy.charge(self, "box_cost")
 	var options := _box_options()
 	if autoplay: # bot: random pick (or skip) — exercises every branch
 		if rng.randf() < 0.1:
-			score += _gain(Tuning.BOX_SKIP_CONSOLATION)
+			score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
 			return _box_close()
 		return _box_choose(options[rng.randi() % options.size()])
-	_box_show(options)
+	modals.show_box(options)
 
 
-func _box_clear() -> void:
-	for c in box_panel.get_children():
-		c.queue_free()
 
 
-func _box_vbox(title_text: String) -> VBoxContainer:
-	_box_clear()
-	box_panel.visible = true
-	var center := CenterContainer.new()
-	box_panel.add_child(center)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	center.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
-	return box
-
-
-## Roll shim — the offer logic lives in scripts/box.gd; tests and
-## _open_box_pick both come through here.
 func _box_options() -> Array:
 	return Box.roll_options(rng)
 
 
-func _box_show(options: Array) -> void:
-	var box := _box_vbox("📦 The enemy dropped a box! Pick one:")
-	for opt in options:
-		var b := Button.new()
-		var header := ""
-		match opt.kind:
-			"item":
-				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
-			"trinket":
-				header = "◈ %s — Trinket · passive, rest of the run" % opt.name
-			"score":
-				header = "★ %s" % opt.name
-		b.text = header + "\n" + opt.description
-		b.add_theme_font_size_override("font_size", 16)
-		b.custom_minimum_size = Vector2(420, 0)
-		b.pressed.connect(_box_choose.bind(opt))
-		box.add_child(b)
-	_box_add_skip(box)
 
 
-func _box_add_skip(box: VBoxContainer) -> void:
-	var skip := Button.new()
-	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
-	skip.pressed.connect(func() -> void:
-		fx_at = get_viewport_rect().size / 2.0
-		score += _gain(Tuning.BOX_SKIP_CONSOLATION)
-		_box_close())
-	box.add_child(skip)
 
 
 func _box_choose(opt: Dictionary) -> void:
@@ -2252,7 +1180,7 @@ func _box_choose(opt: Dictionary) -> void:
 		"trinket":
 			trinkets.append(opt.payload)
 		"score":
-			score += _gain(opt.value)
+			score += Economy.gain(self, opt.value)
 	_box_close()
 
 
@@ -2417,3 +1345,113 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4
 
 func _tile_px(pos: Vector2i) -> Vector2:
 	return board_px + Vector2(pos.x * tile, (Tuning.BOARD_H - 1 - pos.y) * tile)
+
+
+# --- module shims (test-facing seams; logic lives in scripts/*.gd) ---
+
+func _queue_wave(n: int) -> void:
+	WaveLogic.queue(self, n)
+
+
+func _to_config() -> Dictionary:
+	return SaveConfig.to_config(self)
+
+
+func _record_score() -> int:
+	return Economy.record_score(self)
+
+
+# --- HUD wiring (widgets live in scripts/hud.gd; signals up, calls down) ---
+
+func _connect_hud() -> void:
+	hud.pass_pressed.connect(_on_pass)
+	hud.tariff_pressed.connect(_show_tariffs)
+	hud.stack_pressed.connect(_on_stack_pressed)
+	hud.stack_drag_started.connect(_on_stack_drag_start)
+	hud.item_pressed.connect(_use_item)
+	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
+		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
+	hud.return_to_stock_pressed.connect(func() -> void:
+		if selected.x >= 0 and board.has(selected):
+			_setup_to_stock(selected))
+	hud.drawer_changed.connect(_after_drawer_change)
+	hud.menu_toggled.connect(func(open: bool) -> void:
+		game_menu_open = open
+		if open:
+			placing_id = ""
+			placing_cap = false
+			_clear_selection())
+
+
+## Open one drawer (closing the others) or toggle it shut; "" closes all.
+func _set_drawer(which: String) -> void:
+	hud.set_drawer(which)
+	_after_drawer_change()
+
+
+func _after_drawer_change() -> void:
+	if hud.drawer_open != "": # opening a drawer drops any selection (2026-07-08);
+		placing_id = ""       # closing keeps it (outside-tap flow places next tap)
+		placing_cap = false
+		_clear_selection()
+	_layout_board()
+	_refresh()
+
+
+
+
+func _refresh() -> void:
+	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
+	hud.refresh()
+	queue_redraw()
+
+
+# --- modal wiring (widgets live in scripts/modals.gd; signals up, calls down) ---
+
+func _connect_modals() -> void:
+	modals.merge_confirmed.connect(func() -> void:
+		var p := pending_merge
+		pending_merge = []
+		MergeLogic.commit_merge(self, p[0], p[1]))
+	modals.merge_cancelled.connect(func() -> void:
+		pending_merge = []
+		_refresh())
+	modals.box_chosen.connect(_box_choose)
+	modals.box_skipped.connect(_on_box_skipped)
+	modals.win_continue_pressed.connect(_on_win_continue)
+	modals.win_end_pressed.connect(func() -> void:
+		win_open = false
+		_game_over(true, "Wave-%d King checkmated" % wave))
+	modals.reinforce_buy_pressed.connect(func(id: String, cost: int) -> void:
+		if score >= cost:
+			score -= cost
+			stock.append(id)
+			modals.show_reinforce()) # rebuild: fresh score line + affordability
+	modals.reinforce_done_pressed.connect(func() -> void:
+		pending_reinforce = false
+		_refresh())
+	modals.preview_closed.connect(func() -> void: preview_open = false)
+
+
+func _show_win_screen() -> void:
+	win_open = true
+	modals.show_win_screen()
+
+
+func _show_preview(id: String) -> void:
+	preview_open = true
+	modals.show_preview(id)
+
+
+## Opening the tariff overlay deselects, like menus and drawers.
+func _show_tariffs() -> void:
+	placing_id = ""
+	placing_cap = false
+	_clear_selection()
+	modals.show_tariffs()
+
+
+func _on_box_skipped() -> void:
+	fx_at = get_viewport_rect().size / 2.0
+	score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
+	_box_close()

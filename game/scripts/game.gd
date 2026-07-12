@@ -43,7 +43,6 @@ const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
-const DRAWER_H := 68.0  # stock / items / trinkets drawer height
 # Palette rule (2026-07-07): everything player-side is a shade of blue —
 # selection, moves, placement, merge partners; everything enemy-side is red —
 # enemy pieces, threats, capture targets, recon.
@@ -78,7 +77,7 @@ var score := 0:
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
 				"at_px": fx_at if fx_at != Vector2.ZERO
-					else Vector2(score_label.get_global_rect().end) + Vector2(6, 0),
+					else Vector2(hud.score_label.get_global_rect().end) + Vector2(6, 0),
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
@@ -90,8 +89,6 @@ var actions_max := 0  # granted this turn (base + trinket/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
-var pass_count := Label.new() # blue N/M action counter on the PASS button
-var pass_label := Label.new() # the "PASS" word next to the counter
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
@@ -135,27 +132,26 @@ var autoplay_cap := 2000 # --steps N overrides, for short scenario sweeps
 var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
-var hud := CanvasLayer.new()
-var clock_label := Label.new()
-var score_label := Label.new()
-var foes_label := Label.new() # enemies on board (+ incoming spillover)
-var drawer_open := "" # "", "stock", "items", "trinkets"
+var hud := preload("res://scripts/hud.gd").new()
+# HUD state forwarded read-only for the click probes and saves
+# (the widgets themselves live in scripts/hud.gd)
+var drawer_open: String:
+	get: return hud.drawer_open
+var pool_box: HBoxContainer:
+	get: return hud.pool_box
+var pass_button: Button:
+	get: return hud.pass_button
+var game_menu: PanelContainer:
+	get: return hud.game_menu
+var drawer_buttons: Dictionary:
+	get: return hud.drawer_buttons
+var stock_armed: Control:
+	get: return hud.stock_armed
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var pending_merge: Array = [] # the two sources awaiting confirmation
-var drawers := {} # name -> PanelContainer
-var drawer_buttons := {} # name -> Button (count text updates)
-var stock_armed := Control.new() # draws the armed piece on the Stock button
-var trinket_box := HBoxContainer.new()
-var wave_label := Label.new()
-var turn_label := Label.new()
-var pass_button := Button.new()
-var tariff_button := Button.new() # top-row tariff count; opens the overlay
 var tariff_panel: PanelContainer # tariff detail overlay
-var pool_box := HBoxContainer.new()
-var item_box := HBoxContainer.new() # held-items strip
 var box_panel := PanelContainer.new() # box-pick modal
 var preview_panel := PanelContainer.new() # long-press piece preview
-var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 var game_menu_open := false
 var overlay := PanelContainer.new()
 
@@ -186,7 +182,10 @@ func _ready() -> void:
 				textures[id] = load(path)
 				break
 	rng.randomize()
-	_build_hud()
+	add_child(hud)
+	hud.build(self)
+	_connect_hud()
+	_build_modals()
 	if args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
@@ -214,272 +213,18 @@ func _layout_board() -> void:
 	queue_redraw()
 
 
-## The armed stack piece rides on the Stock button styled like a selection:
-## player-blue tint plus the same pulsing outline as a selected board piece.
-func _draw_stock_armed() -> void:
-	# only while the drawer is closed — open, the armed stack itself is visible
-	if placing_id == "" or drawer_open == "stock" or not textures.has(placing_id):
-		return
-	var c := Vector2(19.0, stock_armed.size.y / 2.0)
-	var t := Time.get_ticks_msec() / 1000.0
-	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	stock_armed.draw_texture_rect(textures[placing_id],
-		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false, Color(0.72, 0.85, 1.25))
-	stock_armed.draw_arc(c, 14.0 + 2.0 * pulse, 0, TAU, 24,
-		Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse), 2.0 + pulse)
 
 
-## Open one drawer (closing the others) or toggle it shut; "" closes all.
-func _set_drawer(which: String) -> void:
-	drawer_open = "" if drawer_open == which else which
-	if drawer_open != "": # opening a drawer drops any selection (2026-07-08);
-		placing_id = ""   # closing keeps it (outside-tap flow places next tap)
-		placing_cap = false
-		_clear_selection()
-	for name in drawers:
-		drawers[name].visible = drawer_open == name
-	_layout_board()
-	_refresh()
-
-
-func _build_hud() -> void:
-	add_child(hud)
-	var vp := get_viewport_rect().size
-	# condensed top bar: clock · score · wave · foes, menu at the right corner
-	clock_label.add_theme_font_size_override("font_size", 17)
-	score_label.add_theme_font_size_override("font_size", 18)
-	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	for l: Label in [wave_label, foes_label]:
-		l.add_theme_font_size_override("font_size", 15)
-		l.modulate = Color(1, 1, 1, 0.85)
-	var top := HBoxContainer.new()
-	top.position = Vector2(10, 4)
-	top.custom_minimum_size = Vector2(vp.x - 56, 0)
-	top.add_theme_constant_override("separation", 14)
-	for l in [clock_label, score_label, wave_label, foes_label]:
-		top.add_child(l)
-	hud.add_child(top)
-	tariff_button.add_theme_font_size_override("font_size", 13)
-	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-	tariff_button.pressed.connect(_show_tariffs)
-	top.add_child(tariff_button)
-
-	var menu_btn := Button.new()
-	menu_btn.text = "☰"
-	menu_btn.add_theme_font_size_override("font_size", 15)
-	menu_btn.position = Vector2(vp.x - 34, 3)
-	# both top-row buttons get flat compact styling so they fit inside the
-	# top strip without overflowing onto the board (2026-07-08)
-	for b: Button in [tariff_button, menu_btn]:
-		var compact := StyleBoxFlat.new()
-		compact.bg_color = Color(0.22, 0.22, 0.26)
-		compact.set_corner_radius_all(4)
-		compact.content_margin_left = 7
-		compact.content_margin_right = 7
-		compact.content_margin_top = 1
-		compact.content_margin_bottom = 1
-		for style in ["normal", "hover", "pressed"]:
-			b.add_theme_stylebox_override(style, compact)
-	menu_btn.pressed.connect(func() -> void:
-		placing_id = ""
-		placing_cap = false
-		_clear_selection()
-		game_menu_open = true
-		game_menu.move_to_front() # above every other HUD control
-		game_menu.visible = true)
-	hud.add_child(menu_btn)
-
-	# bottom: action count above a 4-button row (Stock / Items / Trinkets / PASS)
-	turn_label.position = Vector2(0, vp.y - 70)
-	turn_label.custom_minimum_size = Vector2(vp.x, 0)
-	turn_label.add_theme_font_size_override("font_size", 14)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# it floats over the board's bottom edge now — outline for readability
-	turn_label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.1))
-	turn_label.add_theme_constant_override("outline_size", 6)
-	hud.add_child(turn_label)
-	var bar := HBoxContainer.new()
-	bar.position = Vector2(4, vp.y - 46)
-	bar.custom_minimum_size = Vector2(vp.x - 8, 42)
-	bar.add_theme_constant_override("separation", 4)
-	for name in ["stock", "items", "trinkets"]:
-		var b := Button.new()
-		b.text = name.capitalize()
-		b.add_theme_font_size_override("font_size", 17)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(_set_drawer.bind(name))
-		drawer_buttons[name] = b
-		bar.add_child(b)
-	# the armed stack rides on the Stock button, styled like a selection
-	stock_armed.set_anchors_preset(Control.PRESET_FULL_RECT)
-	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stock_armed.draw.connect(_draw_stock_armed)
-	drawer_buttons["stock"].add_child(stock_armed)
-	pass_button.text = "PASS"
-	pass_button.add_theme_font_size_override("font_size", 17)
-	# self_modulate: the red tint must not bleed into the blue counter child
-	pass_button.self_modulate = Color(1, 0.5, 0.5)
-	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	pass_button.pressed.connect(_on_pass)
-	# "2/2 PASS", both vertically centered — the button's own text is only
-	# used for START (setup); in-turn the label pair takes over
-	var pass_box := HBoxContainer.new()
-	pass_box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pass_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	pass_box.add_theme_constant_override("separation", 7)
-	pass_box.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
-	pass_count.add_theme_font_size_override("font_size", 15)
-	pass_count.add_theme_color_override("font_color", Color(0.45, 0.7, 1.0))
-	pass_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pass_box.add_child(pass_count)
-	pass_label.text = "PASS"
-	pass_label.add_theme_font_size_override("font_size", 17)
-	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pass_box.add_child(pass_label)
-	pass_button.add_child(pass_box)
-	bar.add_child(pass_button)
-	hud.add_child(bar)
-
-	game_menu.visible = false
-	game_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var gm_bg := StyleBoxFlat.new()
-	gm_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
-	game_menu.add_theme_stylebox_override("panel", gm_bg)
-	var gm_center := CenterContainer.new()
-	game_menu.add_child(gm_center)
-	var gm_box := VBoxContainer.new()
-	gm_box.add_theme_constant_override("separation", 20)
-	gm_center.add_child(gm_box)
-	var gm_title := Label.new()
-	gm_title.text = "Paused" # menu open = clock frozen (GDD pause)
-	gm_title.add_theme_font_size_override("font_size", 32)
-	gm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	gm_box.add_child(gm_title)
-	var resume := Button.new()
-	resume.text = "Resume"
-	resume.add_theme_font_size_override("font_size", 26)
-	resume.pressed.connect(func() -> void:
-		game_menu_open = false
-		game_menu.visible = false)
-	gm_box.add_child(resume)
-	var to_menu := Button.new()
-	to_menu.text = "Main Menu"
-	to_menu.add_theme_font_size_override("font_size", 20)
-	to_menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
-	gm_box.add_child(to_menu)
-	hud.add_child(game_menu)
-
-	# drawers above the button row: Stock opens from the bottom-left, Items
-	# one at a time, overlaying the board, all identical (2026-07-08): full
-	# width, running to the screen bottom; the button bar re-fronts below so
-	# it stays visible and clickable over them.
-	trinket_box.add_theme_constant_override("separation", 16)
-	var drawer_specs := [ # name, content, x, width, height
-		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["items", item_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["trinkets", trinket_box, 0.0, vp.x, DRAWER_H + 70.0],
-	]
-	for spec in drawer_specs:
-		var panel := PanelContainer.new()
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
-		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - 70.0 - DRAWER_H)
-		panel.custom_minimum_size = Vector2(spec[3], spec[4])
-		panel.visible = false
-		var sc := ScrollContainer.new()
-		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
-		sc.clip_contents = false # the ▲ promote badge overhangs the drawer top
-		sc.add_child(spec[1])
-		panel.add_child(sc)
-		drawers[spec[0]] = panel
-		hud.add_child(panel)
-	bar.move_to_front() # the button bar stays visible over the stock drawer
-
-	box_panel.visible = false
-	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var box_bg := StyleBoxFlat.new()
-	box_bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
-	box_panel.add_theme_stylebox_override("panel", box_bg)
-	hud.add_child(box_panel)
-
-	preview_panel.visible = false
-	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var pv_bg := StyleBoxFlat.new()
-	pv_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
-	preview_panel.add_theme_stylebox_override("panel", pv_bg)
-	hud.add_child(preview_panel)
-
-	overlay.visible = false
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
-	overlay.add_theme_stylebox_override("panel", dim)
-	hud.add_child(overlay)
-
-
-## Combined pool the player can act on: stock first, then captured.
 func _pool() -> Array:
 	return stock + captured
 
 
-func _stacks() -> Array:
-	# pool grouped for display/selection: stock stacks first, then captured
-	var out := []
-	for cap in [false, true]:
-		var counts := {}
-		for id in (captured if cap else stock):
-			counts[id] = counts.get(id, 0) + 1
-		for id in counts:
-			out.append({"id": id, "cap": cap, "count": counts[id]})
-	return out
 
 
 func _clock_text() -> String:
 	return "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
 
 
-func _refresh() -> void:
-	clock_label.text = _clock_text()
-	score_label.text = "★%d" % score
-	var next_in := _cadence() - turns_since_wave
-	var wave_txt := "King!" if _king_alive() \
-		else ("in %d" % maxi(next_in, 0)) if wave < Waves.WAVES.size() else "done"
-	wave_label.text = "wave %d/%d · %s" % [wave, Waves.WAVES.size(), wave_txt]
-	var incoming := pending_spawn.size()
-	foes_label.text = "%d foes" % _enemy_count() + (" +%d" % incoming if incoming > 0 else "")
-	match state:
-		State.SETUP: # the pass button doubles as the explicit start trigger
-			turn_label.text = "Place your army (%d left), then START" % stock.size()
-			pass_button.text = "START"
-			pass_button.self_modulate = Color(0.55, 1.0, 0.55)
-			pass_count.text = ""
-			pass_label.text = ""
-		State.PLAYER_TURN:
-			pass_button.text = ""
-			pass_button.self_modulate = Color(1, 0.5, 0.5)
-			pass_count.text = "%d/%d" % [actions_left, actions_max]
-			pass_label.text = "PASS"
-			turn_label.text = ""
-		State.ENEMY_TURN:
-			turn_label.text = "enemy turn…"
-			pass_count.text = ""
-			pass_label.text = "PASS"
-		State.GAME_OVER:
-			turn_label.text = ""
-			pass_count.text = ""
-	drawer_buttons["stock"].text = "Stock %d" % _pool().size()
-	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["items"].text = "Items %d" % items.size()
-	drawer_buttons["trinkets"].text = "Trinkets %d" % trinkets.size()
-	merge_highlights = MergeLogic.partner_ids(self)
-	tariff_button.text = "⚠%d" % tariffs_active.size() \
-			+ ("·off" if counter_intel_turns > 0 and not tariffs_active.is_empty() else "")
-	_rebuild_pool_strip()
-	_rebuild_item_strip()
-	_rebuild_trinket_strip()
-	queue_redraw()
 
 
 func _enemy_count() -> int:
@@ -490,141 +235,12 @@ func _enemy_count() -> int:
 	return n
 
 
-func _rebuild_trinket_strip() -> void:
-	for c in trinket_box.get_children():
-		c.queue_free()
-	if trinkets.is_empty():
-		var none := Label.new()
-		none.text = "no trinkets yet"
-		none.modulate = Color(1, 1, 1, 0.6)
-		trinket_box.add_child(none)
-		return
-	var counts := {}
-	for t in trinkets: # stack copies: one entry per kind
-		counts[t.key] = counts.get(t.key, 0) + 1
-	var seen := {}
-	for t in trinkets:
-		if seen.has(t.key):
-			continue
-		seen[t.key] = true
-		var l := Label.new()
-		l.text = "◈%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
-		l.tooltip_text = t.description
-		l.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
-		trinket_box.add_child(l)
 
 
-func _rebuild_item_strip() -> void:
-	for c in item_box.get_children():
-		c.queue_free()
-	for i in items.size():
-		var btn := Button.new()
-		btn.text = "✦" + items[i].name
-		btn.tooltip_text = "%s (%s)\n%s" % [items[i].name, items[i].tier, items[i].description]
-		if item_active == i:
-			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(_use_item.bind(i))
-		item_box.add_child(btn)
 
 
-func _rebuild_pool_strip() -> void:
-	for c in pool_box.get_children():
-		c.queue_free()
-	for st in _stacks():
-		var btn := Button.new()
-		var id: String = st.id
-		if textures.has(id): # piece icon instead of glyph text (round 3)
-			btn.icon = textures[id]
-			btn.expand_icon = true
-			btn.custom_minimum_size = Vector2(46, 46)
-		else:
-			btn.text = defs[id].glyph
-			btn.add_theme_font_size_override("font_size", 22)
-		var show_promote: bool = placing_id == id and placing_cap == st.cap \
-				and st.count >= 2 and MergeLogic.pair_ok(self, id, id) \
-				and state == State.PLAYER_TURN and actions_left > 0
-		if st.count > 1:
-			# corner badge keeps the icon full-size (no inline text); it yields
-			# the top-right corner to the ▲ promote button when that shows
-			var badge := Label.new()
-			badge.text = str(st.count)
-			badge.add_theme_font_size_override("font_size", 11)
-			badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-			badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-			badge.add_theme_constant_override("outline_size", 4)
-			if show_promote:
-				badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-				badge.offset_left = 3
-				badge.offset_right = 16
-				badge.offset_bottom = 12
-			else:
-				badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-				badge.offset_left = -16
-				badge.offset_bottom = 12
-			btn.add_child(badge)
-		if show_promote:
-			# round ▲ badge floating over the stack's top-right corner: it
-			# overhangs the drawer's top edge and pokes out a little to the
-			# right of the icon (the stock scroll doesn't clip)
-			var promote := Button.new()
-			promote.text = "▲"
-			promote.add_theme_font_size_override("font_size", 11)
-			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
-			var round := StyleBoxFlat.new()
-			round.bg_color = Color(0.3, 0.6, 1.0) # player blue
-			round.set_corner_radius_all(9)
-			for style in ["normal", "hover", "pressed"]:
-				promote.add_theme_stylebox_override(style, round)
-			promote.tooltip_text = "Promote: merge two into one"
-			promote.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-			promote.offset_left = -14
-			promote.offset_right = 4
-			promote.offset_top = -9
-			promote.offset_bottom = 9
-			promote.pressed.connect(func() -> void:
-				MergeLogic.do_merge(self, {"id": id, "cap": st.cap}, {"id": id, "cap": st.cap}))
-			btn.add_child(promote)
-		btn.tooltip_text = defs[id].name + (" (captured)" if st.cap else "")
-		if placing_id == id and placing_cap == st.cap:
-			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-		elif merge_highlights.has(id):
-			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-		elif not st.cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
-			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
-		elif st.cap:
-			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
-		btn.set_meta("id", id) # drop-target lookup for drag merges
-		btn.set_meta("cap", st.cap)
-		btn.pressed.connect(_on_stack_pressed.bind(id, st.cap, st.count))
-		btn.button_down.connect(_on_stack_drag_start.bind(id, st.cap))
-		pool_box.add_child(btn)
-	if state == State.SETUP and selected.x >= 0:
-		# empty slot: tap it (or drop the dragged piece on the strip) to take
-		# the selected board piece back into stock
-		var slot := Button.new()
-		slot.text = "+"
-		slot.custom_minimum_size = Vector2(46, 46)
-		slot.add_theme_font_size_override("font_size", 22)
-		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
-		slot.tooltip_text = "Put the piece back into stock"
-		slot.pressed.connect(func() -> void:
-			if selected.x >= 0 and board.has(selected):
-				_setup_to_stock(selected))
-		pool_box.add_child(slot)
 
 
-func _stack_button_at(screen: Vector2) -> Button:
-	if not pool_box.is_visible_in_tree(): # stock drawer closed: no targets
-		return null
-	for c in pool_box.get_children():
-		if c is Button and not c.is_queued_for_deletion() and c.has_meta("id") \
-				and (c as Button).get_global_rect().has_point(screen):
-			return c
-	return null
-
-
-## Any new interaction (menu, stock tap/drag, pass, item) drops the board
-## selection so stale highlights never survive into the next action.
 func _clear_selection() -> void:
 	selected = Vector2i(-1, -1)
 	legal_dests.clear()
@@ -736,12 +352,12 @@ func _on_pass() -> void:
 	if box_open or game_menu_open or win_open:
 		return
 	if state == State.SETUP:
-		if drawer_open != "": # setup done: full board for the run
+		if hud.drawer_open != "": # setup done: full board for the run
 			_set_drawer("")
 		WaveLogic.spawn(self, 1)
 		_begin_player_turn()
 	elif state == State.PLAYER_TURN:
-		fx_at = Vector2(pass_button.get_global_rect().get_center())
+		fx_at = Vector2(hud.pass_button.get_global_rect().get_center())
 		Economy.charge(self, "pass_cost")
 		if not early_clear_awarded and _board_cleared():
 			# wave beaten with turns to spare: score + clock scale with the lead
@@ -761,7 +377,7 @@ func _on_pass() -> void:
 func _process(delta: float) -> void:
 	if (selected.x >= 0 or placing_id != "") and not autoplay:
 		queue_redraw() # the selection outline pulses every frame
-		stock_armed.queue_redraw()
+		hud.stock_armed.queue_redraw()
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
 		var open := _setup_open_tiles()
@@ -776,7 +392,7 @@ func _process(delta: float) -> void:
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
-		clock_label.text = _clock_text()
+		hud.clock_label.text = _clock_text()
 		if autoplay:
 			AutoplayBot.step(self)
 	if not anims.is_empty():
@@ -837,7 +453,7 @@ func _begin_player_turn() -> void:
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
-	if drawer_open != "": # full board while the enemy plays
+	if hud.drawer_open != "": # full board while the enemy plays
 		_set_drawer("")
 	_clear_selection()
 	placing_id = ""
@@ -1078,7 +694,7 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
 	merge_highlights = MergeLogic.partner_ids(self)
-	for c in pool_box.get_children():
+	for c in hud.pool_box.get_children():
 		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
 			c.modulate = Color(0.8, 1.1, 1.4)
 	queue_redraw()
@@ -1101,9 +717,9 @@ func _input(event: InputEvent) -> void:
 	if pool_drag_id == "":
 		return
 	if event is InputEventMouseMotion:
-		if drawer_open != "" and not \
-				(drawers[drawer_open] as Control).get_global_rect().has_point(event.position):
-			drawer_autoclosed = drawer_open # reopen if this drag cancels
+		if hud.drawer_open != "" and not \
+				(hud.drawers[hud.drawer_open] as Control).get_global_rect().has_point(event.position):
+			drawer_autoclosed = hud.drawer_open # reopen if this drag cancels
 			_set_drawer("") # dragged out toward the board: give it back
 		queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
@@ -1116,7 +732,7 @@ func _input(event: InputEvent) -> void:
 		# a release inside the open drawer must never hit the board tiles
 		# hidden beneath it — that reads as a misinput (2026-07-08). Dragging
 		# out closes the drawer, so real board drops arrive uncovered.
-		var covered: bool = drawer_open != "" and (drawers[drawer_open] as Control) \
+		var covered: bool = hud.drawer_open != "" and (hud.drawers[hud.drawer_open] as Control) \
 				.get_global_rect().has_point(event.position)
 		# drop on a friendly partner piece: merge into its tile
 		if not covered and state == State.PLAYER_TURN and t.x >= 0 and board.has(t) \
@@ -1127,7 +743,7 @@ func _input(event: InputEvent) -> void:
 		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
 		# back on the same stack is a plain tap (arms placement) — same-stack
 		# promotion goes through the ▲ badge instead (2026-07-07)
-		var target := _stack_button_at(event.position)
+		var target := hud.stack_button_at(event.position)
 		if state == State.PLAYER_TURN and target != null \
 				and merge_highlights.has(target.get_meta("id")) \
 				and not (target.get_meta("id") == id and target.get_meta("cap") == cap):
@@ -1165,7 +781,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var at := _tile_at(event.position)
 		if event.pressed:
 			# any press outside an open drawer closes it to reveal the board
-			if drawer_open != "" and not (drawers[drawer_open] as Control) \
+			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
 				_set_drawer("")
 			if at.x < 0: # dead UI space: a no-interaction press drops selection
@@ -1202,9 +818,9 @@ func _unhandled_input(event: InputEvent) -> void:
 						and board.has(from) and merge_highlights.has(board[t].id):
 					MergeLogic.do_merge(self, from, t) # dragged onto a partner: merge onto its tile
 				elif state == State.SETUP and t.x < 0 and (
-						(pool_box.is_visible_in_tree() and (pool_box.get_parent() as Control)
+						(hud.pool_box.is_visible_in_tree() and (hud.pool_box.get_parent() as Control)
 							.get_global_rect().has_point(event.position))
-						or (drawer_buttons["stock"] as Control)
+						or (hud.drawer_buttons["stock"] as Control)
 							.get_global_rect().has_point(event.position)):
 					_setup_to_stock(from) # dropped on the drawer or Stock button
 				elif t == from and (drag_moved or drag_reselect):
@@ -1324,7 +940,7 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 			recent_place_costs.pop_front()
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
-	elif state == State.SETUP and not stock.is_empty() and drawer_open != "stock":
+	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
 		_set_drawer("stock") # keep the placement flow going
 	_refresh()
 
@@ -1401,7 +1017,7 @@ func _is_long_range(id: String) -> bool:
 
 func _king_down() -> bool:
 	kings_defeated += 1
-	fx_at = Vector2(wave_label.get_global_rect().get_center())
+	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
 	score += Tuning.WIN_SCORE_BONUS
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
@@ -1688,7 +1304,7 @@ func _use_item(index: int) -> void:
 		_item_reset()
 		_refresh()
 		return
-	if drawer_open != "": # using an item hands the board back (targeting)
+	if hud.drawer_open != "": # using an item hands the board back (targeting)
 		_set_drawer("")
 	var it: Dictionary = items[index]
 	if it.target == "":
@@ -1733,7 +1349,7 @@ func _item_click(tile: Vector2i) -> void:
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
-		else Vector2(item_box.get_global_rect().get_center())
+		else Vector2(hud.item_box.get_global_rect().get_center())
 	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
 	actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
@@ -2084,3 +1700,71 @@ func _to_config() -> Dictionary:
 
 func _record_score() -> int:
 	return Economy.record_score(self)
+
+
+# --- HUD wiring (widgets live in scripts/hud.gd; signals up, calls down) ---
+
+func _connect_hud() -> void:
+	hud.pass_pressed.connect(_on_pass)
+	hud.tariff_pressed.connect(_show_tariffs)
+	hud.stack_pressed.connect(_on_stack_pressed)
+	hud.stack_drag_started.connect(_on_stack_drag_start)
+	hud.item_pressed.connect(_use_item)
+	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
+		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
+	hud.return_to_stock_pressed.connect(func() -> void:
+		if selected.x >= 0 and board.has(selected):
+			_setup_to_stock(selected))
+	hud.drawer_changed.connect(_after_drawer_change)
+	hud.menu_toggled.connect(func(open: bool) -> void:
+		game_menu_open = open
+		if open:
+			placing_id = ""
+			placing_cap = false
+			_clear_selection())
+
+
+## Open one drawer (closing the others) or toggle it shut; "" closes all.
+func _set_drawer(which: String) -> void:
+	hud.set_drawer(which)
+	_after_drawer_change()
+
+
+func _after_drawer_change() -> void:
+	if hud.drawer_open != "": # opening a drawer drops any selection (2026-07-08);
+		placing_id = ""       # closing keeps it (outside-tap flow places next tap)
+		placing_cap = false
+		_clear_selection()
+	_layout_board()
+	_refresh()
+
+
+## Modal/overlay scaffolding parents to the HUD layer so it sits above the
+## board; the modals themselves are shown by their _show_* builders.
+func _build_modals() -> void:
+	box_panel.visible = false
+	box_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var box_bg := StyleBoxFlat.new()
+	box_bg.bg_color = Color(0.08, 0.08, 0.1, 0.9)
+	box_panel.add_theme_stylebox_override("panel", box_bg)
+	hud.add_child(box_panel)
+
+	preview_panel.visible = false
+	preview_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var pv_bg := StyleBoxFlat.new()
+	pv_bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
+	preview_panel.add_theme_stylebox_override("panel", pv_bg)
+	hud.add_child(preview_panel)
+
+	overlay.visible = false
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var dim := StyleBoxFlat.new()
+	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
+	overlay.add_theme_stylebox_override("panel", dim)
+	hud.add_child(overlay)
+
+
+func _refresh() -> void:
+	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
+	hud.refresh()
+	queue_redraw()

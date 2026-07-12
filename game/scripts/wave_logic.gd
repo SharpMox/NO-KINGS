@@ -40,7 +40,7 @@ static func queue(g, n: int) -> void:
 		if Economy.tariff_on(g, "recession"):
 			refill *= 0.5
 		g.clock_ms += refill
-		g.fx_at = Vector2(g.wave_label.get_global_rect().get_center())
+		g.fx_at = Vector2(g.hud.wave_label.get_global_rect().get_center())
 		g.score += Economy.gain(g, Tuning.MILESTONE_SCORE_BONUS)
 		# reinforcement drip from the army's own mix (balance 2026-07-06:
 		# starvation was 100% of bot deaths — nothing replenished Stock)

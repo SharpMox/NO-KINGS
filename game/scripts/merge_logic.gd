@@ -90,7 +90,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	else:
 		g.stock.append(result)
-		g.fx_at = Vector2((g.pool_box.get_parent() as Control).get_global_rect().get_center())
+		g.fx_at = Vector2((g.hud.pool_box.get_parent() as Control).get_global_rect().get_center())
 	Economy.charge(g, "fuse_cost")
 	g.placing_id = ""
 	g.placing_cap = false

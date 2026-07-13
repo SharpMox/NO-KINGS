@@ -1,6 +1,6 @@
 # 05 — Buy items & trinkets
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

@@ -52,6 +52,10 @@ static func price(g, slot: Dictionary) -> int:
 	return Tuning.SHOP_BOX_PRICE
 
 
+static func description(slot: Dictionary) -> String:
+	return str(_catalog(slot).get("description", ""))
+
+
 static func display_name(g, slot: Dictionary) -> String:
 	match slot.kind:
 		"piece":
@@ -63,7 +67,7 @@ static func display_name(g, slot: Dictionary) -> String:
 
 ## Purchasable right now: player's turn, an action and the money to spare,
 ## not sold. Kinds outside PURCHASABLE render but stay Buy-disabled.
-const PURCHASABLE := ["piece"] # items/trinkets/boxes arrive in slices 05/06
+const PURCHASABLE := ["piece", "item", "trinket"] # boxes arrive in slice 06
 
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
@@ -80,9 +84,13 @@ static func buy(g, index: int) -> void:
 	g.money -= price(g, slot)
 	g.actions_left -= 1
 	slot.sold = true
-	match slot.kind:
+	match slot.kind: # grants reuse the existing acquisition paths
 		"piece":
 			g.stock.append(slot.key)
+		"item":
+			g.items.append(_catalog(slot))
+		"trinket":
+			g.trinkets.append(_catalog(slot)) # stacks like box copies
 
 
 ## n distinct picks from a key array, uniform.

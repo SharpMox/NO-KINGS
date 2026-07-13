@@ -110,13 +110,41 @@ func _init() -> void:
 	check(game.stock.size() == stock_n + 1, "buying a SOLD slot is a no-op")
 	check(game.score == s0, "shopping never touches score")
 
-	# the other rows render but stay Buy-disabled in this slice
+	# items and trinkets are purchasable (05); boxes stay locked until 06
 	game.money = 9999
-	var locked := true
-	for other in game.shop_stock:
-		if other.kind != "piece":
-			locked = locked and not Shop.can_buy(game, other)
-	check(locked, "item/trinket/box rows are not purchasable yet")
+	game.actions_left = 4
+	var ii := -1
+	var ti := -1
+	var bi := -1
+	for i in game.shop_stock.size():
+		match game.shop_stock[i].kind:
+			"item":
+				ii = i
+			"trinket":
+				ti = i
+			"box":
+				bi = i
+	check(not Shop.can_buy(game, game.shop_stock[bi]),
+		"lootbox rows are not purchasable yet")
+	var items_n: int = game.items.size()
+	Shop.buy(game, ii)
+	check(game.items.size() == items_n + 1
+			and game.items.back().key == game.shop_stock[ii].key,
+		"a bought item joins the held items")
+	game.trinkets.append(Items.TRINKET_EFFECTS.filter(func(t: Dictionary) -> bool:
+		return t.key == game.shop_stock[ti].key)[0]) # pre-own one copy: stacks?
+	Shop.buy(game, ti)
+	check(game.trinkets.size() == 2 and game.trinkets.back().key == game.shop_stock[ti].key,
+		"a bought trinket applies immediately and stacks")
+	check(game.shop_stock[ii].sold and game.shop_stock[ti].sold,
+		"item and trinket slots go SOLD")
+	check(game.actions_left == 2, "each purchase cost one action")
+	game._refresh()
+	check(game.hud.item_box.get_child_count() == game.items.size(),
+		"bought items show in the Inventory drawer strip")
+	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
+			% (game.items.size() + game.trinkets.size()),
+		"the Inventory count includes both purchases")
 
 	game.queue_free()
 	await process_frame

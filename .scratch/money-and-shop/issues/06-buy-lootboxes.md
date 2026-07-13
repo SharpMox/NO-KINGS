@@ -1,6 +1,6 @@
 # 06 — Buy lootboxes
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

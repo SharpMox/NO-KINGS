@@ -67,7 +67,7 @@ static func display_name(g, slot: Dictionary) -> String:
 
 ## Purchasable right now: player's turn, an action and the money to spare,
 ## not sold. Kinds outside PURCHASABLE render but stay Buy-disabled.
-const PURCHASABLE := ["piece", "item", "trinket"] # boxes arrive in slice 06
+const PURCHASABLE := ["piece", "item", "trinket", "box"]
 
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
@@ -75,12 +75,14 @@ static func can_buy(g, slot: Dictionary) -> bool:
 			and g.actions_left >= 1 and g.money >= price(g, slot)
 
 
-## Debit money + 1 action, mark the slot SOLD, grant the good. Buying never
-## ends the turn (a purchase is not a board action).
-static func buy(g, index: int) -> void:
+## Debit money + 1 action, mark the slot SOLD, grant the good; returns
+## whether the purchase happened. Buying never ends the turn (a purchase is
+## not a board action). A bought box grants nothing here — the caller opens
+## the roll modal, which IS the grant.
+static func buy(g, index: int) -> bool:
 	var slot: Dictionary = g.shop_stock[index]
 	if not can_buy(g, slot):
-		return
+		return false
 	g.money -= price(g, slot)
 	g.actions_left -= 1
 	slot.sold = true
@@ -91,6 +93,7 @@ static func buy(g, index: int) -> void:
 			g.items.append(_catalog(slot))
 		"trinket":
 			g.trinkets.append(_catalog(slot)) # stacks like box copies
+	return true
 
 
 ## n distinct picks from a key array, uniform.

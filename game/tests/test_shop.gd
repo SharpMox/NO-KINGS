@@ -110,7 +110,7 @@ func _init() -> void:
 	check(game.stock.size() == stock_n + 1, "buying a SOLD slot is a no-op")
 	check(game.score == s0, "shopping never touches score")
 
-	# items and trinkets are purchasable (05); boxes stay locked until 06
+	# items and trinkets are purchasable (05)
 	game.money = 9999
 	game.actions_left = 4
 	var ii := -1
@@ -124,8 +124,6 @@ func _init() -> void:
 				ti = i
 			"box":
 				bi = i
-	check(not Shop.can_buy(game, game.shop_stock[bi]),
-		"lootbox rows are not purchasable yet")
 	var items_n: int = game.items.size()
 	Shop.buy(game, ii)
 	check(game.items.size() == items_n + 1
@@ -145,6 +143,24 @@ func _init() -> void:
 	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
 			% (game.items.size() + game.trinkets.size()),
 		"the Inventory count includes both purchases")
+
+	# lootboxes (06): buying debits and opens the 3-option roll right away
+	game.money = 100
+	game.actions_left = 2
+	game._open_shop()
+	game.modals.shop_buy_pressed.emit(bi)
+	check(game.shop_stock[bi].sold, "the box slot goes SOLD")
+	check(game.money == 100 - Tuning.SHOP_BOX_PRICE and game.actions_left == 1,
+		"a box costs its price + one action")
+	check(game.box_open and not game.modals.shop_panel.visible,
+		"buying a box opens the roll modal over a closed shop")
+	var sc0: int = game.score
+	var mo0: int = game.money
+	game.modals.box_chosen.emit({"kind": "score", "name": "+50 score",
+		"value": 50, "description": ""})
+	check(game.score == sc0 + 50 and game.money == mo0 + 50,
+		"a rolled score option earns raw score + money")
+	check(not game.box_open, "the pick closes the roll modal")
 
 	game.queue_free()
 	await process_frame

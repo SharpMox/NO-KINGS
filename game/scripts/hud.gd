@@ -26,7 +26,7 @@ var g # the Game node — read-only from here; mutations go up via signals
 
 var clock_label := Label.new()
 var score_label := Label.new()
-var foes_label := Label.new() # enemies on board (+ incoming spillover)
+var money_label := Label.new() # spendable currency (score is the metric)
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
@@ -46,18 +46,19 @@ var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 func build(game) -> void:
 	g = game
 	var vp: Vector2 = g.get_viewport_rect().size
-	# condensed top bar: clock · score · wave · foes, menu at the right corner
+	# condensed top bar: clock · score · money · wave, menu at the right corner
 	clock_label.add_theme_font_size_override("font_size", 17)
 	score_label.add_theme_font_size_override("font_size", 18)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	for l: Label in [wave_label, foes_label]:
-		l.add_theme_font_size_override("font_size", 15)
-		l.modulate = Color(1, 1, 1, 0.85)
+	money_label.add_theme_font_size_override("font_size", 18)
+	money_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	wave_label.add_theme_font_size_override("font_size", 15)
+	wave_label.modulate = Color(1, 1, 1, 0.85)
 	var top := HBoxContainer.new()
 	top.position = Vector2(10, 4)
 	top.custom_minimum_size = Vector2(vp.x - 56, 0)
 	top.add_theme_constant_override("separation", 14)
-	for l in [clock_label, score_label, wave_label, foes_label]:
+	for l in [clock_label, score_label, money_label, wave_label]:
 		top.add_child(l)
 	add_child(top)
 	tariff_button.add_theme_font_size_override("font_size", 13)
@@ -209,12 +210,11 @@ func set_drawer(which: String) -> void:
 func refresh() -> void:
 	clock_label.text = g._clock_text()
 	score_label.text = "★%d" % g.score
+	money_label.text = "$%d" % g.money
 	var next_in: int = g._cadence() - g.turns_since_wave
 	var wave_txt := "King!" if g._king_alive() \
 		else ("in %d" % maxi(next_in, 0)) if g.wave < Waves.WAVES.size() else "done"
 	wave_label.text = "wave %d/%d · %s" % [g.wave, Waves.WAVES.size(), wave_txt]
-	var incoming: int = g.pending_spawn.size()
-	foes_label.text = "%d foes" % g._enemy_count() + (" +%d" % incoming if incoming > 0 else "")
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		turn_label.text = "Place your army (%d left), then START" % g.stock.size()
 		pass_button.text = "START"

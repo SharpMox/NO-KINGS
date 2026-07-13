@@ -85,6 +85,7 @@ var score := 0:
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
+var money := 0 # per-run spend currency; score stays the up-only metric
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
@@ -239,12 +240,6 @@ func _clock_text() -> String:
 
 
 
-func _enemy_count() -> int:
-	var n := 0
-	for pos in board:
-		if board[pos].owner == Rules.ENEMY:
-			n += 1
-	return n
 
 
 
@@ -327,7 +322,7 @@ func _on_pass() -> void:
 			early_clear_awarded = true
 			var early := maxi(_cadence() - turns_since_wave, 0)
 			if early > 0:
-				score += early * Tuning.EARLY_CLEAR_SCORE_PER_TURN
+				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN)
 				clock_ms += early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN
 				_add_turn_fx("CLEARED EARLY  +%d ★ · +%ds" % [
 					early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
@@ -855,7 +850,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		score += Economy.gain(self, Economy.capture_score(self, victim.id))
+		Economy.earn(self, Economy.capture_score(self, victim.id))
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if victim.id == "king": # boss piece — never enters Captured Stock
@@ -907,7 +902,7 @@ func _is_long_range(id: String) -> bool:
 func _king_down() -> bool:
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
-	score += Tuning.WIN_SCORE_BONUS
+	Economy.earn(self, Tuning.WIN_SCORE_BONUS)
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
 		board.erase(k)
@@ -1156,7 +1151,7 @@ func _open_box_pick() -> void:
 	var options := _box_options()
 	if autoplay: # bot: random pick (or skip) — exercises every branch
 		if rng.randf() < 0.1:
-			score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
+			Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
 			return _box_close()
 		return _box_choose(options[rng.randi() % options.size()])
 	modals.show_box(options)
@@ -1180,7 +1175,7 @@ func _box_choose(opt: Dictionary) -> void:
 		"trinket":
 			trinkets.append(opt.payload)
 		"score":
-			score += Economy.gain(self, opt.value)
+			Economy.earn(self, opt.value)
 	_box_close()
 
 
@@ -1453,5 +1448,5 @@ func _show_tariffs() -> void:
 
 func _on_box_skipped() -> void:
 	fx_at = get_viewport_rect().size / 2.0
-	score += Economy.gain(self, Tuning.BOX_SKIP_CONSOLATION)
+	Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
 	_box_close()

@@ -1,6 +1,6 @@
 # 01 — Money counter: earn, display, persist
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

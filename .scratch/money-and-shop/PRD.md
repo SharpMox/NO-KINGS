@@ -1,6 +1,6 @@
 # PRD: Money & Shop
 
-Status: needs-triage
+Status: done — all 7 slices merged (PRs #48–#54)
 
 ## Problem Statement
 

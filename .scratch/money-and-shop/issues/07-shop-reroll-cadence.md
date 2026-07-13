@@ -1,6 +1,6 @@
 # 07 — Shop reroll cadence
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

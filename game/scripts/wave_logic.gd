@@ -6,6 +6,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Shop := preload("res://scripts/shop.gd")
 
 
 static func queue(g, n: int) -> void:
@@ -47,6 +48,7 @@ static func queue(g, n: int) -> void:
 		var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
 		for i in Tuning.MILESTONE_STOCK_DRIP:
 			g.stock.append(mix[g.rng.randi() % mix.size()])
+		Shop.roll(g) # fresh shelf every decade, SOLD included (money-and-shop/07)
 
 
 static func spawn(g, n: int) -> void:

@@ -39,6 +39,9 @@ static func all() -> Array:
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 			"wave": 2, "stock": ["pawn"], "score": 100}},
+		{"name": "Shop: browse & buy (money, SOLD, reroll at 10s)", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"wave": 9, "money": 400, "stock": ["pawn"]}},
 		{"name": "Reinforcements: post-wave-10 shop", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
 			"wave": 11, "score": 300, "stock": ["pawn"], "pending_reinforce": true}},

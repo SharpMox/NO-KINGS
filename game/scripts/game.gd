@@ -1423,7 +1423,12 @@ func _connect_modals() -> void:
 		win_open = false
 		_game_over(true, "Wave-%d King checkmated" % wave))
 	modals.shop_buy_pressed.connect(func(index: int) -> void:
-		Shop.buy(self, index)
+		if not Shop.buy(self, index):
+			return
+		if shop_stock[index].kind == "box": # the roll modal IS the grant
+			if modals.shop_panel:
+				modals.shop_panel.visible = false
+			return _open_box_pick()
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())

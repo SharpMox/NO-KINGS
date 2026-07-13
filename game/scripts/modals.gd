@@ -287,6 +287,9 @@ func show_shop() -> void:
 		what.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
 		what.add_theme_font_size_override("font_size", 16)
 		what.custom_minimum_size = Vector2(230, 0)
+		if slot.kind == "item" or slot.kind == "trinket":
+			what.tooltip_text = Shop.description(slot)
+			what.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
 		row.add_child(what)
 		var buy := Button.new()
 		buy.text = "SOLD" if slot.sold else "Buy"

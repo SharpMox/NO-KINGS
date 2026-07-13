@@ -10,7 +10,7 @@ const Waves := preload("res://data/waves.gd")
 const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 
-const DRAWER_H := 68.0 # stock / items / trinkets drawer height
+const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
 signal pass_pressed
 signal tariff_pressed
@@ -33,7 +33,7 @@ var pass_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
 var tariff_button := Button.new() # top-row tariff count; opens the overlay
-var drawer_open := "" # "", "stock", "items", "trinkets"
+var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
 var stock_armed := Control.new() # draws the armed piece on the Stock button
@@ -88,7 +88,7 @@ func build(game) -> void:
 		menu_toggled.emit(true))
 	add_child(menu_btn)
 
-	# bottom: action count above a 4-button row (Stock / Items / Trinkets / PASS)
+	# bottom: action count above the button row (Stock / Inventory / PASS)
 	turn_label.position = Vector2(0, vp.y - 70)
 	turn_label.custom_minimum_size = Vector2(vp.x, 0)
 	turn_label.add_theme_font_size_override("font_size", 14)
@@ -101,7 +101,7 @@ func build(game) -> void:
 	bar.position = Vector2(4, vp.y - 46)
 	bar.custom_minimum_size = Vector2(vp.x - 8, 42)
 	bar.add_theme_constant_override("separation", 4)
-	for name in ["stock", "items", "trinkets"]:
+	for name in ["stock", "inventory"]:
 		var b := Button.new()
 		b.text = name.capitalize()
 		b.add_theme_font_size_override("font_size", 17)
@@ -171,22 +171,25 @@ func build(game) -> void:
 	gm_box.add_child(to_menu)
 	add_child(game_menu)
 
-	# drawers above the button row: Stock opens from the bottom-left, Items
-	# one at a time, overlaying the board, all identical (2026-07-08): full
-	# width, running to the screen bottom; the button bar re-fronts below so
-	# it stays visible and clickable over them.
+	# drawers above the button row, one at a time, overlaying the board, full
+	# width and running to the screen bottom; the button bar re-fronts below so
+	# it stays visible and clickable over them. Inventory stacks the held-items
+	# strip over the trinket strip (money-and-shop/03).
 	trinket_box.add_theme_constant_override("separation", 16)
+	var inv_box := VBoxContainer.new()
+	inv_box.add_theme_constant_override("separation", 8)
+	inv_box.add_child(item_box)
+	inv_box.add_child(trinket_box)
 	var drawer_specs := [ # name, content, x, width, height
 		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["items", item_box, 0.0, vp.x, DRAWER_H + 70.0],
-		["trinkets", trinket_box, 0.0, vp.x, DRAWER_H + 70.0],
+		["inventory", inv_box, 0.0, vp.x, DRAWER_H * 2 + 70.0],
 	]
 	for spec in drawer_specs:
 		var panel := PanelContainer.new()
 		var bg := StyleBoxFlat.new()
 		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
 		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - 70.0 - DRAWER_H)
+		panel.position = Vector2(spec[2], vp.y - spec[4]) # bottom-anchored
 		panel.custom_minimum_size = Vector2(spec[3], spec[4])
 		panel.visible = false
 		var sc := ScrollContainer.new()
@@ -236,8 +239,7 @@ func refresh() -> void:
 		pass_count.text = ""
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["items"].text = "Items %d" % g.items.size()
-	drawer_buttons["trinkets"].text = "Trinkets %d" % g.trinkets.size()
+	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.trinkets.size())
 	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
 			+ ("·off" if g.counter_intel_turns > 0 and not g.tariffs_active.is_empty() else "")
 	_rebuild_pool_strip()

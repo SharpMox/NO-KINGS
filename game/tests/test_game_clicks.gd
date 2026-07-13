@@ -427,8 +427,8 @@ func _init() -> void:
 	check(game.board.has(Vector2i(4, 4)) and game.legal_paths.is_empty(),
 		"moving clears the movement-shape overlay")
 
-	# reinforcement shop: opens pending at turn start, Buy spends score into
-	# stock, Done hands the turn back
+	# reinforcement shop: opens pending at turn start, Buy is free and adds
+	# to stock, Done hands the turn back
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -443,8 +443,8 @@ func _init() -> void:
 	var r_stock: int = game.stock.size()
 	check(await _click_button_in(game.reinforce_panel, "Buy"), "Buy clickable")
 	await process_frame
-	check(game.stock.size() == r_stock + 1 and game.score == 90,
-		"Buy adds the piece to stock and charges its value")
+	check(game.stock.size() == r_stock + 1 and game.score == 100 and game.money == 0,
+		"Buy adds the piece to stock for free")
 	check(await _click_button_in(game.reinforce_panel, "Done"), "Done clickable")
 	await process_frame
 	check(not game.reinforce_panel.visible and not game.pending_reinforce,

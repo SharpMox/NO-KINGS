@@ -5,34 +5,34 @@
 ## than the MVP's piece-value scale; amounts here live in tuning.gd, scaled
 ## ~/100 — flagged for a design pass.
 ##
-## kind: "action" (score cost when the action happens) · "persistent" (rule
+## kind: "action" (money cost when the action happens) · "persistent" (rule
 ## modifier for the rest of the run) · "oneoff" (applies instantly).
 
 const TARIFFS: Array = [
 	{"key": "move_cost", "name": "Tariff on Move", "tier": "Mild", "kind": "action",
-		"description": "Each piece move costs extra score."},
+		"description": "Each piece move costs extra money."},
 	{"key": "ability_cost", "name": "Tariff on Ability", "tier": "Mild", "kind": "action",
-		"description": "Activating an Item costs extra score."},
+		"description": "Activating an Item costs extra money."},
 	{"key": "capture_cost", "name": "Tariff on Capture", "tier": "Mild", "kind": "action",
-		"description": "Each capture costs extra score."},
+		"description": "Each capture costs extra money."},
 	{"key": "pass_cost", "name": "Tariff on Pass", "tier": "Mild", "kind": "action",
-		"description": "Ending your turn costs extra score."},
+		"description": "Ending your turn costs extra money."},
 	{"key": "long_range_cost", "name": "Tariff on Long-Range", "tier": "Mild", "kind": "action",
-		"description": "Moving a Bishop or Rook costs extra score per square."},
+		"description": "Moving a Bishop or Rook costs extra money per square."},
 	{"key": "box_cost", "name": "Tariff on Box Pick", "tier": "Mild", "kind": "action",
-		"description": "Opening a box costs extra score."},
+		"description": "Opening a box costs extra money."},
 	{"key": "inflation", "name": "Inflation", "tier": "Mild", "kind": "persistent",
-		"description": "All score gains reduced 10% (stacks)."},
+		"description": "All money gains reduced 10% (stacks)."},
 	{"key": "deploy_cost", "name": "Tariff on Deploy", "tier": "Moderate", "kind": "action",
-		"description": "Placing a piece costs extra score."},
+		"description": "Placing a piece costs extra money."},
 	{"key": "fuse_cost", "name": "Tariff on Fuse", "tier": "Moderate", "kind": "action",
-		"description": "Each merge costs extra score."},
+		"description": "Each merge costs extra money."},
 	{"key": "sanctions", "name": "Sanctions", "tier": "Moderate", "kind": "persistent",
 		"description": "One random piece type can no longer be placed."},
 	{"key": "regulation", "name": "Regulation", "tier": "Moderate", "kind": "persistent",
 		"description": "Pawns can no longer be merged."},
 	{"key": "austerity", "name": "Austerity", "tier": "Moderate", "kind": "persistent",
-		"description": "Placing pieces costs double score."},
+		"description": "Placing pieces costs double money."},
 	{"key": "recession", "name": "Recession", "tier": "Moderate", "kind": "persistent",
 		"description": "Milestone clock refills halved."},
 	{"key": "forced_audit", "name": "Forced Audit", "tier": "Moderate", "kind": "oneoff",
@@ -48,7 +48,7 @@ const TARIFFS: Array = [
 	{"key": "jd_vance", "name": "Diplomatic Visit – JD Vance", "tier": "Severe", "kind": "oneoff",
 		"description": "Your highest-value piece is destroyed."},
 	{"key": "asset_freeze", "name": "Asset Freeze", "tier": "Severe", "kind": "oneoff",
-		"description": "Lose half your current score."},
+		"description": "Lose half your current money."},
 ]
 
 ## Excluded: Tariff on Promotion (last-rank promotion is cut from MVP — merges

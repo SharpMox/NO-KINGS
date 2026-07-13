@@ -38,7 +38,7 @@ const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone
                                         # income, not wave pressure, is what kills)
 
 # x10 economy (2026-07-03): pawn = 10 points, queen = 90, amazon = 120
-const PLACEMENT_SCORE_COST := 20   # placing mid-turn costs score (GDD, amount TBD)
+const PLACEMENT_COST := 20         # placing mid-turn costs money (GDD, amount TBD)
 const MILESTONE_SCORE_BONUS := 100 # every 10 waves (GDD, amount TBD)
 const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
 const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)

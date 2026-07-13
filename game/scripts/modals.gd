@@ -15,7 +15,7 @@ signal box_chosen(opt: Dictionary)
 signal box_skipped
 signal win_continue_pressed
 signal win_end_pressed
-signal reinforce_buy_pressed(id: String, cost: int)
+signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
 
@@ -253,13 +253,12 @@ func show_reinforce() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := Label.new()
-	sub.text = "Wave %d cleared — spend score on your army's reserve\n★%d available" % [g.wave - 1, g.score]
+	sub.text = "Wave %d cleared — restock your army's reserve, free of charge" % (g.wave - 1)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
 	for id in g._reinforce_ids():
-		var cost: int = int(g.defs[id].value)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -271,15 +270,14 @@ func show_reinforce() -> void:
 			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			row.add_child(tex)
 		var what := Label.new()
-		what.text = "%s — %d★" % [g.defs[id].name, cost]
+		what.text = str(g.defs[id].name)
 		what.add_theme_font_size_override("font_size", 17)
 		what.custom_minimum_size = Vector2(190, 0)
 		row.add_child(what)
 		var buy := Button.new()
 		buy.text = "Buy"
 		buy.add_theme_font_size_override("font_size", 17)
-		buy.disabled = g.score < cost
-		buy.pressed.connect(func() -> void: reinforce_buy_pressed.emit(id, cost))
+		buy.pressed.connect(func() -> void: reinforce_buy_pressed.emit(id))
 		row.add_child(buy)
 		box.add_child(row)
 	var done := Button.new()

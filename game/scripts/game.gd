@@ -811,14 +811,14 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 	if state == State.PLAYER_TURN:
 		actions_left -= 1
 		turn_action_count += 1
-		var cost := Tuning.PLACEMENT_SCORE_COST
+		var cost := Tuning.PLACEMENT_COST
 		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
 		if free_placements > 0: # Field Orders
 			free_placements -= 1
 			cost = 0
 		Economy.charge(self, "deploy_cost")
-		score = maxi(score - cost, 0)
+		money = maxi(money - cost, 0)
 		recent_place_costs.append(cost)
 		if recent_place_costs.size() > 3:
 			recent_place_costs.pop_front()
@@ -1091,7 +1091,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 					board.erase(pos)
 		"resupply_drop":
 			for c in recent_place_costs:
-				score += c
+				money += c
 			recent_place_costs.clear()
 		"counter_intel":
 			counter_intel_turns += 2
@@ -1417,11 +1417,9 @@ func _connect_modals() -> void:
 	modals.win_end_pressed.connect(func() -> void:
 		win_open = false
 		_game_over(true, "Wave-%d King checkmated" % wave))
-	modals.reinforce_buy_pressed.connect(func(id: String, cost: int) -> void:
-		if score >= cost:
-			score -= cost
-			stock.append(id)
-			modals.show_reinforce()) # rebuild: fresh score line + affordability
+	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
+		stock.append(id) # reinforce is free (money-and-shop/02)
+		modals.show_reinforce())
 	modals.reinforce_done_pressed.connect(func() -> void:
 		pending_reinforce = false
 		_refresh())

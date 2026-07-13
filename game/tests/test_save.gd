@@ -34,6 +34,8 @@ func _init() -> void:
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
 		"score": 470, "money": 35, "clock_s": 812.5,
+		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
+			{"kind": "box", "key": "box", "sold": false}],
 		"free_placements": 1, "ceasefire_turns": 2, "counter_intel_turns": 1,
 		"recent_place_costs": [20, 0, 20],
 	}
@@ -58,6 +60,8 @@ func _init() -> void:
 			print("DIFF %s: %s -> %s" % [k, JSON.stringify(saved[k]), JSON.stringify(again.get(k))])
 	check(b.score == 470, "score restored")
 	check(b.money == 35, "money restored")
+	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
+		"shop slots and SOLD flags restored")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")

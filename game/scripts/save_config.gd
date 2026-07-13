@@ -15,6 +15,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.stock = cfg.get("stock", []).duplicate()
 	g.captured = cfg.get("captured", []).duplicate()
 	g.score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
+	g.money = int(cfg.get("money", 0))
 	g.clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
 	# default: all designed waves done, so nothing spawns into the sandbox
 	g.wave = int(cfg.get("wave", Waves.WAVES.size()))
@@ -80,7 +81,7 @@ static func to_config(g) -> Dictionary:
 		"kings_defeated": g.kings_defeated, "army": g.next_army,
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
-		"score": g.score, "clock_s": g.clock_ms / 1000.0,
+		"score": g.score, "money": g.money, "clock_s": g.clock_ms / 1000.0,
 		"sanctioned_id": g.sanctioned_id,
 		"free_placements": g.free_placements, "ceasefire_turns": g.ceasefire_turns,
 		"skip_enemy_turns": g.skip_enemy_turns, "counter_intel_turns": g.counter_intel_turns,

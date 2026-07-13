@@ -13,7 +13,14 @@ static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> v
 		g.score = maxi(g.score - amount, 0)
 
 
-## Score gains pass through Inflation (-10% per stack, rounded down).
+## Award a gain: score counts the raw amount (up-only performance metric),
+## money takes the Inflation-taxed amount. Every gain site goes through here.
+static func earn(g, amount: int) -> void:
+	g.score += amount
+	g.money += gain(g, amount)
+
+
+## Money gains pass through Inflation (-10% per stack, rounded down).
 static func gain(g, amount: int) -> int:
 	if g.counter_intel_turns > 0:
 		return amount

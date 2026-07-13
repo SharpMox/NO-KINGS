@@ -8,6 +8,7 @@
 extends Node
 
 const Tuning := preload("res://scripts/tuning.gd")
+const Shop := preload("res://scripts/shop.gd")
 
 signal merge_confirmed
 signal merge_cancelled
@@ -15,6 +16,8 @@ signal box_chosen(opt: Dictionary)
 signal box_skipped
 signal win_continue_pressed
 signal win_end_pressed
+signal shop_buy_pressed(index: int)
+signal shop_closed
 signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
@@ -26,6 +29,8 @@ var preview_panel := PanelContainer.new() # long-press piece preview
 var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
+var shop_panel: PanelContainer # the Shop overlay (money-and-shop/04)
+var shop_scroll: ScrollContainer # exposed so probes can scroll rows into view
 var tariff_panel: PanelContainer # tariff detail overlay
 
 
@@ -232,6 +237,75 @@ func show_preview(id: String) -> void:
 		preview_panel.visible = false
 		preview_closed.emit())
 	box.add_child(close)
+
+
+## The Shop overlay: the 19 rolled slots as a scrollable list — lootboxes,
+## trinkets, items, then base pieces (the user-specified row order). Buy rows
+## emit an index; game.gd buys and reopens for fresh SOLD/affordability state.
+func show_shop() -> void:
+	if shop_panel:
+		shop_panel.queue_free()
+	shop_panel = PanelContainer.new()
+	shop_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
+	shop_panel.add_theme_stylebox_override("panel", bg)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	shop_panel.add_child(box)
+	var title := Label.new()
+	title.text = "SHOP"
+	title.add_theme_font_size_override("font_size", 26)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var sub := Label.new()
+	sub.text = "$%d held — a purchase costs its price + 1 action" % g.money
+	sub.add_theme_font_size_override("font_size", 14)
+	sub.modulate = Color(1, 1, 1, 0.8)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(sub)
+	shop_scroll = ScrollContainer.new()
+	shop_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(shop_scroll)
+	var rows := VBoxContainer.new()
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rows.add_theme_constant_override("separation", 6)
+	shop_scroll.add_child(rows)
+	for i in g.shop_stock.size():
+		var slot: Dictionary = g.shop_stock[i]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		if slot.kind == "piece" and g.textures.has(slot.key):
+			var tex := TextureRect.new()
+			tex.texture = g.textures[slot.key]
+			tex.custom_minimum_size = Vector2(30, 30)
+			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			row.add_child(tex)
+		var what := Label.new()
+		what.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
+		what.add_theme_font_size_override("font_size", 16)
+		what.custom_minimum_size = Vector2(230, 0)
+		row.add_child(what)
+		var buy := Button.new()
+		buy.text = "SOLD" if slot.sold else "Buy"
+		buy.disabled = not Shop.can_buy(g, slot)
+		buy.add_theme_font_size_override("font_size", 16)
+		buy.pressed.connect(func() -> void: shop_buy_pressed.emit(i))
+		row.add_child(buy)
+		if slot.sold:
+			row.modulate = Color(1, 1, 1, 0.4)
+		rows.add_child(row)
+	var close := Button.new()
+	close.text = "Close"
+	close.add_theme_font_size_override("font_size", 20)
+	close.pressed.connect(func() -> void:
+		shop_panel.visible = false
+		shop_closed.emit())
+	box.add_child(close)
+	g.hud.add_child(shop_panel)
+	shop_panel.move_to_front()
 
 
 func show_reinforce() -> void:

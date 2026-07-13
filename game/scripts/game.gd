@@ -13,6 +13,7 @@ const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
+const Shop := preload("res://scripts/shop.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
@@ -86,6 +87,7 @@ var score := 0:
 			queue_redraw()
 		score = value
 var money := 0 # per-run spend currency; score stays the up-only metric
+var shop_stock: Array = [] # 19 rolled slots {kind, key, sold} (scripts/shop.gd)
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
@@ -207,6 +209,8 @@ func _ready() -> void:
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
+	if shop_stock.is_empty(): # fresh run, or a save from before the shop
+		Shop.roll(self)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -1369,6 +1373,7 @@ func _connect_hud() -> void:
 	hud.return_to_stock_pressed.connect(func() -> void:
 		if selected.x >= 0 and board.has(selected):
 			_setup_to_stock(selected))
+	hud.shop_pressed.connect(_open_shop)
 	hud.drawer_changed.connect(_after_drawer_change)
 	hud.menu_toggled.connect(func(open: bool) -> void:
 		game_menu_open = open
@@ -1417,6 +1422,11 @@ func _connect_modals() -> void:
 	modals.win_end_pressed.connect(func() -> void:
 		win_open = false
 		_game_over(true, "Wave-%d King checkmated" % wave))
+	modals.shop_buy_pressed.connect(func(index: int) -> void:
+		Shop.buy(self, index)
+		modals.show_shop() # rebuild: fresh SOLD + affordability state
+		_refresh())
+	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
 		stock.append(id) # reinforce is free (money-and-shop/02)
 		modals.show_reinforce())
@@ -1424,6 +1434,13 @@ func _connect_modals() -> void:
 		pending_reinforce = false
 		_refresh())
 	modals.preview_closed.connect(func() -> void: preview_open = false)
+
+
+## Shop entry: player's turn only, never over another modal.
+func _open_shop() -> void:
+	if state != State.PLAYER_TURN or box_open or preview_open or win_open:
+		return
+	modals.show_shop()
 
 
 func _show_win_screen() -> void:

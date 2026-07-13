@@ -55,13 +55,14 @@ func _init() -> void:
 	var b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["ability_cost"]})
 	await process_frame
+	b.money = 500 # tariffs charge money now (money-and-shop/02)
 	b.items.append(_item("extraction", "tile"))
 	b._use_item(0) # start targeting
 	b._use_item(0) # tap again: cancel
-	check(b.score == 500, "cancelled item charges no ability tariff")
+	check(b.money == 500, "cancelled item charges no ability tariff")
 	b._use_item(0)
 	b._item_click(Vector2i(2, 2)) # complete the use
-	check(b.score == 500 - Tuning.TARIFF_ACTION_COST,
+	check(b.money == 500 - Tuning.TARIFF_ACTION_COST,
 		"completed item charges the ability tariff once")
 	b.queue_free()
 	await process_frame
@@ -71,12 +72,13 @@ func _init() -> void:
 	var c := _boot({"board": [["queen", 0, 2, 2], ["knight", 0, 5, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["long_range_cost"]})
 	await process_frame
+	c.money = 500
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
-	check(c.score == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
+	check(c.money == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
 		"riding 3 squares charges 3x the long-range tariff")
-	var score_after: int = c.score
+	var money_after: int = c.money
 	c._move_player(Vector2i(5, 2), Vector2i(6, 4)) # knight leap
-	check(c.score == score_after, "leaps stay exempt from the long-range tariff")
+	check(c.money == money_after, "leaps stay exempt from the long-range tariff")
 	c.queue_free()
 	await process_frame
 

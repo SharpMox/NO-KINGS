@@ -1,6 +1,6 @@
 # 02 — Money pays, score is up-only
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

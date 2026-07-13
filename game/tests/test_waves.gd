@@ -96,14 +96,13 @@ func _init() -> void:
 	await process_frame
 	r._queue_wave(11)
 	check(r.pending_reinforce, "clearing wave 10 pends the reinforcement shop")
-	r.autoplay = true # bot path: buys cheapest, keeps a reserve
+	r.autoplay = true # bot path: the panel is free, grab the cheapest offers
 	var stock0: int = r.stock.size()
 	var score0: int = r.score
 	r._begin_player_turn()
 	check(not r.pending_reinforce, "the bot consumes the pending shop")
-	check(r.stock.size() > stock0 and r.score < score0,
-		"the bot bought reinforcements (stock +%d, score %d->%d)" \
-		% [r.stock.size() - stock0, score0, r.score])
+	check(r.stock.size() == stock0 + 4 and r.score == score0,
+		"the bot restocked for free (stock +%d)" % (r.stock.size() - stock0))
 	r._queue_wave(12)
 	check(not r.pending_reinforce, "non-milestone waves pend no shop")
 	r.queue_free()

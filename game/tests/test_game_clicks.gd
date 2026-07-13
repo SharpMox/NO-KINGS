@@ -451,6 +451,43 @@ func _init() -> void:
 	check(game.items.is_empty() and game.actions_left == inv_acts + 1,
 		"Blitz used from the drawer (net +1 action)")
 
+	# Shop: bottom-row button opens the modal; an enabled Buy purchases a
+	# piece for money + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "money": 500}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	await process_frame
+	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
+		"the shop modal opens")
+	var buy_btn: Button = null # first ENABLED Buy — piece rows in this slice
+	var to_visit: Array = [game.modals.shop_panel]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is Button and n.text == "Buy" and not (n as Button).disabled:
+			buy_btn = n
+			break
+		to_visit.append_array(n.get_children())
+	check(buy_btn != null, "an enabled Buy exists (piece rows)")
+	game.modals.shop_scroll.ensure_control_visible(buy_btn)
+	await process_frame
+	var sh_stock: int = game.stock.size()
+	var sh_money: int = game.money
+	var sh_acts: int = game.actions_left
+	_click(buy_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.stock.size() == sh_stock + 1 and game.money < sh_money
+			and game.actions_left == sh_acts - 1,
+		"shop Buy adds the piece and debits money + one action")
+	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
+	await process_frame
+	check(not game.modals.shop_panel.visible, "the shop modal closes")
+
 	# reinforcement shop: opens pending at turn start, Buy is free and adds
 	# to stock, Done hands the turn back
 	game.queue_free()

@@ -20,6 +20,7 @@ signal item_pressed(index: int)
 signal promote_pressed(id: String, cap: bool)
 signal return_to_stock_pressed
 signal drawer_changed
+signal shop_pressed
 signal menu_toggled(open: bool)
 
 var g # the Game node — read-only from here; mutations go up via signals
@@ -30,6 +31,7 @@ var money_label := Label.new() # spendable currency (score is the metric)
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
+var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
 var tariff_button := Button.new() # top-row tariff count; opens the overlay
@@ -88,7 +90,7 @@ func build(game) -> void:
 		menu_toggled.emit(true))
 	add_child(menu_btn)
 
-	# bottom: action count above the button row (Stock / Inventory / PASS)
+	# bottom: action count above the button row (Stock / Inventory / Shop / PASS)
 	turn_label.position = Vector2(0, vp.y - 70)
 	turn_label.custom_minimum_size = Vector2(vp.x, 0)
 	turn_label.add_theme_font_size_override("font_size", 14)
@@ -116,6 +118,11 @@ func build(game) -> void:
 	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stock_armed.draw.connect(_draw_stock_armed)
 	drawer_buttons["stock"].add_child(stock_armed)
+	shop_button.text = "Shop"
+	shop_button.add_theme_font_size_override("font_size", 17)
+	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
+	bar.add_child(shop_button)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
 	# self_modulate: the red tint must not bleed into the blue counter child

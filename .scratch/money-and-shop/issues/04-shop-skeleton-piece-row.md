@@ -1,6 +1,6 @@
 # 04 — Shop skeleton + piece row
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

@@ -44,6 +44,11 @@ const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
 const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)
 const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless
 const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
+# Shop prices (money-and-shop PRD; playtest placeholders on the x10 economy —
+# income is thin, so they sit low; piece slots charge the catalog value)
+const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}
+const SHOP_TRINKET_PRICE := 100
+const SHOP_BOX_PRICE := 50
 const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;

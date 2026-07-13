@@ -1,6 +1,6 @@
 # 03 — Inventory drawer merge
 
-Status: needs-triage
+Status: done
 
 ## Parent
 

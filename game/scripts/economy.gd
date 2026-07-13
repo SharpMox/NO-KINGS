@@ -7,10 +7,10 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 
 
-## Score cost charged when a tariffed action happens.
+## Money cost charged when a tariffed action happens.
 static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
 	if tariff_on(g, key):
-		g.score = maxi(g.score - amount, 0)
+		g.money = maxi(g.money - amount, 0)
 
 
 ## Award a gain: score counts the raw amount (up-only performance metric),
@@ -99,7 +99,7 @@ static func apply_tariff(g, t: Dictionary) -> void:
 			"asset_seizure":
 				g.stock.clear()
 			"asset_freeze":
-				g.score /= 2
+				g.money /= 2
 			"hostile_takeover":
 				var mine: Array[Vector2i] = g._player_pieces()
 				if not mine.is_empty():

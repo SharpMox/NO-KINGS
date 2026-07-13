@@ -74,19 +74,10 @@ static func try_merge(g) -> bool:
 	return false
 
 
-## Bot version: cheapest pieces first, keeping a 100-score reserve, max 4.
+## Bot version: the panel is free now — grab the 4 cheapest offers.
 static func reinforce(g) -> void:
 	var ids: Array = g._reinforce_ids()
 	ids.sort_custom(func(a: String, b: String) -> bool:
 		return int(g.defs[a].value) < int(g.defs[b].value))
 	for i in 4:
-		var bought := false
-		for id in ids:
-			var cost: int = int(g.defs[id].value)
-			if g.score - cost >= 100:
-				g.score -= cost
-				g.stock.append(id)
-				bought = true
-				break
-		if not bought:
-			return
+		g.stock.append(ids[i % ids.size()])

@@ -5,6 +5,8 @@ extends SceneTree
 
 const GameScript := preload("res://scripts/game.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Tuning := preload("res://scripts/tuning.gd")
+const Items := preload("res://data/items.gd")
 
 var fails := 0
 
@@ -33,6 +35,43 @@ func _init() -> void:
 	Economy.earn(game, 100)
 	check(game.score == 150, "Inflation never touches score")
 	check(game.money == 140, "Inflation taxes money (-10% per stack)")
+
+	# --- every former score cost hits money instead (issue 02) ---
+	var s: int = game.score
+	var m: int = game.money
+	game.stock.append("pawn")
+	game.actions_left = 2
+	game._place("pawn", Vector2i(0, 0))
+	check(game.score == s, "placement never touches score")
+	check(game.money == m - Tuning.PLACEMENT_COST, "placement debits money")
+
+	Economy.activate_tariff_by_key(game, "move_cost")
+	s = game.score
+	m = game.money
+	Economy.charge(game, "move_cost")
+	check(game.score == s, "tariff charges never touch score")
+	check(game.money == m - Tuning.TARIFF_ACTION_COST, "tariff charges debit money")
+
+	s = game.score
+	m = game.money
+	for it in Items.ITEMS:
+		if it.key == "resupply_drop":
+			game.items.append(it)
+	game._use_item(game.items.size() - 1)
+	check(game.score == s, "Resupply Drop never touches score")
+	check(game.money == m + Tuning.PLACEMENT_COST, "Resupply Drop refunds money")
+
+	m = game.money
+	Economy.activate_tariff_by_key(game, "asset_freeze")
+	check(game.score == s, "Asset Freeze never touches score")
+	check(game.money == m / 2, "Asset Freeze halves money")
+
+	s = game.score
+	m = game.money
+	var stock_n: int = game.stock.size()
+	game.modals.reinforce_buy_pressed.emit("pawn")
+	check(game.stock.size() == stock_n + 1, "reinforce buy adds the piece")
+	check(game.score == s and game.money == m, "reinforce buys are free")
 
 	game.queue_free()
 	await process_frame

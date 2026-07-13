@@ -40,7 +40,7 @@ else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
 fi
 
-for t in rules save assets waves endless armies scores items box scenarios; do
+for t in rules save assets waves endless armies scores money items box scenarios; do
 	run "test_$t" --headless -s "tests/test_$t.gd"
 done
 

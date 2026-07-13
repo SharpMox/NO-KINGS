@@ -427,6 +427,30 @@ func _init() -> void:
 	check(game.board.has(Vector2i(4, 4)) and game.legal_paths.is_empty(),
 		"moving clears the movement-shape overlay")
 
+	# Inventory: one button opens a drawer holding both strips; items still
+	# usable from it (money-and-shop/03)
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz"], "trinkets": ["greed"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 2"),
+		"Inventory button opens the drawer")
+	await process_frame
+	check(game.drawer_open == "inventory"
+			and game.hud.item_box.is_visible_in_tree()
+			and game.hud.trinket_box.is_visible_in_tree(),
+		"inventory drawer shows items and trinkets together")
+	var inv_acts: int = game.actions_left
+	check(await _click_button_in(game.hud.item_box, "✦Blitz"),
+		"item clickable in the inventory drawer")
+	await process_frame
+	check(game.items.is_empty() and game.actions_left == inv_acts + 1,
+		"Blitz used from the drawer (net +1 action)")
+
 	# reinforcement shop: opens pending at turn start, Buy is free and adds
 	# to stock, Done hands the turn back
 	game.queue_free()

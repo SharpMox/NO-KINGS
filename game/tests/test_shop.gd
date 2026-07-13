@@ -162,6 +162,19 @@ func _init() -> void:
 		"a rolled score option earns raw score + money")
 	check(not game.box_open, "the pick closes the roll modal")
 
+	# reroll cadence (07): every 10th wave reshuffles the shelf and clears
+	# SOLD; other waves leave it alone (reloads keep slots — see test_save)
+	var before := JSON.stringify(game.shop_stock)
+	game._queue_wave(9)
+	check(JSON.stringify(game.shop_stock) == before,
+		"non-milestone waves keep the shop stock")
+	game._queue_wave(10)
+	check(JSON.stringify(game.shop_stock) != before, "wave 10 rerolls the shop")
+	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
+			return sl.sold).is_empty(),
+		"a reroll clears every SOLD flag")
+	check(game.shop_stock.size() == 19, "a reroll restocks all 19 slots")
+
 	game.queue_free()
 	await process_frame
 

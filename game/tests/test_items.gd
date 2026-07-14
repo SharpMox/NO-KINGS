@@ -38,12 +38,13 @@ func _init() -> void:
 	await process_frame
 	a._on_tile_clicked(Vector2i(2, 2)) # select the board pawn (partner glows)
 	check(a.merge_highlights.has("pawn"), "selection highlights its merge partner")
-	a.items.append(_item("extraction", "tile"))
+	a.items.append(_item("asset_recovery", "tile"))
 	a._use_item(0)
-	a._item_click(Vector2i(2, 2)) # extract the selected pawn off the board
+	a._item_click(Vector2i(2, 2)) # duplicate the selected pawn into stock
 	check(a.selected == Vector2i(-1, -1), "item use clears the selection")
 	a._refresh() # would error on a stale board ref
-	check(a.stock.has("pawn"), "extraction still lands the piece in stock")
+	check(a.stock.has("pawn") and a.board.has(Vector2i(2, 2)),
+		"asset recovery copies the board piece into stock")
 	# tap-merge: select the remaining board pawn, tap the stock pawn's partner…
 	# the pool side is covered in the click probe; here merge the pool pair back
 	check(a.merge_highlights.is_empty(), "no selection, no merge highlights")
@@ -56,7 +57,7 @@ func _init() -> void:
 		"wave": 3, "score": 500, "tariffs": ["ability_cost"]})
 	await process_frame
 	b.money = 500 # tariffs charge money now (money-and-shop/02)
-	b.items.append(_item("extraction", "tile"))
+	b.items.append(_item("demote", "tile"))
 	b._use_item(0) # start targeting
 	b._use_item(0) # tap again: cancel
 	check(b.money == 500, "cancelled item charges no ability tariff")
@@ -100,6 +101,39 @@ func _init() -> void:
 	e._item_click(Vector2i(2, 2))
 	check(e.board[Vector2i(2, 2)].id == "inv-sergeant", "invert swaps a piece for its inv- counterpart")
 	e.queue_free()
+	await process_frame
+
+	# --- rapid deployment: ally piece -> a Deploy tile only (zone rows or
+	# tiles touching an ally — Rules.placement_tiles; Notion KEEP desc)
+	var f := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	f.items.append(_item("rapid_deployment", "pair"))
+	f._use_item(0)
+	f._item_click(Vector2i(2, 2)) # stage A: pick the queen
+	check(not f.item_targets.has(Vector2i(6, 9)),
+		"a far empty tile is not a deploy tile")
+	check(f.item_targets.has(Vector2i(0, 0)), "zone tiles are deploy tiles")
+	check(f.item_targets.has(Vector2i(3, 3)),
+		"tiles touching an ally are deploy tiles")
+	f._item_click(Vector2i(0, 0))
+	check(f.board.has(Vector2i(0, 0)) and not f.board.has(Vector2i(2, 2)),
+		"rapid deployment moves the piece")
+	f.queue_free()
+	await process_frame
+
+	# --- radar jamming: strips the buff from a buffed piece; only buffed
+	# pieces are valid targets
+	var h := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 5, "buff"],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	h.items.append(_item("radar_jamming", "tile"))
+	h._use_item(0)
+	check(h.item_targets.size() == 1 and h.item_targets.has(Vector2i(3, 5)),
+		"radar jamming targets only buffed pieces")
+	h._item_click(Vector2i(3, 5))
+	check(not h.board[Vector2i(3, 5)].get("buff", false),
+		"radar jamming strips the buff")
+	h.queue_free()
 	await process_frame
 
 	print("---")

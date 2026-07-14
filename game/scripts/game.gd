@@ -119,15 +119,11 @@ var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
-var free_placements := 0 # Field Orders
-var ceasefire_turns := 0 # Cease Fire: clock paused while > 0
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
-var recent_place_costs: Array = [] # last 3 paid placement costs (Resupply Drop)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_seen: Array = [] # every activation, for the end screens
 var sanctioned_id := "" # Sanctions: piece type barred from placement
-var counter_intel_turns := 0 # Counter-Intel: tariffs suppressed while > 0
 var rng := RandomNumberGenerator.new()
 
 var autoplay := false
@@ -349,7 +345,7 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if ceasefire_turns <= 0 and not game_menu_open and not win_open: # paused
+		if not game_menu_open and not win_open: # menus pause the clock
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -393,7 +389,6 @@ func _begin_player_turn() -> void:
 	actions_max = actions_left
 	moved_this_turn.clear()
 	turn_action_count = 0
-	counter_intel_turns = maxi(counter_intel_turns - 1, 0)
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		WaveLogic.queue(self, wave + 1)
@@ -425,7 +420,6 @@ func _enemy_turn() -> void:
 	_item_reset()
 	_refresh()
 	turns_since_wave += 1
-	ceasefire_turns = maxi(ceasefire_turns - 1, 0)
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
 		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
@@ -818,14 +812,8 @@ func _place(id: String, tile: Vector2i, cap := false) -> void:
 		var cost := Tuning.PLACEMENT_COST
 		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
-		if free_placements > 0: # Field Orders
-			free_placements -= 1
-			cost = 0
 		Economy.charge(self, "deploy_cost")
 		money = maxi(money - cost, 0)
-		recent_place_costs.append(cost)
-		if recent_place_costs.size() > 3:
-			recent_place_costs.pop_front()
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -1063,42 +1051,11 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			actions_left += 2 # costs 1 to use -> net +1, the item's old value
 			actions_max += 2
 		"asset_recovery":
-			if not captured.is_empty():
-				captured.append(captured[rng.randi() % captured.size()])
-		"field_orders":
-			free_placements += 2
-		"cease_fire":
-			ceasefire_turns += 2
+			stock.append(board[b].id) # copy a board piece into stock
 		"surprise_attack":
 			skip_enemy_turns += 1
-		"suppressing_fire":
-			turns_since_wave -= 3
-		"cluster_bomb":
-			var foes: Array[Vector2i] = []
-			for pos in board:
-				if board[pos].owner == Rules.ENEMY and board[pos].id != "king":
-					foes.append(pos)
-			foes.shuffle()
-			for pos in foes.slice(0, 3):
-				_destroy(pos)
-		"conscription":
-			var pawns: Array[Vector2i] = []
-			for pos in board:
-				if board[pos].owner == Rules.PLAYER and board[pos].id == "pawn":
-					pawns.append(pos)
-			pawns.sort_custom(func(p: Vector2i, q: Vector2i) -> bool: return p.y > q.y)
-			for pos in pawns:
-				var ahead := pos + Vector2i(0, 1)
-				if Rules.in_bounds(ahead) and not board.has(ahead):
-					_add_slide(pos, ahead)
-					board[ahead] = board[pos]
-					board.erase(pos)
-		"resupply_drop":
-			for c in recent_place_costs:
-				money += c
-			recent_place_costs.clear()
-		"counter_intel":
-			counter_intel_turns += 2
+		"radar_jamming":
+			board[b].erase("buff")
 		"demote":
 			board[b].id = "pawn"
 		"promote":
@@ -1107,21 +1064,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
 			_destroy(b)
-		"extraction":
-			stock.append(board[b].id)
-			board.erase(b)
-		"drone_strike":
-			for dx in [0, 1]:
-				for dy in [0, 1]:
-					var pos := b + Vector2i(dx, dy)
-					if board.has(pos) and board[pos].id != "king":
-						_destroy(pos)
-		"bombing_run":
-			for x in Tuning.BOARD_W:
-				var pos := Vector2i(x, b.y)
-				if board.has(pos) and board[pos].id != "king":
-					_destroy(pos)
-		"tactical_reposition", "rapid_deployment", "forced_march":
+		"tactical_reposition", "rapid_deployment":
 			_add_slide(a, b)
 			board[b] = board[a]
 			board.erase(a)

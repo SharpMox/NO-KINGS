@@ -36,8 +36,7 @@ func _init() -> void:
 		"score": 470, "money": 35, "clock_s": 812.5,
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
 			{"kind": "box", "key": "box", "sold": false}],
-		"free_placements": 1, "ceasefire_turns": 2, "counter_intel_turns": 1,
-		"recent_place_costs": [20, 0, 20],
+		"skip_enemy_turns": 1,
 	}
 	var a := _boot(rich)
 	await process_frame
@@ -69,8 +68,7 @@ func _init() -> void:
 	check(b.tariffs_active.size() == 3, "tariff stacks restored")
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")
 	check(b.board.size() >= 5, "pending pieces landed on the board")
-	check(b.ceasefire_turns == 2 and b.free_placements == 1 and b.counter_intel_turns == 1,
-		"item counters restored")
+	check(b.skip_enemy_turns == 1, "item counters restored")
 	var buffed := 0
 	for pos in b.board:
 		if b.board[pos].get("buff", false):

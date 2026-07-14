@@ -1,60 +1,37 @@
-## Items + Trinket Effects, from the Notion GDD catalogs (fetched 2026-07-02).
-## Only entries implementable against current systems are included; exclusions
-## and their reasons are listed at the bottom.
+## Items + Trinket Effects, from the Notion GDD catalogs (STATUS triage
+## synced 2026-07-14: only KEEP items ship; REWORK/REMOVE entries deleted).
+## Exclusions and their reasons are listed at the bottom.
 ##
 ## Item fields: key, name, tier, description, target:
 ##   "" (instant) · "tile" (pick one tile) · "pair" (pick a piece, then a destination)
 
 const ITEMS: Array = [
 	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "",
-		"description": "Gain 2 actions this turn."},
-	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "",
-		"description": "Duplicate a random piece in your Captured Stock."},
-	{"key": "field_orders", "name": "Field Orders", "tier": "Tactical", "target": "",
-		"description": "Your next 2 piece placements cost no money."},
+		"description": "Gain an additional move action for the turn."},
+	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "tile",
+		"description": "Duplicate a piece on the board to your Stock."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",
 		"description": "Convert a target piece (ally or enemy) to a Pawn."},
 	{"key": "promote", "name": "Promote", "tier": "Tactical", "target": "tile",
 		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
 	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",
 		"description": "Invert a target piece's move/capture pattern (only pieces with a defined inverse)."},
-	{"key": "air_strike", "name": "Air Strike", "tier": "Strategic", "target": "tile",
-		"description": "Destroy a target enemy piece; no score, no capture. Not the King."},
-	{"key": "sniper", "name": "Sniper", "tier": "Strategic", "target": "tile",
-		"description": "Destroy an enemy piece one of your pieces could capture. Not the King."},
-	{"key": "extraction", "name": "Extraction", "tier": "Tactical", "target": "tile",
-		"description": "Return one of your board pieces to your Stock."},
-	{"key": "cease_fire", "name": "Cease Fire", "tier": "Tactical", "target": "",
-		"description": "Pause the chess clock for your next 2 player turns."},
-	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",
-		"description": "The enemy skips its next turn."},
-	{"key": "suppressing_fire", "name": "Suppressing Fire", "tier": "Strategic", "target": "",
-		"description": "Push the next wave's spawn back 3 turns."},
 	{"key": "tactical_reposition", "name": "Tactical Reposition", "tier": "Tactical", "target": "pair",
-		"description": "Move any piece (ally or enemy) 1 square to an empty tile."},
-	{"key": "drone_strike", "name": "Drone Strike", "tier": "Decisive", "target": "tile",
-		"description": "Destroy all pieces in a 2x2 area (allies too). Kings unaffected."},
-	{"key": "cluster_bomb", "name": "Cluster Bomb", "tier": "Decisive", "target": "",
-		"description": "Destroy 3 random enemy pieces. Not the King."},
-	{"key": "conscription", "name": "Conscription", "tier": "Strategic", "target": "",
-		"description": "All your Pawns advance 1 square (where empty)."},
-	{"key": "bombing_run", "name": "Bombing Run", "tier": "Decisive", "target": "tile",
-		"description": "Destroy every piece in a target row (allies too). Kings unaffected."},
+		"description": "Move target ally or enemy piece 1 square."},
+	{"key": "air_strike", "name": "Air Strike", "tier": "Strategic", "target": "tile",
+		"description": "Destroy a target enemy piece on the board. No score awarded. Cannot target the King."},
+	{"key": "sniper", "name": "Sniper", "tier": "Strategic", "target": "tile",
+		"description": "Destroy a target enemy piece that could be captured by one of your pieces. Cannot target the King."},
+	{"key": "radar_jamming", "name": "Radar Jamming", "tier": "Strategic", "target": "tile",
+		"description": "Remove target's piece Buffs and/or Debuffs."},
 	{"key": "rapid_deployment", "name": "Rapid Deployment", "tier": "Strategic", "target": "pair",
-		"description": "Move one of your pieces to any empty tile."},
+		"description": "Move a target ally piece to any Deploy tile on the board."},
 	{"key": "decoy_swap", "name": "Decoy Swap", "tier": "Strategic", "target": "pair",
-		"description": "Swap the positions of any two pieces."},
-	{"key": "resupply_drop", "name": "Resupply Drop", "tier": "Tactical", "target": "",
-		"description": "Refund the money cost of your last 3 placements."},
-	{"key": "forced_march", "name": "Forced March", "tier": "Strategic", "target": "pair",
-		"description": "Move any piece up to 3 squares in a straight clear line."},
-	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
-		"description": "Disable all tariffs for the next 2 turns."},
+		"description": "Swap the positions of any two pieces on the board (ally or enemy, in any combination)."},
+	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",
+		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
 ]
 
-## Trinkets: run-long passives. `key` is matched in game.gd hooks.
-## Vague upstream Notes are pinned to concrete MVP behavior here — amounts are
-## assumptions to tune, noted per entry.
 const TRINKET_EFFECTS: Array = [
 	{"key": "first_capture_extra", "name": "First-Capture Extra Action",
 		"description": "If your first action of a turn is a capture, gain an extra action."},
@@ -72,8 +49,8 @@ const TRINKET_EFFECTS: Array = [
 		"description": "+30 score when capturing a piece worth 50+."},
 ]
 
-## Excluded from MVP (reason):
-## - Buff Box (Item): depends on the Piece Buffs system, cut from MVP.
-## - Radar Jamming (Item): enemies have no abilities in MVP — dead effect.
+## Excluded (reason):
+## - REWORK/REMOVE items (STATUS triage 2026-07-14): deleted here; the Notion
+##   Items DB is the source of truth for their return.
 ## - Capture Everything (Trinket): scope TBD upstream.
 ## - Obstacle (Trinket): no obstacle system in MVP.

@@ -50,13 +50,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g._begin_player_turn()
 	# item-effect counters restore AFTER the turn reset (a save is always taken
 	# at a turn start, so move/place/merge budgets are simply fresh)
-	g.free_placements = int(cfg.get("free_placements", 0))
-	g.ceasefire_turns = int(cfg.get("ceasefire_turns", 0))
 	g.skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
-	g.counter_intel_turns = int(cfg.get("counter_intel_turns", 0))
-	g.recent_place_costs.clear()
-	for c in cfg.get("recent_place_costs", []):
-		g.recent_place_costs.append(int(c)) # JSON numbers arrive as floats
 
 
 ## The inverse of apply(): the live run as a JSON-safe config Dictionary.
@@ -85,7 +79,5 @@ static func to_config(g) -> Dictionary:
 		"score": g.score, "money": g.money, "clock_s": g.clock_ms / 1000.0,
 		"shop_stock": g.shop_stock.duplicate(true),
 		"sanctioned_id": g.sanctioned_id,
-		"free_placements": g.free_placements, "ceasefire_turns": g.ceasefire_turns,
-		"skip_enemy_turns": g.skip_enemy_turns, "counter_intel_turns": g.counter_intel_turns,
-		"recent_place_costs": g.recent_place_costs.duplicate(),
+		"skip_enemy_turns": g.skip_enemy_turns,
 	}

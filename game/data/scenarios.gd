@@ -85,10 +85,9 @@ static func all() -> Array:
 		{"name": "Items: full inventory", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 0, 1, 1],
 				["pawn", 1, 2, 6], ["bishop", 1, 4, 6], ["rook", 1, 1, 8], ["knight", 1, 3, 8]],
-			"items": ["blitz", "sniper", "air_strike", "demote", "extraction", "cease_fire",
-				"surprise_attack", "suppressing_fire", "tactical_reposition", "drone_strike",
-				"cluster_bomb", "conscription", "bombing_run", "rapid_deployment", "decoy_swap",
-				"forced_march", "field_orders", "asset_recovery", "resupply_drop", "counter_intel"],
+			"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert",
+				"surprise_attack", "tactical_reposition", "rapid_deployment",
+				"decoy_swap", "asset_recovery", "radar_jamming"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		{"name": "Trinkets: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],

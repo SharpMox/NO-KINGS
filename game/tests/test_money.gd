@@ -6,7 +6,6 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
-const Items := preload("res://data/items.gd")
 
 var fails := 0
 
@@ -51,15 +50,6 @@ func _init() -> void:
 	Economy.charge(game, "move_cost")
 	check(game.score == s, "tariff charges never touch score")
 	check(game.money == m - Tuning.TARIFF_ACTION_COST, "tariff charges debit money")
-
-	s = game.score
-	m = game.money
-	for it in Items.ITEMS:
-		if it.key == "resupply_drop":
-			game.items.append(it)
-	game._use_item(game.items.size() - 1)
-	check(game.score == s, "Resupply Drop never touches score")
-	check(game.money == m + Tuning.PLACEMENT_COST, "Resupply Drop refunds money")
 
 	m = game.money
 	Economy.activate_tariff_by_key(game, "asset_freeze")

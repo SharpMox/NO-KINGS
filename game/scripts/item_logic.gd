@@ -32,11 +32,11 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return enemy and not king
 			"sniper":
 				return enemy and not king and Rules.is_attacked(board, pos, Rules.PLAYER, defs)
-			"extraction":
-				return own
-			"drone_strike", "bombing_run":
-				return true
-			"tactical_reposition", "decoy_swap", "forced_march":
+			"asset_recovery":
+				return occupied and not king
+			"radar_jamming":
+				return occupied and board[pos].get("buff", false)
+			"tactical_reposition", "decoy_swap":
 				return occupied and not king
 			"rapid_deployment":
 				return own
@@ -44,20 +44,8 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 		match key:
 			"tactical_reposition":
 				return not occupied and pos.distance_to(a) < 1.5 and pos != a
-			"rapid_deployment":
-				return not occupied
+			"rapid_deployment": # Deploy tiles: zone rows or touching an ally
+				return Rules.placement_tiles(board).has(pos)
 			"decoy_swap":
 				return occupied and not king and pos != a
-			"forced_march":
-				var d := pos - a
-				if pos == a or occupied:
-					return false
-				var steps := maxi(absi(d.x), absi(d.y))
-				if steps > 3 or (d.x != 0 and d.y != 0 and absi(d.x) != absi(d.y)):
-					return false
-				var step := d.sign()
-				for s in range(1, steps): # path must be clear
-					if board.has(a + step * s):
-						return false
-				return true
 	return false

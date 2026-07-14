@@ -22,8 +22,6 @@ static func earn(g, amount: int) -> void:
 
 ## Money gains pass through Inflation (-10% per stack, rounded down).
 static func gain(g, amount: int) -> int:
-	if g.counter_intel_turns > 0:
-		return amount
 	var out := float(amount)
 	for t in g.tariffs_active:
 		if t.key == "inflation":
@@ -122,8 +120,6 @@ static func apply_tariff(g, t: Dictionary) -> void:
 
 
 static func tariff_on(g, key: String) -> bool:
-	if g.counter_intel_turns > 0:
-		return false
 	for t in g.tariffs_active:
 		if t.key == key:
 			return true

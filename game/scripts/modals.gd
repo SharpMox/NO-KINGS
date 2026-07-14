@@ -388,13 +388,6 @@ func show_tariffs() -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	if g.counter_intel_turns > 0:
-		var off := Label.new()
-		off.text = "Counter-Intel: all tariffs suppressed for %d turns" % g.counter_intel_turns
-		off.add_theme_font_size_override("font_size", 14)
-		off.modulate = Color(0.6, 1.0, 0.8)
-		off.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(off)
 	if g.tariffs_active.is_empty():
 		var none := Label.new()
 		none.text = "none yet — they land every 10th wave"

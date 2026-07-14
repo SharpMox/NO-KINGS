@@ -247,8 +247,7 @@ func refresh() -> void:
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.trinkets.size())
-	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
-			+ ("·off" if g.counter_intel_turns > 0 and not g.tariffs_active.is_empty() else "")
+	tariff_button.text = "⚠%d" % g.tariffs_active.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
 	_rebuild_trinket_strip()

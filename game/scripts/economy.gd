@@ -22,6 +22,8 @@ static func earn(g, amount: int) -> void:
 
 ## Money gains pass through Inflation (-10% per stack, rounded down).
 static func gain(g, amount: int) -> int:
+	if g.tariffs_suppressed: # Counter-Intel pauses persistent tariffs too
+		return amount
 	var out := float(amount)
 	for t in g.tariffs_active:
 		if t.key == "inflation":
@@ -120,6 +122,8 @@ static func apply_tariff(g, t: Dictionary) -> void:
 
 
 static func tariff_on(g, key: String) -> bool:
+	if g.tariffs_suppressed: # Counter-Intel (CONTEXT.md: Tariff suppression)
+		return false
 	for t in g.tariffs_active:
 		if t.key == key:
 			return true

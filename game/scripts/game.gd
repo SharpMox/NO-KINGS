@@ -122,6 +122,7 @@ var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
+var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
 var sanctioned_id := "" # Sanctions: piece type barred from placement
 var rng := RandomNumberGenerator.new()
@@ -1054,6 +1055,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			stock.append(board[b].id) # copy a board piece into stock
 		"surprise_attack":
 			skip_enemy_turns += 1
+		"counter_intel":
+			tariffs_suppressed = true
 		"radar_jamming":
 			board[b].erase("buff")
 		"demote":

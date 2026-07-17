@@ -12,6 +12,7 @@ const Shop := preload("res://scripts/shop.gd")
 static func queue(g, n: int) -> void:
 	g.wave = n
 	g.turns_since_wave = 0
+	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
 		g.pending_reinforce = true

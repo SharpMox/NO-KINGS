@@ -42,6 +42,8 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return own
 			"drone_strike": # any tile anchors the 3x3
 				return true
+			"extraction": # multi: any of your board pieces
+				return own
 	else: # stage B of a pair
 		match key:
 			"tactical_reposition":

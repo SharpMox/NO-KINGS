@@ -336,7 +336,14 @@ func _rebuild_item_strip() -> void:
 		c.queue_free()
 	for i in g.items.size():
 		var btn := Button.new()
-		btn.text = "✦" + g.items[i].name
+		if g.item_icons.has(g.items[i].key):
+			btn.icon = g.item_icons[g.items[i].key]
+			# icon_max_width clamps AND reserves layout space; expand_icon
+			# would let the icon collapse to 0 in a packed strip
+			btn.add_theme_constant_override("icon_max_width", 30)
+			btn.text = g.items[i].name
+		else:
+			btn.text = "✦" + g.items[i].name
 		btn.tooltip_text = "%s (%s)\n%s" % [g.items[i].name, g.items[i].tier, g.items[i].description]
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)

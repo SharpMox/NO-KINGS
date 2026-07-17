@@ -445,7 +445,7 @@ func _init() -> void:
 			and game.hud.trinket_box.is_visible_in_tree(),
 		"inventory drawer shows items and trinkets together")
 	var inv_acts: int = game.actions_left
-	check(await _click_button_in(game.hud.item_box, "✦Blitz"),
+	check(await _click_button_in(game.hud.item_box, "Blitz"),
 		"item clickable in the inventory drawer")
 	await process_frame
 	check(game.items.is_empty() and game.actions_left == inv_acts + 1,
@@ -463,7 +463,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Drone Strike")
 	await process_frame # let the drawer lay out before clicking into it
-	check(await _click_button_in(game.hud.item_box, "✦Drone Strike"),
+	check(await _click_button_in(game.hud.item_box, "Drone Strike"),
 		"Drone Strike clickable in the drawer")
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
@@ -488,7 +488,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Extraction")
 	await process_frame # drawer layout before clicking into it
-	check(await _click_button_in(game.hud.item_box, "✦Extraction"),
+	check(await _click_button_in(game.hud.item_box, "Extraction"),
 		"Extraction clickable in the drawer")
 	await process_frame
 	check(not game.hud.multi_confirm_btn.visible, "no confirm button before any pick")

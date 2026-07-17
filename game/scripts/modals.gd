@@ -276,9 +276,11 @@ func show_shop() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		if slot.kind == "piece" and g.textures.has(slot.key):
+		var slot_tex: Texture2D = g.textures.get(slot.key) if slot.kind == "piece" \
+			else g.item_icons.get(slot.key) if slot.kind == "item" else null
+		if slot_tex != null:
 			var tex := TextureRect.new()
-			tex.texture = g.textures[slot.key]
+			tex.texture = slot_tex
 			tex.custom_minimum_size = Vector2(30, 30)
 			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -452,6 +454,9 @@ func show_box(options: Array) -> void:
 			"score":
 				header = "★ %s" % opt.name
 		b.text = header + "\n" + opt.description
+		if opt.kind == "item" and g.item_icons.has(opt.payload.key):
+			b.icon = g.item_icons[opt.payload.key]
+			b.add_theme_constant_override("icon_max_width", 30)
 		b.add_theme_font_size_override("font_size", 16)
 		b.custom_minimum_size = Vector2(420, 0)
 		b.pressed.connect(func() -> void: box_chosen.emit(opt))

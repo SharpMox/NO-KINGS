@@ -27,7 +27,8 @@ func _boot(cfg: Dictionary) -> Node2D:
 func _init() -> void:
 	var rich := {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1, "buff"], ["rook", 1, 4, 10]],
-		"stock": ["pawn", "ferz"], "captured": ["knight", "knight", "bishop"],
+		"stock": ["pawn", {"id": "ferz", "buff": true}],
+		"captured": ["knight", "knight", "bishop"],
 		"items": ["blitz", "sniper"], "trinkets": ["greed", "greed", "move"],
 		"tariffs": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
@@ -70,6 +71,8 @@ func _init() -> void:
 	check(b.board.size() >= 5, "pending pieces landed on the board")
 	check(b.skip_enemy_turns == 1, "item counters restored")
 	check(b.tariffs_suppressed, "counter-intel suppression restored")
+	check(b.stock.has({"id": "ferz", "buff": true}) and b.stock.has("pawn"),
+		"mixed String/Dictionary stock survives the JSON round-trip (ADR-0002)")
 	var buffed := 0
 	for pos in b.board:
 		if b.board[pos].get("buff", false):

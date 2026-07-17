@@ -83,8 +83,9 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		if ref is Vector2i:
 			result_tile = ref # later selections win
 			g.board.erase(ref)
-		else: # a unit from a stack: remove one copy by value
-			(g.captured if ref.cap else g.stock).erase(ref.id)
+		else: # a unit from a stack: remove one copy by value — the exact entry,
+			# so a stateful copy is consumed and its state discarded (ADR-0002)
+			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
 	if result_tile.x >= 0:
 		g.board[result_tile] = {"id": result, "owner": Rules.PLAYER}
 		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2

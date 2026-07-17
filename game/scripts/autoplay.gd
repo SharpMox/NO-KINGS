@@ -49,6 +49,10 @@ static func use_item(g) -> void:
 	if targets.is_empty():
 		g.items.remove_at(index) # discard unusable (e.g. sniper with no valid mark)
 		return
+	if it.target == "multi": # pick one random piece and confirm
+		g._use_item(index)
+		g.item_selected.append(targets[g.rng.randi() % targets.size()])
+		return g._item_confirm_multi()
 	if it.target == "pair":
 		a = targets[g.rng.randi() % targets.size()]
 		targets = g._item_stage_targets(it, a)
@@ -62,10 +66,10 @@ static func use_item(g) -> void:
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.
 static func try_merge(g) -> bool:
 	var units := []
-	for id in g.stock:
-		units.append({"id": id, "cap": false})
+	for e in g.stock:
+		units.append({"id": (e if e is String else e.id), "cap": false, "entry": e})
 	for id in g.captured:
-		units.append({"id": id, "cap": true})
+		units.append({"id": id, "cap": true, "entry": id})
 	for i in units.size():
 		for j in range(i + 1, units.size()):
 			if MergeLogic.pair_ok(g, units[i].id, units[j].id):

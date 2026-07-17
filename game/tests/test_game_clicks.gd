@@ -476,6 +476,32 @@ func _init() -> void:
 			and game.items.is_empty(),
 		"anchor re-click confirms the strike")
 
+	# Extraction: multi targeting by real clicks — taps toggle picks, the
+	# floating Extract button confirms (rework-items/03)
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
+		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Extraction")
+	await process_frame # drawer layout before clicking into it
+	check(await _click_button_in(game.hud.item_box, "✦Extraction"),
+		"Extraction clickable in the drawer")
+	await process_frame
+	check(not game.hud.multi_confirm_btn.visible, "no confirm button before any pick")
+	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.hud.multi_confirm_btn.visible and game.hud.multi_confirm_btn.text == "Extract 1",
+		"picking a piece shows the Extract confirm")
+	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
+	await process_frame
+	check(not game.board.has(Vector2i(4, 4)) and game.stock.has("knight")
+			and game.items.is_empty(),
+		"Extract click returns the pick to Stock")
+
 	# Shop: bottom-row button opens the modal; an enabled Buy purchases a
 	# piece for money + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
 	game.queue_free()

@@ -116,6 +116,7 @@ var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
 var merge_highlights := {} # ids that complete a merge with the current selection
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
+var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 var trinkets: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
 var pass_after_box := false # auto-pass deferred until the pick resolves
@@ -196,6 +197,10 @@ func _ready() -> void:
 			if ResourceLoader.exists(path):
 				textures[id] = load(path)
 				break
+	for it in Items.ITEMS: # item glyphs (picked 2026-07-17, .scratch/item-icons)
+		var path := "res://assets/items/%s.svg" % it.key
+		if ResourceLoader.exists(path):
+			item_icons[it.key] = load(path)
 	rng.randomize()
 	add_child(hud)
 	hud.build(self)

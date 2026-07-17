@@ -451,6 +451,31 @@ func _init() -> void:
 	check(game.items.is_empty() and game.actions_left == inv_acts + 1,
 		"Blitz used from the drawer (net +1 action)")
 
+	# Drone Strike: area targeting by real clicks — anchor previews the 3x3,
+	# tapping the anchor again confirms the wipe (rework-items/02)
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4],
+		["pawn", 1, 5, 5], ["rook", 1, 7, 10]], "wave": 3, "items": ["drone_strike"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Drone Strike")
+	await process_frame # let the drawer lay out before clicking into it
+	check(await _click_button_in(game.hud.item_box, "✦Drone Strike"),
+		"Drone Strike clickable in the drawer")
+	await process_frame
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.item_active >= 0 and game.item_targets.size() == 9,
+		"anchor click previews the 3x3")
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(not game.board.has(Vector2i(5, 5)) and not game.board.has(Vector2i(4, 4))
+			and game.items.is_empty(),
+		"anchor re-click confirms the strike")
+
 	# Shop: bottom-row button opens the modal; an enabled Buy purchases a
 	# piece for money + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
 	game.queue_free()

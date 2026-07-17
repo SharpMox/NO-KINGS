@@ -171,6 +171,47 @@ func _init() -> void:
 	cj.queue_free()
 	await process_frame
 
+	# --- drone strike: 3x3 destruction around the confirmed anchor; the King
+	# survives; destruction is not capture (CONTEXT.md: Destruction)
+	var ds := _boot({"board": [["queen", 0, 0, 1], ["pawn", 1, 3, 5], ["bishop", 1, 2, 4],
+		["pawn", 0, 4, 6], ["king", 1, 3, 4], ["rook", 1, 7, 10]],
+		"wave": 3, "trinkets": ["greed", "score"], "score": 100})
+	await process_frame
+	ds.money = 100
+	ds.items.append(_item("drone_strike", "area"))
+	ds._use_item(0)
+	ds._item_click(Vector2i(3, 5)) # anchor: preview only, not spent yet
+	check(not ds.items.is_empty(), "area anchor tap previews without spending")
+	ds._item_click(Vector2i(3, 5)) # confirm
+	check(not ds.board.has(Vector2i(3, 5)) and not ds.board.has(Vector2i(2, 4))
+		and not ds.board.has(Vector2i(4, 6)), "drone strike clears the 3x3 (ally included)")
+	check(ds.board.has(Vector2i(3, 4)), "the King survives a drone strike")
+	check(ds.board.has(Vector2i(7, 10)), "pieces outside the 3x3 survive")
+	check(ds.score == 100 and ds.money == 100, "destruction pays no score, money, or trinket procs")
+	ds.queue_free()
+	await process_frame
+
+	# --- drone strike: corner anchors hang off the board; re-anchor + cancel
+	var de := _boot({"board": [["queen", 0, 5, 5], ["pawn", 1, 0, 0], ["pawn", 1, 1, 1],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	de.items.append(_item("drone_strike", "area"))
+	de._use_item(0)
+	de._item_click(Vector2i(0, 0))
+	check(de.item_targets.size() == 4, "corner preview covers only the on-board 2x2")
+	de._item_click(Vector2i(5, 5)) # far tap re-anchors instead of confirming
+	check(de.items.size() == 1 and de.item_targets.has(Vector2i(4, 4)),
+		"far tap re-anchors the preview")
+	de._use_item(0) # tap the armed item: cancel, unspent
+	check(de.items.size() == 1 and de.item_active == -1, "area cancel leaves the item unspent")
+	de._use_item(0)
+	de._item_click(Vector2i(0, 0))
+	de._item_click(Vector2i(0, 0)) # confirm at the corner
+	check(not de.board.has(Vector2i(0, 0)) and not de.board.has(Vector2i(1, 1)),
+		"corner strike destroys the on-board part")
+	de.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

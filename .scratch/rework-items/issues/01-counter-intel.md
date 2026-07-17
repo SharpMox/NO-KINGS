@@ -1,6 +1,6 @@
 # 01 — Counter-Intel: tariff suppression for the wave
 
-Status: open
+Status: done
 Type: AFK
 
 ## Parent

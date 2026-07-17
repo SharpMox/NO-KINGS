@@ -23,6 +23,21 @@ _Avoid_: "team", "deck", "loadout"
 **Signature piece**:
 The piece (and its merge chain) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
 
+**Tariff**:
+A player penalty activated on every 10th wave per the Wave Catalog. Three kinds: **action** (money surcharge when the taxed action happens), **persistent** (rule modifier for the rest of the run, e.g. Inflation), **oneoff** (applies instantly on activation).
+_Avoid_: "debuff", "curse"
+
+**Tariff suppression**:
+What Counter-Intel does (grilled 2026-07-17): action and persistent tariffs stop applying for the rest of the current wave, ending when the next wave spawns. Oneoff tariffs are untouched — they already fired. Replaces the deleted turn-counted version (`counter_intel_turns`).
+
+**Stock entry**:
+One element of the player's Stock: a bare piece id, or `{id + opaque piece state}` for a piece returned from the board carrying state (e.g. a future buff). Stock never interprets the state — see ADR-0002. Distinct-state copies stack separately in the HUD.
+_Avoid_: "inventory" (that's the items/trinkets drawer), "pool"
+
+**Destruction**:
+An item effect removing a piece from the board outright (Air Strike, Sniper, Drone Strike). Not a capture (grilled 2026-07-17): awards no score or money and fires no per-capture trinket effects; a destroyed ally is gone, not returned to Stock.
+_Avoid_: conflating with "capture" — captures are board moves and feed the economy; destruction never does.
+
 ### Godot domain
 
 **Scene**:

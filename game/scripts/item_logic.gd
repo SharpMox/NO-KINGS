@@ -40,6 +40,8 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return occupied and not king
 			"rapid_deployment":
 				return own
+			"drone_strike": # any tile anchors the 3x3
+				return true
 	else: # stage B of a pair
 		match key:
 			"tactical_reposition":
@@ -48,4 +50,6 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return Rules.placement_tiles(board).has(pos)
 			"decoy_swap":
 				return occupied and not king and pos != a
+			"drone_strike": # preview: the 3x3 around the anchor, on-board part
+				return maxi(absi(pos.x - a.x), absi(pos.y - a.y)) <= 1
 	return false

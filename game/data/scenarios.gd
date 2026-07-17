@@ -87,12 +87,17 @@ static func all() -> Array:
 				["pawn", 1, 2, 6], ["bishop", 1, 4, 6], ["rook", 1, 1, 8], ["knight", 1, 3, 8]],
 			"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert",
 				"surprise_attack", "tactical_reposition", "rapid_deployment",
-				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel"],
+				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel",
+				"drone_strike"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		{"name": "Trinkets: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"trinkets": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
 			"wave": 9, "stock": ["pawn"]}},
+		{"name": "Drone Strike (3x3 wipe, King immune)", "cfg": {
+			"board": [["queen", 0, 1, 1], ["pawn", 0, 4, 6], ["pawn", 1, 3, 5],
+				["bishop", 1, 2, 4], ["king", 1, 3, 4], ["rook", 1, 6, 9]],
+			"items": ["drone_strike"], "wave": 5, "stock": ["pawn"]}},
 		{"name": "Counter-Intel (suppress live tariffs)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
 			"items": ["counter_intel"], "tariffs": ["move_cost", "inflation"],

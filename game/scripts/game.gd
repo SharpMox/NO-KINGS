@@ -1027,9 +1027,15 @@ func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
 
 
 func _item_click(tile: Vector2i) -> void:
-	if not item_targets.has(tile):
-		return
 	var it: Dictionary = items[item_active]
+	if it.target == "area": # any tap re-anchors the preview; the anchor confirms
+		if tile != item_stage_a:
+			item_stage_a = tile
+			item_targets = _item_stage_targets(it, tile)
+			_refresh()
+			return
+	elif not item_targets.has(tile):
+		return
 	if it.target == "pair" and item_stage_a.x < 0:
 		item_stage_a = tile
 		item_targets = _item_stage_targets(it, tile)
@@ -1057,6 +1063,12 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			skip_enemy_turns += 1
 		"counter_intel":
 			tariffs_suppressed = true
+		"drone_strike": # 3x3 around b; the King is unaffected (Destruction)
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					var hit := b + Vector2i(dx, dy)
+					if board.has(hit) and board[hit].id != "king":
+						_destroy(hit)
 		"radar_jamming":
 			board[b].erase("buff")
 		"demote":

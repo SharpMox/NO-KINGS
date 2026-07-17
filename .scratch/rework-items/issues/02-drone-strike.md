@@ -1,6 +1,6 @@
 # 02 — Drone Strike: 3×3 area destruction
 
-Status: open
+Status: done
 Type: AFK
 
 ## Parent

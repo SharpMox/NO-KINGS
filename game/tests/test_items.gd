@@ -6,6 +6,8 @@ extends SceneTree
 
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Economy := preload("res://scripts/economy.gd")
+const WaveLogic := preload("res://scripts/wave_logic.gd")
 
 var fails := 0
 
@@ -134,6 +136,39 @@ func _init() -> void:
 	check(not h.board[Vector2i(3, 5)].get("buff", false),
 		"radar jamming strips the buff")
 	h.queue_free()
+	await process_frame
+
+	# --- counter-intel: suppresses action tariffs for the rest of the wave
+	var ci := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "tariffs": ["move_cost"]})
+	await process_frame
+	ci.money = 500
+	ci.items.append(_item("counter_intel", ""))
+	ci._use_item(0)
+	ci._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(ci.money == 500, "counter-intel suppresses the move tariff")
+	ci.queue_free()
+	await process_frame
+
+	# --- counter-intel: persistent tariffs pause too; the next wave's spawn
+	# ends the suppression (CONTEXT.md: Tariff suppression)
+	var cj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "tariffs": ["move_cost", "inflation"]})
+	await process_frame
+	cj.money = 500
+	cj.items.append(_item("counter_intel", ""))
+	cj._use_item(0)
+	Economy.earn(cj, 10)
+	check(cj.money == 510, "suppressed inflation taxes no gains")
+	cj._refresh()
+	check(cj.hud.tariff_button.text.ends_with("·off"), "HUD marks tariffs suppressed")
+	WaveLogic.spawn(cj, 4)
+	Economy.earn(cj, 10)
+	check(cj.money == 519, "next wave spawn ends the suppression (inflation resumes)")
+	cj._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(cj.money == 519 - Tuning.TARIFF_ACTION_COST,
+		"next wave spawn ends the suppression (move tariff resumes)")
+	cj.queue_free()
 	await process_frame
 
 	print("---")

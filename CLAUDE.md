@@ -7,7 +7,7 @@ A fairy-chess project in two parts:
    graph + merge matrix, promotion/fusion/inversion references, a Betza-notation
    sandbox, and a 100-piece encyclopedia).
 2. **The game** *(in progress)* — a Godot 4 mobile game (Android + iOS) of the same
-   fairy-chess system, bootstrapped in `game/` (Godot 4.6, portrait 480×800). The MVP
+   fairy-chess system, bootstrapped in `game/` (Godot 4.7, portrait 480×800). The MVP
    is being built desktop-first from the plan-file spec; the Notion GDD is the design
    source of truth.
 
@@ -72,7 +72,7 @@ Not started yet. When it is, this is the intended setup:
   shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the change.
 - **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the
   headless sweeps: `godot --path game -s tests/test_menu_clicks.gd` and
-  `-s tests/test_game_clicks.gd` (windowed — Godot 4.6 headless drops GUI picking).
+  `-s tests/test_game_clicks.gd` (windowed — Godot headless still drops GUI picking, re-verified on 4.7).
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.

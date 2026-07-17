@@ -16,6 +16,8 @@ const ITEMS: Array = [
 		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
 	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",
 		"description": "Invert a target piece's move/capture pattern (only pieces with a defined inverse)."},
+	{"key": "extraction", "name": "Extraction", "tier": "Tactical", "target": "multi",
+		"description": "Return any number of your pieces from the board to your Stock."},
 	{"key": "tactical_reposition", "name": "Tactical Reposition", "tier": "Tactical", "target": "pair",
 		"description": "Move target ally or enemy piece 1 square."},
 	{"key": "air_strike", "name": "Air Strike", "tier": "Strategic", "target": "tile",

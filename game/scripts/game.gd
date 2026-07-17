@@ -105,6 +105,9 @@ var drag_reselect := false # the pressed piece was already selected (re-click)
 var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
 var pool_click_ms := 0
 var pool_drag_id := "" # stock piece mid-drag from the strip (game-feel pass)
+var armed_entry: Variant = "" # the exact Stock entry behind placing_id /
+	# pool_drag_id: a bare id String or {id + state} Dictionary (ADR-0002).
+	# Only read while one of those is armed, so no reset bookkeeping.
 var preview_open := false
 var placing_id := ""  # stock piece id being placed, "" = none
 var placing_cap := false # the armed stack is captured stock (merge-only origin)
@@ -119,6 +122,8 @@ var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
+var item_selected: Array[Vector2i] = [] # toggled picks of a "multi" item
+var _extract_sel: Array[Vector2i] = [] # multi selection frozen at confirm
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
@@ -256,7 +261,8 @@ func _clear_selection() -> void:
 	queue_redraw()
 
 
-func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
+func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
+	var id: String = entry if entry is String else entry.id
 	if pool_drag_id != "":
 		# mid-drag: hiding the drawer (drag-out close) force-releases the held
 		# button, which fires a spurious tap inside the visibility cascade and
@@ -276,11 +282,12 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 	pool_click_ms = now
 	# tapping a partner of the current selection completes the merge; a
 	# same-stack pair goes through drag instead (tap-again means deselect)
-	var same_stack := placing_id == id and placing_cap == cap
+	var same_stack: bool = placing_id != "" and armed_entry == entry and placing_cap == cap
 	if not same_stack and merge_highlights.has(id):
-		var unit := {"id": id, "cap": cap}
+		var unit := {"id": id, "cap": cap, "entry": entry}
 		if placing_id != "":
-			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, unit)
+			return MergeLogic.do_merge(self,
+				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, unit)
 		if selected.x >= 0:
 			return MergeLogic.do_merge(self, selected, unit)
 	# select / deselect the stack: arms placement + merging (captured stock
@@ -297,6 +304,7 @@ func _on_stack_pressed(id: String, cap: bool, count: int) -> void:
 			return
 		placing_id = id
 		placing_cap = cap
+		armed_entry = entry
 	_clear_selection()
 	_refresh()
 
@@ -560,7 +568,8 @@ func _on_win_continue() -> void:
 
 ## Press-drag from a stock stack: the piece follows the cursor and drops onto
 ## a valid placement tile. Tapping (release back on the button) still selects.
-func _on_stack_drag_start(id: String, cap: bool) -> void:
+func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
+	var id: String = entry if entry is String else entry.id
 	if box_open or win_open or game_menu_open or preview_open:
 		return
 	if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
@@ -572,6 +581,7 @@ func _on_stack_drag_start(id: String, cap: bool) -> void:
 	_clear_selection()
 	pool_drag_id = id
 	pool_drag_cap = cap
+	armed_entry = entry
 	drawer_autoclosed = ""
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
@@ -610,6 +620,7 @@ func _input(event: InputEvent) -> void:
 		var t := _tile_at(event.position)
 		var id := pool_drag_id
 		var cap := pool_drag_cap
+		var entry: Variant = armed_entry
 		pool_drag_id = ""
 		pool_drag_cap = false
 		# a release inside the open drawer must never hit the board tiles
@@ -622,7 +633,7 @@ func _input(event: InputEvent) -> void:
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
 			get_viewport().set_input_as_handled()
 			drawer_autoclosed = ""
-			return MergeLogic.do_merge(self, {"id": id, "cap": cap}, t)
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap, "entry": entry}, t)
 		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
 		# back on the same stack is a plain tap (arms placement) — same-stack
 		# promotion goes through the ▲ badge instead (2026-07-07)
@@ -631,15 +642,16 @@ func _input(event: InputEvent) -> void:
 				and merge_highlights.has(target.get_meta("id")) \
 				and not (target.get_meta("id") == id and target.get_meta("cap") == cap):
 			get_viewport().set_input_as_handled()
-			return MergeLogic.do_merge(self, {"id": id, "cap": cap},
-				{"id": target.get_meta("id"), "cap": target.get_meta("cap")})
+			return MergeLogic.do_merge(self, {"id": id, "cap": cap, "entry": entry},
+				{"id": target.get_meta("id"), "cap": target.get_meta("cap"),
+					"entry": target.get_meta("entry")})
 		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
 				else Rules.placement_tiles(board).has(t))
 		if placeable and (state == State.SETUP
 				or (state == State.PLAYER_TURN and actions_left > 0)):
 			drawer_autoclosed = ""
-			_place(id, t, cap)
+			_place(entry, t, cap)
 		else: # dropped elsewhere (incl. back on the button = plain tap)
 			if drawer_autoclosed != "": # the drag closed it, nothing happened:
 				_set_drawer.call_deferred(drawer_autoclosed) # give it back
@@ -755,11 +767,12 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		# into it (result on that tile)
 		if board.has(tile) and board[tile].owner == Rules.PLAYER \
 				and merge_highlights.has(board[tile].id):
-			return MergeLogic.do_merge(self, {"id": placing_id, "cap": placing_cap}, tile)
+			return MergeLogic.do_merge(self,
+				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, tile)
 		# captured stock deploys like stock (GDD Captured Stock, wired 2026-07-07)
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
 		if ok and not board.has(tile):
-			_place(placing_id, tile, placing_cap)
+			_place(armed_entry, tile, placing_cap)
 		return
 	if state == State.SETUP: # free repositioning before the game starts
 		if selected.x >= 0 and legal_dests.has(tile):
@@ -801,10 +814,14 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		_refresh()
 
 
-func _place(id: String, tile: Vector2i, cap := false) -> void:
+## `entry` is a Stock entry: a bare id String or {id + state} (ADR-0002).
+func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
+	var id: String = entry if entry is String else entry.id
 	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
-	(captured if cap else stock).erase(id)
+	(captured if cap else stock).erase(entry)
 	board[tile] = {"id": id, "owner": Rules.PLAYER}
+	if entry is Dictionary: # restore the piece state it left the board with
+		board[tile].merge(entry)
 	placing_id = ""
 	placing_cap = false
 	if state == State.PLAYER_TURN:
@@ -1018,6 +1035,7 @@ func _item_reset() -> void:
 	item_active = -1
 	item_stage_a = Vector2i(-1, -1)
 	item_targets = []
+	item_selected = []
 
 
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
@@ -1036,6 +1054,13 @@ func _item_click(tile: Vector2i) -> void:
 			return
 	elif not item_targets.has(tile):
 		return
+	if it.target == "multi": # taps toggle; hud's Extract button confirms
+		if item_selected.has(tile):
+			item_selected.erase(tile)
+		else:
+			item_selected.append(tile)
+		_refresh()
+		return
 	if it.target == "pair" and item_stage_a.x < 0:
 		item_stage_a = tile
 		item_targets = _item_stage_targets(it, tile)
@@ -1045,6 +1070,17 @@ func _item_click(tile: Vector2i) -> void:
 	var a := item_stage_a
 	_item_reset()
 	_item_apply(it, a, tile)
+
+
+## Confirm a "multi" item on the current selection (>= 1 picks required).
+func _item_confirm_multi() -> void:
+	if item_active < 0 or item_selected.is_empty():
+		return
+	var it: Dictionary = items[item_active]
+	items.remove_at(item_active)
+	_extract_sel = item_selected.duplicate()
+	_item_reset()
+	_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
@@ -1063,6 +1099,14 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			skip_enemy_turns += 1
 		"counter_intel":
 			tariffs_suppressed = true
+		"extraction": # selection -> Stock at current id; board-only fields
+			# stripped, any remaining piece state rides along (ADR-0002)
+			for pos in _extract_sel:
+				if board.has(pos) and board[pos].owner == Rules.PLAYER:
+					var e: Dictionary = board[pos].duplicate()
+					e.erase("owner")
+					stock.append(e.id if e.size() == 1 else e)
+					board.erase(pos)
 		"drone_strike": # 3x3 around b; the King is unaffected (Destruction)
 			for dx in range(-1, 2):
 				for dy in range(-1, 2):
@@ -1200,6 +1244,8 @@ func _draw() -> void:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)
 		if item_stage_a.x >= 0:
 			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
+		for s in item_selected: # multi picks fill like the stage-A tile
+			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
 	# recon (enemy) paths draw red; the player's draw blue (palette rule)
 	var half := Vector2(tile, tile) / 2
 	for d in legal_dests:
@@ -1325,6 +1371,7 @@ func _connect_hud() -> void:
 	hud.tariff_pressed.connect(_show_tariffs)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
+	hud.multi_confirm_pressed.connect(_item_confirm_multi)
 	hud.item_pressed.connect(_use_item)
 	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
 		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))

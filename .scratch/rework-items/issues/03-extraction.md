@@ -1,6 +1,6 @@
 # 03 — Extraction: multi-select return to Stock + stock state contract
 
-Status: open
+Status: done
 Type: AFK
 
 ## Parent

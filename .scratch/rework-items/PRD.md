@@ -1,6 +1,6 @@
 # PRD: Rework Items — Counter-Intel, Drone Strike, Extraction
 
-Status: open — grilled 2026-07-17 (CONTEXT.md terms + ADR-0002, PR #58); Notion
+Status: done — all 3 slices merged; grilled 2026-07-17 (CONTEXT.md terms + ADR-0002, PR #58); Notion
 Items DB rows flipped REWORK → KEEP with "implementation pending".
 Tracker note: Linear MCP not connected; this file + `issues/` is the tracker
 (money-and-shop precedent). Triage: needs-triage → this PRD supersedes it —

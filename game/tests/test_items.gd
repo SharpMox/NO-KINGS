@@ -8,6 +8,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 var fails := 0
 
@@ -210,6 +211,70 @@ func _init() -> void:
 	check(not de.board.has(Vector2i(0, 0)) and not de.board.has(Vector2i(1, 1)),
 		"corner strike destroys the on-board part")
 	de.queue_free()
+	await process_frame
+
+	# --- extraction: multi-select own pieces back to Stock at current identity
+	var ex := _boot({"board": [["dragon-king", 0, 2, 2], ["pawn", 0, 3, 3],
+		["queen", 0, 5, 5], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	ex.items.append(_item("extraction", "multi"))
+	ex._use_item(0)
+	check(ex.item_targets.size() == 3 and not ex.item_targets.has(Vector2i(7, 10)),
+		"extraction targets only own pieces")
+	ex._item_confirm_multi()
+	check(ex.items.size() == 1, "zero-selection confirm is a no-op")
+	ex._item_click(Vector2i(2, 2))
+	ex._item_click(Vector2i(3, 3))
+	ex._item_click(Vector2i(3, 3)) # toggle the pawn back off
+	check(ex.item_selected == [Vector2i(2, 2)], "taps toggle the selection")
+	ex._use_item(0) # tap the armed item: cancel, unspent, board untouched
+	check(ex.items.size() == 1 and ex.item_selected.is_empty()
+		and ex.board.has(Vector2i(2, 2)), "cancel leaves the item unspent")
+	ex._use_item(0)
+	ex._item_click(Vector2i(2, 2))
+	ex._item_click(Vector2i(3, 3))
+	ex._item_confirm_multi()
+	check(ex.items.is_empty() and ex.stock.has("dragon-king") and ex.stock.has("pawn")
+		and not ex.board.has(Vector2i(2, 2)) and not ex.board.has(Vector2i(3, 3)),
+		"confirm returns the selection to Stock at current identity")
+	check(ex.board.has(Vector2i(5, 5)), "unselected pieces stay on the board")
+	ex.queue_free()
+	await process_frame
+
+	# --- extraction: piece state rides along opaquely; stateful copies stack
+	# apart; placement restores; merging discards (ADR-0002)
+	var ez := _boot({"board": [["knight", 0, 2, 2, "buff"], ["knight", 0, 4, 2],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	ez.actions_left = 5
+	ez.actions_max = 5
+	ez.items.append(_item("extraction", "multi"))
+	ez._use_item(0)
+	ez._item_click(Vector2i(2, 2))
+	ez._item_click(Vector2i(4, 2))
+	ez._item_confirm_multi()
+	var stateful := {"id": "knight", "buff": true}
+	check(ez.stock.has(stateful) and ez.stock.has("knight"),
+		"state rides into Stock; the plain copy stays a bare id")
+	check(ez.hud._stacks().size() == 2, "a stateful copy stacks apart from plain ones")
+	ez._place(stateful, Vector2i(3, 6))
+	check(ez.board[Vector2i(3, 6)].get("buff", false), "placement restores the state")
+	check(not ez.stock.has(stateful) and ez.stock.has("knight"),
+		"placement consumed the stateful entry, not the plain one")
+	ez.queue_free()
+	await process_frame
+
+	# --- merge: a stateful entry is a normal merge input — consumed exactly,
+	# state discarded, result is the plain next piece
+	var em := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"]})
+	await process_frame
+	em.stock.append({"id": "pawn", "buff": true})
+	em.actions_left = 3
+	MergeLogic.commit_merge(em,
+		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}},
+		{"id": "pawn", "cap": false, "entry": "pawn"})
+	check(em.stock == ["sergeant"], "merging a stateful entry consumes it and discards the state")
+	em.queue_free()
 	await process_frame
 
 	print("---")

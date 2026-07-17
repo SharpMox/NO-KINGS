@@ -88,12 +88,16 @@ static func all() -> Array:
 			"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert",
 				"surprise_attack", "tactical_reposition", "rapid_deployment",
 				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel",
-				"drone_strike"],
+				"drone_strike", "extraction"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		{"name": "Trinkets: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"trinkets": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
 			"wave": 9, "stock": ["pawn"]}},
+		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
+			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
+				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],
+			"items": ["extraction"], "wave": 7, "stock": ["pawn"]}},
 		{"name": "Drone Strike (3x3 wipe, King immune)", "cfg": {
 			"board": [["queen", 0, 1, 1], ["pawn", 0, 4, 6], ["pawn", 1, 3, 5],
 				["bishop", 1, 2, 4], ["king", 1, 3, 4], ["rook", 1, 6, 9]],

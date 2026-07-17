@@ -115,8 +115,8 @@ static func apply_tariff(g, t: Dictionary) -> void:
 	g.tariffs_active.append(t)
 	if t.key == "sanctions": # fix the barred type at trigger time
 		var types := {}
-		for id in g.stock + g.captured:
-			types[id] = true
+		for e in g.stock + g.captured:
+			types[e if e is String else e.id] = true
 		if not types.is_empty():
 			g.sanctioned_id = types.keys()[g.rng.randi() % types.size()]
 

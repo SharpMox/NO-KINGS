@@ -14,8 +14,9 @@ const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
 signal pass_pressed
 signal tariff_pressed
-signal stack_pressed(id: String, cap: bool, count: int)
-signal stack_drag_started(id: String, cap: bool)
+signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
+signal stack_drag_started(entry: Variant, cap: bool)
+signal multi_confirm_pressed # the floating Extract button
 signal item_pressed(index: int)
 signal promote_pressed(id: String, cap: bool)
 signal return_to_stock_pressed
@@ -39,6 +40,7 @@ var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
 var stock_armed := Control.new() # draws the armed piece on the Stock button
+var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var trinket_box := HBoxContainer.new()
@@ -123,6 +125,13 @@ func build(game) -> void:
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
+	# floating confirm for "multi" items: shows once >= 1 piece is picked
+	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
+	multi_confirm_btn.position = Vector2(vp.x / 2 - 70, vp.y - 96)
+	multi_confirm_btn.custom_minimum_size = Vector2(140, 40)
+	multi_confirm_btn.visible = false
+	multi_confirm_btn.pressed.connect(func() -> void: multi_confirm_pressed.emit())
+	add_child(multi_confirm_btn)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
 	# self_modulate: the red tint must not bleed into the blue counter child
@@ -249,6 +258,9 @@ func refresh() -> void:
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.trinkets.size())
 	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
 		+ ("·off" if g.tariffs_suppressed else "")
+	multi_confirm_btn.visible = g.item_active >= 0 and not g.item_selected.is_empty() \
+		and g.items[g.item_active].target == "multi"
+	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
 	_rebuild_trinket_strip()
@@ -281,14 +293,17 @@ func _draw_stock_armed() -> void:
 
 
 func _stacks() -> Array:
-	# pool grouped for display/selection: stock stacks first, then captured
+	# pool grouped for display/selection: stock stacks first, then captured.
+	# Grouping is by WHOLE entry (ADR-0002), so a piece carrying state stacks
+	# apart from plain copies of the same id.
 	var out := []
 	for cap in [false, true]:
 		var counts := {}
-		for id in (g.captured if cap else g.stock):
-			counts[id] = counts.get(id, 0) + 1
-		for id in counts:
-			out.append({"id": id, "cap": cap, "count": counts[id]})
+		for e in (g.captured if cap else g.stock):
+			counts[e] = counts.get(e, 0) + 1
+		for e in counts:
+			out.append({"entry": e, "id": (e if e is String else e.id),
+				"cap": cap, "count": counts[e]})
 	return out
 
 
@@ -387,7 +402,7 @@ func _rebuild_pool_strip() -> void:
 			promote.pressed.connect(func() -> void: promote_pressed.emit(id, cap))
 			btn.add_child(promote)
 		btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
-		if g.placing_id == id and g.placing_cap == cap:
+		if g.placing_id != "" and g.armed_entry == st.entry and g.placing_cap == cap:
 			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 		elif g.merge_highlights.has(id):
 			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
@@ -395,10 +410,20 @@ func _rebuild_pool_strip() -> void:
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		elif cap:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
+		if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
+			var mark := Label.new()
+			mark.text = "◆"
+			mark.add_theme_font_size_override("font_size", 11)
+			mark.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+			mark.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+			mark.offset_left = -14
+			mark.offset_top = -14
+			btn.add_child(mark)
 		btn.set_meta("id", id) # drop-target lookup for drag merges
 		btn.set_meta("cap", cap)
-		btn.pressed.connect(func() -> void: stack_pressed.emit(id, cap, st.count))
-		btn.button_down.connect(func() -> void: stack_drag_started.emit(id, cap))
+		btn.set_meta("entry", st.entry)
+		btn.pressed.connect(func() -> void: stack_pressed.emit(st.entry, cap, st.count))
+		btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
 		pool_box.add_child(btn)
 	if g.state == g.State.SETUP and g.selected.x >= 0:
 		# empty slot: tap it (or drop the dragged piece on the strip) to take

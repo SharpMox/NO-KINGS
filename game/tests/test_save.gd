@@ -36,7 +36,7 @@ func _init() -> void:
 		"score": 470, "money": 35, "clock_s": 812.5,
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
 			{"kind": "box", "key": "box", "sold": false}],
-		"skip_enemy_turns": 1,
+		"skip_enemy_turns": 1, "tariffs_off": true,
 	}
 	var a := _boot(rich)
 	await process_frame
@@ -69,6 +69,7 @@ func _init() -> void:
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")
 	check(b.board.size() >= 5, "pending pieces landed on the board")
 	check(b.skip_enemy_turns == 1, "item counters restored")
+	check(b.tariffs_suppressed, "counter-intel suppression restored")
 	var buffed := 0
 	for pos in b.board:
 		if b.board[pos].get("buff", false):

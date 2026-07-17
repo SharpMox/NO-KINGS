@@ -87,12 +87,16 @@ static func all() -> Array:
 				["pawn", 1, 2, 6], ["bishop", 1, 4, 6], ["rook", 1, 1, 8], ["knight", 1, 3, 8]],
 			"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert",
 				"surprise_attack", "tactical_reposition", "rapid_deployment",
-				"decoy_swap", "asset_recovery", "radar_jamming"],
+				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		{"name": "Trinkets: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"trinkets": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
 			"wave": 9, "stock": ["pawn"]}},
+		{"name": "Counter-Intel (suppress live tariffs)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
+			"items": ["counter_intel"], "tariffs": ["move_cost", "inflation"],
+			"money": 100, "wave": 11, "stock": ["pawn"]}},
 		# --- tariffs ---
 		{"name": "Tariffs: all action costs", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5, "buff"], ["bishop", 1, 4, 5]],

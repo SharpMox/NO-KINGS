@@ -47,6 +47,7 @@ static func apply(g, cfg: Dictionary) -> void:
 		g.sanctioned_id = cfg.sanctioned_id
 	if cfg.has("tariffs_seen"): # activation above re-logged; restore the truth
 		g.tariffs_seen = cfg.tariffs_seen.duplicate()
+	g.tariffs_suppressed = cfg.get("tariffs_off", false)
 	g._begin_player_turn()
 	# item-effect counters restore AFTER the turn reset (a save is always taken
 	# at a turn start, so move/place/merge budgets are simply fresh)
@@ -80,4 +81,5 @@ static func to_config(g) -> Dictionary:
 		"shop_stock": g.shop_stock.duplicate(true),
 		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
+		"tariffs_off": g.tariffs_suppressed,
 	}

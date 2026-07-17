@@ -28,6 +28,8 @@ const ITEMS: Array = [
 		"description": "Move a target ally piece to any Deploy tile on the board."},
 	{"key": "decoy_swap", "name": "Decoy Swap", "tier": "Strategic", "target": "pair",
 		"description": "Swap the positions of any two pieces on the board (ally or enemy, in any combination)."},
+	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
+		"description": "Disable all tariffs until the next Wave."},
 	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",
 		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
 ]

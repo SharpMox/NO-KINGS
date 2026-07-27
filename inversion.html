@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="assets/site.css">
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
+  <script src="data/inversions.js"></script>
   <style>
     header { max-width: 1280px; margin: 0 auto; padding: 32px 24px 16px; }
     h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
@@ -114,64 +115,7 @@
   <script>
   // ponytail: canonical data — inline copies drifted before (see CLAUDE.md)
   const PIECES = PIECES_CODEX;
-  const INVERSIONS = [
-  {
-    "lhs": "wazir",
-    "rhs": "ferz"
-  },
-  {
-    "lhs": "bishop",
-    "rhs": "rook"
-  },
-  {
-    "lhs": "pawn",
-    "rhs": "berolina"
-  },
-  {
-    "lhs": "sergeant",
-    "rhs": "inv-sergeant"
-  },
-  {
-    "lhs": "arrow-pawn",
-    "rhs": "inv-arrow-pawn"
-  },
-  {
-    "lhs": "dragon-horse",
-    "rhs": "dragon-king"
-  },
-  {
-    "lhs": "kirin",
-    "rhs": "squirrel"
-  },
-  {
-    "lhs": "elephant-modern",
-    "rhs": "war-machine"
-  },
-  {
-    "lhs": "archbishop",
-    "rhs": "chancellor"
-  },
-  {
-    "lhs": "kirin-plus",
-    "rhs": "inv-kirin-plus"
-  },
-  {
-    "lhs": "high-priestess",
-    "rhs": "champion"
-  },
-  {
-    "lhs": "banshee",
-    "rhs": "raven"
-  },
-  {
-    "lhs": "kirin-plus-plus",
-    "rhs": "inv-kirin-plus-plus"
-  },
-  {
-    "lhs": "gryphon",
-    "rhs": "manticore"
-  }
-];
+  const INVERSIONS = INVERSION_PAIRS;
 
   /* ============================================================
    *  Inversion rendering (renderBoard/renderMove live in assets/board.js)

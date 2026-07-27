@@ -229,13 +229,18 @@
     
     /* Relations block on codex cards — stack of colored sections at the bottom. */
     .relations { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0 0; }
+    /* Grid, not flex column: the collapse toggle rides column 2 of the head
+       row instead of an absolute corner pin. row-gap only — a column-gap
+       would steal 8px from every row's wrapping width. */
     .relation-section {
-      display: flex; flex-direction: column; gap: 8px;
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 0;
       padding: 10px 12px;
       border: 1.5px solid var(--border);
       border-radius: 8px;
       background: var(--surface);
     }
+    .relation-section > * { grid-column: 1 / -1; }
+    .relation-section-head { grid-column: 1; }
     .relation-section-head {
       font-size: 10px; font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.5px;
@@ -304,12 +309,16 @@
       margin-top: 20px;
     }
     /* Collapsible section toggle: hide rows past the third while collapsed. */
-    .relation-section { position: relative; }
     .relation-section.is-collapsed .relation-row.is-extra { display: none; }
+    /* Spans rows 1-2 so it overhangs the first row (as the old absolute pin
+       did) without growing the head row; z-index because the rows it
+       overlaps are later in the DOM. Negative margins: cell starts at the
+       10/12px padding edge, the pin sat at 8/10. */
     .relation-toggle {
-      position: absolute;
-      top: 8px;
-      right: 10px;
+      grid-area: 1 / 2 / 3 / 3;
+      justify-self: end; align-self: start;
+      margin: -2px -2px 0 0;
+      z-index: 1;
       appearance: none;
       background: var(--surface);
       border: 1.5px solid currentColor;

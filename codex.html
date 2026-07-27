@@ -517,6 +517,7 @@
   <script src="data/pieces-codex.js"></script>
   <script src="data/promotions.js"></script>
   <script src="data/fusions.js"></script>
+  <script src="data/inversions.js"></script>
 </head>
 <body>
   <nav class="site-nav" aria-label="Site sections">
@@ -576,36 +577,7 @@
   </header>
 
   <main>
-    <section role="tabpanel" id="tab-all"         aria-labelledby="tabbtn-all" class="active">
-      <div class="card-grid" id="grid-all"></div>
-    </section>
-    <section role="tabpanel" id="tab-pawn-like"   aria-labelledby="tabbtn-pawn-like">
-      <div class="card-grid" id="grid-pawn-like"></div>
-    </section>
-    <section role="tabpanel" id="tab-sliders"     aria-labelledby="tabbtn-sliders">
-      <div class="card-grid" id="grid-sliders"></div>
-    </section>
-    <section role="tabpanel" id="tab-leapers"     aria-labelledby="tabbtn-leapers">
-      <div class="card-grid" id="grid-leapers"></div>
-    </section>
-    <section role="tabpanel" id="tab-leap-riders" aria-labelledby="tabbtn-leap-riders">
-      <div class="card-grid" id="grid-leap-riders"></div>
-    </section>
-    <section role="tabpanel" id="tab-compounds"   aria-labelledby="tabbtn-compounds">
-      <div class="card-grid" id="grid-compounds"></div>
-    </section>
-    <section role="tabpanel" id="tab-hoppers"     aria-labelledby="tabbtn-hoppers">
-      <div class="card-grid" id="grid-hoppers"></div>
-    </section>
-    <section role="tabpanel" id="tab-others"      aria-labelledby="tabbtn-others">
-      <div class="card-grid" id="grid-others"></div>
-    </section>
-    <section role="tabpanel" id="tab-cat-new" aria-labelledby="tabbtn-cat-new"> <div class="card-grid" id="grid-cat-new"></div> </section>
-    <section role="tabpanel" id="tab-cat-base" aria-labelledby="tabbtn-cat-base"> <div class="card-grid" id="grid-cat-base"></div> </section>
-    <section role="tabpanel" id="tab-cat-mid" aria-labelledby="tabbtn-cat-mid"> <div class="card-grid" id="grid-cat-mid"></div> </section>
-    <section role="tabpanel" id="tab-cat-end" aria-labelledby="tabbtn-cat-end"> <div class="card-grid" id="grid-cat-end"></div> </section>
-    <section role="tabpanel" id="tab-cat-invert" aria-labelledby="tabbtn-cat-invert"> <div class="card-grid" id="grid-cat-invert"></div> </section>
-    <section role="tabpanel" id="tab-cat-fusion" aria-labelledby="tabbtn-cat-fusion"> <div class="card-grid" id="grid-cat-fusion"></div> </section>
+
     <!-- List view: flat sortable table of all pieces with their relations.
          Filter input + tabs in the page header drive BOTH views. -->
     <div id="list-view" hidden>
@@ -636,6 +608,21 @@
   </footer>
 
   <script>
+  // Tabpanel shells are derived from the tab buttons — one section + card
+  // grid per aria-controls value (grid id = panel id minus the tab- prefix).
+  {
+    const listView = document.getElementById('list-view');
+    for (const btn of document.querySelectorAll('.tab-btn[aria-controls]')) {
+      const id = btn.getAttribute('aria-controls');
+      const sec = document.createElement('section');
+      sec.setAttribute('role', 'tabpanel');
+      sec.id = id;
+      sec.setAttribute('aria-labelledby', btn.id);
+      if (id === 'tab-all') sec.className = 'active';
+      sec.innerHTML = `<div class="card-grid" id="grid-${id.slice(4)}"></div>`;
+      listView.parentNode.insertBefore(sec, listView);
+    }
+  }
   /* ============================================================
    *  Data
    * ============================================================ */
@@ -722,9 +709,14 @@
   };
 
 
-  const PROMOTE_OF = {"pawn":"sergeant","sergeant":"arrow-pawn","ferz":"elephant-modern","elephant-modern":"high-priestess","wazir":"war-machine","war-machine":"champion","bishop":"dragon-horse","dragon-horse":"archbishop","rook":"dragon-king","dragon-king":"chancellor","knight":"gnu","gnu":"buffalo","kirin":"kirin-plus","kirin-plus":"kirin-plus-plus","alibaba":"bodyguard","bodyguard":"queen"};
-  const DEMOTE_OF = {"sergeant":"pawn","arrow-pawn":"sergeant","elephant-modern":"ferz","high-priestess":"elephant-modern","war-machine":"wazir","champion":"war-machine","dragon-horse":"bishop","archbishop":"dragon-horse","dragon-king":"rook","chancellor":"dragon-king","gnu":"knight","buffalo":"gnu","kirin-plus":"kirin","kirin-plus-plus":"kirin-plus","bodyguard":"alibaba","queen":"bodyguard"};
-  const INVERT_OF = {"wazir":"ferz","ferz":"wazir","bishop":"rook","rook":"bishop","pawn":"berolina","berolina":"pawn","sergeant":"inv-sergeant","inv-sergeant":"sergeant","arrow-pawn":"inv-arrow-pawn","inv-arrow-pawn":"arrow-pawn","dragon-horse":"dragon-king","dragon-king":"dragon-horse","kirin":"squirrel","squirrel":"kirin","elephant-modern":"war-machine","war-machine":"elephant-modern","archbishop":"chancellor","chancellor":"archbishop","kirin-plus":"inv-kirin-plus","inv-kirin-plus":"kirin-plus","high-priestess":"champion","champion":"high-priestess","banshee":"raven","raven":"banshee","kirin-plus-plus":"inv-kirin-plus-plus","inv-kirin-plus-plus":"kirin-plus-plus","gryphon":"manticore","manticore":"gryphon"};
+  // Derived from the shared chains — the literal maps here drifted-in-waiting.
+  const PROMOTE_OF = {}, DEMOTE_OF = {};
+  for (const { ids: [base, mid, end] } of PROMOTION_CHAINS) {
+    PROMOTE_OF[base] = mid; PROMOTE_OF[mid] = end;
+    DEMOTE_OF[mid] = base;  DEMOTE_OF[end] = mid;
+  }
+  const INVERT_OF = {};
+  for (const { lhs, rhs } of INVERSION_PAIRS) { INVERT_OF[lhs] = rhs; INVERT_OF[rhs] = lhs; }
   function renderMiniRelation(targetId, label) {
     const target = PIECES.find(p => p.id === targetId);
     if (!target) return '';
@@ -1100,22 +1092,6 @@
    *  List view: flat sortable + filterable table of all pieces
    *  with their promotion / fusion / inversion relations.
    * ============================================================ */
-  const INVERSION_PAIRS = [
-    ['wazir',           'ferz'],
-    ['bishop',          'rook'],
-    ['pawn',            'berolina'],
-    ['sergeant',        'inv-sergeant'],
-    ['arrow-pawn',      'inv-arrow-pawn'],
-    ['dragon-horse',    'dragon-king'],
-    ['kirin',           'squirrel'],
-    ['elephant-modern', 'war-machine'],
-    ['archbishop',      'chancellor'],
-    ['kirin-plus',      'inv-kirin-plus'],
-    ['high-priestess',  'champion'],
-    ['banshee',         'raven'],
-    ['kirin-plus-plus', 'inv-kirin-plus-plus'],
-    ['gryphon',         'manticore']
-  ];
   const listById = new Map(PIECES_CODEX.map(p => [p.id, p]));
   function listPieceName(id) { const p = listById.get(id); return p ? p.name : id; }
   function listEscape(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -1139,7 +1115,7 @@
       }
     }
     const invert = [];
-    for (const [a, b] of INVERSION_PAIRS) {
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
       if (a === pieceId) invert.push(b);
       if (b === pieceId) invert.push(a);
     }

@@ -567,36 +567,7 @@
   </header>
 
   <main>
-    <section role="tabpanel" id="tab-all"         aria-labelledby="tabbtn-all" class="active">
-      <div class="card-grid" id="grid-all"></div>
-    </section>
-    <section role="tabpanel" id="tab-pawn-like"   aria-labelledby="tabbtn-pawn-like">
-      <div class="card-grid" id="grid-pawn-like"></div>
-    </section>
-    <section role="tabpanel" id="tab-sliders"     aria-labelledby="tabbtn-sliders">
-      <div class="card-grid" id="grid-sliders"></div>
-    </section>
-    <section role="tabpanel" id="tab-leapers"     aria-labelledby="tabbtn-leapers">
-      <div class="card-grid" id="grid-leapers"></div>
-    </section>
-    <section role="tabpanel" id="tab-leap-riders" aria-labelledby="tabbtn-leap-riders">
-      <div class="card-grid" id="grid-leap-riders"></div>
-    </section>
-    <section role="tabpanel" id="tab-compounds"   aria-labelledby="tabbtn-compounds">
-      <div class="card-grid" id="grid-compounds"></div>
-    </section>
-    <section role="tabpanel" id="tab-hoppers"     aria-labelledby="tabbtn-hoppers">
-      <div class="card-grid" id="grid-hoppers"></div>
-    </section>
-    <section role="tabpanel" id="tab-others"      aria-labelledby="tabbtn-others">
-      <div class="card-grid" id="grid-others"></div>
-    </section>
-    <section role="tabpanel" id="tab-cat-new" aria-labelledby="tabbtn-cat-new"> <div class="card-grid" id="grid-cat-new"></div> </section>
-    <section role="tabpanel" id="tab-cat-base" aria-labelledby="tabbtn-cat-base"> <div class="card-grid" id="grid-cat-base"></div> </section>
-    <section role="tabpanel" id="tab-cat-mid" aria-labelledby="tabbtn-cat-mid"> <div class="card-grid" id="grid-cat-mid"></div> </section>
-    <section role="tabpanel" id="tab-cat-end" aria-labelledby="tabbtn-cat-end"> <div class="card-grid" id="grid-cat-end"></div> </section>
-    <section role="tabpanel" id="tab-cat-invert" aria-labelledby="tabbtn-cat-invert"> <div class="card-grid" id="grid-cat-invert"></div> </section>
-    <section role="tabpanel" id="tab-cat-fusion" aria-labelledby="tabbtn-cat-fusion"> <div class="card-grid" id="grid-cat-fusion"></div> </section>
+
     <!-- List view: flat sortable table of all pieces with their relations.
          Filter input + tabs in the page header drive BOTH views. -->
     <div id="list-view" hidden>
@@ -627,6 +598,21 @@
   </footer>
 
   <script>
+  // Tabpanel shells are derived from the tab buttons — one section + card
+  // grid per aria-controls value (grid id = panel id minus the tab- prefix).
+  {
+    const listView = document.getElementById('list-view');
+    for (const btn of document.querySelectorAll('.tab-btn[aria-controls]')) {
+      const id = btn.getAttribute('aria-controls');
+      const sec = document.createElement('section');
+      sec.setAttribute('role', 'tabpanel');
+      sec.id = id;
+      sec.setAttribute('aria-labelledby', btn.id);
+      if (id === 'tab-all') sec.className = 'active';
+      sec.innerHTML = `<div class="card-grid" id="grid-${id.slice(4)}"></div>`;
+      listView.parentNode.insertBefore(sec, listView);
+    }
+  }
   /* ============================================================
    *  Data
    * ============================================================ */

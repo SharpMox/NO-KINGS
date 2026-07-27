@@ -329,10 +329,8 @@
       width: 100%;
       aspect-ratio: 1 / 1;
       height: auto;
-      cursor: grab;
       touch-action: none;
     }
-    #network-svg.is-dragging { cursor: grabbing; }
     /* Phones: the network would squish into an unreadable square at viewport
        width, so render it at a usable fixed size inside a horizontal-scroll
        container and let the reader swipe to pan. The matrix's #graph-wrap
@@ -354,7 +352,7 @@
     .net-edge.is-fuse-into   { stroke: color-mix(in srgb, var(--hurdle-color) 70%, transparent); }
     .net-edge.is-inversion   { stroke: color-mix(in srgb, var(--text-soft) 70%, transparent); stroke-dasharray: 4 3; }
     .net-node {
-      cursor: grab;
+      cursor: pointer;
       transition: opacity 0.15s ease;
     }
     .net-node:focus { outline: none; }
@@ -427,6 +425,26 @@
       .controls { gap: 8px; }
     }
 
+    /* Fullscreen: the whole tab section goes fullscreen (button stays in the
+       controls row, filter chips stay usable, scrollers can't swallow it). */
+    .fs-btn {
+      margin-left: auto;
+      width: 28px; height: 23px; border-radius: 6px;  /* chip-height: keeps the controls row from growing */
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      font-size: 13px; line-height: 1; cursor: pointer;
+    }
+    .fs-btn:hover { background: var(--bg); }
+    section[role="tabpanel"]:fullscreen {
+      background: var(--bg);
+      overflow: auto;
+      padding: 16px 24px;
+    }
+    /* Fit the square graph to the fullscreen viewport, centred. */
+    #tab-graph:fullscreen #network-svg {
+      width: auto; height: min(100vw, calc(100dvh - 90px));
+      margin: 0 auto;
+    }
+
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
   <link rel="stylesheet" href="assets/site.css">
@@ -472,6 +490,7 @@
           <span class="legend-chip is-additive">Additive fusion</span>
           <span class="legend-chip is-synergistic">Synergistic fusion</span>
         </div>
+        <button type="button" class="fs-btn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
       </div>
       <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="graph-wrap">
@@ -486,6 +505,7 @@
         <button type="button" class="toggle-chip is-fusion"     data-kind="fusion"     aria-pressed="false">Fusion</button>
         <button type="button" class="toggle-chip is-promotion"  data-kind="promotion"  aria-pressed="false">Promotion</button>
         <button type="button" class="toggle-chip is-inversion"  data-kind="inversion"  aria-pressed="false">Inversion</button>
+        <button type="button" class="fs-btn" title="Fullscreen" aria-label="Fullscreen">⛶</button>
       </div>
       <p class="mobile-hint" aria-hidden="true">← swipe to explore →</p>
       <div id="network-wrap">
@@ -571,7 +591,6 @@
     tabButtons.forEach(b => b.setAttribute('aria-selected', b.getAttribute('aria-controls') === panelId ? 'true' : 'false'));
     if (panelId === 'tab-matrix' && !built.matrix) { buildMatrixTab(); built.matrix = true; }
     if (panelId === 'tab-graph'  && !built.graph)  { buildGraphTab();  built.graph  = true; }
-    if (panelId === 'tab-graph') { graphResumeIfBuilt(); }
   }
   tabButtons.forEach(btn => btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls'))));
   // Arrow-key tab cycling.
@@ -795,7 +814,9 @@
       '<div class="tt-head"><span class="tt-name"></span><span class="tt-badge"></span></div>' +
       '<div class="tt-board"></div>' +
       '<div class="tt-betza"></div>';
-    document.body.appendChild(matrixTooltip);
+    // Inside the tab section, not body — body-level elements don't paint
+    // while the section is fullscreen. position:fixed still tracks the viewport.
+    document.getElementById('tab-matrix').appendChild(matrixTooltip);
   }
   let lastTooltipRow = null, lastTooltipCol = null;
   function hideMatrixTooltip() {
@@ -867,7 +888,7 @@
    *  Tab 3: Graph — custom force-directed network
    * ============================================================ */
   const ALL_KINDS = ['promotion', 'fuse-with', 'fuse-into', 'inversion'];
-  const NET = { nodes: [], edges: [], nodeById: new Map(), running: false, frame: null, kinds: new Set(ALL_KINDS) };
+  const NET = { nodes: [], edges: [], nodeById: new Map(), kinds: new Set(ALL_KINDS) };
   const NET_SVG_NS = 'http://www.w3.org/2000/svg';
   const NODE_W = 48, NODE_H = 64; // 48x48 board + label height
   function buildGraphTab() {
@@ -876,9 +897,7 @@
     renderGraphScene();
     wireGraphInteractions();
     applyKindFilters();   // honour the default selected chip on first paint
-    graphStart();
   }
-  function graphResumeIfBuilt() { if (built.graph) graphStart(); }
   function initGraphData() {
     NET.nodes = ALL_PIECES_INCL_VOID.map(p => ({ id: p.id, piece: p, x: 0, y: 0, vx: 0, vy: 0, pinned: false }));
     NET.nodeById = new Map(NET.nodes.map(n => [n.id, n]));
@@ -1064,50 +1083,8 @@
       }
     }
   }
-  /* Force simulation params */
-  const K_REP = 22000;       // repulsion strength
-  const SPRING_L = 170;      // ideal edge length
-  const K_SPRING = 0.045;
-  const DAMPING = 0.86;
-  const DT = 1;              // discrete frame step
-  const ENERGY_EPS = 0.05;
-  function graphStep() {
-    // Node coordinates live in viewBox user space, so clamp against the cached
-    // viewBox size (not the live rendered rect, which diverges on resize and
-    // would force a layout read every frame).
-    const W = NET.viewW || 1024, H = NET.viewH || 720;
-    // No forces at all — nodes stay put unless physically dragged.
-    // The sim loop only runs to redraw positions during a drag interaction.
-    for (const n of NET.nodes) { n.fx = 0; n.fy = 0; }
-    // Integrate.
-    let energy = 0;
-    const PAD = NODE_W / 2 + 8;
-    for (const n of NET.nodes) {
-      if (n.pinned) { n.vx = 0; n.vy = 0; continue; }
-      n.vx = (n.vx + n.fx * DT) * DAMPING;
-      n.vy = (n.vy + n.fy * DT) * DAMPING;
-      n.x += n.vx * DT;
-      n.y += n.vy * DT;
-      // Clamp inside SVG.
-      if (n.x < PAD)     { n.x = PAD;     n.vx *= -0.3; }
-      if (n.x > W - PAD) { n.x = W - PAD; n.vx *= -0.3; }
-      if (n.y < PAD)     { n.y = PAD;     n.vy *= -0.3; }
-      if (n.y > H - PAD) { n.y = H - PAD; n.vy *= -0.3; }
-      energy += n.vx * n.vx + n.vy * n.vy;
-    }
-    updateGraphPositions();
-    return energy;
-  }
-  function graphStart() {
-    if (NET.running) return;
-    NET.running = true;
-    function tick() {
-      const e = graphStep();
-      if (e < ENERGY_EPS && !NET.dragging) { NET.running = false; return; }
-      NET.frame = requestAnimationFrame(tick);
-    }
-    tick();
-  }
+  /* The force sim is gone: nodes are laid out once by layoutGraphInitial and
+     never move (dragging was removed on purpose — layout is now static). */
   /* Interactions: drag-pin, hover-highlight, tooltip, double-click. */
   let netTooltip;
   function ensureNetTooltip() {
@@ -1119,7 +1096,7 @@
     netTooltip.innerHTML =
       '<div class="nt-name"></div>' +
       '<div class="nt-relations"></div>';
-    document.body.appendChild(netTooltip);
+    document.getElementById('tab-graph').appendChild(netTooltip);
   }
   // Build the rows for the tooltip's Relations section.
   //   - Promotion + Inversion: one row per matching edge (standard layout).
@@ -1255,7 +1232,7 @@
   function wireGraphInteractions() {
     ensureNetTooltip();
     const svg = document.getElementById('network-svg');
-    let dragging = null, dragStart = null, didMove = false;
+    let pressed = null, dragStart = null;
     // Selected node — once a node has been tapped/clicked, the highlight and
     // tooltip stay locked to it until the user taps another node or anywhere
     // outside the SVG. Critical for mobile, where there's no hover.
@@ -1281,17 +1258,6 @@
       showNetTooltip(n, ev);
     });
     svg.addEventListener('pointermove', (ev) => {
-      if (dragging) {
-        const pt = svgPoint(svg, ev);
-        dragging.x = pt.x;
-        dragging.y = pt.y;
-        dragging.vx = 0;
-        dragging.vy = 0;
-        didMove = true;
-        graphStart();
-        if (!selected) positionFloating(netTooltip, ev);
-        return;
-      }
       if (selected) return;        // locked tooltip stays put
       const g = ev.target.closest('.net-node');
       if (g) {
@@ -1305,44 +1271,33 @@
       clearHighlight();
       hideNetTooltip();
     });
+    // Nodes can't be dragged — pointerdown only arms a possible tap; a press
+    // that travels >4px is a scroll/swipe and selects nothing.
     svg.addEventListener('pointerdown', (ev) => {
       const g = ev.target.closest('.net-node');
       if (!g) return;
       const n = NET.nodeById.get(g.dataset.id);
       if (!n) return;
-      dragging = n;
+      pressed = n;
       dragStart = { x: ev.clientX, y: ev.clientY };
-      didMove = false;
-      NET.dragging = true;
-      svg.classList.add('is-dragging');
-      svg.setPointerCapture(ev.pointerId);
     });
+    svg.addEventListener('pointercancel', () => { pressed = null; dragStart = null; });
     svg.addEventListener('pointerup', (ev) => {
-      if (!dragging) return;
-      const moved = didMove || Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y) > 4;
-      if (moved) {
-        // Pin in place after a drag.
-        dragging.pinned = true;
-        dragging.el.classList.add('is-pinned');
-        // Keep the selection on whatever was being dragged.
-        selectNode(dragging, ev);
-      } else {
+      if (!pressed) return;
+      const moved = Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y) > 4;
+      if (!moved) {
         // Pure tap: toggle selection on this node. Pin tracks selection.
-        if (selected === dragging.id) {
-          dragging.pinned = false;
-          dragging.el.classList.remove('is-pinned');
+        if (selected === pressed.id) {
+          pressed.pinned = false;
+          pressed.el.classList.remove('is-pinned');
           clearSelection();
         } else {
-          dragging.pinned = true;
-          dragging.el.classList.add('is-pinned');
-          selectNode(dragging, ev);
+          pressed.pinned = true;
+          pressed.el.classList.add('is-pinned');
+          selectNode(pressed, ev);
         }
       }
-      dragging = null; dragStart = null;
-      NET.dragging = false;
-      svg.classList.remove('is-dragging');
-      try { svg.releasePointerCapture(ev.pointerId); } catch (_) {}
-      graphStart();
+      pressed = null; dragStart = null;
     });
     // Tapping anywhere outside the graph SVG clears the locked selection.
     document.addEventListener('click', (ev) => {
@@ -1421,24 +1376,30 @@
       });
     });
   }
-  function svgPoint(svg, ev) {
-    // Map screen pixels into SVG user space so dragging stays accurate even
-    // when the rendered size diverges from the fixed viewBox (container resize,
-    // width:100% + aspect-ratio). getScreenCTM accounts for the viewBox scale.
-    const ctm = svg.getScreenCTM();
-    if (ctm) {
-      const pt = svg.createSVGPoint();
-      pt.x = ev.clientX;
-      pt.y = ev.clientY;
-      const u = pt.matrixTransform(ctm.inverse());
-      return { x: u.x, y: u.y };
-    }
-    const r = svg.getBoundingClientRect();
-    return { x: ev.clientX - r.left, y: ev.clientY - r.top };
-  }
 
   /* Build the default Pieces tab on page load. */
   buildGraphTab(); built.graph = true;
+  </script>
+  <script>
+  // Fullscreen: each tab section goes fullscreen via its controls-row button.
+  // Esc works natively; the button flips to an exit control while active.
+  for (const btn of document.querySelectorAll('.fs-btn')) {
+    const sec = btn.closest('section');
+    btn.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else sec.requestFullscreen();
+    });
+  }
+  document.addEventListener('fullscreenchange', () => {
+    const on = !!document.fullscreenElement;
+    for (const btn of document.querySelectorAll('.fs-btn')) {
+      btn.textContent = on ? '\u2715' : '\u26f6';
+      btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  });
+  // ponytail: iOS Safari has no element fullscreen — the button just hides there
+  if (!document.documentElement.requestFullscreen) document.querySelectorAll('.fs-btn').forEach(b => { b.hidden = true; });
   </script>
   <script src="assets/theme.js"></script>
   <script src="assets/tabs.js"></script>

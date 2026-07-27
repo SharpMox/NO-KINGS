@@ -213,16 +213,22 @@
       background: var(--surface);
     }
     .graph-grid th.col-header { overflow: visible; }
+    /* Fixed-track grid: board in the bottom 40px row, label sits on top of
+       it (6px up, 14px in — the old bottom:46/left:14 as margins). The 40px
+       column is fixed, so the nowrap label overflows it instead of
+       inflating it. */
     .col-header-inner {
-      position: relative;
+      display: grid;
+      grid-template-rows: 1fr 40px;
+      grid-template-columns: 40px;
       width: 40px;
       height: 140px;
       overflow: visible;
     }
     .col-header-label {
-      position: absolute;
-      bottom: 46px;
-      left: 14px;
+      grid-area: 1 / 1;
+      align-self: end; justify-self: start;
+      margin: 0 0 6px 14px;
       transform-origin: 0 100%;
       transform: rotate(-45deg);
       font-size: 11px;
@@ -237,24 +243,22 @@
       border: 1px solid var(--border);
       box-sizing: border-box;
     }
-    .col-board { position: absolute; bottom: 0; left: 0; }
+    .col-board { grid-area: 2 / 1; }
     .graph-grid td .cell-board {
       display: block;
       width: 100%;
       height: 100%;
     }
     .graph-grid th svg, .graph-grid td svg { display: block; width: 100%; height: 100%; }
-    .graph-grid td.is-filled { cursor: pointer; position: relative; }
-    .graph-grid td.is-filled::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border: 1px solid transparent;
-      pointer-events: none;
-    }
-    .graph-grid td.is-promotion::after   { border-color: color-mix(in srgb, var(--hop-target)   65%, transparent); }
-    .graph-grid td.is-additive::after    { border-color: color-mix(in srgb, var(--accent)       65%, transparent); }
-    .graph-grid td.is-synergistic::after { border-color: color-mix(in srgb, var(--hurdle-color) 65%, transparent); }
+    .graph-grid td.is-filled { cursor: pointer; }
+    /* Inset outline instead of an absolutely-positioned ::after overlay:
+       outlines paint above content and never affect layout. */
+    .graph-grid td.is-promotion,
+    .graph-grid td.is-additive,
+    .graph-grid td.is-synergistic { outline: 1px solid transparent; outline-offset: -1px; }
+    .graph-grid td.is-promotion   { outline-color: color-mix(in srgb, var(--hop-target)   65%, transparent); }
+    .graph-grid td.is-additive    { outline-color: color-mix(in srgb, var(--accent)       65%, transparent); }
+    .graph-grid td.is-synergistic { outline-color: color-mix(in srgb, var(--hurdle-color) 65%, transparent); }
     .graph-grid td.is-row-stripe,
     .graph-grid td.is-col-stripe {
       background: color-mix(in srgb, var(--accent) 8%, var(--surface));

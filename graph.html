@@ -438,11 +438,33 @@
       background: var(--bg);
       overflow: auto;
       padding: 16px 24px;
+      /* some Android browsers don't stretch the fullscreen element themselves */
+      width: 100%; height: 100%; box-sizing: border-box;
     }
     /* Fit the square graph to the fullscreen viewport, centred. */
     #tab-graph:fullscreen #network-svg {
       width: auto; height: min(100vw, calc(100dvh - 90px));
       margin: 0 auto;
+    }
+    /* Fake fullscreen for iPhones: WebKit has no element-fullscreen API, so
+       the section pins to the viewport instead. Kept as separate rules — a
+       selector list with :fullscreen would be dropped whole by old parsers. */
+    section[role="tabpanel"].fake-fs {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      overflow: auto;
+      padding: 16px 24px;
+    }
+    #tab-graph.fake-fs #network-svg {
+      width: auto; height: min(100vw, calc(100dvh - 90px));
+      margin: 0 auto;
+    }
+    /* Phones: in (fake or real) fullscreen keep the full-density swipe-pan —
+       the fit-to-viewport rules above would letterbox the ring tiny. Last so
+       they win the cascade; separate rules so old parsers can't drop both. */
+    @media (max-width: 560px) {
+      #tab-graph:fullscreen #network-svg { width: 100%; height: auto; }
+      #tab-graph.fake-fs #network-svg { width: 100%; height: auto; }
     }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
@@ -1379,23 +1401,29 @@
   <script>
   // Fullscreen: each tab section goes fullscreen via its controls-row button.
   // Esc works natively; the button flips to an exit control while active.
-  for (const btn of document.querySelectorAll('.fs-btn')) {
-    const sec = btn.closest('section');
-    btn.addEventListener('click', () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else sec.requestFullscreen();
-    });
-  }
-  document.addEventListener('fullscreenchange', () => {
-    const on = !!document.fullscreenElement;
+  // iPhones (WebKit) have no element-fullscreen API, so the section pins to
+  // the viewport with the .fake-fs overlay instead — same button, same flip.
+  function setFsButtons(on) {
     for (const btn of document.querySelectorAll('.fs-btn')) {
       btn.textContent = on ? '\u2715' : '\u26f6';
       btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
       btn.setAttribute('aria-label', btn.title);
     }
-  });
-  // ponytail: iOS Safari has no element fullscreen — the button just hides there
-  if (!document.documentElement.requestFullscreen) document.querySelectorAll('.fs-btn').forEach(b => { b.hidden = true; });
+  }
+  for (const btn of document.querySelectorAll('.fs-btn')) {
+    const sec = btn.closest('section');
+    btn.addEventListener('click', () => {
+      if (sec.requestFullscreen) {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else sec.requestFullscreen();
+      } else {
+        const on = sec.classList.toggle('fake-fs');
+        document.documentElement.style.overflow = on ? 'hidden' : '';
+        setFsButtons(on);
+      }
+    });
+  }
+  document.addEventListener('fullscreenchange', () => setFsButtons(!!document.fullscreenElement));
   </script>
   <script src="assets/theme.js"></script>
   <script src="assets/tabs.js"></script>

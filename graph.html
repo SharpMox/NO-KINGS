@@ -339,7 +339,7 @@
       #network-wrap { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
       /* Render the graph large on phones (1000² square) so nodes + labels read
          clearly; the container scrolls horizontally to pan. */
-      #network-svg { min-width: 1000px; touch-action: auto; }
+      #network-svg { min-width: 1200px; touch-action: auto; }
     }
     .net-edge {
       stroke-width: 1.5;
@@ -891,6 +891,7 @@
   const NET = { nodes: [], edges: [], nodeById: new Map(), kinds: new Set(ALL_KINDS) };
   const NET_SVG_NS = 'http://www.w3.org/2000/svg';
   const NODE_W = 48, NODE_H = 64; // 48x48 board + label height
+  const GRAPH_CANVAS = 1200;      // fixed layout canvas (user units), viewport-independent
   function buildGraphTab() {
     initGraphData();
     layoutGraphInitial();
@@ -924,9 +925,10 @@
     }
   }
   function layoutGraphInitial() {
-    const svg = document.getElementById('network-svg');
-    const r = svg.getBoundingClientRect();
-    const W = r.width || 1024, H = r.height || 720;
+    // Constant canvas: layout no longer depends on the rendered size, so a
+    // graph built in a narrow window is identical to one built fullscreen —
+    // small viewports just scale the SVG down, fullscreen scales it up.
+    const W = GRAPH_CANVAS, H = GRAPH_CANVAS;
     const CX = W / 2, CY = H / 2;
     const MARGIN = NODE_W / 2 + 16;
     const OUTER_R = Math.min(W, H) / 2 - MARGIN;
@@ -975,12 +977,7 @@
   }
   function renderGraphScene() {
     const svg = document.getElementById('network-svg');
-    const vbW = svg.getBoundingClientRect().width || 1024;
-    const vbH = svg.getBoundingClientRect().height || 720;
-    svg.setAttribute('viewBox', '0 0 ' + vbW + ' ' + vbH);
-    // viewBox dimensions are fixed once set; cache the user-space size/center so
-    // the per-frame draw loop never has to force a layout via getBoundingClientRect.
-    NET.viewW = vbW; NET.viewH = vbH;
+    svg.setAttribute('viewBox', '0 0 ' + GRAPH_CANVAS + ' ' + GRAPH_CANVAS);
     // Arrow markers per directed edge kind.
     const defs = document.createElementNS(NET_SVG_NS, 'defs');
     for (const [kind, color] of [
@@ -1049,9 +1046,8 @@
       n.el.setAttribute('transform', 'translate(' + n.x + ',' + n.y + ')');
     }
     // Center of the SVG (user space) — used to decide which side of the chord a
-    // curved edge bows toward. Read from the cached viewBox size so this hot
-    // loop never forces a synchronous layout via getBoundingClientRect.
-    const CX = (NET.viewW || 1024) / 2, CY = (NET.viewH || 720) / 2;
+    // curved edge bows toward.
+    const CX = GRAPH_CANVAS / 2, CY = GRAPH_CANVAS / 2;
     for (const e of NET.edges) {
       const a = NET.nodeById.get(e.from);
       const b = NET.nodeById.get(e.to);

@@ -9,7 +9,7 @@ var ARTEFACTS = [
     effect: "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 Score (needs: streak tracking)",
     conspiracy: "Mothman", url: "https://en.wikipedia.org/wiki/Mothman",
     summary: "Point Pleasant, West Virginia, 1966–67: dozens reported a winged, red-eyed figure. When the Silver Bridge collapsed in 1967 killing 46, the sightings were retold as omens. The wing is the part every witness swears they saw." },
-  { name: "Tinfoil Hat", rarity: "Common", type: "Passive", bonus: ["Score"], status: "REWORK",
+  { name: "Tinfoil Hat", rarity: "Common", type: "Passive", bonus: ["Score"], status: "KEEP",
     effect: "+15% Score gain; -5% Gold gain",
     conspiracy: "Tin foil hat", url: "https://en.wikipedia.org/wiki/Tin_foil_hat",
     summary: "The DIY headgear supposed to block mind-reading and mind-control rays. It became the universal shorthand for conspiracism itself — the one artefact that references all the others." },

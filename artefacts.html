@@ -31,12 +31,27 @@
 
     .art-name { font-weight: 600; font-size: 15px; line-height: 1.3; }
     .art-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    .badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--border); color: var(--text-soft); }
-    .badge.r-common    { color: var(--text-soft); }
-    .badge.r-uncommon  { color: #2e9e5b; border-color: #2e9e5b66; }
-    .badge.r-rare      { color: #3b82d6; border-color: #3b82d666; }
-    .badge.r-legendary { color: #d68a2e; border-color: #d68a2e66; }
-    .badge.st-rework   { color: #c0392b; border-color: #c0392b66; }
+    /* Tag colors mirror the Notion Artefacts DB option colors (Notion tag palette). */
+    .badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 4px; color: rgb(50,48,44); }
+    .nc-gray   { background: rgb(227,226,224); }
+    .nc-brown  { background: rgb(238,224,218); }
+    .nc-orange { background: rgb(250,222,201); }
+    .nc-yellow { background: rgb(253,236,200); }
+    .nc-green  { background: rgb(219,237,219); }
+    .nc-blue   { background: rgb(211,229,239); }
+    .nc-purple { background: rgb(232,222,238); }
+    .nc-pink   { background: rgb(245,224,233); }
+    .nc-red    { background: rgb(255,226,221); }
+    [data-theme="dark"] .badge { color: rgba(255,255,255,0.85); }
+    [data-theme="dark"] .nc-gray   { background: rgb(90,90,90); }
+    [data-theme="dark"] .nc-brown  { background: rgb(96,59,44); }
+    [data-theme="dark"] .nc-orange { background: rgb(133,76,29); }
+    [data-theme="dark"] .nc-yellow { background: rgb(137,99,42); }
+    [data-theme="dark"] .nc-green  { background: rgb(43,89,63); }
+    [data-theme="dark"] .nc-blue   { background: rgb(40,69,108); }
+    [data-theme="dark"] .nc-purple { background: rgb(73,47,100); }
+    [data-theme="dark"] .nc-pink   { background: rgb(105,49,76); }
+    [data-theme="dark"] .nc-red    { background: rgb(110,54,48); }
 
     .art-effect { font-size: 14px; line-height: 1.5; }
     .needs-flag { display: inline-block; font-size: 11px; color: var(--text-soft); background: var(--surface);
@@ -102,12 +117,22 @@
     return effect.replace(/\(needs: ([^)]+)\)/, '<span class="needs-flag">needs: $1</span>');
   }
 
+  // Option colors as set in the Notion Artefacts DB schema (all option names are unique across properties).
+  const TAG_COLOR = {
+    Common: 'gray', Uncommon: 'green', Rare: 'blue', Legendary: 'purple',
+    Passive: 'orange', Trigger: 'purple',
+    Score: 'yellow', Time: 'blue', Gold: 'orange', Piece: 'green', Action: 'red',
+    Buff: 'purple', Item: 'pink', Shop: 'brown', Special: 'gray',
+    '?': 'gray', REWORK: 'orange', KEEP: 'green', REMOVE: 'red'
+  };
+  const badge = v => `<span class="badge nc-${TAG_COLOR[v] || 'gray'}">${v}</span>`;
+
   function rowHtml(a) {
     const badges = [
-      `<span class="badge r-${a.rarity.toLowerCase()}">${a.rarity}</span>`,
-      `<span class="badge">${a.type}</span>`,
-      ...a.bonus.map(b => `<span class="badge">${b}</span>`),
-      a.status !== 'KEEP' ? `<span class="badge st-${a.status.toLowerCase()}">${a.status}</span>` : ''
+      badge(a.rarity),
+      badge(a.type),
+      ...a.bonus.map(badge),
+      a.status !== 'KEEP' ? badge(a.status) : ''
     ].join('');
     return `<div class="art-row">
       <div><div class="art-name">${a.name}</div><div class="art-badges">${badges}</div></div>

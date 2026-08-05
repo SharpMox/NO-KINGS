@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="assets/site.css">
   <script src="data/artefacts.js"></script>
   <style>
-    header { max-width: 1280px; margin: 0 auto; padding: 32px 24px 16px; }
+    header { max-width: 1500px; margin: 0 auto; padding: 32px 24px 16px; }
     h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
     .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
     .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
@@ -27,20 +27,20 @@
       display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
     .theme-toggle:hover { color: var(--accent); }
 
-    main { max-width: 1280px; margin: 0 auto; padding: 0 24px 64px; }
-    .art-head, .art-row { display: grid; grid-template-columns: 220px 1fr 1.4fr; gap: 16px; padding: 14px 12px; }
+    main { max-width: 1500px; margin: 0 auto; padding: 0 24px 64px; }
+    .art-head, .art-row { display: grid; grid-template-columns: 220px 1fr 1.4fr 48px; gap: 16px; padding: 14px 12px; }
     .art-head { position: sticky; top: 0; background: var(--bg); border-bottom: 2px solid var(--border);
       font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); z-index: 1; }
     .art-row { border-bottom: 1px solid var(--border); align-items: start; }
     .art-row:hover { background: var(--surface); }
 
     .art-name { font-weight: 600; font-size: 15px; line-height: 1.3; }
-    .name-line { display: flex; align-items: baseline; gap: 6px; }
-    .flag-btn { appearance: none; background: transparent; border: 0; cursor: pointer; padding: 0 2px;
-      font-size: 13px; color: var(--border); line-height: 1; flex: none; }
-    .flag-btn:hover { color: #d68a2e; }
-    .art-row.flagged { box-shadow: inset 3px 0 0 #d68a2e; }
-    .art-row.flagged .flag-btn { color: #d68a2e; }
+    .flag-btn { appearance: none; width: 40px; height: 40px; cursor: pointer; font-size: 18px; line-height: 1;
+      background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text-soft);
+      display: inline-flex; align-items: center; justify-content: center; justify-self: end; }
+    .flag-btn:hover { border-color: #d68a2e; color: #d68a2e; }
+    .art-row.flagged { box-shadow: inset -3px 0 0 #d68a2e; }
+    .art-row.flagged .flag-btn { background: #d68a2e; border-color: #d68a2e; color: #fff; }
     .flag-note { font-size: 12px; color: #d68a2e; margin-top: 4px; font-style: italic; }
     .art-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
     /* Tag colors mirror the Notion Artefacts DB option colors (Notion tag palette). */
@@ -78,7 +78,8 @@
       h1 { font-size: 24px; }
       .theme-toggle { margin-left: 0; }
       .art-head { display: none; }
-      .art-row { grid-template-columns: 1fr; gap: 8px; padding: 16px 4px; }
+      .art-row { grid-template-columns: 1fr; gap: 8px; padding: 16px 4px; position: relative; }
+      .flag-btn { position: absolute; top: 12px; right: 4px; }
     }
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
@@ -114,7 +115,7 @@
   </header>
 
   <main>
-    <div class="art-head" aria-hidden="true"><span>Name</span><span>Effect</span><span>Conspiracy</span></div>
+    <div class="art-head" aria-hidden="true"><span>Name</span><span>Effect</span><span>Conspiracy</span><span>Flag</span></div>
     <div id="art-rows"></div>
   </main>
 
@@ -163,7 +164,7 @@
     const note = flagged && flags[a.name] ? `<div class="flag-note">⚑ ${flags[a.name]}</div>` : '';
     return `<div class="art-row${flagged ? ' flagged' : ''}" data-i="${i}">
       <div>
-        <div class="name-line"><button class="flag-btn" data-i="${i}" title="${flagged ? 'Unflag' : 'Flag as REWORK'}" aria-label="${flagged ? 'Unflag' : 'Flag as REWORK'} ${a.name}" aria-pressed="${flagged}">⚑</button><div class="art-name">${a.name}</div></div>
+        <div class="art-name">${a.name}</div>
         <div class="art-badges">${badges}</div>${note}
       </div>
       <div class="art-effect">${effectHtml(a.effect)}</div>
@@ -171,6 +172,7 @@
         <span class="conspiracy-name"><a href="${a.url}" target="_blank" rel="noopener">${a.conspiracy}</a></span>
         ${a.summary}
       </div>
+      <button class="flag-btn" data-i="${i}" title="${flagged ? 'Unflag' : 'Flag as REWORK'}" aria-label="${flagged ? 'Unflag' : 'Flag as REWORK'} ${a.name}" aria-pressed="${flagged}">⚑</button>
     </div>`;
   }
 

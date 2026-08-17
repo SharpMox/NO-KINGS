@@ -1,6 +1,6 @@
 /* Artefacts catalog — exported from the Notion Artefacts DB; last resync 2026-08-16 (humor pass, 57 renames).
    NOTE: Notion sync PENDING for this pass (MCP was disconnected) — the site is ahead of Notion until applied.
-   150 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy, url, summary }. */
+   158 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy, url, summary }. */
 
 var ARTEFACTS = [
   // ── Common ──────────────────────────────────────────────────────
@@ -534,6 +534,26 @@ var ARTEFACTS = [
     effect: "Your pieces can carry 2 Piece Buffs at once (needs: multi-buff per piece)",
     conspiracy: "Abduction implants", url: "https://en.wikipedia.org/wiki/Alien_abduction",
     summary: "Abductees report small objects left under the skin — tracking devices, the lore says. The removed specimens that reach laboratories assay as ordinary terrestrial metal and glass, which the lore was ready for: of course they do." },
+  { name: "Tutankhamun's Death Thong", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
+    effect: "Whenever an enemy piece captures one of your pieces: the capturer gets a Slow debuff (needs: enemy auto-debuff)",
+    conspiracy: "The curse of the pharaohs", url: "https://en.wikipedia.org/wiki/Curse_of_the_pharaohs",
+    summary: "Lord Carnarvon died months after opening the tomb and the papers billed every later death to the curse. The tomb genuinely contained the king's sandals — thongs, technically — and whoever disturbs them leaves slower than they arrived." },
+  { name: "Atlantis Snow Globe", rarity: "Rare", type: "Passive", bonus: ["Special"], status: "KEEP",
+    effect: "Your pieces cannot be Demoted (needs: demotion immunity)",
+    conspiracy: "Atlantis", url: "https://en.wikipedia.org/wiki/Atlantis",
+    summary: "Plato invented a doomed island empire to make a point about hubris; the world took it as a treasure map. Under the glass the city never ages — shake it all you like, nothing degrades." },
+  { name: "Templar Severance Package", rarity: "Rare", type: "Trigger", bonus: ["Gold"], status: "KEEP",
+    effect: "On losing a Ranked piece: +150 Gold",
+    conspiracy: "The Knights Templar", url: "https://en.wikipedia.org/wiki/Knights_Templar",
+    summary: "Warrior-bankers grown richer than kings — arrested en masse on Friday, October 13, 1307, and dissolved with extreme prejudice. Senior members received a memorable exit package, one way or another." },
+  { name: "HAARP Volume Knob", rarity: "Rare", type: "Passive", bonus: ["Score","Gold"], status: "KEEP",
+    effect: "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold (needs: spawn modifier)",
+    conspiracy: "HAARP", url: "https://en.wikipedia.org/wiki/High-frequency_Active_Auroral_Research_Program",
+    summary: "An Alaskan array of 180 antennas for heating the ionosphere — blamed for hurricanes, earthquakes and moods. The knob was right there the whole time. Turn it up and the weather gets productive." },
+  { name: "Zeta Reticuli Souvenir Map", rarity: "Rare", type: "Trigger", bonus: ["Piece"], status: "KEEP",
+    effect: "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock (needs: capture conversion)",
+    conspiracy: "The Hill abduction", url: "https://en.wikipedia.org/wiki/Barney_and_Betty_Hill_incident",
+    summary: "New Hampshire, 1961: the first famous alien-abduction account, complete with a star map drawn under hypnosis. Specimens get taken aboard for the collection — every third one, per the schedule." },
   // ── Legendary ───────────────────────────────────────────────────
   { name: "Stargate Divination Crystal", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP",
     effect: "+1 Action per Turn",
@@ -606,7 +626,19 @@ var ARTEFACTS = [
   { name: "Cheyenne Mountain Doorbell", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
     effect: "Your pieces on your back row cannot be captured (needs: capture-immunity zone)",
     conspiracy: "Cheyenne Mountain", url: "https://en.wikipedia.org/wiki/Cheyenne_Mountain_Complex",
-    summary: "NORAD's city under 2,000 feet of granite, sealed by 25-ton blast doors built to ride out a direct hit. Every continuity-of-government theory ends at these doors — the address where the end of the world checks in." }
+    summary: "NORAD's city under 2,000 feet of granite, sealed by 25-ton blast doors built to ride out a direct hit. Every continuity-of-government theory ends at these doors — the address where the end of the world checks in." },
+  { name: "Nazca Boarding Pass", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
+    effect: "You may Deploy onto any empty square (needs: free deploy placement)",
+    conspiracy: "The Nazca Lines", url: "https://en.wikipedia.org/wiki/Nazca_Lines",
+    summary: "Desert figures kilometres long, fully visible only from the air — ancient-astronaut writers read them as runways. With a valid boarding pass, everywhere is a landing strip." },
+  { name: "Zapruder Reel", rarity: "Legendary", type: "Trigger", bonus: ["Action"], status: "KEEP",
+    effect: "Once per Wave: you may repeat your previous Action without spending an Action (needs: action replay)",
+    conspiracy: "The Zapruder film", url: "https://en.wikipedia.org/wiki/Zapruder_film",
+    summary: "26 seconds of home movie that became the most analyzed film in history — run back frame by frame for sixty years. Own the reel and you can run anything back. Once per showing." },
+  { name: "Templar Debit Card", rarity: "Legendary", type: "Passive", bonus: ["Shop","Special"], status: "KEEP",
+    effect: "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
+    conspiracy: "The Knights Templar", url: "https://en.wikipedia.org/wiki/Knights_Templar",
+    summary: "Real history: the Templars invented proto-banking — deposit in Paris, present your letter, withdraw in Jerusalem, centuries before anyone said wire transfer. The card still works, and it takes your other currency." }
 ];
 
 if (typeof module !== "undefined" && module.exports) module.exports = ARTEFACTS;

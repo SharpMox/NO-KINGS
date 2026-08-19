@@ -1,5 +1,4 @@
-/* Artefacts catalog — exported from the Notion Artefacts DB; last resync 2026-08-16 (humor pass, 57 renames).
-   NOTE: Notion sync PENDING for this pass (MCP was disconnected) — the site is ahead of Notion until applied.
+/* Artefacts catalog — canonical mirror of the Notion Artefacts DB; last verified in lockstep 2026-08-19.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy, url, summary }. */
 
 var ARTEFACTS = [

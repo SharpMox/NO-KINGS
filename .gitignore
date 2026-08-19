@@ -34,3 +34,4 @@ game/.godot/
 
 # Export artifacts (godot --export-debug Android)
 build/
+.DS_Store

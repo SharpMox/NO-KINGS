@@ -115,7 +115,7 @@ EMBLEMS = {
         f'<line x1="43" y1="30" x2="57" y2="44" stroke="{IVORY}" stroke-width="3.5"/>'
         f'<path d="M 34 60 L 66 60 L 70 70 L 30 70 Z" fill="{INK}"/>'
     ),
-    "dragon-horse": (  # Paladin: winged helm + sword
+    "dragon-horse": (  # Cardinal: winged helm + sword
         f'<path d="M 40 34 Q 50 24 60 34 L 60 52 Q 50 60 40 52 Z" fill="{INK}"/>'
         f'<rect x="44" y="38" width="12" height="4" fill="{IVORY}"/>'
         f'<path d="M 38 34 Q 24 30 20 40 Q 30 42 38 40 Z" fill="{GOLD}"/>'
@@ -136,7 +136,7 @@ EMBLEMS = {
         f'<path d="M 34 30 L 34 22 L 41 22 L 41 27 L 46 27 L 46 22 L 54 22 L 54 27 L 59 27 L 59 22 L 66 22 L 66 30 L 61 36 L 61 66 L 66 74 L 34 74 L 39 66 L 39 36 Z" fill="{INK}"/>'
         f'<rect x="46" y="52" width="8" height="14" fill="{IVORY}"/>'
     ),
-    "dragon-king": (  # Drake: dragon head profile
+    "dragon-king": (  # Drakehold: dragon head profile
         f'<path d="M 28 56 Q 30 38 48 34 Q 62 30 70 40 L 78 44 L 68 48 Q 66 58 54 60 L 58 68 L 46 64 Q 32 66 28 56 Z" fill="{INK}"/>'
         f'<circle cx="58" cy="42" r="2.8" fill="{IVORY}"/>'
         f'<path d="M 46 33 L 42 22 L 52 30 Z" fill="{GOLD}"/>'
@@ -155,12 +155,12 @@ EMBLEMS = {
         f'<circle cx="52" cy="32" r="2.6" fill="{IVORY}"/>'
         f'<path d="M 55 22 L 60 28 L 54 28 Z" fill="{IVORY}"/>'
     ),
-    "gnu": (  # Hippogriff: horse head + swept wing
+    "gnu": (  # Pegasus: horse head + swept wing
         f'<path d="M 40 76 L 42 54 Q 33 50 35 40 Q 39 27 53 26 L 51 20 L 59 26 Q 69 31 69 46 L 66 76 Z" fill="{INK}"/>'
         f'<circle cx="53" cy="35" r="2.5" fill="{IVORY}"/>'
         f'<path d="M 64 50 Q 82 40 86 26 Q 72 30 62 42 Z" fill="{GOLD}"/>'
     ),
-    "buffalo": (  # Behemoth: horned bull head, front view
+    "buffalo": (  # Hippogriff: horned bull head, front view
         f'<path d="M 36 40 Q 50 30 64 40 L 62 62 Q 50 74 38 62 Z" fill="{INK}"/>'
         f'<path d="M 36 42 Q 20 38 18 24 Q 32 26 40 36 Z" fill="{INK}"/>'
         f'<path d="M 64 42 Q 80 38 82 24 Q 68 26 60 36 Z" fill="{INK}"/>'
@@ -168,7 +168,7 @@ EMBLEMS = {
         f'<circle cx="56" cy="48" r="2.8" fill="{RED}"/>'
         f'<path d="M 46 64 Q 50 68 54 64 L 54 70 L 46 70 Z" fill="{GOLD}"/>'
     ),
-    # ---- Kirin chain: antlered head, gaining halo then stars ----
+    # ---- Long Ma chain: antlered head, gaining halo then stars ----
     "kirin": (
         f'<path d="M 40 78 L 42 56 Q 34 50 38 40 Q 44 30 56 30 L 54 24 L 62 30 Q 70 36 68 48 L 64 78 Z" fill="{INK}"/>'
         f'<path d="M 50 30 Q 44 18 34 16 Q 40 26 46 30 Z" fill="{GOLD}"/>'
@@ -189,15 +189,15 @@ EMBLEMS = {
         f'<path d="M 56 32 Q 56 20 48 14 Q 52 24 52 32 Z" fill="{GOLD}"/>'
         f'<circle cx="55" cy="42" r="2.5" fill="{GOLD}"/>'
     ),
-    # ---- Wanderer chain: traveler -> praetorian -> queen ----
-    "alibaba": (  # Wanderer: wide-brim hat + walking staff
+    # ---- Duchess chain: traveler -> praetorian -> queen ----
+    "alibaba": (  # Duchess: wide-brim hat + walking staff
         f'<path d="M 28 40 Q 50 28 72 40 L 66 44 L 34 44 Z" fill="{INK}"/>'
         f'<circle cx="50" cy="34" r="8" fill="{INK}"/>'
         f'<path d="M 40 48 Q 50 44 60 48 L 64 78 L 36 78 Z" fill="{INK}"/>'
         f'<line x1="68" y1="30" x2="68" y2="82" stroke="{INK}" stroke-width="4"/>'
         f'<circle cx="68" cy="28" r="3.5" fill="{GOLD}"/>'
     ),
-    "bodyguard": (  # Praetorian: crested full-face helm over a tall shield
+    "bodyguard": (  # Princess: crested full-face helm over a tall shield
         f'<path d="M 44 20 Q 42 10 50 6 Q 58 10 56 20 Z" fill="{RED}"/>'
         f'<path d="M 38 30 Q 50 20 62 30 L 62 50 Q 50 58 38 50 Z" fill="{INK}"/>'
         f'<line x1="50" y1="32" x2="50" y2="52" stroke="{IVORY}" stroke-width="2.5"/>'
@@ -253,13 +253,13 @@ EMBLEMS = {
         f'<line x1="64" y1="50" x2="28" y2="50"/></g>'
         f'<path d="M 28 50 L 38 44 L 35 50 L 38 56 Z" fill="none" stroke="{INK}" stroke-width="2.5"/>'
     ),
-    "inv-kirin-plus": (  # Void Kirin: hollow kirin head
+    "inv-kirin-plus": (  # Void Qi Lin: hollow kirin head
         f'<g fill="none" stroke="{INK}" stroke-width="3.5">'
         f'<path d="M 40 78 L 42 58 Q 34 52 38 42 Q 44 32 56 32 L 54 26 L 62 32 Q 70 38 68 50 L 64 78 Z"/>'
         f'<path d="M 50 32 Q 44 20 34 18 Q 40 28 46 32 Z"/>'
         f'<path d="M 56 30 Q 56 18 48 12 Q 52 22 52 30 Z"/></g>'
     ),
-    "inv-kirin-plus-plus": (  # Void Celestial Kirin: hollow + hollow stars
+    "inv-kirin-plus-plus": (  # Void Ying Long: hollow + hollow stars
         f'<g fill="none" stroke="{INK}" stroke-width="3.5">'
         f'<path d="M 40 80 L 42 60 Q 34 54 38 44 Q 44 34 56 34 L 54 28 L 62 34 Q 70 40 68 52 L 64 80 Z"/>'
         f'<path d="M 50 34 Q 44 22 34 20 Q 40 30 46 34 Z"/>'

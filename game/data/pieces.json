@@ -359,7 +359,7 @@
  },
  "high-priestess": {
   "id": "high-priestess",
-  "name": "High Priestess",
+  "name": "Shaman",
   "glyph": "HP",
   "value": 50,
   "next": null,
@@ -611,7 +611,7 @@
  },
  "dragon-horse": {
   "id": "dragon-horse",
-  "name": "Paladin",
+  "name": "Cardinal",
   "glyph": "馬",
   "value": 50,
   "next": "archbishop",
@@ -767,7 +767,7 @@
  },
  "dragon-king": {
   "id": "dragon-king",
-  "name": "Drake",
+  "name": "Drakehold",
   "glyph": "龍",
   "value": 70,
   "next": "chancellor",
@@ -938,7 +938,7 @@
  },
  "gnu": {
   "id": "gnu",
-  "name": "Hippogriff",
+  "name": "Pegasus",
   "glyph": "GU",
   "value": 50,
   "next": "buffalo",
@@ -1017,7 +1017,7 @@
  },
  "buffalo": {
   "id": "buffalo",
-  "name": "Behemoth",
+  "name": "Hippogriff",
   "glyph": "BF",
   "value": 70,
   "next": null,
@@ -1128,7 +1128,7 @@
  },
  "kirin": {
   "id": "kirin",
-  "name": "Kirin",
+  "name": "Long Ma",
   "glyph": "Ki",
   "value": 30,
   "next": "kirin-plus",
@@ -1175,7 +1175,7 @@
  },
  "kirin-plus": {
   "id": "kirin-plus",
-  "name": "Sacred Kirin",
+  "name": "Qi Lin",
   "glyph": "Ki+",
   "value": 50,
   "next": "kirin-plus-plus",
@@ -1254,7 +1254,7 @@
  },
  "inv-kirin-plus": {
   "id": "inv-kirin-plus",
-  "name": "Void Kirin",
+  "name": "Void Qi Lin",
   "glyph": "iKi+",
   "value": 50,
   "next": null,
@@ -1333,7 +1333,7 @@
  },
  "kirin-plus-plus": {
   "id": "kirin-plus-plus",
-  "name": "Celestial Kirin",
+  "name": "Ying Long",
   "glyph": "Ki++",
   "value": 80,
   "next": null,
@@ -1460,7 +1460,7 @@
  },
  "inv-kirin-plus-plus": {
   "id": "inv-kirin-plus-plus",
-  "name": "Void Celestial Kirin",
+  "name": "Void Ying Long",
   "glyph": "iKi++",
   "value": 80,
   "next": null,
@@ -1603,7 +1603,7 @@
  },
  "alibaba": {
   "id": "alibaba",
-  "name": "Wanderer",
+  "name": "Duchess",
   "glyph": "AD",
   "value": 20,
   "next": "bodyguard",
@@ -1650,7 +1650,7 @@
  },
  "bodyguard": {
   "id": "bodyguard",
-  "name": "Praetorian",
+  "name": "Princess",
   "glyph": "BG",
   "value": 50,
   "next": "queen",
@@ -1825,7 +1825,7 @@
  },
  "crown-princess": {
   "id": "crown-princess",
-  "name": "Crown Princess",
+  "name": "Praetor",
   "glyph": "CP",
   "value": 80,
   "next": null,
@@ -1997,7 +1997,7 @@
  },
  "gryphon": {
   "id": "gryphon",
-  "name": "Gryphon",
+  "name": "Hydra",
   "glyph": "GP",
   "value": 60,
   "next": null,
@@ -2102,7 +2102,7 @@
  },
  "manticore": {
   "id": "manticore",
-  "name": "Manticore",
+  "name": "Kraken",
   "glyph": "MN",
   "value": 60,
   "next": null,
@@ -2207,7 +2207,7 @@
  },
  "godzilla": {
   "id": "godzilla",
-  "name": "Godzilla",
+  "name": "Leviathan",
   "glyph": "GZ",
   "value": 110,
   "next": null,
@@ -2408,7 +2408,7 @@
  },
  "banshee": {
   "id": "banshee",
-  "name": "Banshee",
+  "name": "Djinn",
   "glyph": "Bn",
   "value": 80,
   "next": null,
@@ -2528,7 +2528,7 @@
  },
  "raven": {
   "id": "raven",
-  "name": "Raven",
+  "name": "Lich",
   "glyph": "Rv",
   "value": 90,
   "next": null,

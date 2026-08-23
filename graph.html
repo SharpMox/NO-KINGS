@@ -547,7 +547,7 @@
    * ============================================================ */
   const VOID_IDS = new Set(['berolina','inv-sergeant','inv-arrow-pawn','inv-kirin-plus','inv-kirin-plus-plus']);
   // Output-only pieces (never a fusion input) are dropped from the matrix axes.
-  // Raven + Banshee are now inputs (Raven + Banshee = Valkyrie), so they stay.
+  // Lich + Djinn are now inputs (Lich + Djinn = Valkyrie), so they stay.
   const RESULT_ONLY_IDS = new Set(['godzilla','amazonrider']);
   const ALL_PIECES = PIECES_CODEX.filter(p => !VOID_IDS.has(p.id));      // 33 non-Void for Matrix tab
   const ALL_PIECES_INCL_VOID = PIECES_CODEX;                              // 38 for Pieces + Graph tabs

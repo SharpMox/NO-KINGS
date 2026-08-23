@@ -251,7 +251,7 @@
           <tr data-token="p"><td><code>p</code></td><td>Pao-style hop: capture by jumping over one piece on a line</td><td><code>cpR</code> = Cannon's hop-capture along Rook lines</td></tr>
           <tr data-token="g"><td><code>g</code></td><td>Grasshopper hop: must jump over one piece, land immediately past it</td><td><code>gQ</code> = Grasshopper, <code>gB</code> = Bishopper</td></tr>
           <tr data-token="z"><td><code>z</code></td><td>Zigzag bend: turns 90° after each step</td><td><code>zB</code> = Boyscout (crooked Bishop)</td></tr>
-          <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Gryphon, <code>t[WB]</code> = Manticore</td></tr>
+          <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Hydra, <code>t[WB]</code> = Kraken</td></tr>
         </tbody>
       </table></div>
 
@@ -276,7 +276,7 @@
           <tr><td><code>gQ</code></td><td>Grasshopper</td><td>(g)rasshopper hop along (Q)ueen lines</td></tr>
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag crooked (B)ishop — diagonal steps that bend 90° each move</td></tr>
           <tr><td><code>mfWcfFimfnD</code></td><td>Pawn</td><td>(m)ove (f)orward (W)azir + (c)apture (f)orward (F)erz + (i)nitial-only (m)ove (f)orward (n)on-jumping (D)abbaba</td></tr>
-          <tr><td><code>t[FR]</code></td><td>Gryphon</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
+          <tr><td><code>t[FR]</code></td><td>Hydra</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
           <tr><td><code>Q (edges)</code></td><td>Edgehog</td><td>Queen movement restricted to start/end on a board-edge square</td></tr>
         </tbody>
@@ -854,16 +854,16 @@
     // First 4 are visible by default — keep the most distinctive shapes here.
     { betza: 'mfWcfFimfnD',   name: 'Pawn' },
     { betza: 'NN',            name: 'Nightrider' },
-    { betza: 't[FR]',         name: 'Gryphon' },
-    { betza: 't[FR]t[WB]',    name: 'Godzilla' },
+    { betza: 't[FR]',         name: 'Hydra' },
+    { betza: 't[FR]t[WB]',    name: 'Leviathan' },
     // The rest live behind the expand pill.
     { betza: 'Q2',            name: 'Bodyguard' },
     { betza: 'mRcpR',         name: 'Cannon' },
     { betza: 'gQ',            name: 'Grasshopper' },
     { betza: 'zB',            name: 'Boyscout' },
     { betza: 'WAD',           name: 'Champion' },
-    { betza: 'FAN',           name: 'High Priestess' },
-    { betza: 't[WB]',         name: 'Manticore' },
+    { betza: 'FAN',           name: 'Shaman' },
+    { betza: 't[WB]',         name: 'Kraken' },
     { betza: 'K',             name: 'King' },
     { betza: 'Q',             name: 'Queen' },
     { betza: 'R',             name: 'Rook' },
@@ -873,12 +873,12 @@
     { betza: 'QN',            name: 'Amazon' },
     { betza: 'BN',            name: 'Archbishop' },
     { betza: 'RN',            name: 'Dragonlord' },
-    { betza: 'BNN',           name: 'Banshee' },
-    { betza: 'RNN',           name: 'Raven' },
+    { betza: 'BNN',           name: 'Djinn' },
+    { betza: 'RNN',           name: 'Lich' },
     { betza: 'QNN',           name: 'Valkyrie' },
     { betza: 'WD',            name: 'Sorcerer' },
-    { betza: 'FD',            name: 'Kirin' },
-    { betza: 'FDC',           name: 'Sacred Kirin' }
+    { betza: 'FD',            name: 'Long Ma' },
+    { betza: 'FDC',           name: 'Qi Lin' }
   ];
   // Fewer presets stay visible on phones so the collapsed row fits without a
   // horizontal scroll; the rest live behind the "+N more" pill.

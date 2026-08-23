@@ -1911,7 +1911,7 @@
  },
  "amazon": {
   "id": "amazon",
-  "name": "Amazon",
+  "name": "Consul",
   "glyph": "A",
   "value": 120,
   "next": null,

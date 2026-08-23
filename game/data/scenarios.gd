@@ -77,8 +77,8 @@ static func all() -> Array:
 		_chain("Bishop chain", "bishop", "dragon-horse"),
 		_chain("Rook chain", "rook", "dragon-king"),
 		_chain("Knight chain", "knight", "gnu"),
-		_chain("Kirin chain", "kirin", "kirin-plus"),
-		_chain("Wanderer chain", "alibaba", "bodyguard"),
+		_chain("Long Ma chain", "kirin", "kirin-plus"),
+		_chain("Duchess chain", "alibaba", "bodyguard"),
 		# --- reward economy ---
 		{"name": "Box pick (capture the gold badge)", "cfg": {
 			"board": [["queen", 0, 3, 3], ["pawn", 1, 3, 4, "buff"], ["pawn", 1, 1, 5, "buff"], ["knight", 0, 1, 3]]}},

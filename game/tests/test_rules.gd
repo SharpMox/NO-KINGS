@@ -72,7 +72,7 @@ func _init() -> void:
 	check(Rules.moves_for(b, Vector2i(3, 3), defs).has(Vector2i(4, 4)),
 		"archer captures diagonally (capture-only squares)")
 
-	# --- move-gen: nightrider chains (Banshee/Raven/Valkyrie) ---
+	# --- move-gen: nightrider chains (Djinn/Lich/Valkyrie) ---
 	b = {Vector2i(3, 3): piece("banshee", Rules.PLAYER)}
 	var nr := Rules.moves_for(b, Vector2i(3, 3), defs)
 	check(nr.has(Vector2i(4, 5)) and nr.has(Vector2i(5, 7)), "nightrider rides repeated leaps")
@@ -80,7 +80,7 @@ func _init() -> void:
 	nr = Rules.moves_for(b, Vector2i(3, 3), defs)
 	check(not nr.has(Vector2i(5, 7)), "a blocker on the chain stops the nightrider")
 
-	# --- move-gen: bent-riders (Gryphon) ---
+	# --- move-gen: bent-riders (Hydra) ---
 	b = {Vector2i(2, 2): piece("gryphon", Rules.PLAYER)}
 	var gm := Rules.moves_for(b, Vector2i(2, 2), defs)
 	check(gm.has(Vector2i(3, 3)), "gryphon can stop on the pivot")
@@ -102,7 +102,7 @@ func _init() -> void:
 	check(Rules.merge_result(["knight", "alibaba"], defs, fus) == "squirrel",
 		"fusion can produce fusion-only pieces")
 	check(Rules.merge_result(["ferz", "rook"], defs, fus) == "gryphon",
-		"bent-rider fusions are live (Seer + Rook -> Gryphon)")
+		"bent-rider fusions are live (Seer + Rook -> Hydra)")
 	check(Rules.merge_result(["pawn", "rook"], defs, fus) == "",
 		"non-fusion pair does not merge")
 	check(Rules.merge_result(["pawn", "pawn", "pawn"], defs, fus) == "",

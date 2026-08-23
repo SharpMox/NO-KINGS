@@ -38,7 +38,7 @@ character scale similar across the set (heads roughly the same size).
 |---|---|
 | `ferz.png` | **Seer** — an old fortune-teller clutching a small crystal orb, patched robes, eyes closed in concentration. Rank 1 — humble mystic. |
 | `elephant-modern.png` | **Mystic** — a robed diviner levitating two glowing runestones, ornate headwrap, arcane sigils on the sleeves. Rank 2. |
-| `high-priestess.png` | **High Priestess** — a regal oracle with a crescent diadem, layered ceremonial robes, an aura of floating glyphs. Rank 3 — serene and powerful. |
+| `high-priestess.png` | **Shaman** — a regal oracle with a crescent diadem, layered ceremonial robes, an aura of floating glyphs. Rank 3 — serene and powerful. |
 
 ### Mage chain (orthogonal casters)
 | File | Prompt |
@@ -51,35 +51,35 @@ character scale similar across the set (heads roughly the same size).
 | File | Prompt |
 |---|---|
 | `bishop.png` | A classic chess Bishop reimagined as a cleric with a tall mitre and crozier, calm expression. Rank 1. |
-| `dragon-horse.png` | **Paladin** — an armored holy knight with a winged helm, glowing longsword and tower shield bearing a sun emblem. Rank 2. |
+| `dragon-horse.png` | **Cardinal** — an armored holy knight with a winged helm, glowing longsword and tower shield bearing a sun emblem. Rank 2. |
 | `archbishop.png` | **Archbishop** — a militant high cleric in gilded plate-and-vestments, radiant staff, halo-like ring behind the head. Rank 3. |
 
 ### Rook chain
 | File | Prompt |
 |---|---|
 | `rook.png` | A classic stone tower rook with weathered battlements and an oak gate, ivy at the base. Rank 1. |
-| `dragon-king.png` | **Drake** — a young wingless dragon coiled around a broken tower, scales like river stone. Rank 2. |
+| `dragon-king.png` | **Drakehold** — a young wingless dragon coiled around a broken tower, scales like river stone. Rank 2. |
 | `chancellor.png` | **Dragonlord** — an armored dragon-rider atop a battle-scarred drake, lance raised, banners streaming. Rank 3. |
 
 ### Knight chain
 | File | Prompt |
 |---|---|
 | `knight.png` | A classic chess knight as an armored horse head with flowing mane, proud profile. Rank 1. |
-| `gnu.png` | **Hippogriff** — a half-eagle half-horse rearing with wings flared, fierce golden eyes. Rank 2. |
-| `buffalo.png` | **Behemoth** — a colossal horned beast with stone-like hide and glowing rune brands, lowered charging head. Rank 3. |
+| `gnu.png` | **Pegasus** — a half-eagle half-horse rearing with wings flared, fierce golden eyes. Rank 2. |
+| `buffalo.png` | **Hippogriff** — a colossal horned beast with stone-like hide and glowing rune brands, lowered charging head. Rank 3. |
 
-### Kirin chain (celestial)
+### Long Ma chain (celestial)
 | File | Prompt |
 |---|---|
-| `kirin.png` | **Kirin** — an elegant East-Asian kirin (dragon-deer) with a single antler and flowing tail, light flame wisps at the hooves. Rank 1. |
-| `kirin-plus.png` | **Sacred Kirin** — the kirin ascendant, golden antlers, mane of soft fire, faint halo. Rank 2. |
-| `kirin-plus-plus.png` | **Celestial Kirin** — the kirin fully divine, galaxy-patterned coat, twin flowing antlers, ring of small stars orbiting it. Rank 3. |
+| `kirin.png` | **Long Ma** — an elegant East-Asian kirin (dragon-deer) with a single antler and flowing tail, light flame wisps at the hooves. Rank 1. |
+| `kirin-plus.png` | **Qi Lin** — the kirin ascendant, golden antlers, mane of soft fire, faint halo. Rank 2. |
+| `kirin-plus-plus.png` | **Ying Long** — the kirin fully divine, galaxy-patterned coat, twin flowing antlers, ring of small stars orbiting it. Rank 3. |
 
-### Wanderer chain
+### Duchess chain
 | File | Prompt |
 |---|---|
-| `alibaba.png` | **Wanderer** — a cloaked traveler with a walking staff and heavy satchel, face in hood shadow, dusty boots. Rank 1. |
-| `bodyguard.png` | **Praetorian** — an elite royal guard in ornate half-plate with a halberd and full-face helm, unshakeable stance. Rank 2. |
+| `alibaba.png` | **Duchess** — a cloaked traveler with a walking staff and heavy satchel, face in hood shadow, dusty boots. Rank 1. |
+| `bodyguard.png` | **Princess** — an elite royal guard in ornate half-plate with a halberd and full-face helm, unshakeable stance. Rank 2. |
 | `queen.png` | **Queen** — a commanding warrior-queen with a tall crown, ceremonial sword, and flowing regal mantle. Rank 3 — the strongest piece. |
 
 ### Enemy boss

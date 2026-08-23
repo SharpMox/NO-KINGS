@@ -198,7 +198,7 @@ func show_preview(id: String) -> void:
 	box.add_child(title)
 
 	var dia := Control.new()
-	var cells := 9 # covers the longest leap (Celestial Kirin's 4)
+	var cells := 9 # covers the longest leap (Ying Long's 4)
 	var cell := 30
 	dia.custom_minimum_size = Vector2(cells, cells) * cell
 	dia.draw.connect(g._draw_preview_diagram.bind(dia, id, cells, cell))

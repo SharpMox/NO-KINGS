@@ -40,10 +40,15 @@ toggle, `fp-theme` in localStorage), `tabs.js` (per-page tab persistence).
 
 **Data is the single source of truth** in `data/`: `pieces-codex.js` (38 pieces),
 `pieces-encyclopedia.js` (100), `promotions.js` (8 chains), `fusions.js` (additive +
-synergistic). Pages load these via `<script src>` and derive everything (graph edges,
-matrix cells, card relations, counts) from them. **Do not keep inline copies of this
-data** — past bugs came from pages duplicating `PIECES`/`FUSIONS` inline and drifting;
-load the shared file instead.
+synergistic), `inversions.js` (14 pairs). Pages load these via `<script src>` and derive
+everything (graph edges, matrix cells, card relations, counts) from them. **Do not keep
+inline copies of this data** — past bugs came from pages duplicating `PIECES`/`FUSIONS`
+inline and drifting; load the shared file instead.
+
+A `data/` edit therefore reaches every page with **no rebuild** — the pages hardcode
+nothing and read it at load time. The one thing to re-run is
+`node tools/export-game-pieces.mjs`, which regenerates `game/data/pieces.json` +
+`fusions.json` for the Godot side.
 
 ### Conventions
 

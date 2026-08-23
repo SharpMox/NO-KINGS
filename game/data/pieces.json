@@ -35,7 +35,7 @@
  "berolina": {
   "id": "berolina",
   "name": "Void Pawn",
-  "glyph": "BP",
+  "glyph": "vP",
   "value": 10,
   "next": null,
   "moves": [
@@ -68,7 +68,7 @@
  "sergeant": {
   "id": "sergeant",
   "name": "Ranger",
-  "glyph": "SG",
+  "glyph": "Rg",
   "value": 20,
   "next": "arrow-pawn",
   "moves": [
@@ -121,7 +121,7 @@
  "inv-sergeant": {
   "id": "inv-sergeant",
   "name": "Void Ranger",
-  "glyph": "iSg",
+  "glyph": "vRg",
   "value": 20,
   "next": null,
   "moves": [
@@ -174,7 +174,7 @@
  "arrow-pawn": {
   "id": "arrow-pawn",
   "name": "Archer",
-  "glyph": "AP",
+  "glyph": "Ar",
   "value": 30,
   "next": null,
   "moves": [
@@ -228,7 +228,7 @@
  "inv-arrow-pawn": {
   "id": "inv-arrow-pawn",
   "name": "Void Archer",
-  "glyph": "iAP",
+  "glyph": "vAr",
   "value": 30,
   "next": null,
   "moves": [
@@ -282,7 +282,7 @@
  "ferz": {
   "id": "ferz",
   "name": "Seer",
-  "glyph": "F",
+  "glyph": "Se",
   "value": 20,
   "next": "elephant-modern",
   "moves": [
@@ -313,7 +313,7 @@
  "elephant-modern": {
   "id": "elephant-modern",
   "name": "Mystic",
-  "glyph": "EM",
+  "glyph": "My",
   "value": 30,
   "next": "high-priestess",
   "moves": [
@@ -360,7 +360,7 @@
  "high-priestess": {
   "id": "high-priestess",
   "name": "Shaman",
-  "glyph": "HP",
+  "glyph": "Sh",
   "value": 50,
   "next": null,
   "moves": [
@@ -439,7 +439,7 @@
  "wazir": {
   "id": "wazir",
   "name": "Mage",
-  "glyph": "W",
+  "glyph": "Mg",
   "value": 20,
   "next": "war-machine",
   "moves": [
@@ -470,7 +470,7 @@
  "war-machine": {
   "id": "war-machine",
   "name": "Sorcerer",
-  "glyph": "WM",
+  "glyph": "So",
   "value": 30,
   "next": "champion",
   "moves": [
@@ -517,7 +517,7 @@
  "champion": {
   "id": "champion",
   "name": "Archmage",
-  "glyph": "Ch",
+  "glyph": "Am",
   "value": 50,
   "next": null,
   "moves": [
@@ -666,7 +666,7 @@
  "archbishop": {
   "id": "archbishop",
   "name": "Archbishop",
-  "glyph": "AR",
+  "glyph": "Ab",
   "value": 70,
   "next": null,
   "moves": [
@@ -822,7 +822,7 @@
  "chancellor": {
   "id": "chancellor",
   "name": "Dragonlord",
-  "glyph": "CH",
+  "glyph": "Dr",
   "value": 80,
   "next": null,
   "moves": [
@@ -939,7 +939,7 @@
  "gnu": {
   "id": "gnu",
   "name": "Pegasus",
-  "glyph": "GU",
+  "glyph": "Pg",
   "value": 50,
   "next": "buffalo",
   "moves": [
@@ -1018,7 +1018,7 @@
  "buffalo": {
   "id": "buffalo",
   "name": "Hippogriff",
-  "glyph": "BF",
+  "glyph": "Hp",
   "value": 70,
   "next": null,
   "moves": [
@@ -1129,7 +1129,7 @@
  "kirin": {
   "id": "kirin",
   "name": "Long Ma",
-  "glyph": "Ki",
+  "glyph": "Lm",
   "value": 30,
   "next": "kirin-plus",
   "moves": [
@@ -1176,7 +1176,7 @@
  "kirin-plus": {
   "id": "kirin-plus",
   "name": "Qi Lin",
-  "glyph": "Ki+",
+  "glyph": "Ql",
   "value": 50,
   "next": "kirin-plus-plus",
   "moves": [
@@ -1255,7 +1255,7 @@
  "inv-kirin-plus": {
   "id": "inv-kirin-plus",
   "name": "Void Qi Lin",
-  "glyph": "iKi+",
+  "glyph": "vQl",
   "value": 50,
   "next": null,
   "moves": [
@@ -1334,7 +1334,7 @@
  "kirin-plus-plus": {
   "id": "kirin-plus-plus",
   "name": "Ying Long",
-  "glyph": "Ki++",
+  "glyph": "Yl",
   "value": 80,
   "next": null,
   "moves": [
@@ -1461,7 +1461,7 @@
  "inv-kirin-plus-plus": {
   "id": "inv-kirin-plus-plus",
   "name": "Void Ying Long",
-  "glyph": "iKi++",
+  "glyph": "vYl",
   "value": 80,
   "next": null,
   "moves": [
@@ -1604,7 +1604,7 @@
  "alibaba": {
   "id": "alibaba",
   "name": "Duchess",
-  "glyph": "AD",
+  "glyph": "Du",
   "value": 20,
   "next": "bodyguard",
   "moves": [
@@ -1651,7 +1651,7 @@
  "bodyguard": {
   "id": "bodyguard",
   "name": "Princess",
-  "glyph": "BG",
+  "glyph": "Pr",
   "value": 50,
   "next": "queen",
   "moves": [
@@ -1747,7 +1747,7 @@
  "squirrel": {
   "id": "squirrel",
   "name": "Faerie",
-  "glyph": "Sq",
+  "glyph": "Fa",
   "value": 50,
   "next": null,
   "moves": [
@@ -1826,7 +1826,7 @@
  "crown-princess": {
   "id": "crown-princess",
   "name": "Praetor",
-  "glyph": "CP",
+  "glyph": "Pt",
   "value": 80,
   "next": null,
   "moves": [
@@ -1912,7 +1912,7 @@
  "amazon": {
   "id": "amazon",
   "name": "Consul",
-  "glyph": "A",
+  "glyph": "Co",
   "value": 120,
   "next": null,
   "moves": [
@@ -1998,7 +1998,7 @@
  "gryphon": {
   "id": "gryphon",
   "name": "Hydra",
-  "glyph": "GP",
+  "glyph": "Hy",
   "value": 60,
   "next": null,
   "moves": [
@@ -2103,7 +2103,7 @@
  "manticore": {
   "id": "manticore",
   "name": "Kraken",
-  "glyph": "MN",
+  "glyph": "Kr",
   "value": 60,
   "next": null,
   "moves": [
@@ -2208,7 +2208,7 @@
  "godzilla": {
   "id": "godzilla",
   "name": "Leviathan",
-  "glyph": "GZ",
+  "glyph": "Lv",
   "value": 110,
   "next": null,
   "moves": [
@@ -2409,7 +2409,7 @@
  "banshee": {
   "id": "banshee",
   "name": "Djinn",
-  "glyph": "Bn",
+  "glyph": "Dj",
   "value": 80,
   "next": null,
   "moves": [
@@ -2529,7 +2529,7 @@
  "raven": {
   "id": "raven",
   "name": "Lich",
-  "glyph": "Rv",
+  "glyph": "Li",
   "value": 90,
   "next": null,
   "moves": [
@@ -2649,7 +2649,7 @@
  "amazonrider": {
   "id": "amazonrider",
   "name": "Valkyrie",
-  "glyph": "Am",
+  "glyph": "Vk",
   "value": 140,
   "next": null,
   "moves": [

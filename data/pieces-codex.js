@@ -164,7 +164,7 @@ var PIECES_CODEX = [
       betza: 'FAN',
       origin: 'Problem chess',
       description: 'Combines the Ferz (1,1), Alfil (2,2), and Knight (1,2) leaps — 16 reachable squares at short range. Not colour-bound, because the Knight component breaks the otherwise diagonal palette.',
-      description_codex: 'Leaps one or two squares diagonally, or makes a two-by-one L-shaped jump. Promotes from Mystic. Formed by fusing Knight and Mystic. Fuses with several partners to form Archbishop, Amazon, and Praetor.',
+      description_codex: 'Leaps one or two squares diagonally, or makes a two-by-one L-shaped jump. Promotes from Mystic. Formed by fusing Knight and Mystic. Fuses with several partners to form Archbishop, Consul, and Praetor.',
       behaviors: ['compound', 'leaper'],
       moves: [
         { kind: 'dots', squares: [
@@ -239,7 +239,7 @@ var PIECES_CODEX = [
       betza: 'B',
       origin: 'Standard',
       description: 'Slides any number of squares diagonally. Each bishop is locked to one square colour for the entire game — a King + 2 same-colour Bishops cannot deliver mate.',
-      description_codex: 'Slides any distance diagonally. Promotes to Cardinal. Fuses with several partners to form Archbishop, Queen, and Amazon, among others.',
+      description_codex: 'Slides any distance diagonally. Promotes to Cardinal. Fuses with several partners to form Archbishop, Queen, and Consul, among others.',
       behaviors: ['long-range', 'color-bound'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -255,7 +255,7 @@ var PIECES_CODEX = [
       betza: 'BW',
       origin: 'Shōgi',
       description: 'A Bishop that also steps one square orthogonally. Created when a Shōgi Bishop is promoted. No longer colour-bound.',
-      description_codex: 'Slides any distance diagonally; also steps one square orthogonally. Promotes from Bishop to Archbishop. Fuses with several partners to form Queen, Amazon, and Praetor.',
+      description_codex: 'Slides any distance diagonally; also steps one square orthogonally. Promotes from Bishop to Archbishop. Fuses with several partners to form Queen, Consul, and Praetor.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -275,7 +275,7 @@ var PIECES_CODEX = [
       betza: 'BN',
       origin: 'Modern',
       description: 'Bishop + Knight combined. Crucially colour-complete: King + Archbishop alone can force mate, unlike King + Bishop or King + Knight on their own.',
-      description_codex: 'Slides any distance diagonally; also makes a two-by-one L-shaped jump. Promotes from Cardinal. Formed by fusing Bishop + Knight or Bishop + Shaman. Fuses with several partners to form Amazon, Praetor, and Djinn.',
+      description_codex: 'Slides any distance diagonally; also makes a two-by-one L-shaped jump. Promotes from Cardinal. Formed by fusing Bishop + Knight or Bishop + Shaman. Fuses with several partners to form Consul, Praetor, and Djinn.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -308,7 +308,7 @@ var PIECES_CODEX = [
       betza: 'RF',
       origin: 'Shōgi',
       description: 'A Rook that also steps one square diagonally. Created when a Shōgi Rook is promoted in the opponent’s last three ranks.',
-      description_codex: 'Slides any distance orthogonally; also steps one square diagonally. Promotes from Rook to Dragonlord. Formed by fusing Rook and Long Ma. Fuses with several partners to form Queen and Amazon.',
+      description_codex: 'Slides any distance orthogonally; also steps one square diagonally. Promotes from Rook to Dragonlord. Formed by fusing Rook and Long Ma. Fuses with several partners to form Queen and Consul.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -325,7 +325,7 @@ var PIECES_CODEX = [
       betza: 'RN',
       origin: 'Modern',
       description: 'Rook + Knight combined. Roughly equal in value to a Queen in most computer studies.',
-      description_codex: 'Slides any distance orthogonally; also makes a two-by-one L-shaped jump. Promotes from Drakehold. Formed by fusing Knight and Rook. Fuses with several partners to form Amazon and Lich.',
+      description_codex: 'Slides any distance orthogonally; also makes a two-by-one L-shaped jump. Promotes from Drakehold. Formed by fusing Knight and Rook. Fuses with several partners to form Consul and Lich.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1]] },
@@ -536,7 +536,7 @@ var PIECES_CODEX = [
       betza: 'Q',
       origin: 'Standard',
       description: 'Slides any number of squares along ranks, files, or diagonals. The most powerful standard piece — Rook + Bishop combined.',
-      description_codex: 'Slides any distance in any of the eight directions. Promotes from Princess. Formed by several fusions, including Bishop + Rook and Bishop + Drakehold. Fuses with several partners to form Amazon.',
+      description_codex: 'Slides any distance in any of the eight directions. Promotes from Princess. Formed by several fusions, including Bishop + Rook and Bishop + Drakehold. Fuses with several partners to form Consul.',
       behaviors: ['long-range', 'compound'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -585,7 +585,7 @@ var PIECES_CODEX = [
     {
       id: 'amazon',
       family: 'compounds',
-      name: 'Amazon',
+      name: 'Consul',
       original_name: 'Amazon',
       aliases: ['Angel', 'Commander', 'Wyvern'],
       letter: 'A',
@@ -734,7 +734,7 @@ var PIECES_CODEX = [
       betza: 'QNN',
       origin: 'Problem chess',
       description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
-      description_codex: 'Slides any distance in any of the eight directions, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Amazon and Knight.',
+      description_codex: 'Slides any distance in any of the eight directions, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Consul and Knight.',
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },

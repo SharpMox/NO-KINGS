@@ -267,7 +267,10 @@ var PIECES_CODEX = [
       family: 'compounds',
       name: 'Archbishop',
       original_name: 'Archbishop',
-      aliases: ['Princess', 'Cardinal', 'Janus'],
+      // 'Princess' and 'Cardinal' dropped: both are now live display names
+      // (bodyguard and dragon-horse). The encyclopedia keeps them — it carries
+      // the Wikipedia naming, where they remain genuine Archbishop aliases.
+      aliases: ['Janus'],
       letter: 'AR',
       betza: 'BN',
       origin: 'Modern',
@@ -568,7 +571,7 @@ var PIECES_CODEX = [
       letter: 'CP',
       betza: 'BNW',
       origin: 'Modern variants',
-      description: 'Archbishop + Wazir — combines Bishop slides, Knight leaps, and one-step orthogonal moves. A short-step extension of the Princess/Archbishop, similar in spirit to Dragon Horse but with the Knight added.',
+      description: 'Archbishop + Wazir — combines Bishop slides, Knight leaps, and one-step orthogonal moves. A short-step extension of the Archbishop, similar in spirit to Dragon Horse but with the Knight added.',
       description_codex: 'Slides any distance diagonally, steps one square orthogonally, or makes a two-by-one L-shaped jump. Formed by several fusions, including Knight + Cardinal and Mage + Archbishop.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [

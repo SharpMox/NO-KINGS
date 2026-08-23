@@ -172,14 +172,14 @@
       font-weight: 600;
       margin: 0;
     }
-    .original-name { font-size: 12px; color: var(--text-soft); margin-top: 2px; font-style: italic; }
     .card-aliases {
       font-size: 12px;
       color: var(--text-soft);
       font-style: italic;
       display: block;
-      margin-top: -4px;
+      margin-top: 2px;
     }
+    .card-new { margin-top: 4px; }
     .card-board {
       align-self: center;
       width: 100%;
@@ -369,6 +369,7 @@
     .badge-direction-restricted { color: #c84545; border-color: #e8a8a8; }
     .badge-compound     { color: #2a8378; border-color: #95c5be; }
     .badge-capture-different { color: #8a4ea8; border-color: #c2a3d0; }
+    .badge-new          { color: #b03a76; border-color: #e3aecb; }
     [data-theme="dark"] .badge-color-bound  { color: #c890e8; border-color: #5d4072; }
     [data-theme="dark"] .badge-leaper       { color: #6ab1ff; border-color: #3a5378; }
     [data-theme="dark"] .badge-hopper       { color: #6dd6a8; border-color: #2f5a44; }
@@ -379,6 +380,7 @@
     [data-theme="dark"] .badge-direction-restricted { color: #ff7878; border-color: #6e3030; }
     [data-theme="dark"] .badge-compound     { color: #6ed4c2; border-color: #2f6056; }
     [data-theme="dark"] .badge-capture-different { color: #c890e8; border-color: #5d4072; }
+    [data-theme="dark"] .badge-new          { color: #ff8ac0; border-color: #6e3053; }
 
     .card.highlight {
       outline: 3px solid var(--accent);
@@ -815,8 +817,12 @@
   }
 
   function renderCard(piece) {
-    const aliases = piece.aliases && piece.aliases.length
-      ? `<span class="card-aliases">aka ${escapeAttr(piece.aliases.join(', '))}</span>` : '';
+    // One provenance line: invented pieces are flagged New, everything else
+    // points back at the encyclopedia entry it was renamed from.
+    const provenance = piece.origin === 'Invented'
+      ? '<div class="card-new"><span class="badge badge-new">New</span></div>'
+      : piece.original_name && piece.original_name !== piece.name
+        ? `<span class="card-aliases">aka ${escapeAttr(piece.original_name)}</span>` : '';
     const betza = piece.betza
       ? `<a class="betza-chip" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${escapeAttr(piece.betza)} in sandbox"><span class="betza-chip-label" aria-hidden="true">Betza</span>${escapeAttr(piece.betza)}</a>`
       : '';
@@ -825,6 +831,7 @@
     ).join('');
     const searchHaystack = [
       piece.name,
+      piece.original_name || '',
       (piece.aliases || []).join(' '),
       piece.betza || '',
       (piece.behaviors || []).join(' '),
@@ -838,8 +845,7 @@
         <div class="card-header">
           <div>
             <h2 class="card-name">${escapeAttr(piece.name)}</h2>
-            ${piece.original_name && piece.original_name !== piece.name ? '<div class="original-name">originally <em>' + escapeAttr(piece.original_name) + '</em></div>' : ''}
-            ${aliases}
+            ${provenance}
           </div>
         </div>
         <div class="card-board">${renderBoard(piece)}</div>
@@ -984,6 +990,11 @@
     ]
   }
 ];
+  // The New category is exactly the invented pieces, which the card badge also reads
+  // off `origin`. Derive it so the tab and the badge can never disagree.
+  const newCat = ROW2_CATEGORIES.find(c => c.id === 'new');
+  if (newCat) newCat.members = PIECES.filter(p => p.origin === 'Invented').map(p => p.id);
+
   for (const c of ROW2_CATEGORIES) {
     const members = c.members.map(id => PIECES.find(p => p.id === id)).filter(Boolean);
     const grid = document.getElementById('grid-cat-' + c.id);
@@ -1154,9 +1165,11 @@
       row.className = 'piece-row';
       row.dataset.pieceId = p.id;
       row.dataset.search = haystack;
-      const behaviors = (p.behaviors || []).map(b =>
-        '<span class="badge badge-' + listEscape(b) + '">' + listEscape(b) + '</span>'
-      ).join('');
+      const behaviors =
+        (p.origin === 'Invented' ? '<span class="badge badge-new">New</span>' : '') +
+        (p.behaviors || []).map(b =>
+          '<span class="badge badge-' + listEscape(b) + '">' + listEscape(b) + '</span>'
+        ).join('');
       const betzaLink = p.betza
         ? '<a class="pieces-betza-link" href="betza.html?b=' + encodeURIComponent(p.betza) + '" target="_blank" rel="noopener">' + listEscape(p.betza) + '</a>'
         : '<span class="pieces-betza">—</span>';

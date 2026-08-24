@@ -125,7 +125,10 @@
     -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
   .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
-  main{max-width:var(--wrap);margin:0 auto;padding:14px 22px 70px}
+  /* The wall of chains runs wider than the --wrap column the hero and footer
+     use, because three fanned chains need the room. Hero and footer are
+     unaffected: they are outside main and set their own max-width. */
+  main{max-width:1860px;margin:0 auto;padding:14px 18px 70px}
   .board{width:100%;height:auto;display:block}
   .betza-pill{font:600 11px/1.4 var(--mono);color:var(--text-soft);background:var(--surface-2);
     border-radius:var(--rad-pill);padding:2px 9px;display:inline-block}
@@ -155,10 +158,10 @@
      3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
      gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
      narrow pages simply wrap to two rather than shrinking the cards to nothing. */
-  --cw-fit:clamp(148px, calc((min(100vw, 1560px) - 70px + 68px) / 9), 184px);
-  /* test: cards 20% over the three-per-row fit. Fonts are fixed px, so only the
-     card and its board grow. Set back to 1 to restore three fans per row. */
-  --card-scale:1.2;
+  --cw-fit:clamp(144px, calc((min(100vw, 1860px) - 52px + 68px) / 9), 184px);
+  /* 1 is the three-per-row fit. Raising it trades a chain per row for bigger
+     cards; at 1.2 the wall drops to two across. */
+  --card-scale:1;
   --cw:calc(var(--cw-fit) * var(--card-scale));
   /* fan step: card width less the ~20px overlap */
   --spread:calc(var(--cw) - 20px)}
@@ -256,7 +259,7 @@ html{overflow-x:clip}
 .dcard:nth-of-type(3) .stg{color:var(--r-legendary)}
 
 /* line close-up: the whole chain, left to right */
-dialog.line{border:0;padding:0;background:transparent;width:min(1060px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
+dialog.line{border:0;padding:0;background:transparent;width:min(1280px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
 dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
 .line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
   background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
@@ -289,17 +292,26 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start}
 .line-p{text-align:center;min-width:0}
 .line-p .board{max-width:230px;margin:0 auto}
-.line-p h3{margin:10px 0 0;font-size:18px;color:var(--text)}
+/* Under the diagram: name, then category + betza, then one tag per line down
+   the left; the description fills the right and spans all of them. Rows are
+   declared explicitly so the spanning cell cannot distribute its slack between
+   the left-hand lines. */
+.line-p{display:grid;grid-template-columns:auto minmax(0,1fr);
+  grid-template-rows:auto auto auto 1fr;column-gap:15px;row-gap:7px;align-content:start;
+  text-align:left}
+.line-p .board{grid-area:1/1/2/3;max-width:230px;margin:0 auto 5px}
+.line-p h3{grid-area:2/1/3/2;margin:0;font-size:17px;line-height:1.15;color:var(--text)}
 .line-p .bz-m,.line-p .fam-m{display:none}
-.line-p .meta{margin:5px 0 0;font:700 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.line-p .meta{grid-area:3/1/4/2;margin:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  font:700 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
 .line-p .meta b{color:var(--violet-hi)}
-/* one row: the betza string sits with the movement tags */
-.line-p .bh{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:9px}
+.line-p .meta .bz{font:600 10.5px/1 var(--mono);letter-spacing:0;text-transform:none;
+  color:var(--lime);background:var(--surface-2);border-radius:var(--pill);padding:3px 8px}
+/* one tag per row, so the column reads as a list beside the description */
+.line-p .bh{grid-area:4/1/5/2;display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:1px 0 0}
 .line-p .bh span{font:700 8.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
   border:1px solid var(--border);border-radius:var(--pill);padding:4px 8px;color:var(--text-soft)}
-.line-p .bh .bz{background:var(--surface-2);border-color:transparent;color:var(--lime);
-  text-transform:none;letter-spacing:0;font-size:10.5px}
-.line-p .ds{margin:10px 0 0;font-size:12px;line-height:1.55;color:var(--text-soft);text-align:left}
+.line-p .ds{grid-area:2/2/5/3;margin:0;font-size:12px;line-height:1.55;color:var(--text-soft)}
 @media(max-width:760px){
   .line-row{grid-template-columns:1fr;gap:50px}
   .metro-strip{display:none}
@@ -309,22 +321,23 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
     backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:4}
   .line-in h2{clear:none;padding-right:44px}
   /* phone: each stage becomes board-beside-text, small diagram */
-  .line-p{display:grid;grid-template-columns:100px minmax(0,1fr);gap:9px 13px;text-align:left;
-    align-items:start}
-  .line-p .board{max-width:100px;margin:0;grid-column:1;grid-row:1/3;align-self:start}
-  .line-p .ds{grid-column:2;grid-row:1;margin:0;font-size:11.5px;line-height:1.5}
-  .line-p .bh{grid-column:2;grid-row:2;justify-content:flex-start;margin:6px 0 0}
-  .line-p h3{grid-column:1/-1;grid-row:3;margin:0;font-size:15px;
+  .line-row .line-p{display:grid;grid-template-columns:100px minmax(0,1fr);
+    grid-template-rows:auto auto auto;gap:9px 13px;text-align:left;align-items:start}
+  .line-row .line-p .board{max-width:100px;margin:0;grid-column:1;grid-row:1/3;align-self:start}
+  .line-row .line-p .ds{grid-column:2;grid-row:1;margin:0;font-size:11.5px;line-height:1.5}
+  .line-row .line-p .bh{grid-column:2;grid-row:2;flex-direction:row;flex-wrap:wrap;
+    justify-content:flex-start;margin:6px 0 0}
+  .line-row .line-p h3{grid-column:1/-1;grid-row:3;margin:0;font-size:15px;
     display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .line-p .bz-m{display:inline-block;font:600 10.5px/1.5 var(--mono);color:var(--lime);
+  .line-row .line-p .bz-m{display:inline-block;font:600 10.5px/1.5 var(--mono);color:var(--lime);
     background:var(--surface-2);border-radius:var(--pill);padding:2px 9px}
-  .line-p .fam-m{display:inline-block;font:700 9px/1 var(--mono);letter-spacing:.12em;
+  .line-row .line-p .fam-m{display:inline-block;font:700 9px/1 var(--mono);letter-spacing:.12em;
     text-transform:uppercase;color:var(--violet-hi)}
-  .line-p .meta{display:none}
-  .line-p .bh .bz{display:none}
+  .line-row .line-p .meta{display:none}
+  .line-row .line-p .bh .bz{display:none}
   .deck .dcard:not(:last-child)::after{width:32px;height:32px;left:calc(100% - 16px)}
-  .line-p{position:relative}
-  .line-p:not(:last-child)::after{
+  .line-row .line-p{position:relative}
+  .line-row .line-p:not(:last-child)::after{
     content:"";position:absolute;left:50%;bottom:-42px;transform:translateX(-50%);
     width:34px;height:34px;
     background:var(--lime);
@@ -417,8 +430,8 @@ function openLine(c, hue) {
        const p = LOOKUP[id];
        return `<div class="line-p">${renderBoard(p)}
             <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span><span class="fam-m">${esc(p.family || '')}</span></h3>
-            <p class="meta"><b>${esc(p.family || '')}</b></p>
-            <span class="bh"><span class="bz">${esc(p.betza || '')}</span>${(p.behaviors || []).map(b =>
+            <p class="meta"><b>${esc(p.family || '')}</b><span class="bz">${esc(p.betza || '')}</span></p>
+            <span class="bh">${(p.behaviors || []).map(b =>
               `<span>${esc(b)}</span>`).join('')}</span>
             <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;
      }).join('')}</div>`;

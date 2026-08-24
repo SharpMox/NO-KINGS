@@ -6,12 +6,14 @@
   <meta name="description" content="36 fairy-chess piece fusions in NO-KINGS: additive and synergistic combinations of two pieces into a third.">
   <title>Fairy Chess — Fusions</title>
   <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/fusions.js"></script>
   <style>
     header {
-      max-width: 1280px;
+      max-width: var(--wrap);
       margin: 0 auto;
       padding: 32px 24px 16px;
     }
@@ -48,21 +50,6 @@
       border-radius: 8px;
     }
     .back-link:hover { text-decoration: none; border-color: var(--accent); }
-    .theme-toggle {
-      appearance: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      width: 38px;
-      height: 38px;
-      cursor: pointer;
-      color: var(--text);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      margin-left: auto;
-    }
-    .theme-toggle:hover { color: var(--accent); }
 
     .tabs {
       display: flex;
@@ -109,7 +96,7 @@
     }
 
     main {
-      max-width: 1280px;
+      max-width: var(--wrap);
       margin: 0 auto;
       padding: 0 24px 64px;
     }
@@ -179,7 +166,6 @@
     @media (max-width: 720px) {
       h1 { font-size: 24px; }
       .controls { gap: 8px; }
-      .theme-toggle { margin-left: 0; }
       .mini-card { width: 140px; padding: 6px; }
       .fusion-op { font-size: 22px; }
       .fusion-table { border-spacing: 4px; }
@@ -189,23 +175,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav" aria-label="Site sections">
-    <div class="site-nav-inner">
-      <a href="codex.html">Codex</a>
-      <a href="graph.html">Graph</a>
-      <a href="promotion.html">Promotions</a>
-      <a href="fusion.html" class="active">Fusions</a>
-      <a href="inversion.html">Inversions</a>
-      <a href="artefacts.html">Artefacts</a>
-      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
-      <a href="betza.html">Betza</a>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <div id="site-nav" data-page="fusion"></div>
   <header>
     <h1><em>Fusions</em></h1>
     <p class="intro">
@@ -304,6 +274,7 @@
 
   </script>
   <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+  <script src="assets/nav.js"></script>
   <script src="assets/theme.js"></script>
   <script src="assets/tabs.js"></script>
 </body>

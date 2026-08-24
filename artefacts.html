@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="The 180 NO KINGS artefacts as a density map wired to a ledger: rarity, effect, and the conspiracy behind every name.">
   <title>NO KINGS / Artefacts</title>
-  <!-- Set the theme before first paint so dark-mode users get no white flash.
-       assets/theme.js (end of body) still owns the toggle and the persistence. -->
-  <script>try{var t=localStorage.getItem('fp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
   <script src="data/artefacts.js"></script>
   <style>
   /* ============================================================
@@ -34,9 +33,9 @@
   /* ---------- Tokens. Light is :root to match the rest of the site,
        where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
   :root{
-    --void:#f4ecda; --surf:#fcf0d8; --surf-2:#fff8ea;
-    --edge:#e0d0ae; --edge-soft:#ebdcbf;
-    --ink:#231544; --ink-soft:#5f5080; --ink-dim:#8d7fa8;
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
     /* --lime is the display colour (hero gradient, chip fills, active states).
        --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
@@ -52,16 +51,14 @@
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     --ease:cubic-bezier(.22,1,.36,1);
     --wrap:1560px;
-    --nav-min:60px;   /* drives the header height */
-    --nav-h:60px;     /* MEASURED back off it by syncChrome(); see the note there */
     --bar-h:0px;      /* the filter bar's height, but only while it is sticky */
     /* Soft geometry throughout. */
     --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
   }
   [data-theme="dark"]{
-    --void:#0f0a1c; --surf:#181030; --surf-2:#221643;
-    --edge:#332352; --edge-soft:#261a44;
-    --ink:#efeaff; --ink-soft:#a79ac9; --ink-dim:#7d719c;
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
     --violet:#7a3ae8; --violet-hi:#a070e8;
     --lime:#a8d048; --accent:#a8d048;
     --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
@@ -72,7 +69,7 @@
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
-    font-family:var(--sans);background:var(--void);color:var(--ink);
+    font-family:var(--sans);background:var(--bg);color:var(--text);
     line-height:1.55;-webkit-font-smoothing:antialiased;
     transition:background .25s ease,color .25s ease;
   }
@@ -93,45 +90,6 @@
       radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
   }
 
-  /* ---------- Site nav ---------- */
-  .nk-nav{
-    position:sticky;top:0;z-index:60;backdrop-filter:blur(14px);
-    background:color-mix(in srgb, var(--void) 78%, transparent);
-    border-bottom:1px solid var(--edge-soft);
-  }
-  .nk-nav-in{
-    max-width:var(--wrap);margin:0 auto;padding:0 22px;
-    display:flex;align-items:stretch;gap:0;min-height:var(--nav-min);
-  }
-  .nk-mark{
-    display:flex;align-items:center;margin-right:30px;text-decoration:none;
-    font:800 13.5px/1 var(--sans);letter-spacing:.04em;color:var(--ink);
-  }
-  .nk-links{display:flex;align-items:stretch;flex:1}
-  .nk{
-    display:inline-flex;align-items:center;white-space:nowrap;text-decoration:none;
-    font:600 12.5px/1 var(--sans);color:var(--ink-soft);
-    padding:0 13px;border-bottom:2px solid transparent;
-    transition:color .15s ease,border-color .15s ease;
-  }
-  .nk:hover{color:var(--ink)}
-  .nk[aria-current="page"]{color:var(--ink);border-bottom-color:var(--lime)}
-  .nk-gap{margin-left:auto}
-  .nk-burger{
-    display:none;appearance:none;cursor:pointer;align-self:center;margin-left:auto;
-    background:var(--surf);border:1px solid var(--edge);border-radius:var(--rad-pill);
-    width:40px;height:40px;color:var(--ink-soft);place-items:center;
-  }
-  .nk-burger:hover{color:var(--lime);border-color:var(--lime)}
-  .nk-burger[aria-expanded="true"]{background:var(--lime);border-color:var(--lime);color:#141024}
-  .nk-theme{
-    appearance:none;background:var(--surf);border:1px solid var(--edge-soft);
-    border-radius:var(--rad-pill);width:38px;height:38px;cursor:pointer;
-    color:var(--ink-soft);display:grid;place-items:center;
-    margin-left:14px;align-self:center;
-  }
-  .nk-theme:hover{color:var(--lime);border-color:var(--lime)}
-
   /* ---------- Hero ---------- */
   .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
   .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
@@ -143,7 +101,7 @@
        the final glyph past it. Reserve a sliver so the trailing s keeps its tail. */
     padding-right:.07em;
   }
-  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--ink-soft)}
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
   /* ---------- Filter bar ----------
      Full-bleed so the sticky background reaches the window edges, with the
@@ -159,44 +117,44 @@
   @media (min-width:900px){
     .bar{
       position:sticky;top:var(--nav-h);z-index:55;
-      background:color-mix(in srgb, var(--void) 82%, transparent);
+      background:color-mix(in srgb, var(--bg) 82%, transparent);
       backdrop-filter:blur(14px);
-      border-bottom:1px solid var(--edge-soft);
+      border-bottom:1px solid var(--border-soft);
     }
   }
   .bar input[type="search"]{
-    font:400 14px/1 var(--sans);color:var(--ink);background:var(--surf);
-    border:1px solid var(--edge);border-radius:var(--rad-pill);
+    font:400 14px/1 var(--sans);color:var(--text);background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--rad-pill);
     padding:0 18px;height:44px;width:270px;transition:.2s var(--ease);
   }
-  .bar input::placeholder{color:var(--ink-dim)}
+  .bar input::placeholder{color:var(--text-dim)}
   .bar input:focus{outline:none;border-color:var(--lime);box-shadow:var(--glow)}
 
   .group{
     display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;height:44px;
-    border:1px solid var(--edge);border-radius:var(--rad-pill);background:var(--surf);
+    border:1px solid var(--border);border-radius:var(--rad-pill);background:var(--surface);
   }
-  .group-lb{font:700 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);margin-right:5px}
+  .group-lb{font:700 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim);margin-right:5px}
   .group button{
-    appearance:none;cursor:pointer;border:0;background:transparent;color:var(--ink-soft);
+    appearance:none;cursor:pointer;border:0;background:transparent;color:var(--text-soft);
     font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
     padding:10px 14px;border-radius:var(--rad-pill);transition:.18s var(--ease);
   }
-  .group button:hover{color:var(--ink)}
+  .group button:hover{color:var(--text)}
   .group button[aria-pressed="true"]{background:var(--lime);color:#141024}
 
   .chips{display:flex;gap:7px;flex-wrap:wrap}
   .chip{
     appearance:none;cursor:pointer;font:700 11px/1 var(--mono);letter-spacing:.09em;
     text-transform:uppercase;padding:11px 15px;border-radius:var(--rad-pill);
-    border:1px solid var(--edge);background:var(--surf);color:var(--ink-soft);
+    border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
     display:inline-flex;align-items:center;gap:7px;transition:.18s var(--ease);
   }
-  .chip:hover{color:var(--ink);border-color:var(--violet-hi);transform:translateY(-1px)}
+  .chip:hover{color:var(--text);border-color:var(--violet-hi);transform:translateY(-1px)}
   .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:#140f26}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--violet))}
   .chip[aria-pressed="true"] .dot{background:#140f26}
-  .count{margin-left:auto;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+  .count{margin-left:auto;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
   .count b{color:var(--lime);font-size:14px}
 
   main{max-width:var(--wrap);margin:0 auto;padding:8px 22px 90px}
@@ -227,25 +185,25 @@
     display:flex;flex-direction:column;gap:10px;
     max-height:calc(100dvh - var(--nav-h) - var(--bar-h));
     overflow-y:auto;overscroll-behavior:contain;
-    padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--edge) transparent;
+    padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;
   }
   .rail::-webkit-scrollbar{width:6px}
-  .rail::-webkit-scrollbar-thumb{background:var(--edge);border-radius:var(--rad-pill)}
+  .rail::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--rad-pill)}
   .rail::-webkit-scrollbar-track{background:transparent}
 
   /* Opaque and above the threads, so the fan reads as emerging from behind. */
   .tier{
-    position:relative;z-index:2;background:var(--surf);
-    border:1px solid var(--edge-soft);border-radius:var(--rad-md);padding:8px 10px 9px;
+    position:relative;z-index:2;background:var(--surface);
+    border:1px solid var(--border-soft);border-radius:var(--rad-md);padding:8px 10px 9px;
   }
   .tier-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   /* Grouped by bonus there is no rarity on the tier, so the label falls back to
      ink; the squares inside still carry their own rarity colour. */
   .tier-hd h3{
     margin:0;font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
-    color:var(--c,var(--ink));
+    color:var(--c,var(--text));
   }
-  .tier-hd .n{margin-left:auto;font:700 10px/1 var(--mono);color:var(--ink-dim)}
+  .tier-hd .n{margin-left:auto;font:700 10px/1 var(--mono);color:var(--text-dim)}
 
   /* Column count is solved at runtime so the rail always fits its slot. */
   .grid{display:grid;grid-template-columns:repeat(var(--cols,12),1fr);gap:3px}
@@ -265,12 +223,12 @@
   .cell{--hl:color-mix(in srgb, var(--c) 68%, #000)}
   [data-theme="dark"] .cell{--hl:color-mix(in srgb, var(--c) 55%, #fff)}
 
-  .cell:hover{transform:scale(1.42);z-index:3;box-shadow:0 0 0 2px var(--surf),0 0 0 3px var(--hl)}
+  .cell:hover{transform:scale(1.42);z-index:3;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--hl)}
   /* lit = this artefact's row is on screen. Outline only, never a transform:
      scaling 20 cells at once visibly deforms the grid. */
   .cell.is-lit{outline:1.5px solid var(--hl);outline-offset:1px}
-  .cell.is-hot{transform:scale(1.45);z-index:3;box-shadow:0 0 0 2px var(--surf),0 0 0 3px var(--hl)}
-  .cell.is-out{background:var(--edge-soft);opacity:.45}
+  .cell.is-hot{transform:scale(1.45);z-index:3;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--hl)}
+  .cell.is-out{background:var(--border-soft);opacity:.45}
   .cell.is-out.is-lit{outline:none}
 
   /* Below the threshold the 3px corners stop reading and just eat pixels, so
@@ -286,9 +244,9 @@
 
   .legend{
     display:flex;align-items:center;gap:7px;padding:0 3px;flex:none;
-    font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);
+    font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);
   }
-  .legend i{width:11px;height:11px;border-radius:3px;background:var(--ink-dim);display:inline-block}
+  .legend i{width:11px;height:11px;border-radius:3px;background:var(--text-dim);display:inline-block}
   .legend i:nth-of-type(1){opacity:.34}
   .legend i:nth-of-type(2){opacity:.64}
   .legend i:nth-of-type(3){opacity:1}
@@ -299,10 +257,10 @@
     border-radius:var(--rad-sm);scroll-margin-top:calc(var(--nav-h) + var(--bar-h) + 14px);
     border:1px solid transparent;transition:background .16s ease,border-color .16s ease;
   }
-  .row:hover,.row.is-near{background:var(--surf)}
-  .row[open]{background:var(--surf-2);border-color:color-mix(in srgb,var(--c) 42%,transparent)}
+  .row:hover,.row.is-near{background:var(--surface)}
+  .row[open]{background:var(--surface-2);border-color:color-mix(in srgb,var(--c) 42%,transparent)}
   .row.is-flash{animation:flash .9s var(--ease)}
-  @keyframes flash{0%,100%{background:var(--surf-2)}30%{background:color-mix(in srgb,var(--c) 28%,var(--surf-2))}}
+  @keyframes flash{0%,100%{background:var(--surface-2)}30%{background:color-mix(in srgb,var(--c) 28%,var(--surface-2))}}
 
   .row summary{
     list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;
@@ -317,40 +275,40 @@
     flex:0 0 250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .r-eff{
-    margin:0;flex:1;min-width:0;font-size:12.5px;line-height:1.3;color:var(--ink-soft);
+    margin:0;flex:1;min-width:0;font-size:12.5px;line-height:1.3;color:var(--text-soft);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
   .row[open] .r-eff{display:none}
   .r-type{
     flex:none;font:700 9px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
-    color:var(--ink-dim);white-space:nowrap;
+    color:var(--text-dim);white-space:nowrap;
   }
   .r-caret{
-    flex:none;width:22px;height:22px;border-radius:50%;background:var(--surf-2);
-    color:var(--ink-dim);display:grid;place-items:center;font-size:8px;transition:.22s var(--ease);
+    flex:none;width:22px;height:22px;border-radius:50%;background:var(--surface-2);
+    color:var(--text-dim);display:grid;place-items:center;font-size:8px;transition:.22s var(--ease);
   }
   .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:#141024}
 
   .r-open{padding:2px 16px 18px 34px;display:grid;grid-template-columns:1.1fr 1fr;gap:24px}
-  .r-open h4{margin:0 0 6px;font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)}
+  .r-open h4{margin:0 0 6px;font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
   .r-open h4.mt{margin-top:15px}
   .r-open p{margin:0}
   .r-open .fe{font-size:14px;line-height:1.5;margin-bottom:11px}
-  .r-open .sm{font-size:13px;line-height:1.6;color:var(--ink-soft)}
+  .r-open .sm{font-size:13px;line-height:1.6;color:var(--text-soft)}
   .r-open .lk{display:inline-block;margin-bottom:6px;font-size:13.5px;font-weight:700;color:var(--accent);text-decoration:none}
   .r-open .lk:hover{text-decoration:underline}
   .tags{display:flex;flex-wrap:wrap;gap:5px;padding:0;margin:0;list-style:none}
   .tags li{
     font:700 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
     padding:5px 9px;border-radius:var(--rad-pill);
-    background:color-mix(in srgb,var(--c) 20%,var(--surf-2));color:var(--ink);
+    background:color-mix(in srgb,var(--c) 20%,var(--surface-2));color:var(--text);
   }
   .needs{
-    display:inline-block;font:600 10px/1.5 var(--mono);color:var(--ink-dim);
-    background:var(--surf-2);border-radius:var(--rad-pill);padding:2px 9px;white-space:nowrap;
+    display:inline-block;font:600 10px/1.5 var(--mono);color:var(--text-dim);
+    background:var(--surface-2);border-radius:var(--rad-pill);padding:2px 9px;white-space:nowrap;
   }
-  .empty{padding:90px 0;text-align:center;color:var(--ink-dim)}
-  .empty b{display:block;font:700 15px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px}
+  .empty{padding:90px 0;text-align:center;color:var(--text-dim)}
+  .empty b{display:block;font:700 15px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-soft);margin-bottom:10px}
 
   /* ---------- Threads ----------
      They ride on top of everything except the sticky header, so they read as
@@ -371,11 +329,11 @@
   /* ---------- Footer ---------- */
   .foot{
     max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
-    border-top:1px solid var(--edge-soft);color:var(--ink-dim);font-size:13px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px;
   }
   .foot p{margin:0 0 7px}
   .foot p:last-child{margin-bottom:0}
-  .foot-lead{color:var(--ink-soft);font-size:14px}
+  .foot-lead{color:var(--text-soft);font-size:14px}
 
   @media (max-width:1180px){
     .wrap{grid-template-columns:262px minmax(0,1fr)}
@@ -386,22 +344,6 @@
      rail shrinks to a thin strip of dots. The columns stay side by side, so the
      threads stay meaningful and stay on. */
   @media (max-width:860px){
-    /* Eight links wrapped the header onto three rows, which threw every sticky
-       offset off. Collapse them behind a burger instead. */
-    .nk-burger{display:grid}
-    .nk-links{
-      display:none;position:absolute;top:100%;left:0;right:0;
-      flex-direction:column;align-items:stretch;
-      background:var(--surf);border-bottom:1px solid var(--edge);
-      padding:6px 16px 12px;box-shadow:0 20px 40px -22px rgba(0,0,0,.45);
-    }
-    .nk-links[data-open]{display:flex}
-    .nk{padding:14px 8px;font-size:14.5px;border-bottom:none;border-left:2px solid transparent}
-    .nk + .nk{border-top:1px solid var(--edge-soft)}
-    .nk[aria-current="page"]{border-left-color:var(--lime);padding-left:14px}
-    .nk-gap{margin-left:0}
-    .nk-theme{margin-left:8px}
-
     .hero{padding:30px 16px 18px}
     /* Filter bar was 205px tall: full-width search, then 9 chips wrapping onto
        three rows at 44px each. Two rows now, with the chips on one
@@ -455,29 +397,7 @@
 </head>
 <body>
 
-<div class="nk-nav"><nav class="nk-nav-in" aria-label="Site sections">
-  <a class="nk-mark" href="codex.html">NO KINGS</a>
-  <div class="nk-links" id="nk-menu">
-    <a class="nk" href="codex.html">Codex</a>
-    <a class="nk" href="graph.html">Graph</a>
-    <a class="nk" href="promotion.html">Promotions</a>
-    <a class="nk" href="fusion.html">Fusions</a>
-    <a class="nk" href="inversion.html">Inversions</a>
-    <a class="nk" href="artefacts.html" aria-current="page">Artefacts</a>
-    <a class="nk nk-gap" href="encyclopedia/index.html">Encyclopedia</a>
-    <a class="nk" href="betza.html">Betza</a>
-  </div>
-  <button class="nk-burger" id="burger" aria-expanded="false" aria-controls="nk-menu" aria-label="Open menu">
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-      <path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>
-    </svg>
-  </button>
-  <button class="nk-theme" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
-      <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
-    </svg>
-  </button>
-</nav></div>
+<div id="site-nav" data-page="artefacts"></div>
 
 <header class="hero">
   <h1><em>Artefacts</em></h1>
@@ -523,7 +443,7 @@ const TIERS = ['Common', 'Uncommon', 'Rare', 'Legendary'];
 const BONUSES = [...new Set(ARTEFACTS.flatMap(a => a.bonus))].sort();
 
 const railEl = $('rail'), ledger = $('ledger'), chipsEl = $('chips'), countEl = $('count');
-const searchEl = $('q'), barEl = document.querySelector('.bar'), navEl = document.querySelector('.nk-nav');
+const searchEl = $('q'), barEl = document.querySelector('.bar'), navEl = document.getElementById('site-nav');
 const svg = $('threads');
 const paths = {};
 TIERS.forEach(t => paths[t] = svg.querySelector(`path[data-r="${t}"]`));
@@ -704,11 +624,11 @@ function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; dra
 // fixed, and a stale value leaves the rail tucked underneath.
 // --nav-min drives the header height and --nav-h is measured back off it, which
 // keeps the two from feeding into each other.
+// --nav-h is published by assets/nav.js, which owns the header; this only
+// tracks the filter bar.
 function syncChrome() {
-  const root = document.documentElement.style;
-  root.setProperty('--nav-h', navEl.offsetHeight + 'px');
   const stuck = getComputedStyle(barEl).position === 'sticky';
-  root.setProperty('--bar-h', (stuck ? barEl.offsetHeight : 0) + 'px');
+  document.documentElement.style.setProperty('--bar-h', (stuck ? barEl.offsetHeight : 0) + 'px');
 }
 
 // ---- Fit the whole map into its slot, so the rail never needs scrolling. More
@@ -792,25 +712,6 @@ function setView(v) {
 }
 viewBtns.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 
-// ---- Burger menu
-const burger = $('burger'), menu = $('nk-menu');
-function setMenu(open) {
-  menu.toggleAttribute('data-open', open);
-  burger.setAttribute('aria-expanded', String(open));
-  burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-  syncChrome();
-}
-burger.addEventListener('click', () => setMenu(burger.getAttribute('aria-expanded') !== 'true'));
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') { setMenu(false); burger.focus(); }
-});
-document.addEventListener('click', e => {
-  if (burger.getAttribute('aria-expanded') !== 'true') return;
-  if (!menu.contains(e.target) && !burger.contains(e.target)) setMenu(false);
-});
-// Leaving the phone breakpoint must not strand the panel open.
-matchMedia('(max-width:860px)').addEventListener('change', () => setMenu(false));
-
 searchEl.addEventListener('input', apply);
 chipsEl.addEventListener('click', e => {
   const b = e.target.closest('.chip');
@@ -826,6 +727,7 @@ try { startView = localStorage.getItem(VIEW_KEY) === 'bonus' ? 'bonus' : 'rarity
 setView(startView);
 </script>
 <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+<script src="assets/nav.js"></script>
 <script src="assets/theme.js"></script>
 </body>
 </html>

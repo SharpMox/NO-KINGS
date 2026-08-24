@@ -163,7 +163,7 @@ const URL = `${BASE}/artefacts.html`;
   const geo = () => p.evaluate(() => {
     const d = [...document.querySelectorAll('.threads path')].map(x => x.getAttribute('d') || '').join(' ');
     const bar = document.querySelector('.bar');
-    const chrome = document.querySelector('.nk-nav').offsetHeight +
+    const chrome = document.getElementById('site-nav').offsetHeight +
       (getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight : 0);
     let want = 0;
     document.querySelectorAll('.row').forEach(r => {
@@ -256,7 +256,7 @@ const URL = `${BASE}/artefacts.html`;
       dense: rail.hasAttribute('data-dense'),
       scrolls: rail.scrollHeight > rail.clientHeight + 1,
       threads: [...document.querySelectorAll('.threads path')].map(x => x.getAttribute('d')).join(''),
-      navH: document.querySelector('.nk-nav').offsetHeight,
+      navH: document.getElementById('site-nav').offsetHeight,
       navToken: getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim(),
       burger: getComputedStyle(document.getElementById('burger')).display,
       menuOpen: getComputedStyle(document.getElementById('nk-menu')).display !== 'none',
@@ -295,7 +295,7 @@ const URL = `${BASE}/artefacts.html`;
   await c.waitForTimeout(500);
   const chrome = await c.evaluate(() => [
     document.title,
-    document.querySelector('.nk-nav').innerText,
+    document.getElementById('site-nav').innerText,
     document.querySelector('.hero').innerText,
     document.querySelector('.bar').innerText,
     document.querySelector('.foot').innerText

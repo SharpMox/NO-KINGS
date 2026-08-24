@@ -10,7 +10,7 @@
      *  Page-local CSS. Theme palette, nav, footer come from assets/site.css.
      * ============================================================ */
     header {
-      max-width: 1280px;
+      max-width: var(--wrap);
       margin: 0 auto;
       padding: 32px 24px 16px;
     }
@@ -27,7 +27,7 @@
       font-size: 15px;
     }
     main {
-      max-width: 1280px;
+      max-width: var(--wrap);
       margin: 0 auto;
       padding: 0 24px 48px;
     }
@@ -470,29 +470,15 @@
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
   </style>
   <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/promotions.js"></script>
   <script src="data/fusions.js"></script>
 </head>
 <body>
-  <nav class="site-nav" aria-label="Site sections">
-    <div class="site-nav-inner">
-      <a href="codex.html">Codex</a>
-      <a href="graph.html" class="active">Graph</a>
-      <a href="promotion.html">Promotions</a>
-      <a href="fusion.html">Fusions</a>
-      <a href="inversion.html">Inversions</a>
-      <a href="artefacts.html">Artefacts</a>
-      <a href="encyclopedia/index.html" class="nav-encyclopedia">Encyclopedia</a>
-      <a href="betza.html">Betza</a>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <div id="site-nav" data-page="graph"></div>
 
   <header>
     <h1><em>Graph</em></h1>
@@ -1426,6 +1412,7 @@
   }
   document.addEventListener('fullscreenchange', () => setFsButtons(!!document.fullscreenElement));
   </script>
+  <script src="assets/nav.js"></script>
   <script src="assets/theme.js"></script>
   <script src="assets/tabs.js"></script>
 </body>

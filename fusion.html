@@ -277,7 +277,7 @@ html{overflow-x:clip}
 .kind-hd .kind-n{font-size:11px;letter-spacing:.12em;color:var(--text-dim)}
 
 /* line close-up: the whole chain, left to right */
-dialog.line{border:0;padding:0;background:transparent;width:min(1280px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
+dialog.line{border:0;padding:0;background:transparent;width:min(1090px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
 dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
 .line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
   background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
@@ -307,7 +307,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   /* the board's rendered size: capped at 230, otherwise the column, which is
      the dialog less its padding (56) and the two gaps (44), over three.
      Derived from vw rather than % so it can be halved for a `top` offset. */
-  --bw:min(230px, (min(1280px, 100vw) - 100px) / 3)}
+  --bw:min(330px, (min(1090px, 100vw) - 100px) / 3)}
 .line-p{text-align:center;min-width:0;position:relative}
 .line-p .board{max-width:230px;margin:0 auto}
 /* the same operators as the fanned cards, centred in the gap and on the
@@ -328,7 +328,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-p{display:grid;grid-template-columns:auto minmax(0,1fr);
   grid-template-rows:auto auto auto 1fr;column-gap:15px;row-gap:7px;align-content:start;
   text-align:left}
-.line-p .board{grid-area:1/1/2/3;max-width:230px;margin:0 auto 5px}
+.line-p .board{grid-area:1/1/2/3;max-width:330px;margin:0 auto 8px}
 .line-p h3{grid-area:2/1/3/2;margin:0;font-size:17px;line-height:1.15;color:var(--text)}
 .line-p .bz-m,.line-p .fam-m{display:none}
 .line-p .meta{grid-area:3/1/4/2;margin:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;

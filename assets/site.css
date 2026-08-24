@@ -9,44 +9,63 @@
  * ============================================================ */
 
 /* ============== Theme ============== */
+/* Palette sampled from the game's own art, matching artefacts.html:
+     Larry     deep violet #201038 · rim #5020b8 · lavender #a070e8 · grin lime #a8d048
+     the board cream #fcf0d8 · violet #606084
+   Variable NAMES are unchanged, so every existing page picks this up with no
+   markup edits.
+
+   Two deliberate deviations from the raw source colours:
+   - --accent is a DARKER lime than the brand's #6f9420. Every link on the site
+     is var(--accent), and #6f9420 lands at 3.01:1 on this cream, which fails
+     AA for body text. #556f18 is 4.86:1. The bright lime survives as --lime,
+     used only for the hero gradient, where display type needs just 3:1.
+   - --sq-dark is a lightened violet, NOT the board's #606084. On the real board
+     colour every movement marker collapses to ~1.2:1 and the piece disc to
+     2.78:1, which would make the diagrams unreadable. This value beats the old
+     grey on every marker and on the disc. */
 :root {
-  --bg: #eef0f3;
-  --surface: #ffffff;
-  --text: #161a20;
-  --text-soft: #5b6573;
-  --border: #d8dce3;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.05);
-  --sq-light: #d8dce3;
-  --sq-dark: #8c95a3;
-  --piece-disc: #161a20;
-  --piece-disc-text: #ffffff;
-  --move-color: #2e7bd6;
-  --capture-color: #c84545;
-  --hurdle-color: #8a4ea8;
-  --hop-target: #2da06b;
-  --ray-color: #3a7ec4;
-  --rider-color: #da802a;
-  --accent: #2659a8;
+  --bg: #f4ecda;
+  --surface: #fcf0d8;
+  --text: #231544;
+  --text-soft: #5f5080;
+  --border: #e0d0ae;
+  --shadow: 0 1px 3px rgba(35,21,68,0.07), 0 8px 24px rgba(35,21,68,0.06);
+  --sq-light: #fcf0d8;
+  --sq-dark: #b3a8c2;
+  --piece-disc: #231544;
+  --piece-disc-text: #fcf0d8;
+  --move-color: #2e6fd0;
+  --capture-color: #c0392b;
+  --hurdle-color: #7a3ae8;
+  --hop-target: #2f8f5f;
+  --ray-color: #2f7fc0;
+  --rider-color: #c8791f;
+  --accent: #556f18;
+  --lime: #6f9420;
+  --violet-hi: #6a2ed0;
 }
 
 [data-theme="dark"] {
-  --bg: #0f1a2e;
-  --surface: #18243d;
-  --text: #dce4f0;
-  --text-soft: #8fa0b8;
-  --border: #2a3a55;
-  --shadow: 0 1px 3px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.35);
-  --sq-light: #3a4a68;
-  --sq-dark: #1e2a44;
-  --piece-disc: #dce4f0;
-  --piece-disc-text: #0f1a2e;
-  --move-color: #6ab1ff;
+  --bg: #0f0a1c;
+  --surface: #181030;
+  --text: #efeaff;
+  --text-soft: #a79ac9;
+  --border: #332352;
+  --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4);
+  --sq-light: #4a4270;
+  --sq-dark: #241d3e;
+  --piece-disc: #efeaff;
+  --piece-disc-text: #0f0a1c;
+  --move-color: #79a7ff;
   --capture-color: #ff7878;
   --hurdle-color: #c890e8;
   --hop-target: #6dd6a8;
-  --ray-color: #6ab1ff;
+  --ray-color: #79a7ff;
   --rider-color: #ffae5c;
-  --accent: #7ec6ff;
+  --accent: #a8d048;
+  --lime: #a8d048;
+  --violet-hi: #a070e8;
 }
 
 /* ============== Base ============== */
@@ -71,6 +90,30 @@ a:hover { text-decoration: underline; }
 .site-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
 .site-nav .nav-encyclopedia { margin-left: auto; }
 .site-nav .theme-toggle { width: 32px; height: 32px; margin-left: 0; }
+
+/* ============== Page hero (shared across every page) ==============
+   `header h1` is two element selectors, so it outranks each page's inline
+   `h1 { font-size: 32px }` and its `@media` `h1 { font-size: 26px }` on
+   specificity alone. That means no page's own CSS needs editing, and it works
+   on fusion/inversion too, where site.css happens to load BEFORE the inline
+   block. The only markup change per page is wrapping the title in <em>. */
+header h1 {
+  margin: 0 0 12px 0;
+  font-size: clamp(34px, 6.4vw, 72px);
+  line-height: 0.95;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+header h1 em {
+  font-style: italic;
+  background: linear-gradient(96deg, var(--lime) 0%, var(--violet-hi) 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* background-clip:text crops to the element box and the italic slant pushes
+     the final glyph past it. Reserve a sliver so trailing letters keep their tails. */
+  padding-right: 0.07em;
+}
 
 /* ============== Footer ============== */
 footer {

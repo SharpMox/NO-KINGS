@@ -38,7 +38,11 @@
     --edge:#e0d0ae; --edge-soft:#ebdcbf;
     --ink:#231544; --ink-soft:#5f5080; --ink-dim:#8d7fa8;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
-    --lime:#6f9420;
+    /* --lime is the display colour (hero gradient, chip fills, active states).
+       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
+       which fails AA for body text, while #556f18 is 4.86:1. Large display type
+       needs just 3:1, so the gradient keeps the bright one. */
+    --lime:#6f9420; --accent:#556f18;
     /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
        Teal rather than a second green, because at 15px two greens next to each
        other in the rail are not tellable apart. */
@@ -59,7 +63,7 @@
     --edge:#332352; --edge-soft:#261a44;
     --ink:#efeaff; --ink-soft:#a79ac9; --ink-dim:#7d719c;
     --violet:#7a3ae8; --violet-hi:#a070e8;
-    --lime:#a8d048;
+    --lime:#a8d048; --accent:#a8d048;
     --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
     --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
   }
@@ -72,9 +76,9 @@
     line-height:1.55;-webkit-font-smoothing:antialiased;
     transition:background .25s ease,color .25s ease;
   }
-  a{color:var(--lime)}
+  a{color:var(--accent)}
   .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  :focus-visible{outline:2px solid var(--lime);outline-offset:3px;border-radius:var(--rad-sm)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
 
   /* Larry's aura, sitting behind everything. */
   body::before{
@@ -333,7 +337,7 @@
   .r-open p{margin:0}
   .r-open .fe{font-size:14px;line-height:1.5;margin-bottom:11px}
   .r-open .sm{font-size:13px;line-height:1.6;color:var(--ink-soft)}
-  .r-open .lk{display:inline-block;margin-bottom:6px;font-size:13.5px;font-weight:700;color:var(--lime);text-decoration:none}
+  .r-open .lk{display:inline-block;margin-bottom:6px;font-size:13.5px;font-weight:700;color:var(--accent);text-decoration:none}
   .r-open .lk:hover{text-decoration:underline}
   .tags{display:flex;flex-wrap:wrap;gap:5px;padding:0;margin:0;list-style:none}
   .tags li{

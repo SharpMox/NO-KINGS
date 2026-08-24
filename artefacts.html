@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The 180 NO KINGS artefacts: rarity, effect, and the conspiracy behind every name.">
+  <meta name="description" content="The 180 NO KINGS artefacts as a density map wired to a ledger: rarity, effect, and the conspiracy behind every name.">
   <title>NO KINGS / Artefacts</title>
   <!-- Set the theme before first paint so dark-mode users get no white flash.
        assets/theme.js (end of body) still owns the toggle and the persistence. -->
@@ -11,587 +11,817 @@
   <script src="data/artefacts.js"></script>
   <style>
   /* ============================================================
-   *  Artefacts gallery — DESIGN PILOT for the site-wide redesign.
+   *  Artefacts — DESIGN PILOT for the site-wide redesign.
+   *
+   *  A sticky rail of contribution-calendar grids (one square per
+   *  artefact) wired to a compact ledger. Every row on screen
+   *  draws a thread back to its own square. The map groups by
+   *  rarity or by bonus; the chips always filter on whichever
+   *  axis the map is NOT showing.
+   *
+   *  Palette sampled from the game's own art: Larry (deep violet
+   *  #201038, electric rim #5020b8, lavender #a070e8, grin lime
+   *  #a8d048) and the board (cream #fcf0d8).
    *
    *  Deliberately does NOT link assets/site.css: that file styles
    *  `footer` as a bare element and forces min-height:44px onto
    *  .badge/.filter-input on phones, both of which fight this
-   *  layout. Everything it would have given us is restated below
-   *  (box-sizing, base type, .ax-sr, :focus-visible, reduced
-   *  motion). Theme sync still works because assets/theme.js only
-   *  flips [data-theme] on <html> and carries no tokens.
-   *
-   *  Every class is prefixed `ax-` so nothing collides when this
-   *  language is rolled out to the rest of the site.
+   *  layout. Everything it would have supplied is restated below.
+   *  Theme sync still works because assets/theme.js only flips
+   *  [data-theme="dark"] on <html> and carries no tokens.
    * ============================================================ */
 
-  /* ---------- Tokens: cold archive ---------- */
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
   :root{
-    --paper:#e9e9e6; --paper-2:#f7f7f5; --paper-3:#ffffff;
-    --ink:#15161a; --ink-soft:#63666e; --rule:#cfd0cd; --rule-soft:#dedfdb;
-    --slot-a:#e1e1dd; --slot-b:#e5e5e1;
-    --thread:#b3372c; --thread-soft:rgba(179,55,44,.16);
-    --r-common:#8b8e94; --r-uncommon:#3f8f5f; --r-rare:#3f6fbf; --r-legendary:#c08a2e;
-    --foil:rgba(192,138,46,.22);
+    --void:#f4ecda; --surf:#fcf0d8; --surf-2:#fff8ea;
+    --edge:#e0d0ae; --edge-soft:#ebdcbf;
+    --ink:#231544; --ink-soft:#5f5080; --ink-dim:#8d7fa8;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    --lime:#6f9420;
+    /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
+       Teal rather than a second green, because at 15px two greens next to each
+       other in the rail are not tellable apart. */
+    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
-    --ease:cubic-bezier(.2,.7,.3,1);
-    --wrap:1440px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --wrap:1560px;
+    --nav-min:60px;   /* drives the header height */
+    --nav-h:60px;     /* MEASURED back off it by syncChrome(); see the note there */
+    --bar-h:0px;      /* the filter bar's height, but only while it is sticky */
+    /* Soft geometry throughout. */
+    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
   }
   [data-theme="dark"]{
-    --paper:#101114; --paper-2:#1a1c20; --paper-3:#212429;
-    --ink:#e8e9ea; --ink-soft:#8d9198; --rule:#2b2e34; --rule-soft:#24272c;
-    --slot-a:#17191d; --slot-b:#1b1d21;
-    --thread:#e2594a; --thread-soft:rgba(226,89,74,.2);
-    --r-common:#9296a0; --r-uncommon:#5cc184; --r-rare:#78a6f0; --r-legendary:#e0ad55;
-    --foil:rgba(224,173,85,.16);
+    --void:#0f0a1c; --surf:#181030; --surf-2:#221643;
+    --edge:#332352; --edge-soft:#261a44;
+    --ink:#efeaff; --ink-soft:#a79ac9; --ink-dim:#7d719c;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048;
+    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
+    --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
   }
 
   /* ---------- Base (restated, since site.css is not loaded) ---------- */
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
-    font-family:var(--sans); background:var(--paper); color:var(--ink);
-    line-height:1.55; -webkit-font-smoothing:antialiased;
-    transition:background .2s ease,color .2s ease;
+    font-family:var(--sans);background:var(--void);color:var(--ink);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+    transition:background .25s ease,color .25s ease;
   }
-  a{color:var(--thread)}
-  .ax-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  :focus-visible{outline:2px solid var(--thread);outline-offset:2px}
+  a{color:var(--lime)}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--lime);outline-offset:3px;border-radius:var(--rad-sm)}
 
-  /* Shape lock: this design is all-sharp. No corner radius anywhere. */
+  /* Larry's aura, sitting behind everything. */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.14), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.12), transparent 66%);
+  }
+  [data-theme="dark"] body::before{
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
+  }
 
-  /* ---------- Nav ---------- */
-  .ax-nav{position:sticky;top:0;z-index:40;background:var(--paper);border-bottom:1px solid var(--rule)}
-  .ax-nav-in{max-width:var(--wrap);margin:0 auto;padding:0 20px;display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
-  .ax-nav a{
-    font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
-    color:var(--ink-soft); text-decoration:none; padding:15px 14px;
-    display:inline-flex; align-items:center; white-space:nowrap;
-    border-bottom:2px solid transparent; transition:color .15s ease,border-color .15s ease;
+  /* ---------- Site nav ---------- */
+  .nk-nav{
+    position:sticky;top:0;z-index:60;backdrop-filter:blur(14px);
+    background:color-mix(in srgb, var(--void) 78%, transparent);
+    border-bottom:1px solid var(--edge-soft);
   }
-  .ax-nav a:first-child{padding-left:0}
-  .ax-nav a:hover{color:var(--ink)}
-  .ax-nav a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--thread)}
-  .ax-nav-gap{margin-left:auto}
-  .ax-toggle{
-    appearance:none;background:none;border:0;border-left:1px solid var(--rule);
-    padding:0 4px 0 16px;margin-left:12px;color:var(--ink-soft);cursor:pointer;
-    display:inline-flex;align-items:center;
+  .nk-nav-in{
+    max-width:var(--wrap);margin:0 auto;padding:0 22px;
+    display:flex;align-items:stretch;gap:0;min-height:var(--nav-min);
   }
-  .ax-toggle:hover{color:var(--thread)}
+  .nk-mark{
+    display:flex;align-items:center;margin-right:30px;text-decoration:none;
+    font:800 13.5px/1 var(--sans);letter-spacing:.04em;color:var(--ink);
+  }
+  .nk-links{display:flex;align-items:stretch;flex:1}
+  .nk{
+    display:inline-flex;align-items:center;white-space:nowrap;text-decoration:none;
+    font:600 12.5px/1 var(--sans);color:var(--ink-soft);
+    padding:0 13px;border-bottom:2px solid transparent;
+    transition:color .15s ease,border-color .15s ease;
+  }
+  .nk:hover{color:var(--ink)}
+  .nk[aria-current="page"]{color:var(--ink);border-bottom-color:var(--lime)}
+  .nk-gap{margin-left:auto}
+  .nk-burger{
+    display:none;appearance:none;cursor:pointer;align-self:center;margin-left:auto;
+    background:var(--surf);border:1px solid var(--edge);border-radius:var(--rad-pill);
+    width:40px;height:40px;color:var(--ink-soft);place-items:center;
+  }
+  .nk-burger:hover{color:var(--lime);border-color:var(--lime)}
+  .nk-burger[aria-expanded="true"]{background:var(--lime);border-color:var(--lime);color:#141024}
+  .nk-theme{
+    appearance:none;background:var(--surf);border:1px solid var(--edge-soft);
+    border-radius:var(--rad-pill);width:38px;height:38px;cursor:pointer;
+    color:var(--ink-soft);display:grid;place-items:center;
+    margin-left:14px;align-self:center;
+  }
+  .nk-theme:hover{color:var(--lime);border-color:var(--lime)}
 
   /* ---------- Hero ---------- */
-  .ax-hero{max-width:var(--wrap);margin:0 auto;padding:56px 20px 34px}
-  .ax-hero h1{
-    margin:0; font-size:clamp(46px,9vw,104px); line-height:.92; font-weight:800;
-    letter-spacing:-.04em; text-transform:uppercase;
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{
+    font-style:italic;
+    background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    /* background-clip:text crops to the element box and the italic slant pushes
+       the final glyph past it. Reserve a sliver so the trailing s keeps its tail. */
+    padding-right:.07em;
   }
-  .ax-lede{
-    margin:20px 0 0; max-width:52ch; font-size:16px; color:var(--ink-soft);
-    border-left:2px solid var(--thread); padding-left:16px;
-  }
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--ink-soft)}
 
-  /* ---------- Filter bar ---------- */
-  .ax-bar{
-    position:sticky; top:47px; z-index:30; background:var(--paper);
-    border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  /* ---------- Filter bar ----------
+     Full-bleed so the sticky background reaches the window edges, with the
+     content inset to line up with the --wrap container. Keeps it one element:
+     no extra wrapper div. */
+  .bar{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    padding-block:12px 14px;
+    padding-inline:max(22px, calc((100% - var(--wrap)) / 2));
   }
-  .ax-bar-in{
-    max-width:var(--wrap);margin:0 auto;padding:12px 20px;
-    display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;
+  /* Sticky only while the bar is a single row. Below this it wraps and, stacked
+     under the header, would eat too much of a phone viewport. */
+  @media (min-width:900px){
+    .bar{
+      position:sticky;top:var(--nav-h);z-index:55;
+      background:color-mix(in srgb, var(--void) 82%, transparent);
+      backdrop-filter:blur(14px);
+      border-bottom:1px solid var(--edge-soft);
+    }
   }
-  .ax-field{display:flex;flex-direction:column;gap:5px}
-  .ax-field label{font:600 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
-  .ax-field input,.ax-field select{
-    font:400 13px/1.2 var(--sans); color:var(--ink); background:var(--paper-2);
-    border:1px solid var(--rule); padding:8px 10px; height:34px;
+  .bar input[type="search"]{
+    font:400 14px/1 var(--sans);color:var(--ink);background:var(--surf);
+    border:1px solid var(--edge);border-radius:var(--rad-pill);
+    padding:0 18px;height:44px;width:270px;transition:.2s var(--ease);
   }
-  .ax-field input{width:210px}
-  .ax-field select{min-width:118px}
-  .ax-field input:focus,.ax-field select:focus{outline:none;border-color:var(--thread)}
-  .ax-views{display:flex;border:1px solid var(--rule);height:34px}
-  .ax-views button{
-    appearance:none;background:var(--paper-2);border:0;cursor:pointer;
-    font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
-    color:var(--ink-soft);padding:0 14px;
-  }
-  .ax-views button + button{border-left:1px solid var(--rule)}
-  .ax-views button:hover{color:var(--ink)}
-  .ax-views button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-  .ax-reset{
-    appearance:none;background:none;border:1px solid var(--rule);height:34px;padding:0 12px;
-    font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
-    color:var(--ink-soft);cursor:pointer;
-  }
-  .ax-reset:hover{color:var(--thread);border-color:var(--thread)}
-  .ax-count{
-    margin:0 0 8px auto; font:600 11px/1 var(--mono); letter-spacing:.1em;
-    text-transform:uppercase; color:var(--ink-soft);
-  }
-  .ax-count b{color:var(--ink)}
+  .bar input::placeholder{color:var(--ink-dim)}
+  .bar input:focus{outline:none;border-color:var(--lime);box-shadow:var(--glow)}
 
-  /* ---------- Main ---------- */
-  main{max-width:var(--wrap);margin:0 auto;padding:26px 20px 72px}
-  body[data-view="grid"] #ax-board,
-  body[data-view="board"] #ax-grid{display:none}
+  .group{
+    display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;height:44px;
+    border:1px solid var(--edge);border-radius:var(--rad-pill);background:var(--surf);
+  }
+  .group-lb{font:700 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);margin-right:5px}
+  .group button{
+    appearance:none;cursor:pointer;border:0;background:transparent;color:var(--ink-soft);
+    font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+    padding:10px 14px;border-radius:var(--rad-pill);transition:.18s var(--ease);
+  }
+  .group button:hover{color:var(--ink)}
+  .group button[aria-pressed="true"]{background:var(--lime);color:#141024}
 
-  .ax-empty{padding:80px 0;text-align:center;color:var(--ink-soft)}
-  .ax-empty p{margin:0 0 6px;font:600 13px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{
+    appearance:none;cursor:pointer;font:700 11px/1 var(--mono);letter-spacing:.09em;
+    text-transform:uppercase;padding:11px 15px;border-radius:var(--rad-pill);
+    border:1px solid var(--edge);background:var(--surf);color:var(--ink-soft);
+    display:inline-flex;align-items:center;gap:7px;transition:.18s var(--ease);
+  }
+  .chip:hover{color:var(--ink);border-color:var(--violet-hi);transform:translateY(-1px)}
+  .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:#140f26}
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--violet))}
+  .chip[aria-pressed="true"] .dot{background:#140f26}
+  .count{margin-left:auto;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+  .count b{color:var(--lime);font-size:14px}
+
+  main{max-width:var(--wrap);margin:0 auto;padding:8px 22px 90px}
 
   /* ---------- Rarity mapping ---------- */
-  [data-rarity="Common"]{--r:var(--r-common)}
-  [data-rarity="Uncommon"]{--r:var(--r-uncommon)}
-  [data-rarity="Rare"]{--r:var(--r-rare)}
-  [data-rarity="Legendary"]{--r:var(--r-legendary)}
+  [data-r="Common"]{--c:var(--r-common)}
+  [data-r="Uncommon"]{--c:var(--r-uncommon)}
+  [data-r="Rare"]{--c:var(--r-rare)}
+  [data-r="Legendary"]{--c:var(--r-legendary)}
 
-  /* ---------- Grid view ---------- */
-  .ax-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:14px}
-  .ax-card{
-    position:relative; isolation:isolate; display:flex; flex-direction:column;
-    background:var(--paper-2); border:1px solid var(--rule); border-top:3px solid var(--r);
-    /* Rest state is fully visible. The animation only fades IN, so when
-       prefers-reduced-motion kills it the card is already at opacity 1. */
-    opacity:1;
-    animation:ax-in .38s var(--ease) both;
-    animation-delay:calc(var(--i) * 22ms);
-    transition:transform .18s var(--ease),border-color .18s ease,background .18s ease;
-  }
-  @keyframes ax-in{from{opacity:0;transform:translateY(10px)}}
-  .ax-card:hover{transform:translateY(-3px);border-color:var(--rule);background:var(--paper-3)}
-  .ax-card:hover .ax-name{color:var(--thread)}
-
-  /* Reserved art slot. .ax-art owns the box in BOTH branches, so dropping a
-     real image in later shifts nothing (CLS stays 0). No <img> is emitted for
-     a file that does not exist: 180 missing files would be 180 console 404s. */
-  .ax-art{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-bottom:1px solid var(--rule)}
-  .ax-art-empty{
-    position:relative;display:grid;place-items:center;
-    background:repeating-linear-gradient(135deg,var(--slot-a) 0 7px,var(--slot-b) 7px 14px);
-  }
-  .ax-art-empty span{
-    font:700 19px/1 var(--mono);letter-spacing:.16em;color:var(--ink-soft);opacity:.3;
-    padding-left:.16em;
-  }
-  [data-rarity="Legendary"] .ax-art::after{
-    content:"";position:absolute;inset:0;pointer-events:none;
-    background:linear-gradient(118deg,transparent 34%,var(--foil) 50%,transparent 66%);
+  /* ---------- Layout ----------
+     The gutter between map and ledger opens up with the viewport: floored at
+     40px to 430px, then climbing to a 150px ceiling by 1280px. One fluid rule,
+     so the breakpoints below never touch the gap. */
+  .wrap{
+    display:grid;grid-template-columns:292px minmax(0,1fr);align-items:start;
+    gap:clamp(40px, 12.94vw - 15.65px, 150px);
   }
 
-  .ax-body{padding:13px 14px 14px;display:flex;flex-direction:column;gap:9px;flex:1}
-  .ax-stamp{
-    margin:0;font:700 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--r);
-    display:flex;align-items:center;gap:7px;
+  /* ---------- Rail ----------
+     Fills exactly the space left by the header and the filter bar, both of
+     which are measured into tokens so this tracks them.
+     The cap matters: a sticky element taller than its slot can never be
+     scrolled into view, so without it the last grid is unreachable on a short
+     screen. fitRail() keeps the content inside it, so it rarely engages. */
+  .rail{
+    position:sticky;top:calc(var(--nav-h) + var(--bar-h));z-index:3;
+    display:flex;flex-direction:column;gap:10px;
+    max-height:calc(100dvh - var(--nav-h) - var(--bar-h));
+    overflow-y:auto;overscroll-behavior:contain;
+    padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--edge) transparent;
   }
-  .ax-stamp::before{content:"";width:7px;height:7px;background:var(--r);flex:none}
-  .ax-name{
-    margin:0;font-size:16.5px;font-weight:700;line-height:1.22;letter-spacing:-.015em;
-    transition:color .18s ease;
-  }
-  .ax-name a{color:inherit;text-decoration:none}
-  /* Whole card is the hit area, accessible name stays just the artefact name. */
-  .ax-name a::after{content:"";position:absolute;inset:0;z-index:1}
-  .ax-eff{
-    margin:0;font-size:13px;line-height:1.45;color:var(--ink-soft);
-    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-  }
-  .ax-tags{margin:auto 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
-  .ax-tags li{
-    font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
-    padding:4px 6px;color:var(--ink-soft);border:1px solid var(--rule-soft);
-  }
-  .ax-tags li.is-type{color:var(--ink);border-color:var(--rule)}
+  .rail::-webkit-scrollbar{width:6px}
+  .rail::-webkit-scrollbar-thumb{background:var(--edge);border-radius:var(--rad-pill)}
+  .rail::-webkit-scrollbar-track{background:transparent}
 
-  /* ---------- Board view ---------- */
-  .ax-board{position:relative}
-  .ax-threads{position:absolute;inset:0;width:100%;pointer-events:none;z-index:0}
-  .ax-threads path{fill:none;stroke:var(--thread);stroke-width:1;opacity:.5}
-  .ax-cluster{position:relative;z-index:1;margin:0 0 40px}
-  .ax-cluster h3{
-    margin:0 0 20px;font:700 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
-    color:var(--ink-soft);border-bottom:1px solid var(--rule);padding-bottom:9px;
-    display:flex;gap:10px;align-items:baseline;
+  /* Opaque and above the threads, so the fan reads as emerging from behind. */
+  .tier{
+    position:relative;z-index:2;background:var(--surf);
+    border:1px solid var(--edge-soft);border-radius:var(--rad-md);padding:8px 10px 9px;
   }
-  .ax-cluster h3 b{color:var(--ink)}
-  .ax-cluster h3 span{margin-left:auto;color:var(--ink-soft);font-weight:600}
-  .ax-pins{display:flex;flex-wrap:wrap;gap:30px 20px}
-  .ax-pin{position:relative;padding-top:9px;width:186px}
-  /* The tack stays put on the untransformed .ax-pin; only the card below it
-     tilts, hanging from the tack. Keeping the measured element untilted is
-     also what stops rotate() from inflating its rect and drifting the threads. */
-  .ax-pinhead{
-    position:absolute;top:0;left:50%;transform:translateX(-50%);
-    width:9px;height:9px;border-radius:50%;background:var(--thread);
-    box-shadow:0 1px 2px rgba(0,0,0,.35);z-index:2;
+  .tier-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  /* Grouped by bonus there is no rarity on the tier, so the label falls back to
+     ink; the squares inside still carry their own rarity colour. */
+  .tier-hd h3{
+    margin:0;font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+    color:var(--c,var(--ink));
   }
-  .ax-pin-inner{
-    position:relative;display:block;background:var(--paper-2);
-    border:1px solid var(--rule);border-top:2px solid var(--r);
-    padding:14px 13px 12px;min-height:126px;
-    transform:rotate(var(--tilt));transform-origin:50% 0;
-    transition:transform .18s var(--ease),background .18s ease;
-  }
-  .ax-pin:hover .ax-pin-inner{transform:rotate(0deg) translateY(-2px);background:var(--paper-3);z-index:3}
-  .ax-pin .ax-stamp{font-size:9px;letter-spacing:.16em;margin-bottom:8px}
-  .ax-pin .ax-name{font-size:14px}
-  .ax-pin .ax-eff{font-size:11.5px;-webkit-line-clamp:3;margin-top:7px}
+  .tier-hd .n{margin-left:auto;font:700 10px/1 var(--mono);color:var(--ink-dim)}
 
-  /* ---------- Drawer ---------- */
-  #ax-drawer{
-    margin:0 0 0 auto;height:100dvh;max-height:100dvh;width:min(460px,100vw);max-width:100vw;
-    border:0;border-left:1px solid var(--rule);padding:0;
-    background:var(--paper-2);color:var(--ink);overflow:auto;
-    transform:translateX(100%);transition:transform .28s var(--ease);
+  /* Column count is solved at runtime so the rail always fits its slot. */
+  .grid{display:grid;grid-template-columns:repeat(var(--cols,12),1fr);gap:3px}
+  .cell{
+    appearance:none;padding:0;border:0;cursor:pointer;aspect-ratio:1;border-radius:3px;
+    background:color-mix(in srgb, var(--c) var(--lvl,68%), transparent);
+    transition:transform .16s var(--ease), background .16s ease, box-shadow .16s ease;
   }
-  #ax-drawer.is-open{transform:none}
-  #ax-drawer::backdrop{background:rgba(0,0,0,.5)}
-  .ax-close{
-    position:absolute;top:12px;right:12px;z-index:2;appearance:none;
-    background:var(--paper-2);border:1px solid var(--rule);width:34px;height:34px;
-    color:var(--ink-soft);cursor:pointer;font-size:15px;line-height:1;
+  /* shade = bonus-tag count, the way the calendar shades commit volume */
+  .cell[data-lvl="1"]{--lvl:34%}
+  .cell[data-lvl="2"]{--lvl:64%}
+  .cell[data-lvl="3"]{--lvl:100%}
+
+  /* Highlight is a light version of the square's own hue, so the ring reads as
+     that colour lit up rather than a foreign outline. On the cream paper a
+     paler tint would vanish, so there it deepens instead. */
+  .cell{--hl:color-mix(in srgb, var(--c) 68%, #000)}
+  [data-theme="dark"] .cell{--hl:color-mix(in srgb, var(--c) 55%, #fff)}
+
+  .cell:hover{transform:scale(1.42);z-index:3;box-shadow:0 0 0 2px var(--surf),0 0 0 3px var(--hl)}
+  /* lit = this artefact's row is on screen. Outline only, never a transform:
+     scaling 20 cells at once visibly deforms the grid. */
+  .cell.is-lit{outline:1.5px solid var(--hl);outline-offset:1px}
+  .cell.is-hot{transform:scale(1.45);z-index:3;box-shadow:0 0 0 2px var(--surf),0 0 0 3px var(--hl)}
+  .cell.is-out{background:var(--edge-soft);opacity:.45}
+  .cell.is-out.is-lit{outline:none}
+
+  /* Below the threshold the 3px corners stop reading and just eat pixels, so
+     fitRail() flips the rail to dots. scale() rather than a smaller width, so
+     the layout box and therefore the tap target stay full size. */
+  .rail[data-dense] .grid{gap:2px}
+  .rail[data-dense] .cell{border-radius:50%;transform:scale(.62)}
+  /* Re-stated at this specificity, or the rule above outranks the plain :hover
+     and the squares stop reacting. */
+  .rail[data-dense] .cell:hover,
+  .rail[data-dense] .cell.is-hot{transform:scale(1.9)}
+  .rail[data-dense] .cell.is-lit{outline-width:1px;outline-offset:1px}
+
+  .legend{
+    display:flex;align-items:center;gap:7px;padding:0 3px;flex:none;
+    font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);
   }
-  .ax-close:hover{color:var(--thread);border-color:var(--thread)}
-  .ax-d-art{aspect-ratio:16/9;border-bottom:1px solid var(--rule)}
-  .ax-d-body{padding:22px 24px 40px}
-  .ax-d-body h2{margin:10px 0 0;font-size:29px;line-height:1.12;letter-spacing:-.025em;font-weight:800}
-  .ax-d-sec{margin-top:26px;padding-top:18px;border-top:1px solid var(--rule)}
-  .ax-d-sec h3{
-    margin:0 0 10px;font:700 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);
+  .legend i{width:11px;height:11px;border-radius:3px;background:var(--ink-dim);display:inline-block}
+  .legend i:nth-of-type(1){opacity:.34}
+  .legend i:nth-of-type(2){opacity:.64}
+  .legend i:nth-of-type(3){opacity:1}
+
+  /* ---------- Ledger ---------- */
+  .ledger{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .row{
+    border-radius:var(--rad-sm);scroll-margin-top:calc(var(--nav-h) + var(--bar-h) + 14px);
+    border:1px solid transparent;transition:background .16s ease,border-color .16s ease;
   }
-  .ax-d-eff{margin:0;font-size:15px;line-height:1.55}
-  .ax-d-sum{margin:0;font-size:14px;line-height:1.62;color:var(--ink-soft)}
-  .ax-d-link{
-    display:inline-block;margin-bottom:9px;font-size:14.5px;font-weight:600;
-    color:var(--thread);text-decoration:none;border-bottom:1px solid var(--thread-soft);
+  .row:hover,.row.is-near{background:var(--surf)}
+  .row[open]{background:var(--surf-2);border-color:color-mix(in srgb,var(--c) 42%,transparent)}
+  .row.is-flash{animation:flash .9s var(--ease)}
+  @keyframes flash{0%,100%{background:var(--surf-2)}30%{background:color-mix(in srgb,var(--c) 28%,var(--surf-2))}}
+
+  .row summary{
+    list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;
+    padding:8px 13px;min-height:38px;
   }
-  .ax-d-link:hover{border-bottom-color:var(--thread)}
-  .ax-needs{
-    display:inline-block;font:600 10.5px/1.6 var(--mono);color:var(--ink-soft);
-    background:var(--paper);border:1px dashed var(--rule);padding:1px 6px;white-space:nowrap;
+  .row summary::-webkit-details-marker{display:none}
+  .r-dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+  /* Fixed column so every effect starts at the same x. Ragged starts read as a
+     mess once there are 180 of them. */
+  .r-name{
+    margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3;
+    flex:0 0 250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   }
+  .r-eff{
+    margin:0;flex:1;min-width:0;font-size:12.5px;line-height:1.3;color:var(--ink-soft);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .row[open] .r-eff{display:none}
+  .r-type{
+    flex:none;font:700 9px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-dim);white-space:nowrap;
+  }
+  .r-caret{
+    flex:none;width:22px;height:22px;border-radius:50%;background:var(--surf-2);
+    color:var(--ink-dim);display:grid;place-items:center;font-size:8px;transition:.22s var(--ease);
+  }
+  .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:#141024}
+
+  .r-open{padding:2px 16px 18px 34px;display:grid;grid-template-columns:1.1fr 1fr;gap:24px}
+  .r-open h4{margin:0 0 6px;font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim)}
+  .r-open h4.mt{margin-top:15px}
+  .r-open p{margin:0}
+  .r-open .fe{font-size:14px;line-height:1.5;margin-bottom:11px}
+  .r-open .sm{font-size:13px;line-height:1.6;color:var(--ink-soft)}
+  .r-open .lk{display:inline-block;margin-bottom:6px;font-size:13.5px;font-weight:700;color:var(--lime);text-decoration:none}
+  .r-open .lk:hover{text-decoration:underline}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;padding:0;margin:0;list-style:none}
+  .tags li{
+    font:700 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+    padding:5px 9px;border-radius:var(--rad-pill);
+    background:color-mix(in srgb,var(--c) 20%,var(--surf-2));color:var(--ink);
+  }
+  .needs{
+    display:inline-block;font:600 10px/1.5 var(--mono);color:var(--ink-dim);
+    background:var(--surf-2);border-radius:var(--rad-pill);padding:2px 9px;white-space:nowrap;
+  }
+  .empty{padding:90px 0;text-align:center;color:var(--ink-dim)}
+  .empty b{display:block;font:700 15px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px}
+
+  /* ---------- Threads ----------
+     They ride on top of everything except the sticky header, so they read as
+     wiring laid over the interface. The blend mode goes on the <svg> itself,
+     not the paths: this element is a stacking context, so blending a child
+     would isolate against the SVG's own empty backdrop and do nothing. */
+  .threads{
+    position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50;
+    mix-blend-mode:multiply;
+  }
+  [data-theme="dark"] .threads{mix-blend-mode:screen}
+  .threads path{fill:none;stroke-width:1;opacity:.5}
+  .threads path[data-r="Common"]{stroke:var(--r-common)}
+  .threads path[data-r="Uncommon"]{stroke:var(--r-uncommon)}
+  .threads path[data-r="Rare"]{stroke:var(--r-rare)}
+  .threads path[data-r="Legendary"]{stroke:var(--r-legendary)}
 
   /* ---------- Footer ---------- */
-  .ax-foot{
-    max-width:var(--wrap);margin:0 auto;padding:26px 20px 52px;
-    border-top:1px solid var(--rule);color:var(--ink-soft);font-size:13px;
+  .foot{
+    max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--edge-soft);color:var(--ink-dim);font-size:13px;
   }
-  .ax-foot p{margin:0 0 7px}
-  .ax-foot p:last-child{margin-bottom:0}
-  .ax-foot-lead{color:var(--ink);font-size:14px}
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--ink-soft);font-size:14px}
 
-  /* ---------- Phones ---------- */
-  @media (max-width:560px){
-    .ax-nav-in{padding:0 14px}
-    .ax-nav a{font-size:10px;padding:11px 9px;letter-spacing:.1em}
-    .ax-nav-gap{margin-left:0}
-    .ax-toggle{margin-left:auto;padding-left:12px}
-    .ax-hero{padding:32px 14px 22px}
-    .ax-lede{font-size:14.5px;margin-top:16px}
-    .ax-bar{position:static}
-    .ax-bar-in{padding:12px 14px;gap:12px}
-    .ax-field input{width:100%}
-    .ax-field{flex:1 1 140px}
-    .ax-count{margin:0}
-    main{padding:18px 14px 52px}
-    .ax-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-    .ax-name{font-size:14.5px}
-    .ax-pins{gap:26px 14px}
-    .ax-pin{width:calc(50% - 7px)}
-    .ax-d-body{padding:20px 16px 36px}
-    .ax-d-body h2{font-size:24px}
+  @media (max-width:1180px){
+    .wrap{grid-template-columns:262px minmax(0,1fr)}
+    .r-name{flex-basis:200px}
   }
 
-  /* ---------- Motion preference ---------- */
+  /* Phones keep the map beside the ledger rather than stacking it on top: the
+     rail shrinks to a thin strip of dots. The columns stay side by side, so the
+     threads stay meaningful and stay on. */
+  @media (max-width:860px){
+    /* Eight links wrapped the header onto three rows, which threw every sticky
+       offset off. Collapse them behind a burger instead. */
+    .nk-burger{display:grid}
+    .nk-links{
+      display:none;position:absolute;top:100%;left:0;right:0;
+      flex-direction:column;align-items:stretch;
+      background:var(--surf);border-bottom:1px solid var(--edge);
+      padding:6px 16px 12px;box-shadow:0 20px 40px -22px rgba(0,0,0,.45);
+    }
+    .nk-links[data-open]{display:flex}
+    .nk{padding:14px 8px;font-size:14.5px;border-bottom:none;border-left:2px solid transparent}
+    .nk + .nk{border-top:1px solid var(--edge-soft)}
+    .nk[aria-current="page"]{border-left-color:var(--lime);padding-left:14px}
+    .nk-gap{margin-left:0}
+    .nk-theme{margin-left:8px}
+
+    .hero{padding:30px 16px 18px}
+    /* Filter bar was 205px tall: full-width search, then 9 chips wrapping onto
+       three rows at 44px each. Two rows now, with the chips on one
+       horizontally-scrolling strip so their count no longer drives height. */
+    .bar{padding:9px 16px 10px;gap:8px}
+    .group{height:34px;padding:3px;flex:0 0 auto;order:1}
+    .group-lb{display:none}
+    .group button{padding:8px 13px;font-size:10px}
+    /* Zero basis: a 120px basis was enough to claim the rest of the line and
+       bump the count onto its own row. At basis 0 it only takes leftovers. */
+    .bar input[type="search"]{
+      order:2;flex:1 1 0;min-width:88px;width:auto;
+      height:34px;padding:0 14px;font-size:13.5px;
+    }
+    /* Count rides the top row so the chip strip gets a clean full-width lane:
+       sharing a row put the strip's fade against it, and a half-cut chip beside
+       a number reads as broken. */
+    .count{order:3;flex:0 0 auto;margin:0;align-self:center;font-size:10.5px}
+    .chips{
+      order:4;flex:1 1 100%;min-width:0;flex-wrap:nowrap;gap:6px;
+      overflow-x:auto;scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+              mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+    }
+    .chips::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto;padding:8px 11px;font-size:10px}
+    .chip .dot{width:6px;height:6px}
+
+    main{padding:8px 16px 70px}
+    .wrap{grid-template-columns:58px minmax(0,1fr)}
+    .rail{gap:6px;padding-right:2px}
+    .tier{padding:4px 4px 5px;border-radius:8px}
+    .tier-hd{margin-bottom:3px;gap:2px}
+    /* No room for wide tracking or the count at this width. */
+    .tier-hd h3{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tier-hd .n{display:none}
+    .legend{display:none}
+    .threads path{stroke-width:.75;opacity:.42}
+
+    .r-open{grid-template-columns:1fr;gap:14px;padding:2px 10px 16px 24px}
+    .r-eff,.r-type{display:none}
+    .r-name{flex:1 1 auto;font-size:13px}
+    .row summary{gap:9px;padding:7px 10px;min-height:34px}
+    .foot{padding:20px 16px 40px}
+  }
+
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{transition:none !important;animation:none !important}
   }
   </style>
 </head>
-<body data-view="grid">
+<body>
 
-  <nav class="ax-nav" aria-label="Site sections">
-    <div class="ax-nav-in">
-      <a href="codex.html">Codex</a>
-      <a href="graph.html">Graph</a>
-      <a href="promotion.html">Promotions</a>
-      <a href="fusion.html">Fusions</a>
-      <a href="inversion.html">Inversions</a>
-      <a href="artefacts.html" aria-current="page">Artefacts</a>
-      <a href="encyclopedia/index.html" class="ax-nav-gap">Encyclopedia</a>
-      <a href="betza.html">Betza</a>
-      <button class="ax-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
-
-  <header class="ax-hero">
-    <h1>Artefacts</h1>
-    <p class="ax-lede">Every artefact in NO KINGS, named for a conspiracy, a mystery or a lost treasure that people still argue about.</p>
-  </header>
-
-  <div class="ax-bar">
-    <div class="ax-bar-in">
-      <div class="ax-field">
-        <label for="ax-q">Search</label>
-        <input id="ax-q" type="search" placeholder="name, effect, conspiracy">
-      </div>
-      <div class="ax-field">
-        <label for="ax-rarity">Rarity</label>
-        <select id="ax-rarity"><option value="">All</option></select>
-      </div>
-      <div class="ax-field">
-        <label for="ax-type">Type</label>
-        <select id="ax-type"><option value="">All</option></select>
-      </div>
-      <div class="ax-field">
-        <label for="ax-bonus">Bonus</label>
-        <select id="ax-bonus"><option value="">All</option></select>
-      </div>
-      <div class="ax-field" id="ax-cluster-field" hidden>
-        <label for="ax-cluster">Cluster by</label>
-        <select id="ax-cluster">
-          <option value="bonus">Bonus</option>
-          <option value="type">Type</option>
-          <option value="rarity">Rarity</option>
-        </select>
-      </div>
-      <button class="ax-reset" id="ax-reset" type="button">Reset</button>
-      <div class="ax-views" role="group" aria-label="View mode">
-        <button type="button" id="ax-view-grid" aria-pressed="true">Grid</button>
-        <button type="button" id="ax-view-board" aria-pressed="false">Board</button>
-      </div>
-      <p class="ax-count" id="ax-count" role="status" aria-live="polite"></p>
-    </div>
+<div class="nk-nav"><nav class="nk-nav-in" aria-label="Site sections">
+  <a class="nk-mark" href="codex.html">NO KINGS</a>
+  <div class="nk-links" id="nk-menu">
+    <a class="nk" href="codex.html">Codex</a>
+    <a class="nk" href="graph.html">Graph</a>
+    <a class="nk" href="promotion.html">Promotions</a>
+    <a class="nk" href="fusion.html">Fusions</a>
+    <a class="nk" href="inversion.html">Inversions</a>
+    <a class="nk" href="artefacts.html" aria-current="page">Artefacts</a>
+    <a class="nk nk-gap" href="encyclopedia/index.html">Encyclopedia</a>
+    <a class="nk" href="betza.html">Betza</a>
   </div>
+  <button class="nk-burger" id="burger" aria-expanded="false" aria-controls="nk-menu" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>
+    </svg>
+  </button>
+  <button class="nk-theme" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+      <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+    </svg>
+  </button>
+</nav></div>
 
-  <main>
-    <div class="ax-grid" id="ax-grid"></div>
-    <div class="ax-board" id="ax-board">
-      <svg class="ax-threads" id="ax-threads" aria-hidden="true" preserveAspectRatio="none"><path id="ax-thread-path"></path></svg>
-      <div id="ax-clusters"></div>
-    </div>
-  </main>
+<header class="hero">
+  <h1><em>Artefacts</em></h1>
+  <p>Every artefact in NO KINGS, named for a conspiracy, a mystery or a lost treasure that people still argue about.</p>
+</header>
 
-  <dialog id="ax-drawer" aria-labelledby="ax-drawer-title">
-    <button class="ax-close" id="ax-close" type="button" aria-label="Close artefact details">&#10005;</button>
-    <div id="ax-drawer-content"></div>
-  </dialog>
+<div class="bar">
+  <div class="group" role="group" aria-label="Group the map by">
+    <span class="group-lb">Group</span>
+    <button type="button" data-view="rarity" aria-pressed="true">Rarity</button>
+    <button type="button" data-view="bonus" aria-pressed="false">Bonus</button>
+  </div>
+  <label class="sr" for="q">Search artefacts</label>
+  <input id="q" type="search" placeholder="Search name, effect, conspiracy">
+  <div class="chips" id="chips"></div>
+  <p class="count" id="count" role="status" aria-live="polite"></p>
+</div>
 
-  <footer class="ax-foot">
-    <p class="ax-foot-lead">180 artefact effects across 4 rarities, each named for a famous conspiracy, mystery or lost treasure.</p>
-    <p>Data exported from the Notion Artefacts DB (design source of truth). Built as a single static HTML file: no servers, no frameworks. The full review table lives on <a href="artefacts-review.html">the review page</a>.</p>
-  </footer>
+<main>
+  <div class="wrap">
+    <aside class="rail" id="rail" aria-hidden="true"></aside>
+    <div class="ledger" id="ledger"></div>
+  </div>
+</main>
 
-  <script>
-  // ponytail: canonical data comes from data/artefacts.js — never inline a copy (see CLAUDE.md).
-  const $ = id => document.getElementById(id);
-  const gridEl = $('ax-grid'), clustersEl = $('ax-clusters'), boardEl = $('ax-board');
-  const countEl = $('ax-count'), threadPath = $('ax-thread-path'), svgEl = $('ax-threads');
-  const qEl = $('ax-q'), rarityEl = $('ax-rarity'), typeEl = $('ax-type'),
-        bonusEl = $('ax-bonus'), clusterEl = $('ax-cluster'), clusterField = $('ax-cluster-field');
-  const drawer = $('ax-drawer'), drawerContent = $('ax-drawer-content');
+<svg class="threads" id="threads" aria-hidden="true">
+  <path data-r="Common"></path><path data-r="Uncommon"></path>
+  <path data-r="Rare"></path><path data-r="Legendary"></path>
+</svg>
 
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
-  const RARITY_RANK = { Common:0, Uncommon:1, Rare:2, Legendary:3 };
+<footer class="foot">
+  <p class="foot-lead">180 artefact effects across 4 rarities, each named for a famous conspiracy, mystery or lost treasure.</p>
+  <p>Data exported from the Notion Artefacts DB (design source of truth). Built as a single static HTML file: no servers, no frameworks. The full review table lives on <a href="artefacts-review.html">the review page</a>.</p>
+</footer>
 
-  // Initials for the empty art slot: "Ark's Bunkbed" -> AB. Reads as an
-  // evidence-bag label rather than as a broken image.
-  function initials(name) {
-    const w = name.replace(/[^A-Za-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
-    return (w.length > 1 ? w[0][0] + w[1][0] : name.slice(0, 2)).toUpperCase();
+<script>
+// ponytail: canonical data comes from data/artefacts.js — never inline a copy (see CLAUDE.md).
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const effectHtml = e => esc(e).replace(/\(needs: ([^)]+)\)/, '<span class="needs">needs: $1</span>');
+
+const TIERS = ['Common', 'Uncommon', 'Rare', 'Legendary'];
+const BONUSES = [...new Set(ARTEFACTS.flatMap(a => a.bonus))].sort();
+
+const railEl = $('rail'), ledger = $('ledger'), chipsEl = $('chips'), countEl = $('count');
+const searchEl = $('q'), barEl = document.querySelector('.bar'), navEl = document.querySelector('.nk-nav');
+const svg = $('threads');
+const paths = {};
+TIERS.forEach(t => paths[t] = svg.querySelector(`path[data-r="${t}"]`));
+
+// Bonus is a multi-select, so an artefact with Score+Gold gets a square in both
+// grids: 217 squares over 9 grids rather than 180. Grouping on bonus[0] alone
+// would report 31 Gold artefacts when there are really 53.
+const BONUS_ORDER = (() => {
+  const n = {};
+  ARTEFACTS.forEach(a => a.bonus.forEach(b => n[b] = (n[b] || 0) + 1));
+  return Object.keys(n).sort((x, y) => n[y] - n[x] || x.localeCompare(y));
+})();
+const GROUPS = {
+  rarity: { keys: TIERS, of: a => [a.rarity] },
+  bonus: { keys: BONUS_ORDER, of: a => a.bonus }
+};
+
+// ---- Filtering. The controls ARE the state; nothing to drift.
+const haystacks = ARTEFACTS.map(a =>
+  [a.name, a.effect, a.conspiracy, a.summary, a.rarity, a.type, a.bonus.join(' ')].join(' ').toLowerCase());
+const active = new Set();
+let filterDim = 'bonus';
+
+// The chips filter on whichever axis the map is NOT grouped by: grouping
+// already shows you one dimension spatially, so filtering by it is dead weight.
+function setFilterDim(dim) {
+  filterDim = dim;
+  active.clear();
+  // The dot only carries meaning on rarity chips, where it is that tier's
+  // colour. Bonus chips have no colour of their own, so it would render as nine
+  // identical violet dots saying nothing.
+  chipsEl.innerHTML = (dim === 'rarity' ? TIERS : BONUSES).map(v => dim === 'rarity'
+    ? `<button class="chip" type="button" data-r="${v}" data-v="${v}" aria-pressed="false"><span class="dot"></span>${v}</button>`
+    : `<button class="chip" type="button" data-v="${v}" aria-pressed="false">${v}</button>`).join('');
+}
+const passes = a => !active.size ||
+  (filterDim === 'rarity' ? active.has(a.rarity) : a.bonus.some(b => active.has(b)));
+
+function currentSet() {
+  const q = searchEl.value.trim().toLowerCase();
+  const out = [];
+  for (let i = 0; i < ARTEFACTS.length; i++) {
+    if (!passes(ARTEFACTS[i])) continue;
+    if (q && !haystacks[i].includes(q)) continue;
+    out.push(i);
   }
+  return out;
+}
 
-  function artSlot(a, cls) {
-    return a.image
-      ? `<img class="ax-art ${cls}" src="${esc(a.image)}" alt="" loading="lazy" decoding="async">`
-      : `<div class="ax-art ax-art-empty ${cls}" aria-hidden="true"><span>${esc(initials(a.name))}</span></div>`;
-  }
-
-  const effectHtml = e => esc(e).replace(/\(needs: ([^)]+)\)/, '<span class="ax-needs">needs: $1</span>');
-  const tagsHtml = a => `<ul class="ax-tags"><li class="is-type">${esc(a.type)}</li>` +
-    a.bonus.map(b => `<li>${esc(b)}</li>`).join('') + '</ul>';
-
-  // ---- Filtering. The four controls ARE the state; no parallel state object
-  // to drift, and both views share them for free.
-  const haystacks = ARTEFACTS.map(a =>
-    [a.name, a.effect, a.conspiracy, a.summary, a.rarity, a.type, a.bonus.join(' ')].join(' ').toLowerCase());
-
-  function currentSet() {
-    const q = qEl.value.trim().toLowerCase(), r = rarityEl.value, t = typeEl.value, b = bonusEl.value;
-    const out = [];
-    for (let i = 0; i < ARTEFACTS.length; i++) {
-      const a = ARTEFACTS[i];
-      if (r && a.rarity !== r) continue;
-      if (t && a.type !== t) continue;
-      if (b && !a.bonus.includes(b)) continue;
-      if (q && !haystacks[i].includes(q)) continue;
-      out.push(i);
-    }
-    return out;
-  }
-
-  const EMPTY = '<div class="ax-empty"><p>No artefacts match</p><p style="font-family:inherit;letter-spacing:0;text-transform:none;font-weight:400">Widen the filters or clear the search.</p></div>';
-
-  // ---- Grid view
-  function cardHtml(i, n) {
-    const a = ARTEFACTS[i];
-    return `<article class="ax-card" data-rarity="${esc(a.rarity)}" style="--i:${Math.min(n, 12)}">
-      ${artSlot(a, '')}
-      <div class="ax-body">
-        <p class="ax-stamp">${esc(a.rarity)}</p>
-        <h3 class="ax-name"><a href="#artefact" data-i="${i}">${esc(a.name)}</a></h3>
-        <p class="ax-eff">${effectHtml(a.effect)}</p>
-        ${tagsHtml(a)}
-      </div>
-    </article>`;
-  }
-
-  function renderGrid(idx) {
-    gridEl.innerHTML = idx.length ? idx.map(cardHtml).join('') : EMPTY;
-  }
-
-  // ---- Board view
-  const CLUSTER_OF = {
-    bonus: a => a.bonus[0],
-    type: a => a.type,
-    rarity: a => a.rarity
-  };
-
-  function renderBoard(idx) {
-    if (!idx.length) { clustersEl.innerHTML = EMPTY; threadPath.removeAttribute('d'); return; }
-    const dim = clusterEl.value, key = CLUSTER_OF[dim];
-    const groups = new Map();
-    for (const i of idx) {
-      const k = key(ARTEFACTS[i]);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(i);
-    }
-    // Rarity clusters read in rarity order; the rest read biggest first.
-    const names = [...groups.keys()].sort((x, y) => dim === 'rarity'
-      ? RARITY_RANK[x] - RARITY_RANK[y]
-      : groups.get(y).length - groups.get(x).length || x.localeCompare(y));
-
-    clustersEl.innerHTML = names.map(name => {
-      const pins = groups.get(name).map((i, n) => {
+// ---- The map. Built per grouping; index -> [cell, ...] because one artefact
+// can own several squares in the bonus view.
+const cells = new Map();
+function buildRail(view) {
+  const g = GROUPS[view];
+  railEl.innerHTML = g.keys.map(key => {
+    const items = [];
+    ARTEFACTS.forEach((a, i) => { if (g.of(a).includes(key)) items.push(i); });
+    return `<section class="tier"${view === 'rarity' ? ` data-r="${key}"` : ''}>
+      <div class="tier-hd"><h3>${esc(key)}</h3><span class="n">${items.length}</span></div>
+      <div class="grid">${items.map(i => {
         const a = ARTEFACTS[i];
-        return `<div class="ax-pin" data-rarity="${esc(a.rarity)}" style="--tilt:calc((${n % 5} - 2) * 0.5deg)">
-          <span class="ax-pinhead"></span>
-          <div class="ax-pin-inner">
-            <p class="ax-stamp">${esc(a.rarity)}</p>
-            <h4 class="ax-name"><a href="#artefact" data-i="${i}">${esc(a.name)}</a></h4>
-            <p class="ax-eff">${effectHtml(a.effect)}</p>
-          </div>
-        </div>`;
-      }).join('');
-      return `<section class="ax-cluster"><h3><b>${esc(name)}</b><span>${groups.get(name).length}</span></h3>
-        <div class="ax-pins">${pins}</div></section>`;
-    }).join('');
-    requestAnimationFrame(layoutThreads);
-  }
+        return `<button class="cell" type="button" tabindex="-1" data-cell="${i}"
+          data-r="${esc(a.rarity)}" data-lvl="${a.bonus.length}" title="${esc(a.name)}"></button>`;
+      }).join('')}</div>
+    </section>`;
+  }).join('') + `<p class="legend"><span>Bonus tags</span><i></i><i></i><i></i></p>`;
 
-  // One <path> for the whole board: one polyline per cluster, linking its tacks.
-  function layoutThreads() {
-    if (document.body.dataset.view !== 'board') return;   // hidden => every rect is 0
-    const b = boardEl.getBoundingClientRect();
-    const parts = [];
-    for (const cluster of clustersEl.querySelectorAll('.ax-cluster')) {
-      const heads = cluster.querySelectorAll('.ax-pinhead');
-      if (heads.length < 2) continue;
-      let d = '';
-      heads.forEach((h, n) => {
-        const r = h.getBoundingClientRect();
-        // Board-local: subtracting the board's own viewport rect cancels scroll,
-        // so this never needs a scroll listener.
-        d += (n ? ' L' : 'M') + (r.left - b.left + r.width / 2).toFixed(1) +
-             ' ' + (r.top - b.top + r.height / 2).toFixed(1);
-      });
-      parts.push(d);
-    }
-    svgEl.setAttribute('viewBox', `0 0 ${boardEl.offsetWidth} ${boardEl.offsetHeight}`);
-    svgEl.setAttribute('height', boardEl.offsetHeight);
-    threadPath.setAttribute('d', parts.join(' '));
-  }
+  cells.clear();
+  railEl.querySelectorAll('.cell').forEach(c => {
+    const i = +c.dataset.cell;
+    if (!cells.has(i)) cells.set(i, []);
+    cells.get(i).push(c);
+  });
+}
 
-  let raf = 0;
-  const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; layoutThreads(); }); };
-  new ResizeObserver(schedule).observe(boardEl);
-
-  // ---- Render entry point
-  function apply() {
-    const idx = currentSet();
-    countEl.innerHTML = `<b>${idx.length}</b> of ${ARTEFACTS.length} artefacts`;
-    (document.body.dataset.view === 'board' ? renderBoard : renderGrid)(idx);
-  }
-
-  // ---- View switching
-  const VIEW_KEY = 'nokings-view:artefacts';
-  function setView(v) {
-    document.body.dataset.view = v;
-    $('ax-view-grid').setAttribute('aria-pressed', String(v === 'grid'));
-    $('ax-view-board').setAttribute('aria-pressed', String(v === 'board'));
-    clusterField.hidden = v !== 'board';
-    try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
-    apply();
-  }
-
-  // ---- Drawer. Native <dialog> gives focus trap, Escape, aria-modal,
-  // backdrop and focus restoration for free.
-  function openDrawer(i) {
+// ---- The ledger
+function render(idx) {
+  ledger.innerHTML = idx.length ? idx.map(i => {
     const a = ARTEFACTS[i];
-    drawerContent.innerHTML = `${artSlot(a, 'ax-d-art')}
-      <div class="ax-d-body" data-rarity="${esc(a.rarity)}">
-        <p class="ax-stamp">${esc(a.rarity)}</p>
-        <h2 id="ax-drawer-title">${esc(a.name)}</h2>
-        <div class="ax-d-sec">
-          <h3>Effect</h3>
-          <p class="ax-d-eff">${effectHtml(a.effect)}</p>
-          ${tagsHtml(a)}
+    return `<details class="row" data-row="${i}" data-r="${esc(a.rarity)}">
+      <summary>
+        <span class="r-dot"></span>
+        <h3 class="r-name">${esc(a.name)}</h3>
+        <p class="r-eff">${effectHtml(a.effect)}</p>
+        <span class="r-type">${esc(a.type)}</span>
+        <span class="r-caret">&#9660;</span>
+      </summary>
+      <div class="r-open">
+        <div>
+          <h4>Effect</h4><p class="fe">${effectHtml(a.effect)}</p>
+          <h4 class="mt">Bonuses</h4>
+          <!-- Notion's Bonus multi-select only. Type (Passive/Trigger) is a
+               separate property and already sits on the summary line. -->
+          <ul class="tags">${a.bonus.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
         </div>
-        <div class="ax-d-sec">
-          <h3>The conspiracy</h3>
-          <a class="ax-d-link" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.conspiracy)}</a>
-          <p class="ax-d-sum">${esc(a.summary)}</p>
-        </div>
-      </div>`;
-    drawer.showModal();
-    requestAnimationFrame(() => drawer.classList.add('is-open'));
+        <div><h4>The conspiracy</h4>
+          <a class="lk" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.conspiracy)}</a>
+          <p class="sm">${esc(a.summary)}</p></div>
+      </div>
+    </details>`;
+  }).join('') : '<div class="empty"><b>Nothing matches</b>Widen the filters or clear the search.</div>';
+
+  // Dim the squares that fell out of the filter; the map always shows them all.
+  const inSet = new Set(idx);
+  cells.forEach((list, i) => list.forEach(el => el.classList.toggle('is-out', !inSet.has(i))));
+  observeRows();
+  schedule();
+}
+
+function apply() {
+  const idx = currentSet();
+  countEl.innerHTML = `<b>${idx.length}</b> / ${ARTEFACTS.length}`;
+  render(idx);
+}
+
+// ---- Which rows are on screen. IntersectionObserver owns membership; the rAF
+// loop below owns geometry.
+let io = null;
+const visible = new Set();
+function chromeHeight() {
+  return navEl.offsetHeight +
+    (getComputedStyle(barEl).position === 'sticky' ? barEl.offsetHeight : 0);
+}
+function observeRows() {
+  if (io) io.disconnect();
+  visible.clear();
+  // Discount the sticky chrome, so a row hidden behind the header or the filter
+  // bar does not sprout a thread that vanishes underneath them.
+  const chrome = chromeHeight();
+  io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      const i = +e.target.dataset.row;
+      if (e.isIntersecting) visible.add(i); else visible.delete(i);
+    }
+    schedule();
+  }, { rootMargin: `-${chrome + 4}px 0px -4px 0px` });
+  ledger.querySelectorAll('.row').forEach(r => io.observe(r));
+}
+
+// ---- Threads. One endpoint is sticky (viewport-fixed), the other scrolls, so
+// everything is measured in viewport space straight off getBoundingClientRect.
+function draw() {
+  const d = { Common: '', Uncommon: '', Rare: '', Legendary: '' };
+  const lit = new Set();
+
+  // Read phase: collect every rect first, write afterwards, so the frame cannot
+  // layout-thrash.
+  const segs = [];
+  for (const i of visible) {
+    const list = cells.get(i), row = ledger.querySelector(`.row[data-row="${i}"]`);
+    if (!list || !row) continue;
+    // One thread per square: in the bonus view a 3-tag artefact genuinely
+    // reaches into three grids, and showing all three is the point.
+    const w = row.getBoundingClientRect();
+    for (const cell of list) segs.push({ r: ARTEFACTS[i].rarity, c: cell.getBoundingClientRect(), w });
+    lit.add(i);
   }
 
-  document.querySelector('main').addEventListener('click', e => {
-    const a = e.target.closest('a[data-i]');
-    if (!a) return;
-    e.preventDefault();
-    openDrawer(+a.dataset.i);
-  });
-  $('ax-close').addEventListener('click', () => drawer.close());
-  drawer.addEventListener('click', e => { if (e.target === drawer) drawer.close(); });
-  drawer.addEventListener('close', () => drawer.classList.remove('is-open'));
-
-  // ---- Wiring. Select options come from the data so they cannot drift.
-  function fillSelect(el, values) {
-    el.insertAdjacentHTML('beforeend', values.map(v => `<option>${esc(v)}</option>`).join(''));
+  // Write phase. Clamp the square end to the rail's visible box: on a short
+  // screen the rail scrolls internally, and an out-of-view square would
+  // otherwise anchor its thread somewhere it clearly is not.
+  const rb = railEl.getBoundingClientRect();
+  for (const s of segs) {
+    const cx = Math.min(s.c.right, rb.right);
+    const cy = Math.min(Math.max(s.c.top + s.c.height / 2, rb.top + 2), rb.bottom - 2);
+    const rx = s.w.left, ry = s.w.top + Math.min(s.w.height / 2, 19);
+    d[s.r] += `M${cx.toFixed(1)} ${cy.toFixed(1)}C${(cx + 44).toFixed(1)} ${cy.toFixed(1)},${(rx - 44).toFixed(1)} ${ry.toFixed(1)},${rx.toFixed(1)} ${ry.toFixed(1)}`;
   }
-  fillSelect(rarityEl, [...new Set(ARTEFACTS.map(a => a.rarity))].sort((x, y) => RARITY_RANK[x] - RARITY_RANK[y]));
-  fillSelect(typeEl, [...new Set(ARTEFACTS.map(a => a.type))].sort());
-  fillSelect(bonusEl, [...new Set(ARTEFACTS.flatMap(a => a.bonus))].sort());
+  for (const t of TIERS) paths[t].setAttribute('d', d[t]);
+  cells.forEach((list, i) => list.forEach(el => el.classList.toggle('is-lit', lit.has(i))));
+}
 
-  [qEl, rarityEl, typeEl, bonusEl, clusterEl].forEach(el =>
-    el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', apply));
-  $('ax-reset').addEventListener('click', () => {
-    qEl.value = ''; rarityEl.value = ''; typeEl.value = ''; bonusEl.value = '';
-    apply();
-  });
-  $('ax-view-grid').addEventListener('click', () => setView('grid'));
-  $('ax-view-board').addEventListener('click', () => setView('board'));
+let raf = 0;
+function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); }
 
-  let saved = 'grid';
-  try { saved = localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'grid'; } catch (e) {}
-  setView(saved);
-  </script>
-  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
-  <script src="assets/theme.js"></script>
+// Measure the chrome rather than trusting constants: the header collapses to a
+// burger on phones and the filter bar carries 4 or 9 chips, so neither height is
+// fixed, and a stale value leaves the rail tucked underneath.
+// --nav-min drives the header height and --nav-h is measured back off it, which
+// keeps the two from feeding into each other.
+function syncChrome() {
+  const root = document.documentElement.style;
+  root.setProperty('--nav-h', navEl.offsetHeight + 'px');
+  const stuck = getComputedStyle(barEl).position === 'sticky';
+  root.setProperty('--bar-h', (stuck ? barEl.offsetHeight : 0) + 'px');
+}
+
+// ---- Fit the whole map into its slot, so the rail never needs scrolling. More
+// columns means smaller squares and fewer rows, so total height falls
+// monotonically as the column count rises: binary-search the smallest column
+// count that fits, which is the largest squares that fit.
+const MIN_COLS = 4, MAX_COLS = 34, MAX_CELL = 16;
+function fitRail() {
+  const avail = innerHeight - chromeHeight();
+  const set = n => railEl.style.setProperty('--cols', n);
+
+  // Squares cap at MAX_CELL. Rather than capping the track width (which would
+  // leave the grid narrower than its card), raise the column floor until 1fr
+  // tracks land at or under the cap, so the grid still fills the rail.
+  const grid = railEl.querySelector('.grid');
+  if (!grid) return;
+  const gap = parseFloat(getComputedStyle(grid).columnGap) || 3;
+  const capCols = Math.ceil((grid.clientWidth + gap) / (MAX_CELL + gap));
+
+  let lo = Math.max(MIN_COLS, capCols), hi = MAX_COLS, best = MAX_COLS;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    set(mid);
+    if (railEl.scrollHeight <= avail) { best = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  set(best);
+
+  // Small squares read better as dots. Measure with offsetWidth, NOT
+  // getBoundingClientRect: the latter includes the dense scale(.62), so once
+  // dots engaged the measurement would stay under the threshold forever and the
+  // rail could never return to squares when the viewport grew.
+  const size = grid.firstElementChild ? grid.firstElementChild.offsetWidth : 99;
+  railEl.toggleAttribute('data-dense', size < 12);
+}
+
+const relayout = () => { syncChrome(); fitRail(); schedule(); };
+new ResizeObserver(relayout).observe(barEl);
+addEventListener('resize', relayout);
+// Passive + rAF-coalesced: the two endpoints move relative to each other every
+// frame, and no declarative CSS can compute arbitrary endpoint geometry.
+addEventListener('scroll', schedule, { passive: true });
+ledger.addEventListener('toggle', schedule, true);
+
+// ---- Click a square: expand the row and bring it into view.
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+railEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell');
+  if (!c) return;
+  const row = ledger.querySelector(`.row[data-row="${c.dataset.cell}"]`);
+  if (!row) return;                       // filtered out of the ledger
+  row.open = true;
+  row.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' });
+  row.classList.remove('is-flash');
+  void row.offsetWidth;                   // restart the flash
+  row.classList.add('is-flash');
+  schedule();
+});
+
+// ---- Hover either side highlights its counterpart.
+const hover = (el, sel, fn) => {
+  el.addEventListener('mouseover', e => { const t = e.target.closest(sel); if (t) fn(t, true); });
+  el.addEventListener('mouseout', e => { const t = e.target.closest(sel); if (t) fn(t, false); });
+};
+hover(railEl, '.cell', (c, on) => {
+  const row = ledger.querySelector(`.row[data-row="${c.dataset.cell}"]`);
+  if (row) row.classList.toggle('is-near', on);
+});
+hover(ledger, '.row', (r, on) =>
+  cells.get(+r.dataset.row)?.forEach(c => c.classList.toggle('is-hot', on)));
+
+// ---- Group toggle
+const VIEW_KEY = 'nokings-view:artefacts';
+const viewBtns = document.querySelectorAll('.group button');
+function setView(v) {
+  viewBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+  buildRail(v);
+  setFilterDim(v === 'rarity' ? 'bonus' : 'rarity');
+  try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
+  apply();
+  relayout();               // chip count and grid count both just changed
+}
+viewBtns.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+
+// ---- Burger menu
+const burger = $('burger'), menu = $('nk-menu');
+function setMenu(open) {
+  menu.toggleAttribute('data-open', open);
+  burger.setAttribute('aria-expanded', String(open));
+  burger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  syncChrome();
+}
+burger.addEventListener('click', () => setMenu(burger.getAttribute('aria-expanded') !== 'true'));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && burger.getAttribute('aria-expanded') === 'true') { setMenu(false); burger.focus(); }
+});
+document.addEventListener('click', e => {
+  if (burger.getAttribute('aria-expanded') !== 'true') return;
+  if (!menu.contains(e.target) && !burger.contains(e.target)) setMenu(false);
+});
+// Leaving the phone breakpoint must not strand the panel open.
+matchMedia('(max-width:860px)').addEventListener('change', () => setMenu(false));
+
+searchEl.addEventListener('input', apply);
+chipsEl.addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const v = b.dataset.v;
+  if (active.has(v)) { active.delete(v); b.setAttribute('aria-pressed', 'false'); }
+  else { active.add(v); b.setAttribute('aria-pressed', 'true'); }
+  apply();
+});
+
+let startView = 'rarity';
+try { startView = localStorage.getItem(VIEW_KEY) === 'bonus' ? 'bonus' : 'rarity'; } catch (e) {}
+setView(startView);
+</script>
+<!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+<script src="assets/theme.js"></script>
 </body>
 </html>

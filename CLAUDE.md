@@ -33,21 +33,35 @@ tests, no servers. Deployed as plain static files (note the `.nojekyll`).
 - `promotion.html` · `fusion.html` · `inversion.html` — the 8 promotion chains, the fusions, and the inversion pairs.
 - `betza.html` — Betza "funny notation" reference + a live sandbox that renders any string.
 - `encyclopedia/index.html` — 100-piece visual reference, grouped by family/origin.
-- `artefacts.html` — the 180 artefacts, as a card grid and an "evidence board" of
-  thread-linked clusters. **Design pilot for the site-wide redesign**: it deliberately
-  does *not* link `assets/site.css` (that file styles `footer` as a bare element and
-  forces `min-height:44px` onto `.badge`/`.filter-input` on phones, both of which fight
-  the new layout). It carries its own tokens, nav and footer markup, all classes prefixed
-  `ax-`, and still shares `assets/theme.js` so the light/dark choice stays in sync. When
-  the look is settled, this file is the seed of the new `site.css`.
+- `artefacts.html` — the 180 artefacts as a **density map wired to a ledger**: a sticky
+  rail of contribution-calendar grids (one square per artefact, shaded by bonus-tag
+  count) beside a one-line-per-artefact list, with an SVG thread from every on-screen row
+  back to its own square. The map groups by rarity or by bonus, and the filter chips
+  always show whichever axis the map is *not* grouped by. **Design pilot for the
+  site-wide redesign**: it deliberately does *not* link `assets/site.css` (that file
+  styles `footer` as a bare element and forces `min-height:44px` onto
+  `.badge`/`.filter-input` on phones, both of which fight this layout). It carries its
+  own tokens, nav and footer markup, and still shares `assets/theme.js` so the light/dark
+  choice stays in sync. When the look is settled, this file is the seed of the new
+  `site.css`.
 - `artefacts-review.html` — unlisted Notion review tool (flag rows REWORK, export to
-  paste back to Claude). Was `artefacts.html` until the gallery took that URL.
+  paste back to Claude). Was `artefacts.html` until the map took that URL.
 
-**Artefact artwork** is pending. An artefact record may carry an optional
-`image: "assets/artefacts/<slug>.png"`; when it is absent the gallery renders a reserved
-placeholder of identical geometry, so art can be dropped in later with zero layout shift.
-Never emit an `<img>` for a file that does not exist — 180 missing files would be 180
-console 404s and the verification rule below is *zero* console errors.
+Two things about `artefacts.html` that are easy to break:
+
+- **Chrome heights are measured, never assumed.** The header collapses to a burger on
+  phones and the filter bar carries 4 or 9 chips, so `--nav-h` and `--bar-h` are written
+  from `offsetHeight` at runtime. Hardcoding them leaves the rail tucked underneath.
+- **`fitRail()` solves the column count** so the rail always fits `100dvh` minus that
+  chrome without scrolling. It measures cell size with `offsetWidth`, *not*
+  `getBoundingClientRect()`, because the dense dot mode applies `scale(.62)` and a
+  transformed rect would latch the page into dots forever.
+
+**Artefact artwork** has no home in this design yet: the ledger is deliberately one line
+per artefact and carries no image slot. When art arrives, the expanded row is the place
+for it. Whatever renders it, never emit an `<img>` for a file that does not exist — 180
+missing files would be 180 console 404s and the verification rule below is *zero*
+console errors.
 
 **Shared code** lives in `assets/`: `site.css` (palette, sticky nav, footer, base +
 shared a11y), `board.js` (SVG board / movement-diagram renderer), `theme.js` (light/dark

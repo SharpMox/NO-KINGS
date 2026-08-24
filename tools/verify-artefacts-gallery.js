@@ -1,199 +1,307 @@
-/* Verifies artefacts.html (the gallery) plus the nav link added to every page.
+/* Verifies artefacts.html (the map + ledger) plus the nav link on every page.
    Serve first:  python3 -m http.server 8931
    Run:          node tools/verify-artefacts-gallery.js
 
-   Expectations are computed from the page's own ARTEFACTS, never hardcoded, so
-   a data edit cannot produce a false red. */
+   Every expectation is derived from the page's own ARTEFACTS, never hardcoded,
+   so a data edit cannot produce a false red. */
 const { chromium } = require('/tmp/node_modules/playwright');
 const BASE = 'http://localhost:8931';
+const URL = `${BASE}/artefacts.html`;
 
 (async () => {
   const browser = await chromium.launch();
   const fails = [];
-  const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' ' + msg); if (!cond) fails.push(msg); };
-
-  const watch = page => {
-    const errors = [];
-    page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    page.on('pageerror', e => errors.push(String(e)));
-    return errors;
+  const ok = (c, m) => { console.log((c ? 'PASS' : 'FAIL') + ' ' + m); if (!c) fails.push(m); };
+  const watch = p => {
+    const e = [];
+    p.on('console', m => { if (m.type() === 'error') e.push(m.text()); });
+    p.on('pageerror', x => e.push(String(x)));
+    return e;
   };
+  const snap = p => p.evaluate(() => ({
+    tiers: document.querySelectorAll('.tier').length,
+    cells: document.querySelectorAll('.cell').length,
+    rows: document.querySelectorAll('.row').length,
+    chips: [...document.querySelectorAll('.chip')].map(c => c.dataset.v),
+    heads: [...document.querySelectorAll('.tier-hd h3')].map(h => h.textContent)
+  }));
 
-  // ---- 1 + 2: both themes render, and the tokens actually react to the theme.
+  // ---- 1: both themes render clean, and the tokens react to the theme.
   const bg = {};
   for (const theme of ['light', 'dark']) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    const errors = watch(page);
-    await page.addInitScript(t => localStorage.setItem('fp-theme', t), theme);
-    const resp = await page.goto(`${BASE}/artefacts.html`);
-    ok(resp.status() === 200, `${theme}: page 200`);
-    await page.waitForTimeout(400);
-    ok(errors.length === 0, `${theme}: zero console errors${errors.length ? ' - ' + errors.join(' | ') : ''}`);
-    const cards = await page.locator('.ax-card').count();
-    ok(cards === 180, `${theme}: 180 cards rendered (got ${cards})`);
-    ok(await page.locator('img').count() === 0, `${theme}: no <img> emitted while artwork is pending (no 404s)`);
-    bg[theme] = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    await page.close();
+    const p = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+    const errs = watch(p);
+    await p.addInitScript(t => {
+      localStorage.setItem('fp-theme', t);
+      localStorage.setItem('nokings-view:artefacts', 'rarity');
+    }, theme);
+    const r = await p.goto(URL);
+    await p.waitForTimeout(700);
+    ok(r.status() === 200 && errs.length === 0,
+      `${theme}: 200 + zero console errors${errs.length ? ' - ' + errs.join(' | ') : ''}`);
+    ok(await p.locator('.cell').count() === 180, `${theme}: 180 squares on the map`);
+    bg[theme] = await p.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    await p.close();
   }
   ok(bg.light !== bg.dark, `body background differs light vs dark (${bg.light} / ${bg.dark})`);
 
-  // ---- 3: nav regression across every page.
-  const pages = ['codex', 'graph', 'promotion', 'fusion', 'inversion', 'betza', 'artefacts', 'encyclopedia/index'];
-  for (const p of pages) {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    const errors = watch(page);
-    const resp = await page.goto(`${BASE}/${p}.html`);
-    await page.waitForTimeout(250);
-    const links = await page.locator('nav a[href$="artefacts.html"]').count();
-    ok(resp.status() === 200 && errors.length === 0 && links === 1,
-      `${p}.html: 200, zero console errors, exactly 1 Artefacts nav link (got ${links})`);
-    await page.close();
+  // ---- 2: nav regression across every page.
+  for (const name of ['codex', 'graph', 'promotion', 'fusion', 'inversion', 'betza', 'artefacts', 'encyclopedia/index']) {
+    const p = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+    const errs = watch(p);
+    const r = await p.goto(`${BASE}/${name}.html`);
+    await p.waitForTimeout(250);
+    const links = await p.locator('nav a[href$="artefacts.html"]').count();
+    ok(r.status() === 200 && errs.length === 0 && links === 1,
+      `${name}.html: 200, zero console errors, exactly 1 Artefacts nav link (got ${links})`);
+    await p.close();
   }
 
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
-  const errors = watch(page);
-  await page.goto(`${BASE}/artefacts.html`);
-  await page.waitForTimeout(300);
+  // Explicit context: the persistence check needs a second page sharing storage.
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 950 } });
+  const p = await ctx.newPage();
+  await p.addInitScript(() => localStorage.setItem('nokings-view:artefacts', 'rarity'));
+  const errs = watch(p);
+  await p.goto(URL);
+  await p.waitForTimeout(800);
 
-  const exp = await page.evaluate(() => ({
-    total: ARTEFACTS.length,
-    legendary: ARTEFACTS.filter(a => a.rarity === 'Legendary').length,
-    passive: ARTEFACTS.filter(a => a.type === 'Passive').length,
-    special: ARTEFACTS.filter(a => a.bonus.includes('Special')).length,
-    legendaryPassive: ARTEFACTS.filter(a => a.rarity === 'Legendary' && a.type === 'Passive').length,
-    bonusClusters: new Set(ARTEFACTS.map(a => a.bonus[0])).size,
-    typeClusters: new Set(ARTEFACTS.map(a => a.type)).size,
-    rarityClusters: new Set(ARTEFACTS.map(a => a.rarity)).size
-  }));
-
-  const shown = () => page.locator('.ax-card').count();
-  const countText = () => page.locator('#ax-count').innerText();
-
-  // ---- 4: filters, and the live count agreeing with what is on screen.
-  await page.fill('#ax-q', 'booger');
-  ok(await shown() === 1, 'search "booger" narrows to 1 card');
-  await page.fill('#ax-q', '');
-  await page.selectOption('#ax-rarity', 'Legendary');
-  ok(await shown() === exp.legendary, `rarity Legendary = ${exp.legendary} cards`);
-  ok((await countText()).startsWith(String(exp.legendary)), 'live count matches the rendered cards');
-  await page.selectOption('#ax-type', 'Passive');
-  ok(await shown() === exp.legendaryPassive, `Legendary + Passive = ${exp.legendaryPassive} cards`);
-  await page.click('#ax-reset');
-  ok(await shown() === exp.total, `reset restores all ${exp.total}`);
-  await page.selectOption('#ax-type', 'Passive');
-  ok(await shown() === exp.passive, `type Passive = ${exp.passive} cards`);
-  await page.click('#ax-reset');
-  await page.selectOption('#ax-bonus', 'Special');
-  ok(await shown() === exp.special, `bonus Special = ${exp.special} cards`);
-  await page.click('#ax-reset');
-
-  // ---- 5: a filter change stays cheap with all 180 in the DOM.
-  const ms = await page.evaluate(() => {
-    const el = document.getElementById('ax-rarity');
-    const t = performance.now();
-    el.value = 'Rare'; el.dispatchEvent(new Event('change'));
-    return performance.now() - t;
-  });
-  ok(ms < 50, `filter change under 50ms (${ms.toFixed(1)}ms)`);
-  await page.click('#ax-reset');
-
-  // ---- 6: drawer semantics come from native <dialog>.
-  const first = await page.evaluate(() => ({ name: ARTEFACTS[0].name, conspiracy: ARTEFACTS[0].conspiracy }));
-  await page.locator('.ax-card .ax-name a').first().click();
-  await page.waitForTimeout(350);
-  ok(await page.locator('#ax-drawer[open]').count() === 1, 'clicking a card opens the drawer');
-  const inside = await page.evaluate(() => document.getElementById('ax-drawer').contains(document.activeElement));
-  ok(inside, 'focus moves inside the dialog');
-  const dText = await page.locator('#ax-drawer').innerText();
-  ok(dText.includes(first.name) && dText.includes(first.conspiracy), 'drawer shows the name and the conspiracy');
-  ok(await page.locator('#ax-drawer a[href^="https://"]').count() === 1, 'drawer has one external wiki link');
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(250);
-  ok(await page.locator('#ax-drawer[open]').count() === 0, 'Escape closes the drawer');
-  const restored = await page.evaluate(() => document.activeElement.matches('.ax-card .ax-name a'));
-  ok(restored, 'focus returns to the originating card link');
-
-  // ---- 7: board view and thread geometry.
-  await page.click('#ax-view-board');
-  await page.waitForTimeout(400);
-  ok(await page.locator('svg.ax-threads').count() === 1, 'exactly one threads svg');
-  for (const [dim, expected] of [['bonus', exp.bonusClusters], ['type', exp.typeClusters], ['rarity', exp.rarityClusters]]) {
-    await page.selectOption('#ax-cluster', dim);
-    await page.waitForTimeout(350);
-    const pins = await page.locator('.ax-pin').count();
-    const clusters = await page.locator('.ax-cluster').count();
-    ok(pins === exp.total && clusters === expected,
-      `cluster by ${dim}: ${exp.total} pins in ${expected} clusters (got ${pins} / ${clusters})`);
-    const geo = await page.evaluate(() => {
-      const d = document.getElementById('ax-thread-path').getAttribute('d') || '';
-      const board = document.getElementById('ax-board');
-      const nums = d.match(/-?\d+(\.\d+)?/g) || [];
-      let outside = 0;
-      for (let i = 0; i < nums.length; i += 2) {
-        const x = +nums[i], y = +nums[i + 1];
-        if (x < 0 || x > board.offsetWidth || y < 0 || y > board.offsetHeight) outside++;
-      }
-      return { moves: (d.match(/M/g) || []).length, points: nums.length / 2, outside, d };
+  const exp = await p.evaluate(() => {
+    const byR = {}, byB = {};
+    ARTEFACTS.forEach(a => {
+      byR[a.rarity] = (byR[a.rarity] || 0) + 1;
+      a.bonus.forEach(b => byB[b] = (byB[b] || 0) + 1);
     });
-    ok(geo.moves === expected, `cluster by ${dim}: one polyline per cluster (${geo.moves} M tokens)`);
-    ok(geo.points === exp.total, `cluster by ${dim}: every pin is a thread vertex (${geo.points})`);
-    ok(geo.outside === 0, `cluster by ${dim}: all thread coordinates are board-local (${geo.outside} outside the box)`);
+    return {
+      total: ARTEFACTS.length, byR, byB,
+      tags: ARTEFACTS.reduce((n, a) => n + a.bonus.length, 0),
+      bonuses: Object.keys(byB).length,
+      legendary: byR.Legendary,
+      legendaryTags: ARTEFACTS.filter(a => a.rarity === 'Legendary').reduce((n, a) => n + a.bonus.length, 0),
+      special: ARTEFACTS.filter(a => a.bonus.includes('Special')).length
+    };
+  });
+
+  // ---- 3: rarity grouping
+  let s = await snap(p);
+  ok(s.tiers === 4 && s.cells === exp.total, `rarity view: ${exp.total} squares in 4 grids`);
+  ok(s.heads.join() === 'Common,Uncommon,Rare,Legendary', `rarity view: grids in tier order`);
+  ok(s.chips.length === exp.bonuses && !s.chips.includes('Legendary'),
+    `rarity view: chips filter the other axis, ${exp.bonuses} bonuses`);
+  for (const [r, n] of Object.entries(exp.byR)) {
+    ok(await p.locator(`.tier[data-r="${r}"] .cell`).count() === n, `rarity view: ${r} grid has ${n} squares`);
   }
 
-  // ---- 8: threads re-layout on resize, via ResizeObserver.
-  await page.selectOption('#ax-cluster', 'bonus');
-  await page.waitForTimeout(300);
-  const before = await page.getAttribute('#ax-thread-path', 'd');
-  await page.setViewportSize({ width: 900, height: 900 });
-  await page.waitForTimeout(500);
-  const after = await page.evaluate(() => {
-    const d = document.getElementById('ax-thread-path').getAttribute('d') || '';
-    const board = document.getElementById('ax-board');
+  // ---- 4: shade encodes bonus-tag count
+  const badLvl = await p.evaluate(() => {
+    let bad = 0;
+    document.querySelectorAll('.cell').forEach(c => {
+      if (+c.dataset.lvl !== ARTEFACTS[+c.dataset.cell].bonus.length) bad++;
+    });
+    return bad;
+  });
+  ok(badLvl === 0, `every square's shade matches its bonus-tag count (${badLvl} wrong)`);
+
+  // ---- 5: filtering dims the map instead of shrinking it
+  await p.click('.chip[data-v="Special"]');
+  await p.waitForTimeout(500);
+  let f = await p.evaluate(() => ({
+    rows: document.querySelectorAll('.row').length,
+    lit: document.querySelectorAll('.cell:not(.is-out)').length,
+    cells: document.querySelectorAll('.cell').length,
+    count: document.querySelector('#count').innerText.trim()
+  }));
+  ok(f.rows === exp.special && f.lit === exp.special && f.cells === exp.total,
+    `rarity view: bonus Special -> ${exp.special} rows, map keeps all ${exp.total} squares`);
+  ok(f.count.startsWith(String(exp.special)), `live count agrees (${f.count})`);
+  await p.click('.chip[data-v="Special"]');
+  await p.waitForTimeout(400);
+  await p.fill('#q', 'booger');
+  await p.waitForTimeout(400);
+  ok((await snap(p)).rows === 1, 'search "booger" narrows to 1 row');
+  await p.fill('#q', '');
+  await p.waitForTimeout(400);
+  ok((await snap(p)).rows === exp.total, `clearing the search restores ${exp.total} rows`);
+
+  // ---- 6: bonus grouping duplicates by tag
+  await p.click('.group button[data-view="bonus"]');
+  await p.waitForTimeout(700);
+  s = await snap(p);
+  ok(s.tiers === exp.bonuses && s.cells === exp.tags,
+    `bonus view: ${exp.tags} squares (one per tag, not ${exp.total}) in ${exp.bonuses} grids`);
+  ok(s.rows === exp.total, `bonus view: ledger still lists each artefact once (${s.rows})`);
+  ok(s.chips.join() === 'Common,Uncommon,Rare,Legendary', `bonus view: chips swap to rarities`);
+  const perBonus = await p.evaluate(() => {
+    const out = {};
+    document.querySelectorAll('.tier').forEach(t =>
+      out[t.querySelector('h3').textContent] = t.querySelectorAll('.cell').length);
+    return out;
+  });
+  ok(Object.entries(exp.byB).every(([b, n]) => perBonus[b] === n),
+    `bonus view: every grid's count matches the data (Gold ${perBonus.Gold}, Score ${perBonus.Score})`);
+
+  await p.click('.chip[data-v="Legendary"]');
+  await p.waitForTimeout(500);
+  f = await p.evaluate(() => ({
+    rows: document.querySelectorAll('.row').length,
+    lit: document.querySelectorAll('.cell:not(.is-out)').length
+  }));
+  ok(f.rows === exp.legendary && f.lit === exp.legendaryTags,
+    `bonus view: rarity Legendary -> ${exp.legendary} rows and ${exp.legendaryTags} undimmed squares`);
+  await p.click('.chip[data-v="Legendary"]');
+  await p.waitForTimeout(400);
+
+  // ---- 7: clicking a square expands and scrolls to its row
+  await p.evaluate(() => document.querySelector('.cell[data-cell="120"]').click());
+  await p.waitForTimeout(900);
+  const st = await p.evaluate(() => {
+    const r = document.querySelector('.row[data-row="120"]'), b = r.getBoundingClientRect();
+    return { open: r.open, inView: b.top > 0 && b.bottom < innerHeight };
+  });
+  ok(st.open && st.inView, 'clicking a square expands its row and scrolls it into view');
+
+  // ---- 8: threads, in the duplicating view
+  const geo = () => p.evaluate(() => {
+    const d = [...document.querySelectorAll('.threads path')].map(x => x.getAttribute('d') || '').join(' ');
+    const bar = document.querySelector('.bar');
+    const chrome = document.querySelector('.nk-nav').offsetHeight +
+      (getComputedStyle(bar).position === 'sticky' ? bar.offsetHeight : 0);
+    let want = 0;
+    document.querySelectorAll('.row').forEach(r => {
+      const b = r.getBoundingClientRect();
+      if (b.bottom > chrome + 4 && b.top < innerHeight - 4)
+        want += document.querySelectorAll(`.cell[data-cell="${r.dataset.row}"]`).length;
+    });
     const nums = d.match(/-?\d+(\.\d+)?/g) || [];
     let outside = 0;
-    for (let i = 0; i < nums.length; i += 2) {
-      if (+nums[i] < 0 || +nums[i] > board.offsetWidth || +nums[i + 1] < 0 || +nums[i + 1] > board.offsetHeight) outside++;
-    }
-    return { d, outside };
+    for (let i = 0; i < nums.length; i += 2)
+      if (+nums[i] < -80 || +nums[i] > innerWidth + 80 || +nums[i + 1] < -80 || +nums[i + 1] > innerHeight + 80) outside++;
+    return { d, segs: (d.match(/M/g) || []).length, want, outside };
   });
-  ok(before !== after.d && after.outside === 0, 'threads re-layout on resize and stay inside the board box');
+  await p.evaluate(() => window.scrollBy(0, 600));
+  await p.waitForTimeout(700);
+  const g1 = await geo();
+  ok(g1.segs > 0 && g1.segs === g1.want,
+    `one thread per square of every on-screen row (${g1.segs} threads / ${g1.want} squares)`);
+  ok(g1.outside === 0, `all thread coordinates inside the viewport (${g1.outside} outside)`);
+  await p.evaluate(() => window.scrollBy(0, 900));
+  await p.waitForTimeout(600);
+  const g2 = await geo();
+  ok(g2.d !== g1.d && g2.outside === 0 && g2.segs === g2.want, 'threads redraw on scroll and stay correct');
 
-  // ---- 9: no horizontal overflow on a phone, in both views and with the drawer open.
-  await page.setViewportSize({ width: 375, height: 800 });
-  await page.waitForTimeout(400);
-  const over = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  ok(await over() <= 0, `board view: no horizontal overflow at 375px (delta ${await over()}px)`);
-  await page.click('#ax-view-grid');
-  await page.waitForTimeout(300);
-  ok(await over() <= 0, `grid view: no horizontal overflow at 375px (delta ${await over()}px)`);
-  await page.locator('.ax-card .ax-name a').first().click();
-  await page.waitForTimeout(400);
-  ok(await over() <= 0, `drawer open: no horizontal overflow at 375px (delta ${await over()}px)`);
-  await page.keyboard.press('Escape');
+  // ---- 9: the grouping choice persists
+  const fresh = await ctx.newPage();
+  await fresh.goto(URL);
+  await fresh.waitForTimeout(700);
+  ok(await fresh.locator('.group button[data-view="bonus"][aria-pressed="true"]').count() === 1,
+    'grouping choice persists into a new page load');
+  await fresh.close();
 
-  // ---- 11: no em dash in the page's own authored chrome (artefact prose is
-  // canonical Notion copy and passes through untouched).
-  const chrome = await page.evaluate(() => [
+  // ---- 10: the rail fits its slot exactly, and never scrolls internally
+  const fit = await p.evaluate(() => {
+    const rail = document.querySelector('.rail');
+    const rb = rail.getBoundingClientRect(), bb = document.querySelector('.bar').getBoundingClientRect();
+    return {
+      gap: Math.round(rb.top - bb.bottom), over: Math.round(rb.bottom - innerHeight),
+      scrolls: rail.scrollHeight > rail.clientHeight + 1,
+      cell: rail.querySelector('.cell').offsetWidth
+    };
+  });
+  ok(fit.gap === 0 && fit.over <= 0, `rail sits flush under the filter bar and inside the viewport (gap ${fit.gap})`);
+  ok(!fit.scrolls, 'rail fits without internal scrolling');
+  ok(fit.cell <= 16, `squares respect the 16px cap (${fit.cell}px)`);
+
+  // ---- 11: dots engage when small, and un-engage when the viewport grows
+  await p.setViewportSize({ width: 1280, height: 720 });
+  await p.waitForTimeout(800);
+  const dense = await p.evaluate(() => ({
+    dense: document.querySelector('.rail').hasAttribute('data-dense'),
+    cell: document.querySelector('.cell').offsetWidth
+  }));
+  ok(dense.dense, `cramped bonus view switches to dots (${dense.cell}px)`);
+  await p.setViewportSize({ width: 1600, height: 1200 });
+  await p.waitForTimeout(900);
+  const back = await p.evaluate(() => ({
+    dense: document.querySelector('.rail').hasAttribute('data-dense'),
+    cell: document.querySelector('.cell').offsetWidth
+  }));
+  ok(!back.dense && back.cell > 12, `growing the viewport returns to ${back.cell}px squares (no dense latch)`);
+
+  ok(errs.length === 0, `interaction run: zero console errors${errs.length ? ' - ' + errs.join(' | ') : ''}`);
+  await ctx.close();
+
+  // ---- 12: reduced motion must not hide anything
+  const rmCtx = await browser.newContext({ viewport: { width: 1440, height: 950 }, reducedMotion: 'reduce' });
+  const rm = await rmCtx.newPage();
+  await rm.goto(URL);
+  await rm.waitForTimeout(600);
+  const op = await rm.evaluate(() => [
+    getComputedStyle(document.querySelector('.row')).opacity,
+    getComputedStyle(document.querySelector('.cell')).opacity]);
+  ok(await rm.locator('.row').count() === exp.total && op[0] === '1' && op[1] === '1',
+    `reduced motion: ${exp.total} rows at full opacity`);
+  await rmCtx.close();
+
+  // ---- 13: phone. Map stays beside the ledger; nav collapses to a burger.
+  const m = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const mErrs = watch(m);
+  await m.goto(URL);
+  await m.waitForTimeout(700);
+  const mob = await m.evaluate(() => {
+    const rail = document.querySelector('.rail'), cell = document.querySelector('.cell');
+    return {
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      pos: getComputedStyle(rail).position,
+      railW: Math.round(rail.getBoundingClientRect().width),
+      cell: cell.offsetWidth,
+      dense: rail.hasAttribute('data-dense'),
+      scrolls: rail.scrollHeight > rail.clientHeight + 1,
+      threads: [...document.querySelectorAll('.threads path')].map(x => x.getAttribute('d')).join(''),
+      navH: document.querySelector('.nk-nav').offsetHeight,
+      navToken: getComputedStyle(document.documentElement).getPropertyValue('--nav-h').trim(),
+      burger: getComputedStyle(document.getElementById('burger')).display,
+      menuOpen: getComputedStyle(document.getElementById('nk-menu')).display !== 'none',
+      barH: Math.round(document.querySelector('.bar').getBoundingClientRect().height)
+    };
+  });
+  ok(mob.over <= 0, `390px: no horizontal overflow (delta ${mob.over}px)`);
+  ok(mob.pos === 'sticky' && mob.railW <= 70, `390px: thin ${mob.railW}px rail stays pinned beside the ledger`);
+  ok(mob.dense && mob.cell <= 11 && !mob.scrolls, `390px: ${mob.cell}px dots, no internal scroll`);
+  ok(!!mob.threads, '390px: threads still drawn, columns are still side by side');
+  ok(mob.burger !== 'none' && !mob.menuOpen, '390px: burger shown, menu closed by default');
+  ok(mob.navH < 80 && mob.navToken === mob.navH + 'px',
+    `390px: header is one row and --nav-h is measured (${mob.navToken})`);
+  ok(mob.barH < 120, `390px: filter bar is compact (${mob.barH}px)`);
+
+  await m.click('#burger');
+  await m.waitForTimeout(400);
+  const open = await m.evaluate(() => ({
+    links: document.querySelectorAll('#nk-menu[data-open] .nk').length,
+    expanded: document.getElementById('burger').getAttribute('aria-expanded'),
+    over: document.documentElement.scrollWidth - document.documentElement.clientWidth
+  }));
+  ok(open.links === 8 && open.expanded === 'true' && open.over <= 0,
+    '390px: burger opens all 8 links with no overflow');
+  await m.keyboard.press('Escape');
+  await m.waitForTimeout(300);
+  ok(await m.evaluate(() => document.getElementById('burger').getAttribute('aria-expanded')) === 'false',
+    '390px: Escape closes the menu');
+  ok(mErrs.length === 0, `390px: zero console errors${mErrs.length ? ' - ' + mErrs.join(' | ') : ''}`);
+  await m.close();
+
+  // ---- 14: no em dash in the page's own authored chrome. Artefact prose is
+  // canonical Notion copy and passes through untouched.
+  const c = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  await c.goto(URL);
+  await c.waitForTimeout(500);
+  const chrome = await c.evaluate(() => [
     document.title,
-    document.querySelector('nav').innerText,
-    document.querySelector('.ax-hero').innerText,
-    document.querySelector('.ax-bar').innerText,
-    document.querySelector('.ax-foot').innerText
+    document.querySelector('.nk-nav').innerText,
+    document.querySelector('.hero').innerText,
+    document.querySelector('.bar').innerText,
+    document.querySelector('.foot').innerText
   ].join(' '));
   ok(!chrome.includes('—'), 'no em dash in nav, hero, filter bar, title or footer');
-
-  ok(errors.length === 0, `interaction run: zero console errors${errors.length ? ' - ' + errors.join(' | ') : ''}`);
-  await page.close();
-
-  // ---- 10: reduced motion must not leave the cards stranded at opacity 0.
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
-  const rm = await ctx.newPage();
-  await rm.goto(`${BASE}/artefacts.html`);
-  await rm.waitForTimeout(400);
-  const rmCards = await rm.locator('.ax-card').count();
-  const rmOpacity = await rm.evaluate(() => getComputedStyle(document.querySelector('.ax-card')).opacity);
-  ok(rmCards === 180 && rmOpacity === '1', `reduced motion: 180 cards visible (opacity ${rmOpacity})`);
-  await ctx.close();
+  await c.close();
 
   await browser.close();
   console.log(fails.length ? `\n${fails.length} FAILURES` : '\nALL GREEN');

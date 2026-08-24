@@ -11,7 +11,7 @@ const { chromium } = require('/tmp/node_modules/playwright');
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('pageerror', e => errors.push(String(e)));
     await page.addInitScript(t => localStorage.setItem('fp-theme', t), theme);
-    const resp = await page.goto('http://localhost:8931/artefacts.html');
+    const resp = await page.goto('http://localhost:8931/artefacts-review.html');
     ok(resp.status() === 200, `${theme}: page 200`);
     await page.waitForTimeout(300);
     ok(errors.length === 0, `${theme}: zero console errors${errors.length ? ' — ' + errors.join(' | ') : ''}`);
@@ -21,7 +21,7 @@ const { chromium } = require('/tmp/node_modules/playwright');
   }
 
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await page.goto('http://localhost:8931/artefacts.html');
+  await page.goto('http://localhost:8931/artefacts-review.html');
   await page.fill('#search', 'booger');
   ok(await page.locator('.art-row').count() === 1, 'search "booger" narrows to 1 row');
   await page.fill('#search', '');

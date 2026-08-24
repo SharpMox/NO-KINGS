@@ -109,18 +109,15 @@
      no extra wrapper div. */
   .bar{
     display:flex;gap:12px;align-items:center;flex-wrap:wrap;
-    padding-block:12px 14px;
+    padding-block:12px 32px;
     padding-inline:max(22px, calc((100% - var(--wrap)) / 2));
   }
   /* Sticky only while the bar is a single row. Below this it wraps and, stacked
      under the header, would eat too much of a phone viewport. */
   @media (min-width:900px){
-    .bar{
-      position:sticky;top:var(--nav-h);z-index:55;
-      background:color-mix(in srgb, var(--bg) 82%, transparent);
-      backdrop-filter:blur(14px);
-      border-bottom:1px solid var(--border-soft);
-    }
+    /* No fill and no border: the blur alone smears the ledger rows passing
+       behind it, which is what keeps the chips legible while scrolling. */
+    .bar{position:sticky;top:var(--nav-h);z-index:55;backdrop-filter:blur(14px)}
   }
   .bar input[type="search"]{
     font:400 14px/1 var(--sans);color:var(--text);background:var(--surface);
@@ -130,20 +127,26 @@
   .bar input::placeholder{color:var(--text-dim)}
   .bar input:focus{outline:none;border-color:var(--lime);box-shadow:var(--glow)}
 
+  /* count and toggle share one container at the right edge of the bar */
+  .bar-end{margin-left:auto;order:3;position:relative}
+  .bar-end .group{height:44px}
+  .bar-end .count{position:absolute;top:calc(100% + 7px);right:3px;white-space:nowrap}
   .group{
-    display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;height:44px;
-    border:1px solid var(--border);border-radius:var(--rad-pill);background:var(--surface);
+    display:inline-flex;align-items:center;gap:5px;padding:4px;
+    border:1px solid var(--border-soft);border-radius:var(--rad-pill);background:var(--surface);
   }
-  .group-lb{font:700 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim);margin-right:5px}
+  .bar input[type="search"]{order:1}
+  .chips{order:2}
   .group button{
     appearance:none;cursor:pointer;border:0;background:transparent;color:var(--text-soft);
     font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
-    padding:10px 14px;border-radius:var(--rad-pill);transition:.18s var(--ease);
+    padding:9px 16px;border-radius:var(--rad-pill);transition:.18s var(--ease);
   }
   .group button:hover{color:var(--text)}
   .group button[aria-pressed="true"]{background:var(--lime);color:#141024}
 
-  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 0;min-width:0}
+  @media (max-width:1280px){.chips{order:4;flex:1 1 100%}}
   .chip{
     appearance:none;cursor:pointer;font:700 11px/1 var(--mono);letter-spacing:.09em;
     text-transform:uppercase;padding:11px 15px;border-radius:var(--rad-pill);
@@ -154,7 +157,7 @@
   .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:#140f26}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--violet))}
   .chip[aria-pressed="true"] .dot{background:#140f26}
-  .count{margin-left:auto;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+  .count{margin:0;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
   .count b{color:var(--lime);font-size:14px}
 
   main{max-width:var(--wrap);margin:0 auto;padding:8px 22px 90px}
@@ -268,6 +271,8 @@
   }
   .row summary::-webkit-details-marker{display:none}
   .r-dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+  /* Fixed width and right-aligned so #7 and #180 leave the names on one x. */
+  .r-no{flex:0 0 30px;text-align:right;font:700 9.5px/1 var(--mono);color:var(--text-dim)}
   /* Fixed column so every effect starts at the same x. Ragged starts read as a
      mess once there are 180 of them. */
   .r-name{
@@ -349,8 +354,11 @@
        three rows at 44px each. Two rows now, with the chips on one
        horizontally-scrolling strip so their count no longer drives height. */
     .bar{padding:9px 16px 10px;gap:8px}
-    .group{height:34px;padding:3px;flex:0 0 auto;order:1}
-    .group-lb{display:none}
+    .bar{padding:9px 16px 10px}
+    .bar-end{position:static;display:flex;flex-direction:row;align-items:center;gap:9px;order:2;margin-left:auto}
+    .bar-end .group{height:auto}
+    .bar-end .count{position:static}
+    .group{padding:3px;flex:0 0 auto}
     .group button{padding:8px 13px;font-size:10px}
     /* Zero basis: a 120px basis was enough to claim the rest of the line and
        bump the count onto its own row. At basis 0 it only takes leftovers. */
@@ -361,7 +369,7 @@
     /* Count rides the top row so the chip strip gets a clean full-width lane:
        sharing a row put the strip's fade against it, and a half-cut chip beside
        a number reads as broken. */
-    .count{order:3;flex:0 0 auto;margin:0;align-self:center;font-size:10.5px}
+    .count{flex:0 0 auto;margin:0;font-size:10.5px}
     .chips{
       order:4;flex:1 1 100%;min-width:0;flex-wrap:nowrap;gap:6px;
       overflow-x:auto;scrollbar-width:none;
@@ -386,6 +394,7 @@
     .r-open{grid-template-columns:1fr;gap:14px;padding:2px 10px 16px 24px}
     .r-eff,.r-type{display:none}
     .r-name{flex:1 1 auto;font-size:13px}
+    .r-no{flex:0 0 24px;font-size:9px}
     .row summary{gap:9px;padding:7px 10px;min-height:34px}
     .foot{padding:20px 16px 40px}
   }
@@ -405,15 +414,16 @@
 </header>
 
 <div class="bar">
-  <div class="group" role="group" aria-label="Group the map by">
-    <span class="group-lb">Group</span>
-    <button type="button" data-view="rarity" aria-pressed="true">Rarity</button>
-    <button type="button" data-view="bonus" aria-pressed="false">Bonus</button>
-  </div>
   <label class="sr" for="q">Search artefacts</label>
   <input id="q" type="search" placeholder="Search name, effect, conspiracy">
   <div class="chips" id="chips"></div>
-  <p class="count" id="count" role="status" aria-live="polite"></p>
+  <div class="bar-end">
+    <div class="group" role="group" aria-label="Group the map by">
+      <button type="button" data-view="rarity" aria-pressed="true">Rarity</button>
+      <button type="button" data-view="bonus" aria-pressed="false">Bonus</button>
+    </div>
+    <p class="count" id="count" role="status" aria-live="polite"></p>
+  </div>
 </div>
 
 <main>
@@ -526,6 +536,7 @@ function render(idx) {
     return `<details class="row" data-row="${i}" data-r="${esc(a.rarity)}">
       <summary>
         <span class="r-dot"></span>
+        <span class="r-no">#${i + 1}</span>
         <h3 class="r-name">${esc(a.name)}</h3>
         <p class="r-eff">${effectHtml(a.effect)}</p>
         <span class="r-type">${esc(a.type)}</span>

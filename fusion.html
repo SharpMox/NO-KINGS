@@ -190,7 +190,8 @@
 .deck.fan{height:252px}
 /* the header is in flow now: it has to hold the fan toggle beside the name */
 .stk-hd{display:flex;align-items:center;gap:9px;margin:0 0 10px 4px}
-.stk-hd h3{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}
+.stk-hd h3{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent)}
 .fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
   color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
 .fx:hover{color:var(--lime)}
@@ -237,8 +238,8 @@
   pointer-events:none;z-index:5}
 [data-theme="dark"] .dcard:not(:last-child)::after{
   filter:drop-shadow(0 2px 7px rgba(8,4,18,.95)) drop-shadow(0 0 10px rgba(8,4,18,.7))}
-.dcard:nth-of-type(1)::after{content:"+"}
-.dcard:nth-of-type(2)::after{content:"="}
+.dcard:nth-of-type(1)::after{content:"="}
+.dcard:nth-of-type(2)::after{content:"+"}
 .deck.fan .dcard:not(:last-child)::after{opacity:1;transform:translateY(-50%) scale(1)}
 /* fanned: the hand lies flat, three cards side by side, centred in its column */
 .deck.fan .dcard{top:6px;transform:translateX(calc((var(--k) - 1) * var(--spread,164px)))}
@@ -248,12 +249,14 @@ html{overflow-x:clip}
   gap:5px;font-weight:700;font-size:12.5px;line-height:1;height:44px;
   padding:0 4px;text-align:center}
 .dcard .stg{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
-/* borrows the artefact rarity ramp. The two inputs are peers so they share a
-   colour; only the product moves up the ramp, and how far says which kind of
-   fusion it was. */
-.dcard:nth-of-type(1) .stg,.dcard:nth-of-type(2) .stg{color:var(--r-uncommon)}
-.dcard:nth-of-type(3) .stg{color:var(--r-rare)}
-.deck.syn .dcard:nth-of-type(3) .stg{color:var(--r-legendary)}
+/* colours off the artefact rarity ramp: the inputs share lime, the product is
+   violet. --r-rare, not --lime: the bright lime is 3.01:1 on cream and this
+   label is 8.5px, which needs 4.5:1 (see artefacts.html). */
+.dcard:nth-of-type(2) .stg,.dcard:nth-of-type(3) .stg{color:var(--r-rare)}
+.dcard:nth-of-type(1) .stg{color:var(--r-legendary)}
+/* the product is the one card that is not an input: lime edge, and it sits on
+   top of a collapsed stack */
+.dcard:nth-of-type(1){border-color:var(--lime)}
 
 /* section headings over each wall of stacks */
 .kind + .kind{margin-top:54px}
@@ -327,10 +330,10 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-p{position:relative}
   /* stacked on a phone, so the equation reads downward */
   .line-p:not(:last-child)::after{
-    content:"+";position:absolute;left:50%;bottom:-40px;transform:translateX(-50%);
+    content:"=";position:absolute;left:50%;bottom:-40px;transform:translateX(-50%);
     color:var(--lime);font:800 32px/1 var(--mono);
     filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
-  .line-p:nth-of-type(2)::after{content:"="}
+  .line-p:nth-of-type(2)::after{content:"+"}
   [data-theme="dark"] .line-p:not(:last-child)::after{
     filter:drop-shadow(0 2px 7px rgba(8,4,18,.9))}
 }
@@ -373,9 +376,10 @@ const nm = id => LOOKUP[id] ? LOOKUP[id].name : id;
 // One flat list, additive first, so data-c indexes it across both sections.
 const ALL = [...FUSIONS.additive.map(f => ({ ...f, kind: 'additive' })),
              ...FUSIONS.synergistic.map(f => ({ ...f, kind: 'synergistic' }))];
-const IDS = f => [f.lhs, f.rhs, f.out];
-// the two inputs are peers; only the product names the kind of fusion it was
-const ROLES = f => ['Input', 'Input', f.kind];
+const IDS = f => [f.out, f.lhs, f.rhs];
+// the product leads, so the stack reads out = lhs + rhs and the front card of
+// a collapsed stack is the thing the fusion makes
+const ROLES = f => [f.kind, 'Input', 'Input'];
 
 const FX = `<svg viewBox="0 0 23 12" width="17" height="9" aria-hidden="true">
   ${[2, 1, 0].map(i => `<rect style="--i:${i}" x="8" y="2.5" width="7" height="7" rx="1.8"/>`).join('')}
@@ -387,9 +391,9 @@ const stack = (f, i) => `<div class="stk">
        <button class="fx" type="button" aria-pressed="true"
                aria-label="Stack the ${esc(nm(f.out))} cards">${FX}</button>
      </div>
-     <div class="deck fan${f.kind === 'synergistic' ? ' syn' : ''}" tabindex="0" role="button"
+     <div class="deck fan" tabindex="0" role="button"
           data-c="${i}"
-          aria-label="Open ${esc(nm(f.lhs))} plus ${esc(nm(f.rhs))} equals ${esc(nm(f.out))}">
+          aria-label="Open ${esc(nm(f.out))} equals ${esc(nm(f.lhs))} plus ${esc(nm(f.rhs))}">
      ${IDS(f).map((id, k) => {
        const p = LOOKUP[id];
        return `<div class="dcard" style="--k:${k}">
@@ -406,7 +410,7 @@ for (const kind of ['additive', 'synergistic']) {
   $(`#${kind} .kind-n`).textContent = items.length;
 }
 
-const OPS = ['+', '='];
+const OPS = ['=', '+'];
 function openFusion(f) {
   let dlg = document.getElementById('linedlg');
   if (!dlg) {

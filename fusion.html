@@ -195,24 +195,27 @@
 .fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
   color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
 .fx:hover{color:var(--lime)}
-/* one step vector drives the whole glyph: a down-and-right cascade when the
-   cards are stacked, a flat row when they are fanned. The (--i - 1) keeps the
-   middle card put, so both arrangements stay centred on the same point. */
+/* One shared vector no longer describes this page: the deck's cards cross when
+   it collapses, because the product is last in the equation but first in the
+   stack. So each square carries both places — --i in the row, --j in the
+   cascade — and --t blends between them, 0 = row, 1 = cascade. The product's
+   square therefore travels across its neighbours exactly like the real card. */
 .fx rect{fill:var(--bg);stroke:currentColor;stroke-width:1.2;
-  transform:translate(calc((var(--i) - 1) * var(--dx)),calc((var(--i) - 1) * var(--dy)));
+  transform:translate(
+    calc((1 - var(--t)) * (var(--i) - 1) * 7.6px + var(--t) * (var(--j) - 1) * 2.6px),
+    calc(var(--t) * (var(--j) - 1) * 2.2px));
   transition:transform .32s var(--ease)}
-/* Registered so the step vector can be interpolated: a bare custom property
-   is not animatable, and without this the hover loop would jump between the
-   two arrangements instead of sweeping through them. */
-@property --dx{syntax:"<length>";inherits:true;initial-value:0px}
-@property --dy{syntax:"<length>";inherits:true;initial-value:0px}
+/* Registered so the blend can be interpolated: a bare custom property is not
+   animatable, and without this the hover loop would jump between the two
+   arrangements instead of sweeping through them. */
+@property --t{syntax:"<number>";inherits:true;initial-value:0}
 /* at rest the glyph shows where the click lands, not where the deck is: a
    stacked deck offers the row, a fanned deck offers the cascade */
-.fx{--dx:7.6px;--dy:0px}
-.stk:has(.deck.fan) .fx{--dx:2.6px;--dy:2.2px}
+.fx{--t:0}
+.stk:has(.deck.fan) .fx{--t:1}
 /* on hover it plays the change back and forth, so the button demonstrates the
    move rather than just naming its endpoint */
-@keyframes fx-swing{from{--dx:7.6px;--dy:0px}to{--dx:2.6px;--dy:2.2px}}
+@keyframes fx-swing{from{--t:0}to{--t:1}}
 .fx:hover{animation:fx-swing .8s cubic-bezier(.45,.05,.55,.95) infinite alternate}
 .dcard{position:absolute;left:50%;width:var(--cw);margin-left:calc(var(--cw) / -2);
   background:linear-gradient(150deg,rgba(160,112,232,.12),rgba(24,16,48,.18) 45%),
@@ -394,7 +397,8 @@ const ROLES = f => ['Input', 'Input', f.kind];
 const DEPTH = [1, 2, 0];
 
 const FX = `<svg viewBox="0 0 23 12" width="17" height="9" aria-hidden="true">
-  ${[2, 1, 0].map(i => `<rect style="--i:${i}" x="8" y="2.5" width="7" height="7" rx="1.8"/>`).join('')}
+  ${[0, 1, 2].sort((a, b) => DEPTH[b] - DEPTH[a]).map(i =>
+    `<rect style="--i:${i};--j:${DEPTH[i]}" x="8" y="2.5" width="7" height="7" rx="1.8"/>`).join('')}
   </svg>`;
 
 const stack = (f, i) => `<div class="stk">

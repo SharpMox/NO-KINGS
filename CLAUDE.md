@@ -33,6 +33,21 @@ tests, no servers. Deployed as plain static files (note the `.nojekyll`).
 - `promotion.html` · `fusion.html` · `inversion.html` — the 8 promotion chains, the fusions, and the inversion pairs.
 - `betza.html` — Betza "funny notation" reference + a live sandbox that renders any string.
 - `encyclopedia/index.html` — 100-piece visual reference, grouped by family/origin.
+- `artefacts.html` — the 180 artefacts, as a card grid and an "evidence board" of
+  thread-linked clusters. **Design pilot for the site-wide redesign**: it deliberately
+  does *not* link `assets/site.css` (that file styles `footer` as a bare element and
+  forces `min-height:44px` onto `.badge`/`.filter-input` on phones, both of which fight
+  the new layout). It carries its own tokens, nav and footer markup, all classes prefixed
+  `ax-`, and still shares `assets/theme.js` so the light/dark choice stays in sync. When
+  the look is settled, this file is the seed of the new `site.css`.
+- `artefacts-review.html` — unlisted Notion review tool (flag rows REWORK, export to
+  paste back to Claude). Was `artefacts.html` until the gallery took that URL.
+
+**Artefact artwork** is pending. An artefact record may carry an optional
+`image: "assets/artefacts/<slug>.png"`; when it is absent the gallery renders a reserved
+placeholder of identical geometry, so art can be dropped in later with zero layout shift.
+Never emit an `<img>` for a file that does not exist — 180 missing files would be 180
+console 404s and the verification rule below is *zero* console errors.
 
 **Shared code** lives in `assets/`: `site.css` (palette, sticky nav, footer, base +
 shared a11y), `board.js` (SVG board / movement-diagram renderer), `theme.js` (light/dark

@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The 180 NO KINGS artefacts: rarity, effect, and the conspiracy behind every name.">
+  <title>NO KINGS / Artefacts</title>
+  <!-- Set the theme before first paint so dark-mode users get no white flash.
+       assets/theme.js (end of body) still owns the toggle and the persistence. -->
+  <script>try{var t=localStorage.getItem('fp-theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+  <script src="data/artefacts.js"></script>
+  <style>
+  /* ============================================================
+   *  Artefacts gallery — DESIGN PILOT for the site-wide redesign.
+   *
+   *  Deliberately does NOT link assets/site.css: that file styles
+   *  `footer` as a bare element and forces min-height:44px onto
+   *  .badge/.filter-input on phones, both of which fight this
+   *  layout. Everything it would have given us is restated below
+   *  (box-sizing, base type, .ax-sr, :focus-visible, reduced
+   *  motion). Theme sync still works because assets/theme.js only
+   *  flips [data-theme] on <html> and carries no tokens.
+   *
+   *  Every class is prefixed `ax-` so nothing collides when this
+   *  language is rolled out to the rest of the site.
+   * ============================================================ */
+
+  /* ---------- Tokens: cold archive ---------- */
+  :root{
+    --paper:#e9e9e6; --paper-2:#f7f7f5; --paper-3:#ffffff;
+    --ink:#15161a; --ink-soft:#63666e; --rule:#cfd0cd; --rule-soft:#dedfdb;
+    --slot-a:#e1e1dd; --slot-b:#e5e5e1;
+    --thread:#b3372c; --thread-soft:rgba(179,55,44,.16);
+    --r-common:#8b8e94; --r-uncommon:#3f8f5f; --r-rare:#3f6fbf; --r-legendary:#c08a2e;
+    --foil:rgba(192,138,46,.22);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --ease:cubic-bezier(.2,.7,.3,1);
+    --wrap:1440px;
+  }
+  [data-theme="dark"]{
+    --paper:#101114; --paper-2:#1a1c20; --paper-3:#212429;
+    --ink:#e8e9ea; --ink-soft:#8d9198; --rule:#2b2e34; --rule-soft:#24272c;
+    --slot-a:#17191d; --slot-b:#1b1d21;
+    --thread:#e2594a; --thread-soft:rgba(226,89,74,.2);
+    --r-common:#9296a0; --r-uncommon:#5cc184; --r-rare:#78a6f0; --r-legendary:#e0ad55;
+    --foil:rgba(224,173,85,.16);
+  }
+
+  /* ---------- Base (restated, since site.css is not loaded) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--sans); background:var(--paper); color:var(--ink);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    transition:background .2s ease,color .2s ease;
+  }
+  a{color:var(--thread)}
+  .ax-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--thread);outline-offset:2px}
+
+  /* Shape lock: this design is all-sharp. No corner radius anywhere. */
+
+  /* ---------- Nav ---------- */
+  .ax-nav{position:sticky;top:0;z-index:40;background:var(--paper);border-bottom:1px solid var(--rule)}
+  .ax-nav-in{max-width:var(--wrap);margin:0 auto;padding:0 20px;display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .ax-nav a{
+    font:600 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-soft); text-decoration:none; padding:15px 14px;
+    display:inline-flex; align-items:center; white-space:nowrap;
+    border-bottom:2px solid transparent; transition:color .15s ease,border-color .15s ease;
+  }
+  .ax-nav a:first-child{padding-left:0}
+  .ax-nav a:hover{color:var(--ink)}
+  .ax-nav a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--thread)}
+  .ax-nav-gap{margin-left:auto}
+  .ax-toggle{
+    appearance:none;background:none;border:0;border-left:1px solid var(--rule);
+    padding:0 4px 0 16px;margin-left:12px;color:var(--ink-soft);cursor:pointer;
+    display:inline-flex;align-items:center;
+  }
+  .ax-toggle:hover{color:var(--thread)}
+
+  /* ---------- Hero ---------- */
+  .ax-hero{max-width:var(--wrap);margin:0 auto;padding:56px 20px 34px}
+  .ax-hero h1{
+    margin:0; font-size:clamp(46px,9vw,104px); line-height:.92; font-weight:800;
+    letter-spacing:-.04em; text-transform:uppercase;
+  }
+  .ax-lede{
+    margin:20px 0 0; max-width:52ch; font-size:16px; color:var(--ink-soft);
+    border-left:2px solid var(--thread); padding-left:16px;
+  }
+
+  /* ---------- Filter bar ---------- */
+  .ax-bar{
+    position:sticky; top:47px; z-index:30; background:var(--paper);
+    border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+  }
+  .ax-bar-in{
+    max-width:var(--wrap);margin:0 auto;padding:12px 20px;
+    display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;
+  }
+  .ax-field{display:flex;flex-direction:column;gap:5px}
+  .ax-field label{font:600 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  .ax-field input,.ax-field select{
+    font:400 13px/1.2 var(--sans); color:var(--ink); background:var(--paper-2);
+    border:1px solid var(--rule); padding:8px 10px; height:34px;
+  }
+  .ax-field input{width:210px}
+  .ax-field select{min-width:118px}
+  .ax-field input:focus,.ax-field select:focus{outline:none;border-color:var(--thread)}
+  .ax-views{display:flex;border:1px solid var(--rule);height:34px}
+  .ax-views button{
+    appearance:none;background:var(--paper-2);border:0;cursor:pointer;
+    font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);padding:0 14px;
+  }
+  .ax-views button + button{border-left:1px solid var(--rule)}
+  .ax-views button:hover{color:var(--ink)}
+  .ax-views button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .ax-reset{
+    appearance:none;background:none;border:1px solid var(--rule);height:34px;padding:0 12px;
+    font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);cursor:pointer;
+  }
+  .ax-reset:hover{color:var(--thread);border-color:var(--thread)}
+  .ax-count{
+    margin:0 0 8px auto; font:600 11px/1 var(--mono); letter-spacing:.1em;
+    text-transform:uppercase; color:var(--ink-soft);
+  }
+  .ax-count b{color:var(--ink)}
+
+  /* ---------- Main ---------- */
+  main{max-width:var(--wrap);margin:0 auto;padding:26px 20px 72px}
+  body[data-view="grid"] #ax-board,
+  body[data-view="board"] #ax-grid{display:none}
+
+  .ax-empty{padding:80px 0;text-align:center;color:var(--ink-soft)}
+  .ax-empty p{margin:0 0 6px;font:600 13px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+
+  /* ---------- Rarity mapping ---------- */
+  [data-rarity="Common"]{--r:var(--r-common)}
+  [data-rarity="Uncommon"]{--r:var(--r-uncommon)}
+  [data-rarity="Rare"]{--r:var(--r-rare)}
+  [data-rarity="Legendary"]{--r:var(--r-legendary)}
+
+  /* ---------- Grid view ---------- */
+  .ax-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:14px}
+  .ax-card{
+    position:relative; isolation:isolate; display:flex; flex-direction:column;
+    background:var(--paper-2); border:1px solid var(--rule); border-top:3px solid var(--r);
+    /* Rest state is fully visible. The animation only fades IN, so when
+       prefers-reduced-motion kills it the card is already at opacity 1. */
+    opacity:1;
+    animation:ax-in .38s var(--ease) both;
+    animation-delay:calc(var(--i) * 22ms);
+    transition:transform .18s var(--ease),border-color .18s ease,background .18s ease;
+  }
+  @keyframes ax-in{from{opacity:0;transform:translateY(10px)}}
+  .ax-card:hover{transform:translateY(-3px);border-color:var(--rule);background:var(--paper-3)}
+  .ax-card:hover .ax-name{color:var(--thread)}
+
+  /* Reserved art slot. .ax-art owns the box in BOTH branches, so dropping a
+     real image in later shifts nothing (CLS stays 0). No <img> is emitted for
+     a file that does not exist: 180 missing files would be 180 console 404s. */
+  .ax-art{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-bottom:1px solid var(--rule)}
+  .ax-art-empty{
+    position:relative;display:grid;place-items:center;
+    background:repeating-linear-gradient(135deg,var(--slot-a) 0 7px,var(--slot-b) 7px 14px);
+  }
+  .ax-art-empty span{
+    font:700 19px/1 var(--mono);letter-spacing:.16em;color:var(--ink-soft);opacity:.3;
+    padding-left:.16em;
+  }
+  [data-rarity="Legendary"] .ax-art::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(118deg,transparent 34%,var(--foil) 50%,transparent 66%);
+  }
+
+  .ax-body{padding:13px 14px 14px;display:flex;flex-direction:column;gap:9px;flex:1}
+  .ax-stamp{
+    margin:0;font:700 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--r);
+    display:flex;align-items:center;gap:7px;
+  }
+  .ax-stamp::before{content:"";width:7px;height:7px;background:var(--r);flex:none}
+  .ax-name{
+    margin:0;font-size:16.5px;font-weight:700;line-height:1.22;letter-spacing:-.015em;
+    transition:color .18s ease;
+  }
+  .ax-name a{color:inherit;text-decoration:none}
+  /* Whole card is the hit area, accessible name stays just the artefact name. */
+  .ax-name a::after{content:"";position:absolute;inset:0;z-index:1}
+  .ax-eff{
+    margin:0;font-size:13px;line-height:1.45;color:var(--ink-soft);
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .ax-tags{margin:auto 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:4px}
+  .ax-tags li{
+    font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+    padding:4px 6px;color:var(--ink-soft);border:1px solid var(--rule-soft);
+  }
+  .ax-tags li.is-type{color:var(--ink);border-color:var(--rule)}
+
+  /* ---------- Board view ---------- */
+  .ax-board{position:relative}
+  .ax-threads{position:absolute;inset:0;width:100%;pointer-events:none;z-index:0}
+  .ax-threads path{fill:none;stroke:var(--thread);stroke-width:1;opacity:.5}
+  .ax-cluster{position:relative;z-index:1;margin:0 0 40px}
+  .ax-cluster h3{
+    margin:0 0 20px;font:700 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--ink-soft);border-bottom:1px solid var(--rule);padding-bottom:9px;
+    display:flex;gap:10px;align-items:baseline;
+  }
+  .ax-cluster h3 b{color:var(--ink)}
+  .ax-cluster h3 span{margin-left:auto;color:var(--ink-soft);font-weight:600}
+  .ax-pins{display:flex;flex-wrap:wrap;gap:30px 20px}
+  .ax-pin{position:relative;padding-top:9px;width:186px}
+  /* The tack stays put on the untransformed .ax-pin; only the card below it
+     tilts, hanging from the tack. Keeping the measured element untilted is
+     also what stops rotate() from inflating its rect and drifting the threads. */
+  .ax-pinhead{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:9px;height:9px;border-radius:50%;background:var(--thread);
+    box-shadow:0 1px 2px rgba(0,0,0,.35);z-index:2;
+  }
+  .ax-pin-inner{
+    position:relative;display:block;background:var(--paper-2);
+    border:1px solid var(--rule);border-top:2px solid var(--r);
+    padding:14px 13px 12px;min-height:126px;
+    transform:rotate(var(--tilt));transform-origin:50% 0;
+    transition:transform .18s var(--ease),background .18s ease;
+  }
+  .ax-pin:hover .ax-pin-inner{transform:rotate(0deg) translateY(-2px);background:var(--paper-3);z-index:3}
+  .ax-pin .ax-stamp{font-size:9px;letter-spacing:.16em;margin-bottom:8px}
+  .ax-pin .ax-name{font-size:14px}
+  .ax-pin .ax-eff{font-size:11.5px;-webkit-line-clamp:3;margin-top:7px}
+
+  /* ---------- Drawer ---------- */
+  #ax-drawer{
+    margin:0 0 0 auto;height:100dvh;max-height:100dvh;width:min(460px,100vw);max-width:100vw;
+    border:0;border-left:1px solid var(--rule);padding:0;
+    background:var(--paper-2);color:var(--ink);overflow:auto;
+    transform:translateX(100%);transition:transform .28s var(--ease);
+  }
+  #ax-drawer.is-open{transform:none}
+  #ax-drawer::backdrop{background:rgba(0,0,0,.5)}
+  .ax-close{
+    position:absolute;top:12px;right:12px;z-index:2;appearance:none;
+    background:var(--paper-2);border:1px solid var(--rule);width:34px;height:34px;
+    color:var(--ink-soft);cursor:pointer;font-size:15px;line-height:1;
+  }
+  .ax-close:hover{color:var(--thread);border-color:var(--thread)}
+  .ax-d-art{aspect-ratio:16/9;border-bottom:1px solid var(--rule)}
+  .ax-d-body{padding:22px 24px 40px}
+  .ax-d-body h2{margin:10px 0 0;font-size:29px;line-height:1.12;letter-spacing:-.025em;font-weight:800}
+  .ax-d-sec{margin-top:26px;padding-top:18px;border-top:1px solid var(--rule)}
+  .ax-d-sec h3{
+    margin:0 0 10px;font:700 10px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);
+  }
+  .ax-d-eff{margin:0;font-size:15px;line-height:1.55}
+  .ax-d-sum{margin:0;font-size:14px;line-height:1.62;color:var(--ink-soft)}
+  .ax-d-link{
+    display:inline-block;margin-bottom:9px;font-size:14.5px;font-weight:600;
+    color:var(--thread);text-decoration:none;border-bottom:1px solid var(--thread-soft);
+  }
+  .ax-d-link:hover{border-bottom-color:var(--thread)}
+  .ax-needs{
+    display:inline-block;font:600 10.5px/1.6 var(--mono);color:var(--ink-soft);
+    background:var(--paper);border:1px dashed var(--rule);padding:1px 6px;white-space:nowrap;
+  }
+
+  /* ---------- Footer ---------- */
+  .ax-foot{
+    max-width:var(--wrap);margin:0 auto;padding:26px 20px 52px;
+    border-top:1px solid var(--rule);color:var(--ink-soft);font-size:13px;
+  }
+  .ax-foot p{margin:0 0 7px}
+  .ax-foot p:last-child{margin-bottom:0}
+  .ax-foot-lead{color:var(--ink);font-size:14px}
+
+  /* ---------- Phones ---------- */
+  @media (max-width:560px){
+    .ax-nav-in{padding:0 14px}
+    .ax-nav a{font-size:10px;padding:11px 9px;letter-spacing:.1em}
+    .ax-nav-gap{margin-left:0}
+    .ax-toggle{margin-left:auto;padding-left:12px}
+    .ax-hero{padding:32px 14px 22px}
+    .ax-lede{font-size:14.5px;margin-top:16px}
+    .ax-bar{position:static}
+    .ax-bar-in{padding:12px 14px;gap:12px}
+    .ax-field input{width:100%}
+    .ax-field{flex:1 1 140px}
+    .ax-count{margin:0}
+    main{padding:18px 14px 52px}
+    .ax-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .ax-name{font-size:14.5px}
+    .ax-pins{gap:26px 14px}
+    .ax-pin{width:calc(50% - 7px)}
+    .ax-d-body{padding:20px 16px 36px}
+    .ax-d-body h2{font-size:24px}
+  }
+
+  /* ---------- Motion preference ---------- */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
+  </style>
+</head>
+<body data-view="grid">
+
+  <nav class="ax-nav" aria-label="Site sections">
+    <div class="ax-nav-in">
+      <a href="codex.html">Codex</a>
+      <a href="graph.html">Graph</a>
+      <a href="promotion.html">Promotions</a>
+      <a href="fusion.html">Fusions</a>
+      <a href="inversion.html">Inversions</a>
+      <a href="artefacts.html" aria-current="page">Artefacts</a>
+      <a href="encyclopedia/index.html" class="ax-nav-gap">Encyclopedia</a>
+      <a href="betza.html">Betza</a>
+      <button class="ax-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <header class="ax-hero">
+    <h1>Artefacts</h1>
+    <p class="ax-lede">Every artefact in NO KINGS, named for a conspiracy, a mystery or a lost treasure that people still argue about.</p>
+  </header>
+
+  <div class="ax-bar">
+    <div class="ax-bar-in">
+      <div class="ax-field">
+        <label for="ax-q">Search</label>
+        <input id="ax-q" type="search" placeholder="name, effect, conspiracy">
+      </div>
+      <div class="ax-field">
+        <label for="ax-rarity">Rarity</label>
+        <select id="ax-rarity"><option value="">All</option></select>
+      </div>
+      <div class="ax-field">
+        <label for="ax-type">Type</label>
+        <select id="ax-type"><option value="">All</option></select>
+      </div>
+      <div class="ax-field">
+        <label for="ax-bonus">Bonus</label>
+        <select id="ax-bonus"><option value="">All</option></select>
+      </div>
+      <div class="ax-field" id="ax-cluster-field" hidden>
+        <label for="ax-cluster">Cluster by</label>
+        <select id="ax-cluster">
+          <option value="bonus">Bonus</option>
+          <option value="type">Type</option>
+          <option value="rarity">Rarity</option>
+        </select>
+      </div>
+      <button class="ax-reset" id="ax-reset" type="button">Reset</button>
+      <div class="ax-views" role="group" aria-label="View mode">
+        <button type="button" id="ax-view-grid" aria-pressed="true">Grid</button>
+        <button type="button" id="ax-view-board" aria-pressed="false">Board</button>
+      </div>
+      <p class="ax-count" id="ax-count" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <main>
+    <div class="ax-grid" id="ax-grid"></div>
+    <div class="ax-board" id="ax-board">
+      <svg class="ax-threads" id="ax-threads" aria-hidden="true" preserveAspectRatio="none"><path id="ax-thread-path"></path></svg>
+      <div id="ax-clusters"></div>
+    </div>
+  </main>
+
+  <dialog id="ax-drawer" aria-labelledby="ax-drawer-title">
+    <button class="ax-close" id="ax-close" type="button" aria-label="Close artefact details">&#10005;</button>
+    <div id="ax-drawer-content"></div>
+  </dialog>
+
+  <footer class="ax-foot">
+    <p class="ax-foot-lead">180 artefact effects across 4 rarities, each named for a famous conspiracy, mystery or lost treasure.</p>
+    <p>Data exported from the Notion Artefacts DB (design source of truth). Built as a single static HTML file: no servers, no frameworks. The full review table lives on <a href="artefacts-review.html">the review page</a>.</p>
+  </footer>
+
+  <script>
+  // ponytail: canonical data comes from data/artefacts.js — never inline a copy (see CLAUDE.md).
+  const $ = id => document.getElementById(id);
+  const gridEl = $('ax-grid'), clustersEl = $('ax-clusters'), boardEl = $('ax-board');
+  const countEl = $('ax-count'), threadPath = $('ax-thread-path'), svgEl = $('ax-threads');
+  const qEl = $('ax-q'), rarityEl = $('ax-rarity'), typeEl = $('ax-type'),
+        bonusEl = $('ax-bonus'), clusterEl = $('ax-cluster'), clusterField = $('ax-cluster-field');
+  const drawer = $('ax-drawer'), drawerContent = $('ax-drawer-content');
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+  const RARITY_RANK = { Common:0, Uncommon:1, Rare:2, Legendary:3 };
+
+  // Initials for the empty art slot: "Ark's Bunkbed" -> AB. Reads as an
+  // evidence-bag label rather than as a broken image.
+  function initials(name) {
+    const w = name.replace(/[^A-Za-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+    return (w.length > 1 ? w[0][0] + w[1][0] : name.slice(0, 2)).toUpperCase();
+  }
+
+  function artSlot(a, cls) {
+    return a.image
+      ? `<img class="ax-art ${cls}" src="${esc(a.image)}" alt="" loading="lazy" decoding="async">`
+      : `<div class="ax-art ax-art-empty ${cls}" aria-hidden="true"><span>${esc(initials(a.name))}</span></div>`;
+  }
+
+  const effectHtml = e => esc(e).replace(/\(needs: ([^)]+)\)/, '<span class="ax-needs">needs: $1</span>');
+  const tagsHtml = a => `<ul class="ax-tags"><li class="is-type">${esc(a.type)}</li>` +
+    a.bonus.map(b => `<li>${esc(b)}</li>`).join('') + '</ul>';
+
+  // ---- Filtering. The four controls ARE the state; no parallel state object
+  // to drift, and both views share them for free.
+  const haystacks = ARTEFACTS.map(a =>
+    [a.name, a.effect, a.conspiracy, a.summary, a.rarity, a.type, a.bonus.join(' ')].join(' ').toLowerCase());
+
+  function currentSet() {
+    const q = qEl.value.trim().toLowerCase(), r = rarityEl.value, t = typeEl.value, b = bonusEl.value;
+    const out = [];
+    for (let i = 0; i < ARTEFACTS.length; i++) {
+      const a = ARTEFACTS[i];
+      if (r && a.rarity !== r) continue;
+      if (t && a.type !== t) continue;
+      if (b && !a.bonus.includes(b)) continue;
+      if (q && !haystacks[i].includes(q)) continue;
+      out.push(i);
+    }
+    return out;
+  }
+
+  const EMPTY = '<div class="ax-empty"><p>No artefacts match</p><p style="font-family:inherit;letter-spacing:0;text-transform:none;font-weight:400">Widen the filters or clear the search.</p></div>';
+
+  // ---- Grid view
+  function cardHtml(i, n) {
+    const a = ARTEFACTS[i];
+    return `<article class="ax-card" data-rarity="${esc(a.rarity)}" style="--i:${Math.min(n, 12)}">
+      ${artSlot(a, '')}
+      <div class="ax-body">
+        <p class="ax-stamp">${esc(a.rarity)}</p>
+        <h3 class="ax-name"><a href="#artefact" data-i="${i}">${esc(a.name)}</a></h3>
+        <p class="ax-eff">${effectHtml(a.effect)}</p>
+        ${tagsHtml(a)}
+      </div>
+    </article>`;
+  }
+
+  function renderGrid(idx) {
+    gridEl.innerHTML = idx.length ? idx.map(cardHtml).join('') : EMPTY;
+  }
+
+  // ---- Board view
+  const CLUSTER_OF = {
+    bonus: a => a.bonus[0],
+    type: a => a.type,
+    rarity: a => a.rarity
+  };
+
+  function renderBoard(idx) {
+    if (!idx.length) { clustersEl.innerHTML = EMPTY; threadPath.removeAttribute('d'); return; }
+    const dim = clusterEl.value, key = CLUSTER_OF[dim];
+    const groups = new Map();
+    for (const i of idx) {
+      const k = key(ARTEFACTS[i]);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(i);
+    }
+    // Rarity clusters read in rarity order; the rest read biggest first.
+    const names = [...groups.keys()].sort((x, y) => dim === 'rarity'
+      ? RARITY_RANK[x] - RARITY_RANK[y]
+      : groups.get(y).length - groups.get(x).length || x.localeCompare(y));
+
+    clustersEl.innerHTML = names.map(name => {
+      const pins = groups.get(name).map((i, n) => {
+        const a = ARTEFACTS[i];
+        return `<div class="ax-pin" data-rarity="${esc(a.rarity)}" style="--tilt:calc((${n % 5} - 2) * 0.5deg)">
+          <span class="ax-pinhead"></span>
+          <div class="ax-pin-inner">
+            <p class="ax-stamp">${esc(a.rarity)}</p>
+            <h4 class="ax-name"><a href="#artefact" data-i="${i}">${esc(a.name)}</a></h4>
+            <p class="ax-eff">${effectHtml(a.effect)}</p>
+          </div>
+        </div>`;
+      }).join('');
+      return `<section class="ax-cluster"><h3><b>${esc(name)}</b><span>${groups.get(name).length}</span></h3>
+        <div class="ax-pins">${pins}</div></section>`;
+    }).join('');
+    requestAnimationFrame(layoutThreads);
+  }
+
+  // One <path> for the whole board: one polyline per cluster, linking its tacks.
+  function layoutThreads() {
+    if (document.body.dataset.view !== 'board') return;   // hidden => every rect is 0
+    const b = boardEl.getBoundingClientRect();
+    const parts = [];
+    for (const cluster of clustersEl.querySelectorAll('.ax-cluster')) {
+      const heads = cluster.querySelectorAll('.ax-pinhead');
+      if (heads.length < 2) continue;
+      let d = '';
+      heads.forEach((h, n) => {
+        const r = h.getBoundingClientRect();
+        // Board-local: subtracting the board's own viewport rect cancels scroll,
+        // so this never needs a scroll listener.
+        d += (n ? ' L' : 'M') + (r.left - b.left + r.width / 2).toFixed(1) +
+             ' ' + (r.top - b.top + r.height / 2).toFixed(1);
+      });
+      parts.push(d);
+    }
+    svgEl.setAttribute('viewBox', `0 0 ${boardEl.offsetWidth} ${boardEl.offsetHeight}`);
+    svgEl.setAttribute('height', boardEl.offsetHeight);
+    threadPath.setAttribute('d', parts.join(' '));
+  }
+
+  let raf = 0;
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; layoutThreads(); }); };
+  new ResizeObserver(schedule).observe(boardEl);
+
+  // ---- Render entry point
+  function apply() {
+    const idx = currentSet();
+    countEl.innerHTML = `<b>${idx.length}</b> of ${ARTEFACTS.length} artefacts`;
+    (document.body.dataset.view === 'board' ? renderBoard : renderGrid)(idx);
+  }
+
+  // ---- View switching
+  const VIEW_KEY = 'nokings-view:artefacts';
+  function setView(v) {
+    document.body.dataset.view = v;
+    $('ax-view-grid').setAttribute('aria-pressed', String(v === 'grid'));
+    $('ax-view-board').setAttribute('aria-pressed', String(v === 'board'));
+    clusterField.hidden = v !== 'board';
+    try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
+    apply();
+  }
+
+  // ---- Drawer. Native <dialog> gives focus trap, Escape, aria-modal,
+  // backdrop and focus restoration for free.
+  function openDrawer(i) {
+    const a = ARTEFACTS[i];
+    drawerContent.innerHTML = `${artSlot(a, 'ax-d-art')}
+      <div class="ax-d-body" data-rarity="${esc(a.rarity)}">
+        <p class="ax-stamp">${esc(a.rarity)}</p>
+        <h2 id="ax-drawer-title">${esc(a.name)}</h2>
+        <div class="ax-d-sec">
+          <h3>Effect</h3>
+          <p class="ax-d-eff">${effectHtml(a.effect)}</p>
+          ${tagsHtml(a)}
+        </div>
+        <div class="ax-d-sec">
+          <h3>The conspiracy</h3>
+          <a class="ax-d-link" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.conspiracy)}</a>
+          <p class="ax-d-sum">${esc(a.summary)}</p>
+        </div>
+      </div>`;
+    drawer.showModal();
+    requestAnimationFrame(() => drawer.classList.add('is-open'));
+  }
+
+  document.querySelector('main').addEventListener('click', e => {
+    const a = e.target.closest('a[data-i]');
+    if (!a) return;
+    e.preventDefault();
+    openDrawer(+a.dataset.i);
+  });
+  $('ax-close').addEventListener('click', () => drawer.close());
+  drawer.addEventListener('click', e => { if (e.target === drawer) drawer.close(); });
+  drawer.addEventListener('close', () => drawer.classList.remove('is-open'));
+
+  // ---- Wiring. Select options come from the data so they cannot drift.
+  function fillSelect(el, values) {
+    el.insertAdjacentHTML('beforeend', values.map(v => `<option>${esc(v)}</option>`).join(''));
+  }
+  fillSelect(rarityEl, [...new Set(ARTEFACTS.map(a => a.rarity))].sort((x, y) => RARITY_RANK[x] - RARITY_RANK[y]));
+  fillSelect(typeEl, [...new Set(ARTEFACTS.map(a => a.type))].sort());
+  fillSelect(bonusEl, [...new Set(ARTEFACTS.flatMap(a => a.bonus))].sort());
+
+  [qEl, rarityEl, typeEl, bonusEl, clusterEl].forEach(el =>
+    el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', apply));
+  $('ax-reset').addEventListener('click', () => {
+    qEl.value = ''; rarityEl.value = ''; typeEl.value = ''; bonusEl.value = '';
+    apply();
+  });
+  $('ax-view-grid').addEventListener('click', () => setView('grid'));
+  $('ax-view-board').addEventListener('click', () => setView('board'));
+
+  let saved = 'grid';
+  try { saved = localStorage.getItem(VIEW_KEY) === 'board' ? 'board' : 'grid'; } catch (e) {}
+  setView(saved);
+  </script>
+  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+  <script src="assets/theme.js"></script>
+</body>
+</html>

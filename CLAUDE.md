@@ -44,8 +44,6 @@ tests, no servers. Deployed as plain static files (note the `.nojekyll`).
   own tokens, nav and footer markup, and still shares `assets/theme.js` so the light/dark
   choice stays in sync. When the look is settled, this file is the seed of the new
   `site.css`.
-- `artefacts-review.html` — unlisted Notion review tool (flag rows REWORK, export to
-  paste back to Claude). Was `artefacts.html` until the map took that URL.
 
 Two things about `artefacts.html` that are easy to break:
 

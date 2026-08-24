@@ -37,8 +37,8 @@
     .mini-betza { font-size: 11px; color: var(--text-soft); font-family: 'SF Mono','Menlo',monospace; text-align: center; line-height: 1.2; }
     a.mini-betza { display: block; text-decoration: none; cursor: pointer; transition: color 0.12s ease; }
     a.mini-betza:hover { color: var(--accent); }
+    /* Invented pieces keep the dashed border; the "· invented" name suffix is gone. */
     .mini-card.invented { border-style: dashed; }
-    .mini-card.invented .mini-name::after { content: '  · invented'; color: var(--text-soft); font-size: 11px; font-style: italic; }
 
     .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
     .tab-btn { appearance: none; background: transparent; border: 0; padding: 8px 16px; font-size: 14px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-radius: 7px; font-family: inherit; transition: color 0.15s ease, background 0.15s ease; }

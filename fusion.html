@@ -3,279 +3,475 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="36 fairy-chess piece fusions in NO-KINGS: additive and synergistic combinations of two pieces into a third.">
-  <title>Fairy Chess — Fusions</title>
-  <link rel="stylesheet" href="assets/site.css">
+  <meta name="description" content="The 36 NO KINGS fusions as equation card stacks: two pieces whose movement combines into a third, additive or synergistic.">
+  <title>NO KINGS / Fusions</title>
   <link rel="stylesheet" href="assets/nav.css">
   <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/fusions.js"></script>
   <style>
-    header {
-      max-width: var(--wrap);
-      margin: 0 auto;
-      padding: 32px 24px 16px;
-    }
-    h1 {
-      margin: 0 0 8px 0;
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-    .intro {
-      color: var(--text-soft);
-      max-width: 760px;
-      margin: 0 0 24px 0;
-      font-size: 15px;
-    }
-    .controls {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .back-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      text-decoration: none;
-      color: var(--accent);
-      font-weight: 500;
-      font-size: 14px;
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-    }
-    .back-link:hover { text-decoration: none; border-color: var(--accent); }
+  /* ============================================================
+   *  Fusions — every fusion is a wallet stack of three cards read as an
+   *  equation: lhs + rhs = out.
+   *
+   *  ponytail: the card system below is duplicated from promotion.html.
+   *  Extract an assets/stacks.css when a third page wants it, or once both
+   *  pages stop moving — not while promotion.html is still in review.
+   *  Follows artefacts.html, the design pilot: it does NOT link
+   *  assets/site.css and carries its own tokens, but shares
+   *  assets/nav.{css,js} and assets/theme.js so the header and the
+   *  light/dark choice stay in sync with the rest of the site.
+   * ============================================================ */
 
-    .tabs {
-      display: flex;
-      gap: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 4px;
-    }
-    .tab-btn {
-      appearance: none;
-      background: transparent;
-      border: 0;
-      padding: 8px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-soft);
-      cursor: pointer;
-      border-radius: 7px;
-      font-family: inherit;
-      transition: color 0.15s ease, background 0.15s ease;
-    }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn[aria-selected="true"] {
-      background: var(--bg);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-    }
-    .tab-count {
-      display: inline-block;
-      margin-left: 4px;
-      padding: 1px 6px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-soft);
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      line-height: 1.4;
-    }
-    .tab-btn[aria-selected="true"] .tab-count {
-      background: var(--surface);
-      color: var(--text);
-    }
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
+  :root{
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    /* --lime is the display colour (hero gradient, chip fills, active states).
+       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
+       which fails AA for body text, while #556f18 is 4.86:1. Large display type
+       needs just 3:1, so the gradient keeps the bright one. */
+    --lime:#6f9420; --accent:#556f18;
+    /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
+       Teal rather than a second green, because at 15px two greens next to each
+       other in the rail are not tellable apart. */
+    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
+    /* Board tokens for assets/board.js, copied from assets/site.css. */
+    --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
+    --piece-disc:#231544; --piece-disc-text:#fcf0d8;
+    --move-color:#2e6fd0; --capture-color:#c0392b; --hurdle-color:#7a3ae8;
+    --hop-target:#2f8f5f; --ray-color:#2f7fc0; --rider-color:#c8791f;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --wrap:1560px;
+    /* Soft geometry throughout. */
+    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+    /* the card fan overshoots slightly on the way out */
+    --spring:cubic-bezier(.3,1.45,.42,1);
+  }
+  [data-theme="dark"]{
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048; --accent:#a8d048;
+    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
+    --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
+    --sq-light:#4a4270; --sq-dark:#241d3e;
+    --piece-disc:#efeaff; --piece-disc-text:#0f0a1c;
+    --move-color:#79a7ff; --capture-color:#ff7878; --hurdle-color:#c890e8;
+    --hop-target:#6dd6a8; --ray-color:#79a7ff; --rider-color:#ffae5c;
+  }
 
-    main {
-      max-width: var(--wrap);
-      margin: 0 auto;
-      padding: 0 24px 64px;
-    }
-    section[role="tabpanel"] { display: none; }
-    section[role="tabpanel"].active { display: block; }
+  /* ---------- Base (restated, since site.css is not loaded) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--sans);background:var(--bg);color:var(--text);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+    transition:background .25s ease,color .25s ease;
+  }
+  a{color:var(--accent)}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
 
-    .table-scroll {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .fusion-table {
-      border-collapse: separate;
-      border-spacing: 8px;
-      width: 100%;
-    }
-    .fusion-table td,
-    .fusion-table th {
-      padding: 0;
-      vertical-align: middle;
-    }
-    .fusion-table tbody td {
-      padding-top: 48px;
-    }
-    .fusion-table tbody tr:first-child td {
-      padding-top: 0;
-    }
-    .fusion-op {
-      text-align: center;
-      font-size: 32px;
-      color: var(--text-soft);
-      font-weight: 300;
-      width: 1%;
-      user-select: none;
-    }
-    .mini-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      width: 280px;
-      padding: 8px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      box-shadow: var(--shadow);
-      margin: 0 auto;
-    }
-    .mini-card .board {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-radius: 4px;
-      overflow: hidden;
-      background: var(--sq-light);
-    }
-    .mini-betza { font-size: 11px; color: var(--text-soft); font-family: 'SF Mono','Menlo',monospace; text-align: center; line-height: 1.2; }
-    a.mini-betza { display: block; text-decoration: none; cursor: pointer; transition: color 0.12s ease; }
-    a.mini-betza:hover { color: var(--accent); }
-    .mini-name {
-      font-size: 13px;
-      font-weight: 500;
-      text-align: center;
-      color: var(--text);
-      line-height: 1.2;
-    }
+  /* Larry's aura, sitting behind everything. */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.14), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.12), transparent 66%);
+  }
+  [data-theme="dark"] body::before{
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
+  }
 
-    @media (max-width: 720px) {
-      h1 { font-size: 24px; }
-      .controls { gap: 8px; }
-      .mini-card { width: 140px; padding: 6px; }
-      .fusion-op { font-size: 22px; }
-      .fusion-table { border-spacing: 4px; }
-    }
+  /* ---------- Hero ---------- */
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{
+    font-style:italic;
+    background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    /* background-clip:text crops to the element box and the italic slant pushes
+       the final glyph past it. Reserve a sliver so the trailing s keeps its tail. */
+    padding-right:.07em;
+  }
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
-    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+  /* ---------- Base + shell (restated: site.css is not loaded, same as
+       artefacts.html, the design pilot this page follows) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{overflow-x:clip}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;
+    -webkit-font-smoothing:antialiased;transition:background .25s ease,color .25s ease}
+  a{color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(720px 460px at 12% -6%,rgba(106,46,208,.14),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(111,148,32,.12),transparent 66%)}
+  [data-theme="dark"] body::before{
+    background:radial-gradient(720px 460px at 12% -6%,rgba(122,58,232,.30),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(168,208,72,.13),transparent 66%)}
+
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{font-style:italic;background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
+
+  main{max-width:var(--wrap);margin:0 auto;padding:14px 22px 70px}
+  .board{width:100%;height:auto;display:block}
+  .betza-pill{font:600 11px/1.4 var(--mono);color:var(--text-soft);background:var(--surface-2);
+    border-radius:var(--rad-pill);padding:2px 9px;display:inline-block}
+  .dd-close{position:absolute;top:14px;right:14px;appearance:none;cursor:pointer;width:34px;height:34px;
+    border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft)}
+  .dd-close:hover{color:var(--accent);border-color:var(--accent)}
+
+  .foot{max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px}
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--text-soft);font-size:14px}
+  @media(max-width:600px){.foot{padding:20px 16px 40px}}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+
+/* deck motion: back-out curve, slight overshoot */
+
+
+/* ===== C / STACKS — each chain is a wallet stack; every name strip stays readable ===== */
+/* Chains flow instead of sitting in a grid: each one is only as wide as its
+   own arrangement needs, so a fanned chain takes a full hand's width while a
+   stacked one takes a single card's, and a row packs whatever fits. */
+.decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
+  gap:34px 26px;padding-top:26px;
+  /* Card width is solved backwards from "three fanned chains per row": a fan is
+     3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
+     gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
+     narrow pages simply wrap to two rather than shrinking the cards to nothing. */
+  --cw-fit:clamp(148px, calc((min(100vw, 1560px) - 70px + 68px) / 9), 184px);
+  /* 36 fusions, so keep the three-per-row fit rather than Promotions' 1.2:
+     at 1.2 this page would be 18 rows tall instead of 12. */
+  --card-scale:1;
+  --cw:calc(var(--cw-fit) * var(--card-scale));
+  /* fan step: card width less the ~20px overlap */
+  --spread:calc(var(--cw) - 20px)}
+/* the 26px is the stack's own cascade: 13px per tucked card */
+.stk{flex:0 0 auto;width:min(100%, calc(var(--cw) + 26px))}
+.stk:has(.deck.fan){width:min(100%, calc(var(--cw) + 2 * var(--spread)))}
+/* phones: no stack ritual, every hand arrives already fanned */
+@media(max-width:600px){
+  .decks{gap:22px 16px;--cw:132px;
+    --spread:min(112px, calc((100vw - 166px) / 2))}
+  /* .decks .deck: the later base rule pins height 346, specificity again */
+  .decks .deck.fan{height:182px}
+  /* .deck .dcard outranks the later base .dcard rule; the media block sits
+     before it in source, so specificity has to carry the override */
+  .deck.fan .dcard{top:6px;transform:translateX(calc((var(--k) - 1) * var(--spread,164px)))}
+  /* the deep phone overlap puts most of each tucked card behind the front
+     card's frosted glass, which blurred them to nothing: solid cards here */
+  .deck .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+  /* tucked cards: name over stage, right-aligned into the visible sliver */
+  .deck .dcard .nm{height:38px;font-size:11.5px}
+  .deck .dcard:not(:first-child) .nm{flex-direction:column;align-items:flex-end;
+    justify-content:center;gap:2px;padding-right:8px}
+}
+.deck{position:relative;height:346px;cursor:pointer;z-index:1}
+.deck.fan{height:252px}
+/* the header is in flow now: it has to hold the fan toggle beside the name */
+.stk-hd{display:flex;align-items:center;gap:9px;margin:0 0 10px 4px}
+.stk-hd h3{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}
+.fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
+  color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
+.fx:hover{color:var(--lime)}
+/* one step vector drives the whole glyph: a down-and-right cascade when the
+   cards are stacked, a flat row when they are fanned. The (--i - 1) keeps the
+   middle card put, so both arrangements stay centred on the same point. */
+.fx rect{fill:var(--bg);stroke:currentColor;stroke-width:1.2;
+  transform:translate(calc((var(--i) - 1) * var(--dx)),calc((var(--i) - 1) * var(--dy)));
+  transition:transform .32s var(--ease)}
+/* the glyph shows where the click lands, not where the deck is: a stacked
+   deck offers the row, a fanned deck offers the cascade */
+.fx{--dx:7.6px;--dy:0px}
+.stk:has(.deck.fan) .fx{--dx:2.6px;--dy:2.2px}
+/* hovering falls back to the arrangement the deck is in right now */
+.stk:has(.deck.fan) .fx:hover{--dx:7.6px;--dy:0px}
+.stk:has(.deck:not(.fan)) .fx:hover{--dx:2.6px;--dy:2.2px}
+.dcard{position:absolute;left:50%;width:var(--cw);margin-left:calc(var(--cw) / -2);
+  background:linear-gradient(150deg,rgba(160,112,232,.12),rgba(24,16,48,.18) 45%),
+             color-mix(in srgb,var(--surface) 46%,transparent);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  border:1px solid var(--violet-hi);border-radius:16px;padding:10px 10px 0;text-align:center;
+  /* base in front, later stages behind and lower: each card's bottom name
+     strip peeks below the card in front of it */
+  /* the stack slid out a little: each tucked card steps down AND right the
+     same amount, every deck alike */
+  top:calc(var(--k) * 44px);z-index:calc(3 - var(--k));
+  transform:translateX(calc((var(--k) - 1) * 13px));
+  transition:top .58s var(--spring),transform .58s var(--spring),border-color .2s ease;
+  box-shadow:inset 0 1px 0 rgba(239,234,255,.16),0 -12px 28px -18px rgba(0,0,0,.95)}
+@media (prefers-reduced-transparency:reduce){
+  .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+/* the two seams carry the equation: a + between the inputs, an = before the
+   product. Same geometry and reveal as the Promotions arrow, but plain text so
+   the two seams can differ and so the glyph inherits --lime per theme. */
+.dcard:not(:last-child)::after{
+  position:absolute;left:calc(100% - 29px);top:42%;
+  width:58px;height:58px;display:grid;place-items:center;
+  color:var(--lime);font:800 40px/1 var(--mono);
+  filter:drop-shadow(0 1px 4px rgba(252,240,216,.95)) drop-shadow(0 0 9px rgba(252,240,216,.85));
+  opacity:0;transform:translateY(-50%) scale(.55);
+  transition:opacity .3s var(--ease),transform .5s var(--spring);
+  pointer-events:none;z-index:5}
+[data-theme="dark"] .dcard:not(:last-child)::after{
+  filter:drop-shadow(0 2px 7px rgba(8,4,18,.95)) drop-shadow(0 0 10px rgba(8,4,18,.7))}
+.dcard:nth-of-type(1)::after{content:"+"}
+.dcard:nth-of-type(2)::after{content:"="}
+.deck.fan .dcard:not(:last-child)::after{opacity:1;transform:translateY(-50%) scale(1)}
+/* fanned: the hand lies flat, three cards side by side, centred in its column */
+.deck.fan .dcard{top:6px;transform:translateX(calc((var(--k) - 1) * var(--spread,164px)))}
+html{overflow-x:clip}
+.dcard .brd{border-radius:9px;overflow:hidden;display:block}
+.dcard .nm{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;font-weight:700;font-size:12.5px;line-height:1;height:44px;
+  padding:0 4px;text-align:center}
+.dcard .stg{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+/* borrows the artefact rarity ramp. The two inputs are peers so they share a
+   colour; only the product moves up the ramp, and how far says which kind of
+   fusion it was. */
+.dcard:nth-of-type(1) .stg,.dcard:nth-of-type(2) .stg{color:var(--r-uncommon)}
+.dcard:nth-of-type(3) .stg{color:var(--r-rare)}
+.deck.syn .dcard:nth-of-type(3) .stg{color:var(--r-legendary)}
+
+/* section headings over each wall of stacks */
+.kind + .kind{margin-top:54px}
+.kind-hd{margin:0 0 2px 4px;display:flex;align-items:baseline;gap:11px;
+  font:700 13px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--text-soft)}
+.kind-hd .kind-n{font-size:11px;letter-spacing:.12em;color:var(--text-dim)}
+
+/* line close-up: the whole chain, left to right */
+dialog.line{border:0;padding:0;background:transparent;width:min(1060px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
+dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
+.line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
+  background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
+             color-mix(in srgb,var(--surface) 42%,transparent);
+  backdrop-filter:blur(26px) saturate(160%);
+  -webkit-backdrop-filter:blur(26px) saturate(160%);
+  border:1px solid rgba(239,234,255,.18);
+  box-shadow:inset 0 1px 0 rgba(239,234,255,.22),
+             inset 0 -1px 0 rgba(239,234,255,.06),
+             0 40px 90px -30px rgba(0,0,0,.85)}
+.line-in::after{content:"";position:absolute;inset:1px;border-radius:25px;pointer-events:none;
+  border:1px solid rgba(239,234,255,.07)}
+/* the glass needs something to refract: keep the page visible behind it */
+dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
+  backdrop-filter:blur(7px)!important;-webkit-backdrop-filter:blur(7px)!important}
+@media (prefers-reduced-transparency:reduce){
+  .line-in{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+.line-in h2{margin:0 0 16px;font-size:26px;letter-spacing:-.02em;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.line-in h2 .op{color:var(--text-dim);font:800 21px/1 var(--mono)}
+.line-lb{display:block;margin:0 0 7px;font:700 10px/1 var(--mono);
+  letter-spacing:.18em;text-transform:uppercase;color:var(--r-rare)}
+.line-lb.syn-lb{color:var(--r-legendary)}
+/* the chain drawn as its metro line: one coloured track, three stations */
+.line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start}
+.line-p{text-align:center;min-width:0}
+.line-p .board{max-width:230px;margin:0 auto}
+.line-p h3{margin:10px 0 0;font-size:18px;color:var(--text)}
+.line-p .bz-m,.line-p .fam-m{display:none}
+.line-p .meta{margin:5px 0 0;font:700 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.line-p .meta b{color:var(--violet-hi)}
+/* one row: the betza string sits with the movement tags */
+.line-p .bh{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:9px}
+.line-p .bh span{font:700 8.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--border);border-radius:var(--pill);padding:4px 8px;color:var(--text-soft)}
+.line-p .bh .bz{background:var(--surface-2);border-color:transparent;color:var(--lime);
+  text-transform:none;letter-spacing:0;font-size:10.5px}
+.line-p .ds{margin:10px 0 0;font-size:12px;line-height:1.55;color:var(--text-soft);text-align:left}
+@media(max-width:760px){
+  .line-row{grid-template-columns:1fr;gap:50px}
+  .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}
+  .line-in .dd-close{position:sticky;top:0;float:right;margin:0 0 -12px 0;
+    background:color-mix(in srgb,var(--surface) 82%,transparent);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:4}
+  .line-in h2{clear:none;padding-right:44px}
+  /* phone: each stage becomes board-beside-text, small diagram */
+  .line-p{display:grid;grid-template-columns:100px minmax(0,1fr);gap:9px 13px;text-align:left;
+    align-items:start}
+  .line-p .board{max-width:100px;margin:0;grid-column:1;grid-row:1/3;align-self:start}
+  .line-p .ds{grid-column:2;grid-row:1;margin:0;font-size:11.5px;line-height:1.5}
+  .line-p .bh{grid-column:2;grid-row:2;justify-content:flex-start;margin:6px 0 0}
+  .line-p h3{grid-column:1/-1;grid-row:3;margin:0;font-size:15px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .line-p .bz-m{display:inline-block;font:600 10.5px/1.5 var(--mono);color:var(--lime);
+    background:var(--surface-2);border-radius:var(--pill);padding:2px 9px}
+  .line-p .fam-m{display:inline-block;font:700 9px/1 var(--mono);letter-spacing:.12em;
+    text-transform:uppercase;color:var(--violet-hi)}
+  .line-p .meta{display:none}
+  .line-p .bh .bz{display:none}
+  .deck .dcard:not(:last-child)::after{width:32px;height:32px;left:calc(100% - 16px);font-size:25px}
+  .line-p{position:relative}
+  /* stacked on a phone, so the equation reads downward */
+  .line-p:not(:last-child)::after{
+    content:"+";position:absolute;left:50%;bottom:-40px;transform:translateX(-50%);
+    color:var(--lime);font:800 32px/1 var(--mono);
+    filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
+  .line-p:nth-of-type(2)::after{content:"="}
+  [data-theme="dark"] .line-p:not(:last-child)::after{
+    filter:drop-shadow(0 2px 7px rgba(8,4,18,.9))}
+}
   </style>
 </head>
 <body>
-  <div id="site-nav" data-page="fusion"></div>
-  <header>
-    <h1><em>Fusions</em></h1>
-    <p class="intro">
-      A reference of the <strong>36 fusions</strong> in NO-KINGS.
-    </p>
-    <div class="controls">
-      <div class="tabs" role="tablist" aria-label="Fusion type">
-        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-additive"    id="tabbtn-additive">Additive <span class="tab-count" id="count-additive"></span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-synergistic" id="tabbtn-synergistic">Synergistic <span class="tab-count" id="count-synergistic"></span></button>
-      </div>
-    </div>
-  </header>
 
-  <main>
-    <section role="tabpanel" id="tab-additive"    aria-labelledby="tabbtn-additive" class="active">
-      <div id="additive-table"></div>
-    </section>
-    <section role="tabpanel" id="tab-synergistic" aria-labelledby="tabbtn-synergistic">
-      <div id="synergistic-table"></div>
-    </section>
-  </main>
+<div id="site-nav" data-page="fusion"></div>
 
-  <footer>
-    <p class="footer-page-line">36 Pairs of pieces whose movement schemes combine into a third piece — additive (set-equality) and synergistic (emergent bent rider) flavours.</p>
-    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-  </footer>
+<header class="hero">
+  <h1><em>Fusions</em></h1>
+  <p>Pairs of pieces whose movement combines into a third: additive when the sets simply merge, synergistic when something new emerges.</p>
+</header>
 
-  <script>
-  // ponytail: canonical data — inline copies drifted before (see CLAUDE.md)
-  const PIECES = PIECES_CODEX;
+<main>
+  <section class="kind" id="additive">
+    <h2 class="kind-hd">Additive <span class="kind-n"></span></h2>
+    <div class="decks"></div>
+  </section>
+  <section class="kind" id="synergistic">
+    <h2 class="kind-hd">Synergistic <span class="kind-n"></span></h2>
+    <div class="decks"></div>
+  </section>
+</main>
 
-  // FUSIONS is loaded from data/fusions.js (shared with graph + codex).
+<footer class="foot">
+  <p class="foot-lead">Pairs of pieces whose movement schemes combine into a third — additive (set-equality) and synergistic (emergent bent rider) flavours.</p>
+  <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
 
-  /* ============================================================
-   *  Fusion rendering (renderBoard/renderMove live in assets/board.js)
-   * ============================================================ */
+<script>
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-  function renderMiniCard(piece) {
-    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${piece.betza} in sandbox">${piece.betza}</a>` : '';
-    return `<div class="mini-card">
-      ${renderBoard(piece)}
-      <div class="mini-name">${piece.name}</div>
-      ${betzaLine}
-    </div>`;
+const LOOKUP = {};
+PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
+const nm = id => LOOKUP[id] ? LOOKUP[id].name : id;
+
+// One flat list, additive first, so data-c indexes it across both sections.
+const ALL = [...FUSIONS.additive.map(f => ({ ...f, kind: 'additive' })),
+             ...FUSIONS.synergistic.map(f => ({ ...f, kind: 'synergistic' }))];
+const IDS = f => [f.lhs, f.rhs, f.out];
+// the two inputs are peers; only the product names the kind of fusion it was
+const ROLES = f => ['Input', 'Input', f.kind];
+
+const FX = `<svg viewBox="0 0 23 12" width="17" height="9" aria-hidden="true">
+  ${[2, 1, 0].map(i => `<rect style="--i:${i}" x="8" y="2.5" width="7" height="7" rx="1.8"/>`).join('')}
+  </svg>`;
+
+const stack = (f, i) => `<div class="stk">
+     <div class="stk-hd">
+       <h3>${esc(nm(f.out))}</h3>
+       <button class="fx" type="button" aria-pressed="true"
+               aria-label="Stack the ${esc(nm(f.out))} cards">${FX}</button>
+     </div>
+     <div class="deck fan${f.kind === 'synergistic' ? ' syn' : ''}" tabindex="0" role="button"
+          data-c="${i}"
+          aria-label="Open ${esc(nm(f.lhs))} plus ${esc(nm(f.rhs))} equals ${esc(nm(f.out))}">
+     ${IDS(f).map((id, k) => {
+       const p = LOOKUP[id];
+       return `<div class="dcard" style="--k:${k}">
+         <span class="brd">${renderBoard(p)}</span>
+         <span class="nm">${esc(p.name)} <span class="stg">${ROLES(f)[k]}</span></span></div>`;
+     }).join('')}
+     </div>
+   </div>`;
+
+// counts come from the data, never hardcoded
+for (const kind of ['additive', 'synergistic']) {
+  const items = ALL.map((f, i) => [f, i]).filter(([f]) => f.kind === kind);
+  $(`#${kind} .decks`).innerHTML = items.map(([f, i]) => stack(f, i)).join('');
+  $(`#${kind} .kind-n`).textContent = items.length;
+}
+
+const OPS = ['+', '='];
+function openFusion(f) {
+  let dlg = document.getElementById('linedlg');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.className = 'line'; dlg.id = 'linedlg';
+    dlg.innerHTML = '<div class="line-in"><button class="dd-close">\u2715</button><div id="line-body"></div></div>';
+    document.body.appendChild(dlg);
+    dlg.querySelector('.dd-close').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
   }
+  document.getElementById('line-body').innerHTML =
+    `<span class="line-lb${f.kind === 'synergistic' ? ' syn-lb' : ''}">${f.kind}</span>
+     <h2>${IDS(f).map((id, k) =>
+       `${k ? `<span class="op">${OPS[k - 1]}</span>` : ''}<span>${esc(nm(id))}</span>`).join('')}</h2>
+     <div class="line-row">${IDS(f).map(id => {
+       const p = LOOKUP[id];
+       return `<div class="line-p">${renderBoard(p)}
+            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span><span class="fam-m">${esc(p.family || '')}</span></h3>
+            <p class="meta"><b>${esc(p.family || '')}</b></p>
+            <span class="bh"><span class="bz">${esc(p.betza || '')}</span>${(p.behaviors || []).map(b =>
+              `<span>${esc(b)}</span>`).join('')}</span>
+            <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;
+     }).join('')}</div>`;
+  dlg.showModal();
+}
 
-  function renderFusion(f) {
-    const card = id => {
-      const p = PIECES.find(x => x.id === id);
-      return p ? renderMiniCard(p) : `<div class="mini-card"><em>missing: ${id}</em></div>`;
-    };
-    return `<tr>
-      <td>${card(f.lhs)}</td>
-      <td class="fusion-op">+</td>
-      <td>${card(f.rhs)}</td>
-      <td class="fusion-op">=</td>
-      <td>${card(f.out)}</td>
-    </tr>`;
-  }
-
-  function renderTable(rows) {
-    return `<div class="table-scroll"><table class="fusion-table"><tbody>${rows.map(renderFusion).join('')}</tbody></table></div>`;
-  }
-
-  document.getElementById('additive-table').innerHTML = renderTable(FUSIONS.additive);
-  document.getElementById('synergistic-table').innerHTML = renderTable(FUSIONS.synergistic);
-  document.getElementById('count-additive').textContent = FUSIONS.additive.length;
-  document.getElementById('count-synergistic').textContent = FUSIONS.synergistic.length;
-
-  /* ============================================================
-   *  Tab switching
-   * ============================================================ */
-  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
-  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
-  function activateTab(panelId) {
-    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
-    tabBtns.forEach(b => {
-      const sel = b.getAttribute('aria-controls') === panelId;
-      b.setAttribute('aria-selected', sel ? 'true' : 'false');
-      b.setAttribute('tabindex', sel ? '0' : '-1');
-    });
-    history.replaceState(null, '', '#' + panelId);
-  }
-  tabBtns.forEach((btn, i) => {
-    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
-        tabBtns[next].focus();
-        activateTab(tabBtns[next].getAttribute('aria-controls'));
-      }
-    });
+// FLIP: chains that get pushed to another row are told where they used to be
+// and then animated back to zero, so a reflow reads as movement.
+function flip(mutate) {
+  const items = $$('.stk');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return mutate();
+  const before = items.map(el => el.getBoundingClientRect());
+  mutate();
+  items.forEach((el, i) => {
+    const now = el.getBoundingClientRect();
+    const dx = before[i].left - now.left, dy = before[i].top - now.top;
+    if (!dx && !dy) return;
+    el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }],
+               { duration: 560, easing: 'cubic-bezier(.3,1.45,.42,1)' });
   });
-  if (location.hash === '#tab-synergistic') activateTab('tab-synergistic');
+}
 
-  </script>
-  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
-  <script src="assets/nav.js"></script>
-  <script src="assets/theme.js"></script>
-  <script src="assets/tabs.js"></script>
+const main = document.querySelector('main');
+main.addEventListener('click', e => {
+  const fx = e.target.closest('.fx');
+  if (fx) {
+    const deck = fx.closest('.stk').querySelector('.deck');
+    flip(() => {
+      const fan = deck.classList.toggle('fan');
+      fx.setAttribute('aria-pressed', String(fan));
+      fx.setAttribute('aria-label', `${fan ? 'Stack' : 'Fan out'} the cards`);
+    });
+    return;
+  }
+  const deck = e.target.closest('.deck');
+  if (deck) openFusion(ALL[+deck.dataset.c]);
+});
+main.addEventListener('keydown', e => {
+  const deck = e.target.closest('.deck');
+  if (deck && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault(); openFusion(ALL[+deck.dataset.c]);
+  }
+});
+</script>
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
 </body>
 </html>

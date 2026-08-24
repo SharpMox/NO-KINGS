@@ -1,0 +1,134 @@
+/* ============================================================
+ *  Shared site header — presentation.
+ *
+ *  Markup and behaviour live in assets/nav.js; this file is kept
+ *  separate so artefacts.html, which deliberately does not load
+ *  site.css, can use the identical header by linking just this.
+ *
+ *  It therefore depends only on tokens BOTH worlds define:
+ *  --bg --surface --border --border-soft --text --text-soft --lime
+ * ============================================================ */
+
+:root {
+  --nav-min: 60px;   /* drives the header height */
+  --nav-h: 61px;     /* measured back off it by nav.js; pages offset sticky things from this */
+}
+
+/* #site-nav IS the bar: the sticky element has to be the outer box, or a
+   sticky child would only stick within its 61px parent and scroll away. */
+#site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  min-height: var(--nav-min);   /* reserve the box so injecting the nav shifts nothing */
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.nk-nav-in {
+  max-width: var(--wrap, 1560px);
+  margin: 0 auto;
+  padding: 0 22px;
+  display: flex;
+  align-items: stretch;
+  min-height: var(--nav-min);
+}
+
+.nk-mark {
+  display: flex;
+  align-items: center;
+  margin-right: 30px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 13.5px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+.nk-mark:hover { text-decoration: none; }
+
+.nk-links { display: flex; align-items: stretch; flex: 1; }
+
+.nk {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  padding: 0 13px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.nk:hover { color: var(--text); text-decoration: none; }
+.nk[aria-current="page"] { color: var(--text); border-bottom-color: var(--lime); }
+.nk-gap { margin-left: auto; }
+.nk:focus-visible { outline-offset: 4px; }
+
+.nk-burger {
+  display: none;
+  appearance: none;
+  cursor: pointer;
+  align-self: center;
+  margin-left: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 40px;
+  height: 40px;
+  color: var(--text-soft);
+  place-items: center;
+}
+.nk-burger:hover { color: var(--lime); border-color: var(--lime); }
+.nk-burger[aria-expanded="true"] { background: var(--lime); border-color: var(--lime); color: #141024; }
+
+.nk-theme {
+  appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  cursor: pointer;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+  margin-left: 14px;
+  align-self: center;
+}
+.nk-theme:hover { color: var(--lime); border-color: var(--lime); }
+
+/* ---------- Phones ----------
+   Eight links wrap the header onto three rows at 375px, which pushed it to
+   167px and threw off everything pinned below it. Collapse behind a burger so
+   the header stays one row at ~61px on every viewport. */
+@media (max-width: 860px) {
+  .nk-burger { display: grid; }
+  .nk-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px 12px;
+    box-shadow: 0 20px 40px -22px rgba(0, 0, 0, 0.45);
+  }
+  .nk-links[data-open] { display: flex; }
+  .nk {
+    padding: 14px 8px;
+    font-size: 14.5px;
+    border-bottom: none;
+    border-left: 2px solid transparent;
+  }
+  .nk + .nk { border-top: 1px solid var(--border-soft); }
+  .nk[aria-current="page"] { border-left-color: var(--lime); padding-left: 14px; }
+  .nk-gap { margin-left: 0; }
+  .nk-nav-in { padding: 0 16px; }
+  .nk-theme { margin-left: 8px; }
+}

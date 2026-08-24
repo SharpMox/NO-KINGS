@@ -3,233 +3,731 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Review table of the 180 NO-KINGS artefacts: name, effect, and the conspiracy behind each one.">
-  <title>NO KINGS — Artefacts</title>
-  <link rel="stylesheet" href="assets/site.css">
+  <meta name="description" content="The 180 NO KINGS artefacts as a density map wired to a ledger: rarity, effect, and the conspiracy behind every name.">
+  <title>NO KINGS / Artefacts</title>
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
   <script src="data/artefacts.js"></script>
   <style>
-    header { max-width: 1500px; margin: 0 auto; padding: 32px 24px 16px; }
-    h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
-    .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
-    .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-    .search-input, .rarity-select { font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
-      border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
-    .search-input { flex: 1 1 220px; max-width: 340px; }
-    .search-input:focus, .rarity-select:focus { outline: none; border-color: var(--accent); }
-    .shown-count { font-size: 13px; color: var(--text-soft); }
-    .ctrl-btn { font: inherit; font-size: 13px; color: var(--text); background: var(--surface);
-      border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
-    .ctrl-btn:hover { border-color: var(--accent); }
-    .ctrl-btn:disabled { opacity: 0.45; cursor: default; }
-    .flagged-only { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-soft); cursor: pointer; }
-    .theme-toggle { appearance: none; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; width: 38px; height: 38px; cursor: pointer; color: var(--text);
-      display: inline-flex; align-items: center; justify-content: center; margin-left: auto; }
-    .theme-toggle:hover { color: var(--accent); }
+  /* ============================================================
+   *  Artefacts — DESIGN PILOT for the site-wide redesign.
+   *
+   *  A sticky rail of contribution-calendar grids (one square per
+   *  artefact) wired to a compact ledger. Every row on screen
+   *  draws a thread back to its own square. The map groups by
+   *  rarity or by bonus; the chips always filter on whichever
+   *  axis the map is NOT showing.
+   *
+   *  Palette sampled from the game's own art: Larry (deep violet
+   *  #201038, electric rim #5020b8, lavender #a070e8, grin lime
+   *  #a8d048) and the board (cream #fcf0d8).
+   *
+   *  Deliberately does NOT link assets/site.css: that file styles
+   *  `footer` as a bare element and forces min-height:44px onto
+   *  .badge/.filter-input on phones, both of which fight this
+   *  layout. Everything it would have supplied is restated below.
+   *  Theme sync still works because assets/theme.js only flips
+   *  [data-theme="dark"] on <html> and carries no tokens.
+   * ============================================================ */
 
-    main { max-width: 1500px; margin: 0 auto; padding: 0 24px 64px; }
-    .art-head, .art-row { display: grid; grid-template-columns: 220px 1fr 1.4fr 48px; gap: 16px; padding: 14px 12px; }
-    .art-head { position: sticky; top: 0; background: var(--bg); border-bottom: 2px solid var(--border);
-      font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-soft); z-index: 1; }
-    .art-row { border-bottom: 1px solid var(--border); align-items: start; }
-    .art-row:hover { background: var(--surface); }
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
+  :root{
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    /* --lime is the display colour (hero gradient, chip fills, active states).
+       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
+       which fails AA for body text, while #556f18 is 4.86:1. Large display type
+       needs just 3:1, so the gradient keeps the bright one. */
+    --lime:#6f9420; --accent:#556f18;
+    /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
+       Teal rather than a second green, because at 15px two greens next to each
+       other in the rail are not tellable apart. */
+    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --wrap:1560px;
+    --bar-h:0px;      /* the filter bar's height, but only while it is sticky */
+    /* Soft geometry throughout. */
+    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+  }
+  [data-theme="dark"]{
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048; --accent:#a8d048;
+    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
+    --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
+  }
 
-    .art-name { font-weight: 600; font-size: 15px; line-height: 1.3; }
-    .flag-btn { appearance: none; width: 40px; height: 40px; cursor: pointer; font-size: 18px; line-height: 1;
-      background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; color: var(--text-soft);
-      display: inline-flex; align-items: center; justify-content: center; justify-self: end; }
-    .flag-btn:hover { border-color: #d68a2e; color: #d68a2e; }
-    .art-row.flagged { box-shadow: inset -3px 0 0 #d68a2e; }
-    .art-row.flagged .flag-btn { background: #d68a2e; border-color: #d68a2e; color: #fff; }
-    .flag-note { font-size: 12px; color: #d68a2e; margin-top: 4px; font-style: italic; }
-    .art-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    /* Tag colors mirror the Notion Artefacts DB option colors (Notion tag palette). */
-    .badge { font-size: 10.5px; font-weight: 600; padding: 1px 7px; border-radius: 4px; color: rgb(50,48,44); }
-    .nc-gray   { background: rgb(227,226,224); }
-    .nc-brown  { background: rgb(238,224,218); }
-    .nc-orange { background: rgb(250,222,201); }
-    .nc-yellow { background: rgb(253,236,200); }
-    .nc-green  { background: rgb(219,237,219); }
-    .nc-blue   { background: rgb(211,229,239); }
-    .nc-purple { background: rgb(232,222,238); }
-    .nc-pink   { background: rgb(245,224,233); }
-    .nc-red    { background: rgb(255,226,221); }
-    [data-theme="dark"] .badge { color: rgba(255,255,255,0.85); }
-    [data-theme="dark"] .nc-gray   { background: rgb(90,90,90); }
-    [data-theme="dark"] .nc-brown  { background: rgb(96,59,44); }
-    [data-theme="dark"] .nc-orange { background: rgb(133,76,29); }
-    [data-theme="dark"] .nc-yellow { background: rgb(137,99,42); }
-    [data-theme="dark"] .nc-green  { background: rgb(43,89,63); }
-    [data-theme="dark"] .nc-blue   { background: rgb(40,69,108); }
-    [data-theme="dark"] .nc-purple { background: rgb(73,47,100); }
-    [data-theme="dark"] .nc-pink   { background: rgb(105,49,76); }
-    [data-theme="dark"] .nc-red    { background: rgb(110,54,48); }
+  /* ---------- Base (restated, since site.css is not loaded) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--sans);background:var(--bg);color:var(--text);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+    transition:background .25s ease,color .25s ease;
+  }
+  a{color:var(--accent)}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
 
-    .art-effect { font-size: 14px; line-height: 1.5; }
-    .needs-flag { display: inline-block; font-size: 11px; color: var(--text-soft); background: var(--surface);
-      border: 1px dashed var(--border); border-radius: 6px; padding: 0 6px; margin-left: 4px; white-space: nowrap; }
+  /* Larry's aura, sitting behind everything. */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.14), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.12), transparent 66%);
+  }
+  [data-theme="dark"] body::before{
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
+  }
 
-    .art-conspiracy { font-size: 13.5px; line-height: 1.55; color: var(--text-soft); }
-    .conspiracy-name { display: block; font-size: 13px; font-weight: 600; margin-bottom: 3px; }
-    .conspiracy-name a { color: var(--accent); text-decoration: none; }
-    .conspiracy-name a:hover { text-decoration: underline; }
+  /* ---------- Hero ---------- */
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{
+    font-style:italic;
+    background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    /* background-clip:text crops to the element box and the italic slant pushes
+       the final glyph past it. Reserve a sliver so the trailing s keeps its tail. */
+    padding-right:.07em;
+  }
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
-    @media (max-width: 560px) {
-      h1 { font-size: 24px; }
-      .theme-toggle { margin-left: 0; }
-      .art-head { display: none; }
-      .art-row { grid-template-columns: 1fr; gap: 8px; padding: 16px 4px; position: relative; }
-      .flag-btn { position: absolute; top: 12px; right: 4px; }
+  /* ---------- Filter bar ----------
+     Full-bleed so the sticky background reaches the window edges, with the
+     content inset to line up with the --wrap container. Keeps it one element:
+     no extra wrapper div. */
+  .bar{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    padding-block:12px 14px;
+    padding-inline:max(22px, calc((100% - var(--wrap)) / 2));
+  }
+  /* Sticky only while the bar is a single row. Below this it wraps and, stacked
+     under the header, would eat too much of a phone viewport. */
+  @media (min-width:900px){
+    .bar{
+      position:sticky;top:var(--nav-h);z-index:55;
+      background:color-mix(in srgb, var(--bg) 82%, transparent);
+      backdrop-filter:blur(14px);
+      border-bottom:1px solid var(--border-soft);
     }
-    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+  }
+  .bar input[type="search"]{
+    font:400 14px/1 var(--sans);color:var(--text);background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--rad-pill);
+    padding:0 18px;height:44px;width:270px;transition:.2s var(--ease);
+  }
+  .bar input::placeholder{color:var(--text-dim)}
+  .bar input:focus{outline:none;border-color:var(--lime);box-shadow:var(--glow)}
+
+  .group{
+    display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;height:44px;
+    border:1px solid var(--border);border-radius:var(--rad-pill);background:var(--surface);
+  }
+  .group-lb{font:700 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim);margin-right:5px}
+  .group button{
+    appearance:none;cursor:pointer;border:0;background:transparent;color:var(--text-soft);
+    font:700 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+    padding:10px 14px;border-radius:var(--rad-pill);transition:.18s var(--ease);
+  }
+  .group button:hover{color:var(--text)}
+  .group button[aria-pressed="true"]{background:var(--lime);color:#141024}
+
+  .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .chip{
+    appearance:none;cursor:pointer;font:700 11px/1 var(--mono);letter-spacing:.09em;
+    text-transform:uppercase;padding:11px 15px;border-radius:var(--rad-pill);
+    border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
+    display:inline-flex;align-items:center;gap:7px;transition:.18s var(--ease);
+  }
+  .chip:hover{color:var(--text);border-color:var(--violet-hi);transform:translateY(-1px)}
+  .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:#140f26}
+  .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--violet))}
+  .chip[aria-pressed="true"] .dot{background:#140f26}
+  .count{margin-left:auto;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
+  .count b{color:var(--lime);font-size:14px}
+
+  main{max-width:var(--wrap);margin:0 auto;padding:8px 22px 90px}
+
+  /* ---------- Rarity mapping ---------- */
+  [data-r="Common"]{--c:var(--r-common)}
+  [data-r="Uncommon"]{--c:var(--r-uncommon)}
+  [data-r="Rare"]{--c:var(--r-rare)}
+  [data-r="Legendary"]{--c:var(--r-legendary)}
+
+  /* ---------- Layout ----------
+     The gutter between map and ledger opens up with the viewport: floored at
+     40px to 430px, then climbing to a 150px ceiling by 1280px. One fluid rule,
+     so the breakpoints below never touch the gap. */
+  .wrap{
+    display:grid;grid-template-columns:292px minmax(0,1fr);align-items:start;
+    gap:clamp(40px, 12.94vw - 15.65px, 150px);
+  }
+
+  /* ---------- Rail ----------
+     Fills exactly the space left by the header and the filter bar, both of
+     which are measured into tokens so this tracks them.
+     The cap matters: a sticky element taller than its slot can never be
+     scrolled into view, so without it the last grid is unreachable on a short
+     screen. fitRail() keeps the content inside it, so it rarely engages. */
+  .rail{
+    position:sticky;top:calc(var(--nav-h) + var(--bar-h));z-index:3;
+    display:flex;flex-direction:column;gap:10px;
+    max-height:calc(100dvh - var(--nav-h) - var(--bar-h));
+    overflow-y:auto;overscroll-behavior:contain;
+    padding-right:4px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+  }
+  .rail::-webkit-scrollbar{width:6px}
+  .rail::-webkit-scrollbar-thumb{background:var(--border);border-radius:var(--rad-pill)}
+  .rail::-webkit-scrollbar-track{background:transparent}
+
+  /* Opaque and above the threads, so the fan reads as emerging from behind. */
+  .tier{
+    position:relative;z-index:2;background:var(--surface);
+    border:1px solid var(--border-soft);border-radius:var(--rad-md);padding:8px 10px 9px;
+  }
+  .tier-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  /* Grouped by bonus there is no rarity on the tier, so the label falls back to
+     ink; the squares inside still carry their own rarity colour. */
+  .tier-hd h3{
+    margin:0;font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
+    color:var(--c,var(--text));
+  }
+  .tier-hd .n{margin-left:auto;font:700 10px/1 var(--mono);color:var(--text-dim)}
+
+  /* Column count is solved at runtime so the rail always fits its slot. */
+  .grid{display:grid;grid-template-columns:repeat(var(--cols,12),1fr);gap:3px}
+  .cell{
+    appearance:none;padding:0;border:0;cursor:pointer;aspect-ratio:1;border-radius:3px;
+    background:color-mix(in srgb, var(--c) var(--lvl,68%), transparent);
+    transition:transform .16s var(--ease), background .16s ease, box-shadow .16s ease;
+  }
+  /* shade = bonus-tag count, the way the calendar shades commit volume */
+  .cell[data-lvl="1"]{--lvl:34%}
+  .cell[data-lvl="2"]{--lvl:64%}
+  .cell[data-lvl="3"]{--lvl:100%}
+
+  /* Highlight is a light version of the square's own hue, so the ring reads as
+     that colour lit up rather than a foreign outline. On the cream paper a
+     paler tint would vanish, so there it deepens instead. */
+  .cell{--hl:color-mix(in srgb, var(--c) 68%, #000)}
+  [data-theme="dark"] .cell{--hl:color-mix(in srgb, var(--c) 55%, #fff)}
+
+  .cell:hover{transform:scale(1.42);z-index:3;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--hl)}
+  /* lit = this artefact's row is on screen. Outline only, never a transform:
+     scaling 20 cells at once visibly deforms the grid. */
+  .cell.is-lit{outline:1.5px solid var(--hl);outline-offset:1px}
+  .cell.is-hot{transform:scale(1.45);z-index:3;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--hl)}
+  .cell.is-out{background:var(--border-soft);opacity:.45}
+  .cell.is-out.is-lit{outline:none}
+
+  /* Below the threshold the 3px corners stop reading and just eat pixels, so
+     fitRail() flips the rail to dots. scale() rather than a smaller width, so
+     the layout box and therefore the tap target stay full size. */
+  .rail[data-dense] .grid{gap:2px}
+  .rail[data-dense] .cell{border-radius:50%;transform:scale(.62)}
+  /* Re-stated at this specificity, or the rule above outranks the plain :hover
+     and the squares stop reacting. */
+  .rail[data-dense] .cell:hover,
+  .rail[data-dense] .cell.is-hot{transform:scale(1.9)}
+  .rail[data-dense] .cell.is-lit{outline-width:1px;outline-offset:1px}
+
+  .legend{
+    display:flex;align-items:center;gap:7px;padding:0 3px;flex:none;
+    font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);
+  }
+  .legend i{width:11px;height:11px;border-radius:3px;background:var(--text-dim);display:inline-block}
+  .legend i:nth-of-type(1){opacity:.34}
+  .legend i:nth-of-type(2){opacity:.64}
+  .legend i:nth-of-type(3){opacity:1}
+
+  /* ---------- Ledger ---------- */
+  .ledger{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .row{
+    border-radius:var(--rad-sm);scroll-margin-top:calc(var(--nav-h) + var(--bar-h) + 14px);
+    border:1px solid transparent;transition:background .16s ease,border-color .16s ease;
+  }
+  .row:hover,.row.is-near{background:var(--surface)}
+  .row[open]{background:var(--surface-2);border-color:color-mix(in srgb,var(--c) 42%,transparent)}
+  .row.is-flash{animation:flash .9s var(--ease)}
+  @keyframes flash{0%,100%{background:var(--surface-2)}30%{background:color-mix(in srgb,var(--c) 28%,var(--surface-2))}}
+
+  .row summary{
+    list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;
+    padding:8px 13px;min-height:38px;
+  }
+  .row summary::-webkit-details-marker{display:none}
+  .r-dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+  /* Fixed column so every effect starts at the same x. Ragged starts read as a
+     mess once there are 180 of them. */
+  .r-name{
+    margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3;
+    flex:0 0 250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .r-eff{
+    margin:0;flex:1;min-width:0;font-size:12.5px;line-height:1.3;color:var(--text-soft);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .row[open] .r-eff{display:none}
+  .r-type{
+    flex:none;font:700 9px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;
+    color:var(--text-dim);white-space:nowrap;
+  }
+  .r-caret{
+    flex:none;width:22px;height:22px;border-radius:50%;background:var(--surface-2);
+    color:var(--text-dim);display:grid;place-items:center;font-size:8px;transition:.22s var(--ease);
+  }
+  .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:#141024}
+
+  .r-open{padding:2px 16px 18px 34px;display:grid;grid-template-columns:1.1fr 1fr;gap:24px}
+  .r-open h4{margin:0 0 6px;font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
+  .r-open h4.mt{margin-top:15px}
+  .r-open p{margin:0}
+  .r-open .fe{font-size:14px;line-height:1.5;margin-bottom:11px}
+  .r-open .sm{font-size:13px;line-height:1.6;color:var(--text-soft)}
+  .r-open .lk{display:inline-block;margin-bottom:6px;font-size:13.5px;font-weight:700;color:var(--accent);text-decoration:none}
+  .r-open .lk:hover{text-decoration:underline}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;padding:0;margin:0;list-style:none}
+  .tags li{
+    font:700 9.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+    padding:5px 9px;border-radius:var(--rad-pill);
+    background:color-mix(in srgb,var(--c) 20%,var(--surface-2));color:var(--text);
+  }
+  .needs{
+    display:inline-block;font:600 10px/1.5 var(--mono);color:var(--text-dim);
+    background:var(--surface-2);border-radius:var(--rad-pill);padding:2px 9px;white-space:nowrap;
+  }
+  .empty{padding:90px 0;text-align:center;color:var(--text-dim)}
+  .empty b{display:block;font:700 15px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-soft);margin-bottom:10px}
+
+  /* ---------- Threads ----------
+     They ride on top of everything except the sticky header, so they read as
+     wiring laid over the interface. The blend mode goes on the <svg> itself,
+     not the paths: this element is a stacking context, so blending a child
+     would isolate against the SVG's own empty backdrop and do nothing. */
+  .threads{
+    position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50;
+    mix-blend-mode:multiply;
+  }
+  [data-theme="dark"] .threads{mix-blend-mode:screen}
+  .threads path{fill:none;stroke-width:1;opacity:.5}
+  .threads path[data-r="Common"]{stroke:var(--r-common)}
+  .threads path[data-r="Uncommon"]{stroke:var(--r-uncommon)}
+  .threads path[data-r="Rare"]{stroke:var(--r-rare)}
+  .threads path[data-r="Legendary"]{stroke:var(--r-legendary)}
+
+  /* ---------- Footer ---------- */
+  .foot{
+    max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px;
+  }
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--text-soft);font-size:14px}
+
+  @media (max-width:1180px){
+    .wrap{grid-template-columns:262px minmax(0,1fr)}
+    .r-name{flex-basis:200px}
+  }
+
+  /* Phones keep the map beside the ledger rather than stacking it on top: the
+     rail shrinks to a thin strip of dots. The columns stay side by side, so the
+     threads stay meaningful and stay on. */
+  @media (max-width:860px){
+    .hero{padding:30px 16px 18px}
+    /* Filter bar was 205px tall: full-width search, then 9 chips wrapping onto
+       three rows at 44px each. Two rows now, with the chips on one
+       horizontally-scrolling strip so their count no longer drives height. */
+    .bar{padding:9px 16px 10px;gap:8px}
+    .group{height:34px;padding:3px;flex:0 0 auto;order:1}
+    .group-lb{display:none}
+    .group button{padding:8px 13px;font-size:10px}
+    /* Zero basis: a 120px basis was enough to claim the rest of the line and
+       bump the count onto its own row. At basis 0 it only takes leftovers. */
+    .bar input[type="search"]{
+      order:2;flex:1 1 0;min-width:88px;width:auto;
+      height:34px;padding:0 14px;font-size:13.5px;
+    }
+    /* Count rides the top row so the chip strip gets a clean full-width lane:
+       sharing a row put the strip's fade against it, and a half-cut chip beside
+       a number reads as broken. */
+    .count{order:3;flex:0 0 auto;margin:0;align-self:center;font-size:10.5px}
+    .chips{
+      order:4;flex:1 1 100%;min-width:0;flex-wrap:nowrap;gap:6px;
+      overflow-x:auto;scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+              mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+    }
+    .chips::-webkit-scrollbar{display:none}
+    .chip{flex:0 0 auto;padding:8px 11px;font-size:10px}
+    .chip .dot{width:6px;height:6px}
+
+    main{padding:8px 16px 70px}
+    .wrap{grid-template-columns:58px minmax(0,1fr)}
+    .rail{gap:6px;padding-right:2px}
+    .tier{padding:4px 4px 5px;border-radius:8px}
+    .tier-hd{margin-bottom:3px;gap:2px}
+    /* No room for wide tracking or the count at this width. */
+    .tier-hd h3{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tier-hd .n{display:none}
+    .legend{display:none}
+    .threads path{stroke-width:.75;opacity:.42}
+
+    .r-open{grid-template-columns:1fr;gap:14px;padding:2px 10px 16px 24px}
+    .r-eff,.r-type{display:none}
+    .r-name{flex:1 1 auto;font-size:13px}
+    .row summary{gap:9px;padding:7px 10px;min-height:34px}
+    .foot{padding:20px 16px 40px}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Artefacts</h1>
-    <p class="intro">
-      Review table of the <strong>180 artefacts</strong> — name, effect, and the conspiracy each one references.
-      Synced from the Notion Artefacts DB (last sync 2026-08-21).
-      Click ⚑ to mark a row REWORK (with an optional note — saved in this browser), then
-      <strong>Export review</strong> copies the list to paste to Claude, who applies it back to Notion.
-    </p>
-    <div class="controls">
-      <input class="search-input" id="search" type="search" placeholder="Search name, effect, conspiracy…" aria-label="Search artefacts">
-      <select class="rarity-select" id="rarity" aria-label="Filter by rarity">
-        <option value="">All rarities</option>
-        <option>Common</option>
-        <option>Uncommon</option>
-        <option>Rare</option>
-        <option>Legendary</option>
-      </select>
-      <label class="flagged-only"><input type="checkbox" id="flagged-only"> Flagged only</label>
-      <button class="ctrl-btn" id="export-btn" disabled>Export review</button>
-      <button class="ctrl-btn" id="clear-btn" disabled title="Remove all flags">Clear</button>
-      <span class="shown-count" id="shown-count"></span>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" aria-pressed="false" title="Toggle dark mode">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-          <path d="M21.64 13a1 1 0 0 0-1.05-.14 8.05 8.05 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36 10.14 10.14 0 1 0 22 14.05a1 1 0 0 0-.36-1.05Z"/>
-        </svg>
-      </button>
-    </div>
-  </header>
 
-  <main>
-    <div class="art-head" aria-hidden="true"><span>Name</span><span>Effect</span><span>Conspiracy</span><span>Flag</span></div>
-    <div id="art-rows"></div>
-  </main>
+<div id="site-nav" data-page="artefacts"></div>
 
-  <footer>
-    <p class="footer-page-line">180 artefact effects across 4 rarities, each named for a famous conspiracy, mystery or lost treasure.</p>
-    <p>Data exported from the Notion Artefacts DB (design source of truth). Built as a single static HTML file — no servers, no frameworks.</p>
-  </footer>
+<header class="hero">
+  <h1><em>Artefacts</em></h1>
+  <p>Every artefact in NO KINGS, named for a conspiracy, a mystery or a lost treasure that people still argue about.</p>
+</header>
 
-  <script>
-  // ponytail: canonical data — inline copies drifted before (see CLAUDE.md)
-  const rowsEl = document.getElementById('art-rows');
-  const searchEl = document.getElementById('search');
-  const rarityEl = document.getElementById('rarity');
-  const countEl = document.getElementById('shown-count');
+<div class="bar">
+  <div class="group" role="group" aria-label="Group the map by">
+    <span class="group-lb">Group</span>
+    <button type="button" data-view="rarity" aria-pressed="true">Rarity</button>
+    <button type="button" data-view="bonus" aria-pressed="false">Bonus</button>
+  </div>
+  <label class="sr" for="q">Search artefacts</label>
+  <input id="q" type="search" placeholder="Search name, effect, conspiracy">
+  <div class="chips" id="chips"></div>
+  <p class="count" id="count" role="status" aria-live="polite"></p>
+</div>
 
-  function effectHtml(effect) {
-    return effect.replace(/\(needs: ([^)]+)\)/, '<span class="needs-flag">needs: $1</span>');
+<main>
+  <div class="wrap">
+    <aside class="rail" id="rail" aria-hidden="true"></aside>
+    <div class="ledger" id="ledger"></div>
+  </div>
+</main>
+
+<svg class="threads" id="threads" aria-hidden="true">
+  <path data-r="Common"></path><path data-r="Uncommon"></path>
+  <path data-r="Rare"></path><path data-r="Legendary"></path>
+</svg>
+
+<footer class="foot">
+  <p class="foot-lead">180 artefact effects across 4 rarities, each named for a famous conspiracy, mystery or lost treasure.</p>
+  <p>Data exported from the Notion Artefacts DB (design source of truth). Built as a single static HTML file: no servers, no frameworks.</p>
+</footer>
+
+<script>
+// ponytail: canonical data comes from data/artefacts.js — never inline a copy (see CLAUDE.md).
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const effectHtml = e => esc(e).replace(/\(needs: ([^)]+)\)/, '<span class="needs">needs: $1</span>');
+
+const TIERS = ['Common', 'Uncommon', 'Rare', 'Legendary'];
+const BONUSES = [...new Set(ARTEFACTS.flatMap(a => a.bonus))].sort();
+
+const railEl = $('rail'), ledger = $('ledger'), chipsEl = $('chips'), countEl = $('count');
+const searchEl = $('q'), barEl = document.querySelector('.bar'), navEl = document.getElementById('site-nav');
+const svg = $('threads');
+const paths = {};
+TIERS.forEach(t => paths[t] = svg.querySelector(`path[data-r="${t}"]`));
+
+// Bonus is a multi-select, so an artefact with Score+Gold gets a square in both
+// grids: 217 squares over 9 grids rather than 180. Grouping on bonus[0] alone
+// would report 31 Gold artefacts when there are really 53.
+const BONUS_ORDER = (() => {
+  const n = {};
+  ARTEFACTS.forEach(a => a.bonus.forEach(b => n[b] = (n[b] || 0) + 1));
+  return Object.keys(n).sort((x, y) => n[y] - n[x] || x.localeCompare(y));
+})();
+const GROUPS = {
+  rarity: { keys: TIERS, of: a => [a.rarity] },
+  bonus: { keys: BONUS_ORDER, of: a => a.bonus }
+};
+
+// ---- Filtering. The controls ARE the state; nothing to drift.
+const haystacks = ARTEFACTS.map(a =>
+  [a.name, a.effect, a.conspiracy, a.summary, a.rarity, a.type, a.bonus.join(' ')].join(' ').toLowerCase());
+const active = new Set();
+let filterDim = 'bonus';
+
+// The chips filter on whichever axis the map is NOT grouped by: grouping
+// already shows you one dimension spatially, so filtering by it is dead weight.
+function setFilterDim(dim) {
+  filterDim = dim;
+  active.clear();
+  // The dot only carries meaning on rarity chips, where it is that tier's
+  // colour. Bonus chips have no colour of their own, so it would render as nine
+  // identical violet dots saying nothing.
+  chipsEl.innerHTML = (dim === 'rarity' ? TIERS : BONUSES).map(v => dim === 'rarity'
+    ? `<button class="chip" type="button" data-r="${v}" data-v="${v}" aria-pressed="false"><span class="dot"></span>${v}</button>`
+    : `<button class="chip" type="button" data-v="${v}" aria-pressed="false">${v}</button>`).join('');
+}
+const passes = a => !active.size ||
+  (filterDim === 'rarity' ? active.has(a.rarity) : a.bonus.some(b => active.has(b)));
+
+function currentSet() {
+  const q = searchEl.value.trim().toLowerCase();
+  const out = [];
+  for (let i = 0; i < ARTEFACTS.length; i++) {
+    if (!passes(ARTEFACTS[i])) continue;
+    if (q && !haystacks[i].includes(q)) continue;
+    out.push(i);
   }
+  return out;
+}
 
-  // Option colors as set in the Notion Artefacts DB schema (all option names are unique across properties).
-  const TAG_COLOR = {
-    Common: 'gray', Uncommon: 'green', Rare: 'blue', Legendary: 'purple',
-    Passive: 'orange', Trigger: 'purple',
-    Score: 'yellow', Time: 'blue', Gold: 'orange', Piece: 'green', Action: 'red',
-    Buff: 'purple', Item: 'pink', Shop: 'brown', Special: 'gray',
-    '?': 'gray', BASIC: 'yellow', REWORK: 'orange', KEEP: 'green', REMOVE: 'red'
-  };
-  const badge = v => `<span class="badge nc-${TAG_COLOR[v] || 'gray'}">${v}</span>`;
+// ---- The map. Built per grouping; index -> [cell, ...] because one artefact
+// can own several squares in the bonus view.
+const cells = new Map();
+function buildRail(view) {
+  const g = GROUPS[view];
+  railEl.innerHTML = g.keys.map(key => {
+    const items = [];
+    ARTEFACTS.forEach((a, i) => { if (g.of(a).includes(key)) items.push(i); });
+    return `<section class="tier"${view === 'rarity' ? ` data-r="${key}"` : ''}>
+      <div class="tier-hd"><h3>${esc(key)}</h3><span class="n">${items.length}</span></div>
+      <div class="grid">${items.map(i => {
+        const a = ARTEFACTS[i];
+        return `<button class="cell" type="button" tabindex="-1" data-cell="${i}"
+          data-r="${esc(a.rarity)}" data-lvl="${a.bonus.length}" title="${esc(a.name)}"></button>`;
+      }).join('')}</div>
+    </section>`;
+  }).join('') + `<p class="legend"><span>Bonus tags</span><i></i><i></i><i></i></p>`;
 
-  // Review flags — { name: note } in this browser's localStorage. Export → paste to Claude → applied to Notion.
-  const FLAG_KEY = 'artefact-review-flags';
-  let flags = JSON.parse(localStorage.getItem(FLAG_KEY) || '{}');
-  const saveFlags = () => localStorage.setItem(FLAG_KEY, JSON.stringify(flags));
-  const flaggedOnlyEl = document.getElementById('flagged-only');
-  const exportBtn = document.getElementById('export-btn');
-  const clearBtn = document.getElementById('clear-btn');
+  cells.clear();
+  railEl.querySelectorAll('.cell').forEach(c => {
+    const i = +c.dataset.cell;
+    if (!cells.has(i)) cells.set(i, []);
+    cells.get(i).push(c);
+  });
+}
 
-  function rowHtml(a, i) {
-    const flagged = a.name in flags;
-    const badges = [
-      badge(a.rarity),
-      badge(a.type),
-      ...a.bonus.map(badge),
-      a.status !== 'KEEP' ? badge(a.status) : ''
-    ].join('');
-    const note = flagged && flags[a.name] ? `<div class="flag-note">⚑ ${flags[a.name]}</div>` : '';
-    return `<div class="art-row${flagged ? ' flagged' : ''}" data-i="${i}">
-      <div>
-        <div class="art-name">${a.name}</div>
-        <div class="art-badges">${badges}</div>${note}
+// ---- The ledger
+function render(idx) {
+  ledger.innerHTML = idx.length ? idx.map(i => {
+    const a = ARTEFACTS[i];
+    return `<details class="row" data-row="${i}" data-r="${esc(a.rarity)}">
+      <summary>
+        <span class="r-dot"></span>
+        <h3 class="r-name">${esc(a.name)}</h3>
+        <p class="r-eff">${effectHtml(a.effect)}</p>
+        <span class="r-type">${esc(a.type)}</span>
+        <span class="r-caret">&#9660;</span>
+      </summary>
+      <div class="r-open">
+        <div>
+          <h4>Effect</h4><p class="fe">${effectHtml(a.effect)}</p>
+          <h4 class="mt">Bonuses</h4>
+          <!-- Notion's Bonus multi-select only. Type (Passive/Trigger) is a
+               separate property and already sits on the summary line. -->
+          <ul class="tags">${a.bonus.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+        </div>
+        <div><h4>The conspiracy</h4>
+          <a class="lk" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.conspiracy)}</a>
+          <p class="sm">${esc(a.summary)}</p></div>
       </div>
-      <div class="art-effect">${effectHtml(a.effect)}</div>
-      <div class="art-conspiracy">
-        <span class="conspiracy-name"><a href="${a.url}" target="_blank" rel="noopener">${a.conspiracy}</a></span>
-        ${a.summary}
-      </div>
-      <button class="flag-btn" data-i="${i}" title="${flagged ? 'Unflag' : 'Flag as REWORK'}" aria-label="${flagged ? 'Unflag' : 'Flag as REWORK'} ${a.name}" aria-pressed="${flagged}">⚑</button>
-    </div>`;
-  }
+    </details>`;
+  }).join('') : '<div class="empty"><b>Nothing matches</b>Widen the filters or clear the search.</div>';
 
-  const haystacks = ARTEFACTS.map(a =>
-    [a.name, a.effect, a.conspiracy, a.summary, a.rarity, a.type, a.status, a.bonus.join(' ')].join(' ').toLowerCase());
+  // Dim the squares that fell out of the filter; the map always shows them all.
+  const inSet = new Set(idx);
+  cells.forEach((list, i) => list.forEach(el => el.classList.toggle('is-out', !inSet.has(i))));
+  observeRows();
+  schedule();
+}
 
-  function render() {
-    const q = searchEl.value.trim().toLowerCase();
-    const r = rarityEl.value;
-    const shown = ARTEFACTS.map((a, i) => ({ a, i })).filter(({ a, i }) =>
-      (!r || a.rarity === r) && (!q || haystacks[i].includes(q)) && (!flaggedOnlyEl.checked || a.name in flags));
-    rowsEl.innerHTML = shown.map(({ a, i }) => rowHtml(a, i)).join('');
-    countEl.textContent = `${shown.length} / ${ARTEFACTS.length}`;
-    const n = Object.keys(flags).length;
-    exportBtn.textContent = n ? `Export review (${n})` : 'Export review';
-    exportBtn.disabled = !n;
-    clearBtn.disabled = !n;
-  }
+function apply() {
+  const idx = currentSet();
+  countEl.innerHTML = `<b>${idx.length}</b> / ${ARTEFACTS.length}`;
+  render(idx);
+}
 
-  rowsEl.addEventListener('click', e => {
-    const btn = e.target.closest('.flag-btn');
-    if (!btn) return;
-    const a = ARTEFACTS[+btn.dataset.i];
-    if (a.name in flags) {
-      delete flags[a.name];
-    } else {
-      const note = prompt(`Flag "${a.name}" as REWORK — note (optional):`, '');
-      if (note === null) return;
-      flags[a.name] = note.trim();
+// ---- Which rows are on screen. IntersectionObserver owns membership; the rAF
+// loop below owns geometry.
+let io = null;
+const visible = new Set();
+function chromeHeight() {
+  return navEl.offsetHeight +
+    (getComputedStyle(barEl).position === 'sticky' ? barEl.offsetHeight : 0);
+}
+function observeRows() {
+  if (io) io.disconnect();
+  visible.clear();
+  // Discount the sticky chrome, so a row hidden behind the header or the filter
+  // bar does not sprout a thread that vanishes underneath them.
+  const chrome = chromeHeight();
+  io = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      const i = +e.target.dataset.row;
+      if (e.isIntersecting) visible.add(i); else visible.delete(i);
     }
-    saveFlags();
-    render();
-  });
+    schedule();
+  }, { rootMargin: `-${chrome + 4}px 0px -4px 0px` });
+  ledger.querySelectorAll('.row').forEach(r => io.observe(r));
+}
 
-  exportBtn.addEventListener('click', () => {
-    const lines = Object.entries(flags).map(([name, note]) => `- ${name}${note ? ' — ' + note : ''}`);
-    const text = `NO KINGS artefact review — set STATUS=REWORK:\n${lines.join('\n')}`;
-    navigator.clipboard.writeText(text).then(() => {
-      const n = Object.keys(flags).length;
-      exportBtn.textContent = 'Copied ✓';
-      setTimeout(() => { exportBtn.textContent = `Export review (${n})`; }, 1500);
-    });
-  });
+// ---- Threads. One endpoint is sticky (viewport-fixed), the other scrolls, so
+// everything is measured in viewport space straight off getBoundingClientRect.
+function draw() {
+  const d = { Common: '', Uncommon: '', Rare: '', Legendary: '' };
+  const lit = new Set();
 
-  clearBtn.addEventListener('click', () => {
-    if (!confirm(`Remove all ${Object.keys(flags).length} flags?`)) return;
-    flags = {};
-    saveFlags();
-    render();
-  });
+  // Read phase: collect every rect first, write afterwards, so the frame cannot
+  // layout-thrash.
+  const segs = [];
+  for (const i of visible) {
+    const list = cells.get(i), row = ledger.querySelector(`.row[data-row="${i}"]`);
+    if (!list || !row) continue;
+    // One thread per square: in the bonus view a 3-tag artefact genuinely
+    // reaches into three grids, and showing all three is the point.
+    const w = row.getBoundingClientRect();
+    for (const cell of list) segs.push({ r: ARTEFACTS[i].rarity, c: cell.getBoundingClientRect(), w });
+    lit.add(i);
+  }
 
-  searchEl.addEventListener('input', render);
-  rarityEl.addEventListener('change', render);
-  flaggedOnlyEl.addEventListener('change', render);
-  render();
-  </script>
-  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
-  <script src="assets/theme.js"></script>
+  // Write phase. Clamp the square end to the rail's visible box: on a short
+  // screen the rail scrolls internally, and an out-of-view square would
+  // otherwise anchor its thread somewhere it clearly is not.
+  const rb = railEl.getBoundingClientRect();
+  for (const s of segs) {
+    const cx = Math.min(s.c.right, rb.right);
+    const cy = Math.min(Math.max(s.c.top + s.c.height / 2, rb.top + 2), rb.bottom - 2);
+    const rx = s.w.left, ry = s.w.top + Math.min(s.w.height / 2, 19);
+    d[s.r] += `M${cx.toFixed(1)} ${cy.toFixed(1)}C${(cx + 44).toFixed(1)} ${cy.toFixed(1)},${(rx - 44).toFixed(1)} ${ry.toFixed(1)},${rx.toFixed(1)} ${ry.toFixed(1)}`;
+  }
+  for (const t of TIERS) paths[t].setAttribute('d', d[t]);
+  cells.forEach((list, i) => list.forEach(el => el.classList.toggle('is-lit', lit.has(i))));
+}
+
+let raf = 0;
+function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); }
+
+// Measure the chrome rather than trusting constants: the header collapses to a
+// burger on phones and the filter bar carries 4 or 9 chips, so neither height is
+// fixed, and a stale value leaves the rail tucked underneath.
+// --nav-min drives the header height and --nav-h is measured back off it, which
+// keeps the two from feeding into each other.
+// --nav-h is published by assets/nav.js, which owns the header; this only
+// tracks the filter bar.
+function syncChrome() {
+  const stuck = getComputedStyle(barEl).position === 'sticky';
+  document.documentElement.style.setProperty('--bar-h', (stuck ? barEl.offsetHeight : 0) + 'px');
+}
+
+// ---- Fit the whole map into its slot, so the rail never needs scrolling. More
+// columns means smaller squares and fewer rows, so total height falls
+// monotonically as the column count rises: binary-search the smallest column
+// count that fits, which is the largest squares that fit.
+const MIN_COLS = 4, MAX_COLS = 34, MAX_CELL = 16;
+function fitRail() {
+  const avail = innerHeight - chromeHeight();
+  const set = n => railEl.style.setProperty('--cols', n);
+
+  // Squares cap at MAX_CELL. Rather than capping the track width (which would
+  // leave the grid narrower than its card), raise the column floor until 1fr
+  // tracks land at or under the cap, so the grid still fills the rail.
+  const grid = railEl.querySelector('.grid');
+  if (!grid) return;
+  const gap = parseFloat(getComputedStyle(grid).columnGap) || 3;
+  const capCols = Math.ceil((grid.clientWidth + gap) / (MAX_CELL + gap));
+
+  let lo = Math.max(MIN_COLS, capCols), hi = MAX_COLS, best = MAX_COLS;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    set(mid);
+    if (railEl.scrollHeight <= avail) { best = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  set(best);
+
+  // Small squares read better as dots. Measure with offsetWidth, NOT
+  // getBoundingClientRect: the latter includes the dense scale(.62), so once
+  // dots engaged the measurement would stay under the threshold forever and the
+  // rail could never return to squares when the viewport grew.
+  const size = grid.firstElementChild ? grid.firstElementChild.offsetWidth : 99;
+  railEl.toggleAttribute('data-dense', size < 12);
+}
+
+const relayout = () => { syncChrome(); fitRail(); schedule(); };
+new ResizeObserver(relayout).observe(barEl);
+addEventListener('resize', relayout);
+// Passive + rAF-coalesced: the two endpoints move relative to each other every
+// frame, and no declarative CSS can compute arbitrary endpoint geometry.
+addEventListener('scroll', schedule, { passive: true });
+ledger.addEventListener('toggle', schedule, true);
+
+// ---- Click a square: expand the row and bring it into view.
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+railEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell');
+  if (!c) return;
+  const row = ledger.querySelector(`.row[data-row="${c.dataset.cell}"]`);
+  if (!row) return;                       // filtered out of the ledger
+  row.open = true;
+  row.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'center' });
+  row.classList.remove('is-flash');
+  void row.offsetWidth;                   // restart the flash
+  row.classList.add('is-flash');
+  schedule();
+});
+
+// ---- Hover either side highlights its counterpart.
+const hover = (el, sel, fn) => {
+  el.addEventListener('mouseover', e => { const t = e.target.closest(sel); if (t) fn(t, true); });
+  el.addEventListener('mouseout', e => { const t = e.target.closest(sel); if (t) fn(t, false); });
+};
+hover(railEl, '.cell', (c, on) => {
+  const row = ledger.querySelector(`.row[data-row="${c.dataset.cell}"]`);
+  if (row) row.classList.toggle('is-near', on);
+});
+hover(ledger, '.row', (r, on) =>
+  cells.get(+r.dataset.row)?.forEach(c => c.classList.toggle('is-hot', on)));
+
+// ---- Group toggle
+const VIEW_KEY = 'nokings-view:artefacts';
+const viewBtns = document.querySelectorAll('.group button');
+function setView(v) {
+  viewBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+  buildRail(v);
+  setFilterDim(v === 'rarity' ? 'bonus' : 'rarity');
+  try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
+  apply();
+  relayout();               // chip count and grid count both just changed
+}
+viewBtns.forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+
+searchEl.addEventListener('input', apply);
+chipsEl.addEventListener('click', e => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const v = b.dataset.v;
+  if (active.has(v)) { active.delete(v); b.setAttribute('aria-pressed', 'false'); }
+  else { active.add(v); b.setAttribute('aria-pressed', 'true'); }
+  apply();
+});
+
+let startView = 'rarity';
+try { startView = localStorage.getItem(VIEW_KEY) === 'bonus' ? 'bonus' : 'rarity'; } catch (e) {}
+setView(startView);
+</script>
+<!-- Shared theme JS (cached across pages). See assets/theme.js. -->
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
 </body>
 </html>

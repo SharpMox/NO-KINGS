@@ -18,9 +18,10 @@
     });
   }
   try {
-    const saved = localStorage.getItem('fp-theme');
-    if (saved) setTheme(saved);
-    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
-    else setTheme('light');
-  } catch (e) {}
+    // Dark is the product default; prefers-color-scheme is deliberately not
+    // consulted, so a first-time visitor sees the intended look whatever their
+    // OS is set to. Only an explicit choice made here selects light.
+    // assets/theme-init.js applies the same rule before first paint.
+    setTheme(localStorage.getItem('fp-theme') === 'light' ? 'light' : 'dark');
+  } catch (e) { setTheme('dark'); }
 })();

@@ -277,7 +277,7 @@ html{overflow-x:clip}
 .kind-hd .kind-n{font-size:11px;letter-spacing:.12em;color:var(--text-dim)}
 
 /* line close-up: the whole chain, left to right */
-dialog.line{border:0;padding:0;background:transparent;width:min(1090px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
+dialog.line{border:0;padding:0;background:transparent;width:min(1158px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
 dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
 .line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
   background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
@@ -303,18 +303,18 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   letter-spacing:.18em;text-transform:uppercase;color:var(--r-rare)}
 .line-lb.syn-lb{color:var(--r-legendary)}
 /* the chain drawn as its metro line: one coloured track, three stations */
-.line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start;
+.line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:56px;align-items:start;
   /* the board's rendered size: capped at 230, otherwise the column, which is
      the dialog less its padding (56) and the two gaps (44), over three.
      Derived from vw rather than % so it can be halved for a `top` offset. */
-  --bw:min(330px, (min(1090px, 100vw) - 100px) / 3)}
+  --bw:min(330px, (min(1158px, 100vw) - 168px) / 3)}
 .line-p{text-align:center;min-width:0;position:relative}
 .line-p .board{max-width:230px;margin:0 auto}
 /* the same operators as the fanned cards, centred in the gap and on the
    boards' own centre line rather than the whole column, whose height varies
    with the description */
 .line-p:not(:last-child)::after{
-  content:"+";position:absolute;right:-11px;top:calc(var(--bw) / 2);
+  content:"+";position:absolute;right:-28px;top:calc(var(--bw) / 2);
   transform:translate(50%,-50%);pointer-events:none;
   color:var(--lime);font:800 38px/1 var(--mono);
   filter:drop-shadow(0 1px 4px rgba(252,240,216,.95)) drop-shadow(0 0 9px rgba(252,240,216,.85))}
@@ -370,7 +370,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
      left+right and top+bottom together would otherwise let the desktop values
      win on an auto-sized box. */
   .line-row .line-p:not(:last-child)::after{
-    content:"+";position:absolute;left:50%;right:auto;top:auto;bottom:-40px;
+    content:"+";position:absolute;left:50px;right:auto;top:auto;bottom:-40px;
     transform:translateX(-50%);
     color:var(--lime);font:800 32px/1 var(--mono);
     filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
@@ -473,8 +473,8 @@ function openFusion(f) {
      <div class="line-row">${IDS(f).map(id => {
        const p = LOOKUP[id];
        return `<div class="line-p">${renderBoard(p)}
-            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span><span class="fam-m">${esc(p.family || '')}</span></h3>
-            <p class="meta"><b>${esc(p.family || '')}</b><span class="bz">${esc(p.betza || '')}</span></p>
+            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span></h3>
+            <p class="meta"><span class="bz">${esc(p.betza || '')}</span></p>
             <span class="bh">${(p.behaviors || []).map(b =>
               `<span>${esc(b)}</span>`).join('')}</span>
             <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;

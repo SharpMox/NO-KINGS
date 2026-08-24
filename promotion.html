@@ -429,8 +429,8 @@ function openLine(c, hue) {
      <div class="line-row">${c.ids.map(id => {
        const p = LOOKUP[id];
        return `<div class="line-p">${renderBoard(p)}
-            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span><span class="fam-m">${esc(p.family || '')}</span></h3>
-            <p class="meta"><b>${esc(p.family || '')}</b><span class="bz">${esc(p.betza || '')}</span></p>
+            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span></h3>
+            <p class="meta"><span class="bz">${esc(p.betza || '')}</span></p>
             <span class="bh">${(p.behaviors || []).map(b =>
               `<span>${esc(b)}</span>`).join('')}</span>
             <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;

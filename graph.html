@@ -167,6 +167,7 @@
      *  Tab 1: Matrix — existing 29x29 grid.
      * ============================================================ */
     #graph-wrap {
+      display: flex;
       overflow-x: auto;
       overflow-y: visible;
       border: 1px solid var(--border);
@@ -176,6 +177,14 @@
     table.graph-grid {
       border-collapse: separate;
       border-spacing: 0;
+      /* Centres the grid in both axes when the wrap is roomier than the table
+         (231px of dead space sat to its right at 1440px+).
+         `margin:auto` rather than justify/align-content on the flex parent:
+         centring a flex container's overflowing content makes the leading edge
+         unreachable, because you cannot scroll to a negative offset. An auto
+         margin resolves to 0 the moment the table is wider than the wrap, so
+         narrow viewports still start hard against the left and pan normally. */
+      margin: auto;
     }
     .graph-grid td {
       padding: 0;
@@ -441,6 +450,11 @@
       /* some Android browsers don't stretch the fullscreen element themselves */
       width: 100%; height: 100%; box-sizing: border-box;
     }
+    /* Give the matrix wrap the fullscreen height so its `margin:auto` has room
+       to centre vertically; without a height it just hugs the table and the
+       vertical half of the centring can never apply. */
+    #tab-matrix:fullscreen #graph-wrap { height: calc(100dvh - 96px); }
+    #tab-matrix.fake-fs #graph-wrap { height: calc(100dvh - 96px); }
     /* Fit the square graph to the fullscreen viewport, centred. */
     #tab-graph:fullscreen #network-svg {
       width: auto; height: min(100vw, calc(100dvh - 90px));

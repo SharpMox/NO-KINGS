@@ -303,9 +303,24 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   letter-spacing:.18em;text-transform:uppercase;color:var(--r-rare)}
 .line-lb.syn-lb{color:var(--r-legendary)}
 /* the chain drawn as its metro line: one coloured track, three stations */
-.line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start}
-.line-p{text-align:center;min-width:0}
+.line-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-items:start;
+  /* the board's rendered size: capped at 230, otherwise the column, which is
+     the dialog less its padding (56) and the two gaps (44), over three.
+     Derived from vw rather than % so it can be halved for a `top` offset. */
+  --bw:min(230px, (min(1060px, 100vw) - 100px) / 3)}
+.line-p{text-align:center;min-width:0;position:relative}
 .line-p .board{max-width:230px;margin:0 auto}
+/* the same operators as the fanned cards, centred in the gap and on the
+   boards' own centre line rather than the whole column, whose height varies
+   with the description */
+.line-p:not(:last-child)::after{
+  content:"+";position:absolute;right:-11px;top:calc(var(--bw) / 2);
+  transform:translate(50%,-50%);pointer-events:none;
+  color:var(--lime);font:800 38px/1 var(--mono);
+  filter:drop-shadow(0 1px 4px rgba(252,240,216,.95)) drop-shadow(0 0 9px rgba(252,240,216,.85))}
+.line-p:nth-of-type(2)::after{content:"="}
+[data-theme="dark"] .line-p:not(:last-child)::after{
+  filter:drop-shadow(0 2px 7px rgba(8,4,18,.95)) drop-shadow(0 0 10px rgba(8,4,18,.7))}
 .line-p h3{margin:10px 0 0;font-size:18px;color:var(--text)}
 .line-p .bz-m,.line-p .fam-m{display:none}
 .line-p .meta{margin:5px 0 0;font:700 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
@@ -339,14 +354,18 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-p .meta{display:none}
   .line-p .bh .bz{display:none}
   .deck .dcard:not(:last-child)::after{width:32px;height:32px;left:calc(100% - 16px);font-size:25px}
-  .line-p{position:relative}
-  /* stacked on a phone, so the equation reads downward */
-  .line-p:not(:last-child)::after{
-    content:"+";position:absolute;left:50%;bottom:-40px;transform:translateX(-50%);
+  /* Stacked on a phone, so the equation reads downward instead of across.
+     .line-row prefix: this block sits before the base rules in source, so only
+     specificity can carry the override. right/top must be cleared explicitly —
+     left+right and top+bottom together would otherwise let the desktop values
+     win on an auto-sized box. */
+  .line-row .line-p:not(:last-child)::after{
+    content:"+";position:absolute;left:50%;right:auto;top:auto;bottom:-40px;
+    transform:translateX(-50%);
     color:var(--lime);font:800 32px/1 var(--mono);
     filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
-  .line-p:nth-of-type(2)::after{content:"="}
-  [data-theme="dark"] .line-p:not(:last-child)::after{
+  .line-row .line-p:nth-of-type(2)::after{content:"="}
+  [data-theme="dark"] .line-row .line-p:not(:last-child)::after{
     filter:drop-shadow(0 2px 7px rgba(8,4,18,.9))}
 }
   </style>

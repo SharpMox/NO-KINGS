@@ -385,9 +385,11 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
    lands nowhere near its Void twin - that pair swaps move for capture rather
    than rotating, and gets the swap on its own. Driven by the behaviour, not
    by the pair's name. */
-.line-axis.plain{height:330px;justify-content:center}
-.line-axis.plain .rot,.line-axis.plain .turn{display:none}
-.line-axis.plain .swap{position:static;transform:none}
+.line-axis.plain .turn{display:none}
+/* upright, and two of them come to a board's height, so nothing needs nudging */
+.line-axis.plain .rot{width:165px;height:165px}
+.line-axis.plain .rot .board{width:165px;transform:none}
+.line-axis.plain .rot:hover .board{animation:none}
 .line-row:has(.plain) .line-p .board{margin-top:0}
 /* a 150px board rotated 45 spans its full 212px cell, so touching cells put
    the diamonds point to point; the swap sits on that junction */
@@ -440,8 +442,8 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis .rot{width:107px;height:107px}
   .line-axis .rot .board{width:76px}
   .line-axis .turn{width:34px;height:18px}
-  .line-axis.plain{height:auto;padding:6px 0}
-  .line-axis.plain .swap{transform:rotate(90deg)}
+  .line-axis.plain .rot{width:100px;height:100px}
+  .line-axis.plain .rot .board{width:100px}
   /* nothing to line up beside: the axis is in the flow, not in a column */
   .line-row .line-p .board{margin-top:0}
   .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}
@@ -548,16 +550,19 @@ function openPair(v) {
     dlg.querySelector('.dd-close').addEventListener('click', () => dlg.close());
     dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
   }
+  // a forward-only piece cannot be shown rotating: turning its diagram turns
+  // "forward" with it. That pair gets upright boards and a square swap instead.
+  const flat = IDS(v).some(id => (LOOKUP[id].behaviors || []).includes('direction-restricted'));
   document.getElementById('line-body').innerHTML =
     `<span class="line-lb">${esc(LOOKUP[v.lhs].family)}</span>
      <h2>${esc(LABEL(v))}</h2>
      <div class="line-row">${[
        piece(v.lhs),
-       `<div class="line-axis${IDS(v).some(id => (LOOKUP[id].behaviors || []).includes('direction-restricted')) ? ' plain' : ''}">
+       `<div class="line-axis${flat ? ' plain' : ''}">
           ${TURN}
-          <span class="rot">${rot(LOOKUP[v.lhs])}</span>
+          <span class="rot">${(flat ? marked : rot)(LOOKUP[v.lhs])}</span>
           <span class="swap">\u21C4</span>
-          <span class="rot back">${rot(LOOKUP[v.rhs])}</span>
+          <span class="rot back">${(flat ? marked : rot)(LOOKUP[v.rhs])}</span>
           ${TURN_BACK}
         </div>`,
        piece(v.rhs),
@@ -568,10 +573,20 @@ function openPair(v) {
 // the pair's own diagrams, re-used at preview size and turned 45 degrees:
 // the rotation is the whole claim this page makes, shown rather than described
 const rot = p => renderBoard(p).replace('class="board" role="img"', 'class="board rot-b" aria-hidden="true"');
+
+// For a forward-only pair there is no rotation to show: what swaps is the
+// square ahead of the piece with the one to its right. Drawn in the board's
+// own coordinates so it scales with the diagram.
+const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="5"
+     stroke-linecap="round" stroke-linejoin="round">
+  <path d="M162 126 A 20 20 0 0 1 198 126"/>
+  <path d="M190.4 123.4 L198 126 L200.6 118.5"/>
+  <path d="M169.6 123.4 L162 126 L159.4 118.5"/></g>`;
+const marked = p => rot(p).replace('</svg>', MARK + '</svg>');
 const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
   <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"
         stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M33.1 19.6 L42.0 21.0 L43.4 12.1" fill="none" stroke="currentColor" stroke-width="2.6"
+  <path d="M33.2 22.7 L42.0 21.0 L40.3 12.1" fill="none" stroke="currentColor" stroke-width="2.6"
         stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
 

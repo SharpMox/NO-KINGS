@@ -176,7 +176,8 @@
   .decks{gap:22px 16px;--cw:132px;
     --spread:min(112px, calc((100vw - 166px) / 2))}
   /* .decks .deck: the later base rule pins height 346, specificity again */
-  .decks .deck.fan{height:182px}
+  .decks .deck{height:calc(var(--cw) + 116px)}
+  .decks .deck.fan{height:calc(var(--cw) + 40px)}
   /* .deck .dcard outranks the later base .dcard rule; the media block sits
      before it in source, so specificity has to carry the override */
   .deck.fan .dcard{top:6px;transform:translateX(calc((var(--k) - 1) * var(--spread,164px)))}
@@ -188,14 +189,19 @@
   .deck .dcard:not(:first-child) .nm{flex-direction:column;align-items:flex-end;
     justify-content:center;gap:2px;padding-right:8px}
 }
-.deck{position:relative;height:346px;cursor:pointer;z-index:1}
-.deck.fan{height:252px}
+.deck{position:relative;height:calc(var(--cw) + 122px);cursor:pointer;z-index:1}
+.deck.fan{height:calc(var(--cw) + 46px)}
 /* the header is in flow now: it has to hold the fan toggle beside the name */
-.stk-hd{display:flex;align-items:center;gap:9px;margin:0 0 10px 4px}
+/* the label is part of the control: clicking it, or the padding round it,
+   works the button beside it */
+.stk-hd{display:flex;align-items:center;gap:9px;margin:0 0 4px;padding:5px 9px 5px 4px;
+  width:max-content;max-width:100%;border-radius:10px;cursor:pointer;
+  transition:background .18s var(--ease)}
+.stk-hd:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
 .stk-hd h3{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}
 .fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
   color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
-.fx:hover{color:var(--lime)}
+.fx:hover,.stk-hd:hover .fx{color:var(--lime)}
 /* one step vector drives the whole glyph: a down-and-right cascade when the
    cards are stacked, a flat row when they are fanned. The (--i - 1) keeps the
    middle card put, so both arrangements stay centred on the same point. */
@@ -214,7 +220,7 @@
 /* on hover it plays the change back and forth, so the button demonstrates the
    move rather than just naming its endpoint */
 @keyframes fx-swing{from{--dx:7.6px;--dy:0px}to{--dx:2.6px;--dy:2.2px}}
-.fx:hover{animation:fx-swing .8s cubic-bezier(.45,.05,.55,.95) infinite alternate}
+.fx:hover,.stk-hd:hover .fx{animation:fx-swing .8s cubic-bezier(.45,.05,.55,.95) infinite alternate}
 .dcard{position:absolute;left:50%;width:var(--cw);margin-left:calc(var(--cw) / -2);
   background:linear-gradient(150deg,rgba(160,112,232,.12),rgba(24,16,48,.18) 45%),
              color-mix(in srgb,var(--surface) 46%,transparent);
@@ -457,7 +463,9 @@ function flip(mutate) {
 }
 
 $('#decks').addEventListener('click', e => {
-  const fx = e.target.closest('.fx');
+  // the header counts as the button: same toggle from the label or its padding
+  const hd = e.target.closest('.stk-hd');
+  const fx = e.target.closest('.fx') || (hd && hd.querySelector('.fx'));
   if (fx) {
     const deck = fx.closest('.stk').querySelector('.deck');
     flip(() => {

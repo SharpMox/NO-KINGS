@@ -110,7 +110,7 @@
   .bar{
     display:flex;gap:12px;align-items:center;flex-wrap:wrap;
     padding-block:12px 32px;
-    padding-inline:max(22px, calc((100% - var(--wrap)) / 2));
+    padding-inline:10px;
   }
   /* Sticky only while the bar is a single row. Below this it wraps and, stacked
      under the header, would eat too much of a phone viewport. */
@@ -160,7 +160,7 @@
   .count{margin:0;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
   .count b{color:var(--lime);font-size:14px}
 
-  main{max-width:var(--wrap);margin:0 auto;padding:8px 22px 90px}
+  main{max-width:none;margin:0 auto;padding:8px 10px 90px}
 
   /* ---------- Rarity mapping ---------- */
   [data-r="Common"]{--c:var(--r-common)}

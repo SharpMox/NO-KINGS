@@ -580,15 +580,15 @@ const rot = p => renderBoard(p).replace('class="board" role="img"', 'class="boar
 // For a forward-only pair there is no rotation to show: what swaps is the
 // square ahead of the piece with the one to its right. Drawn in the board's
 // own coordinates so it scales with the diagram.
-const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="4.5"
+const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
      stroke-linecap="round" stroke-linejoin="round">
   <path d="M162 108 A 20 20 0 0 1 198 108"/>
   <path d="M190.4 105.4 L198 108 L200.6 100.4"/>
   <path d="M159.4 100.4 L162 108 L169.6 105.4"/></g>`;
-// cropped to the four squares the swap happens in, which zooms the mark with
-// the board since it lives in the same coordinate space
+// cropped to the squares the swap happens in, which zooms the mark with the
+// board since it lives in the same coordinate space
 const marked = p => rot(p)
-  .replace('viewBox="0 0 324 324"', 'viewBox="90 72 144 144"')
+  .replace('viewBox="0 0 324 324"', 'viewBox="70 38 184 184"')
   .replace('</svg>', MARK + '</svg>');
 const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
   <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"

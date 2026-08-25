@@ -743,6 +743,7 @@ function setOpen(open) {
   if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
   chipsEl.hidden = false;
   chipsEl.style.width = rowsW + 'px';
+  bar.style.height = bar.getBoundingClientRect().height + 'px';
   fbox.classList.add('sizing');
   fbox.animate(
     [{ width: `${from.width}px`, height: `${from.height}px` },
@@ -751,6 +752,7 @@ function setOpen(open) {
   ).finished.then(() => {
     chipsEl.style.width = '';
     chipsEl.hidden = !open;
+    bar.style.height = '';
     fbox.classList.remove('sizing');
   }).catch(() => {});
 }

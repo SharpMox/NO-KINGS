@@ -648,6 +648,7 @@ function setOpen(open) {
   // grid would re-column itself on every frame as the frame resizes
   chipsEl.hidden = false;
   chipsEl.style.width = rowsW + 'px';
+  bar.style.height = bar.getBoundingClientRect().height + 'px';
   fbox.classList.add('sizing');
   fbox.animate(
     [{ width: `${from.width}px`, height: `${from.height}px` },
@@ -656,6 +657,7 @@ function setOpen(open) {
   ).finished.then(() => {
     chipsEl.style.width = '';
     chipsEl.hidden = !open;
+    bar.style.height = '';
     fbox.classList.remove('sizing');
   }).catch(() => {});
 }

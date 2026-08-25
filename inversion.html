@@ -3,162 +3,807 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="14 ortho-to-diagonal inversion pairs plus self-inverse fairy-chess pieces in NO-KINGS.">
-  <title>Fairy Chess — Inversions</title>
-  <link rel="stylesheet" href="assets/site.css">
+  <meta name="description" content="The 14 NO KINGS inversion pairs as card stacks: every straight move swapped for its diagonal twin, 45 degrees over.">
+  <title>NO KINGS / Inversions</title>
   <link rel="stylesheet" href="assets/nav.css">
   <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/inversions.js"></script>
+  <!-- chain order for the wall; no inversion data comes from here -->
+  <script src="data/promotions.js"></script>
   <style>
-    header { max-width: var(--wrap); margin: 0 auto; padding: 32px 24px 16px; }
-    h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
-    .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
-    .controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-    .back-link { display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
-      color: var(--accent); font-weight: 500; font-size: 14px; padding: 8px 14px;
-      background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
-    .back-link:hover { text-decoration: none; border-color: var(--accent); }
+  /* ============================================================
+   *  Inversions — every pair is a wallet stack of two cards. The halves are
+   *  peers: a piece and its 45-degree twin, straight swapped for diagonal.
+   *
+   *  ponytail: the card system below is duplicated from promotion.html.
+   *  Extract an assets/stacks.css when a third page wants it, or once both
+   *  pages stop moving — not while promotion.html is still in review.
+   *  Follows artefacts.html, the design pilot: it does NOT link
+   *  assets/site.css and carries its own tokens, but shares
+   *  assets/nav.{css,js} and assets/theme.js so the header and the
+   *  light/dark choice stay in sync with the rest of the site.
+   * ============================================================ */
 
-    main { max-width: none; margin: 0 auto; padding: 0 10px 64px; }
-    .inversion-table { border-collapse: separate; border-spacing: 8px; width: 100%; }
-    .inversion-table td { vertical-align: middle; padding: 0; }
-    .inversion-table tbody td { padding-top: 48px; }
-    .inversion-table tbody tr:first-child td { padding-top: 0; }
-    .inversion-op { text-align: center; font-size: 32px; color: var(--text-soft); font-weight: 300; width: 1%; user-select: none; }
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
+  :root{
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    /* --lime is the display colour (hero gradient, chip fills, active states).
+       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
+       which fails AA for body text, while #556f18 is 4.86:1. Large display type
+       needs just 3:1, so the gradient keeps the bright one. */
+    --lime:#6f9420; --accent:#556f18;
+    /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
+       Teal rather than a second green, because at 15px two greens next to each
+       other in the rail are not tellable apart. */
+    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
+    /* Board tokens for assets/board.js, copied from assets/site.css. */
+    --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
+    --piece-disc:#231544; --piece-disc-text:#fcf0d8;
+    --move-color:#2e6fd0; --capture-color:#c0392b; --hurdle-color:#7a3ae8;
+    --hop-target:#2f8f5f; --ray-color:#2f7fc0; --rider-color:#c8791f;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --wrap:1560px;
+    /* Soft geometry throughout. */
+    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+    /* the card fan overshoots slightly on the way out */
+    --spring:cubic-bezier(.3,1.45,.42,1);
+  }
+  [data-theme="dark"]{
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048; --accent:#a8d048;
+    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
+    --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
+    --sq-light:#4a4270; --sq-dark:#241d3e;
+    --piece-disc:#efeaff; --piece-disc-text:#0f0a1c;
+    --move-color:#79a7ff; --capture-color:#ff7878; --hurdle-color:#c890e8;
+    --hop-target:#6dd6a8; --ray-color:#79a7ff; --rider-color:#ffae5c;
+  }
 
-    .mini-card { display: flex; flex-direction: column; align-items: center; gap: 6px;
-      width: 280px; padding: 8px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; box-shadow: var(--shadow); margin: 0 auto; }
-    .mini-card .board { width: 100%; height: auto; display: block; border-radius: 4px;
-      overflow: hidden; background: var(--sq-light); }
-    .mini-name { font-size: 13px; font-weight: 500; text-align: center; color: var(--text); line-height: 1.2; }
-    .mini-betza { font-size: 11px; color: var(--text-soft); font-family: 'SF Mono','Menlo',monospace; text-align: center; line-height: 1.2; }
-    a.mini-betza { display: block; text-decoration: none; cursor: pointer; transition: color 0.12s ease; }
-    a.mini-betza:hover { color: var(--accent); }
-    /* Invented pieces keep the dashed border; the "· invented" name suffix is gone. */
-    .mini-card.invented { border-style: dashed; }
+  /* ---------- Base (restated, since site.css is not loaded) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--sans);background:var(--bg);color:var(--text);
+    line-height:1.55;-webkit-font-smoothing:antialiased;
+    transition:background .25s ease,color .25s ease;
+  }
+  a{color:var(--accent)}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
 
-    .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
-    .tab-btn { appearance: none; background: transparent; border: 0; padding: 8px 16px; font-size: 14px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-radius: 7px; font-family: inherit; transition: color 0.15s ease, background 0.15s ease; }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn[aria-selected="true"] { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-    .tab-count { display: inline-block; margin-left: 4px; padding: 1px 6px; font-size: 11px; font-weight: 600; color: var(--text-soft); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; line-height: 1.4; }
-    .tab-btn[aria-selected="true"] .tab-count { background: var(--surface); color: var(--text); }
-    section[role="tabpanel"] { display: none; }
-    section[role="tabpanel"].active { display: block; }
+  /* Larry's aura, sitting behind everything. */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.14), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.12), transparent 66%);
+  }
+  [data-theme="dark"] body::before{
+    background:
+      radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
+      radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
+  }
 
-    .unaffected-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 8px 0; }
-    .unaffected-note { color: var(--text-soft); font-size: 14px; max-width: 760px; margin: 0 0 20px 0; }
+  /* ---------- Hero ---------- */
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{
+    font-style:italic;
+    background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    /* background-clip:text crops to the element box and the italic slant pushes
+       the final glyph past it. Reserve a sliver so the trailing s keeps its tail. */
+    padding-right:.07em;
+  }
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
-    @media (max-width: 720px) {
-      h1 { font-size: 24px; }
-      .controls { gap: 8px; }
-      .mini-card { width: 140px; padding: 6px; }
-      .inversion-op { font-size: 22px; }
-      .inversion-table { border-spacing: 4px; }
-      .unaffected-grid { grid-template-columns: 1fr; }
-    }
+  /* ---------- Base + shell (restated: site.css is not loaded, same as
+       artefacts.html, the design pilot this page follows) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{overflow-x:clip}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;
+    -webkit-font-smoothing:antialiased;transition:background .25s ease,color .25s ease}
+  a{color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(720px 460px at 12% -6%,rgba(106,46,208,.14),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(111,148,32,.12),transparent 66%)}
+  [data-theme="dark"] body::before{
+    background:radial-gradient(720px 460px at 12% -6%,rgba(122,58,232,.30),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(168,208,72,.13),transparent 66%)}
 
-    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{font-style:italic;background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
+  .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
+
+  /* Same wall as promotion.html: wider than the --wrap column the hero and
+     footer use, so the cards come out the same size on both pages. */
+  /* No cap and a 10px gutter: the wall takes the whole window so the cards
+     come out as large as the solve allows. Hero and footer keep the --wrap
+     column - they are outside main and set their own max-width. */
+  main{max-width:none;margin:0 auto;padding:14px 10px 70px}
+  .board{width:100%;height:auto;display:block}
+  .betza-pill{font:600 11px/1.4 var(--mono);color:var(--text-soft);background:var(--surface-2);
+    border-radius:var(--rad-pill);padding:2px 9px;display:inline-block}
+  .dd-close{position:absolute;top:14px;right:14px;appearance:none;cursor:pointer;width:34px;height:34px;
+    border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft)}
+  .dd-close:hover{color:var(--accent);border-color:var(--accent)}
+
+  .foot{max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px}
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--text-soft);font-size:14px}
+  @media(max-width:600px){.foot{padding:20px 16px 40px}}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+
+/* deck motion: back-out curve, slight overshoot */
+
+
+/* ===== C / STACKS — each chain is a wallet stack; every name strip stays readable ===== */
+/* Chains flow instead of sitting in a grid: each one is only as wide as its
+   own arrangement needs, so a fanned chain takes a full hand's width while a
+   stacked one takes a single card's, and a row packs whatever fits. */
+/* ---------- Piece filter bar ----------
+   Full-bleed so the sticky blur reaches the window edges, content on the same
+   10px gutter as the wall below. Sticky only above 900px: with this many chips
+   it wraps to several rows and would eat a phone viewport. */
+.bar{display:flex;gap:7px;align-items:flex-start;flex-wrap:wrap;padding:4px 10px 0}
+/* The button IS the container: closed it hugs its own label, open it grows
+   into the panel holding the rows. The frame lives on the shell, so there is
+   one box the whole time rather than a button beside a list. */
+.fbox{display:inline-flex;align-items:flex-start;gap:14px;
+  width:max-content;max-width:100%;
+  border:1px solid var(--border);border-radius:8px;
+  background:linear-gradient(150deg,rgba(160,112,232,.06),rgba(24,16,48,.09) 48%),
+             color-mix(in srgb,var(--surface) 52%,transparent);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  box-shadow:inset 0 1px 0 rgba(239,234,255,.13)}
+@media (prefers-reduced-transparency:reduce){
+  .fbox{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+/* open, it takes the rest of the bar so the panel reaches the right edge */
+.fbox:has(.filt[aria-expanded="true"]){width:auto;flex:1 1 auto}
+.filt{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.09em;
+  text-transform:uppercase;padding:11px 14px;border:0;background:transparent;
+  color:var(--text-soft);display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
+  transition:color .18s var(--ease)}
+.fbox:hover .filt,.filt[aria-expanded="true"]{color:var(--text)}
+/* open, drop the label onto the first chip row's text line: 11 of grid padding
+   + 1 of chip border + 8 of chip padding */
+.filt[aria-expanded="true"]{padding-top:20px}
+/* how many are on, since the list itself is usually closed */
+.filt .n{font:700 9.5px/1 var(--mono);color:#141024;background:var(--lime);
+  border-radius:var(--rad-pill);padding:3px 6px}
+.filt .n:empty{display:none}
+/* Each column is its own 3-row group - a promotion chain, base over mid over
+   end - and the groups wrap. So the eleven columns sit in one band when there
+   is room and cut into two, then three, stacked bands as it narrows, without
+   ever scrolling sideways. */
+/* The groups sit in one grid rather than wrapping as flex items: uniform
+   tracks mean every column lines up whatever the width, instead of each band
+   sizing itself. Each group is still a chain stacked three deep, and the
+   column gap is what reads as the grouping. */
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
+  gap:8px;flex:1 1 auto;padding:11px 14px 11px 0}
+.chips[hidden]{display:none}
+/* while the frame is being animated it must not be flex-sized, and it clips so
+   the rows are revealed by the edge rather than reflowing behind it */
+.bar .fbox.sizing{flex:0 0 auto;overflow:hidden}
+.bar .fbox.sizing .chips{flex:0 0 auto}
+.bar{position:sticky;top:var(--nav-h);z-index:55}
+.bar:has(.filt[aria-expanded="true"]){backdrop-filter:blur(14px)}
+.chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
+  text-transform:uppercase;padding:8px 11px;border-radius:5px;text-align:center;
+  border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
+  transition:.18s var(--ease)}
+.chip:hover{color:var(--text);border-color:var(--violet-hi)}
+/* kept visible so the roster reads the same on every page, but inert */
+.chip[disabled]{opacity:.32;cursor:not-allowed;pointer-events:none}
+.chip[aria-pressed="true"]{background:var(--lime);border-color:transparent;color:#141024}
+.stk.is-out{display:none}
+@media(max-width:600px){
+  .bar{padding:2px 10px 0}
+  .fbox{flex-direction:column;align-items:stretch;gap:0}
+  .chips{padding:0 12px 12px;gap:14px 16px;
+    grid-template-columns:repeat(auto-fit,minmax(84px,1fr))}
+  .chip{font-size:9.5px;letter-spacing:.05em;padding:7px 9px}
+  .filt[aria-expanded="true"]{padding-top:11px}
+  /* the grid already scrolls sideways; nothing phone-specific left to do */
+}
+.decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
+  gap:34px 26px;padding-top:26px;
+  /* Card width is solved backwards from "three fanned chains per row": a fan is
+     3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
+     gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
+     narrow pages simply wrap to two rather than shrinking the cards to nothing. */
+  --cw-fit:clamp(144px, calc((100vw - 36px + 68px) / 9), 184px);
+  /* 1 is the three-per-row fit. Raising it trades a fusion per row for bigger
+     cards; at 1.2 the wall drops to two across. */
+  --card-scale:1;
+  --cw:calc(var(--cw-fit) * var(--card-scale));
+  /* fan step: card width less the ~20px overlap */
+  --spread:calc(var(--cw) - 20px)}
+/* the 26px is the stack's own cascade: 13px per tucked card */
+.stk{flex:0 0 auto;width:min(100%, calc(var(--cw) + 13px))}
+.stk:has(.deck.fan){width:min(100%, calc(var(--cw) + var(--spread)))}
+/* phones: no stack ritual, every hand arrives already fanned */
+@media(max-width:600px){
+  .decks{gap:22px 16px;--cw:132px;
+    --spread:min(112px, calc((100vw - 166px) / 2))}
+  /* .decks .deck: the later base rule pins height 346, specificity again */
+  .decks .deck{height:calc(var(--cw) + 72px)}
+  .decks .deck.fan{height:calc(var(--cw) + 40px)}
+  /* .deck .dcard outranks the later base .dcard rule; the media block sits
+     before it in source, so specificity has to carry the override */
+  .deck.fan .dcard{top:6px;transform:translateX(calc((var(--k) - .5) * var(--spread,164px)))}
+  /* the deep phone overlap puts most of each tucked card behind the front
+     card's frosted glass, which blurred them to nothing: solid cards here */
+  .deck .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+  /* tucked cards: name over stage, right-aligned into the visible sliver */
+  .deck .dcard .nm{height:38px;font-size:11.5px}
+  .deck:not(.fan) .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
+    justify-content:center;gap:2px;padding-right:8px}
+}
+.deck{position:relative;height:calc(var(--cw) + 78px);cursor:pointer;z-index:1}
+.deck.fan{height:calc(var(--cw) + 46px)}
+/* the header is in flow now: it has to hold the fan toggle beside the name */
+/* the label is part of the control: clicking it, or the padding round it,
+   works the button beside it */
+.stk-hd{display:flex;align-items:center;gap:9px;margin:0 0 4px;padding:5px 9px 5px 4px;
+  width:max-content;max-width:100%;border-radius:10px;cursor:pointer;
+  transition:background .18s var(--ease)}
+.stk-hd:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
+.stk-hd h3{margin:0;font:700 11px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent)}
+.fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
+  color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
+.fx:hover,.stk-hd:hover .fx{color:var(--lime)}
+/* One shared vector no longer describes this page: the deck's cards cross when
+   it collapses, because the product is last in the equation but first in the
+   stack. So each square carries both places — --i in the row, --j in the
+   cascade — and --t blends between them, 0 = row, 1 = cascade. The product's
+   square therefore travels across its neighbours exactly like the real card. */
+.fx rect{fill:var(--bg);stroke:currentColor;stroke-width:1.2;
+  transform:translate(
+    calc((1 - var(--t)) * (var(--i) - .5) * 7.6px + var(--t) * (var(--j) - .5) * 2.6px),
+    calc(var(--t) * (var(--j) - .5) * 2.2px));
+  transition:transform .32s var(--ease)}
+/* Registered so the blend can be interpolated: a bare custom property is not
+   animatable, and without this the hover loop would jump between the two
+   arrangements instead of sweeping through them. */
+@property --t{syntax:"<number>";inherits:true;initial-value:0}
+/* at rest the glyph shows where the click lands, not where the deck is: a
+   stacked deck offers the row, a fanned deck offers the cascade */
+.fx{--t:0}
+.stk:has(.deck.fan) .fx{--t:1}
+/* the section button offers the cascade while anything in the section is
+   still fanned, so it reads as "collapse these" until they all are */
+.kind:has(.deck.fan) .fx-all{--t:1}
+/* outside .bar on purpose: the blur is a backdrop-filter on that strip */
+.fx-row{padding:10px 10px 0 13px}
+/* on hover it plays the change back and forth, so the button demonstrates the
+   move rather than just naming its endpoint */
+@keyframes fx-swing{from{--t:0}to{--t:1}}
+.fx:hover,.stk-hd:hover .fx{animation:fx-swing .8s cubic-bezier(.45,.05,.55,.95) infinite alternate}
+.dcard{position:absolute;left:50%;width:var(--cw);margin-left:calc(var(--cw) / -2);
+  background:linear-gradient(150deg,rgba(160,112,232,.12),rgba(24,16,48,.18) 45%),
+             color-mix(in srgb,var(--surface) 46%,transparent);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  border:1px solid var(--violet-hi);border-radius:16px;padding:10px 10px 0;text-align:center;
+  /* base in front, later stages behind and lower: each card's bottom name
+     strip peeks below the card in front of it */
+  /* the stack slid out a little: each tucked card steps down AND right the
+     same amount, every deck alike */
+  top:calc(var(--d) * 44px);z-index:calc(3 - var(--d));
+  transform:translateX(calc((var(--d) - .5) * 13px));
+  transition:top .58s var(--spring),transform .58s var(--spring),border-color .2s ease;
+  box-shadow:inset 0 1px 0 rgba(239,234,255,.16),0 -12px 28px -18px rgba(0,0,0,.95)}
+@media (prefers-reduced-transparency:reduce){
+  .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+/* the two seams carry the equation: a + between the inputs, an = before the
+   product. Same geometry and reveal as the Promotions arrow, but plain text so
+   the two seams can differ and so the glyph inherits --lime per theme. */
+.dcard:not(:last-child)::after{
+  position:absolute;left:calc(100% - 29px);top:42%;
+  width:58px;height:58px;display:grid;place-items:center;
+  color:var(--lime);font:800 40px/1 var(--mono);
+  filter:drop-shadow(0 1px 4px rgba(252,240,216,.95)) drop-shadow(0 0 9px rgba(252,240,216,.85));
+  opacity:0;transform:translateY(-50%) scale(.55);
+  transition:opacity .3s var(--ease),transform .5s var(--spring);
+  pointer-events:none;z-index:5}
+[data-theme="dark"] .dcard:not(:last-child)::after{
+  filter:drop-shadow(0 2px 7px rgba(8,4,18,.95)) drop-shadow(0 0 10px rgba(8,4,18,.7))}
+.dcard:nth-of-type(1)::after{content:"\21C4"}
+.deck.fan .dcard:not(:last-child)::after{opacity:1;transform:translateY(-50%) scale(1)}
+/* fanned: the hand lies flat in equation order. z-index goes back to --k here
+   so each card paints over its right-hand neighbour — otherwise the = badge,
+   which lives inside the middle card, would be buried under the product. */
+.deck.fan .dcard{top:6px;z-index:calc(3 - var(--k));
+  transform:translateX(calc((var(--k) - .5) * var(--spread,164px)))}
+html{overflow-x:clip}
+.dcard .brd{border-radius:9px;overflow:hidden;display:block}
+.dcard .nm{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;font-weight:700;font-size:12.5px;line-height:1;height:44px;
+  padding:0 4px;text-align:center}
+.dcard .stg{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+/* colours off the artefact rarity ramp: the inputs share lime, the product is
+   violet. --r-rare, not --lime: the bright lime is 3.01:1 on cream and this
+   label is 8.5px, which needs 4.5:1 (see artefacts.html). */
+.dcard .stg{color:var(--r-uncommon)}
+/* the product is the one card that is not an input: lime edge, and it sits on
+   top of a collapsed stack */
+
+
+/* line close-up: the whole chain, left to right */
+dialog.line{border:0;padding:0;background:transparent;width:min(1004px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
+dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
+.line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
+  background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
+             color-mix(in srgb,var(--surface) 42%,transparent);
+  backdrop-filter:blur(26px) saturate(160%);
+  -webkit-backdrop-filter:blur(26px) saturate(160%);
+  border:1px solid rgba(239,234,255,.18);
+  box-shadow:inset 0 1px 0 rgba(239,234,255,.22),
+             inset 0 -1px 0 rgba(239,234,255,.06),
+             0 40px 90px -30px rgba(0,0,0,.85)}
+.line-in::after{content:"";position:absolute;inset:1px;border-radius:25px;pointer-events:none;
+  border:1px solid rgba(239,234,255,.07)}
+/* the glass needs something to refract: keep the page visible behind it */
+dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
+  backdrop-filter:blur(7px)!important;-webkit-backdrop-filter:blur(7px)!important}
+@media (prefers-reduced-transparency:reduce){
+  .line-in{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+.line-in h2{margin:0 0 26px;font-size:26px;letter-spacing:-.02em;color:var(--lime)}
+.line-lb{display:block;margin:0 0 7px;font:700 10px/1 var(--mono);
+  letter-spacing:.18em;text-transform:uppercase;color:var(--r-rare)}
+/* piece, rotation axis, piece */
+.line-row{display:grid;grid-template-columns:1fr auto 1fr;gap:34px;align-items:start}
+
+/* The axis is the proof: each diagram turned 45 degrees, the top one into the
+   piece on the right and the bottom one back into the piece on the left. */
+.line-axis{position:relative;display:flex;flex-direction:column;align-items:center;gap:0;width:220px}
+.line-axis .turn{color:var(--lime);flex:none;margin:0 0 2px}
+/* Pawn moves forward only, so turning its diagram turns "forward" with it and
+   lands nowhere near its Void twin - that pair swaps move for capture rather
+   than rotating, and gets the swap on its own. Driven by the behaviour, not
+   by the pair's name. */
+.line-axis.plain .turn{display:none}
+/* upright, with room for the swap to sit between rather than across them.
+   Explicit margins rather than a gap, since the colour pairs add a legend
+   above and below that wants far less air than the swap does. */
+.line-axis.plain{gap:0}
+.line-axis.plain .rot:not(.back){margin-bottom:56px}
+.line-axis .gswap{color:var(--lime);flex:none;margin:0 0 12px}
+.line-axis .gswap:last-child{margin:12px 0 0}
+/* the squares the other piece reaches, breathing */
+@keyframes chroma{0%,100%{opacity:0}50%{opacity:.82}}
+.line-axis .chroma{opacity:0;animation:chroma 2.2s ease-in-out infinite}
+.line-axis.plain .rot{width:158px;height:158px}
+.line-axis.plain .rot .board{width:158px;transform:none}
+.line-axis.plain .rot:hover .board{animation:none}
+/* these axes run taller than a board, so the boards come down to meet the
+   swap - measured, like the tilted pair above */
+.line-row:has(.plain) .line-p .board{margin-top:21px}
+.line-row:has(.gswap) .line-p .board{margin-top:54px}
+/* a 150px board rotated 45 spans its full 212px cell, so touching cells put
+   the diamonds point to point; the swap sits on that junction */
+.line-axis .swap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
+.line-axis .turn.back{transform:rotate(180deg);margin:2px 0 0}
+/* a square sweeps its diagonal when it turns, so the cell reserves 150 * sqrt2 */
+.line-axis .rot{width:212px;height:212px;display:grid;place-items:center;flex:none}
+.line-axis .rot .board{width:150px;max-width:none;margin:0;transform:rotate(45deg)}
+/* hovering replays the turn itself, back and forth */
+@keyframes tilt{from{transform:rotate(45deg)}to{transform:rotate(0)}}
+.line-axis .rot:hover .board{animation:tilt 1.5s cubic-bezier(.45,.05,.55,.95) infinite alternate}
+.line-axis .swap{color:var(--lime);font:800 38px/1 var(--mono);flex:none;
+  filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
+[data-theme="dark"] .line-axis .swap{filter:drop-shadow(0 2px 7px rgba(8,4,18,.95))}
+.line-p{text-align:center;min-width:0;position:relative}
+.line-p .board{max-width:230px;margin:0 auto}
+/* Under the diagram: name, then category + betza, then one tag per line down
+   the left; the description fills the right and spans all of them. Rows are
+   declared explicitly so the spanning cell cannot distribute its slack between
+   the left-hand lines. */
+.line-p{display:grid;grid-template-columns:auto minmax(0,1fr);
+  grid-template-rows:auto auto auto 1fr;column-gap:15px;row-gap:7px;align-content:start;
+  text-align:left}
+.line-p .board{grid-area:1/1/2/3;max-width:330px;margin:75px auto 8px}
+.line-p h3{grid-area:2/1/3/2;margin:0;font-size:17px;line-height:1.15;color:var(--text)}
+.line-p .bz-m,.line-p .fam-m{display:none}
+.line-p .meta{grid-area:3/1/4/2;margin:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+  font:700 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
+.line-p .meta b{color:var(--violet-hi)}
+.line-p .meta .bz{font:600 10.5px/1 var(--mono);letter-spacing:0;text-transform:none;
+  color:var(--lime);background:var(--surface-2);border-radius:var(--rad-pill);padding:3px 8px}
+/* one tag per row, so the column reads as a list beside the description */
+.line-p .bh{grid-area:4/1/5/2;display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:1px 0 0}
+.line-p .bh span{font:700 8.5px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid var(--border);border-radius:var(--rad-pill);padding:4px 8px;color:var(--text-soft)}
+.line-p .ds{grid-area:2/2/5/3;margin:0;font-size:12px;line-height:1.55;color:var(--text-soft)}
+@media(max-width:760px){
+  .line-row{grid-template-columns:1fr;gap:34px}
+  /* Stacked vertically the axis ate ~340px of a phone. Grid re-places it into
+     one band instead - a preview either side of the arrows - without touching
+     the source order the desktop column depends on. 76px sweeps 107. */
+  .line-axis{display:grid;width:auto;
+    grid-template-columns:max-content max-content;grid-template-rows:auto auto auto;
+    align-items:center;justify-items:center;justify-content:center;gap:2px 0}
+  .line-axis .turn:not(.back),.line-axis .gswap:first-child{grid-area:1/1/2/3}
+  .line-axis .turn.back,.line-axis .gswap:last-child{grid-area:3/1/4/3}
+  .line-axis .gswap{margin:0}
+  .line-axis .rot:not(.back){grid-area:2/1}
+  .line-axis .rot.back{grid-area:2/2}
+  .line-axis .swap{font-size:28px}
+  .line-axis .rot{width:min(calc(50vw - 36px),164px);height:min(calc(50vw - 36px),164px)}
+  .line-axis .rot .board{width:calc(min(calc(50vw - 36px),164px) / 1.415)}
+  .line-axis .turn{width:34px;height:18px}
+  .line-axis.plain{gap:2px 44px}
+  .line-axis.plain .rot:not(.back){margin-bottom:0}
+  .line-axis.plain .rot{width:min(calc(50vw - 54px),142px);height:min(calc(50vw - 54px),142px)}
+  .line-axis.plain .rot .board{width:min(calc(50vw - 54px),142px)}
+  /* nothing to line up beside: the axis is in the flow, not in a column */
+  .line-row .line-p .board{margin-top:0}
+  .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}
+  .line-in .dd-close{position:sticky;top:0;float:right;margin:0 0 -12px 0;
+    background:color-mix(in srgb,var(--surface) 82%,transparent);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:4}
+  .line-in h2{clear:none;padding-right:44px}
+  /* phone: each stage becomes board-beside-text, small diagram */
+  .line-row .line-p{display:grid;grid-template-columns:100px minmax(0,1fr);
+    grid-template-rows:auto auto auto;gap:9px 13px;text-align:left;align-items:start}
+  .line-row .line-p .board{max-width:100px;margin:0;grid-column:1;grid-row:1/3;align-self:start}
+  .line-row .line-p .ds{grid-column:2;grid-row:1;margin:0;font-size:11.5px;line-height:1.5}
+  .line-row .line-p .bh{grid-column:2;grid-row:2;flex-direction:row;flex-wrap:wrap;
+    justify-content:flex-start;margin:6px 0 0}
+  .line-row .line-p h3{grid-column:1/-1;grid-row:3;margin:0;font-size:15px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .line-row .line-p .bz-m{display:inline-block;font:600 10.5px/1.5 var(--mono);color:var(--lime);
+    background:var(--surface-2);border-radius:var(--rad-pill);padding:2px 9px}
+  .line-row .line-p .fam-m{display:inline-block;font:700 9px/1 var(--mono);letter-spacing:.12em;
+    text-transform:uppercase;color:var(--violet-hi)}
+  .line-row .line-p .meta{display:none}
+  .line-row .line-p .bh .bz{display:none}
+  .deck .dcard:not(:last-child)::after{width:32px;height:32px;left:calc(100% - 16px);font-size:25px}
+}
   </style>
 </head>
 <body>
-  <div id="site-nav" data-page="inversion"></div>
-  <header>
-    <h1><em>Inversions</em></h1>
-    <p class="intro">
-      A reference of the <strong>14 inversion pairs</strong> in NO-KINGS.
-    </p>
-    <div class="controls">
-      <div class="tabs" role="tablist" aria-label="Inversion view">
-        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-inversions" id="tabbtn-inversions">Inversions <span class="tab-count" id="count-inversions"></span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-unaffected" id="tabbtn-unaffected">Unaffected <span class="tab-count" id="count-unaffected"></span></button>
-      </div>
-    </div>
-  </header>
 
-  <main>
-    <section role="tabpanel" id="tab-inversions" aria-labelledby="tabbtn-inversions" class="active">
-      <div id="inversion-table"></div>
-    </section>
-    <section role="tabpanel" id="tab-unaffected" aria-labelledby="tabbtn-unaffected">
-      <p class="unaffected-note">These pieces look the same after a 45° ortho ↔ diagonal swap (or are otherwise self-inverse), so they have no distinct inverted form. They're listed here for completeness.</p>
-      <div class="unaffected-grid" id="unaffected-grid"></div>
-    </section>
-  </main>
+<div id="site-nav" data-page="inversion"></div>
 
-  <footer>
-    <p class="footer-page-line">14 Pairs of pieces that invert to one another — a 45° ortho ↔ diagonal swap of every atomic component.</p>
-    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-  </footer>
+<header class="hero">
+  <h1><em>Inversions</em></h1>
+  <p>Pairs of pieces that invert into one another: every straight move swapped for its diagonal twin, the whole set turned 45 degrees.</p>
+</header>
 
-  <script>
-  // ponytail: canonical data — inline copies drifted before (see CLAUDE.md)
-  const PIECES = PIECES_CODEX;
-  const INVERSIONS = INVERSION_PAIRS;
+<div class="bar" id="bar">
+  <div class="fbox">
+    <button class="filt" type="button" aria-expanded="false" aria-controls="chips">
+      Filters <span class="n"></span></button>
+    <div class="chips" id="chips" hidden></div>
+  </div>
+</div>
 
-  /* ============================================================
-   *  Inversion rendering (renderBoard/renderMove live in assets/board.js)
-   * ============================================================ */
+<div class="fx-row"><button class="fx fx-all" type="button" aria-pressed="true"></button></div>
 
-  function renderMiniCard(piece, invented) {
-    const betzaLine = piece.betza ? `<a class="mini-betza" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${piece.betza} in sandbox">${piece.betza}</a>` : '';
-    return `<div class="mini-card${invented ? ' invented' : ''}">
-      ${renderBoard(piece)}
-      <div class="mini-name">${piece.name}</div>
-      ${betzaLine}
-    </div>`;
+<main>
+  <div class="decks" id="decks"></div>
+</main>
+
+<footer class="foot">
+  <p class="foot-lead">14 pairs of pieces whose movement schemes are 45-degree rotations of one another — every straight move becomes a diagonal one and back.</p>
+  <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
+
+<script>
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const LOOKUP = {};
+PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
+const nm = id => LOOKUP[id] ? LOOKUP[id].name : id;
+
+// Ordered by promotion chain: the Pawn line's three pairs first, then each
+// other chain's three kept together, then the two pairs in no chain at all.
+// A pair often bridges two chains - Mage is the Mage line, Seer the Seer line -
+// so it sorts by the lower of the two, which is what holds each trio together.
+const STAGE_OF = {};
+PROMOTION_CHAINS.forEach((c, ci) => c.ids.forEach((id, si) => STAGE_OF[id] = { ci, si }));
+const chainKey = v => {
+  const a = STAGE_OF[v.lhs], b = STAGE_OF[v.rhs];
+  const ci = Math.min(a ? a.ci : 99, b ? b.ci : 99);
+  const si = a && a.ci === ci ? a.si : b && b.ci === ci ? b.si : 99;
+  return ci * 100 + si;
+};
+const PAIRS = [...INVERSION_PAIRS].sort((x, y) => chainKey(x) - chainKey(y));
+const IDS = v => [v.lhs, v.rhs];
+const LABEL = v => `${nm(v.lhs)} \u21C4 ${nm(v.rhs)}`;
+// the halves are peers, so both cards carry the family - which the data gives
+// them in common, since an inversion never crosses families
+const ROLES = v => [LOOKUP[v.lhs].family, LOOKUP[v.rhs].family];
+// two cards, the left half fronting the stack
+const DEPTH = [0, 1];
+
+const FX = `<svg viewBox="0 0 19 12" width="15" height="9" aria-hidden="true">
+  ${[1, 0].map(i =>
+    `<rect style="--i:${i};--j:${DEPTH[i]}" x="6" y="2.5" width="7" height="7" rx="1.8"/>`).join('')}
+  </svg>`;
+
+const stack = (v, i) => `<div class="stk" data-ids="${IDS(v).join(' ')}">
+     <div class="stk-hd">
+       <h3>${esc(LABEL(v))}</h3>
+       <button class="fx" type="button" aria-pressed="true"
+               aria-label="Stack the ${esc(LABEL(v))} cards">${FX}</button>
+     </div>
+     <div class="deck fan" tabindex="0" role="button" data-c="${i}"
+          aria-label="Open ${esc(nm(v.lhs))} inverted with ${esc(nm(v.rhs))}">
+     ${IDS(v).map((id, k) => {
+       const p = LOOKUP[id];
+       return `<div class="dcard${DEPTH[k] ? '' : ' front'}" style="--k:${k};--d:${DEPTH[k]}">
+         <span class="brd">${renderBoard(p)}</span>
+         <span class="nm">${esc(p.name)} <span class="stg">${esc(ROLES(v)[k])}</span></span></div>`;
+     }).join('')}
+     </div>
+   </div>`;
+
+$('#decks').innerHTML = PAIRS.map(stack).join('');
+
+function openPair(v) {
+  let dlg = document.getElementById('linedlg');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.className = 'line'; dlg.id = 'linedlg';
+    dlg.innerHTML = '<div class="line-in"><button class="dd-close">\u2715</button><div id="line-body"></div></div>';
+    document.body.appendChild(dlg);
+    dlg.querySelector('.dd-close').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
   }
+  // a forward-only piece cannot be shown rotating: turning its diagram turns
+  // "forward" with it. That pair gets upright boards and a square swap instead.
+  const has = b => IDS(v).some(id => (LOOKUP[id].behaviors || []).includes(b));
+  // forward-only: nothing rotates, the two squares swap instead
+  const flat = has('direction-restricted');
+  // one keeps its square colour, the other crosses: show the two lattices
+  const hue = has('color-bound') && has('color-changing');
+  const preview = flat ? marked : hue ? tinted(v) : rot;
+  document.getElementById('line-body').innerHTML =
+    `<span class="line-lb">${esc(LOOKUP[v.lhs].family)}</span>
+     <h2>${esc(LABEL(v))}</h2>
+     <div class="line-row">${[
+       piece(v.lhs),
+       `<div class="line-axis${flat || hue ? ' plain' : ''}">
+          ${hue ? GRID_TO : TURN}
+          <span class="rot">${preview(LOOKUP[v.lhs])}</span>
+          <span class="swap">\u21C4</span>
+          <span class="rot back">${preview(LOOKUP[v.rhs])}</span>
+          ${hue ? GRID_BACK : TURN_BACK}
+        </div>`,
+       piece(v.rhs),
+     ].join('')}</div>`;
+  dlg.showModal();
+}
 
-  function renderRow(inv) {
-    const left  = PIECES.find(p => p.id === inv.lhs);
-    const right = PIECES.find(p => p.id === inv.rhs);
-    const leftHtml  = left  ? renderMiniCard(left, inv.lhs.startsWith('inv-')) : `<div class="mini-card"><em>missing: ${inv.lhs}</em></div>`;
-    const rightHtml = right ? renderMiniCard(right, inv.rhs.startsWith('inv-')) : `<div class="mini-card"><em>missing: ${inv.rhs}</em></div>`;
-    return `<tr><td>${leftHtml}</td><td class="inversion-op">↔</td><td>${rightHtml}</td></tr>`;
-  }
+// the pair's own diagrams, re-used at preview size and turned 45 degrees:
+// the rotation is the whole claim this page makes, shown rather than described
+const rot = p => renderBoard(p).replace('class="board" role="img"', 'class="board rot-b" aria-hidden="true"');
 
-  document.getElementById('inversion-table').innerHTML = `<table class="inversion-table"><tbody>${INVERSIONS.map(renderRow).join('')}</tbody></table>`;
-  document.getElementById('count-inversions').textContent = INVERSIONS.length;
+// For a forward-only pair there is no rotation to show: what swaps is the
+// square ahead of the piece with the one to its right. Drawn in the board's
+// own coordinates so it scales with the diagram.
+const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
+     stroke-linecap="round" stroke-linejoin="round">
+  <path d="M162 108 A 20 20 0 0 1 198 108"/>
+  <path d="M190.4 105.4 L198 108 L200.6 100.4"/>
+  <path d="M159.4 100.4 L162 108 L169.6 105.4"/></g>`;
+// cropped to the squares the swap happens in, which zooms the mark with the
+// board since it lives in the same coordinate space
+// Qi Lin and its Void twin do not rotate into each other - one keeps to its
+// own square colour, the other crosses every move. Tinting the squares each
+// can actually land on puts the two lattices side by side.
+// The squares a piece's blue move markers land on. board.js draws those as
+// circles carrying --move-color, at svgCenter, so the square is the marker
+// floored to the 36 grid.
+const MOVE_SQUARES = p => {
+  const re = /<circle cx="([\d.]+)" cy="([\d.]+)"[^>]*--move-color[^>]*>/g;
+  const svg = renderBoard(p), out = [];
+  for (let m; (m = re.exec(svg)); )
+    out.push([Math.floor(+m[1] / 36) * 36, Math.floor(+m[2] / 36) * 36]);
+  return out;
+};
+const WASH = squares => `<g class="chroma">` + squares
+  .map(([x, y]) => `<rect x="${x}" y="${y}" width="36" height="36" fill="var(--lime)"/>`)
+  .join('') + `</g>`;
 
-  const UNAFFECTED_IDS = ["knight","queen","amazon","amazonrider","crown-princess","alibaba","bodyguard","gnu","buffalo","godzilla"];
-  const unaffectedGrid = document.getElementById('unaffected-grid');
-  unaffectedGrid.innerHTML = UNAFFECTED_IDS.map(id => {
-    const p = PIECES.find(x => x.id === id);
-    return p ? renderMiniCard(p, false) : `<div class="mini-card"><em>missing: ${id}</em></div>`;
-  }).join('');
-  document.getElementById('count-unaffected').textContent = UNAFFECTED_IDS.length;
+// Each board lights where the OTHER piece goes: the top one pulses the squares
+// its twin reaches, the bottom one the squares the first reaches. Since the two
+// keep to opposite colours, that is always the board's other shade.
+const tinted = v => {
+  const wash = { [v.lhs]: WASH(MOVE_SQUARES(LOOKUP[v.rhs])),
+                 [v.rhs]: WASH(MOVE_SQUARES(LOOKUP[v.lhs])) };
+  return p => {
+    const svg = rot(p);
+    // after the last board square, so the markers stay on top of the wash
+    const j = svg.indexOf('/>', svg.lastIndexOf('<rect')) + 2;
+    return svg.slice(0, j) + wash[p.id] + svg.slice(j);
+  };
+};
 
-  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
-  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
-  function activateTab(panelId) {
-    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
-    tabBtns.forEach(b => {
-      const sel = b.getAttribute('aria-controls') === panelId;
-      b.setAttribute('aria-selected', sel ? 'true' : 'false');
-      b.setAttribute('tabindex', sel ? '0' : '-1');
-    });
-    history.replaceState(null, '', '#' + panelId);
-  }
-  tabBtns.forEach((btn, i) => {
-    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
-        tabBtns[next].focus();
-        activateTab(tabBtns[next].getAttribute('aria-controls'));
-      }
-    });
+const marked = p => rot(p)
+  .replace('viewBox="0 0 324 324"', 'viewBox="72 36 180 180"')
+  .replace('</svg>', MARK + '</svg>');
+const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
+  <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"
+        stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M33.2 22.7 L42.0 21.0 L40.3 12.1" fill="none" stroke="currentColor" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
+
+// the legend for a colour flip: one grid handing over to the other
+const gridSwap = right => `<svg class="gswap" viewBox="0 0 56 20" width="56" height="20" aria-hidden="true">
+  <rect x="1" y="2" width="16" height="16" rx="3" fill="var(--sq-light)"
+        stroke="var(--text-dim)" stroke-width="1.2"/>
+  <circle cx="9" cy="10" r="3.5" fill="var(--move-color)"/>
+  <rect x="39" y="2" width="16" height="16" rx="3" fill="var(--sq-dark)"
+        stroke="var(--text-dim)" stroke-width="1.2"/>
+  <circle cx="47" cy="10" r="3.5" fill="var(--move-color)"/>
+  <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <path d="M22 10 h12"/>
+    <path d="${right ? 'M31 7 L34 10 L31 13' : 'M25 7 L22 10 L25 13'}"/>
+  </g></svg>`;
+const GRID_TO = gridSwap(true), GRID_BACK = gridSwap(false);
+
+const piece = id => ((p) => {
+       return `<div class="line-p">${renderBoard(p)}
+            <h3>${esc(p.name)}<span class="bz-m">${esc(p.betza || '')}</span></h3>
+            <p class="meta"><span class="bz">${esc(p.betza || '')}</span></p>
+            <span class="bh">${(p.behaviors || []).map(b =>
+              `<span>${esc(b)}</span>`).join('')}</span>
+            <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;
+})(LOOKUP[id]);
+
+// FLIP: chains that get pushed to another row are told where they used to be
+// and then animated back to zero, so a reflow reads as movement.
+function flip(mutate) {
+  const items = $$('.stk');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return mutate();
+  const before = items.map(el => el.getBoundingClientRect());
+  mutate();
+  items.forEach((el, i) => {
+    const now = el.getBoundingClientRect();
+    const dx = before[i].left - now.left, dy = before[i].top - now.top;
+    if (!dx && !dy) return;
+    el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }],
+               { duration: 560, easing: 'cubic-bezier(.3,1.45,.42,1)' });
   });
-  if (location.hash === '#tab-unaffected') activateTab('tab-unaffected');
+}
 
-  </script>
-  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
-  <script src="assets/nav.js"></script>
-  <script src="assets/theme.js"></script>
-  <script src="assets/tabs.js"></script>
+const main = document.querySelector('main');
+// aria for one stack's toggle, shared by the per-stack and section buttons
+function markFx(fx, fan, what) {
+  fx.setAttribute('aria-pressed', String(fan));
+  fx.setAttribute('aria-label', `${fan ? 'Stack' : 'Fan out'} ${what}`);
+}
+
+// Every non-Void piece on this page. The five Void halves get no chip of
+// their own - picking Pawn shows Pawn and its Void twin, since a pair matches
+// when either half is picked.
+// flattened rather than grouped by pair: five pairs have a Void half and so
+// contribute one chip, which left every such column with a hole
+const FILTER_IDS = PAIRS.flatMap(IDS).filter(id => !nm(id).startsWith('Void '));
+const bar = $('#bar'), filt = bar.querySelector('.filt');
+const chip = id =>
+  `<button class="chip" type="button" data-id="${id}" aria-pressed="false">${esc(nm(id))}</button>`;
+// pair order is kept, so a pair's two chips still sit next to each other
+$('#chips').innerHTML = FILTER_IDS.map(chip).join('');
+
+const wideEnough = matchMedia('(min-width:900px)').matches;
+filt.setAttribute('aria-expanded', String(wideEnough));
+$('#chips').hidden = !wideEnough;
+
+const picked = new Set();
+function applyFilter() {
+  filt.querySelector('.n').textContent = picked.size || '';
+  $$('.stk').forEach(s => s.classList.toggle('is-out',
+    picked.size > 0 && !s.dataset.ids.split(' ').some(id => picked.has(id))));
+}
+
+// Open and close by animating the frame between its two measured sizes.
+// Neither max-content width nor auto height interpolates, so the sizes are
+// read either side of the state change and played back with WAAPI.
+const fbox = bar.querySelector('.fbox'), chipsEl = $('#chips');
+function setOpen(open) {
+  const from = fbox.getBoundingClientRect();
+  let rowsW = open ? 0 : chipsEl.getBoundingClientRect().width;
+  filt.setAttribute('aria-expanded', String(open));
+  chipsEl.hidden = !open;
+  const to = fbox.getBoundingClientRect();
+  if (open) rowsW = chipsEl.getBoundingClientRect().width;
+  if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+  chipsEl.hidden = false;
+  chipsEl.style.width = rowsW + 'px';
+  bar.style.height = bar.getBoundingClientRect().height + 'px';
+  fbox.classList.add('sizing');
+  fbox.animate(
+    [{ width: `${from.width}px`, height: `${from.height}px` },
+     { width: `${to.width}px`,   height: `${to.height}px` }],
+    { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' }
+  ).finished.then(() => {
+    chipsEl.style.width = '';
+    chipsEl.hidden = !open;
+    bar.style.height = '';
+    fbox.classList.remove('sizing');
+  }).catch(() => {});
+}
+
+// one wall, so the toggle-all covers the page
+const allBtn = $('.fx-row .fx-all');
+allBtn.innerHTML = FX;
+markFx(allBtn, true, 'every pair');
+allBtn.addEventListener('click', () => {
+  const decks = $$('.deck');
+  const fan = !decks.some(d => d.classList.contains('fan'));
+  flip(() => {
+    decks.forEach(d => d.classList.toggle('fan', fan));
+    $$('.stk .fx').forEach(fx => markFx(fx, fan, 'the cards'));
+    markFx(allBtn, fan, 'every pair');
+  });
+});
+
+bar.addEventListener('click', e => {
+  if (e.target.closest('.filt')) {
+    setOpen(filt.getAttribute('aria-expanded') !== 'true');
+    return;
+  }
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const on = chip.getAttribute('aria-pressed') !== 'true';
+  chip.setAttribute('aria-pressed', String(on));
+  picked[on ? 'add' : 'delete'](chip.dataset.id);
+  applyFilter();
+});
+
+main.addEventListener('click', e => {
+  // the header counts as the button: same toggle from the label or its padding
+  const hd = e.target.closest('.stk-hd');
+  const fx = e.target.closest('.fx') || (hd && hd.querySelector('.fx'));
+  if (fx) {
+    const deck = fx.closest('.stk').querySelector('.deck');
+    flip(() => markFx(fx, deck.classList.toggle('fan'), 'the cards'));
+    return;
+  }
+  const deck = e.target.closest('.deck');
+  if (deck) openPair(PAIRS[+deck.dataset.c]);
+});
+main.addEventListener('keydown', e => {
+  const deck = e.target.closest('.deck');
+  if (deck && (e.key === 'Enter' || e.key === ' ')) {
+    e.preventDefault(); openPair(PAIRS[+deck.dataset.c]);
+  }
+});
+</script>
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
 </body>
 </html>

@@ -209,7 +209,8 @@
    the rows are revealed by the edge rather than reflowing behind it */
 .bar .fbox.sizing{flex:0 0 auto;overflow:hidden}
 .bar .fbox.sizing .chips{flex:0 0 auto}
-.bar{position:sticky;top:var(--nav-h);z-index:55;backdrop-filter:blur(14px)}
+.bar{position:sticky;top:var(--nav-h);z-index:55}
+.bar:has(.filt[aria-expanded="true"]){backdrop-filter:blur(14px)}
 .chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
   text-transform:uppercase;padding:8px 11px;border-radius:5px;text-align:center;
   border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
@@ -259,7 +260,7 @@
   .deck .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
   /* tucked cards: name over stage, right-aligned into the visible sliver */
   .deck .dcard .nm{height:38px;font-size:11.5px}
-  .deck .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
+  .deck:not(.fan) .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
     justify-content:center;gap:2px;padding-right:8px}
 }
 .deck{position:relative;height:calc(var(--cw) + 122px);cursor:pointer;z-index:1}
@@ -647,6 +648,7 @@ function setOpen(open) {
   // grid would re-column itself on every frame as the frame resizes
   chipsEl.hidden = false;
   chipsEl.style.width = rowsW + 'px';
+  bar.style.height = bar.getBoundingClientRect().height + 'px';
   fbox.classList.add('sizing');
   fbox.animate(
     [{ width: `${from.width}px`, height: `${from.height}px` },
@@ -655,6 +657,7 @@ function setOpen(open) {
   ).finished.then(() => {
     chipsEl.style.width = '';
     chipsEl.hidden = !open;
+    bar.style.height = '';
     fbox.classList.remove('sizing');
   }).catch(() => {});
 }

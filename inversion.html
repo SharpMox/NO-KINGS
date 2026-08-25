@@ -209,6 +209,7 @@
 .bar .fbox.sizing{flex:0 0 auto;overflow:hidden}
 .bar .fbox.sizing .chips{flex:0 0 auto}
 .bar{position:sticky;top:var(--nav-h);z-index:55}
+.bar:has(.filt[aria-expanded="true"]){backdrop-filter:blur(14px)}
 .chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
   text-transform:uppercase;padding:8px 11px;border-radius:5px;text-align:center;
   border:1px solid var(--border);background:var(--surface);color:var(--text-soft);

@@ -11,7 +11,7 @@
     h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
     .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
 
-    main { max-width: var(--wrap); margin: 0 auto; padding: 0 24px 64px; }
+    main { max-width: none; margin: 0 auto; padding: 0 10px 64px; }
 
     .betza-page { max-width: 720px; margin: 0 auto; color: var(--text); }
     .betza-page h3 { margin: 20px 0 6px 0; font-size: 18px; font-weight: 600; }
@@ -58,7 +58,7 @@
     .betza-active li .betza-active-name { color: var(--text); }
 
     /* ============== Sandbox + side-by-side layout ============== */
-    .betza-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; max-width: var(--wrap); margin: 0 auto; padding: 32px 24px 64px; }
+    .betza-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; max-width: none; margin: 0 auto; padding: 32px 10px 64px; }
     @media (max-width: 960px) { .betza-layout { grid-template-columns: minmax(0, 1fr); } }
     .sandbox { position: sticky; top: calc(var(--nav-h) + 20px); align-self: start; max-height: calc(100vh - var(--nav-h) - 36px); overflow-y: auto; }
     @media (max-width: 960px) { .sandbox { position: static; max-height: none; overflow-y: visible; } }

@@ -259,7 +259,7 @@
   .deck .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
   /* tucked cards: name over stage, right-aligned into the visible sliver */
   .deck .dcard .nm{height:38px;font-size:11.5px}
-  .deck .dcard:not(:first-child) .nm{flex-direction:column;align-items:flex-end;
+  .deck .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
     justify-content:center;gap:2px;padding-right:8px}
 }
 .deck{position:relative;height:calc(var(--cw) + 122px);cursor:pointer;z-index:1}
@@ -536,7 +536,7 @@ const stack = (f, i) => `<div class="stk" data-ids="${IDS(f).join(' ')}">
           aria-label="Open ${esc(nm(f.lhs))} plus ${esc(nm(f.rhs))} equals ${esc(nm(f.out))}">
      ${IDS(f).map((id, k) => {
        const p = LOOKUP[id];
-       return `<div class="dcard" style="--k:${k};--d:${DEPTH[k]}">
+       return `<div class="dcard${DEPTH[k] ? '' : ' front'}" style="--k:${k};--d:${DEPTH[k]}">
          <span class="brd">${renderBoard(p)}</span>
          <span class="nm">${esc(p.name)} <span class="stg">${ROLES(f)[k]}</span></span></div>`;
      }).join('')}

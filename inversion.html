@@ -10,6 +10,8 @@
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/inversions.js"></script>
+  <!-- chain order for the wall; no inversion data comes from here -->
+  <script src="data/promotions.js"></script>
   <style>
   /* ============================================================
    *  Inversions — every pair is a wallet stack of two cards. The halves are
@@ -510,7 +512,19 @@ const LOOKUP = {};
 PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
 const nm = id => LOOKUP[id] ? LOOKUP[id].name : id;
 
-const PAIRS = INVERSION_PAIRS;
+// Ordered by promotion chain: the Pawn line's three pairs first, then each
+// other chain's three kept together, then the two pairs in no chain at all.
+// A pair often bridges two chains - Mage is the Mage line, Seer the Seer line -
+// so it sorts by the lower of the two, which is what holds each trio together.
+const STAGE_OF = {};
+PROMOTION_CHAINS.forEach((c, ci) => c.ids.forEach((id, si) => STAGE_OF[id] = { ci, si }));
+const chainKey = v => {
+  const a = STAGE_OF[v.lhs], b = STAGE_OF[v.rhs];
+  const ci = Math.min(a ? a.ci : 99, b ? b.ci : 99);
+  const si = a && a.ci === ci ? a.si : b && b.ci === ci ? b.si : 99;
+  return ci * 100 + si;
+};
+const PAIRS = [...INVERSION_PAIRS].sort((x, y) => chainKey(x) - chainKey(y));
 const IDS = v => [v.lhs, v.rhs];
 const LABEL = v => `${nm(v.lhs)} \u21C4 ${nm(v.rhs)}`;
 // the halves are peers, so both cards carry the family - which the data gives

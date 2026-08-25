@@ -259,7 +259,7 @@
   .deck .dcard{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
   /* tucked cards: name over stage, right-aligned into the visible sliver */
   .deck .dcard .nm{height:38px;font-size:11.5px}
-  .deck .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
+  .deck:not(.fan) .dcard:not(.front) .nm{flex-direction:column;align-items:flex-end;
     justify-content:center;gap:2px;padding-right:8px}
 }
 .deck{position:relative;height:calc(var(--cw) + 122px);cursor:pointer;z-index:1}

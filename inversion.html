@@ -454,13 +454,13 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis .rot:not(.back){grid-area:2/1}
   .line-axis .rot.back{grid-area:2/2}
   .line-axis .swap{font-size:28px}
-  .line-axis .rot{width:107px;height:107px}
-  .line-axis .rot .board{width:76px}
+  .line-axis .rot{width:min(calc(50vw - 36px),164px);height:min(calc(50vw - 36px),164px)}
+  .line-axis .rot .board{width:calc(min(calc(50vw - 36px),164px) / 1.415)}
   .line-axis .turn{width:34px;height:18px}
   .line-axis.plain{gap:2px 44px}
   .line-axis.plain .rot:not(.back){margin-bottom:0}
-  .line-axis.plain .rot{width:104px;height:104px}
-  .line-axis.plain .rot .board{width:104px}
+  .line-axis.plain .rot{width:min(calc(50vw - 54px),142px);height:min(calc(50vw - 54px),142px)}
+  .line-axis.plain .rot .board{width:min(calc(50vw - 54px),142px)}
   /* nothing to line up beside: the axis is in the flow, not in a column */
   .line-row .line-p .board{margin-top:0}
   .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}

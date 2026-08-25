@@ -218,6 +218,10 @@
    stacked deck offers the row, a fanned deck offers the cascade */
 .fx{--t:0}
 .stk:has(.deck.fan) .fx{--t:1}
+/* the section button offers the cascade while anything in the section is
+   still fanned, so it reads as "collapse these" until they all are */
+.kind:has(.deck.fan) .fx-all{--t:1}
+.fx-all{align-self:center;margin-left:-3px}
 /* on hover it plays the change back and forth, so the button demonstrates the
    move rather than just naming its endpoint */
 @keyframes fx-swing{from{--t:0}to{--t:1}}
@@ -395,12 +399,14 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 </header>
 
 <main>
-  <section class="kind" id="additive">
-    <h2 class="kind-hd">Additive <span class="kind-n"></span></h2>
+  <section class="kind" id="synergistic">
+    <h2 class="kind-hd">Synergistic <span class="kind-n"></span>
+      <button class="fx fx-all" type="button" aria-pressed="true"></button></h2>
     <div class="decks"></div>
   </section>
-  <section class="kind" id="synergistic">
-    <h2 class="kind-hd">Synergistic <span class="kind-n"></span></h2>
+  <section class="kind" id="additive">
+    <h2 class="kind-hd">Additive <span class="kind-n"></span>
+      <button class="fx fx-all" type="button" aria-pressed="true"></button></h2>
     <div class="decks"></div>
   </section>
 </main>
@@ -454,10 +460,13 @@ const stack = (f, i) => `<div class="stk">
    </div>`;
 
 // counts come from the data, never hardcoded
+$$('.fx-all').forEach(b => { b.innerHTML = FX; });
+
 for (const kind of ['additive', 'synergistic']) {
   const items = ALL.map((f, i) => [f, i]).filter(([f]) => f.kind === kind);
   $(`#${kind} .decks`).innerHTML = items.map(([f, i]) => stack(f, i)).join('');
   $(`#${kind} .kind-n`).textContent = items.length;
+  markFx($(`#${kind} .fx-all`), true, `every ${kind} fusion`);
 }
 
 const OPS = ['+', '='];
@@ -504,15 +513,30 @@ function flip(mutate) {
 }
 
 const main = document.querySelector('main');
+// aria for one stack's toggle, shared by the per-stack and section buttons
+function markFx(fx, fan, what) {
+  fx.setAttribute('aria-pressed', String(fan));
+  fx.setAttribute('aria-label', `${fan ? 'Stack' : 'Fan out'} ${what}`);
+}
+
 main.addEventListener('click', e => {
+  // section button first: it carries .fx too, and has no .stk to look up
+  const all = e.target.closest('.fx-all');
+  if (all) {
+    const sec = all.closest('.kind');
+    const decks = $$(`#${sec.id} .deck`);
+    const fan = !decks.some(d => d.classList.contains('fan'));
+    flip(() => {
+      decks.forEach(d => d.classList.toggle('fan', fan));
+      $$(`#${sec.id} .stk .fx`).forEach(fx => markFx(fx, fan, 'the cards'));
+      markFx(all, fan, `every ${sec.id} fusion`);
+    });
+    return;
+  }
   const fx = e.target.closest('.fx');
   if (fx) {
     const deck = fx.closest('.stk').querySelector('.deck');
-    flip(() => {
-      const fan = deck.classList.toggle('fan');
-      fx.setAttribute('aria-pressed', String(fan));
-      fx.setAttribute('aria-label', `${fan ? 'Stack' : 'Fan out'} the cards`);
-    });
+    flip(() => markFx(fx, deck.classList.toggle('fan'), 'the cards'));
     return;
   }
   const deck = e.target.closest('.deck');

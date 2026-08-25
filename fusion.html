@@ -381,9 +381,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 @media (prefers-reduced-transparency:reduce){
   .line-in{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
-.line-in h2{margin:0 0 16px;font-size:26px;letter-spacing:-.02em;
-  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.line-in h2 .op{color:var(--text-dim);font:800 21px/1 var(--mono)}
+.line-in h2{margin:0 0 16px;font-size:26px;letter-spacing:-.02em;color:var(--lime)}
 .line-lb{display:block;margin:0 0 7px;font:700 10px/1 var(--mono);
   letter-spacing:.18em;text-transform:uppercase;color:var(--r-rare)}
 .line-lb.syn-lb{color:var(--r-legendary)}
@@ -553,7 +551,6 @@ for (const kind of ['additive', 'synergistic']) {
   markFx($(`#${kind} .fx-all`), false, `every ${kind} fusion`);
 }
 
-const OPS = ['+', '='];
 function openFusion(f) {
   let dlg = document.getElementById('linedlg');
   if (!dlg) {
@@ -566,8 +563,7 @@ function openFusion(f) {
   }
   document.getElementById('line-body').innerHTML =
     `<span class="line-lb${f.kind === 'synergistic' ? ' syn-lb' : ''}">${f.kind}</span>
-     <h2>${IDS(f).map((id, k) =>
-       `${k ? `<span class="op">${OPS[k - 1]}</span>` : ''}<span>${esc(nm(id))}</span>`).join('')}</h2>
+     <h2>${esc(nm(f.out))}</h2>
      <div class="line-row">${IDS(f).map(id => {
        const p = LOOKUP[id];
        return `<div class="line-p">${renderBoard(p)}

@@ -163,15 +163,13 @@
 /* The button IS the container: closed it hugs its own label, open it grows
    into the panel holding the rows. The frame lives on the shell, so there is
    one box the whole time rather than a button beside a list. */
-.fbox{display:inline-flex;align-items:center;gap:14px;
+.fbox{display:inline-flex;align-items:flex-start;gap:14px;
   width:max-content;max-width:100%;
-  border:1px solid var(--border);border-radius:8px;background:var(--surface);
-  transition:border-color .18s var(--ease)}
+  border:1px solid var(--border);border-radius:8px;background:var(--surface)}
 /* open, it takes the rest of the bar so the panel reaches the right edge */
 .fbox:has(.filt[aria-expanded="true"]){width:auto;flex:1 1 auto}
-.fbox:hover,.fbox:has(.filt[aria-expanded="true"]){border-color:var(--violet-hi)}
 .filt{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.09em;
-  text-transform:uppercase;padding:11px 14px;border:0;background:transparent;
+  text-transform:uppercase;padding:20px 14px 11px;border:0;background:transparent;
   color:var(--text-soft);display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
   transition:color .18s var(--ease)}
 .fbox:hover .filt,.filt[aria-expanded="true"]{color:var(--text)}

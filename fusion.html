@@ -204,10 +204,11 @@
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
   gap:16px 20px;flex:1 1 auto;padding:11px 14px 11px 0}
 .cgroup{display:grid;grid-template-rows:repeat(3,auto);gap:4px}
-.chips[hidden]{display:none;opacity:0;translate:0 -5px}
-.chips{opacity:1;translate:0 0;
-  transition:opacity .26s var(--ease),translate .26s var(--ease),display .26s allow-discrete}
-@starting-style{.chips:not([hidden]){opacity:0;translate:0 -5px}}
+.chips[hidden]{display:none}
+/* while the frame is being animated it must not be flex-sized, and it clips so
+   the rows are revealed by the edge rather than reflowing behind it */
+.bar .fbox.sizing{flex:0 0 auto;overflow:hidden}
+.bar .fbox.sizing .chips{flex:0 0 auto}
 .bar{position:sticky;top:var(--nav-h);z-index:55;backdrop-filter:blur(14px)}
 .chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
   text-transform:uppercase;padding:8px 11px;border-radius:5px;text-align:center;
@@ -632,11 +633,39 @@ function applyFilter() {
     picked.size > 0 && !s.dataset.ids.split(' ').some(id => picked.has(id))));
 }
 
+// Open and close by animating the frame between its two measured sizes.
+// Neither max-content width nor auto height interpolates, so the sizes are
+// read either side of the state change and played back with WAAPI.
+const fbox = bar.querySelector('.fbox'), chipsEl = $('#chips');
+function setOpen(open) {
+  const from = fbox.getBoundingClientRect();
+  // the width the rows have while open, captured whichever way we are going
+  let rowsW = open ? 0 : chipsEl.getBoundingClientRect().width;
+  filt.setAttribute('aria-expanded', String(open));
+  chipsEl.hidden = !open;
+  const to = fbox.getBoundingClientRect();
+  if (open) rowsW = chipsEl.getBoundingClientRect().width;
+  if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+
+  // keep the rows painted and at their open width for the whole move, or the
+  // grid would re-column itself on every frame as the frame resizes
+  chipsEl.hidden = false;
+  chipsEl.style.width = rowsW + 'px';
+  fbox.classList.add('sizing');
+  fbox.animate(
+    [{ width: `${from.width}px`, height: `${from.height}px` },
+     { width: `${to.width}px`,   height: `${to.height}px` }],
+    { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' }
+  ).finished.then(() => {
+    chipsEl.style.width = '';
+    chipsEl.hidden = !open;
+    fbox.classList.remove('sizing');
+  }).catch(() => {});
+}
+
 bar.addEventListener('click', e => {
   if (e.target.closest('.filt')) {
-    const open = filt.getAttribute('aria-expanded') !== 'true';
-    filt.setAttribute('aria-expanded', String(open));
-    $('#chips').hidden = !open;
+    setOpen(filt.getAttribute('aria-expanded') !== 'true');
     return;
   }
   const chip = e.target.closest('.chip');

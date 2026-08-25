@@ -395,12 +395,9 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-axis.plain .rot:not(.back){margin-bottom:56px}
 .line-axis .gswap{color:var(--lime);flex:none;margin:0 0 12px}
 .line-axis .gswap:last-child{margin:12px 0 0}
-/* One lattice lights and dies, then the other, on repeat. Half a cycle of
-   negative delay puts the second beat in the back half rather than making it
-   wait a turn before it first appears. */
-@keyframes chroma{0%{opacity:0}10%{opacity:.46}32%{opacity:.46}45%{opacity:0}100%{opacity:0}}
-.line-axis .chroma{opacity:0;animation:chroma 3.6s ease-in-out infinite}
-.line-axis .chroma.b{animation-delay:-1.8s}
+/* the squares the other piece reaches, breathing */
+@keyframes chroma{0%,100%{opacity:0}50%{opacity:.5}}
+.line-axis .chroma{opacity:0;animation:chroma 2.2s ease-in-out infinite}
 .line-axis.plain .rot{width:158px;height:158px}
 .line-axis.plain .rot .board{width:158px;transform:none}
 .line-axis.plain .rot:hover .board{animation:none}
@@ -624,27 +621,31 @@ const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
 // Qi Lin and its Void twin do not rotate into each other - one keeps to its
 // own square colour, the other crosses every move. Tinting the squares each
 // can actually land on puts the two lattices side by side.
-const CHROMA = (par, beat) => {
-  let r = '';
-  for (let cx = 0; cx < 9; cx++)
-    for (let cy = 0; cy < 9; cy++)
-      if ((cx + cy) % 2 === par)
-        r += `<rect x="${cx * 36}" y="${cy * 36}" width="36" height="36" fill="var(--lime)"/>`;
-  return `<g class="chroma ${beat}">${r}</g>`;
+// The squares a piece's blue move markers land on. board.js draws those as
+// circles carrying --move-color, at svgCenter, so the square is the marker
+// floored to the 36 grid.
+const MOVE_SQUARES = p => {
+  const re = /<circle cx="([\d.]+)" cy="([\d.]+)"[^>]*--move-color[^>]*>/g;
+  const svg = renderBoard(p), out = [];
+  for (let m; (m = re.exec(svg)); )
+    out.push([Math.floor(+m[1] / 36) * 36, Math.floor(+m[2] / 36) * 36]);
+  return out;
 };
-// the piece stands on the centre square, whose parity is 0, so a colour-bound
-// piece lands on 0 and a colour-changing one on 1
-const parOf = p => ((p.behaviors || []).includes('color-changing') ? 1 : 0);
-// Both boards carry both lattices and run the same beat: the top piece's
-// squares light, fade, then the bottom piece's, fade, over and over. Showing
-// it on each board is what makes the two comparable.
+const WASH = squares => `<g class="chroma">` + squares
+  .map(([x, y]) => `<rect x="${x}" y="${y}" width="36" height="36" fill="var(--lime)"/>`)
+  .join('') + `</g>`;
+
+// Each board lights where the OTHER piece goes: the top one pulses the squares
+// its twin reaches, the bottom one the squares the first reaches. Since the two
+// keep to opposite colours, that is always the board's other shade.
 const tinted = v => {
-  const wash = CHROMA(parOf(LOOKUP[v.lhs]), 'a') + CHROMA(parOf(LOOKUP[v.rhs]), 'b');
+  const wash = { [v.lhs]: WASH(MOVE_SQUARES(LOOKUP[v.rhs])),
+                 [v.rhs]: WASH(MOVE_SQUARES(LOOKUP[v.lhs])) };
   return p => {
     const svg = rot(p);
     // after the last board square, so the markers stay on top of the wash
     const j = svg.indexOf('/>', svg.lastIndexOf('<rect')) + 2;
-    return svg.slice(0, j) + wash + svg.slice(j);
+    return svg.slice(0, j) + wash[p.id] + svg.slice(j);
   };
 };
 

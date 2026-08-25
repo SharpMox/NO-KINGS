@@ -287,7 +287,9 @@
 .stk:has(.deck.fan) .fx{--dx:2.6px;--dy:2.2px}
 /* the bar button offers the cascade while anything is still fanned */
 body:has(.deck.fan) .fx-all{--dx:2.6px;--dy:2.2px}
-.fx-row{flex:0 0 100%;padding:9px 0 2px 3px}
+/* outside .bar on purpose: the blur is a backdrop-filter on that strip, so
+   anything inside it would be covered by the smear */
+.fx-row{padding:10px 10px 0 13px}
 /* on hover it plays the change back and forth, so the button demonstrates the
    move rather than just naming its endpoint */
 @keyframes fx-swing{from{--dx:7.6px;--dy:0px}to{--dx:2.6px;--dy:2.2px}}
@@ -442,8 +444,8 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
       Filters <span class="n"></span></button>
     <div class="chips" id="chips" hidden></div>
   </div>
-  <div class="fx-row"><button class="fx fx-all" type="button" aria-pressed="true"></button></div>
 </div>
+<div class="fx-row"><button class="fx fx-all" type="button" aria-pressed="true"></button></div>
 
 <main>
   <div class="decks" id="decks"></div>
@@ -559,8 +561,18 @@ const FILTER_IDS = [...CHAIN_IDS, ...PIECES_CODEX.map(p => p.id)
   .filter(id => !CHAIN_IDS.includes(id) && !nm(id).startsWith('Void '))
   .sort((a, b) => nm(a).localeCompare(nm(b)))];
 const bar = $('#bar'), filt = bar.querySelector('.filt');
-bar.querySelector('.fx-all').innerHTML = FX;
-markFx(bar.querySelector('.fx-all'), true, 'every chain');
+const allBtn = $('.fx-row .fx-all');
+allBtn.innerHTML = FX;
+markFx(allBtn, true, 'every chain');
+allBtn.addEventListener('click', () => {
+  const decks = $$('.deck');
+  const fan = !decks.some(d => d.classList.contains('fan'));
+  flip(() => {
+    decks.forEach(d => d.classList.toggle('fan', fan));
+    $$('.stk .fx').forEach(fx => markFx(fx, fan, 'the cards'));
+    markFx(allBtn, fan, 'every chain');
+  });
+});
 const chip = id =>
   `<button class="chip" type="button" data-id="${id}" aria-pressed="false"` +
   `${PRESENT.has(id) ? '' : ' disabled'}>${esc(nm(id))}</button>`;
@@ -624,15 +636,6 @@ bar.addEventListener('click', e => {
     applyFilter();
     return;
   }
-  const all = e.target.closest('.fx-all');
-  if (!all) return;
-  const decks = $$('.deck');
-  const fan = !decks.some(d => d.classList.contains('fan'));
-  flip(() => {
-    decks.forEach(d => d.classList.toggle('fan', fan));
-    $$('.stk .fx').forEach(fx => markFx(fx, fan, 'the cards'));
-    markFx(all, fan, 'every chain');
-  });
 });
 
 $('#decks').addEventListener('click', e => {

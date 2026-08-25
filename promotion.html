@@ -287,7 +287,7 @@
 .stk:has(.deck.fan) .fx{--dx:2.6px;--dy:2.2px}
 /* the bar button offers the cascade while anything is still fanned */
 body:has(.deck.fan) .fx-all{--dx:2.6px;--dy:2.2px}
-.fx-all{margin:8px 4px 0 0}   /* onto the closed button's centre line */
+.fx-row{flex:0 0 100%;padding:9px 0 2px 3px}
 /* on hover it plays the change back and forth, so the button demonstrates the
    move rather than just naming its endpoint */
 @keyframes fx-swing{from{--dx:7.6px;--dy:0px}to{--dx:2.6px;--dy:2.2px}}
@@ -437,12 +437,12 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 </header>
 
 <div class="bar" id="bar">
-  <button class="fx fx-all" type="button" aria-pressed="true"></button>
   <div class="fbox">
     <button class="filt" type="button" aria-expanded="false" aria-controls="chips">
       Filters <span class="n"></span></button>
     <div class="chips" id="chips" hidden></div>
   </div>
+  <div class="fx-row"><button class="fx fx-all" type="button" aria-pressed="true"></button></div>
 </div>
 
 <main>

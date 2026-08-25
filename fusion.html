@@ -10,6 +10,8 @@
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/fusions.js"></script>
+  <!-- chain order for the filter grid; no fusion data comes from here -->
+  <script src="data/promotions.js"></script>
   <style>
   /* ============================================================
    *  Fusions — every fusion is a wallet stack of three cards read as an
@@ -172,13 +174,20 @@
 .filt .n{font:700 9.5px/1 var(--mono);color:#141024;background:var(--lime);
   border-radius:var(--rad-pill);padding:3px 6px}
 .filt .n:empty{display:none}
-.chips{display:flex;flex-wrap:wrap;gap:7px;flex:1 1 100%;margin-top:3px}
+/* Three rows filled column by column: a promotion chain per column, base over
+   mid over end, then the pieces belonging to no chain fill the columns after
+   them. 33 pieces is exactly 11 columns. Scrolls sideways rather than
+   wrapping, since column flow has no wrap. */
+.chips{display:grid;grid-template-rows:repeat(3,auto);grid-auto-flow:column;
+  grid-auto-columns:max-content;gap:4px 5px;flex:1 1 100%;margin-top:3px;
+  overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
 .chips[hidden]{display:none}
 @media (min-width:900px){
   .bar{position:sticky;top:var(--nav-h);z-index:55;backdrop-filter:blur(14px)}
 }
-.chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
-  text-transform:uppercase;padding:9px 12px;border-radius:var(--rad-pill);
+.chip{appearance:none;cursor:pointer;font:700 9px/1 var(--mono);letter-spacing:.01em;
+  text-transform:uppercase;padding:6px 8px;border-radius:5px;text-align:left;
   border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
   transition:.18s var(--ease)}
 .chip:hover{color:var(--text);border-color:var(--violet-hi)}
@@ -188,10 +197,7 @@
 .stk.is-out{display:none}
 @media(max-width:600px){
   .bar{padding:2px 10px 12px}
-  /* the chips scroll as one strip rather than stacking eleven rows deep */
-  .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto}
+  /* the grid already scrolls sideways; nothing phone-specific left to do */
 }
 .decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
   gap:34px 26px;padding-top:26px;
@@ -569,9 +575,12 @@ function markFx(fx, fan, what) {
 // The whole non-Void roster on every page, so the list reads the same
 // everywhere; pieces this page never shows are rendered but disabled.
 const PRESENT = new Set(ALL.flatMap(IDS));
-const FILTER_IDS = PIECES_CODEX.map(p => p.id)
-  .filter(id => !nm(id).startsWith('Void '))
-  .sort((a, b) => nm(a).localeCompare(nm(b)));
+// Order drives the 3-row grid: each promotion chain takes a column, base over
+// mid over end, then whatever belongs to no chain fills the columns after.
+const CHAIN_IDS = PROMOTION_CHAINS.flatMap(c => c.ids).filter(id => !nm(id).startsWith('Void '));
+const FILTER_IDS = [...CHAIN_IDS, ...PIECES_CODEX.map(p => p.id)
+  .filter(id => !CHAIN_IDS.includes(id) && !nm(id).startsWith('Void '))
+  .sort((a, b) => nm(a).localeCompare(nm(b)))];
 const bar = $('#bar'), filt = bar.querySelector('.filt');
 $('#chips').innerHTML = FILTER_IDS.map(id =>
   `<button class="chip" type="button" data-id="${id}" aria-pressed="false"` +

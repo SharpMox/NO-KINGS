@@ -388,14 +388,24 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
    than rotating, and gets the swap on its own. Driven by the behaviour, not
    by the pair's name. */
 .line-axis.plain .turn{display:none}
-/* upright, with room for the swap to sit between rather than across them */
-.line-axis.plain{gap:56px}
+/* upright, with room for the swap to sit between rather than across them.
+   Explicit margins rather than a gap, since the colour pairs add a legend
+   above and below that wants far less air than the swap does. */
+.line-axis.plain{gap:0}
+.line-axis.plain .rot:not(.back){margin-bottom:56px}
+.line-axis .gswap{color:var(--lime);flex:none;margin:0 0 12px}
+.line-axis .gswap:last-child{margin:12px 0 0}
+/* the two lattices trade places: while one brightens the other dims */
+@keyframes chroma{from{opacity:.14}to{opacity:.46}}
+.line-axis .chroma{opacity:.32;animation:chroma 1.9s ease-in-out infinite alternate}
+.line-axis .rot.back .chroma{animation-direction:alternate-reverse}
 .line-axis.plain .rot{width:158px;height:158px}
 .line-axis.plain .rot .board{width:158px;transform:none}
 .line-axis.plain .rot:hover .board{animation:none}
-/* the gap makes this axis taller than a board, so the boards come down to
-   meet its swap - measured, like the tilted pair above */
+/* these axes run taller than a board, so the boards come down to meet the
+   swap - measured, like the tilted pair above */
 .line-row:has(.plain) .line-p .board{margin-top:21px}
+.line-row:has(.gswap) .line-p .board{margin-top:54px}
 /* a 150px board rotated 45 spans its full 212px cell, so touching cells put
    the diamonds point to point; the swap sits on that junction */
 .line-axis .swap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
@@ -439,8 +449,9 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis{display:grid;width:auto;
     grid-template-columns:max-content max-content;grid-template-rows:auto auto auto;
     align-items:center;justify-items:center;justify-content:center;gap:2px 0}
-  .line-axis .turn:not(.back){grid-area:1/1/2/3}
-  .line-axis .turn.back{grid-area:3/1/4/3}
+  .line-axis .turn:not(.back),.line-axis .gswap:first-child{grid-area:1/1/2/3}
+  .line-axis .turn.back,.line-axis .gswap:last-child{grid-area:3/1/4/3}
+  .line-axis .gswap{margin:0}
   .line-axis .rot:not(.back){grid-area:2/1}
   .line-axis .rot.back{grid-area:2/2}
   .line-axis .swap{font-size:28px}
@@ -448,6 +459,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis .rot .board{width:76px}
   .line-axis .turn{width:34px;height:18px}
   .line-axis.plain{gap:2px 44px}
+  .line-axis.plain .rot:not(.back){margin-bottom:0}
   .line-axis.plain .rot{width:104px;height:104px}
   .line-axis.plain .rot .board{width:104px}
   /* nothing to line up beside: the axis is in the flow, not in a column */
@@ -582,11 +594,11 @@ function openPair(v) {
      <div class="line-row">${[
        piece(v.lhs),
        `<div class="line-axis${flat || hue ? ' plain' : ''}">
-          ${TURN}
+          ${hue ? GRID_SWAP : TURN}
           <span class="rot">${preview(LOOKUP[v.lhs])}</span>
           <span class="swap">\u21C4</span>
           <span class="rot back">${preview(LOOKUP[v.rhs])}</span>
-          ${TURN_BACK}
+          ${hue ? GRID_SWAP : TURN_BACK}
         </div>`,
        piece(v.rhs),
      ].join('')}</div>`;
@@ -615,8 +627,8 @@ const CHROMA = par => {
   for (let cx = 0; cx < 9; cx++)
     for (let cy = 0; cy < 9; cy++)
       if ((cx + cy) % 2 === par)
-        r += `<rect x="${cx * 36}" y="${cy * 36}" width="36" height="36" fill="var(--lime)" opacity=".32"/>`;
-  return `<g>${r}</g>`;
+        r += `<rect x="${cx * 36}" y="${cy * 36}" width="36" height="36" fill="var(--lime)"/>`;
+  return `<g class="chroma">${r}</g>`;
 };
 // the piece stands on the centre square, whose parity is 0, so a colour-bound
 // piece lands on 0 and a colour-changing one on 1
@@ -637,6 +649,14 @@ const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-
   <path d="M33.2 22.7 L42.0 21.0 L40.3 12.1" fill="none" stroke="currentColor" stroke-width="2.6"
         stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
+
+// the legend for a colour flip: one grid handing over to the other
+const GRID_SWAP = `<svg class="gswap" viewBox="0 0 56 20" width="56" height="20" aria-hidden="true">
+  <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <rect x="1" y="2" width="16" height="16" rx="3"/>
+    <rect x="39" y="2" width="16" height="16" rx="3"/><path d="M40.5 17.5 L53.5 2.5"/>
+    <path d="M22 10 h12"/><path d="M25 7 L22 10 L25 13"/><path d="M31 7 L34 10 L31 13"/>
+  </g></svg>`;
 
 const piece = id => ((p) => {
        return `<div class="line-p">${renderBoard(p)}

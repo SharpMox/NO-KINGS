@@ -379,13 +379,15 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 
 /* The axis is the proof: each diagram turned 45 degrees, the top one into the
    piece on the right and the bottom one back into the piece on the left. */
-.line-axis{display:flex;flex-direction:column;align-items:center;gap:8px;width:220px}
+.line-axis{position:relative;display:flex;flex-direction:column;align-items:center;gap:0;width:220px}
 .line-axis .turn{color:var(--lime);flex:none;margin:0 0 2px}
+/* a 150px board rotated 45 spans its full 212px cell, so touching cells put
+   the diamonds point to point; the swap sits on that junction */
+.line-axis .swap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
 .line-axis .turn.back{transform:rotate(180deg);margin:2px 0 0}
 /* a square sweeps its diagonal when it turns, so the cell reserves 150 * sqrt2 */
 .line-axis .rot{width:212px;height:212px;display:grid;place-items:center;flex:none}
 .line-axis .rot .board{width:150px;max-width:none;margin:0;transform:rotate(45deg)}
-.line-axis .rot.back .board{transform:rotate(-45deg)}
 .line-axis .swap{color:var(--lime);font:800 38px/1 var(--mono);flex:none;
   filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
 [data-theme="dark"] .line-axis .swap{filter:drop-shadow(0 2px 7px rgba(8,4,18,.95))}
@@ -398,7 +400,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-p{display:grid;grid-template-columns:auto minmax(0,1fr);
   grid-template-rows:auto auto auto 1fr;column-gap:15px;row-gap:7px;align-content:start;
   text-align:left}
-.line-p .board{grid-area:1/1/2/3;max-width:330px;margin:110px auto 8px}
+.line-p .board{grid-area:1/1/2/3;max-width:330px;margin:75px auto 8px}
 .line-p h3{grid-area:2/1/3/2;margin:0;font-size:17px;line-height:1.15;color:var(--text)}
 .line-p .bz-m,.line-p .fam-m{display:none}
 .line-p .meta{grid-area:3/1/4/2;margin:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
@@ -417,13 +419,13 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
      one band instead - a preview either side of the arrows - without touching
      the source order the desktop column depends on. 76px sweeps 107. */
   .line-axis{display:grid;width:auto;
-    grid-template-columns:auto auto auto;grid-template-rows:auto auto auto;
-    align-items:center;justify-items:center;gap:2px 10px}
-  .line-axis .turn:not(.back){grid-area:1/2}
-  .line-axis .swap{grid-area:2/2;font-size:28px}
-  .line-axis .turn.back{grid-area:3/2}
+    grid-template-columns:max-content max-content;grid-template-rows:auto auto auto;
+    align-items:center;justify-items:center;justify-content:center;gap:2px 0}
+  .line-axis .turn:not(.back){grid-area:1/1/2/3}
+  .line-axis .turn.back{grid-area:3/1/4/3}
   .line-axis .rot:not(.back){grid-area:2/1}
-  .line-axis .rot.back{grid-area:2/3}
+  .line-axis .rot.back{grid-area:2/2}
+  .line-axis .swap{font-size:28px}
   .line-axis .rot{width:107px;height:107px}
   .line-axis .rot .board{width:76px}
   .line-axis .turn{width:34px;height:18px}
@@ -556,7 +558,7 @@ const rot = p => renderBoard(p).replace('class="board" role="img"', 'class="boar
 const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
   <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"
         stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M33.2 18.1 L41 20 L38.8 12.3" fill="none" stroke="currentColor" stroke-width="2.6"
+  <path d="M32.0 20.2 L41 20 L40.8 11.0" fill="none" stroke="currentColor" stroke-width="2.6"
         stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
 

@@ -163,14 +163,16 @@
 /* The button IS the container: closed it hugs its own label, open it grows
    into the panel holding the rows. The frame lives on the shell, so there is
    one box the whole time rather than a button beside a list. */
-.fbox{display:inline-flex;flex-direction:column;align-items:flex-start;
+.fbox{display:inline-flex;align-items:center;gap:14px;
   width:max-content;max-width:100%;
   border:1px solid var(--border);border-radius:8px;background:var(--surface);
   transition:border-color .18s var(--ease)}
+/* open, it takes the rest of the bar so the panel reaches the right edge */
+.fbox:has(.filt[aria-expanded="true"]){width:auto;flex:1 1 auto}
 .fbox:hover,.fbox:has(.filt[aria-expanded="true"]){border-color:var(--violet-hi)}
 .filt{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.09em;
-  text-transform:uppercase;padding:10px 14px;border:0;background:transparent;
-  color:var(--text-soft);display:inline-flex;align-items:center;gap:7px;
+  text-transform:uppercase;padding:11px 14px;border:0;background:transparent;
+  color:var(--text-soft);display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
   transition:color .18s var(--ease)}
 .fbox:hover .filt,.filt[aria-expanded="true"]{color:var(--text)}
 /* how many are on, since the list itself is usually closed */
@@ -181,14 +183,15 @@
    end - and the groups wrap. So the eleven columns sit in one band when there
    is room and cut into two, then three, stacked bands as it narrows, without
    ever scrolling sideways. */
-.chips{display:flex;flex-wrap:wrap;gap:11px 5px;padding:0 10px 10px}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 20px;
+  flex:1 1 auto;padding:11px 14px 11px 0}
 .cgroup{display:grid;grid-template-rows:repeat(3,auto);gap:4px}
 .chips[hidden]{display:none}
 @media (min-width:900px){
   .bar{position:sticky;top:var(--nav-h);z-index:55;backdrop-filter:blur(14px)}
 }
-.chip{appearance:none;cursor:pointer;font:700 9px/1 var(--mono);letter-spacing:.01em;
-  text-transform:uppercase;padding:6px 8px;border-radius:5px;text-align:left;
+.chip{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.08em;
+  text-transform:uppercase;padding:8px 11px;border-radius:5px;text-align:center;
   border:1px solid var(--border);background:var(--surface);color:var(--text-soft);
   transition:.18s var(--ease)}
 .chip:hover{color:var(--text);border-color:var(--violet-hi)}
@@ -198,6 +201,8 @@
 .stk.is-out{display:none}
 @media(max-width:600px){
   .bar{padding:2px 10px 12px}
+  .fbox{flex-direction:column;align-items:stretch;gap:0}
+  .chips{padding:0 12px 12px;justify-content:flex-start}
   /* the grid already scrolls sideways; nothing phone-specific left to do */
 }
 .decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;

@@ -169,10 +169,13 @@
 /* open, it takes the rest of the bar so the panel reaches the right edge */
 .fbox:has(.filt[aria-expanded="true"]){width:auto;flex:1 1 auto}
 .filt{appearance:none;cursor:pointer;font:700 10.5px/1 var(--mono);letter-spacing:.09em;
-  text-transform:uppercase;padding:20px 14px 11px;border:0;background:transparent;
+  text-transform:uppercase;padding:11px 14px;border:0;background:transparent;
   color:var(--text-soft);display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;
   transition:color .18s var(--ease)}
 .fbox:hover .filt,.filt[aria-expanded="true"]{color:var(--text)}
+/* open, drop the label onto the first chip row's text line: 11 of grid padding
+   + 1 of chip border + 8 of chip padding */
+.filt[aria-expanded="true"]{padding-top:20px}
 /* how many are on, since the list itself is usually closed */
 .filt .n{font:700 9.5px/1 var(--mono);color:#141024;background:var(--lime);
   border-radius:var(--rad-pill);padding:3px 6px}
@@ -181,8 +184,12 @@
    end - and the groups wrap. So the eleven columns sit in one band when there
    is room and cut into two, then three, stacked bands as it narrows, without
    ever scrolling sideways. */
-.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:14px 20px;
-  flex:1 1 auto;padding:11px 14px 11px 0}
+/* The groups sit in one grid rather than wrapping as flex items: uniform
+   tracks mean every column lines up whatever the width, instead of each band
+   sizing itself. Each group is still a chain stacked three deep, and the
+   column gap is what reads as the grouping. */
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
+  gap:16px 20px;flex:1 1 auto;padding:11px 14px 11px 0}
 .cgroup{display:grid;grid-template-rows:repeat(3,auto);gap:4px}
 .chips[hidden]{display:none}
 @media (min-width:900px){
@@ -200,7 +207,8 @@
 @media(max-width:600px){
   .bar{padding:2px 10px 12px}
   .fbox{flex-direction:column;align-items:stretch;gap:0}
-  .chips{padding:0 12px 12px;justify-content:flex-start}
+  .chips{padding:0 12px 12px}
+  .filt[aria-expanded="true"]{padding-top:11px}
   /* the grid already scrolls sideways; nothing phone-specific left to do */
 }
 .decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
@@ -548,6 +556,11 @@ const chip = id =>
 $('#chips').innerHTML = FILTER_IDS.reduce((out, id, i) =>
   (i % 3 ? out : [...out, FILTER_IDS.slice(i, i + 3)]), [])
   .map(g => `<div class="cgroup">${g.map(chip).join('')}</div>`).join('');
+
+// open where there is room for it, shut where it would fill the viewport
+const wideEnough = matchMedia('(min-width:900px)').matches;
+filt.setAttribute('aria-expanded', String(wideEnough));
+$('#chips').hidden = !wideEnough;
 
 const picked = new Set();
 function applyFilter() {

@@ -131,7 +131,10 @@
 
   /* Same wall as promotion.html: wider than the --wrap column the hero and
      footer use, so the cards come out the same size on both pages. */
-  main{max-width:1860px;margin:0 auto;padding:14px 18px 70px}
+  /* No cap and a 10px gutter: the wall takes the whole window so the cards
+     come out as large as the solve allows. Hero and footer keep the --wrap
+     column - they are outside main and set their own max-width. */
+  main{max-width:none;margin:0 auto;padding:14px 10px 70px}
   .board{width:100%;height:auto;display:block}
   .betza-pill{font:600 11px/1.4 var(--mono);color:var(--text-soft);background:var(--surface-2);
     border-radius:var(--rad-pill);padding:2px 9px;display:inline-block}
@@ -161,7 +164,7 @@
      3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
      gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
      narrow pages simply wrap to two rather than shrinking the cards to nothing. */
-  --cw-fit:clamp(144px, calc((min(100vw, 1860px) - 52px + 68px) / 9), 184px);
+  --cw-fit:clamp(144px, calc((100vw - 36px + 68px) / 9), 184px);
   /* 1 is the three-per-row fit. Raising it trades a fusion per row for bigger
      cards; at 1.2 the wall drops to two across. */
   --card-scale:1;

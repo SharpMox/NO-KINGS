@@ -381,6 +381,14 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
    piece on the right and the bottom one back into the piece on the left. */
 .line-axis{position:relative;display:flex;flex-direction:column;align-items:center;gap:0;width:220px}
 .line-axis .turn{color:var(--lime);flex:none;margin:0 0 2px}
+/* Pawn moves forward only, so turning its diagram turns "forward" with it and
+   lands nowhere near its Void twin - that pair swaps move for capture rather
+   than rotating, and gets the swap on its own. Driven by the behaviour, not
+   by the pair's name. */
+.line-axis.plain{height:330px;justify-content:center}
+.line-axis.plain .rot,.line-axis.plain .turn{display:none}
+.line-axis.plain .swap{position:static;transform:none}
+.line-row:has(.plain) .line-p .board{margin-top:0}
 /* a 150px board rotated 45 spans its full 212px cell, so touching cells put
    the diamonds point to point; the swap sits on that junction */
 .line-axis .swap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
@@ -388,6 +396,9 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 /* a square sweeps its diagonal when it turns, so the cell reserves 150 * sqrt2 */
 .line-axis .rot{width:212px;height:212px;display:grid;place-items:center;flex:none}
 .line-axis .rot .board{width:150px;max-width:none;margin:0;transform:rotate(45deg)}
+/* hovering replays the turn itself, back and forth */
+@keyframes tilt{from{transform:rotate(0)}to{transform:rotate(45deg)}}
+.line-axis .rot:hover .board{animation:tilt 1.5s cubic-bezier(.45,.05,.55,.95) infinite alternate}
 .line-axis .swap{color:var(--lime);font:800 38px/1 var(--mono);flex:none;
   filter:drop-shadow(0 1px 4px rgba(252,240,216,.95))}
 [data-theme="dark"] .line-axis .swap{filter:drop-shadow(0 2px 7px rgba(8,4,18,.95))}
@@ -429,6 +440,8 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis .rot{width:107px;height:107px}
   .line-axis .rot .board{width:76px}
   .line-axis .turn{width:34px;height:18px}
+  .line-axis.plain{height:auto;padding:6px 0}
+  .line-axis.plain .swap{transform:rotate(90deg)}
   /* nothing to line up beside: the axis is in the flow, not in a column */
   .line-row .line-p .board{margin-top:0}
   .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}
@@ -540,7 +553,7 @@ function openPair(v) {
      <h2>${esc(LABEL(v))}</h2>
      <div class="line-row">${[
        piece(v.lhs),
-       `<div class="line-axis">
+       `<div class="line-axis${IDS(v).some(id => (LOOKUP[id].behaviors || []).includes('direction-restricted')) ? ' plain' : ''}">
           ${TURN}
           <span class="rot">${rot(LOOKUP[v.lhs])}</span>
           <span class="swap">\u21C4</span>
@@ -558,7 +571,7 @@ const rot = p => renderBoard(p).replace('class="board" role="img"', 'class="boar
 const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
   <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"
         stroke-width="2.6" stroke-linecap="round"/>
-  <path d="M32.0 20.2 L41 20 L40.8 11.0" fill="none" stroke="currentColor" stroke-width="2.6"
+  <path d="M33.1 19.6 L42.0 21.0 L43.4 12.1" fill="none" stroke="currentColor" stroke-width="2.6"
         stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
 

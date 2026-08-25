@@ -570,17 +570,22 @@ function openPair(v) {
   }
   // a forward-only piece cannot be shown rotating: turning its diagram turns
   // "forward" with it. That pair gets upright boards and a square swap instead.
-  const flat = IDS(v).some(id => (LOOKUP[id].behaviors || []).includes('direction-restricted'));
+  const has = b => IDS(v).some(id => (LOOKUP[id].behaviors || []).includes(b));
+  // forward-only: nothing rotates, the two squares swap instead
+  const flat = has('direction-restricted');
+  // one keeps its square colour, the other crosses: show the two lattices
+  const hue = has('color-bound') && has('color-changing');
+  const preview = flat ? marked : hue ? tinted : rot;
   document.getElementById('line-body').innerHTML =
     `<span class="line-lb">${esc(LOOKUP[v.lhs].family)}</span>
      <h2>${esc(LABEL(v))}</h2>
      <div class="line-row">${[
        piece(v.lhs),
-       `<div class="line-axis${flat ? ' plain' : ''}">
+       `<div class="line-axis${flat || hue ? ' plain' : ''}">
           ${TURN}
-          <span class="rot">${(flat ? marked : rot)(LOOKUP[v.lhs])}</span>
+          <span class="rot">${preview(LOOKUP[v.lhs])}</span>
           <span class="swap">\u21C4</span>
-          <span class="rot back">${(flat ? marked : rot)(LOOKUP[v.rhs])}</span>
+          <span class="rot back">${preview(LOOKUP[v.rhs])}</span>
           ${TURN_BACK}
         </div>`,
        piece(v.rhs),
@@ -602,6 +607,27 @@ const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
   <path d="M159.4 100.4 L162 108 L169.6 105.4"/></g>`;
 // cropped to the squares the swap happens in, which zooms the mark with the
 // board since it lives in the same coordinate space
+// Qi Lin and its Void twin do not rotate into each other - one keeps to its
+// own square colour, the other crosses every move. Tinting the squares each
+// can actually land on puts the two lattices side by side.
+const CHROMA = par => {
+  let r = '';
+  for (let cx = 0; cx < 9; cx++)
+    for (let cy = 0; cy < 9; cy++)
+      if ((cx + cy) % 2 === par)
+        r += `<rect x="${cx * 36}" y="${cy * 36}" width="36" height="36" fill="var(--lime)" opacity=".32"/>`;
+  return `<g>${r}</g>`;
+};
+// the piece stands on the centre square, whose parity is 0, so a colour-bound
+// piece lands on 0 and a colour-changing one on 1
+const tinted = p => {
+  const svg = rot(p);
+  const par = (p.behaviors || []).includes('color-changing') ? 1 : 0;
+  // after the last board square, so the markers stay on top of the wash
+  const j = svg.indexOf('/>', svg.lastIndexOf('<rect')) + 2;
+  return svg.slice(0, j) + CHROMA(par) + svg.slice(j);
+};
+
 const marked = p => rot(p)
   .replace('viewBox="0 0 324 324"', 'viewBox="72 36 180 180"')
   .replace('</svg>', MARK + '</svg>');

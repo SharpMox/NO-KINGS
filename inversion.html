@@ -388,13 +388,14 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
    than rotating, and gets the swap on its own. Driven by the behaviour, not
    by the pair's name. */
 .line-axis.plain .turn{display:none}
-/* upright, with air between them; 158 + 14 + 158 still comes to a board's
-   height, so the swap keeps landing on its centre line */
-.line-axis.plain{gap:14px}
+/* upright, with room for the swap to sit between rather than across them */
+.line-axis.plain{gap:56px}
 .line-axis.plain .rot{width:158px;height:158px}
 .line-axis.plain .rot .board{width:158px;transform:none}
 .line-axis.plain .rot:hover .board{animation:none}
-.line-row:has(.plain) .line-p .board{margin-top:0}
+/* the gap makes this axis taller than a board, so the boards come down to
+   meet its swap - measured, like the tilted pair above */
+.line-row:has(.plain) .line-p .board{margin-top:21px}
 /* a 150px board rotated 45 spans its full 212px cell, so touching cells put
    the diamonds point to point; the swap sits on that junction */
 .line-axis .swap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2}
@@ -446,7 +447,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-axis .rot{width:107px;height:107px}
   .line-axis .rot .board{width:76px}
   .line-axis .turn{width:34px;height:18px}
-  .line-axis.plain{gap:2px 12px}
+  .line-axis.plain{gap:2px 44px}
   .line-axis.plain .rot{width:104px;height:104px}
   .line-axis.plain .rot .board{width:104px}
   /* nothing to line up beside: the axis is in the flow, not in a column */
@@ -602,7 +603,7 @@ const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
 // cropped to the squares the swap happens in, which zooms the mark with the
 // board since it lives in the same coordinate space
 const marked = p => rot(p)
-  .replace('viewBox="0 0 324 324"', 'viewBox="70 38 184 184"')
+  .replace('viewBox="0 0 324 324"', 'viewBox="72 36 180 180"')
   .replace('</svg>', MARK + '</svg>');
 const TURN = `<svg class="turn" viewBox="0 0 48 26" width="46" height="25" aria-hidden="true">
   <path d="M5 20 A 26 26 0 0 1 41 20" fill="none" stroke="currentColor"

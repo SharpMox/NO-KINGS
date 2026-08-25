@@ -395,10 +395,12 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-axis.plain .rot:not(.back){margin-bottom:56px}
 .line-axis .gswap{color:var(--lime);flex:none;margin:0 0 12px}
 .line-axis .gswap:last-child{margin:12px 0 0}
-/* the two lattices trade places: while one brightens the other dims */
-@keyframes chroma{from{opacity:.14}to{opacity:.46}}
-.line-axis .chroma{opacity:.32;animation:chroma 1.9s ease-in-out infinite alternate}
-.line-axis .rot.back .chroma{animation-direction:alternate-reverse}
+/* One lattice lights and dies, then the other, on repeat. Half a cycle of
+   negative delay puts the second beat in the back half rather than making it
+   wait a turn before it first appears. */
+@keyframes chroma{0%{opacity:0}10%{opacity:.46}32%{opacity:.46}45%{opacity:0}100%{opacity:0}}
+.line-axis .chroma{opacity:0;animation:chroma 3.6s ease-in-out infinite}
+.line-axis .chroma.b{animation-delay:-1.8s}
 .line-axis.plain .rot{width:158px;height:158px}
 .line-axis.plain .rot .board{width:158px;transform:none}
 .line-axis.plain .rot:hover .board{animation:none}
@@ -587,7 +589,7 @@ function openPair(v) {
   const flat = has('direction-restricted');
   // one keeps its square colour, the other crosses: show the two lattices
   const hue = has('color-bound') && has('color-changing');
-  const preview = flat ? marked : hue ? tinted : rot;
+  const preview = flat ? marked : hue ? tinted(v) : rot;
   document.getElementById('line-body').innerHTML =
     `<span class="line-lb">${esc(LOOKUP[v.lhs].family)}</span>
      <h2>${esc(LABEL(v))}</h2>
@@ -622,22 +624,28 @@ const MARK = `<g fill="none" stroke="var(--lime)" stroke-width="3"
 // Qi Lin and its Void twin do not rotate into each other - one keeps to its
 // own square colour, the other crosses every move. Tinting the squares each
 // can actually land on puts the two lattices side by side.
-const CHROMA = par => {
+const CHROMA = (par, beat) => {
   let r = '';
   for (let cx = 0; cx < 9; cx++)
     for (let cy = 0; cy < 9; cy++)
       if ((cx + cy) % 2 === par)
         r += `<rect x="${cx * 36}" y="${cy * 36}" width="36" height="36" fill="var(--lime)"/>`;
-  return `<g class="chroma">${r}</g>`;
+  return `<g class="chroma ${beat}">${r}</g>`;
 };
 // the piece stands on the centre square, whose parity is 0, so a colour-bound
 // piece lands on 0 and a colour-changing one on 1
-const tinted = p => {
-  const svg = rot(p);
-  const par = (p.behaviors || []).includes('color-changing') ? 1 : 0;
-  // after the last board square, so the markers stay on top of the wash
-  const j = svg.indexOf('/>', svg.lastIndexOf('<rect')) + 2;
-  return svg.slice(0, j) + CHROMA(par) + svg.slice(j);
+const parOf = p => ((p.behaviors || []).includes('color-changing') ? 1 : 0);
+// Both boards carry both lattices and run the same beat: the top piece's
+// squares light, fade, then the bottom piece's, fade, over and over. Showing
+// it on each board is what makes the two comparable.
+const tinted = v => {
+  const wash = CHROMA(parOf(LOOKUP[v.lhs]), 'a') + CHROMA(parOf(LOOKUP[v.rhs]), 'b');
+  return p => {
+    const svg = rot(p);
+    // after the last board square, so the markers stay on top of the wash
+    const j = svg.indexOf('/>', svg.lastIndexOf('<rect')) + 2;
+    return svg.slice(0, j) + wash + svg.slice(j);
+  };
 };
 
 const marked = p => rot(p)
@@ -652,9 +660,11 @@ const TURN_BACK = TURN.replace('class="turn"', 'class="turn back"');
 
 // the legend for a colour flip: one grid handing over to the other
 const GRID_SWAP = `<svg class="gswap" viewBox="0 0 56 20" width="56" height="20" aria-hidden="true">
+  <rect x="1" y="2" width="16" height="16" rx="3" fill="var(--sq-light)"
+        stroke="var(--text-dim)" stroke-width="1.2"/>
+  <rect x="39" y="2" width="16" height="16" rx="3" fill="var(--sq-dark)"
+        stroke="var(--text-dim)" stroke-width="1.2"/>
   <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
-    <rect x="1" y="2" width="16" height="16" rx="3"/>
-    <rect x="39" y="2" width="16" height="16" rx="3"/><path d="M40.5 17.5 L53.5 2.5"/>
     <path d="M22 10 h12"/><path d="M25 7 L22 10 L25 13"/><path d="M31 7 L34 10 L31 13"/>
   </g></svg>`;
 

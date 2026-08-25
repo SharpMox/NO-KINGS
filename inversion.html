@@ -381,7 +381,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
    piece on the right and the bottom one back into the piece on the left. */
 .line-axis{display:flex;flex-direction:column;align-items:center;gap:8px;width:220px}
 .line-axis .turn{color:var(--lime);flex:none;margin:0 0 2px}
-.line-axis .turn.back{transform:scaleX(-1);margin:2px 0 0}
+.line-axis .turn.back{transform:rotate(180deg);margin:2px 0 0}
 /* a square sweeps its diagonal when it turns, so the cell reserves 150 * sqrt2 */
 .line-axis .rot{width:212px;height:212px;display:grid;place-items:center;flex:none}
 .line-axis .rot .board{width:150px;max-width:none;margin:0;transform:rotate(45deg)}
@@ -413,12 +413,15 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 .line-p .ds{grid-area:2/2/5/3;margin:0;font-size:12px;line-height:1.55;color:var(--text-soft)}
 @media(max-width:760px){
   .line-row{grid-template-columns:1fr;gap:34px}
-  /* Provisional: the pieces stack, so the swap has to point down the page
-     instead of across it. The previews are hidden until this layout is
-     designed properly - they would add ~400px between the two pieces. */
-  .line-axis{width:auto;flex-direction:row;justify-content:center}
-  .line-axis .rot,.line-axis .turn{display:none}
-  .line-axis .swap{transform:rotate(90deg)}
+  /* The pieces stack here, so the axis runs on down the page between them:
+     same order, smaller, with the swap turned to point along it. 84px sweeps
+     119. */
+  .line-axis{width:auto;gap:6px}
+  .line-axis .rot{width:119px;height:119px}
+  .line-axis .rot .board{width:84px}
+  .line-axis .turn{width:34px;height:18px}
+  .line-axis .swap{font-size:30px;transform:rotate(90deg)}
+  /* nothing to line up beside: the axis is in the flow, not in a column */
   .line-row .line-p .board{margin-top:0}
   .line-in{max-height:calc(100dvh - 20px);overflow-y:auto;padding-top:16px}
   .line-in .dd-close{position:sticky;top:0;float:right;margin:0 0 -12px 0;

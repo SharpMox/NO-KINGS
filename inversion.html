@@ -200,8 +200,7 @@
    sizing itself. Each group is still a chain stacked three deep, and the
    column gap is what reads as the grouping. */
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
-  gap:16px 20px;flex:1 1 auto;padding:11px 14px 11px 0}
-.cgroup{display:grid;grid-template-rows:repeat(2,auto);gap:4px;align-content:start}
+  gap:8px;flex:1 1 auto;padding:11px 14px 11px 0}
 .chips[hidden]{display:none}
 /* while the frame is being animated it must not be flex-sized, and it clips so
    the rows are revealed by the edge rather than reflowing behind it */
@@ -572,13 +571,14 @@ function markFx(fx, fan, what) {
 // Every non-Void piece on this page. The five Void halves get no chip of
 // their own - picking Pawn shows Pawn and its Void twin, since a pair matches
 // when either half is picked.
-const PAIR_GROUPS = PAIRS.map(v => IDS(v).filter(id => !nm(id).startsWith('Void ')));
+// flattened rather than grouped by pair: five pairs have a Void half and so
+// contribute one chip, which left every such column with a hole
+const FILTER_IDS = PAIRS.flatMap(IDS).filter(id => !nm(id).startsWith('Void '));
 const bar = $('#bar'), filt = bar.querySelector('.filt');
 const chip = id =>
   `<button class="chip" type="button" data-id="${id}" aria-pressed="false">${esc(nm(id))}</button>`;
-// one column per pair, so the grid reads as the pairs themselves
-$('#chips').innerHTML = PAIR_GROUPS
-  .map(g => `<div class="cgroup">${g.map(chip).join('')}</div>`).join('');
+// pair order is kept, so a pair's two chips still sit next to each other
+$('#chips').innerHTML = FILTER_IDS.map(chip).join('');
 
 const wideEnough = matchMedia('(min-width:900px)').matches;
 filt.setAttribute('aria-expanded', String(wideEnough));

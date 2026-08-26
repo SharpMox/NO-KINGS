@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="7" fill="#0f0a1c"/>
-  <path d="M7 22V11l5 4 4-6 4 6 5-4v11z" fill="#efeaff"/>
-  <path d="M6 24.5 26 8" stroke="#a8d048" stroke-width="3.2" stroke-linecap="round"/>
+  <!-- Crown in the lower band. Its three peaks stay clear of the sign above,
+       which is what keeps the silhouette readable down to 16px. -->
+  <path d="M3 29V20l5.5 4L16 16.5l7.5 7.5L29 20v9z" fill="#efeaff"/>
+  <!-- Regular octagon, flat top: r=7 about (16, 9.5), sitting on the crown. -->
+  <polygon points="22.47,12.18 18.68,15.97 13.32,15.97 9.53,12.18 9.53,6.82 13.32,3.03 18.68,3.03 22.47,6.82"
+           fill="#d92d20" stroke="#0f0a1c" stroke-width="1.5" stroke-linejoin="round"/>
+  <rect x="11.4" y="8.25" width="9.2" height="2.5" rx="1.25" fill="#fff"/>
 </svg>

@@ -25,90 +25,98 @@
       margin: 0 0 24px 0;
       font-size: 15px;
     }
-    .controls {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .tabs {
-      display: flex;
-      gap: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 4px;
-      flex-wrap: wrap;
-    }
-    .tabs { width: 100%; }
-    .tab-btn.is-empty { display: none; }
+    .sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+          overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 
-    .tab-btn {
-      appearance: none;
-      background: transparent;
-      border: 0;
-      padding: 8px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-soft);
-      cursor: pointer;
-      border-radius: 7px;
-      font-family: inherit;
-      transition: color 0.15s ease, background 0.15s ease;
+    /* ============== Filter zone ==============
+       Same chip pattern as the other pages. The Filters box and the search sit
+       on one aligned row; the legend runs beneath them. Chips are multi-select
+       — OR within a row, AND across the two rows. */
+    .bar { display: flex; flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 20px; }
+    .bar-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    /* The button IS the container: closed it hugs its own label, open it grows
+       into the panel holding the two rows. Same shell as fusion/inversion/
+       promotion, so the control reads identically across the site. */
+    .fbox {
+      display: inline-flex; align-items: flex-start; gap: 14px;
+      width: max-content; max-width: 100%;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: linear-gradient(150deg, rgba(160,112,232,.06), rgba(24,16,48,.09) 48%),
+                  color-mix(in srgb, var(--surface) 52%, transparent);
+      backdrop-filter: blur(14px) saturate(150%);
+      -webkit-backdrop-filter: blur(14px) saturate(150%);
+      box-shadow: inset 0 1px 0 rgba(239,234,255,.13);
     }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn[aria-selected="true"] {
-      background: var(--bg);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    @media (prefers-reduced-transparency: reduce) {
+      .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
     }
-    .filter-input {
-      appearance: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px;
-      color: var(--text);
-      width: 260px;
-      font-family: inherit;
+    /* open, it takes the rest of the row so the panel reaches the search */
+    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; flex: 1 1 auto; }
+    /* closed, match the search field's height so the two line up exactly */
+    .filt {
+      appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono); letter-spacing: .09em;
+      text-transform: uppercase; padding: 0 16px; min-height: 42px; border: 0; background: transparent;
+      color: var(--text-soft); display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+      transition: color .18s var(--ease);
     }
-    .filter-input:focus {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
+    .fbox:hover .filt, .filt[aria-expanded="true"] { color: var(--text); }
+    /* open, drop the label onto the first chip row's text line */
+    .filt[aria-expanded="true"] { align-items: flex-start; padding-top: 22px; min-height: 0; }
+    /* how many are on, since the rows are usually closed */
+    .filt .n {
+      font: 700 9.5px/1 var(--mono); color: #141024; background: var(--lime);
+      border-radius: var(--rad-pill); padding: 3px 6px;
     }
-    .evolution-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      text-decoration: none;
-      color: var(--accent);
-      font-weight: 500;
-      font-size: 14px;
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-left: auto;
+    .filt .n:empty { display: none; }
+    .chip-rows { display: flex; flex-direction: column; gap: 7px; flex: 1 1 auto; padding: 11px 14px 11px 0; }
+    .chip-rows[hidden] { display: none; }
+    /* while the frame animates it must not be flex-sized, and it clips so the
+       rows are revealed by the edge rather than reflowing behind it */
+    .fbox.sizing { flex: 0 0 auto; overflow: hidden; }
+    .fbox.sizing .chip-rows { flex: 0 0 auto; }
+    .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+    .chip {
+      appearance: none; cursor: pointer;
+      font: 700 11px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+      padding: 11px 15px; border-radius: var(--rad-pill);
+      border: 1px solid var(--border); background: var(--surface); color: var(--text-soft);
+      display: inline-flex; align-items: center; gap: 7px;
+      transition: color .18s var(--ease), border-color .18s var(--ease), transform .18s var(--ease);
     }
-    .evolution-link:hover {
-      text-decoration: none;
-      border-color: var(--accent);
+    .chip:hover:not(:disabled) { color: var(--text); border-color: var(--violet-hi); transform: translateY(-1px); }
+    /* White on --violet is 7.21:1 light / 5.84:1 dark — both AA at this weight.
+       NOT --lime: it is #6f9420 in site.css, only 3.01:1 on the cream. */
+    .chip[aria-pressed="true"] { background: var(--violet); border-color: transparent; color: #fff; }
+    .chip:disabled { opacity: .4; cursor: default; }
+    /* Hierarchy comes from size, not opacity: opacity composites the text
+       against the chip and drops these 10px counters below 4.5:1. */
+    .chip-n {
+      font-size: 10px; letter-spacing: 0; color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
     }
+    .chip[aria-pressed="true"] .chip-n { color: #fff; }
 
-    /* ============== Legend ============== */
+    /* sits on the same row as the Filters box, matching its closed height */
+    .bar-top input[type="search"] {
+      appearance: none; flex: 0 0 auto; width: 300px; max-width: 100%;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--rad-pill); padding: 0 18px; height: 44px;
+      font: 400 14px/1 var(--sans, inherit); color: var(--text);
+      transition: border-color .2s var(--ease);
+    }
+    .bar-top input[type="search"]::placeholder { color: var(--text-dim); }
+    .bar-top input[type="search"]:focus { outline: none; border-color: var(--violet-hi); }
+    @media (max-width: 720px) { .bar-top input[type="search"] { flex: 1 1 100%; width: auto; } }
+
+    /* ============== Legend ==============
+       Runs beneath the filter row, full width, with no box of its own. */
     .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 18px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 13px;
+      gap: 8px 18px;
+      font-size: 12.5px;
       color: var(--text-soft);
-      margin-bottom: 24px;
+      margin: 0;
     }
     .legend-item {
       display: inline-flex;
@@ -129,8 +137,7 @@
       margin: 0 auto;
       padding: 0 10px 64px;
     }
-    section[role="tabpanel"] { display: none; }
-    section[role="tabpanel"].active { display: block; }
+    .empty { padding: 90px 0; text-align: center; color: var(--text-dim); }
 
     /* ============== Card grid ============== */
     .card-grid {
@@ -138,9 +145,15 @@
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 20px;
     }
+    /* Glass, same treatment as the codex side panel: a tinted wash over a
+       part-transparent surface, blurred so the aura below shows through. */
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background:
+        linear-gradient(150deg, rgba(160,112,232,.10), rgba(24,16,48,.12) 46%),
+        color-mix(in srgb, var(--surface) 66%, transparent);
+      backdrop-filter: blur(16px) saturate(150%);
+      -webkit-backdrop-filter: blur(16px) saturate(150%);
+      border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
       border-radius: 14px;
       padding: 18px;
       box-shadow: var(--shadow);
@@ -148,6 +161,21 @@
       flex-direction: column;
       gap: 12px;
       scroll-margin-top: 24px;
+    }
+    /* Glass needs something behind it, and it must stay readable without it. */
+    @media (prefers-reduced-transparency: reduce) {
+      .card { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background:
+        radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.13), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.11), transparent 66%);
+    }
+    [data-theme="dark"] body::before {
+      background:
+        radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
     }
     .card-header {
       display: flex;
@@ -265,59 +293,22 @@
       100% { outline-color: transparent; }
     }
 
-    /* ============== Tab count chip + empty-tab state ============== */
-    .tabs { flex-wrap: wrap; }
-    .tab-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 5px;
-      margin-left: 6px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-soft);
-      line-height: 1;
-    }
-    .tab-btn[aria-selected="true"] .tab-count {
-      background: var(--surface);
-      color: var(--text);
-    }
-    .empty-tab {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-soft);
-      font-style: italic;
-      background: var(--surface);
-      border: 1px dashed var(--border);
-      border-radius: 12px;
-      max-width: 560px;
-      margin: 0 auto;
-    }
 
 
     /* ============== Responsive ============== */
     @media (max-width: 720px) {
       .card-grid { grid-template-columns: 1fr; }
-      .filter-input { flex: 1 1 100%; width: auto; }
       h1 { font-size: 26px; }
-      .controls { gap: 8px; }
     }
 
-    /* Phones: compact the filter block (matches the codex page). `.controls`-
-       scoped so these outrank site.css's shared 44px tap targets. */
+    /* Phones: compact the chips. `.bar`-scoped so these outrank site.css's
+       shared 44px tap targets, same as the other pages do. */
     @media (max-width: 560px) {
-      .controls { gap: 6px; }
-      /* Lay the filter pills out in a 3-column grid so they align row-to-row
-         (equal-width cells), instead of an uneven flex wrap. */
-      .controls .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-      .controls .tab-btn { min-height: 28px; padding: 4px 5px; font-size: 11px; justify-content: center; text-align: center; }
-      .controls .tab-btn .tab-count { font-size: 10px; }
-      .controls .filter-input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 28px; padding: 5px 10px; font-size: 11px; }
+      .bar { gap: 7px; }
+      .bar .chips { gap: 5px; }
+      .bar .chip { padding: 7px 10px; font-size: 10px; letter-spacing: .05em; }
+      .bar .bar-top input[type="search"] { min-height: 38px; height: 38px; font-size: 13px; }
+      .legend { font-size: 11.5px; gap: 6px 12px; }
       /* Deep-linked cards must clear the sticky header. nav.js measures it
          into --nav-h, so this no longer goes stale when the nav changes shape. */
       .card { scroll-margin-top: calc(var(--nav-h) + 12px); }
@@ -326,9 +317,14 @@
     /* ============== Print ============== */
     @media print {
       body { background: white; color: black; }
-      .controls, .theme-toggle, .filter-input, .tabs { display: none; }
-      section[role="tabpanel"] { display: block !important; page-break-before: always; }
-      .card { break-inside: avoid; box-shadow: none; }
+      body::before { display: none; }
+      .bar, .theme-toggle { display: none; }
+      .card {
+        break-inside: avoid; box-shadow: none;
+        background: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+      /* filters do not apply on paper — show every piece */
+      .card[hidden] { display: flex !important; }
     }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
@@ -345,33 +341,41 @@
     <h1><em>Fairy Chess Pieces</em></h1>
     <p class="intro">
       A visual reference for the movement of <em>fairy chess pieces</em> — non-standard pieces used in chess variants and chess-problem composition.
-      Pieces are grouped by how they move: pick a tab to explore each family.
+      Filter by how a piece moves, by where it came from, or by both at once.
       Sourced from <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia's <em>List of fairy chess pieces</em></a>.
     </p>
-    <div class="controls">
-      <div class="tabs" role="tablist" aria-label="Movement type">
-        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-all"         id="tabbtn-all">All pieces <span class="tab-count" id="count-all">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-pawn-like"   id="tabbtn-pawn-like">Pawn-like <span class="tab-count" id="count-pawn-like">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-sliders"     id="tabbtn-sliders">Sliders <span class="tab-count" id="count-sliders">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leapers"     id="tabbtn-leapers">Leapers <span class="tab-count" id="count-leapers">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leap-riders" id="tabbtn-leap-riders">Leap-Riders <span class="tab-count" id="count-leap-riders">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-compounds"   id="tabbtn-compounds">Compounds <span class="tab-count" id="count-compounds">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-hoppers"     id="tabbtn-hoppers">Hoppers <span class="tab-count" id="count-hoppers">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-others"      id="tabbtn-others">Others <span class="tab-count" id="count-others">0</span></button>
+    <search class="bar">
+      <div class="bar-top">
+      <div class="fbox">
+        <button class="filt" type="button" aria-expanded="false" aria-controls="enc-chips">Filters <span class="n"></span></button>
+        <div class="chip-rows" id="enc-chips" hidden>
+      <div class="chips" role="group" aria-label="Filter by movement family">
+        <button class="chip" type="button" data-fam="*" aria-pressed="true">All pieces <span class="chip-n" id="count-all">0</span></button>
+        <button class="chip" type="button" data-fam="pawn-like" aria-pressed="false">Pawn-like <span class="chip-n" id="count-pawn-like">0</span></button>
+        <button class="chip" type="button" data-fam="sliders" aria-pressed="false">Sliders <span class="chip-n" id="count-sliders">0</span></button>
+        <button class="chip" type="button" data-fam="leapers" aria-pressed="false">Leapers <span class="chip-n" id="count-leapers">0</span></button>
+        <button class="chip" type="button" data-fam="leap-riders" aria-pressed="false">Leap-Riders <span class="chip-n" id="count-leap-riders">0</span></button>
+        <button class="chip" type="button" data-fam="compounds" aria-pressed="false">Compounds <span class="chip-n" id="count-compounds">0</span></button>
+        <button class="chip" type="button" data-fam="hoppers" aria-pressed="false">Hoppers <span class="chip-n" id="count-hoppers">0</span></button>
+        <button class="chip" type="button" data-fam="others" aria-pressed="false">Others <span class="chip-n" id="count-others">0</span></button>
       </div>
-      <div class="tabs origin-tabs" role="tablist" aria-label="Origin">
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-standard"   id="tabbtn-origin-standard">Standard <span class="tab-count" id="count-origin-standard">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-modern"     id="tabbtn-origin-modern">Modern <span class="tab-count" id="count-origin-modern">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-problem"    id="tabbtn-origin-problem">Problem <span class="tab-count" id="count-origin-problem">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-shogi"      id="tabbtn-origin-shogi">Shōgi <span class="tab-count" id="count-origin-shogi">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-xiangqi"    id="tabbtn-origin-xiangqi">Xiangqi <span class="tab-count" id="count-origin-xiangqi">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-shatranj"   id="tabbtn-origin-shatranj">Shatranj <span class="tab-count" id="count-origin-shatranj">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-tamerlane"  id="tabbtn-origin-tamerlane">Tamerlane <span class="tab-count" id="count-origin-tamerlane">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-origin-historical" id="tabbtn-origin-historical">Others <span class="tab-count" id="count-origin-historical">0</span></button>
+      <div class="chips" role="group" aria-label="Filter by origin">
+        <button class="chip" type="button" data-ori="standard" aria-pressed="false">Standard <span class="chip-n" id="count-origin-standard">0</span></button>
+        <button class="chip" type="button" data-ori="modern" aria-pressed="false">Modern <span class="chip-n" id="count-origin-modern">0</span></button>
+        <button class="chip" type="button" data-ori="problem" aria-pressed="false">Problem <span class="chip-n" id="count-origin-problem">0</span></button>
+        <button class="chip" type="button" data-ori="shogi" aria-pressed="false">Shōgi <span class="chip-n" id="count-origin-shogi">0</span></button>
+        <button class="chip" type="button" data-ori="xiangqi" aria-pressed="false">Xiangqi <span class="chip-n" id="count-origin-xiangqi">0</span></button>
+        <button class="chip" type="button" data-ori="shatranj" aria-pressed="false">Shatranj <span class="chip-n" id="count-origin-shatranj">0</span></button>
+        <button class="chip" type="button" data-ori="tamerlane" aria-pressed="false">Tamerlane <span class="chip-n" id="count-origin-tamerlane">0</span></button>
+        <button class="chip" type="button" data-ori="historical" aria-pressed="false">Others <span class="chip-n" id="count-origin-historical">0</span></button>
       </div>
-      <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
-    </div>
-    <div class="legend" aria-label="Diagram legend">
+        </div>
+      </div>
+        <label class="sr" for="filter">Filter pieces</label>
+        <input id="filter" type="search" placeholder="Filter pieces…">
+      </div>
+      <div class="legend" aria-label="Diagram legend">
+
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
@@ -380,43 +384,13 @@
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
-    </div>
+      </div>
+    </search>
   </header>
 
   <main>
-    <section role="tabpanel" id="tab-all"         aria-labelledby="tabbtn-all" class="active">
-      <div class="card-grid" id="grid-all"></div>
-    </section>
-    <section role="tabpanel" id="tab-pawn-like"   aria-labelledby="tabbtn-pawn-like">
-      <div class="card-grid" id="grid-pawn-like"></div>
-    </section>
-    <section role="tabpanel" id="tab-sliders"     aria-labelledby="tabbtn-sliders">
-      <div class="card-grid" id="grid-sliders"></div>
-    </section>
-    <section role="tabpanel" id="tab-leapers"     aria-labelledby="tabbtn-leapers">
-      <div class="card-grid" id="grid-leapers"></div>
-    </section>
-    <section role="tabpanel" id="tab-leap-riders" aria-labelledby="tabbtn-leap-riders">
-      <div class="card-grid" id="grid-leap-riders"></div>
-    </section>
-    <section role="tabpanel" id="tab-compounds"   aria-labelledby="tabbtn-compounds">
-      <div class="card-grid" id="grid-compounds"></div>
-    </section>
-    <section role="tabpanel" id="tab-hoppers"     aria-labelledby="tabbtn-hoppers">
-      <div class="card-grid" id="grid-hoppers"></div>
-    </section>
-    <section role="tabpanel" id="tab-others"      aria-labelledby="tabbtn-others">
-      <div class="card-grid" id="grid-others"></div>
-    </section>
-
-    <section role="tabpanel" id="tab-origin-standard"   aria-labelledby="tabbtn-origin-standard">  <div class="card-grid" id="grid-origin-standard"></div>   </section>
-    <section role="tabpanel" id="tab-origin-modern"     aria-labelledby="tabbtn-origin-modern">    <div class="card-grid" id="grid-origin-modern"></div>     </section>
-    <section role="tabpanel" id="tab-origin-problem"    aria-labelledby="tabbtn-origin-problem">   <div class="card-grid" id="grid-origin-problem"></div>    </section>
-    <section role="tabpanel" id="tab-origin-shogi"      aria-labelledby="tabbtn-origin-shogi">     <div class="card-grid" id="grid-origin-shogi"></div>      </section>
-    <section role="tabpanel" id="tab-origin-xiangqi"    aria-labelledby="tabbtn-origin-xiangqi">   <div class="card-grid" id="grid-origin-xiangqi"></div>    </section>
-    <section role="tabpanel" id="tab-origin-shatranj"   aria-labelledby="tabbtn-origin-shatranj">  <div class="card-grid" id="grid-origin-shatranj"></div>   </section>
-    <section role="tabpanel" id="tab-origin-tamerlane"  aria-labelledby="tabbtn-origin-tamerlane"> <div class="card-grid" id="grid-origin-tamerlane"></div>  </section>
-    <section role="tabpanel" id="tab-origin-historical" aria-labelledby="tabbtn-origin-historical"><div class="card-grid" id="grid-origin-historical"></div> </section>
+    <div class="card-grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>No pieces match these filters.</p>
   </main>
 
   <footer>
@@ -557,7 +531,9 @@
    *  Init
    * ============================================================ */
 
-  // Bucket pieces by family and render each tab's grid.
+  // Bucket by family so PIECE_ORDER can sort within each, then flatten once.
+  // The page renders ONE grid: previously every piece was emitted up to three
+  // times (family tab + "all" tab + origin tab), ~300 cards for 100 pieces.
   const grouped = Object.fromEntries(FAMILY_ORDER.map(f => [f, []]));
   for (const p of PIECES) {
     if (!grouped[p.family]) {
@@ -567,36 +543,17 @@
       grouped[p.family].push(p);
     }
   }
-  // Sort each family by its PIECE_ORDER. Unlisted pieces fall to the end.
   for (const f of FAMILY_ORDER) {
     const order = PIECE_ORDER[f] || [];
     grouped[f].sort((a, b) => {
-      const ai = order.indexOf(a.id);
-      const bi = order.indexOf(b.id);
+      const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
       if (ai === -1 && bi === -1) return 0;
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
     });
   }
-  for (const f of FAMILY_ORDER) {
-    const grid = document.getElementById('grid-' + f);
-    if (grouped[f].length) {
-      grid.innerHTML = grouped[f].map(renderCard).join('');
-    } else {
-      grid.innerHTML = '<p class="empty-tab">No pieces here yet — reserved for pieces whose defining feature isn’t one of the five movement families.</p>';
-    }
-    document.getElementById('count-' + f).textContent = grouped[f].length;
-    const fbtn = document.getElementById('tabbtn-' + f);
-    if (fbtn && grouped[f].length === 0) fbtn.classList.add('is-empty');
-  }
 
-  // Render the "All pieces" tab: flat grid of every piece, ordered by family then PIECE_ORDER.
-  const allOrdered = FAMILY_ORDER.flatMap(f => grouped[f]);
-  document.getElementById('grid-all').innerHTML = allOrdered.map(p => renderCard({ ...p, _idSuffix: '--all' })).join('');
-  document.getElementById('count-all').textContent = allOrdered.length;
-
-  // Bucket pieces by origin and render each origin tab's grid.
   const ORIGIN_BUCKETS = [
     { id: 'standard',   origins: ['Standard'] },
     { id: 'modern',     origins: ['Modern', 'Modern variants', 'Modern variants (Betza, Gilman, Cazaux)', 'Omega Chess', 'Maharajah and the Sepoys'] },
@@ -609,96 +566,131 @@
   ];
   const originToBucket = new Map();
   for (const b of ORIGIN_BUCKETS) for (const o of b.origins) originToBucket.set(o, b.id);
-  const byOrigin = Object.fromEntries(ORIGIN_BUCKETS.map(b => [b.id, []]));
-  for (const p of PIECES) {
-    const bucketId = originToBucket.get(p.origin);
-    if (bucketId) byOrigin[bucketId].push(p);
-    else console.warn('Unbucketed origin:', p.origin, 'on piece', p.id);
+
+  const ALL = FAMILY_ORDER.flatMap(f => grouped[f]);
+  for (const p of ALL) {
+    p._bucket = originToBucket.get(p.origin) || '';
+    if (!p._bucket) console.warn('Unbucketed origin:', p.origin, 'on piece', p.id);
   }
-  for (const b of ORIGIN_BUCKETS) {
-    const grid = document.getElementById('grid-origin-' + b.id);
-    if (byOrigin[b.id].length) {
-      grid.innerHTML = byOrigin[b.id].map(p => renderCard({ ...p, _idSuffix: '--origin' })).join('');
-    } else {
-      grid.innerHTML = '<p class="empty-tab">No pieces in this origin yet.</p>';
-    }
-    document.getElementById('count-origin-' + b.id).textContent = byOrigin[b.id].length;
-    const obtn = document.getElementById('tabbtn-origin-' + b.id);
-    if (obtn && byOrigin[b.id].length === 0) obtn.classList.add('is-empty');
-  }
+  document.getElementById('grid').innerHTML = ALL.map(renderCard).join('');
 
-  // Tabs
-  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
-  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+  // Pair every card element with its piece once, so filtering never re-queries.
+  const CARDS = Array.from(document.querySelectorAll('#grid .card'))
+    .map((el, i) => ({ el, piece: ALL[i], hay: el.dataset.search || '' }));
 
-  function activateTab(panelId, opts = {}) {
-    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
-    tabBtns.forEach(b => {
-      const sel = b.getAttribute('aria-controls') === panelId;
-      b.setAttribute('aria-selected', sel ? 'true' : 'false');
-      b.setAttribute('tabindex', sel ? '0' : '-1');
-    });
-    if (!opts.skipHash) history.replaceState(null, '', '#' + panelId);
-  }
-
-  tabBtns.forEach((btn, i) => {
-    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + tabBtns.length) % tabBtns.length;
-        tabBtns[next].focus();
-        activateTab(tabBtns[next].getAttribute('aria-controls'));
-      }
-    });
-  });
-
-  // Hash routing: honor any #tab-<family> on load.
-  if (location.hash.startsWith('#tab-')) {
-    const wantedId = location.hash.slice(1);
-    if (document.getElementById(wantedId)) {
-      activateTab(wantedId, { skipHash: true });
-    }
-  }
-
-  // Filter: scope across every card grid so switching tabs preserves the filter.
+  /* ============================================================
+   *  Filtering — chips are multi-select: OR within a row, AND across rows.
+   *  Counts are facet counts: each chip shows what it WOULD yield, i.e. its
+   *  own row's selection is ignored when counting it. That is why selecting
+   *  "Leapers" leaves the other family counts meaningful instead of zeroed.
+   * ============================================================ */
+  const famChips = Array.from(document.querySelectorAll('.chip[data-fam]'));
+  const oriChips = Array.from(document.querySelectorAll('.chip[data-ori]'));
+  const gridEl = document.getElementById('grid');
+  const emptyEl = document.getElementById('empty');
   const filterInput = document.getElementById('filter');
-  filterInput.addEventListener('input', () => {
-    const q = filterInput.value.trim().toLowerCase();
-    const visibleFamily = Object.fromEntries(FAMILY_ORDER.map(f => [f, 0]));
-    const visibleOrigin = Object.fromEntries(ORIGIN_BUCKETS.map(b => [b.id, 0]));
-    let visibleAll = 0;
-    document.querySelectorAll('.card-grid .card').forEach(card => {
-      const haystack = card.dataset.search || '';
-      const show = !q || haystack.includes(q);
-      card.style.display = show ? '' : 'none';
-      if (show) {
-        const grid = card.closest('.card-grid');
-        const gid = grid && grid.id;
-        if (gid === 'grid-all') {
-          visibleAll++;
-        } else if (gid && gid.startsWith('grid-origin-')) {
-          const b = gid.replace('grid-origin-', '');
-          if (visibleOrigin[b] !== undefined) visibleOrigin[b]++;
-        } else if (gid) {
-          const f = gid.replace(/^grid-/, '');
-          if (visibleFamily[f] !== undefined) visibleFamily[f]++;
-        }
-      }
+
+  const famSel = new Set();   // empty === "All pieces"
+  const oriSel = new Set();
+  let q = '';
+
+  const matchQ = c => !q || c.hay.includes(q);
+  const matchFam = c => famSel.size === 0 || famSel.has(c.piece.family);
+  const matchOri = c => oriSel.size === 0 || oriSel.has(c.piece._bucket);
+
+  function apply() {
+    let shown = 0;
+    for (const c of CARDS) {
+      const vis = matchQ(c) && matchFam(c) && matchOri(c);
+      c.el.hidden = !vis;
+      if (vis) shown++;
+    }
+    emptyEl.hidden = shown > 0;
+    gridEl.hidden = shown === 0;
+
+    // family counts ignore famSel; origin counts ignore oriSel
+    const famBase = CARDS.filter(c => matchQ(c) && matchOri(c));
+    const oriBase = CARDS.filter(c => matchQ(c) && matchFam(c));
+    for (const chip of famChips) {
+      const v = chip.dataset.fam;
+      const n = v === '*' ? famBase.length : famBase.filter(c => c.piece.family === v).length;
+      chip.querySelector('.chip-n').textContent = n;
+      chip.disabled = n === 0 && v !== '*';
+      chip.setAttribute('aria-pressed', String(v === '*' ? famSel.size === 0 : famSel.has(v)));
+    }
+    for (const chip of oriChips) {
+      const v = chip.dataset.ori;
+      const n = oriBase.filter(c => c.piece._bucket === v).length;
+      chip.querySelector('.chip-n').textContent = n;
+      chip.disabled = n === 0;
+      chip.setAttribute('aria-pressed', String(oriSel.has(v)));
+    }
+
+    // the panel is usually shut, so the button carries the active count
+    const active = famSel.size + oriSel.size;
+    filt.querySelector('.n').textContent = active ? String(active) : '';
+    filt.setAttribute('aria-label', active
+      ? `Filters, ${active} active` : 'Filters');
+  }
+
+  function toggle(set, v) { set.has(v) ? set.delete(v) : set.add(v); }
+
+  /* ---- Collapsible filter panel, same shell and motion as the deck pages.
+       The rows are kept painted at their open width for the whole move, or
+       they would re-wrap on every frame as the frame resizes. ---- */
+  const barEl = document.querySelector('.bar');
+  const fbox = document.querySelector('.fbox');
+  const filt = document.querySelector('.filt');
+  const rowsEl = document.getElementById('enc-chips');
+
+  function setOpen(open) {
+    const from = fbox.getBoundingClientRect();
+    let rowsW = open ? 0 : rowsEl.getBoundingClientRect().width;
+    filt.setAttribute('aria-expanded', String(open));
+    rowsEl.hidden = !open;
+    const to = fbox.getBoundingClientRect();
+    if (open) rowsW = rowsEl.getBoundingClientRect().width;
+    if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+
+    rowsEl.hidden = false;
+    rowsEl.style.width = rowsW + 'px';
+    barEl.style.height = barEl.getBoundingClientRect().height + 'px';
+    fbox.classList.add('sizing');
+    fbox.animate(
+      [{ width: `${from.width}px`, height: `${from.height}px` },
+       { width: `${to.width}px`,   height: `${to.height}px` }],
+      { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' }
+    ).finished.then(() => {
+      rowsEl.style.width = '';
+      rowsEl.hidden = !open;
+      barEl.style.height = '';
+      fbox.classList.remove('sizing');
+    }).catch(() => {});
+  }
+  filt.addEventListener('click', () => setOpen(filt.getAttribute('aria-expanded') !== 'true'));
+
+  for (const chip of famChips) {
+    chip.addEventListener('click', () => {
+      const v = chip.dataset.fam;
+      if (v === '*') famSel.clear(); else toggle(famSel, v);
+      apply();
     });
-    for (const f of FAMILY_ORDER) {
-      document.getElementById('count-' + f).textContent = visibleFamily[f];
-    }
-    for (const b of ORIGIN_BUCKETS) {
-      document.getElementById('count-origin-' + b.id).textContent = visibleOrigin[b.id];
-    }
-    document.getElementById('count-all').textContent = visibleAll;
-  });
+  }
+  for (const chip of oriChips) {
+    chip.addEventListener('click', () => { toggle(oriSel, chip.dataset.ori); apply(); });
+  }
+  filterInput.addEventListener('input', () => { q = filterInput.value.trim().toLowerCase(); apply(); });
+
+  // Keep the old deep links working: #tab-leapers / #tab-origin-shogi.
+  const hash = location.hash.slice(1);
+  if (hash.startsWith('tab-origin-')) oriSel.add(hash.replace('tab-origin-', ''));
+  else if (hash.startsWith('tab-') && hash !== 'tab-all') famSel.add(hash.replace('tab-', ''));
+
+  apply();
 
   </script>
   <!-- Shared theme JS (cached across pages). See ../assets/theme.js. -->
   <script src="../assets/nav.js"></script>
   <script src="../assets/theme.js"></script>
-  <script src="../assets/tabs.js"></script>
 </body>
 </html>

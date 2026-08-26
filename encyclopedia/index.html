@@ -29,11 +29,10 @@
           overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 
     /* ============== Filter zone ==============
-       Same chip pattern as the other pages. The Filters box and the search sit
-       on one aligned row; the legend runs beneath them. Chips are multi-select
-       — OR within a row, AND across the two rows. */
-    .bar { display: flex; flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 20px; }
-    .bar-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+       Same chip pattern as the other pages: a collapsible Filters box holding
+       two rows of pill toggles, with the legend beneath it. Chips are
+       multi-select — OR within a row, AND across the two rows. */
+    .bar { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
     /* The button IS the container: closed it hugs its own label, open it grows
        into the panel holding the two rows. Same shell as fusion/inversion/
        promotion, so the control reads identically across the site. */
@@ -50,9 +49,8 @@
     @media (prefers-reduced-transparency: reduce) {
       .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
     }
-    /* open, it takes the rest of the row so the panel reaches the search */
-    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; flex: 1 1 auto; }
-    /* closed, match the search field's height so the two line up exactly */
+    /* open, the box claims the full width of the bar */
+    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; align-self: stretch; }
     .filt {
       appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono); letter-spacing: .09em;
       text-transform: uppercase; padding: 0 16px; min-height: 42px; border: 0; background: transparent;
@@ -96,21 +94,11 @@
     }
     .chip[aria-pressed="true"] .chip-n { color: #fff; }
 
-    /* sits on the same row as the Filters box, matching its closed height */
-    .bar-top input[type="search"] {
-      appearance: none; flex: 0 0 auto; width: 300px; max-width: 100%;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--rad-pill); padding: 0 18px; height: 44px;
-      font: 400 14px/1 var(--sans, inherit); color: var(--text);
-      transition: border-color .2s var(--ease);
-    }
-    .bar-top input[type="search"]::placeholder { color: var(--text-dim); }
-    .bar-top input[type="search"]:focus { outline: none; border-color: var(--violet-hi); }
-    @media (max-width: 720px) { .bar-top input[type="search"] { flex: 1 1 100%; width: auto; } }
 
     /* ============== Legend ==============
-       Runs beneath the filter row, full width, with no box of its own. */
+       Runs beneath the Filters box, full width, with no box of its own. */
     .legend {
+      align-self: stretch;
       display: flex;
       flex-wrap: wrap;
       gap: 8px 18px;
@@ -149,14 +137,18 @@
        part-transparent surface, blurred so the aura below shows through. */
     .card {
       background:
-        linear-gradient(150deg, rgba(160,112,232,.10), rgba(24,16,48,.12) 46%),
-        color-mix(in srgb, var(--surface) 66%, transparent);
+        linear-gradient(150deg, rgba(160,112,232,.12), rgba(24,16,48,.14) 46%),
+        color-mix(in srgb, var(--surface) 54%, transparent);
       backdrop-filter: blur(16px) saturate(150%);
       -webkit-backdrop-filter: blur(16px) saturate(150%);
-      border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+      /* The rim is struck from --text, not --border: --border at 72% composites
+         to within a few units of the card fill, so the edge disappeared. A
+         percentage of the text colour always contrasts with its own surface,
+         in either theme. The inset highlight is the lit top edge. */
+      border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
       border-radius: 14px;
       padding: 18px;
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text) 10%, transparent);
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -166,16 +158,26 @@
     @media (prefers-reduced-transparency: reduce) {
       .card { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
     }
+    /* The aura is what the cards' blur actually has to work on. The other
+       redesigned pages only tint the top corners, which is fine there because
+       their content overlaps; here the grid runs the length of the page, so
+       the wash has to reach it or the blur is sampling flat colour and the
+       glass reads as a plain panel. Fixed, so it shifts under the cards as
+       the grid scrolls. */
     body::before {
       content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
       background:
-        radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.13), transparent 68%),
-        radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.11), transparent 66%);
+        radial-gradient(720px 460px at 12% -6%, rgba(106,46,208,.16), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(111,148,32,.13), transparent 66%),
+        radial-gradient(900px 700px at 78% 62%, rgba(106,46,208,.10), transparent 70%),
+        radial-gradient(800px 620px at 18% 96%, rgba(111,148,32,.09), transparent 70%);
     }
     [data-theme="dark"] body::before {
       background:
-        radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.30), transparent 68%),
-        radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.13), transparent 66%);
+        radial-gradient(720px 460px at 12% -6%, rgba(122,58,232,.34), transparent 68%),
+        radial-gradient(560px 380px at 92% 4%, rgba(168,208,72,.15), transparent 66%),
+        radial-gradient(900px 700px at 78% 62%, rgba(122,58,232,.20), transparent 70%),
+        radial-gradient(800px 620px at 18% 96%, rgba(168,208,72,.10), transparent 70%);
     }
     .card-header {
       display: flex;
@@ -307,7 +309,6 @@
       .bar { gap: 7px; }
       .bar .chips { gap: 5px; }
       .bar .chip { padding: 7px 10px; font-size: 10px; letter-spacing: .05em; }
-      .bar .bar-top input[type="search"] { min-height: 38px; height: 38px; font-size: 13px; }
       .legend { font-size: 11.5px; gap: 6px 12px; }
       /* Deep-linked cards must clear the sticky header. nav.js measures it
          into --nav-h, so this no longer goes stale when the nav changes shape. */
@@ -345,7 +346,6 @@
       Sourced from <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia's <em>List of fairy chess pieces</em></a>.
     </p>
     <search class="bar">
-      <div class="bar-top">
       <div class="fbox">
         <button class="filt" type="button" aria-expanded="false" aria-controls="enc-chips">Filters <span class="n"></span></button>
         <div class="chip-rows" id="enc-chips" hidden>
@@ -370,9 +370,6 @@
         <button class="chip" type="button" data-ori="historical" aria-pressed="false">Others <span class="chip-n" id="count-origin-historical">0</span></button>
       </div>
         </div>
-      </div>
-        <label class="sr" for="filter">Filter pieces</label>
-        <input id="filter" type="search" placeholder="Filter pieces…">
       </div>
       <div class="legend" aria-label="Diagram legend">
 
@@ -588,20 +585,17 @@
   const oriChips = Array.from(document.querySelectorAll('.chip[data-ori]'));
   const gridEl = document.getElementById('grid');
   const emptyEl = document.getElementById('empty');
-  const filterInput = document.getElementById('filter');
 
   const famSel = new Set();   // empty === "All pieces"
   const oriSel = new Set();
-  let q = '';
 
-  const matchQ = c => !q || c.hay.includes(q);
   const matchFam = c => famSel.size === 0 || famSel.has(c.piece.family);
   const matchOri = c => oriSel.size === 0 || oriSel.has(c.piece._bucket);
 
   function apply() {
     let shown = 0;
     for (const c of CARDS) {
-      const vis = matchQ(c) && matchFam(c) && matchOri(c);
+      const vis = matchFam(c) && matchOri(c);
       c.el.hidden = !vis;
       if (vis) shown++;
     }
@@ -609,8 +603,8 @@
     gridEl.hidden = shown === 0;
 
     // family counts ignore famSel; origin counts ignore oriSel
-    const famBase = CARDS.filter(c => matchQ(c) && matchOri(c));
-    const oriBase = CARDS.filter(c => matchQ(c) && matchFam(c));
+    const famBase = CARDS.filter(matchOri);
+    const oriBase = CARDS.filter(matchFam);
     for (const chip of famChips) {
       const v = chip.dataset.fam;
       const n = v === '*' ? famBase.length : famBase.filter(c => c.piece.family === v).length;
@@ -679,7 +673,6 @@
   for (const chip of oriChips) {
     chip.addEventListener('click', () => { toggle(oriSel, chip.dataset.ori); apply(); });
   }
-  filterInput.addEventListener('input', () => { q = filterInput.value.trim().toLowerCase(); apply(); });
 
   // Keep the old deep links working: #tab-leapers / #tab-origin-shogi.
   const hash = location.hash.slice(1);

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="The 180 NO KINGS artefacts as a density map wired to a ledger: rarity, effect, and the conspiracy behind every name.">
   <title>NO KINGS / Artefacts</title>
@@ -35,17 +36,17 @@
   :root{
     --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
     --border:#e0d0ae; --border-soft:#ebdcbf;
-    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
     /* --lime is the display colour (hero gradient, chip fills, active states).
-       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
-       which fails AA for body text, while #556f18 is 4.86:1. Large display type
-       needs just 3:1, so the gradient keeps the bright one. */
-    --lime:#6f9420; --accent:#556f18;
+       --accent is the LINK colour. Both are AA on this cream: --lime #577319 is
+       4.61:1 and --accent #556f18 is 4.86:1. (--lime was #6f9420 at 3.01:1,
+       which failed AA wherever it was used as text, so it was darkened.) */
+    --lime:#577319; --on-lime:#fcf0d8; --accent:#556f18;
     /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
        Teal rather than a second green, because at 15px two greens next to each
        other in the rail are not tellable apart. */
-    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --r-common:#656a76; --r-uncommon:#10766d; --r-rare:#537416; --r-legendary:#7a3ae8;
     --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -58,9 +59,9 @@
   [data-theme="dark"]{
     --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
     --border:#332352; --border-soft:#261a44;
-    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
     --violet:#7a3ae8; --violet-hi:#a070e8;
-    --lime:#a8d048; --accent:#a8d048;
+    --lime:#a8d048; --on-lime:#141024; --accent:#a8d048;
     --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
     --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
   }
@@ -143,7 +144,7 @@
     padding:9px 16px;border-radius:var(--rad-pill);transition:.18s var(--ease);
   }
   .group button:hover{color:var(--text)}
-  .group button[aria-pressed="true"]{background:var(--lime);color:#141024}
+  .group button[aria-pressed="true"]{background:var(--lime);color:var(--on-lime)}
 
   .chips{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 0;min-width:0}
   @media (max-width:1280px){.chips{order:4;flex:1 1 100%}}
@@ -202,7 +203,7 @@
   .tier-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   /* Grouped by bonus there is no rarity on the tier, so the label falls back to
      ink; the squares inside still carry their own rarity colour. */
-  .tier-hd h3{
+  .tier-hd h2{
     margin:0;font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;
     color:var(--c,var(--text));
   }
@@ -386,7 +387,7 @@
     .tier{padding:4px 4px 5px;border-radius:8px}
     .tier-hd{margin-bottom:3px;gap:2px}
     /* No room for wide tracking or the count at this width. */
-    .tier-hd h3{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tier-hd h2{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tier-hd .n{display:none}
     .legend{display:none}
     .threads path{stroke-width:.75;opacity:.42}
@@ -413,7 +414,7 @@
   <p>Every artefact in NO KINGS, named for a conspiracy, a mystery or a lost treasure that people still argue about.</p>
 </header>
 
-<div class="bar">
+<search class="bar">
   <label class="sr" for="q">Search artefacts</label>
   <input id="q" type="search" placeholder="Search name, effect, conspiracy">
   <div class="chips" id="chips"></div>
@@ -424,9 +425,12 @@
     </div>
     <p class="count" id="count" role="status" aria-live="polite"></p>
   </div>
-</div>
+</search>
 
 <main>
+  <!-- The rail is a visual density map (aria-hidden), so the ledger carries the
+       document outline: this h2 keeps h1 -> h3 rows from skipping a level. -->
+  <h2 class="sr">Artefact ledger</h2>
   <div class="wrap">
     <aside class="rail" id="rail" aria-hidden="true"></aside>
     <div class="ledger" id="ledger"></div>
@@ -512,7 +516,7 @@ function buildRail(view) {
     const items = [];
     ARTEFACTS.forEach((a, i) => { if (g.of(a).includes(key)) items.push(i); });
     return `<section class="tier"${view === 'rarity' ? ` data-r="${key}"` : ''}>
-      <div class="tier-hd"><h3>${esc(key)}</h3><span class="n">${items.length}</span></div>
+      <div class="tier-hd"><h2>${esc(key)}</h2><span class="n">${items.length}</span></div>
       <div class="grid">${items.map(i => {
         const a = ARTEFACTS[i];
         return `<button class="cell" type="button" tabindex="-1" data-cell="${i}"

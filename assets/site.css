@@ -48,7 +48,7 @@
   /* Shared with artefacts.html so assets/nav.css can style one header for both. */
   --surface-2: #fff8ea;
   --border-soft: #ebdcbf;
-  --text-dim: #8d7fa8;
+  --text-dim: #6f6484;
   --wrap: 1560px;   /* one centred-column width for the whole site */
 }
 
@@ -75,7 +75,7 @@
   --violet-hi: #a070e8;
   --surface-2: #221643;
   --border-soft: #261a44;
-  --text-dim: #7d719c;
+  --text-dim: #8c81a9;
 }
 
 /* ============== Base ============== */

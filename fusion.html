@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="The 36 NO KINGS fusions as equation card stacks: two pieces whose movement combines into a third, additive or synergistic.">
   <title>NO KINGS / Fusions</title>
@@ -31,17 +32,17 @@
   :root{
     --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
     --border:#e0d0ae; --border-soft:#ebdcbf;
-    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
     /* --lime is the display colour (hero gradient, chip fills, active states).
-       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
-       which fails AA for body text, while #556f18 is 4.86:1. Large display type
-       needs just 3:1, so the gradient keeps the bright one. */
-    --lime:#6f9420; --accent:#556f18;
+       --accent is the LINK colour. Both are AA on this cream: --lime #577319 is
+       4.61:1 and --accent #556f18 is 4.86:1. (--lime was #6f9420 at 3.01:1,
+       which failed AA wherever it was used as text, so it was darkened.) */
+    --lime:#577319; --accent:#556f18;
     /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
        Teal rather than a second green, because at 15px two greens next to each
        other in the rail are not tellable apart. */
-    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --r-common:#656a76; --r-uncommon:#10766d; --r-rare:#537416; --r-legendary:#7a3ae8;
     --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
     /* Board tokens for assets/board.js, copied from assets/site.css. */
     --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
@@ -60,7 +61,7 @@
   [data-theme="dark"]{
     --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
     --border:#332352; --border-soft:#261a44;
-    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
     --violet:#7a3ae8; --violet-hi:#a070e8;
     --lime:#a8d048; --accent:#a8d048;
     --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
@@ -348,7 +349,7 @@ html{overflow-x:clip}
   padding:0 4px;text-align:center}
 .dcard .stg{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
 /* colours off the artefact rarity ramp: the inputs share lime, the product is
-   violet. --r-rare, not --lime: the bright lime is 3.01:1 on cream and this
+   violet. --r-rare, not --lime: --lime reads as a heading colour here and this
    label is 8.5px, which needs 4.5:1 (see artefacts.html). */
 .dcard:nth-of-type(1) .stg,.dcard:nth-of-type(2) .stg{color:var(--r-rare)}
 .dcard:nth-of-type(3) .stg{color:var(--r-legendary)}
@@ -531,12 +532,11 @@ const stack = (f, i) => `<div class="stk" data-ids="${IDS(f).join(' ')}">
                aria-label="Fan out the ${esc(nm(f.out))} cards">${FX}</button>
      </div>
      <div class="deck" tabindex="0" role="button"
-          data-c="${i}"
-          aria-label="Open ${esc(nm(f.lhs))} plus ${esc(nm(f.rhs))} equals ${esc(nm(f.out))}">
+          data-c="${i}">
      ${IDS(f).map((id, k) => {
        const p = LOOKUP[id];
        return `<div class="dcard${DEPTH[k] ? '' : ' front'}" style="--k:${k};--d:${DEPTH[k]}">
-         <span class="brd">${renderBoard(p)}</span>
+         <span class="brd" aria-hidden="true">${renderBoard(p)}</span>
          <span class="nm">${esc(p.name)} <span class="stg">${ROLES(f)[k]}</span></span></div>`;
      }).join('')}
      </div>

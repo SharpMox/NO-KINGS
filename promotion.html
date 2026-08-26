@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="The 8 NO KINGS promotion chains as card stacks: fuse two identical pieces and the pair climbs one step, base to mid to end.">
   <title>NO KINGS / Promotions</title>
@@ -25,17 +26,17 @@
   :root{
     --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
     --border:#e0d0ae; --border-soft:#ebdcbf;
-    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
     /* --lime is the display colour (hero gradient, chip fills, active states).
-       --accent is the LINK colour: the bright lime is only 3.01:1 on this cream,
-       which fails AA for body text, while #556f18 is 4.86:1. Large display type
-       needs just 3:1, so the gradient keeps the bright one. */
-    --lime:#6f9420; --accent:#556f18;
+       --accent is the LINK colour. Both are AA on this cream: --lime #577319 is
+       4.61:1 and --accent #556f18 is 4.86:1. (--lime was #6f9420 at 3.01:1,
+       which failed AA wherever it was used as text, so it was darkened.) */
+    --lime:#577319; --accent:#556f18;
     /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
        Teal rather than a second green, because at 15px two greens next to each
        other in the rail are not tellable apart. */
-    --r-common:#7d8492; --r-uncommon:#12857b; --r-rare:#5f8419; --r-legendary:#7a3ae8;
+    --r-common:#656a76; --r-uncommon:#10766d; --r-rare:#537416; --r-legendary:#7a3ae8;
     --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
     /* Board tokens for assets/board.js, copied from assets/site.css. */
     --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
@@ -54,7 +55,7 @@
   [data-theme="dark"]{
     --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
     --border:#332352; --border-soft:#261a44;
-    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
     --violet:#7a3ae8; --violet-hi:#a070e8;
     --lime:#a8d048; --accent:#a8d048;
     --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
@@ -267,7 +268,7 @@
   width:max-content;max-width:100%;border-radius:10px;cursor:pointer;
   transition:background .18s var(--ease)}
 .stk-hd:hover{background:color-mix(in srgb,var(--surface) 70%,transparent)}
-.stk-hd h3{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}
+.stk-hd h2{margin:0;font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase}
 .fx{appearance:none;cursor:pointer;border:0;background:transparent;padding:3px;line-height:0;
   color:var(--text-dim);border-radius:7px;transition:color .18s var(--ease)}
 .fx:hover,.stk-hd:hover .fx{color:var(--lime)}
@@ -489,16 +490,15 @@ const FX = `<svg viewBox="0 0 23 12" width="17" height="9" aria-hidden="true">
 $('#decks').innerHTML = CH.map((c, i) =>
   `<div class="stk" data-ids="${c.ids.join(' ')}">
      <div class="stk-hd">
-       <h3 style="color:${HUES[i]}">${esc(TITLE(c))}</h3>
+       <h2 style="color:${HUES[i]}">${esc(TITLE(c))}</h2>
        <button class="fx" type="button" aria-pressed="true"
                aria-label="Stack the ${esc(TITLE(c))} cards">${FX}</button>
      </div>
-     <div class="deck fan" tabindex="0" role="button" data-c="${i}"
-        aria-label="Open the ${esc(TITLE(c))} stack">
+     <div class="deck fan" tabindex="0" role="button" data-c="${i}">
      ${c.ids.map((id, k) => {
        const p = LOOKUP[id];
        return `<div class="dcard${k ? '' : ' front'}" style="--k:${k}">
-         <span class="brd">${renderBoard(p)}</span>
+         <span class="brd" aria-hidden="true">${renderBoard(p)}</span>
          <span class="nm">${esc(p.name)} <span class="stg">${STAGES[k]}</span></span></div>`;
      }).join('')}
      </div>

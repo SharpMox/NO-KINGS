@@ -10,7 +10,6 @@
   <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
-  <script src="data/pieces-encyclopedia.js"></script>
   <script src="data/promotions.js"></script>
   <style>
   /* ============================================================
@@ -464,7 +463,6 @@ const $$ = s => [...document.querySelectorAll(s)];
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const LOOKUP = {};
-PIECES_ENCYCLOPEDIA.forEach(p => LOOKUP[p.id] = p);
 PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
 const CH = PROMOTION_CHAINS;
 // every line and line title in the accent lime, per direction

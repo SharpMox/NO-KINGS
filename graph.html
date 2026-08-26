@@ -491,6 +491,7 @@
   <script src="data/pieces-codex.js"></script>
   <script src="data/promotions.js"></script>
   <script src="data/fusions.js"></script>
+  <script src="data/inversions.js"></script>
 </head>
 <body>
   <div id="site-nav" data-page="graph"></div>
@@ -579,24 +580,6 @@
     const f = fusionMap.get([rowId, colId].sort().join('|'));
     return f ? { result: f.out, kind: f.kind } : null;
   }
-  // Inversion pairs (14 total) — copied verbatim from inversion.html.
-  const INVERSION_PAIRS = [
-    ['wazir',           'ferz'],
-    ['bishop',          'rook'],
-    ['pawn',            'berolina'],
-    ['sergeant',        'inv-sergeant'],
-    ['arrow-pawn',      'inv-arrow-pawn'],
-    ['dragon-horse',    'dragon-king'],
-    ['kirin',           'squirrel'],
-    ['elephant-modern', 'war-machine'],
-    ['archbishop',      'chancellor'],
-    ['kirin-plus',      'inv-kirin-plus'],
-    ['high-priestess',  'champion'],
-    ['banshee',         'raven'],
-    ['kirin-plus-plus', 'inv-kirin-plus-plus'],
-    ['gryphon',         'manticore']
-  ];
-
   // Shared rendering helpers.
   function zoomedBoard(piece) {
     return renderBoard(piece).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
@@ -944,7 +927,7 @@
       }
     }
     // Inversion edges (undirected).
-    for (const [a, b] of INVERSION_PAIRS) {
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
       NET.edges.push({ kind: 'inversion', from: a, to: b, directed: false });
     }
   }
@@ -988,7 +971,7 @@
     }
     // For each inversion pair that involves an actual Void piece, place the
     // Void on the outer ring radially aligned with its non-Void partner.
-    for (const [a, b] of INVERSION_PAIRS) {
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
       const voidId = VOID_IDS.has(a) ? a : (VOID_IDS.has(b) ? b : null);
       if (!voidId) continue;
       const baseId = voidId === a ? b : a;

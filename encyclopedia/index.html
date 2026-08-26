@@ -350,7 +350,6 @@
         <button class="filt" type="button" aria-expanded="false" aria-controls="enc-chips">Filters <span class="n"></span></button>
         <div class="chip-rows" id="enc-chips" hidden>
       <div class="chips" role="group" aria-label="Filter by movement family">
-        <button class="chip" type="button" data-fam="*" aria-pressed="true">All pieces <span class="chip-n" id="count-all">0</span></button>
         <button class="chip" type="button" data-fam="pawn-like" aria-pressed="false">Pawn-like <span class="chip-n" id="count-pawn-like">0</span></button>
         <button class="chip" type="button" data-fam="sliders" aria-pressed="false">Sliders <span class="chip-n" id="count-sliders">0</span></button>
         <button class="chip" type="button" data-fam="leapers" aria-pressed="false">Leapers <span class="chip-n" id="count-leapers">0</span></button>
@@ -586,7 +585,7 @@
   const gridEl = document.getElementById('grid');
   const emptyEl = document.getElementById('empty');
 
-  const famSel = new Set();   // empty === "All pieces"
+  const famSel = new Set();   // empty === no family filter, i.e. show all
   const oriSel = new Set();
 
   const matchFam = c => famSel.size === 0 || famSel.has(c.piece.family);
@@ -607,10 +606,10 @@
     const oriBase = CARDS.filter(matchFam);
     for (const chip of famChips) {
       const v = chip.dataset.fam;
-      const n = v === '*' ? famBase.length : famBase.filter(c => c.piece.family === v).length;
+      const n = famBase.filter(c => c.piece.family === v).length;
       chip.querySelector('.chip-n').textContent = n;
-      chip.disabled = n === 0 && v !== '*';
-      chip.setAttribute('aria-pressed', String(v === '*' ? famSel.size === 0 : famSel.has(v)));
+      chip.disabled = n === 0;
+      chip.setAttribute('aria-pressed', String(famSel.has(v)));
     }
     for (const chip of oriChips) {
       const v = chip.dataset.ori;
@@ -664,11 +663,7 @@
   filt.addEventListener('click', () => setOpen(filt.getAttribute('aria-expanded') !== 'true'));
 
   for (const chip of famChips) {
-    chip.addEventListener('click', () => {
-      const v = chip.dataset.fam;
-      if (v === '*') famSel.clear(); else toggle(famSel, v);
-      apply();
-    });
+    chip.addEventListener('click', () => { toggle(famSel, chip.dataset.fam); apply(); });
   }
   for (const chip of oriChips) {
     chip.addEventListener('click', () => { toggle(oriSel, chip.dataset.ori); apply(); });

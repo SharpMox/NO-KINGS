@@ -134,17 +134,11 @@
       align-items: start;
     }
     .sandbox-board { grid-area: board; }
-    /* An <svg> with no width/height attributes has a default intrinsic size of
-       300x150, so `width: 100%` inside an `auto` grid track resolved the track
-       to 300px and the board sat at exactly 300x300 at every desktop width —
-       never shrinking to give the Codes panel room, never growing either. A
-       real viewport-relative size lets it scale. */
-    /* Only where the fixed panel is actually competing for width. Below 961px
-       the panel rejoins the flow and the sandbox has the page to itself, so a
-       vw-based size would shrink the board for no reason. */
-    @media (min-width: 961px) {
-      .sandbox > .sandbox-board { width: clamp(200px, 19vw, 300px); }
-    }
+    /* The diagram never goes below 300x300 — squares stop being readable well
+       before that. A flat floor, not min(300px, 100%): as a percentage that
+       resolves against the grid area, which let the track undercut it (270px
+       at 1000). 300 still fits a 320px viewport once the gutters come off. */
+    .sandbox-board { min-width: 300px; }
     .sandbox > .fbox { grid-area: codes; }
     .sandbox > .legend { grid-area: legend; }
     .sandbox-controls { grid-area: controls; }
@@ -169,6 +163,19 @@
       flex-direction: column; align-items: stretch; gap: 0;
     }
     .sandbox:has(.filt[aria-expanded="true"]) > .legend { flex-direction: row; flex-wrap: wrap; gap: 8px 18px; }
+
+    /* The open row needs board(300) + gap(24) + codes(320) = 644px. Between
+       961 and 1320 the fixed panel leaves less than that, and the board can no
+       longer absorb the difference now it has a floor — so the open state
+       stacks there instead of overflowing. */
+    @media (min-width: 961px) and (max-width: 1320px) {
+      .sandbox:has(.filt[aria-expanded="true"]) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "board" "codes" "legend" "controls";
+        justify-content: center;
+      }
+      .sandbox:has(.filt[aria-expanded="true"]) > .sandbox-board { margin-inline: auto; }
+    }
 
     /* Narrow: one column, everything stacked in source order. */
     @media (max-width: 720px) {

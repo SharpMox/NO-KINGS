@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Three views on the NO-KINGS codex pieces: flat reference table, merge/fusion matrix, and force-directed relationship graph.">
   <title>NO KINGS / Graph</title>
@@ -490,6 +491,7 @@
   <script src="data/pieces-codex.js"></script>
   <script src="data/promotions.js"></script>
   <script src="data/fusions.js"></script>
+  <script src="data/inversions.js"></script>
 </head>
 <body>
   <div id="site-nav" data-page="graph"></div>
@@ -578,24 +580,6 @@
     const f = fusionMap.get([rowId, colId].sort().join('|'));
     return f ? { result: f.out, kind: f.kind } : null;
   }
-  // Inversion pairs (14 total) — copied verbatim from inversion.html.
-  const INVERSION_PAIRS = [
-    ['wazir',           'ferz'],
-    ['bishop',          'rook'],
-    ['pawn',            'berolina'],
-    ['sergeant',        'inv-sergeant'],
-    ['arrow-pawn',      'inv-arrow-pawn'],
-    ['dragon-horse',    'dragon-king'],
-    ['kirin',           'squirrel'],
-    ['elephant-modern', 'war-machine'],
-    ['archbishop',      'chancellor'],
-    ['kirin-plus',      'inv-kirin-plus'],
-    ['high-priestess',  'champion'],
-    ['banshee',         'raven'],
-    ['kirin-plus-plus', 'inv-kirin-plus-plus'],
-    ['gryphon',         'manticore']
-  ];
-
   // Shared rendering helpers.
   function zoomedBoard(piece) {
     return renderBoard(piece).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
@@ -943,7 +927,7 @@
       }
     }
     // Inversion edges (undirected).
-    for (const [a, b] of INVERSION_PAIRS) {
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
       NET.edges.push({ kind: 'inversion', from: a, to: b, directed: false });
     }
   }
@@ -987,7 +971,7 @@
     }
     // For each inversion pair that involves an actual Void piece, place the
     // Void on the outer ring radially aligned with its non-Void partner.
-    for (const [a, b] of INVERSION_PAIRS) {
+    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
       const voidId = VOID_IDS.has(a) ? a : (VOID_IDS.has(b) ? b : null);
       if (!voidId) continue;
       const baseId = voidId === a ? b : a;
@@ -1051,10 +1035,24 @@
       // children inside a nested <svg> sized + cropped to the node box.
       // Using innerHTML avoids DOMParser silently failing on non-XML content
       // (e.g. apostrophes / ampersands inside <desc>).
-      const boardInner = renderBoard(n.piece).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+      // Also drop the board's <title>/<desc>: the node already carries an
+      // aria-label, and that duplicated text would land inside the node's
+      // accessible-name computation (WCAG 2.5.3 label-in-name).
+      // Strip the board's <title>/<desc> and hide its glyph <text> from the a11y
+      // tree: the node already carries an aria-label, so that duplicated text is
+      // decoration. aria-hidden does not hide it visually.
+      // Note: axe's label-content-name-mismatch still flags these nodes — its
+      // visible-text walk does not honour aria-hidden inside SVG, so it counts
+      // the glyph as a visible label. Screen readers do honour it, and voice
+      // control matches on the visible "Pawn" text, which IS the accessible
+      // name — so WCAG 2.5.3 holds. Lighthouse scores the rule at weight 0.
+      const boardInner = renderBoard(n.piece)
+        .replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')
+        .replace(/<title>[\s\S]*?<\/title>|<desc>[\s\S]*?<\/desc>/g, '')
+        .replace(/<text /g, '<text aria-hidden="true" ');
       g.innerHTML =
         '<rect class="net-node-bg" x="' + (-HALF) + '" y="' + (-HALF) + '" width="' + NODE_W + '" height="' + NODE_W + '" rx="6"/>' +
-        '<svg class="net-node-board" viewBox="72 72 180 180" x="' + (-HALF) + '" y="' + (-HALF) + '" width="' + NODE_W + '" height="' + NODE_W + '">' + boardInner + '</svg>' +
+        '<svg class="net-node-board" aria-hidden="true" viewBox="72 72 180 180" x="' + (-HALF) + '" y="' + (-HALF) + '" width="' + NODE_W + '" height="' + NODE_W + '">' + boardInner + '</svg>' +
         '<text class="net-node-label" x="0" y="' + (HALF + 14) + '">' + escapeHtml(n.piece.name) + '</text>';
       n.el = g;
       gNodes.appendChild(g);

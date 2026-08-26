@@ -50,8 +50,9 @@
     @media (prefers-reduced-transparency: reduce) {
       .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
     }
-    /* open, it takes the rest of the row so the panel reaches the search */
-    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; flex: 1 1 auto; }
+    /* Open, the box claims the whole row, so .bar-top wraps and the search
+       drops underneath it rather than being squeezed alongside the chips. */
+    .bar:has(.filt[aria-expanded="true"]) .fbox { width: auto; flex: 1 1 100%; }
     /* closed, match the search field's height so the two line up exactly */
     .filt {
       appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono); letter-spacing: .09em;

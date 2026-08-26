@@ -3,506 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Filterable codex of 38 fairy-chess pieces with movement diagrams, Betza notation, renames, and piece relations.">
-  <title>Fairy Chess — Codex</title>
-  <style>
-    /* ============== Header ============== */
-    header {
-      max-width: var(--wrap);
-      margin: 0 auto;
-      padding: 32px 24px 16px;
-    }
-    h1 {
-      margin: 0 0 8px 0;
-      font-size: 32px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-    }
-    .intro {
-      color: var(--text-soft);
-      max-width: 760px;
-      margin: 0 0 24px 0;
-      font-size: 15px;
-    }
-    .controls {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-    .tabs {
-      display: flex;
-      gap: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 4px;
-      flex-wrap: wrap;
-    }
-    .tabs { width: 100%; }
-    .tab-btn.is-empty { display: none; }
-
-    .tab-btn {
-      appearance: none;
-      background: transparent;
-      border: 0;
-      padding: 8px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-soft);
-      cursor: pointer;
-      border-radius: 7px;
-      font-family: inherit;
-      transition: color 0.15s ease, background 0.15s ease;
-    }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn[aria-selected="true"] {
-      background: var(--bg);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-    }
-    .filter-input {
-      appearance: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 14px;
-      color: var(--text);
-      width: 260px;
-      font-family: inherit;
-    }
-    .filter-input:focus {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-    .evolution-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      text-decoration: none;
-      color: var(--accent);
-      font-weight: 500;
-      font-size: 14px;
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-left: auto;
-    }
-    .evolution-link:hover {
-      text-decoration: none;
-      border-color: var(--accent);
-    }
-
-    /* ============== Legend ============== */
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 18px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 13px;
-      color: var(--text-soft);
-      margin-bottom: 24px;
-    }
-    .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .legend-swatch {
-      width: 24px;
-      height: 24px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* ============== Main ============== */
-    main {
-      max-width: none;
-      margin: 0 auto;
-      padding: 0 10px 64px;
-    }
-    section[role="tabpanel"] { display: none; }
-    section[role="tabpanel"].active { display: block; }
-
-    /* ============== Card grid ============== */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      scroll-margin-top: 24px;
-    }
-    .card-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .card-name {
-      font-size: 20px;
-      font-weight: 600;
-      margin: 0;
-    }
-    .card-aliases {
-      font-size: 12px;
-      color: var(--text-soft);
-      font-style: italic;
-      display: block;
-      margin-top: 2px;
-    }
-    .card-new { margin-top: 4px; }
-    .card-board {
-      align-self: center;
-      width: 100%;
-      max-width: 280px;
-    }
-    .board {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-radius: 6px;
-      overflow: hidden;
-      background: var(--sq-light);
-    }
-    .card-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-    }
-    .betza-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      padding: 3px 9px;
-      border-radius: 6px;
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      font-size: 12px;
-    }
-    a.betza-chip { text-decoration: none; cursor: pointer; transition: border-color 0.12s ease, color 0.12s ease; }
-    a.betza-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .betza-chip-label {
-      color: var(--text-soft);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-    }
-    .origin-tag {
-      font-size: 10px;
-      color: var(--text-soft);
-      text-transform: uppercase;
-      letter-spacing: 0.7px;
-      font-weight: 600;
-    }
-    
-    /* Relations block on codex cards — stack of colored sections at the bottom. */
-    .relations { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0 0; }
-    /* Grid, not flex column: the collapse toggle rides column 2 of the head
-       row instead of an absolute corner pin. row-gap only — a column-gap
-       would steal 8px from every row's wrapping width. */
-    .relation-section {
-      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 0;
-      padding: 10px 12px;
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      background: var(--surface);
-    }
-    .relation-section > * { grid-column: 1 / -1; }
-    .relation-section-head { grid-column: 1; }
-    .relation-section-head {
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-soft);
-      margin-bottom: 2px;
-    }
-    .relation-section.is-promotion {
-      border-color: color-mix(in srgb, var(--hop-target) 55%, var(--border));
-      background: color-mix(in srgb, var(--hop-target) 6%, var(--surface));
-    }
-    .relation-section.is-promotion .relation-section-head { color: var(--hop-target); }
-    .relation-section.is-fuse-from {
-      border-color: color-mix(in srgb, var(--hurdle-color) 55%, var(--border));
-      background: color-mix(in srgb, var(--hurdle-color) 6%, var(--surface));
-    }
-    .relation-section.is-fuse-from .relation-section-head { color: var(--hurdle-color); }
-    .relation-section.is-fuse-with-into {
-      border-image: linear-gradient(110deg, var(--accent) 0%, var(--hurdle-color) 100%) 1;
-      border-style: solid;
-      border-width: 1.5px;
-      border-radius: 0;            /* border-image only renders without radius */
-      background: linear-gradient(110deg,
-        color-mix(in srgb, var(--accent)       6%, var(--surface)) 0% 45%,
-        color-mix(in srgb, var(--hurdle-color) 6%, var(--surface)) 55% 100%);
-    }
-    .relation-section.is-fuse-with-into .relation-section-head {
-      background: linear-gradient(110deg, var(--accent), var(--hurdle-color));
-      -webkit-background-clip: text; background-clip: text;
-      color: transparent;
-    }
-    .relation-section.is-inversion {
-      border-color: color-mix(in srgb, var(--text-soft) 45%, var(--border));
-      background: color-mix(in srgb, var(--text-soft) 5%, var(--surface));
-    }
-    .relation-section.is-inversion .relation-section-head { color: var(--text-soft); }
-    .relation-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-    .relation-label { color: var(--text-soft); width: 80px; flex-shrink: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; font-size: 10px; }
-    .relation-target { display: flex; align-items: center; gap: 8px; }
-    .relation-mini { width: 64px; height: 64px; flex-shrink: 0; border-radius: 3px; overflow: hidden; background: var(--sq-light); border: 1px solid var(--border); }
-    .relation-mini svg { display: block; width: 100%; height: 100%; }
-    .relation-name { font-weight: 500; color: var(--text); }
-    /* Fusion rows: name UNDER diagram; diagrams across rows line up vertically. */
-    .relation-row.is-fusion-pair, .relation-row.is-fusion-into {
-      gap: 12px;
-      align-items: flex-start;
-    }
-    .relation-row.is-fusion-pair .relation-target,
-    .relation-row.is-fusion-into  .relation-target {
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      width: 64px;
-    }
-    .relation-row.is-fusion-pair .relation-name,
-    .relation-row.is-fusion-into  .relation-name {
-      font-size: 11px;
-      text-align: center;
-      line-height: 1.2;
-    }
-    .relation-op {
-      font-size: 20px; font-weight: 500;
-      color: var(--text-soft);
-      flex-shrink: 0;
-      /* Center vertically on the 64 px diagram, not on the diagram + name block. */
-      align-self: flex-start;
-      margin-top: 20px;
-    }
-    /* Collapsible section toggle: hide rows past the third while collapsed. */
-    .relation-section.is-collapsed .relation-row.is-extra { display: none; }
-    /* Spans rows 1-2 so it overhangs the first row (as the old absolute pin
-       did) without growing the head row; z-index because the rows it
-       overlaps are later in the DOM. Negative margins: cell starts at the
-       10/12px padding edge, the pin sat at 8/10. */
-    .relation-toggle {
-      grid-area: 1 / 2 / 3 / 3;
-      justify-self: end; align-self: start;
-      margin: -2px -2px 0 0;
-      z-index: 1;
-      appearance: none;
-      background: var(--surface);
-      border: 1.5px solid currentColor;
-      border-radius: 999px;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 3px 12px;
-      font-family: inherit;
-      color: var(--text-soft);
-      line-height: 1.3;
-    }
-    .relation-toggle:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .relation-section.is-fuse-from      .relation-toggle { color: var(--hurdle-color); }
-    .relation-section.is-fuse-with-into .relation-toggle { color: var(--accent); }
-    .relation-section.is-collapsed .when-expanded,
-    .relation-section:not(.is-collapsed) .when-collapsed { display: none; }
-
-    .card-desc {
-      font-size: 14px;
-      color: var(--text);
-      margin: 0;
-    }
-    .behavior-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      padding: 3px 9px;
-      border-radius: 12px;
-      font-size: 11px;
-      color: var(--text-soft);
-      font-weight: 500;
-    }
-    .badge-color-bound  { color: #8a4ea8; border-color: #c2a3d0; }
-    .badge-leaper       { color: #2e7bd6; border-color: #a9c8eb; }
-    .badge-hopper       { color: #2da06b; border-color: #a0d6bc; }
-    .badge-royal        { color: #c84545; border-color: #e8a8a8; }
-    .badge-long-range   { color: #c45821; border-color: #e8b497; }
-    .badge-promotes     { color: #b88500; border-color: #e6cb8a; }
-    .badge-capture-only { color: #c84545; border-color: #e8a8a8; }
-    .badge-direction-restricted { color: #c84545; border-color: #e8a8a8; }
-    .badge-compound     { color: #2a8378; border-color: #95c5be; }
-    .badge-capture-different { color: #8a4ea8; border-color: #c2a3d0; }
-    .badge-new          { color: #b03a76; border-color: #e3aecb; }
-    [data-theme="dark"] .badge-color-bound  { color: #c890e8; border-color: #5d4072; }
-    [data-theme="dark"] .badge-leaper       { color: #6ab1ff; border-color: #3a5378; }
-    [data-theme="dark"] .badge-hopper       { color: #6dd6a8; border-color: #2f5a44; }
-    [data-theme="dark"] .badge-royal        { color: #ff7878; border-color: #6e3030; }
-    [data-theme="dark"] .badge-long-range   { color: #ff9050; border-color: #6e4530; }
-    [data-theme="dark"] .badge-promotes     { color: #e8c060; border-color: #6e5a30; }
-    [data-theme="dark"] .badge-capture-only { color: #ff7878; border-color: #6e3030; }
-    [data-theme="dark"] .badge-direction-restricted { color: #ff7878; border-color: #6e3030; }
-    [data-theme="dark"] .badge-compound     { color: #6ed4c2; border-color: #2f6056; }
-    [data-theme="dark"] .badge-capture-different { color: #c890e8; border-color: #5d4072; }
-    [data-theme="dark"] .badge-new          { color: #ff8ac0; border-color: #6e3053; }
-
-    .card.highlight {
-      outline: 3px solid var(--accent);
-      outline-offset: 4px;
-      animation: pulse 1.5s ease-out;
-    }
-    @keyframes pulse {
-      0%   { outline-color: var(--accent); }
-      100% { outline-color: transparent; }
-    }
-
-    /* ============== Tab count chip + empty-tab state ============== */
-    .tabs { flex-wrap: wrap; }
-    .tab-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 18px;
-      height: 18px;
-      padding: 0 5px;
-      margin-left: 6px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 9px;
-      font-size: 10.5px;
-      font-weight: 600;
-      color: var(--text-soft);
-      line-height: 1;
-    }
-    .tab-btn[aria-selected="true"] .tab-count {
-      background: var(--surface);
-      color: var(--text);
-    }
-    .empty-tab {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-soft);
-      font-style: italic;
-      background: var(--surface);
-      border: 1px dashed var(--border);
-      border-radius: 12px;
-      max-width: 560px;
-      margin: 0 auto;
-    }
-
-
-    /* ============== Responsive ============== */
-    @media (max-width: 720px) {
-      .card-grid { grid-template-columns: 1fr; }
-      .filter-input { flex: 1 1 100%; width: auto; }
-      h1 { font-size: 26px; }
-      .controls { gap: 8px; }
-    }
-
-    /* Phones: compact the filter block and put the search + view-toggle on one
-       row. `.controls`-scoped so these outrank site.css's shared 44px targets
-       (which would otherwise keep these controls big). */
-    @media (max-width: 560px) {
-      .controls { gap: 6px; }
-      /* Lay the filter pills out in a 3-column grid so they align row-to-row
-         (equal-width cells), instead of an uneven flex wrap. */
-      .controls .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-      .controls .tab-btn { min-height: 28px; padding: 4px 5px; font-size: 11px; justify-content: center; text-align: center; }
-      .controls .tab-btn .tab-count { font-size: 10px; }
-      .controls .filter-input { flex: 1 1 auto; width: auto; min-width: 0; min-height: 28px; padding: 5px 10px; font-size: 11px; }
-      .controls .view-toggle { min-height: 28px; padding: 3px; margin-left: 0; }
-      .controls .view-btn { min-height: 28px; padding: 4px 10px; font-size: 11px; }
-      /* Deep-linked cards must clear the sticky header. nav.js measures it
-         into --nav-h, so this no longer goes stale when the nav changes shape. */
-      .card { scroll-margin-top: calc(var(--nav-h) + 12px); }
-    }
-
-    /* ============== Print ============== */
-    @media print {
-      body { background: white; color: black; }
-      .controls, .theme-toggle, .filter-input, .tabs { display: none; }
-      section[role="tabpanel"] { display: block !important; page-break-before: always; }
-      .card { break-inside: avoid; box-shadow: none; }
-    }
-
-    /* ============== View toggle (Cards / List) ============== */
-    .view-toggle { display: inline-flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-left: auto; }
-    .view-btn { appearance: none; background: transparent; border: 0; padding: 6px 14px; font-size: 13px; font-weight: 500; color: var(--text-soft); cursor: pointer; border-radius: 7px; font-family: inherit; }
-    .view-btn:hover { color: var(--text); }
-    .view-btn[aria-pressed="true"] { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-    /* In list view, hide the legend and the card tabpanels (tabs + filter
-       input stay visible and drive the list's row visibility). */
-    body[data-view="list"] .legend { display: none; }
-    body[data-view="list"] section[role="tabpanel"] { display: none; }
-    body[data-view="cards"] #list-view { display: none; }
-
-    /* ============== Pieces flat table (List view) ============== */
-    #pieces-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
-    #pieces-table th, #pieces-table td { text-align: left; padding: 8px 12px; vertical-align: middle; border-top: 1px solid var(--border); }
-    #pieces-table thead th { background: var(--bg); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-soft); border-top: 0; border-bottom: 1px solid var(--border); cursor: default; user-select: none; white-space: nowrap; }
-    #pieces-table thead th[data-sortable="true"] { cursor: pointer; }
-    #pieces-table thead th .sort-mark { margin-left: 4px; opacity: 0.4; font-size: 10px; }
-    #pieces-table thead th[data-sort-dir="asc"] .sort-mark,
-    #pieces-table thead th[data-sort-dir="desc"] .sort-mark { opacity: 1; color: var(--accent); }
-    #pieces-table tbody tr.piece-row:hover td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-    .pieces-diagram { width: 64px; height: 64px; }
-    .pieces-diagram svg { width: 100%; height: 100%; display: block; }
-    #pieces-table th:first-child, #pieces-table td:first-child { padding: 0; width: 64px; vertical-align: middle; }
-    .pieces-name { font-weight: 600; }
-    .pieces-betza { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 10.5px; color: var(--text); max-width: 80px; overflow-wrap: anywhere; word-break: break-all; line-height: 1.25; }
-    .pieces-betza-link { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; word-break: break-all; }
-    .pieces-betza-link:hover { text-decoration: underline; }
-    .pieces-rel-empty { color: var(--text-soft); }
-    /* Column tints on td cells only — headers stay default. */
-    #pieces-table td.col-prom      { background: color-mix(in srgb, var(--hop-target)   8%, var(--surface)); }
-    #pieces-table td.col-fuse-with { background: color-mix(in srgb, var(--accent)       8%, var(--surface)); }
-    #pieces-table td.col-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 8%, var(--surface)); }
-    #pieces-table td.col-invert    { background: color-mix(in srgb, var(--text-soft)    8%, var(--surface)); }
-    /* Relation pills. */
-    .pieces-pill { display: inline-block; padding: 1px 9px; margin: 1px 2px; border-radius: 999px; font-size: 11.5px; white-space: nowrap; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
-    .pieces-pill.is-promotion { background: color-mix(in srgb, var(--hop-target)   16%, var(--surface)); border-color: color-mix(in srgb, var(--hop-target)   45%, var(--border)); }
-    .pieces-pill.is-fuse-with { background: color-mix(in srgb, var(--accent)       16%, var(--surface)); border-color: color-mix(in srgb, var(--accent)       45%, var(--border)); }
-    .pieces-pill.is-fuse-from { background: color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)); border-color: color-mix(in srgb, var(--hurdle-color) 45%, var(--border)); }
-    .pieces-pill.is-inversion { background: color-mix(in srgb, var(--text-soft)    16%, var(--surface)); border-color: color-mix(in srgb, var(--text-soft)    45%, var(--border)); }
-    .pieces-pill.is-fusion-pair {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: linear-gradient(110deg,
-        color-mix(in srgb, var(--accent)       16%, var(--surface)) 0% 45%,
-        color-mix(in srgb, var(--hurdle-color) 16%, var(--surface)) 55% 100%);
-      border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-    }
-    .pp-partner { color: var(--accent); font-weight: 500; }
-    .pp-arrow   { color: var(--text-soft); font-size: 10.5px; }
-    .pp-output  { color: var(--hurdle-color); font-weight: 500; }
-    #pieces-table th:last-child, #pieces-table td:last-child { min-width: 220px; }
-
-    /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
-  </style>
-  <link rel="stylesheet" href="assets/site.css">
+  <meta name="description" content="The 38 NO KINGS pieces mapped by origin: eight promotion chains, five void mirrors, nine fusion products. Click any piece for its full record and relations.">
+  <title>NO KINGS / Codex</title>
   <link rel="stylesheet" href="assets/nav.css">
   <script src="assets/theme-init.js"></script>
   <script src="assets/board.js"></script>
@@ -510,756 +12,660 @@
   <script src="data/promotions.js"></script>
   <script src="data/fusions.js"></script>
   <script src="data/inversions.js"></script>
+  <style>
+  /* ============================================================
+   *  Codex — one map of the whole system. Every piece is placed by
+   *  how it comes to exist (chain, mirror, or fusion), clicking a
+   *  card opens a side panel whose relation boxes wire themselves
+   *  back to the map through the gutters.
+   *  Follows artefacts.html, the design pilot: it does NOT link
+   *  assets/site.css and carries its own tokens, but shares
+   *  assets/nav.{css,js} and assets/theme.js so the header and the
+   *  light/dark choice stay in sync with the rest of the site.
+   * ============================================================ */
+
+  /* ---------- Tokens. Light is :root to match the rest of the site,
+       where theme.js ADDS [data-theme="dark"] and removes it for light. ---------- */
+  :root{
+    --bg:#f4ecda; --surface:#fcf0d8; --surface-2:#fff8ea;
+    --border:#e0d0ae; --border-soft:#ebdcbf;
+    --text:#231544; --text-soft:#5f5080; --text-dim:#8d7fa8;
+    --violet:#6a2ed0; --violet-hi:#8a52d8;
+    --lime:#6f9420; --accent:#556f18;
+    /* Board tokens for assets/board.js, copied from assets/site.css. */
+    --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
+    --piece-disc:#231544; --piece-disc-text:#fcf0d8;
+    --move-color:#2e6fd0; --capture-color:#c0392b; --hurdle-color:#7a3ae8;
+    --hop-target:#2f8f5f; --ray-color:#2f7fc0; --rider-color:#c8791f;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.22,1,.36,1);
+    --wrap:1560px;
+    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+  }
+  [data-theme="dark"]{
+    --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
+    --border:#332352; --border-soft:#261a44;
+    --text:#efeaff; --text-soft:#a79ac9; --text-dim:#7d719c;
+    --violet:#7a3ae8; --violet-hi:#a070e8;
+    --lime:#a8d048; --accent:#a8d048;
+    --sq-light:#4a4270; --sq-dark:#241d3e;
+    --piece-disc:#efeaff; --piece-disc-text:#0f0a1c;
+    --move-color:#79a7ff; --capture-color:#ff7878; --hurdle-color:#c890e8;
+    --hop-target:#6dd6a8; --ray-color:#79a7ff; --rider-color:#ffae5c;
+  }
+
+  /* ---------- Base + shell (restated: site.css is not loaded, same as
+       artefacts.html, the design pilot this page follows) ---------- */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{overflow-x:clip}
+  body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;
+    -webkit-font-smoothing:antialiased;transition:background .25s ease,color .25s ease}
+  a{color:var(--accent)}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:var(--rad-sm)}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(720px 460px at 12% -6%,rgba(106,46,208,.14),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(111,148,32,.12),transparent 66%)}
+  [data-theme="dark"] body::before{
+    background:radial-gradient(720px 460px at 12% -6%,rgba(122,58,232,.30),transparent 68%),
+               radial-gradient(560px 380px at 92% 4%,rgba(168,208,72,.13),transparent 66%)}
+
+  .hero{max-width:var(--wrap);margin:0 auto;padding:52px 22px 26px}
+  .hero h1{margin:0;font-size:clamp(44px,7.4vw,88px);line-height:.95;font-weight:800;letter-spacing:-.035em}
+  .hero h1 em{font-style:italic;background:linear-gradient(96deg,var(--lime) 0%,var(--violet-hi) 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
+  .hero p{margin:16px 0 0;max-width:52ch;font-size:16.5px;color:var(--text-soft)}
+
+  /* Full-width column with 10px gutters, like the other stack pages.
+     Hero and footer keep the --wrap column - they set their own max-width. */
+  main{max-width:none;margin:0 auto;padding:14px 10px 90px}
+  .board{width:100%;height:auto;display:block}
+  .betza-pill{font:600 11px/1.4 var(--mono);color:var(--text-soft);background:var(--surface-2);
+    border-radius:var(--rad-pill);padding:2px 9px;display:inline-block}
+  .mono-lb{font:700 10px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--text-dim)}
+
+  .foot{max-width:var(--wrap);margin:0 auto;padding:26px 22px 52px;
+    border-top:1px solid var(--border-soft);color:var(--text-dim);font-size:13px}
+  .foot p{margin:0 0 7px}
+  .foot p:last-child{margin-bottom:0}
+  .foot-lead{color:var(--text-soft);font-size:14px}
+  @media(max-width:600px){.foot{padding:20px 16px 40px}}
+
+  /* ---------- Count + border legend row ---------- */
+  .cx-controls{display:flex;align-items:center;gap:14px;margin:0 0 26px}
+  .cx-count{font:700 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+  .cx-legend{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-left:auto;
+    font:500 11.5px/1 var(--sans);color:var(--text-dim)}
+  .lg-box{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-3px;
+    margin-right:7px;background:var(--surface);border:1.5px solid var(--border-soft)}
+  .lg-box.promo{border-color:color-mix(in srgb,var(--violet-hi) 45%,var(--border-soft))}
+  .lg-box.forged{border-color:color-mix(in srgb,var(--lime) 45%,var(--border-soft))}
+  .lg-box.mirror{border-style:dashed;border-color:color-mix(in srgb,var(--violet-hi) 40%,var(--border-soft))}
+
+  /* ---------- The map: a single flow of fixed-size cards, ordered
+       chain by chain (each void mirror right after its twin), forged
+       pieces last. Grid tracks keep every row aligned. ---------- */
+  .atlas{--tw:88px;display:grid;grid-template-columns:repeat(auto-fill,var(--tw));
+    justify-content:space-between;align-items:start;gap:24px 20px}
+  body.sp-push .cx .atlas{justify-content:center}
+  @media(max-width:1000px){.atlas{justify-content:center}}
+
+  /* cards: cropped movement fingerprint that zooms out on hover */
+  .tile{appearance:none;border:1px solid var(--border-soft);color:var(--text);
+    background:color-mix(in srgb,var(--surface) 52%,transparent);
+    backdrop-filter:blur(9px) saturate(150%);-webkit-backdrop-filter:blur(9px) saturate(150%);
+    border-radius:14px;padding:9px 9px 8px;cursor:pointer;display:flex;flex-direction:column;gap:7px;
+    align-items:center;width:var(--tw,88px);transition:border-color .2s var(--ease),transform .2s var(--ease)}
+  @media (prefers-reduced-transparency:reduce){
+    .tile{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}}
+  .tile:hover{border-color:var(--violet-hi);transform:translateY(-2px);z-index:2}
+  .tile .fp{position:relative;width:calc(var(--tw,88px) - 18px);aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--sq-dark)}
+  .tile .fp svg{width:100%;height:100%;display:block;transform:scale(1.8);transition:transform .45s var(--ease)}
+  .tile:hover .fp svg{transform:scale(1)}
+  /* the name sits on the bottom of the diagram, over a scrim */
+  .tile .nm{position:absolute;left:0;right:0;bottom:0;padding:16px 3px 4px;
+    font:700 10px/1.15 var(--sans);letter-spacing:-.01em;text-align:center;
+    background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 92%,transparent) 72%)}
+  /* relatives light up when a card is hovered */
+  .tile.linked{border-color:var(--violet-hi);box-shadow:0 0 0 2px color-mix(in srgb,var(--violet-hi) 55%,transparent)}
+  .tile.linked .nm{color:var(--violet-hi)}
+  .tile.ing{border-color:var(--lime);box-shadow:0 0 0 2px color-mix(in srgb,var(--lime) 55%,transparent)}
+  .tile.ing .nm{color:var(--lime)}
+  .tile.pl{border-color:var(--hop-target);box-shadow:0 0 0 2px color-mix(in srgb,var(--hop-target) 55%,transparent)}
+  .tile.pl .nm{color:var(--hop-target)}
+  .tile.open{border-color:var(--lime);
+    box-shadow:0 0 0 4px color-mix(in srgb,var(--lime) 75%,transparent),
+               0 0 22px color-mix(in srgb,var(--lime) 35%,transparent)}
+  /* how a piece is obtained, encoded in its border */
+  .tile.forged{border-color:color-mix(in srgb,var(--lime) 45%,var(--border-soft))}
+  .tile.forged:hover{border-color:var(--lime)}
+  .tile.promo{border-color:color-mix(in srgb,var(--violet-hi) 45%,var(--border-soft))}
+  .tile.mirror{border-style:dashed;border-color:color-mix(in srgb,var(--violet-hi) 40%,var(--border-soft))}
+  .tile.mirror:hover{border-color:var(--violet-hi)}
+  @media(max-width:640px){.atlas{--tw:76px}}
+
+  /* ---------- Connector traces: hovered card to its relatives, and
+       panel boxes to their pieces, all routed through the gutters ---------- */
+  #atlas{position:relative}
+  .alinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  /* two layers of the same panel traces: inside the panel UNDER its glass
+     boxes, and behind the cards on the map side. The panel's backdrop-filter
+     makes it the containing block, so its layer is clipped by the panel and
+     repositioned via a <g> translate. */
+  .plinks{position:absolute;left:0;top:0;width:100vw;height:100dvh;pointer-events:none;z-index:0}
+  .plinks2{position:fixed;inset:0;width:100vw;height:100dvh;pointer-events:none;z-index:-1}
+  #sp-body{position:relative;z-index:1}
+  .sp-close{z-index:2}
+
+  /* ---------- Piece details: a slide-over panel, the map stays live
+       behind it. 700px at 1440 viewport, scaling with the window. ---------- */
+  .spanel{position:fixed;top:var(--nav-h,61px);right:0;bottom:0;width:min(700px,48.6vw);z-index:80;
+    display:flex;flex-direction:column;
+    overflow:hidden;padding:22px 34px 26px;border-left:1px solid var(--border);
+    background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
+               color-mix(in srgb,var(--surface) 62%,transparent);
+    backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
+    box-shadow:-30px 0 70px -40px rgba(0,0,0,.8);
+    transform:translateX(calc(100% + 12px));visibility:hidden;
+    transition:transform .38s var(--ease),visibility 0s linear .38s}
+  .spanel.open{transform:none;visibility:visible;
+    transition:transform .38s var(--ease),visibility 0s}
+  @media (prefers-reduced-transparency:reduce){.spanel{background:var(--surface)}}
+  @media(max-width:760px){.spanel{width:100vw}}
+  /* desktop: the open panel pushes the map instead of covering it */
+  @media(min-width:761px){body.sp-push .cx{padding-right:min(700px,48.6vw)}}
+  .sp-close{position:absolute;top:16px;right:18px;appearance:none;cursor:pointer;width:34px;height:34px;
+    border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text-soft)}
+  .sp-close:hover{color:var(--accent);border-color:var(--accent)}
+  /* fullscreen panel scrolls as one page: keep the close button in reach */
+  @media(max-width:760px){.sp-close{position:sticky;top:10px;display:block;
+    margin:0 0 -34px auto}}
+  .spanel .mono-lb{color:var(--violet-hi)}
+  .spanel h2{margin:5px 0 0;font-size:28px;letter-spacing:-.025em}
+  .spanel .betza-pill{margin-top:9px}
+  /* the record's big diagram only — renderBoard puts class="board" on every
+     svg, so this must NOT catch the 64px relation minis */
+  .spanel .sp-main > .board{max-width:min(440px,100%);border-radius:10px;overflow:hidden;display:block}
+
+  /* panel split: piece record pinned on top (diagram beside its info); the
+     relations section below scrolls on its own so the record never leaves */
+  /* diagram legend: one row above the record */
+  .dg-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 44px 12px 0;
+    font-size:11px;color:var(--text-soft)}
+  .dg-legend span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .dg-legend svg{flex:none}
+
+  #sp-body{flex:1;min-height:0}
+  .sp-grid{display:flex;flex-direction:column;gap:26px;margin-top:4px;height:100%}
+  .sp-rels{flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+  .spanel .sp-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px 26px;
+    align-items:start;grid-template-rows:auto auto auto auto 1fr}
+  .spanel .sp-main > .board{grid-area:1 / 1 / 6 / 2;margin:0;max-width:100%}
+  .spanel .sp-main .mono-lb,.spanel .sp-main h2,.spanel .sp-main .betza-pill,
+  .spanel .sp-main .bench-desc,.spanel .sp-main .bench-tags{grid-column:2}
+  .spanel .sp-main .betza-pill{justify-self:start}
+  .spanel .sp-main .bench-desc{margin-top:12px}
+  @media(max-width:760px){.spanel .sp-main{display:block}
+    .spanel .sp-main > .board{margin:16px auto 0;max-width:min(230px,60vw)}}
+
+  /* piece record text */
+  .bench-desc{margin:14px 0 0;font-size:13.5px;line-height:1.6;color:var(--text-soft)}
+  .bench-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:13px}
+  .bench-tag{font:600 10px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text-soft);
+    border:1px solid var(--border);border-radius:var(--rad-pill);padding:5px 10px}
+
+  /* ---------- Relation boxes. Fixed-height multicol: boxes stack down the
+       left column first, whole boxes moving right when out of room; a box
+       taller than the strip scrolls inside itself. Glass, so the traces
+       passing underneath show through. ---------- */
+  .relations{columns:2;column-fill:auto;column-gap:10px;height:100%}
+  @media(max-width:760px){
+    .spanel{overflow-y:auto}
+    #sp-body,.sp-grid{height:auto}
+    .sp-rels{overflow:visible}
+    .relations{columns:1;height:auto}
+  }
+  .relation-section{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 0;
+    margin-bottom:10px;break-inside:avoid;max-height:100%;overflow-y:auto;scrollbar-width:thin;
+    padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
+    background:color-mix(in srgb,var(--surface) 52%,transparent);
+    backdrop-filter:blur(9px) saturate(150%);-webkit-backdrop-filter:blur(9px) saturate(150%)}
+  @media (prefers-reduced-transparency:reduce){
+    .relation-section{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}}
+  .relation-section > *{grid-column:1 / -1}
+  .relation-section-head{grid-column:1;font:700 10px/1.4 var(--mono);letter-spacing:.08em;
+    text-transform:uppercase;color:var(--text-soft);margin-bottom:2px}
+  .relation-section.is-promotion{border-color:color-mix(in srgb,var(--hop-target) 55%,var(--border));
+    background:color-mix(in srgb,var(--hop-target) 8%,color-mix(in srgb,var(--surface) 48%,transparent))}
+  .relation-section.is-promotion .relation-section-head{color:var(--hop-target)}
+  .relation-section.is-fuse-from{border-color:color-mix(in srgb,var(--hurdle-color) 55%,var(--border));
+    background:color-mix(in srgb,var(--hurdle-color) 8%,color-mix(in srgb,var(--surface) 48%,transparent))}
+  .relation-section.is-fuse-from .relation-section-head{color:var(--hurdle-color)}
+  .relation-section.is-fuse-with-into{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));
+    background:linear-gradient(110deg,
+        color-mix(in srgb,var(--accent) 8%,transparent) 0% 45%,
+        color-mix(in srgb,var(--hurdle-color) 8%,transparent) 55% 100%),
+      color-mix(in srgb,var(--surface) 48%,transparent)}
+  .relation-section.is-fuse-with-into .relation-section-head{
+    background:linear-gradient(110deg,var(--accent),var(--hurdle-color));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .relation-section.is-inversion{border-color:color-mix(in srgb,var(--text-soft) 45%,var(--border));
+    background:color-mix(in srgb,var(--text-soft) 6%,color-mix(in srgb,var(--surface) 48%,transparent))}
+  .relation-section.is-inversion .relation-section-head{color:var(--text-soft)}
+  .relation-row{display:flex;align-items:center;justify-content:center;gap:10px;font-size:12px}
+  .relation-label{color:var(--text-soft);width:74px;flex-shrink:0;font-weight:600;
+    text-transform:uppercase;letter-spacing:.04em;font-size:10px}
+  @media(max-width:1300px){.relation-label{display:none}}
+  /* fullscreen panel has the room again */
+  @media(max-width:760px){.relation-label{display:inline-block}}
+  /* ...unless the screen is truly tiny */
+  @media(max-width:330px){.relation-label{display:none}}
+  .relation-target{display:flex;align-items:center;cursor:pointer;border-radius:6px}
+  .relation-target:hover .relation-name{color:var(--accent)}
+  .relation-mini{position:relative;width:64px;height:64px;flex-shrink:0;border-radius:9px;overflow:hidden;
+    background:var(--sq-dark);border:1px solid var(--border)}
+  .relation-mini svg{display:block;width:100%;height:100%;transform:scale(1.8)}
+  /* mini names overlay the bottom of their diagram */
+  .relation-name{position:absolute;left:0;right:0;bottom:0;padding:10px 2px 2px;
+    font-size:8.5px;font-weight:600;line-height:1.15;text-align:center;color:var(--text);
+    background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--bg) 94%,transparent) 72%)}
+  .relation-row.is-fusion-pair,.relation-row.is-fusion-into{gap:10px}
+  .relation-op{font-size:20px;font-weight:500;color:var(--text-soft);flex-shrink:0}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+  </style>
 </head>
 <body>
-  <div id="site-nav" data-page="codex"></div>
-  <header>
-    <h1><em>Codex</em></h1>
-    <p class="intro">A filterable reference of the <strong>38 pieces</strong> used across NO-KINGS.</p>
-    <div class="controls">
-      <div class="tabs" role="tablist" aria-label="Movement type">
-        <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="tab-all"         id="tabbtn-all">All pieces <span class="tab-count" id="count-all">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-pawn-like"   id="tabbtn-pawn-like">Pawn-like <span class="tab-count" id="count-pawn-like">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-sliders"     id="tabbtn-sliders">Sliders <span class="tab-count" id="count-sliders">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leapers"     id="tabbtn-leapers">Leapers <span class="tab-count" id="count-leapers">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-leap-riders" id="tabbtn-leap-riders">Leap-Riders <span class="tab-count" id="count-leap-riders">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-compounds"   id="tabbtn-compounds">Compounds <span class="tab-count" id="count-compounds">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-hoppers"     id="tabbtn-hoppers">Hoppers <span class="tab-count" id="count-hoppers">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-others"      id="tabbtn-others">Others <span class="tab-count" id="count-others">0</span></button>
-      </div>
-      <div class="tabs origin-tabs" role="tablist" aria-label="Category">
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-new" id="tabbtn-cat-new">New <span class="tab-count" id="count-cat-new">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-base" id="tabbtn-cat-base">Base <span class="tab-count" id="count-cat-base">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-mid" id="tabbtn-cat-mid">Mid <span class="tab-count" id="count-cat-mid">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-end" id="tabbtn-cat-end">End <span class="tab-count" id="count-cat-end">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-invert" id="tabbtn-cat-invert">Invert <span class="tab-count" id="count-cat-invert">0</span></button>
-        <button class="tab-btn" role="tab" aria-selected="false" aria-controls="tab-cat-fusion" id="tabbtn-cat-fusion">Fusion <span class="tab-count" id="count-cat-fusion">0</span></button>
-      </div>
-      <input type="text" class="filter-input" id="filter" placeholder="Filter pieces (e.g. knight, hop, color-bound)" aria-label="Filter pieces"/>
-      <div class="view-toggle" role="group" aria-label="View mode">
-        <button type="button" class="view-btn" data-view="cards" aria-pressed="true">Cards</button>
-        <button type="button" class="view-btn" data-view="list"  aria-pressed="false">List</button>
-      </div>
+<div id="site-nav" data-page="codex"></div>
+
+<header class="hero"><h1><em>Codex</em></h1>
+<p>All 38 pieces of NO KINGS, placed by how each one comes to exist: eight promotion chains, five mirrors, nine fusions.</p></header>
+
+<main>
+<section class="cx">
+  <div class="cx-controls">
+    <span class="cx-count">38 pieces</span>
+    <span class="cx-legend">
+      <span><span class="lg-box promo"></span>promotion only</span>
+      <span><span class="lg-box forged"></span>fusion only</span>
+      <span><span class="lg-box mirror"></span>void mirror</span>
+    </span>
+  </div>
+  <div class="atlas" id="atlas"></div>
+  <svg class="plinks2" id="plinks2" aria-hidden="true"></svg>
+  <aside class="spanel" id="spanel" aria-label="Piece details">
+    <svg class="plinks" id="plinks" aria-hidden="true"></svg>
+    <button class="sp-close" id="sp-close" aria-label="Close details">&#10005;</button>
+    <div class="dg-legend" aria-label="Diagram legend">
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg>Move &amp; capture</span>
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg>Move only</span>
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg>Capture only</span>
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg>Slide any distance</span>
+      <span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg>Rider (repeats leap)</span>
     </div>
-    <div class="legend" aria-label="Diagram legend">
-      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
-      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
-      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
-      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg></span> Slide any distance</span>
-      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
-    </div>
-  </header>
+    <div id="sp-body"></div>
+  </aside>
+</section>
+</main>
 
-  <main>
+<footer class="foot">
+  <p class="foot-lead">Codex of all 38 pieces used in NO KINGS, mapped by origin. Click a piece for its record; hover it to light up its relatives.</p>
+  <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
 
-    <!-- List view: flat sortable table of all pieces with their relations.
-         Filter input + tabs in the page header drive BOTH views. -->
-    <div id="list-view" hidden>
-      <div class="table-scroll">
-      <table id="pieces-table">
-        <thead>
-          <tr>
-            <th data-col="diagram"></th>
-            <th data-col="name" data-sortable="true">Name <span class="sort-mark">▾</span></th>
-            <th data-col="promotes_from" class="col-prom">Prom. from</th>
-            <th data-col="promotes_to"   class="col-prom">Prom. to</th>
-            <th data-col="fuse_with"     class="col-fuse-with">Fuse with</th>
-            <th data-col="fuse_from"     class="col-fuse-from">Fuse from</th>
-            <th data-col="invert"        class="col-invert">Invert</th>
-            <th data-col="betza" data-sortable="true">Betza <span class="sort-mark">▾</span></th>
-            <th data-col="behaviors">Behaviors</th>
-          </tr>
-        </thead>
-        <tbody id="pieces-tbody"></tbody>
-      </table>
-      </div>
-    </div>
-  </main>
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-  <footer>
-    <p class="footer-page-line">Filterable Codex of all the 38 pieces used in NO KINGS</p>
-    <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
-  </footer>
+const LOOKUP = {};
+PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
+const crop = p => renderBoard(p);   /* crop is done with a CSS scale so it can animate open */
 
-  <script>
-  // Tabpanel shells are derived from the tab buttons — one section + card
-  // grid per aria-controls value (grid id = panel id minus the tab- prefix).
-  {
-    const listView = document.getElementById('list-view');
-    for (const btn of document.querySelectorAll('.tab-btn[aria-controls]')) {
-      const id = btn.getAttribute('aria-controls');
-      const sec = document.createElement('section');
-      sec.setAttribute('role', 'tabpanel');
-      sec.id = id;
-      sec.setAttribute('aria-labelledby', btn.id);
-      if (id === 'tab-all') sec.className = 'active';
-      sec.innerHTML = `<div class="card-grid" id="grid-${id.slice(4)}"></div>`;
-      listView.parentNode.insertBefore(sec, listView);
-    }
+/* relationship maps, all derived from the shared data files */
+const PROM = {}, DEM = {};
+for (const {ids:[b,m,e]} of PROMOTION_CHAINS){ PROM[b]=m; PROM[m]=e; DEM[m]=b; DEM[e]=m; }
+const INV = {};
+for (const {lhs,rhs} of INVERSION_PAIRS){ if(LOOKUP[lhs]&&LOOKUP[rhs]){ INV[lhs]=rhs; INV[rhs]=lhs; } }
+const RECIPES = {};
+for (const kind of ['synergistic','additive'])
+  for (const f of FUSIONS[kind]) if (LOOKUP[f.out]) (RECIPES[f.out] = RECIPES[f.out] || []).push(f);
+const CHAIN_IDS = new Set(PROMOTION_CHAINS.flatMap(c => c.ids));
+const MIRROR_IDS = new Set(Object.keys(INV).filter(id => !CHAIN_IDS.has(id) && !RECIPES[id]));
+const FORGED = PIECES_CODEX.filter(p => !CHAIN_IDS.has(p.id) && !MIRROR_IDS.has(p.id));
+const FUSE_WITH_INTO = {};
+for (const kind of ['additive','synergistic'])
+  for (const { lhs, rhs, out } of FUSIONS[kind]){
+    if (!LOOKUP[lhs] || !LOOKUP[rhs] || !LOOKUP[out]) continue;
+    (FUSE_WITH_INTO[lhs] = FUSE_WITH_INTO[lhs] || []).push({ partner: rhs, output: out });
+    (FUSE_WITH_INTO[rhs] = FUSE_WITH_INTO[rhs] || []).push({ partner: lhs, output: out });
   }
-  /* ============================================================
-   *  Data
-   * ============================================================ */
-  const PIECES = PIECES_CODEX.map(p => ({ ...p, description: p.description_codex || p.description }));
 
-  const FAMILY_ORDER = ['pawn-like', 'sliders', 'leapers', 'leap-riders', 'compounds', 'hoppers', 'others'];
+/* ============ the map ============ */
+/* promotion-only: reached by promoting, and by nothing else */
+const PROMO_ONLY = new Set(PROMOTION_CHAINS.flatMap(c => c.ids.slice(1)).filter(id => !RECIPES[id]));
+function tileHTML(p, cls){
+  const kind = cls || (PROMO_ONLY.has(p.id) ? 'promo' : '');
+  return `<button class="tile ${kind}" data-id="${p.id}">
+    <span class="fp">${crop(p)}<span class="nm">${esc(p.name)}</span></span></button>`;
+}
+$('#atlas').innerHTML = `
+  ${PROMOTION_CHAINS.flatMap(c => c.ids.flatMap(id => {
+    const mir = INV[id] && MIRROR_IDS.has(INV[id]) ? INV[id] : null;
+    return [tileHTML(LOOKUP[id])].concat(mir ? [tileHTML(LOOKUP[mir],'mirror')] : []);
+  })).join('')}
+  ${FORGED.map(p => tileHTML(p,'forged')).join('')}
+  <svg class="alinks" id="alinks" aria-hidden="true"></svg>`;
 
-  // Per-tab ordering by rough complexity (familiar → unusual → compound → complex).
-  // Pieces not listed here fall to the end of their tab.
-  const PIECE_ORDER = {
-    'pawn-like': [
-      'pawn', 'chinese-pawn', 'korean-pawn', 'berolina',
-      'hiashatar-pawn', 'torpedo-pawn', 'corporal',
-      'berolina-plus', 'arrow-pawn', 'sergeant'
-    ],
-    'sliders': [
-      'rook', 'bishop', 'queen',
-      'lance', 'bodyguard', 'edgehog',
-      'reflecting-bishop', 'hunter'
-    ],
-    'leapers': [
-      // Standard short leapers
-      'wazir', 'ferz', 'dabbaba', 'alfil', 'knight',
-      // Larger single (m,n) leapers, ascending in distance
-      'threeleaper', 'fourleaper', 'camel', 'zebra', 'giraffe',
-      'tripper', 'stag', 'antelope', 'commuter',
-      // Blockable / direction-restricted variants
-      'mao',
-      // King-move family (4–8 directions, one step)
-      'king', 'mann', 'anti-king', 'prince',
-      'xiangqi-general', 'advisor',
-      'silver-general', 'gold-general',
-      // 2-component leaper compounds (small components)
-      'phoenix', 'kirin', 'war-machine', 'elephant-modern',
-      'alibaba', 'gnu', 'centaur', 'kangaroo', 'mounted-king',
-      // 2-component leaper compounds (longer-range components)
-      'bison', 'roc', 'newt', 'leon',
-      'auroch', 'okapi', 'impala', 'pegasus',
-      // 3+ component compounds
-      'high-priestess', 'champion', 'squirrel', 'buffalo'
-    ],
-    'leap-riders': [
-      'nightrider', 'camelrider', 'alfilrider', 'dabbabarider',
-      'alibabarider', 'gnurider'
-    ],
-    'compounds': [
-      // Classic slider+leaper compounds
-      'amazon', 'archbishop', 'chancellor',
-      // Shōgi-derived promoted-piece compounds
-      'dragon-king', 'dragon-horse',
-      // Royal compound versions
-      'maharaja',
-      // Slider + leaper variants
-      'caliph', 'canvasser', 'crown-princess',
-      // Slider + leap-rider variants
-      'raven', 'banshee', 'amazonrider',
-      // Most complex / direction-asymmetric
-      'eagle'
-    ],
-    'hoppers': [
-      // Foundational hopper
-      'grasshopper',
-      // Variants of grasshopper-style hopping
-      'equihopper', 'lion',
-      // Capture-only hopper
-      'locust',
-      // Cannon family (move-and-capture differ)
-      'cannon', 'vao', 'leo', 'nao',
-      // Restricted-line grasshoppers
-      'bishopper', 'nightriderhopper',
-      // Inverse cannons (capture freely, move by hop)
-      'faro', 'loco'
-    ],
-    'others': [
-      // Zigzag (90° turn after each step)
-      'boyscout', 'girlscout',
-      // Single-bend riders
-      'gryphon', 'manticore', 'astrologer',
-      // Closed-cycle nightrider
-      'quintessence',
-      // Compound bent rider
-      'godzilla'
-    ]
+const tileEl = id => document.querySelector(`#atlas .tile[data-id="${id}"]`);
+
+/* ============ shared trace language ============ */
+/* polyline with every corner cut at 45 degrees */
+function chamferPath(pts, c){
+  let d = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length - 1; i++){
+    const [px, py] = pts[i], [ax, ay] = pts[i - 1], [bx, by] = pts[i + 1];
+    const inD = [Math.sign(px - ax), Math.sign(py - ay)], outD = [Math.sign(bx - px), Math.sign(by - py)];
+    const l1 = Math.min(c, Math.hypot(px - ax, py - ay) / 2), l2 = Math.min(c, Math.hypot(bx - px, by - py) / 2);
+    d += ` L ${px - inD[0] * l1} ${py - inD[1] * l1} L ${px + outD[0] * l2} ${py + outD[1] * l2}`;
+  }
+  return d + ` L ${pts[pts.length - 1][0]} ${pts[pts.length - 1][1]}`;
+}
+function tracePath(pts, color){
+  return `<path d="${chamferPath(pts, 12)}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>`
+    + `<circle cx="${pts[0][0]}" cy="${pts[0][1]}" r="3" fill="${color}"/>`
+    + `<circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="3" fill="${color}"/>`;
+}
+/* gutter geometry shared by hover threads and panel links */
+function buildGutters(rects, capX){
+  const bandify = pairs => {
+    const s = [...pairs].sort((a, b) => a[0] - b[0]), bands = [];
+    for (const [a, b] of s){
+      const last = bands[bands.length - 1];
+      if (last && a - last.start < 40) last.end = Math.max(last.end, b);
+      else bands.push({ start: a, end: b });
+    }
+    return bands;
   };
-
-
-  // Derived from the shared chains — the literal maps here drifted-in-waiting.
-  const PROMOTE_OF = {}, DEMOTE_OF = {};
-  for (const { ids: [base, mid, end] } of PROMOTION_CHAINS) {
-    PROMOTE_OF[base] = mid; PROMOTE_OF[mid] = end;
-    DEMOTE_OF[mid] = base;  DEMOTE_OF[end] = mid;
+  const rowBands = bandify(rects.map(r => [r.top, r.bottom]));
+  const colBands = bandify(rects.map(r => [r.left, r.right]));
+  const rowG = [rowBands[0].start - 14,
+    ...rowBands.slice(1).map((b, i) => (rowBands[i].end + b.start) / 2),
+    rowBands[rowBands.length - 1].end + 14];
+  let lastCol = colBands[colBands.length - 1].end + 16;
+  if (capX != null) lastCol = Math.min(lastCol, capX);
+  const colG = [...colBands.slice(1).map((b, i) => (colBands[i].end + b.start) / 2), lastCol];
+  return { rowBands, colBands, rowG, colG };
+}
+/* a card-to-card thread routed through the gutters */
+function thread(a, b, color, G, lane){
+  const idx = (bands, v) => bands.findIndex(bd => v >= bd.start - 2 && v <= bd.end + 2);
+  const sR = idx(G.rowBands, a.top), tR = idx(G.rowBands, b.top);
+  const sC = idx(G.colBands, a.left), tC = idx(G.colBands, b.left);
+  const scx = a.left + a.width/2, tcx = b.left + b.width/2;
+  let pts;
+  if (sR === tR && Math.abs(sC - tC) <= 1){
+    const ltr = b.left > a.left;
+    pts = [[ltr ? a.right : a.left, a.top + a.height/2], [ltr ? b.left : b.right, b.top + b.height/2]];
+  } else if (sR === tR){
+    const Yg = G.rowG[sR + 1] + lane();
+    pts = [[scx, a.bottom], [scx, Yg], [tcx, Yg], [tcx, b.bottom]];
+  } else {
+    const down = tR > sR;
+    const YgS = G.rowG[sR + (down ? 1 : 0)] + lane();
+    const YgT0 = G.rowG[tR + (down ? 0 : 1)];
+    if (Math.abs(YgS - YgT0) < 24){
+      pts = [[scx, down ? a.bottom : a.top], [scx, YgS], [tcx, YgS], [tcx, down ? b.top : b.bottom]];
+    } else {
+      const YgT = YgT0 + lane();
+      const Xg = (tC > sC ? G.colG[sC] : sC > 0 ? G.colG[sC - 1] : G.colG[sC]) + lane();
+      pts = [[scx, down ? a.bottom : a.top], [scx, YgS], [Xg, YgS], [Xg, YgT], [tcx, YgT], [tcx, down ? b.top : b.bottom]];
+    }
   }
-  const INVERT_OF = {};
-  for (const { lhs, rhs } of INVERSION_PAIRS) { INVERT_OF[lhs] = rhs; INVERT_OF[rhs] = lhs; }
-  function renderMiniRelation(targetId, label) {
-    const target = PIECES.find(p => p.id === targetId);
-    if (!target) return '';
-    return `<div class="relation-row">
-      <span class="relation-label">${label}</span>
-      <div class="relation-target">
-        <div class="relation-mini">${renderBoard(target)}</div>
-        <span class="relation-name">${target.name}</span>
-      </div>
+  return tracePath(pts, color);
+}
+const rel = (r, base) => ({ left: r.left - base.left, right: r.right - base.left,
+  top: r.top - base.top, bottom: r.bottom - base.top, width: r.width, height: r.height });
+
+/* ============ hover: relatives light up, threads through the gutters ============ */
+function clearGlow(){
+  $$('#atlas .tile.linked, #atlas .tile.ing, #atlas .tile.pl').forEach(t => t.classList.remove('linked','ing','pl'));
+  $('#alinks').innerHTML = '';
+}
+$('#atlas').addEventListener('mouseover', e => {
+  const t = e.target.closest('.tile');
+  clearGlow();
+  if (!t) return;
+  const id = t.dataset.id;
+  const pairs = [];
+  if (INV[id]){ tileEl(INV[id])?.classList.add('linked'); pairs.push([INV[id], 'var(--violet-hi)']); }
+  for (const pid of [DEM[id], PROM[id]].filter(Boolean)){
+    tileEl(pid)?.classList.add('pl'); pairs.push([pid, 'var(--hop-target)']);
+  }
+  const r = (RECIPES[id]||[])[0];
+  if (r) for (const ing of [r.lhs, r.rhs]){ tileEl(ing)?.classList.add('ing'); pairs.push([ing, 'var(--lime)']); }
+  const base = $('#atlas').getBoundingClientRect();
+  const from = rel(t.getBoundingClientRect(), base);
+  const G = buildGutters($$('#atlas > .tile').map(el => rel(el.getBoundingClientRect(), base)), null);
+  let ln = 0;
+  const lane = () => { const o = (ln % 2 ? 1 : -1) * Math.ceil(ln / 2) * 3; ln++; return o; };
+  $('#alinks').innerHTML = pairs.map(([pid, c]) => {
+    const el = tileEl(pid);
+    return el ? thread(from, rel(el.getBoundingClientRect(), base), c, G, lane) : '';
+  }).join('');
+});
+$('#atlas').addEventListener('mouseleave', clearGlow);
+
+/* ============ the panel ============ */
+function recordHTML(p){
+  return `
+    <span class="mono-lb">${esc(p.family)}${p.origin==='Invented' ? ' &#183; new' : ''}</span>
+    <h2>${esc(p.name)}</h2>
+    ${p.betza ? `<span class="betza-pill">${esc(p.betza)}</span>` : ''}
+    ${renderBoard(p)}
+    <p class="bench-desc">${esc(p.description_codex || p.description)}</p>
+    ${(p.behaviors||[]).length ? `<div class="bench-tags">${p.behaviors.map(b=>`<span class="bench-tag">${esc(b.replace(/-/g,' '))}</span>`).join('')}</div>` : ''}`;
+}
+/* relation sections; targets jump the panel */
+function relTarget(id){
+  const t = LOOKUP[id];
+  return `<div class="relation-target" data-jump="${id}">
+    <div class="relation-mini">${renderBoard(t)}<span class="relation-name">${esc(t.name)}</span></div></div>`;
+}
+function relRow(id, label){
+  return `<div class="relation-row"><span class="relation-label">${label}</span>${relTarget(id)}</div>`;
+}
+function relSection(kindClass, head, rowsArr){
+  return `<div class="relation-section ${kindClass}">
+    <div class="relation-section-head">${head}</div>${rowsArr.join('')}</div>`;
+}
+function relationsHTML(p){
+  const id = p.id, sections = [];
+  if (INV[id])
+    sections.push(`<div class="relation-section is-inversion"><div class="relation-section-head">Invert</div>${relRow(INV[id], 'Invert to')}</div>`);
+  if (PROM[id] || DEM[id]){
+    const rows = [DEM[id] ? relRow(DEM[id], 'Demote to') : '',
+                  PROM[id] ? relRow(PROM[id], 'Promote to') : ''].filter(Boolean).join('');
+    sections.push(`<div class="relation-section is-promotion"><div class="relation-section-head">Promotion</div>${rows}</div>`);
+  }
+  const ff = RECIPES[id] || [];
+  if (ff.length)
+    sections.push(relSection('is-fuse-from', 'Fusion =', ff.map(({lhs,rhs}) => `
+      <div class="relation-row is-fusion-pair"><span class="relation-label">From</span>${relTarget(lhs)}<span class="relation-op">+</span>${relTarget(rhs)}</div>`)));
+  const fwi = FUSE_WITH_INTO[id] || [];
+  if (fwi.length)
+    sections.push(relSection('is-fuse-with-into', 'Fusion +', fwi.map(({partner,output}) => `
+      <div class="relation-row is-fusion-into"><span class="relation-label">With</span>${relTarget(partner)}<span class="relation-op">&#8594;</span>${relTarget(output)}</div>`)));
+  return sections.length ? `<div class="relations">${sections.join('')}</div>` : '';
+}
+
+const spanel = $('#spanel'), spBody = $('#sp-body');
+const RM = matchMedia('(prefers-reduced-motion:reduce)');
+let spId = null;
+
+/* traces from the panel's relation boxes to their pieces on the map */
+const plinks = $('#plinks'), plinks2 = $('#plinks2');
+const SEC_COLOR = { 'is-inversion': 'var(--violet-hi)', 'is-promotion': 'var(--hop-target)',
+  'is-fuse-from': 'var(--hurdle-color)', 'is-fuse-with-into': 'var(--accent)' };
+function drawPanelLinks(){
+  plinks.innerHTML = plinks2.innerHTML = '';
+  if (!spanel.classList.contains('open') || matchMedia('(max-width:760px)').matches) return;
+  const pr = spanel.getBoundingClientRect();
+  /* the map-side layer stops at the panel seam; the panel clips its own layer */
+  plinks2.style.clipPath = `inset(0 ${Math.max(0, innerWidth - pr.left)}px 0 0)`;
+  /* collect one link per unique piece per box, then order each box's
+     anchors top-to-bottom to match the pieces' positions on the map */
+  const seen = new Set(), out = [], jobs = new Map();
+  for (const tg of spBody.querySelectorAll('.relation-target[data-jump]')){
+    const id = tg.dataset.jump;
+    const sec = tg.closest('.relation-section');
+    const kind = Object.keys(SEC_COLOR).find(k => sec.classList.contains(k)) || '';
+    if (seen.has(kind + '|' + id)) continue;   /* one thread per piece PER BOX */
+    seen.add(kind + '|' + id);
+    const tile = tileEl(id);
+    if (!tile) continue;
+    if (!jobs.has(sec)) jobs.set(sec, []);
+    jobs.get(sec).push({ kind, R: tile.getBoundingClientRect() });
+  }
+  const rels = spBody.querySelector('.sp-rels');
+  const relsLeft = rels ? rels.getBoundingClientRect().left : 0;
+  const { rowBands, colBands, rowG, colG } =
+    buildGutters($$('#atlas > .tile').map(t => t.getBoundingClientRect()), pr.left - 14);
+  const laneMaps = new Map();
+  const lane = k => { const n = laneMaps.get(k) || 0; laneMaps.set(k, n + 1);
+    return (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 3; };
+  for (const [sec, list] of jobs){
+    list.sort((a, b) => (a.R.top - b.R.top) || (a.R.left - b.R.left));
+    const b0 = sec.getBoundingClientRect();
+    const rightCol = b0.left > relsLeft + 20;
+    list.forEach(({ kind, R }, i) => {
+    /* topmost target takes the topmost anchor on the box's border */
+    const n = rightCol ? list.length - 1 - i : i;
+    const c = SEC_COLOR[kind] || 'var(--text-dim)';
+    const x2 = R.right, y2 = R.top + R.height/2;
+    /* anchors stagger along the left border: top-left corner downward for
+       left-column boxes, bottom-left corner upward for right-column ones */
+    const x1 = b0.left;
+    const y1 = rightCol ? b0.bottom - 6 - n * 12 : b0.top + 6 + n * 12;
+    /* each link gets a unique landing lane, fanning outward from the center */
+    const o = (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 8;
+    /* route through the gutters: out of the panel into the outer strip,
+       down the strip, along the row gutter nearest the approach, then into
+       whichever card side the route arrives at */
+    const cx0 = R.left + R.width / 2, cy0 = R.top + R.height / 2;
+    const idxR = rowBands.findIndex(bd => R.top >= bd.start - 2 && R.top <= bd.end + 2);
+    const idxC = colBands.findIndex(bd => R.left >= bd.start - 2 && R.left <= bd.end + 2);
+    const entry = Math.abs(y1 - cy0) > (x1 - cx0) ? (y1 < cy0 ? 'top' : 'bottom') : 'right';
+    const XR = colG[colG.length - 1] + lane('XR');
+    let pts, exX, exY;
+    if (entry === 'right'){
+      const gA = rowG[idxR], gB = rowG[idxR + 1];
+      const Yg0 = Math.abs(y1 - gA) <= Math.abs(y1 - gB) ? gA : gB;
+      const Yg = Yg0 + lane('r' + Math.round(Yg0));
+      const XT = colG[Math.min(idxC, colG.length - 1)] + lane('c' + idxC);
+      exX = x2; exY = cy0 + Math.max(-26, Math.min(26, o));
+      pts = [[x1, y1], [XR, y1], [XR, Yg], [XT, Yg], [XT, exY], [exX, exY]];
+    } else {
+      const Yg0 = entry === 'top' ? rowG[idxR] : rowG[idxR + 1];
+      const Yg = Yg0 + lane('r' + Math.round(Yg0));
+      exX = cx0 + Math.max(-R.width / 2 + 10, Math.min(R.width / 2 - 10, o));
+      exY = entry === 'top' ? R.top : R.bottom;
+      pts = [[x1, y1], [XR, y1], [XR, Yg], [exX, Yg], [exX, exY]];
+    }
+    pts = pts.filter((p, i2) => !i2 || Math.abs(p[0] - pts[i2-1][0]) > 0.5 || Math.abs(p[1] - pts[i2-1][1]) > 0.5);
+    out.push(tracePath(pts, c));
+    });
+  }
+  const body = out.join('');
+  /* the panel layer's origin is the panel itself, not the viewport */
+  const off = plinks.getBoundingClientRect();
+  plinks.innerHTML = `<g transform="translate(${-off.left},${-off.top})">${body}</g>`;
+  plinks2.innerHTML = body;
+}
+let plRaf = 0;
+function queueLinks(){ cancelAnimationFrame(plRaf); plRaf = requestAnimationFrame(drawPanelLinks); }
+addEventListener('scroll', queueLinks, { passive: true });
+addEventListener('resize', queueLinks);
+spanel.addEventListener('scroll', queueLinks, { passive: true });
+spBody.addEventListener('scroll', queueLinks, { capture: true, passive: true });   /* .sp-rels horizontal scroll */
+
+/* desktop push: FLIP the atlas cards so the squeeze animates instead of snapping */
+function setPush(on){
+  if (document.body.classList.contains('sp-push') === on) return;
+  const flip = matchMedia('(min-width:761px)').matches && !RM.matches;
+  const els = flip ? $$('#atlas > .tile') : [];
+  const before = els.map(el => el.getBoundingClientRect());
+  document.body.classList.toggle('sp-push', on);
+  els.forEach((el, i) => {
+    const a = el.getBoundingClientRect();
+    const dx = before[i].left - a.left, dy = before[i].top - a.top;
+    if (dx || dy) el.animate(
+      [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }],
+      { duration: 380, easing: 'cubic-bezier(.22,1,.36,1)' });
+  });
+}
+function openPanel(id){
+  $$('#atlas .tile.open').forEach(t => t.classList.remove('open'));
+  tileEl(id)?.classList.add('open');
+  const swap = () => {
+    const p = LOOKUP[id];
+    spBody.innerHTML = `<div class="sp-grid">
+      <div class="sp-main">${recordHTML(p)}</div>
+      <div class="sp-rels">${relationsHTML(p)}</div>
     </div>`;
+  };
+  if (spanel.classList.contains('open') && spId && spId !== id && !RM.matches){
+    spBody.animate([{opacity:1, transform:'none'}, {opacity:0, transform:'translateX(34px)'}],
+        {duration:150, easing:'ease-in'})
+      .finished.then(() => {
+        swap();
+        spBody.animate([{opacity:0, transform:'translateX(-20px)'}, {opacity:1, transform:'none'}],
+          {duration:220, easing:'ease-out'});
+      }).catch(() => {});
+  } else swap();
+  spId = id;
+  spanel.classList.add('open');
+  setPush(true);
+  setTimeout(queueLinks, 40);
+  setTimeout(queueLinks, 480);   /* again once the push FLIP and content swap settle */
+}
+function closePanel(){
+  spanel.classList.remove('open');
+  spId = null;
+  $$('#atlas .tile.open').forEach(t => t.classList.remove('open'));
+  setPush(false);
+  plinks.innerHTML = plinks2.innerHTML = '';
+}
+$('#atlas').addEventListener('click', e => { const t = e.target.closest('.tile'); if (t) openPanel(t.dataset.id); });
+$('#sp-close').addEventListener('click', closePanel);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+$('#sp-body').addEventListener('click', e => {
+  const b = e.target.closest('[data-jump]');
+  if (!b) return;
+  openPanel(b.dataset.jump);
+  tileEl(b.dataset.jump)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
+
+/* deep links: #piece-<id> anchors and graph.html's dblclick ?q=<name> both
+   open the panel on that piece */
+try {
+  const q = new URL(location.href).searchParams.get('q');
+  let target = null;
+  if (location.hash.startsWith('#piece-')) target = location.hash.slice(7);
+  else if (q){
+    const needle = q.trim().toLowerCase();
+    const hit = PIECES_CODEX.find(p => p.name.toLowerCase() === needle)
+      || PIECES_CODEX.find(p => p.name.toLowerCase().includes(needle) || p.id.includes(needle));
+    if (hit) target = hit.id;
   }
-  // One mini piece (board + name) inside a fusion row.
-  function relationMini(targetId) {
-    const target = PIECES.find(p => p.id === targetId);
-    if (!target) return '';
-    return `<div class="relation-target">
-      <div class="relation-mini">${renderBoard(target)}</div>
-      <span class="relation-name">${target.name}</span>
-    </div>`;
+  if (target && LOOKUP[target]){
+    openPanel(target);
+    tileEl(target)?.scrollIntoView({ block: 'center' });
   }
-  // Build the two fusion lookups by walking FUSIONS.
-  // fuseWithInto[pieceId]  -> [{partnerId, outputId}, ...]
-  // fuseFromInputs[pieceId] -> [{lhsId, rhsId}, ...]
-  const FUSE_WITH_INTO = {};
-  const FUSE_FROM = {};
-  for (const kind of ['additive', 'synergistic']) {
-    for (const { lhs, rhs, out } of (FUSIONS[kind] || [])) {
-      (FUSE_WITH_INTO[lhs] = FUSE_WITH_INTO[lhs] || []).push({ partner: rhs, output: out });
-      (FUSE_WITH_INTO[rhs] = FUSE_WITH_INTO[rhs] || []).push({ partner: lhs, output: out });
-      (FUSE_FROM[out] = FUSE_FROM[out] || []).push({ lhs, rhs });
-    }
-  }
-  function renderRelations(piece) {
-    const promote = PROMOTE_OF[piece.id];
-    const demote = DEMOTE_OF[piece.id];
-    const invert = INVERT_OF[piece.id];
-    const fwi    = FUSE_WITH_INTO[piece.id] || [];
-    const ff     = FUSE_FROM[piece.id] || [];
-    if (!promote && !demote && !invert && !fwi.length && !ff.length) return '';
-
-    const sections = [];
-
-    // Invert — grey box. Shown first at the top of the relations stack.
-    if (invert) {
-      sections.push(`<div class="relation-section is-inversion"><div class="relation-section-head">Invert</div>${renderMiniRelation(invert, 'Invert to')}</div>`);
-    }
-
-    // Promote / Demote — green box (two stacked rows when both apply).
-    if (promote || demote) {
-      const rows = [
-        demote  ? renderMiniRelation(demote,  'Demote to')  : '',
-        promote ? renderMiniRelation(promote, 'Promote to') : ''
-      ].filter(Boolean).join('');
-      sections.push(`<div class="relation-section is-promotion"><div class="relation-section-head">Promotion</div>${rows}</div>`);
-    }
-
-    // Collapse rows beyond the third into a "Show N more" toggle. Sections
-    // with 3 or fewer rows render fully, no toggle.
-    const VISIBLE = 3;
-    function collapsibleSection(kindClass, head, rowsArr) {
-      const hidden = Math.max(0, rowsArr.length - VISIBLE);
-      const collapseClass = hidden > 0 ? ' is-collapsed' : '';
-      const rows = rowsArr.map((html, i) => i >= VISIBLE
-        ? html.replace(/^(\s*<div class="relation-row )/, '$1is-extra ')
-        : html).join('');
-      const toggle = hidden > 0
-        ? `<button type="button" class="relation-toggle" aria-expanded="false">
-             <span class="when-collapsed">+${hidden} more</span>
-             <span class="when-expanded">Show less</span>
-           </button>`
-        : '';
-      return `<div class="relation-section ${kindClass}${collapseClass}"><div class="relation-section-head">${head}</div>${toggle}${rows}</div>`;
-    }
-
-    // Fuse from — purple box, "A + B" pairs that produce this piece.
-    if (ff.length) {
-      const rows = ff.map(({ lhs, rhs }) => `
-        <div class="relation-row is-fusion-pair">
-          ${relationMini(lhs)}
-          <span class="relation-op">+</span>
-          ${relationMini(rhs)}
-        </div>`);
-      sections.push(collapsibleSection('is-fuse-from', 'Fuse from', rows));
-    }
-
-    // Fuse with into — blue→purple box, partner → output for each fusion this
-    // piece takes part in as an input.
-    if (fwi.length) {
-      const rows = fwi.map(({ partner, output }) => `
-        <div class="relation-row is-fusion-into">
-          ${relationMini(partner)}
-          <span class="relation-op">→</span>
-          ${relationMini(output)}
-        </div>`);
-      sections.push(collapsibleSection('is-fuse-with-into', 'Fuse with → into', rows));
-    }
-
-    return '<div class="relations">' + sections.join('') + '</div>';
-  }
-
-  function renderCard(piece) {
-    // One provenance line: invented pieces are flagged New, everything else
-    // points back at the encyclopedia entry it was renamed from.
-    const provenance = piece.origin === 'Invented'
-      ? '<div class="card-new"><span class="badge badge-new">New</span></div>'
-      : piece.original_name && piece.original_name !== piece.name
-        ? `<span class="card-aliases">aka ${escapeAttr(piece.original_name)}</span>` : '';
-    const betza = piece.betza
-      ? `<a class="betza-chip" href="betza.html?b=${encodeURIComponent(piece.betza)}" target="_blank" rel="noopener" title="Open in Betza sandbox" aria-label="Open Betza notation ${escapeAttr(piece.betza)} in sandbox"><span class="betza-chip-label" aria-hidden="true">Betza</span>${escapeAttr(piece.betza)}</a>`
-      : '';
-    const badges = (piece.behaviors || []).map(b =>
-      `<span class="badge badge-${b}">${b.replace(/-/g, ' ')}</span>`
-    ).join('');
-    const searchHaystack = [
-      piece.name,
-      piece.original_name || '',
-      (piece.aliases || []).join(' '),
-      piece.betza || '',
-      (piece.behaviors || []).join(' '),
-      piece.origin,
-      piece.description
-    ].join(' ').toLowerCase();
-
-    const idSuffix = piece._idSuffix || '';
-    return `
-      <article class="card" id="piece-${piece.id}${idSuffix}" data-search="${escapeAttr(searchHaystack)}">
-        <div class="card-header">
-          <div>
-            <h2 class="card-name">${escapeAttr(piece.name)}</h2>
-            ${provenance}
-          </div>
-        </div>
-        <div class="card-board">${renderBoard(piece)}</div>
-        <div class="card-meta">
-          ${betza}
-        </div>
-        <p class="card-desc">${escapeAttr(piece.description)}</p>
-        ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}
-        ${renderRelations(piece)}
-      </article>
-    `;
-  }
-
-
-  function escapeAttr(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  /* ============================================================
-   *  Init
-   * ============================================================ */
-
-  // Bucket pieces by family and render each tab's grid.
-  const grouped = Object.fromEntries(FAMILY_ORDER.map(f => [f, []]));
-  for (const p of PIECES) {
-    if (!grouped[p.family]) {
-      console.warn('Unknown family for piece', p.id, p.family);
-      grouped['others'].push(p);
-    } else {
-      grouped[p.family].push(p);
-    }
-  }
-  // Sort each family by its PIECE_ORDER. Unlisted pieces fall to the end.
-  for (const f of FAMILY_ORDER) {
-    const order = PIECE_ORDER[f] || [];
-    grouped[f].sort((a, b) => {
-      const ai = order.indexOf(a.id);
-      const bi = order.indexOf(b.id);
-      if (ai === -1 && bi === -1) return 0;
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  }
-  for (const f of FAMILY_ORDER) {
-    const grid = document.getElementById('grid-' + f);
-    if (grouped[f].length) {
-      grid.innerHTML = grouped[f].map(renderCard).join('');
-    } else {
-      grid.innerHTML = '<p class="empty-tab">No pieces here yet — reserved for pieces whose defining feature isn’t one of the five movement families.</p>';
-    }
-    document.getElementById('count-' + f).textContent = grouped[f].length;
-    const fbtn = document.getElementById('tabbtn-' + f);
-    if (fbtn && grouped[f].length === 0) fbtn.classList.add('is-empty');
-  }
-
-  // Render the "All pieces" tab: flat grid of every piece, ordered by family then PIECE_ORDER.
-  const allOrdered = FAMILY_ORDER.flatMap(f => grouped[f]);
-  document.getElementById('grid-all').innerHTML = allOrdered.map(p => renderCard({ ...p, _idSuffix: '--all' })).join('');
-  document.getElementById('count-all').textContent = allOrdered.length;
-
-  // Codex second-row categories (multi-membership).
-  const ROW2_CATEGORIES = [
-  {
-    "id": "new",
-    "label": "New",
-    "members": [
-      "kirin-plus",
-      "kirin-plus-plus",
-      "inv-sergeant",
-      "inv-arrow-pawn",
-      "inv-kirin-plus",
-      "inv-kirin-plus-plus"
-    ]
-  },
-  {
-    "id": "base",
-    "label": "Base",
-    "members": [
-      "pawn",
-      "ferz",
-      "wazir",
-      "bishop",
-      "rook",
-      "knight",
-      "kirin",
-      "alibaba"
-    ]
-  },
-  {
-    "id": "mid",
-    "label": "Mid",
-    "members": [
-      "sergeant",
-      "elephant-modern",
-      "war-machine",
-      "dragon-horse",
-      "dragon-king",
-      "gnu",
-      "kirin-plus",
-      "bodyguard"
-    ]
-  },
-  {
-    "id": "end",
-    "label": "End",
-    "members": [
-      "arrow-pawn",
-      "high-priestess",
-      "champion",
-      "archbishop",
-      "chancellor",
-      "buffalo",
-      "kirin-plus-plus",
-      "queen"
-    ]
-  },
-  {
-    "id": "invert",
-    "label": "Invert",
-    "members": [
-      "berolina",
-      "inv-sergeant",
-      "inv-arrow-pawn",
-      "inv-kirin-plus",
-      "inv-kirin-plus-plus"
-    ]
-  },
-  {
-    "id": "fusion",
-    "label": "Fusion",
-    "members": [
-      "crown-princess",
-      "amazon",
-      "gryphon",
-      "manticore",
-      "banshee",
-      "raven",
-      "amazonrider",
-      "godzilla",
-      "squirrel"
-    ]
-  }
-];
-  // The New category is exactly the invented pieces, which the card badge also reads
-  // off `origin`. Derive it so the tab and the badge can never disagree.
-  const newCat = ROW2_CATEGORIES.find(c => c.id === 'new');
-  if (newCat) newCat.members = PIECES.filter(p => p.origin === 'Invented').map(p => p.id);
-
-  for (const c of ROW2_CATEGORIES) {
-    const members = c.members.map(id => PIECES.find(p => p.id === id)).filter(Boolean);
-    const grid = document.getElementById('grid-cat-' + c.id);
-    if (grid) {
-      if (members.length) {
-        grid.innerHTML = members.map(p => renderCard({ ...p, _idSuffix: '--cat-' + c.id })).join('');
-      } else {
-        grid.innerHTML = '<p class="empty-tab">No pieces in this category yet.</p>';
-      }
-      document.getElementById('count-cat-' + c.id).textContent = members.length;
-      const btn = document.getElementById('tabbtn-cat-' + c.id);
-      if (btn && members.length === 0) btn.classList.add('is-empty');
-    }
-  }
-
-  // Tabs
-  const tabBtns = Array.from(document.querySelectorAll('.tab-btn'));
-  const panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
-
-  function activateTab(panelId, opts = {}) {
-    panels.forEach(p => p.classList.toggle('active', p.id === panelId));
-    tabBtns.forEach(b => {
-      const sel = b.getAttribute('aria-controls') === panelId;
-      b.setAttribute('aria-selected', sel ? 'true' : 'false');
-      b.setAttribute('tabindex', sel ? '0' : '-1');
-    });
-    if (!opts.skipHash) history.replaceState(null, '', '#' + panelId);
-  }
-
-  tabBtns.forEach((btn) => {
-    btn.addEventListener('click', () => activateTab(btn.getAttribute('aria-controls')));
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        // Keep arrow navigation within the same tablist (WAI-ARIA tabs pattern).
-        const siblings = Array.from(btn.closest('[role="tablist"]').querySelectorAll('.tab-btn'));
-        const i = siblings.indexOf(btn);
-        const next = (i + (e.key === 'ArrowRight' ? 1 : -1) + siblings.length) % siblings.length;
-        siblings[next].focus();
-        activateTab(siblings[next].getAttribute('aria-controls'));
-      }
-    });
-  });
-
-  // Hash routing: honor any #tab-<family> on load.
-  if (location.hash.startsWith('#tab-')) {
-    const wantedId = location.hash.slice(1);
-    if (document.getElementById(wantedId)) {
-      activateTab(wantedId, { skipHash: true });
-    }
-  }
-
-  // Filter: scope across every card grid so switching tabs preserves the filter.
-  const filterInput = document.getElementById('filter');
-  filterInput.addEventListener('input', () => {
-    const q = filterInput.value.trim().toLowerCase();
-    const visibleFamily = Object.fromEntries(FAMILY_ORDER.map(f => [f, 0]));
-    const visibleCat = Object.fromEntries(ROW2_CATEGORIES.map(c => [c.id, 0]));
-    let visibleAll = 0;
-    document.querySelectorAll('.card-grid .card').forEach(card => {
-      const haystack = card.dataset.search || '';
-      const show = !q || haystack.includes(q);
-      card.style.display = show ? '' : 'none';
-      if (show) {
-        const grid = card.closest('.card-grid');
-        const gid = grid && grid.id;
-        if (gid === 'grid-all') {
-          visibleAll++;
-        } else if (gid && gid.startsWith('grid-cat-')) {
-          const c = gid.replace('grid-cat-', '');
-          if (visibleCat[c] !== undefined) visibleCat[c]++;
-        } else if (gid) {
-          const f = gid.replace(/^grid-/, '');
-          if (visibleFamily[f] !== undefined) visibleFamily[f]++;
-        }
-      }
-    });
-    for (const f of FAMILY_ORDER) {
-      document.getElementById('count-' + f).textContent = visibleFamily[f];
-    }
-    for (const c of ROW2_CATEGORIES) {
-      document.getElementById('count-cat-' + c.id).textContent = visibleCat[c.id];
-    }
-    document.getElementById('count-all').textContent = visibleAll;
-    // Also re-apply to the List view's table (whether or not it is currently visible).
-    if (typeof filterListRows === 'function') filterListRows();
-  });
-  // Switching tabs in any mode also re-applies the List view's row filter.
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => { if (typeof filterListRows === 'function') filterListRows(); });
-  });
-
-  // Seed the filter from ?q=<query> on page load (used by graph.html dblclick → codex).
-  try {
-    const q = new URL(location.href).searchParams.get('q');
-    if (q) {
-      filterInput.value = q;
-      filterInput.dispatchEvent(new Event('input'));
-    }
-  } catch (_) { /* file:// without a query */ }
-
-  /* ============================================================
-   *  List view: flat sortable + filterable table of all pieces
-   *  with their promotion / fusion / inversion relations.
-   * ============================================================ */
-  const listById = new Map(PIECES_CODEX.map(p => [p.id, p]));
-  function listPieceName(id) { const p = listById.get(id); return p ? p.name : id; }
-  function listEscape(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function listZoomedBoard(piece) {
-    return renderBoard(piece).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
-  }
-  function computeListRelations(pieceId) {
-    const promotesFrom = [], promotesTo = [];
-    for (const chain of PROMOTION_CHAINS) {
-      const idx = chain.ids.indexOf(pieceId);
-      if (idx === -1) continue;
-      if (idx > 0)                    promotesFrom.push(chain.ids[idx - 1]);
-      if (idx < chain.ids.length - 1) promotesTo.push(chain.ids[idx + 1]);
-    }
-    const fuseWith = [], fuseFrom = [];
-    for (const kind of ['additive', 'synergistic']) {
-      for (const { lhs, rhs, out } of FUSIONS[kind]) {
-        if (lhs === pieceId) fuseWith.push({ partner: listPieceName(rhs), output: listPieceName(out) });
-        if (rhs === pieceId) fuseWith.push({ partner: listPieceName(lhs), output: listPieceName(out) });
-        if (out === pieceId) fuseFrom.push(listPieceName(lhs) + ' + ' + listPieceName(rhs));
-      }
-    }
-    const invert = [];
-    for (const { lhs: a, rhs: b } of INVERSION_PAIRS) {
-      if (a === pieceId) invert.push(b);
-      if (b === pieceId) invert.push(a);
-    }
-    return {
-      promotesFrom: promotesFrom.map(listPieceName),
-      promotesTo:   promotesTo.map(listPieceName),
-      fuseWith:     fuseWith,
-      fuseFrom:     fuseFrom,
-      invert:       invert.map(listPieceName)
-    };
-  }
-  function listPills(items, kindClass) {
-    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
-    return items.map(s => '<span class="pieces-pill ' + kindClass + '">' + listEscape(s) + '</span>').join('');
-  }
-  function listFuseWithPills(items) {
-    if (!items || !items.length) return '<span class="pieces-rel-empty">—</span>';
-    return items.map(({ partner, output }) =>
-      '<span class="pieces-pill is-fusion-pair">' +
-        '<span class="pp-partner">' + listEscape(partner) + '</span>' +
-        '<span class="pp-arrow">→</span>' +
-        '<span class="pp-output">'  + listEscape(output)  + '</span>' +
-      '</span>'
-    ).join('');
-  }
-  let listSortCol = null, listSortDir = 'asc';
-  function renderListRows(pieces) {
-    const tbody = document.getElementById('pieces-tbody');
-    tbody.innerHTML = '';
-    for (const p of pieces) {
-      const rel = computeListRelations(p.id);
-      const fuseWithSearch = rel.fuseWith.map(x => x.partner + ' ' + x.output).join(' ');
-      const haystack = [
-        p.name, p.original_name, p.betza, (p.behaviors || []).join(' '),
-        rel.promotesFrom.join(' '), rel.promotesTo.join(' '),
-        fuseWithSearch, rel.fuseFrom.join(' '), rel.invert.join(' ')
-      ].filter(Boolean).join(' ').toLowerCase();
-      const row = document.createElement('tr');
-      row.className = 'piece-row';
-      row.dataset.pieceId = p.id;
-      row.dataset.search = haystack;
-      const behaviors =
-        (p.origin === 'Invented' ? '<span class="badge badge-new">New</span>' : '') +
-        (p.behaviors || []).map(b =>
-          '<span class="badge badge-' + listEscape(b) + '">' + listEscape(b) + '</span>'
-        ).join('');
-      const betzaLink = p.betza
-        ? '<a class="pieces-betza-link" href="betza.html?b=' + encodeURIComponent(p.betza) + '" target="_blank" rel="noopener">' + listEscape(p.betza) + '</a>'
-        : '<span class="pieces-betza">—</span>';
-      row.innerHTML =
-        '<td><div class="pieces-diagram">' + listZoomedBoard(p) + '</div></td>' +
-        '<td><span class="pieces-name">' + listEscape(p.name) + '</span></td>' +
-        '<td class="col-prom">'      + listPills(rel.promotesFrom, 'is-promotion') + '</td>' +
-        '<td class="col-prom">'      + listPills(rel.promotesTo,   'is-promotion') + '</td>' +
-        '<td class="col-fuse-with">' + listFuseWithPills(rel.fuseWith)             + '</td>' +
-        '<td class="col-fuse-from">' + listPills(rel.fuseFrom,     'is-fuse-from') + '</td>' +
-        '<td class="col-invert">'    + listPills(rel.invert,       'is-inversion') + '</td>' +
-        '<td class="pieces-betza">' + betzaLink + '</td>' +
-        '<td><div class="behavior-badges">' + (behaviors || '<span class="badge">—</span>') + '</div></td>';
-      tbody.appendChild(row);
-    }
-  }
-  let listBuilt = false;
-  // Compute the active tab's filter for the list view.
-  function activeTabListFilter() {
-    const activeBtn = document.querySelector('.tab-btn[aria-selected="true"]');
-    if (!activeBtn) return null;
-    const id = activeBtn.getAttribute('aria-controls');
-    if (id === 'tab-all') return null;
-    if (id.startsWith('tab-cat-')) {
-      const catId = id.replace('tab-cat-', '');
-      const cat = ROW2_CATEGORIES.find(c => c.id === catId);
-      return cat ? { kind: 'category', members: new Set(cat.members) } : null;
-    }
-    return { kind: 'family', value: id.replace('tab-', '') };
-  }
-  // Apply the page's filter input AND the active tab to the list table.
-  function filterListRows() {
-    const q = (filterInput.value || '').trim().toLowerCase();
-    const tabF = activeTabListFilter();
-    for (const row of document.querySelectorAll('#pieces-tbody tr.piece-row')) {
-      const pid = row.dataset.pieceId;
-      const p = listById.get(pid);
-      let tabOk = true;
-      if (tabF && p) {
-        if (tabF.kind === 'family')        tabOk = p.family === tabF.value;
-        else if (tabF.kind === 'category') tabOk = tabF.members.has(pid);
-      }
-      const searchOk = !q || row.dataset.search.includes(q);
-      row.style.display = (tabOk && searchOk) ? '' : 'none';
-    }
-  }
-  function buildList() {
-    renderListRows(PIECES_CODEX);
-    document.querySelectorAll('#pieces-table thead th[data-sortable="true"]').forEach(th => {
-      th.addEventListener('click', () => {
-        const col = th.dataset.col;
-        const dir = (listSortCol === col && listSortDir === 'asc') ? 'desc' : 'asc';
-        listSortCol = col;
-        listSortDir = dir;
-        const sorted = PIECES_CODEX.slice().sort((a, b) => {
-          const av = (a[col] || '').toString().toLowerCase();
-          const bv = (b[col] || '').toString().toLowerCase();
-          if (av === bv) return 0;
-          return (av < bv ? -1 : 1) * (dir === 'asc' ? 1 : -1);
-        });
-        renderListRows(sorted);
-        filterListRows();   // re-apply current filter state after re-render
-        document.querySelectorAll('#pieces-table thead th').forEach(h => h.removeAttribute('data-sort-dir'));
-        th.setAttribute('data-sort-dir', dir);
-      });
-    });
-    // Double-click a row to open the same codex page anchored at the piece's card.
-    document.getElementById('pieces-tbody').addEventListener('dblclick', (ev) => {
-      const row = ev.target.closest('tr.piece-row');
-      if (!row) return;
-      const piece = listById.get(row.dataset.pieceId);
-      if (!piece) return;
-      // Switch to cards view and scroll to the card.
-      setView('cards');
-      const card = document.getElementById('piece-' + piece.id);
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    // Apply the current filter state immediately so the first visit reflects it.
-    filterListRows();
-  }
-  function setView(view) {
-    document.body.setAttribute('data-view', view);
-    document.querySelectorAll('.view-btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === view ? 'true' : 'false'));
-    const listEl = document.getElementById('list-view');
-    if (view === 'list') {
-      if (!listBuilt) { buildList(); listBuilt = true; }
-      listEl.hidden = false;
-    } else {
-      listEl.hidden = true;
-    }
-    try { localStorage.setItem('nokings-view:codex', view); } catch (_) {}
-  }
-  document.querySelectorAll('.view-btn').forEach(btn => {
-    btn.addEventListener('click', () => setView(btn.dataset.view));
-  });
-  // Restore saved view on load.
-  try {
-    const saved = localStorage.getItem('nokings-view:codex');
-    setView(saved === 'list' ? 'list' : 'cards');
-  } catch (_) { setView('cards'); }
-
-  // Delegated handler for collapsible Fuse from / Fuse with into sections.
-  document.addEventListener('click', (ev) => {
-    const btn = ev.target.closest('.relation-toggle');
-    if (!btn) return;
-    const section = btn.closest('.relation-section');
-    if (!section) return;
-    section.classList.toggle('is-collapsed');
-    btn.setAttribute('aria-expanded', section.classList.contains('is-collapsed') ? 'false' : 'true');
-  });
-
-  </script>
-  <!-- Shared theme JS (cached across pages). See assets/theme.js. -->
-  <script src="assets/nav.js"></script>
-  <script src="assets/theme.js"></script>
-  <script src="assets/tabs.js"></script>
+} catch (_) { /* file:// without a query */ }
+</script>
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
 </body>
 </html>

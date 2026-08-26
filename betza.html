@@ -53,9 +53,9 @@
       .betza-table th:last-child,
       .betza-table td:last-child { width: 100%; }
     }
-    .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--hop-target); border-radius: 10px; background: color-mix(in srgb, var(--hop-target) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
+    .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
     .betza-active[hidden] { display: none; }
-    .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--hop-target); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .betza-active ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
     .betza-active li { display: grid; grid-template-columns: minmax(56px, auto) 48px 1fr; gap: 10px; align-items: center; font-size: 12.5px; color: var(--text); }
     .betza-active li.is-iconless { grid-template-columns: minmax(56px, auto) 1fr; gap: 10px; padding: 2px 0; }
@@ -121,25 +121,46 @@
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     /* Legend above the diagram: the sandbox draws with the same markers the
        encyclopedia does, so it reuses that key verbatim. */
-    /* Diagram, then the Codes button stacked over its key. Closed, the pair is
-       centred as a group; open, the Codes panel needs the room, so the group
-       goes left, the side column takes the rest of the width and the key turns
-       into a horizontal strip beneath the button. */
-    .sim-row {
-      display: flex; align-items: flex-start; justify-content: center;
-      gap: 24px; flex-wrap: wrap; margin: 0 0 16px;
+    /* Grid areas, so the legend can sit beside the diagram when the Codes panel
+       is shut and drop to a full-width row above the keyboard when it opens --
+       without moving in the DOM or being duplicated. */
+    .sandbox {
+      display: grid; gap: 14px 24px; justify-content: center;
+      grid-template-columns: auto auto;
+      grid-template-areas:
+        "board codes"
+        "board legend"
+        "controls controls";
+      align-items: start;
     }
-    .sim-row .sandbox-board { flex: 0 0 auto; }
-    .sim-side { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; flex: 0 1 auto; }
+    .sandbox-board { grid-area: board; }
+    .sandbox > .fbox { grid-area: codes; }
+    .sandbox > .legend { grid-area: legend; }
+    .sandbox-controls { grid-area: controls; }
     .legend { display: flex; flex-direction: column; gap: 9px; margin: 0; font-size: 12.5px; color: var(--text-soft); }
 
-    .sandbox:has(.filt[aria-expanded="true"]) .sim-row { justify-content: flex-start; }
-    /* 320px basis, not 0: squeezed narrower than this the code pills cannot
-       shrink to fit their own text and push the page sideways. Below that it
-       wraps under the diagram and takes the full width instead. */
-    .sandbox:has(.filt[aria-expanded="true"]) .sim-side { flex: 1 1 320px; min-width: 0; align-self: stretch; }
-    .sandbox:has(.filt[aria-expanded="true"]) .fbox { align-self: stretch; }
-    .sandbox:has(.filt[aria-expanded="true"]) .legend { flex-direction: row; flex-wrap: wrap; gap: 8px 18px; }
+    /* Open: the diagram goes left, Codes takes the rest of its row, and the key
+       becomes a horizontal strip on its own row directly above the keyboard. */
+    .sandbox:has(.filt[aria-expanded="true"]) {
+      justify-content: start;
+      grid-template-columns: auto minmax(320px, 1fr);
+      grid-template-areas:
+        "board  codes"
+        "legend legend"
+        "controls controls";
+    }
+    .sandbox:has(.filt[aria-expanded="true"]) > .fbox { align-self: start; width: auto; }
+    .sandbox:has(.filt[aria-expanded="true"]) > .legend { flex-direction: row; flex-wrap: wrap; gap: 8px 18px; }
+
+    /* Narrow: one column, everything stacked in source order. */
+    @media (max-width: 720px) {
+      .sandbox,
+      .sandbox:has(.filt[aria-expanded="true"]) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "board" "codes" "legend" "controls";
+        justify-content: stretch;
+      }
+    }
     .legend-item { display: inline-flex; align-items: center; gap: 6px; }
     .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 
@@ -176,7 +197,7 @@
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; flex: 1 1 auto; padding: 10px 14px 10px 0; }
     .sandbox-presets[hidden] { display: none; }
     .sandbox-presets-label { font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; align-self: center; margin-right: 4px; }
-    .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--accent); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-preset:hover { border-color: var(--accent); color: var(--accent); }
     .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
     /* Phones: the collapsed single-row preset strip is wider than the screen,
@@ -197,7 +218,10 @@
     .sandbox-keyboard { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; width: 100%; }
     .sandbox-key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
     .sandbox-key-row .sandbox-key { flex: 1 1 auto; justify-content: center; max-width: 96px; }
-    .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+    /* The one purple accent on the page: these labels name the groups rather
+       than being read as prose, so they can carry colour. --violet-hi, not
+       --violet, which is only 3.11:1 on the dark surface. */
+    .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 700; color: var(--violet-hi); text-transform: uppercase; letter-spacing: 0.5px; }
     .sandbox-key { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-key:hover { border-color: var(--accent); color: var(--accent); }
     .sandbox-key:active { background: var(--bg); }
@@ -241,14 +265,12 @@
 
   <main class="betza-layout">
     <section class="sandbox" aria-label="Betza sandbox">
-      <div class="sim-row">
-        <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
-        <div class="sim-side">
-        <div class="fbox">
-          <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes</button>
-          <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
-        </div>
-        <div class="legend" aria-label="Diagram legend">
+      <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
+      <div class="fbox">
+        <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes</button>
+        <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
+      </div>
+      <div class="legend" aria-label="Diagram legend">
 
 
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
@@ -259,8 +281,6 @@
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
-        </div>
-        </div>
       </div>
       <div class="sandbox-controls">
         <label class="sr-only" for="sandbox-input">Betza notation</label>

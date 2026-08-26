@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Ralph Betza's funny notation reference with a live sandbox that renders any Betza string as a movement diagram.">
-  <title>Fairy Chess — Betza notation</title>
+  <meta name="description" content="The NO KINGS Betza reference: Ralph Betza's funny notation with a live sandbox that renders any Betza string as a movement diagram.">
+  <title>NO KINGS / Betza</title>
   <style>
 
     header { max-width: var(--wrap); margin: 0 auto; padding: 32px 24px 16px; }
@@ -239,7 +239,7 @@
           <tr data-token="p"><td><code>p</code></td><td>Pao-style hop: capture by jumping over one piece on a line</td><td><code>cpR</code> = Cannon's hop-capture along Rook lines</td></tr>
           <tr data-token="g"><td><code>g</code></td><td>Grasshopper hop: must jump over one piece, land immediately past it</td><td><code>gQ</code> = Grasshopper, <code>gB</code> = Bishopper</td></tr>
           <tr data-token="z"><td><code>z</code></td><td>Zigzag bend: turns 90° after each step</td><td><code>zB</code> = Boyscout (crooked Bishop)</td></tr>
-          <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Hydra, <code>t[WB]</code> = Kraken</td></tr>
+          <tr data-token="t"><td><code>t</code></td><td>Bent rider: one step in the first piece's style, then continues outward in the second's style</td><td><code>t[FR]</code> = Quetzalcoatl, <code>t[WB]</code> = Kraken</td></tr>
         </tbody>
       </table></div>
 
@@ -264,7 +264,7 @@
           <tr><td><code>gQ</code></td><td>Grasshopper</td><td>(g)rasshopper hop along (Q)ueen lines</td></tr>
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag crooked (B)ishop — diagonal steps that bend 90° each move</td></tr>
           <tr><td><code>mfWcfFimfnD</code></td><td>Pawn</td><td>(m)ove (f)orward (W)azir + (c)apture (f)orward (F)erz + (i)nitial-only (m)ove (f)orward (n)on-jumping (D)abbaba</td></tr>
-          <tr><td><code>t[FR]</code></td><td>Hydra</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
+          <tr><td><code>t[FR]</code></td><td>Quetzalcoatl</td><td>(t) bent rider with [(F)erz step then outward (R)ook]</td></tr>
           <tr><td><code>zB</code></td><td>Boyscout</td><td>(z)igzag (B)ishop = diagonal step turning 90° after each step</td></tr>
           <tr><td><code>Q (edges)</code></td><td>Edgehog</td><td>Queen movement restricted to start/end on a board-edge square</td></tr>
         </tbody>
@@ -842,7 +842,7 @@
     // First 4 are visible by default — keep the most distinctive shapes here.
     { betza: 'mfWcfFimfnD',   name: 'Pawn' },
     { betza: 'NN',            name: 'Nightrider' },
-    { betza: 't[FR]',         name: 'Hydra' },
+    { betza: 't[FR]',         name: 'Quetzalcoatl' },
     { betza: 't[FR]t[WB]',    name: 'Leviathan' },
     // The rest live behind the expand pill.
     { betza: 'Q2',            name: 'Bodyguard' },

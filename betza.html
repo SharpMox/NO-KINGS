@@ -109,17 +109,27 @@
     .notation-hd { margin: 0 0 18px; }
     .notation-hd h1 { font-size: clamp(30px, 3.4vw, 46px); margin-bottom: 6px; }
     .notation-hd .intro { margin: 0; color: var(--text-soft); font-size: 14px; }
-    /* The sticky Active panel clears the header via the height nav.js measures,
-       so it no longer needs a per-breakpoint magic number. */
-    .betza-active { top: calc(var(--nav-h) + 12px); }
+    /* The Active panel is sticky inside .notation, which is its own scroll
+       container starting just under the nav -- so its offset is measured from
+       the panel's top, not the page's. The old calc(--nav-h + 12px) was written
+       when this column scrolled with the page and now pushes it a nav's height
+       too far down. */
+    .betza-active { top: 0; }
+    /* below the breakpoint the panel rejoins page flow, where the sticky nav
+       does have to be cleared. Declared after the base rule so it wins. */
+    @media (max-width: 960px) { .betza-active { top: calc(var(--nav-h) + 12px); } }
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     /* Legend above the diagram: the sandbox draws with the same markers the
        encyclopedia does, so it reuses that key verbatim. */
-    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 14px; font-size: 12.5px; color: var(--text-soft); }
+    /* Diagram and its key sit side by side; the key reads as a vertical
+       column so each marker lines up under the last. */
+    .sim-row { display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; margin: 0 0 16px; }
+    .sim-row .sandbox-board { flex: 0 1 360px; }
+    .legend { display: flex; flex-direction: column; gap: 9px; margin: 0; font-size: 12.5px; color: var(--text-soft); flex: 1 1 220px; }
     .legend-item { display: inline-flex; align-items: center; gap: 6px; }
     .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 
-    .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0 auto 16px; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
+    .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
     /* ---------- Codes: the 26 presets, in the site's collapsible box ----------
        Same .fbox/.filt shell as the encyclopedia and the deck pages. Replaces
        the old "+N more" pill, so all 26 are reachable in one place instead of
@@ -147,11 +157,6 @@
     }
     .fbox:hover .filt, .filt[aria-expanded="true"] { color: var(--text); }
     .filt[aria-expanded="true"] { align-items: flex-start; padding-top: 20px; min-height: 0; }
-    .filt .n {
-      font: 700 9.5px/1 var(--mono, ui-monospace, Menlo, monospace); color: #141024;
-      background: var(--lime); border-radius: 999px; padding: 3px 6px;
-    }
-    .filt .n:empty { display: none; }
     .fbox.sizing { flex: 0 0 auto; overflow: hidden; }
 
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; flex: 1 1 auto; padding: 10px 14px 10px 0; }
@@ -222,7 +227,10 @@
 
   <main class="betza-layout">
     <section class="sandbox" aria-label="Betza sandbox">
-      <div class="legend" aria-label="Diagram legend">
+      <div class="sim-row">
+        <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
+        <div class="legend" aria-label="Diagram legend">
+
 
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
@@ -232,10 +240,10 @@
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
+        </div>
       </div>
-      <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
       <div class="fbox">
-        <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes <span class="n"></span></button>
+        <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes</button>
         <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
       </div>
       <div class="sandbox-controls">
@@ -1012,7 +1020,6 @@
     const codesBox = document.querySelector('.sandbox .fbox');
     const codesBtn = codesBox && codesBox.querySelector('.filt');
     if (codesBox && codesBtn) {
-      codesBtn.querySelector('.n').textContent = String(SANDBOX_PRESETS.length);
       codesBtn.addEventListener('click', () => {
         const open = codesBtn.getAttribute('aria-expanded') !== 'true';
         const from = codesBox.getBoundingClientRect();

@@ -149,7 +149,14 @@
         "legend legend"
         "controls controls";
     }
-    .sandbox:has(.filt[aria-expanded="true"]) > .fbox { align-self: start; width: auto; }
+    /* Open, the box stacks: the label becomes a header strip and the codes get
+       the entire width beneath it. Left as a flex ROW the label held a column
+       down the whole left edge and the pills wrapped in what was left of it,
+       never flowing under the label. */
+    .sandbox:has(.filt[aria-expanded="true"]) > .fbox {
+      align-self: start; width: auto;
+      flex-direction: column; align-items: stretch; gap: 0;
+    }
     .sandbox:has(.filt[aria-expanded="true"]) > .legend { flex-direction: row; flex-wrap: wrap; gap: 8px 18px; }
 
     /* Narrow: one column, everything stacked in source order. */
@@ -183,6 +190,7 @@
       .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
     }
     .sandbox:has(.filt[aria-expanded="true"]) .fbox { width: auto; display: flex; }
+    .sandbox:has(.filt[aria-expanded="true"]) .sandbox-presets { padding: 4px 14px 12px; width: auto; }
     .filt {
       appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono, ui-monospace, Menlo, monospace);
       letter-spacing: .09em; text-transform: uppercase; padding: 0 16px; min-height: 42px;
@@ -191,7 +199,7 @@
       transition: color .18s ease;
     }
     .fbox:hover .filt, .filt[aria-expanded="true"] { color: var(--text); }
-    .filt[aria-expanded="true"] { align-items: flex-start; padding-top: 20px; min-height: 0; }
+    .filt[aria-expanded="true"] { justify-content: flex-start; padding: 13px 14px 4px; min-height: 0; }
     .fbox.sizing { flex: 0 0 auto; overflow: hidden; }
 
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; flex: 1 1 auto; padding: 10px 14px 10px 0; }

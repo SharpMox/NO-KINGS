@@ -1,10 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" rx="7" fill="#0f0a1c"/>
-  <!-- Crown in the lower band. Its three peaks stay clear of the sign above,
-       which is what keeps the silhouette readable down to 16px. -->
-  <path d="M3 29V20l5.5 4L16 16.5l7.5 7.5L29 20v9z" fill="#efeaff"/>
-  <!-- Regular octagon, flat top: r=7 about (16, 9.5), sitting on the crown. -->
-  <polygon points="22.47,12.18 18.68,15.97 13.32,15.97 9.53,12.18 9.53,6.82 13.32,3.03 18.68,3.03 22.47,6.82"
-           fill="#d92d20" stroke="#0f0a1c" stroke-width="1.5" stroke-linejoin="round"/>
-  <rect x="11.4" y="8.25" width="9.2" height="2.5" rx="1.25" fill="#fff"/>
+  <!-- Crown sits wholly inside the ring, with deep valleys and a base band:
+       the slash cuts across it, so the silhouette has to survive being broken.
+       Earlier passes used a shallower crown and it read as an envelope. -->
+  <path d="M8 23v-4.5h16V23z M8 18.5V9l4 3.5L16 6.5l4 6L24 9v9.5z" fill="#efeaff"/>
+  <!-- Prohibition sign: hollow ring so the crown shows through, slash running
+       upper-left to lower-right. The ring carries the mark at 16px, so it gets
+       the heavier stroke. -->
+  <g fill="none" stroke="#e5352b" stroke-linecap="butt">
+    <circle cx="16" cy="16" r="11" stroke-width="3"/>
+    <line x1="8.22" y1="8.22" x2="23.78" y2="23.78" stroke-width="2.6"/>
+  </g>
 </svg>

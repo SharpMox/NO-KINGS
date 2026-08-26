@@ -126,6 +126,10 @@
       padding: 0 10px 64px;
     }
     .empty { padding: 90px 0; text-align: center; color: var(--text-dim); }
+    /* [hidden] is a UA rule, so ANY author `display` outranks it — and both of
+       these set one below. Without this the filter sets the attribute and the
+       cards stay on screen. */
+    .card[hidden], .card-grid[hidden] { display: none; }
 
     /* ============== Card grid ============== */
     .card-grid {
@@ -608,14 +612,15 @@
       const v = chip.dataset.fam;
       const n = famBase.filter(c => c.piece.family === v).length;
       chip.querySelector('.chip-n').textContent = n;
-      chip.disabled = n === 0;
+      // never disable a chip that is ON, or it cannot be switched back off
+      chip.disabled = n === 0 && !famSel.has(v);
       chip.setAttribute('aria-pressed', String(famSel.has(v)));
     }
     for (const chip of oriChips) {
       const v = chip.dataset.ori;
       const n = oriBase.filter(c => c.piece._bucket === v).length;
       chip.querySelector('.chip-n').textContent = n;
-      chip.disabled = n === 0;
+      chip.disabled = n === 0 && !oriSel.has(v);
       chip.setAttribute('aria-pressed', String(oriSel.has(v)));
     }
 

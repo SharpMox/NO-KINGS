@@ -15,11 +15,17 @@
     main { max-width: none; margin: 0 auto; padding: 0 10px 64px; }
 
     .betza-page { max-width: 720px; margin: 0 auto; color: var(--text); }
-    .betza-page h3 { margin: 20px 0 6px 0; font-size: 18px; font-weight: 600; }
-    .betza-page h3:first-of-type { margin-top: 8px; }
+    .betza-page h2 { margin: 20px 0 6px 0; font-size: 18px; font-weight: 600; }
+    .betza-page h2:first-of-type { margin-top: 8px; }
     .betza-page p { margin: 0 0 8px 0; font-size: 14px; color: var(--text-soft); line-height: 1.55; }
     .betza-note { font-size: 12.5px; font-style: italic; }
-    .betza-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
+    /* Glass must degrade to a solid surface when the user asks for less of it. */
+    @media (prefers-reduced-transparency: reduce) {
+      .sandbox-controls, .sandbox-preset, .sandbox-key, .betza-table {
+        background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+    }
+    .betza-table { width: 100%; border-collapse: collapse; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
     .betza-table thead { background: var(--bg); }
     .betza-table th { text-align: left; padding: 6px 12px; font-weight: 600; font-size: 11.5px; color: var(--text-soft); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
     .betza-table td { padding: 6px 12px; border-top: 1px solid var(--border); vertical-align: top; color: var(--text); }
@@ -59,10 +65,47 @@
     .betza-active li .betza-active-name { color: var(--text); }
 
     /* ============== Sandbox + side-by-side layout ============== */
-    .betza-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; max-width: none; margin: 0 auto; padding: 32px 10px 64px; }
-    @media (max-width: 960px) { .betza-layout { grid-template-columns: minmax(0, 1fr); } }
-    .sandbox { position: sticky; top: calc(var(--nav-h) + 20px); align-self: start; max-height: calc(100vh - var(--nav-h) - 36px); overflow-y: auto; }
-    @media (max-width: 960px) { .sandbox { position: static; max-height: none; overflow-y: visible; } }
+    /* ---------- Layout ----------
+       The notation reference is a permanent side panel, like the codex's, but
+       with no open/close: it is always there, scrolls on its own, and the
+       sandbox keeps the rest of the page to itself. --panel-w is the one
+       number both sides read, so the reserve can never drift from the width. */
+    :root { --panel-w: min(720px, 46vw); }
+    .betza-layout { display: block; max-width: none; margin: 0 auto; padding: 32px 10px 64px; }
+    @media (min-width: 961px) {
+      .betza-layout { padding-right: calc(var(--panel-w) + 30px); }
+      footer { padding-right: calc(var(--panel-w) + 30px); }
+    }
+    .sandbox { max-width: 620px; }
+
+    .notation {
+      position: fixed; top: var(--nav-h, 61px); right: 0; bottom: 0;
+      width: var(--panel-w); z-index: 40;
+      overflow-y: auto; overscroll-behavior: contain;
+      padding: 26px 30px 48px; border-left: 1px solid var(--border);
+      background: linear-gradient(150deg, rgba(160,112,232,.14), rgba(24,16,48,.20) 42%),
+                  color-mix(in srgb, var(--surface) 62%, transparent);
+      backdrop-filter: blur(26px) saturate(160%);
+      -webkit-backdrop-filter: blur(26px) saturate(160%);
+      box-shadow: -30px 0 70px -40px rgba(0,0,0,.8);
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      .notation { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+    /* Below the breakpoint it rejoins the flow underneath the sandbox. */
+    @media (max-width: 960px) {
+      .notation {
+        position: static; width: auto; height: auto; overflow: visible;
+        border-left: 0; border-top: 1px solid var(--border);
+        margin-top: 34px; padding: 26px 0 0; box-shadow: none;
+        background: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+    }
+    /* The hero lives at the top of the panel now. site.css styles `header h1`,
+       so keeping it wrapped in a <header> preserves the gradient treatment. */
+    .notation-hd { margin: 0 0 18px; }
+    .notation-hd h1 { font-size: clamp(30px, 3.4vw, 46px); margin-bottom: 6px; }
+    .notation-hd .intro { margin: 0; color: var(--text-soft); font-size: 14px; }
     /* The sticky Active panel clears the header via the height nav.js measures,
        so it no longer needs a per-breakpoint magic number. */
     .betza-active { top: calc(var(--nav-h) + 12px); }
@@ -73,7 +116,7 @@
     .sandbox-presets:not(.is-expanded) .sandbox-preset-name { display: none; }
     .sandbox-presets .sandbox-preset { flex-shrink: 0; }
     .sandbox-presets-label { font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; align-self: center; margin-right: 4px; }
-    .sandbox-preset { appearance: none; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-preset:hover { border-color: var(--accent); color: var(--accent); }
     .sandbox-preset.is-hidden { display: none; }
     .sandbox-preset.is-expand { border-style: dashed; color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; }
@@ -87,7 +130,7 @@
     }
     .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
     .sandbox-board svg { width: 100%; height: 100%; display: block; }
-    .sandbox-controls { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 10px; }
+    .sandbox-controls { border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 10px; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); padding: 10px; }
     .sandbox-input { width: 100%; padding: 12px 14px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; outline: none; transition: border-color 0.15s ease; }
     .sandbox-input:focus { border-color: var(--accent); }
     .sandbox-input[data-invalid="true"] { border-color: var(--capture-color); }
@@ -95,7 +138,7 @@
     .sandbox-keyboard { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
     .sandbox-key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; }
-    .sandbox-key { appearance: none; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-key { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-key:hover { border-color: var(--accent); color: var(--accent); }
     .sandbox-key:active { background: var(--bg); }
     .sandbox-key.is-clear { color: var(--text-soft); }
@@ -136,10 +179,6 @@
 <body>
   <div id="site-nav" data-page="betza"></div>
 
-  <header>
-    <h1><em>Betza</em></h1>
-  </header>
-
   <main class="betza-layout">
     <section class="sandbox" aria-label="Betza sandbox">
       <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
@@ -155,16 +194,18 @@
       </div>
     </section>
 
-    <section class="notation">
-      <h2>Betza notation</h2>
-      <p class="intro">Ralph Betza's letter notation, used on every card in this site.</p>
+    <section class="notation" aria-label="Betza notation reference">
+      <header class="notation-hd">
+        <h1><em>Betza</em></h1>
+        <p class="intro">Ralph Betza's letter notation, used on every card in this site.</p>
+      </header>
       <aside class="betza-active" id="betza-active" aria-label="Active notations" aria-live="polite" hidden>
         <div class="betza-active-label">Active</div>
         <ul id="betza-active-list"></ul>
       </aside>
     <div class="betza-page">
 
-      <h3>Atomic leapers</h3>
+      <h2>Atomic leapers</h2>
       <p>One-shot jumps to a fixed offset; intervening pieces ignored.</p>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Letter</th><th>Diagram</th><th>Offset</th></tr></thead>
@@ -182,7 +223,7 @@
       </table></div>
       <p class="betza-note">Non-standard leapers use an explicit offset, e.g. <code>(1,4)</code> Giraffe.</p>
 
-      <h3>Sliders &amp; standard compound atomics</h3>
+      <h2>Sliders &amp; standard compound atomics</h2>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Letter</th><th>Diagram</th><th>Equivalent to</th></tr></thead>
         <tbody>
@@ -193,7 +234,7 @@
         </tbody>
       </table></div>
 
-      <h3>Riders (doubled letter = repeat the leap)</h3>
+      <h2>Riders (doubled letter = repeat the leap)</h2>
       <p>Doubled letter repeats the leap in a straight line until blocked at a landing square.</p>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Letter</th><th>Diagram</th><th>Movement</th></tr></thead>
@@ -205,7 +246,7 @@
         </tbody>
       </table></div>
 
-      <h3>Direction prefixes (lowercase)</h3>
+      <h2>Direction prefixes (lowercase)</h2>
       <p>Restrict the next uppercase move to specific directions.</p>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
@@ -220,7 +261,7 @@
       </table></div>
       <p class="betza-note">Prefixes combine, e.g. <code>fs</code> = forward + sideways.</p>
 
-      <h3>Power modifiers</h3>
+      <h2>Power modifiers</h2>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
@@ -233,7 +274,7 @@
         </tbody>
       </table></div>
 
-      <h3>Hop &amp; bend prefixes</h3>
+      <h2>Hop &amp; bend prefixes</h2>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Prefix</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
@@ -244,7 +285,7 @@
         </tbody>
       </table></div>
 
-      <h3>Numbers and brackets</h3>
+      <h2>Numbers and brackets</h2>
       <div class="table-scroll"><table class="betza-table">
         <thead><tr><th>Syntax</th><th>Meaning</th><th>Example</th></tr></thead>
         <tbody>
@@ -254,7 +295,7 @@
         </tbody>
       </table></div>
 
-      <h3>Reading a compound</h3>
+      <h2>Reading a compound</h2>
       <div class="table-scroll"><table class="betza-table betza-examples">
         <thead><tr><th>Notation</th><th>Piece</th><th>Breakdown</th></tr></thead>
         <tbody>

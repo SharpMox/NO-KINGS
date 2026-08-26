@@ -167,6 +167,18 @@
         grid-template-areas: "board" "codes" "legend" "controls";
         justify-content: stretch;
       }
+      /* Stacked, the board is a block in a full-width track, so it needs the
+         auto margins to sit centred rather than flush left. */
+      /* .sandbox > … so it outranks the base rule's `margin: 0`, which is
+         declared later in the file and would otherwise win on source order. */
+      .sandbox > .sandbox-board { margin-inline: auto; }
+      /* And the key reads as a row here in BOTH states — a vertical list of
+         eight costs most of a phone screen. Declared after the open-state rule
+         so it wins in either. */
+      .sandbox > .legend,
+      .sandbox:has(.filt[aria-expanded="true"]) > .legend {
+        flex-direction: row; flex-wrap: wrap; gap: 8px 16px;
+      }
     }
     .legend-item { display: inline-flex; align-items: center; gap: 6px; }
     .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }

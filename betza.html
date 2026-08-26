@@ -21,11 +21,13 @@
     .betza-note { font-size: 12.5px; font-style: italic; }
     /* Glass must degrade to a solid surface when the user asks for less of it. */
     @media (prefers-reduced-transparency: reduce) {
-      .sandbox-controls, .sandbox-preset, .sandbox-key, .betza-table {
+      .sandbox-controls, .sandbox-preset, .sandbox-key {
         background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none;
       }
     }
-    .betza-table { width: 100%; border-collapse: collapse; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
+    /* Solid, not glass: inside the panel the tables sat on an already-blurred
+       backdrop and had almost no contrast against it. */
+    .betza-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
     .betza-table thead { background: var(--bg); }
     .betza-table th { text-align: left; padding: 6px 12px; font-weight: 600; font-size: 11.5px; color: var(--text-soft); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
     .betza-table td { padding: 6px 12px; border-top: 1px solid var(--border); vertical-align: top; color: var(--text); }
@@ -76,7 +78,8 @@
       .betza-layout { padding-right: calc(var(--panel-w) + 30px); }
       footer { padding-right: calc(var(--panel-w) + 30px); }
     }
-    .sandbox { max-width: 620px; }
+    /* uncapped: the keyboard should use whatever width the panel leaves */
+    .sandbox { max-width: none; }
 
     .notation {
       position: fixed; top: var(--nav-h, 61px); right: 0; bottom: 0;
@@ -110,23 +113,57 @@
        so it no longer needs a per-breakpoint magic number. */
     .betza-active { top: calc(var(--nav-h) + 12px); }
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    /* Legend above the diagram: the sandbox draws with the same markers the
+       encyclopedia does, so it reuses that key verbatim. */
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 14px; font-size: 12.5px; color: var(--text-soft); }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+
     .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0 auto 16px; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
-    .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 12px 0; }
-    .sandbox-presets:not(.is-expanded) { flex-wrap: nowrap; }
-    .sandbox-presets:not(.is-expanded) .sandbox-preset-name { display: none; }
-    .sandbox-presets .sandbox-preset { flex-shrink: 0; }
+    /* ---------- Codes: the 26 presets, in the site's collapsible box ----------
+       Same .fbox/.filt shell as the encyclopedia and the deck pages. Replaces
+       the old "+N more" pill, so all 26 are reachable in one place instead of
+       a nowrap strip that scrolled sideways. */
+    .fbox {
+      display: inline-flex; align-items: flex-start; gap: 14px;
+      width: max-content; max-width: 100%; margin: 0 0 12px 0;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: linear-gradient(150deg, rgba(160,112,232,.06), rgba(24,16,48,.09) 48%),
+                  color-mix(in srgb, var(--surface) 52%, transparent);
+      backdrop-filter: blur(14px) saturate(150%);
+      -webkit-backdrop-filter: blur(14px) saturate(150%);
+      box-shadow: inset 0 1px 0 rgba(239,234,255,.13);
+    }
+    @media (prefers-reduced-transparency: reduce) {
+      .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
+    .sandbox:has(.filt[aria-expanded="true"]) .fbox { width: auto; display: flex; }
+    .filt {
+      appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono, ui-monospace, Menlo, monospace);
+      letter-spacing: .09em; text-transform: uppercase; padding: 0 16px; min-height: 42px;
+      border: 0; background: transparent; color: var(--text-soft);
+      display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+      transition: color .18s ease;
+    }
+    .fbox:hover .filt, .filt[aria-expanded="true"] { color: var(--text); }
+    .filt[aria-expanded="true"] { align-items: flex-start; padding-top: 20px; min-height: 0; }
+    .filt .n {
+      font: 700 9.5px/1 var(--mono, ui-monospace, Menlo, monospace); color: #141024;
+      background: var(--lime); border-radius: 999px; padding: 3px 6px;
+    }
+    .filt .n:empty { display: none; }
+    .fbox.sizing { flex: 0 0 auto; overflow: hidden; }
+
+    .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; flex: 1 1 auto; padding: 10px 14px 10px 0; }
+    .sandbox-presets[hidden] { display: none; }
     .sandbox-presets-label { font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; align-self: center; margin-right: 4px; }
     .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-preset:hover { border-color: var(--accent); color: var(--accent); }
-    .sandbox-preset.is-hidden { display: none; }
-    .sandbox-preset.is-expand { border-style: dashed; color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 11px; }
-    .sandbox-preset.is-expand:hover { color: var(--accent); border-color: var(--accent); }
     .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
     /* Phones: the collapsed single-row preset strip is wider than the screen,
        so let it scroll horizontally instead of pushing the page. Desktop
        (>560px) keeps the original nowrap row. */
     @media (max-width: 560px) {
-      .sandbox-presets:not(.is-expanded) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
     .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
     .sandbox-board svg { width: 100%; height: 100%; display: block; }
@@ -135,8 +172,12 @@
     .sandbox-input:focus { border-color: var(--accent); }
     .sandbox-input[data-invalid="true"] { border-color: var(--capture-color); }
     .sandbox-error { min-height: 14px; margin: 4px 0 6px 0; font-size: 12px; font-style: italic; color: var(--capture-color); }
-    .sandbox-keyboard { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
-    .sandbox-key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    /* The keyboard fills whatever width the side panel leaves: each row is a
+       flex line whose keys grow to share it, rather than a short cluster
+       hugging the left edge. */
+    .sandbox-keyboard { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; width: 100%; }
+    .sandbox-key-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+    .sandbox-key-row .sandbox-key { flex: 1 1 auto; justify-content: center; max-width: 96px; }
     .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; }
     .sandbox-key { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-key:hover { border-color: var(--accent); color: var(--accent); }
@@ -181,8 +222,22 @@
 
   <main class="betza-layout">
     <section class="sandbox" aria-label="Betza sandbox">
+      <div class="legend" aria-label="Diagram legend">
+
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="var(--move-color)"/></svg></span> Move &amp; capture</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="5.5" fill="none" stroke="var(--move-color)" stroke-width="2.2"/></svg></span> Move only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="6.5" y1="6.5" x2="17.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="6.5" y2="17.5" stroke="var(--capture-color)" stroke-width="2.6" stroke-linecap="round"/></svg></span> Capture only</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><line x1="12" y1="20" x2="12" y2="6" stroke="var(--ray-color)" stroke-width="2.6" stroke-linecap="round"/><polygon points="12,3 8,9 16,9" fill="var(--ray-color)"/></svg></span> Slide any distance</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><rect x="4.5" y="4.5" width="15" height="15" fill="none" stroke="var(--hurdle-color)" stroke-width="2" stroke-dasharray="3 2"/></svg></span> Hurdle (piece to jump)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,4 18,12 12,20 6,12" fill="var(--hop-target)"/></svg></span> Hop landing (move &amp; capture)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
+      <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
+      </div>
       <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
-      <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings"></div>
+      <div class="fbox">
+        <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes <span class="n"></span></button>
+        <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
+      </div>
       <div class="sandbox-controls">
         <label class="sr-only" for="sandbox-input">Betza notation</label>
         <input type="text" id="sandbox-input" class="sandbox-input"
@@ -314,13 +369,14 @@
 
       <p class="betza-note">Full spec: <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Wikipedia — Fairy chess piece</a>.</p>
     </div>
-    </section>
-  </main>
 
-  <footer>
+    <footer>
     <p class="footer-page-line">A reference for Ralph Betza's "funny notation" — the compact letter system that describes every piece's movement on the other pages.</p>
     <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
   </footer>
+    </section>
+  </main>
+
 
   <script>
   function renderBetzaIcon(spec) {
@@ -911,8 +967,6 @@
     { betza: 'FDC',           name: 'Qi Lin' }
   ];
   // Fewer presets stay visible on phones so the collapsed row fits without a
-  // horizontal scroll; the rest live behind the "+N more" pill.
-  const presetsVisibleCount = () => window.matchMedia('(max-width: 560px)').matches ? 3 : 4;
 
   const sandboxInput = document.getElementById('sandbox-input');
   const sandboxBoard = document.getElementById('sandbox-board');
@@ -921,7 +975,6 @@
   const sandboxPresets = document.getElementById('sandbox-presets');
 
   if (sandboxInput && sandboxBoard && sandboxKeyboard) {
-    let presetsExpanded = false;
     // Build a preset button without a per-button listener — clicks are delegated
     // at the container below. The button carries its preset string in data-preset.
     function makePresetButton(preset) {
@@ -936,36 +989,14 @@
     }
     function buildPresets() {
       if (!sandboxPresets) return;
-      const visible = presetsVisibleCount();
       sandboxPresets.innerHTML = '';
-      sandboxPresets.classList.toggle('is-expanded', presetsExpanded);
-      SANDBOX_PRESETS.forEach((preset, i) => {
-        const btn = makePresetButton(preset);
-        if (!presetsExpanded && i >= visible) btn.classList.add('is-hidden');
-        sandboxPresets.appendChild(btn);
-      });
-      if (SANDBOX_PRESETS.length > visible) {
-        const expandBtn = document.createElement('button');
-        expandBtn.type = 'button';
-        expandBtn.className = 'sandbox-preset is-expand';
-        expandBtn.setAttribute('aria-expanded', presetsExpanded ? 'true' : 'false');
-        expandBtn.setAttribute('aria-label', presetsExpanded ? 'Show fewer presets' : 'Show ' + (SANDBOX_PRESETS.length - visible) + ' more presets');
-        expandBtn.dataset.expand = '1';
-        expandBtn.textContent = presetsExpanded
-          ? '− less'
-          : '+ ' + (SANDBOX_PRESETS.length - visible) + ' more';
-        sandboxPresets.appendChild(expandBtn);
-      }
+      SANDBOX_PRESETS.forEach(preset => sandboxPresets.appendChild(makePresetButton(preset)));
     }
+
     if (sandboxPresets) {
       sandboxPresets.addEventListener('click', (ev) => {
         const btn = ev.target.closest('button.sandbox-preset');
         if (!btn) return;
-        if (btn.dataset.expand === '1') {
-          presetsExpanded = !presetsExpanded;
-          buildPresets();
-          return;
-        }
         const preset = btn.dataset.preset;
         if (preset === undefined) return;
         sandboxInput.value = preset;
@@ -974,8 +1005,37 @@
       });
     }
     buildPresets();
-    // Rebuild when crossing the phone breakpoint so the visible-count changes.
-    window.matchMedia('(max-width: 560px)').addEventListener('change', buildPresets);
+
+    /* ---- Codes disclosure: same shell and motion as the other pages. The
+         rows are held at their open width for the whole move so they do not
+         re-wrap on every frame as the frame resizes. ---- */
+    const codesBox = document.querySelector('.sandbox .fbox');
+    const codesBtn = codesBox && codesBox.querySelector('.filt');
+    if (codesBox && codesBtn) {
+      codesBtn.querySelector('.n').textContent = String(SANDBOX_PRESETS.length);
+      codesBtn.addEventListener('click', () => {
+        const open = codesBtn.getAttribute('aria-expanded') !== 'true';
+        const from = codesBox.getBoundingClientRect();
+        let rowsW = open ? 0 : sandboxPresets.getBoundingClientRect().width;
+        codesBtn.setAttribute('aria-expanded', String(open));
+        sandboxPresets.hidden = !open;
+        const to = codesBox.getBoundingClientRect();
+        if (open) rowsW = sandboxPresets.getBoundingClientRect().width;
+        if (matchMedia('(prefers-reduced-motion:reduce)').matches) return;
+        sandboxPresets.hidden = false;
+        sandboxPresets.style.width = rowsW + 'px';
+        codesBox.classList.add('sizing');
+        codesBox.animate(
+          [{ width: from.width + 'px', height: from.height + 'px' },
+           { width: to.width + 'px',   height: to.height + 'px' }],
+          { duration: 320, easing: 'cubic-bezier(.22,1,.36,1)' }
+        ).finished.then(() => {
+          sandboxPresets.style.width = '';
+          sandboxPresets.hidden = !open;
+          codesBox.classList.remove('sizing');
+        }).catch(() => {});
+      });
+    }
     // Human-readable names for keyboard buttons (screen-reader labels only — visible text stays as the letter).
     const KEY_LABELS = {
       W: 'Wazir', F: 'Ferz', D: 'Dabbaba', A: 'Alfil', N: 'Knight',

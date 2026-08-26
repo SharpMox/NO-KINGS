@@ -1997,8 +1997,8 @@
  },
  "gryphon": {
   "id": "gryphon",
-  "name": "Hydra",
-  "glyph": "Hy",
+  "name": "Quetzalcoatl",
+  "glyph": "Qz",
   "value": 60,
   "next": null,
   "moves": [

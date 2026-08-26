@@ -129,7 +129,7 @@ var PIECES_CODEX = [
       betza: 'F',
       origin: 'Shatranj',
       description: 'Steps one square diagonally. The historical Shatranj precursor to the modern Queen; colour-bound to its starting square colour.',
-      description_codex: 'Steps one square diagonally. Promotes to Mystic. Fuses with Rook to form Hydra.',
+      description_codex: 'Steps one square diagonally. Promotes to Mystic. Fuses with Rook to form Quetzalcoatl.',
       behaviors: ['leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -602,10 +602,10 @@ var PIECES_CODEX = [
     {
       id: 'gryphon',
       family: 'others',
-      name: 'Hydra',
+      name: 'Quetzalcoatl',
       original_name: 'Gryphon',
       aliases: ['Aanca', 'Eagle (Grant Acedrex)'],
-      letter: 'Hy',
+      letter: 'Qz',
       betza: 't[FR]',
       origin: 'Grant Acedrex (1283)',
       description: 'A bent slider: takes one diagonal step (Ferz), then continues as a Rook outwards — moving orthogonally away from its starting square. The pivot square is itself a valid stopping square. Originated in Grant Acedrex, the 13th-century Castilian variant.',
@@ -631,8 +631,8 @@ var PIECES_CODEX = [
       letter: 'Kr',
       betza: 't[WB]',
       origin: 'Modern variants (Betza, Gilman, Cazaux)',
-      description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Hydra. Pivot square is itself a valid stopping square.',
-      description_codex: 'Steps one square orthogonally, then continues sliding outward diagonally for any distance. Formed by fusing Mage and Bishop. Fuses with Hydra to form Leviathan.',
+      description: 'A bent slider: takes one orthogonal step (Wazir), then continues as a Bishop outwards. The orthogonal counterpart of the Quetzalcoatl. Pivot square is itself a valid stopping square.',
+      description_codex: 'Steps one square orthogonally, then continues sliding outward diagonally for any distance. Formed by fusing Mage and Bishop. Fuses with Quetzalcoatl to form Leviathan.',
       behaviors: ['long-range'],
       moves: [
         { kind: 'bent-rider', pivot: [0,  1],  dir: [1,  1] },
@@ -654,8 +654,8 @@ var PIECES_CODEX = [
       letter: 'Lv',
       betza: 't[FR]t[WB]',
       origin: 'Modern variants',
-      description: 'A double bent-rider that combines the Hydra (Ferz + outward Rook) and the Kraken (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Hydra-style (diagonal pivot, orthogonal slide) and eight Kraken-style (orthogonal pivot, diagonal slide).',
-      description_codex: 'Either steps one square diagonally and continues orthogonally outward, or steps one square orthogonally and continues diagonally outward. Formed by fusing Kraken and Hydra.',
+      description: 'A double bent-rider that combines the Quetzalcoatl (Ferz + outward Rook) and the Kraken (Wazir + outward Bishop) into a single piece. Sixteen bent paths radiating from the centre — eight Quetzalcoatl-style (diagonal pivot, orthogonal slide) and eight Kraken-style (orthogonal pivot, diagonal slide).',
+      description_codex: 'Either steps one square diagonally and continues orthogonally outward, or steps one square orthogonally and continues diagonally outward. Formed by fusing Kraken and Quetzalcoatl.',
       behaviors: ['compound', 'long-range'],
       moves: [
         { kind: 'bent-rider', pivot: [1,  1],  dir: [0,  1] },

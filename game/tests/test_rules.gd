@@ -80,7 +80,7 @@ func _init() -> void:
 	nr = Rules.moves_for(b, Vector2i(3, 3), defs)
 	check(not nr.has(Vector2i(5, 7)), "a blocker on the chain stops the nightrider")
 
-	# --- move-gen: bent-riders (Hydra) ---
+	# --- move-gen: bent-riders (Quetzalcoatl) ---
 	b = {Vector2i(2, 2): piece("gryphon", Rules.PLAYER)}
 	var gm := Rules.moves_for(b, Vector2i(2, 2), defs)
 	check(gm.has(Vector2i(3, 3)), "gryphon can stop on the pivot")
@@ -102,7 +102,7 @@ func _init() -> void:
 	check(Rules.merge_result(["knight", "alibaba"], defs, fus) == "squirrel",
 		"fusion can produce fusion-only pieces")
 	check(Rules.merge_result(["ferz", "rook"], defs, fus) == "gryphon",
-		"bent-rider fusions are live (Seer + Rook -> Hydra)")
+		"bent-rider fusions are live (Seer + Rook -> Quetzalcoatl)")
 	check(Rules.merge_result(["pawn", "rook"], defs, fus) == "",
 		"non-fusion pair does not merge")
 	check(Rules.merge_result(["pawn", "pawn", "pawn"], defs, fus) == "",

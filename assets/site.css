@@ -50,6 +50,11 @@
   --border-soft: #ebdcbf;
   --text-dim: #6f6484;
   --wrap: 1560px;   /* one centred-column width for the whole site */
+  /* Shared with the redesigned pages, which define these locally. Theme-neutral,
+     so they live once here rather than in each page that links this file. */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --rad-pill: 999px;
+  --ease: cubic-bezier(.22, 1, .36, 1);
 }
 
 [data-theme="dark"] {

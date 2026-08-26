@@ -121,11 +121,25 @@
     .notation h2 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     /* Legend above the diagram: the sandbox draws with the same markers the
        encyclopedia does, so it reuses that key verbatim. */
-    /* Diagram and its key sit side by side; the key reads as a vertical
-       column so each marker lines up under the last. */
-    .sim-row { display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; margin: 0 0 16px; }
-    .sim-row .sandbox-board { flex: 0 1 360px; }
-    .legend { display: flex; flex-direction: column; gap: 9px; margin: 0; font-size: 12.5px; color: var(--text-soft); flex: 1 1 220px; }
+    /* Diagram, then the Codes button stacked over its key. Closed, the pair is
+       centred as a group; open, the Codes panel needs the room, so the group
+       goes left, the side column takes the rest of the width and the key turns
+       into a horizontal strip beneath the button. */
+    .sim-row {
+      display: flex; align-items: flex-start; justify-content: center;
+      gap: 24px; flex-wrap: wrap; margin: 0 0 16px;
+    }
+    .sim-row .sandbox-board { flex: 0 0 auto; }
+    .sim-side { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; flex: 0 1 auto; }
+    .legend { display: flex; flex-direction: column; gap: 9px; margin: 0; font-size: 12.5px; color: var(--text-soft); }
+
+    .sandbox:has(.filt[aria-expanded="true"]) .sim-row { justify-content: flex-start; }
+    /* 320px basis, not 0: squeezed narrower than this the code pills cannot
+       shrink to fit their own text and push the page sideways. Below that it
+       wraps under the diagram and takes the full width instead. */
+    .sandbox:has(.filt[aria-expanded="true"]) .sim-side { flex: 1 1 320px; min-width: 0; align-self: stretch; }
+    .sandbox:has(.filt[aria-expanded="true"]) .fbox { align-self: stretch; }
+    .sandbox:has(.filt[aria-expanded="true"]) .legend { flex-direction: row; flex-wrap: wrap; gap: 8px 18px; }
     .legend-item { display: inline-flex; align-items: center; gap: 6px; }
     .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 
@@ -229,6 +243,11 @@
     <section class="sandbox" aria-label="Betza sandbox">
       <div class="sim-row">
         <div class="sandbox-board" id="sandbox-board" role="img" aria-label="Movement diagram"></div>
+        <div class="sim-side">
+        <div class="fbox">
+          <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes</button>
+          <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
+        </div>
         <div class="legend" aria-label="Diagram legend">
 
 
@@ -241,10 +260,7 @@
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="6" fill="none" stroke="var(--hop-target)" stroke-width="2.2"/></svg></span> Hop landing (move only)</span>
       <span class="legend-item"><span class="legend-swatch"><svg viewBox="0 0 24 24" width="24" height="24"><circle cx="7" cy="17" r="2.3" fill="var(--rider-color)"/><circle cx="17" cy="7" r="2.3" fill="var(--rider-color)"/><line x1="7" y1="17" x2="17" y2="7" stroke="var(--rider-color)" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.6"/></svg></span> Rider (repeats leap)</span>
         </div>
-      </div>
-      <div class="fbox">
-        <button class="filt" type="button" aria-expanded="false" aria-controls="sandbox-presets">Codes</button>
-        <div class="sandbox-presets" id="sandbox-presets" aria-label="Preset Betza strings" hidden></div>
+        </div>
       </div>
       <div class="sandbox-controls">
         <label class="sr-only" for="sandbox-input">Betza notation</label>

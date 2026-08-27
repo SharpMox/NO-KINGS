@@ -40,6 +40,22 @@ const ITEMS: Array = [
 		"description": "Destroy all pieces (ally and enemy) within a 3x3 target area. The King is unaffected."},
 	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",
 		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
+	{"key": "buff_box", "name": "Buff Box", "tier": "Strategic", "target": "tile",
+		"description": "Choose 1 of 3 random Piece Buffs, then apply it to a target piece (ally or enemy)."},
+]
+
+## Piece Buffs — one-shot effects that ride on a single board piece, delivered
+## by the Buff Box item (GDD Piece Buffs DB). Two models:
+##   dormant  — sits on the piece until its trigger fires, then resolves and is
+##              consumed. No expiry: it can wait forever.
+##   timed    — activates on application and runs for a fixed window.
+## Only the dormant pair ships in this slice; the timed buffs (Aura, Smog,
+## Slow) need magnitudes the catalog never gave and land with the rest.
+const PIECE_BUFFS: Array = [
+	{"key": "shield", "name": "Shield", "tier": "Tactical", "model": "dormant",
+		"description": "Prevents the next capture attempt on this piece. Both pieces stay put."},
+	{"key": "critical", "name": "Critical", "tier": "Tactical", "model": "dormant",
+		"description": "The next capture by this piece scores double."},
 ]
 
 const ARTEFACT_EFFECTS: Array = [

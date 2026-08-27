@@ -1,6 +1,6 @@
 # 03 — Piece Buffs: the delivery path + 3 buffs
 
-Status: todo
+Status: done (2 of 3 buffs; Slow deferred — see Outcome)
 
 ## Parent
 
@@ -52,6 +52,47 @@ expire. Those two models are what slice 04 then fills in against.
 - [ ] Radar Jamming strips these buffs (its description already promises it)
 - [ ] The clock does not pause during pick or targeting
 - [ ] Scenario added for the buff flow; `run_all.sh` all green
+
+## Outcome (2026-08-27)
+
+The delivery path and both **dormant** buffs shipped. The **timed** model did not —
+see below.
+
+**Buff Box added to the Notion Items DB.** It was referenced by name on both Reward
+Economy and Game Flow — Box Pick but had no row in the catalog, so nothing could roll or
+price it. Created as **Strategic** (60 Gold) on the reasoning that it is a lottery over
+three buffs and can hit a Decisive one. Revisit after playtesting.
+
+**Divergence from the GDD, recorded on the item's Notes:** the GDD fires the buff
+sub-pick *immediately* when Buff Box is picked from the Item Box's 5 options. The
+prototype has no two-step box (divergence #10) and every other Item resolves on use, so
+Buff Box enters the inventory like any Item and fires its sub-pick + targeting when used.
+One acquisition path serves boxes, Shop purchases and scenarios, and the player keeps the
+tactical choice of *when*.
+
+**Shipped:** `buff_logic.gd` (buffs as `{"key": …}` Dictionaries on the piece, so
+ADR-0002 carries them through Stock and the save untouched); the 3-of-N sub-pick modal
+with cancel-keeps-the-item; ally-or-enemy targeting through the existing `item_logic`
+stage machinery; the **capture-repulsion rule** as a shared seam
+(`BuffLogic.repels_capture`) hooked into both the player and AI capture paths, so Reflect
+drops in beside Shield; Radar Jamming widened to strip piece buffs as its description
+already promised; board rows in the save now carry a state Dictionary while still
+accepting the legacy `"buff"` string.
+
+### Deferred: the timed model (Slow / Aura / Smog)
+
+Slow was meant to prove activate-immediately-and-expire. It could not ship honestly:
+**"movement range is reduced by 1" has no defined meaning for most pieces.** `moves_for`
+has a `range` limit only for *rides*, and an unbounded rider (Rook, `range = 0`) has no
+"range − 1". Read as Chebyshev distance instead, a Knight's max is 2, so −1 leaves it
+with no legal move at all — a freeze, not a slow.
+
+Aura and Smog have the same hole: the catalog says *bonus movement and/or score gain* and
+*reduced movement range and capture power* with no numbers anywhere.
+
+Rather than invent an interpretation and create exactly the drift slices 01–02 spent
+their time removing, all three timed buffs move to **slice 04**, which now has to settle
+the magnitudes with the user first.
 
 ## Blocked by
 

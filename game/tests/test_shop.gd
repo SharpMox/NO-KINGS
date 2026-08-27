@@ -217,6 +217,26 @@ func _init() -> void:
 	check(game.shop_restocks == 3,
 		"a single huge gain banks every threshold it crossed (next: 7000)")
 
+	# always openable, and it pauses the run clock (GDD Shop page). Buying
+	# stays turn-gated: outside your turn the shelf is a readable catalog.
+	game.state = game.State.ENEMY_TURN
+	game._open_shop()
+	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
+		"the Shop opens outside the player's turn")
+	var any: Dictionary = game.shop_stock[0]
+	game.gold = 99999
+	game.actions_left = 5
+	check(not Shop.can_buy(game, any), "but buying is refused outside your turn")
+
+	game.state = game.State.PLAYER_TURN
+	game._open_shop()
+	var clock0: float = game.clock_ms
+	game._process(0.5)
+	check(game.clock_ms == clock0, "the clock does not tick while the Shop is open")
+	game.modals.shop_panel.visible = false
+	game._process(0.5)
+	check(game.clock_ms < clock0, "closing the Shop resumes the clock")
+
 	game.queue_free()
 	await process_frame
 

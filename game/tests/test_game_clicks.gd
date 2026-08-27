@@ -539,6 +539,16 @@ func _init() -> void:
 	await process_frame
 	check(not game.modals.shop_panel.visible, "the shop modal closes")
 
+	# the Shop is reachable in any state, not just your turn (GDD Shop page)
+	var was_state: int = game.state
+	game.state = game.State.ENEMY_TURN
+	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable off-turn")
+	await process_frame
+	check(game.modals.shop_panel.visible, "the shop opens during the enemy turn")
+	check(await _click_button_in(game.modals.shop_panel, "Close"), "off-turn shop closes")
+	await process_frame
+	game.state = was_state
+
 	# reinforcement shop: opens pending at turn start, Buy is free and adds
 	# to stock, Done hands the turn back
 	game.queue_free()

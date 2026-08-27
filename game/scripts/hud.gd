@@ -286,8 +286,8 @@ func _draw_stock_armed() -> void:
 	var c := Vector2(19.0, stock_armed.size.y / 2.0)
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	stock_armed.draw_texture_rect(g.textures[g.placing_id],
-		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false, Color(0.72, 0.85, 1.25))
+	stock_armed.draw_texture_rect(g.piece_tex(g.placing_id),
+		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false)
 	stock_armed.draw_arc(c, 14.0 + 2.0 * pulse, 0, TAU, 24,
 		Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse), 2.0 + pulse)
 
@@ -359,7 +359,7 @@ func _rebuild_pool_strip() -> void:
 		var id: String = st.id
 		var cap: bool = st.cap
 		if g.textures.has(id): # piece icon instead of glyph text (round 3)
-			btn.icon = g.textures[id]
+			btn.icon = g.piece_tex(id) # Stock is always yours: the player token
 			btn.expand_icon = true
 			btn.custom_minimum_size = Vector2(46, 46)
 		else:

@@ -47,6 +47,9 @@ const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
+# side shift for monochrome tokens only — the painted art carries its own colour
+const COL_SIDE_PLAYER := Color(0.72, 0.85, 1.25)
+const COL_SIDE_ENEMY := Color(1.25, 0.72, 0.72)
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
 # Palette rule (2026-07-07): everything player-side is a shade of blue —
 # selection, moves, placement, merge partners; everything enemy-side is red —
@@ -63,7 +66,8 @@ var board_px := Vector2(24, 120)
 
 var defs: Dictionary
 var fusions: Dictionary # unordered pair "a+b" -> result id
-var textures := {} # id -> Texture2D; missing ids fall back to glyph text
+var textures := {} # id -> {Rules.PLAYER: Texture2D, Rules.ENEMY: Texture2D}
+var mono_art := {} # ids whose token is one shared image, so it needs the side tint
 var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
@@ -191,13 +195,21 @@ func _ready() -> void:
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
-		# png wins if present (drop painted art in anytime); svg is the
-		# generated vector set (tools/generate-piece-art.py)
-		for ext in ["png", "svg"]:
-			var path := "res://assets/pieces/%s.%s" % [id, ext]
-			if ResourceLoader.exists(path):
-				textures[id] = load(path)
-				break
+		# Painted art is side-specific: <id>-light.png is the player token,
+		# <id>-dark.png the enemy one, so no side tint is applied to them.
+		# A lone <id>.svg is the old generated vector set — one monochrome
+		# token for both sides, still tinted blue/red at draw time (king,
+		# until its art arrives).
+		var light := "res://assets/pieces/%s-light.png" % id
+		var dark := "res://assets/pieces/%s-dark.png" % id
+		if ResourceLoader.exists(light) and ResourceLoader.exists(dark):
+			textures[id] = {Rules.PLAYER: load(light), Rules.ENEMY: load(dark)}
+			continue
+		var mono := "res://assets/pieces/%s.svg" % id
+		if ResourceLoader.exists(mono):
+			var t: Texture2D = load(mono)
+			textures[id] = {Rules.PLAYER: t, Rules.ENEMY: t}
+			mono_art[id] = true
 	for it in Items.ITEMS: # item glyphs (picked 2026-07-17, .scratch/item-icons)
 		var path := "res://assets/items/%s.svg" % it.key
 		if ResourceLoader.exists(path):
@@ -962,7 +974,7 @@ func _draw_preview_diagram(dia: Control, id: String, cells: int, cell: int) -> v
 			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
 				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
 	if textures.has(id):
-		dia.draw_texture_rect(textures[id],
+		dia.draw_texture_rect(piece_tex(id),
 			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
 	for m in defs[id].moves:
 		if m.type == "bent": # pivot step, then a ride outward from the pivot
@@ -1294,7 +1306,7 @@ func _draw() -> void:
 			continue
 		var p: Dictionary = board[pos]
 		var px := _tile_px(pos)
-		var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
+		var tint := Color.WHITE # side colour lives in the art; _draw_piece tints mono tokens
 		if pos == drag_from:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
@@ -1313,8 +1325,7 @@ func _draw() -> void:
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
-			var mtint := Color(0.72, 0.85, 1.25) if mp.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
-			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), mtint)
+			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), Color.WHITE)
 		elif a.kind == "pop":
 			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
@@ -1336,17 +1347,27 @@ func _draw() -> void:
 			draw_string(font, Vector2(bx, by + 31), a.text,
 				HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
-		draw_texture_rect(textures[board[drag_from].id],
+		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 	if pool_drag_id != "" and textures.has(pool_drag_id): # stock drag ghost
-		draw_texture_rect(textures[pool_drag_id],
+		draw_texture_rect(piece_tex(pool_drag_id),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
+
+
+## Token art for a piece; the player token unless a side is named.
+func piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
+	return textures[id][owner]
 
 
 func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4.0) -> void:
 	if textures.has(p.id):
-		draw_texture_rect(textures[p.id],
-			Rect2(px + Vector2(inset, inset), Vector2(tile - inset * 2, tile - inset * 2)), false, tint)
+		# `tint` carries state only (spent grey, ghost alpha); a monochrome
+		# token still needs the blue/red side shift multiplied in
+		var col := tint
+		if mono_art.has(p.id):
+			col *= COL_SIDE_PLAYER if p.owner == Rules.PLAYER else COL_SIDE_ENEMY
+		draw_texture_rect(piece_tex(p.id, p.owner),
+			Rect2(px + Vector2(inset, inset), Vector2(tile - inset * 2, tile - inset * 2)), false, col)
 	else: # ponytail: glyph fallback so a missing PNG never breaks the board
 		var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
 		var glyph: String = defs[p.id].glyph

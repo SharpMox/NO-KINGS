@@ -1,6 +1,6 @@
 # 02 — Notion reconciliation (doc only)
 
-Status: todo
+Status: done
 
 ## Parent
 
@@ -32,10 +32,44 @@ the GDD now contradicts itself. Fix the doc so the next audit compares against o
 
 ## Acceptance criteria
 
-- [ ] No page states a rule another page reverses
-- [ ] The divergence list matches the code it describes
-- [ ] `Letter` resolved either way, with the reason recorded
-- [ ] Both open questions answered or explicitly parked on the page
+- [x] No page states a rule another page reverses
+- [x] The divergence list matches the code it describes
+- [x] `Letter` resolved either way, with the reason recorded
+- [x] Both open questions answered or explicitly parked on the page
+
+## Outcome (2026-08-27)
+
+Eight Notion pages edited plus 32 database rows. Every edit carries a dated
+"Reconciled" note so the change is auditable from the page itself.
+
+| Page | Change |
+| --- | --- |
+| `Score` | Costs section rewritten: everything debits Gold, Score only goes up |
+| `Captured Stock` | 3-piece merges → the 2-piece pair model; placement cost → Gold |
+| `Game Flow — Player Turn` | same two corrections |
+| `Board` | 6×8 → 8×12 |
+| `Overview` | 6×8 → 8×12; back-row breach needs the *whole* row |
+| `Game Over & Winner Screens` | back-row breach needs the whole row |
+| `Fable Prototype Test` | #12 Blitz updated; #13 struck — no longer a divergence |
+| `Pieces & Movement` | bounce-back rule kept and defined (below) |
+| `Stock` | capacity claim deleted (below) |
+| `Pieces` DB | 32 `Letter` rows resynced to the game glyphs |
+
+**Decisions taken (user, 2026-08-27):**
+
+1. **`Letter` resynced to the game.** The column now matches `pieces.json` glyphs
+   exactly — `Du` Duchess, `Rg` Ranger, `Lm` Long Ma, `Lv` Leviathan, `Kr` Kraken and so
+   on; the 6 standard pieces keep their unicode chess glyphs and the King gained `♚`
+   (it was empty). Verified all 39 match the game and are unique.
+2. **Bounce-back is a real rule, not dead text.** It was written anticipating a general
+   capture-repulsion mechanic. It now reads as effect-driven — an ordinary capture always
+   succeeds; an effect on the defender can stop it, and then the attacker returns to its
+   starting tile. **Shield** is the canonical carrier and **Reflect** the aggressive
+   variant, so the rule first ships with slice 03, not before.
+3. **Stock is uncapped.** The capacity line was aimed at a player hoarding unlimited
+   Pawns; merging already applies that pressure. Deleted, with the note that Pawn
+   hoarding should be capped specifically if it ever becomes a problem — not via a
+   revived general capacity system.
 
 ## Blocked by
 

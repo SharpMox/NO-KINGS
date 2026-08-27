@@ -214,6 +214,9 @@ func _ready() -> void:
 		var path := "res://assets/items/%s.svg" % it.key
 		if ResourceLoader.exists(path):
 			item_icons[it.key] = load(path)
+	# GDD Game Flow — Run: one seed per run, captured so a save resumes the same
+	# stream. SaveConfig.apply below overrides both when restoring a save, and a
+	# scenario may pin "seed" to replay a bug exactly.
 	rng.randomize()
 	add_child(hud)
 	hud.build(self)

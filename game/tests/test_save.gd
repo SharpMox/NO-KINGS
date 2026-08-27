@@ -80,6 +80,38 @@ func _init() -> void:
 			buffed += 1
 	check(buffed == 2, "box carriers survive the round trip")
 
+	# --- GDD Game Flow — Run: the seed rides along, so resuming a save rolls
+	# exactly what an uninterrupted run would have rolled from that point.
+	var live := _boot({"board": [["rook", 1, 4, 10]], "wave": 3})
+	await process_frame
+	live.rng.seed = 424242
+	for i in 5: # burn some stream so the save is captured mid-sequence
+		live.rng.randi()
+	var mid: Dictionary = live._to_config()
+	var expected := []
+	for i in 8:
+		expected.append(live.rng.randi())
+	live.queue_free()
+	await process_frame
+
+	# round-trip through JSON, exactly as the real save file does
+	var resumed := _boot(JSON.parse_string(JSON.stringify(mid)))
+	await process_frame
+	var got := []
+	for i in 8:
+		got.append(resumed.rng.randi())
+	check(int(mid.seed) == 424242, "the seed is captured in the save")
+	check(got == expected, "a resumed save continues the same RNG stream")
+	resumed.queue_free()
+	await process_frame
+
+	# a fresh run without a seed still varies
+	var fresh := _boot({"board": [["rook", 1, 4, 10]], "wave": 3})
+	await process_frame
+	check(fresh.rng.seed != 0, "an unpinned run still gets a random seed")
+	fresh.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL SAVE CHECKS OK")

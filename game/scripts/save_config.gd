@@ -15,8 +15,9 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.stock = cfg.get("stock", []).duplicate()
 	g.captured = cfg.get("captured", []).duplicate()
 	g.score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
-	g.money = int(cfg.get("money", 0))
+	g.gold = int(cfg.get("gold", 0))
 	g.shop_stock = cfg.get("shop_stock", []).duplicate(true)
+	g.shop_restocks = int(cfg.get("shop_restocks", 0)) # no reroll-scumming
 	g.clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
 	# default: all designed waves done, so nothing spawns into the sandbox
 	g.wave = int(cfg.get("wave", Waves.WAVES.size()))
@@ -37,10 +38,10 @@ static func apply(g, cfg: Dictionary) -> void:
 		for it in Items.ITEMS:
 			if it.key == key:
 				g.items.append(it)
-	for key in cfg.get("trinkets", []):
-		for t in Items.TRINKET_EFFECTS:
+	for key in cfg.get("artefacts", []):
+		for t in Items.ARTEFACT_EFFECTS:
 			if t.key == key:
-				g.trinkets.append(t)
+				g.artefacts.append(t)
 	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
 		Economy.activate_tariff_by_key(g, key)
 	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
@@ -69,7 +70,7 @@ static func to_config(g) -> Dictionary:
 		return out
 	return {
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
-		"items": keys_of.call(g.items), "trinkets": keys_of.call(g.trinkets),
+		"items": keys_of.call(g.items), "artefacts": keys_of.call(g.artefacts),
 		"tariffs": keys_of.call(g.tariffs_active), "tariffs_seen": g.tariffs_seen.duplicate(),
 		"wave": g.wave, "turns_since_wave": g.turns_since_wave,
 		"early_clear_awarded": g.early_clear_awarded,
@@ -77,8 +78,9 @@ static func to_config(g) -> Dictionary:
 		"kings_defeated": g.kings_defeated, "army": g.next_army,
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
-		"score": g.score, "money": g.money, "clock_s": g.clock_ms / 1000.0,
+		"score": g.score, "gold": g.gold, "clock_s": g.clock_ms / 1000.0,
 		"shop_stock": g.shop_stock.duplicate(true),
+		"shop_restocks": g.shop_restocks,
 		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"tariffs_off": g.tariffs_suppressed,

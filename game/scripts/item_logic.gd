@@ -5,25 +5,39 @@ const Rules := preload("res://scripts/rules.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 
 
-static func stage_targets(board: Dictionary, defs: Dictionary, key: String, a: Vector2i) -> Array[Vector2i]:
+## Base of a piece's promotion chain: walk `next` backwards. Returns `id`
+## itself when nothing promotes into it (Demote then has no effect).
+static func chain_base(defs: Dictionary, id: String) -> String:
+	for k: String in defs:
+		if defs[k].next == id:
+			return chain_base(defs, k)
+	return id
+
+
+static func stage_targets(board: Dictionary, defs: Dictionary, key: String, a: Vector2i,
+		moved: Array[Vector2i] = [] as Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:
 			var pos := Vector2i(x, y)
-			if tile_valid(board, defs, key, a, pos):
+			if tile_valid(board, defs, key, a, pos, moved):
 				out.append(pos)
 	return out
 
 
-static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vector2i, pos: Vector2i) -> bool:
+static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vector2i, pos: Vector2i,
+		moved: Array[Vector2i] = [] as Array[Vector2i]) -> bool:
 	var occupied := board.has(pos)
 	var enemy: bool = occupied and board[pos].owner == Rules.ENEMY
 	var own: bool = occupied and board[pos].owner == Rules.PLAYER
 	var king: bool = occupied and board[pos].id == "king"
 	if a.x < 0: # stage A (or single-tile items)
 		match key:
+			"blitz": # only a piece that already moved needs a second move
+				return own and moved.has(pos)
 			"demote":
-				return occupied and not king
+				return occupied and not king \
+					and chain_base(defs, board[pos].id) != board[pos].id
 			"promote":
 				return own and not king and defs[board[pos].id].next != null
 			"invert":

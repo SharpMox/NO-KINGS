@@ -1,17 +1,21 @@
-## Items + Trinket Effects, from the Notion GDD catalogs (STATUS triage
+## Items + Artefact Effects, from the Notion GDD catalogs (STATUS triage
 ## synced 2026-07-14: only KEEP items ship; REWORK/REMOVE entries deleted).
 ## Exclusions and their reasons are listed at the bottom.
+##
+## The Notion Items DB is the source of truth for names, tiers and effects —
+## when it disagrees with this file, Notion wins and this file changes (user
+## call 2026-08-27; last name+effect audit 2026-08-27, Blitz and Demote resynced).
 ##
 ## Item fields: key, name, tier, description, target:
 ##   "" (instant) · "tile" (pick one tile) · "pair" (pick a piece, then a destination)
 
 const ITEMS: Array = [
-	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "",
-		"description": "Gain an additional move action for the turn."},
+	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile",
+		"description": "Target Piece can move a second time this turn."},
 	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "tile",
 		"description": "Duplicate a piece on the board to your Stock."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",
-		"description": "Convert a target piece (ally or enemy) to a Pawn."},
+		"description": "Convert a target piece (ally or enemy) to its base chain piece. No effect if it has none."},
 	{"key": "promote", "name": "Promote", "tier": "Tactical", "target": "tile",
 		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
 	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",
@@ -38,7 +42,7 @@ const ITEMS: Array = [
 		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
 ]
 
-const TRINKET_EFFECTS: Array = [
+const ARTEFACT_EFFECTS: Array = [
 	{"key": "first_capture_extra", "name": "First-Capture Extra Action",
 		"description": "If your first action of a turn is a capture, gain an extra action."},
 	{"key": "greed", "name": "Greed",
@@ -58,5 +62,5 @@ const TRINKET_EFFECTS: Array = [
 ## Excluded (reason):
 ## - REWORK/REMOVE items (STATUS triage 2026-07-14): deleted here; the Notion
 ##   Items DB is the source of truth for their return.
-## - Capture Everything (Trinket): scope TBD upstream.
-## - Obstacle (Trinket): no obstacle system in MVP.
+## - Capture Everything (Artefact): scope TBD upstream.
+## - Obstacle (Artefact): no obstacle system in MVP.

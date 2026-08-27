@@ -3,24 +3,26 @@
 ## tariff data lives in data/tariffs.gd).
 
 const Rules := preload("res://scripts/rules.gd")
+const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 
 
-## Money cost charged when a tariffed action happens.
+## Gold cost charged when a tariffed action happens.
 static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
 	if tariff_on(g, key):
-		g.money = maxi(g.money - amount, 0)
+		g.gold = maxi(g.gold - amount, 0)
 
 
 ## Award a gain: score counts the raw amount (up-only performance metric),
-## money takes the Inflation-taxed amount. Every gain site goes through here.
+## gold takes the Inflation-taxed amount. Every gain site goes through here.
 static func earn(g, amount: int) -> void:
 	g.score += amount
-	g.money += gain(g, amount)
+	g.gold += gain(g, amount)
+	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 
-## Money gains pass through Inflation (-10% per stack, rounded down).
+## Gold gains pass through Inflation (-10% per stack, rounded down).
 static func gain(g, amount: int) -> int:
 	if g.tariffs_suppressed: # Counter-Intel pauses persistent tariffs too
 		return amount
@@ -35,7 +37,7 @@ static func gain(g, amount: int) -> int:
 static func capture_score(g, victim_id: String) -> int:
 	var base: int = g.defs[victim_id].value
 	var pts := base
-	for t in g.trinkets: # run-long passives (stack per copy)
+	for t in g.artefacts: # run-long passives (stack per copy)
 		match t.key:
 			"greed":
 				if victim_id == "pawn":
@@ -99,7 +101,7 @@ static func apply_tariff(g, t: Dictionary) -> void:
 			"asset_seizure":
 				g.stock.clear()
 			"asset_freeze":
-				g.money /= 2
+				g.gold /= 2
 			"hostile_takeover":
 				var mine: Array[Vector2i] = g._player_pieces()
 				if not mine.is_empty():

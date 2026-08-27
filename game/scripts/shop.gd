@@ -1,21 +1,23 @@
 ## The Shop — pure logic over the live game node `g`, no nodes (like box.gd).
-## Owns the randomized 19-slot stock (3 lootboxes / 4 artefacts / 4 items /
-## 8 distinct base pieces), gold prices, purchase rules, and rerolls.
+## Owns the randomized 22-slot stock (6 typed boxes / 4 artefacts / 4 items /
+## 8 distinct base pieces), gold prices, purchase rules, and restocks.
 ## Slots are JSON-safe ({kind, key, sold}) so saves carry them verbatim;
 ## names and prices are derived on demand. (money-and-shop/04)
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 
-const ROWS := {"box": 3, "artefact": 4, "item": 4, "piece": 8}
+const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
+const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
 
 
-## Reroll g.shop_stock in place. Plain function on purpose: future effects
-## (items, tariffs) may call it outside the wave cadence (money-and-shop/07).
+## Reroll g.shop_stock in place. Plain function on purpose: effects
+## (items, tariffs) may call it outside the score cadence (money-and-shop/07).
 static func roll(g) -> void:
 	var slots := []
-	for i in ROWS.box:
-		slots.append({"kind": "box", "key": "box", "sold": false})
+	for type in BOX_TYPES:
+		for i in ROWS.box / BOX_TYPES.size():
+			slots.append({"kind": "box", "key": type, "sold": false})
 	for key in _sample(Items.ARTEFACT_EFFECTS.map(func(t: Dictionary) -> String:
 			return t.key), ROWS.artefact, g.rng):
 		slots.append({"kind": "artefact", "key": key, "sold": false})
@@ -62,7 +64,25 @@ static func display_name(g, slot: Dictionary) -> String:
 			return str(g.defs[slot.key].name)
 		"item", "artefact":
 			return str(_catalog(slot).name)
-	return "Lootbox"
+	return "%s Box" % str(slot.key).capitalize()
+
+
+## Cumulative score that buys the (n+1)-th restock, given n already banked:
+## 1000 / 2500 / 4500 / 7000 … — the gap itself grows by the step each time.
+static func threshold(n: int) -> int:
+	return Tuning.SHOP_RESTOCK_BASE * (n + 1) + Tuning.SHOP_RESTOCK_STEP * n * (n + 1) / 2
+
+
+## Restock every threshold the run's score has passed. Called from the single
+## gain site (Economy.earn); a leap over several thresholds banks them all but
+## rolls once — the shelf can only be fresh, not fresher.
+static func maybe_restock(g) -> void:
+	var crossed := false
+	while g.score >= threshold(g.shop_restocks):
+		g.shop_restocks += 1
+		crossed = true
+	if crossed:
+		roll(g)
 
 
 ## Purchasable right now: player's turn, an action and the gold to spare,

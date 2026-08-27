@@ -49,6 +49,12 @@ const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
 const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}
 const SHOP_ARTEFACT_PRICE := 100
 const SHOP_BOX_PRICE := 50
+# Restock cadence (GDD Shop page): the shelf refreshes on cumulative score,
+# not on waves. The 1st costs BASE, and every later one costs STEP more than
+# the last — 1000 / 2500 / 4500 / 7000. Placeholders: a median Crown run ends
+# near 300, so either these come down or income goes up after a playtest sweep.
+const SHOP_RESTOCK_BASE := 1000
+const SHOP_RESTOCK_STEP := 500
 const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;

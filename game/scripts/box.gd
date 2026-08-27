@@ -9,12 +9,15 @@ const Tuning := preload("res://scripts/tuning.gd")
 ## two-step pick): 3 options rolled independently — Item 40% / Artefact 30% /
 ## Score 30% — never repeating within the offer. Each is self-describing:
 ## {kind, name, description, tier?, value?, payload?}.
-static func roll_options(rng: RandomNumberGenerator) -> Array:
+## `only_kind` pins every option to one kind — that is what a typed Shop Box
+## sells (GDD Shop page); the capture-driven Box Pick leaves it empty.
+static func roll_options(rng: RandomNumberGenerator, only_kind := "") -> Array:
 	var out := []
 	var taken := {}
 	for i in 3:
 		var r := rng.randf()
-		var kind := "item" if r < 0.4 else ("artefact" if r < 0.7 else "score")
+		var kind := only_kind if only_kind != "" \
+			else ("item" if r < 0.4 else ("artefact" if r < 0.7 else "score"))
 		var opt := {}
 		match kind:
 			"item":

@@ -28,7 +28,11 @@ This slice is the tracer bullet — the whole path end to end, with 3 buffs rath
 5. **The clock keeps ticking** through both pick steps and the targeting (GDD Box Pick).
 6. **Three buffs to prove both persistence models:**
    - **Shield** (Tactical, dormant) — prevents the next capture attempt on this piece;
-     consumed; both pieces stay put.
+     consumed; both pieces stay put. **This is also the first carrier of the general
+     capture-repulsion rule** confirmed in slice 02 and now written on
+     [Pieces & Movement](https://app.notion.com/p/367f1559c99b81b394b8faa429cf8151): a
+     stopped capture returns the attacker to its starting tile. Build the repulsion as a
+     rule the buff triggers, not as Shield-specific code — Reflect needs the same seam.
    - **Critical** (Tactical, dormant) — next capture by this piece scores double.
    - **Slow** (Tactical, immediate + timed) — applied piece loses 1 movement range,
      consumed at the end of the next enemy turn.

@@ -277,6 +277,22 @@ func _init() -> void:
 	em.queue_free()
 	await process_frame
 
+	# --- Demote returns a piece to the base of its own chain, not always Pawn
+	# (Notion resync 2026-08-27); a piece with no chain above it isn't targetable
+	var dm := _boot({"board": [["archbishop", 0, 2, 2], ["squirrel", 0, 4, 2],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	dm.actions_left = 3
+	dm.items.append(_item("demote", "tile"))
+	dm._use_item(0)
+	check(dm.item_targets.has(Vector2i(2, 2)) and not dm.item_targets.has(Vector2i(4, 2)),
+		"Demote offers a promoted piece but not a chainless one")
+	dm._item_click(Vector2i(2, 2))
+	check(dm.board[Vector2i(2, 2)].id == "bishop",
+		"Demote sends the Archbishop back to Bishop, its chain base")
+	dm.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

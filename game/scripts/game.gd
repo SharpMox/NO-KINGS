@@ -360,7 +360,7 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if not game_menu_open and not win_open: # menus pause the clock
+		if not game_menu_open and not win_open and not shop_open(): # these pause the clock
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -1453,10 +1453,19 @@ func _connect_modals() -> void:
 
 
 ## Shop entry: player's turn only, never over another modal.
+## Always openable, in any state — the GDD makes the Shop the one surface the
+## player can reach at will. Buying is still turn-gated (Shop.can_buy), so
+## outside your turn it is a readable catalog with dead Buy buttons.
 func _open_shop() -> void:
-	if state != State.PLAYER_TURN or box_open or preview_open or win_open:
+	if box_open or preview_open or win_open: # one modal at a time
 		return
 	modals.show_shop()
+
+
+## The Shop panel is up. Read from the panel itself rather than a mirrored
+## flag: show_shop()/close both move it, and a second source of truth drifts.
+func shop_open() -> bool:
+	return modals.shop_panel != null and modals.shop_panel.visible
 
 
 func _show_win_screen() -> void:

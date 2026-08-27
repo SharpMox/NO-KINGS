@@ -14,6 +14,8 @@ Buying stays exactly as it is: `PLAYER_TURN` only, 1 action plus the Gold price.
 
 The GDD makes the pause a Difficulty-Ranks lever (higher ranks leave the Clock running). The prototype has no difficulty system, so the pause is unconditional here and the lever lands with difficulty ranks.
 
+**Known gap:** "pauses the game" is implemented as *the Clock stops*. The enemy turn is a coroutine driven by `await create_timer(ENEMY_TURN_PAUSE)` and `_run_enemy_actions()`, so opening the Shop mid-enemy-turn does not freeze enemy moves or their animations — they keep resolving behind the panel. Since the Clock is the only real-time pressure in the game and the enemy turn is a short scripted sequence, this is left as-is rather than threading a pause check through the coroutine. Revisit if the enemy turn ever gets long enough to matter.
+
 ## Acceptance criteria
 
 - [ ] The Shop opens outside `PLAYER_TURN`

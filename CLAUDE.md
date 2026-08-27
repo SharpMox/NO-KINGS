@@ -114,6 +114,28 @@ Not started yet. When it is, this is the intended setup:
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
 
+### Piece art
+
+Tokens live in `game/assets/pieces/` and are keyed by **codex id**, never by the
+fantasy display name (`chancellor-light.png`, not `dragonlord-light.png` — see the
+id convention below). Two files per piece:
+
+- `<id>-light.png` — the **player** token · `<id>-dark.png` — the **enemy** token.
+
+The art carries its own side colour, so `_draw_piece` passes `Color.WHITE` and only
+multiplies in state tints (spent grey, drag-ghost alpha). A piece with no painted
+pair falls back to a single monochrome `<id>.svg`, which *is* given the blue/red
+side shift (`COL_SIDE_PLAYER`/`COL_SIDE_ENEMY`) — tracked in `mono_art`. The King is
+the only one on that path today; dropping `king-light.png` + `king-dark.png` in
+switches it over with no code change. Read tokens through `piece_tex(id, owner)` —
+never index `textures[id]` directly, it holds a `{PLAYER, ENEMY}` dictionary.
+
+PNGs import with **mipmaps on**: source art is 192×192 and the board tile is ~51px,
+so without them the tokens shimmer during slide animations.
+
+`test_assets.gd` fails a piece that has only one side of the pair, or that has both
+painted art *and* a leftover svg.
+
 ### Godot agent tools (MCP)
 
 Agents drive the live Godot editor via the [Godot AI](https://github.com/hi-godot/godot-ai)

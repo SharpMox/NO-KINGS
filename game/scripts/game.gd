@@ -1312,7 +1312,7 @@ func _draw() -> void:
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
-		_draw_piece(font, p, px, tint, 0.0 if pos == selected else 4.0)
+		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
 		if p.get("buff", false): # box carrier: gold badge
 			draw_circle(px + Vector2(tile - 9, 9), 6, Color(0.95, 0.78, 0.15))
 	if selected.x >= 0 and board.has(selected): # animated pulse on the selection
@@ -1359,7 +1359,9 @@ func piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
 	return textures[id][owner]
 
 
-func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4.0) -> void:
+## `inset` is negative on purpose: the painted tokens read better slightly
+## overflowing their square than padded inside it (user call 2026-08-27).
+func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -2.0) -> void:
 	if textures.has(p.id):
 		# `tint` carries state only (spent grey, ghost alpha); a monochrome
 		# token still needs the blue/red side shift multiplied in

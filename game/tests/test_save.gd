@@ -29,12 +29,12 @@ func _init() -> void:
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1, "buff"], ["rook", 1, 4, 10]],
 		"stock": ["pawn", {"id": "ferz", "buff": true}],
 		"captured": ["knight", "knight", "bishop"],
-		"items": ["blitz", "sniper"], "trinkets": ["greed", "greed", "move"],
+		"items": ["blitz", "sniper"], "artefacts": ["greed", "greed", "move"],
 		"tariffs": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
-		"score": 470, "money": 35, "clock_s": 812.5,
+		"score": 470, "gold": 35, "clock_s": 812.5,
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
 			{"kind": "box", "key": "box", "sold": false}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
@@ -59,13 +59,13 @@ func _init() -> void:
 		if JSON.stringify(saved[k]) != JSON.stringify(again.get(k)):
 			print("DIFF %s: %s -> %s" % [k, JSON.stringify(saved[k]), JSON.stringify(again.get(k))])
 	check(b.score == 470, "score restored")
-	check(b.money == 35, "money restored")
+	check(b.gold == 35, "gold restored")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")
-	check(b.trinkets.size() == 3, "trinket stacks restored")
+	check(b.artefacts.size() == 3, "artefact stacks restored")
 	check(b.tariffs_active.size() == 3, "tariff stacks restored")
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")
 	check(b.board.size() >= 5, "pending pieces landed on the board")

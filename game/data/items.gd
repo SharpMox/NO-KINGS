@@ -1,4 +1,4 @@
-## Items + Trinket Effects, from the Notion GDD catalogs (STATUS triage
+## Items + Artefact Effects, from the Notion GDD catalogs (STATUS triage
 ## synced 2026-07-14: only KEEP items ship; REWORK/REMOVE entries deleted).
 ## Exclusions and their reasons are listed at the bottom.
 ##
@@ -38,7 +38,7 @@ const ITEMS: Array = [
 		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
 ]
 
-const TRINKET_EFFECTS: Array = [
+const ARTEFACT_EFFECTS: Array = [
 	{"key": "first_capture_extra", "name": "First-Capture Extra Action",
 		"description": "If your first action of a turn is a capture, gain an extra action."},
 	{"key": "greed", "name": "Greed",
@@ -58,5 +58,5 @@ const TRINKET_EFFECTS: Array = [
 ## Excluded (reason):
 ## - REWORK/REMOVE items (STATUS triage 2026-07-14): deleted here; the Notion
 ##   Items DB is the source of truth for their return.
-## - Capture Everything (Trinket): scope TBD upstream.
-## - Obstacle (Trinket): no obstacle system in MVP.
+## - Capture Everything (Artefact): scope TBD upstream.
+## - Obstacle (Artefact): no obstacle system in MVP.

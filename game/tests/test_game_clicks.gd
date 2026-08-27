@@ -224,12 +224,12 @@ func _init() -> void:
 	var opt_btn := _first_option_button(game.box_panel)
 	check(opt_btn != null and "\n" in opt_btn.text,
 		"box options describe themselves (two-line label)")
-	var loot_before: int = game.items.size() + game.trinkets.size()
+	var loot_before: int = game.items.size() + game.artefacts.size()
 	var score_before: int = game.score
 	_click(opt_btn.get_global_rect().get_center())
 	await process_frame
 	check(not game.box_open, "picking an option closes the box")
-	check(game.items.size() + game.trinkets.size() > loot_before
+	check(game.items.size() + game.artefacts.size() > loot_before
 		or game.score > score_before, "the picked reward is applied")
 
 	# SETUP: the pass button reads START, and a stock piece can be dragged
@@ -432,7 +432,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "items": ["blitz"], "trinkets": ["greed"]}
+		"wave": 3, "items": ["blitz"], "artefacts": ["greed"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -442,8 +442,8 @@ func _init() -> void:
 	await process_frame
 	check(game.drawer_open == "inventory"
 			and game.hud.item_box.is_visible_in_tree()
-			and game.hud.trinket_box.is_visible_in_tree(),
-		"inventory drawer shows items and trinkets together")
+			and game.hud.artefact_box.is_visible_in_tree(),
+		"inventory drawer shows items and artefacts together")
 	var inv_acts: int = game.actions_left
 	check(await _click_button_in(game.hud.item_box, "Blitz"),
 		"item clickable in the inventory drawer")
@@ -503,11 +503,11 @@ func _init() -> void:
 		"Extract click returns the pick to Stock")
 
 	# Shop: bottom-row button opens the modal; an enabled Buy purchases a
-	# piece for money + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
+	# piece for gold + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "money": 500}
+		"wave": 3, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -528,13 +528,13 @@ func _init() -> void:
 	game.modals.shop_scroll.ensure_control_visible(buy_btn)
 	await process_frame
 	var sh_stock: int = game.stock.size()
-	var sh_money: int = game.money
+	var sh_gold: int = game.gold
 	var sh_acts: int = game.actions_left
 	_click(buy_btn.get_global_rect().get_center())
 	await process_frame
-	check(game.stock.size() == sh_stock + 1 and game.money < sh_money
+	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
 			and game.actions_left == sh_acts - 1,
-		"shop Buy adds the piece and debits money + one action")
+		"shop Buy adds the piece and debits gold + one action")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	await process_frame
 	check(not game.modals.shop_panel.visible, "the shop modal closes")
@@ -555,7 +555,7 @@ func _init() -> void:
 	var r_stock: int = game.stock.size()
 	check(await _click_button_in(game.reinforce_panel, "Buy"), "Buy clickable")
 	await process_frame
-	check(game.stock.size() == r_stock + 1 and game.score == 100 and game.money == 0,
+	check(game.stock.size() == r_stock + 1 and game.score == 100 and game.gold == 0,
 		"Buy adds the piece to stock for free")
 	check(await _click_button_in(game.reinforce_panel, "Done"), "Done clickable")
 	await process_frame

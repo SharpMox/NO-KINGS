@@ -1,7 +1,7 @@
 extends SceneTree
-## Money: every gain raises score by the raw amount (up-only metric) and
-## money by the Inflation-taxed amount — Inflation never touches score.
-## Run headless:  godot --headless --path game -s tests/test_money.gd
+## Gold: every gain raises score by the raw amount (up-only metric) and
+## gold by the Inflation-taxed amount — Inflation never touches score.
+## Run headless:  godot --headless --path game -s tests/test_gold.gd
 
 const GameScript := preload("res://scripts/game.gd")
 const Economy := preload("res://scripts/economy.gd")
@@ -26,47 +26,47 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 
-	check(game.money == 0, "a run starts broke")
+	check(game.gold == 0, "a run starts broke")
 	Economy.earn(game, 50)
-	check(game.score == 50 and game.money == 50, "earn raises score and money 1:1")
+	check(game.score == 50 and game.gold == 50, "earn raises score and gold 1:1")
 
 	Economy.activate_tariff_by_key(game, "inflation")
 	Economy.earn(game, 100)
 	check(game.score == 150, "Inflation never touches score")
-	check(game.money == 140, "Inflation taxes money (-10% per stack)")
+	check(game.gold == 140, "Inflation taxes gold (-10% per stack)")
 
-	# --- every former score cost hits money instead (issue 02) ---
+	# --- every former score cost hits gold instead (issue 02) ---
 	var s: int = game.score
-	var m: int = game.money
+	var m: int = game.gold
 	game.stock.append("pawn")
 	game.actions_left = 2
 	game._place("pawn", Vector2i(0, 0))
 	check(game.score == s, "placement never touches score")
-	check(game.money == m - Tuning.PLACEMENT_COST, "placement debits money")
+	check(game.gold == m - Tuning.PLACEMENT_COST, "placement debits gold")
 
 	Economy.activate_tariff_by_key(game, "move_cost")
 	s = game.score
-	m = game.money
+	m = game.gold
 	Economy.charge(game, "move_cost")
 	check(game.score == s, "tariff charges never touch score")
-	check(game.money == m - Tuning.TARIFF_ACTION_COST, "tariff charges debit money")
+	check(game.gold == m - Tuning.TARIFF_ACTION_COST, "tariff charges debit gold")
 
-	m = game.money
+	m = game.gold
 	Economy.activate_tariff_by_key(game, "asset_freeze")
 	check(game.score == s, "Asset Freeze never touches score")
-	check(game.money == m / 2, "Asset Freeze halves money")
+	check(game.gold == m / 2, "Asset Freeze halves gold")
 
 	s = game.score
-	m = game.money
+	m = game.gold
 	var stock_n: int = game.stock.size()
 	game.modals.reinforce_buy_pressed.emit("pawn")
 	check(game.stock.size() == stock_n + 1, "reinforce buy adds the piece")
-	check(game.score == s and game.money == m, "reinforce buys are free")
+	check(game.score == s and game.gold == m, "reinforce buys are free")
 
 	game.queue_free()
 	await process_frame
 
 	print("---")
 	if fails == 0:
-		print("ALL MONEY CHECKS OK")
+		print("ALL GOLD CHECKS OK")
 	quit(1 if fails > 0 else 0)

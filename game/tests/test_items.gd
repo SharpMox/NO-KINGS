@@ -59,14 +59,14 @@ func _init() -> void:
 	var b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["ability_cost"]})
 	await process_frame
-	b.money = 500 # tariffs charge money now (money-and-shop/02)
+	b.gold = 500 # tariffs charge gold now (money-and-shop/02)
 	b.items.append(_item("demote", "tile"))
 	b._use_item(0) # start targeting
 	b._use_item(0) # tap again: cancel
-	check(b.money == 500, "cancelled item charges no ability tariff")
+	check(b.gold == 500, "cancelled item charges no ability tariff")
 	b._use_item(0)
 	b._item_click(Vector2i(2, 2)) # complete the use
-	check(b.money == 500 - Tuning.TARIFF_ACTION_COST,
+	check(b.gold == 500 - Tuning.TARIFF_ACTION_COST,
 		"completed item charges the ability tariff once")
 	b.queue_free()
 	await process_frame
@@ -76,13 +76,13 @@ func _init() -> void:
 	var c := _boot({"board": [["queen", 0, 2, 2], ["knight", 0, 5, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 500, "tariffs": ["long_range_cost"]})
 	await process_frame
-	c.money = 500
+	c.gold = 500
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
-	check(c.money == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
+	check(c.gold == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
 		"riding 3 squares charges 3x the long-range tariff")
-	var money_after: int = c.money
+	var gold_after: int = c.gold
 	c._move_player(Vector2i(5, 2), Vector2i(6, 4)) # knight leap
-	check(c.money == money_after, "leaps stay exempt from the long-range tariff")
+	check(c.gold == gold_after, "leaps stay exempt from the long-range tariff")
 	c.queue_free()
 	await process_frame
 
@@ -143,11 +143,11 @@ func _init() -> void:
 	var ci := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "tariffs": ["move_cost"]})
 	await process_frame
-	ci.money = 500
+	ci.gold = 500
 	ci.items.append(_item("counter_intel", ""))
 	ci._use_item(0)
 	ci._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(ci.money == 500, "counter-intel suppresses the move tariff")
+	check(ci.gold == 500, "counter-intel suppresses the move tariff")
 	ci.queue_free()
 	await process_frame
 
@@ -156,18 +156,18 @@ func _init() -> void:
 	var cj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "tariffs": ["move_cost", "inflation"]})
 	await process_frame
-	cj.money = 500
+	cj.gold = 500
 	cj.items.append(_item("counter_intel", ""))
 	cj._use_item(0)
 	Economy.earn(cj, 10)
-	check(cj.money == 510, "suppressed inflation taxes no gains")
+	check(cj.gold == 510, "suppressed inflation taxes no gains")
 	cj._refresh()
 	check(cj.hud.tariff_button.text.ends_with("·off"), "HUD marks tariffs suppressed")
 	WaveLogic.spawn(cj, 4)
 	Economy.earn(cj, 10)
-	check(cj.money == 519, "next wave spawn ends the suppression (inflation resumes)")
+	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")
 	cj._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(cj.money == 519 - Tuning.TARIFF_ACTION_COST,
+	check(cj.gold == 519 - Tuning.TARIFF_ACTION_COST,
 		"next wave spawn ends the suppression (move tariff resumes)")
 	cj.queue_free()
 	await process_frame
@@ -176,9 +176,9 @@ func _init() -> void:
 	# survives; destruction is not capture (CONTEXT.md: Destruction)
 	var ds := _boot({"board": [["queen", 0, 0, 1], ["pawn", 1, 3, 5], ["bishop", 1, 2, 4],
 		["pawn", 0, 4, 6], ["king", 1, 3, 4], ["rook", 1, 7, 10]],
-		"wave": 3, "trinkets": ["greed", "score"], "score": 100})
+		"wave": 3, "artefacts": ["greed", "score"], "score": 100})
 	await process_frame
-	ds.money = 100
+	ds.gold = 100
 	ds.items.append(_item("drone_strike", "area"))
 	ds._use_item(0)
 	ds._item_click(Vector2i(3, 5)) # anchor: preview only, not spent yet
@@ -188,7 +188,7 @@ func _init() -> void:
 		and not ds.board.has(Vector2i(4, 6)), "drone strike clears the 3x3 (ally included)")
 	check(ds.board.has(Vector2i(3, 4)), "the King survives a drone strike")
 	check(ds.board.has(Vector2i(7, 10)), "pieces outside the 3x3 survive")
-	check(ds.score == 100 and ds.money == 100, "destruction pays no score, money, or trinket procs")
+	check(ds.score == 100 and ds.gold == 100, "destruction pays no score, gold, or artefact procs")
 	ds.queue_free()
 	await process_frame
 

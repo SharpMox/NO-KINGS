@@ -240,7 +240,7 @@ func show_preview(id: String) -> void:
 
 
 ## The Shop overlay: the 19 rolled slots as a scrollable list — lootboxes,
-## trinkets, items, then base pieces (the user-specified row order). Buy rows
+## artefacts, items, then base pieces (the user-specified row order). Buy rows
 ## emit an index; game.gd buys and reopens for fresh SOLD/affordability state.
 func show_shop() -> void:
 	if shop_panel:
@@ -259,7 +259,7 @@ func show_shop() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := Label.new()
-	sub.text = "$%d held — a purchase costs its price + 1 action" % g.money
+	sub.text = "$%d held — a purchase costs its price + 1 action" % g.gold
 	sub.add_theme_font_size_override("font_size", 14)
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -289,7 +289,7 @@ func show_shop() -> void:
 		what.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
 		what.add_theme_font_size_override("font_size", 16)
 		what.custom_minimum_size = Vector2(230, 0)
-		if slot.kind == "item" or slot.kind == "trinket":
+		if slot.kind == "item" or slot.kind == "artefact":
 			what.tooltip_text = Shop.description(slot)
 			what.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
 		row.add_child(what)
@@ -449,8 +449,8 @@ func show_box(options: Array) -> void:
 		match opt.kind:
 			"item":
 				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
-			"trinket":
-				header = "◈ %s — Trinket · passive, rest of the run" % opt.name
+			"artefact":
+				header = "◈ %s — Artefact · passive, rest of the run" % opt.name
 			"score":
 				header = "★ %s" % opt.name
 		b.text = header + "\n" + opt.description

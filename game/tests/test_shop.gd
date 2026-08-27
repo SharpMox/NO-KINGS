@@ -1,6 +1,6 @@
 extends SceneTree
-## The Shop: 19-slot randomized stock (3 lootboxes / 4 trinkets / 4 items /
-## 8 distinct base pieces), priced in money, purchases cost 1 action, bought
+## The Shop: 19-slot randomized stock (3 lootboxes / 4 artefacts / 4 items /
+## 8 distinct base pieces), priced in gold, purchases cost 1 action, bought
 ## slots go SOLD. Pure logic in scripts/shop.gd over the live game node.
 ## Run headless:  godot --headless --path game -s tests/test_shop.gd
 
@@ -31,9 +31,9 @@ func _init() -> void:
 	for slot in game.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
 	check(game.shop_stock.size() == 19, "a run boots with a rolled 19-slot shop")
-	check(kinds.get("box", 0) == 3 and kinds.get("trinket", 0) == 4
+	check(kinds.get("box", 0) == 3 and kinds.get("artefact", 0) == 4
 			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 8,
-		"rows: 3 lootboxes / 4 trinkets / 4 items / 8 base pieces")
+		"rows: 3 lootboxes / 4 artefacts / 4 items / 8 base pieces")
 
 	# pool rules: merge-chain roots minus the King and inversion pieces
 	var pool: Array = Shop.base_piece_pool(game.defs)
@@ -64,7 +64,7 @@ func _init() -> void:
 		"1/value weighting: pawns common, amazonriders rare but possible (%d vs %d)"
 			% [pawn_n, heavy_n])
 
-	# prices: piece = catalog value, item by tier, trinket/box flat
+	# prices: piece = catalog value, item by tier, artefact/box flat
 	var priced_ok := true
 	for slot in game.shop_stock:
 		var want: int
@@ -74,14 +74,14 @@ func _init() -> void:
 			"item":
 				want = Tuning.SHOP_ITEM_PRICE[Items.ITEMS.filter(
 					func(it: Dictionary) -> bool: return it.key == slot.key)[0].tier]
-			"trinket":
-				want = Tuning.SHOP_TRINKET_PRICE
+			"artefact":
+				want = Tuning.SHOP_ARTEFACT_PRICE
 			_:
 				want = Tuning.SHOP_BOX_PRICE
 		priced_ok = priced_ok and Shop.price(game, slot) == want
 	check(priced_ok, "every slot prices by its row's rule")
 
-	# purchases: money + one action, slot goes SOLD, the piece lands in stock
+	# purchases: gold + one action, slot goes SOLD, the piece lands in stock
 	var pi := -1
 	for i in game.shop_stock.size():
 		if game.shop_stock[i].kind == "piece":
@@ -91,16 +91,16 @@ func _init() -> void:
 	var cost: int = Shop.price(game, slot)
 	var s0: int = game.score
 	game.actions_left = 2
-	game.money = cost - 1
-	check(not Shop.can_buy(game, slot), "short on money -> not buyable")
-	game.money = cost
+	game.gold = cost - 1
+	check(not Shop.can_buy(game, slot), "short on gold -> not buyable")
+	game.gold = cost
 	game.actions_left = 0
 	check(not Shop.can_buy(game, slot), "no actions left -> not buyable")
 	game.actions_left = 2
 	check(Shop.can_buy(game, slot), "affordable + an action -> buyable")
 	var stock_n: int = game.stock.size()
 	Shop.buy(game, pi)
-	check(game.money == 0 and game.actions_left == 1,
+	check(game.gold == 0 and game.actions_left == 1,
 		"buying debits the price and one action")
 	check(game.shop_stock[pi].sold, "a bought slot is SOLD")
 	check(game.stock.size() == stock_n + 1 and game.stock.back() == slot.key,
@@ -110,8 +110,8 @@ func _init() -> void:
 	check(game.stock.size() == stock_n + 1, "buying a SOLD slot is a no-op")
 	check(game.score == s0, "shopping never touches score")
 
-	# items and trinkets are purchasable (05)
-	game.money = 9999
+	# items and artefacts are purchasable (05)
+	game.gold = 9999
 	game.actions_left = 4
 	var ii := -1
 	var ti := -1
@@ -120,7 +120,7 @@ func _init() -> void:
 		match game.shop_stock[i].kind:
 			"item":
 				ii = i
-			"trinket":
+			"artefact":
 				ti = i
 			"box":
 				bi = i
@@ -129,37 +129,37 @@ func _init() -> void:
 	check(game.items.size() == items_n + 1
 			and game.items.back().key == game.shop_stock[ii].key,
 		"a bought item joins the held items")
-	game.trinkets.append(Items.TRINKET_EFFECTS.filter(func(t: Dictionary) -> bool:
+	game.artefacts.append(Items.ARTEFACT_EFFECTS.filter(func(t: Dictionary) -> bool:
 		return t.key == game.shop_stock[ti].key)[0]) # pre-own one copy: stacks?
 	Shop.buy(game, ti)
-	check(game.trinkets.size() == 2 and game.trinkets.back().key == game.shop_stock[ti].key,
-		"a bought trinket applies immediately and stacks")
+	check(game.artefacts.size() == 2 and game.artefacts.back().key == game.shop_stock[ti].key,
+		"a bought artefact applies immediately and stacks")
 	check(game.shop_stock[ii].sold and game.shop_stock[ti].sold,
-		"item and trinket slots go SOLD")
+		"item and artefact slots go SOLD")
 	check(game.actions_left == 2, "each purchase cost one action")
 	game._refresh()
 	check(game.hud.item_box.get_child_count() == game.items.size(),
 		"bought items show in the Inventory drawer strip")
 	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
-			% (game.items.size() + game.trinkets.size()),
+			% (game.items.size() + game.artefacts.size()),
 		"the Inventory count includes both purchases")
 
 	# lootboxes (06): buying debits and opens the 3-option roll right away
-	game.money = 100
+	game.gold = 100
 	game.actions_left = 2
 	game._open_shop()
 	game.modals.shop_buy_pressed.emit(bi)
 	check(game.shop_stock[bi].sold, "the box slot goes SOLD")
-	check(game.money == 100 - Tuning.SHOP_BOX_PRICE and game.actions_left == 1,
+	check(game.gold == 100 - Tuning.SHOP_BOX_PRICE and game.actions_left == 1,
 		"a box costs its price + one action")
 	check(game.box_open and not game.modals.shop_panel.visible,
 		"buying a box opens the roll modal over a closed shop")
 	var sc0: int = game.score
-	var mo0: int = game.money
+	var mo0: int = game.gold
 	game.modals.box_chosen.emit({"kind": "score", "name": "+50 score",
 		"value": 50, "description": ""})
-	check(game.score == sc0 + 50 and game.money == mo0 + 50,
-		"a rolled score option earns raw score + money")
+	check(game.score == sc0 + 50 and game.gold == mo0 + 50,
+		"a rolled score option earns raw score + gold")
 	check(not game.box_open, "the pick closes the roll modal")
 
 	# reroll cadence (07): every 10th wave reshuffles the shelf and clears

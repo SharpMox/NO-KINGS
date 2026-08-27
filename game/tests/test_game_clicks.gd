@@ -437,6 +437,13 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
+	# Blitz is targeted now (Notion 2026-08-27), so the queen has to move
+	# before there is anything to spend it on
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.moved_this_turn.has(Vector2i(2, 4)), "the queen is spent for the turn")
 	check(await _click_button_in(game.hud, "Inventory 2"),
 		"Inventory button opens the drawer")
 	await process_frame
@@ -448,8 +455,13 @@ func _init() -> void:
 	check(await _click_button_in(game.hud.item_box, "Blitz"),
 		"item clickable in the inventory drawer")
 	await process_frame
-	check(game.items.is_empty() and game.actions_left == inv_acts + 1,
-		"Blitz used from the drawer (net +1 action)")
+	check(game.item_targets.size() == 1 and game.item_targets[0] == Vector2i(2, 4),
+		"Blitz only offers the piece that already moved")
+	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.items.is_empty() and not game.moved_this_turn.has(Vector2i(2, 4))
+			and game.actions_left == inv_acts,
+		"Blitz frees the target to move again and refunds its own action")
 
 	# Drone Strike: area targeting by real clicks — anchor previews the 3x3,
 	# tapping the anchor again confirms the wipe (rework-items/02)

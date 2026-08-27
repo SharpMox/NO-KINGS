@@ -2,16 +2,20 @@
 ## synced 2026-07-14: only KEEP items ship; REWORK/REMOVE entries deleted).
 ## Exclusions and their reasons are listed at the bottom.
 ##
+## The Notion Items DB is the source of truth for names, tiers and effects —
+## when it disagrees with this file, Notion wins and this file changes (user
+## call 2026-08-27; last name+effect audit 2026-08-27, Blitz and Demote resynced).
+##
 ## Item fields: key, name, tier, description, target:
 ##   "" (instant) · "tile" (pick one tile) · "pair" (pick a piece, then a destination)
 
 const ITEMS: Array = [
-	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "",
-		"description": "Gain an additional move action for the turn."},
+	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile",
+		"description": "Target Piece can move a second time this turn."},
 	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "tile",
 		"description": "Duplicate a piece on the board to your Stock."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",
-		"description": "Convert a target piece (ally or enemy) to a Pawn."},
+		"description": "Convert a target piece (ally or enemy) to its base chain piece. No effect if it has none."},
 	{"key": "promote", "name": "Promote", "tier": "Tactical", "target": "tile",
 		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
 	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",

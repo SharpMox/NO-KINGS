@@ -47,6 +47,9 @@ const COL_LIGHT := Color("f0d9b5")
 const COL_DARK := Color("b58863")
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
+# side shift for monochrome tokens only — the painted art carries its own colour
+const COL_SIDE_PLAYER := Color(0.72, 0.85, 1.25)
+const COL_SIDE_ENEMY := Color(1.25, 0.72, 0.72)
 const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
 # Palette rule (2026-07-07): everything player-side is a shade of blue —
 # selection, moves, placement, merge partners; everything enemy-side is red —
@@ -63,7 +66,8 @@ var board_px := Vector2(24, 120)
 
 var defs: Dictionary
 var fusions: Dictionary # unordered pair "a+b" -> result id
-var textures := {} # id -> Texture2D; missing ids fall back to glyph text
+var textures := {} # id -> {Rules.PLAYER: Texture2D, Rules.ENEMY: Texture2D}
+var mono_art := {} # ids whose token is one shared image, so it needs the side tint
 var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
@@ -86,13 +90,14 @@ var score := 0:
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
-var money := 0 # per-run spend currency; score stays the up-only metric
-var shop_stock: Array = [] # 19 rolled slots {kind, key, sold} (scripts/shop.gd)
+var gold := 0 # per-run spend currency; score stays the up-only metric
+var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
+var shop_restocks := 0 # score thresholds banked so far (Shop.threshold)
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
 var actions_left := 0 # unified: move, place, merge, item — 1 action each
-var actions_max := 0  # granted this turn (base + trinket/item bonuses)
+var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
 var selected := Vector2i(-1, -1) # selected board piece
@@ -117,7 +122,7 @@ var merge_highlights := {} # ids that complete a merge with the current selectio
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
-var trinkets: Array = [] # run-long passive effects
+var artefacts: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
 var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
@@ -126,7 +131,7 @@ var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
 var item_selected: Array[Vector2i] = [] # toggled picks of a "multi" item
 var _extract_sel: Array[Vector2i] = [] # multi selection frozen at confirm
 var skip_enemy_turns := 0 # Surprise Attack
-var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
+var turn_action_count := 0 # moves+placements taken this turn (artefact hook)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
@@ -190,13 +195,21 @@ func _ready() -> void:
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
-		# png wins if present (drop painted art in anytime); svg is the
-		# generated vector set (tools/generate-piece-art.py)
-		for ext in ["png", "svg"]:
-			var path := "res://assets/pieces/%s.%s" % [id, ext]
-			if ResourceLoader.exists(path):
-				textures[id] = load(path)
-				break
+		# Painted art is side-specific: <id>-light.png is the player token,
+		# <id>-dark.png the enemy one, so no side tint is applied to them.
+		# A lone <id>.svg is the old generated vector set — one monochrome
+		# token for both sides, still tinted blue/red at draw time (king,
+		# until its art arrives).
+		var light := "res://assets/pieces/%s-light.png" % id
+		var dark := "res://assets/pieces/%s-dark.png" % id
+		if ResourceLoader.exists(light) and ResourceLoader.exists(dark):
+			textures[id] = {Rules.PLAYER: load(light), Rules.ENEMY: load(dark)}
+			continue
+		var mono := "res://assets/pieces/%s.svg" % id
+		if ResourceLoader.exists(mono):
+			var t: Texture2D = load(mono)
+			textures[id] = {Rules.PLAYER: t, Rules.ENEMY: t}
+			mono_art[id] = true
 	for it in Items.ITEMS: # item glyphs (picked 2026-07-17, .scratch/item-icons)
 		var path := "res://assets/items/%s.svg" % it.key
 		if ResourceLoader.exists(path):
@@ -359,7 +372,7 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if not game_menu_open and not win_open: # menus pause the clock
+		if not game_menu_open and not win_open and not shop_open(): # these pause the clock
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -397,7 +410,7 @@ func _begin_player_turn() -> void:
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
 	actions_left = Tuning.ACTIONS_PER_TURN
-	for t in trinkets:
+	for t in artefacts:
 		if t.key == "move":
 			actions_left += 1
 	actions_max = actions_left
@@ -836,7 +849,7 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
 		Economy.charge(self, "deploy_cost")
-		money = maxi(money - cost, 0)
+		gold = maxi(gold - cost, 0)
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -961,7 +974,7 @@ func _draw_preview_diagram(dia: Control, id: String, cells: int, cell: int) -> v
 			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
 				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
 	if textures.has(id):
-		dia.draw_texture_rect(textures[id],
+		dia.draw_texture_rect(piece_tex(id),
 			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
 	for m in defs[id].moves:
 		if m.type == "bent": # pivot step, then a ride outward from the pivot
@@ -1046,7 +1059,7 @@ func _item_reset() -> void:
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
 ## `a` = first pick for "pair" items, or (-1,-1).
 func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
-	return ItemLogic.stage_targets(board, defs, it.key, a)
+	return ItemLogic.stage_targets(board, defs, it.key, a, moved_this_turn)
 
 
 func _item_click(tile: Vector2i) -> void:
@@ -1095,9 +1108,11 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
 	match it.key:
-		"blitz":
-			actions_left += 2 # costs 1 to use -> net +1, the item's old value
-			actions_max += 2
+		"blitz": # lift the one-move-per-piece lock on the target (Notion 2026-08-27).
+			# Refunds its own action: at 2 actions/turn, move + Blitz would
+			# otherwise leave 0 and auto-pass before the second move ever happens.
+			moved_this_turn.erase(b)
+			actions_left += 1
 		"asset_recovery":
 			stock.append(board[b].id) # copy a board piece into stock
 		"surprise_attack":
@@ -1121,7 +1136,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"radar_jamming":
 			board[b].erase("buff")
 		"demote":
-			board[b].id = "pawn"
+			board[b].id = ItemLogic.chain_base(defs, board[b].id)
 		"promote":
 			board[b].id = defs[board[b].id].next
 		"invert":
@@ -1156,10 +1171,10 @@ func _destroy(pos: Vector2i) -> void:
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---
 
-func _open_box_pick() -> void:
+func _open_box_pick(only_kind := "") -> void:
 	box_open = true
 	Economy.charge(self, "box_cost")
-	var options := _box_options()
+	var options := _box_options(only_kind)
 	if autoplay: # bot: random pick (or skip) — exercises every branch
 		if rng.randf() < 0.1:
 			Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
@@ -1170,8 +1185,8 @@ func _open_box_pick() -> void:
 
 
 
-func _box_options() -> Array:
-	return Box.roll_options(rng)
+func _box_options(only_kind := "") -> Array:
+	return Box.roll_options(rng, only_kind)
 
 
 
@@ -1183,8 +1198,8 @@ func _box_choose(opt: Dictionary) -> void:
 	match opt.kind:
 		"item":
 			items.append(opt.payload)
-		"trinket":
-			trinkets.append(opt.payload)
+		"artefact":
+			artefacts.append(opt.payload)
 		"score":
 			Economy.earn(self, opt.value)
 	_box_close()
@@ -1291,13 +1306,13 @@ func _draw() -> void:
 			continue
 		var p: Dictionary = board[pos]
 		var px := _tile_px(pos)
-		var tint := Color(0.72, 0.85, 1.25) if p.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
+		var tint := Color.WHITE # side colour lives in the art; _draw_piece tints mono tokens
 		if pos == drag_from:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
-		_draw_piece(font, p, px, tint, 0.0 if pos == selected else 4.0)
+		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
 		if p.get("buff", false): # box carrier: gold badge
 			draw_circle(px + Vector2(tile - 9, 9), 6, Color(0.95, 0.78, 0.15))
 	if selected.x >= 0 and board.has(selected): # animated pulse on the selection
@@ -1310,8 +1325,7 @@ func _draw() -> void:
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
-			var mtint := Color(0.72, 0.85, 1.25) if mp.owner == Rules.PLAYER else Color(1.25, 0.72, 0.72)
-			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), mtint)
+			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), Color.WHITE)
 		elif a.kind == "pop":
 			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
@@ -1333,17 +1347,29 @@ func _draw() -> void:
 			draw_string(font, Vector2(bx, by + 31), a.text,
 				HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
-		draw_texture_rect(textures[board[drag_from].id],
+		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 	if pool_drag_id != "" and textures.has(pool_drag_id): # stock drag ghost
-		draw_texture_rect(textures[pool_drag_id],
+		draw_texture_rect(piece_tex(pool_drag_id),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 
 
-func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := 4.0) -> void:
+## Token art for a piece; the player token unless a side is named.
+func piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
+	return textures[id][owner]
+
+
+## `inset` is negative on purpose: the painted tokens read better slightly
+## overflowing their square than padded inside it (user call 2026-08-27).
+func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -2.0) -> void:
 	if textures.has(p.id):
-		draw_texture_rect(textures[p.id],
-			Rect2(px + Vector2(inset, inset), Vector2(tile - inset * 2, tile - inset * 2)), false, tint)
+		# `tint` carries state only (spent grey, ghost alpha); a monochrome
+		# token still needs the blue/red side shift multiplied in
+		var col := tint
+		if mono_art.has(p.id):
+			col *= COL_SIDE_PLAYER if p.owner == Rules.PLAYER else COL_SIDE_ENEMY
+		draw_texture_rect(piece_tex(p.id, p.owner),
+			Rect2(px + Vector2(inset, inset), Vector2(tile - inset * 2, tile - inset * 2)), false, col)
 	else: # ponytail: glyph fallback so a missing PNG never breaks the board
 		var col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
 		var glyph: String = defs[p.id].glyph
@@ -1438,7 +1464,7 @@ func _connect_modals() -> void:
 		if shop_stock[index].kind == "box": # the roll modal IS the grant
 			if modals.shop_panel:
 				modals.shop_panel.visible = false
-			return _open_box_pick()
+			return _open_box_pick(shop_stock[index].key) # typed: rolls its kind
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())
@@ -1452,10 +1478,19 @@ func _connect_modals() -> void:
 
 
 ## Shop entry: player's turn only, never over another modal.
+## Always openable, in any state — the GDD makes the Shop the one surface the
+## player can reach at will. Buying is still turn-gated (Shop.can_buy), so
+## outside your turn it is a readable catalog with dead Buy buttons.
 func _open_shop() -> void:
-	if state != State.PLAYER_TURN or box_open or preview_open or win_open:
+	if box_open or preview_open or win_open: # one modal at a time
 		return
 	modals.show_shop()
+
+
+## The Shop panel is up. Read from the panel itself rather than a mirrored
+## flag: show_shop()/close both move it, and a second source of truth drifts.
+func shop_open() -> bool:
+	return modals.shop_panel != null and modals.shop_panel.visible
 
 
 func _show_win_screen() -> void:

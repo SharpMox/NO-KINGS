@@ -4,7 +4,7 @@
 ## Config keys (all optional):
 ##   board: Array of [piece_id, owner(0/1), x, y]
 ##   stock / captured: Array of piece ids
-##   items / trinkets: Array of catalog keys
+##   items / artefacts: Array of catalog keys
 ##   tariffs: Array of tariff keys (action/persistent, added active)
 ##   oneoffs: Array of one-off tariff keys, applied after setup
 ##   wave: int (default = all waves done, so no spawns disturb the sandbox)
@@ -33,21 +33,21 @@ static func all() -> Array:
 				["pawn", 0, 0, 11], ["pawn", 0, 1, 11], ["pawn", 0, 2, 11], ["pawn", 0, 3, 11],
 				["pawn", 0, 4, 11], ["pawn", 0, 5, 11], ["pawn", 0, 6, 11], ["pawn", 0, 7, 11]],
 			"wave": 1, "score": 500}},
-		{"name": "Captured stock: deploy (money cost) & merge", "cfg": {
+		{"name": "Captured stock: deploy (gold cost) & merge", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "rook", "knight", "pawn"],
 			"stock": ["pawn"], "score": 500, "wave": 5}},
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 			"wave": 2, "stock": ["pawn"], "score": 100}},
-		{"name": "Shop: browse & buy (money, SOLD, reroll at 10s)", "cfg": {
+		{"name": "Shop: browse & buy (gold, SOLD, reroll at 10s)", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
-			"wave": 9, "money": 400, "stock": ["pawn"]}},
+			"wave": 9, "gold": 400, "stock": ["pawn"]}},
 		{"name": "Reinforcements: post-wave-10 shop", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
 			"wave": 11, "score": 300, "stock": ["pawn"], "pending_reinforce": true}},
 		{"name": "Economy: Blitz + First-Capture bonus actions", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
-			"items": ["blitz"], "trinkets": ["first_capture_extra"], "score": 200, "wave": 3}},
+			"items": ["blitz"], "artefacts": ["first_capture_extra"], "score": 200, "wave": 3}},
 		# win-screen tests: King one queen-move away, capture it to trigger the
 		# screen — wave 50 = Continue/End Run, wave >= 150 = FULL CLEAR game over
 		{"name": "Win screen: wave 50 (capture King)", "cfg": {
@@ -90,9 +90,9 @@ static func all() -> Array:
 				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel",
 				"drone_strike", "extraction"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
-		{"name": "Trinkets: all active", "cfg": {
+		{"name": "Artefacts: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
-			"trinkets": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
+			"artefacts": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
 			"wave": 9, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
@@ -105,7 +105,7 @@ static func all() -> Array:
 		{"name": "Counter-Intel (suppress live tariffs)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
 			"items": ["counter_intel"], "tariffs": ["move_cost", "inflation"],
-			"money": 100, "wave": 11, "stock": ["pawn"]}},
+			"gold": 100, "wave": 11, "stock": ["pawn"]}},
 		# --- tariffs ---
 		{"name": "Tariffs: all action costs", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5, "buff"], ["bishop", 1, 4, 5]],

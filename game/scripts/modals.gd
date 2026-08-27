@@ -73,7 +73,7 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	center.add_child(box)
 	if g.textures.has(result):
 		var tex := TextureRect.new()
-		tex.texture = g.textures[result]
+		tex.texture = g.piece_tex(result)
 		tex.custom_minimum_size = Vector2(96, 96)
 		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -222,7 +222,7 @@ func show_preview(id: String) -> void:
 				arrow.add_theme_font_size_override("font_size", 22)
 				row.add_child(arrow)
 			var tr := TextureRect.new()
-			tr.texture = g.textures.get(chain[i])
+			tr.texture = g.piece_tex(chain[i]) if g.textures.has(chain[i]) else null
 			tr.custom_minimum_size = Vector2(48, 48)
 			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			if chain[i] != id:
@@ -240,7 +240,7 @@ func show_preview(id: String) -> void:
 
 
 ## The Shop overlay: the 19 rolled slots as a scrollable list — lootboxes,
-## trinkets, items, then base pieces (the user-specified row order). Buy rows
+## artefacts, items, then base pieces (the user-specified row order). Buy rows
 ## emit an index; game.gd buys and reopens for fresh SOLD/affordability state.
 func show_shop() -> void:
 	if shop_panel:
@@ -259,7 +259,7 @@ func show_shop() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := Label.new()
-	sub.text = "$%d held — a purchase costs its price + 1 action" % g.money
+	sub.text = "$%d held — a purchase costs its price + 1 action" % g.gold
 	sub.add_theme_font_size_override("font_size", 14)
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -276,7 +276,8 @@ func show_shop() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		var slot_tex: Texture2D = g.textures.get(slot.key) if slot.kind == "piece" \
+		var slot_tex: Texture2D = g.piece_tex(slot.key) if slot.kind == "piece" \
+				and g.textures.has(slot.key) \
 			else g.item_icons.get(slot.key) if slot.kind == "item" else null
 		if slot_tex != null:
 			var tex := TextureRect.new()
@@ -289,7 +290,7 @@ func show_shop() -> void:
 		what.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
 		what.add_theme_font_size_override("font_size", 16)
 		what.custom_minimum_size = Vector2(230, 0)
-		if slot.kind == "item" or slot.kind == "trinket":
+		if slot.kind == "item" or slot.kind == "artefact":
 			what.tooltip_text = Shop.description(slot)
 			what.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
 		row.add_child(what)
@@ -343,7 +344,7 @@ func show_reinforce() -> void:
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		if g.textures.has(id):
 			var tex := TextureRect.new()
-			tex.texture = g.textures[id]
+			tex.texture = g.piece_tex(id)
 			tex.custom_minimum_size = Vector2(34, 34)
 			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -449,8 +450,8 @@ func show_box(options: Array) -> void:
 		match opt.kind:
 			"item":
 				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
-			"trinket":
-				header = "◈ %s — Trinket · passive, rest of the run" % opt.name
+			"artefact":
+				header = "◈ %s — Artefact · passive, rest of the run" % opt.name
 			"score":
 				header = "★ %s" % opt.name
 		b.text = header + "\n" + opt.description

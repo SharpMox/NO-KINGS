@@ -1047,7 +1047,7 @@ func _item_reset() -> void:
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
 ## `a` = first pick for "pair" items, or (-1,-1).
 func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
-	return ItemLogic.stage_targets(board, defs, it.key, a)
+	return ItemLogic.stage_targets(board, defs, it.key, a, moved_this_turn)
 
 
 func _item_click(tile: Vector2i) -> void:
@@ -1096,9 +1096,11 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
 	match it.key:
-		"blitz":
-			actions_left += 2 # costs 1 to use -> net +1, the item's old value
-			actions_max += 2
+		"blitz": # lift the one-move-per-piece lock on the target (Notion 2026-08-27).
+			# Refunds its own action: at 2 actions/turn, move + Blitz would
+			# otherwise leave 0 and auto-pass before the second move ever happens.
+			moved_this_turn.erase(b)
+			actions_left += 1
 		"asset_recovery":
 			stock.append(board[b].id) # copy a board piece into stock
 		"surprise_attack":
@@ -1122,7 +1124,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"radar_jamming":
 			board[b].erase("buff")
 		"demote":
-			board[b].id = "pawn"
+			board[b].id = ItemLogic.chain_base(defs, board[b].id)
 		"promote":
 			board[b].id = defs[board[b].id].next
 		"invert":

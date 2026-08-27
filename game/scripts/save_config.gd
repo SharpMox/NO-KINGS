@@ -18,6 +18,13 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.gold = int(cfg.get("gold", 0))
 	g.shop_stock = cfg.get("shop_stock", []).duplicate(true)
 	g.shop_restocks = int(cfg.get("shop_restocks", 0)) # no reroll-scumming
+	# GDD Game Flow — Run: restore the run's RNG so a resumed save rolls what an
+	# uninterrupted run would have. Seed first — assigning it resets the state.
+	# Both travel as strings: they are int64 and JSON numbers are doubles.
+	if cfg.has("seed"):
+		g.rng.seed = int(cfg.seed)
+	if cfg.has("rng_state"): # mid-stream, not back at the top of it
+		g.rng.state = int(cfg.rng_state)
 	g.clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
 	# default: all designed waves done, so nothing spawns into the sandbox
 	g.wave = int(cfg.get("wave", Waves.WAVES.size()))
@@ -84,4 +91,5 @@ static func to_config(g) -> Dictionary:
 		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"tariffs_off": g.tariffs_suppressed,
+		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
 	}

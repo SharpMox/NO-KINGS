@@ -36,7 +36,7 @@ static func queue(g, n: int) -> void:
 		Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
 		var refill: float = Tuning.CLOCK_REFILL_MS
-		for t in g.trinkets:
+		for t in g.artefacts:
 			if t.key == "timer":
 				refill += 5000
 		if Economy.tariff_on(g, "recession"):

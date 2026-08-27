@@ -6,7 +6,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 
 
 ## One randomized offer (goal rework 2026-07-06, diverges from the GDD's
-## two-step pick): 3 options rolled independently — Item 40% / Trinket 30% /
+## two-step pick): 3 options rolled independently — Item 40% / Artefact 30% /
 ## Score 30% — never repeating within the offer. Each is self-describing:
 ## {kind, name, description, tier?, value?, payload?}.
 static func roll_options(rng: RandomNumberGenerator) -> Array:
@@ -14,7 +14,7 @@ static func roll_options(rng: RandomNumberGenerator) -> Array:
 	var taken := {}
 	for i in 3:
 		var r := rng.randf()
-		var kind := "item" if r < 0.4 else ("trinket" if r < 0.7 else "score")
+		var kind := "item" if r < 0.4 else ("artefact" if r < 0.7 else "score")
 		var opt := {}
 		match kind:
 			"item":
@@ -23,11 +23,11 @@ static func roll_options(rng: RandomNumberGenerator) -> Array:
 				var e: Dictionary = pool[rng.randi() % pool.size()]
 				opt = {"kind": "item", "name": e.name, "tier": e.tier,
 					"description": e.description, "payload": e}
-			"trinket":
-				var pool := Items.TRINKET_EFFECTS.filter(func(e: Dictionary) -> bool:
+			"artefact":
+				var pool := Items.ARTEFACT_EFFECTS.filter(func(e: Dictionary) -> bool:
 					return not taken.has(e.name))
 				var e: Dictionary = pool[rng.randi() % pool.size()]
-				opt = {"kind": "trinket", "name": e.name,
+				opt = {"kind": "artefact", "name": e.name,
 					"description": e.description, "payload": e}
 			"score":
 				var pool := Tuning.SCORE_BOX_CHUNKS.filter(func(v: int) -> bool:

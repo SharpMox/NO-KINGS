@@ -28,7 +28,7 @@ var g # the Game node — read-only from here; mutations go up via signals
 
 var clock_label := Label.new()
 var score_label := Label.new()
-var money_label := Label.new() # spendable currency (score is the metric)
+var gold_label := Label.new() # spendable currency (score is the metric)
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
@@ -43,26 +43,26 @@ var stock_armed := Control.new() # draws the armed piece on the Stock button
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
-var trinket_box := HBoxContainer.new()
+var artefact_box := HBoxContainer.new()
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
 
 func build(game) -> void:
 	g = game
 	var vp: Vector2 = g.get_viewport_rect().size
-	# condensed top bar: clock · score · money · wave, menu at the right corner
+	# condensed top bar: clock · score · gold · wave, menu at the right corner
 	clock_label.add_theme_font_size_override("font_size", 17)
 	score_label.add_theme_font_size_override("font_size", 18)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	money_label.add_theme_font_size_override("font_size", 18)
-	money_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_label.add_theme_font_size_override("font_size", 18)
+	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	wave_label.add_theme_font_size_override("font_size", 15)
 	wave_label.modulate = Color(1, 1, 1, 0.85)
 	var top := HBoxContainer.new()
 	top.position = Vector2(10, 4)
 	top.custom_minimum_size = Vector2(vp.x - 56, 0)
 	top.add_theme_constant_override("separation", 14)
-	for l in [clock_label, score_label, money_label, wave_label]:
+	for l in [clock_label, score_label, gold_label, wave_label]:
 		top.add_child(l)
 	add_child(top)
 	tariff_button.add_theme_font_size_override("font_size", 13)
@@ -190,12 +190,12 @@ func build(game) -> void:
 	# drawers above the button row, one at a time, overlaying the board, full
 	# width and running to the screen bottom; the button bar re-fronts below so
 	# it stays visible and clickable over them. Inventory stacks the held-items
-	# strip over the trinket strip (money-and-shop/03).
-	trinket_box.add_theme_constant_override("separation", 16)
+	# strip over the artefact strip (money-and-shop/03).
+	artefact_box.add_theme_constant_override("separation", 16)
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
 	inv_box.add_child(item_box)
-	inv_box.add_child(trinket_box)
+	inv_box.add_child(artefact_box)
 	var drawer_specs := [ # name, content, x, width, height
 		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
 		["inventory", inv_box, 0.0, vp.x, DRAWER_H * 2 + 70.0],
@@ -229,7 +229,7 @@ func set_drawer(which: String) -> void:
 func refresh() -> void:
 	clock_label.text = g._clock_text()
 	score_label.text = "★%d" % g.score
-	money_label.text = "$%d" % g.money
+	gold_label.text = "$%d" % g.gold
 	var next_in: int = g._cadence() - g.turns_since_wave
 	var wave_txt := "King!" if g._king_alive() \
 		else ("in %d" % maxi(next_in, 0)) if g.wave < Waves.WAVES.size() else "done"
@@ -255,7 +255,7 @@ func refresh() -> void:
 		pass_count.text = ""
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.trinkets.size())
+	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
 	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
 		+ ("·off" if g.tariffs_suppressed else "")
 	multi_confirm_btn.visible = g.item_active >= 0 and not g.item_selected.is_empty() \
@@ -263,7 +263,7 @@ func refresh() -> void:
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
-	_rebuild_trinket_strip()
+	_rebuild_artefact_strip()
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
@@ -307,20 +307,20 @@ func _stacks() -> Array:
 	return out
 
 
-func _rebuild_trinket_strip() -> void:
-	for c in trinket_box.get_children():
+func _rebuild_artefact_strip() -> void:
+	for c in artefact_box.get_children():
 		c.queue_free()
-	if g.trinkets.is_empty():
+	if g.artefacts.is_empty():
 		var none := Label.new()
-		none.text = "no trinkets yet"
+		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
-		trinket_box.add_child(none)
+		artefact_box.add_child(none)
 		return
 	var counts := {}
-	for t in g.trinkets: # stack copies: one entry per kind
+	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
 	var seen := {}
-	for t in g.trinkets:
+	for t in g.artefacts:
 		if seen.has(t.key):
 			continue
 		seen[t.key] = true
@@ -328,7 +328,7 @@ func _rebuild_trinket_strip() -> void:
 		l.text = "◈%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
 		l.tooltip_text = t.description
 		l.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
-		trinket_box.add_child(l)
+		artefact_box.add_child(l)
 
 
 func _rebuild_item_strip() -> void:

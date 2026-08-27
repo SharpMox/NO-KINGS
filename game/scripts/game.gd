@@ -86,13 +86,13 @@ var score := 0:
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
-var money := 0 # per-run spend currency; score stays the up-only metric
+var gold := 0 # per-run spend currency; score stays the up-only metric
 var shop_stock: Array = [] # 19 rolled slots {kind, key, sold} (scripts/shop.gd)
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
 var actions_left := 0 # unified: move, place, merge, item — 1 action each
-var actions_max := 0  # granted this turn (base + trinket/item bonuses)
+var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
 var selected := Vector2i(-1, -1) # selected board piece
@@ -117,7 +117,7 @@ var merge_highlights := {} # ids that complete a merge with the current selectio
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
-var trinkets: Array = [] # run-long passive effects
+var artefacts: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
 var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
@@ -126,7 +126,7 @@ var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
 var item_selected: Array[Vector2i] = [] # toggled picks of a "multi" item
 var _extract_sel: Array[Vector2i] = [] # multi selection frozen at confirm
 var skip_enemy_turns := 0 # Surprise Attack
-var turn_action_count := 0 # moves+placements taken this turn (trinket hook)
+var turn_action_count := 0 # moves+placements taken this turn (artefact hook)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
@@ -397,7 +397,7 @@ func _begin_player_turn() -> void:
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
 	actions_left = Tuning.ACTIONS_PER_TURN
-	for t in trinkets:
+	for t in artefacts:
 		if t.key == "move":
 			actions_left += 1
 	actions_max = actions_left
@@ -836,7 +836,7 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 		if Economy.tariff_on(self, "austerity"):
 			cost *= 2
 		Economy.charge(self, "deploy_cost")
-		money = maxi(money - cost, 0)
+		gold = maxi(gold - cost, 0)
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -1183,8 +1183,8 @@ func _box_choose(opt: Dictionary) -> void:
 	match opt.kind:
 		"item":
 			items.append(opt.payload)
-		"trinket":
-			trinkets.append(opt.payload)
+		"artefact":
+			artefacts.append(opt.payload)
 		"score":
 			Economy.earn(self, opt.value)
 	_box_close()

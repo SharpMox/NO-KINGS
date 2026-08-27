@@ -1,6 +1,6 @@
 extends SceneTree
 ## Randomized lootbox (goal rework 2026-07-06): one step, 3 random options
-## across Item/Trinket/Score, each self-describing; choosing applies by kind.
+## across Item/Artefact/Score, each self-describing; choosing applies by kind.
 ## Run headless:  godot --headless --path game -s tests/test_box.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -30,7 +30,7 @@ func _init() -> void:
 	var shaped := true
 	var names := {}
 	for o in opts:
-		shaped = shaped and o.kind in ["item", "trinket", "score"] \
+		shaped = shaped and o.kind in ["item", "artefact", "score"] \
 			and o.name != "" and o.description != ""
 		names[o.name] = true
 	check(shaped, "every option carries kind, name and description")
@@ -41,22 +41,22 @@ func _init() -> void:
 	for i in 100:
 		for o in game._box_options():
 			kinds_seen[o.kind] = true
-	check(kinds_seen.size() == 3, "rolls cover items, trinkets and score")
+	check(kinds_seen.size() == 3, "rolls cover items, artefacts and score")
 
 	# choosing applies by kind
 	var item_opt := {}
-	var trinket_opt := {}
+	var artefact_opt := {}
 	var score_opt := {}
-	while item_opt.is_empty() or trinket_opt.is_empty() or score_opt.is_empty():
+	while item_opt.is_empty() or artefact_opt.is_empty() or score_opt.is_empty():
 		for o in game._box_options():
 			match o.kind:
 				"item": item_opt = o
-				"trinket": trinket_opt = o
+				"artefact": artefact_opt = o
 				"score": score_opt = o
 	game._box_choose(item_opt)
 	check(game.items.size() == 1, "picking an Item adds it to the held items")
-	game._box_choose(trinket_opt)
-	check(game.trinkets.size() == 1, "picking a Trinket adds a run-long passive")
+	game._box_choose(artefact_opt)
+	check(game.artefacts.size() == 1, "picking a Artefact adds a run-long passive")
 	var before: int = game.score
 	game._box_choose(score_opt)
 	check(game.score == before + int(score_opt.value), "picking Score banks it now")

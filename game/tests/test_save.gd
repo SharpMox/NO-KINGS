@@ -34,7 +34,7 @@ func _init() -> void:
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
-		"score": 470, "gold": 35, "clock_s": 812.5,
+		"score": 470, "gold": 35, "clock_s": 812.5, "shop_restocks": 2,
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
 			{"kind": "box", "key": "box", "sold": false}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
@@ -62,6 +62,7 @@ func _init() -> void:
 	check(b.gold == 35, "gold restored")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")
+	check(b.shop_restocks == 2, "the restock marker survives (no reroll-scumming)")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")

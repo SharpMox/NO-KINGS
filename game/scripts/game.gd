@@ -87,7 +87,8 @@ var score := 0:
 			queue_redraw()
 		score = value
 var gold := 0 # per-run spend currency; score stays the up-only metric
-var shop_stock: Array = [] # 19 rolled slots {kind, key, sold} (scripts/shop.gd)
+var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
+var shop_restocks := 0 # score thresholds banked so far (Shop.threshold)
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
@@ -1156,10 +1157,10 @@ func _destroy(pos: Vector2i) -> void:
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---
 
-func _open_box_pick() -> void:
+func _open_box_pick(only_kind := "") -> void:
 	box_open = true
 	Economy.charge(self, "box_cost")
-	var options := _box_options()
+	var options := _box_options(only_kind)
 	if autoplay: # bot: random pick (or skip) — exercises every branch
 		if rng.randf() < 0.1:
 			Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
@@ -1170,8 +1171,8 @@ func _open_box_pick() -> void:
 
 
 
-func _box_options() -> Array:
-	return Box.roll_options(rng)
+func _box_options(only_kind := "") -> Array:
+	return Box.roll_options(rng, only_kind)
 
 
 
@@ -1438,7 +1439,7 @@ func _connect_modals() -> void:
 		if shop_stock[index].kind == "box": # the roll modal IS the grant
 			if modals.shop_panel:
 				modals.shop_panel.visible = false
-			return _open_box_pick()
+			return _open_box_pick(shop_stock[index].key) # typed: rolls its kind
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())

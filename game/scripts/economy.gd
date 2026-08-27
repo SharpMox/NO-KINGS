@@ -3,6 +3,7 @@
 ## tariff data lives in data/tariffs.gd).
 
 const Rules := preload("res://scripts/rules.gd")
+const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 
@@ -18,6 +19,7 @@ static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> v
 static func earn(g, amount: int) -> void:
 	g.score += amount
 	g.gold += gain(g, amount)
+	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 
 ## Gold gains pass through Inflation (-10% per stack, rounded down).

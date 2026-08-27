@@ -1,11 +1,14 @@
 extends SceneTree
-## The Shop: 19-slot randomized stock (3 lootboxes / 4 artefacts / 4 items /
+## The Shop: 22-slot randomized stock (6 typed boxes / 4 artefacts / 4 items /
 ## 8 distinct base pieces), priced in gold, purchases cost 1 action, bought
-## slots go SOLD. Pure logic in scripts/shop.gd over the live game node.
+## slots go SOLD. Restocks on cumulative-score thresholds (GDD Shop page).
+## Pure logic in scripts/shop.gd over the live game node.
 ## Run headless:  godot --headless --path game -s tests/test_shop.gd
 
 const GameScript := preload("res://scripts/game.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Box := preload("res://scripts/box.gd")
+const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 
@@ -30,10 +33,31 @@ func _init() -> void:
 	var kinds := {}
 	for slot in game.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(game.shop_stock.size() == 19, "a run boots with a rolled 19-slot shop")
-	check(kinds.get("box", 0) == 3 and kinds.get("artefact", 0) == 4
+	check(game.shop_stock.size() == 22, "a run boots with a rolled 22-slot shop")
+	check(kinds.get("box", 0) == 6 and kinds.get("artefact", 0) == 4
 			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 8,
-		"rows: 3 lootboxes / 4 artefacts / 4 items / 8 base pieces")
+		"rows: 6 boxes / 4 artefacts / 4 items / 8 base pieces")
+
+	# boxes are typed, 2 of each (GDD Shop page: 2 Item / 2 Artefact / 2 Score)
+	var box_types := {}
+	for slot in game.shop_stock:
+		if slot.kind == "box":
+			box_types[slot.key] = box_types.get(slot.key, 0) + 1
+	check(box_types == {"item": 2, "artefact": 2, "score": 2},
+		"the box row is typed 2 Item / 2 Artefact / 2 Score")
+	check(Shop.display_name(game, {"kind": "box", "key": "score"}) == "Score Box",
+		"a typed box names its type")
+
+	# a typed box rolls only its own kind
+	var score_opts := Box.roll_options(game.rng, "score")
+	check(score_opts.size() == 3 and score_opts.all(func(o: Dictionary) -> bool:
+			return o.kind == "score"),
+		"a Score Box rolls score options only")
+	check(Box.roll_options(game.rng, "item").all(func(o: Dictionary) -> bool:
+			return o.kind == "item"),
+		"an Item Box rolls item options only")
+	check(Box.roll_options(game.rng).size() == 3,
+		"an untyped roll still mixes kinds (Box Pick path)")
 
 	# pool rules: merge-chain roots minus the King and inversion pieces
 	var pool: Array = Shop.base_piece_pool(game.defs)
@@ -162,18 +186,36 @@ func _init() -> void:
 		"a rolled score option earns raw score + gold")
 	check(not game.box_open, "the pick closes the roll modal")
 
-	# reroll cadence (07): every 10th wave reshuffles the shelf and clears
-	# SOLD; other waves leave it alone (reloads keep slots — see test_save)
+	# restock cadence: cumulative score thresholds, not waves (GDD Shop page).
+	# Thresholds are 1000 / 2500 / 4500 / 7000 — the gap grows 500 each time.
+	check(Shop.threshold(0) == 1000 and Shop.threshold(1) == 2500
+			and Shop.threshold(2) == 4500 and Shop.threshold(3) == 7000,
+		"thresholds step 1000 / 2500 / 4500 / 7000")
+
 	var before := JSON.stringify(game.shop_stock)
-	game._queue_wave(9)
-	check(JSON.stringify(game.shop_stock) == before,
-		"non-milestone waves keep the shop stock")
 	game._queue_wave(10)
-	check(JSON.stringify(game.shop_stock) != before, "wave 10 rerolls the shop")
+	check(JSON.stringify(game.shop_stock) == before,
+		"the 10-wave milestone no longer rerolls the shop")
+
+	game.score = 0
+	game.shop_restocks = 0
+	Economy.earn(game, 999)
+	check(JSON.stringify(game.shop_stock) == before and game.shop_restocks == 0,
+		"score below the threshold leaves the stock alone")
+	Economy.earn(game, 1)
+	check(JSON.stringify(game.shop_stock) != before, "crossing 1000 restocks")
+	check(game.shop_restocks == 1, "the restock counter advances")
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
 			return sl.sold).is_empty(),
-		"a reroll clears every SOLD flag")
-	check(game.shop_stock.size() == 19, "a reroll restocks all 19 slots")
+		"a restock clears every SOLD flag")
+	check(game.shop_stock.size() == 22, "a restock refills all 22 slots")
+
+	# one gain crossing several thresholds restocks once, not once per threshold
+	game.score = 0
+	game.shop_restocks = 0
+	Economy.earn(game, 5000)
+	check(game.shop_restocks == 3,
+		"a single huge gain banks every threshold it crossed (next: 7000)")
 
 	game.queue_free()
 	await process_frame

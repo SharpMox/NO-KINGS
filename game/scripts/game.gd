@@ -1242,8 +1242,15 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
-		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from, to)
-			* BuffLogic.capture_multiplier(board, from))
+		var capture_pts := Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from, to) \
+			* BuffLogic.capture_multiplier(board, from)
+		# Curtain Rods Bag (issue 31): "first Capture each Wave" is only
+		# knowable here, right after capture_score() sets last_capture_ctx —
+		# wave_capture_index is 0-based, read before Economy.earn runs, so its
+		# on_score_change/on_gold_change handlers below can scope to this one
+		# call by reason alone (see artefact_hooks.gd's header).
+		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
+		Economy.earn(self, capture_pts, earn_reason)
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
@@ -1653,7 +1660,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 				for dy in range(-1, 2):
 					var hit := b + Vector2i(dx, dy)
 					if board.has(hit) and board[hit].id != "king":
-						_destroy(hit)
+						_destroy(hit, true)
 		"radar_jamming": # strips the box-carrier flag AND any piece buffs
 			board[b].erase("buff")
 			# Antikythera Warranty Card: "Piece Buffs cannot be removed by
@@ -1680,7 +1687,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"invert":
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
-			_destroy(b)
+			_destroy(b, true)
 		"tactical_reposition", "rapid_deployment":
 			_add_slide(a, b)
 			board[b] = board[a]
@@ -1714,13 +1721,20 @@ func _detonate(at: Vector2i) -> void:
 ## Fireproof Pajamas (artefact hook 24) vetoes this via _lose_player_piece's
 ## returned ctx.cancel — the single choke point every Item/Tariff kill
 ## (Drone Strike, Air Strike, Sniper, bomb detonation via _detonate, the
-## jd_vance Tariff) already funnels through.
-func _destroy(pos: Vector2i) -> void:
+## jd_vance Tariff) already funnels through. `by_item` (issue 31) is true only
+## from the three literal Item call sites (Drone Strike, Air Strike, Sniper)
+## — $2.3 Trillion Receipt's "Enemies destroyed by Items award their Score
+## and Gold value" is a DELIBERATE exception to "Destruction pays nothing"
+## above, scoped exactly to the GDD text: Bomb's _detonate and the jd_vance
+## Tariff are not Items, so they stay unpaid, same as ever.
+func _destroy(pos: Vector2i, by_item: bool = false) -> void:
 	if board[pos].owner == Rules.PLAYER:
 		if _lose_player_piece(pos, "destroyed").cancel:
 			return
 	else:
 		lost_enemy += 1
+		if by_item:
+			ArtefactHooks.run(self, "on_destroy", {"id": board[pos].id, "value": defs[board[pos].id].value})
 	_add_pop(pos)
 	board.erase(pos)
 

@@ -50,12 +50,42 @@ rather than building a layer at a time.
 | 10 | Arrow Planning | S | — |
 | 11 | Enemy AI parity (2 actions, protect the King) | M | — |
 | 12 | Accounts & cloud saves | XL | 05 |
-| 13 | Hook architecture | L | — |
+| 13 | Hook architecture | L | — (may be absorbed by 15) |
+
+### Artefacts (added 2026-08-28)
+
+Originally excluded by user instruction. The site knows all **180**; the game hand-writes
+**7**. 64 are Passive and 116 Trigger, and **86 carry an explicit `(needs: …)` note** —
+the catalog authors flagging a system that does not exist yet.
+
+| Slice | What | Size | Blocked by |
+| --- | --- | --- | --- |
+| 14 | Artefact catalog pipeline (data only) | S | — |
+| 15 | Artefact trigger engine | L | 14 |
+| 16 | Gold & Score artefacts | L | 15 |
+| 17 | Action, Time & Piece artefacts | M | 15 |
+| 18 | Shop, Item & Buff artefacts | M | 15, 04, 08 |
+| 19 | Special + the 86 prerequisite artefacts | XL | 15–18 |
+| 20 | Rarity weighting & balance pass | M | 16–19 |
+
+Two things fall out of this that change earlier slices:
+
+- **Slice 15 is slice 13 arriving for a real reason.** The hook architecture was parked as
+  a refactor with no player-facing value; 180 artefacts are that value. Build it in 15
+  against a real consumer and either close 13 or reduce it to migrating tariffs onto the
+  same hooks.
+- **Slice 18 forces the Shop's deferred "base + modifiers" slot pass.** That was
+  explicitly deferred "until an Artefact needs it" — several now do, by name, on the GDD
+  Shop page.
+
+## Open flags
+
+`FLAGS.md` holds the non-blocking findings that surfaced while working the slices — art
+gaps, unvalidated tuning, and the judgement calls made to ship that are cheap to reverse.
+They are not slices; they are decisions or small pieces of art away from closing.
 
 ## Out of scope
 
-- **Artefacts** — excluded by explicit user instruction 2026-08-27; the 180-entry catalog
-  and its shop/box wiring are tracked separately.
 - **The 13 deliberate divergences** on the Fable Prototype Test page. Slice 11 revisits
   exactly one of them (enemy actions) because the GDD number was never actually tried;
   the rest stand.

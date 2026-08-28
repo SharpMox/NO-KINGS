@@ -14,8 +14,11 @@ const Tuning := preload("res://scripts/tuning.gd")
 ## `allowed_tiers` further restricts an Item roll (Majestic 12 Secret
 ## Handshake Diagram, issue 18: "Item Boxes only offer Strategic and Decisive
 ## Items") — empty means every tier, as before.
+## `score` depth-gates the Artefact pick (issue 20 "rarity is depth-gated"
+## decision) — cumulative run Score, defaulting to 0 for callers that don't
+## track a run (tests, a Shop Box's Item/Score-only rolls).
 static func roll_options(rng: RandomNumberGenerator, only_kind := "",
-		allowed_tiers: Array = []) -> Array:
+		allowed_tiers: Array = [], score := 0) -> Array:
 	var out := []
 	var taken := {}
 	for i in 3:
@@ -34,7 +37,7 @@ static func roll_options(rng: RandomNumberGenerator, only_kind := "",
 			"artefact":
 				var pool := Items.ARTEFACT_EFFECTS.filter(func(e: Dictionary) -> bool:
 					return not taken.has(e.name))
-				var e: Dictionary = pool[rng.randi() % pool.size()]
+				var e: Dictionary = pool[Tuning.weighted_artefact_pick(pool, score, rng)]
 				opt = {"kind": "artefact", "name": e.name,
 					"description": e.description, "payload": e}
 			"score":

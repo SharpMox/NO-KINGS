@@ -66,6 +66,14 @@ found. Collected here so they are not lost in Outcome sections:
   a real GDD/code mismatch. Those artefacts currently hook `on_wave_clear` and check
   `g.wave % 5` directly.
 - Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
+- **"Demoted" is undefined** (issue 31). Blocks Dark Market Light Bulb. Two readings that
+  differ for any piece demoted then re-promoted.
+- **There is no Clock-gain choke point** (issue 30). `clock_ms` is mutated directly at ~15
+  sites, unlike Gold and Score which route through `Economy.earn`/`gain`. Blocks Black Knight
+  Morse Code, and any future artefact that wants to modify time. Worth building for its own
+  sake, not just for one artefact.
+- **There is no run-long turn counter** (issue 30) — only `turns_since_wave`, which resets
+  every Wave.
 - ~~**Tier 5 kills Blitz outright.**~~ Resolved by the Blitz rework
   (`fix/blitz-and-crypto-wallet`, 2026-08-28, user call): Blitz itself now costs 0 actions
   and the target's next move/capture is free, so it no longer depends on the 2-actions/turn

@@ -99,6 +99,7 @@ waiting on design calls.
 | 32 | Box & Shop UI extensions | blocked — 3 decisions |
 | 33 | Board & positional rules | blocked — 4 decisions |
 | 34 | Consumables & caps | blocked — 3 decisions |
+| 35 | Clock-gain choke point & turn counter | **independent** |
 
 The blocked three are parked deliberately: each would mean inventing a rule the GDD does
 not state, which is the failure mode slices 01-02 existed to clean up. Their issue files

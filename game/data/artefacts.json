@@ -424,7 +424,7 @@
   ],
   "effect": "The Buff Box offers 4 Piece Buff choices instead of 3; each pick costs 5 Gold",
   "conspiracy": "Numbers stations",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "alleged-weather-balloon",
@@ -448,7 +448,7 @@
   ],
   "effect": "When one of your Piece Buffs of any tier triggers: +10 Gold",
   "conspiracy": "The Amityville Horror",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "mrna-firmware-update",
@@ -461,7 +461,7 @@
   ],
   "effect": "Every 3rd Piece Buff you apply: the piece also Ranks Up (needs: rank hook)",
   "conspiracy": "The vaccine microchip claim",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "men-in-black-prescription-sunglasses",
@@ -879,7 +879,7 @@
   ],
   "effect": "The Buff Box offers 5 Piece Buff choices instead of 3",
   "conspiracy": "Bohemian Grove",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "chocolate-key-cake",
@@ -903,7 +903,7 @@
   ],
   "effect": "When one of your Decisive Piece Buffs (Trap, Reflect, Bomb) triggers: +100 Gold",
   "conspiracy": "The death of Cleopatra",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "merchants-of-death-sample-case",
@@ -927,7 +927,7 @@
   ],
   "effect": "Whenever a piece (ally or enemy) is Demoted or consumes/loses a Piece Buff: +25 Gold",
   "conspiracy": "The Georgia Guidestones",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "inflatable-vietcong-torpedo",
@@ -1112,7 +1112,7 @@
   ],
   "effect": "On losing a piece carrying a Piece Buff: the Buff transfers to the nearest ally (needs: buff transfer)",
   "conspiracy": "Soviet photo retouching",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "lusitania-hardtack-crate",
@@ -1137,7 +1137,7 @@
   ],
   "effect": "Your pieces cannot be Demoted (needs: demotion immunity)",
   "conspiracy": "Atlantis",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "templar-severance-gold-one-pile",
@@ -1173,7 +1173,7 @@
   ],
   "effect": "On the first Piece Buff consumed each Wave: it is re-applied to the same piece",
   "conspiracy": "The Fountain of Youth",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "tutankhamun-s-death-thong",
@@ -1284,7 +1284,7 @@
   ],
   "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects (needs: buff protection)",
   "conspiracy": "The Antikythera mechanism",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "2-3-trillion-receipt",
@@ -1622,7 +1622,7 @@
   ],
   "effect": "When you apply a Piece Buff: one adjacent ally gets a copy (needs: buff copy)",
   "conspiracy": "The Pied Piper of Hamelin",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "super-soldier-multivitamins",
@@ -1867,7 +1867,7 @@
   ],
   "effect": "+45% Gold and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs (needs: buff strip)",
   "conspiracy": "The Hope Diamond curse",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "royal-fiat-undamaged",

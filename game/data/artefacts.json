@@ -105,7 +105,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "Gold gains also add 2x their amount as Score",
+  "effect": "+20% Score gain",
   "conspiracy": "Fake gold bars",
   "implemented": true
  },
@@ -1036,7 +1036,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "Gold gains also add 10x their amount as Score",
+  "effect": "+50% Score gain",
   "conspiracy": "The Vatican bank scandal",
   "implemented": true
  },

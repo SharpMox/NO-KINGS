@@ -1045,11 +1045,17 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 
 		# --- issue 16: Gold gain also pays Score (mirror of the above) ---
 		["tungsten-filled-gold-bar", "on_gold_change"]:
-			# issue 20 fix: ctx.base + ctx.score_bonus, same reasoning as
-			# El Dorado above — was g.score += roundi(ctx.amount) * 2.
-			ctx.score_bonus += ctx.base * 2
+			# Rebalanced 2026-08-28: "+20% Score gain" — was "2x their amount as
+			# Score", an unconditional 3x Score multiplier (Gold is earned 1:1
+			# with Score) wildly out of scale with the catalog (Tinfoil Hat is
+			# +15% at the same Common rarity). ctx.score_bonus, same reasoning
+			# as El Dorado above.
+			ctx.score_bonus += ctx.base * 0.20
 		["popemobile-piggy-bank", "on_gold_change"]:
-			ctx.score_bonus += ctx.base * 10
+			# Rebalanced 2026-08-28: "+50% Score gain" — was "10x" (an
+			# unconditional 11x Score multiplier at Uncommon). Same reasoning
+			# as Tungsten-Filled Gold Bar above.
+			ctx.score_bonus += ctx.base * 0.50
 
 		# --- issue 16: on_capture triggers ---
 		["suspiciously-large-femur", "on_capture"]:

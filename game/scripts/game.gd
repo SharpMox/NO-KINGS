@@ -1811,7 +1811,7 @@ func _box_options(only_kind := "") -> Array:
 			if t.key == "majestic-12-secret-handshake-diagram":
 				allowed_tiers = ["Strategic", "Decisive"]
 				break
-	return Box.roll_options(rng, only_kind, allowed_tiers, score)
+	return Box.roll_options(rng, only_kind, allowed_tiers)
 
 
 

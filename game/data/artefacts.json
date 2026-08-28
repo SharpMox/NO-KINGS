@@ -254,7 +254,7 @@
   ],
   "effect": "On Turn start: +1s Clock per allied piece on the Board, -1s per enemy piece on the Board",
   "conspiracy": "5G panic",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "frame-25",
@@ -315,7 +315,7 @@
   ],
   "effect": "On Wave clear: +10s Clock",
   "conspiracy": "The phantom time hypothesis",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nigerian-prince-wire-transfer",
@@ -1357,7 +1357,7 @@
   ],
   "effect": "If your first Action of a Turn is a Capture: +1 Action",
   "conspiracy": "The Stargate Project",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "elvish-hard-hat",
@@ -1490,7 +1490,7 @@
   ],
   "effect": "On Wave clear: +1 random Piece to your Stock",
   "conspiracy": "Qin Shi Huang's tomb",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "definitely-not-russia-patch",
@@ -1634,7 +1634,7 @@
   ],
   "effect": "While 3+ allied pieces carry Piece Buffs: +1 Action per Turn",
   "conspiracy": "Super soldier programs",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "holy-dna-kit",
@@ -1659,7 +1659,7 @@
   ],
   "effect": "While holding 3+ unused Items: +1 Action per Turn",
   "conspiracy": "The doomsday vault",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "oak-island-wishing-well",
@@ -1696,7 +1696,7 @@
   ],
   "effect": "While you have 8+ pieces on the Board: +1 Action per Turn",
   "conspiracy": "The Dead Internet theory",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "illuminati-fridge-magnet",
@@ -1891,7 +1891,7 @@
   ],
   "effect": "+1 Action per Turn",
   "conspiracy": "The plots against Castro",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "hellfire-club-discord-invite",

@@ -514,6 +514,45 @@
 ##   at some point this run, or one currently below its peak rank? A Notion
 ##   question, not a guess — see .scratch/gdd-gaps/issues/31's Outcome.
 ##
+## issue 30 (action-type tracking) added a per-turn ordered action log
+## (game.gd `action_log`, cleared in _begin_player_turn) and its own hook,
+## `on_action` — the 7 sites that already did `turn_action_count += 1` (move,
+## capture, blocked-capture, bomb, trap, place, item; merge_logic.gd's
+## commit_merge calls it on `g`) now all funnel through one new choke point,
+## game.gd's `_log_action(kind)`, instead of touching the counter directly.
+## ctx = {kind, first} — `kind` is "move"/"capture"/"place"/"merge"/"item"
+## (a blocked/repelled attack still logs "capture": it's an attempt against
+## an occupied tile, the same shape Zapruder's Director's Cut will eventually
+## want); `first` is whether this is the Turn's opening Action, computed off
+## `action_log.is_empty()` BEFORE the log/counter update — so a handler can
+## gate on "the very first Action" without reaching into game state itself.
+## Elvish Hard Hat ("first Action of a Turn is an Item or ability: +1
+## Action") is the first listener: `ctx.first and ctx.kind == "item"` grants
+## `actions_left`/`actions_max` +1 from inside `_log_action`, which every
+## call site invokes BEFORE its own `actions_left == 0` auto-pass check — the
+## same ordering that already lets first_capture_extra/Stargate Divination
+## Crystal (`turn_action_count == 0`, on_capture) refund an action without
+## ever resurrecting a Turn that already ended (Blitz hit this exact shape
+## during its own rework — see this header's on_capture notes above).
+## Covered by test_items.gd ("Elvish Hard Hat" + "... cannot resurrect an
+## already-passed Turn").
+##
+## Black Knight Morse Code ("Every 3rd Turn: your Score and Clock gains that
+## Turn are doubled (needs: turn counter)") stays unimplemented — its own
+## catalog text names a different gap than issue 30's own description implied
+## ("needs a per-turn action counter with type"). There is no "which Turn
+## number is this" counter anywhere in game.gd (only `turns_since_wave`,
+## reset every Wave, not a run-long count) and no hook for "a Clock gain
+## happened" — `clock_ms` is mutated directly at ~15 scattered call sites,
+## unlike Gold/Score which already route through Economy.earn/gain's
+## on_score_change/on_gold_change. Doubling "Score AND Clock gains, every 3rd
+## Turn" needs both a new counter and a new Clock-gain hook mirroring
+## on_score_change's base/amount contract — two new pieces of infrastructure,
+## neither of which the action log provides. Zapruder's Director's Cut
+## (replay semantics) and Y2K Patch Floppy Disk (a turn-skip seam) are
+## untouched for the same reason the issue named going in: real new
+## mechanisms, not a hook this log can wire up.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -535,6 +574,8 @@ const HOOKS := [
 	"on_gold_zero",
 	# --- issue 31: an enemy destroyed by an Item (game.gd _destroy) ---
 	"on_destroy",
+	# --- issue 30: per-turn action log (game.gd _log_action) ---
+	"on_action",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -772,6 +813,8 @@ const REGISTRY := {
 
 	# --- issue 29: runtime rarity metadata's first consumer ---
 	"illuminati-fridge-magnet": ["on_gold_change"],
+	# --- issue 30: per-turn action log (game.gd _log_action / on_action) ---
+	"elvish-hard-hat": ["on_action"],
 }
 
 
@@ -1790,3 +1833,16 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["illuminati-fridge-magnet", "on_gold_change"]:
 			if holds_every_rarity(g):
 				ctx.amount += ctx.base * 0.5
+
+		# --- issue 30: per-turn action log ---
+		["elvish-hard-hat", "on_action"]:
+			# Fires from game.gd's _log_action, BEFORE the log/counter update —
+			# ctx.first is action_log.is_empty() at that point, so this is the
+			# gate on "the Turn's first Action", same shape first_capture_extra/
+			# Stargate Divination Crystal use `turn_action_count == 0` for. The
+			# grant lands before _log_action's caller runs its own
+			# actions_left==0 auto-pass check, so it can never resurrect an
+			# already-passed Turn — covered by test_items.gd.
+			if ctx.first and ctx.kind == "item":
+				g.actions_left += 1
+				g.actions_max += 1

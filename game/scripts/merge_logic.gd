@@ -78,7 +78,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		return
 	var result := Rules.merge_result(ids, g.defs, g.fusions)
 	g.actions_left -= 1
-	g.turn_action_count += 1
+	g._log_action("merge")
 	var result_tile := Vector2i(-1, -1)
 	for ref in [a, b]:
 		if ref is Vector2i:

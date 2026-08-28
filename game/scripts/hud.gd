@@ -457,7 +457,7 @@ func _rebuild_pool_strip() -> void:
 			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 		elif g.merge_highlights.has(id):
 			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-		elif not cap and id == g.sanctioned_id and Economy.tariff_on(g, "sanctions"):
+		elif not cap and Economy.sanctioned(g, id):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
 		elif cap:
 			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint

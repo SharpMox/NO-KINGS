@@ -21,7 +21,7 @@ static func origin_id(g) -> String:
 
 ## Valid pair under the current tariffs (Regulation blocks pawn merges).
 static func pair_ok(g, a: String, b: String) -> bool:
-	if Economy.tariff_on(g, "regulation") and (a == "pawn" or b == "pawn"):
+	if not Economy.merge_ok(g, a, b):
 		return false
 	return Rules.merge_result([a, b], g.defs, g.fusions) != ""
 

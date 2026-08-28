@@ -81,6 +81,54 @@
 ##   tier}. `tier` is an Item's tier ("Tactical"/"Strategic"/"Decisive") and
 ##   "" for every other kind. Same immutable-base/additive-amount contract as
 ##   on_score_change/on_gold_change, so two discounts stack additively.
+##
+## issue 13 (hook architecture, reduced scope) migrated the tariff system
+## (data/tariffs.gd) onto this same registry, so g.artefacts and
+## g.tariffs_active are just two flavours of "held modifier" run() dispatches
+## identically — the ad hoc `if Economy.tariff_on(g, "...")` branches that
+## used to sit inline in game.gd/wave_logic.gd/merge_logic.gd/hud.gd are now
+## REGISTRY entries + _dispatch cases like any artefact. `tariff_on` is gone;
+## Economy grew narrow query wrappers instead (sanctioned/merge_ok/
+## deploy_cost/enemy_actions), mirroring how earn()/gain()/capture_score()
+## already wrapped run() for artefacts. Kept file/class name: tariffs are
+## conceptually "artefacts the GDD calls tariffs" — still artefact-shaped
+## triggers, not a second kind of thing — and a rename would have widened the
+## diff against the concurrent artefacts/shop/buff branch for no behavioural
+## gain.
+##
+## g.tariffs_suppressed (Counter-Intel) pauses every held tariff at once —
+## enforced centrally in run() by leaving tariffs_active out of `held`
+## entirely while suppressed, rather than each handler re-checking it (that
+## was the one thing `tariff_on` did that a plain REGISTRY lookup didn't).
+##
+## Two semantics coexist deliberately, same as the artefact-stacking note
+## above: most tariff handlers are idempotent gates (Sanctions/Regulation/
+## Austerity/Filibuster/Trade War, and the 8 action-cost keys on on_charge) —
+## a key held twice (Mild tiers may redraw the same tariff) still only gates
+## once, because the handler *sets* a ctx field rather than accumulating.
+## Inflation is the deliberate stacking exception (data/tariffs.gd: "-10% per
+## stack"): its on_gold_gain handler does `ctx.amount *= 0.9`, so N held
+## copies compound multiplicatively — one dispatch per copy, same mechanism
+## artefacts use for additive stacking, just a multiplicative handler body.
+## Covered by test_gold.gd (single stack) and test_items.gd's counter-intel
+## cases (suppression pauses it, next wave's spawn resumes it).
+##
+## Tariff/artefact ordering: run() dispatches the artefacts group before the
+## tariffs group (two separately-sorted passes, not one merged sort) so a
+## shared hook — only on_milestone today (artefact "timer" + tariff
+## "recession") — keeps computing the artefact-modified base first and
+## applying the tariff modifier on top, exactly the order the pre-migration
+## call site used (`refill` built by the artefact hook run, then halved by
+## Recession right after it, outside the hook). A single alphabetical sort
+## across both groups would have flipped that for any key sorting before
+## "timer" and changed the milestone refill's number.
+##
+## Oneoff tariffs (forced_audit, hostile_takeover, asset_seizure, jd_vance,
+## asset_freeze) stay on Economy.apply_tariff's own `match t.key` — that's
+## already a single non-scattered dispatch point (fires once, at activation),
+## not an ad hoc branch repeated at multiple call sites, so folding it into
+## REGISTRY/_dispatch too would add a hook with no behavioural or
+## architectural win.
 
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
@@ -92,6 +140,9 @@ const HOOKS := [
 	"on_wave_clear", "on_wave_spawn", "on_milestone",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
 	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
+	# --- issue 13: tariff-only trigger points (see header) ---
+	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
+	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -166,17 +217,40 @@ const REGISTRY := {
 	# majestic-12-secret-handshake-diagram fire nowhere — Shop.roll/price and
 	# game.gd's _box_options read g.artefacts directly, the same way Shop.buy
 	# already reads slot.kind without a hook (shop-drawer-ui/08's deferred pass).
+	# --- issue 13: tariff system (data/tariffs.gd) ---
+	"move_cost": ["on_charge"],
+	"ability_cost": ["on_charge"],
+	"capture_cost": ["on_charge"],
+	"pass_cost": ["on_charge"],
+	"long_range_cost": ["on_charge"],
+	"box_cost": ["on_charge"],
+	"deploy_cost": ["on_charge"],
+	"fuse_cost": ["on_charge"],
+	"inflation": ["on_gold_gain"],
+	"sanctions": ["on_sanction_check"],
+	"regulation": ["on_merge_check"],
+	"austerity": ["on_place_cost"],
+	"recession": ["on_milestone"],
+	"filibuster": ["on_enemy_turn_start"],
+	"trade_war": ["on_wave_roster"],
 }
 
 
-## Run every held artefact's handler for `hook`, key-sorted, mutating and
-## returning `ctx`. Handlers write to `ctx` for values the caller reads back
-## (e.g. a score total) and touch `g` directly for side effects (clock,
-## actions) — exactly what the pre-migration call sites did inline.
+## Run every held modifier's handler for `hook`, mutating and returning
+## `ctx`. Handlers write to `ctx` for values the caller reads back (e.g. a
+## score total) and touch `g` directly for side effects (clock, actions) —
+## exactly what the pre-migration call sites did inline.
+##
+## Two held sources, dispatched as two separately key-sorted groups —
+## artefacts (g.artefacts) always before tariffs (g.tariffs_active, skipped
+## entirely while g.tariffs_suppressed) — see the header for why a single
+## merged sort would be wrong for the one hook (on_milestone) both groups use.
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	var held: Array = g.artefacts.duplicate()
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
-	for t in held:
+	var tariffs: Array = [] if g.tariffs_suppressed else g.tariffs_active.duplicate()
+	tariffs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
+	for t in held + tariffs:
 		if REGISTRY.get(t.key, []).has(hook):
 			_dispatch(g, t.key, hook, ctx)
 	return ctx
@@ -517,3 +591,38 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 					var pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 						return it.tier == "Tactical")
 					g.items.append(pool[g.rng.randi() % pool.size()])
+
+		# --- issue 13: tariff system ---
+		# The 8 action-cost tariffs share one hook: charge() calls run() once
+		# per charge with ctx.key set to the specific tariff it's charging,
+		# and only the matching held key may set ctx.charged — with several
+		# cost tariffs held at once (common; see data/scenarios.gd "Tariffs:
+		# all action costs"), each dispatch here still checks `key` against
+		# `ctx.key` or an unrelated held tariff would gate a charge for a key
+		# it isn't. ctx.charged is a flag, not a counter, so a key held twice
+		# (a redrawn Mild tariff) still only gates once — no double charge.
+		["move_cost", "on_charge"], ["ability_cost", "on_charge"], ["capture_cost", "on_charge"], ["pass_cost", "on_charge"], ["long_range_cost", "on_charge"], ["box_cost", "on_charge"], ["deploy_cost", "on_charge"], ["fuse_cost", "on_charge"]:
+			if ctx.key == key:
+				ctx.charged = true
+		["inflation", "on_gold_gain"]:
+			# stacks multiplicatively per held copy (header) — data/tariffs.gd:
+			# "All gold gains reduced 10% (stacks)"
+			ctx.amount *= 0.9
+		["sanctions", "on_sanction_check"]:
+			if ctx.id == g.sanctioned_id:
+				ctx.blocked = true
+		["regulation", "on_merge_check"]:
+			if ctx.a == "pawn" or ctx.b == "pawn":
+				ctx.blocked = true
+		["austerity", "on_place_cost"]:
+			ctx.cost *= 2
+		["recession", "on_milestone"]:
+			ctx.refill *= 0.5
+		["filibuster", "on_enemy_turn_start"]:
+			ctx.actions += 1
+		["trade_war", "on_wave_roster"]:
+			# +1 piece per wave, drawn from the wave's own mix, never the King
+			# (review 2026-07-03)
+			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
+			if not extras.is_empty():
+				ctx.roster.append(extras[g.rng.randi() % extras.size()])

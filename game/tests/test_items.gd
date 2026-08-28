@@ -906,14 +906,21 @@ func _init() -> void:
 	await process_frame
 
 	# Holy Lint: On Capture, the capturing piece gets +1 Piece Buff (no gate) —
-	# exercises attacker_pos end to end through a real board capture
+	# exercises attacker_pos end to end through a real board capture.
+	# Seed pinned: an unpinned rng.randi() % 12 lands on "critical" or "range"
+	# 2/12 of the time, and _move_player consumes either on this very capture
+	# (game.gd's "Range is spent by the capture, not by repositioning"), which
+	# flaked this check ~1 run in 3 on identical code. Seed "1" is a durable
+	# roll ("stun", a dormant buff untouched by this capture path) — verified
+	# deterministic across repeated runs.
 	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
-		"wave": 3, "artefacts": ["holy-lint"]})
+		"wave": 3, "artefacts": ["holy-lint"], "seed": "1"})
 	await process_frame
 	lint.actions_left = 5
 	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
-	check(BuffLogic.of(lint.board[Vector2i(3, 2)]).size() == 1,
-		"Holy Lint: the capturing piece gets +1 Piece Buff")
+	var lint_buffs: Array = BuffLogic.of(lint.board[Vector2i(3, 2)])
+	check(lint_buffs.size() == 1 and lint_buffs[0].key == "stun",
+		"Holy Lint: the capturing piece gets +1 Piece Buff (stun, seed 1)")
 	lint.queue_free()
 	await process_frame
 

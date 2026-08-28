@@ -33,6 +33,26 @@ the rank stored in run state and the save, and the Shop-pause lever wired to it.
 - [ ] Whatever other levers the grilling settles on
 - [ ] `run_all.sh` all green
 
+## Decisions taken (2026-08-28)
+
+The page's four open questions, answered so the slice can be built. Each is deliberately
+the smallest defensible option — difficulty is a frame around the game, not a second game.
+
+1. **What it modulates:** three levers only — the Shop clock-pause (the one already
+   resolved on the page), tariff severity (shift the tier draw one step harsher), and
+   starting Stock size. Explicitly NOT King strength or wave density: both are tuned
+   against the wave catalog, and moving them invalidates the balance work.
+2. **How many ranks:** three, named for the game's own fiction — **Citizen / Officer /
+   Autocrat**. Three is enough to be meaningful and few enough to tune.
+3. **Leaderboard weighting:** none. Difficulty is a comfort setting; Score is unweighted.
+   Weighting opens a fairness question the local-only leaderboard cannot answer, and it
+   can be added later without migrating anything.
+4. **Locked at run start:** yes. Continuing into endless keeps the rank — otherwise a
+   player could clear wave 50 on Citizen and bank an endless run on easy footing.
+
+Write all four back to the Notion page when implementing.
+
+
 ## Blocked by
 
 - 05 — Settings surface

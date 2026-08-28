@@ -37,6 +37,21 @@ exception. Settle it here, once, and record it.
 - [ ] A scenario holding a representative handful, swept by `test_scenarios`
 - [ ] `run_all.sh` all green
 
+## Decision: Score penalties debit Gold (2026-08-28)
+
+Only **4 of 180** artefacts collide with the up-only Score rule, and two of those are rate
+reductions (*Daylight Savings Jar*, *45.5 Carat Curse*: "−20% Score gain") — a smaller gain
+is still a gain, so Score never falls and they need no change.
+
+That leaves exactly two real subtractions: *27 Club Punch Card* (−50 Score) and *Social
+Credit Report Card* (−10 Score).
+
+**Ruling: those two debit Gold instead.** The up-only rule is load-bearing and stated on
+three GDD pages (Score, Shop, Reward Economy) — it is why the final Score is an honest
+leaderboard number. Two artefacts do not overturn it, and Gold is where every other
+penalty in the game already lands. Re-text both on Notion when implementing.
+
+
 ## Blocked by
 
 - 15 — trigger engine

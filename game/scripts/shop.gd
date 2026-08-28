@@ -6,6 +6,7 @@
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
 const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
@@ -103,9 +104,11 @@ static func buy(g, index: int) -> bool:
 	var slot: Dictionary = g.shop_stock[index]
 	if not can_buy(g, slot):
 		return false
-	g.gold -= price(g, slot)
+	var cost := price(g, slot)
+	g.gold -= cost
 	g.actions_left -= 1
 	slot.sold = true
+	g.gold_spent_shop_this_wave += cost # issue 16: Zurich Gnome Figurine et al.
 	match slot.kind: # grants reuse the existing acquisition paths
 		"piece":
 			g.stock.append(slot.key)
@@ -113,6 +116,7 @@ static func buy(g, index: int) -> bool:
 			g.items.append(_catalog(slot))
 		"artefact":
 			g.artefacts.append(_catalog(slot)) # stacks like box copies
+	ArtefactHooks.run(g, "on_purchase", {"kind": slot.kind, "key": slot.key, "price": cost})
 	return true
 
 

@@ -3,12 +3,13 @@
 // derives a stable kebab-case key per artefact and asserts uniqueness — a
 // silent collision would merge two artefacts.
 //
-// `implemented` is false for all 180: none of them have game mechanics yet
-// (that's slices 15-20 — the trigger engine, then the catalog rollout). The 7
-// keys already shipped in game/data/items.gd (ARTEFACT_EFFECTS_CORE) pre-date
-// this catalog and have no Notion/site equivalent, so they are not in this
-// export; items.gd merges them with whatever catalog entries later flip to
-// implemented: true, so the shop/box roll pool never needs re-plumbing.
+// `implemented` mirrors each entry's `implemented` flag in data/artefacts.js
+// (default false — most of the 180 have no game mechanics yet; slices 16-20
+// flip them on one hook-batch at a time). The 7 keys already shipped in
+// game/data/items.gd (ARTEFACT_EFFECTS_CORE) pre-date this catalog and have
+// no Notion/site equivalent, so they are not in this export; items.gd merges
+// them with whatever catalog entries are flagged implemented: true, so the
+// shop/box roll pool never needs re-plumbing.
 //
 // Run manually after editing data/artefacts.js:
 //   node tools/export-game-artefacts.mjs
@@ -54,11 +55,12 @@ for (const a of ARTEFACTS) {
     bonus: a.bonus,
     effect: a.effect,
     conspiracy: a.conspiracy,
-    implemented: false,
+    implemented: a.implemented === true,
   });
 }
 
 if (out.length !== 180) throw new Error(`expected 180 artefacts, got ${out.length}`);
 
 writeFileSync(join(root, "game/data/artefacts.json"), JSON.stringify(out, null, 1) + "\n");
-console.log(`wrote game/data/artefacts.json (${out.length} artefacts, 0 implemented, keys unique)`);
+const implementedCount = out.filter((e) => e.implemented).length;
+console.log(`wrote game/data/artefacts.json (${out.length} artefacts, ${implementedCount} implemented, keys unique)`);

@@ -11,8 +11,18 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 static func queue(g, n: int) -> void:
+	if n > 1: # wave 1 has no prior wave to have "cleared" (issue 16)
+		var clean: bool = g.lost_player == g.wave_start_lost_player
+		ArtefactHooks.run(g, "on_wave_clear", {
+			"clean": clean, "turns": g.turns_since_wave,
+			"captures": g.wave_capture_count, "gold_spent": g.gold_spent_shop_this_wave,
+			"gold_base": g.gold, # immutable snapshot: percentage payouts stay
+		}) # additive across held copies, not compounding one on the next
 	g.wave = n
 	g.turns_since_wave = 0
+	g.wave_capture_count = 0
+	g.gold_spent_shop_this_wave = 0
+	g.wave_start_lost_player = g.lost_player
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
@@ -53,6 +63,7 @@ static func queue(g, n: int) -> void:
 		var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
 		for i in Tuning.MILESTONE_STOCK_DRIP:
 			g.stock.append(mix[g.rng.randi() % mix.size()])
+	ArtefactHooks.run(g, "on_wave_spawn", {"wave": n})
 
 
 static func spawn(g, n: int) -> void:

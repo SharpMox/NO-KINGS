@@ -115,6 +115,19 @@ var salvation_charged := true # Salvation Gift Card: ready to veto the next
 var last_capture_ctx: Dictionary = {} # this move's on_capture ctx (Economy.
 	# capture_score) — read back by _move_player after its own board mutation
 	# for USS Eldridge / Royal Fiat's post-move reposition (artefact hook 24)
+var club27_streak := 0 # 27 Club Punch Card (issue 26): grows +1 per clean
+	# Wave clear, reset to 0 on_piece_lost — same shape as nibiru_wave_streak
+var wave_lost_ids: Array = [] # ids of player pieces lost this Wave, in order
+	# (Jon Burrows' Fake ID / Walt's Cryonic Capsule, issue 26); reset in
+	# WaveLogic.queue(), appended in _lose_player_piece — distinct from the
+	# run-wide lost_player counter above
+var arks_bunkbed_used := false # Ark's Bunkbed: this 5-Wave Milestone window's
+	# free duplicate already granted; reset on_wave_clear when g.wave % 5 == 0
+	# (the "5-Wave Milestone" cadence, issue 26 — see artefact_hooks.gd)
+var lottery_purchase_count := 0 # Pre-Scratched Lottery Ticket: Shop
+	# purchases made while held (issue 26) — read by Shop.price()
+var doomsday_snooze_used_this_wave := false # Doomsday Clock Snooze Button:
+	# this Wave's one +25s already spent, reset in WaveLogic.queue() (26)
 var dihydrogen_free_wave := -1 # Dihydrogen Monoxide Battery: wave its one free
 	# Tactical Item use already fired this Wave, -1 = not yet (artefact hook 19)
 var wardenclyffe_free_wave := -1 # same idea, Wardenclyffe AAA Batteries' any-tier version
@@ -478,6 +491,13 @@ func _process(delta: float) -> void:
 		var shop_pauses := shop_open() and next_rank == Tuning.RANKS[0]
 		if not game_menu_open and not win_open and not shop_pauses and not backgrounded:
 			clock_ms -= delta * 1000.0
+		# Doomsday Clock Snooze Button (issue 26): the Clock ticks here every
+		# frame, continuously — no discrete hook fires on a threshold cross,
+		# so this is a direct per-frame watch, same reasoning as _held above.
+		if clock_ms < 30000.0 and clock_ms > 0.0 and not doomsday_snooze_used_this_wave \
+				and _held("doomsday-clock-snooze-button"):
+			clock_ms += 25000.0
+			doomsday_snooze_used_this_wave = true
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
@@ -759,6 +779,31 @@ func _player_pieces() -> Array[Vector2i]:
 	return out
 
 
+## Structural "is this Artefact held" read, for the handful of standing rules
+## (issue 26: Nazca Boarding Pass, Nuclear Football Menu) that aren't a
+## triggered effect and so have no hook to dispatch on — same direct
+## g.artefacts read shop.gd already uses for chocolate-key-cake etc.
+func _held(key: String) -> bool:
+	for t in artefacts:
+		if t.key == key:
+			return true
+	return false
+
+
+## Nazca Boarding Pass (issue 26): Deploy legality opens to every empty tile
+## instead of Rules.placement_tiles' zone/touching-ally set. A standing rule,
+## not a hook — see _held above.
+func _deploy_tiles() -> Array[Vector2i]:
+	if _held("nazca-boarding-pass"):
+		var out: Array[Vector2i] = []
+		for x in Tuning.BOARD_W:
+			for y in Tuning.BOARD_H:
+				if not board.has(Vector2i(x, y)):
+					out.append(Vector2i(x, y))
+		return out
+	return Rules.placement_tiles(board)
+
+
 func _game_over(won: bool, reason: String) -> void:
 	state = State.GAME_OVER
 	ArtefactHooks.run(self, "on_game_over") # before record_score: e.g. Rapture
@@ -891,7 +936,7 @@ func _input(event: InputEvent) -> void:
 					"entry": target.get_meta("entry")})
 		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
-				else Rules.placement_tiles(board).has(t))
+				else _deploy_tiles().has(t))
 		if placeable and (state == State.SETUP
 				or (state == State.PLAYER_TURN and actions_left > 0)):
 			drawer_autoclosed = ""
@@ -1046,7 +1091,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			return MergeLogic.do_merge(self,
 				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, tile)
 		# captured stock deploys like stock (GDD Captured Stock, wired 2026-07-07)
-		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else Rules.placement_tiles(board).has(tile)
+		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else _deploy_tiles().has(tile)
 		if ok and not board.has(tile):
 			_place(armed_entry, tile, placing_cap)
 		return
@@ -1102,11 +1147,13 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 	placing_id = ""
 	placing_cap = false
 	if state == State.PLAYER_TURN:
-		ArtefactHooks.run(self, "on_deploy", {"pos": tile}) # MK-Ultra Sugar Cube (18)
-		actions_left -= 1
+		# MK-Ultra Sugar Cube (18); skip_action: Hitler's Argentinian Passport (26)
+		var deploy_ctx := ArtefactHooks.run(self, "on_deploy", {"pos": tile, "skip_action": false})
+		if not deploy_ctx.skip_action:
+			actions_left -= 1
 		turn_action_count += 1
 		Economy.charge(self, "deploy_cost")
-		gold = maxi(gold - Economy.deploy_cost(self), 0)
+		Economy.spend_gold(self, Economy.deploy_cost(self))
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -1522,7 +1569,10 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
 		else Vector2(hud.item_box.get_global_rect().get_center())
 	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
-	actions_left -= 1 # every item use is one of the turn's actions
+	# Nuclear Football Menu (issue 26): Items are free of their Action cost
+	# while the Clock is under 60s. Single call site, so no hook needed.
+	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
+		actions_left -= 1 # every item use is one of the turn's actions
 	turn_action_count += 1
 	match it.key:
 		"blitz": # lift the one-move-per-piece lock on the target (Notion 2026-08-27).
@@ -1631,14 +1681,16 @@ func _destroy(pos: Vector2i) -> void:
 ## Returns the dispatched ctx (artefact hook 24, was void — the other 4 call
 ## sites already ignored the return value): `cancel` is Fireproof Pajamas'
 ## veto (_destroy only), `destroy_attacker` is Hoffa's Cement Shoes' mutual-
-## destruction request (the enemy-move loop only). `lost_player` only counts
-## when the loss isn't cancelled.
+## destruction request (the enemy-move loop only). `lost_player` and
+## `wave_lost_ids` (issue 26: Jon Burrows' Fake ID / Walt's Cryonic Capsule,
+## read on_wave_clear) only count when the loss isn't cancelled.
 func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(-1, -1)) -> Dictionary:
 	var ctx := ArtefactHooks.run(self, "on_piece_lost",
 		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos,
 			"cancel": false, "destroy_attacker": false})
 	if not ctx.cancel:
 		lost_player += 1
+		wave_lost_ids.append(board[pos].id)
 	return ctx
 
 
@@ -1837,7 +1889,7 @@ func _draw() -> void:
 				"bent":
 					_draw_linked_dots(_tile_px(selected) + half, p.line, col)
 	if placing_id != "" or pool_drag_id != "":
-		var tiles := _setup_open_tiles() if state == State.SETUP else Rules.placement_tiles(board)
+		var tiles := _setup_open_tiles() if state == State.SETUP else _deploy_tiles()
 		for t in tiles:
 			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)

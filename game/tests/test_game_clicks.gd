@@ -202,6 +202,17 @@ func _init() -> void:
 		"in-game Sound toggle clickable")
 	await process_frame
 	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists")
+
+	# Animations toggle (06): live-applies to the running game, no restart —
+	# game.animations_on flips the instant the button is pressed
+	check(game.animations_on, "animations start on by default")
+	var anims_on: bool = Settings.load_settings().animations_on
+	check(await _click_button_in(game.game_menu, "Animations: %s" % ("On" if anims_on else "Reduced")),
+		"in-game Animations toggle clickable")
+	await process_frame
+	check(Settings.load_settings().animations_on != anims_on, "in-game Animations toggle persists")
+	check(not game.animations_on, "in-game Animations toggle applies live, no restart")
+
 	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable")
 	await process_frame
 

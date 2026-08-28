@@ -340,7 +340,7 @@
   ],
   "effect": "On your first Capture each Wave: double Score, but it pays no Gold",
   "conspiracy": "JFK assassination theories",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "obedience-flavored-tap-water",
@@ -1297,7 +1297,7 @@
   ],
   "effect": "Enemies destroyed by Items award their Score and Gold value (needs: destroy-score hook)",
   "conspiracy": "The missing trillions",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "pigeon-charging-cable",
@@ -2134,7 +2134,7 @@
   ],
   "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
   "conspiracy": "The Knights Templar",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "uap-breath-mint",

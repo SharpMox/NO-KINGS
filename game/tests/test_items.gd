@@ -2460,6 +2460,71 @@ func _init() -> void:
 	all_rarities.queue_free()
 	await process_frame
 
+	# --- issue 31: capture-context effects ---
+
+	# Curtain Rods Bag: first Capture each Wave doubles Score and pays no
+	# Gold; later Captures the same Wave are unaffected (pawn value 10)
+	var crb := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3], ["pawn", 1, 2, 4],
+		["rook", 1, 7, 10]], "wave": 3, "score": 0, "gold": 0,
+		"artefacts": ["curtain-rods-bag-rifle-shaped"]})
+	await process_frame
+	crb.actions_left = 5
+	crb._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this Wave
+	check(crb.score == 20 and crb.gold == 0,
+		"Curtain Rods Bag: first Capture each Wave doubles Score (10 -> 20) and pays no Gold")
+	crb._move_player(Vector2i(2, 3), Vector2i(2, 4)) # second Capture this Wave
+	check(crb.score == 30 and crb.gold == 10,
+		"Curtain Rods Bag: the second Capture the same Wave pays normally")
+	crb.queue_free()
+	await process_frame
+
+	# Templar Debit Card: pay Shop costs with Score, 10 Score per 1 Gold, for
+	# whatever Gold can't cover
+	var tdc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "score": 100, "gold": 5, "artefacts": ["templar-debit-card"]})
+	await process_frame
+	tdc.shop_stock.append({"kind": "piece", "key": "pawn", "sold": false}) # 10 Gold
+	check(Shop.can_buy(tdc, tdc.shop_stock[-1]),
+		"Templar Debit Card: Score covers what 5 Gold can't of a 10-Gold pawn")
+	Shop.buy(tdc, tdc.shop_stock.size() - 1)
+	check(tdc.gold == 0 and tdc.score == 50,
+		"Templar Debit Card: the Gold-uncovered remainder (5) debits as Score at 10:1 (-50)")
+	tdc.queue_free()
+	await process_frame
+
+	var tdc_no := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "score": 100, "gold": 5})
+	await process_frame
+	tdc_no.shop_stock.append({"kind": "piece", "key": "pawn", "sold": false})
+	check(not Shop.can_buy(tdc_no, tdc_no.shop_stock[-1]),
+		"without the card, Score alone can't cover a Gold shortfall")
+	tdc_no.queue_free()
+	await process_frame
+
+	# $2.3 Trillion Receipt: enemies destroyed by Items award their Score and
+	# Gold value; non-Item destruction (Bomb/Tariff) still pays nothing
+	var receipt := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4], ["pawn", 1, 5, 5],
+		["rook", 1, 7, 10]], "wave": 3, "score": 0, "gold": 0,
+		"artefacts": ["2-3-trillion-receipt"]})
+	await process_frame
+	receipt._destroy(Vector2i(4, 4), true) # Item-caused (Drone Strike/Air Strike/Sniper)
+	check(receipt.score == 10 and receipt.gold == 10,
+		"$2.3 Trillion Receipt: an enemy destroyed by an Item awards its Score and Gold value")
+	receipt._destroy(Vector2i(5, 5)) # not Item-caused (Bomb's _detonate / jd_vance Tariff path)
+	check(receipt.score == 10 and receipt.gold == 10,
+		"$2.3 Trillion Receipt: non-Item destruction still pays nothing (Destruction default)")
+	receipt.queue_free()
+	await process_frame
+
+	var no_receipt := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4], ["rook", 1, 7, 10]],
+		"wave": 3, "score": 0, "gold": 0})
+	await process_frame
+	no_receipt._destroy(Vector2i(4, 4), true)
+	check(no_receipt.score == 0 and no_receipt.gold == 0,
+		"without the artefact, an Item-destroyed enemy still pays nothing")
+	no_receipt.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

@@ -117,6 +117,10 @@ var dihydrogen_free_wave := -1 # Dihydrogen Monoxide Battery: wave its one free
 var wardenclyffe_free_wave := -1 # same idea, Wardenclyffe AAA Batteries' any-tier version
 var item_use_tactical_count := 0 # 33rd Degree Fidelity Card's per-tier use counters
 var item_use_strategic_count := 0
+var mrna_apply_count := 0 # mRNA Firmware Update: Piece Buffs applied to your
+	# pieces so far — every 3rd also Ranks Up (artefact hook 23)
+var youth_fountain_wave := -1 # Youth Fountain Martini: wave its one free
+	# buff-consume re-apply already fired this Wave, -1 = not yet (hook 23)
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -586,19 +590,26 @@ func _run_enemy_actions() -> void:
 			# Shield works against the AI too: the attempt is spent, nothing
 			# moves. Reflect kills the attacker and takes its tile.
 			if BuffLogic.reflects_capture(board[act.to]):
-				BuffLogic.consume(board[act.to], "reflect")
+				_consume_buff(act.to, "reflect")
 				_add_float(act.from, "Reflected!", COL_CAPTURE)
 				lost_enemy += 1
 				_add_pop(act.from)
 				board[act.from] = board[act.to]
 				board.erase(act.to)
 			else:
-				BuffLogic.consume(board[act.to], "shield")
+				_consume_buff(act.to, "shield")
 				_add_float(act.to, "Blocked", COL_MERGE)
 			queue_redraw()
 			continue
 		if board.has(act.to) and (BuffLogic.has(board[act.to], "bomb")
 				or BuffLogic.has(board[act.from], "bomb")):
+			# Consumed before either piece is erased, purely so Cleopatra's
+			# Hairpin / Guidestone Blood Ritual see the trigger — both
+			# pieces are gone either way.
+			if BuffLogic.has(board[act.to], "bomb"):
+				_consume_buff(act.to, "bomb")
+			if BuffLogic.has(board[act.from], "bomb"):
+				_consume_buff(act.from, "bomb")
 			board.erase(act.to)
 			board[act.to] = board[act.from]
 			board.erase(act.from)
@@ -607,6 +618,7 @@ func _run_enemy_actions() -> void:
 			continue
 		if board.has(act.to) and BuffLogic.has(board[act.to], "trap"):
 			# Trap takes the attacker with it — neither piece survives
+			_consume_buff(act.to, "trap") # same reasoning as bomb above
 			_add_float(act.from, "Trapped!", COL_CAPTURE)
 			_lose_player_piece(act.to, "trap")
 			lost_enemy += 1
@@ -1120,14 +1132,14 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# tile and nothing is captured. The attempt still costs the action.
 		# Reflect goes further — the defender takes the attacker's tile.
 		if BuffLogic.reflects_capture(board[to]):
-			BuffLogic.consume(board[to], "reflect")
+			_consume_buff(to, "reflect")
 			_add_float(from, "Reflected!", COL_CAPTURE)
 			_lose_player_piece(from, "reflect")
 			_add_pop(from)
 			board[from] = board[to] # the defender counter-attacks into the tile
 			board.erase(to)
 		else:
-			BuffLogic.consume(board[to], "shield")
+			_consume_buff(to, "shield")
 			_add_float(to, "Blocked", COL_MERGE)
 		Economy.charge(self, "move_cost")
 		actions_left -= 1
@@ -1148,17 +1160,18 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		return_to_start = last_capture_ctx.get("return_to_start", false)
 		move_to_backrow = last_capture_ctx.get("move_to_backrow", false)
 		if BuffLogic.has(board[from], "critical"):
-			BuffLogic.consume(board[from], "critical")
+			_consume_buff(from, "critical")
 			_add_float(to, "Critical!", COL_MERGE)
 		# Range is spent by the capture, not by repositioning
-		BuffLogic.consume(board[from], "range")
+		if BuffLogic.has(board[from], "range"):
+			_consume_buff(from, "range")
 		if BuffLogic.has(victim, "stun"): # cuts both ways
 			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
 			_add_float(from, "Stunned!", COL_MERGE)
 		if BuffLogic.has(board[from], "multicapture"):
 			# one extra enemy beside the piece just taken (ruled 2026-08-28)
 			var also := BuffLogic.multicapture_target(board, to, Rules.PLAYER, defs)
-			BuffLogic.consume(board[from], "multicapture")
+			_consume_buff(from, "multicapture")
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
@@ -1174,6 +1187,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			# Precedence ruled 2026-08-28: Reflect > Bomb > Trap. Reflect
 			# resolved above (the capture never lands); the blast takes the
 			# attacker anyway, so Trap has nothing left to do.
+			# Consumed before either piece is erased, purely so Cleopatra's
+			# Hairpin / Guidestone Blood Ritual see the trigger.
+			if BuffLogic.has(victim, "bomb"):
+				_consume_buff(to, "bomb")
+			if BuffLogic.has(board[from], "bomb"):
+				_consume_buff(from, "bomb")
 			captured.append(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
@@ -1185,6 +1204,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				return _on_pass()
 			return _refresh()
 		if BuffLogic.has(victim, "trap"): # the attacker goes with it
+			_consume_buff(to, "trap") # same reasoning as bomb above
 			_add_float(from, "Trapped!", COL_CAPTURE)
 			_lose_player_piece(from, "trap")
 			_add_pop(from)
@@ -1394,11 +1414,16 @@ func _item_reset() -> void:
 
 
 ## Buff Box stage 0: 3 random Piece Buffs, pick one, then target a piece.
-## The clock keeps ticking through both (GDD Box Pick).
+## The clock keeps ticking through both (GDD Box Pick). Numbers Station
+## Sudoku (+1 choice) / Bohemian Grove Friendship Bracelet (+2) are a plain
+## UI change here (issue 23), not a REGISTRY hook — additive per held copy,
+## same convention artefact_hooks.gd documents for its own stacking.
 func _open_buff_pick() -> void:
+	var offer_size := 3 + _artefact_count("numbers-station-sudoku") \
+		+ 2 * _artefact_count("bohemian-grove-friendship-bracelet")
 	var pool: Array = Items.PIECE_BUFFS.duplicate()
 	var offer := []
-	for i in mini(3, pool.size()):
+	for i in mini(offer_size, pool.size()):
 		offer.append(pool.pop_at(rng.randi() % pool.size()))
 	if autoplay: # bot: take one so the flow is exercised, never stall
 		return _buff_chosen(offer[rng.randi() % offer.size()].key)
@@ -1418,6 +1443,7 @@ func _buff_chosen(key: String) -> void:
 	buff_pick_open = false
 	modals.hide_buff_pick()
 	pending_buff = key
+	gold = maxi(gold - 5 * _artefact_count("numbers-station-sudoku"), 0) # "each pick costs 5 Gold"
 	var it: Dictionary = items[item_active]
 	item_stage_a = Vector2i(-1, -1)
 	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
@@ -1517,13 +1543,22 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 						_destroy(hit)
 		"radar_jamming": # strips the box-carrier flag AND any piece buffs
 			board[b].erase("buff")
-			BuffLogic.clear(board[b])
+			# Antikythera Warranty Card: "Piece Buffs cannot be removed by
+			# Tariffs or enemy effects" — the box-carrier flag isn't a Piece
+			# Buff (buff_logic.gd header), so only BuffLogic.clear is gated.
+			if not ArtefactHooks.run(self, "on_buff_removal", {"pos": b, "blocked": false}).blocked:
+				BuffLogic.clear(board[b])
 		"buff_box":
-			BuffLogic.add(board[b], _buff_pick, _buff_turns(_buff_pick))
+			_apply_buff(board[b], _buff_pick, _buff_turns(_buff_pick), b)
 			_add_float(b, BuffLogic.name_of(_buff_pick), COL_MERGE)
 			_buff_pick = ""
 		"demote":
-			board[b].id = ItemLogic.chain_base(defs, board[b].id)
+			# Atlantis Snow Globe / Antikythera Warranty Card: "your pieces
+			# cannot be Demoted".
+			if not ArtefactHooks.run(self, "on_demote", {"pos": b, "blocked": false}).blocked:
+				var old_id: String = board[b].id
+				board[b].id = ItemLogic.chain_base(defs, board[b].id)
+				ArtefactHooks.run(self, "on_piece_demoted", {"pos": b, "old_id": old_id, "id": board[b].id})
 		"promote":
 			var old_id: String = board[b].id
 			board[b].id = defs[board[b].id].next
@@ -1609,6 +1644,42 @@ func _consume_item(index: int, it: Dictionary) -> void:
 		{"key": it.key, "tier": it.get("tier", ""), "last": items.size() == 1, "cancel": false})
 	if not ctx.cancel:
 		items.remove_at(index)
+
+
+## Single choke point for granting a Piece Buff (artefact hook 23) — was
+## BuffLogic.add called straight from game.gd's buff_box apply and half a
+## dozen artefact grants in artefact_hooks.gd. Fires on_buff_apply AFTER the
+## buff lands (Pied Piper's Rat Census, mRNA Firmware Update). `pos` is
+## Vector2i(-1,-1) for a grant onto a piece not on the board (Stock — Holy
+## Grail Coaster's stock-index branch); those handlers just no-op on pos.x<0.
+## `fire_hook` is false for Pied Piper's own copy so a copy can never itself
+## trigger another copy (would ping-pong between two adjacent allies).
+## Debuffs riding the same buffs list (`stunned`) are NOT Piece Buffs and
+## call BuffLogic.add directly — they must never reach this choke point.
+func _apply_buff(piece: Dictionary, key: String, turns: int,
+		pos := Vector2i(-1, -1), fire_hook := true) -> void:
+	BuffLogic.add(piece, key, turns)
+	if fire_hook:
+		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
+
+
+## Single choke point for a Piece Buff resolving off the board (artefact hook
+## 23) — was 5 scattered BuffLogic.consume call sites (Reflect/Shield x2,
+## Critical, Range, Multicapture) plus 2 new ones added alongside this hook
+## (Bomb, Trap — previously the carrying piece was just erased with no
+## explicit consume, so Cleopatra's Hairpin/Guidestone Blood Ritual never saw
+## those triggers). Fires on_buff_consume AFTER removal — no artefact needs
+## to veto a buff resolving, so unlike on_item_consume there is no ctx.cancel.
+func _consume_buff(pos: Vector2i, key: String) -> void:
+	BuffLogic.consume(board[pos], key)
+	ArtefactHooks.run(self, "on_buff_consume", {"pos": pos, "key": key})
+
+
+## Held copies of one artefact key — Numbers Station Sudoku / Bohemian Grove
+## Friendship Bracelet's Buff Box choice-count is a plain UI change
+## (_open_buff_pick), not a REGISTRY hook (issue 23), so it just counts here.
+func _artefact_count(key: String) -> int:
+	return artefacts.filter(func(a: Dictionary) -> bool: return a.key == key).size()
 
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---

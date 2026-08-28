@@ -253,6 +253,66 @@
 ## sites), Alien Pet Rocks (a new `moved_this_wave` set threaded through
 ## every move/place site), Curtain Rods Bag (the same ctx-survives-earn()
 ## gap issue 26 is scoped to close).
+##
+## issue 23 (Buff lifecycle, split out of 19) added the Piece-Buff-side
+## choke points 19 had already done for Item/piece-lost/rank-up:
+## - on_buff_apply fires from game.gd's new `_apply_buff(piece, key, turns,
+##   pos, fire_hook)` — was BuffLogic.add called straight from the buff_box
+##   Item apply and half a dozen artefact grants in this file (_grant_buff_to
+##   now takes `g` and routes through it too). ctx = {piece, key, turns,
+##   pos}; `pos` is Vector2i(-1,-1) for a grant onto a piece not on the board
+##   (Stock — Holy Grail Coaster's stock-index branch, Sleeper Agent
+##   Pillow). AFTER the buff lands, not before — nothing needs to veto a
+##   grant. `stunned` (the debuff Stun leaves on whoever triggers it) rides
+##   the same `buffs` list but is NOT a catalogued Piece Buff (Items.
+##   PIECE_BUFFS has no entry for it — see buff_logic.gd's own header on the
+##   "buff"/"Buff" naming collision) and its 2 call sites still call
+##   BuffLogic.add directly, deliberately bypassing this hook. `fire_hook` is
+##   false for Pied Piper's Rat Census's own copy — otherwise two adjacent
+##   allies both holding it would ping-pong the copy back and forth forever.
+## - on_buff_consume fires from game.gd's new `_consume_buff(pos, key)` —
+##   was 5 scattered BuffLogic.consume call sites (Reflect/Shield x2,
+##   Critical, Range, Multicapture) plus 2 new ones added alongside this
+##   hook: Bomb and Trap previously just erased the carrying piece with no
+##   explicit consume() call (moot for BuffLogic's own state, since the
+##   piece is discarded either way) — now consumed first, purely so
+##   Cleopatra's Hairpin/Guidestone Blood Ritual see those two triggers.
+##   Fires AFTER removal (no veto needed); ctx = {pos, key}. `_buff_tier(key)`
+##   is Cleopatra's Decisive-only scope; `_nearest_ally`/`_adjacent_ally` are
+##   the two different "closest ally" reads KGB Photo Eraser (transfer, any
+##   distance) and Pied Piper (adjacent only) each need.
+## - on_demote / on_piece_demoted both fire from game.gd's "demote" Item
+##   case — the gate BEFORE the mutation (ctx = {pos, blocked}, Atlantis Snow
+##   Globe / Antikythera Warranty Card set `blocked` for their own pieces)
+##   and the event AFTER a demotion that wasn't blocked (ctx = {pos, old_id,
+##   id}, mirrors on_rank_up's shape). Guidestone Blood Ritual is the only
+##   on_piece_demoted listener — unlike Dark Market Light Bulb's still-open
+##   "Demoted pieces give no Score" ask above (a PERSISTENT is-this-piece-
+##   demoted flag, which genuinely doesn't exist), "whenever a piece IS
+##   demoted" is a one-shot event with nothing to persist, so it isn't
+##   blocked by that same gap.
+## - on_buff_removal fires from game.gd's "radar_jamming" Item case, gating
+##   only the BuffLogic.clear half (the box-carrier `buff` flag it also
+##   strips isn't a Piece Buff — buff_logic.gd's header again). Antikythera
+##   Warranty Card is its only listener. No Tariff or other enemy effect
+##   currently removes a Piece Buff, so this clause is vacuously satisfied
+##   everywhere else today; the hook exists for the one mechanism named in
+##   the effect text and the GDD's own "Sanctions/radar_jamming/demote" list.
+## - Numbers Station Sudoku / Bohemian Grove Friendship Bracelet (Buff Box
+##   +1/+2 choices, the former at +5 Gold/pick) are a plain UI change in
+##   game.gd's `_open_buff_pick`/`_buff_chosen` (`_artefact_count(key)`), not
+##   a REGISTRY hook — issue 18's own held-back note already called this one
+##   out as "not a hook at all", so it stays off this file's choke points
+##   entirely, additive per held copy same as everything else here.
+## - Abduction Probe ("pieces can carry 2 Piece Buffs at once") stays
+##   unimplemented after the audit the issue asked for: BuffLogic.add already
+##   appends to a plain Array with no 1-buff cap anywhere — not in BuffLogic,
+##   not in buff_box's Item targeting, not in any artefact grant — so a
+##   second Piece Buff already lands today, artefact or not. There is no
+##   existing cap to lift from 1 to 2, so "implementing" this artefact would
+##   mean introducing a brand-new base-game restriction (default 1, this
+##   artefact raises it to 2) that nothing today asks for — a design
+##   decision, not a wiring job. Notion question, not a guess.
 
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
@@ -269,6 +329,8 @@ const HOOKS := [
 	# --- issue 13: tariff-only trigger points (see header) ---
 	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
+	# --- issue 23: Piece Buff lifecycle choke points (see header) ---
+	"on_buff_apply", "on_buff_consume", "on_demote", "on_piece_demoted", "on_buff_removal",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -418,6 +480,18 @@ const REGISTRY := {
 	"royal-fiat-undamaged": ["on_capture"],
 	"fireproof-pajamas": ["on_piece_lost"],
 	"hoffa-s-cement-shoes": ["on_wave_clear", "on_piece_lost"],
+
+	# --- issue 23: Piece Buff lifecycle (game.gd _apply_buff/_consume_buff) ---
+	"amityville-ouija-board": ["on_buff_consume"],
+	"cleopatra-s-hairpin": ["on_buff_consume"],
+	"guidestone-blood-ritual": ["on_buff_consume", "on_piece_demoted"],
+	"kgb-photo-eraser": ["on_piece_lost"],
+	"pied-piper-s-rat-census": ["on_buff_apply"],
+	"mrna-firmware-update": ["on_buff_apply"],
+	"youth-fountain-martini": ["on_buff_consume"],
+	"45-5-carat-curse": ["on_gold_change", "on_score_change", "on_wave_clear"],
+	"antikythera-warranty-card": ["on_demote", "on_buff_removal"],
+	"atlantis-snow-globe": ["on_demote"],
 }
 
 
@@ -462,6 +536,35 @@ static func _player_positions(g) -> Array:
 	return out
 
 
+## Nearest OTHER ally to `pos` by straight-line distance (KGB Photo Eraser's
+## buff-transfer target) — ties broken by board iteration order, no RNG
+## needed. Vector2i(-1,-1) when `pos` has no ally left to transfer to.
+static func _nearest_ally(g, pos: Vector2i) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_dist := -1
+	for p in _player_positions(g):
+		if p == pos:
+			continue
+		var d: int = (p - pos).length_squared()
+		if best_dist < 0 or d < best_dist:
+			best_dist = d
+			best = p
+	return best
+
+
+## First ally in one of the 8 tiles adjacent to `pos` (Pied Piper's Rat
+## Census's buff-copy target). Vector2i(-1,-1) when none.
+static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var at := pos + Vector2i(dx, dy)
+			if g.board.has(at) and g.board[at].owner == Rules.PLAYER:
+				return at
+	return Vector2i(-1, -1)
+
+
 ## A uniformly random Piece Buff key, optionally restricted to one tier
 ## ("Tactical Piece Buff" in several issue-18 effect texts).
 static func _random_buff_key(rng: RandomNumberGenerator, tier := "") -> String:
@@ -480,16 +583,29 @@ static func _buff_turns(key: String) -> int:
 	return 0
 
 
+## The catalogued tier of a Piece Buff key (Cleopatra's Hairpin: "Decisive
+## Piece Buffs" only — Trap, Reflect, Bomb).
+static func _buff_tier(key: String) -> String:
+	for b in Items.PIECE_BUFFS:
+		if b.key == key:
+			return b.tier
+	return ""
+
+
 ## Grant one random Piece Buff to a live Dictionary — a board piece
 ## (BuffLogic.add takes any Dictionary with a `buffs` field) or a freshly
-## built {"id": ...} piece not yet placed (Sleeper Agent Pillow).
-static func _grant_buff_to(piece: Dictionary, rng: RandomNumberGenerator, tier := "") -> void:
-	var key := _random_buff_key(rng, tier)
-	BuffLogic.add(piece, key, _buff_turns(key))
+## built {"id": ...} piece not yet placed (Sleeper Agent Pillow). Routes
+## through g._apply_buff (issue 23's choke point) so on_buff_apply (Pied
+## Piper's Rat Census, mRNA Firmware Update) sees every artefact grant too.
+## `pos` is Vector2i(-1,-1) for the off-board Stock case — those handlers
+## just no-op on pos.x < 0.
+static func _grant_buff_to(g, piece: Dictionary, tier := "", pos := Vector2i(-1, -1)) -> void:
+	var key := _random_buff_key(g.rng, tier)
+	g._apply_buff(piece, key, _buff_turns(key), pos)
 
 
 static func _grant_buff(g, pos: Vector2i, tier := "") -> void:
-	_grant_buff_to(g.board[pos], g.rng, tier)
+	_grant_buff_to(g, g.board[pos], tier, pos)
 
 
 ## "Ranked" (issue 19): a piece that has been promoted at least once, i.e. it
@@ -779,7 +895,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			# branch already merges any extra fields onto the board piece.
 			if ctx.kind == "piece" and not g.stock.is_empty():
 				var piece := {"id": ctx.key}
-				_grant_buff_to(piece, g.rng, "Tactical")
+				_grant_buff_to(g, piece, "Tactical")
 				g.stock[g.stock.size() - 1] = piece
 
 		# --- issue 18: Item-tag triggers ---
@@ -865,7 +981,19 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 				g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
 		["tutankhamun-s-death-thong", "on_piece_lost"]:
 			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0:
-				BuffLogic.add(g.board[ctx.attacker_pos], "slow", _buff_turns("slow"))
+				g._apply_buff(g.board[ctx.attacker_pos], "slow", _buff_turns("slow"), ctx.attacker_pos)
+		["kgb-photo-eraser", "on_piece_lost"]:
+			# Fires before the board entry is erased (header), so the lost
+			# piece's own Buffs are still readable. Each one transfers with
+			# its remaining life intact — not re-rolled — to the nearest ally.
+			# ctx.cancel (issue 24, Fireproof Pajamas) means the piece is NOT
+			# actually lost — skip the transfer or it'd duplicate the Buff.
+			var lost_buffs: Array = BuffLogic.of(g.board[ctx.pos])
+			if not ctx.cancel and not lost_buffs.is_empty():
+				var ally := _nearest_ally(g, ctx.pos)
+				if ally.x >= 0:
+					for b in lost_buffs:
+						g._apply_buff(g.board[ally], b.key, int(b.get("turns", 0)), ally)
 
 		# --- issue 19: on_item_consume (game.gd _consume_item) ---
 		["arms-fair-goodie-bag", "on_item_consume"]:
@@ -911,7 +1039,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 				# which a same-call handler appending its own grant (Bigfoot
 				# Toenail Clipping) would otherwise shift out from under this
 				var piece := {"id": g.stock[ctx.stock_index]} # (Sleeper Agent
-				_grant_buff_to(piece, g.rng)                  # Pillow's pattern)
+				_grant_buff_to(g, piece)                      # Pillow's pattern)
 				g.stock[ctx.stock_index] = piece
 		["bigfoot-toenail-clipping", "on_rank_up"]:
 			g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
@@ -960,7 +1088,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 						or g.defs[g.board[pos].id].value > g.defs[g.board[strongest].id].value):
 					strongest = pos
 			if strongest.x >= 0:
-				BuffLogic.add(g.board[strongest], "slow", _buff_turns("slow"))
+				g._apply_buff(g.board[strongest], "slow", _buff_turns("slow"), strongest)
 
 		# --- issue 19: cheap follow-ups (named in issue 16/17's Outcome) ---
 		["casino-invisible-clock", "on_purchase"]:
@@ -1007,3 +1135,59 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0 and not g.hoffa_used_this_wave:
 				g.hoffa_used_this_wave = true
 				ctx.destroy_attacker = true
+
+		# --- issue 23: on_buff_consume (game.gd _consume_buff) ---
+		["amityville-ouija-board", "on_buff_consume"]:
+			if g.board[ctx.pos].owner == Rules.PLAYER:
+				g.gold += 10
+		["cleopatra-s-hairpin", "on_buff_consume"]:
+			if g.board[ctx.pos].owner == Rules.PLAYER and _buff_tier(ctx.key) == "Decisive":
+				g.gold += 100
+		["guidestone-blood-ritual", "on_buff_consume"]:
+			g.gold += 25 # owner-agnostic — ally or enemy, any tier
+		["guidestone-blood-ritual", "on_piece_demoted"]:
+			g.gold += 25 # owner-agnostic — ally or enemy
+		["youth-fountain-martini", "on_buff_consume"]:
+			if g.youth_fountain_wave != g.wave:
+				g.youth_fountain_wave = g.wave
+				g._apply_buff(g.board[ctx.pos], ctx.key, _buff_turns(ctx.key), ctx.pos)
+
+		# --- issue 23: on_buff_apply (game.gd _apply_buff) ---
+		["pied-piper-s-rat-census", "on_buff_apply"]:
+			# fire_hook=false on the copy itself — otherwise two adjacent
+			# allies holding this artefact would ping-pong the copy forever.
+			if ctx.pos.x >= 0 and g.board[ctx.pos].owner == Rules.PLAYER:
+				var ally := _adjacent_ally(g, ctx.pos)
+				if ally.x >= 0:
+					g._apply_buff(g.board[ally], ctx.key, ctx.turns, ally, false)
+		["mrna-firmware-update", "on_buff_apply"]:
+			if ctx.pos.x >= 0 and g.board[ctx.pos].owner == Rules.PLAYER:
+				g.mrna_apply_count += 1
+				if g.mrna_apply_count % 3 == 0:
+					var old_id: String = g.board[ctx.pos].id
+					var next_id = g.defs[old_id].next
+					if next_id != null:
+						g.board[ctx.pos].id = next_id
+						run(g, "on_rank_up",
+							{"pos": ctx.pos, "old_id": old_id, "id": next_id, "stock_index": -1})
+
+		# --- issue 23: demotion/buff-removal immunity (game.gd "demote"/"radar_jamming") ---
+		["antikythera-warranty-card", "on_demote"]:
+			if g.board[ctx.pos].owner == Rules.PLAYER:
+				ctx.blocked = true
+		["antikythera-warranty-card", "on_buff_removal"]:
+			if g.board[ctx.pos].owner == Rules.PLAYER:
+				ctx.blocked = true
+		["atlantis-snow-globe", "on_demote"]:
+			if g.board[ctx.pos].owner == Rules.PLAYER:
+				ctx.blocked = true
+
+		# --- issue 23: payout half cheap, strip half needs no new hook ---
+		["45-5-carat-curse", "on_gold_change"]:
+			ctx.amount += ctx.base * 0.45
+		["45-5-carat-curse", "on_score_change"]:
+			ctx.amount += ctx.base * 0.45
+		["45-5-carat-curse", "on_wave_clear"]:
+			if g.wave % 3 == 0:
+				for pos in g._player_pieces():
+					BuffLogic.clear(g.board[pos])

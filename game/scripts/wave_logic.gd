@@ -53,10 +53,11 @@ static func queue(g, n: int) -> void:
 			entry.buff = true
 			buff_id = ""
 		g.pending_spawn.append(entry)
-	if n == 2:
-		Economy.activate_tariff_by_key(g, "inflation") # T0, GDD: fires after wave 1
-	elif Tariffs.SCHEDULE.has(n):
-		Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
+	if Tuning.TARIFFS_SCHEDULED: # off for now — see Tuning.TARIFFS_SCHEDULED
+		if n == 2:
+			Economy.activate_tariff_by_key(g, "inflation") # T0, GDD: fires after wave 1
+		elif Tariffs.SCHEDULE.has(n):
+			Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
 		var ctx := ArtefactHooks.run(g, "on_milestone", {"refill": Tuning.CLOCK_REFILL_MS})
 		g.clock_ms += ctx.refill # Recession (issue 13) halves this via the same hook

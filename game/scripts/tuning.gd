@@ -10,6 +10,15 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # move/capture, place, merge/fuse, item use
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
+## Automatic tariff scheduling — OFF for now (user call 2026-08-28), pending
+## the combined Kings + Tariffs design pass. This ONLY stops the every-10-waves
+## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and
+## testable: the catalog, the hooks slice 13 migrated onto ArtefactHooks, the
+## tariff-intercepting artefacts, and direct activation via a scenario/save
+## config or Economy.activate_tariff all behave exactly as before. Flip this
+## back to true to restore the cadence — nothing else needs touching.
+const TARIFFS_SCHEDULED := false
+
 const STUN_MISSES := 2            # Stun: turns the attacker loses, its own
                                    # side's turns (user call 2026-08-28)
 const ENEMY_ACTIONS_PER_TURN := 1  # playtest override, re-justified 2026-08-28 (Issue 11,

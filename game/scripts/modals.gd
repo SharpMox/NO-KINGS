@@ -32,8 +32,9 @@ var preview_panel := PanelContainer.new() # long-press piece preview
 var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
-var shop_panel: PanelContainer # the Shop overlay (money-and-shop/04)
-var shop_scroll: ScrollContainer # exposed so probes can scroll rows into view
+var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
+var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
+const SHOP_TILE := 46.0 # matches the pool-strip icon size (hud.gd) for visual rhythm
 var tariff_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # Buff Box sub-pick (3 Piece Buffs)
 
@@ -247,79 +248,248 @@ func show_preview(id: String) -> void:
 	box.add_child(close)
 
 
-## The Shop overlay: the 19 rolled slots as a scrollable list — lootboxes,
-## artefacts, items, then base pieces (the user-specified row order). Buy rows
-## emit an index; game.gd buys and reopens for fresh SOLD/affordability state.
+## The Shop drawer: docked at the right edge, covering ~90% of the screen
+## (a sliver of board stays visible on the left, reading as a drawer rather
+## than the old full-screen modal). No entrance animation — this codebase has
+## no Control-tween precedent, a tween buys nothing acceptance criteria test
+## for, and it made click probes racy against the panel's in-flight position;
+## simplest is the instant show every other panel here already uses.
+## Never scrolls — every slot in g.shop_stock renders as an icon tile with a
+## price badge, grouped into four fixed zones (PIECES full-width top band;
+## ARTEFACTS/ITEMS stacked lower-left; BOXES lower-right, full height) so the
+## grid geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
+## Tapping a tile expands the fixed-height detail dock at the bottom with its
+## name, effect text and Buy; buy rows emit an index and game.gd reopens for
+## fresh SOLD/affordability state.
 func show_shop() -> void:
+	var was_open := shop_panel != null and shop_panel.visible
 	if shop_panel:
 		shop_panel.queue_free()
-	shop_panel = PanelContainer.new()
-	shop_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	if not was_open:
+		shop_expanded_index = -1 # fresh open always starts collapsed
+
+	var vp: Vector2 = g.get_viewport_rect().size
+	var draw_w := roundi(vp.x * 0.9) # "~90% of the screen up to full"
+	shop_panel = Panel.new()
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
+	bg.bg_color = Color(0.08, 0.08, 0.1, 0.97)
 	shop_panel.add_theme_stylebox_override("panel", bg)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	shop_panel.add_child(box)
+	shop_panel.position = Vector2(vp.x - draw_w, 0)
+	shop_panel.size = Vector2(draw_w, vp.y)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	for side in ["left", "top", "right", "bottom"]:
+		margin.add_theme_constant_override("margin_%s" % side, 10)
+	shop_panel.add_child(margin)
+	var root := VBoxContainer.new()
+	root.add_theme_constant_override("separation", 8)
+	margin.add_child(root)
+
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "SHOP"
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
+	title.add_theme_font_size_override("font_size", 22)
+	header.add_child(title)
 	var sub := Label.new()
-	sub.text = "$%d held — a purchase costs its price + 1 action" % g.gold
-	sub.add_theme_font_size_override("font_size", 14)
-	sub.modulate = Color(1, 1, 1, 0.8)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
-	shop_scroll = ScrollContainer.new()
-	shop_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(shop_scroll)
-	var rows := VBoxContainer.new()
-	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rows.add_theme_constant_override("separation", 6)
-	shop_scroll.add_child(rows)
-	for i in g.shop_stock.size():
-		var slot: Dictionary = g.shop_stock[i]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		var slot_tex: Texture2D = g.piece_tex(slot.key) if slot.kind == "piece" \
-				and g.textures.has(slot.key) \
-			else g.item_icons.get(slot.key) if slot.kind == "item" else null
-		if slot_tex != null:
-			var tex := TextureRect.new()
-			tex.texture = slot_tex
-			tex.custom_minimum_size = Vector2(30, 30)
-			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(tex)
-		var what := Label.new()
-		what.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
-		what.add_theme_font_size_override("font_size", 16)
-		what.custom_minimum_size = Vector2(230, 0)
-		if slot.kind == "item" or slot.kind == "artefact":
-			what.tooltip_text = Shop.description(slot)
-			what.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
-		row.add_child(what)
-		var buy := Button.new()
-		buy.text = "SOLD" if slot.sold else "Buy"
-		buy.disabled = not Shop.can_buy(g, slot)
-		buy.add_theme_font_size_override("font_size", 16)
-		buy.pressed.connect(func() -> void: shop_buy_pressed.emit(i))
-		row.add_child(buy)
-		if slot.sold:
-			row.modulate = Color(1, 1, 1, 0.4)
-		rows.add_child(row)
+	sub.text = "$%d — price + 1 action" % g.gold
+	sub.add_theme_font_size_override("font_size", 12)
+	sub.modulate = Color(1, 1, 1, 0.75)
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(sub)
 	var close := Button.new()
 	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
+	close.add_theme_font_size_override("font_size", 14)
 	close.pressed.connect(func() -> void:
 		shop_panel.visible = false
 		shop_closed.emit())
-	box.add_child(close)
+	header.add_child(close)
+	root.add_child(header)
+
+	var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
+	for i in g.shop_stock.size():
+		by_kind[g.shop_stock[i].kind].append(i)
+
+	var pieces_band := VBoxContainer.new()
+	pieces_band.add_theme_constant_override("separation", 4)
+	pieces_band.add_child(_shop_zone_label("PIECES"))
+	var pieces_row := HBoxContainer.new()
+	pieces_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	pieces_row.add_theme_constant_override("separation", 4)
+	for i in by_kind.piece:
+		pieces_row.add_child(_shop_tile(i))
+	pieces_band.add_child(pieces_row)
+	root.add_child(pieces_band)
+
+	var lower := HBoxContainer.new()
+	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower.add_theme_constant_override("separation", 8)
+	root.add_child(lower)
+	var left_col := VBoxContainer.new()
+	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_col.size_flags_stretch_ratio = 1.15
+	lower.add_child(left_col)
+	left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact))
+	left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item))
+	var right_col := VBoxContainer.new()
+	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_col.size_flags_stretch_ratio = 0.85
+	lower.add_child(right_col)
+	right_col.add_child(_shop_sub_zone("BOXES", by_kind.box))
+
+	var dock := PanelContainer.new()
+	dock.custom_minimum_size = Vector2(0, 92)
+	var dock_bg := StyleBoxFlat.new()
+	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
+	dock.add_theme_stylebox_override("panel", dock_bg)
+	if shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
+		dock.add_child(_shop_detail(shop_expanded_index))
+	else:
+		var hint := Label.new()
+		hint.text = "Tap a tile for details"
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		hint.modulate = Color(1, 1, 1, 0.5)
+		hint.add_theme_font_size_override("font_size", 13)
+		dock.add_child(hint)
+	root.add_child(dock)
+
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
+
+
+func _shop_zone_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 12)
+	l.modulate = Color(1, 1, 1, 0.6)
+	return l
+
+
+## A labeled, centered grid of tiles that expands to fill its share of the
+## lower block's height — this is what gives ARTEFACTS/ITEMS their upper/lower
+## halves and BOXES the full height of the lower-right (money-and-shop/04
+## kept the logic; shop-drawer-ui/08 is only the geometry).
+func _shop_sub_zone(title_text: String, indices: Array) -> VBoxContainer:
+	var wrap := VBoxContainer.new()
+	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrap.add_theme_constant_override("separation", 4)
+	wrap.add_child(_shop_zone_label(title_text))
+	var center := CenterContainer.new()
+	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	for i in indices:
+		grid.add_child(_shop_tile(i))
+	center.add_child(grid)
+	wrap.add_child(center)
+	return wrap
+
+
+## Icon or price-badge glyph for a slot — a Texture2D when painted art exists,
+## otherwise a fallback character (mirrors hud.gd's pool-strip glyph fallback
+## and show_box's per-kind glyphs, so the vocabulary matches across the app).
+func _shop_icon(slot: Dictionary) -> Variant:
+	match slot.kind:
+		"piece":
+			return g.piece_tex(slot.key) if g.textures.has(slot.key) else g.defs[slot.key].glyph
+		"item":
+			return g.item_icons[slot.key] if g.item_icons.has(slot.key) else "✦"
+		"artefact":
+			return "◈"
+		_: # box — glyph by the box's typed contents
+			return {"item": "⚔", "artefact": "◈", "score": "★"}.get(slot.key, "📦")
+
+
+## One icon tile with a price badge; sold tiles grey out but keep their slot
+## meta.shop_index (index into g.shop_stock) exists for the click probes.
+func _shop_tile(index: int) -> Button:
+	var slot: Dictionary = g.shop_stock[index]
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(SHOP_TILE, SHOP_TILE)
+	btn.clip_text = true # multi-char glyph fallbacks ("vRg") must never grow the tile
+	btn.set_meta("shop_index", index)
+	var icon: Variant = _shop_icon(slot)
+	if icon is Texture2D:
+		btn.icon = icon
+		btn.expand_icon = true
+	else:
+		btn.text = str(icon)
+		btn.add_theme_font_size_override("font_size", 16)
+	btn.tooltip_text = Shop.display_name(g, slot)
+	if slot.sold:
+		btn.modulate = Color(1, 1, 1, 0.4) # greys out, stays in place — never removed
+	var price := Label.new()
+	price.text = "$%d" % Shop.price(g, slot)
+	price.add_theme_font_size_override("font_size", 10)
+	price.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+	price.add_theme_constant_override("outline_size", 3)
+	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	price.offset_left = -28
+	price.offset_top = -14
+	btn.add_child(price)
+	btn.pressed.connect(func() -> void:
+		shop_expanded_index = -1 if shop_expanded_index == index else index
+		show_shop())
+	return btn
+
+
+## The expanded tile: icon, name, effect text (when the catalog has one) and
+## Buy/SOLD, docked at a fixed height so expanding never reflows the grids.
+func _shop_detail(index: int) -> Control:
+	var slot: Dictionary = g.shop_stock[index]
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var icon: Variant = _shop_icon(slot)
+	if icon is Texture2D:
+		var tex := TextureRect.new()
+		tex.texture = icon
+		tex.custom_minimum_size = Vector2(56, 56)
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(tex)
+	else:
+		var glyph := Label.new()
+		glyph.text = str(icon)
+		glyph.add_theme_font_size_override("font_size", 34)
+		glyph.custom_minimum_size = Vector2(56, 56)
+		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(glyph)
+
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 2)
+	var name := Label.new()
+	name.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
+	name.add_theme_font_size_override("font_size", 16)
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(name)
+	var desc_text := Shop.description(slot)
+	if desc_text != "":
+		var desc := Label.new()
+		desc.text = desc_text
+		desc.add_theme_font_size_override("font_size", 12)
+		desc.modulate = Color(1, 1, 1, 0.8)
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(desc)
+	row.add_child(info)
+
+	var buy := Button.new()
+	buy.text = "SOLD" if slot.sold else "Buy"
+	buy.disabled = not Shop.can_buy(g, slot)
+	buy.add_theme_font_size_override("font_size", 15)
+	buy.pressed.connect(func() -> void: shop_buy_pressed.emit(index))
+	row.add_child(buy)
+	return row
 
 
 func show_reinforce() -> void:

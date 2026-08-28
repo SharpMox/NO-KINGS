@@ -733,6 +733,9 @@ const REGISTRY := {
 	# have NO REGISTRY entry — they never dispatch through the normal loop
 	# below, only through _run_meta_triggers reading `held`/`fired` directly
 	# (see the issue 21 header section).
+
+	# --- issue 29: runtime rarity metadata's first consumer ---
+	"illuminati-fridge-magnet": ["on_gold_change"],
 }
 
 
@@ -899,6 +902,36 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 ## (wave_logic.gd's queue() dispatches on_wave_clear before bumping g.wave).
 static func _milestone5_hit(wave: int, acquired_wave: int) -> bool:
 	return wave >= acquired_wave and (wave - acquired_wave) % 5 == 4
+
+
+## Catalog rarity for an artefact key ("Common"/"Uncommon"/"Rare"/"Legendary"),
+## "" for the 7 core keys (items.gd's ARTEFACT_EFFECTS_CORE, which predate the
+## catalog and carry no rarity at all) or an unrecognized key. Every
+## acquisition path (shop.gd's buy, game.gd's _box_choose and --artefacts
+## flag, save_config.gd's apply()) stamps `rarity` onto the held copy
+## directly via this lookup — the same "stamp at acquisition" pattern
+## acquired_wave uses — so this is only ever exercised live for a held entry
+## that predates the stamp (an old save; issue 29).
+static func rarity_of(key: String) -> String:
+	for e in Items.ARTEFACT_CATALOG:
+		if e.key == key:
+			return str(e.get("rarity", ""))
+	return ""
+
+
+const RARITIES := ["Common", "Uncommon", "Rare", "Legendary"]
+
+## Illuminati Fridge Magnet's "own Artefacts of every rarity" check — reads
+## each held copy's own `rarity` stamp, falling back to rarity_of() for a
+## copy that predates it (see rarity_of's header).
+static func holds_every_rarity(g) -> bool:
+	var have := {}
+	for t in g.artefacts:
+		have[str(t.get("rarity", rarity_of(t.key)))] = true
+	for r in RARITIES:
+		if not have.has(r):
+			return false
+	return true
 
 
 ## A uniformly random Piece Buff key, optionally restricted to one tier
@@ -1692,3 +1725,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.kind == "artefact":
 				g.score += 150
 				g.clock_ms += 5000
+
+		# --- issue 29: Illuminati Fridge Magnet — off the immutable
+		# `ctx.base` like every other percentage Gold/Score handler (see the
+		# on_score_change/on_gold_change CONTRACT in the header) ---
+		["illuminati-fridge-magnet", "on_gold_change"]:
+			if holds_every_rarity(g):
+				ctx.amount += ctx.base * 0.5

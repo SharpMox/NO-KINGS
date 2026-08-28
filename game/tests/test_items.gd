@@ -935,14 +935,15 @@ func _init() -> void:
 
 	# Holy Lint: On Capture, the capturing piece gets +1 Piece Buff (no gate) —
 	# exercises attacker_pos end to end through a real board capture.
-	# Seed pinned: an unpinned rng.randi() % 12 lands on "critical" or "range"
-	# 2/12 of the time, and _move_player consumes either on this very capture
-	# (game.gd's "Range is spent by the capture, not by repositioning"), which
-	# flaked this check ~1 run in 3 on identical code. Seed "1" is a durable
-	# roll ("stun", a dormant buff untouched by this capture path) — verified
-	# deterministic across repeated runs.
+	# Seed pinned: Holy Lint's random draw covers every tier, including Bomb/
+	# Trap/Multicapture — self-consuming hazards of their own (a freshly
+	# granted Bomb would detonate THIS capture, same class of bug as Critical/
+	# Range below, just not in this fix's scope) that a random roll would
+	# occasionally hit and destroy the piece the test then inspects. Seed 4
+	# is a durable roll ("stun", a dormant buff untouched by this capture
+	# path either way) — verified deterministic across repeated runs.
 	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
-		"wave": 3, "artefacts": ["holy-lint"], "seed": "1"})
+		"wave": 3, "artefacts": ["holy-lint"], "seed": "4"})
 	await process_frame
 	lint.actions_left = 5
 	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
@@ -950,6 +951,69 @@ func _init() -> void:
 	check(lint_buffs.size() == 1 and lint_buffs[0].key == "stun",
 		"Holy Lint: the capturing piece gets +1 Piece Buff (stun, seed 1)")
 	lint.queue_free()
+	await process_frame
+
+	# --- fix (ruled 2026-08-28): grant-on-capture (Obedience-Flavored Tap
+	# Water, Holy Lint) must land AFTER critical/range are consumed by the
+	# SAME capture that granted them — a reward banked for the NEXT capture,
+	# not this one. Before the fix, a granted Critical doubled the capture
+	# that granted it (capture_multiplier read the just-mutated board[from]
+	# synchronously) and a granted Range was immediately spent for zero
+	# effect (the comment above, on Holy Lint, is the flake this caused).
+	# Seeds are found live, mirroring _random_buff_key's own pool + roll, so
+	# this doesn't hardcode an RNG index that could silently drift.
+	var tac_pool: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
+		return not b.get("self_harming", false) and b.tier == "Tactical")
+	var crit_idx := -1
+	var range_idx := -1
+	for i in tac_pool.size():
+		if tac_pool[i].key == "critical":
+			crit_idx = i
+		elif tac_pool[i].key == "range":
+			range_idx = i
+	var find_rng := RandomNumberGenerator.new()
+	var crit_seed := -1
+	var range_seed := -1
+	for s in 5000:
+		if crit_seed < 0:
+			find_rng.seed = s
+			if find_rng.randi() % tac_pool.size() == crit_idx:
+				crit_seed = s
+		if range_seed < 0:
+			find_rng.seed = s
+			if find_rng.randi() % tac_pool.size() == range_idx:
+				range_seed = s
+		if crit_seed >= 0 and range_seed >= 0:
+			break
+	check(crit_seed >= 0 and range_seed >= 0, "(setup) found seeds landing a granted Critical and a granted Range")
+
+	var gc := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 2, 3], ["pawn", 1, 5, 5], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["obedience-flavored-tap-water"]})
+	await process_frame
+	var gc_pawn_val: int = gc.defs.pawn.value
+	gc.actions_left = 3
+	gc.rng.seed = crit_seed # the very next rng draw is _random_buff_key's, inside this capture
+	gc._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this wave: Tap Water grants Critical
+	check(gc.score == gc_pawn_val,
+		"a Critical granted by THIS capture doesn't double THIS capture's own score")
+	check(BuffLogic.has(gc.board[Vector2i(2, 3)], "critical"),
+		"the granted Critical survives on the attacker after the capture that granted it")
+	gc.score = 0
+	gc._move_player(Vector2i(2, 3), Vector2i(5, 5)) # a second, unrelated capture
+	check(gc.score == gc_pawn_val * 2,
+		"the banked Critical doubles the NEXT capture — it really works as a reward")
+	gc.queue_free()
+	await process_frame
+
+	var gr := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["obedience-flavored-tap-water"]})
+	await process_frame
+	gr.actions_left = 3
+	gr.rng.seed = range_seed
+	gr._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this wave: Tap Water grants Range
+	check(BuffLogic.has(gr.board[Vector2i(2, 3)], "range"),
+		"the granted Range survives on the attacker after the capture that granted it, not spent for zero effect")
+	gr.queue_free()
 	await process_frame
 
 	# Frame 25: On Wave clear, +1 Tactical Item, -10 Gold

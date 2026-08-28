@@ -2380,6 +2380,8 @@ func _init() -> void:
 	Shop.buy(buyer, buyer.shop_stock.size() - 1)
 	check(buyer.artefacts.size() == 1 and buyer.artefacts[0].acquired_wave == 7,
 		"Shop buy stamps acquired_wave to the current wave")
+	check(buyer.artefacts[0].rarity == "Common", # issue 29
+		"Shop buy stamps rarity from the catalog (Manna Vending Machine: Common)")
 	buyer.queue_free()
 	await process_frame
 
@@ -2389,10 +2391,12 @@ func _init() -> void:
 	boxer._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": catalog_entry})
 	check(boxer.artefacts.size() == 1 and boxer.artefacts[0].acquired_wave == 9,
 		"Box pick stamps acquired_wave to the current wave")
+	check(boxer.artefacts[0].rarity == "Common", # issue 29
+		"Box pick stamps rarity from the catalog (Manna Vending Machine: Common)")
 	boxer.queue_free()
 	await process_frame
 
-	# save/load round-trip: each held copy's own acquired_wave survives
+	# save/load round-trip: each held copy's own acquired_wave AND rarity survive
 	var saver := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "artefacts": ["manna-vending-machine"]})
 	await process_frame
@@ -2410,10 +2414,50 @@ func _init() -> void:
 	var restored_waves: Array = []
 	for t in m5_restored.artefacts:
 		restored_waves.append(int(t.acquired_wave))
+		check(t.rarity == "Common", "save -> load preserves rarity (issue 29)") # issue 29
 	restored_waves.sort()
 	check(restored_waves == [1, 3],
 		"save -> load preserves each held copy's own acquired_wave (%s)" % [restored_waves])
 	m5_restored.queue_free()
+	await process_frame
+
+	# --- issue 29: runtime rarity metadata — an old save's artefact entries
+	# predate the `rarity` field ({key, acquired_wave} only, no `rarity` key)
+	# — apply() must not crash and must degrade to a fresh catalog lookup
+	# (ArtefactHooks.rarity_of), not treat the copy as unrated
+	var old_save := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "artefacts": [{"key": "manna-vending-machine", "acquired_wave": 2}]})
+	await process_frame
+	check(old_save.artefacts.size() == 1 and old_save.artefacts[0].rarity == "Common",
+		"an old save entry with no `rarity` key degrades to the catalog lookup, not a crash")
+	old_save.queue_free()
+	await process_frame
+
+	# --- issue 29: Illuminati Fridge Magnet — "+50% Gold gain" while holding
+	# an Artefact of every rarity (Common/Uncommon/Rare/Legendary). Rare is
+	# the Fridge Magnet itself; the other three are picked for hooks that
+	# never touch on_gold_change/on_score_change, so Economy.earn's result
+	# isolates the Fridge Magnet's own bonus.
+	var partial := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["illuminati-fridge-magnet", "fema-summer-camp-flyer", # Rare + Common
+			"putin-s-golden-toilet-brush"]}) # + Uncommon — no Legendary yet
+	await process_frame
+	check(not ArtefactHooks.holds_every_rarity(partial),
+		"three of four rarities held (Legendary missing): holds_every_rarity is false")
+	Economy.earn(partial, 100)
+	check(partial.gold == 100, "Illuminati Fridge Magnet withholds its bonus until every rarity is held")
+	partial.queue_free()
+	await process_frame
+
+	var all_rarities := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["illuminati-fridge-magnet", "fema-summer-camp-flyer",
+			"putin-s-golden-toilet-brush", "cia-exploding-cigar"]}) # Rare/Common/Uncommon/Legendary
+	await process_frame
+	check(ArtefactHooks.holds_every_rarity(all_rarities),
+		"all four rarities held: holds_every_rarity is true")
+	Economy.earn(all_rarities, 100)
+	check(all_rarities.gold == 150, "Illuminati Fridge Magnet: +50% Gold gain once every rarity is held")
+	all_rarities.queue_free()
 	await process_frame
 
 	print("---")

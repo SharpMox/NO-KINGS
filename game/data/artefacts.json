@@ -1708,7 +1708,7 @@
   ],
   "effect": "While you own Artefacts of every rarity: +50% Gold gain",
   "conspiracy": "The Illuminati",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "abduction-probe",

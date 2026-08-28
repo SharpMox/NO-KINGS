@@ -1,6 +1,6 @@
 # 29 — Runtime artefact metadata
 
-Status: todo — INDEPENDENT (no design decision needed)
+Status: done — INDEPENDENT (no design decision needed)
 
 ## Parent
 
@@ -31,10 +31,26 @@ the next rarity-reading artefact is a one-liner.
 
 ## Acceptance criteria
 
-- [ ] Held entries carry `rarity`; old saves degrade to a catalog lookup, not a crash
-- [ ] Illuminati Fridge Magnet implemented and flagged
-- [ ] `run_all.sh` all green
+- [x] Held entries carry `rarity`; old saves degrade to a catalog lookup, not a crash
+- [x] Illuminati Fridge Magnet implemented and flagged
+- [x] `run_all.sh` all green
 
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Stamped `rarity` at every acquisition path that already stamps `acquired_wave`
+(shop.gd's `buy`, game.gd's `_box_choose` and the `--artefacts` CLI flag,
+save_config.gd's `apply()`), each via a new `ArtefactHooks.rarity_of(key)`
+catalog lookup. `to_config()`/`apply()` round-trip it like `acquired_wave`; an
+entry whose Dictionary has no `rarity` key (a save written before this field
+existed) falls back to `rarity_of()` instead of crashing or reading garbage.
+Added `ArtefactHooks.holds_every_rarity(g)` (reads each held copy's stamp,
+same catalog fallback for a pre-stamp entry) and wired Illuminati Fridge
+Magnet's `on_gold_change` handler off it. Flagged `implemented: true` in
+`data/artefacts.js`, re-exported via `tools/export-game-artefacts.mjs`.
+Covered by `test_items.gd` (Shop/Box/save-round-trip rarity stamps, the
+old-save fallback, and the Fridge Magnet's gated +50%) and a new
+`data/scenarios.gd` entry swept by `test_scenarios.gd`.

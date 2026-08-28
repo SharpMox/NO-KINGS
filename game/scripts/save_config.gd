@@ -6,6 +6,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
 const Economy := preload("res://scripts/economy.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 ## Start the game from a config Dictionary instead of the normal SETUP flow.
@@ -60,19 +61,25 @@ static func apply(g, cfg: Dictionary) -> void:
 	for entry in cfg.get("artefacts", []):
 		# Two shapes: a bare key String (every scenario config, data/scenarios.gd,
 		# and the balance-sweep --artefacts flag — "acquired this boot", so it
-		# stamps g.wave, already set above) or a {key, acquired_wave} Dictionary
-		# (a real save round-tripping to_config()'s own output below) — the
-		# per-artefact "5-Wave Milestone" cadence (ruled 2026-08-28,
-		# artefact_hooks.gd's _milestone5_hit) needs the wave each held copy
-		# was actually acquired on, not just g.wave at load time.
+		# stamps g.wave, already set above) or a {key, acquired_wave, rarity}
+		# Dictionary (a real save round-tripping to_config()'s own output
+		# below) — the per-artefact "5-Wave Milestone" cadence (ruled
+		# 2026-08-28, artefact_hooks.gd's _milestone5_hit) needs the wave each
+		# held copy was actually acquired on, not just g.wave at load time.
 		var key: String = entry if entry is String else str(entry.key)
 		var acquired: int = g.wave if entry is String else int(entry.get("acquired_wave", g.wave))
+		# `rarity` (issue 29): a bare-key entry never carried one, and a save
+		# written before this field existed doesn't either — both fall back
+		# to a fresh catalog lookup (ArtefactHooks.rarity_of).
+		var rarity: String = str(entry.rarity) if entry is Dictionary and entry.has("rarity") \
+			else ArtefactHooks.rarity_of(key)
 		for t in Items.ARTEFACT_EFFECTS:
 			if t.key == key:
 				var inst: Dictionary = t.duplicate() # never mutate the shared
 					# catalog entry (Items.ARTEFACT_EFFECTS is one Array of
 					# Dictionaries reused by every lookup) with a per-copy stamp
 				inst.acquired_wave = acquired
+				inst.rarity = rarity
 				g.artefacts.append(inst)
 	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
 		Economy.activate_tariff_by_key(g, key)
@@ -104,9 +111,12 @@ static func to_config(g) -> Dictionary:
 			out.append(e.key)
 		return out
 	var artefacts_out := []
-	for t in g.artefacts: # {key, acquired_wave} per copy — apply()'s new shape,
-		artefacts_out.append({"key": t.key, "acquired_wave": int(t.get("acquired_wave", g.wave))}) # so a
+	for t in g.artefacts: # {key, acquired_wave, rarity} per copy — apply()'s
+		artefacts_out.append({"key": t.key, "acquired_wave": int(t.get("acquired_wave", g.wave)),
+			"rarity": str(t.get("rarity", ArtefactHooks.rarity_of(t.key)))}) # shape, so a
 			# reloaded save keeps each held copy's own "5-Wave Milestone" cadence
+			# and rarity (issue 29) — the catalog fallback covers an in-memory
+			# entry that predates the stamp, same as apply()'s own fallback
 	return {
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,

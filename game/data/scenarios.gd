@@ -182,6 +182,11 @@ static func all() -> Array:
 				"illuminati-nwo-booster-pack", "100-genuine-original-mona-lisa",
 				"deja-vu-glitch", "capstone-polish"],
 			"gold": 100, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: issue 29 (rarity metadata + Illuminati Fridge Magnet)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
+			"artefacts": ["illuminati-fridge-magnet", "fema-summer-camp-flyer", # Rare + Common
+				"putin-s-golden-toilet-brush", "cia-exploding-cigar"], # Uncommon + Legendary
+			"gold": 100, "wave": 3, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

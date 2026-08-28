@@ -129,17 +129,60 @@
 ## not an ad hoc branch repeated at multiple call sites, so folding it into
 ## REGISTRY/_dispatch too would add a hook with no behavioural or
 ## architectural win.
+##
+## issue 19 (Special + the `(needs: ...)` backlog, plus what 16/17/18 held
+## back for a missing hook) closed the two most-cited gaps and added two more:
+## - on_piece_lost was already in HOOKS (a placeholder since slice 15/16) but
+##   had no call site — the 5 scattered `lost_player += 1` sites (enemy
+##   capture, both Reflect directions, both Trap directions, item destruction)
+##   now all funnel through game.gd's `_lose_player_piece(pos, reason,
+##   attacker_pos)`, called BEFORE the board entry is erased/overwritten so a
+##   handler can still read it (whether it carried a Piece Buff, its id).
+##   `reason` is one of "captured"/"trap"/"reflect"/"destroyed"; `attacker_pos`
+##   is the enemy piece that did the capturing when there is one
+##   (Vector2i(-1,-1) otherwise, e.g. Trap/Reflect/_destroy).
+## - on_item_consume: game.gd's 3 scattered `items.remove_at` sites now call
+##   `_consume_item(index, it)`, ctx = {key, tier, last, cancel}. `last` is
+##   whether this was the only Item held (Tape Eraser Magnet). Fires BEFORE
+##   removal so a handler can veto it via ctx.cancel = true (Dihydrogen
+##   Monoxide Battery, Wardenclyffe AAA Batteries: "the Item is not
+##   consumed") — the call site only removes when ctx.cancel is still false
+##   after every held artefact has run. The Item's own effect (_item_apply)
+##   still happens either way; only whether it leaves `items` changes.
+## - on_rank_up fires from two choke points: merge_logic.gd's commit_merge,
+##   when the merged pair is a same-id promotion-chain step rather than a
+##   Fusion of two different pieces (ids[0] == ids[1]), and game.gd's
+##   "promote" Item. ctx = {pos, old_id, id}; `pos.x < 0` means the result
+##   landed in Stock, not the board (a pool-only merge) — Holy Grail Coaster
+##   branches on that to convert the bare Stock id into a buff-carrying
+##   Dictionary, Sleeper Agent Pillow's same pattern (issue 18).
+## - on_tariff_apply (economy.gd apply_tariff, ctx = {key, tier}) and
+##   on_tariff_charge (economy.gd charge, fired right after on_charge leaves
+##   ctx.charged true — issue 13 landed on_charge concurrently, so this rides
+##   its gate rather than querying tariff state itself; ctx = {key, amount})
+##   — both were already single choke points, so no call sites moved; issue
+##   16/18's held-back tariff artefacts just needed the hook wired at the
+##   spot that already existed.
+## - "Ranked" (Templar Severance Gold, CIA Heart Attack Gun, Backmasked
+##   Vinyl, Bigfoot Toenail Clipping) reads as `ItemLogic.chain_base(defs, id)
+##   != id` — a piece not at its own promotion-chain base — the same check
+##   the "demote" Item's own target validity already runs. No "Demoted" flag
+##   exists (a piece demoted to its base is indistinguishable from one that
+##   started there), so Dark Market Light Bulb's "Demoted pieces give no
+##   Score" clause stays unimplemented — Notion question, not a guess.
 
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
 
 const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
 	"on_wave_clear", "on_wave_spawn", "on_milestone",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
 	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
+	"on_item_consume", "on_rank_up", "on_tariff_apply", "on_tariff_charge",
 	# --- issue 13: tariff-only trigger points (see header) ---
 	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
@@ -217,6 +260,7 @@ const REGISTRY := {
 	# majestic-12-secret-handshake-diagram fire nowhere — Shop.roll/price and
 	# game.gd's _box_options read g.artefacts directly, the same way Shop.buy
 	# already reads slot.kind without a hook (shop-drawer-ui/08's deferred pass).
+
 	# --- issue 13: tariff system (data/tariffs.gd) ---
 	"move_cost": ["on_charge"],
 	"ability_cost": ["on_charge"],
@@ -233,6 +277,58 @@ const REGISTRY := {
 	"recession": ["on_milestone"],
 	"filibuster": ["on_enemy_turn_start"],
 	"trade_war": ["on_wave_roster"],
+
+	# --- issue 19: on_piece_lost (game.gd _lose_player_piece, 5 call sites) ---
+	"satoshi-s-private-key": ["on_wave_clear", "on_piece_lost"],
+	"lusitania-hardtack-crate": ["on_piece_lost"],
+	"templar-severance-gold-one-pile": ["on_piece_lost"],
+	"d-b-cooper-s-parachute": ["on_piece_lost"],
+	"nibiru-hide-and-seek-trophy": ["on_wave_clear", "on_piece_lost"],
+	"flight-19-blackbox": ["on_piece_lost"],
+	"backmasked-vinyl": ["on_piece_lost"],
+	"tutankhamun-s-death-thong": ["on_piece_lost"],
+
+	# --- issue 19: on_item_consume (game.gd _consume_item, 3 call sites) ---
+	"arms-fair-goodie-bag": ["on_item_consume"],
+	"doomsday-autoclicker": ["on_item_consume"],
+	"tape-eraser-magnet": ["on_item_consume"],
+	"dihydrogen-monoxide-battery": ["on_item_consume"],
+	"wardenclyffe-aaa-batteries": ["on_item_consume"],
+	"33rd-degree-fidelity-card": ["on_item_consume"],
+	"defense-lobbyist-business-card": ["on_item_consume"],
+
+	# --- issue 19: on_rank_up (merge_logic.gd commit_merge same-id merges,
+	# game.gd "promote" item) ---
+	"witness-protection-mustache": ["on_rank_up"],
+	"holy-grail-coaster": ["on_rank_up"],
+	"bigfoot-toenail-clipping": ["on_rank_up"],
+
+	# --- issue 19: chain-lookup reads off existing hooks (ItemLogic.chain_base) ---
+	"cia-heart-attack-gun": ["on_capture"],
+	"montauk-eggo-waffle": ["on_wave_clear"],
+
+	# --- issue 19: board-half reads off existing hooks ---
+	"dyatlov-geiger-counter": ["on_score_change"],
+	"fema-summer-camp-flyer": ["on_turn_end"],
+
+	# --- issue 19: enemy auto-debuff (BuffLogic is owner-agnostic already) ---
+	"diplomatic-migraine-ray": ["on_wave_spawn"],
+
+	# --- issue 19: cheap follow-ups on hooks that landed after their own
+	# slice (named in issue 16/17's own Outcome sections) ---
+	"casino-invisible-clock": ["on_purchase"],
+	"2012-doomsday-party-hat": ["on_gold_change"],
+	"fort-knox-iou": ["on_score_change", "on_wave_clear"],
+
+	# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd apply_tariff/charge) ---
+	"merchants-of-death-sample-case": ["on_tariff_apply"],
+	"tunguska-toothpicks": ["on_tariff_charge"],
+
+	# --- issue 19: capture conversion, the cheap wave-clear half (economy.gd
+	# capture_score's ctx isn't exposed to game.gd's _move_player caller, so
+	# the per-capture half — Zeta Reticuli Souvenir Map — is out of scope; see
+	# issue 26) ---
+	"stockholm-syndrome-pamphlet": ["on_wave_clear"],
 }
 
 
@@ -305,6 +401,28 @@ static func _grant_buff_to(piece: Dictionary, rng: RandomNumberGenerator, tier :
 
 static func _grant_buff(g, pos: Vector2i, tier := "") -> void:
 	_grant_buff_to(g.board[pos], g.rng, tier)
+
+
+## "Ranked" (issue 19): a piece that has been promoted at least once, i.e. it
+## is not its own promotion-chain base. Reuses ItemLogic.chain_base — the same
+## walk the "demote" Item's own target-validity check already does.
+static func _ranked(defs: Dictionary, id: String) -> bool:
+	return ItemLogic.chain_base(defs, id) != id
+
+
+## A uniformly random Item of one tier (Flight 19 Blackbox, 33rd Degree
+## Fidelity Card, Defense Lobbyist Business Card — all grant-on-trigger).
+static func _random_item_of_tier(rng: RandomNumberGenerator, tier: String) -> Dictionary:
+	var pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool: return it.tier == tier)
+	return pool[rng.randi() % pool.size()]
+
+
+## Player-owned board positions on the far half of the Board from their own
+## deploy zone (Dyatlov Geiger Counter's "enemy half"); the complementary
+## "your half" check (FEMA Summer Camp Flyer, over enemy positions) is the
+## same predicate run over the other side's pieces.
+static func _on_enemy_half(pos: Vector2i) -> bool:
+	return pos.y >= Tuning.BOARD_H / 2
 
 
 static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
@@ -626,3 +744,150 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
 			if not extras.is_empty():
 				ctx.roster.append(extras[g.rng.randi() % extras.size()])
+
+		# --- issue 19: on_piece_lost (game.gd _lose_player_piece) ---
+		["satoshi-s-private-key", "on_wave_clear"]:
+			g.gold += 2 * g._player_pieces().size()
+		["satoshi-s-private-key", "on_piece_lost"]:
+			g.gold = maxi(g.gold - 2, 0)
+		["lusitania-hardtack-crate", "on_piece_lost"]:
+			if not BuffLogic.of(g.board[ctx.pos]).is_empty():
+				g.gold += 150
+				g.score += 150
+		["templar-severance-gold-one-pile", "on_piece_lost"]:
+			if _ranked(g.defs, ctx.id):
+				g.gold += 150
+		["d-b-cooper-s-parachute", "on_piece_lost"]:
+			g.gold += roundi(g.defs[ctx.id].value * 0.75)
+		["nibiru-hide-and-seek-trophy", "on_wave_clear"]:
+			g.nibiru_wave_streak += 1
+			g.gold += 10 * g.nibiru_wave_streak
+		["nibiru-hide-and-seek-trophy", "on_piece_lost"]:
+			g.nibiru_wave_streak = 0
+		["flight-19-blackbox", "on_piece_lost"]:
+			g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+		["backmasked-vinyl", "on_piece_lost"]:
+			if _ranked(g.defs, ctx.id):
+				g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
+		["tutankhamun-s-death-thong", "on_piece_lost"]:
+			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0:
+				BuffLogic.add(g.board[ctx.attacker_pos], "slow", _buff_turns("slow"))
+
+		# --- issue 19: on_item_consume (game.gd _consume_item) ---
+		["arms-fair-goodie-bag", "on_item_consume"]:
+			if ctx.tier == "Strategic":
+				g.gold += 25
+		["doomsday-autoclicker", "on_item_consume"]:
+			if ctx.tier == "Decisive":
+				g.score += 200
+				g.clock_ms += 10000
+		["tape-eraser-magnet", "on_item_consume"]:
+			if ctx.last:
+				g.score += 100
+				g.gold += 50
+		["dihydrogen-monoxide-battery", "on_item_consume"]:
+			if ctx.tier == "Tactical" and g.dihydrogen_free_wave != g.wave:
+				g.dihydrogen_free_wave = g.wave
+				ctx.cancel = true
+		["wardenclyffe-aaa-batteries", "on_item_consume"]:
+			if g.wardenclyffe_free_wave != g.wave:
+				g.wardenclyffe_free_wave = g.wave
+				ctx.cancel = true
+		["33rd-degree-fidelity-card", "on_item_consume"]:
+			if ctx.tier == "Tactical":
+				g.item_use_tactical_count += 1
+				if g.item_use_tactical_count % 3 == 0:
+					g.items.append(_random_item_of_tier(g.rng, "Strategic"))
+			elif ctx.tier == "Strategic":
+				g.item_use_strategic_count += 1
+				if g.item_use_strategic_count % 3 == 0:
+					g.items.append(_random_item_of_tier(g.rng, "Decisive"))
+		["defense-lobbyist-business-card", "on_item_consume"]:
+			if ctx.tier != "Tactical":
+				g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+
+		# --- issue 19: on_rank_up (merge_logic.gd commit_merge, game.gd "promote") ---
+		["witness-protection-mustache", "on_rank_up"]:
+			g.clock_ms += 20000
+		["holy-grail-coaster", "on_rank_up"]:
+			if ctx.pos.x >= 0:
+				_grant_buff(g, ctx.pos)
+			elif ctx.stock_index >= 0: # landed in Stock: promote the bare id at
+				# the exact index the merge placed it — NOT g.stock.size() - 1,
+				# which a same-call handler appending its own grant (Bigfoot
+				# Toenail Clipping) would otherwise shift out from under this
+				var piece := {"id": g.stock[ctx.stock_index]} # (Sleeper Agent
+				_grant_buff_to(piece, g.rng)                  # Pillow's pattern)
+				g.stock[ctx.stock_index] = piece
+		["bigfoot-toenail-clipping", "on_rank_up"]:
+			g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
+
+		# --- issue 19: chain-lookup off the existing on_capture/on_wave_clear hooks ---
+		["cia-heart-attack-gun", "on_capture"]:
+			if ctx.turn_capture_index == 0 and ctx.attacker_id != "" \
+					and (ctx.attacker_buffed or _ranked(g.defs, ctx.attacker_id)):
+				g.gold += roundi(ctx.base) # +100% Gold
+		["montauk-eggo-waffle", "on_wave_clear"]:
+			if g.wave % 5 == 0:
+				var candidates: Array = []
+				for i in g.stock.size():
+					var e = g.stock[i]
+					var id: String = e if e is String else e.id
+					if g.defs[id].next != null:
+						candidates.append(i)
+				if not candidates.is_empty():
+					var idx: int = candidates[g.rng.randi() % candidates.size()]
+					var e = g.stock[idx]
+					if e is String:
+						g.stock[idx] = g.defs[e].next
+					else:
+						e.id = g.defs[e.id].next
+
+		# --- issue 19: board-half reads (Tuning.BOARD_H, owner-agnostic) ---
+		["dyatlov-geiger-counter", "on_score_change"]:
+			var far := 0
+			for pos in _player_positions(g):
+				if _on_enemy_half(pos):
+					far += 1
+			if far >= 3:
+				ctx.amount += ctx.base # +100% Score
+		["fema-summer-camp-flyer", "on_turn_end"]:
+			var near := 0
+			for pos in g.board:
+				if g.board[pos].owner == Rules.ENEMY and not _on_enemy_half(pos):
+					near += 1
+			g.gold += 2 * near
+
+		# --- issue 19: enemy auto-debuff (BuffLogic is owner-agnostic already) ---
+		["diplomatic-migraine-ray", "on_wave_spawn"]:
+			var strongest := Vector2i(-1, -1)
+			for pos in g.board:
+				if g.board[pos].owner == Rules.ENEMY and (strongest.x < 0
+						or g.defs[g.board[pos].id].value > g.defs[g.board[strongest].id].value):
+					strongest = pos
+			if strongest.x >= 0:
+				BuffLogic.add(g.board[strongest], "slow", _buff_turns("slow"))
+
+		# --- issue 19: cheap follow-ups (named in issue 16/17's Outcome) ---
+		["casino-invisible-clock", "on_purchase"]:
+			g.clock_ms += 25000
+		["2012-doomsday-party-hat", "on_gold_change"]:
+			g.clock_ms += ctx.amount * 500.0 # +5s per 10 Gold
+		["fort-knox-iou", "on_score_change"]:
+			if g.gold < 10:
+				ctx.amount += ctx.base * 0.5
+		["fort-knox-iou", "on_wave_clear"]:
+			if g.gold < 10:
+				g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+
+		# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd) ---
+		["merchants-of-death-sample-case", "on_tariff_apply"]:
+			g.gold += 100
+		["tunguska-toothpicks", "on_tariff_charge"]:
+			g.score += 150
+			g.clock_ms += 5000
+
+		# --- issue 19: capture conversion, the cheap wave-clear half ---
+		["stockholm-syndrome-pamphlet", "on_wave_clear"]:
+			if not g.captured.is_empty():
+				g.stock.append(g.captured.pop_front())

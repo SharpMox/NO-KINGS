@@ -140,12 +140,19 @@ func _init() -> void:
 	var ii := -1
 	var ti := -1
 	var bi := -1
+	# Chocolate Key Cake / Alleged Weather Balloon / Sub-Antarctic Visa change
+	# how many slots a later roll() produces — the restock-size check below
+	# assumes the artefact this test holds for the rest of the run does NOT,
+	# so skip those 3 keys when picking `ti` (issue 19 grew the artefact pool,
+	# which changed what a fixed rng seed happens to roll into this slot).
+	var slot_count_modifiers := ["chocolate-key-cake", "alleged-weather-balloon", "sub-antarctic-visa"]
 	for i in game.shop_stock.size():
 		match game.shop_stock[i].kind:
 			"item":
 				ii = i
 			"artefact":
-				ti = i
+				if ti < 0 or slot_count_modifiers.has(game.shop_stock[ti].key):
+					ti = i
 			"box":
 				bi = i
 	var items_n: int = game.items.size()

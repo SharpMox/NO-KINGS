@@ -140,6 +140,16 @@ static func all() -> Array:
 				"sub-antarctic-visa", "crop-circle-plank", "mk-ultra-sugar-cube",
 				"frame-25", "sleeper-agent-pillow"],
 			"gold": 200, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: slice 19 (Special + prereqs)", "cfg": {
+			"board": [["pawn", 0, 2, 1], ["pawn", 0, 3, 1], ["queen", 0, 4, 1],
+				["pawn", 1, 2, 5], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],
+			"items": ["air_strike", "drone_strike", "buff_box"],
+			"artefacts": ["satoshi-s-private-key", "flight-19-blackbox",
+				"arms-fair-goodie-bag", "dihydrogen-monoxide-battery",
+				"witness-protection-mustache", "cia-heart-attack-gun",
+				"dyatlov-geiger-counter", "merchants-of-death-sample-case",
+				"tunguska-toothpicks"],
+			"tariffs": ["move_cost"], "gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

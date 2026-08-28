@@ -370,6 +370,35 @@ func _init() -> void:
 	cia.queue_free()
 	await process_frame
 
+	# --- issue 42: Dark Market Light Bulb ("Ranked pieces give double Gold on
+	# Capture; Demoted pieces give no Score on Capture") — the "Ranked" idiom
+	# mirrors CIA Heart Attack Gun above; "Demoted" reads the new peak_ranked
+	# stamp (ArtefactHooks.run()'s on_rank_up branch, tested end-to-end via a
+	# real merge/demote/promote sequence in test_items_buffs.gd) via
+	# ArtefactHooks._demoted(). Hand-set here since only the artefact's own
+	# Gold/Score math is under test, not the stamp mechanism itself.
+	var dmlb := _boot({"board": [["sergeant", 0, 2, 2], # already Ranked
+			["pawn", 0, 3, 2, {"peak_ranked": true}], # Demoted: below its own peak
+			["pawn", 0, 4, 2], # never Ranked — the control case
+			["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "score": 0, "artefacts": ["dark-market-light-bulb"]})
+	await process_frame
+	var dmlb_pawn_val: int = dmlb.defs["pawn"].value
+	Economy.capture_score(dmlb, "pawn", "sergeant", false, Vector2i(2, 2))
+	check(dmlb.gold == dmlb_pawn_val, "Dark Market Light Bulb: a Ranked attacker gives double Gold on Capture")
+	check(dmlb.last_capture_ctx.pts == dmlb_pawn_val,
+		"Dark Market Light Bulb: Score is untouched for a Ranked (not Demoted) attacker")
+	dmlb.gold = 0
+	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(3, 2)) # the Demoted attacker
+	check(dmlb.last_capture_ctx.pts == 0,
+		"Dark Market Light Bulb: a Demoted attacker gives no Score on Capture")
+	check(dmlb.gold == 0, "Dark Market Light Bulb: an unranked (not just Demoted) attacker gets no Gold bonus")
+	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(4, 2)) # never Ranked, never Demoted
+	check(dmlb.gold == 0 and dmlb.last_capture_ctx.pts == dmlb_pawn_val,
+		"Dark Market Light Bulb: a piece that was never Ranked is unaffected")
+	dmlb.queue_free()
+	await process_frame
+
 	var montauk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "stock": ["pawn"], "artefacts": ["montauk-eggo-waffle"]})
 	await process_frame

@@ -1100,7 +1100,7 @@
   ],
   "effect": "Ranked pieces give double Gold on Capture; Demoted pieces give no Score on Capture",
   "conspiracy": "The Phoebus cartel",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "kgb-photo-eraser",

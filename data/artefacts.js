@@ -53,6 +53,17 @@
    (Economy.add_clock/on_clock_change) and a run-long Turn counter
    (g.turn_number) now exist, so it's an ordinary two-hook artefact; see
    game/scripts/artefact_hooks.gd's header.
+   2026-08-29 (issue 42): Dark Market Light Bulb flipped to implemented: true
+   — "Demoted" ruled currently-below-peak-rank (option b, clears on
+   re-promotion), backed by a new per-piece peak_ranked stamp; see
+   game/scripts/artefact_hooks.gd's header. The 3 Tactical-restricted random-
+   buff granters (MK-Ultra Sugar Cube, Obedience-Flavored Tap Water, Sleeper
+   Agent Pillow) were considered for widening to the full Piece Buff pool and
+   left Tactical-only — all 3 are Common/Uncommon rarity on high-frequency
+   triggers (every Deploy, once per Wave, every Shop piece-buy), and a
+   Decisive buff (Bomb/Trap/Reflect) that often would be a much bigger power
+   swing than their catalog text asks for; see artefact_hooks.gd's own
+   comments at those 3 call sites and .scratch/gdd-gaps/issues/42's Outcome.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -417,7 +428,7 @@ var ARTEFACTS = [
     effect: "Whenever a Tariff charges you: +150 Score and +5s Clock",
     conspiracy: "The Tunguska event", url: "https://en.wikipedia.org/wiki/Tunguska_event",
     summary: "1908: a blast flattened 2,000 square kilometres of Siberian forest — and left no crater. Airburst meteor is the science; a UFO that parked very badly is the folklore. The citation was never paid." },
-  { name: "Dark Market Light Bulb", rarity: "Uncommon", type: "Passive", bonus: ["Gold"], status: "KEEP",
+  { name: "Dark Market Light Bulb", rarity: "Uncommon", type: "Passive", bonus: ["Gold"], status: "KEEP", implemented: true,
     effect: "Ranked pieces give double Gold on Capture; Demoted pieces give no Score on Capture",
     conspiracy: "The Phoebus cartel", url: "https://en.wikipedia.org/wiki/Phoebus_cartel",
     summary: "In 1924 the world's bulb makers agreed to cap lifespans at 1,000 hours and fined factories whose bulbs lasted. Planned obsolescence's documented birth — while a Livermore firehouse bulb burns on past its century." },

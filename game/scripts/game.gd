@@ -98,6 +98,11 @@ var king_ids_defeated: Array = []  # roster (Kings.name_of), same order as falls
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
+var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
+	# hook 16: "clean wave" = lost_player unchanged since this snapshot)
+var wave_capture_count := 0 # captures this wave, reset in WaveLogic.queue()
+var turn_capture_count := 0 # captures this player turn, reset in _begin_player_turn
+var gold_spent_shop_this_wave := 0 # reset in WaveLogic.queue() (artefact hook 16)
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -418,7 +423,7 @@ func _on_pass() -> void:
 			early_clear_awarded = true
 			var early := maxi(_cadence() - turns_since_wave, 0)
 			if early > 0:
-				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN)
+				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear")
 				clock_ms += early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN
 				_add_turn_fx("CLEARED EARLY  +%d ★ · +%ds" % [
 					early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
@@ -486,6 +491,7 @@ func _begin_player_turn() -> void:
 	actions_max = actions_left
 	moved_this_turn.clear()
 	turn_action_count = 0
+	turn_capture_count = 0
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
 		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
@@ -692,6 +698,9 @@ func _player_pieces() -> Array[Vector2i]:
 
 func _game_over(won: bool, reason: String) -> void:
 	state = State.GAME_OVER
+	ArtefactHooks.run(self, "on_game_over") # before record_score: e.g. Rapture
+		# Insurance Policy converts Gold to Score, and the converted total is
+		# what gets ranked (issue 16)
 	if not is_scenario and FileAccess.file_exists(SAVE_PATH):
 		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
@@ -1088,7 +1097,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		return _refresh()
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		Economy.earn(self, Economy.capture_score(self, victim.id)
+		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
+		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed)
 			* BuffLogic.capture_multiplier(board, from))
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
@@ -1104,7 +1114,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			BuffLogic.consume(board[from], "multicapture")
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
-				Economy.earn(self, Economy.capture_score(self, board[also].id))
+				Economy.earn(self, Economy.capture_score(self, board[also].id,
+					board[from].id, attacker_buffed))
 				captured.append(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)

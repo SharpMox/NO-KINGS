@@ -103,6 +103,8 @@ var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
 var wave_capture_count := 0 # captures this wave, reset in WaveLogic.queue()
 var turn_capture_count := 0 # captures this player turn, reset in _begin_player_turn
 var gold_spent_shop_this_wave := 0 # reset in WaveLogic.queue() (artefact hook 16)
+var silk_road_active := false # Silk Road Coupon's -50% Shop prices, reset in
+	# WaveLogic.queue() every wave (artefact hook 18)
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -430,6 +432,7 @@ func _on_pass() -> void:
 					early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN / 1000],
 					Color(0.95, 0.8, 0.25))
 		clock_ms += Tuning.TURN_END_CLOCK_BONUS_MS # finishing a turn buys time
+		ArtefactHooks.run(self, "on_turn_end") # Shrinkflation Cereal Box (18)
 		_enemy_turn()
 
 
@@ -1039,6 +1042,7 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 	placing_id = ""
 	placing_cap = false
 	if state == State.PLAYER_TURN:
+		ArtefactHooks.run(self, "on_deploy", {"pos": tile}) # MK-Ultra Sugar Cube (18)
 		actions_left -= 1
 		turn_action_count += 1
 		var cost := Tuning.PLACEMENT_COST
@@ -1098,7 +1102,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
-		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed)
+		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from)
 			* BuffLogic.capture_multiplier(board, from))
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
@@ -1115,7 +1119,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed))
+					board[from].id, attacker_buffed, from))
 				captured.append(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
@@ -1526,7 +1530,13 @@ func _open_box_pick(only_kind := "") -> void:
 
 
 func _box_options(only_kind := "") -> Array:
-	return Box.roll_options(rng, only_kind)
+	var allowed_tiers: Array = []
+	if only_kind == "item": # Majestic 12 Secret Handshake Diagram (18): Item
+		for t in artefacts: # Boxes only, not the mixed capture-driven Box Pick
+			if t.key == "majestic-12-secret-handshake-diagram":
+				allowed_tiers = ["Strategic", "Decisive"]
+				break
+	return Box.roll_options(rng, only_kind, allowed_tiers)
 
 
 

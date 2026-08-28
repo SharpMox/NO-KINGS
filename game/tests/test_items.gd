@@ -554,6 +554,56 @@ func _init() -> void:
 	mc.queue_free()
 	await process_frame
 
+	# --- Bomb: on either side of a capture, everything within 1 square dies.
+	# Destruction, not capture — no score, nothing to Captured Stock, and the
+	# King is unaffected. Precedence ruled 2026-08-28: Reflect > Bomb > Trap.
+	var bm := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["pawn", 1, 3, 5], ["pawn", 0, 1, 4], ["king", 1, 1, 5],
+		["pawn", 1, 6, 9], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bm.actions_left = 5
+	BuffLogic.add(bm.board[Vector2i(2, 5)], "bomb")
+	var score_before: int = bm.score
+	var caught: int = bm.captured.size()
+	bm._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(not bm.board.has(Vector2i(2, 5)), "the bomb piece is gone")
+	check(not bm.board.has(Vector2i(2, 2)), "the attacker is caught in the blast")
+	check(not bm.board.has(Vector2i(3, 5)) and not bm.board.has(Vector2i(1, 4)),
+		"the blast takes enemies AND allies within 1 square")
+	check(bm.board.has(Vector2i(1, 5)), "the King is unaffected by the blast")
+	check(bm.board.has(Vector2i(6, 9)), "pieces outside the blast survive")
+	check(bm.captured.size() == caught + 1,
+		"only the captured piece reaches Captured Stock — the blast is destruction")
+	check(bm.score > score_before, "the capture itself still scores")
+	bm.queue_free()
+	await process_frame
+
+	# Reflect outranks Bomb: the capture never lands, so nothing detonates
+	var rb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["pawn", 1, 3, 5], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	rb.actions_left = 5
+	BuffLogic.add(rb.board[Vector2i(2, 5)], "bomb")
+	BuffLogic.add(rb.board[Vector2i(2, 5)], "reflect")
+	rb._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(rb.board.has(Vector2i(3, 5)),
+		"Reflect outranks Bomb — the capture never lands, nothing detonates")
+	rb.queue_free()
+	await process_frame
+
+	# Bomb outranks Trap: the blast resolves, Trap adds nothing
+	var bt := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["pawn", 1, 3, 5], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bt.actions_left = 5
+	BuffLogic.add(bt.board[Vector2i(2, 5)], "bomb")
+	BuffLogic.add(bt.board[Vector2i(2, 5)], "trap")
+	bt._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(not bt.board.has(Vector2i(3, 5)),
+		"Bomb outranks Trap — the area blast still resolves")
+	bt.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

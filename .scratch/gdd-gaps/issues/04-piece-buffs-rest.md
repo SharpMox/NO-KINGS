@@ -1,6 +1,6 @@
 # 04 — Piece Buffs: the remaining 9
 
-Status: in progress — 11 of 12 buffs done; Bomb left (needs a precedence ruling)
+Status: done — all 12 Piece Buffs ship
 
 ## Parent
 
@@ -99,12 +99,23 @@ meaning for a leap and was open-ended for a rider. The extra piece is chosen aut
 as the most valuable eligible neighbour so the trigger needs no second targeting step; the
 King is never taken as collateral.
 
-### Left to build — 1
+### Round 4 (2026-08-28) — Bomb, and the precedence ruling
 
-**Bomb** — on capturing or being captured, destroys itself, the other piece, and
-everything within 1 square. ⚠️ **Precedence must be settled first**: Reflect, Trap and Bomb
-all fire on being captured. Suggested order — Reflect (repels before the capture resolves)
-> Bomb (area) > Trap (single) — but that is a proposal, not a ruling.
+**Precedence ruled: Reflect > Bomb > Trap.** All three fire on being captured and one
+piece can carry more than one. Reflect repels the attempt before the capture resolves at
+all, so nothing else triggers; Bomb's blast already takes the attacker, so Trap has
+nothing left to do. Written onto Bomb's Notion page.
+
+**Bomb** destroys itself, the other piece and everything within 1 square, on either side
+of a capture. The blast is **Destruction, not capture** (CONTEXT.md): no score, no Gold,
+no per-capture Artefact procs, destroyed allies gone rather than returned to Stock. Only
+the piece actually captured reaches Captured Stock and scores. The King is unaffected,
+matching Drone Strike. The blast centres on the tile the capture happened on, so the
+attacker — which has landed there by then — is always caught.
+
+**All 12 catalogued Piece Buffs now ship**, across both models and both sides of a
+capture. Slice 04 is complete.
+
 
 ## Blocked by
 

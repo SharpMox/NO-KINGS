@@ -498,6 +498,14 @@ func _run_enemy_actions() -> void:
 				_add_float(act.to, "Blocked", COL_MERGE)
 			queue_redraw()
 			continue
+		if board.has(act.to) and (BuffLogic.has(board[act.to], "bomb")
+				or BuffLogic.has(board[act.from], "bomb")):
+			board.erase(act.to)
+			board[act.to] = board[act.from]
+			board.erase(act.from)
+			_detonate(act.to)
+			queue_redraw()
+			continue
 		if board.has(act.to) and BuffLogic.has(board[act.to], "trap"):
 			# Trap takes the attacker with it — neither piece survives
 			_add_float(act.from, "Trapped!", COL_CAPTURE)
@@ -979,6 +987,21 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				board.erase(also)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
+		if victim.id != "king" and (BuffLogic.has(victim, "bomb")
+				or BuffLogic.has(board[from], "bomb")):
+			# Precedence ruled 2026-08-28: Reflect > Bomb > Trap. Reflect
+			# resolved above (the capture never lands); the blast takes the
+			# attacker anyway, so Trap has nothing left to do.
+			captured.append(victim.id) # the capture itself still resolved
+			board.erase(to)
+			board[to] = board[from] # the attacker lands, then the blast
+			board.erase(from)
+			_detonate(to)
+			actions_left -= 1
+			turn_action_count += 1
+			if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
+				return _on_pass()
+			return _refresh()
 		if BuffLogic.has(victim, "trap"): # the attacker goes with it
 			_add_float(from, "Trapped!", COL_CAPTURE)
 			lost_player += 1
@@ -1321,6 +1344,19 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 		return _on_pass() # last action, or the item cleared the last enemy
 	_refresh()
+
+
+## Bomb blast: everything within 1 square of `at`, the bomb piece included.
+## Destruction, not capture (CONTEXT.md) — no score, no Captured Stock, and
+## destroyed allies do not return to Stock. The King is unaffected, as with
+## Drone Strike.
+func _detonate(at: Vector2i) -> void:
+	_add_float(at, "Boom!", COL_CAPTURE)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var pos := at + Vector2i(dx, dy)
+			if board.has(pos) and board[pos].id != "king":
+				_destroy(pos)
 
 
 ## Item destruction: piece leaves the board — no score, no captured stock.

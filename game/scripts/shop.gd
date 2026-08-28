@@ -246,7 +246,11 @@ static func buy(g, index: int) -> bool:
 		"item":
 			g.items.append(_catalog(slot))
 		"artefact":
-			g.artefacts.append(_catalog(slot)) # stacks like box copies
+			var entry: Dictionary = _catalog(slot).duplicate() # never mutate the
+				# shared catalog Dictionary — stamp a per-copy acquisition wave
+				# (artefact_hooks.gd's per-artefact "5-Wave Milestone" cadence)
+			entry.acquired_wave = g.wave
+			g.artefacts.append(entry) # stacks like box copies
 	ArtefactHooks.run(g, "on_purchase", {"kind": slot.kind, "key": slot.key, "price": cost})
 	return true
 

@@ -891,13 +891,18 @@ func _init() -> void:
 	# --- issue 18 (Shop/Item/Buff batch): Buff-tag artefacts go through
 	# BuffLogic.add, not a parallel path ---
 
-	# Crop Circle Plank: "5-Wave Milestone" fires off the just-cleared wave
-	# number directly (on_wave_clear), not the engine's own 10-wave
-	# on_milestone cadence — see artefact_hooks.gd's silk-road-coupon note
+	# Crop Circle Plank: "5-Wave Milestone" is PER-ARTEFACT (ruled 2026-08-28)
+	# — this held copy counts its own 5 waves from its own acquisition, fired
+	# off the just-cleared wave (on_wave_clear), not the engine's own GLOBAL
+	# 10-wave on_milestone cadence. acquired_wave is forced to 1 here so the
+	# test can isolate the handler's own cadence math (_milestone5_hit) from
+	# the separate acquisition-stamping coverage below — wave 5 clearing is
+	# then this copy's beat 5 (1 + 4), a real 5-Wave Milestone.
 	var crop := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
 		["knight", 0, 4, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "artefacts": ["crop-circle-plank"], "gold": 50})
 	await process_frame
+	crop.artefacts[0].acquired_wave = 1
 	WaveLogic.queue(crop, crop.wave + 1) # clears wave 5: a real 5-Wave Milestone
 	var buffed := 0
 	for pos in crop.board:
@@ -908,10 +913,11 @@ func _init() -> void:
 	crop.queue_free()
 	await process_frame
 
-	# it does NOT fire clearing wave 6 or 7 (not a multiple of 5)
+	# it does NOT fire clearing wave 6 or 7 (not this copy's own multiple of 5)
 	var crop_off := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
 		["rook", 1, 7, 10]], "wave": 6, "artefacts": ["crop-circle-plank"], "gold": 50})
 	await process_frame
+	crop_off.artefacts[0].acquired_wave = 1
 	WaveLogic.queue(crop_off, crop_off.wave + 1)
 	check(crop_off.gold == 50, "Crop Circle Plank: no-op on a wave clear that isn't a multiple of 5")
 	crop_off.queue_free()
@@ -1281,7 +1287,9 @@ func _init() -> void:
 	var montauk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "stock": ["pawn"], "artefacts": ["montauk-eggo-waffle"]})
 	await process_frame
-	WaveLogic.queue(montauk, 6) # Wave 5 just cleared -> "5-Wave Milestone" fires this on_wave_clear
+	montauk.artefacts[0].acquired_wave = 1 # per-artefact cadence (2026-08-28):
+		# isolate the handler's own math from acquisition-stamping coverage below
+	WaveLogic.queue(montauk, 6) # Wave 5 just cleared -> this copy's own "5-Wave Milestone" fires this on_wave_clear
 	check(montauk.stock == ["sergeant"],
 		"Montauk Eggo Waffle: the only Stock piece Ranks Up on the 5-Wave Milestone")
 	montauk.queue_free()
@@ -1765,7 +1773,9 @@ func _init() -> void:
 	Economy.activate_tariff_by_key(salvation, "regulation")
 	check(salvation.tariffs_active.size() == 1 and salvation.tariffs_active[0].key == "regulation",
 		"Salvation Gift Card: a second Tariff applies normally once spent")
-	WaveLogic.queue(salvation, 6) # clears wave 5 (5-Wave Milestone): recharges
+	salvation.artefacts[0].acquired_wave = 1 # per-artefact cadence (2026-08-28):
+		# isolate the handler's own math from acquisition-stamping coverage below
+	WaveLogic.queue(salvation, 6) # clears wave 5, this copy's own 5-Wave Milestone: recharges
 	check(salvation.salvation_charged, "Salvation Gift Card: recharges at the 5-Wave Milestone")
 	salvation.queue_free()
 	await process_frame
@@ -1885,11 +1895,14 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
-	# Assembly Manual) — on_wave_clear + g.wave % 5 == 0, silk-road-coupon's
-	# cadence, not the 10-wave on_milestone hook ---
+	# Assembly Manual) — on_wave_clear + _milestone5_hit, PER-ARTEFACT
+	# (ruled 2026-08-28), silk-road-coupon's cadence, not the GLOBAL 10-wave
+	# on_milestone hook. acquired_wave forced to 1 to isolate the handler's
+	# own cadence math from the acquisition-stamping coverage below.
 	var arkb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 99999, "artefacts": ["ark-s-bunkbed"]})
 	await process_frame
+	arkb.artefacts[0].acquired_wave = 1
 	arkb.actions_left = 20
 	var arkb_idx1 := -1
 	for j in arkb.shop_stock.size():
@@ -1926,6 +1939,7 @@ func _init() -> void:
 	var trojan := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "artefacts": ["trojan-horse-assembly-manual"]})
 	await process_frame
+	trojan.artefacts[0].acquired_wave = 1
 	check(not trojan.box_open, "(control) no Box open before the Wave-5 clear")
 	WaveLogic.queue(trojan, 6) # clears wave 5 -> 5-Wave Milestone
 	check(trojan.box_open,
@@ -2230,6 +2244,91 @@ func _init() -> void:
 	bz.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
+
+	# --- fix (ruled 2026-08-28): the "5-Wave Milestone" is PER-ARTEFACT, not
+	# the GLOBAL beat every held copy used to check (g.wave % 5 == 0). Each
+	# held copy counts its own 5 waves from its own acquisition wave (stamped
+	# on g.artefacts entries — ArtefactHooks._milestone5_hit) ---
+
+	# core fix: two copies of the same artefact, acquired on different waves,
+	# fire on DIFFERENT wave-clears — not in lockstep. Manna Vending Machine
+	# (+2 Items per firing) makes each copy's own firing directly countable.
+	var m5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["manna-vending-machine"]}) # copy A: acquired wave 1
+	await process_frame
+	for t in Items.ARTEFACT_EFFECTS: # copy B: acquired wave 3 (held from the
+		if t.key == "manna-vending-machine": # start, same as two Shop buys on
+			var copy_b: Dictionary = t.duplicate() # different waves would produce)
+			copy_b.acquired_wave = 3
+			m5.artefacts.append(copy_b)
+			break
+	check(m5.artefacts.size() == 2, "two held copies, acquired on different waves")
+	for n in range(2, 6): # clear waves 1..4: neither copy is due yet
+		WaveLogic.queue(m5, n)
+	check(m5.items.size() == 0, "neither copy fires before its own beat 5 (waves 1-4 cleared)")
+	WaveLogic.queue(m5, 6) # clears wave 5: copy A's beat 5 (1+4) — copy B's is wave 7 (3+4)
+	check(m5.items.size() == 2, "only copy A (acquired wave 1) fires clearing wave 5")
+	WaveLogic.queue(m5, 7) # clears wave 6: neither copy's beat
+	check(m5.items.size() == 2, "no double-fire clearing wave 6")
+	WaveLogic.queue(m5, 8) # clears wave 7: copy B's beat 5 (3+4)
+	check(m5.items.size() == 4, "copy B (acquired wave 3) fires on its OWN beat, clearing wave 7 — not lockstepped with copy A")
+	m5.queue_free()
+	await process_frame
+
+	# acquisition-wave stamping: every acquisition path stamps g.wave, and
+	# never mutates the shared Items.ARTEFACT_EFFECTS catalog entry
+	var catalog_entry: Dictionary
+	for t in Items.ARTEFACT_EFFECTS:
+		if t.key == "manna-vending-machine":
+			catalog_entry = t
+			break
+	check(not catalog_entry.has("acquired_wave"),
+		"the shared catalog entry itself is never stamped (each acquisition duplicates it)")
+
+	# Shop buy
+	var buyer := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 7, "gold": 99999})
+	await process_frame
+	buyer.actions_left = 5
+	buyer.shop_stock.append({"kind": "artefact", "key": "manna-vending-machine", "sold": false})
+	Shop.buy(buyer, buyer.shop_stock.size() - 1)
+	check(buyer.artefacts.size() == 1 and buyer.artefacts[0].acquired_wave == 7,
+		"Shop buy stamps acquired_wave to the current wave")
+	buyer.queue_free()
+	await process_frame
+
+	# Box pick
+	var boxer := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 9})
+	await process_frame
+	boxer._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": catalog_entry})
+	check(boxer.artefacts.size() == 1 and boxer.artefacts[0].acquired_wave == 9,
+		"Box pick stamps acquired_wave to the current wave")
+	boxer.queue_free()
+	await process_frame
+
+	# save/load round-trip: each held copy's own acquired_wave survives
+	var saver := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["manna-vending-machine"]})
+	await process_frame
+	for t in Items.ARTEFACT_EFFECTS:
+		if t.key == "manna-vending-machine":
+			var b2: Dictionary = t.duplicate()
+			b2.acquired_wave = 3
+			saver.artefacts.append(b2)
+			break
+	var m5_cfg: Dictionary = saver._to_config()
+	saver.queue_free()
+	await process_frame
+	var m5_restored := _boot(JSON.parse_string(JSON.stringify(m5_cfg)))
+	await process_frame
+	var restored_waves: Array = []
+	for t in m5_restored.artefacts:
+		restored_waves.append(int(t.acquired_wave))
+	restored_waves.sort()
+	check(restored_waves == [1, 3],
+		"save -> load preserves each held copy's own acquired_wave (%s)" % [restored_waves])
+	m5_restored.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

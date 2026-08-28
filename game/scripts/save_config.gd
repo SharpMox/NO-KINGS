@@ -57,10 +57,23 @@ static func apply(g, cfg: Dictionary) -> void:
 		for it in Items.ITEMS:
 			if it.key == key:
 				g.items.append(it)
-	for key in cfg.get("artefacts", []):
+	for entry in cfg.get("artefacts", []):
+		# Two shapes: a bare key String (every scenario config, data/scenarios.gd,
+		# and the balance-sweep --artefacts flag — "acquired this boot", so it
+		# stamps g.wave, already set above) or a {key, acquired_wave} Dictionary
+		# (a real save round-tripping to_config()'s own output below) — the
+		# per-artefact "5-Wave Milestone" cadence (ruled 2026-08-28,
+		# artefact_hooks.gd's _milestone5_hit) needs the wave each held copy
+		# was actually acquired on, not just g.wave at load time.
+		var key: String = entry if entry is String else str(entry.key)
+		var acquired: int = g.wave if entry is String else int(entry.get("acquired_wave", g.wave))
 		for t in Items.ARTEFACT_EFFECTS:
 			if t.key == key:
-				g.artefacts.append(t)
+				var inst: Dictionary = t.duplicate() # never mutate the shared
+					# catalog entry (Items.ARTEFACT_EFFECTS is one Array of
+					# Dictionaries reused by every lookup) with a per-copy stamp
+				inst.acquired_wave = acquired
+				g.artefacts.append(inst)
 	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
 		Economy.activate_tariff_by_key(g, key)
 	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
@@ -90,9 +103,13 @@ static func to_config(g) -> Dictionary:
 		for e in arr:
 			out.append(e.key)
 		return out
+	var artefacts_out := []
+	for t in g.artefacts: # {key, acquired_wave} per copy — apply()'s new shape,
+		artefacts_out.append({"key": t.key, "acquired_wave": int(t.get("acquired_wave", g.wave))}) # so a
+			# reloaded save keeps each held copy's own "5-Wave Milestone" cadence
 	return {
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
-		"items": keys_of.call(g.items), "artefacts": keys_of.call(g.artefacts),
+		"items": keys_of.call(g.items), "artefacts": artefacts_out,
 		"tariffs": keys_of.call(g.tariffs_active), "tariffs_seen": g.tariffs_seen.duplicate(),
 		"wave": g.wave, "turns_since_wave": g.turns_since_wave,
 		"early_clear_awarded": g.early_clear_awarded,

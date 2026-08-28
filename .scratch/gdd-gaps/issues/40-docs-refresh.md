@@ -1,6 +1,6 @@
 # 40 — Repo docs refresh
 
-Status: todo — INDEPENDENT
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -41,6 +41,29 @@ plan for what might be.
 - [ ] The backlog's real location is named
 - [ ] The hard-won conventions are written down where an agent will read them
 - [ ] `CONTEXT.md` checked and refreshed if drifted
+
+## Outcome (2026-08-29)
+
+Rewrote `CLAUDE.md`'s game section from "planned — not started yet" to what the game
+actually is, and pointed the backlog at `.scratch/gdd-gaps/` instead of the Linear that was
+never used. Kept the parts that were already accurate and hard-won — the UI-probes-first
+rule, the non-regression discipline, the piece-art conventions — and added:
+
+- **Architecture**: `game.gd` as the live node, everything else a pure logic module on `g`
+  or plain Dictionaries, which is why the headless suites can drive real logic.
+- **`artefact_hooks.gd` as the shared dispatch for Artefacts AND Tariffs**, with the ctx
+  contract and the stacking/ordering rules spelled out — the two things four handlers broke
+  before they were written down anywhere.
+- **ADR-0002** and why opaque piece state keeps paying off.
+- **Conventions learned the hard way**: generated data is generated (never hand-edit the
+  JSON); tests pin their seed; verify independently rather than trusting a green claim,
+  including your own subagents'; saves are versioned and additive vs reshaped is the
+  distinction that matters; ambiguity goes back to Notion as a question, not into code as a
+  guess.
+
+`CONTEXT.md` also corrected — it opened by describing the project as "driven from Linear",
+and its GitNexus-fork glossary is now explicitly marked as an agent-tooling experiment that
+nothing in `game/` depends on, rather than reading as shipped architecture.
 
 ## Blocked by
 

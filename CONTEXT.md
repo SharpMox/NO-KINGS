@@ -1,6 +1,8 @@
 # NO-KINGS
 
-A Godot 4 mobile game built by AI agents driven from Linear (issues are the unit of work). The agent stack includes a fork of GitNexus extended to understand Godot files; the fork-specific terms live in their own subsection below.
+A Godot 4 mobile game built by AI agents. The backlog lives in `.scratch/gdd-gaps/` (a PRD plus one file per slice) and the Notion GDD is the design source of truth for the catalogs — **not Linear**, which earlier revisions of this file named but which was never actually used.
+
+> ⚠️ The GitNexus-fork subsection below documents an agent-tooling experiment that is **not part of the shipped game**. It is kept for reference; nothing in `game/` depends on it.
 
 ## Language
 

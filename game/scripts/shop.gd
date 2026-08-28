@@ -250,7 +250,10 @@ static func buy(g, index: int) -> bool:
 			var entry: Dictionary = _catalog(slot).duplicate() # never mutate the
 				# shared catalog Dictionary — stamp a per-copy acquisition wave
 				# (artefact_hooks.gd's per-artefact "5-Wave Milestone" cadence)
+				# and rarity (issue 29 — Illuminati Fridge Magnet's "every
+				# rarity" check, ArtefactHooks.holds_every_rarity)
 			entry.acquired_wave = g.wave
+			entry.rarity = ArtefactHooks.rarity_of(entry.key)
 			g.artefacts.append(entry) # stacks like box copies
 	ArtefactHooks.run(g, "on_purchase", {"kind": slot.kind, "key": slot.key, "price": cost})
 	return true

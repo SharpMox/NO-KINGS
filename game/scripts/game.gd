@@ -328,8 +328,10 @@ func _ready() -> void:
 			for t in Items.ARTEFACT_EFFECTS:
 				if t.key == key:
 					var inst: Dictionary = t.duplicate() # per-copy acquisition
-						# wave stamp (artefact_hooks.gd's "5-Wave Milestone")
+						# wave stamp (artefact_hooks.gd's "5-Wave Milestone") and
+						# rarity stamp (issue 29 — Illuminati Fridge Magnet)
 					inst.acquired_wave = wave
+					inst.rarity = ArtefactHooks.rarity_of(key)
 					artefacts.append(inst)
 	if shop_stock.is_empty(): # fresh run, or a save from before the shop
 		Shop.roll(self)
@@ -1849,8 +1851,10 @@ func _box_choose(opt: Dictionary) -> void:
 			var entry: Dictionary = opt.payload.duplicate() # never mutate the
 				# shared catalog Dictionary rolled by Box.roll_options — stamp a
 				# per-copy acquisition wave (artefact_hooks.gd's "5-Wave
-				# Milestone" cadence)
+				# Milestone" cadence) and rarity (issue 29 — Illuminati Fridge
+				# Magnet's "every rarity" check)
 			entry.acquired_wave = wave
+			entry.rarity = ArtefactHooks.rarity_of(entry.key)
 			artefacts.append(entry)
 		"score":
 			Economy.earn(self, opt.value)

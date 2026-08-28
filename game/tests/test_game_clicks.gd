@@ -271,6 +271,47 @@ func _init() -> void:
 	check(game.items.size() + game.artefacts.size() > loot_before
 		or game.score > score_before, "the picked reward is applied")
 
+	# Buff Box sub-pick, riding the generic choice-modal seam (issue 41):
+	# opening it blocks board input, Cancel leaves the item unspent, and
+	# picking a choice resumes targeting exactly like before the migration.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box")
+	await process_frame
+	check(await _click_button_in(game.hud.item_box, "Buff Box"),
+		"Buff Box clickable in the drawer")
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"the Buff Box sub-pick opens the generic choice modal")
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel (keeps the item)"),
+		"Cancel clickable on the choice modal")
+	await process_frame
+	check(not game.buff_pick_open and game.items.size() == 1,
+		"cancelling the choice modal closes it and leaves the item unspent")
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens after cancel")
+	await process_frame
+	check(await _click_button_in(game.hud.item_box, "Buff Box"), "Buff Box clickable again")
+	await process_frame
+	var buff_btn := _first_option_button(game.modals.buff_panel)
+	check(buff_btn != null and "\n" in buff_btn.text,
+		"choice options describe themselves (two-line label), same as Box Pick")
+	_click(buff_btn.get_global_rect().get_center())
+	await process_frame
+	check(not game.buff_pick_open and not game.item_targets.is_empty(),
+		"picking a choice closes the modal and resumes targeting (the continuation)")
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.items.is_empty(), "targeting the buff spends the item, closing the loop")
+
 	# SETUP: the pass button reads START, and a stock piece can be dragged
 	# from the pool strip onto a zone tile (game-feel pass 2026-07-06)
 	game.queue_free()

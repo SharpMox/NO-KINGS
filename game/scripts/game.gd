@@ -204,7 +204,11 @@ var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 var artefacts: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
-var buff_pick_open := false # Buff Box sub-pick showing; same input block
+var buff_pick_open := false # generic "choose 1 of N, then continue" modal
+	# showing (issue 41) — same input block regardless of which caller opened
+	# it; the Buff Box sub-pick was the first caller, never a special case.
+var _choice_on_chosen: Callable # continuation for the open choice pick
+var _choice_on_cancelled: Callable # ditto, run on cancel (may be invalid)
 var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
@@ -1550,11 +1554,45 @@ func _item_reset() -> void:
 	pending_buff = ""
 
 
+## Generic "choose 1 of N, then continue" modal seam (issue 41). `offers` are
+## Dictionaries with `label` (button text) and `value` (handed back verbatim
+## to `on_chosen`) — the modal and this seam don't know what a caller does
+## with the pick. `on_cancelled` is called with no args on Cancel/close; pass
+## an invalid Callable if backing out needs no cleanup.
+func _open_choice_pick(header: String, offers: Array, cancel_text: String,
+		on_chosen: Callable, on_cancelled: Callable) -> void:
+	buff_pick_open = true
+	_choice_on_chosen = on_chosen
+	_choice_on_cancelled = on_cancelled
+	modals.show_choice_pick(header, offers, cancel_text)
+
+
+func _choice_picked(value) -> void:
+	buff_pick_open = false
+	modals.hide_choice_pick()
+	var cb := _choice_on_chosen
+	_choice_on_chosen = Callable()
+	_choice_on_cancelled = Callable()
+	cb.call(value)
+
+
+func _choice_pick_cancelled() -> void:
+	buff_pick_open = false
+	modals.hide_choice_pick()
+	var cb := _choice_on_cancelled
+	_choice_on_chosen = Callable()
+	_choice_on_cancelled = Callable()
+	if cb.is_valid():
+		cb.call()
+
+
 ## Buff Box stage 0: 3 random Piece Buffs, pick one, then target a piece.
 ## The clock keeps ticking through both (GDD Box Pick). Numbers Station
 ## Sudoku (+1 choice) / Bohemian Grove Friendship Bracelet (+2) are a plain
 ## UI change here (issue 23), not a REGISTRY hook — additive per held copy,
-## same convention artefact_hooks.gd documents for its own stacking.
+## same convention artefact_hooks.gd documents for its own stacking. Riding
+## the generic choice-pick seam (issue 41): the Buff Box was never special,
+## just first.
 func _open_buff_pick() -> void:
 	var offer_size := 3 + _artefact_count("numbers-station-sudoku") \
 		+ 2 * _artefact_count("bohemian-grove-friendship-bracelet")
@@ -1564,8 +1602,12 @@ func _open_buff_pick() -> void:
 		offer.append(pool.pop_at(rng.randi() % pool.size()))
 	if autoplay: # bot: take one so the flow is exercised, never stall
 		return _buff_chosen(offer[rng.randi() % offer.size()].key)
-	buff_pick_open = true
-	modals.show_buff_pick(offer)
+	var choices := []
+	for b in offer:
+		choices.append({"label": "%s — %s\n%s" % [b.name, b.tier, b.description],
+			"value": b.key})
+	_open_choice_pick("✦ Buff Box — pick a Piece Buff:", choices,
+		"Cancel (keeps the item)", _buff_chosen, _buff_pick_cancelled)
 
 
 ## Catalogued life of a timed buff, in player turns (0 = dormant).
@@ -1577,8 +1619,6 @@ func _buff_turns(key: String) -> int:
 
 
 func _buff_chosen(key: String) -> void:
-	buff_pick_open = false
-	modals.hide_buff_pick()
 	pending_buff = key
 	gold = maxi(gold - 5 * _artefact_count("numbers-station-sudoku"), 0) # "each pick costs 5 Gold"
 	var it: Dictionary = items[item_active]
@@ -1593,8 +1633,6 @@ func _buff_chosen(key: String) -> void:
 ## Backing out of the buff pick leaves the item unspent, like cancelling any
 ## other targeting.
 func _buff_pick_cancelled() -> void:
-	buff_pick_open = false
-	modals.hide_buff_pick()
 	_item_reset()
 	_refresh()
 
@@ -2170,8 +2208,8 @@ func _refresh() -> void:
 # --- modal wiring (widgets live in scripts/modals.gd; signals up, calls down) ---
 
 func _connect_modals() -> void:
-	modals.buff_chosen.connect(_buff_chosen)
-	modals.buff_pick_cancelled.connect(_buff_pick_cancelled)
+	modals.choice_chosen.connect(_choice_picked)
+	modals.choice_pick_cancelled.connect(_choice_pick_cancelled)
 	modals.merge_confirmed.connect(func() -> void:
 		var p := pending_merge
 		pending_merge = []

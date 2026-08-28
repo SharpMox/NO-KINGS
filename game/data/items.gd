@@ -49,13 +49,34 @@ const ITEMS: Array = [
 ##   dormant  — sits on the piece until its trigger fires, then resolves and is
 ##              consumed. No expiry: it can wait forever.
 ##   timed    — activates on application and runs for a fixed window.
-## Only the dormant pair ships in this slice; the timed buffs (Aura, Smog,
-## Slow) need magnitudes the catalog never gave and land with the rest.
+## "Reduced movement range" (Slow, Smog) means the piece moves and captures
+## exactly like a Pawn — ruled 2026-08-28, see the Notion Piece Buffs pages.
+## `turns` on a timed buff is its life in player turns.
 const PIECE_BUFFS: Array = [
 	{"key": "shield", "name": "Shield", "tier": "Tactical", "model": "dormant",
 		"description": "Prevents the next capture attempt on this piece. Both pieces stay put."},
 	{"key": "critical", "name": "Critical", "tier": "Tactical", "model": "dormant",
 		"description": "The next capture by this piece scores double."},
+	{"key": "multicapture", "name": "Multicapture", "tier": "Strategic", "model": "dormant",
+		"description": "The next capture by this piece also takes one enemy standing beside the piece it captured."},
+	{"key": "taunt", "name": "Taunt", "tier": "Tactical", "model": "dormant",
+		"description": "The next enemy capture attempt is forced to target this piece."},
+	{"key": "stun", "name": "Stun", "tier": "Tactical", "model": "dormant",
+		"description": "The next piece that captures this one loses its following 2 turns."},
+	{"key": "bomb", "name": "Bomb", "tier": "Decisive", "model": "dormant",
+		"description": "On capturing or being captured, destroys itself, the other piece, and everything within 1 square."},
+	{"key": "trap", "name": "Trap", "tier": "Decisive", "model": "dormant",
+		"description": "When this piece is captured, the attacking piece is captured too."},
+	{"key": "range", "name": "Range", "tier": "Tactical", "model": "dormant",
+		"description": "Until this piece captures, it can also capture any enemy standing beside an enemy it could already take."},
+	{"key": "reflect", "name": "Reflect", "tier": "Decisive", "model": "dormant",
+		"description": "Stops the next capture attempt, then takes the attacker's tile and captures it."},
+	{"key": "slow", "name": "Slow", "tier": "Tactical", "model": "timed", "turns": 1,
+		"description": "This piece moves and captures like a Pawn until the end of the next enemy turn."},
+	{"key": "aura", "name": "Aura", "tier": "Strategic", "model": "timed", "turns": 2,
+		"description": "For 2 player turns, adjacent allies score double on their captures."},
+	{"key": "smog", "name": "Smog", "tier": "Strategic", "model": "timed", "turns": 2,
+		"description": "For 2 player turns, adjacent enemies move and capture like a Pawn."},
 ]
 
 const ARTEFACT_EFFECTS: Array = [

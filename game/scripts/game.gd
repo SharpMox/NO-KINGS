@@ -351,6 +351,9 @@ func _on_pass() -> void:
 	elif state == State.PLAYER_TURN:
 		fx_at = Vector2(hud.pass_button.get_global_rect().get_center())
 		Economy.charge(self, "pass_cost")
+		for pos in board: # same boundary rule, player side
+			if board[pos].owner == Rules.PLAYER:
+				BuffLogic.tick_side(board[pos])
 		if not early_clear_awarded and _board_cleared():
 			# wave beaten with turns to spare: score + clock scale with the lead
 			early_clear_awarded = true
@@ -423,6 +426,8 @@ func _begin_player_turn() -> void:
 	actions_max = actions_left
 	moved_this_turn.clear()
 	turn_action_count = 0
+	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
+		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		WaveLogic.queue(self, wave + 1)
@@ -479,12 +484,45 @@ func _run_enemy_actions() -> void:
 		if not autoplay:
 			await get_tree().create_timer(0.35).timeout
 		if board.has(act.to) and BuffLogic.repels_capture(board[act.to]):
-			# Shield works against the AI too: the attempt is spent, nothing moves
-			BuffLogic.consume(board[act.to], "shield")
-			_add_float(act.to, "Blocked", COL_MERGE)
+			# Shield works against the AI too: the attempt is spent, nothing
+			# moves. Reflect kills the attacker and takes its tile.
+			if BuffLogic.reflects_capture(board[act.to]):
+				BuffLogic.consume(board[act.to], "reflect")
+				_add_float(act.from, "Reflected!", COL_CAPTURE)
+				lost_enemy += 1
+				_add_pop(act.from)
+				board[act.from] = board[act.to]
+				board.erase(act.to)
+			else:
+				BuffLogic.consume(board[act.to], "shield")
+				_add_float(act.to, "Blocked", COL_MERGE)
+			queue_redraw()
+			continue
+		if board.has(act.to) and (BuffLogic.has(board[act.to], "bomb")
+				or BuffLogic.has(board[act.from], "bomb")):
+			board.erase(act.to)
+			board[act.to] = board[act.from]
+			board.erase(act.from)
+			_detonate(act.to)
+			queue_redraw()
+			continue
+		if board.has(act.to) and BuffLogic.has(board[act.to], "trap"):
+			# Trap takes the attacker with it — neither piece survives
+			_add_float(act.from, "Trapped!", COL_CAPTURE)
+			lost_player += 1
+			lost_enemy += 1
+			_add_pop(act.to)
+			_add_pop(act.from)
+			board.erase(act.to)
+			board.erase(act.from)
 			queue_redraw()
 			continue
 		if board.has(act.to):
+			if BuffLogic.has(board[act.to], "stun"):
+				# 2 ticks: the buff ages at the start of each PLAYER turn, so
+				# 2 keeps the attacker out for exactly one enemy turn
+				BuffLogic.add(board[act.from], "stunned", Tuning.STUN_MISSES + 1)
+				_add_float(act.from, "Stunned!", COL_MERGE)
 			lost_player += 1
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
@@ -493,6 +531,9 @@ func _run_enemy_actions() -> void:
 		queue_redraw()
 		if _back_row_breached():
 			return _game_over(false, "Back-row breach")
+	for pos in board: # Stun ages on the stunned side's own turn boundary
+		if board[pos].owner == Rules.ENEMY:
+			BuffLogic.tick_side(board[pos])
 
 
 func _add_slide(from: Vector2i, to: Vector2i) -> void:
@@ -834,7 +875,8 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and board[tile].owner == Rules.PLAYER and merge_highlights.has(board[tile].id):
 		MergeLogic.do_merge(self, selected, tile) # second pick completes the merge on its tile
 	elif board.has(tile) and board[tile].owner == Rules.PLAYER and actions_left > 0 \
-			and not moved_this_turn.has(tile):
+			and not moved_this_turn.has(tile) \
+			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
 		legal_dests = Rules.moves_for(board, tile, defs)
 		legal_paths = Rules.move_paths(board, tile, defs)
@@ -901,8 +943,17 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
 		# tile and nothing is captured. The attempt still costs the action.
-		BuffLogic.consume(board[to], "shield")
-		_add_float(to, "Blocked", COL_MERGE)
+		# Reflect goes further — the defender takes the attacker's tile.
+		if BuffLogic.reflects_capture(board[to]):
+			BuffLogic.consume(board[to], "reflect")
+			_add_float(from, "Reflected!", COL_CAPTURE)
+			lost_player += 1
+			_add_pop(from)
+			board[from] = board[to] # the defender counter-attacks into the tile
+			board.erase(to)
+		else:
+			BuffLogic.consume(board[to], "shield")
+			_add_float(to, "Blocked", COL_MERGE)
 		Economy.charge(self, "move_cost")
 		actions_left -= 1
 		turn_action_count += 1
@@ -914,12 +965,55 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		Economy.earn(self, Economy.capture_score(self, victim.id)
-			* BuffLogic.capture_multiplier(board[from]))
+			* BuffLogic.capture_multiplier(board, from))
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
 			_add_float(to, "Critical!", COL_MERGE)
+		# Range is spent by the capture, not by repositioning
+		BuffLogic.consume(board[from], "range")
+		if BuffLogic.has(victim, "stun"): # cuts both ways
+			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
+			_add_float(from, "Stunned!", COL_MERGE)
+		if BuffLogic.has(board[from], "multicapture"):
+			# one extra enemy beside the piece just taken (ruled 2026-08-28)
+			var also := BuffLogic.multicapture_target(board, to, Rules.PLAYER, defs)
+			BuffLogic.consume(board[from], "multicapture")
+			if also.x >= 0:
+				_add_float(also, "Multicapture!", COL_MERGE)
+				Economy.earn(self, Economy.capture_score(self, board[also].id))
+				captured.append(board[also].id)
+				lost_enemy += 1
+				_add_pop(also)
+				board.erase(also)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
+		if victim.id != "king" and (BuffLogic.has(victim, "bomb")
+				or BuffLogic.has(board[from], "bomb")):
+			# Precedence ruled 2026-08-28: Reflect > Bomb > Trap. Reflect
+			# resolved above (the capture never lands); the blast takes the
+			# attacker anyway, so Trap has nothing left to do.
+			captured.append(victim.id) # the capture itself still resolved
+			board.erase(to)
+			board[to] = board[from] # the attacker lands, then the blast
+			board.erase(from)
+			_detonate(to)
+			actions_left -= 1
+			turn_action_count += 1
+			if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
+				return _on_pass()
+			return _refresh()
+		if BuffLogic.has(victim, "trap"): # the attacker goes with it
+			_add_float(from, "Trapped!", COL_CAPTURE)
+			lost_player += 1
+			_add_pop(from)
+			board.erase(from)
+			board.erase(to)
+			captured.append(victim.id)
+			actions_left -= 1
+			turn_action_count += 1
+			if actions_left == 0 and state == State.PLAYER_TURN:
+				return _on_pass()
+			return _refresh()
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
 		else:
@@ -1112,6 +1206,14 @@ func _open_buff_pick() -> void:
 	modals.show_buff_pick(offer)
 
 
+## Catalogued life of a timed buff, in player turns (0 = dormant).
+func _buff_turns(key: String) -> int:
+	for b in Items.PIECE_BUFFS:
+		if b.key == key:
+			return int(b.get("turns", 0))
+	return 0
+
+
 func _buff_chosen(key: String) -> void:
 	buff_pick_open = false
 	modals.hide_buff_pick()
@@ -1217,7 +1319,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[b].erase("buff")
 			BuffLogic.clear(board[b])
 		"buff_box":
-			BuffLogic.add(board[b], _buff_pick)
+			BuffLogic.add(board[b], _buff_pick, _buff_turns(_buff_pick))
 			_add_float(b, BuffLogic.name_of(_buff_pick), COL_MERGE)
 			_buff_pick = ""
 		"demote":
@@ -1242,6 +1344,19 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 		return _on_pass() # last action, or the item cleared the last enemy
 	_refresh()
+
+
+## Bomb blast: everything within 1 square of `at`, the bomb piece included.
+## Destruction, not capture (CONTEXT.md) — no score, no Captured Stock, and
+## destroyed allies do not return to Stock. The King is unaffected, as with
+## Drone Strike.
+func _detonate(at: Vector2i) -> void:
+	_add_float(at, "Boom!", COL_CAPTURE)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var pos := at + Vector2i(dx, dy)
+			if board.has(pos) and board[pos].id != "king":
+				_destroy(pos)
 
 
 ## Item destruction: piece leaves the board — no score, no captured stock.

@@ -10,6 +10,8 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # move/capture, place, merge/fuse, item use
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
+const STUN_MISSES := 2            # Stun: turns the attacker loses, its own
+                                   # side's turns (user call 2026-08-28)
 const ENEMY_ACTIONS_PER_TURN := 1  # playtest override 2026-07-02 (GDD says 2)
 const ENEMY_TURN_PAUSE := 0.4      # beat before/after the enemy acts (feel 2026-07-06)
 

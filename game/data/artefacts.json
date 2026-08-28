@@ -534,9 +534,9 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Capture: +2 Gold; +10 more Gold if the captured piece had captured one of yours (needs: per-piece capture memory)",
+  "effect": "On Capture: +2 Gold; +10 more Gold if the captured piece had captured one of yours",
   "conspiracy": "The Chupacabra",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bielefeld-library-card",
@@ -839,9 +839,9 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On Wave clear: the ally piece with the most Captures that Wave gets +1 Piece Buff (needs: per-piece capture tracking)",
+  "effect": "On Wave clear: the ally piece with the most Captures that Wave gets +1 Piece Buff",
   "conspiracy": "The Zodiac ciphers",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "voynich-dictionary",
@@ -1963,9 +1963,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On a piece's 3rd Capture: it Ranks Up (needs: per-piece capture counter)",
+  "effect": "On a piece's 3rd Capture: it Ranks Up",
   "conspiracy": "Ancient astronauts",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "rapture-insurance-policy",

@@ -313,6 +313,42 @@
 ##   mean introducing a brand-new base-game restriction (default 1, this
 ##   artefact raises it to 2) that nothing today asks for — a design
 ##   decision, not a wiring job. Notion question, not a guess.
+##
+## issue 25 (split from 19 — 3 artefacts want a capture count kept per
+## INDIVIDUAL piece, not Economy's run-wide wave/turn_capture_count) added a
+## board-piece ledger: `captures` (lifetime) and `wave_captures` (reset every
+## Wave in WaveLogic.queue), both absent = 0. game.gd's `_note_capture(pos)`
+## is the single choke point that increments both, called from Economy.
+## capture_score (the player's own capture — g._note_capture(attacker_pos),
+## before the on_capture hook runs, so a handler in the same dispatch already
+## sees the bump) and from _run_enemy_actions' capture branch directly (the
+## enemy's own capture never reaches capture_score — the enemy doesn't score).
+## Those are the two, and only the two, "a piece's OWN capture resolves"
+## sites issue 25 names; the Reflect/Trap/Bomb counter-kill branches are a
+## different resolution path and are out of scope. ADR-0002 (Stock holds
+## opaque piece state) already settles the round-trip question the issue
+## raised without guessing: nothing strips a field it doesn't know about, so
+## `captures` rides through Extraction/placement exactly like Piece Buffs
+## already do — no new code needed, covered by test_save.gd. `wave_captures`
+## is the one field this slice DOES reach in and strip, by name, at the one
+## place issue 25 named (WaveLogic.queue) — on both g.board and any Dictionary
+## Stock entries, so a piece Extracted mid-Wave doesn't carry a stale count
+## into a Wave it never played.
+## - on_capture ctx grew `victim_captures` (economy.gd capture_score reads
+##   g.board[victim_pos].get("captures", 0) before the caller erases the
+##   victim) — Chupacabra Chew Toy's "+10 more Gold if the captured piece had
+##   captured one of yours" (only enemies capture player pieces, so any
+##   lifetime count > 0 already means "one of yours").
+## - Alien Rocket Toy plugs into the same on_capture dispatch: on
+##   ctx.attacker_pos's 3rd lifetime capture, promotes it in place
+##   (mirroring game.gd's "promote" Item) and fires on_rank_up itself —
+##   exactly the "once on_rank_up lands" plan the issue described, since 19
+##   had already wired that hook.
+## - Zodiac Crossword Puzzle reads `wave_captures` on on_wave_clear (fired
+##   from WaveLogic.queue BEFORE the reset above runs, so it still sees the
+##   Wave that just ended) and grants +1 Piece Buff to the ally with the
+##   highest count — ties keep whichever board position is found first, the
+##   same reading Diplomatic Migraine Ray's "the strongest" already uses.
 
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
@@ -492,6 +528,12 @@ const REGISTRY := {
 	"45-5-carat-curse": ["on_gold_change", "on_score_change", "on_wave_clear"],
 	"antikythera-warranty-card": ["on_demote", "on_buff_removal"],
 	"atlantis-snow-globe": ["on_demote"],
+
+	# --- issue 25: per-piece capture ledger (game.gd _note_capture,
+	# economy.gd capture_score's victim_captures) ---
+	"chupacabra-chew-toy": ["on_capture"],
+	"zodiac-crossword-puzzle": ["on_wave_clear"],
+	"alien-rocket-toy": ["on_capture"],
 }
 
 
@@ -1191,3 +1233,27 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			if g.wave % 3 == 0:
 				for pos in g._player_pieces():
 					BuffLogic.clear(g.board[pos])
+
+		# --- issue 25: per-piece capture ledger ---
+		["chupacabra-chew-toy", "on_capture"]:
+			g.gold += 2
+			if ctx.victim_captures > 0: # the victim had captured one of yours
+				g.gold += 10
+		["alien-rocket-toy", "on_capture"]:
+			if ctx.attacker_pos.x >= 0 and g.board.has(ctx.attacker_pos):
+				var rocket_piece: Dictionary = g.board[ctx.attacker_pos]
+				if rocket_piece.get("captures", 0) == 3 and g.defs[rocket_piece.id].next != null:
+					var old_id: String = rocket_piece.id
+					rocket_piece.id = g.defs[old_id].next
+					run(g, "on_rank_up", {"pos": ctx.attacker_pos,
+						"old_id": old_id, "id": rocket_piece.id, "stock_index": -1})
+		["zodiac-crossword-puzzle", "on_wave_clear"]:
+			var best := Vector2i(-1, -1)
+			var best_n := 0
+			for pos in _player_positions(g):
+				var n: int = g.board[pos].get("wave_captures", 0)
+				if n > best_n:
+					best_n = n
+					best = pos
+			if best.x >= 0:
+				_grant_buff(g, best)

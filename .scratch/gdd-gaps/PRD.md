@@ -105,6 +105,8 @@ waiting on design calls.
 | 38 | Save schema versioning | **independent** |
 | 39 | Notion drift guard | **independent** |
 | 40 | Repo docs refresh | **independent** |
+| 41 | Mid-effect choice modal | **independent** (ruled) |
+| 42 | Full buff pool, and "Demoted" | **independent** (ruled) |
 
 Slices 36-40 are **engineering health** rather than game features. They exist because the
 same three problems kept costing time across this backlog: a flaky suite that makes green

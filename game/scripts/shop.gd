@@ -24,15 +24,30 @@ const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
 const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Legendary"]
 
 
+## Row counts after the Tier 3+ modifier (07-difficulty-ranks: "Shop stocks
+## 1 fewer of each kind") — the seam every roll() count reads through instead
+## of the ROWS constant directly, same shape as the artefact/item modifiers
+## below.
+static func _rows(g) -> Dictionary:
+	var d: int = Tuning.shop_row_delta(g.next_tier)
+	var out := {}
+	for k in ROWS:
+		out[k] = ROWS[k] + d
+	return out
+
+
 ## Reroll g.shop_stock in place. Plain function on purpose: effects
 ## (items, tariffs) may call it outside the score cadence (money-and-shop/07).
 static func roll(g) -> void:
+	var rows := _rows(g)
 	var slots := []
-	for type in BOX_TYPES:
-		for i in ROWS.box / BOX_TYPES.size():
-			slots.append({"kind": "box", "key": type, "sold": false})
+	var box_base: int = rows.box / BOX_TYPES.size()
+	var box_remainder: int = rows.box % BOX_TYPES.size()
+	for ti in BOX_TYPES.size():
+		for i in box_base + (1 if ti < box_remainder else 0):
+			slots.append({"kind": "box", "key": BOX_TYPES[ti], "sold": false})
 
-	var artefact_keys: Array = _sample_weighted_artefacts(Items.ARTEFACT_EFFECTS, ROWS.artefact, g)
+	var artefact_keys: Array = _sample_weighted_artefacts(Items.ARTEFACT_EFFECTS, rows.artefact, g)
 	for key in artefact_keys:
 		slots.append({"kind": "artefact", "key": key, "sold": false})
 	for key in _sample_biased_artefacts(g, _extra_artefact_slots(g), artefact_keys):
@@ -44,11 +59,11 @@ static func roll(g) -> void:
 	var item_keys: Array = _sample(tactical_pool, extra.tactical, g.rng)
 	var rest_pool: Array = Items.ITEMS.map(func(it: Dictionary) -> String: return it.key) \
 			.filter(func(k: String) -> bool: return not item_keys.has(k))
-	item_keys += _sample(rest_pool, ROWS.item + extra.total - extra.tactical, g.rng)
+	item_keys += _sample(rest_pool, rows.item + extra.total - extra.tactical, g.rng)
 	for key in item_keys:
 		slots.append({"kind": "item", "key": key, "sold": false})
 
-	for id in _sample_pieces(g, ROWS.piece):
+	for id in _sample_pieces(g, rows.piece):
 		slots.append({"kind": "piece", "key": id, "sold": false})
 	g.shop_stock = slots
 

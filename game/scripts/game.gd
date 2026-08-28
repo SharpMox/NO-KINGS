@@ -36,10 +36,10 @@ static var is_scenario := false
 ## Starting stock for a fresh run (menu's army select sets it; saves carry
 ## their stock in next_config instead, so this only matters when empty).
 static var next_army: String = Tuning.DEFAULT_ARMY
-## Difficulty rank (07-difficulty-ranks): menu's rank picker sets it, locked
+## Difficulty tier (07-difficulty-ranks): menu's tier picker sets it, locked
 ## for the run — a save/Continue restores it via SaveConfig instead of
 ## re-reading this, same split as next_army above.
-static var next_rank: String = Tuning.DEFAULT_RANK
+static var next_tier: String = Tuning.DEFAULT_TIER
 
 const SAVE_PATH := "user://save.json"
 const SCORES_PATH := "user://scores.json"
@@ -278,6 +278,8 @@ func _ready() -> void:
 		autoplay_cap = int(args[args.find("--steps") + 1])
 	if args.has("--army"): # balance fleets: run the bot with a specific army
 		next_army = args[args.find("--army") + 1]
+	if args.has("--tier"): # balance fleets: run the bot at a specific difficulty tier
+		next_tier = args[args.find("--tier") + 1]
 	_layout_board()
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
@@ -315,9 +317,8 @@ func _ready() -> void:
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
 	if next_config.is_empty():
-		# rank lever (c): higher ranks trim that many pieces off the front of
-		# the army — the cheap, numerous troops (07-difficulty-ranks)
-		stock = Tuning.ARMIES[next_army].slice(Tuning.RANKS.find(next_rank))
+		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
+		stock = Tuning.starting_stock(next_army, next_tier)
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
@@ -495,10 +496,16 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		# rank lever (a): Officer/Autocrat keep the clock running through the
-		# Shop, so shopping costs real time (07-difficulty-ranks)
-		var shop_pauses := shop_open() and next_rank == Tuning.RANKS[0]
-		if not game_menu_open and not win_open and not shop_pauses and not backgrounded:
+		# Tier 1 (baseline) pauses the Clock for menu/win-screen/Shop/the Stock
+		# and Inventory drawers/the piece preview; Tier 2+ keeps it running
+		# through all of those, so browsing costs real time (07-difficulty-ranks).
+		# Box Pick and the Buff Box sub-pick are deliberately absent from this
+		# list at every tier — GDD Box Pick: "decisive picks rewarded,
+		# indecision punished". OS-backgrounded pause (slice 06) always wins;
+		# it is not a difficulty lever.
+		var tier_pauses := not Tuning.clock_never_pauses(next_tier) \
+				and (game_menu_open or win_open or shop_open() or drawer_open != "" or preview_open)
+		if not tier_pauses and not backgrounded:
 			clock_ms -= delta * 1000.0
 		# Doomsday Clock Snooze Button (issue 26): the Clock ticks here every
 		# frame, continuously — no discrete hook fires on a threshold cross,
@@ -542,7 +549,7 @@ func _begin_player_turn() -> void:
 		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.ACTIONS_PER_TURN
+	actions_left = Tuning.actions_per_turn(next_tier) # Tier 5: -1 (07-difficulty-ranks)
 	ArtefactHooks.run(self, "on_turn_start")
 	actions_max = actions_left
 	moved_this_turn.clear()

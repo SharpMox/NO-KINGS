@@ -34,7 +34,11 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.kings_defeated = int(cfg.get("kings_defeated", 0))
 	g.king_ids_defeated = cfg.get("king_ids_defeated", []).duplicate()
 	g.next_army = str(cfg.get("army", g.next_army)) # milestone drip draws from it
-	g.next_rank = str(cfg.get("rank", g.next_rank)) # locked at run start, Continue keeps it
+	# "rank" key kept for save compat (07-difficulty-ranks rework: 3 named
+	# ranks -> 5 numbered tiers). An old save's rank name ("Citizen" etc.) or
+	# any other unrecognized value falls back to Tier 1 baseline everywhere
+	# Tuning reads next_tier (tier_index() returns 0 for an unknown string).
+	g.next_tier = str(cfg.get("rank", g.next_tier)) # locked at run start, Continue keeps it
 	g.lost_player = int(cfg.get("lost_player", 0))
 	g.lost_enemy = int(cfg.get("lost_enemy", 0))
 	g.pending_spawn = cfg.get("pending", []).duplicate(true)
@@ -94,7 +98,7 @@ static func to_config(g) -> Dictionary:
 		"early_clear_awarded": g.early_clear_awarded,
 		"pending_reinforce": g.pending_reinforce,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
-		"army": g.next_army, "rank": g.next_rank,
+		"army": g.next_army, "rank": g.next_tier,
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "clock_s": g.clock_ms / 1000.0,

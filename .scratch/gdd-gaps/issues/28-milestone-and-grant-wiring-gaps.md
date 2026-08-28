@@ -1,6 +1,6 @@
 # 28 — Milestone wiring gaps and two grant-pool leftovers
 
-Status: todo
+Status: done (2026-08-29)
 
 ## Parent
 

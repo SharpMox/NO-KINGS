@@ -1,6 +1,6 @@
 # 36 — Test determinism (flaky suite)
 
-Status: todo — INDEPENDENT · **PRIORITY**
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -55,3 +55,20 @@ config (`"seed"`) and round-trips deterministically. It is simply not used.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in `b30b655` (PR #150), across 15 test files.
+
+The defect was that 170 of 171 `_boot()` fixtures ran on `randomize()` — exactly one
+pinned a seed. Any suite whose assertions touched a random roll (buff grants, wave
+spawns, shop rolls) could pass or fail on the same code, which made every "ALL GREEN"
+claim unfalsifiable and cost real time chasing phantom regressions (the Holy Lint flake
+was one of these).
+
+`_boot()` now defaults to a fixed seed in every suite; opting out is explicit and has to
+say why. The commit also closed import and contention races that made concurrent runs
+flaky independently of RNG. Verified by five consecutive full-suite runs from the agent
+plus three more run independently — 8/8 ALL GREEN.
+
+The convention is now written into `CLAUDE.md` so it does not regress.

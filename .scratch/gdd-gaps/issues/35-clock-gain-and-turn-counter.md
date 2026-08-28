@@ -1,6 +1,6 @@
 # 35 — Clock-gain choke point & run-long turn counter
 
-Status: todo — INDEPENDENT (no design decision needed)
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -53,3 +53,19 @@ it becomes an ordinary two-hook artefact.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in `a3b0261` (PR #145). Both seams built as their own thing, not as scaffolding
+for one artefact:
+
+- **`Economy.add_clock`** is now the single choke point for Clock gain, matching the
+  shape `earn`/`gain` already had for Gold and Score. The ~15 direct `clock_ms` mutations
+  named in FLAGS.md route through it, so any future effect that wants to modify time
+  hooks one function instead of chasing call sites.
+- **A run-long Turn counter** now rides in the run state and the save, alongside the
+  existing `turns_since_wave` (which resets every Wave and could not answer "how long has
+  this run been going").
+
+`test_clock.gd` (96 lines) covers both. This unblocks Black Knight Morse Code; the two
+FLAGS.md entries that named these gaps are now closed.

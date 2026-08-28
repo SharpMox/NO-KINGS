@@ -5,6 +5,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Tariffs := preload("res://data/tariffs.gd")
+const Kings := preload("res://data/kings.gd")
 const Economy := preload("res://scripts/economy.gd")
 
 
@@ -17,7 +18,10 @@ static func queue(g, n: int) -> void:
 		g.pending_reinforce = true
 	var buff_id: String = Waves.BUFFS.get(n, "")
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
-	g._add_turn_fx("KING WAVE!" if roster.has("king") else "WAVE %d" % n,
+	# King identity picked here, once, so the wave banner can name it (issue 09
+	# selection rule: tier-ordered by King-wave depth, sampled within the tier)
+	var king: Dictionary = Kings.select(g.rng, n) if roster.has("king") else {}
+	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
 		Color(1.0, 0.8, 0.3))
 	if Economy.tariff_on(g, "trade_war"): # +1 piece per wave, drawn from the wave's own mix
 		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
@@ -25,6 +29,8 @@ static func queue(g, n: int) -> void:
 			roster.append(extras[g.rng.randi() % extras.size()])
 	for id in roster:
 		var entry := {"id": id}
+		if id == "king":
+			entry.king_id = king.id
 		if id == buff_id: # first spawned piece of the flagged type carries the box
 			entry.buff = true
 			buff_id = ""
@@ -73,3 +79,5 @@ static func spawn_pending(g) -> void:
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
 		if entry.get("buff", false):
 			g.board[spot].buff = true
+		if entry.has("king_id"):
+			g.board[spot].king_id = entry.king_id

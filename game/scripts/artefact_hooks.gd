@@ -441,6 +441,15 @@
 ## test_items.gd ("two echo artefacts + a percentage artefact stay bounded
 ## and order-independent").
 ##
+## issue 28 fixed a separate gap in the same layer: `fired` used to carry
+## bare keys, so an echoed 5-Wave Milestone artefact (_milestone5_hit) always
+## checked its cadence against the default acquired_wave=1 instead of the
+## firing copy's own stamp — two copies acquired on different waves would
+## echo on the wrong beat. `fired` now carries the whole entry through to
+## every echoed `_dispatch` call; the RE-ENTRANCY RULE above is untouched —
+## still bare `_dispatch`, never `run()`. Covered by test_items.gd ("Max
+## Headroom Mask echoes John Titor's Crypto Wallet on THAT copy's own beat").
+##
 ## Illuminati Fridge Magnet, Deep State Yearbook and New World Order
 ## Gerrymandering stay unimplemented — real design rulings, not guesses (see
 ## .scratch/gdd-gaps/issues/21's Outcome). So do Ecdysis Sheddings ("copies
@@ -876,12 +885,17 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	if hook == "on_turn_start":
 		g.dejavu_score_turn_done = false
 		g.dejavu_gold_turn_done = false
-	var fired: Array = [] # issue 21: keys that actually dispatched this call,
-		# not just held — Bilderberg Hotel Slippers' own contract
+	var fired: Array = [] # issue 21: the held/tariff ENTRIES that actually
+		# dispatched this call, not just held — Bilderberg Hotel Slippers' own
+		# contract. Carries the whole entry (not just t.key) so the echo layer
+		# below can re-dispatch with this specific copy's own acquired_wave
+		# instead of falling back to the default (issue 28: a 5-Wave Milestone
+		# artefact echoed by Max Headroom Mask/Polybius Cartridge/etc. used to
+		# echo on the wrong beat for any copy not acquired on wave 1).
 	for t in held + tariffs:
 		if REGISTRY.get(t.key, []).has(hook):
 			_dispatch(g, t.key, hook, ctx, t.get("acquired_wave", 1))
-			fired.append(t.key)
+			fired.append(t)
 	if g.artefact_echo_depth == 0: # re-entrancy guard, see header
 		g.artefact_echo_depth += 1
 		_run_meta_triggers(g, hook, ctx, fired, held)
@@ -893,7 +907,11 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 ## trigger goes straight through _dispatch, so nothing here can ever be
 ## observed by a second pass of itself. `fired`/`held` are the same-call
 ## snapshots run() already built; `counts` is just `held` grouped by key,
-## for CERN's duplicate check.
+## for CERN's duplicate check. `fired` holds full entries (issue 28), not
+## bare keys, so every echoed _dispatch can pass the ORIGINAL copy's own
+## acquired_wave through instead of silently defaulting to 1 — the gap
+## that made a 5-Wave Milestone artefact echo on the wrong beat whenever
+## the copy that fired wasn't acquired on wave 1.
 static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, held: Array) -> void:
 	var counts := {}
 	for t in held:
@@ -901,32 +919,33 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 
 	var n_poly: int = counts.get("polybius-cartridge", 0)
 	if n_poly > 0 and hook == "on_capture":
-		for key in fired:
+		for entry in fired:
 			for i in n_poly:
-				_dispatch(g, key, hook, ctx)
+				_dispatch(g, entry.key, hook, ctx, entry.get("acquired_wave", 1))
 
 	var n_headroom: int = counts.get("max-headroom-mask", 0)
 	if n_headroom > 0 and (hook == "on_wave_clear" or hook == "on_wave_spawn"):
-		for key in fired:
+		for entry in fired:
 			for i in n_headroom:
-				_dispatch(g, key, hook, ctx)
+				_dispatch(g, entry.key, hook, ctx, entry.get("acquired_wave", 1))
 
 	var n_diary: int = counts.get("red-diary-s-missing-pages", 0)
 	if n_diary > 0 and hook == "on_piece_lost":
-		for key in fired:
+		for entry in fired:
 			for i in n_diary:
-				_dispatch(g, key, hook, ctx)
+				_dispatch(g, entry.key, hook, ctx, entry.get("acquired_wave", 1))
 
 	var n_cern: int = counts.get("cern-ctrl-z-shortcut", 0)
 	if n_cern > 0:
 		var seen := {}
-		for key in fired:
+		for entry in fired:
+			var key: String = entry.key
 			if seen.has(key):
 				continue
 			seen[key] = true
 			if counts.get(key, 0) >= 2:
 				for i in n_cern:
-					_dispatch(g, key, hook, ctx)
+					_dispatch(g, key, hook, ctx, entry.get("acquired_wave", 1))
 
 	var n_bilderberg: int = counts.get("bilderberg-hotel-slippers", 0)
 	if n_bilderberg > 0 and fired.size() >= 2:
@@ -940,9 +959,9 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 	var n_mona: int = counts.get("100-genuine-original-mona-lisa", 0)
 	if n_mona > 0 and not g.mona_lisa_turn_done and not fired.is_empty():
 		g.mona_lisa_turn_done = true
-		var first_key: String = fired[0]
+		var first_entry: Dictionary = fired[0]
 		for i in n_mona:
-			_dispatch(g, first_key, hook, ctx)
+			_dispatch(g, first_entry.key, hook, ctx, first_entry.get("acquired_wave", 1))
 
 	var n_dejavu: int = counts.get("deja-vu-glitch", 0)
 	if n_dejavu > 0:
@@ -1125,12 +1144,16 @@ static func _on_enemy_half(pos: Vector2i) -> bool:
 ## `acquired_wave` (issue: "5-Wave Milestone" ruled per-artefact, not global —
 ## see _milestone5_hit below) is the wave this specific held copy entered
 ## g.artefacts (stamped on every acquisition path: save_config.gd, shop.gd,
-## the box-pick/--artefacts spots in game.gd). Defaults to 1 for the
-## _run_meta_triggers echo calls below, which re-dispatch by bare key with no
-## specific copy in hand — a known, documented gap (a milestone-5 artefact
-## echoed by Max Headroom Mask/Polybius Cartridge/etc. falls back to the
-## wave-1 cadence for that extra dispatch only; real gameplay/test coverage
-## doesn't combine them today, see the fix's PR notes).
+## the box-pick/--artefacts spots in game.gd). Defaults to 1 only for the two
+## call sites that genuinely have no copy in hand (run()'s own normal loop
+## reads it off `t.get("acquired_wave", 1)`, an old-save fallback; direct
+## test-only calls). The `_run_meta_triggers` echo calls (issue 21) now pass
+## the firing copy's own `acquired_wave` explicitly (issue 28 fix — they used
+## to re-dispatch by bare key and silently fall back to wave 1, so a
+## milestone-5 artefact echoed by Max Headroom Mask/Polybius Cartridge/etc.
+## fired on the wrong beat for any copy not acquired on wave 1). Covered by
+## test_items.gd ("Max Headroom Mask echoes John Titor's Crypto Wallet on
+## THAT copy's own beat, not the wave-1 default").
 static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int = 1) -> void:
 	match [key, hook]:
 		["greed", "on_capture"]:

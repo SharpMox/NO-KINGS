@@ -8,6 +8,9 @@ const PLAYER := 0
 const ENEMY := 1
 
 
+const BuffLogic := preload("res://scripts/buff_logic.gd")
+
+
 static func load_pieces() -> Dictionary:
 	var text := FileAccess.get_file_as_string("res://data/pieces.json")
 	return JSON.parse_string(text)
@@ -27,10 +30,10 @@ static func in_bounds(p: Vector2i) -> bool:
 ## is_attacked, which only cares about capture coverage.
 static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_filter: String = "") -> Array[Vector2i]:
 	var piece: Dictionary = board[from]
-	var def: Dictionary = defs[piece.id]
 	var mirror := -1 if piece.owner == ENEMY else 1
 	var out: Array[Vector2i] = []
-	for m in def.moves:
+	# Slow/Smog swap the move set for the Pawn's (ruling 2026-08-28)
+	for m in BuffLogic.moves_of(board, from, defs):
 		if mode_filter != "" and m.mode != "both" and m.mode != mode_filter:
 			continue
 		if m.type == "bent": # one step to the pivot, then ride outward from it

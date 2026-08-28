@@ -350,6 +350,39 @@
 ##   highest count — ties keep whichever board position is found first, the
 ##   same reading Diplomatic Migraine Ray's "the strongest" already uses.
 
+## issue 22 (split out of 19: "the reactive on_tariff_apply/on_tariff_charge
+## hooks can't express changing whether/how a Tariff applies") added the
+## filter/scale/cancel shapes those two hooks were missing:
+## - Panama Papers Shredder ("Mild Tariffs don't affect you") and Amber Room
+##   Bubble Wrap ("ignore Inflation and other gold-reducing Tariffs") both
+##   dispatch before the tariff they're gating (artefacts-before-tariffs
+##   ordering, header above) and set a ctx flag the gated tariff's own case
+##   reads — `on_charge`'s 6 Mild action-cost keys check `ctx.mild_blocked`
+##   (split from the 2 Moderate keys, deploy_cost/fuse_cost, which don't);
+##   `on_gold_gain`'s Inflation checks `ctx.gain_immune`, set by either
+##   artefact (a boolean gate, not a percentage — no compounding to reason
+##   about). Neither artefact touches on_tariff_apply/on_tariff_charge
+##   themselves (issue 19's "a Tariff was applied/charged" meta-notifications
+##   fire regardless — Merchants of Death Sample Case still pays out on a
+##   Mild Tariff even though Panama Papers Shredder just neutralized its
+##   effect); on_tariff_charge additionally just can't fire for a blocked
+##   charge, since Economy.charge only dispatches it inside `if ctx.charged`.
+## - Ark Grounding Cable ("Tariff penalties reduced by 50%") is the
+##   percentage-scale twin — economy.gd's charge() grew `base`/`amount` ctx
+##   fields (mirroring on_score_change) so `ctx.amount -= ctx.base * 0.5` can
+##   shrink the actual gold deducted, off the immutable base like every other
+##   percentage handler.
+## - Salvation Gift Card ("cancelled; recharges at each 5-Wave Milestone") is
+##   the veto — economy.gd's apply_tariff() grew `ctx.cancel`, read right
+##   after the on_tariff_apply dispatch, same shape as on_item_consume's
+##   cancel. Recharge state (`g.salvation_charged`, starts true) is consumed
+##   on a successful veto and restored on_wave_clear at wave%5==0, the same
+##   cadence Silk Road Coupon already established (issue 18).
+## - Exhibit 399 (tariff choice) and SETI's Red Marker (tariff inversion) stay
+##   unimplemented — both need a design ruling before any code (a blocking
+##   modal choice; a per-Tariff "equivalent bonus" table) — see the issue 22
+##   Outcome / Notion questions.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -534,6 +567,12 @@ const REGISTRY := {
 	"chupacabra-chew-toy": ["on_capture"],
 	"zodiac-crossword-puzzle": ["on_wave_clear"],
 	"alien-rocket-toy": ["on_capture"],
+
+	# --- issue 22: tariff interception (filter/scale/cancel; see header) ---
+	"panama-papers-shredder": ["on_charge", "on_gold_gain"],
+	"amber-room-bubble-wrap": ["on_gold_gain"],
+	"ark-grounding-cable": ["on_charge"],
+	"salvation-gift-card": ["on_tariff_apply", "on_wave_clear"],
 }
 
 
@@ -971,13 +1010,21 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		# `ctx.key` or an unrelated held tariff would gate a charge for a key
 		# it isn't. ctx.charged is a flag, not a counter, so a key held twice
 		# (a redrawn Mild tariff) still only gates once — no double charge.
-		["move_cost", "on_charge"], ["ability_cost", "on_charge"], ["capture_cost", "on_charge"], ["pass_cost", "on_charge"], ["long_range_cost", "on_charge"], ["box_cost", "on_charge"], ["deploy_cost", "on_charge"], ["fuse_cost", "on_charge"]:
+		# Mild-tier action costs only — Panama Papers Shredder (issue 22) sets
+		# ctx.mild_blocked before these dispatch (artefacts-before-tariffs
+		# ordering); the 2 Moderate keys below don't check it.
+		["move_cost", "on_charge"], ["ability_cost", "on_charge"], ["capture_cost", "on_charge"], ["pass_cost", "on_charge"], ["long_range_cost", "on_charge"], ["box_cost", "on_charge"]:
+			if ctx.key == key and not ctx.get("mild_blocked", false):
+				ctx.charged = true
+		["deploy_cost", "on_charge"], ["fuse_cost", "on_charge"]:
 			if ctx.key == key:
 				ctx.charged = true
 		["inflation", "on_gold_gain"]:
 			# stacks multiplicatively per held copy (header) — data/tariffs.gd:
-			# "All gold gains reduced 10% (stacks)"
-			ctx.amount *= 0.9
+			# "All gold gains reduced 10% (stacks)". ctx.gain_immune (issue 22:
+			# Panama Papers Shredder / Amber Room Bubble Wrap) skips it entirely.
+			if not ctx.get("gain_immune", false):
+				ctx.amount *= 0.9
 		["sanctions", "on_sanction_check"]:
 			if ctx.id == g.sanctioned_id:
 				ctx.blocked = true
@@ -1257,3 +1304,21 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 					best = pos
 			if best.x >= 0:
 				_grant_buff(g, best)
+
+		# --- issue 22: tariff interception (see header) ---
+		["panama-papers-shredder", "on_charge"]:
+			ctx.mild_blocked = true # only the 6 Mild-tier keys' case checks this
+		["panama-papers-shredder", "on_gold_gain"]:
+			ctx.gain_immune = true # Inflation is the one Mild on_gold_gain tariff
+		["amber-room-bubble-wrap", "on_gold_gain"]:
+			ctx.gain_immune = true # same flag: "ignore Inflation and other
+				# gold-reducing Tariffs" is the same gate regardless of tier
+		["ark-grounding-cable", "on_charge"]:
+			ctx.amount -= ctx.base * 0.5 # off the immutable base, additive per copy
+		["salvation-gift-card", "on_tariff_apply"]:
+			if g.salvation_charged:
+				g.salvation_charged = false
+				ctx.cancel = true
+		["salvation-gift-card", "on_wave_clear"]:
+			if g.wave % 5 == 0: # same cadence as Silk Road Coupon (issue 18)
+				g.salvation_charged = true

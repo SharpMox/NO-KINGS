@@ -156,6 +156,12 @@ static func all() -> Array:
 				["rook", 1, 4, 6]],
 			"artefacts": ["chupacabra-chew-toy", "zodiac-crossword-puzzle", "alien-rocket-toy"],
 			"gold": 50, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: slice 22 (tariff interception)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
+			"artefacts": ["panama-papers-shredder", "amber-room-bubble-wrap",
+				"ark-grounding-cable", "salvation-gift-card"],
+			"tariffs": ["move_cost", "inflation", "deploy_cost"],
+			"gold": 200, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

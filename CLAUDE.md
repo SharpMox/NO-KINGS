@@ -171,6 +171,17 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   5. Locked external skills (`skills-lock.json`).
   6. General training-data knowledge / blogs / Stack Overflow — lowest; a hypothesis to verify.
   Never let a lower tier override a higher one without flagging the conflict.
+- **Before an audit of the GDD catalogs, run the Notion drift checker.** The Notion
+  GDD (Artefacts, Items, Pieces, Tariffs) and the repo mirrors (`data/artefacts.js`,
+  `game/data/items.gd`, `data/pieces-codex.js`, `game/data/tariffs.gd`) have drifted
+  apart unnoticed before and been hand-fixed twice — the second fix still missed a
+  row. `tools/check-notion-drift.mjs` diffs them and prints every disagreement; it
+  never writes to either side. It needs a Notion snapshot as input (a plain script
+  can't call the Notion MCP tools) — see the header of that file for the exact SQL
+  to run and the JSON shape to save, then:
+  ```sh
+  node tools/check-notion-drift.mjs <snapshot.json>
+  ```
 
 ## Commits
 

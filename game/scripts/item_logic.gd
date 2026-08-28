@@ -33,8 +33,9 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 	var king: bool = occupied and board[pos].id == "king"
 	if a.x < 0: # stage A (or single-tile items)
 		match key:
-			"blitz": # only a piece that already moved needs a second move
-				return own and moved.has(pos)
+			"blitz": # any own piece (Notion 2026-08-28 rework) — King excluded,
+					# same as every other targeted item
+				return own and not king
 			"buff_box": # GDD: ally or enemy — the choice is the point
 				return occupied and not king
 			"demote":

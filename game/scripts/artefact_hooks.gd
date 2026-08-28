@@ -84,8 +84,9 @@
 ## Crystal is the one action-granting handler that runs mid-turn (on_capture,
 ## not on_turn_start) — it fires from Economy.capture_score *before*
 ## _move_player's own actions_left -= 1 / auto-pass check, the same ordering
-## that lets the Blitz item (game.gd _item_apply) refund its own action
-## without ever resurrecting an already-ended turn. Covered by test_items.gd
+## that lets the Blitz item's free-move flag (game.gd _move_player, checked
+## before that decrement) skip it without ever resurrecting an already-ended
+## turn. Covered by test_items.gd
 ## ("Stargate Divination Crystal refunds the capture's action before the
 ## auto-pass check").
 ##
@@ -544,7 +545,6 @@ const REGISTRY := {
 	"alien-autopsy-bloopers": ["on_wave_clear"],
 	"golden-buddha-bobblehead": ["on_wave_clear"],
 	"nigerian-prince-wire-transfer": ["on_wave_spawn"],
-	"john-titor-s-crypto-wallet": ["on_milestone"],
 	"putin-s-golden-toilet-brush": ["on_purchase"],
 	"rapture-insurance-policy": ["on_game_over"],
 	# --- issue 17: Action/Time/Piece batch (8 artefacts, no needs-note) ---
@@ -703,6 +703,10 @@ const REGISTRY := {
 	# clock-refill trigger, see there) ---
 	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
 	"trojan-horse-assembly-manual": ["on_wave_clear"],
+	# was left on on_milestone (the GLOBAL 10-wave beat) when the other 8 were
+	# converted above — paid at half the intended rate; moved to this
+	# per-artefact cadence 2026-08-28 (user-reported)
+	"john-titor-s-crypto-wallet": ["on_wave_clear"],
 
 	# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
 	# WaveLogic.queue) ---
@@ -1134,8 +1138,6 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.score += 100
 			g.gold += 10
 			g.clock_ms = maxf(g.clock_ms - 3000.0, 0.0)
-		["john-titor-s-crypto-wallet", "on_milestone"]:
-			g.gold += int(g.clock_ms / 1000.0 / 5.0)
 		["putin-s-golden-toilet-brush", "on_purchase"]:
 			g.score += 5 * ctx.price
 		["rapture-insurance-policy", "on_game_over"]:
@@ -1161,8 +1163,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["stargate-divination-crystal", "on_capture"]:
 			# Fires from Economy.capture_score, BEFORE the capture's own
 			# actions_left -= 1 / auto-pass check runs (game.gd _move_player)
-			# — same ordering that lets Blitz refund its own action without
-			# ever resurrecting an already-ended turn. actions_max moves too,
+			# — same ordering that lets Blitz's free-move flag skip that
+			# decrement without ever resurrecting an already-ended turn. actions_max moves too,
 			# mirroring first_capture_extra (its on_capture sibling above),
 			# since turn start already happened and won't re-sync it for us.
 			if g.turn_action_count == 0:
@@ -1208,6 +1210,9 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# trigger — see _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
+		["john-titor-s-crypto-wallet", "on_wave_clear"]:
+			if _milestone5_hit(g.wave, acquired_wave): # see silk-road-coupon's case above
+				g.gold += int(g.clock_ms / 1000.0 / 5.0)
 
 		# --- issue 18: Buff-tag triggers, all through BuffLogic.add ---
 		["crop-circle-plank", "on_wave_clear"]:

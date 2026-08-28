@@ -36,10 +36,7 @@ static func queue(g, n: int) -> void:
 	var king: Dictionary = Kings.select(g.rng, n) if roster.has("king") else {}
 	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
 		Color(1.0, 0.8, 0.3))
-	if Economy.tariff_on(g, "trade_war"): # +1 piece per wave, drawn from the wave's own mix
-		var extras: Array = roster.filter(func(id: String) -> bool: return id != "king")
-		if not extras.is_empty(): # never duplicate the King (review 2026-07-03)
-			roster.append(extras[g.rng.randi() % extras.size()])
+	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # Trade War (issue 13)
 	for id in roster:
 		var entry := {"id": id}
 		if id == "king":
@@ -54,10 +51,7 @@ static func queue(g, n: int) -> void:
 		Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
 		var ctx := ArtefactHooks.run(g, "on_milestone", {"refill": Tuning.CLOCK_REFILL_MS})
-		var refill: float = ctx.refill
-		if Economy.tariff_on(g, "recession"):
-			refill *= 0.5
-		g.clock_ms += refill
+		g.clock_ms += ctx.refill # Recession (issue 13) halves this via the same hook
 		g.fx_at = Vector2(g.hud.wave_label.get_global_rect().get_center())
 		Economy.earn(g, Tuning.MILESTONE_SCORE_BONUS)
 		# reinforcement drip from the army's own mix (balance 2026-07-06:

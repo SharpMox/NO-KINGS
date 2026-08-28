@@ -62,3 +62,7 @@ const SCHEDULE := {
 	60: "Mild", 70: "Mild", 80: "Moderate", 90: "Moderate", 100: "Severe",
 	110: "Mild", 120: "Moderate", 130: "Moderate", 140: "Severe", 150: "Severe",
 }
+
+## Severity order the SCHEDULE draws from — Economy.activate_tariff() shifts
+## one step up this list for Officer/Autocrat (07-difficulty-ranks).
+const TIER_ORDER := ["Mild", "Moderate", "Severe"]

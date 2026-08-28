@@ -109,8 +109,20 @@ func _init() -> void:
 	await process_frame
 	check(GameScript.next_army == "Wild Hunt", "army click stages its stock")
 
-	# Scores opens the local high-score list (fresh menu again: the army
-	# click above changed the scene). The army click's change_scene_to_file
+	# rank select: shown after the army, locked for the run (07-difficulty-ranks)
+	check(_find_button(menu, "Citizen") != null, "army click opens the rank select")
+	check(await _click_button(menu, "← Back"), "rank Back clickable")
+	await process_frame
+	check(_find_button(menu, "Wild Hunt") != null, "rank Back restores the army select")
+	await _click_button(menu, "Wild Hunt")
+	await process_frame
+	GameScript.next_rank = ""
+	check(await _click_button(menu, "Officer"), "rank button clickable")
+	await process_frame
+	check(GameScript.next_rank == "Officer", "rank click stages the run's difficulty")
+
+	# Scores opens the local high-score list (fresh menu again: the rank
+	# click above changed the scene). The rank click's change_scene_to_file
 	# is deferred, so the Game it loaded is still root's current_scene here —
 	# free it too, or its full-rect HUD keeps intercepting clicks that land
 	# near the screen bottom (found via the Guide panel's Back, 05-menus).

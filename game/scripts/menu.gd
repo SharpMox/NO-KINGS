@@ -13,6 +13,7 @@ static var window_sized := false # once per launch, not on every return to menu
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
 var army_center: CenterContainer
+var rank_center: CenterContainer
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
 var about_center: CenterContainer
@@ -114,9 +115,8 @@ func _ready() -> void:
 	for army_name in Tuning.ARMIES:
 		_button(army_box, army_name, 26, func() -> void:
 			GameScript.next_army = army_name
-			GameScript.next_config = {}
-			GameScript.is_scenario = false
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+			army_center.visible = false
+			rank_center.visible = true)
 		var roster := Label.new()
 		roster.text = _army_summary(Tuning.ARMIES[army_name])
 		roster.add_theme_font_size_override("font_size", 13)
@@ -126,6 +126,29 @@ func _ready() -> void:
 	_button(army_box, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
+
+	# rank select: chosen after the army, locked for the run
+	# (07-difficulty-ranks — Continue into endless keeps it)
+	rank_center = CenterContainer.new()
+	rank_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rank_center.visible = false
+	add_child(rank_center)
+	var rank_box := VBoxContainer.new()
+	rank_box.add_theme_constant_override("separation", 12)
+	rank_center.add_child(rank_box)
+	var rank_pick := Label.new()
+	rank_pick.text = "Choose your difficulty"
+	rank_pick.add_theme_font_size_override("font_size", 28)
+	rank_box.add_child(rank_pick)
+	for rank_name in Tuning.RANKS:
+		_button(rank_box, rank_name, 26, func() -> void:
+			GameScript.next_rank = rank_name
+			GameScript.next_config = {}
+			GameScript.is_scenario = false
+			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+	_button(rank_box, "← Back", 20, func() -> void:
+		rank_center.visible = false
+		army_center.visible = true)
 
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]

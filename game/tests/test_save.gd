@@ -80,6 +80,36 @@ func _init() -> void:
 			buffed += 1
 	check(buffed == 2, "box carriers survive the round trip")
 
+	# --- issue 25: a piece's capture ledger (lifetime `captures` + Wave-scoped
+	# `wave_captures`) survives the JSON round-trip on both board and Stock —
+	# ADR-0002's opaque pass-through, same mechanism Piece Buffs already ride.
+	# A separate, single round-trip (not folded into the "identical" check
+	# above): JSON.parse_string returns floats for JSON numbers, and neither
+	# Dictionary `==`/`has()` nor JSON.stringify string-compare treat 2 and
+	# 2.0 as equal the way a bare `==` on the field does — this checks the
+	# value actually read back, not a byte-identical re-serialization.
+	var ledger := _boot({"board": [["knight", 0, 5, 1, {"captures": 2, "wave_captures": 1}],
+			["rook", 1, 7, 10]], # a live enemy, so boot doesn't read as "board
+			# cleared early" and advance straight into next Wave's own reset
+		"stock": ["pawn", {"id": "rook", "captures": 3}], "wave": 3})
+	await process_frame
+	var ledger_saved: Dictionary = ledger._to_config()
+	ledger.queue_free()
+	await process_frame
+	var ledger_restored := _boot(JSON.parse_string(JSON.stringify(ledger_saved)))
+	await process_frame
+	check(ledger_restored.board[Vector2i(5, 1)].get("captures", 0) == 2
+		and ledger_restored.board[Vector2i(5, 1)].get("wave_captures", 0) == 1,
+		"issue 25: a board piece's capture ledger (lifetime + Wave-scoped) survives the JSON round-trip")
+	var restored_rook: Variant = null
+	for e in ledger_restored.stock:
+		if e is Dictionary and e.get("id") == "rook":
+			restored_rook = e
+	check(restored_rook != null and restored_rook.get("captures", 0) == 3,
+		"issue 25: a piece's lifetime capture ledger rides along into Stock (ADR-0002), same as a Piece Buff")
+	ledger_restored.queue_free()
+	await process_frame
+
 	# --- GDD Game Flow — Run: the seed rides along, so resuming a save rolls
 	# exactly what an uninterrupted run would have rolled from that point.
 	var live := _boot({"board": [["rook", 1, 4, 10]], "wave": 3})

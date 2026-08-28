@@ -634,6 +634,12 @@ func _run_enemy_actions() -> void:
 				# 2 keeps the attacker out for exactly one enemy turn
 				BuffLogic.add(board[act.from], "stunned", Tuning.STUN_MISSES + 1)
 				_add_float(act.from, "Stunned!", COL_MERGE)
+			_note_capture(act.from) # no on_capture here (the enemy doesn't
+				# score) — still the attacker's OWN ledger, read later by
+				# Chupacabra Chew Toy off the victim (issue 25). Fires even
+				# when Hoffa's Cement Shoes sinks the attacker right after —
+				# the capture already happened, same as Bomb/Trap in
+				# _move_player killing the attacker AFTER its capture scored.
 			if _lose_player_piece(act.to, "captured", act.from).destroy_attacker:
 				# Hoffa's Cement Shoes (artefact hook 24): once per Wave, the
 				# capturer sinks with its victim — Trap's own mutual-
@@ -1152,7 +1158,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
-		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from)
+		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from, to)
 			* BuffLogic.capture_multiplier(board, from))
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
@@ -1175,7 +1181,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed, from))
+					board[from].id, attacker_buffed, from, also))
 				captured.append(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
@@ -1631,6 +1637,21 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 	if not ctx.cancel:
 		lost_player += 1
 	return ctx
+
+
+## Single choke point for a piece's OWN capture ledger (issue 25, split from
+## 19 — 3 artefacts read per-piece capture memory, not the run-wide
+## wave/turn_capture_count Economy already tracks). `captures` is lifetime and
+## rides through Stock round-trips like Piece Buffs already do (ADR-0002: the
+## Stock entry is opaque, nothing strips a field it doesn't know about);
+## `wave_captures` is reset every Wave in WaveLogic.queue. Both absent = 0.
+## Called from Economy.capture_score (the player's own capture, `g._note_
+## capture`) and _run_enemy_actions' capture branch above (the enemy's own
+## capture, which never goes through capture_score since the enemy doesn't
+## score) — the two "a piece's OWN capture resolves" sites issue 25 names.
+func _note_capture(pos: Vector2i) -> void:
+	board[pos].captures = board[pos].get("captures", 0) + 1
+	board[pos].wave_captures = board[pos].get("wave_captures", 0) + 1
 
 
 ## Single choke point for an Item leaving `items` (artefact hook 19) — was 3

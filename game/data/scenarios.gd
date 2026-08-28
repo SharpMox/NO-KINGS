@@ -173,6 +173,15 @@ static func all() -> Array:
 				"agartha-welcome-mat"],
 			"items": ["counter_intel"],
 			"gold": 200, "wave": 4, "stock": ["pawn"], "clock_s": 40.0}},
+		{"name": "Artefacts: issue 31 (capture-context effects)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4],
+				["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
+			"artefacts": ["curtain-rods-bag-rifle-shaped", "templar-debit-card",
+				"2-3-trillion-receipt"],
+			"items": ["drone_strike"], # destroy a pawn for the Receipt; capture the
+				# other two for Curtain Rods Bag's first-Capture-each-Wave bonus
+			"score": 200, "gold": 20, "wave": 4, "stock": ["pawn"]}}, # low Gold, enough
+			# Score to test Templar Debit Card paying a Shop cost's shortfall
 		{"name": "Artefacts: slice 21 (echo and meta-triggers)", "cfg": {
 			"board": [["pawn", 0, 2, 1], ["pawn", 0, 3, 1], ["queen", 0, 4, 1],
 				["pawn", 1, 2, 5], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],

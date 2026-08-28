@@ -485,6 +485,35 @@
 ##   modal choice; a per-Tariff "equivalent bonus" table) — see the issue 22
 ##   Outcome / Notion questions.
 ##
+## issue 31 (capture-context effects) added:
+## - Curtain Rods Bag ("first Capture each Wave: double Score, but it pays no
+##   Gold") needs the Score and Gold sides of one Economy.earn call to
+##   diverge. game.gd's capture call site tags that one earn() with reason
+##   "wave_first_capture" (readable right after Economy.capture_score sets
+##   last_capture_ctx.wave_capture_index, before earn() runs) — its
+##   on_score_change handler doubles off the immutable base like every other
+##   doubler; its on_gold_change handler cancels this call's own 1:1 base
+##   contribution (`ctx.amount = maxf(ctx.amount - ctx.base, 0.0)`, floored so
+##   two held copies can't drive Gold negative). Both are own-resource
+##   handlers, not a cross-resource gold_bonus/score_bonus payment — no new
+##   ctx channel needed.
+## - Templar Debit Card ("pay Shop costs with Score, 10 Score per 1 Gold") has
+##   no REGISTRY entry, same as Agartha Welcome Mat's credit line: a standing
+##   rule read directly off g.artefacts in shop.gd (Shop._score_credit), not
+##   a triggered hook. can_buy() counts it into the funds check; buy() spends
+##   whatever Gold (+ Agartha's credit line) can't cover as Score.
+## - $2.3 Trillion Receipt ("Enemies destroyed by Items award their Score and
+##   Gold value") is a deliberate, GDD-text-scoped exception to _destroy's
+##   "Destruction pays nothing" rule (Destruction is not Capture — CONTEXT.md
+##   — see _destroy's own header comment in game.gd). The new on_destroy hook
+##   only fires for the `by_item = true` call sites (Drone Strike, Air
+##   Strike, Sniper); Bomb's _detonate and the jd_vance Tariff still pay
+##   nothing, same as ever.
+## - Dark Market Light Bulb ("Demoted pieces give no Score on Capture") stays
+##   unimplemented: "Demoted" is undefined for this catalog — a piece demoted
+##   at some point this run, or one currently below its peak rank? A Notion
+##   question, not a guess — see .scratch/gdd-gaps/issues/31's Outcome.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -504,6 +533,8 @@ const HOOKS := [
 	"on_buff_apply", "on_buff_consume", "on_demote", "on_piece_demoted", "on_buff_removal",
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
 	"on_gold_zero",
+	# --- issue 31: an enemy destroyed by an Item (game.gd _destroy) ---
+	"on_destroy",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -719,6 +750,11 @@ const REGISTRY := {
 
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
 	"zero-point-energy-drink": ["on_gold_zero"],
+
+	# --- issue 31: capture-context effects. Templar Debit Card has no entry
+	# here (see the header) — it's a standing shop.gd rule, not a hook. ---
+	"curtain-rods-bag-rifle-shaped": ["on_score_change", "on_gold_change"],
+	"2-3-trillion-receipt": ["on_destroy"],
 
 	# --- issue 21: echo and meta-triggers ---
 	# Capstone Polish is a plain on_purchase handler, scoped like the other
@@ -1717,6 +1753,28 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# economy.gd/shop.gd's spend_gold) ---
 		["zero-point-energy-drink", "on_gold_zero"]:
 			g.actions_left += 2
+
+		# --- issue 31: capture-context effects ---
+		["curtain-rods-bag-rifle-shaped", "on_score_change"]:
+			if ctx.reason == "wave_first_capture":
+				ctx.amount += ctx.base # double Score, off the immutable base
+					# like every other doubler (voynich-dictionary et al.)
+		["curtain-rods-bag-rifle-shaped", "on_gold_change"]:
+			if ctx.reason == "wave_first_capture":
+				# "pays no Gold" — cancel this call's own 1:1 base contribution.
+				# Own-resource (on_gold_change shrinking its own amount), not a
+				# cross-resource gold_bonus/score_bonus payment — see the
+				# CONTRACT note in the header. maxf floors at 0 so two held
+				# copies (additive stacking, header) can't drive Gold negative.
+				ctx.amount = maxf(ctx.amount - ctx.base, 0.0)
+		["2-3-trillion-receipt", "on_destroy"]:
+			# Deliberate exception to "_destroy pays nothing" (game.gd's
+			# _destroy header) — direct writes are fine here exactly as they
+			# are in on_capture/on_wave_clear/on_game_over above; on_destroy
+			# only ever fires for Item-caused kills (game.gd's `by_item`
+			# param), so this never sees Bomb or Tariff destructions.
+			g.score += ctx.value
+			g.gold += ctx.value
 
 		# --- issue 21: echo and meta-triggers (the rest of the family runs
 		# through _run_meta_triggers above, off `held`/`fired` directly —

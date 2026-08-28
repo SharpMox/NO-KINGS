@@ -17,9 +17,19 @@ static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> v
 
 ## Award a gain: score counts the raw amount (up-only performance metric),
 ## gold takes the Inflation-taxed amount. Every gain site goes through here.
-static func earn(g, amount: int) -> void:
-	g.score += amount
-	g.gold += gain(g, amount)
+## `reason` tags the source for hook handlers that must not fire on every
+## gain (e.g. an early-clear-only multiplier) — most callers leave it "".
+## Score/Gold percentage artefacts hook in here (issue 16), ADDITIVE off an
+## immutable ctx.base so multiple copies/artefacts never compound (matches
+## the on_capture stacking rule in artefact_hooks.gd).
+static func earn(g, amount: int, reason: String = "") -> void:
+	var score_ctx := ArtefactHooks.run(g, "on_score_change",
+		{"base": float(amount), "amount": float(amount), "reason": reason})
+	g.score += roundi(score_ctx.amount)
+	var gold_amount := gain(g, amount)
+	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
+		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason})
+	g.gold += roundi(gold_ctx.amount)
 	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 
@@ -35,10 +45,21 @@ static func gain(g, amount: int) -> int:
 	return roundi(out)
 
 
-static func capture_score(g, victim_id: String) -> int:
+## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
+## still intact when the two call sites in game.gd call this) — "" / false
+## when no attacker applies (e.g. direct test calls), which every
+## attacker-dependent handler treats as "no match" (issue 16).
+static func capture_score(g, victim_id: String, attacker_id: String = "",
+		attacker_buffed: bool = false) -> int:
 	var base: int = g.defs[victim_id].value
-	var ctx := ArtefactHooks.run(g, "on_capture",
-		{"victim_id": victim_id, "base": base, "pts": base})
+	var ctx := ArtefactHooks.run(g, "on_capture", {
+		"victim_id": victim_id, "base": base, "pts": base,
+		"attacker_id": attacker_id, "attacker_buffed": attacker_buffed,
+		"wave_capture_index": g.wave_capture_count, # captures already made
+		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
+	})
+	g.wave_capture_count += 1
+	g.turn_capture_count += 1
 	return ctx.pts
 
 

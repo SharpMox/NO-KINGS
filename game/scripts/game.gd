@@ -23,6 +23,7 @@ const Tariffs := preload("res://data/tariffs.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Kings := preload("res://data/kings.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -436,9 +437,7 @@ func _begin_player_turn() -> void:
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
 	actions_left = Tuning.ACTIONS_PER_TURN
-	for t in artefacts:
-		if t.key == "move":
-			actions_left += 1
+	ArtefactHooks.run(self, "on_turn_start")
 	actions_max = actions_left
 	moved_this_turn.clear()
 	turn_action_count = 0

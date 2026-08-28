@@ -1,6 +1,13 @@
 # 13 — Hook architecture
 
-Status: todo
+Status: reduced — hook list/method contract shipped in slice 15
+(`game/scripts/artefact_hooks.gd`), against artefacts as the real consumer. Remaining
+scope: migrate the tariff system (`economy.gd:apply_tariff`/`tariff_on`) onto the same
+`ArtefactHooks` registry. Piece Buffs (`buff_logic.gd`) stay a separate direct-call
+module for now — no player-facing motivation to unify has shown up, so this is not
+reduced further than the tariff migration until one does. See
+`.scratch/gdd-gaps/issues/15-artefact-trigger-engine.md`'s Outcome section for the full
+reasoning.
 
 ## Parent
 
@@ -28,12 +35,13 @@ some by `run_all.sh` plus the autoplay sweep.
 
 ## Acceptance criteria
 
-- [ ] Hook list and signal/method contract defined
-- [ ] At least Piece Buffs and the tariff system registered through hooks rather than
-      direct calls
+- [x] Hook list and signal/method contract defined — `HOOKS` +
+      `ArtefactHooks.run(g, hook, ctx)` in `game/scripts/artefact_hooks.gd` (slice 15)
+- [ ] The tariff system registered through hooks rather than direct calls (reduced from
+      "Piece Buffs and the tariff system" — see Status)
 - [ ] The Global Systems Loop diagram drawn and added to the Notion page
 - [ ] No behaviour change — pure refactor, `run_all.sh` green before and after
 
 ## Blocked by
 
-- 03 / 04 — Piece Buffs (the first real consumer)
+- 15 — Artefact trigger engine (shipped the hook registry against a real consumer)

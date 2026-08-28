@@ -14,6 +14,7 @@ const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
+const CloudSave := preload("res://scripts/cloud_save.gd")
 const Shop := preload("res://scripts/shop.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
 const Tuning := preload("res://scripts/tuning.gd")
@@ -496,6 +497,7 @@ func _begin_player_turn() -> void:
 	if not autoplay and not is_scenario: # autosave at every turn start
 		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 		f.store_string(JSON.stringify(SaveConfig.to_config(self)))
+		CloudSave.sync_file("run", SAVE_PATH) # mirror to the platform backend (12)
 	_refresh()
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
 		if autoplay:

@@ -7,6 +7,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const CloudSave := preload("res://scripts/cloud_save.gd")
 
 
 ## Gold cost charged when a tariffed action happens.
@@ -55,6 +56,7 @@ static func record_score(g) -> int:
 		return int(x.score) > int(y.score))
 	var f := FileAccess.open(g.SCORES_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify(scores.slice(0, 10)))
+	CloudSave.sync_file("scores", g.SCORES_PATH) # mirror to the platform backend (12)
 	return rank
 
 
@@ -71,6 +73,7 @@ static func record_history(g, won: bool) -> void:
 	})
 	var f := FileAccess.open(g.HISTORY_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify(history.slice(0, HISTORY_CAP)))
+	CloudSave.sync_file("history", g.HISTORY_PATH) # mirror to the platform backend (12)
 
 
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---

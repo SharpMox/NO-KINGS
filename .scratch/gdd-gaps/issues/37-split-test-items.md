@@ -1,6 +1,6 @@
 # 37 — Split `test_items.gd`
 
-Status: todo — INDEPENDENT
+Status: done — INDEPENDENT
 
 ## Parent
 
@@ -34,11 +34,31 @@ cross-test state coupling that would otherwise make the split risky.
 
 ## Acceptance criteria
 
-- [ ] `test_items.gd` split into area files, none over ~600 lines
-- [ ] Every assertion preserved verbatim; count them before and after and report both
-- [ ] Any cross-test state dependency found is reported, not silently patched
-- [ ] `run_all.sh` all green
+- [x] `test_items.gd` split into area files, none over ~600 lines
+- [x] Every assertion preserved verbatim; count them before and after and report both
+- [x] Any cross-test state dependency found is reported, not silently patched
+- [x] `run_all.sh` all green
 
 ## Blocked by
 
-- ideally 36 first
+- ideally 36 first (done — `_boot()`/`DEFAULT_SEED` pinning from slice 36 was preserved
+  identically in every split file)
+
+## Outcome
+
+Split into 7 files: `test_items.gd` (core item abilities), `test_items_tariffs.gd`,
+`test_items_buffs.gd`, `test_items_artefacts_1.gd` through `_4.gd` (the bulk, by
+issue-cluster). 340 assertions before, 340 after — verified by a script-checked multiset
+diff of every non-blank statement line against the original, not just a count match.
+Largest file is 568 lines.
+
+**No latent cross-test state dependency was found.** Each of the 7 files also passes when
+run standalone (`godot --headless -s tests/test_X.gd`), so nothing in the original file was
+silently relying on state left behind by an earlier assertion in the same `_init()` scope —
+the seeding from slice 36 evidently did remove that coupling, as this issue predicted.
+
+One structural note, not a behavior change: the file's only inline mid-`_init()` const
+(`const BuffLogic := preload(...)`) was hoisted to a top-level const in the 3 files that
+use it, since a local const from one split file isn't visible in another.
+
+PR: https://github.com/SharpMox/NO-KINGS/pull/154

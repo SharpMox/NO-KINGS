@@ -134,7 +134,7 @@ func _ready() -> void:
 		army_center.visible = false
 		main_box.visible = true)
 
-	# rank select: chosen after the army, locked for the run
+	# tier select: chosen after the army, locked for the run
 	# (07-difficulty-ranks — Continue into endless keeps it)
 	rank_center = CenterContainer.new()
 	rank_center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -147,9 +147,9 @@ func _ready() -> void:
 	rank_pick.text = "Choose your difficulty"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
-	for rank_name in Tuning.RANKS:
-		_button(rank_box, rank_name, 26, func() -> void:
-			GameScript.next_rank = rank_name
+	for tier_name in Tuning.TIERS:
+		_button(rank_box, tier_name, 26, func() -> void:
+			GameScript.next_tier = tier_name
 			GameScript.next_config = {}
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))

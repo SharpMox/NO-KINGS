@@ -151,11 +151,8 @@ static func record_history(g, won: bool) -> void:
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
 
 static func activate_tariff(g, tier: String) -> void:
-	# rank lever (b): Officer/Autocrat draw one tier harsher, capped at Severe
-	# (07-difficulty-ranks) — a binary bump, like the Shop clock-pause lever
-	if g.next_rank != Tuning.RANKS[0]:
-		var i: int = Tariffs.TIER_ORDER.find(tier)
-		tier = Tariffs.TIER_ORDER[mini(i + 1, Tariffs.TIER_ORDER.size() - 1)]
+	# Tariffs behave identically at every difficulty tier (07-difficulty-ranks
+	# rework — the severity-shift lever was rejected as illegible).
 	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
 		if t.tier != tier:
 			return false

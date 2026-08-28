@@ -5,7 +5,9 @@
    rarity rebalance pass 1+2: 8 Uncommon->Common, 21 Rare->Uncommon => 50/54/50/26;
    2026-08-28 (issue 16): 31 Gold/Score artefacts with no needs-note flipped to
    implemented: true, wired into game/scripts/artefact_hooks.gd; Social Credit
-   Report Card re-texted, its -10 Score penalty now debits Gold (up-only Score)).
+   Report Card re-texted, its -10 Score penalty now debits Gold (up-only Score);
+   2026-08-28 (issue 17): 8 Action/Time/Piece artefacts with no needs-note
+   flipped to implemented: true, same wiring).
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -92,6 +94,7 @@ var ARTEFACTS = [
     conspiracy: "Witness protection", url: "https://en.wikipedia.org/wiki/United_States_Federal_Witness_Protection_Program",
     summary: "The state-run identity eraser: new name, new town, new haircut — 19,000 people who officially never existed. The mustache makes you someone else, effective immediately." },
   { name: "5G Microchips", rarity: "Common", type: "Trigger", bonus: ["Time"], status: "KEEP",
+    implemented: true,
     effect: "On Turn start: +1s Clock per allied piece on the Board, -1s per enemy piece on the Board",
     conspiracy: "5G panic", url: "https://en.wikipedia.org/wiki/5G_misinformation",
     summary: "Phone towers blamed for everything from headaches to pandemics; masts were burned across Europe in 2020. The anti-5G pendants sold to believers turned out, in some cases, to be radioactive." },
@@ -112,6 +115,7 @@ var ARTEFACTS = [
     conspiracy: "Yamashita's gold", url: "https://en.wikipedia.org/wiki/Yamashita%27s_gold",
     summary: "War loot from across Asia, buried in booby-trapped Philippine tunnels as Japan retreated — so the legend goes. A treasure hunter who said he found part of it sued the Marcos estate and won." },
   { name: "Charlemagne's Birth Certificate", rarity: "Common", type: "Trigger", bonus: ["Time"], status: "KEEP",
+    implemented: true,
     effect: "On Wave clear: +10s Clock",
     conspiracy: "The phantom time hypothesis", url: "https://en.wikipedia.org/wiki/Phantom_time_hypothesis",
     summary: "Heribert Illig's claim that the years 614–911 never happened — three centuries forged into the calendar, Charlemagne and all. It's not 2026, says the theory; it's around 1729." },
@@ -454,6 +458,7 @@ var ARTEFACTS = [
     conspiracy: "The New World Order", url: "https://en.wikipedia.org/wiki/New_World_Order_conspiracy_theory",
     summary: "The theory that contains the others: a hidden cabal steering history toward one world government, with every summit, crisis and banknote symbol as a clause in the plan. The charter is always about to come into force." },
   { name: "Stargate Divination Crystal", rarity: "Rare", type: "Trigger", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "If your first Action of a Turn is a Capture: +1 Action",
     conspiracy: "The Stargate Project", url: "https://en.wikipedia.org/wiki/Stargate_Project_(U.S._Army_unit)",
     summary: "For twenty years the US Army and CIA paid psychics to describe distant targets from a desk. Declassified in 1995 with the verdict 'no intelligence value' — leaving the logs of two decades of government séances." },
@@ -498,6 +503,7 @@ var ARTEFACTS = [
     conspiracy: "Flight 19", url: "https://en.wikipedia.org/wiki/Flight_19",
     summary: "Five Navy Avengers vanished off Florida in 1945, followed by the seaplane sent to find them. The founding case of the Bermuda Triangle — six aircraft, twenty-seven men, and a logbook that ends mid-exercise." },
   { name: "Terracotta Draft Card", rarity: "Rare", type: "Trigger", bonus: ["Piece"], status: "KEEP",
+    implemented: true,
     effect: "On Wave clear: +1 random Piece to your Stock",
     conspiracy: "Qin Shi Huang's tomb", url: "https://en.wikipedia.org/wiki/Mausoleum_of_Qin_Shi_Huang",
     summary: "Eight thousand clay soldiers guard a tomb no one has opened — soil readings confirm the rivers of mercury inside. By tradition the craftsmen were sealed in with it, so there's always an opening in the ranks. The draft never closed." },
@@ -546,6 +552,7 @@ var ARTEFACTS = [
     conspiracy: "The Pied Piper of Hamelin", url: "https://en.wikipedia.org/wiki/Pied_Piper_of_Hamelin",
     summary: "Hamelin's own records date themselves from it: in 1284, 130 of the town's children followed a piper out of the gates and were gone. Plague, drowning, emigration, crusade — the town has kept the loss on the books for 700 years." },
   { name: "Super Soldier Multivitamins", rarity: "Rare", type: "Passive", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "While 3+ allied pieces carry Piece Buffs: +1 Action per Turn",
     conspiracy: "Super soldier programs", url: "https://en.wikipedia.org/wiki/Supersoldier",
     summary: "Every superpower allegedly ran one: engineer the perfect soldier, deny the program. It ships as multivitamins now — one a day, side effects include extra turns." },
@@ -554,6 +561,7 @@ var ARTEFACTS = [
     conspiracy: "The Priory of Sion", url: "https://en.wikipedia.org/wiki/Priory_of_Sion",
     summary: "A 'thousand-year secret society' invented in 1956 by Pierre Plantard, who planted forged parchments in the national library to give himself a Merovingian pedigree. The hoax outgrew him into The Da Vinci Code." },
   { name: "Seed Vault Secret Hatch", rarity: "Rare", type: "Passive", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "While holding 3+ unused Items: +1 Action per Turn",
     conspiracy: "The doomsday vault", url: "https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault",
     summary: "A seed backup for civilization, drilled into Arctic permafrost behind blast doors. To theorists, the guest book is the tell: why do the world's elites keep visiting a freezer — unless they know the date?" },
@@ -566,6 +574,7 @@ var ARTEFACTS = [
     conspiracy: "The nuclear football", url: "https://en.wikipedia.org/wiki/Nuclear_football",
     summary: "The satchel that follows the president everywhere holds the strike options card — which aides say reads like a Denny's breakfast menu. The most consequential laminated menu on earth, and nobody orders." },
   { name: "'I Am Not a Robot' Checkbox", rarity: "Rare", type: "Passive", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "While you have 8+ pieces on the Board: +1 Action per Turn",
     conspiracy: "The Dead Internet theory", url: "https://en.wikipedia.org/wiki/Dead_Internet_theory",
     summary: "The theory that the internet died years ago and everyone you talk to is a bot performing for other bots. The checkbox is civilization's last line of defense, and you clicked it without reading." },
@@ -631,6 +640,7 @@ var ARTEFACTS = [
     summary: "A white Fiat Uno clipped the Mercedes in the tunnel and was never found — the theory's central missing object. Whatever it touched, it left the scene untouched." },
   // ── Legendary ───────────────────────────────────────────────────
   { name: "CIA Exploding Cigar", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "+1 Action per Turn",
     conspiracy: "The plots against Castro", url: "https://en.wikipedia.org/wiki/Assassination_attempts_on_Fidel_Castro",
     summary: "The CIA ran over 600 schemes against Castro — exploding cigars, poisoned wetsuits, an exploding seashell. All real, all declassified, none successful. He died at 90, in bed, undefeated by novelty items." },

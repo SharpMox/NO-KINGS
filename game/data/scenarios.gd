@@ -125,6 +125,15 @@ static func all() -> Array:
 				"nero-s-marshmallow-stick", "suspiciously-large-femur",
 				"social-credit-report-card", "john-titor-s-crypto-wallet"],
 			"gold": 100, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: slice 17 (Action/Time/Piece)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["bishop", 0, 1, 1], ["knight", 0, 4, 1],
+				["pawn", 0, 0, 1], ["pawn", 0, 5, 1], ["pawn", 0, 6, 1], ["pawn", 0, 7, 1],
+				["pawn", 1, 2, 5], ["rook", 1, 4, 6]],
+			"items": ["blitz", "sniper", "demote"],
+			"artefacts": ["cia-exploding-cigar", "i-am-not-a-robot-checkbox", "seed-vault-secret-hatch",
+				"super-soldier-multivitamins", "stargate-divination-crystal", "5g-microchips",
+				"terracotta-draft-card", "charlemagne-s-birth-certificate"],
+			"wave": 3, "score": 200, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

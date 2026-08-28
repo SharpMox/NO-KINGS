@@ -688,6 +688,140 @@ func _init() -> void:
 	nero.queue_free()
 	await process_frame
 
+	# --- slice 17 (Action/Time/Piece, no-prerequisite subset) ---
+
+	# CIA Exploding Cigar: flat +1 action every turn, like "move"
+	var cig := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["cia-exploding-cigar"]})
+	await process_frame
+	check(cig.actions_left == Tuning.ACTIONS_PER_TURN + 1
+			and cig.actions_max == Tuning.ACTIONS_PER_TURN + 1,
+		"CIA Exploding Cigar grants +1 action every turn")
+	cig.queue_free()
+	await process_frame
+
+	# 'I Am Not a Robot' Checkbox: +1 action at 8+ allied pieces on the Board
+	var bot8 := _boot({"board": [
+			["queen", 0, 0, 0], ["rook", 0, 1, 0], ["bishop", 0, 2, 0], ["knight", 0, 3, 0],
+			["pawn", 0, 4, 0], ["pawn", 0, 5, 0], ["pawn", 0, 6, 0], ["pawn", 0, 7, 0],
+			["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["i-am-not-a-robot-checkbox"]})
+	await process_frame
+	check(bot8.actions_left == Tuning.ACTIONS_PER_TURN + 1,
+		"'I Am Not a Robot' Checkbox grants +1 action at 8+ allied pieces")
+	bot8.queue_free()
+	await process_frame
+
+	var bot7 := _boot({"board": [
+			["queen", 0, 0, 0], ["rook", 0, 1, 0], ["bishop", 0, 2, 0], ["knight", 0, 3, 0],
+			["pawn", 0, 4, 0], ["pawn", 0, 5, 0], ["pawn", 0, 6, 0],
+			["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["i-am-not-a-robot-checkbox"]})
+	await process_frame
+	check(bot7.actions_left == Tuning.ACTIONS_PER_TURN,
+		"'I Am Not a Robot' Checkbox withholds the bonus below 8 allied pieces")
+	bot7.queue_free()
+	await process_frame
+
+	# Seed Vault Secret Hatch: +1 action while holding 3+ unused Items
+	var sv3 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz", "sniper", "demote"],
+		"artefacts": ["seed-vault-secret-hatch"]})
+	await process_frame
+	check(sv3.actions_left == Tuning.ACTIONS_PER_TURN + 1,
+		"Seed Vault Secret Hatch grants +1 action at 3+ unused items")
+	sv3.queue_free()
+	await process_frame
+
+	var sv2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz", "sniper"],
+		"artefacts": ["seed-vault-secret-hatch"]})
+	await process_frame
+	check(sv2.actions_left == Tuning.ACTIONS_PER_TURN,
+		"Seed Vault Secret Hatch withholds the bonus below 3 items")
+	sv2.queue_free()
+	await process_frame
+
+	# Super Soldier Multivitamins: +1 action while 3+ allied pieces carry a
+	# Piece Buff (board slot 4 as a Dictionary merges onto the piece — the
+	# `buffs` array BuffLogic.of() reads, per buff_logic.gd's header)
+	var ss3 := _boot({"board": [
+			["queen", 0, 2, 2, {"buffs": [{"key": "shield"}]}],
+			["rook", 0, 3, 2, {"buffs": [{"key": "critical"}]}],
+			["bishop", 0, 4, 2, {"buffs": [{"key": "range"}]}],
+			["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["super-soldier-multivitamins"]})
+	await process_frame
+	check(ss3.actions_left == Tuning.ACTIONS_PER_TURN + 1,
+		"Super Soldier Multivitamins grants +1 action at 3+ buffed allies")
+	ss3.queue_free()
+	await process_frame
+
+	var ss2 := _boot({"board": [
+			["queen", 0, 2, 2, {"buffs": [{"key": "shield"}]}],
+			["rook", 0, 3, 2, {"buffs": [{"key": "critical"}]}],
+			["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["super-soldier-multivitamins"]})
+	await process_frame
+	check(ss2.actions_left == Tuning.ACTIONS_PER_TURN,
+		"Super Soldier Multivitamins withholds the bonus below 3 buffed allies")
+	ss2.queue_free()
+	await process_frame
+
+	# 5G Microchips: +1s Clock per allied piece, -1s per enemy piece, at Turn start
+	var g5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 0, 3, 2], ["bishop", 0, 4, 2],
+			["rook", 1, 7, 10]],
+		"wave": 3, "clock_s": 100.0, "artefacts": ["5g-microchips"]})
+	await process_frame
+	check(g5.clock_ms <= 100000 + 2000 and g5.clock_ms >= 100000 + 2000 - 1000,
+		"5G Microchips nets +1s per ally minus 1s per enemy (3 allies, 1 enemy here)")
+	g5.queue_free()
+	await process_frame
+
+	# Terracotta Draft Card + Charlemagne's Birth Certificate: On Wave clear.
+	# An all-player, no-pending-spawn board clears on the very first
+	# _begin_player_turn() the boot already runs, so no extra plumbing is
+	# needed to reach the hook.
+	var wc := _boot({"board": [["queen", 0, 2, 2]], "wave": 1, "clock_s": 100.0,
+		"artefacts": ["terracotta-draft-card", "charlemagne-s-birth-certificate"]})
+	await process_frame
+	check(wc.stock.size() == 1 and wc.stock[0] is String,
+		"Terracotta Draft Card grants a bare-id piece to Stock on Wave clear (ADR-0002: no board state to carry)")
+	check(wc.clock_ms <= 100000 + 10000 and wc.clock_ms >= 100000 + 10000 - 1000,
+		"Charlemagne's Birth Certificate grants +10s Clock on Wave clear")
+	wc.queue_free()
+	await process_frame
+
+	# Stargate Divination Crystal — the auto-pass interaction the issue calls
+	# out (Blitz hit the same shape): granting an action mid-resolution must
+	# never resurrect a turn that already auto-passed. Baseline first: with no
+	# artefact, spending the last action on a capture auto-passes.
+	var base := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["rook", 1, 7, 10]],
+		"wave": 3})
+	await process_frame
+	base.actions_left = 1
+	base.actions_max = 1
+	base._move_player(Vector2i(2, 2), Vector2i(2, 4)) # captures the pawn: last action
+	check(base.actions_left == 0 and base.state == base.State.ENEMY_TURN,
+		"baseline: spending the last action on a capture auto-passes the turn")
+	base.queue_free()
+	await process_frame
+
+	# With Stargate, the SAME capture is also the first action of the turn:
+	# the hook refunds the action inside Economy.capture_score, before
+	# _move_player's own actions_left -= 1 / auto-pass check runs — so the
+	# check never sees 0 and the turn never ends.
+	var sg := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["stargate-divination-crystal"]})
+	await process_frame
+	sg.actions_left = 1
+	sg.actions_max = 1
+	sg._move_player(Vector2i(2, 2), Vector2i(2, 4))
+	check(sg.actions_left == 1 and sg.state == sg.State.PLAYER_TURN,
+		"Stargate Divination Crystal refunds the capture's action before the auto-pass check — the turn stays open")
+	sg.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

@@ -50,8 +50,25 @@
 ##   the wave that's starting.
 ## - on_game_over (game.gd:_game_over, before the run is scored/saved) — new
 ##   hook, added to HOOKS below; Rapture Insurance Policy is its first user.
+##
+## issue 17 (Action/Time/Piece batch) added 8 no-prerequisite artefacts, all
+## on hooks issue 16 had already wired (on_capture, on_turn_start,
+## on_wave_clear) — no new call sites. Piece grants into Stock follow
+## ADR-0002 (docs/adr/0002-stock-holds-opaque-piece-state.md): Terracotta
+## Draft Card's grant is a bare id String because a fresh pool piece carries
+## no board state (the Dictionary form is for a piece pulled off the board
+## with state attached, e.g. Extraction in game.gd). Stargate Divination
+## Crystal is the one action-granting handler that runs mid-turn (on_capture,
+## not on_turn_start) — it fires from Economy.capture_score *before*
+## _move_player's own actions_left -= 1 / auto-pass check, the same ordering
+## that lets the Blitz item (game.gd _item_apply) refund its own action
+## without ever resurrecting an already-ended turn. Covered by test_items.gd
+## ("Stargate Divination Crystal refunds the capture's action before the
+## auto-pass check").
 
 const Rules := preload("res://scripts/rules.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
@@ -102,6 +119,15 @@ const REGISTRY := {
 	"john-titor-s-crypto-wallet": ["on_milestone"],
 	"putin-s-golden-toilet-brush": ["on_purchase"],
 	"rapture-insurance-policy": ["on_game_over"],
+	# --- issue 17: Action/Time/Piece batch (8 artefacts, no needs-note) ---
+	"cia-exploding-cigar": ["on_turn_start"],
+	"i-am-not-a-robot-checkbox": ["on_turn_start"],
+	"seed-vault-secret-hatch": ["on_turn_start"],
+	"super-soldier-multivitamins": ["on_turn_start"],
+	"stargate-divination-crystal": ["on_capture"],
+	"5g-microchips": ["on_turn_start"],
+	"terracotta-draft-card": ["on_wave_clear"],
+	"charlemagne-s-birth-certificate": ["on_wave_clear"],
 }
 
 
@@ -278,3 +304,42 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["rapture-insurance-policy", "on_game_over"]:
 			g.score += g.gold * 20
 			g.gold = 0
+
+		# --- issue 17: Action/Time/Piece batch ---
+		["cia-exploding-cigar", "on_turn_start"]:
+			g.actions_left += 1
+		["i-am-not-a-robot-checkbox", "on_turn_start"]:
+			if g._player_pieces().size() >= 8:
+				g.actions_left += 1
+		["seed-vault-secret-hatch", "on_turn_start"]:
+			if g.items.size() >= 3:
+				g.actions_left += 1
+		["super-soldier-multivitamins", "on_turn_start"]:
+			var buffed := 0
+			for pos in g._player_pieces():
+				if not BuffLogic.of(g.board[pos]).is_empty():
+					buffed += 1
+			if buffed >= 3:
+				g.actions_left += 1
+		["stargate-divination-crystal", "on_capture"]:
+			# Fires from Economy.capture_score, BEFORE the capture's own
+			# actions_left -= 1 / auto-pass check runs (game.gd _move_player)
+			# — same ordering that lets Blitz refund its own action without
+			# ever resurrecting an already-ended turn. actions_max moves too,
+			# mirroring first_capture_extra (its on_capture sibling above),
+			# since turn start already happened and won't re-sync it for us.
+			if g.turn_action_count == 0:
+				g.actions_left += 1
+				g.actions_max += 1
+		["5g-microchips", "on_turn_start"]:
+			var allies: int = g._player_pieces().size()
+			var enemies: int = g.board.size() - allies
+			g.clock_ms += (allies - enemies) * 1000
+		["terracotta-draft-card", "on_wave_clear"]:
+			var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
+			g.stock.append(mix[g.rng.randi() % mix.size()]) # bare id: a fresh
+				# piece carries no board state, so ADR-0002's plain-String form
+				# applies (a Dictionary would only be needed for a piece pulled
+				# off the board with state attached, e.g. Extraction)
+		["charlemagne-s-birth-certificate", "on_wave_clear"]:
+			g.clock_ms += 10000

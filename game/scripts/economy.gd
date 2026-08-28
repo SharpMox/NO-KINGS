@@ -49,13 +49,17 @@ static func gain(g, amount: int) -> int:
 ## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
 ## still intact when the two call sites in game.gd call this) — "" / false
 ## when no attacker applies (e.g. direct test calls), which every
-## attacker-dependent handler treats as "no match" (issue 16).
+## attacker-dependent handler treats as "no match" (issue 16). `attacker_pos`
+## (issue 18) is that same board position, Vector2i(-1,-1) when it doesn't
+## apply, so a handler can grant something to the attacking piece itself
+## (Obedience-Flavored Tap Water, Holy Lint) instead of just reading its id.
 static func capture_score(g, victim_id: String, attacker_id: String = "",
-		attacker_buffed: bool = false) -> int:
+		attacker_buffed: bool = false, attacker_pos: Vector2i = Vector2i(-1, -1)) -> int:
 	var base: int = g.defs[victim_id].value
 	var ctx := ArtefactHooks.run(g, "on_capture", {
 		"victim_id": victim_id, "base": base, "pts": base,
 		"attacker_id": attacker_id, "attacker_buffed": attacker_buffed,
+		"attacker_pos": attacker_pos,
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
 	})

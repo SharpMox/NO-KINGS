@@ -46,7 +46,7 @@
   ],
   "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item (needs: gold-threshold)",
   "conspiracy": "Fort Knox's missing gold",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "fema-summer-camp-flyer",
@@ -58,7 +58,7 @@
   ],
   "effect": "At Turn end: +2 Gold per enemy piece on your half of the Board (needs: zone check)",
   "conspiracy": "FEMA camps",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "zurich-gnome-figurine",
@@ -242,7 +242,7 @@
   ],
   "effect": "On Rank Up: +20s Clock",
   "conspiracy": "Witness protection",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "5g-microchips",
@@ -278,7 +278,7 @@
   ],
   "effect": "On Wave clear: +2 Gold per allied piece on the Board; on losing a piece: -2 Gold",
   "conspiracy": "Satoshi Nakamoto",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "capstone-polish",
@@ -364,7 +364,7 @@
   ],
   "effect": "On your first Capture with a Ranked or Buffed piece each Turn: +100% Gold",
   "conspiracy": "The heart attack gun",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "dihydrogen-monoxide-battery",
@@ -376,7 +376,7 @@
   ],
   "effect": "On your first Tactical Item use each Wave: the Item is not consumed",
   "conspiracy": "The water-fuelled car",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "walt-s-cryonic-capsule",
@@ -745,7 +745,7 @@
   ],
   "effect": "On Rank Up: the piece gets +1 Piece Buff",
   "conspiracy": "The Holy Grail",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "casino-invisible-clock",
@@ -757,7 +757,7 @@
   ],
   "effect": "On Shop purchase: +25s Clock",
   "conspiracy": "Casino design",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "arms-fair-goodie-bag",
@@ -769,7 +769,7 @@
   ],
   "effect": "On Strategic Item use: +25 Gold",
   "conspiracy": "War profiteering",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "doomsday-clock-snooze-button",
@@ -915,7 +915,7 @@
   ],
   "effect": "Whenever a new Tariff is applied: +100 Gold",
   "conspiracy": "Merchants of Death",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "guidestone-blood-ritual",
@@ -1002,7 +1002,7 @@
   ],
   "effect": "While 3+ of your pieces are on the enemy half of the Board: +100% Score gain (needs: zone check)",
   "conspiracy": "The Dyatlov Pass incident",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "hollow-moon-cross-section",
@@ -1063,7 +1063,7 @@
   ],
   "effect": "On using your last held Item: +100 Score and +50 Gold",
   "conspiracy": "The 18½-minute gap",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "alien-autopsy-bloopers",
@@ -1088,7 +1088,7 @@
   ],
   "effect": "Whenever a Tariff charges you: +150 Score and +5s Clock",
   "conspiracy": "The Tunguska event",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "dark-market-light-bulb",
@@ -1125,7 +1125,7 @@
   ],
   "effect": "On losing a piece carrying a Piece Buff: +150 Gold and +150 Score",
   "conspiracy": "The Lusitania",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "atlantis-snow-globe",
@@ -1149,7 +1149,7 @@
   ],
   "effect": "On losing a Ranked piece: +150 Gold",
   "conspiracy": "The Knights Templar",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bible-gag-reel-scroll",
@@ -1185,7 +1185,7 @@
   ],
   "effect": "Whenever an enemy piece captures one of your pieces: the capturer gets a Slow debuff (needs: enemy auto-debuff)",
   "conspiracy": "The curse of the pharaohs",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "diplomatic-migraine-ray",
@@ -1197,7 +1197,7 @@
   ],
   "effect": "On Wave start: the strongest enemy piece gets a Slow debuff (needs: enemy auto-debuff)",
   "conspiracy": "Havana syndrome",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "doomsday-autoclicker",
@@ -1210,7 +1210,7 @@
   ],
   "effect": "On Decisive Item use: +200 Score and +10s Clock",
   "conspiracy": "Dead Hand",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "illuminati-nwo-booster-pack",
@@ -1247,7 +1247,7 @@
   ],
   "effect": "On Rank Up: add a copy of the piece's base-chain piece to your Stock (needs: chain lookup)",
   "conspiracy": "Bigfoot",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "backmasked-vinyl",
@@ -1259,7 +1259,7 @@
   ],
   "effect": "On losing a Ranked piece: a copy of its base-chain piece is added to your Stock (needs: chain lookup)",
   "conspiracy": "Backmasking",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "mao-s-loyalty-badge",
@@ -1321,7 +1321,7 @@
   ],
   "effect": "Every 3rd Tactical Item used: gain a Strategic Item; every 3rd Strategic: gain a Decisive (needs: use counters)",
   "conspiracy": "The 33rd degree",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "loch-ness-stool-sample",
@@ -1417,7 +1417,7 @@
   ],
   "effect": "On 5-Wave Milestone: one random Stock piece Ranks Up (needs: stock rank-up)",
   "conspiracy": "The Montauk Project",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "trojan-horse-assembly-manual",
@@ -1454,7 +1454,7 @@
   ],
   "effect": "On losing a piece: refund 75% of its value as Gold",
   "conspiracy": "D.B. Cooper",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nostradamus-mad-libs",
@@ -1478,7 +1478,7 @@
   ],
   "effect": "On losing a piece: +1 Tactical Item",
   "conspiracy": "Flight 19",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "terracotta-draft-card",
@@ -1514,7 +1514,7 @@
   ],
   "effect": "On Wave clear: move 1 piece from your Captured Stock into your Stock (needs: capture conversion)",
   "conspiracy": "Stockholm syndrome",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "uss-eldridge-invisibility-paint",
@@ -1538,7 +1538,7 @@
   ],
   "effect": "On your first Item use each Wave: the Item is not consumed",
   "conspiracy": "Free energy suppression",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "epstein-s-black-book",
@@ -1562,7 +1562,7 @@
   ],
   "effect": "Per 10 Gold gained: +5s Clock",
   "conspiracy": "The 2012 phenomenon",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "agartha-welcome-mat",
@@ -1989,7 +1989,7 @@
   ],
   "effect": "On Wave clear: pays Gold starting at +10, growing +10 per Wave; collapses to 0 and restarts when you lose a piece",
   "conspiracy": "Nibiru",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "jon-burrows-fake-id",
@@ -2049,7 +2049,7 @@
   ],
   "effect": "Whenever you use a non-Tactical Item: gain a random Tactical Item (needs: grant hook)",
   "conspiracy": "The military-industrial complex",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "fifa-complimentary-yacht",

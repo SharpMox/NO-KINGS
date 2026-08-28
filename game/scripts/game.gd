@@ -105,6 +105,13 @@ var turn_capture_count := 0 # captures this player turn, reset in _begin_player_
 var gold_spent_shop_this_wave := 0 # reset in WaveLogic.queue() (artefact hook 16)
 var silk_road_active := false # Silk Road Coupon's -50% Shop prices, reset in
 	# WaveLogic.queue() every wave (artefact hook 18)
+var nibiru_wave_streak := 0 # Nibiru Hide-and-Seek Trophy: grows +1 per Wave
+	# clear, reset to 0 on_piece_lost (artefact_hooks.gd, artefact hook 19)
+var dihydrogen_free_wave := -1 # Dihydrogen Monoxide Battery: wave its one free
+	# Tactical Item use already fired this Wave, -1 = not yet (artefact hook 19)
+var wardenclyffe_free_wave := -1 # same idea, Wardenclyffe AAA Batteries' any-tier version
+var item_use_tactical_count := 0 # 33rd Degree Fidelity Card's per-tier use counters
+var item_use_strategic_count := 0
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -596,7 +603,7 @@ func _run_enemy_actions() -> void:
 		if board.has(act.to) and BuffLogic.has(board[act.to], "trap"):
 			# Trap takes the attacker with it — neither piece survives
 			_add_float(act.from, "Trapped!", COL_CAPTURE)
-			lost_player += 1
+			_lose_player_piece(act.to, "trap")
 			lost_enemy += 1
 			_add_pop(act.to)
 			_add_pop(act.from)
@@ -610,7 +617,7 @@ func _run_enemy_actions() -> void:
 				# 2 keeps the attacker out for exactly one enemy turn
 				BuffLogic.add(board[act.from], "stunned", Tuning.STUN_MISSES + 1)
 				_add_float(act.from, "Stunned!", COL_MERGE)
-			lost_player += 1
+			_lose_player_piece(act.to, "captured", act.from)
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
@@ -1084,7 +1091,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		if BuffLogic.reflects_capture(board[to]):
 			BuffLogic.consume(board[to], "reflect")
 			_add_float(from, "Reflected!", COL_CAPTURE)
-			lost_player += 1
+			_lose_player_piece(from, "reflect")
 			_add_pop(from)
 			board[from] = board[to] # the defender counter-attacks into the tile
 			board.erase(to)
@@ -1143,7 +1150,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			return _refresh()
 		if BuffLogic.has(victim, "trap"): # the attacker goes with it
 			_add_float(from, "Trapped!", COL_CAPTURE)
-			lost_player += 1
+			_lose_player_piece(from, "trap")
 			_add_pop(from)
 			board.erase(from)
 			board.erase(to)
@@ -1314,7 +1321,7 @@ func _use_item(index: int) -> void:
 		_set_drawer("")
 	var it: Dictionary = items[index]
 	if it.target == "":
-		items.remove_at(index)
+		_consume_item(index, it)
 		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
 		return
 	if it.key == "buff_box" and pending_buff == "": # pick the buff, then the target
@@ -1408,7 +1415,7 @@ func _item_click(tile: Vector2i) -> void:
 		item_targets = _item_stage_targets(it, tile)
 		_refresh()
 		return
-	items.remove_at(item_active)
+	_consume_item(item_active, it)
 	var a := item_stage_a
 	_buff_pick = pending_buff # _item_reset clears it; the effect still needs it
 	_item_reset()
@@ -1420,7 +1427,7 @@ func _item_confirm_multi() -> void:
 	if item_active < 0 or item_selected.is_empty():
 		return
 	var it: Dictionary = items[item_active]
-	items.remove_at(item_active)
+	_consume_item(item_active, it)
 	_extract_sel = item_selected.duplicate()
 	_buff_pick = pending_buff
 	_item_reset()
@@ -1469,7 +1476,10 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"demote":
 			board[b].id = ItemLogic.chain_base(defs, board[b].id)
 		"promote":
+			var old_id: String = board[b].id
 			board[b].id = defs[board[b].id].next
+			ArtefactHooks.run(self, "on_rank_up",
+				{"pos": b, "old_id": old_id, "id": board[b].id, "stock_index": -1})
 		"invert":
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
@@ -1506,11 +1516,37 @@ func _detonate(at: Vector2i) -> void:
 ## Item destruction: piece leaves the board — no score, no captured stock.
 func _destroy(pos: Vector2i) -> void:
 	if board[pos].owner == Rules.PLAYER:
-		lost_player += 1
+		_lose_player_piece(pos, "destroyed")
 	else:
 		lost_enemy += 1
 	_add_pop(pos)
 	board.erase(pos)
+
+
+## Single choke point for a player piece leaving the board (artefact hook 19)
+## — was 5 scattered `lost_player += 1` sites (enemy capture, both Reflect
+## directions, both Trap directions, and _destroy above). Each now calls here
+## instead, BEFORE the board entry is erased/overwritten, so on_piece_lost
+## handlers can still read it (e.g. whether it carried a Piece Buff).
+## `attacker_pos` is the enemy piece that did the capturing, when there is one
+## (Vector2i(-1,-1) otherwise) — Tutankhamun's Death Thong debuffs it.
+func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(-1, -1)) -> void:
+	lost_player += 1
+	ArtefactHooks.run(self, "on_piece_lost",
+		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos})
+
+
+## Single choke point for an Item leaving `items` (artefact hook 19) — was 3
+## scattered `items.remove_at` sites. Fires BEFORE removal so a handler can
+## veto it via ctx.cancel (Dihydrogen Monoxide Battery, Wardenclyffe AAA
+## Batteries: "the Item is not consumed") — the call site only removes when
+## the hook leaves ctx.cancel false. `it` is the item dict already looked up
+## by the caller (items[index], before it moves).
+func _consume_item(index: int, it: Dictionary) -> void:
+	var ctx := ArtefactHooks.run(self, "on_item_consume",
+		{"key": it.key, "tier": it.get("tier", ""), "last": items.size() == 1, "cancel": false})
+	if not ctx.cancel:
+		items.remove_at(index)
 
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---

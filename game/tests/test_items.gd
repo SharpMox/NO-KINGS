@@ -960,6 +960,279 @@ func _init() -> void:
 	majestic.queue_free()
 	await process_frame
 
+	# --- issue 19: on_piece_lost (Satoshi's Private Key, Nibiru Hide-and-Seek
+	# Trophy) — game.gd's new choke point, called from _destroy here
+	var sat := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 50, "artefacts": ["satoshi-s-private-key", "nibiru-hide-and-seek-trophy"]})
+	await process_frame
+	WaveLogic.queue(sat, sat.wave + 1) # Wave clear 1: Satoshi +2/ally (2 allies), Nibiru +10 (streak 1)
+	check(sat.gold == 50 + 4 + 10, "Satoshi's Private Key + Nibiru Hide-and-Seek Trophy: first Wave-clear payout")
+	WaveLogic.queue(sat, sat.wave + 1) # Wave clear 2, no loss yet: Nibiru grows to +20 (streak 2)
+	check(sat.gold == 50 + 4 + 10 + 4 + 20, "Nibiru Hide-and-Seek Trophy: the payout grows +10 per Wave")
+	sat._destroy(Vector2i(2, 2)) # lose a piece: Satoshi -2 Gold, Nibiru streak resets
+	check(sat.nibiru_wave_streak == 0, "Nibiru Hide-and-Seek Trophy: losing a piece resets the streak")
+	var gold_after_loss: int = sat.gold
+	check(gold_after_loss == 50 + 4 + 10 + 4 + 20 - 2, "Satoshi's Private Key: -2 Gold on losing a piece")
+	WaveLogic.queue(sat, sat.wave + 1) # Wave clear 3: Nibiru restarts at +10 (streak 1), 1 ally left
+	check(sat.gold == gold_after_loss + 2 + 10, "Nibiru Hide-and-Seek Trophy: collapses to 0 and restarts after a loss")
+	sat.queue_free()
+	await process_frame
+
+	# --- issue 19: on_piece_lost (Lusitania "Hardtack" Crate, D.B. Cooper's
+	# Parachute, Templar Severance Gold, Backmasked Vinyl, Tutankhamun's Death
+	# Thong) — the Buff-carry / Ranked / attacker-debuff branches
+	var lus := _boot({"board": [["queen", 0, 2, 2, {"buffs": [{"key": "critical"}]}],
+			["pawn", 1, 7, 10]],
+		"wave": 4, "gold": 0, "score": 0,
+		"artefacts": ["lusitania-hardtack-crate", "d-b-cooper-s-parachute"]})
+	await process_frame
+	lus._destroy(Vector2i(2, 2)) # the queen carries a Buff and is unranked
+	check(lus.score == 150, "Lusitania \"Hardtack\" Crate: +150 Score for a Buff-carrying piece lost")
+	check(lus.gold == 150 + roundi(lus.defs["queen"].value * 0.75),
+		"Lusitania (+150 Gold) and D.B. Cooper's Parachute (+75% of value) both pay on the same loss")
+	lus.queue_free()
+	await process_frame
+
+	var rank := _boot({"board": [["sergeant", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0,
+		"artefacts": ["templar-severance-gold-one-pile", "backmasked-vinyl"]})
+	await process_frame
+	rank._destroy(Vector2i(2, 2)) # a Ranked piece (sergeant, promoted from pawn)
+	check(rank.gold == 150, "Templar Severance Gold (One Pile): +150 Gold for a Ranked piece lost")
+	check(rank.stock == ["pawn"], "Backmasked Vinyl: a copy of the base-chain piece (pawn) joins Stock")
+	rank.queue_free()
+	await process_frame
+
+	var unranked := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0,
+		"artefacts": ["templar-severance-gold-one-pile", "backmasked-vinyl"]})
+	await process_frame
+	unranked._destroy(Vector2i(2, 2)) # a base pawn: not Ranked — neither artefact pays
+	check(unranked.gold == 0 and unranked.stock.is_empty(),
+		"Templar Severance Gold / Backmasked Vinyl: no payout for a non-Ranked piece")
+	unranked.queue_free()
+	await process_frame
+
+	var tutan := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 4, "artefacts": ["tutankhamun-s-death-thong"]})
+	await process_frame
+	await tutan._run_enemy_actions() # the enemy rook captures the player's pawn
+	check(BuffLogic.has(tutan.board[Vector2i(2, 2)], "slow"),
+		"Tutankhamun's Death Thong: the capturing enemy piece gets Slow")
+	tutan.queue_free()
+	await process_frame
+
+	# --- issue 19: on_item_consume — each artefact boots alone (any single-item
+	# use also satisfies Tape Eraser Magnet's "last held" gate, so it gets its
+	# own isolated boot rather than entangling its math with the others)
+	var arms := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "artefacts": ["arms-fair-goodie-bag"]})
+	await process_frame
+	arms.items.append({"key": "x1", "name": "x1", "tier": "Strategic", "target": "", "description": ""})
+	arms.actions_left = 5
+	arms._use_item(0)
+	check(arms.gold == 25, "Arms Fair Goodie Bag: +25 Gold on a Strategic Item use")
+	arms.queue_free()
+	await process_frame
+
+	var doom := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "score": 0, "artefacts": ["doomsday-autoclicker"]})
+	await process_frame
+	doom.items.append({"key": "x2", "name": "x2", "tier": "Decisive", "target": "", "description": ""})
+	doom.actions_left = 5
+	var clock_doom: float = doom.clock_ms
+	doom._use_item(0)
+	check(doom.score == 200 and doom.clock_ms > clock_doom,
+		"Doomsday Autoclicker: +200 Score and +10s Clock on a Decisive Item use")
+	doom.queue_free()
+	await process_frame
+
+	var tape := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "score": 0, "artefacts": ["tape-eraser-magnet"]})
+	await process_frame
+	tape.items.append({"key": "x3", "name": "x3", "tier": "Tactical", "target": "", "description": ""})
+	tape.actions_left = 5
+	tape._use_item(0) # the ONLY held Item — Tape Eraser Magnet's "last held" gate
+	check(tape.score == 100 and tape.gold == 50,
+		"Tape Eraser Magnet: +100 Score and +50 Gold on using your last held Item")
+	tape.queue_free()
+	await process_frame
+
+	var lobbyist := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "artefacts": ["defense-lobbyist-business-card"]})
+	await process_frame
+	lobbyist.items.append({"key": "x4", "name": "x4", "tier": "Strategic", "target": "", "description": ""})
+	lobbyist.actions_left = 5
+	lobbyist._use_item(0) # non-Tactical use: the grant lands, then x4 itself is removed
+	check(lobbyist.items.size() == 1 and lobbyist.items[0].tier == "Tactical",
+		"Defense Lobbyist Business Card: a non-Tactical use grants a Tactical Item")
+	lobbyist.items.clear()
+	lobbyist.items.append({"key": "x5", "name": "x5", "tier": "Tactical", "target": "", "description": ""})
+	lobbyist.actions_left = 5
+	lobbyist._use_item(0) # a Tactical use grants nothing
+	check(lobbyist.items.is_empty(), "Defense Lobbyist Business Card: no grant on a Tactical use")
+	lobbyist.queue_free()
+	await process_frame
+
+	var cancel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "artefacts": ["dihydrogen-monoxide-battery", "wardenclyffe-aaa-batteries"]})
+	await process_frame
+	cancel.items.append({"key": "y1", "name": "y1", "tier": "Tactical", "target": "", "description": ""})
+	cancel.actions_left = 5
+	cancel._use_item(0)
+	check(cancel.items.size() == 1, "Dihydrogen Monoxide Battery: the first Tactical use this Wave is not consumed")
+	cancel.actions_left = 5
+	cancel._use_item(0) # second use this Wave: both artefacts already spent their free use
+	check(cancel.items.is_empty(), "the second use this Wave IS consumed")
+	cancel.queue_free()
+	await process_frame
+
+	var fidelity := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "artefacts": ["33rd-degree-fidelity-card"]})
+	await process_frame
+	for i in 3:
+		fidelity.items.append({"key": "z", "name": "z", "tier": "Tactical", "target": "", "description": ""})
+		fidelity.actions_left = 5
+		fidelity._use_item(0)
+	check(fidelity.items.size() == 1 and fidelity.items[0].tier == "Strategic",
+		"33rd Degree Fidelity Card: the 3rd Tactical use grants a Strategic Item")
+	fidelity.queue_free()
+	await process_frame
+
+	# --- issue 19: on_rank_up (Witness Protection Mustache, Holy Grail
+	# Coaster, Bigfoot Toenail Clipping) — merge_logic.gd's commit_merge, a
+	# same-id merge (Rank Up), both board- and Stock-landing cases
+	var rankup := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "stock": ["pawn", "pawn"],
+		"artefacts": ["witness-protection-mustache", "holy-grail-coaster", "bigfoot-toenail-clipping"]})
+	await process_frame
+	var clock_rankup: float = rankup.clock_ms
+	MergeLogic.commit_merge(rankup, Vector2i(2, 2), Vector2i(3, 2)) # board merge: lands on Vector2i(3, 2)
+	check(rankup.clock_ms > clock_rankup, "Witness Protection Mustache: +20s Clock on Rank Up")
+	check(BuffLogic.of(rankup.board[Vector2i(3, 2)]).size() == 1,
+		"Holy Grail Coaster: +1 Piece Buff to the Ranked piece (board landing)")
+	check(rankup.stock.has("pawn"), "Bigfoot Toenail Clipping: a copy of the base-chain piece joins Stock")
+	MergeLogic.commit_merge(rankup, # pool-only merge (both refs from Stock): lands in Stock, not the board
+		{"id": "pawn", "cap": false, "entry": "pawn"}, {"id": "pawn", "cap": false, "entry": "pawn"})
+	var converted: Variant = null # Bigfoot Toenail Clipping's own Stock grant (a bare
+		# String) can land anywhere in the Array — find the Dictionary instead
+	for stock_entry in rankup.stock:
+		if stock_entry is Dictionary:
+			converted = stock_entry
+	check(converted != null and BuffLogic.of(converted).size() == 1,
+		"Holy Grail Coaster: the Stock-landing case converts the bare id into a Buff-carrying Dictionary")
+	rankup.queue_free()
+	await process_frame
+
+	# --- issue 19: chain-lookup off existing hooks (CIA Heart Attack Gun,
+	# Montauk Eggo Waffle) — ItemLogic.chain_base, no new hook
+	var cia := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "artefacts": ["cia-heart-attack-gun"]})
+	await process_frame
+	var pawn_val: int = cia.defs["pawn"].value
+	Economy.capture_score(cia, "pawn", "knight", true, Vector2i(2, 2)) # Buffed attacker, first Capture this Turn
+	check(cia.gold == pawn_val, "CIA Heart Attack Gun: +100% Gold on the first Capture with a Buffed attacker")
+	cia.gold = 0
+	cia.turn_capture_count = 0
+	Economy.capture_score(cia, "pawn", "pawn", false, Vector2i(2, 2)) # unranked, unbuffed attacker: no bonus
+	check(cia.gold == 0, "CIA Heart Attack Gun: no bonus for an unranked, unbuffed attacker")
+	cia.gold = 0
+	cia.turn_capture_count = 0
+	Economy.capture_score(cia, "pawn", "sergeant", false, Vector2i(2, 2)) # a Ranked, unbuffed attacker still qualifies
+	check(cia.gold == pawn_val, "CIA Heart Attack Gun: +100% Gold for a Ranked (not just Buffed) attacker")
+	cia.queue_free()
+	await process_frame
+
+	var montauk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "stock": ["pawn"], "artefacts": ["montauk-eggo-waffle"]})
+	await process_frame
+	WaveLogic.queue(montauk, 6) # Wave 5 just cleared -> "5-Wave Milestone" fires this on_wave_clear
+	check(montauk.stock == ["sergeant"],
+		"Montauk Eggo Waffle: the only Stock piece Ranks Up on the 5-Wave Milestone")
+	montauk.queue_free()
+	await process_frame
+
+	# --- issue 19: board-half reads (Dyatlov Geiger Counter, FEMA Summer Camp
+	# Flyer) — Tuning.BOARD_H, no new hook
+	var dya := _boot({"board": [["pawn", 0, 2, 7], ["pawn", 0, 3, 8], ["pawn", 0, 4, 9],
+			["rook", 1, 7, 10]],
+		"wave": 4, "score": 0, "artefacts": ["dyatlov-geiger-counter"]})
+	await process_frame
+	Economy.earn(dya, 100)
+	check(dya.score == 200, "Dyatlov Geiger Counter: +100% Score with 3+ allies on the enemy half")
+	dya.queue_free()
+	await process_frame
+
+	var fema := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["rook", 1, 4, 3]],
+		"wave": 4, "gold": 0, "artefacts": ["fema-summer-camp-flyer"]})
+	await process_frame
+	fema.state = fema.State.PLAYER_TURN
+	fema.actions_left = 0
+	fema._on_pass()
+	check(fema.gold == 4, "FEMA Summer Camp Flyer: +2 Gold per enemy piece on your half at Turn end")
+	fema.queue_free()
+	await process_frame
+
+	# --- issue 19: enemy auto-debuff (Diplomatic Migraine Ray) — BuffLogic is
+	# owner-agnostic already, no new hook
+	var dip := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 3, 8], ["queen", 1, 4, 9]],
+		"wave": 4, "artefacts": ["diplomatic-migraine-ray"]})
+	await process_frame
+	WaveLogic.queue(dip, dip.wave + 1) # on_wave_spawn: the strongest enemy piece gets Slow
+	check(BuffLogic.has(dip.board[Vector2i(4, 9)], "slow"),
+		"Diplomatic Migraine Ray: the strongest enemy piece gets Slow on Wave spawn")
+	dip.queue_free()
+	await process_frame
+
+	# --- issue 19: cheap follow-ups (Casino Invisible Clock, 2012 Doomsday
+	# Party Hat, Fort Knox IOU) — hooks that landed after their own slice
+	var cheap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 9999, "score": 0,
+		"artefacts": ["casino-invisible-clock", "2012-doomsday-party-hat", "fort-knox-iou"]})
+	await process_frame
+	var clock_cheap1: float = cheap.clock_ms
+	for i in cheap.shop_stock.size():
+		if cheap.shop_stock[i].kind == "item":
+			Shop.buy(cheap, i)
+			break
+	check(cheap.clock_ms > clock_cheap1, "Casino Invisible Clock: +25s Clock on a Shop purchase")
+	var clock_cheap2: float = cheap.clock_ms
+	Economy.earn(cheap, 20) # a Gold gain, not a purchase — 2012 Doomsday Party Hat's own hook
+	check(cheap.clock_ms > clock_cheap2, "2012 Doomsday Party Hat: +5s Clock per 10 Gold gained")
+	cheap.gold = 5
+	var s0: int = cheap.score
+	Economy.earn(cheap, 100)
+	check(cheap.score == s0 + 150, "Fort Knox IOU: +50% Score gain while holding under 10 Gold")
+	cheap.queue_free()
+	await process_frame
+
+	# --- issue 19: on_tariff_apply / on_tariff_charge (Merchants of Death
+	# Sample Case, Tunguska Toothpicks) — economy.gd's existing choke points
+	var tar := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "score": 0,
+		"artefacts": ["merchants-of-death-sample-case", "tunguska-toothpicks"]})
+	await process_frame
+	Economy.activate_tariff_by_key(tar, "move_cost")
+	check(tar.gold == 100, "Merchants of Death Sample Case: +100 Gold whenever a new Tariff is applied")
+	tar.gold = 500
+	var clock_tar: float = tar.clock_ms
+	Economy.charge(tar, "move_cost")
+	check(tar.score == 150 and tar.clock_ms > clock_tar,
+		"Tunguska Toothpicks: +150 Score and +5s Clock whenever a Tariff charges you")
+	tar.queue_free()
+	await process_frame
+
+	# --- issue 19: capture conversion, the cheap wave-clear half (Stockholm
+	# Syndrome Pamphlet)
+	var stock19 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "captured": ["pawn"], "artefacts": ["stockholm-syndrome-pamphlet"]})
+	await process_frame
+	WaveLogic.queue(stock19, stock19.wave + 1)
+	check(stock19.captured.is_empty() and stock19.stock.has("pawn"),
+		"Stockholm Syndrome Pamphlet: a Captured Stock piece moves to Stock on Wave clear")
+	stock19.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

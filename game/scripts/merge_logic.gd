@@ -4,6 +4,7 @@
 
 const Rules := preload("res://scripts/rules.gd")
 const Economy := preload("res://scripts/economy.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 ## The piece the current selection would merge FROM: an armed pool stack
@@ -86,12 +87,23 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		else: # a unit from a stack: remove one copy by value — the exact entry,
 			# so a stateful copy is consumed and its state discarded (ADR-0002)
 			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
+	var stock_index := -1
 	if result_tile.x >= 0:
 		g.board[result_tile] = {"id": result, "owner": Rules.PLAYER}
 		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	else:
 		g.stock.append(result)
+		stock_index = g.stock.size() - 1 # captured now — a handler appending its
+			# own Stock grant during on_rank_up (Bigfoot Toenail Clipping) must
+			# not shift which entry Holy Grail Coaster's stock case converts
 		g.fx_at = Vector2((g.hud.pool_box.get_parent() as Control).get_global_rect().get_center())
+	if ids[0] == ids[1]: # a same-id merge advances the promotion chain — a Rank
+		# Up, distinct from a Fusion of two different pieces (artefact hook 19).
+		# result_tile.x < 0 means the result landed in Stock, not the board —
+		# handlers that grant something onto the piece itself branch on that,
+		# reading `stock_index` rather than "the last Stock entry" (see above).
+		ArtefactHooks.run(g, "on_rank_up",
+			{"pos": result_tile, "old_id": ids[0], "id": result, "stock_index": stock_index})
 	Economy.charge(g, "fuse_cost")
 	g.placing_id = ""
 	g.placing_cap = false

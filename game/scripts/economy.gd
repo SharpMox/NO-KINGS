@@ -13,11 +13,15 @@ const CloudSave := preload("res://scripts/cloud_save.gd")
 ## Gold cost charged when a tariffed action happens. Dispatches on_charge
 ## (issue 13) with ctx.key set to the specific tariff being charged; the
 ## matching held tariff (if any, and only Counter-Intel's suppression is
-## checked centrally by ArtefactHooks.run) sets ctx.charged.
+## checked centrally by ArtefactHooks.run) sets ctx.charged. When it does,
+## on_tariff_charge (issue 19) fires right after — "whenever a Tariff charges
+## you" — a single choke point since every call site already funnels through
+## here.
 static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
 	var ctx := ArtefactHooks.run(g, "on_charge", {"key": key, "charged": false})
 	if ctx.charged:
 		g.gold = maxi(g.gold - amount, 0)
+		ArtefactHooks.run(g, "on_tariff_charge", {"key": key, "amount": amount})
 
 
 ## Award a gain: score counts the raw amount (up-only performance metric),
@@ -127,9 +131,13 @@ static func activate_tariff_by_key(g, key: String) -> void:
 			return apply_tariff(g, t)
 
 
+## Single choke point for every Tariff taking effect (oneoff or persistent) —
+## "whenever a new Tariff is applied" (artefact hook 19) fires here, once,
+## regardless of which of the two activate_* callers led here.
 static func apply_tariff(g, t: Dictionary) -> void:
 	g.tariffs_seen.append(t.name)
 	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
+	ArtefactHooks.run(g, "on_tariff_apply", {"key": t.key, "tier": t.get("tier", "")})
 	if t.kind == "oneoff":
 		match t.key:
 			"forced_audit":

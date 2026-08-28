@@ -19,6 +19,23 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## Fixtures are deterministic by default (slice 36: a flaky suite makes every
+## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
+## out — only for a test that genuinely wants variance.
+const DEFAULT_SEED := 1
+
+
+func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
+	if seed_it and not cfg.has("seed"):
+		cfg = cfg.duplicate()
+		cfg.seed = DEFAULT_SEED
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	return game
+
+
 func _init() -> void:
 	# --- roster shape ---
 	check(Kings.TIER_ORDER.size() == 4, "4 costume tiers")
@@ -51,10 +68,7 @@ func _init() -> void:
 	check(Kings.name_of("nonexistent") == "King", "name_of falls back on an unknown id")
 
 	# --- a queued King wave attaches an identity that lands on the board ---
-	GameScript.next_config = {"board": [], "wave": 49}
-	GameScript.is_scenario = true
-	var g: Node2D = load("res://scenes/Game.tscn").instantiate()
-	root.add_child(g)
+	var g: Node2D = _boot({"board": [], "wave": 49})
 	await process_frame
 	await process_frame
 	g._queue_wave(50)

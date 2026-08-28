@@ -9,6 +9,7 @@ extends Node
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Kings := preload("res://data/kings.gd")
 
 signal merge_confirmed
 signal merge_cancelled
@@ -134,6 +135,9 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	box.add_child(_overlay_label(reason, 18))
 	var stats := "Score %d · Deepest wave %d\nKings %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
 		% [g.score, g.wave, g.kings_defeated, g.tariffs_seen.size(), g.lost_player, g.lost_enemy]
+	if not g.king_ids_defeated.is_empty():
+		var names: Array = g.king_ids_defeated.map(func(id: String) -> String: return Kings.name_of(id))
+		stats += "\nDefeated: %s" % ", ".join(names)
 	if rank > 0:
 		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
 	box.add_child(_overlay_label(stats, 19))
@@ -163,7 +167,8 @@ func show_win_screen() -> void:
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
 	box.add_child(_overlay_label("VICTORY", 32))
-	box.add_child(_overlay_label("The wave-%d King has fallen" % g.wave, 18))
+	var fallen: String = Kings.name_of(g.king_ids_defeated.back()) if not g.king_ids_defeated.is_empty() else "King"
+	box.add_child(_overlay_label("The wave-%d King, %s, has fallen" % [g.wave, fallen], 18))
 	var preview := 1 # GDD "ranking preview": where the score would land now
 	for e in g.load_scores():
 		if int(e.score) >= g.score:

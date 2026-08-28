@@ -1371,6 +1371,177 @@ func _init() -> void:
 	hoffa2.queue_free()
 	await process_frame
 
+	# --- issue 23: on_buff_consume (Amityville Ouija Board, Cleopatra's Hairpin)
+	# — game.gd's new _consume_buff choke point
+	var amc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["amityville-ouija-board", "cleopatra-s-hairpin"]})
+	await process_frame
+	BuffLogic.add(amc.board[Vector2i(2, 2)], "shield") # Tactical
+	await amc._run_enemy_actions() # the rook attacks, Shield repels and is consumed
+	check(amc.gold == 10,
+		"Amityville Ouija Board: +10 Gold on any-tier Piece Buff consume; Cleopatra's Hairpin skips a Tactical buff")
+	BuffLogic.add(amc.board[Vector2i(2, 2)], "reflect") # Decisive
+	await amc._run_enemy_actions() # the same rook attacks again, into Reflect
+	check(amc.gold == 10 + 10 + 100,
+		"Cleopatra's Hairpin: +100 Gold on top of Amityville's own +10, for a Decisive Buff (Reflect)")
+	amc.queue_free()
+	await process_frame
+
+	# --- issue 23: on_buff_consume / on_piece_demoted, owner-agnostic
+	# (Guidestone Blood Ritual) ---
+	var gbr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 3, "gold": 0, "artefacts": ["guidestone-blood-ritual"]})
+	await process_frame
+	gbr.actions_left = 5
+	BuffLogic.add(gbr.board[Vector2i(2, 5)], "shield") # the ENEMY rook carries it
+	gbr._move_player(Vector2i(2, 2), Vector2i(2, 5)) # the player attacks into it
+	check(gbr.gold == 25,
+		"Guidestone Blood Ritual: +25 Gold on ANY piece's Buff consume, ally or enemy")
+	gbr.queue_free()
+	await process_frame
+
+	var gbr2 := _boot({"board": [["sergeant", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["guidestone-blood-ritual"]})
+	await process_frame
+	gbr2.actions_left = 5
+	gbr2.items.append(_item("demote", "tile"))
+	gbr2._use_item(0)
+	gbr2._item_click(Vector2i(2, 2))
+	check(gbr2.board[Vector2i(2, 2)].id == "pawn" and gbr2.gold == 25,
+		"Guidestone Blood Ritual: +25 Gold whenever a piece (ally or enemy) is Demoted")
+	gbr2.queue_free()
+	await process_frame
+
+	# --- issue 23: on_buff_consume, first-per-Wave re-apply (Youth Fountain Martini) ---
+	var yfm := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 3, "artefacts": ["youth-fountain-martini"]})
+	await process_frame
+	BuffLogic.add(yfm.board[Vector2i(2, 2)], "shield")
+	await yfm._run_enemy_actions() # Shield blocks the attack and is consumed
+	check(BuffLogic.has(yfm.board[Vector2i(2, 2)], "shield"),
+		"Youth Fountain Martini: the first Buff consumed each Wave is re-applied to the same piece")
+	await yfm._run_enemy_actions() # the same rook, repelled again, attacks again
+	check(not BuffLogic.has(yfm.board[Vector2i(2, 2)], "shield"),
+		"Youth Fountain Martini: only the first consume each Wave gets the refresh")
+	yfm.queue_free()
+	await process_frame
+
+	# --- issue 23: on_buff_apply (Pied Piper's Rat Census, mRNA Firmware Update)
+	# — game.gd's new _apply_buff choke point ---
+	var ppr := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["pied-piper-s-rat-census"]})
+	await process_frame
+	ppr.actions_left = 5
+	ppr.items.append(_item("buff_box", "tile"))
+	ppr._use_item(0)
+	ppr._buff_chosen("shield")
+	ppr._item_click(Vector2i(2, 2)) # buff the queen — the pawn at (3,3) is adjacent
+	check(BuffLogic.has(ppr.board[Vector2i(2, 2)], "shield")
+			and BuffLogic.has(ppr.board[Vector2i(3, 3)], "shield"),
+		"Pied Piper's Rat Census: applying a Piece Buff copies it to one adjacent ally")
+	ppr.queue_free()
+	await process_frame
+
+	var mrna := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["mrna-firmware-update"]})
+	await process_frame
+	mrna.actions_left = 5
+	for i in 3:
+		mrna.items.append(_item("buff_box", "tile"))
+		mrna._use_item(0)
+		mrna._buff_chosen("shield")
+		mrna._item_click(Vector2i(2, 2))
+	check(mrna.board[Vector2i(2, 2)].id == "sergeant",
+		"mRNA Firmware Update: every 3rd Piece Buff you apply also Ranks Up the piece")
+	mrna.queue_free()
+	await process_frame
+
+	# --- issue 23: on_piece_lost buff transfer (KGB Photo Eraser) ---
+	var kgb := _boot({"board": [["queen", 0, 2, 2, {"buffs": [{"key": "critical"}]}],
+			["pawn", 0, 3, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["kgb-photo-eraser"]})
+	await process_frame
+	kgb._destroy(Vector2i(2, 2)) # the queen carries a Buff and is lost
+	check(BuffLogic.has(kgb.board[Vector2i(3, 3)], "critical"),
+		"KGB Photo Eraser: a lost piece's Buff transfers to the nearest ally")
+	kgb.queue_free()
+	await process_frame
+
+	# --- issue 23: demotion / buff-removal immunity (Antikythera Warranty
+	# Card, Atlantis Snow Globe) — game.gd "demote"/"radar_jamming" ---
+	var ant := _boot({"board": [["sergeant", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["antikythera-warranty-card"]})
+	await process_frame
+	ant.actions_left = 5
+	ant.items.append(_item("demote", "tile"))
+	ant._use_item(0)
+	ant._item_click(Vector2i(2, 2))
+	check(ant.board[Vector2i(2, 2)].id == "sergeant",
+		"Antikythera Warranty Card: your pieces cannot be Demoted")
+	BuffLogic.add(ant.board[Vector2i(2, 2)], "shield")
+	ant.items.append(_item("radar_jamming", "tile"))
+	ant._use_item(0)
+	ant._item_click(Vector2i(2, 2))
+	check(BuffLogic.has(ant.board[Vector2i(2, 2)], "shield"),
+		"Antikythera Warranty Card: your Piece Buffs cannot be removed by Radar Jamming")
+	ant.queue_free()
+	await process_frame
+
+	var atl := _boot({"board": [["sergeant", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["atlantis-snow-globe"]})
+	await process_frame
+	atl.actions_left = 5
+	atl.items.append(_item("demote", "tile"))
+	atl._use_item(0)
+	atl._item_click(Vector2i(2, 2))
+	check(atl.board[Vector2i(2, 2)].id == "sergeant",
+		"Atlantis Snow Globe: your pieces cannot be Demoted")
+	atl.queue_free()
+	await process_frame
+
+	# --- issue 23: payout + strip (45.5 Carat Curse) — no new hook needed ---
+	var carat := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["45-5-carat-curse"]})
+	await process_frame
+	BuffLogic.add(carat.board[Vector2i(2, 2)], "shield")
+	Economy.earn(carat, 100)
+	check(carat.gold == 145 and carat.score == 145,
+		"45.5 Carat Curse: +45% Gold and Score gain")
+	WaveLogic.queue(carat, carat.wave + 1) # Wave 3 clears — every 3rd Wave strips Buffs
+	check(BuffLogic.of(carat.board[Vector2i(2, 2)]).is_empty(),
+		"45.5 Carat Curse: every 3rd Wave clear strips all allied Piece Buffs")
+	carat.queue_free()
+	await process_frame
+
+	# --- issue 23: Buff Box choice-count (Numbers Station Sudoku, Bohemian
+	# Grove Friendship Bracelet) — a UI change in _open_buff_pick/_buff_chosen,
+	# not a REGISTRY hook (issue 18's own held-back note) ---
+	var nss := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 20, "artefacts": ["numbers-station-sudoku"]})
+	await process_frame
+	nss.actions_left = 5
+	nss.items.append(_item("buff_box", "tile"))
+	nss._use_item(0)
+	var nss_box: Node = nss.modals.buff_panel.get_child(0).get_child(0)
+	check(nss_box.get_child_count() - 2 == 4, # minus the head label and cancel button
+		"Numbers Station Sudoku: the Buff Box offers 4 choices instead of 3")
+	nss._buff_chosen("shield")
+	check(nss.gold == 20 - 5, "Numbers Station Sudoku: each pick costs 5 Gold")
+	nss.queue_free()
+	await process_frame
+
+	var bgf := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bohemian-grove-friendship-bracelet"]})
+	await process_frame
+	bgf.actions_left = 5
+	bgf.items.append(_item("buff_box", "tile"))
+	bgf._use_item(0)
+	var bgf_box: Node = bgf.modals.buff_panel.get_child(0).get_child(0)
+	check(bgf_box.get_child_count() - 2 == 5,
+		"Bohemian Grove Friendship Bracelet: the Buff Box offers 5 choices instead of 3")
+	bgf.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

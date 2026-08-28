@@ -1,6 +1,6 @@
 # 04 — Piece Buffs: the remaining 9
 
-Status: in progress — 10 of 12 buffs done; Multicapture + Bomb left
+Status: in progress — 11 of 12 buffs done; Bomb left (needs a precedence ruling)
 
 ## Parent
 
@@ -84,11 +84,22 @@ entirely), **Stun** (`stunned` marker the AI filters out of `legal_moves`; 2 tic
 buffs age at the start of each *player* turn, so 2 keeps the attacker out for exactly one
 enemy turn), **Trap** (both capture paths — the victim still enters Captured Stock).
 
-### Left to build — 2
+### Round 3 (2026-08-28) — Stun re-ruled, Multicapture simplified
 
-**Multicapture** — the next capture hits every enemy along the move's line in sequence.
-Rides stop at the first occupied square today, so this sweeps past it. Needs a decision
-for leaps, which have no line to sweep.
+**Stun now costs 2 turns, measured in the stunned side's OWN turns** (user call): an enemy
+loses 2 enemy turns, a player piece loses 2 player turns. That is a different cadence from
+the player-turn-timed buffs, so `BuffLogic` splits the tick — `tick()` ages Slow/Aura/Smog
+at the start of each player turn, `tick_side()` ages Stun at the end of that side's own
+turn. It cuts both ways now: capturing an enemy carrying Stun stuns *your* attacker, and a
+stunned player piece cannot be picked up.
+
+**Multicapture simplified** (user call): instead of sweeping the whole line, the capture
+takes **one** extra enemy standing beside the piece just captured. The original text had no
+meaning for a leap and was open-ended for a rider. The extra piece is chosen automatically
+as the most valuable eligible neighbour so the trigger needs no second targeting step; the
+King is never taken as collateral.
+
+### Left to build — 1
 
 **Bomb** — on capturing or being captured, destroys itself, the other piece, and
 everything within 1 square. ⚠️ **Precedence must be settled first**: Reflect, Trap and Bomb

@@ -506,14 +506,52 @@ func _init() -> void:
 	check(st.board.has(Vector2i(2, 6)) and st.board[Vector2i(2, 6)].owner == 1,
 		"the enemy captures the stunning piece")
 	check(BuffLogic.has(st.board[Vector2i(2, 6)], "stunned"), "the attacker is stunned")
+	# Stun costs the attacker 2 of its OWN turns (user call 2026-08-28), which
+	# is a different cadence from the player-turn-timed buffs
+	# Assert on behaviour, not on the buff: the tick happens at the end of the
+	# side's own turn, so checking presence after the call sees it already aged.
 	var frozen: Vector2i = Vector2i(2, 6)
 	await st._run_enemy_actions()
-	check(st.board.has(frozen) and BuffLogic.has(st.board[frozen], "stunned"),
-		"a stunned piece does not act on the following enemy turn")
-	st._begin_player_turn()
-	st._begin_player_turn()
-	check(not BuffLogic.has(st.board[frozen], "stunned"), "the stun wears off")
+	check(st.board.has(frozen), "stun turn 1: the piece did not move")
+	await st._run_enemy_actions()
+	check(st.board.has(frozen), "stun turn 2: still frozen")
+	await st._run_enemy_actions()
+	check(not st.board.has(frozen),
+		"it moves again on the third turn — exactly 2 enemy turns lost")
 	st.queue_free()
+	await process_frame
+
+	# ...and the same cuts the player's way: taking a stunning enemy stuns YOUR
+	# piece, for 2 player turns, and it cannot be picked up meanwhile
+	var sp := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	sp.actions_left = 9
+	BuffLogic.add(sp.board[Vector2i(2, 5)], "stun")
+	sp._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(BuffLogic.has(sp.board[Vector2i(2, 5)], "stunned"),
+		"capturing a stunning enemy stuns your own attacker")
+	sp._on_tile_clicked(Vector2i(2, 5))
+	check(sp.selected == Vector2i(-1, -1), "a stunned piece cannot be picked up")
+	sp.queue_free()
+	await process_frame
+
+	# --- Multicapture (ruled 2026-08-28): also takes one enemy beside the
+	# piece just captured — the most valuable neighbour
+	var mc := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5],
+		["rook", 1, 3, 5], ["pawn", 1, 3, 6], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	mc.actions_left = 5
+	BuffLogic.add(mc.board[Vector2i(2, 2)], "multicapture")
+	mc._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(not mc.board.has(Vector2i(3, 5)),
+		"Multicapture also takes the rook beside the captured pawn")
+	check(mc.board.has(Vector2i(3, 6)), "only ONE extra piece is taken")
+	check(mc.captured.has("rook") and mc.captured.has("pawn"),
+		"both captures reach Captured Stock")
+	check(not BuffLogic.has(mc.board[Vector2i(2, 5)], "multicapture"),
+		"Multicapture is consumed")
+	mc.queue_free()
 	await process_frame
 
 	print("---")

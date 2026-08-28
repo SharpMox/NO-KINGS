@@ -239,57 +239,6 @@ func _init() -> void:
 	await process_frame
 
 
-	# --- issue 42: peak-rank stamp + Dark Market Light Bulb ("Ranked pieces
-	# give double Gold on Capture; Demoted pieces give no Score on Capture",
-	# ruled option (b) — Demoted clears the moment the piece re-Ranks) ---
-	var dmlb := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 0, "score": 0, "artefacts": ["dark-market-light-bulb"]})
-	await process_frame
-	dmlb.actions_left = 10 # merge, demote, promote in one sequence
-	MergeLogic.commit_merge(dmlb, Vector2i(2, 2), Vector2i(3, 2)) # Rank Up: pawn+pawn -> sergeant
-	var ranked_piece: Dictionary = dmlb.board[Vector2i(3, 2)]
-	check(ranked_piece.id == "sergeant" and ranked_piece.get("peak_ranked", false),
-		"peak-rank stamp: a Rank Up sets peak_ranked")
-	check(not ArtefactHooks._demoted(dmlb.defs, ranked_piece),
-		"a freshly Ranked piece is not Demoted")
-	var dmlb_pawn_val: int = dmlb.defs["pawn"].value
-
-	dmlb.items.append(_item("demote", "tile"))
-	dmlb._use_item(dmlb.items.size() - 1)
-	dmlb._item_click(Vector2i(3, 2)) # sergeant -> pawn (chain_base)
-	var demoted_piece: Dictionary = dmlb.board[Vector2i(3, 2)]
-	check(demoted_piece.id == "pawn" and demoted_piece.get("peak_ranked", false),
-		"Demote drops the id to base but the peak-rank stamp survives")
-	check(ArtefactHooks._demoted(dmlb.defs, demoted_piece),
-		"below its own peak rank: Demoted")
-	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(3, 2)) # attacker unranked: no Gold bonus
-	check(dmlb.last_capture_ctx.pts == 0,
-		"Dark Market Light Bulb: Demoted attacker gives no Score on Capture")
-	check(dmlb.gold == 0, "Dark Market Light Bulb: an unranked (not just Demoted) attacker gets no Gold bonus")
-
-	dmlb.items.append(_item("promote", "tile"))
-	dmlb._use_item(dmlb.items.size() - 1)
-	dmlb._item_click(Vector2i(3, 2)) # pawn -> sergeant again: re-Ranked
-	var reranked_piece: Dictionary = dmlb.board[Vector2i(3, 2)]
-	check(not ArtefactHooks._demoted(dmlb.defs, reranked_piece),
-		"re-promoting past the old peak clears Demoted (ruled option b, not \"was ever demoted\")")
-	Economy.capture_score(dmlb, "pawn", "sergeant", false, Vector2i(3, 2))
-	check(dmlb.gold == dmlb_pawn_val, "Dark Market Light Bulb: a Ranked attacker gives double Gold on Capture")
-	check(dmlb.last_capture_ctx.pts == dmlb_pawn_val,
-		"Dark Market Light Bulb: Score is untouched once Demoted has cleared")
-	dmlb.queue_free()
-	await process_frame
-
-	var dmlb_plain := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 0, "score": 0, "artefacts": ["dark-market-light-bulb"]})
-	await process_frame
-	var dmlb_plain_val: int = dmlb_plain.defs["knight"].value
-	Economy.capture_score(dmlb_plain, "knight", "pawn", false, Vector2i(2, 2)) # never Ranked, never Demoted
-	check(dmlb_plain.gold == 0 and dmlb_plain.last_capture_ctx.pts == dmlb_plain_val,
-		"Dark Market Light Bulb: a piece that was never Ranked is unaffected")
-	dmlb_plain.queue_free()
-	await process_frame
-
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

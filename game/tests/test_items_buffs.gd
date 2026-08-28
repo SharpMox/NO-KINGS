@@ -8,6 +8,8 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Rules := preload("res://scripts/rules.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -351,6 +353,36 @@ func _init() -> void:
 	bt.queue_free()
 	await process_frame
 
+	# --- issue 42: peak-rank stamp ("Demoted" ruled option (b) — currently
+	# below the piece's own historical PEAK rank, clearing on re-promotion,
+	# not "was ever demoted"). `peak_ranked` rides the piece Dictionary next
+	# to `buffs` (ADR-0002); ArtefactHooks._demoted() is the read side. Dark
+	# Market Light Bulb (the only consumer today) has its own coverage in
+	# test_items_artefacts_2.gd, alongside the rest of the "Ranked" cluster.
+	var pr := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "items": ["demote", "promote"]})
+	await process_frame
+	pr.actions_left = 10 # merge, demote, promote in one sequence
+	MergeLogic.commit_merge(pr, Vector2i(2, 2), Vector2i(3, 2)) # Rank Up: pawn+pawn -> sergeant
+	var pr_ranked: Dictionary = pr.board[Vector2i(3, 2)]
+	check(pr_ranked.id == "sergeant" and pr_ranked.get("peak_ranked", false),
+		"peak-rank stamp: a Rank Up sets peak_ranked")
+	check(not ArtefactHooks._demoted(pr.defs, pr_ranked), "a freshly Ranked piece is not Demoted")
+
+	pr._use_item(0) # "demote"
+	pr._item_click(Vector2i(3, 2)) # sergeant -> pawn (chain_base)
+	var pr_demoted: Dictionary = pr.board[Vector2i(3, 2)]
+	check(pr_demoted.id == "pawn" and pr_demoted.get("peak_ranked", false),
+		"Demote drops the id to base but the peak-rank stamp survives")
+	check(ArtefactHooks._demoted(pr.defs, pr_demoted), "below its own peak rank: Demoted")
+
+	pr._use_item(0) # "promote" — "demote" was consumed above, shifting it to index 0
+	pr._item_click(Vector2i(3, 2)) # pawn -> sergeant again: re-Ranked
+	var pr_reranked: Dictionary = pr.board[Vector2i(3, 2)]
+	check(not ArtefactHooks._demoted(pr.defs, pr_reranked),
+		"re-promoting past the old peak clears Demoted (ruled option b, not \"was ever demoted\")")
+	pr.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

@@ -5,6 +5,8 @@ extends Control
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Guide := preload("res://scripts/guide.gd")
+const Settings := preload("res://scripts/settings.gd")
 
 static var window_sized := false # once per launch, not on every return to menu
 
@@ -12,9 +14,16 @@ var main_box: VBoxContainer
 var test_scroll: ScrollContainer
 var army_center: CenterContainer
 var scores_center: CenterContainer
+var history_scroll: ScrollContainer
+var about_center: CenterContainer
+var guide_scroll: ScrollContainer
+var settings_panel: CenterContainer
 
 
 func _ready() -> void:
+	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
+	# applies at its own _ready() — belt and suspenders, both are idempotent.
+	Settings.apply(Settings.load_settings())
 	# real boots only — the click probes instantiate the menu by hand and inject
 	# clicks at 480×800 coords, which a mid-probe resize would break
 	if not window_sized and DisplayServer.get_name() != "headless" \
@@ -47,8 +56,21 @@ func _ready() -> void:
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "Scores", 24, _show_scores)
+	_button(main_box, "Games History", 24, _show_history)
+	_button(main_box, "Guide", 24, func() -> void:
+		main_box.visible = false
+		guide_scroll.visible = true)
+	_button(main_box, "About", 24, _show_about)
+	_button(main_box, "Settings", 24, func() -> void:
+		main_box.visible = false
+		settings_panel.visible = true)
 	_button(main_box, "TEST", 24, _show_tests)
 	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
+
+	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
+	# scripts/settings.gd) so the two entry points can't drift apart
+	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
+	settings_panel = Settings.build(self, func() -> void: main_box.visible = true)
 
 	# scenario submenu: scrollable list, hidden until TEST — hide the SCROLL
 	# itself: a visible full-rect ScrollContainer eats every click beneath it
@@ -152,6 +174,69 @@ func _show_scores() -> void:
 		box.add_child(row)
 	_button(box, "← Back", 20, func() -> void:
 		scores_center.visible = false
+		main_box.visible = true)
+
+
+## Games History: every real run's summary, newest first — distinct from the
+## ranked top-10 Highscores above (05-menus-and-settings).
+func _show_history() -> void:
+	main_box.visible = false
+	if history_scroll:
+		history_scroll.queue_free()
+	history_scroll = ScrollContainer.new()
+	history_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	history_scroll.offset_left = 40
+	history_scroll.offset_top = 30
+	history_scroll.offset_right = -40
+	history_scroll.offset_bottom = -30
+	add_child(history_scroll)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 6)
+	history_scroll.add_child(box)
+	var head := Label.new()
+	head.text = "Games History"
+	head.add_theme_font_size_override("font_size", 28)
+	box.add_child(head)
+	var runs := GameScript.load_history()
+	if runs.is_empty():
+		var none := Label.new()
+		none.text = "No runs yet"
+		box.add_child(none)
+	for e in runs:
+		var row := Label.new()
+		row.text = "%s — %d · wave %d · %d king%s · %d tariff%s · %d lost" % [
+			"Win" if e.get("won", false) else "Loss", int(e.score), int(e.wave),
+			int(e.kings), "" if int(e.kings) == 1 else "s",
+			int(e.tariffs), "" if int(e.tariffs) == 1 else "s", int(e.get("lost", 0))]
+		row.add_theme_font_size_override("font_size", 15)
+		box.add_child(row)
+	_button(box, "← Back", 20, func() -> void:
+		history_scroll.visible = false
+		main_box.visible = true)
+
+
+func _show_about() -> void:
+	main_box.visible = false
+	if about_center:
+		about_center.queue_free()
+	about_center = CenterContainer.new()
+	about_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(about_center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	about_center.add_child(box)
+	var head := Label.new()
+	head.text = "About"
+	head.add_theme_font_size_override("font_size", 28)
+	box.add_child(head)
+	var body := Label.new()
+	body.text = "NO KINGS\nA fairy-chess strategy game — MVP build.\nBuilt with Godot 4."
+	body.add_theme_font_size_override("font_size", 15)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(body)
+	_button(box, "← Back", 20, func() -> void:
+		about_center.visible = false
 		main_box.visible = true)
 
 

@@ -21,6 +21,7 @@ const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const Scenarios := preload("res://data/scenarios.gd")
+const Settings := preload("res://scripts/settings.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -35,6 +36,7 @@ static var next_army: String = Tuning.DEFAULT_ARMY
 
 const SAVE_PATH := "user://save.json"
 const SCORES_PATH := "user://scores.json"
+const HISTORY_PATH := "user://history.json"
 
 
 ## Local high scores, best first: [{score, wave, kings}], top 10 kept.
@@ -42,6 +44,15 @@ static func load_scores() -> Array:
 	if not FileAccess.file_exists(SCORES_PATH):
 		return []
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SCORES_PATH))
+	return parsed if parsed is Array else []
+
+
+## Games History: every real run's summary, newest first — distinct from the
+## top-10 Highscores above. See Economy.record_history for what's stored.
+static func load_history() -> Array:
+	if not FileAccess.file_exists(HISTORY_PATH):
+		return []
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(HISTORY_PATH))
 	return parsed if parsed is Array else []
 
 const COL_LIGHT := Color("f0d9b5")
@@ -182,6 +193,9 @@ var game_menu_open := false
 
 
 func _ready() -> void:
+	# CLI bypasses (--autoplay/--scenario) and the click probes boot Game.tscn
+	# straight, skipping the Menu's own apply() — so this scene applies too.
+	Settings.apply(Settings.load_settings())
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	autoplay_exit = autoplay
@@ -613,6 +627,7 @@ func _game_over(won: bool, reason: String) -> void:
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
 		rank = Economy.record_score(self)
+		_record_history(won) # Games History: every real run, win or loss
 	modals.show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay_exit:
@@ -1593,6 +1608,10 @@ func _to_config() -> Dictionary:
 
 func _record_score() -> int:
 	return Economy.record_score(self)
+
+
+func _record_history(won: bool) -> void:
+	Economy.record_history(self, won)
 
 
 # --- HUD wiring (widgets live in scripts/hud.gd; signals up, calls down) ---

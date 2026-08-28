@@ -190,10 +190,21 @@
 ## - "Ranked" (Templar Severance Gold, CIA Heart Attack Gun, Backmasked
 ##   Vinyl, Bigfoot Toenail Clipping) reads as `ItemLogic.chain_base(defs, id)
 ##   != id` — a piece not at its own promotion-chain base — the same check
-##   the "demote" Item's own target validity already runs. No "Demoted" flag
-##   exists (a piece demoted to its base is indistinguishable from one that
-##   started there), so Dark Market Light Bulb's "Demoted pieces give no
-##   Score" clause stays unimplemented — Notion question, not a guess.
+##   the "demote" Item's own target validity already runs.
+##
+## issue 42 (ruled 2026-08-29) added "Demoted": currently BELOW the piece's
+## own historical peak rank — option (b), chosen over "was ever demoted" —
+## which unblocked Dark Market Light Bulb. `peak_ranked` is a sticky stamp
+## run() writes on every on_rank_up dispatch (a piece is Ranked by
+## definition right after a rank-up); `_demoted()` reads it back as
+## "peak_ranked is set but the piece is at its base id right now" — the
+## moment a later rank-up re-Ranks the piece, that comparison flips false on
+## its own, satisfying "clears on re-promotion" for free, no separate reset
+## needed. Rides the piece Dictionary per ADR-0002, so it round-trips through
+## save_config.gd/Extraction the same way the per-piece capture ledger
+## (issue 25) already does — no new save code. Covered by test_items.gd
+## ("Dark Market Light Bulb: Ranked doubles Gold, Demoted zeroes Score,
+## re-promoting clears Demoted").
 ##
 ## issue 24 (combat & positioning, split out of 19) added the "post-move ctx
 ## flag" mechanism issue 19's own Outcome deferred:
@@ -743,6 +754,10 @@ const REGISTRY := {
 	"cia-heart-attack-gun": ["on_capture"],
 	"montauk-eggo-waffle": ["on_wave_clear"],
 
+	# --- issue 42: peak-rank stamp (on_rank_up, above) unblocks Dark Market
+	# Light Bulb's "Demoted" clause ---
+	"dark-market-light-bulb": ["on_capture"],
+
 	# --- issue 19: board-half reads off existing hooks ---
 	"dyatlov-geiger-counter": ["on_score_change"],
 	"fema-summer-camp-flyer": ["on_turn_end"],
@@ -885,6 +900,20 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	if hook == "on_turn_start":
 		g.dejavu_score_turn_done = false
 		g.dejavu_gold_turn_done = false
+	if hook == "on_rank_up" and ctx.pos.x >= 0: # issue 42: peak-rank stamp,
+		# the single choke point every on_rank_up dispatch already passes
+		# through (merge_logic.gd commit_merge, game.gd "promote" Item, and
+		# this file's own mrna-firmware-update/alien-rocket-toy in-place
+		# promotions) — a piece is Ranked by definition right after a rank-up,
+		# so stamp unconditionally, independent of any artefact being held.
+		# Skipped for a Stock landing (ctx.pos.x < 0): a fresh Stock entry is
+		# a bare id String there (merge_logic.gd, ADR-0002 — "Merging discards
+		# input state"), nothing to stamp a field onto until some other
+		# handler (Holy Grail Coaster's own branch) converts it to a
+		# Dictionary — same limitation buffs/the capture ledger already
+		# accept for that path, not a new gap. See _demoted() below for the
+		# read side (Dark Market Light Bulb).
+		g.board[ctx.pos].peak_ranked = true
 	var fired: Array = [] # issue 21: the held/tariff ENTRIES that actually
 		# dispatched this call, not just held — Bilderberg Hotel Slippers' own
 		# contract. Carries the whole entry (not just t.key) so the echo layer
@@ -1078,6 +1107,18 @@ static func holds_every_rarity(g) -> bool:
 ## (ruled 2026-08-28). The player's own Buff Box pick (game.gd
 ## _open_buff_pick) reads Items.PIECE_BUFFS directly, not this function, so
 ## choosing Slow deliberately (e.g. onto an enemy) is untouched.
+##
+## Two rules coexist here on different axes (issue 42, ruled 2026-08-29):
+## `tier == ""` (the default every REGISTRY caller but 3 uses) draws from the
+## FULL pool across all tiers — issue 28 asked whether random grants should
+## be tier-restricted across the board, ruled no. `self_harming` exclusion
+## (above, issue 27) is a separate axis: "full pool" means all TIERS, not
+## "all buffs including the debuff" — Slow stays excluded from every random
+## grant regardless of tier. An explicit `tier` arg (MK-Ultra Sugar Cube,
+## Obedience-Flavored Tap Water, Sleeper Agent Pillow pass "Tactical") is a
+## PER-ARTEFACT restriction matching that catalog entry's own text, not a
+## blanket policy — see those 3 call sites' own comments for why they stay
+## Tactical-only.
 static func _random_buff_key(rng: RandomNumberGenerator, tier := "") -> String:
 	var pool: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
 		return not b.get("self_harming", false) and (tier == "" or b.tier == tier))
@@ -1124,6 +1165,20 @@ static func _grant_buff(g, pos: Vector2i, tier := "") -> void:
 ## walk the "demote" Item's own target-validity check already does.
 static func _ranked(defs: Dictionary, id: String) -> bool:
 	return ItemLogic.chain_base(defs, id) != id
+
+
+## "Demoted" (issue 42, ruled 2026-08-29 — option (b), chosen over "was ever
+## demoted"): currently sitting BELOW the piece's own historical peak rank,
+## not "was ever demoted". `peak_ranked` is the stamp run() writes on every
+## on_rank_up (above) — sticky true once a piece has ever been Ranked, since
+## nothing clears it. A piece is Demoted when that stamp is set but the piece
+## is back at its base id (_ranked false): the moment a later rank-up
+## re-Ranks it, this flips back to false on its own — no separate "clear"
+## step, satisfying the ruling for free. A piece that never ranked up has no
+## `peak_ranked` field (absent = false) and is never Demoted. Dark Market
+## Light Bulb is the only reader.
+static func _demoted(defs: Dictionary, piece: Dictionary) -> bool:
+	return piece.get("peak_ranked", false) and not _ranked(defs, piece.id)
 
 
 ## A uniformly random Item of one tier (Flight 19 Blackbox, 33rd Degree
@@ -1397,12 +1452,22 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 					pool.remove_at(idx)
 				g.gold = maxi(g.gold - 10, 0)
 		["mk-ultra-sugar-cube", "on_deploy"]:
+			# Tactical-only per its own catalog text (issue 42 considered
+			# widening all 3 "Tactical Piece Buff" granters to the full pool
+			# — declined: Common rarity + fires on literally every Deploy is
+			# the highest-frequency grant in the catalog, and a Decisive buff
+			# (Bomb/Trap/Reflect) that often from a Common artefact is a much
+			# bigger swing than "no random buff grant is tier-restricted by
+			# default" (Ruling 1, _random_buff_key above) was ever meant to
+			# cover — see .scratch/gdd-gaps/issues/42's Outcome.
 			_grant_buff(g, ctx.pos, "Tactical")
 		["obedience-flavored-tap-water", "on_capture"]:
 			# Doesn't grant here — game.gd's _move_player applies it AFTER this
 			# capture's own critical/range consumption (ruled 2026-08-28, see
 			# economy.gd's ctx.grant_buffs comment), so the new buff survives
 			# for the NEXT capture instead of being doubled/wasted by this one.
+			# Tactical-only: same issue-42 balance call as MK-Ultra Sugar Cube
+			# above (Common rarity, once-per-Wave is still frequent).
 			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
 				ctx.grant_buffs.append("Tactical")
 		["holy-lint", "on_capture"]:
@@ -1431,6 +1496,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# (Shop.buy, just before this hook runs) — replace it with a
 			# Dictionary carrying the buff; _place's `entry is Dictionary`
 			# branch already merges any extra fields onto the board piece.
+			# Tactical-only: same issue-42 balance call as MK-Ultra Sugar
+			# Cube above (Uncommon rarity, still a frequent Shop-buy trigger).
 			if ctx.kind == "piece" and not g.stock.is_empty():
 				var piece := {"id": ctx.key}
 				_grant_buff_to(g, piece, "Tactical")
@@ -1595,6 +1662,23 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.turn_capture_index == 0 and ctx.attacker_id != "" \
 					and (ctx.attacker_buffed or _ranked(g.defs, ctx.attacker_id)):
 				g.gold += roundi(ctx.base) # +100% Gold
+
+		# --- issue 42: peak-rank stamp unblocks Dark Market Light Bulb ---
+		["dark-market-light-bulb", "on_capture"]:
+			if ctx.attacker_id != "" and _ranked(g.defs, ctx.attacker_id):
+				g.gold += roundi(ctx.base) # Ranked: double Gold, same idiom as
+					# CIA Heart Attack Gun's own "+100% Gold" above
+			if ctx.attacker_pos.x >= 0 and g.board.has(ctx.attacker_pos) \
+					and _demoted(g.defs, g.board[ctx.attacker_pos]):
+				# Demoted: no Score. Sets an OUTPUT flag rather than zeroing
+				# ctx.pts here — a same-hook `+=` handler could dispatch
+				# before or after this one (run()'s key-sort), and a direct
+				# write here would make the result depend on which side of
+				# "dark-market-light-bulb" alphabetically it landed (the
+				# exact order-dependence the header's ctx contract bans).
+				# economy.gd's capture_score applies `no_score` exactly once,
+				# after every on_capture handler has finished.
+				ctx.no_score = true
 		["montauk-eggo-waffle", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave):
 				var candidates: Array = []

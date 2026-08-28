@@ -608,6 +608,7 @@ var ARTEFACTS = [
     conspiracy: "The Dead Internet theory", url: "https://en.wikipedia.org/wiki/Dead_Internet_theory",
     summary: "The theory that the internet died years ago and everyone you talk to is a bot performing for other bots. The checkbox is civilization's last line of defense, and you clicked it without reading." },
   { name: "Illuminati Fridge Magnet", rarity: "Rare", type: "Passive", bonus: ["Gold"], status: "KEEP",
+    implemented: true,
     effect: "While you own Artefacts of every rarity: +50% Gold gain",
     conspiracy: "The Illuminati", url: "https://en.wikipedia.org/wiki/Illuminati",
     summary: "A real Bavarian society of Enlightenment radicals, founded 1776, banned 1785 — nine years of existence, two and a half centuries of afterlife as the master explanation for everything. The seal never expired." },

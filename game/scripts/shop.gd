@@ -8,8 +8,20 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
+## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
+## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
+## Balloon add Item slots, Sub-Antarctic Visa adds a hidden Artefact slot —
+## see _extra_item_slots / _extra_artefact_slots, additive per held copy
+## (slice 15 stacking rule) and read straight off g.artefacts, the same way
+## Shop.buy already reads slot.kind with no hook indirection.
 const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
 const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
+
+## Rarity order low -> high (GDD Artefacts DB). A hidden slot (Sub-Antarctic
+## Visa) samples from strictly above the lowest rarity present in the
+## rollable pool — "one rarity higher" without a baseline-roll to compare
+## against, since the normal 4-slot artefact roll isn't rarity-weighted at all.
+const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Legendary"]
 
 
 ## Reroll g.shop_stock in place. Plain function on purpose: effects
@@ -19,15 +31,71 @@ static func roll(g) -> void:
 	for type in BOX_TYPES:
 		for i in ROWS.box / BOX_TYPES.size():
 			slots.append({"kind": "box", "key": type, "sold": false})
-	for key in _sample(Items.ARTEFACT_EFFECTS.map(func(t: Dictionary) -> String:
-			return t.key), ROWS.artefact, g.rng):
+
+	var artefact_keys: Array = _sample(Items.ARTEFACT_EFFECTS.map(func(t: Dictionary) -> String:
+			return t.key), ROWS.artefact, g.rng)
+	for key in artefact_keys:
 		slots.append({"kind": "artefact", "key": key, "sold": false})
-	for key in _sample(Items.ITEMS.map(func(it: Dictionary) -> String:
-			return it.key), ROWS.item, g.rng):
+	for key in _sample_biased_artefacts(g, _extra_artefact_slots(g), artefact_keys):
+		slots.append({"kind": "artefact", "key": key, "sold": false, "biased": true})
+
+	var extra: Dictionary = _extra_item_slots(g)
+	var tactical_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
+			return it.tier == "Tactical").map(func(it: Dictionary) -> String: return it.key)
+	var item_keys: Array = _sample(tactical_pool, extra.tactical, g.rng)
+	var rest_pool: Array = Items.ITEMS.map(func(it: Dictionary) -> String: return it.key) \
+			.filter(func(k: String) -> bool: return not item_keys.has(k))
+	item_keys += _sample(rest_pool, ROWS.item + extra.total - extra.tactical, g.rng)
+	for key in item_keys:
 		slots.append({"kind": "item", "key": key, "sold": false})
+
 	for id in _sample_pieces(g, ROWS.piece):
 		slots.append({"kind": "piece", "key": id, "sold": false})
 	g.shop_stock = slots
+
+
+## Chocolate Key Cake (+2 Item slots) / Alleged Weather Balloon (+1, Tactical
+## only) — additive per held copy. `tactical` is how many of `total` must
+## come from the Tactical-tier pool alone.
+static func _extra_item_slots(g) -> Dictionary:
+	var total := 0
+	var tactical := 0
+	for t in g.artefacts:
+		if t.key == "chocolate-key-cake":
+			total += 2
+		elif t.key == "alleged-weather-balloon":
+			total += 1
+			tactical += 1
+	return {"total": total, "tactical": tactical}
+
+
+## Sub-Antarctic Visa: +1 hidden Artefact slot per held copy.
+static func _extra_artefact_slots(g) -> int:
+	var n := 0
+	for t in g.artefacts:
+		if t.key == "sub-antarctic-visa":
+			n += 1
+	return n
+
+
+## n keys for the hidden slot(s), biased toward the higher rarities and
+## distinct from `exclude` (the normal 4-slot roll) where possible.
+static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
+	if n <= 0:
+		return []
+	var pool: Array = Items.ARTEFACT_EFFECTS.filter(func(t: Dictionary) -> bool:
+		return not exclude.has(t.key) and RARITY_ORDER.has(t.get("rarity", "")))
+	if not pool.is_empty():
+		var lowest: String = pool[0].rarity
+		for t in pool:
+			if RARITY_ORDER.find(t.rarity) < RARITY_ORDER.find(lowest):
+				lowest = t.rarity
+		var biased: Array = pool.filter(func(t: Dictionary) -> bool: return t.rarity != lowest)
+		if not biased.is_empty():
+			pool = biased
+	if pool.is_empty(): # every candidate excluded or unrated: fall back
+		pool = Items.ARTEFACT_EFFECTS.filter(func(t: Dictionary) -> bool: return not exclude.has(t.key))
+	return _sample(pool.map(func(t: Dictionary) -> String: return t.key), n, g.rng)
 
 
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King
@@ -44,15 +112,30 @@ static func base_piece_pool(defs: Dictionary) -> Array:
 	return out
 
 
+## Base price by row, then the on_price seam (issue 18) composes every held
+## modifier off that immutable base — same additive-not-compounding contract
+## as on_score_change/on_gold_change (slice 15/16), so two Denazification
+## Visas stack to -100%, not -75%. The hidden slot's own +50% (Sub-Antarctic
+## Visa) is baked into `base` first, ahead of the hook: it's the slot's own
+## structural price, not a held-artefact modifier on every artefact's price.
 static func price(g, slot: Dictionary) -> int:
+	var base: float
+	var tier := ""
 	match slot.kind:
 		"piece":
-			return int(g.defs[slot.key].value)
+			base = float(g.defs[slot.key].value)
 		"item":
-			return int(Tuning.SHOP_ITEM_PRICE[_catalog(slot).tier])
+			tier = _catalog(slot).tier
+			base = float(Tuning.SHOP_ITEM_PRICE[tier])
 		"artefact":
-			return Tuning.SHOP_ARTEFACT_PRICE
-	return Tuning.SHOP_BOX_PRICE
+			base = float(Tuning.SHOP_ARTEFACT_PRICE)
+			if slot.get("biased", false):
+				base *= 1.5
+		_:
+			base = float(Tuning.SHOP_BOX_PRICE)
+	var ctx := ArtefactHooks.run(g, "on_price",
+		{"base": base, "amount": base, "kind": slot.kind, "tier": tier})
+	return maxi(roundi(ctx.amount), 0)
 
 
 static func description(slot: Dictionary) -> String:

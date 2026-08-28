@@ -11,6 +11,8 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 static func queue(g, n: int) -> void:
+	g.silk_road_active = false # cleared before dispatch, so this wave-clear's
+		# own on_wave_clear handler (below) can re-enable it for the wave ahead
 	if n > 1: # wave 1 has no prior wave to have "cleared" (issue 16)
 		var clean: bool = g.lost_player == g.wave_start_lost_player
 		ArtefactHooks.run(g, "on_wave_clear", {

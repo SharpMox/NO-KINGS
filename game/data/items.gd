@@ -115,11 +115,15 @@ static var ARTEFACT_CATALOG: Array = _load_artefact_catalog()
 ## Rollable/sellable/grantable pool: the core 7 plus whichever catalog entries
 ## are flagged implemented — grows as slices 16-20 land, with no re-plumbing
 ## here or in shop.gd/box.gd/economy.gd.
+## `rarity` rides along (issue 18: Sub-Antarctic Visa's hidden Shop slot biases
+## its roll toward higher-rarity Artefacts) — "" for the 7 core keys, which
+## predate the catalog and carry no rarity at all.
 static func _build_artefact_effects() -> Array:
 	var out := ARTEFACT_EFFECTS_CORE.duplicate()
 	for e in ARTEFACT_CATALOG:
 		if e.get("implemented", false):
-			out.append({"key": e.key, "name": e.name, "description": e.effect})
+			out.append({"key": e.key, "name": e.name, "description": e.effect,
+				"rarity": e.get("rarity", "")})
 	return out
 
 static var ARTEFACT_EFFECTS: Array = _build_artefact_effects()

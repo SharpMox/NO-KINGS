@@ -65,8 +65,25 @@
 ## without ever resurrecting an already-ended turn. Covered by test_items.gd
 ## ("Stargate Divination Crystal refunds the capture's action before the
 ## auto-pass check").
+##
+## issue 18 (Shop/Item/Buff batch) added:
+## - on_deploy fires from game.gd:_place, ctx = {pos} (the tile the piece just
+##   landed on — MK-Ultra Sugar Cube reads g.board[ctx.pos]).
+## - on_turn_end fires from game.gd:_on_pass's PLAYER_TURN branch, no ctx —
+##   the turn-end mirror of the on_turn_start call already there.
+## - on_capture ctx grew `attacker_pos` (the Vector2i the attacker piece was
+##   still standing on when capture_score ran — Vector2i(-1,-1) from the two
+##   direct-call test sites), so a handler can grant something to the actual
+##   attacking piece instead of just reading its id.
+## - on_price is the Shop's "base + modifiers" seam (shop-drawer-ui/08
+##   deferred it "until an Artefact needs it" — several now do). Shop.price()
+##   runs it after computing the row's base price; ctx = {base, amount, kind,
+##   tier}. `tier` is an Item's tier ("Tactical"/"Strategic"/"Decisive") and
+##   "" for every other kind. Same immutable-base/additive-amount contract as
+##   on_score_change/on_gold_change, so two discounts stack additively.
 
 const Rules := preload("res://scripts/rules.gd")
+const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 
@@ -74,7 +91,7 @@ const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
 	"on_wave_clear", "on_wave_spawn", "on_milestone",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
-	"on_gold_change", "on_score_change", "on_box_open", "on_game_over",
+	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -128,6 +145,27 @@ const REGISTRY := {
 	"5g-microchips": ["on_turn_start"],
 	"terracotta-draft-card": ["on_wave_clear"],
 	"charlemagne-s-birth-certificate": ["on_wave_clear"],
+	# --- issue 18: Shop/Item/Buff batch (20 artefacts, no needs-note) ---
+	"denazification-visa": ["on_price"],
+	"hollow-moon-cross-section": ["on_price"],
+	"shrinkflation-cereal-box": ["on_turn_end", "on_price"],
+	"skull-and-bones-coffin": ["on_score_change", "on_price"],
+	"silk-road-coupon": ["on_wave_clear", "on_price"],
+	"crop-circle-plank": ["on_wave_clear"],
+	"mk-ultra-sugar-cube": ["on_deploy"],
+	"obedience-flavored-tap-water": ["on_capture"],
+	"holy-lint": ["on_capture"],
+	"scientology-e-meter": ["on_wave_clear"],
+	"xenu-ot-iii-season-pass": ["on_wave_clear"],
+	"sugar-free-chemtrail-can": ["on_wave_clear"],
+	"sleeper-agent-pillow": ["on_purchase"],
+	"frame-25": ["on_wave_clear"],
+	"manna-vending-machine": ["on_wave_clear"],
+	"mao-s-loyalty-badge": ["on_purchase"],
+	# chocolate-key-cake, alleged-weather-balloon, sub-antarctic-visa and
+	# majestic-12-secret-handshake-diagram fire nowhere — Shop.roll/price and
+	# game.gd's _box_options read g.artefacts directly, the same way Shop.buy
+	# already reads slot.kind without a hook (shop-drawer-ui/08's deferred pass).
 }
 
 
@@ -152,6 +190,47 @@ static func _count_player_id(g, id: String) -> int:
 		if g.board[pos].owner == Rules.PLAYER and g.board[pos].id == id:
 			n += 1
 	return n
+
+
+## Player-owned board positions — the random-ally-target pool for Buff-tag
+## artefacts (Crop Circle Plank, Scientology E-Meter, Xenu OT III Season
+## Pass, Sugar Free Chemtrail Can).
+static func _player_positions(g) -> Array:
+	var out := []
+	for pos in g.board:
+		if g.board[pos].owner == Rules.PLAYER:
+			out.append(pos)
+	return out
+
+
+## A uniformly random Piece Buff key, optionally restricted to one tier
+## ("Tactical Piece Buff" in several issue-18 effect texts).
+static func _random_buff_key(rng: RandomNumberGenerator, tier := "") -> String:
+	var pool: Array = Items.PIECE_BUFFS if tier == "" \
+		else Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.tier == tier)
+	return pool[rng.randi() % pool.size()].key
+
+
+## Catalogued life of a timed buff, in player turns (0 = dormant) — mirrors
+## game.gd's private _buff_turns, kept alongside its own PIECE_BUFFS lookup
+## instead of reaching across files for a one-line match.
+static func _buff_turns(key: String) -> int:
+	for b in Items.PIECE_BUFFS:
+		if b.key == key:
+			return int(b.get("turns", 0))
+	return 0
+
+
+## Grant one random Piece Buff to a live Dictionary — a board piece
+## (BuffLogic.add takes any Dictionary with a `buffs` field) or a freshly
+## built {"id": ...} piece not yet placed (Sleeper Agent Pillow).
+static func _grant_buff_to(piece: Dictionary, rng: RandomNumberGenerator, tier := "") -> void:
+	var key := _random_buff_key(rng, tier)
+	BuffLogic.add(piece, key, _buff_turns(key))
+
+
+static func _grant_buff(g, pos: Vector2i, tier := "") -> void:
+	_grant_buff_to(g.board[pos], g.rng, tier)
 
 
 static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
@@ -343,3 +422,98 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 				# off the board with state attached, e.g. Extraction)
 		["charlemagne-s-birth-certificate", "on_wave_clear"]:
 			g.clock_ms += 10000
+
+		# --- issue 18: Shop price modifiers (Shop.price's on_price seam) ---
+		["denazification-visa", "on_price"]:
+			if ctx.kind == "item" and ctx.tier == "Tactical":
+				ctx.amount -= ctx.base * 0.50
+		["hollow-moon-cross-section", "on_price"]:
+			if ctx.kind == "artefact":
+				ctx.amount -= ctx.base * 0.25
+		["shrinkflation-cereal-box", "on_price"]:
+			ctx.amount += ctx.base * 0.50
+		["shrinkflation-cereal-box", "on_turn_end"]:
+			g.gold += 10
+			g.score += 10
+			g.clock_ms += 1000.0
+		["skull-and-bones-coffin", "on_price"]:
+			ctx.amount += ctx.base * 0.05
+		["skull-and-bones-coffin", "on_score_change"]:
+			if g.gold >= 200:
+				ctx.amount += ctx.base * 0.20
+		["silk-road-coupon", "on_price"]:
+			if g.silk_road_active:
+				ctx.amount -= ctx.base * 0.50
+		["silk-road-coupon", "on_wave_clear"]:
+			# "5-Wave Milestone" (12 effect texts) is a different cadence than
+			# on_milestone's own 10-wave clock-refill trigger, so this checks
+			# the just-cleared wave directly rather than piggybacking that hook.
+			if g.wave % 5 == 0:
+				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
+
+		# --- issue 18: Buff-tag triggers, all through BuffLogic.add ---
+		["crop-circle-plank", "on_wave_clear"]:
+			if g.wave % 5 == 0: # "5-Wave Milestone" — see silk-road-coupon's on_wave_clear case above
+				var pool := _player_positions(g)
+				for i in mini(2, pool.size()):
+					var idx: int = g.rng.randi() % pool.size()
+					_grant_buff(g, pool[idx])
+					pool.remove_at(idx)
+				g.gold = maxi(g.gold - 10, 0)
+		["mk-ultra-sugar-cube", "on_deploy"]:
+			_grant_buff(g, ctx.pos, "Tactical")
+		["obedience-flavored-tap-water", "on_capture"]:
+			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
+				_grant_buff(g, ctx.attacker_pos, "Tactical")
+		["holy-lint", "on_capture"]:
+			if ctx.attacker_pos.x >= 0:
+				_grant_buff(g, ctx.attacker_pos)
+		["scientology-e-meter", "on_wave_clear"]:
+			# "the piece" — Wave clear has no single trigger piece, so this
+			# reads it as a random ally (same reading as Xenu OT III below).
+			g.gold = maxi(g.gold - 5, 0)
+			var se_pool := _player_positions(g)
+			if not se_pool.is_empty():
+				_grant_buff(g, se_pool[g.rng.randi() % se_pool.size()])
+		["xenu-ot-iii-season-pass", "on_wave_clear"]:
+			g.gold = maxi(g.gold - 15, 0)
+			var xe_pool := _player_positions(g)
+			for i in 3: # 3 independent random-ally picks; may repeat a piece
+				if xe_pool.is_empty():
+					break
+				_grant_buff(g, xe_pool[g.rng.randi() % xe_pool.size()])
+		["sugar-free-chemtrail-can", "on_wave_clear"]:
+			if g.wave % 5 == 0:
+				for pos in _player_positions(g):
+					_grant_buff(g, pos)
+		["sleeper-agent-pillow", "on_purchase"]:
+			# the piece landed as a plain id string at the end of g.stock
+			# (Shop.buy, just before this hook runs) — replace it with a
+			# Dictionary carrying the buff; _place's `entry is Dictionary`
+			# branch already merges any extra fields onto the board piece.
+			if ctx.kind == "piece" and not g.stock.is_empty():
+				var piece := {"id": ctx.key}
+				_grant_buff_to(piece, g.rng, "Tactical")
+				g.stock[g.stock.size() - 1] = piece
+
+		# --- issue 18: Item-tag triggers ---
+		["frame-25", "on_wave_clear"]:
+			var tac_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
+				return it.tier == "Tactical")
+			g.items.append(tac_pool[g.rng.randi() % tac_pool.size()])
+			g.gold = maxi(g.gold - 10, 0)
+		["manna-vending-machine", "on_wave_clear"]:
+			if g.wave % 5 == 0:
+				for i in 2:
+					g.items.append(Items.ITEMS[g.rng.randi() % Items.ITEMS.size()])
+		["mao-s-loyalty-badge", "on_purchase"]:
+			if ctx.kind == "item":
+				var tier := ""
+				for it in Items.ITEMS:
+					if it.key == ctx.key:
+						tier = it.tier
+						break
+				if tier == "Tactical":
+					var pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
+						return it.tier == "Tactical")
+					g.items.append(pool[g.rng.randi() % pool.size()])

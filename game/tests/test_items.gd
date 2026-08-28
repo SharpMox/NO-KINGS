@@ -863,6 +863,80 @@ func _init() -> void:
 	sg.queue_free()
 	await process_frame
 
+	# --- issue 30: per-turn action log + Elvish Hard Hat ("first Action of a
+	# Turn is an Item or ability: +1 Action"). Basic effect: an Item as the
+	# Turn's first action grants the bonus.
+	var ehh := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]], "wave": 3,
+		"artefacts": ["elvish-hard-hat"]})
+	await process_frame
+	ehh.actions_left = 2
+	ehh.actions_max = 2
+	ehh.items.append(_item("counter_intel", ""))
+	ehh._use_item(0) # untargeted Item, resolves immediately — costs 1 action
+	check(ehh.actions_left == 2 and ehh.actions_max == 3,
+		"Elvish Hard Hat: an Item as the Turn's first Action refunds it and grants +1 Action")
+	check(ehh.action_log.size() == 1 and ehh.action_log[0].kind == "item",
+		"the action log records the Item as this Turn's first entry")
+	ehh.queue_free()
+	await process_frame
+
+	# A move (not an Item) as the first Action earns no bonus.
+	var ehh_move := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]], "wave": 3,
+		"artefacts": ["elvish-hard-hat"]})
+	await process_frame
+	ehh_move.actions_left = 2
+	ehh_move.actions_max = 2
+	ehh_move._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(ehh_move.actions_left == 1 and ehh_move.actions_max == 2,
+		"Elvish Hard Hat doesn't fire when the first Action is a move, not an Item")
+	ehh_move.queue_free()
+	await process_frame
+
+	# An Item as the SECOND Action (a move already spent the first) earns no
+	# bonus either — the effect text is "first Action", not "any Item".
+	var ehh_second := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]], "wave": 3,
+		"artefacts": ["elvish-hard-hat"]})
+	await process_frame
+	ehh_second.actions_left = 2
+	ehh_second.actions_max = 2
+	ehh_second._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first action: a move
+	ehh_second.items.append(_item("counter_intel", ""))
+	ehh_second._use_item(0) # second action: an Item — too late for the bonus
+	check(ehh_second.actions_left == 0 and ehh_second.actions_max == 2,
+		"Elvish Hard Hat doesn't fire on an Item that isn't the Turn's first Action")
+	ehh_second.queue_free()
+	await process_frame
+
+	# The trap the issue calls out (same shape as Stargate above): a Tier-5
+	# single-action Turn where the only Action is an Item. Baseline first —
+	# with no artefact, spending the Turn's one action auto-passes.
+	var ehh_base := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]], "wave": 3})
+	await process_frame
+	ehh_base.actions_left = 1
+	ehh_base.actions_max = 1
+	ehh_base.items.append(_item("counter_intel", ""))
+	ehh_base._use_item(0)
+	check(ehh_base.actions_left == 0 and ehh_base.state == ehh_base.State.ENEMY_TURN,
+		"baseline: spending a single-action Turn's only action on an Item auto-passes the turn")
+	ehh_base.queue_free()
+	await process_frame
+
+	# With Elvish Hard Hat, that SAME Item use is also the Turn's first Action:
+	# the hook refunds it inside _log_action, before _item_apply's own
+	# actions_left == 0 auto-pass check runs — the check never sees 0, so the
+	# turn is never resurrected because it never actually passes.
+	var ehh_trap := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]], "wave": 3,
+		"artefacts": ["elvish-hard-hat"]})
+	await process_frame
+	ehh_trap.actions_left = 1
+	ehh_trap.actions_max = 1
+	ehh_trap.items.append(_item("counter_intel", ""))
+	ehh_trap._use_item(0)
+	check(ehh_trap.actions_left == 1 and ehh_trap.state == ehh_trap.State.PLAYER_TURN,
+		"Elvish Hard Hat refunds the Item's action before the auto-pass check — an already-passed turn is never resurrected because the turn never passes")
+	ehh_trap.queue_free()
+	await process_frame
+
 	# --- fix (ruled 2026-08-28): RANDOM artefact buff grants must never hand
 	# out a self-harming buff — today only Slow (it makes its own holder move
 	# and capture like a Pawn, a debuff on its own holder). The player's own

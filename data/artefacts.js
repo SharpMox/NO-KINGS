@@ -27,6 +27,11 @@
    choice) and SETI's Red Marker (tariff inversion) stay unimplemented —
    both need a design ruling first, see game/scripts/artefact_hooks.gd's
    header and .scratch/gdd-gaps/issues/22's Outcome.
+   2026-08-28 (issue 30): Elvish Hard Hat flipped to implemented: true (the
+   new per-turn action log + on_action hook, game/scripts/artefact_hooks.gd).
+   Black Knight Morse Code stays unimplemented — its own catalog text needs a
+   Turn counter and a Clock-gain hook, neither of which the action log
+   provides; see artefact_hooks.gd's issue 30 header note.
    2026-08-28 (issue 26): 15 economy/Shop/Box grab-bag artefacts flipped to
    implemented: true (spawn roster modifiers, a Shop purchase counter +
    forced-free override, deploy-cost/placement rules, a Gold-floor + a
@@ -498,6 +503,7 @@ var ARTEFACTS = [
     conspiracy: "The Stargate Project", url: "https://en.wikipedia.org/wiki/Stargate_Project_(U.S._Army_unit)",
     summary: "For twenty years the US Army and CIA paid psychics to describe distant targets from a desk. Declassified in 1995 with the verdict 'no intelligence value' — leaving the logs of two decades of government séances." },
   { name: "Elvish Hard Hat", rarity: "Rare", type: "Trigger", bonus: ["Action"], status: "KEEP",
+    implemented: true,
     effect: "If your first Action of a Turn is an Item or ability: +1 Action",
     conspiracy: "The Demolition Elves", url: "https://en.wikipedia.org/wiki/Elf",
     summary: "From the deep catalog: the theory that small unseen crews quietly demolish and rearrange the world overnight — that's why nothing is where you left it. OSHA-compliant, size XXS. (Full dossier in the Conspiracies DB.)" },

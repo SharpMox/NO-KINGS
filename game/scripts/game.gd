@@ -211,6 +211,10 @@ var _extract_sel: Array[Vector2i] = [] # multi selection frozen at confirm
 var _buff_pick := "" # pending_buff frozen at confirm (_item_reset runs first)
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (artefact hook)
+var action_log: Array[Dictionary] = [] # ordered {kind} entries this Turn (issue 30);
+	# kind is one of "move"/"capture"/"place"/"merge"/"item". Cleared in
+	# _begin_player_turn; appended only by _log_action, the choke point every
+	# action site's turn_action_count += 1 already funnelled through.
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
@@ -562,6 +566,7 @@ func _begin_player_turn() -> void:
 	for pos in board: # Blitz's free move is scoped "this Turn" — never carries over
 		board[pos].erase("blitz_free_move")
 	turn_action_count = 0
+	action_log = []
 	turn_capture_count = 0
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
 		BuffLogic.tick(board[pos])
@@ -1175,7 +1180,7 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 		var deploy_ctx := ArtefactHooks.run(self, "on_deploy", {"pos": tile, "skip_action": false})
 		if not deploy_ctx.skip_action:
 			actions_left -= 1
-		turn_action_count += 1
+		_log_action("place")
 		Economy.charge(self, "deploy_cost")
 		Economy.spend_gold(self, Economy.deploy_cost(self))
 		if actions_left == 0 or _board_cleared(): # last action spent placing
@@ -1213,6 +1218,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# up front, so every actions_left -= 1 below can consume it.
 	var moving_piece: Dictionary = board[from]
 	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
+	var did_capture := board.has(to) # action-log kind (issue 30): "move" vs "capture"
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
@@ -1233,7 +1239,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			moving_piece.erase("blitz_free_move")
 		else:
 			actions_left -= 1
-		turn_action_count += 1
+		_log_action("capture") # blocked attack — still an attempt against a piece
 		moved_this_turn.append(from)
 		_clear_selection()
 		if actions_left == 0 and state == State.PLAYER_TURN:
@@ -1309,7 +1315,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				moving_piece.erase("blitz_free_move")
 			else:
 				actions_left -= 1
-			turn_action_count += 1
+			_log_action("capture")
 			if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 				return _on_pass()
 			return _refresh()
@@ -1325,7 +1331,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				moving_piece.erase("blitz_free_move")
 			else:
 				actions_left -= 1
-			turn_action_count += 1
+			_log_action("capture")
 			if actions_left == 0 and state == State.PLAYER_TURN:
 				return _on_pass()
 			return _refresh()
@@ -1360,7 +1366,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		moving_piece.erase("blitz_free_move")
 	else:
 		actions_left -= 1
-	turn_action_count += 1
+	_log_action("capture" if did_capture else "move")
 	moved_this_turn.append(final_pos)
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
@@ -1633,7 +1639,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
 		actions_left -= it.get("action_cost", 1) # data-driven (Blitz: 0)
-	turn_action_count += 1
+	_log_action("item")
 	match it.key:
 		"blitz": # Notion 2026-08-28 rework: costs 0 actions itself; the target's
 			# NEXT move/capture this Turn is free (_move_player checks the flag).
@@ -1775,6 +1781,23 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 func _note_capture(pos: Vector2i) -> void:
 	board[pos].captures = board[pos].get("captures", 0) + 1
 	board[pos].wave_captures = board[pos].get("wave_captures", 0) + 1
+
+
+## Single choke point for the per-turn action log (issue 30) — the 7 sites
+## that already did `turn_action_count += 1` (move, capture, blocked-capture,
+## bomb, trap, place, item; merge_logic.gd's commit_merge calls this on `g`)
+## now call this instead. Fires `on_action` BEFORE the log/counter update so
+## a handler reading `ctx.first` (this being Action #1) can still act on the
+## Turn's very first Action — same ordering first_capture_extra/Stargate
+## Divination Crystal already rely on for `turn_action_count == 0` (see
+## artefact_hooks.gd header). A handler granting an action here (Elvish Hard
+## Hat) lands before every call site's own actions_left==0 auto-pass check,
+## so it can never resurrect a turn that would otherwise already have ended —
+## same shape as Stargate, covered by test_items.gd.
+func _log_action(kind: String) -> void:
+	ArtefactHooks.run(self, "on_action", {"kind": kind, "first": action_log.is_empty()})
+	action_log.append({"kind": kind})
+	turn_action_count += 1
 
 
 ## Single choke point for an Item leaving `items` (artefact hook 19) — was 3

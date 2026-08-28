@@ -424,6 +424,9 @@ func _shop_tile(index: int) -> Button:
 		btn.text = str(icon)
 		btn.add_theme_font_size_override("font_size", 16)
 	btn.tooltip_text = Shop.display_name(g, slot)
+	var rarity := Shop.rarity_of(slot) # issue 20: rarity legibility — tints the tile
+	if rarity != "":
+		btn.self_modulate = Tuning.ARTEFACT_RARITY_COLOR[rarity]
 	if slot.sold:
 		btn.modulate = Color(1, 1, 1, 0.4) # greys out, stays in place — never removed
 	var price := Label.new()
@@ -473,6 +476,13 @@ func _shop_detail(index: int) -> Control:
 	name.add_theme_font_size_override("font_size", 16)
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(name)
+	var rarity := Shop.rarity_of(slot) # issue 20: rarity legibility
+	if rarity != "":
+		var rlabel := Label.new()
+		rlabel.text = rarity
+		rlabel.add_theme_font_size_override("font_size", 12)
+		rlabel.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
+		info.add_child(rlabel)
 	var desc_text := Shop.description(slot)
 	if desc_text != "":
 		var desc := Label.new()
@@ -671,13 +681,19 @@ func show_box(options: Array) -> void:
 			"item":
 				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
 			"artefact":
-				header = "◈ %s — Artefact · passive, rest of the run" % opt.name
+				var rarity: String = str(opt.payload.get("rarity", ""))
+				header = "◈ %s — Artefact%s · passive, rest of the run" \
+					% [opt.name, (" · %s" % rarity) if rarity != "" else ""]
 			"score":
 				header = "★ %s" % opt.name
 		b.text = header + "\n" + opt.description
 		if opt.kind == "item" and g.item_icons.has(opt.payload.key):
 			b.icon = g.item_icons[opt.payload.key]
 			b.add_theme_constant_override("icon_max_width", 30)
+		if opt.kind == "artefact": # issue 20: rarity legibility
+			var rarity: String = str(opt.payload.get("rarity", ""))
+			if rarity != "":
+				b.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
 		b.add_theme_font_size_override("font_size", 16)
 		b.custom_minimum_size = Vector2(420, 0)
 		b.pressed.connect(func() -> void: box_chosen.emit(opt))

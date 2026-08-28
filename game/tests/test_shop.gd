@@ -88,7 +88,7 @@ func _init() -> void:
 		"1/value weighting: pawns common, amazonriders rare but possible (%d vs %d)"
 			% [pawn_n, heavy_n])
 
-	# prices: piece = catalog value, item by tier, artefact/box flat
+	# prices: piece = catalog value, item by tier, artefact by rarity, box flat
 	var priced_ok := true
 	for slot in game.shop_stock:
 		var want: int
@@ -99,11 +99,23 @@ func _init() -> void:
 				want = Tuning.SHOP_ITEM_PRICE[Items.ITEMS.filter(
 					func(it: Dictionary) -> bool: return it.key == slot.key)[0].tier]
 			"artefact":
-				want = Tuning.SHOP_ARTEFACT_PRICE
+				want = Tuning.SHOP_ARTEFACT_PRICE[Shop.rarity_of(slot)]
 			_:
 				want = Tuning.SHOP_BOX_PRICE
 		priced_ok = priced_ok and Shop.price(game, slot) == want
-	check(priced_ok, "every slot prices by its row's rule")
+	check(priced_ok, "every slot prices by its row's rule (artefact: by rarity)")
+
+	# --- issue 20: rarity legibility (Shop.rarity_of) ---
+	check(Shop.rarity_of({"kind": "piece", "key": "pawn"}) == "",
+		"pieces carry no rarity")
+	check(Shop.rarity_of({"kind": "artefact", "key": "greed"}) == "",
+		"the 7 core artefacts predate the rarity catalog")
+	var rated := Items.ARTEFACT_CATALOG.filter(func(e: Dictionary) -> bool:
+		return e.get("implemented", false))
+	if not rated.is_empty():
+		var sample: Dictionary = rated[0]
+		check(Shop.rarity_of({"kind": "artefact", "key": sample.key}) == sample.rarity,
+			"an implemented catalog artefact's rarity round-trips through the shop slot")
 
 	# purchases: gold + one action, slot goes SOLD, the piece lands in stock
 	var pi := -1
@@ -265,8 +277,9 @@ func _init() -> void:
 	check(item_n == Shop.ROWS.item + 5, "the rolled stock actually carries the +5 Item slots (%d)" % item_n)
 	check(artefact_n == Shop.ROWS.artefact + 1, "the rolled stock carries the +1 hidden Artefact slot")
 	check(not hidden.is_empty(), "exactly one artefact slot is flagged biased (the hidden one)")
-	check(Shop.price(slots, hidden) == roundi(Tuning.SHOP_ARTEFACT_PRICE * 1.5),
-		"the hidden slot prices at +50% over a normal Artefact slot")
+	check(Shop.price(slots, hidden)
+			== roundi(Tuning.SHOP_ARTEFACT_PRICE[Shop.rarity_of(hidden)] * 1.5),
+		"the hidden slot prices at +50% over a normal Artefact slot of its own rarity")
 	slots.queue_free()
 	await process_frame
 
@@ -297,10 +310,10 @@ func _init() -> void:
 	root.add_child(priced)
 	await process_frame
 
-	var artefact_slot := {"kind": "artefact", "key": "greed", "sold": false}
+	var artefact_slot := {"kind": "artefact", "key": "greed", "sold": false} # core key: rarity ""
 	var artefact_price := Shop.price(priced, artefact_slot)
-	# base 100, -25% (Hollow Moon) +50% (Shrinkflation) = +25% additive net
-	check(artefact_price == roundi(Tuning.SHOP_ARTEFACT_PRICE * 1.25),
+	# base 50 ("" rarity), -25% (Hollow Moon) +50% (Shrinkflation) = +25% additive net
+	check(artefact_price == roundi(Tuning.SHOP_ARTEFACT_PRICE[""] * 1.25),
 		"Hollow Moon's -25% and Shrinkflation's +50% compose additively off the same base")
 	priced.queue_free()
 	await process_frame

@@ -7,6 +7,7 @@ extends SceneTree
 
 const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
+const ShopScript := preload("res://scripts/shop.gd")
 
 var fails := 0
 
@@ -552,8 +553,10 @@ func _init() -> void:
 			and game.items.is_empty(),
 		"Extract click returns the pick to Stock")
 
-	# Shop: bottom-row button opens the modal; an enabled Buy purchases a
-	# piece for gold + 1 action; SOLD greys; Close dismisses (money-and-shop/04)
+	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
+	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for
+	# gold + 1 action, the tile greys SOLD in place, Close dismisses
+	# (money-and-shop/04, shop-drawer-ui/08)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -565,29 +568,50 @@ func _init() -> void:
 	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
-		"the shop modal opens")
-	var buy_btn: Button = null # first ENABLED Buy — piece rows in this slice
+		"the shop drawer opens")
+	var tile: Button = null # first affordable piece tile — every slot is visible, none scrolled
+	var tile_index := -1
 	var to_visit: Array = [game.modals.shop_panel]
 	while not to_visit.is_empty():
 		var n: Node = to_visit.pop_back()
-		if n is Button and n.text == "Buy" and not (n as Button).disabled:
-			buy_btn = n
-			break
+		if n is Button and n.has_meta("shop_index"):
+			var idx: int = n.get_meta("shop_index")
+			var slot: Dictionary = game.shop_stock[idx]
+			if slot.kind == "piece" and ShopScript.can_buy(game, slot):
+				tile = n
+				tile_index = idx
+				break
 		to_visit.append_array(n.get_children())
-	check(buy_btn != null, "an enabled Buy exists (piece rows)")
-	game.modals.shop_scroll.ensure_control_visible(buy_btn)
+	check(tile != null, "an affordable piece tile exists")
+	_click(tile.get_global_rect().get_center())
 	await process_frame
+	check(game.modals.shop_expanded_index == tile_index, "tapping a tile expands it")
 	var sh_stock: int = game.stock.size()
 	var sh_gold: int = game.gold
 	var sh_acts: int = game.actions_left
-	_click(buy_btn.get_global_rect().get_center())
+	check(await _click_button_in(game.modals.shop_panel, "Buy"),
+		"Buy clickable in the expanded tile")
 	await process_frame
 	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
 			and game.actions_left == sh_acts - 1,
 		"shop Buy adds the piece and debits gold + one action")
+	check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
+	var sold_tile: Button = null
+	to_visit = [game.modals.shop_panel]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is Button and n.has_meta("shop_index") and n.get_meta("shop_index") == tile_index:
+			sold_tile = n
+			break
+		to_visit.append_array(n.get_children())
+	check(sold_tile != null and sold_tile.modulate.a < 0.9,
+		"the sold tile greys out and stays in place")
+	var shows_sold: bool = await _click_button_in(game.modals.shop_panel, "SOLD")
+	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
+	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	await process_frame
-	check(not game.modals.shop_panel.visible, "the shop modal closes")
+	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
 	# the Shop is reachable in any state, not just your turn (GDD Shop page)
 	var was_state: int = game.state

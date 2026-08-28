@@ -101,12 +101,15 @@ the result depend on `run()`'s alphabetical key-sort relative to any other
 `+=`-style on_capture handler, exactly the order-dependence the file's ctx contract
 (header) exists to rule out.
 
-Test coverage (`test_items.gd`, "Dark Market Light Bulb"): a real merge → `_demoted`
-false; a real "demote" Item use → stamp survives the id drop, `_demoted` true, a
-capture pays 0 Score and no Gold bonus; a real "promote" Item use back past the old
-peak → `_demoted` false again, a capture pays double Gold and full Score. Plus a
-never-Ranked control piece, unaffected either way. `data/scenarios.gd` gained
-"Artefacts: slice 42 (peak-rank stamp — Dark Market Light Bulb)" for manual/swept
-sandbox coverage of the same 3 states. `run_all.sh`: ALL GREEN.
+Test coverage split by topic, after issue 37's `test_items.gd` split landed mid-branch
+(rebased onto it, no conflicts): `test_items_buffs.gd` gets the stamp machinery itself
+— a real merge → `_demoted` false; a real "demote" Item use → stamp survives the id
+drop, `_demoted` true; a real "promote" Item use back past the old peak → `_demoted`
+false again (the case that distinguishes option (b) from "was ever demoted").
+`test_items_artefacts_2.gd` (the "Ranked" cluster, right after CIA Heart Attack Gun)
+gets Dark Market Light Bulb's own Gold/Score payout on hand-set Ranked/Demoted/never-
+Ranked board state. `data/scenarios.gd` gained "Artefacts: slice 42 (peak-rank stamp —
+Dark Market Light Bulb)" for manual/swept sandbox coverage of the same 3 states.
+`run_all.sh`: ALL GREEN (full suite, blocking, foreground).
 
 PR: https://github.com/SharpMox/NO-KINGS/pull/155

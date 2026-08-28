@@ -31,12 +31,27 @@ static func add(piece: Dictionary, key: String, turns := 0) -> void:
 	piece.buffs = list
 
 
-## Tick every timed buff on a piece, dropping the expired ones.
+## Buffs measured in the OWNER's own turns rather than in player turns, so
+## they age on a different boundary (see tick_side).
+const SIDE_TIMED := ["stunned"]
+
+
+## Age the player-turn-timed buffs (Slow, Aura, Smog), dropping the expired.
 static func tick(piece: Dictionary) -> void:
+	_age(piece, false)
+
+
+## Age the owner-turn-timed buffs (Stun). Called at the end of that side's own
+## turn, so a stunned piece misses its own turns rather than the player's.
+static func tick_side(piece: Dictionary) -> void:
+	_age(piece, true)
+
+
+static func _age(piece: Dictionary, side_timed: bool) -> void:
 	var list := []
 	for b in of(piece):
-		if not b.has("turns"):
-			list.append(b)
+		if not b.has("turns") or SIDE_TIMED.has(b.key) != side_timed:
+			list.append(b) # not this cadence — leave it alone
 			continue
 		var left: int = int(b.turns) - 1
 		if left > 0:
@@ -119,3 +134,25 @@ static func _adjacent_source(board: Dictionary, from: Vector2i, key: String, sam
 ## the defender takes the attacker's tile and captures it instead.
 static func reflects_capture(victim: Dictionary) -> bool:
 	return has(victim, "reflect")
+
+
+## Multicapture (ruled 2026-08-28): the capture also takes ONE enemy standing
+## beside the piece just captured. Picks the most valuable neighbour so the
+## trigger needs no extra targeting step. Returns (-1,-1) when nothing adjoins.
+static func multicapture_target(board: Dictionary, at: Vector2i, owner: int, defs: Dictionary) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_value := -1
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var pos := at + Vector2i(dx, dy)
+			if not board.has(pos) or board[pos].owner == owner:
+				continue
+			if board[pos].id == "king": # boss piece is never collateral
+				continue
+			var v: int = int(defs[board[pos].id].value)
+			if v > best_value:
+				best_value = v
+				best = pos
+	return best

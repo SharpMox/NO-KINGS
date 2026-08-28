@@ -351,6 +351,9 @@ func _on_pass() -> void:
 	elif state == State.PLAYER_TURN:
 		fx_at = Vector2(hud.pass_button.get_global_rect().get_center())
 		Economy.charge(self, "pass_cost")
+		for pos in board: # same boundary rule, player side
+			if board[pos].owner == Rules.PLAYER:
+				BuffLogic.tick_side(board[pos])
 		if not early_clear_awarded and _board_cleared():
 			# wave beaten with turns to spare: score + clock scale with the lead
 			early_clear_awarded = true
@@ -510,7 +513,7 @@ func _run_enemy_actions() -> void:
 			if BuffLogic.has(board[act.to], "stun"):
 				# 2 ticks: the buff ages at the start of each PLAYER turn, so
 				# 2 keeps the attacker out for exactly one enemy turn
-				BuffLogic.add(board[act.from], "stunned", 2)
+				BuffLogic.add(board[act.from], "stunned", Tuning.STUN_MISSES + 1)
 				_add_float(act.from, "Stunned!", COL_MERGE)
 			lost_player += 1
 			_add_pop(act.to)
@@ -520,6 +523,9 @@ func _run_enemy_actions() -> void:
 		queue_redraw()
 		if _back_row_breached():
 			return _game_over(false, "Back-row breach")
+	for pos in board: # Stun ages on the stunned side's own turn boundary
+		if board[pos].owner == Rules.ENEMY:
+			BuffLogic.tick_side(board[pos])
 
 
 func _add_slide(from: Vector2i, to: Vector2i) -> void:
@@ -861,7 +867,8 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and board[tile].owner == Rules.PLAYER and merge_highlights.has(board[tile].id):
 		MergeLogic.do_merge(self, selected, tile) # second pick completes the merge on its tile
 	elif board.has(tile) and board[tile].owner == Rules.PLAYER and actions_left > 0 \
-			and not moved_this_turn.has(tile):
+			and not moved_this_turn.has(tile) \
+			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
 		legal_dests = Rules.moves_for(board, tile, defs)
 		legal_paths = Rules.move_paths(board, tile, defs)
@@ -956,6 +963,20 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			_add_float(to, "Critical!", COL_MERGE)
 		# Range is spent by the capture, not by repositioning
 		BuffLogic.consume(board[from], "range")
+		if BuffLogic.has(victim, "stun"): # cuts both ways
+			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
+			_add_float(from, "Stunned!", COL_MERGE)
+		if BuffLogic.has(board[from], "multicapture"):
+			# one extra enemy beside the piece just taken (ruled 2026-08-28)
+			var also := BuffLogic.multicapture_target(board, to, Rules.PLAYER, defs)
+			BuffLogic.consume(board[from], "multicapture")
+			if also.x >= 0:
+				_add_float(also, "Multicapture!", COL_MERGE)
+				Economy.earn(self, Economy.capture_score(self, board[also].id))
+				captured.append(board[also].id)
+				lost_enemy += 1
+				_add_pop(also)
+				board.erase(also)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if BuffLogic.has(victim, "trap"): # the attacker goes with it

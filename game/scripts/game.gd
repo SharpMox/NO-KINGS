@@ -280,6 +280,11 @@ func _ready() -> void:
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
+	if args.has("--artefacts"): # balance sweep (issue 20): force a starting
+		for key in args[args.find("--artefacts") + 1].split(","): # loadout, comma-separated keys, on top of whatever the boot path above granted
+			for t in Items.ARTEFACT_EFFECTS:
+				if t.key == key:
+					artefacts.append(t)
 	if shop_stock.is_empty(): # fresh run, or a save from before the shop
 		Shop.roll(self)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
@@ -1531,7 +1536,7 @@ func _box_options(only_kind := "") -> Array:
 			if t.key == "majestic-12-secret-handshake-diagram":
 				allowed_tiers = ["Strategic", "Decisive"]
 				break
-	return Box.roll_options(rng, only_kind, allowed_tiers)
+	return Box.roll_options(rng, only_kind, allowed_tiers, score)
 
 
 

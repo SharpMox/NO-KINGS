@@ -349,6 +349,37 @@
 ##   Wave that just ended) and grants +1 Piece Buff to the ally with the
 ##   highest count — ties keep whichever board position is found first, the
 ##   same reading Diplomatic Migraine Ray's "the strongest" already uses.
+##
+## issue 26 (the economy/Shop/Box grab-bag split off issue 19) shipped 15 of
+## its ~39 rows, picking the ones with an existing hook or a single contained
+## call site and leaving anything needing brand-new player-facing UI (a
+## reroll button, a choice modal, a decline path, an alt payment currency, a
+## gold-for-actions button) or a genuine Notion ruling (item cap's baseline
+## size, the retired "Shop visit" term, "Piece Box" not being a real Box
+## kind) for a follow-up — see .scratch/gdd-gaps/issues/26's Outcome. New:
+## - on_gold_zero (economy.gd/shop.gd `spend_gold`, the shared debit+floor
+##   choke point both now route every Gold spend through) fires once, only
+##   when a spend lands exactly on 0 Gold that wasn't already there — Zero-
+##   Point Energy Drink. shop.gd can't call economy.gd's `spend_gold` (that
+##   file already preloads Shop; a preload back would cycle), so Shop.buy
+##   inlines the same 3 lines instead of the two staying in sync by hand
+##   being a real risk — see the comment there.
+## - on_deploy's ctx grew `skip_action` (Hitler's Argentinian Passport: the
+##   deploy still happens, `actions_left` just isn't spent) — seeded false by
+##   game.gd's `_place`, the same output-field pattern as on_charge's
+##   `charged` and on_sanction_check's `blocked`.
+## - on_wave_roster (already wired for Trade War, issue 13) gets its first
+##   artefact users: HAARP Volume Knob / Wuhan Vial Label add a piece the
+##   same way Trade War does (drawn from the wave's own mix, never the King);
+##   Pigeon Charging Cable removes one, floored so a wave never spawns with
+##   zero non-King pieces.
+## - Some rows never needed a REGISTRY/hook entry at all — Nazca Boarding
+##   Pass, Nuclear Football Menu, Doomsday Clock Snooze Button and Agartha
+##   Welcome Mat are standing rules read directly off `g.artefacts` at their
+##   one call site (game.gd's `_deploy_tiles`/`_held`, `_item_apply`,
+##   `_process`'s per-frame Clock tick, shop.gd's `can_buy`/`buy`) — the same
+##   no-hook pattern chocolate-key-cake already used (see REGISTRY's comment
+##   there), not a gap in the engine.
 
 ## issue 22 (split out of 19: "the reactive on_tariff_apply/on_tariff_charge
 ## hooks can't express changing whether/how a Tariff applies") added the
@@ -400,6 +431,8 @@ const HOOKS := [
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
 	# --- issue 23: Piece Buff lifecycle choke points (see header) ---
 	"on_buff_apply", "on_buff_consume", "on_demote", "on_piece_demoted", "on_buff_removal",
+	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
+	"on_gold_zero",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -474,6 +507,11 @@ const REGISTRY := {
 	# majestic-12-secret-handshake-diagram fire nowhere — Shop.roll/price and
 	# game.gd's _box_options read g.artefacts directly, the same way Shop.buy
 	# already reads slot.kind without a hook (shop-drawer-ui/08's deferred pass).
+	# issue 26 adds 4 more standing rules to that same no-hook list: Nazca
+	# Boarding Pass (game.gd's _deploy_tiles), Nuclear Football Menu (the
+	# single _item_apply call site), Doomsday Clock Snooze Button (the
+	# per-frame Clock tick in _process — no discrete hook to fire on) and
+	# Agartha Welcome Mat (Shop.can_buy/buy's own credit-line read).
 
 	# --- issue 13: tariff system (data/tariffs.gd) ---
 	"move_cost": ["on_charge"],
@@ -573,6 +611,39 @@ const REGISTRY := {
 	"amber-room-bubble-wrap": ["on_gold_gain"],
 	"ark-grounding-cable": ["on_charge"],
 	"salvation-gift-card": ["on_tariff_apply", "on_wave_clear"],
+
+	# --- issue 26: spawn roster modifiers (WaveLogic.queue's existing
+	# on_wave_roster dispatch — trade_war's own prerequisite, not a new one) ---
+	"haarp-volume-knob": ["on_wave_roster", "on_wave_clear"],
+	"wuhan-vial-label": ["on_wave_roster", "on_capture"],
+	"pigeon-charging-cable": ["on_wave_roster"],
+
+	# --- issue 26: Shop purchase counter (Shop.price's forced-free override
+	# reads g.lottery_purchase_count directly; this only increments it) ---
+	"pre-scratched-lottery-ticket": ["on_purchase"],
+
+	# --- issue 26: on_deploy ctx.skip_action / g.artefacts-read placement
+	# (Hitler's Argentinian Passport, Nazca Boarding Pass — the latter has no
+	# hook at all, see game.gd's _deploy_tiles) ---
+	"hitler-s-argentinian-passport": ["on_deploy"],
+
+	# --- issue 26: "5-Wave Milestone" (on_wave_clear + g.wave % 5 == 0, the
+	# silk-road-coupon/crop-circle-plank cadence — a different one than
+	# on_milestone's own 10-wave clock-refill trigger, see there) ---
+	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
+	"trojan-horse-assembly-manual": ["on_wave_clear"],
+
+	# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
+	# WaveLogic.queue) ---
+	"jon-burrows-fake-id": ["on_wave_clear"],
+	"walt-s-cryonic-capsule": ["on_wave_clear"],
+
+	# --- issue 26: Score-gain streak (g.club27_streak), same debits-Gold
+	# ruling as Social Credit Report Card (issue 16) ---
+	"27-club-punch-card": ["on_wave_clear", "on_piece_lost", "on_score_change"],
+
+	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
+	"zero-point-energy-drink": ["on_gold_zero"],
 }
 
 
@@ -1322,3 +1393,81 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["salvation-gift-card", "on_wave_clear"]:
 			if g.wave % 5 == 0: # same cadence as Silk Road Coupon (issue 18)
 				g.salvation_charged = true
+
+		# --- issue 26: spawn roster modifiers (on_wave_roster, WaveLogic.queue
+		# — trade_war's own prerequisite above, not a new one) ---
+		["haarp-volume-knob", "on_wave_roster"]:
+			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
+			if not extras.is_empty():
+				ctx.roster.append(extras[g.rng.randi() % extras.size()])
+		["haarp-volume-knob", "on_wave_clear"]:
+			g.score += 200
+			g.gold += 15
+		["wuhan-vial-label", "on_wave_roster"]:
+			var wuhan_extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
+			if not wuhan_extras.is_empty():
+				ctx.roster.append(wuhan_extras[g.rng.randi() % wuhan_extras.size()])
+		["wuhan-vial-label", "on_capture"]:
+			# a capture-only Gold bonus, off the capture's own immutable base —
+			# ctx.pts (score) feeds Economy.earn's shared amount, so inflating
+			# it would raise Gold *and* Score together; this stays Gold-only.
+			g.gold += roundi(ctx.base * 0.25)
+		["pigeon-charging-cable", "on_wave_roster"]:
+			# -1 piece per wave, floored so a wave never spawns with zero
+			# non-King pieces — same "never the King" rule as trade_war/HAARP/
+			# Wuhan above, just subtracting instead of adding
+			var pigeon_extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
+			if pigeon_extras.size() > 1:
+				ctx.roster.erase(pigeon_extras[g.rng.randi() % pigeon_extras.size()])
+
+		# --- issue 26: Shop purchase counter (Pre-Scratched Lottery Ticket;
+		# the forced-free override itself lives in Shop.price) ---
+		["pre-scratched-lottery-ticket", "on_purchase"]:
+			g.lottery_purchase_count += 1
+
+		# --- issue 26: free-deploy (Hitler's Argentinian Passport) ---
+		["hitler-s-argentinian-passport", "on_deploy"]:
+			ctx.skip_action = true
+
+		# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
+		# Assembly Manual) — see silk-road-coupon's on_wave_clear case above
+		# for why this checks g.wave % 5 == 0 directly instead of on_milestone
+		["ark-s-bunkbed", "on_wave_clear"]:
+			if g.wave % 5 == 0:
+				g.arks_bunkbed_used = false # the new Milestone recharges it
+		["ark-s-bunkbed", "on_purchase"]:
+			if ctx.kind == "piece" and not g.arks_bunkbed_used:
+				g.stock.append(ctx.key)
+				g.arks_bunkbed_used = true
+		["trojan-horse-assembly-manual", "on_wave_clear"]:
+			if g.wave % 5 == 0 and not g.box_open: # don't clobber an open Box Pick
+				g._open_box_pick()
+
+		# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
+		# game.gd's _lose_player_piece / WaveLogic.queue) ---
+		["jon-burrows-fake-id", "on_wave_clear"]:
+			if not g.wave_lost_ids.is_empty():
+				g.stock.append(g.wave_lost_ids[0])
+		["walt-s-cryonic-capsule", "on_wave_clear"]:
+			if not g.wave_lost_ids.is_empty():
+				g.stock.append(g.wave_lost_ids[-1])
+
+		# --- issue 26: Score-gain streak (27 Club Punch Card); -50 Gold on
+		# loss, same issue-16 ruling as Social Credit Report Card (Score is
+		# up-only) ---
+		["27-club-punch-card", "on_wave_clear"]:
+			if ctx.clean:
+				g.club27_streak += 1
+			else: # belt-and-suspenders: on_piece_lost below already zeroed it
+				g.club27_streak = 0
+		["27-club-punch-card", "on_piece_lost"]:
+			g.club27_streak = 0
+			g.gold = maxi(g.gold - 50, 0)
+		["27-club-punch-card", "on_score_change"]:
+			if g.club27_streak > 0:
+				ctx.amount += ctx.base * 0.05 * float(g.club27_streak)
+
+		# --- issue 26: Gold reaching exactly 0 (Zero-Point Energy Drink;
+		# economy.gd/shop.gd's spend_gold) ---
+		["zero-point-energy-drink", "on_gold_zero"]:
+			g.actions_left += 2

@@ -135,7 +135,18 @@ static func price(g, slot: Dictionary) -> int:
 			base = float(Tuning.SHOP_BOX_PRICE)
 	var ctx := ArtefactHooks.run(g, "on_price",
 		{"base": base, "amount": base, "kind": slot.kind, "tier": tier})
-	return maxi(roundi(ctx.amount), 0)
+	var amount: float = ctx.amount
+	# Pre-Scratched Lottery Ticket (issue 26): "every 5th purchase free" is an
+	# absolute override, not a percentage composed off `base` like every other
+	# on_price handler — a later-sorting discount artefact adding on top of a
+	# forced-to-0 ctx.amount would go negative. Applied after the hook instead
+	# of inside it, same reasoning Inflation gets for stacking multiplicatively
+	# instead of additively (artefact_hooks.gd header): a deliberate exception.
+	for t in g.artefacts:
+		if t.key == "pre-scratched-lottery-ticket" and (g.lottery_purchase_count + 1) % 5 == 0:
+			amount = 0.0
+			break
+	return maxi(roundi(amount), 0)
 
 
 ## "" for non-artefact slots and the 7 core artefacts that predate the
@@ -182,7 +193,18 @@ const PURCHASABLE := ["piece", "item", "artefact", "box"]
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
-			and g.actions_left >= 1 and g.gold >= price(g, slot)
+			and g.actions_left >= 1 and g.gold + _credit(g) >= price(g, slot)
+
+
+## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold
+## into the negative — read directly off g.artefacts like the other
+## structural Shop reads above (_extra_item_slots etc.), not a hook: it's a
+## standing rule on this one call site, not a triggered effect.
+static func _credit(g) -> int:
+	for t in g.artefacts:
+		if t.key == "agartha-welcome-mat":
+			return 100
+	return 0
 
 
 ## Debit gold + 1 action, mark the slot SOLD, grant the good; returns
@@ -194,7 +216,12 @@ static func buy(g, index: int) -> bool:
 	if not can_buy(g, slot):
 		return false
 	var cost := price(g, slot)
-	g.gold -= cost
+	var before: int = g.gold
+	g.gold = maxi(g.gold - cost, -_credit(g)) # Economy.spend_gold would cycle
+		# back through this file (economy.gd preloads Shop), so this inlines
+		# the same debit + on_gold_zero dispatch it does — see there.
+	if before > 0 and g.gold == 0:
+		ArtefactHooks.run(g, "on_gold_zero", {}) # Zero-Point Energy Drink (26)
 	g.actions_left -= 1
 	slot.sold = true
 	g.gold_spent_shop_this_wave += cost # issue 16: Zurich Gnome Figurine et al.

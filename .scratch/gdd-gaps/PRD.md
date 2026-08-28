@@ -85,6 +85,25 @@ Two things fall out of this that change earlier slices:
   explicitly deferred "until an Artefact needs it" — several now do, by name, on the GDD
   Shop page.
 
+## The remainder, sliced (2026-08-28)
+
+45 artefacts remain unimplemented. Sliced by **shared infrastructure** rather than bonus
+tag, because that is what actually gates them — three groups are buildable now, three are
+waiting on design calls.
+
+| Slice | What | Status |
+| --- | --- | --- |
+| 29 | Runtime artefact metadata (rarity on instances) | **independent** |
+| 30 | Action-type tracking | **independent** |
+| 31 | Capture-context effects | **independent** (one term to define) |
+| 32 | Box & Shop UI extensions | blocked — 3 decisions |
+| 33 | Board & positional rules | blocked — 4 decisions |
+| 34 | Consumables & caps | blocked — 3 decisions |
+
+The blocked three are parked deliberately: each would mean inventing a rule the GDD does
+not state, which is the failure mode slices 01-02 existed to clean up. Their issue files
+list exactly which questions need answering.
+
 ## Open flags
 
 `FLAGS.md` holds the non-blocking findings that surfaced while working the slices — art

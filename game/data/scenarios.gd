@@ -196,6 +196,11 @@ static func all() -> Array:
 			"artefacts": ["illuminati-fridge-magnet", "fema-summer-camp-flyer", # Rare + Common
 				"putin-s-golden-toilet-brush", "cia-exploding-cigar"], # Uncommon + Legendary
 			"gold": 100, "wave": 3, "stock": ["pawn"]}},
+		{"name": "Artefacts: slice 30 (action log — Elvish Hard Hat)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 6]],
+			"items": ["counter_intel", "blitz"],
+			"artefacts": ["elvish-hard-hat"],
+			"gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

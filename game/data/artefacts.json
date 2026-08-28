@@ -1369,7 +1369,7 @@
   ],
   "effect": "If your first Action of a Turn is an Item or ability: +1 Action",
   "conspiracy": "The Demolition Elves",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "majestic-12-secret-handshake-diagram",

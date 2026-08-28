@@ -91,3 +91,12 @@ const ARMIES := {
 		"knight", "alibaba", "alibaba"],
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
+
+# Difficulty ranks (07-difficulty-ranks, decided 2026-08-28): picked pre-run,
+# locked for the run (Continue into endless keeps it), NOT a leaderboard
+# weight — comfort only. Officer/Autocrat both disable the Shop clock-pause
+# and shift tariffs one tier harsher (binary levers — a pause is on or off);
+# starting Stock size is the one lever that scales per rank, trimming the
+# rank's RANKS index worth of pieces off the front of the army.
+const RANKS := ["Citizen", "Officer", "Autocrat"]
+const DEFAULT_RANK := "Citizen"

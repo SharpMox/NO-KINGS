@@ -128,6 +128,12 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
 		"return_to_start": false, "move_to_backrow": false,
+		"no_score": false, # issue 42: Dark Market Light Bulb's "Demoted pieces
+			# give no Score" — an OUTPUT flag, not a direct ctx.pts write, so it
+			# doesn't depend on whether a same-hook `+=` handler dispatches
+			# before or after it (run()'s key-sort); applied exactly once,
+			# below, after every on_capture handler has finished — same
+			# pattern as gold_bonus/score_bonus above.
 		"grant_buffs": [], # tiers ("" = any) an on_capture handler wants to hand
 			# the attacker (Obedience-Flavored Tap Water, Holy Lint) — an OUTPUT
 			# list, not applied here: _move_player reads it back off
@@ -139,6 +145,8 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 	})
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
+	if ctx.no_score:
+		ctx.pts = 0
 	g.last_capture_ctx = ctx
 	return ctx.pts
 

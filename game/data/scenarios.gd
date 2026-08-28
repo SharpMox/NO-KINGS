@@ -207,6 +207,15 @@ static func all() -> Array:
 			"gold": 100, "score": 0, "clock_s": 90.0, "wave": 99, "kings_defeated": 1,
 			"stock": ["pawn"]}}, # a recurring King refill on top of lifesteal/Black
 			# Knight's own Clock hooks, and a 3rd-Turn cadence within easy reach
+		{"name": "Artefacts: slice 42 (peak-rank stamp — Dark Market Light Bulb)", "cfg": {
+			"board": [["sergeant", 0, 2, 1], # already Ranked
+				["pawn", 0, 3, 1, {"peak_ranked": true}], # Demoted: below its own peak
+				["pawn", 0, 4, 1], # never Ranked — the control case
+				["pawn", 1, 2, 5], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],
+			"items": ["demote", "promote"], # demote the sergeant, then promote the
+				# demoted pawn back — the sandbox for "clears on re-promotion"
+			"artefacts": ["dark-market-light-bulb"],
+			"gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

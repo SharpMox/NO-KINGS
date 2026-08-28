@@ -450,6 +450,72 @@ func _init() -> void:
 	rf.queue_free()
 	await process_frame
 
+	# --- Range (ruled 2026-08-28): every enemy this piece can already capture
+	# also exposes the enemies standing beside it, capture-only
+	var rg := _boot({"board": [["rook", 0, 2, 2], ["rook", 1, 2, 5],
+		["pawn", 1, 3, 5], ["pawn", 1, 5, 9], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	rg.actions_left = 5
+	var plain: Array = Rules.moves_for(rg.board, Vector2i(2, 2), rg.defs)
+	check(plain.has(Vector2i(2, 5)) and not plain.has(Vector2i(3, 5)),
+		"without Range the rook takes its blocker but nothing beside it")
+	BuffLogic.add(rg.board[Vector2i(2, 2)], "range")
+	var reach: Array = Rules.moves_for(rg.board, Vector2i(2, 2), rg.defs)
+	check(reach.has(Vector2i(3, 5)), "Range reaches the enemy beside a capturable enemy")
+	check(not reach.has(Vector2i(5, 9)), "a distant enemy stays out of reach")
+	check(not reach.has(Vector2i(3, 4)),
+		"Range is capture-only — it does not open empty squares")
+	rg._move_player(Vector2i(2, 2), Vector2i(3, 5)) # take past the blocker
+	check(rg.board.has(Vector2i(3, 5)) and rg.board[Vector2i(3, 5)].owner == 0,
+		"the piece captures through the halo")
+	check(not BuffLogic.has(rg.board[Vector2i(3, 5)], "range"),
+		"Range is consumed by the capture")
+	rg.queue_free()
+	await process_frame
+
+	# --- Trap: the attacker dies with its victim, on either side
+	var tr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	tr.actions_left = 5
+	BuffLogic.add(tr.board[Vector2i(2, 5)], "trap")
+	tr._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(not tr.board.has(Vector2i(2, 2)) and not tr.board.has(Vector2i(2, 5)),
+		"Trap kills both the victim and the attacker")
+	check(tr.captured.has("rook"), "the trapped victim still enters Captured Stock")
+	tr.queue_free()
+	await process_frame
+
+	# --- Taunt forces the AI's capture choice away from the juicier target
+	var tt := _boot({"board": [["queen", 0, 2, 4], ["pawn", 0, 2, 6],
+		["rook", 1, 2, 8], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	BuffLogic.add(tt.board[Vector2i(2, 6)], "taunt") # the cheap pawn taunts
+	var act: Dictionary = Rules.ai_action(tt.board, tt.defs)
+	check(act.get("to") == Vector2i(2, 6),
+		"Taunt overrides the highest-value-target heuristic")
+	tt.queue_free()
+	await process_frame
+
+	# --- Stun: the enemy that takes a stunning piece sits out one enemy turn
+	var st := _boot({"board": [["pawn", 0, 2, 6], ["rook", 1, 2, 8],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	BuffLogic.add(st.board[Vector2i(2, 6)], "stun")
+	await st._run_enemy_actions()
+	check(st.board.has(Vector2i(2, 6)) and st.board[Vector2i(2, 6)].owner == 1,
+		"the enemy captures the stunning piece")
+	check(BuffLogic.has(st.board[Vector2i(2, 6)], "stunned"), "the attacker is stunned")
+	var frozen: Vector2i = Vector2i(2, 6)
+	await st._run_enemy_actions()
+	check(st.board.has(frozen) and BuffLogic.has(st.board[frozen], "stunned"),
+		"a stunned piece does not act on the following enemy turn")
+	st._begin_player_turn()
+	st._begin_player_turn()
+	check(not BuffLogic.has(st.board[frozen], "stunned"), "the stun wears off")
+	st.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

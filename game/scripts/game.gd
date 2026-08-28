@@ -495,7 +495,23 @@ func _run_enemy_actions() -> void:
 				_add_float(act.to, "Blocked", COL_MERGE)
 			queue_redraw()
 			continue
+		if board.has(act.to) and BuffLogic.has(board[act.to], "trap"):
+			# Trap takes the attacker with it — neither piece survives
+			_add_float(act.from, "Trapped!", COL_CAPTURE)
+			lost_player += 1
+			lost_enemy += 1
+			_add_pop(act.to)
+			_add_pop(act.from)
+			board.erase(act.to)
+			board.erase(act.from)
+			queue_redraw()
+			continue
 		if board.has(act.to):
+			if BuffLogic.has(board[act.to], "stun"):
+				# 2 ticks: the buff ages at the start of each PLAYER turn, so
+				# 2 keeps the attacker out for exactly one enemy turn
+				BuffLogic.add(board[act.from], "stunned", 2)
+				_add_float(act.from, "Stunned!", COL_MERGE)
 			lost_player += 1
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
@@ -938,8 +954,22 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
 			_add_float(to, "Critical!", COL_MERGE)
+		# Range is spent by the capture, not by repositioning
+		BuffLogic.consume(board[from], "range")
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
+		if BuffLogic.has(victim, "trap"): # the attacker goes with it
+			_add_float(from, "Trapped!", COL_CAPTURE)
+			lost_player += 1
+			_add_pop(from)
+			board.erase(from)
+			board.erase(to)
+			captured.append(victim.id)
+			actions_left -= 1
+			turn_action_count += 1
+			if actions_left == 0 and state == State.PLAYER_TURN:
+				return _on_pass()
+			return _refresh()
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
 		else:

@@ -10,9 +10,13 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 
 
-## Gold cost charged when a tariffed action happens.
+## Gold cost charged when a tariffed action happens. Dispatches on_charge
+## (issue 13) with ctx.key set to the specific tariff being charged; the
+## matching held tariff (if any, and only Counter-Intel's suppression is
+## checked centrally by ArtefactHooks.run) sets ctx.charged.
 static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
-	if tariff_on(g, key):
+	var ctx := ArtefactHooks.run(g, "on_charge", {"key": key, "charged": false})
+	if ctx.charged:
 		g.gold = maxi(g.gold - amount, 0)
 
 
@@ -34,16 +38,14 @@ static func earn(g, amount: int, reason: String = "") -> void:
 	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 
-## Gold gains pass through Inflation (-10% per stack, rounded down).
+## Gold gains pass through Inflation (-10% per stack, rounded down). Each
+## held Inflation copy dispatches on_gold_gain once (issue 13), multiplying
+## ctx.amount — the deliberate multiplicative-stacking exception documented
+## in artefact_hooks.gd. round(), don't truncate: int() zeroed out pawn
+## captures (1 * 0.9 -> 0).
 static func gain(g, amount: int) -> int:
-	if g.tariffs_suppressed: # Counter-Intel pauses persistent tariffs too
-		return amount
-	var out := float(amount)
-	for t in g.tariffs_active:
-		if t.key == "inflation":
-			out *= 0.9
-	# round, don't truncate: int() zeroed out pawn captures (1 * 0.9 -> 0)
-	return roundi(out)
+	var ctx := ArtefactHooks.run(g, "on_gold_gain", {"amount": float(amount)})
+	return roundi(ctx.amount)
 
 
 ## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
@@ -157,10 +159,28 @@ static func apply_tariff(g, t: Dictionary) -> void:
 			g.sanctioned_id = types.keys()[g.rng.randi() % types.size()]
 
 
-static func tariff_on(g, key: String) -> bool:
-	if g.tariffs_suppressed: # Counter-Intel (CONTEXT.md: Tariff suppression)
-		return false
-	for t in g.tariffs_active:
-		if t.key == key:
-			return true
-	return false
+# --- issue 13: narrow query wrappers for the tariff keys that gate/modify
+# behaviour rather than charge gold — each just unpacks the ctx an
+# ArtefactHooks.run() call filled in, mirroring earn()/gain()/capture_score()
+# above for artefacts. Replaces the ad hoc `if tariff_on(g, "...")` branches
+# that used to sit inline at every call site (see artefact_hooks.gd header).
+
+## True when `id` (an uncaptured piece type) is barred from placement by
+## Sanctions.
+static func sanctioned(g, id: String) -> bool:
+	return ArtefactHooks.run(g, "on_sanction_check", {"id": id, "blocked": false}).blocked
+
+
+## False when Regulation blocks this merge pair (a fielded Pawn on either side).
+static func merge_ok(g, a: String, b: String) -> bool:
+	return not ArtefactHooks.run(g, "on_merge_check", {"a": a, "b": b, "blocked": false}).blocked
+
+
+## Placement gold cost, doubled by Austerity.
+static func deploy_cost(g) -> int:
+	return ArtefactHooks.run(g, "on_place_cost", {"cost": Tuning.PLACEMENT_COST}).cost
+
+
+## Enemy actions this turn, +1 under Filibuster.
+static func enemy_actions(g) -> int:
+	return ArtefactHooks.run(g, "on_enemy_turn_start", {"actions": Tuning.ENEMY_ACTIONS_PER_TURN}).actions

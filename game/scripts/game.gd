@@ -367,7 +367,7 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 	else:
 		if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 			return # captured only merges, and a merge needs a turn action
-		if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
+		if not cap and Economy.sanctioned(self, id):
 			return
 		if not cap and not (state == State.SETUP or actions_left > 0):
 			return
@@ -556,9 +556,7 @@ func _wait_while_backgrounded() -> void:
 
 
 func _run_enemy_actions() -> void:
-	var actions := Tuning.ENEMY_ACTIONS_PER_TURN
-	if Economy.tariff_on(self, "filibuster"):
-		actions += 1
+	var actions := Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs)
@@ -750,7 +748,7 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	var id: String = entry if entry is String else entry.id
 	if box_open or buff_pick_open or win_open or game_menu_open or preview_open:
 		return
-	if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
+	if not cap and Economy.sanctioned(self, id):
 		return
 	if cap and (state != State.PLAYER_TURN or actions_left <= 0):
 		return # captured drags only merge, and a merge needs a turn action
@@ -1045,11 +1043,8 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 		ArtefactHooks.run(self, "on_deploy", {"pos": tile}) # MK-Ultra Sugar Cube (18)
 		actions_left -= 1
 		turn_action_count += 1
-		var cost := Tuning.PLACEMENT_COST
-		if Economy.tariff_on(self, "austerity"):
-			cost *= 2
 		Economy.charge(self, "deploy_cost")
-		gold = maxi(gold - cost, 0)
+		gold = maxi(gold - Economy.deploy_cost(self), 0)
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":

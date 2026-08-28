@@ -138,6 +138,41 @@ func _init() -> void:
 	await create_timer(0.2).timeout
 	check(c1.clock_ms < before_buff, "Tier 1: the Buff Box sub-pick never pauses the Clock")
 	c1.buff_pick_open = false
+
+	# --- issue 41: the generic choice-modal seam, exercised directly — not
+	# through the Buff Box — proves it generalises: opening it blocks input
+	# on the shared flag (same guard sites), the Clock keeps ticking (Tier
+	# 1, same list the Buff Box check above just used), the continuation
+	# resumes with the picked value, and cancel runs its OWN continuation
+	# instead of the chosen one — the Buff Box precedent for "leaves the
+	# triggering effect unspent."
+	var picked := [] # closure cell: GDScript captures locals by value
+	var cancelled := [false]
+	c1._open_choice_pick("pick one", [{"label": "A", "value": "a"},
+			{"label": "B", "value": "b"}], "Nope",
+		func(v): picked.append(v),
+		func(): cancelled[0] = true)
+	check(c1.buff_pick_open and c1.modals.buff_panel != null,
+		"issue 41: opening the generic seam sets the shared flag and shows the panel")
+	var arrow_before: bool = c1.arrow_mode
+	c1._on_arrow_toggle()
+	check(c1.arrow_mode == arrow_before,
+		"issue 41: the generic seam blocks input at the same guard sites as the Buff Box")
+	var before_choice: float = c1.clock_ms
+	await create_timer(0.2).timeout
+	check(c1.clock_ms < before_choice,
+		"Tier 1: the generic choice-pick seam never pauses the Clock (generalises, not Buff-Box-only)")
+	c1.modals.choice_chosen.emit("b")
+	check(picked == ["b"], "issue 41: the continuation resumes with the picked value")
+	check(not c1.buff_pick_open and c1.modals.buff_panel == null,
+		"issue 41: picking closes the panel and clears the shared flag")
+	c1._open_choice_pick("pick one", [{"label": "A", "value": "a"}], "Nope",
+		func(v): picked.append(v), func(): cancelled[0] = true)
+	c1.modals.choice_pick_cancelled.emit()
+	check(cancelled[0] and picked == ["b"],
+		"issue 41: cancel runs the cancel continuation, not the chosen one — the effect stays unspent")
+	check(not c1.buff_pick_open, "issue 41: cancelling clears the shared flag too")
+
 	c1.queue_free()
 	await process_frame
 
@@ -154,6 +189,12 @@ func _init() -> void:
 	check(c2.clock_ms == before_bg, "Tier 2+: OS-backgrounding still pauses the Clock")
 	c2.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
 	c2.preview_open = false
+	c2.buff_pick_open = true # issue 41: the choice-pick seam, higher tier too
+	var before_c2_choice: float = c2.clock_ms
+	await create_timer(0.2).timeout
+	check(c2.clock_ms < before_c2_choice,
+		"Tier 2+: the choice-pick seam still never pauses the Clock")
+	c2.buff_pick_open = false
 	c2.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER

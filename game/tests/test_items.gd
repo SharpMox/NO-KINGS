@@ -627,6 +627,67 @@ func _init() -> void:
 	order_b.queue_free()
 	await process_frame
 
+	# --- issue 16 (Gold/Score batch): percentage Score/Gold modifiers stack
+	# additively — two Tinfoil Hats give +30%/-10%, not compounding (95%^2)
+	var tinfoil := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["tinfoil-hat", "tinfoil-hat"]})
+	await process_frame
+	Economy.earn(tinfoil, 100)
+	check(tinfoil.score == 130, "two Tinfoil Hats: +15% Score each stacks to +30%, not +30.25%")
+	check(tinfoil.gold == 90, "two Tinfoil Hats: -5% Gold each stacks to -10%, not -9.75%")
+	tinfoil.queue_free()
+	await process_frame
+
+	# Tungsten-Filled Gold Bar: Gold gains also add 2x their amount as Score
+	var tungsten := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["tungsten-filled-gold-bar"]})
+	await process_frame
+	Economy.earn(tungsten, 100)
+	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
+	check(tungsten.score == 300, "Tungsten-Filled Gold Bar: +100 base, +200 (2x the Gold) Score")
+	tungsten.queue_free()
+	await process_frame
+
+	# Zurich Gnome Figurine: at Wave end, refund 10% of Gold spent in the Shop
+	var zurich := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["zurich-gnome-figurine"], "gold": 100})
+	await process_frame
+	zurich.gold_spent_shop_this_wave = 40
+	WaveLogic.queue(zurich, zurich.wave + 1)
+	check(zurich.gold == 104, "Zurich Gnome Figurine refunds 10% of Gold spent in the Shop at Wave clear")
+	zurich.queue_free()
+	await process_frame
+
+	# Social Credit Report Card + issue 16 ruling: the -10 Score penalty on
+	# losing a piece debits Gold instead, so Score stays up-only
+	var social := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["social-credit-report-card"], "gold": 100, "score": 500})
+	await process_frame
+	WaveLogic.queue(social, social.wave + 1) # clean: no pieces lost since wave start
+	check(social.score == 600, "Social Credit Report Card: +100 Score on a clean Wave clear")
+	check(social.gold == 100, "Social Credit Report Card: no Gold change on a clean clear")
+	social.lost_player += 1 # a piece falls during the next wave
+	WaveLogic.queue(social, social.wave + 1)
+	check(social.score == 600, "Social Credit Report Card: Score stays up-only after losing a piece")
+	check(social.gold == 90, "Social Credit Report Card: the -10 Score penalty debits Gold instead (issue 16 ruling)")
+	social.queue_free()
+	await process_frame
+
+	# Nero's Marshmallow Stick: each Capture in a Turn gives +25% more Score
+	# than the previous one (linear step off the untouched base value)
+	var nero := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["nero-s-marshmallow-stick"]})
+	await process_frame
+	var nero_base: int = nero.defs.pawn.value
+	var cap1 := Economy.capture_score(nero, "pawn")
+	var cap2 := Economy.capture_score(nero, "pawn")
+	var cap3 := Economy.capture_score(nero, "pawn")
+	check(cap1 == nero_base, "Nero's Marshmallow Stick: the first Capture this Turn is unmodified")
+	check(cap2 == nero_base + roundi(nero_base * 0.25), "Nero's Marshmallow Stick: the 2nd Capture gives +25% more")
+	check(cap3 == nero_base + roundi(nero_base * 0.5), "Nero's Marshmallow Stick: the 3rd Capture gives +50% more")
+	nero.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

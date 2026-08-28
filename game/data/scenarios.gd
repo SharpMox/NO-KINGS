@@ -119,6 +119,12 @@ static func all() -> Array:
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"artefacts": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
 			"wave": 9, "stock": ["pawn"]}},
+		{"name": "Artefacts: Gold/Score batch (issue 16)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
+			"artefacts": ["tinfoil-hat", "tungsten-filled-gold-bar", "zurich-gnome-figurine",
+				"nero-s-marshmallow-stick", "suspiciously-large-femur",
+				"social-credit-report-card", "john-titor-s-crypto-wallet"],
+			"gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

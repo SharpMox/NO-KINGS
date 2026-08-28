@@ -21,7 +21,7 @@
   ],
   "effect": "+15% Score gain; -5% Gold gain",
   "conspiracy": "Tin foil hat",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "area-51-parking-permit",
@@ -70,7 +70,7 @@
   ],
   "effect": "At Wave end: refund 10% of Gold spent in the Shop",
   "conspiracy": "Swiss bank secrecy",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nero-s-marshmallow-stick",
@@ -83,7 +83,7 @@
   ],
   "effect": "Each Capture in a Turn gives +25% more Score and Gold than the previous one; resets at Turn end",
   "conspiracy": "The Great Fire of Rome",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "pre-scratched-lottery-ticket",
@@ -107,7 +107,7 @@
   ],
   "effect": "Gold gains also add 2x their amount as Score",
   "conspiracy": "Fake gold bars",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "crop-circle-plank",
@@ -144,7 +144,7 @@
   ],
   "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +3 Gold",
   "conspiracy": "The hidden giant skeletons",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "daylight-savings-jar",
@@ -157,7 +157,7 @@
   ],
   "effect": "While the Clock is over 90s: +20% Score and +10% Gold gain; while under 30s: -20% Score and -10% Gold gain",
   "conspiracy": "The Daylight Saving racket",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "phantom-punch-glove",
@@ -169,7 +169,7 @@
   ],
   "effect": "On capturing a higher-value piece with a lower-value piece: double Score; on capturing a lower-value piece with a higher-value one: half Score",
   "conspiracy": "The phantom punch",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "naruto-run-manual",
@@ -181,7 +181,7 @@
   ],
   "effect": "On clearing a Wave in 3 turns or less: x2 Score",
   "conspiracy": "Storm Area 51",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "social-credit-report-card",
@@ -191,9 +191,9 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -10 Score",
+  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -10 Gold (issue 16: Score is up-only, so this penalty debits Gold instead)",
   "conspiracy": "The social credit system",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "mk-ultra-sugar-cube",
@@ -303,7 +303,7 @@
   ],
   "effect": "On Wave clear: +5% of your current Gold",
   "conspiracy": "Yamashita's gold",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "charlemagne-s-birth-certificate",
@@ -328,7 +328,7 @@
   ],
   "effect": "On Wave start: +100 Score, +10 Gold, and -3s Clock",
   "conspiracy": "The advance-fee scam",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "curtain-rods-bag-rifle-shaped",
@@ -473,7 +473,7 @@
   ],
   "effect": "While 2+ of your same-type pieces are on the Board: their Captures give +25% Score",
   "conspiracy": "The Men in Black",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "skull-and-bones-coffin",
@@ -498,7 +498,7 @@
   ],
   "effect": "While the Clock is under 30s: +100% Score gain and +50% Gold gain",
   "conspiracy": "The Moscow–Washington hotline",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bilderberg-hotel-slippers",
@@ -524,7 +524,7 @@
   ],
   "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +10 Gold",
   "conspiracy": "The Sphinx's nose",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "chupacabra-chew-toy",
@@ -548,7 +548,7 @@
   ],
   "effect": "On Wave clear: +500 Score if you captured nothing that Wave",
   "conspiracy": "The Bielefeld Conspiracy",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "alien-pet-rocks",
@@ -572,7 +572,7 @@
   ],
   "effect": "5% of Score gains are also paid as Gold",
   "conspiracy": "El Dorado",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "jet-fuel-vial",
@@ -634,7 +634,7 @@
   ],
   "effect": "Whenever you buy in the Shop: +5 Score per Gold spent",
   "conspiracy": "Putin's Palace",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "deja-vu-glitch",
@@ -672,7 +672,7 @@
   ],
   "effect": "Inverted pieces give double Score and Gold on Capture",
   "conspiracy": "Modern flat Earth",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "panama-papers-shredder",
@@ -733,7 +733,7 @@
   ],
   "effect": "On clearing a Wave without losing a piece: +200 Score and +20 Gold",
   "conspiracy": "QAnon",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "holy-grail-coaster",
@@ -817,7 +817,7 @@
   ],
   "effect": "On Wave clear: +5 Gold per Artefact you own",
   "conspiracy": "The Trilateral Commission",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "money-printer-service-manual",
@@ -829,7 +829,7 @@
   ],
   "effect": "On Wave clear: +10% of your current Gold",
   "conspiracy": "Federal Reserve lore",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "zodiac-crossword-puzzle",
@@ -854,7 +854,7 @@
   ],
   "effect": "On your first Capture each Wave: double Score and Gold",
   "conspiracy": "The Voynich manuscript",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cia-press-pass",
@@ -867,7 +867,7 @@
   ],
   "effect": "Pieces carrying a Piece Buff give double Score and +50% Gold on Capture",
   "conspiracy": "Operation Mockingbird",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bohemian-grove-friendship-bracelet",
@@ -965,7 +965,7 @@
   ],
   "effect": "While the Clock is under 60s: +50% Score gain and +25% Gold gain",
   "conspiracy": "The Bermuda Triangle",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "amber-room-bubble-wrap",
@@ -1026,7 +1026,7 @@
   ],
   "effect": "On 5-Wave Milestone: +1 Gold per 5 seconds left on the Clock",
   "conspiracy": "John Titor",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "popemobile-piggy-bank",
@@ -1038,7 +1038,7 @@
   ],
   "effect": "Gold gains also add 10x their amount as Score",
   "conspiracy": "The Vatican bank scandal",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "moon-landing-slate",
@@ -1050,7 +1050,7 @@
   ],
   "effect": "On clearing a Wave in 2 turns or less: x10 Score (early-clear tracking exists)",
   "conspiracy": "The moon landing hoax",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "tape-eraser-magnet",
@@ -1075,7 +1075,7 @@
   ],
   "effect": "On Wave clear: +2 Gold per piece in your Captured Stock",
   "conspiracy": "The alien autopsy film",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "tunguska-toothpicks",
@@ -1442,7 +1442,7 @@
   ],
   "effect": "On Capture: +1 Gold and +10 Score per piece in your Stock",
   "conspiracy": "The burning of the Library of Alexandria",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "d-b-cooper-s-parachute",
@@ -1647,7 +1647,7 @@
   ],
   "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% Score and Gold",
   "conspiracy": "The Priory of Sion",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "seed-vault-secret-hatch",
@@ -1977,7 +1977,7 @@
   ],
   "effect": "On Game Over Screen: convert all your Gold into Score at 20x rate",
   "conspiracy": "The Rapture Index",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nibiru-hide-and-seek-trophy",

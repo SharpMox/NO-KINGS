@@ -10,6 +10,12 @@ const Scenarios := preload("res://data/scenarios.gd")
 
 const BOT_STEPS := 40 # bot actions per scenario; enough to hit waves & merges
 
+## This sweep only checks "did it boot into a playable turn" and "did it
+## crash" (slice 36: check(true, ...) below asserts nothing else) — pinned by
+## default so a crash's presence/absence is reproducible, not itself a flake.
+## No scenario pins its own "seed", so every sweep gets the same one.
+const DEFAULT_SEED := 1
+
 var fails := 0
 
 
@@ -25,7 +31,11 @@ func _init() -> void:
 	var all := Scenarios.all()
 	for i in all.size():
 		var s: Dictionary = all[i]
-		GameScript.next_config = s.cfg
+		var cfg: Dictionary = s.cfg
+		if not cfg.has("seed"):
+			cfg = cfg.duplicate()
+			cfg.seed = DEFAULT_SEED
+		GameScript.next_config = cfg
 		GameScript.is_scenario = true
 		var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 		root.add_child(game)

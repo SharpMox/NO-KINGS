@@ -12,6 +12,32 @@ GODOT="${GODOT:-godot}"
 TIMEOUT="${TIMEOUT:-300}" # per-step cap: a crashed probe must not block forever
 fails=""
 
+# Fresh worktrees have no .godot/ import cache, and Godot's on-demand import
+# races with the first suite's resource loads — intermittently "Failed
+# loading resource" on item SVG icons (slice 36). Import synchronously,
+# once, up front, so every suite below runs against a warm cache. Cheap/no-op
+# on an already-warm cache (a couple of seconds).
+echo "importing assets..."
+import_log=$(mktemp)
+if ! "$GODOT" --headless --path . --import >"$import_log" 2>&1; then
+	echo "WARNING: asset import exited non-zero — resource loads below may race a stale cache"
+	tail -20 "$import_log"
+fi
+rm -f "$import_log"
+
+# The windowed click probes (menu-clicks/game-clicks) grab real window focus
+# and OS-level click routing, which another running Godot instance can
+# steal. Detect that plainly instead of retrying — a retry that hides a
+# real intermittent bug is worse than the flake.
+other_godot=""
+if [ "${1:-}" != "--headless" ]; then
+	other_godot=$(pgrep -f '[Gg]odot' 2>/dev/null || true)
+	if [ -n "$other_godot" ]; then
+		echo "WARNING: other Godot process(es) running (pid:$(printf '%s' "$other_godot" | tr '\n' ' '))"
+		echo "WARNING: menu-clicks/game-clicks need an uncontended machine — a failure below may be contention, not a regression. Close other Godot instances and re-run to confirm."
+	fi
+fi
+
 run() {
 	name="$1"; shift
 	outfile=$(mktemp)

@@ -17,11 +17,25 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
-func _init() -> void:
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3}
+## Fixtures are deterministic by default (slice 36: a flaky suite makes every
+## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
+## out — only for a test that genuinely wants variance.
+const DEFAULT_SEED := 1
+
+
+func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
+	if seed_it and not cfg.has("seed"):
+		cfg = cfg.duplicate()
+		cfg.seed = DEFAULT_SEED
+	GameScript.next_config = cfg
 	GameScript.is_scenario = true
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
+	return game
+
+
+func _init() -> void:
+	var game: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 
 	# offer shape: 3 options, self-describing, no duplicates

@@ -100,6 +100,16 @@ waiting on design calls.
 | 33 | Board & positional rules | blocked — 4 decisions |
 | 34 | Consumables & caps | blocked — 3 decisions |
 | 35 | Clock-gain choke point & turn counter | **independent** |
+| 36 | Test determinism (flaky suite) | **independent · PRIORITY** |
+| 37 | Split `test_items.gd` | **independent** |
+| 38 | Save schema versioning | **independent** |
+| 39 | Notion drift guard | **independent** |
+| 40 | Repo docs refresh | **independent** |
+
+Slices 36-40 are **engineering health** rather than game features. They exist because the
+same three problems kept costing time across this backlog: a flaky suite that makes green
+claims unfalsifiable, a 2682-line test file that collides on every merge, and doc/catalog
+drift that is silent by construction.
 
 The blocked three are parked deliberately: each would mean inventing a rule the GDD does
 not state, which is the failure mode slices 01-02 existed to clean up. Their issue files

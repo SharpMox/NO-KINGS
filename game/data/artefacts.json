@@ -988,9 +988,9 @@
    "Score",
    "Time"
   ],
-  "effect": "Every 3rd Turn: your Score and Clock gains that Turn are doubled (needs: turn counter)",
+  "effect": "Every 3rd Turn: your Score and Clock gains that Turn are doubled",
   "conspiracy": "The Black Knight satellite",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "dyatlov-geiger-counter",

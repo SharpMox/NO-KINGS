@@ -93,6 +93,10 @@ var board := {} # Vector2i -> {id, owner}
 var state := State.SETUP
 var wave := 0            # last spawned wave number
 var turns_since_wave := 0
+var turn_number := 0 # run-long counter (issue 35), incremented once at the
+	# single _begin_player_turn site — unlike turns_since_wave (reset every
+	# Wave, in _enemy_turn), this never resets; Black Knight Morse Code's
+	# "every 3rd Turn" reads it. Round-tripped through save_config.gd.
 var kings_defeated := 0  # 1 = endless unlocked; end screens show it
 var king_ids_defeated: Array = []  # roster (Kings.name_of), same order as falls
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
@@ -483,12 +487,12 @@ func _on_pass() -> void:
 			var early := maxi(_cadence() - turns_since_wave, 0)
 			if early > 0:
 				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear")
-				clock_ms += early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN
+				Economy.add_clock(self, early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN, "early_clear")
 				_add_turn_fx("CLEARED EARLY  +%d ★ · +%ds" % [
 					early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
 					early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN / 1000],
 					Color(0.95, 0.8, 0.25))
-		clock_ms += Tuning.TURN_END_CLOCK_BONUS_MS # finishing a turn buys time
+		Economy.add_clock(self, Tuning.TURN_END_CLOCK_BONUS_MS, "turn_end") # finishing a turn buys time
 		ArtefactHooks.run(self, "on_turn_end") # Shrinkflation Cereal Box (18)
 		_enemy_turn()
 
@@ -516,13 +520,20 @@ func _process(delta: float) -> void:
 		var tier_pauses := not Tuning.clock_never_pauses(next_tier) \
 				and (game_menu_open or win_open or shop_open() or drawer_open != "" or preview_open)
 		if not tier_pauses and not backgrounded:
+			# issue 35: deliberately NOT routed through Economy.add_clock/
+			# on_clock_change — this is a continuous per-frame DRAIN, not a
+			# discrete gain, and hooking it would fire on_clock_change every
+			# single frame. Direct mutation stays, on purpose; don't "finish
+			# the job" by wiring this one up too.
 			clock_ms -= delta * 1000.0
-		# Doomsday Clock Snooze Button (issue 26): the Clock ticks here every
-		# frame, continuously — no discrete hook fires on a threshold cross,
-		# so this is a direct per-frame watch, same reasoning as _held above.
+		# Doomsday Clock Snooze Button (issue 26): the THRESHOLD CROSS is
+		# watched here every frame (no discrete hook fires on one), but the
+		# actual grant below is a one-time-per-wave GAIN, guarded by
+		# doomsday_snooze_used_this_wave — routed through Economy.add_clock
+		# (issue 35) same as any other gain, unlike the drain right above.
 		if clock_ms < 30000.0 and clock_ms > 0.0 and not doomsday_snooze_used_this_wave \
 				and _held("doomsday-clock-snooze-button"):
-			clock_ms += 25000.0
+			Economy.add_clock(self, 25000.0, "doomsday_snooze")
 			doomsday_snooze_used_this_wave = true
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -557,6 +568,10 @@ func _add_turn_fx(text: String, color: Color) -> void:
 func _begin_player_turn() -> void:
 	if state == State.ENEMY_TURN: # skip on the SETUP->first-turn transition
 		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
+	turn_number += 1 # issue 35: the single increment site — save_config.gd's
+		# apply() overrides the result AFTER this call (same pattern as
+		# skip_enemy_turns there), since a resumed save must not double-count
+		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
 	actions_left = Tuning.actions_per_turn(next_tier) # Tier 5: -1 (07-difficulty-ranks)
@@ -870,7 +885,7 @@ func _end_shot() -> void:
 func _on_win_continue() -> void:
 	win_open = false
 	overlay.visible = false
-	clock_ms += Tuning.CONTINUE_CLOCK_REFILL_MS # one-time endless bonus
+	Economy.add_clock(self, Tuning.CONTINUE_CLOCK_REFILL_MS, "continue") # one-time endless bonus
 	if actions_left == 0 and state == State.PLAYER_TURN:
 		return _on_pass() # the checkmate spent the last action — resume the flow
 	_refresh()
@@ -1418,7 +1433,7 @@ func _king_down(defeated_id := "") -> bool:
 			return true
 		_show_win_screen()
 		return true
-	clock_ms += Tuning.KING_CLOCK_REFILL_MS # recurring King
+	Economy.add_clock(self, Tuning.KING_CLOCK_REFILL_MS, "king_refill") # recurring King
 	_refresh()
 	return false
 

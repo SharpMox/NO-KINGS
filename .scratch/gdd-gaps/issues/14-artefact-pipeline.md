@@ -1,6 +1,6 @@
 # 14 — Artefact catalog pipeline
 
-Status: todo
+Status: done
 
 ## Parent
 
@@ -42,3 +42,31 @@ Nothing changes mechanically this slice. It is the seam everything after it hang
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped as specced. `tools/export-game-artefacts.mjs` (mirrors `export-game-pieces.mjs`)
+derives a kebab-case key per artefact name, asserts uniqueness and asserts no collision
+with the 7 shipped keys, then writes `game/data/artefacts.json`: 180 entries, each
+`{key, name, rarity, type, bonus, effect, conspiracy, implemented}`.
+
+`game/data/items.gd`: the 7 hand-written effects are unchanged content but renamed to
+`ARTEFACT_EFFECTS_CORE` (keys untouched — saves/scenarios/shop are unaffected).
+`ARTEFACT_CATALOG` loads the 180-entry JSON (same `FileAccess` + `JSON.parse_string`
+pattern as `Rules.load_pieces()`). `ARTEFACT_EFFECTS` — the pool `shop.gd`/`box.gd`/
+`economy.gd` actually roll, sell and grant from — is `ARTEFACT_EFFECTS_CORE` plus
+whichever catalog entries are flagged `implemented`. No other `.gd` file changed.
+
+**Decision (ambiguity call):** none of the 180 catalog effect texts correspond to the 7
+shipped mechanics (checked by grep on distinctive phrases — no overlap), so all 180
+start `implemented: false`. The 7 core effects predate the Notion Artefacts DB and have
+no catalog row; they are not force-mapped onto unrelated flavour entries, since that
+would make an artefact's displayed effect text lie about what it does. The seam is real
+today: slices 16-20 flip a catalog entry's flag and add its `economy.gd` case, and the
+roll pool picks it up with no shop/box changes.
+
+`game/tests/test_assets.gd` extended: asserts the catalog has exactly 180 unique keys,
+no catalog key collides with a core key, and every `implemented: true` catalog entry has
+a matching `ARTEFACT_EFFECTS` entry (catalog/code agreement, per acceptance criteria).
+
+`game/tests/run_all.sh` — ALL GREEN (click probes + full headless suite + autoplay).

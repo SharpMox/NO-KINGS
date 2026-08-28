@@ -18,8 +18,19 @@ Multicapture (next capture hits every enemy along the move's line, in sequence) 
 attempt; this piece instead takes the attacker's tile and captures it) · Bomb (on capturing
 or being captured, destroys itself, the other piece, and everything within 1 square).
 
-**Immediate + timed (2 player turns):** Aura (adjacent allies buffed while adjacent) ·
-Smog (adjacent enemies debuffed while adjacent).
+**Immediate + timed:** Slow (movement range −1, expires end of next enemy turn) · Aura
+(adjacent allies buffed, 2 player turns) · Smog (adjacent enemies debuffed, 2 player
+turns). Slow moved here from slice 03 — see that issue's Outcome.
+
+⚠️ **Settle the magnitudes before building these three.** None are defined in the
+catalog, and slice 03 stopped rather than guess:
+
+- **"Movement range reduced by 1"** is undefined for most pieces. `moves_for` only has a
+  range limit for *rides*, and an unbounded rider has no "range − 1"; read as Chebyshev
+  distance, a Knight loses every legal move. Needs a rule that works for leapers, bounded
+  riders and unbounded riders alike.
+- **Aura's "bonus movement and/or score gain"** and **Smog's "reduced movement range and
+  capture power"** have no numbers, and "capture power" is not a stat the game has.
 
 Aura and Smog need a value for "buffed"/"debuffed" — the catalog says *bonus movement
 and/or score gain* and *reduced movement range and capture power* without numbers. Pick

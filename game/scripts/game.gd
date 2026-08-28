@@ -9,6 +9,7 @@ extends Node2D
 const Rules := preload("res://scripts/rules.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
@@ -124,12 +125,15 @@ var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 var artefacts: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
+var buff_pick_open := false # Buff Box sub-pick showing; same input block
 var pass_after_box := false # auto-pass deferred until the pick resolves
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
 var item_selected: Array[Vector2i] = [] # toggled picks of a "multi" item
+var pending_buff := "" # Buff Box: the buff chosen, waiting for its target
 var _extract_sel: Array[Vector2i] = [] # multi selection frozen at confirm
+var _buff_pick := "" # pending_buff frozen at confirm (_item_reset runs first)
 var skip_enemy_turns := 0 # Surprise Attack
 var turn_action_count := 0 # moves+placements taken this turn (artefact hook)
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
@@ -290,7 +294,7 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 		# corrupts the strip rebuild (found 2026-07-08). Real taps clear the
 		# drag in _input before this signal arrives.
 		return
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open \
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
 			or preview_open or game_menu_open or win_open:
 		return
 	# double-tap on the same stack: piece info
@@ -337,7 +341,7 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 
 
 func _on_pass() -> void:
-	if box_open or game_menu_open or win_open:
+	if box_open or buff_pick_open or game_menu_open or win_open:
 		return
 	if state == State.SETUP:
 		if hud.drawer_open != "": # setup done: full board for the run
@@ -474,6 +478,12 @@ func _run_enemy_actions() -> void:
 			return
 		if not autoplay:
 			await get_tree().create_timer(0.35).timeout
+		if board.has(act.to) and BuffLogic.repels_capture(board[act.to]):
+			# Shield works against the AI too: the attempt is spent, nothing moves
+			BuffLogic.consume(board[act.to], "shield")
+			_add_float(act.to, "Blocked", COL_MERGE)
+			queue_redraw()
+			continue
 		if board.has(act.to):
 			lost_player += 1
 			_add_pop(act.to)
@@ -489,6 +499,15 @@ func _add_slide(from: Vector2i, to: Vector2i) -> void:
 	if autoplay:
 		return
 	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0})
+
+
+## Floating label at a tile — the same anim the score popups use, for effects
+## that have no score to show (a buff landing, a capture repelled).
+func _add_float(at: Vector2i, text: String, color: Color) -> void:
+	if autoplay:
+		return
+	anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": text,
+		"at_px": _tile_px(at) + Vector2(tile, tile) / 2, "color": color})
 
 
 func _add_pop(at: Vector2i) -> void:
@@ -591,7 +610,7 @@ func _on_win_continue() -> void:
 ## a valid placement tile. Tapping (release back on the button) still selects.
 func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	var id: String = entry if entry is String else entry.id
-	if box_open or win_open or game_menu_open or preview_open:
+	if box_open or buff_pick_open or win_open or game_menu_open or preview_open:
 		return
 	if not cap and id == sanctioned_id and Economy.tariff_on(self, "sanctions"):
 		return
@@ -685,7 +704,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if preview_open or game_menu_open:
 		return # the panels' own buttons handle dismissal
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or win_open:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
 		return
 	if event is InputEventMouseMotion:
@@ -879,9 +898,26 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
 	var king_captured := false
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
+	if board.has(to) and BuffLogic.repels_capture(board[to]):
+		# GDD Pieces & Movement: a repelled attacker returns to its starting
+		# tile and nothing is captured. The attempt still costs the action.
+		BuffLogic.consume(board[to], "shield")
+		_add_float(to, "Blocked", COL_MERGE)
+		Economy.charge(self, "move_cost")
+		actions_left -= 1
+		turn_action_count += 1
+		moved_this_turn.append(from)
+		_clear_selection()
+		if actions_left == 0 and state == State.PLAYER_TURN:
+			return _on_pass()
+		return _refresh()
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
-		Economy.earn(self, Economy.capture_score(self, victim.id))
+		Economy.earn(self, Economy.capture_score(self, victim.id)
+			* BuffLogic.capture_multiplier(board[from]))
+		if BuffLogic.has(board[from], "critical"):
+			BuffLogic.consume(board[from], "critical")
+			_add_float(to, "Critical!", COL_MERGE)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if victim.id == "king": # boss piece — never enters Captured Stock
@@ -1043,6 +1079,9 @@ func _use_item(index: int) -> void:
 		items.remove_at(index)
 		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
 		return
+	if it.key == "buff_box" and pending_buff == "": # pick the buff, then the target
+		item_active = index
+		return _open_buff_pick()
 	item_active = index
 	item_stage_a = Vector2i(-1, -1)
 	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
@@ -1057,6 +1096,42 @@ func _item_reset() -> void:
 	item_stage_a = Vector2i(-1, -1)
 	item_targets = []
 	item_selected = []
+	pending_buff = ""
+
+
+## Buff Box stage 0: 3 random Piece Buffs, pick one, then target a piece.
+## The clock keeps ticking through both (GDD Box Pick).
+func _open_buff_pick() -> void:
+	var pool: Array = Items.PIECE_BUFFS.duplicate()
+	var offer := []
+	for i in mini(3, pool.size()):
+		offer.append(pool.pop_at(rng.randi() % pool.size()))
+	if autoplay: # bot: take one so the flow is exercised, never stall
+		return _buff_chosen(offer[rng.randi() % offer.size()].key)
+	buff_pick_open = true
+	modals.show_buff_pick(offer)
+
+
+func _buff_chosen(key: String) -> void:
+	buff_pick_open = false
+	modals.hide_buff_pick()
+	pending_buff = key
+	var it: Dictionary = items[item_active]
+	item_stage_a = Vector2i(-1, -1)
+	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
+	_clear_selection()
+	placing_id = ""
+	placing_cap = false
+	_refresh()
+
+
+## Backing out of the buff pick leaves the item unspent, like cancelling any
+## other targeting.
+func _buff_pick_cancelled() -> void:
+	buff_pick_open = false
+	modals.hide_buff_pick()
+	_item_reset()
+	_refresh()
 
 
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
@@ -1089,6 +1164,7 @@ func _item_click(tile: Vector2i) -> void:
 		return
 	items.remove_at(item_active)
 	var a := item_stage_a
+	_buff_pick = pending_buff # _item_reset clears it; the effect still needs it
 	_item_reset()
 	_item_apply(it, a, tile)
 
@@ -1100,6 +1176,7 @@ func _item_confirm_multi() -> void:
 	var it: Dictionary = items[item_active]
 	items.remove_at(item_active)
 	_extract_sel = item_selected.duplicate()
+	_buff_pick = pending_buff
 	_item_reset()
 	_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
 
@@ -1136,8 +1213,13 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 					var hit := b + Vector2i(dx, dy)
 					if board.has(hit) and board[hit].id != "king":
 						_destroy(hit)
-		"radar_jamming":
+		"radar_jamming": # strips the box-carrier flag AND any piece buffs
 			board[b].erase("buff")
+			BuffLogic.clear(board[b])
+		"buff_box":
+			BuffLogic.add(board[b], _buff_pick)
+			_add_float(b, BuffLogic.name_of(_buff_pick), COL_MERGE)
+			_buff_pick = ""
 		"demote":
 			board[b].id = ItemLogic.chain_base(defs, board[b].id)
 		"promote":
@@ -1448,6 +1530,8 @@ func _refresh() -> void:
 # --- modal wiring (widgets live in scripts/modals.gd; signals up, calls down) ---
 
 func _connect_modals() -> void:
+	modals.buff_chosen.connect(_buff_chosen)
+	modals.buff_pick_cancelled.connect(_buff_pick_cancelled)
 	modals.merge_confirmed.connect(func() -> void:
 		var p := pending_merge
 		pending_merge = []
@@ -1485,7 +1569,7 @@ func _connect_modals() -> void:
 ## player can reach at will. Buying is still turn-gated (Shop.can_buy), so
 ## outside your turn it is a readable catalog with dead Buy buttons.
 func _open_shop() -> void:
-	if box_open or preview_open or win_open: # one modal at a time
+	if box_open or buff_pick_open or preview_open or win_open: # one modal at a time
 		return
 	modals.show_shop()
 

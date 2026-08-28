@@ -35,6 +35,8 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 		match key:
 			"blitz": # only a piece that already moved needs a second move
 				return own and moved.has(pos)
+			"buff_box": # GDD: ally or enemy — the choice is the point
+				return occupied and not king
 			"demote":
 				return occupied and not king \
 					and chain_base(defs, board[pos].id) != board[pos].id
@@ -48,8 +50,9 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return enemy and not king and Rules.is_attacked(board, pos, Rules.PLAYER, defs)
 			"asset_recovery":
 				return occupied and not king
-			"radar_jamming":
-				return occupied and board[pos].get("buff", false)
+			"radar_jamming": # box-carrier flag or any piece buff
+				return occupied and (board[pos].get("buff", false)
+					or not board[pos].get("buffs", []).is_empty())
 			"tactical_reposition", "decoy_swap":
 				return occupied and not king
 			"rapid_deployment":

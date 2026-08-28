@@ -38,8 +38,14 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
-		if p.size() > 4 and p[4] == "buff":
-			piece.buff = true
+		# slot 4 is the piece's non-positional state. Legacy saves and the
+		# scenario table write the bare string "buff" (box carrier); anything
+		# richer — piece buffs — travels as a Dictionary merged in whole.
+		if p.size() > 4:
+			if typeof(p[4]) == TYPE_STRING:
+				piece.buff = true
+			elif typeof(p[4]) == TYPE_DICTIONARY:
+				piece.merge(p[4], true)
 		g.board[Vector2i(int(p[2]), int(p[3]))] = piece
 	for key in cfg.get("items", []):
 		for it in Items.ITEMS:
@@ -67,8 +73,11 @@ static func to_config(g) -> Dictionary:
 	var b := []
 	for pos in g.board:
 		var row := [g.board[pos].id, g.board[pos].owner, pos.x, pos.y]
-		if g.board[pos].get("buff", false):
-			row.append("buff")
+		var extra: Dictionary = g.board[pos].duplicate(true)
+		extra.erase("id")
+		extra.erase("owner")
+		if not extra.is_empty(): # box-carrier flag and/or piece buffs
+			row.append(extra)
 		b.append(row)
 	var keys_of := func(arr: Array) -> Array:
 		var out := []

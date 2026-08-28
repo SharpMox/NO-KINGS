@@ -21,7 +21,16 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
-func _boot(cfg: Dictionary) -> Node2D:
+## Fixtures are deterministic by default (slice 36: a flaky suite makes every
+## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
+## out — only for a test that genuinely wants variance.
+const DEFAULT_SEED := 1
+
+
+func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
+	if seed_it and not cfg.has("seed"):
+		cfg = cfg.duplicate()
+		cfg.seed = DEFAULT_SEED
 	GameScript.next_config = cfg
 	GameScript.is_scenario = true # never touch the real save
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()

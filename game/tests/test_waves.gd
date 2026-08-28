@@ -19,6 +19,23 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## Fixtures are deterministic by default (slice 36: a flaky suite makes every
+## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
+## out — only for a test that genuinely wants variance.
+const DEFAULT_SEED := 1
+
+
+func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
+	if seed_it and not cfg.has("seed"):
+		cfg = cfg.duplicate()
+		cfg.seed = DEFAULT_SEED
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	return game
+
+
 func _init() -> void:
 	check(Waves.WAVES.size() == 150, "150 designed waves")
 
@@ -61,11 +78,7 @@ func _init() -> void:
 
 	# --- early-clear bonus: emptying the board before the next wave pays out
 	# score + clock scaled by the turns to spare, once per wave (2026-07-07) ---
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
-		"wave": 2}
-	GameScript.is_scenario = true
-	var g: Node2D = load("res://scenes/Game.tscn").instantiate()
-	root.add_child(g)
+	var g: Node2D = _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]], "wave": 2})
 	await process_frame
 	await process_frame
 	var clock0: float = g.clock_ms
@@ -87,11 +100,8 @@ func _init() -> void:
 	await process_frame
 
 	# --- reinforcement shop: queues after waves 10/20/30/40, bot buys in ---
-	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 10, "score": 300}
-	GameScript.is_scenario = true
-	var r: Node2D = load("res://scenes/Game.tscn").instantiate()
-	root.add_child(r)
+	var r: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 10, "score": 300})
 	await process_frame
 	await process_frame
 	r._queue_wave(11)

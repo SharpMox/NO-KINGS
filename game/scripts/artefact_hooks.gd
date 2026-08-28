@@ -84,8 +84,9 @@
 ## Crystal is the one action-granting handler that runs mid-turn (on_capture,
 ## not on_turn_start) — it fires from Economy.capture_score *before*
 ## _move_player's own actions_left -= 1 / auto-pass check, the same ordering
-## that lets the Blitz item (game.gd _item_apply) refund its own action
-## without ever resurrecting an already-ended turn. Covered by test_items.gd
+## that lets the Blitz item's free-move flag (game.gd _move_player, checked
+## before that decrement) skip it without ever resurrecting an already-ended
+## turn. Covered by test_items.gd
 ## ("Stargate Divination Crystal refunds the capture's action before the
 ## auto-pass check").
 ##
@@ -1162,8 +1163,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["stargate-divination-crystal", "on_capture"]:
 			# Fires from Economy.capture_score, BEFORE the capture's own
 			# actions_left -= 1 / auto-pass check runs (game.gd _move_player)
-			# — same ordering that lets Blitz refund its own action without
-			# ever resurrecting an already-ended turn. actions_max moves too,
+			# — same ordering that lets Blitz's free-move flag skip that
+			# decrement without ever resurrecting an already-ended turn. actions_max moves too,
 			# mirroring first_capture_extra (its on_capture sibling above),
 			# since turn start already happened and won't re-sync it for us.
 			if g.turn_action_count == 0:

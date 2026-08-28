@@ -476,8 +476,10 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	# Blitz is targeted now (Notion 2026-08-27), so the queen has to move
-	# before there is anything to spend it on
+	# Blitz rework (Notion 2026-08-28): targets ANY own piece, moved or not,
+	# costs 0 actions itself, and marks the target's next move/capture free.
+	# Move the queen first so this probe also covers the already-moved case
+	# (Blitz lifting the one-move-per-piece lock).
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
@@ -495,12 +497,20 @@ func _init() -> void:
 		"item clickable in the inventory drawer")
 	await process_frame
 	check(game.item_targets.size() == 1 and game.item_targets[0] == Vector2i(2, 4),
-		"Blitz only offers the piece that already moved")
+		"Blitz offers the queen (its only own piece), whether moved or not")
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.items.is_empty() and not game.moved_this_turn.has(Vector2i(2, 4))
 			and game.actions_left == inv_acts,
-		"Blitz frees the target to move again and refunds its own action")
+		"Blitz costs 0 actions and lifts the one-move-per-piece lock on the already-moved target")
+	check(game.board[Vector2i(2, 4)].get("blitz_free_move", false),
+		"the target's next move is flagged free")
+	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 5)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(Vector2i(2, 5)) and game.actions_left == inv_acts,
+		"the freed second move genuinely happens and still costs no action")
 
 	# Drone Strike: area targeting by real clicks — anchor previews the 3x3,
 	# tapping the anchor again confirms the wipe (rework-items/02)

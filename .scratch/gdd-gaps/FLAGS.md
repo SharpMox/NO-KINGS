@@ -66,9 +66,10 @@ found. Collected here so they are not lost in Outcome sections:
   a real GDD/code mismatch. Those artefacts currently hook `on_wave_clear` and check
   `g.wave % 5` directly.
 - Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
-- **Tier 5 kills Blitz outright.** With one action per turn, the move spends the turn before
-  Blitz's already-moved target filter can ever match. Measured, not theorised; flagged rather
-  than compensated for, since the tier spec calls for a flat action cut.
+- ~~**Tier 5 kills Blitz outright.**~~ Resolved by the Blitz rework
+  (`fix/blitz-and-crypto-wallet`, 2026-08-28, user call): Blitz itself now costs 0 actions
+  and the target's next move/capture is free, so it no longer depends on the 2-actions/turn
+  math this flag was measuring against.
 - **Tier 5 may simply be too harsh.** 24-run sweep: median survival wave 38.5 -> 9.5, 0/24
   wins, every loss to resource starvation. That is the measurement, not a verdict — a top
   tier is allowed to be brutal, but it wants a play test before it is called balanced.

@@ -22,8 +22,8 @@ signal shop_closed
 signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
-signal buff_chosen(key: String)
-signal buff_pick_cancelled
+signal choice_chosen(value)
+signal choice_pick_cancelled
 
 var g # the Game node — read-only from here; mutations go up via signals
 
@@ -36,7 +36,9 @@ var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
 const SHOP_TILE := 46.0 # matches the pool-strip icon size (hud.gd) for visual rhythm
 var tariff_panel: PanelContainer # tariff detail overlay
-var buff_panel: PanelContainer # Buff Box sub-pick (3 Piece Buffs)
+var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
+	# for its first caller, the Buff Box sub-pick — never renamed, since it's
+	# just the panel field, not a Buff-specific behaviour
 
 
 func build(game) -> void:
@@ -630,9 +632,14 @@ func _box_vbox(title_text: String) -> VBoxContainer:
 	return box
 
 
-## Buff Box stage 0 — pick 1 of 3 Piece Buffs, then the board takes over for
-## targeting. Cancel leaves the item unspent, so there is no consolation here.
-func show_buff_pick(offer: Array) -> void:
+## Generic "choose 1 of N, then continue" modal (issue 41). `offers` are
+## Dictionaries with `label` (button text) and `value` (emitted via
+## `choice_chosen` when picked) — this modal doesn't know what a caller does
+## with the pick, only how to show options and report back. First caller was
+## the Buff Box sub-pick (pick 1 of 3 Piece Buffs, then the board takes over
+## for targeting); cancelling leaves the triggering effect unspent, so there
+## is no consolation here — same for every caller after it.
+func show_choice_pick(header: String, offers: Array, cancel_text: String) -> void:
 	if buff_panel:
 		buff_panel.queue_free()
 	buff_panel = PanelContainer.new()
@@ -646,27 +653,27 @@ func show_buff_pick(offer: Array) -> void:
 	box.add_theme_constant_override("separation", 12)
 	center.add_child(box)
 	var head := Label.new()
-	head.text = "\u2726 Buff Box \u2014 pick a Piece Buff:"
+	head.text = header
 	head.add_theme_font_size_override("font_size", 22)
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(head)
-	for b in offer:
+	for o in offers:
 		var btn := Button.new()
-		btn.text = "%s \u2014 %s\n%s" % [b.name, b.tier, b.description]
+		btn.text = str(o.label)
 		btn.add_theme_font_size_override("font_size", 16)
 		btn.custom_minimum_size = Vector2(420, 0)
-		var key: String = b.key
-		btn.pressed.connect(func() -> void: buff_chosen.emit(key))
+		var value = o.value
+		btn.pressed.connect(func() -> void: choice_chosen.emit(value))
 		box.add_child(btn)
 	var cancel := Button.new()
-	cancel.text = "Cancel (keeps the item)"
-	cancel.pressed.connect(func() -> void: buff_pick_cancelled.emit())
+	cancel.text = cancel_text
+	cancel.pressed.connect(func() -> void: choice_pick_cancelled.emit())
 	box.add_child(cancel)
 	g.hud.add_child(buff_panel)
 	buff_panel.move_to_front()
 
 
-func hide_buff_pick() -> void:
+func hide_choice_pick() -> void:
 	if buff_panel:
 		buff_panel.queue_free()
 		buff_panel = null

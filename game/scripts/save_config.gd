@@ -1,6 +1,27 @@
 ## Run-state serialization: the config Dictionary a save restores from and a
 ## scenario boots from — over the live game node `g` (split out of game.gd;
 ## the shape is documented in data/scenarios.gd).
+##
+## SCHEMA VERSIONING (issue 38). Every save carries `save_version`; a save
+## without one is version 0, which is every save written before 2026-08-28.
+##
+## The policy, so the next field does not need this reasoned out again:
+##
+##   ADDITIVE — a new field with a sensible default. Read it with
+##   `cfg.get("field", default)` and DO NOT bump the version. Old saves keep
+##   loading because the default is correct for them. Almost every field this
+##   file has gained works this way (seed, rank, turn_number, per-artefact
+##   acquired_wave/rarity, the per-piece capture ledger).
+##
+##   MIGRATING — a field whose MEANING or SHAPE changed, so an old value would
+##   be silently misread. That needs a bump plus an entry in `_MIGRATIONS`,
+##   because a default cannot repair it. There are none yet; the table is here
+##   so the first one has an obvious home rather than becoming another ad-hoc
+##   guard scattered through apply().
+##
+## The distinction matters: an additive field that is read with a default is
+## safe forever, but a reshaped field read with a default is a silent
+## corruption. If unsure which you have, it is migrating.
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
@@ -9,10 +30,33 @@ const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
+## Bumped ONLY for a migrating change (see the header). Additive fields do not
+## bump it.
+const SAVE_VERSION := 1
+
+## version -> Callable(cfg) that reshapes a save of that version into the next
+## one. Applied in order, so a v0 save walks every step up to SAVE_VERSION.
+## Empty on purpose: nothing has needed reshaping yet.
+const _MIGRATIONS := {}
+
+
+## Walk a loaded config up to SAVE_VERSION. A config with no `save_version` is
+## version 0 — every save written before the field existed.
+static func migrate(cfg: Dictionary) -> Dictionary:
+	var v: int = int(cfg.get("save_version", 0))
+	while v < SAVE_VERSION:
+		if _MIGRATIONS.has(v):
+			cfg = _MIGRATIONS[v].call(cfg)
+		v += 1
+	cfg["save_version"] = SAVE_VERSION
+	return cfg
+
+
 ## Start the game from a config Dictionary instead of the normal SETUP flow.
 ## Every field of run state is settable — the same mechanism a saved game
 ## will restore from.
 static func apply(g, cfg: Dictionary) -> void:
+	cfg = migrate(cfg)
 	g.stock = cfg.get("stock", []).duplicate()
 	g.captured = cfg.get("captured", []).duplicate()
 	g.score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
@@ -124,6 +168,7 @@ static func to_config(g) -> Dictionary:
 			# and rarity (issue 29) — the catalog fallback covers an in-memory
 			# entry that predates the stamp, same as apply()'s own fallback
 	return {
+		"save_version": SAVE_VERSION,
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,
 		"tariffs": keys_of.call(g.tariffs_active), "tariffs_seen": g.tariffs_seen.duplicate(),

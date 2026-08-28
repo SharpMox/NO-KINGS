@@ -158,6 +158,35 @@ func _init() -> void:
 	b = {Vector2i(2, 7): piece("king", Rules.ENEMY), Vector2i(4, 5): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
 	check(act.from == Vector2i(4, 5), "King stays put; escort advances")
+
+	# --- protect the King (GDD Rule 2) ---
+	# Not in check (the knight's leap set is [(1,9),(1,5),(2,8),(2,6)], never
+	# (2,9)) but it covers (1,9) and (2,8), both adjacent to the King: a
+	# reposition-then-capture combo away. A juicier, non-threatening queen
+	# is also up for grabs — the King guard must win over best-trade.
+	b = {
+		Vector2i(2, 9): piece("king", Rules.ENEMY),
+		Vector2i(0, 7): piece("knight", Rules.PLAYER),
+		Vector2i(0, 3): piece("rook", Rules.ENEMY),
+		Vector2i(5, 3): piece("queen", Rules.PLAYER),
+		Vector2i(5, 6): piece("rook", Rules.ENEMY),
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.from == Vector2i(0, 3) and act.to == Vector2i(0, 7),
+		"King guard: neutralise the piece threatening it over a bigger, safe trade")
+	# No enemy piece can reach the threat — the King retreats out of its range.
+	b = {
+		Vector2i(2, 9): piece("king", Rules.ENEMY),
+		Vector2i(0, 7): piece("knight", Rules.PLAYER),
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.from == Vector2i(2, 9), "King guard: retreats when the threat can't be captured")
+	var after := b.duplicate(true)
+	after[act.to] = after[act.from]
+	after.erase(act.from)
+	check(Rules._king_threats(after, act.to, defs).is_empty(),
+		"King guard: the retreat square is actually out of the knight's reach")
+
 	# Back-row commitment: a lone rook at row 1 holds out of row 0...
 	b = {Vector2i(3, 1): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)

@@ -6,6 +6,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 ## Gold cost charged when a tariffed action happens.
@@ -36,24 +37,9 @@ static func gain(g, amount: int) -> int:
 
 static func capture_score(g, victim_id: String) -> int:
 	var base: int = g.defs[victim_id].value
-	var pts := base
-	for t in g.artefacts: # run-long passives (stack per copy)
-		match t.key:
-			"greed":
-				if victim_id == "pawn":
-					pts += 10
-			"score":
-				pts += 10
-			"bounty":
-				if base >= 50:
-					pts += 30
-			"lifesteal":
-				g.clock_ms += 2000
-			"first_capture_extra":
-				if g.turn_action_count == 0:
-					g.actions_left += 1
-					g.actions_max += 1
-	return pts
+	var ctx := ArtefactHooks.run(g, "on_capture",
+		{"victim_id": victim_id, "base": base, "pts": base})
+	return ctx.pts
 
 
 ## Persist the finished run to the local high scores; returns its all-time

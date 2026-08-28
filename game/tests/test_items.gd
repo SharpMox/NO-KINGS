@@ -604,6 +604,29 @@ func _init() -> void:
 	bt.queue_free()
 	await process_frame
 
+	# --- artefact trigger engine (slice 15): stacking is additive per copy,
+	# and the result never depends on acquisition order
+	var stack := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["greed", "greed"]})
+	await process_frame
+	var pawn_base: int = stack.defs.pawn.value
+	check(Economy.capture_score(stack, "pawn") == pawn_base + 20,
+		"two Greeds stack additively (+10 each), not multiplicatively")
+	stack.queue_free()
+	await process_frame
+
+	var order_a := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["greed", "score", "bounty"]})
+	await process_frame
+	var order_b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bounty", "score", "greed"]})
+	await process_frame
+	check(Economy.capture_score(order_a, "pawn") == Economy.capture_score(order_b, "pawn"),
+		"capture score is independent of artefact acquisition order")
+	order_a.queue_free()
+	order_b.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

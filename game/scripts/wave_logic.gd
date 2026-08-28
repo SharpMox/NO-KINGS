@@ -7,6 +7,7 @@ const Waves := preload("res://data/waves.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const Kings := preload("res://data/kings.gd")
 const Economy := preload("res://scripts/economy.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 
 static func queue(g, n: int) -> void:
@@ -40,10 +41,8 @@ static func queue(g, n: int) -> void:
 	elif Tariffs.SCHEDULE.has(n):
 		Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
-		var refill: float = Tuning.CLOCK_REFILL_MS
-		for t in g.artefacts:
-			if t.key == "timer":
-				refill += 5000
+		var ctx := ArtefactHooks.run(g, "on_milestone", {"refill": Tuning.CLOCK_REFILL_MS})
+		var refill: float = ctx.refill
 		if Economy.tariff_on(g, "recession"):
 			refill *= 0.5
 		g.clock_ms += refill

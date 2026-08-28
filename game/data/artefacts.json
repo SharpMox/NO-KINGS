@@ -684,7 +684,7 @@
   ],
   "effect": "Mild Tariffs don't affect you (needs: tariff filtering)",
   "conspiracy": "The Panama Papers",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "silk-road-coupon",
@@ -977,7 +977,7 @@
   ],
   "effect": "Your Gold gains ignore Inflation and other gold-reducing Tariffs",
   "conspiracy": "The lost Amber Room",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "black-knight-morse-code",
@@ -1610,7 +1610,7 @@
   ],
   "effect": "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone (needs: tariff cancel)",
   "conspiracy": "The sale of indulgences",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "pied-piper-s-rat-census",
@@ -1817,7 +1817,7 @@
   ],
   "effect": "Tariff penalties are reduced by 50% (needs: tariff scaling)",
   "conspiracy": "The Ark of the Covenant",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "moscovium-glow-stick",

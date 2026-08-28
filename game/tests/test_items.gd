@@ -1614,6 +1614,62 @@ func _init() -> void:
 	zodiac.queue_free()
 	await process_frame
 
+	# --- issue 22: tariff interception (Panama Papers Shredder, Amber Room
+	# Bubble Wrap, Ark Grounding Cable, Salvation Gift Card) ---
+	var panama := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 500, "artefacts": ["panama-papers-shredder"],
+		"tariffs": ["move_cost", "deploy_cost"]})
+	await process_frame
+	var g0: int = panama.gold
+	Economy.charge(panama, "move_cost")
+	check(panama.gold == g0, "Panama Papers Shredder: a Mild Tariff (move_cost) doesn't charge you")
+	Economy.charge(panama, "deploy_cost")
+	check(panama.gold == g0 - Tuning.TARIFF_ACTION_COST,
+		"Panama Papers Shredder: a Moderate Tariff (deploy_cost) still charges you")
+	panama.queue_free()
+	await process_frame
+
+	var panama2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "artefacts": ["panama-papers-shredder"], "tariffs": ["inflation"]})
+	await process_frame
+	Economy.earn(panama2, 100)
+	check(panama2.gold == 100, "Panama Papers Shredder: Inflation (Mild) doesn't reduce Gold gains")
+	panama2.queue_free()
+	await process_frame
+
+	var amber := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "artefacts": ["amber-room-bubble-wrap"], "tariffs": ["inflation"]})
+	await process_frame
+	Economy.earn(amber, 100)
+	check(amber.gold == 100, "Amber Room Bubble Wrap: ignores Inflation's Gold-gain reduction")
+	amber.queue_free()
+	await process_frame
+
+	var ark := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 500, "artefacts": ["ark-grounding-cable"], "tariffs": ["move_cost"]})
+	await process_frame
+	var g_ark: int = ark.gold
+	Economy.charge(ark, "move_cost")
+	check(ark.gold == g_ark - roundi(Tuning.TARIFF_ACTION_COST * 0.5),
+		"Ark Grounding Cable: Tariff penalties reduced by 50%")
+	ark.queue_free()
+	await process_frame
+
+	var salvation := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 0, "artefacts": ["salvation-gift-card"]})
+	await process_frame
+	Economy.activate_tariff_by_key(salvation, "sanctions")
+	check(salvation.tariffs_active.is_empty() and salvation.sanctioned_id == "",
+		"Salvation Gift Card: the first Tariff applied is cancelled")
+	check(not salvation.salvation_charged, "Salvation Gift Card: spent after cancelling")
+	Economy.activate_tariff_by_key(salvation, "regulation")
+	check(salvation.tariffs_active.size() == 1 and salvation.tariffs_active[0].key == "regulation",
+		"Salvation Gift Card: a second Tariff applies normally once spent")
+	WaveLogic.queue(salvation, 6) # clears wave 5 (5-Wave Milestone): recharges
+	check(salvation.salvation_charged, "Salvation Gift Card: recharges at the 5-Wave Milestone")
+	salvation.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

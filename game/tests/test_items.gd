@@ -2116,6 +2116,29 @@ func _init() -> void:
 	order_2.queue_free()
 	await process_frame
 
+	# --- 07-difficulty-ranks: Tier 5's -1 action/turn interacts with Blitz,
+	# which refunds its own action precisely so move+Blitz doesn't leave 0 at
+	# the normal 2 actions/turn. At 1 action/turn the halving removes the
+	# second action Blitz relies on entirely: the move alone spends the
+	# turn's only action and auto-passes before Blitz's own target filter
+	# (a piece that already moved this turn) is ever reachable — Blitz is
+	# dead at Tier 5, not merely weaker. Documented here, not "fixed": the
+	# tier spec calls for a flat action cut, not item-specific compensation.
+	GameScript.next_tier = "Tier 5"
+	var bz := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz"]})
+	await process_frame
+	check(bz.actions_left == 1, "Tier 5 grants exactly 1 action at turn start")
+	bz._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(bz.state != bz.State.PLAYER_TURN,
+		"the turn's only action auto-passes on the first move, before Blitz can target it")
+	bz._use_item(0)
+	check(bz.item_active == -1,
+		"Blitz never arms post-move at Tier 5 — can't fire the interaction it was tuned for")
+	bz.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

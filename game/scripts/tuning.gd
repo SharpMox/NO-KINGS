@@ -149,11 +149,45 @@ const ARMIES := {
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 
-# Difficulty ranks (07-difficulty-ranks, decided 2026-08-28): picked pre-run,
-# locked for the run (Continue into endless keeps it), NOT a leaderboard
-# weight — comfort only. Officer/Autocrat both disable the Shop clock-pause
-# and shift tariffs one tier harsher (binary levers — a pause is on or off);
-# starting Stock size is the one lever that scales per rank, trimming the
-# rank's RANKS index worth of pieces off the front of the army.
-const RANKS := ["Citizen", "Officer", "Autocrat"]
-const DEFAULT_RANK := "Citizen"
+# Difficulty tiers (07-difficulty-ranks, redesigned 2026-08-28 — user call):
+# 5 numbered tiers, picked pre-run, locked for the run (Continue into
+# endless keeps it), NOT a leaderboard weight — comfort only. Levers are
+# CUMULATIVE: each tier is the one below plus one more. Tier 1 is the
+# default and has no debuffs.
+#   2: the Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)
+#   3: Shop stocks 1 fewer of each kind
+#   4: starting Stock halved per piece type, rounding up (singletons survive)
+#   5: -1 action per turn
+const TIERS := ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5"]
+const DEFAULT_TIER := TIERS[0]
+
+static func tier_index(tier: String) -> int:
+	var i := TIERS.find(tier)
+	return i if i >= 0 else 0 # unrecognized/old-save value falls back to baseline
+
+static func clock_never_pauses(tier: String) -> bool:
+	return tier_index(tier) >= 1
+
+static func shop_row_delta(tier: String) -> int:
+	return -1 if tier_index(tier) >= 2 else 0
+
+static func actions_per_turn(tier: String) -> int:
+	return ACTIONS_PER_TURN - (1 if tier_index(tier) >= 4 else 0)
+
+## Starting Stock: Tier 4+ halves each distinct piece type, rounding UP so
+## singletons survive — e.g. Crown's 8 pawns -> 4, its lone rook stays 1.
+static func starting_stock(army: String, tier: String) -> Array:
+	var base: Array = ARMIES[army]
+	if tier_index(tier) < 3:
+		return base.duplicate()
+	var counts := {}
+	for id in base:
+		counts[id] = counts.get(id, 0) + 1
+	var out := []
+	for id in base: # preserve first-occurrence order
+		if not counts.has(id):
+			continue
+		for i in ceili(counts[id] / 2.0):
+			out.append(id)
+		counts.erase(id)
+	return out

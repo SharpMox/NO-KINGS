@@ -7,9 +7,9 @@
   "bonus": [
    "Score"
   ],
-  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 Score (needs: streak tracking)",
+  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 Gold (issue 16: Score is up-only, so this penalty debits Gold instead)",
   "conspiracy": "The 27 Club",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "tinfoil-hat",
@@ -93,9 +93,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Every 5th Shop purchase: free (needs: purchase counter)",
+  "effect": "Every 5th Shop purchase: free",
   "conspiracy": "The Hot Lotto fraud",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "tungsten-filled-gold-bar",
@@ -386,9 +386,9 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On Wave clear: the last piece you lost this Wave returns to your Stock (needs: loss tracking + stock return)",
+  "effect": "On Wave clear: the last piece you lost this Wave returns to your Stock",
   "conspiracy": "The frozen Walt Disney legend",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "pandemic-toilet-paper-pallet",
@@ -657,9 +657,9 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; Captures give +25% more Gold (needs: spawn modifier)",
+  "effect": "Enemy Waves spawn +1 extra piece; Captures give +25% more Gold",
   "conspiracy": "The lab leak question",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "azimuthal-pancake-map",
@@ -779,9 +779,9 @@
   "bonus": [
    "Time"
   ],
-  "effect": "The first time the Clock drops below 30s each Wave: +25s Clock (needs: threshold hook)",
+  "effect": "The first time the Clock drops below 30s each Wave: +25s Clock",
   "conspiracy": "The Doomsday Clock",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "scientology-e-meter",
@@ -1307,9 +1307,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Enemy Waves spawn 1 fewer piece (needs: spawn modifier)",
+  "effect": "Enemy Waves spawn 1 fewer piece",
   "conspiracy": "Birds Aren't Real",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "33rd-degree-fidelity-card",
@@ -1427,9 +1427,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On 5-Wave Milestone: open a free Box (needs: box grant)",
+  "effect": "On 5-Wave Milestone: open a free Box",
   "conspiracy": "The Trojan Horse",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "library-of-alexandria-matchbox",
@@ -1572,9 +1572,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Shop purchases can take your Gold negative, down to -100 (needs: credit system)",
+  "effect": "Shop purchases can take your Gold negative, down to -100",
   "conspiracy": "The Hollow Earth",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "polybius-cartridge",
@@ -1684,7 +1684,7 @@
   ],
   "effect": "While the Clock is under 60s: using Items doesn't spend an Action",
   "conspiracy": "The nuclear football",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "i-am-not-a-robot-checkbox",
@@ -1731,9 +1731,9 @@
    "Score",
    "Gold"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold (needs: spawn modifier)",
+  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold",
   "conspiracy": "HAARP",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "zeta-reticuli-souvenir-map",
@@ -1852,9 +1852,9 @@
   "bonus": [
    "Action"
   ],
-  "effect": "On reaching exactly 0 Gold: +2 Actions that Turn (needs: gold threshold hook)",
+  "effect": "On reaching exactly 0 Gold: +2 Actions that Turn",
   "conspiracy": "Zero-point energy",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "45-5-carat-curse",
@@ -1951,9 +1951,9 @@
   "bonus": [
    "Action"
   ],
-  "effect": "Deploying doesn't spend an Action (needs: free-deploy rule)",
+  "effect": "Deploying doesn't spend an Action",
   "conspiracy": "Hitler survival theories",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "alien-rocket-toy",
@@ -1999,9 +1999,9 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On Wave clear: the first piece you lost that Wave returns to your Stock (needs: per-wave loss tracking)",
+  "effect": "On Wave clear: the first piece you lost that Wave returns to your Stock",
   "conspiracy": "Elvis lives",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "y2k-patch-floppy-disk",
@@ -2107,9 +2107,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "You may Deploy onto any empty square (needs: free deploy placement)",
+  "effect": "You may Deploy onto any empty square",
   "conspiracy": "The Nazca Lines",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "zapruder-s-director-s-cut",
@@ -2192,8 +2192,8 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On buying a Piece: a second copy joins your Stock; once per 5-Wave Milestone (needs: piece duplication)",
+  "effect": "On buying a Piece: a second copy joins your Stock; once per 5-Wave Milestone",
   "conspiracy": "The searches for Noah's Ark",
-  "implemented": false
+  "implemented": true
  }
 ]

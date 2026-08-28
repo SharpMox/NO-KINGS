@@ -162,6 +162,17 @@ static func all() -> Array:
 				"ark-grounding-cable", "salvation-gift-card"],
 			"tariffs": ["move_cost", "inflation", "deploy_cost"],
 			"gold": 200, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: economy & Box batch (issue 26)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
+			"artefacts": ["haarp-volume-knob", "wuhan-vial-label", "pigeon-charging-cable",
+				"pre-scratched-lottery-ticket", "hitler-s-argentinian-passport",
+				"nazca-boarding-pass", "nuclear-football-menu", "ark-s-bunkbed",
+				"trojan-horse-assembly-manual", "jon-burrows-fake-id",
+				"walt-s-cryonic-capsule", "27-club-punch-card",
+				"doomsday-clock-snooze-button", "zero-point-energy-drink",
+				"agartha-welcome-mat"],
+			"items": ["counter_intel"],
+			"gold": 200, "wave": 4, "stock": ["pawn"], "clock_s": 40.0}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

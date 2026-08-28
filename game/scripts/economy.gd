@@ -23,9 +23,22 @@ static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> v
 	var ctx := ArtefactHooks.run(g, "on_charge",
 		{"key": key, "charged": false, "base": float(amount), "amount": float(amount)})
 	if ctx.charged:
-		var charged_amount := roundi(ctx.amount)
-		g.gold = maxi(g.gold - charged_amount, 0)
+		var charged_amount := roundi(ctx.amount) # issue 22: Ark Grounding Cable scales this
+		spend_gold(g, charged_amount) # issue 26: floor + on_gold_zero (Zero-Point Energy Drink)
 		ArtefactHooks.run(g, "on_tariff_charge", {"key": key, "amount": charged_amount})
+
+
+## Debit gold, floored at `floor_at` (0 for every call site here; Shop.buy
+## passes a negative floor for Agartha Welcome Mat's credit line — it can't
+## call this directly, shop.gd would cycle back through this file's own
+## `const Shop` preload, so it inlines the same 3 lines instead — see there).
+## Zero-Point Energy Drink (issue 26) watches every debit for landing exactly
+## on 0 (and not already there before this spend) — +2 Actions that Turn.
+static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
+	var before: int = g.gold
+	g.gold = maxi(g.gold - amount, floor_at)
+	if before > 0 and g.gold == 0:
+		ArtefactHooks.run(g, "on_gold_zero", {})
 
 
 ## Award a gain: score counts the raw amount (up-only performance metric),

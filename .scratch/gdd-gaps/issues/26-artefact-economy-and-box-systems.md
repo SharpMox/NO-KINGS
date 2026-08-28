@@ -1,6 +1,6 @@
 # 26 — Artefacts: economy, Shop, Box and misc small systems
 
-Status: todo
+Status: done (partial — 15 of ~39 rows; see Outcome)
 
 ## Parent
 
@@ -61,17 +61,164 @@ that doesn't exist yet.
 
 ## Acceptance criteria
 
-- [ ] Re-group this table at pickup time — several rows (box reroll pair,
+- [x] Re-group this table at pickup time — several rows (box reroll pair,
       loss-tracking pair, spawn-modifier trio, choice-UI trio) are cheap
       once their ONE shared prerequisite lands; don't reopen each as a
-      separate design question
+      separate design question — done for the spawn-modifier trio and the
+      loss-tracking pair (both shipped, see Outcome); the box-reroll pair and
+      choice-UI trio's shared prerequisite is a new UI affordance, which
+      stayed out of scope this pass (see Outcome) — still one triage
+      decision each, not reopened individually
 - [ ] "Shop visit" is retired — Notion ruling needed before Pandemic Toilet
-      Paper Pallet or Jet Fuel Vial are touched at all
+      Paper Pallet or Jet Fuel Vial are touched at all — still open, neither
+      touched
 - [ ] Dark Market Light Bulb: Notion ruling on whether "Demoted" is
-      trackable state or a text change
-- [ ] Scenario coverage, `run_all.sh` all green
+      trackable state or a text change — still open, not touched
+- [x] Scenario coverage, `run_all.sh` all green — see Outcome
 
 ## Blocked by
 
 - 15 — trigger engine
 - 19 — Special + prereq triage (this file is one of its splits)
+
+## Outcome
+
+15 of the ~39 rows shipped (`implemented: true`, wired in
+`game/scripts/artefact_hooks.gd`); the rest stayed `false` — either a new
+player-facing UI affordance (button, modal, alt payment path) that this pass
+didn't build, or a genuine ambiguity that belongs on Notion, not guessed into
+code. Quality over count, per the slice brief.
+
+### Shipped (15)
+
+- **Spawn-roster trio** (on_wave_roster, already wired for Trade War — issue
+  13's own prerequisite, not a new one): HAARP Volume Knob (+1 piece, +200
+  Score/+15 Gold on Wave clear), Wuhan Vial Label (+1 piece, +25% Gold on
+  Capture off the capture's own base), Pigeon Charging Cable (-1 piece,
+  floored so a Wave never spawns zero non-King pieces).
+- **Shop purchase counter**: Pre-Scratched Lottery Ticket. The "every 5th
+  purchase free" text is an absolute override applied after Shop.price's
+  on_price composition finishes, not a percentage handler inside it — a
+  later-sorting discount artefact adding to a forced-to-0 `ctx.amount` would
+  go negative (see the comment in `shop.gd:price`).
+- **Free-deploy / free placement**: Hitler's Argentinian Passport
+  (`on_deploy` grew `ctx.skip_action`), Nazca Boarding Pass (no hook — a
+  standing rule read off `g.artefacts` in a new `game.gd:_deploy_tiles`
+  helper, the same no-hook pattern chocolate-key-cake already uses).
+- **Cost exemption**: Nuclear Football Menu — a single call site
+  (`_item_apply`'s action-cost line), no hook needed.
+- **Per-frame threshold watch**: Doomsday Clock Snooze Button. The Clock
+  ticks in `_process` every frame, continuously — no discrete hook fires on
+  a threshold cross, so this is a direct watch (`_held` + a per-Wave "already
+  spent" flag) at that one call site, same no-hook reasoning as Nazca/Nuclear
+  Football Menu above.
+- **"5-Wave Milestone" grants** (on_wave_clear + `g.wave % 5 == 0` —
+  silk-road-coupon/crop-circle-plank's cadence, a different one than
+  `on_milestone`'s own 10-wave Clock-refill trigger; the issue table's
+  reference to "milestone" was this cadence, confirmed against the existing
+  precedent, not the hook of the same English word): Ark's Bunkbed (piece
+  duplication, once per window), Trojan Horse Assembly Manual (a free Box —
+  `_open_box_pick` turned out already safe to call from a hook dispatch,
+  guarded against clobbering an already-open Box Pick).
+- **Per-Wave first/last-lost tracking** (`g.wave_lost_ids`, reset in
+  `WaveLogic.queue`, appended centrally in `_lose_player_piece`): Jon
+  Burrows' Fake ID (first), Walt's Cryonic Capsule (last).
+- **Score-gain streak**: 27 Club Punch Card (`g.club27_streak`, built off
+  `on_wave_clear`'s existing `ctx.clean` rather than reinventing Nibiru
+  Hide-and-Seek Trophy's own streak logic) — its -50 Score penalty re-texted
+  to -50 Gold, the same issue-16 ruling Social Credit Report Card already
+  carries (Score is up-only).
+- **Gold reaching exactly 0**: Zero-Point Energy Drink. Required a new
+  choke point — `economy.gd`/`shop.gd`'s `spend_gold` — since Gold is spent
+  from 3 different call sites (`Economy.charge`, `Shop.buy`, the deploy-cost
+  line in `game.gd:_place`) and none of them previously shared one. New
+  `on_gold_zero` hook, fires once per spend that lands exactly on 0 Gold not
+  already there.
+- **Gold floor on Shop purchases**: Agartha Welcome Mat. Scoped exactly to
+  its own text ("Shop purchases can take your Gold negative") — `Shop.buy`
+  passes a -100 floor and `Shop.can_buy` extends its afford check by the
+  same 100, not a change to `charge()`/tariffs/deploy cost. `shop.gd`
+  can't call `Economy.spend_gold` directly (`economy.gd` already preloads
+  `Shop`; a preload back would cycle), so `Shop.buy` inlines the same 3
+  lines — noted in both places so they don't drift apart.
+
+### Left `implemented: false` (~24) — why
+
+- **Item cap** (Area 51 Parking Permit, Denver Bunker Timeshare): the
+  prerequisite isn't "add a cap," it's "what's the baseline cap before any
+  artefact modifies it" — no number for that exists anywhere in the GDD
+  text extracted for this issue. Guessing a baseline changes core economy
+  balance for every run, held artefact or not. **Notion question.**
+- **"Shop visit" retired term** (Pandemic Toilet Paper Pallet, Jet Fuel
+  Vial): unchanged from issue 18/19/the table's own note — still blocked on
+  a ruling, still not touched.
+- **New player-facing UI** (a real new affordance or a legality change to
+  an existing control, not just a hook): box reroll (Bible Gag Reel Scroll,
+  Snowden's Rubik's Cube), combined box UI (All-Seeing Eye Contact Lens),
+  box multi-pick (Nostradamus Mad Libs), box decline (Cicada Rejection
+  Letter), choice modal (Yalta Cocktail Napkin), gold-for-actions button
+  (FIFA Complimentary Yacht), gold-sink action button (Oak Island Wishing
+  Well), alt Shop payment currency (Templar Debit Card), a Pass-button
+  legality lock while Actions remain (Hellfire Club Discord Invite — its
+  own +2 Actions/Turn half is cheap, on_turn_start, but shipping only that
+  half would silently drop the artefact's actual cost). None of these fit
+  CLAUDE.md's "UI first, bypasses second" rule inside a hook-focused pass —
+  each needs its own click-probe coverage and belongs in a UI-scoped
+  follow-up, ideally batched (the choice-UI trio named in the table shares
+  one modal design).
+- **Loch Ness Stool Sample** ("open a random Piece Box"): "Piece Box" isn't
+  a real Box kind in this codebase — `Box.roll_options`/`_box_choose` only
+  ever resolve to item/artefact/score, never a piece grant. Implementing
+  this means inventing a new Box-content kind, not wiring an existing one.
+  **Notion question**: is a Piece Box worth adding as a real kind, or does
+  this artefact's text change to one of the 3 existing kinds?
+- **Zeta Reticuli Souvenir Map** ("every 3rd Capture: Stock instead of
+  Captured Stock"): `_move_player` has 4 separate `captured.append(...)`
+  sites (normal capture, bomb, trap, multicapture), each with different
+  control flow and some early-returning. Redirecting all 4 consistently is
+  real surface area with real edge-case risk for one artefact; Stockholm
+  Syndrome Pamphlet (issue 19) already shipped this system's cheap
+  wave-clear half, so only the per-capture half is still open.
+- **Consumable artefacts** (Epstein's Black Book, Moscovium Glow Stick):
+  "an Artefact removes itself from `g.artefacts`" plus, for Moscovium,
+  "activate an Artefact" as a brand-new player action — two pieces of
+  architecture nothing else in the catalog needs yet. Out of scope for a
+  pass that's otherwise wiring existing hooks.
+- **Dark Market Light Bulb**: unchanged from issue 19's own note — no
+  "Demoted" state exists or can exist without new tracking. Still a Notion
+  question, still not touched.
+- **'Definitely Not Russia' Patch** ("the first piece you lose each Wave
+  doesn't count... for your Artefacts and penalties"): needs one artefact's
+  `on_piece_lost` handler to veto every *other* held artefact's own
+  `on_piece_lost` handler for that one event — the ORDERING section of
+  `artefact_hooks.gd`'s header exists specifically to keep handlers
+  commutative for a fixed multiset of keys; a veto is the opposite of that
+  guarantee and the engine has no mechanism for it today.
+- **$2.3 Trillion Receipt** ("Enemies destroyed by Items award their Score
+  and Gold value"): `_destroy`'s own doc comment says "no score, no
+  captured stock" — deliberately. An artefact-conditioned exception to a
+  documented deliberate design decision is a bigger call than this pass's
+  scope, and worth confirming the decision still holds before coding
+  around it.
+- **Mar-a-Lago Toilet Papers** ("a random Shop item becomes free; all other
+  prices +10%"): genuinely stateful and underspecified per the table's own
+  note — which slot stays free across a restock, and whether +10% stacks
+  per Milestone, forever, or resets. **Notion question**, not a guess.
+- **Everything else needing its own new call site with real edge-case
+  surface** left alone rather than half-implemented: Elvish Hard Hat
+  ("ability" is undefined separately from "Item" in this data model — itself
+  a Notion question) and Black Knight Morse Code (a turn counter plus
+  clock-gain sites that have no hook at all today).
+
+### Tests
+
+`game/tests/test_items.gd` gained 27 checks across all 15 shipped
+artefacts, including 6 explicit controls (a tile normally illegal without
+Nazca, the same Item costing an Action at full Clock without Nuclear
+Football Menu, no duplicate before/after Ark's Bunkbed's Milestone window,
+the middle of 3 losses returning to neither Jon Burrows' nor Walt's Stock
+grant, Gold landing exactly on 0, and the same Shop purchase blocked
+without Agartha's credit line). `game/data/scenarios.gd` gained "Artefacts:
+economy & Box batch (issue 26)" holding all 15 keys together, swept by
+`test_scenarios` and the full autoplay run. `game/tests/run_all.sh` — ALL
+GREEN (windowed click probes, headless suites, autoplay).

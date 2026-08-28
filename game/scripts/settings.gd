@@ -5,7 +5,7 @@
 ## ships the one real, wired toggle that exists today: Sound.
 
 const SETTINGS_PATH := "user://settings.json"
-const DEFAULTS := {"sound_on": true}
+const DEFAULTS := {"sound_on": true, "animations_on": true}
 
 
 static func load_settings() -> Dictionary:
@@ -30,8 +30,11 @@ static func apply(data: Dictionary) -> void:
 
 ## Shared, full-rect, initially-hidden Settings panel built as a child of
 ## `layer`; returns it so the caller toggles `.visible`. `on_back` runs when
-## the panel's own Back button is pressed (hides the panel itself).
-static func build(layer: Node, on_back: Callable) -> CenterContainer:
+## the panel's own Back button is pressed (hides the panel itself). `on_change`
+## (optional) fires with the full settings Dictionary after every toggle, so a
+## caller with a live session (the in-game menu) can apply it without a
+## restart — the Main Menu has no running game to update, so it's unused there.
+static func build(layer: Node, on_back: Callable, on_change := Callable()) -> CenterContainer:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.visible = false
@@ -54,8 +57,27 @@ static func build(layer: Node, on_back: Callable) -> CenterContainer:
 		data.sound_on = not data.sound_on
 		save_settings(data)
 		apply(data)
-		relabel.call())
+		relabel.call()
+		if on_change.is_valid():
+			on_change.call(data))
 	box.add_child(sound)
+
+	# Reduce/Disable Animations (06): instant transitions, for motion
+	# sensitivity and low-end devices. Muted uniformly — slides, pops
+	# (including box-pick capture pops), floating text, banners, outlines;
+	# see game.gd's `animations_on` gate on the `anims` queue.
+	var anim := Button.new()
+	anim.add_theme_font_size_override("font_size", 22)
+	var relabel_anim := func() -> void:
+		anim.text = "Animations: On" if data.animations_on else "Animations: Reduced"
+	relabel_anim.call()
+	anim.pressed.connect(func() -> void:
+		data.animations_on = not data.animations_on
+		save_settings(data)
+		relabel_anim.call()
+		if on_change.is_valid():
+			on_change.call(data))
+	box.add_child(anim)
 
 	var back := Button.new()
 	back.text = "← Back"

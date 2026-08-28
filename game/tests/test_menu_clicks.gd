@@ -171,6 +171,9 @@ func _init() -> void:
 	check(await _click_button(menu, "Sound: On"), "Sound toggle clickable")
 	await process_frame
 	check(not Settings.load_settings().sound_on, "Sound toggle persists to disk")
+	check(await _click_button(menu, "Animations: On"), "Animations toggle clickable")
+	await process_frame
+	check(not Settings.load_settings().animations_on, "Animations toggle persists to disk")
 	check(await _click_button(menu, "← Back"), "Settings Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "Settings Back restores the main menu")

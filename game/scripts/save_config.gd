@@ -92,6 +92,12 @@ static func apply(g, cfg: Dictionary) -> void:
 	# item-effect counters restore AFTER the turn reset (a save is always taken
 	# at a turn start, so move/place/merge budgets are simply fresh)
 	g.skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
+	# turn_number (issue 35): _begin_player_turn's own += 1 just above doesn't
+	# know this call is a resume, not a fresh Turn — override with the saved
+	# value (falling back to whatever it just computed, for older configs/
+	# scenarios written before this field existed) so a resumed save doesn't
+	# double-count the Turn it was saved on.
+	g.turn_number = int(cfg.get("turn_number", g.turn_number))
 
 
 ## The inverse of apply(): the live run as a JSON-safe config Dictionary.
@@ -121,7 +127,7 @@ static func to_config(g) -> Dictionary:
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,
 		"tariffs": keys_of.call(g.tariffs_active), "tariffs_seen": g.tariffs_seen.duplicate(),
-		"wave": g.wave, "turns_since_wave": g.turns_since_wave,
+		"wave": g.wave, "turns_since_wave": g.turns_since_wave, "turn_number": g.turn_number,
 		"early_clear_awarded": g.early_clear_awarded,
 		"pending_reinforce": g.pending_reinforce,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),

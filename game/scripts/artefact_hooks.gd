@@ -547,26 +547,57 @@
 ## already-passed Turn").
 ##
 ## Black Knight Morse Code ("Every 3rd Turn: your Score and Clock gains that
-## Turn are doubled (needs: turn counter)") stays unimplemented — its own
-## catalog text names a different gap than issue 30's own description implied
-## ("needs a per-turn action counter with type"). There is no "which Turn
-## number is this" counter anywhere in game.gd (only `turns_since_wave`,
+## Turn are doubled (needs: turn counter)") stayed unimplemented at issue 30 —
+## its own catalog text names a different gap than issue 30's own description
+## implied ("needs a per-turn action counter with type"). There was no "which
+## Turn number is this" counter anywhere in game.gd (only `turns_since_wave`,
 ## reset every Wave, not a run-long count) and no hook for "a Clock gain
-## happened" — `clock_ms` is mutated directly at ~15 scattered call sites,
+## happened" — `clock_ms` was mutated directly at ~15 scattered call sites,
 ## unlike Gold/Score which already route through Economy.earn/gain's
-## on_score_change/on_gold_change. Doubling "Score AND Clock gains, every 3rd
-## Turn" needs both a new counter and a new Clock-gain hook mirroring
-## on_score_change's base/amount contract — two new pieces of infrastructure,
-## neither of which the action log provides. Zapruder's Director's Cut
-## (replay semantics) and Y2K Patch Floppy Disk (a turn-skip seam) are
-## untouched for the same reason the issue named going in: real new
-## mechanisms, not a hook this log can wire up.
+## on_score_change/on_gold_change. Both gaps are closed by issue 35 below.
+##
+## issue 35 (Clock-gain choke point & run-long turn counter) added:
+## - `Economy.add_clock(g, ms, reason)`, mirroring earn()/gain() — every
+##   direct `clock_ms +=`/`-=` GAIN site (milestone/King refills, the
+##   Continue bonus, the early-clear/turn-end bonuses, and every artefact/
+##   item/tariff that grants or drains time, including the ones IN this
+##   file's own _dispatch below) now calls it instead, so the new
+##   `on_clock_change` hook (added to HOOKS) sees every one. Same immutable-
+##   base/additive-amount ctx contract as on_score_change (CONTRACT note
+##   above): `base` is read-only input, `amount` is the output a percentage
+##   handler adds to off `base` — never off the running `amount`. A handler
+##   inside THIS file calling back into Economy.add_clock (economy.gd calling
+##   back into ArtefactHooks.run) is a real re-entrant dispatch, unlike every
+##   other cross-resource case above (which hand a value back through a ctx
+##   output field instead, e.g. gold_bonus/score_bonus) — Clock has no paired
+##   sibling dispatch to piggyback on the way Score/Gold do inside earn(), so
+##   there is no output field to hand it through. Verified safe: run()'s only
+##   shared mutable state is `g.artefact_echo_depth`, which _run_meta_triggers
+##   already guards for reentrancy, and a nested on_clock_change call
+##   completes (loop + its own meta-trigger pass) before control returns to
+##   the outer dispatch, so the outer hook's `held`/`fired` snapshots are
+##   never touched. Covered by test_clock.gd.
+## - The ONE deliberate exception is game.gd's `_process` per-frame drain —
+##   a continuous tick, not a discrete gain, so hooking it would fire every
+##   frame; it stays a direct `clock_ms -=`, commented at the call site.
+## - A run-long Turn counter, `g.turn_number`, incremented at the single
+##   `_begin_player_turn` call site (game.gd) — unlike `turns_since_wave`
+##   (reset every Wave, in `_enemy_turn`), this never resets, and
+##   save_config.gd round-trips it.
+## - Black Knight Morse Code is now an ordinary two-hook artefact
+##   (on_score_change + on_clock_change, both gated `g.turn_number % 3 == 0`)
+##   — see REGISTRY/_dispatch below.
 ##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const Economy := preload("res://scripts/economy.gd") # issue 35: clock-grant
+	# handlers below call Economy.add_clock so the Clock gets the same choke
+	# point as Score/Gold — a real cycle (economy.gd preloads this file back),
+	# which Godot 4 resolves fine for static-func calls (verified empirically;
+	# nothing here is referenced at parse time, only called at runtime)
 
 const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
@@ -585,6 +616,8 @@ const HOOKS := [
 	"on_destroy",
 	# --- issue 30: per-turn action log (game.gd _log_action) ---
 	"on_action",
+	# --- issue 35: Clock-gain choke point (economy.gd add_clock) ---
+	"on_clock_change",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -824,6 +857,8 @@ const REGISTRY := {
 	"illuminati-fridge-magnet": ["on_gold_change"],
 	# --- issue 30: per-turn action log (game.gd _log_action / on_action) ---
 	"elvish-hard-hat": ["on_action"],
+	# --- issue 35: Clock-gain choke point + run-long Turn counter ---
+	"black-knight-morse-code": ["on_score_change", "on_clock_change"],
 }
 
 
@@ -1130,7 +1165,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.base >= 50:
 				ctx.pts += 30
 		["lifesteal", "on_capture"]:
-			g.clock_ms += 2000
+			Economy.add_clock(g, 2000, "lifesteal")
 		["first_capture_extra", "on_capture"]:
 			if g.turn_action_count == 0:
 				g.actions_left += 1
@@ -1272,7 +1307,9 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["nigerian-prince-wire-transfer", "on_wave_spawn"]:
 			g.score += 100
 			g.gold += 10
-			g.clock_ms = maxf(g.clock_ms - 3000.0, 0.0)
+			Economy.add_clock(g, -3000.0, "nigerian-prince-wire-transfer") # issue 35:
+				# a Clock LOSS — routed through the same choke point (negative
+				# amount, floored at 0 by add_clock itself)
 		["putin-s-golden-toilet-brush", "on_purchase"]:
 			g.score += 5 * ctx.price
 		["rapture-insurance-policy", "on_game_over"]:
@@ -1308,7 +1345,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["5g-microchips", "on_turn_start"]:
 			var allies: int = g._player_pieces().size()
 			var enemies: int = g.board.size() - allies
-			g.clock_ms += (allies - enemies) * 1000
+			Economy.add_clock(g, float((allies - enemies) * 1000), "5g-microchips") # issue
+				# 35: signed — can net a loss when outnumbered, same call either way
 		["terracotta-draft-card", "on_wave_clear"]:
 			var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
 			g.stock.append(mix[g.rng.randi() % mix.size()]) # bare id: a fresh
@@ -1316,7 +1354,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				# applies (a Dictionary would only be needed for a piece pulled
 				# off the board with state attached, e.g. Extraction)
 		["charlemagne-s-birth-certificate", "on_wave_clear"]:
-			g.clock_ms += 10000
+			Economy.add_clock(g, 10000, "charlemagne-s-birth-certificate")
 
 		# --- issue 18: Shop price modifiers (Shop.price's on_price seam) ---
 		["denazification-visa", "on_price"]:
@@ -1330,7 +1368,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["shrinkflation-cereal-box", "on_turn_end"]:
 			g.gold += 10
 			g.score += 10
-			g.clock_ms += 1000.0
+			Economy.add_clock(g, 1000.0, "shrinkflation-cereal-box")
 		["skull-and-bones-coffin", "on_price"]:
 			ctx.amount += ctx.base * 0.05
 		["skull-and-bones-coffin", "on_score_change"]:
@@ -1510,7 +1548,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["doomsday-autoclicker", "on_item_consume"]:
 			if ctx.tier == "Decisive":
 				g.score += 200
-				g.clock_ms += 10000
+				Economy.add_clock(g, 10000, "doomsday-autoclicker")
 		["tape-eraser-magnet", "on_item_consume"]:
 			if ctx.last:
 				g.score += 100
@@ -1538,7 +1576,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 
 		# --- issue 19: on_rank_up (merge_logic.gd commit_merge, game.gd "promote") ---
 		["witness-protection-mustache", "on_rank_up"]:
-			g.clock_ms += 20000
+			Economy.add_clock(g, 20000, "witness-protection-mustache")
 		["holy-grail-coaster", "on_rank_up"]:
 			if ctx.pos.x >= 0:
 				_grant_buff(g, ctx.pos)
@@ -1600,14 +1638,15 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 
 		# --- issue 19: cheap follow-ups (named in issue 16/17's Outcome) ---
 		["casino-invisible-clock", "on_purchase"]:
-			g.clock_ms += 25000
+			Economy.add_clock(g, 25000, "casino-invisible-clock")
 		["2012-doomsday-party-hat", "on_gold_change"]:
 			# issue 20 fix: ctx.base, not the running ctx.amount (see the
-			# on_score_change/on_gold_change CONTRACT in the header) — Clock
-			# has no ctx output field of its own, so the direct g.clock_ms
-			# write stays (same sanctioned pattern as lifesteal on_capture),
-			# only the read source changes.
-			g.clock_ms += ctx.base * 500.0 # +5s per 10 Gold
+			# on_score_change/on_gold_change CONTRACT in the header). issue 35:
+			# now routes through Economy.add_clock (its own on_clock_change
+			# dispatch, off Clock's OWN base — Gold's ctx.base here is only
+			# the read source sizing the grant, same as john-titor's-crypto-
+			# wallet reading g.clock_ms elsewhere in this file).
+			Economy.add_clock(g, ctx.base * 500.0, "2012-doomsday-party-hat") # +5s per 10 Gold
 		["fort-knox-iou", "on_score_change"]:
 			if g.gold < 10:
 				ctx.amount += ctx.base * 0.5
@@ -1620,7 +1659,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.gold += 100
 		["tunguska-toothpicks", "on_tariff_charge"]:
 			g.score += 150
-			g.clock_ms += 5000
+			Economy.add_clock(g, 5000, "tunguska-toothpicks")
 
 		# --- issue 19: capture conversion, the cheap wave-clear half ---
 		["stockholm-syndrome-pamphlet", "on_wave_clear"]:
@@ -1848,7 +1887,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["capstone-polish", "on_purchase"]:
 			if ctx.kind == "artefact":
 				g.score += 150
-				g.clock_ms += 5000
+				Economy.add_clock(g, 5000, "capstone-polish")
 
 		# --- issue 29: Illuminati Fridge Magnet — off the immutable
 		# `ctx.base` like every other percentage Gold/Score handler (see the
@@ -1869,3 +1908,14 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.first and ctx.kind == "item":
 				g.actions_left += 1
 				g.actions_max += 1
+
+		# --- issue 35: Clock-gain choke point + run-long Turn counter ---
+		["black-knight-morse-code", "on_score_change"]:
+			if g.turn_number % 3 == 0:
+				ctx.amount += ctx.base # double Score — base is never negative
+					# (Score is up-only, economy.gd's earn() header)
+		["black-knight-morse-code", "on_clock_change"]:
+			if g.turn_number % 3 == 0 and ctx.base > 0:
+				ctx.amount += ctx.base # double Clock GAINS only — "gains ...
+					# doubled" (catalog text), so a same-Turn Clock LOSS
+					# (e.g. Nigerian Prince Wire Transfer) is left alone

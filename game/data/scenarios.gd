@@ -90,6 +90,12 @@ static func all() -> Array:
 				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel",
 				"drone_strike", "extraction"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
+		{"name": "Piece Buffs (Buff Box: pick, target, Shield/Critical)", "cfg": {
+			"board": [["queen", 0, 2, 1, {"buffs": [{"key": "critical"}]}],
+				["pawn", 0, 3, 1], ["rook", 1, 2, 6, {"buffs": [{"key": "shield"}]}],
+				["bishop", 1, 4, 6], ["knight", 1, 3, 8]],
+			"items": ["buff_box", "buff_box", "radar_jamming"],
+			"stock": ["pawn"], "score": 500, "wave": 1}},
 		{"name": "Artefacts: all active", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"artefacts": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],

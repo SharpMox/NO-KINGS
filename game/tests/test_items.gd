@@ -9,6 +9,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Rules := preload("res://scripts/rules.gd")
 
 var fails := 0
 
@@ -291,6 +292,89 @@ func _init() -> void:
 	check(dm.board[Vector2i(2, 2)].id == "bishop",
 		"Demote sends the Archbishop back to Bishop, its chain base")
 	dm.queue_free()
+	await process_frame
+
+	# --- Piece Buffs (slice 03): Buff Box picks a buff, then targets a piece;
+	# Shield repels one capture from either side; Critical doubles one capture
+	const BuffLogic := preload("res://scripts/buff_logic.gd")
+	var bb := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 3],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bb.actions_left = 5
+	bb.items.append(_item("buff_box", "tile"))
+	bb._use_item(0)
+	check(bb.buff_pick_open or bb.pending_buff != "", "Buff Box opens the buff sub-pick")
+	bb._buff_pick_cancelled()
+	check(bb.items.size() == 1 and bb.pending_buff == "",
+		"cancelling the sub-pick leaves the item unspent")
+	bb._use_item(0)
+	bb._buff_chosen("shield")
+	check(bb.item_targets.has(Vector2i(2, 2)) and bb.item_targets.has(Vector2i(3, 3)),
+		"buff targeting offers both allies and enemies")
+	bb._item_click(Vector2i(2, 2)) # shield the queen
+	check(BuffLogic.has(bb.board[Vector2i(2, 2)], "shield"), "the buff lands on the target")
+	check(bb.items.is_empty(), "the Buff Box is spent")
+
+	# the AI attacking a shielded piece is repelled; the shield is consumed.
+	# The rook must share a file with the queen or it simply never attacks —
+	# and then both assertions below would pass for the wrong reason.
+	bb.board.erase(Vector2i(3, 3))
+	bb.board[Vector2i(2, 5)] = {"id": "rook", "owner": 1}
+	check(Rules.moves_for(bb.board, Vector2i(2, 5), bb.defs).has(Vector2i(2, 2)),
+		"the enemy rook really can reach the shielded queen")
+	await bb._run_enemy_actions()
+	check(bb.board.has(Vector2i(2, 2)) and bb.board[Vector2i(2, 2)].id == "queen",
+		"Shield repels the enemy capture — the piece survives")
+	check(not BuffLogic.has(bb.board[Vector2i(2, 2)], "shield"),
+		"Shield is consumed by the attempt it blocks")
+	bb.queue_free()
+	await process_frame
+
+	# player side: shield blocks one capture, then the next one lands
+	var sh := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	sh.actions_left = 5
+	BuffLogic.add(sh.board[Vector2i(2, 5)], "shield")
+	sh._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(sh.board.has(Vector2i(2, 2)) and sh.board[Vector2i(2, 5)].id == "rook",
+		"a repelled attacker stays on its starting tile and captures nothing")
+	check(not BuffLogic.has(sh.board[Vector2i(2, 5)], "shield"), "the shield is spent")
+	sh.moved_this_turn.clear()
+	sh._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(sh.board[Vector2i(2, 5)].id == "queen", "the next attempt captures normally")
+	sh.queue_free()
+	await process_frame
+
+	# Critical doubles exactly one capture, then is gone
+	var cr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 2, 8], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	cr.actions_left = 5
+	BuffLogic.add(cr.board[Vector2i(2, 2)], "critical")
+	var before: int = cr.score
+	cr._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	var doubled: int = cr.score - before
+	check(not BuffLogic.has(cr.board[Vector2i(2, 5)], "critical"), "Critical is consumed")
+	cr.moved_this_turn.clear()
+	before = cr.score
+	cr._move_player(Vector2i(2, 5), Vector2i(2, 8))
+	check(doubled == 2 * (cr.score - before),
+		"Critical doubles one capture's score, the next is normal")
+	cr.queue_free()
+	await process_frame
+
+	# Radar Jamming strips piece buffs, as its description promises
+	var rj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	rj.actions_left = 5
+	BuffLogic.add(rj.board[Vector2i(2, 2)], "shield")
+	rj.items.append(_item("radar_jamming", "tile"))
+	rj._use_item(0)
+	rj._item_click(Vector2i(2, 2))
+	check(BuffLogic.of(rj.board[Vector2i(2, 2)]).is_empty(),
+		"Radar Jamming strips piece buffs")
+	rj.queue_free()
 	await process_frame
 
 	print("---")

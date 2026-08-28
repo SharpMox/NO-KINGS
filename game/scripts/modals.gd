@@ -21,6 +21,8 @@ signal shop_closed
 signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
+signal buff_chosen(key: String)
+signal buff_pick_cancelled
 
 var g # the Game node — read-only from here; mutations go up via signals
 
@@ -32,6 +34,7 @@ var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var shop_panel: PanelContainer # the Shop overlay (money-and-shop/04)
 var shop_scroll: ScrollContainer # exposed so probes can scroll rows into view
 var tariff_panel: PanelContainer # tariff detail overlay
+var buff_panel: PanelContainer # Buff Box sub-pick (3 Piece Buffs)
 
 
 func build(game) -> void:
@@ -440,6 +443,48 @@ func _box_vbox(title_text: String) -> VBoxContainer:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	return box
+
+
+## Buff Box stage 0 — pick 1 of 3 Piece Buffs, then the board takes over for
+## targeting. Cancel leaves the item unspent, so there is no consolation here.
+func show_buff_pick(offer: Array) -> void:
+	if buff_panel:
+		buff_panel.queue_free()
+	buff_panel = PanelContainer.new()
+	buff_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.08, 0.1, 0.92)
+	buff_panel.add_theme_stylebox_override("panel", bg)
+	var center := CenterContainer.new()
+	buff_panel.add_child(center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	center.add_child(box)
+	var head := Label.new()
+	head.text = "\u2726 Buff Box \u2014 pick a Piece Buff:"
+	head.add_theme_font_size_override("font_size", 22)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(head)
+	for b in offer:
+		var btn := Button.new()
+		btn.text = "%s \u2014 %s\n%s" % [b.name, b.tier, b.description]
+		btn.add_theme_font_size_override("font_size", 16)
+		btn.custom_minimum_size = Vector2(420, 0)
+		var key: String = b.key
+		btn.pressed.connect(func() -> void: buff_chosen.emit(key))
+		box.add_child(btn)
+	var cancel := Button.new()
+	cancel.text = "Cancel (keeps the item)"
+	cancel.pressed.connect(func() -> void: buff_pick_cancelled.emit())
+	box.add_child(cancel)
+	g.hud.add_child(buff_panel)
+	buff_panel.move_to_front()
+
+
+func hide_buff_pick() -> void:
+	if buff_panel:
+		buff_panel.queue_free()
+		buff_panel = null
 
 
 func show_box(options: Array) -> void:

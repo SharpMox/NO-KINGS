@@ -228,9 +228,9 @@
    "Special",
    "Piece"
   ],
-  "effect": "Once per Wave: when one of your pieces is captured, the capturer sinks with it — both are removed (needs: mutual destruction)",
+  "effect": "Once per Wave: when one of your pieces is captured, the capturer sinks with it — both are removed",
   "conspiracy": "The disappearance of Jimmy Hoffa",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "witness-protection-mustache",
@@ -1526,7 +1526,7 @@
   ],
   "effect": "On your first Capture each Turn: the capturing piece returns to its starting position",
   "conspiracy": "The Philadelphia Experiment",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "wardenclyffe-aaa-batteries",
@@ -1779,9 +1779,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your pieces cannot be destroyed by Item or Tariff effects (needs: destruction immunity)",
+  "effect": "Your pieces cannot be destroyed by Item or Tariff effects",
   "conspiracy": "Spontaneous human combustion",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "red-diary-s-missing-pages",
@@ -1877,9 +1877,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your first piece to Capture each Turn is moved to your back row after capturing (needs: forced retreat)",
+  "effect": "Your first piece to Capture each Turn is moved to your back row after capturing",
   "conspiracy": "The Diana conspiracy theories",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cia-exploding-cigar",

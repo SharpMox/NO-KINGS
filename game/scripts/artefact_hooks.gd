@@ -193,6 +193,66 @@
 ##   exists (a piece demoted to its base is indistinguishable from one that
 ##   started there), so Dark Market Light Bulb's "Demoted pieces give no
 ##   Score" clause stays unimplemented — Notion question, not a guess.
+##
+## issue 24 (combat & positioning, split out of 19) added the "post-move ctx
+## flag" mechanism issue 19's own Outcome deferred:
+## - USS Eldridge Invisibility Paint / Royal Fiat (Undamaged) both want to
+##   reposition the capturing piece AFTER `_move_player`'s own slide has
+##   already landed it on `to` — but on_capture fires from
+##   Economy.capture_score, mid-`_move_player`, BEFORE that slide runs.
+##   capture_score now stashes its ctx on `g.last_capture_ctx` (a Dictionary,
+##   so the reference survives the call boundary) right before returning
+##   `ctx.pts`; `_move_player` reads `return_to_start`/`move_to_backrow` back
+##   off it right after its own `board[to] = board[from]` — the same shape as
+##   on_item_consume's `cancel`, just read one call frame later since the
+##   mutation it's gating hasn't happened yet when the hook runs. Both gate
+##   on `turn_capture_index == 0 and attacker_pos.x >= 0` (first Capture this
+##   Turn, a real attacker) — same pattern as CIA Heart Attack Gun/Obedience-
+##   Flavored Tap Water above. Royal Fiat's landing tile is the first empty
+##   back-row (y=0) square scanning x=0..BOARD_W-1 (ruled 2026-08-28, no GDD
+##   guidance on ties); a full back row is a no-op, the piece just stays on
+##   `to`. Only the plain-capture path reads either flag — Trap/Bomb/
+##   Multicapture's branches `return` before reaching it, and a second
+##   capture_score call inside Multicapture would overwrite
+##   `g.last_capture_ctx` anyway, so `_move_player` snapshots both flags into
+##   locals immediately after its own (first) capture_score call rather than
+##   re-reading `g.last_capture_ctx` at the tail. Holding both artefacts at
+##   once is a real if rare combo (both Rare); return_to_start wins the tie
+##   (checked first) since it fully undoes the move rather than partially
+##   redirecting it. Covered by test_items.gd ("USS Eldridge Invisibility
+##   Paint" / "Royal Fiat (Undamaged)" / the two-held-together case).
+## - Fireproof Pajamas is on_piece_lost's own `cancel` flag (new, mirroring
+##   on_item_consume's), scoped to `ctx.reason == "destroyed"` — the single
+##   choke point `_destroy` already is for every Item/Tariff kill (Drone
+##   Strike, Air Strike, Sniper, bomb detonation via `_detonate`, the
+##   jd_vance Tariff). `_lose_player_piece` now returns its ctx (previously
+##   void; the other 4 call sites already ignored the return value, so this
+##   is additive) and only increments `lost_player` when not cancelled.
+##   Captures/Trap/Reflect don't set `reason == "destroyed"`, so they're
+##   untouched.
+## - Hoffa's Cement Shoes reuses on_piece_lost's `reason == "captured"` +
+##   `attacker_pos` (Tutankhamun's Death Thong's exact gate) to set a new
+##   `destroy_attacker` output flag, once per Wave (`g.hoffa_used_this_wave`,
+##   reset on_wave_clear — the "satoshi-s-private-key"-style two-hook shape).
+##   The enemy-move loop (game.gd `_run_enemy_actions`) reads the flag
+##   straight off `_lose_player_piece`'s return and, when set, removes the
+##   attacker too — Trap's existing mutual-destruction shape, just artefact-
+##   gated instead of BuffLogic-gated, and once per Wave instead of every
+##   time. Covered by test_items.gd ("Hoffa's Cement Shoes").
+##
+## issue 24 left unimplemented (see .scratch/gdd-gaps/issues/24's Outcome for
+## the full list): Cheyenne Mountain Doorbell / Winchester Salt Lined Doors
+## (zone rules need their own design pass into Rules.legal_moves/AI
+## targeting), Bovine Tractor Beam / Roanoke Hex Kit (player-initiated
+## targeting UI, not a hook), Inflatable Vietcong Torpedo / UAP Breath Mint
+## (a new pre-capture "dodge" choke point plus an undecided modal-choice /
+## landing-tile ruling), Zapruder's Director's Cut (needs a recorded "last
+## action" shape spanning move/capture/item/merge), Pegasus Free Trial (a
+## per-piece exception to `moved_this_turn`'s flat Array-membership lock —
+## risky to redesign under two concurrent branches also touching move
+## sites), Alien Pet Rocks (a new `moved_this_wave` set threaded through
+## every move/place site), Curtain Rods Bag (the same ctx-survives-earn()
+## gap issue 26 is scoped to close).
 
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
@@ -352,6 +412,12 @@ const REGISTRY := {
 	# the per-capture half — Zeta Reticuli Souvenir Map — is out of scope; see
 	# issue 26) ---
 	"stockholm-syndrome-pamphlet": ["on_wave_clear"],
+
+	# --- issue 24: combat & positioning (post-move ctx flag; see header) ---
+	"uss-eldridge-invisibility-paint": ["on_capture"],
+	"royal-fiat-undamaged": ["on_capture"],
+	"fireproof-pajamas": ["on_piece_lost"],
+	"hoffa-s-cement-shoes": ["on_wave_clear", "on_piece_lost"],
 }
 
 
@@ -924,3 +990,20 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["stockholm-syndrome-pamphlet", "on_wave_clear"]:
 			if not g.captured.is_empty():
 				g.stock.append(g.captured.pop_front())
+
+		# --- issue 24: combat & positioning ---
+		["uss-eldridge-invisibility-paint", "on_capture"]:
+			if ctx.turn_capture_index == 0 and ctx.attacker_pos.x >= 0:
+				ctx.return_to_start = true
+		["royal-fiat-undamaged", "on_capture"]:
+			if ctx.turn_capture_index == 0 and ctx.attacker_pos.x >= 0:
+				ctx.move_to_backrow = true
+		["fireproof-pajamas", "on_piece_lost"]:
+			if ctx.reason == "destroyed":
+				ctx.cancel = true
+		["hoffa-s-cement-shoes", "on_wave_clear"]:
+			g.hoffa_used_this_wave = false
+		["hoffa-s-cement-shoes", "on_piece_lost"]:
+			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0 and not g.hoffa_used_this_wave:
+				g.hoffa_used_this_wave = true
+				ctx.destroy_attacker = true

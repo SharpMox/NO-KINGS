@@ -107,6 +107,11 @@ var silk_road_active := false # Silk Road Coupon's -50% Shop prices, reset in
 	# WaveLogic.queue() every wave (artefact hook 18)
 var nibiru_wave_streak := 0 # Nibiru Hide-and-Seek Trophy: grows +1 per Wave
 	# clear, reset to 0 on_piece_lost (artefact_hooks.gd, artefact hook 19)
+var hoffa_used_this_wave := false # Hoffa's Cement Shoes: once per Wave, reset
+	# on_wave_clear (artefact_hooks.gd, artefact hook 24)
+var last_capture_ctx: Dictionary = {} # this move's on_capture ctx (Economy.
+	# capture_score) — read back by _move_player after its own board mutation
+	# for USS Eldridge / Royal Fiat's post-move reposition (artefact hook 24)
 var dihydrogen_free_wave := -1 # Dihydrogen Monoxide Battery: wave its one free
 	# Tactical Item use already fired this Wave, -1 = not yet (artefact hook 19)
 var wardenclyffe_free_wave := -1 # same idea, Wardenclyffe AAA Batteries' any-tier version
@@ -617,7 +622,19 @@ func _run_enemy_actions() -> void:
 				# 2 keeps the attacker out for exactly one enemy turn
 				BuffLogic.add(board[act.from], "stunned", Tuning.STUN_MISSES + 1)
 				_add_float(act.from, "Stunned!", COL_MERGE)
-			_lose_player_piece(act.to, "captured", act.from)
+			if _lose_player_piece(act.to, "captured", act.from).destroy_attacker:
+				# Hoffa's Cement Shoes (artefact hook 24): once per Wave, the
+				# capturer sinks with its victim — Trap's own mutual-
+				# destruction shape above, artefact-gated instead of
+				# BuffLogic-gated
+				_add_float(act.from, "Sunk!", COL_CAPTURE)
+				lost_enemy += 1
+				_add_pop(act.to)
+				_add_pop(act.from)
+				board.erase(act.to)
+				board.erase(act.from)
+				queue_redraw()
+				continue
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
@@ -659,6 +676,18 @@ func _back_row_breached() -> bool:
 		if not board.has(t) or board[t].owner != Rules.ENEMY:
 			return false
 	return true
+
+
+## Royal Fiat (Undamaged)'s forced-retreat landing tile (artefact hook 24):
+## the first empty back-row (y=0) square scanning x=0..BOARD_W-1 — no GDD
+## guidance on ties, ruled 2026-08-28. Vector2i(-1,-1) when the row is full,
+## which the caller treats as "no forced move" rather than displacing anyone.
+func _first_empty_backrow_tile() -> Vector2i:
+	for x in Tuning.BOARD_W:
+		var t := Vector2i(x, 0)
+		if not board.has(t):
+			return t
+	return Vector2i(-1, -1)
 
 
 func _cadence() -> int:
@@ -1083,6 +1112,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
 	var king_captured := false
 	var captured_king_id := ""
+	var return_to_start := false # USS Eldridge Invisibility Paint (artefact hook 24)
+	var move_to_backrow := false # Royal Fiat (Undamaged), same mechanism
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
@@ -1111,6 +1142,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
 		Economy.earn(self, Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from)
 			* BuffLogic.capture_multiplier(board, from))
+		# snapshotted now, before Multicapture (below) can fire a second
+		# capture_score call that overwrites g.last_capture_ctx with its own
+		# ctx (artefact hook 24 — see artefact_hooks.gd header)
+		return_to_start = last_capture_ctx.get("return_to_start", false)
+		move_to_backrow = last_capture_ctx.get("move_to_backrow", false)
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
 			_add_float(to, "Critical!", COL_MERGE)
@@ -1174,9 +1210,22 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
+	var final_pos := to
+	if return_to_start: # USS Eldridge Invisibility Paint — undo the slide
+		board[from] = board[to]
+		board.erase(to)
+		_add_slide(to, from)
+		final_pos = from
+	elif move_to_backrow and to.y != 0: # Royal Fiat (Undamaged) — forced retreat
+		var dest := _first_empty_backrow_tile()
+		if dest.x >= 0:
+			board[dest] = board[to]
+			board.erase(to)
+			_add_slide(to, dest)
+			final_pos = dest
 	actions_left -= 1
 	turn_action_count += 1
-	moved_this_turn.append(to)
+	moved_this_turn.append(final_pos)
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
 		if _king_down(captured_king_id):
@@ -1514,9 +1563,14 @@ func _detonate(at: Vector2i) -> void:
 
 
 ## Item destruction: piece leaves the board — no score, no captured stock.
+## Fireproof Pajamas (artefact hook 24) vetoes this via _lose_player_piece's
+## returned ctx.cancel — the single choke point every Item/Tariff kill
+## (Drone Strike, Air Strike, Sniper, bomb detonation via _detonate, the
+## jd_vance Tariff) already funnels through.
 func _destroy(pos: Vector2i) -> void:
 	if board[pos].owner == Rules.PLAYER:
-		_lose_player_piece(pos, "destroyed")
+		if _lose_player_piece(pos, "destroyed").cancel:
+			return
 	else:
 		lost_enemy += 1
 	_add_pop(pos)
@@ -1530,10 +1584,18 @@ func _destroy(pos: Vector2i) -> void:
 ## handlers can still read it (e.g. whether it carried a Piece Buff).
 ## `attacker_pos` is the enemy piece that did the capturing, when there is one
 ## (Vector2i(-1,-1) otherwise) — Tutankhamun's Death Thong debuffs it.
-func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(-1, -1)) -> void:
-	lost_player += 1
-	ArtefactHooks.run(self, "on_piece_lost",
-		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos})
+## Returns the dispatched ctx (artefact hook 24, was void — the other 4 call
+## sites already ignored the return value): `cancel` is Fireproof Pajamas'
+## veto (_destroy only), `destroy_attacker` is Hoffa's Cement Shoes' mutual-
+## destruction request (the enemy-move loop only). `lost_player` only counts
+## when the loss isn't cancelled.
+func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(-1, -1)) -> Dictionary:
+	var ctx := ArtefactHooks.run(self, "on_piece_lost",
+		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos,
+			"cancel": false, "destroy_attacker": false})
+	if not ctx.cancel:
+		lost_player += 1
+	return ctx
 
 
 ## Single choke point for an Item leaving `items` (artefact hook 19) — was 3

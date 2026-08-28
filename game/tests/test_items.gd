@@ -1268,6 +1268,109 @@ func _init() -> void:
 	stock19.queue_free()
 	await process_frame
 
+	# --- issue 24: combat & positioning (USS Eldridge Invisibility Paint,
+	# Royal Fiat (Undamaged)) — the shared post-move ctx flag mechanism
+	var eldridge := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
+		"wave": 3, "artefacts": ["uss-eldridge-invisibility-paint"]})
+	await process_frame
+	eldridge.actions_left = 5
+	eldridge._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(eldridge.board.has(Vector2i(2, 2)) and not eldridge.board.has(Vector2i(3, 2)),
+		"USS Eldridge Invisibility Paint: the capturing piece returns to its starting position")
+	eldridge.queue_free()
+	await process_frame
+
+	var eldridge2 := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["pawn", 1, 4, 2]],
+		"wave": 3, "artefacts": ["uss-eldridge-invisibility-paint"]})
+	await process_frame
+	eldridge2.actions_left = 5
+	eldridge2._move_player(Vector2i(2, 2), Vector2i(3, 2)) # 1st Capture this Turn: returns
+	eldridge2._move_player(Vector2i(2, 2), Vector2i(4, 2)) # 2nd Capture this Turn: stays put
+	check(eldridge2.board.has(Vector2i(4, 2)) and not eldridge2.board.has(Vector2i(2, 2)),
+		"USS Eldridge Invisibility Paint: only your first Capture each Turn returns")
+	eldridge2.queue_free()
+	await process_frame
+
+	var fiat := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
+		"wave": 3, "artefacts": ["royal-fiat-undamaged"]})
+	await process_frame
+	fiat.actions_left = 5
+	fiat._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(fiat.board.has(Vector2i(0, 0)) and not fiat.board.has(Vector2i(3, 2)),
+		"Royal Fiat (Undamaged): the first capturing piece each Turn retreats to the back row")
+	fiat.queue_free()
+	await process_frame
+
+	var backrow: Array = []
+	for x in 8:
+		backrow.append(["pawn", 0, x, 0])
+	var fiat_full := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]] + backrow,
+		"wave": 3, "artefacts": ["royal-fiat-undamaged"]})
+	await process_frame
+	fiat_full.actions_left = 5
+	fiat_full._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(fiat_full.board.has(Vector2i(3, 2)),
+		"Royal Fiat (Undamaged): a full back row is a no-op, the piece stays put")
+	fiat_full.queue_free()
+	await process_frame
+
+	# both held: return_to_start wins the tie (ruled in artefact_hooks.gd)
+	var both := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
+		"wave": 3, "artefacts": ["uss-eldridge-invisibility-paint", "royal-fiat-undamaged"]})
+	await process_frame
+	both.actions_left = 5
+	both._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(both.board.has(Vector2i(2, 2)),
+		"USS Eldridge Invisibility Paint takes precedence over Royal Fiat when both fire together")
+	both.queue_free()
+	await process_frame
+
+	# Fireproof Pajamas — blocks Item/Tariff destruction (_destroy's choke
+	# point), leaves ordinary Capture untouched
+	var fire := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 4]],
+		"wave": 3, "artefacts": ["fireproof-pajamas"]})
+	await process_frame
+	fire._destroy(Vector2i(4, 4))
+	check(fire.board.has(Vector2i(4, 4)) and fire.lost_player == 0,
+		"Fireproof Pajamas: an Item/Tariff destroy is blocked and doesn't count as a loss")
+	fire.queue_free()
+	await process_frame
+
+	var fire2 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 4, "artefacts": ["fireproof-pajamas"]})
+	await process_frame
+	await fire2._run_enemy_actions() # the enemy rook captures the player's pawn
+	check(fire2.board.has(Vector2i(2, 2)) and fire2.board[Vector2i(2, 2)].owner == Rules.ENEMY,
+		"Fireproof Pajamas: does not block an ordinary Capture, only Item/Tariff destruction")
+	fire2.queue_free()
+	await process_frame
+
+	# Hoffa's Cement Shoes — once per Wave, the capturer sinks with its victim
+	var hoffa := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 4, "artefacts": ["hoffa-s-cement-shoes"]})
+	await process_frame
+	await hoffa._run_enemy_actions()
+	check(not hoffa.board.has(Vector2i(2, 2)) and hoffa.lost_enemy == 1,
+		"Hoffa's Cement Shoes: the capturing enemy piece is removed along with its victim")
+	hoffa.queue_free()
+	await process_frame
+
+	var hoffa2 := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 4, 2],
+			["rook", 1, 2, 5], ["rook", 1, 4, 5]],
+		"wave": 4, "artefacts": ["hoffa-s-cement-shoes"]})
+	await process_frame
+	await hoffa2._run_enemy_actions() # 1st Capture this Wave: mutual destruction
+	await hoffa2._run_enemy_actions() # 2nd Capture this Wave: already used, capturer survives
+	var enemies_left := 0
+	for pos in hoffa2.board:
+		if hoffa2.board[pos].owner == Rules.ENEMY:
+			enemies_left += 1
+	check(hoffa2.board.is_empty() == false and enemies_left == 1 and hoffa2.lost_enemy == 1
+			and hoffa2.lost_player == 2,
+		"Hoffa's Cement Shoes: once per Wave — the second Capture's attacker survives")
+	hoffa2.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

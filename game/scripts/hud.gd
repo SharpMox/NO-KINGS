@@ -9,6 +9,8 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Guide := preload("res://scripts/guide.gd")
+const Settings := preload("res://scripts/settings.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -179,6 +181,26 @@ func build(game) -> void:
 		game_menu.visible = false
 		menu_toggled.emit(false))
 	gm_box.add_child(resume)
+
+	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
+	# scripts/settings.gd) so both entry points show identical content
+	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true)
+	var settings_panel := Settings.build(game_menu, func() -> void: gm_box.visible = true)
+	var guide_btn := Button.new()
+	guide_btn.text = "Guide"
+	guide_btn.add_theme_font_size_override("font_size", 20)
+	guide_btn.pressed.connect(func() -> void:
+		gm_box.visible = false
+		guide_scroll.visible = true)
+	gm_box.add_child(guide_btn)
+	var settings_btn := Button.new()
+	settings_btn.text = "Settings"
+	settings_btn.add_theme_font_size_override("font_size", 20)
+	settings_btn.pressed.connect(func() -> void:
+		gm_box.visible = false
+		settings_panel.visible = true)
+	gm_box.add_child(settings_btn)
+
 	var to_menu := Button.new()
 	to_menu.text = "Main Menu"
 	to_menu.add_theme_font_size_override("font_size", 20)

@@ -510,13 +510,14 @@ func _init() -> void:
 	# --- issue 28: audit the 3 unwired 5-Wave-Milestone artefacts + a general
 	# REGISTRY-coverage guard + echo x milestone coverage ---
 
-	# Yalta Cocktail Napkin / Roanoke Hex Kit have no REGISTRY wiring (their
-	# Outcomes say deliberately unimplemented) — must stay `implemented:
-	# false` so Items._build_artefact_effects() never offers a dead artefact
-	# to the player. Mar-a-Lago Toilet Papers was the 3rd of this originally-
-	# unwired trio; issue 43 wired it (on_wave_clear + on_price) and flipped
-	# it to implemented: true — see test_items_artefacts_3.gd.
-	for unwired_key in ["yalta-cocktail-napkin", "roanoke-hex-kit"]:
+	# Roanoke Hex Kit has no REGISTRY wiring (its Outcome says deliberately
+	# unimplemented) — must stay `implemented: false` so
+	# Items._build_artefact_effects() never offers a dead artefact to the
+	# player. It is the last of the originally-unwired trio: issue 43 wired
+	# Mar-a-Lago Toilet Papers (on_wave_clear + on_price) and issue 44 wired
+	# Yalta Cocktail Napkin (the choice-modal seam's first real consumer) —
+	# both are covered in test_items_artefacts_3.gd.
+	for unwired_key in ["roanoke-hex-kit"]:
 		var unwired_found := false
 		for cat in Items.ARTEFACT_CATALOG:
 			if cat.key == unwired_key:

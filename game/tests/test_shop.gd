@@ -240,6 +240,71 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
+	# --- issue 18: Shop slot pass — base + modifiers, additive per copy ---
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["chocolate-key-cake", "chocolate-key-cake",
+			"alleged-weather-balloon", "sub-antarctic-visa"]}
+	GameScript.is_scenario = true
+	var slots: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(slots)
+	await process_frame
+
+	check(Shop._extra_item_slots(slots) == {"total": 5, "tactical": 1},
+		"2 Chocolate Key Cakes (+2 each) + 1 Alleged Weather Balloon (+1, Tactical) = +5 Item slots")
+	check(Shop._extra_artefact_slots(slots) == 1, "1 Sub-Antarctic Visa = +1 hidden Artefact slot")
+	var item_n := 0
+	var artefact_n := 0
+	var hidden: Dictionary = {}
+	for sl in slots.shop_stock:
+		if sl.kind == "item":
+			item_n += 1
+		elif sl.kind == "artefact":
+			artefact_n += 1
+			if sl.get("biased", false):
+				hidden = sl
+	check(item_n == Shop.ROWS.item + 5, "the rolled stock actually carries the +5 Item slots (%d)" % item_n)
+	check(artefact_n == Shop.ROWS.artefact + 1, "the rolled stock carries the +1 hidden Artefact slot")
+	check(not hidden.is_empty(), "exactly one artefact slot is flagged biased (the hidden one)")
+	check(Shop.price(slots, hidden) == roundi(Tuning.SHOP_ARTEFACT_PRICE * 1.5),
+		"the hidden slot prices at +50% over a normal Artefact slot")
+	slots.queue_free()
+	await process_frame
+
+	# --- issue 18: Shop price modifiers, same held copy stacks additively
+	# off the immutable base as two Denazification Visas hit 0, not -25%^2
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["denazification-visa", "denazification-visa"], "gold": 500}
+	GameScript.is_scenario = true
+	var denaz: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(denaz)
+	await process_frame
+
+	var tac_item := {"kind": "item", "key": "blitz", "sold": false} # Blitz is Tactical
+	check(Shop.price(denaz, tac_item) == 0,
+		"two Denazification Visas: -50% each stacks to -100%, clamped at 0 gold")
+	var non_tac_item := {"kind": "item", "key": "air_strike", "sold": false} # Strategic
+	check(Shop.price(denaz, non_tac_item) == Tuning.SHOP_ITEM_PRICE["Strategic"],
+		"Denazification Visa only discounts Tactical Items, not other tiers")
+	denaz.queue_free()
+	await process_frame
+
+	# --- issue 18: two different artefacts' price modifiers compose off the
+	# same base too (slice 15 rule applies across artefacts, not just copies)
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["hollow-moon-cross-section", "shrinkflation-cereal-box"], "gold": 500}
+	GameScript.is_scenario = true
+	var priced: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(priced)
+	await process_frame
+
+	var artefact_slot := {"kind": "artefact", "key": "greed", "sold": false}
+	var artefact_price := Shop.price(priced, artefact_slot)
+	# base 100, -25% (Hollow Moon) +50% (Shrinkflation) = +25% additive net
+	check(artefact_price == roundi(Tuning.SHOP_ARTEFACT_PRICE * 1.25),
+		"Hollow Moon's -25% and Shrinkflation's +50% compose additively off the same base")
+	priced.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL SHOP CHECKS OK")

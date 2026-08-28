@@ -10,6 +10,8 @@ const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
+const Shop := preload("res://scripts/shop.gd")
+const Items := preload("res://data/items.gd")
 
 var fails := 0
 
@@ -820,6 +822,142 @@ func _init() -> void:
 	check(sg.actions_left == 1 and sg.state == sg.State.PLAYER_TURN,
 		"Stargate Divination Crystal refunds the capture's action before the auto-pass check — the turn stays open")
 	sg.queue_free()
+	await process_frame
+
+	# --- issue 18 (Shop/Item/Buff batch): Buff-tag artefacts go through
+	# BuffLogic.add, not a parallel path ---
+
+	# Crop Circle Plank: "5-Wave Milestone" fires off the just-cleared wave
+	# number directly (on_wave_clear), not the engine's own 10-wave
+	# on_milestone cadence — see artefact_hooks.gd's silk-road-coupon note
+	var crop := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
+		["knight", 0, 4, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "artefacts": ["crop-circle-plank"], "gold": 50})
+	await process_frame
+	WaveLogic.queue(crop, crop.wave + 1) # clears wave 5: a real 5-Wave Milestone
+	var buffed := 0
+	for pos in crop.board:
+		if crop.board[pos].owner == Rules.PLAYER and BuffLogic.of(crop.board[pos]).size() > 0:
+			buffed += 1
+	check(buffed == 2, "Crop Circle Plank: exactly 2 allied pieces get +1 Piece Buff")
+	check(crop.gold == 40, "Crop Circle Plank: -10 Gold")
+	crop.queue_free()
+	await process_frame
+
+	# it does NOT fire clearing wave 6 or 7 (not a multiple of 5)
+	var crop_off := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 6, "artefacts": ["crop-circle-plank"], "gold": 50})
+	await process_frame
+	WaveLogic.queue(crop_off, crop_off.wave + 1)
+	check(crop_off.gold == 50, "Crop Circle Plank: no-op on a wave clear that isn't a multiple of 5")
+	crop_off.queue_free()
+	await process_frame
+
+	# MK-Ultra Sugar Cube: On Deploy, the deployed piece gets a Tactical buff
+	var mkultra := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["mk-ultra-sugar-cube"], "stock": ["pawn"], "gold": 100})
+	await process_frame
+	mkultra.state = mkultra.State.PLAYER_TURN
+	mkultra.actions_left = 2
+	mkultra._place("pawn", Vector2i(4, 2))
+	var deployed: Array = BuffLogic.of(mkultra.board[Vector2i(4, 2)])
+	check(deployed.size() == 1, "MK-Ultra Sugar Cube: the deployed piece gets +1 Piece Buff")
+	if deployed.size() == 1:
+		var tac_keys: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
+			return b.tier == "Tactical").map(func(b: Dictionary) -> String: return b.key)
+		check(tac_keys.has(deployed[0].key), "MK-Ultra Sugar Cube: the Buff is Tactical-tier")
+	mkultra.queue_free()
+	await process_frame
+
+	# Holy Lint: On Capture, the capturing piece gets +1 Piece Buff (no gate) —
+	# exercises attacker_pos end to end through a real board capture
+	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
+		"wave": 3, "artefacts": ["holy-lint"]})
+	await process_frame
+	lint.actions_left = 5
+	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(BuffLogic.of(lint.board[Vector2i(3, 2)]).size() == 1,
+		"Holy Lint: the capturing piece gets +1 Piece Buff")
+	lint.queue_free()
+	await process_frame
+
+	# Frame 25: On Wave clear, +1 Tactical Item, -10 Gold
+	var frame := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["frame-25"], "gold": 50})
+	await process_frame
+	var items_n0: int = frame.items.size()
+	WaveLogic.queue(frame, frame.wave + 1)
+	check(frame.items.size() == items_n0 + 1, "Frame 25: +1 Item at Wave clear")
+	check(frame.items.back().tier == "Tactical", "Frame 25: the granted Item is Tactical-tier")
+	check(frame.gold == 40, "Frame 25: -10 Gold at Wave clear")
+	frame.queue_free()
+	await process_frame
+
+	# Sleeper Agent Pillow: a bought Piece arrives with a random Tactical Buff
+	# — the piece isn't on the board yet, so this rides stock as a Dictionary
+	var sleeper := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["sleeper-agent-pillow"], "gold": 9999})
+	await process_frame
+	sleeper.state = sleeper.State.PLAYER_TURN
+	sleeper.actions_left = 5
+	var piece_i := -1
+	for i in sleeper.shop_stock.size():
+		if sleeper.shop_stock[i].kind == "piece":
+			piece_i = i
+			break
+	Shop.buy(sleeper, piece_i)
+	var bought: Variant = sleeper.stock.back()
+	check(bought is Dictionary and BuffLogic.of(bought).size() == 1,
+		"Sleeper Agent Pillow: the bought Piece lands in Stock carrying a Buff")
+	sleeper.actions_left = 5
+	sleeper._place(bought, Vector2i(4, 2))
+	check(BuffLogic.of(sleeper.board[Vector2i(4, 2)]).size() == 1,
+		"Sleeper Agent Pillow: the Buff survives deployment onto the board")
+	sleeper.queue_free()
+	await process_frame
+
+	# Shrinkflation Cereal Box: +10 Gold/+10 Score/+1s Clock at every Turn end
+	# (new on_turn_end hook, game.gd:_on_pass)
+	var shrink := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["shrinkflation-cereal-box"], "gold": 50, "score": 0})
+	await process_frame
+	shrink.state = shrink.State.PLAYER_TURN
+	shrink.actions_left = 0 # any non-SETUP pass through _on_pass reaches on_turn_end
+	var clock0: float = shrink.clock_ms
+	shrink._on_pass()
+	check(shrink.gold == 60 and shrink.score == 10, "Shrinkflation Cereal Box: +10 Gold/+10 Score at Turn end")
+	check(shrink.clock_ms > clock0, "Shrinkflation Cereal Box: +1s Clock at Turn end")
+	shrink.queue_free()
+	await process_frame
+
+	# Skull and Bones Coffin: +20% Score gain while holding 200+ Gold, gated
+	# off (not just discounted) below that
+	var skull := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["skull-and-bones-coffin"], "gold": 199})
+	await process_frame
+	Economy.earn(skull, 100)
+	check(skull.score == 100, "Skull and Bones Coffin: no bonus under 200 Gold")
+	skull.gold = 200
+	Economy.earn(skull, 100)
+	check(skull.score == 220, "Skull and Bones Coffin: +20% Score gain at 200+ Gold")
+	skull.queue_free()
+	await process_frame
+
+	# Majestic 12 Secret Handshake Diagram: Item Boxes only offer
+	# Strategic/Decisive Items — the mixed Box Pick is unaffected
+	var majestic := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["majestic-12-secret-handshake-diagram"]})
+	await process_frame
+	var tactical_keys: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
+		return it.tier == "Tactical").map(func(it: Dictionary) -> String: return it.key)
+	var saw_only_high_tier := true
+	for i in 20:
+		for opt in majestic._box_options("item"):
+			if tactical_keys.has(opt.payload.key):
+				saw_only_high_tier = false
+	check(saw_only_high_tier, "Majestic 12: typed Item Boxes never roll a Tactical Item")
+	check(majestic._box_options().size() == 3, "Majestic 12: the mixed Box Pick still rolls freely")
+	majestic.queue_free()
 	await process_frame
 
 	print("---")

@@ -134,6 +134,12 @@ static func all() -> Array:
 				"super-soldier-multivitamins", "stargate-divination-crystal", "5g-microchips",
 				"terracotta-draft-card", "charlemagne-s-birth-certificate"],
 			"wave": 3, "score": 200, "stock": ["pawn"]}},
+		{"name": "Artefacts: Shop/Item/Buff batch (issue 18)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
+			"artefacts": ["denazification-visa", "hollow-moon-cross-section", "chocolate-key-cake",
+				"sub-antarctic-visa", "crop-circle-plank", "mk-ultra-sugar-cube",
+				"frame-25", "sleeper-agent-pillow"],
+			"gold": 200, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

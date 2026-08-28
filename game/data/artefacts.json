@@ -119,7 +119,7 @@
   ],
   "effect": "On 5-Wave Milestone: 2 random allied pieces get +1 Piece Buff; -10 Gold",
   "conspiracy": "Crop circles",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "mar-a-lago-toilet-papers",
@@ -205,7 +205,7 @@
   ],
   "effect": "On Deploy: the deployed piece gets +1 Tactical Piece Buff",
   "conspiracy": "Project MKUltra",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "frog-pride-flag",
@@ -266,7 +266,7 @@
   ],
   "effect": "On Wave clear: +1 Tactical Item; -10 Gold",
   "conspiracy": "Subliminal advertising",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "satoshi-s-private-key",
@@ -352,7 +352,7 @@
   ],
   "effect": "On your first Capture each Wave: the capturing piece gets +1 Tactical Piece Buff",
   "conspiracy": "Water fluoridation",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cia-heart-attack-gun",
@@ -412,7 +412,7 @@
   ],
   "effect": "Tactical Items cost 50% less in the Shop",
   "conspiracy": "Operation Paperclip",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "numbers-station-sudoku",
@@ -434,9 +434,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "The Shop stocks +1 Item slot; it only offers Tactical Items (needs: shop layout change)",
+  "effect": "The Shop stocks +1 Item slot; it only offers Tactical Items",
   "conspiracy": "Roswell",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "amityville-ouija-board",
@@ -485,7 +485,7 @@
   ],
   "effect": "While holding 200+ Gold: +20% Score gain; Shop prices +5%",
   "conspiracy": "Skull and Bones",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "the-red-phone",
@@ -596,7 +596,7 @@
   ],
   "effect": "On 5-Wave Milestone: +2 Items",
   "conspiracy": "The Manna Machine",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "spare-organ-receipt",
@@ -696,7 +696,7 @@
   ],
   "effect": "On 5-Wave Milestone: Shop prices -50% until the next Wave",
   "conspiracy": "Silk Road",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "sleeper-agent-pillow",
@@ -708,7 +708,7 @@
   ],
   "effect": "On buying a Piece in the Shop: it arrives with a random Tactical Piece Buff",
   "conspiracy": "The Manchurian candidate",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "holy-lint",
@@ -720,7 +720,7 @@
   ],
   "effect": "On Capture: +1 Piece Buff",
   "conspiracy": "The Shroud of Turin",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "qanon-profile-picture",
@@ -793,7 +793,7 @@
   ],
   "effect": "On Wave clear: -5 Gold, +1 Piece Buff",
   "conspiracy": "Scientology auditing",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "xenu-ot-iii-season-pass",
@@ -805,7 +805,7 @@
   ],
   "effect": "On Wave clear: -15 Gold, +3 Piece Buffs",
   "conspiracy": "Xenu",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "trilateral-meeting-stickers",
@@ -889,9 +889,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "The Shop stocks +2 Item slots (needs: shop layout change)",
+  "effect": "The Shop stocks +2 Item slots",
   "conspiracy": "Iran–Contra",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cleopatra-s-hairpin",
@@ -1014,7 +1014,7 @@
   ],
   "effect": "Artefacts cost 25% less in the Shop",
   "conspiracy": "The Hollow Moon",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "john-titor-s-crypto-wallet",
@@ -1271,7 +1271,7 @@
   ],
   "effect": "On buying a Tactical Item in the Shop: a second random Tactical Item is free",
   "conspiracy": "The Mao badge craze",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "antikythera-warranty-card",
@@ -1381,7 +1381,7 @@
   ],
   "effect": "Item Boxes only offer Strategic and Decisive Items",
   "conspiracy": "Majestic 12",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "yalta-cocktail-napkin",
@@ -1405,7 +1405,7 @@
   ],
   "effect": "On 5-Wave Milestone: every allied piece on the Board gets +1 Piece Buff",
   "conspiracy": "Chemtrails",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "montauk-eggo-waffle",
@@ -1840,9 +1840,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "The Shop stocks +1 hidden slot offering Artefacts at +50% price but one rarity higher (needs: shop layout change + rarity bias)",
+  "effect": "The Shop stocks +1 hidden slot offering Artefacts at +50% price but one rarity higher",
   "conspiracy": "Antarctica",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "zero-point-energy-drink",
@@ -1917,7 +1917,7 @@
   ],
   "effect": "At every Turn end: +10 Gold, +10 Score, +1s Clock; Shop prices +50%",
   "conspiracy": "Shrinkflation",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "all-seeing-eye-contact-lens",

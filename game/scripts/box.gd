@@ -11,7 +11,11 @@ const Tuning := preload("res://scripts/tuning.gd")
 ## {kind, name, description, tier?, value?, payload?}.
 ## `only_kind` pins every option to one kind — that is what a typed Shop Box
 ## sells (GDD Shop page); the capture-driven Box Pick leaves it empty.
-static func roll_options(rng: RandomNumberGenerator, only_kind := "") -> Array:
+## `allowed_tiers` further restricts an Item roll (Majestic 12 Secret
+## Handshake Diagram, issue 18: "Item Boxes only offer Strategic and Decisive
+## Items") — empty means every tier, as before.
+static func roll_options(rng: RandomNumberGenerator, only_kind := "",
+		allowed_tiers: Array = []) -> Array:
 	var out := []
 	var taken := {}
 	for i in 3:
@@ -22,7 +26,8 @@ static func roll_options(rng: RandomNumberGenerator, only_kind := "") -> Array:
 		match kind:
 			"item":
 				var pool := Items.ITEMS.filter(func(e: Dictionary) -> bool:
-					return not taken.has(e.name))
+					return not taken.has(e.name) \
+						and (allowed_tiers.is_empty() or allowed_tiers.has(e.tier)))
 				var e: Dictionary = pool[rng.randi() % pool.size()]
 				opt = {"kind": "item", "name": e.name, "tier": e.tier,
 					"description": e.description, "payload": e}

@@ -69,13 +69,25 @@ static func gain(g, amount: int) -> int:
 ## stashed on `g.last_capture_ctx` (a Dictionary reference survives the call
 ## boundary this int return value can't) so `_move_player` can read them back
 ## AFTER its own board mutation runs; see artefact_hooks.gd's header.
+## `victim_pos` (issue 25) is board[to]/board[also] — still intact here too —
+## read into `victim_captures` BEFORE the caller erases it, for Chupacabra
+## Chew Toy's "the captured piece had captured one of yours" (a piece can
+## only capture a player piece, so any lifetime captures > 0 qualifies).
+## attacker_pos also bumps the attacker's own ledger here (g._note_capture)
+## before the hook runs, so an on_capture handler in the same dispatch (Alien
+## Rocket Toy) already sees this capture counted.
 static func capture_score(g, victim_id: String, attacker_id: String = "",
-		attacker_buffed: bool = false, attacker_pos: Vector2i = Vector2i(-1, -1)) -> int:
+		attacker_buffed: bool = false, attacker_pos: Vector2i = Vector2i(-1, -1),
+		victim_pos: Vector2i = Vector2i(-1, -1)) -> int:
 	var base: int = g.defs[victim_id].value
+	if attacker_pos.x >= 0 and g.board.has(attacker_pos):
+		g._note_capture(attacker_pos)
+	var victim_captures: int = g.board[victim_pos].get("captures", 0) \
+		if victim_pos.x >= 0 and g.board.has(victim_pos) else 0
 	var ctx := ArtefactHooks.run(g, "on_capture", {
 		"victim_id": victim_id, "base": base, "pts": base,
 		"attacker_id": attacker_id, "attacker_buffed": attacker_buffed,
-		"attacker_pos": attacker_pos,
+		"attacker_pos": attacker_pos, "victim_captures": victim_captures,
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
 		"return_to_start": false, "move_to_backrow": false,

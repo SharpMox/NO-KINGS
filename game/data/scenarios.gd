@@ -150,6 +150,12 @@ static func all() -> Array:
 				"dyatlov-geiger-counter", "merchants-of-death-sample-case",
 				"tunguska-toothpicks"],
 			"tariffs": ["move_cost"], "gold": 100, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: issue 25 (per-piece capture ledger)", "cfg": {
+			"board": [["queen", 0, 2, 1, {"captures": 2, "wave_captures": 1}],
+				["pawn", 0, 3, 1], ["pawn", 1, 2, 5], ["pawn", 1, 3, 5, {"captures": 1}],
+				["rook", 1, 4, 6]],
+			"artefacts": ["chupacabra-chew-toy", "zodiac-crossword-puzzle", "alien-rocket-toy"],
+			"gold": 50, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

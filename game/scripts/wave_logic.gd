@@ -23,6 +23,12 @@ static func queue(g, n: int) -> void:
 	g.wave = n
 	g.turns_since_wave = 0
 	g.wave_capture_count = 0
+	for pos in g.board: # Zodiac Crossword Puzzle's Wave-scoped per-piece ledger
+		g.board[pos].erase("wave_captures") # (issue 25) — the lifetime one
+			# (`captures`) is untouched, only this Wave-scoped copy resets
+	for entry in g.stock: # a piece Extracted mid-Wave shouldn't carry a stale
+		if entry is Dictionary: # count into a Wave it never played (edge case,
+			entry.erase("wave_captures") # cheap enough to close outright)
 	g.gold_spent_shop_this_wave = 0
 	g.wave_start_lost_player = g.lost_player
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives

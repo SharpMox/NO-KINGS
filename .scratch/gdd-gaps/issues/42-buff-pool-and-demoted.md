@@ -109,4 +109,4 @@ never-Ranked control piece, unaffected either way. `data/scenarios.gd` gained
 "Artefacts: slice 42 (peak-rank stamp — Dark Market Light Bulb)" for manual/swept
 sandbox coverage of the same 3 states. `run_all.sh`: ALL GREEN.
 
-PR: https://github.com/SharpMox/NO-KINGS/pull/154
+PR: https://github.com/SharpMox/NO-KINGS/pull/155

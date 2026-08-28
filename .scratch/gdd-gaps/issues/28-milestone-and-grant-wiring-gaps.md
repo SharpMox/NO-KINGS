@@ -50,8 +50,39 @@ No test exercises echo + milestone together, which is why it was invisible.
       (`fix/blitz-and-crypto-wallet`, 2026-08-28 — user-reported; registered
       on `on_wave_clear` + `_milestone5_hit`, same as silk-road-coupon /
       crop-circle-plank / ark-s-bunkbed)
-- [ ] The three unwired artefacts confirmed `implemented: false`, or wired
-- [ ] Decision recorded on whether random grants are tier-restricted
-- [ ] Echo layer carries the artefact entry (not just its key) so `acquired_wave` survives
-- [ ] A test covering echo + a milestone artefact together
-- [ ] `run_all.sh` all green
+- [x] The three unwired artefacts confirmed `implemented: false`, or wired
+      (`fix/issue-28-wiring`, 2026-08-28 — all three still `false` in
+      `data/artefacts.js`/`game/data/artefacts.json`; no live bug. Audit also
+      added a general regression test: every `implemented: true` artefact
+      must have a REGISTRY entry or be a documented standing-rule exception —
+      see test_items.gd's issue 28 section)
+- [ ] Decision recorded on whether random grants are tier-restricted — open
+      question below, not decided by this fix
+- [x] Echo layer carries the artefact entry (not just its key) so `acquired_wave` survives
+      (`fix/issue-28-wiring`, 2026-08-28 — `run()`'s `fired` array now holds
+      the held-copy entry, not the bare key; `_run_meta_triggers` reads
+      `entry.get("acquired_wave", 1)` off it instead of the `_dispatch`
+      default. The re-entrancy guard (`fired`/`_run_meta_triggers` never
+      re-entering `run()`, backstopped by `artefact_echo_depth`) is untouched)
+- [x] A test covering echo + a milestone artefact together
+      (`fix/issue-28-wiring`, 2026-08-28 — test_items.gd: John Titor's Crypto
+      Wallet (acquired wave 2) + Max Headroom Mask; before the fix the echo
+      dispatch defaulted to `acquired_wave=1` and paid nothing on this copy's
+      real beat (wave 6), so the held copy under-paid by half on every echo)
+- [x] `run_all.sh` all green
+
+## Outcome
+
+Items 1 and 3 are fixed on `fix/issue-28-wiring` (PR pending). Item 2's tier-restriction
+question is **not decided here** — it needs your call, not an agent's:
+
+> **Should randomly-granted buffs (Holy Lint, Crop Circle Plank, Sugar Free Chemtrail
+> Can, Xenu OT III Season Pass, Scientology E-Meter, MK-Ultra Sugar Cube, etc.) be
+> restricted to drawing from the Tactical tier only — the way MK-Ultra Sugar Cube
+> already is — instead of drawing from all 12 Piece Buffs including the Decisive ones
+> (Bomb, Trap, Multicapture, Reflect)?**
+
+If the answer is yes, that's the natural place to also close out the Bomb/Trap/
+Multicapture self-consumption timing questions issue 27 left open for item 2 above —
+restricting the pool sidesteps them rather than requiring separate per-buff timing
+fixes. Left alone pending your answer.

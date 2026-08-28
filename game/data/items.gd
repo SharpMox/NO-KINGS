@@ -6,12 +6,14 @@
 ## when it disagrees with this file, Notion wins and this file changes (user
 ## call 2026-08-27; last name+effect audit 2026-08-27, Blitz and Demote resynced).
 ##
-## Item fields: key, name, tier, description, target:
+## Item fields: key, name, tier, description, target, action_cost (default 1
+##   if omitted — the Actions it costs to USE the item itself; separate from
+##   whatever effect it grants on its target):
 ##   "" (instant) · "tile" (pick one tile) · "pair" (pick a piece, then a destination)
 
 const ITEMS: Array = [
-	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile",
-		"description": "Target Piece can move a second time this turn."},
+	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile", "action_cost": 0,
+		"description": "Target Piece: its next move or capture this Turn costs no action."},
 	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "tile",
 		"description": "Duplicate a piece on the board to your Stock."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",

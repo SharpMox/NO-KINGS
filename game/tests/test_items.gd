@@ -925,6 +925,32 @@ func _init() -> void:
 	crop_off.queue_free()
 	await process_frame
 
+	# John Titor's Crypto Wallet: was left wired to on_milestone (the GLOBAL
+	# 10-wave beat) when the rest of this "5-Wave Milestone" batch moved to
+	# the per-artefact on_wave_clear + _milestone5_hit cadence — paid at half
+	# the intended rate. Acquired wave 2: fires clearing wave 6 (2+4, beat 1)
+	# and wave 11 (2+9, beat 2). Waves 8-10 are jumped directly (g.wave set,
+	# not queued one by one) so the test never calls WaveLogic.queue with the
+	# GLOBAL milestone wave (10) itself — that fires its OWN clock refill +
+	# score/gold bonus (wave_logic.gd's `n % MILESTONE_WAVES == 0` block),
+	# unrelated to this artefact and just noise for this assertion; the
+	# separate control test below isolates that wave on purpose instead.
+	var cw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 2, "artefacts": ["john-titor-s-crypto-wallet"], "gold": 0})
+	await process_frame
+	cw.artefacts[0].acquired_wave = 2
+	cw.clock_ms = 25000.0 # 25s left -> +5 Gold per firing (int(25.0 / 5.0))
+	for n in range(3, 7): # clear waves 2..5: not this copy's beat yet
+		WaveLogic.queue(cw, n)
+	check(cw.gold == 0, "no payout before the copy's own beat 5 (acquired wave 2 -> W+4 = wave 6)")
+	WaveLogic.queue(cw, 7) # clears wave 6: this copy's beat 1 (2+4)
+	check(cw.gold == 5, "fires on its own 5-wave beat, +1 Gold per 5s left on the Clock (25s -> +5)")
+	cw.wave = 11 # skip straight past 8/9/10 (see comment above)
+	WaveLogic.queue(cw, 12) # clears wave 11: this copy's beat 2 (2+9)
+	check(cw.gold == 10, "fires again on its own next 5-wave beat (W+9), not the global cadence")
+	cw.queue_free()
+	await process_frame
+
 	# MK-Ultra Sugar Cube: On Deploy, the deployed piece gets a Tactical buff
 	var mkultra := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["mk-ultra-sugar-cube"], "stock": ["pawn"], "gold": 100})
@@ -2224,25 +2250,83 @@ func _init() -> void:
 	order_2.queue_free()
 	await process_frame
 
-	# --- 07-difficulty-ranks: Tier 5's -1 action/turn interacts with Blitz,
-	# which refunds its own action precisely so move+Blitz doesn't leave 0 at
-	# the normal 2 actions/turn. At 1 action/turn the halving removes the
-	# second action Blitz relies on entirely: the move alone spends the
-	# turn's only action and auto-passes before Blitz's own target filter
-	# (a piece that already moved this turn) is ever reachable — Blitz is
-	# dead at Tier 5, not merely weaker. Documented here, not "fixed": the
-	# tier spec calls for a flat action cut, not item-specific compensation.
+	# --- Blitz rework (Notion 2026-08-28): costs 0 actions itself (data-driven
+	# via items.gd's action_cost, defaulting to 1 for every other item),
+	# targets ANY own piece (King excluded, like every other targeted item —
+	# the already-moved-only restriction is gone), and marks the target's
+	# NEXT move/capture this Turn free. If the target already moved, Blitz
+	# also lifts the one-move-per-piece lock so that free move can actually
+	# happen. A real power increase (three Blitzes = three free moves), not a
+	# wash: the old "costs 1, refunds 1" behavior is gone. ---
+
+	# targeting: an un-moved own piece is now offered too; the King never is
+	var bfree := _boot({"board": [["queen", 0, 2, 2], ["king", 0, 0, 0], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz"]})
+	await process_frame
+	check(bfree.actions_left == 2, "2 actions/turn at the default tier")
+	bfree._use_item(0)
+	check(bfree.item_targets.has(Vector2i(2, 2)) and not bfree.item_targets.has(Vector2i(0, 0)),
+		"Blitz offers the un-moved queen but excludes the King")
+	bfree._item_click(Vector2i(2, 2))
+	check(bfree.items.is_empty() and bfree.actions_left == 2, "Blitz costs 0 actions to use")
+	check(bfree.board[Vector2i(2, 2)].get("blitz_free_move", false),
+		"Blitz marks the target's next move/capture as free")
+	bfree._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(bfree.actions_left == 2, "the marked piece's move costs no action")
+	check(not bfree.board[Vector2i(2, 3)].get("blitz_free_move", false),
+		"the free-move flag is consumed by that one move")
+	bfree.queue_free()
+	await process_frame
+
+	# an already-moved target: Blitz also lifts the one-move-per-piece lock,
+	# and THAT second move is the free one
+	var bt2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz"]})
+	await process_frame
+	bt2._move_player(Vector2i(2, 2), Vector2i(2, 3)) # spends the queen's move
+	check(bt2.moved_this_turn.has(Vector2i(2, 3)) and bt2.actions_left == 1,
+		"queen is spent for the turn, 1 action left")
+	bt2._use_item(0)
+	check(bt2.item_targets.has(Vector2i(2, 3)), "Blitz can target an already-moved piece too")
+	bt2._item_click(Vector2i(2, 3))
+	check(not bt2.moved_this_turn.has(Vector2i(2, 3)) and bt2.actions_left == 1,
+		"Blitz lifts the one-move-per-piece lock, still costing nothing itself")
+	bt2._move_player(Vector2i(2, 3), Vector2i(2, 4))
+	check(bt2.actions_left == 1, "the second move is free — genuinely moved again for 0 actions")
+	bt2.queue_free()
+	await process_frame
+
+	# the flag is scoped "this Turn" — it must not survive into the next one
+	var bt3 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "items": ["blitz"]})
+	await process_frame
+	bt3._use_item(0)
+	bt3._item_click(Vector2i(2, 2))
+	check(bt3.board[Vector2i(2, 2)].get("blitz_free_move", false), "flag set this turn")
+	bt3._begin_player_turn() # simulate the next player turn starting
+	check(not bt3.board[Vector2i(2, 2)].get("blitz_free_move", false),
+		"the free-move flag does not survive into a new turn")
+	bt3.queue_free()
+	await process_frame
+
+	# --- 07-difficulty-ranks: Tier 5's -1 action/turn. The OLD Blitz refunded
+	# its own action, so at 1 action/turn the first move alone spent the
+	# turn's only action and auto-passed before Blitz's target filter (a
+	# piece that already moved) was ever reachable — Blitz was functionally
+	# dead at Tier 5. The rework fixes this by construction: Blitz itself is
+	# free and its target's move is free too, so it must genuinely work here.
 	GameScript.next_tier = "Tier 5"
 	var bz := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "items": ["blitz"]})
 	await process_frame
 	check(bz.actions_left == 1, "Tier 5 grants exactly 1 action at turn start")
-	bz._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(bz.state != bz.State.PLAYER_TURN,
-		"the turn's only action auto-passes on the first move, before Blitz can target it")
-	bz._use_item(0)
-	check(bz.item_active == -1,
-		"Blitz never arms post-move at Tier 5 — can't fire the interaction it was tuned for")
+	bz._use_item(0) # Blitz on the un-moved queen
+	bz._item_click(Vector2i(2, 2))
+	check(bz.actions_left == 1 and bz.state == bz.State.PLAYER_TURN,
+		"Blitz itself costs no action, even at Tier 5 — no auto-pass either")
+	bz._move_player(Vector2i(2, 2), Vector2i(2, 3)) # the marked free move
+	check(bz.actions_left == 1 and bz.state == bz.State.PLAYER_TURN,
+		"the free move spends no action — the turn's only action is still there, no auto-pass")
 	bz.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER

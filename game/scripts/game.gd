@@ -557,6 +557,8 @@ func _begin_player_turn() -> void:
 	ArtefactHooks.run(self, "on_turn_start")
 	actions_max = actions_left
 	moved_this_turn.clear()
+	for pos in board: # Blitz's free move is scoped "this Turn" — never carries over
+		board[pos].erase("blitz_free_move")
 	turn_action_count = 0
 	turn_capture_count = 0
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
@@ -1202,6 +1204,13 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var captured_king_id := ""
 	var return_to_start := false # USS Eldridge Invisibility Paint (artefact hook 24)
 	var move_to_backrow := false # Royal Fiat (Undamaged), same mechanism
+	# Blitz rework (Notion 2026-08-28): the target's next move/capture this
+	# Turn costs no action — a one-shot flag on the piece Dictionary itself
+	# (ADR-0002: opaque piece state rides the Dictionary object, not a board
+	# position, since `from` is about to move or disappear). Captured once,
+	# up front, so every actions_left -= 1 below can consume it.
+	var moving_piece: Dictionary = board[from]
+	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
@@ -1218,7 +1227,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			_consume_buff(to, "shield")
 			_add_float(to, "Blocked", COL_MERGE)
 		Economy.charge(self, "move_cost")
-		actions_left -= 1
+		if blitz_free:
+			moving_piece.erase("blitz_free_move")
+		else:
+			actions_left -= 1
 		turn_action_count += 1
 		moved_this_turn.append(from)
 		_clear_selection()
@@ -1284,7 +1296,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			board[to] = board[from] # the attacker lands, then the blast
 			board.erase(from)
 			_detonate(to)
-			actions_left -= 1
+			if blitz_free:
+				moving_piece.erase("blitz_free_move")
+			else:
+				actions_left -= 1
 			turn_action_count += 1
 			if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 				return _on_pass()
@@ -1297,7 +1312,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			board.erase(from)
 			board.erase(to)
 			captured.append(victim.id)
-			actions_left -= 1
+			if blitz_free:
+				moving_piece.erase("blitz_free_move")
+			else:
+				actions_left -= 1
 			turn_action_count += 1
 			if actions_left == 0 and state == State.PLAYER_TURN:
 				return _on_pass()
@@ -1329,7 +1347,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			board.erase(to)
 			_add_slide(to, dest)
 			final_pos = dest
-	actions_left -= 1
+	if blitz_free:
+		moving_piece.erase("blitz_free_move")
+	else:
+		actions_left -= 1
 	turn_action_count += 1
 	moved_this_turn.append(final_pos)
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
@@ -1602,14 +1623,15 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	# Nuclear Football Menu (issue 26): Items are free of their Action cost
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
-		actions_left -= 1 # every item use is one of the turn's actions
+		actions_left -= it.get("action_cost", 1) # data-driven (Blitz: 0)
 	turn_action_count += 1
 	match it.key:
-		"blitz": # lift the one-move-per-piece lock on the target (Notion 2026-08-27).
-			# Refunds its own action: at 2 actions/turn, move + Blitz would
-			# otherwise leave 0 and auto-pass before the second move ever happens.
+		"blitz": # Notion 2026-08-28 rework: costs 0 actions itself; the target's
+			# NEXT move/capture this Turn is free (_move_player checks the flag).
+			# If it already moved, also lift the one-move-per-piece lock so it
+			# can genuinely move again — that move is the free one.
 			moved_this_turn.erase(b)
-			actions_left += 1
+			board[b].blitz_free_move = true
 		"asset_recovery":
 			stock.append(board[b].id) # copy a board piece into stock
 		"surprise_attack":

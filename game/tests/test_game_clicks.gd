@@ -6,6 +6,7 @@ extends SceneTree
 ##   godot --path game -s tests/test_game_clicks.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const Settings := preload("res://scripts/settings.gd")
 
 var fails := 0
 
@@ -20,6 +21,13 @@ func check(cond: bool, label: String) -> void:
 
 func _click_button_in(node: Node, text: String) -> bool:
 	if node is Button and node.text == text and node.is_visible_in_tree():
+		var p: Node = node.get_parent()
+		while p: # bring buttons inside scroll lists into the viewport first
+			if p is ScrollContainer: # the in-game Guide panel scrolls (05-menus)
+				p.ensure_control_visible(node)
+				await process_frame
+				break
+			p = p.get_parent()
 		_click(node.get_global_rect().get_center())
 		return true
 	for c in node.get_children():
@@ -54,6 +62,7 @@ func _init() -> void:
 	create_timer(120.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: probe still running after 120s — force quit")
 		quit(1))
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 		"captured": ["pawn", "pawn"],
@@ -179,9 +188,27 @@ func _init() -> void:
 	var frozen: float = game.clock_ms
 	await create_timer(0.4).timeout
 	check(game.clock_ms == frozen, "clock pauses while the menu is open")
+
+	# Guide and Settings (05-menus-and-settings): each opens over the pause
+	# menu and its own Back returns to the pause menu, not straight to Resume
+	check(await _click_button_in(game.game_menu, "Guide"), "in-game Guide button clickable")
+	await process_frame
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Guide Back clickable")
+	await process_frame
+	check(await _click_button_in(game.game_menu, "Settings"), "in-game Settings button clickable")
+	await process_frame
+	var sound_on: bool = Settings.load_settings().sound_on
+	check(await _click_button_in(game.game_menu, "Sound: %s" % ("On" if sound_on else "Off")),
+		"in-game Sound toggle clickable")
+	await process_frame
+	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists")
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable")
+	await process_frame
+
 	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable")
 	await process_frame
 	check(not game.game_menu_open, "Resume closes the menu")
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
 
 	# wave-50 King capture opens the win screen; Continue resumes the run
 	game.queue_free()

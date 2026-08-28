@@ -6,6 +6,7 @@ extends SceneTree
 ##   godot --path game -s tests/test_menu_clicks.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const Settings := preload("res://scripts/settings.gd")
 
 var fails := 0
 
@@ -61,6 +62,7 @@ func _init() -> void:
 	create_timer(120.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: probe still running after 120s — force quit")
 		quit(1))
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
 	var menu: Node = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(menu)
 	await process_frame
@@ -108,8 +110,14 @@ func _init() -> void:
 	check(GameScript.next_army == "Wild Hunt", "army click stages its stock")
 
 	# Scores opens the local high-score list (fresh menu again: the army
-	# click above changed the scene)
+	# click above changed the scene). The army click's change_scene_to_file
+	# is deferred, so the Game it loaded is still root's current_scene here —
+	# free it too, or its full-rect HUD keeps intercepting clicks that land
+	# near the screen bottom (found via the Guide panel's Back, 05-menus).
 	menu.queue_free()
+	if current_scene and current_scene != menu:
+		current_scene.queue_free()
+		current_scene = null
 	await process_frame
 	var f := FileAccess.open(GameScript.SCORES_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify([{"score": 512, "wave": 7, "kings": 0}]))
@@ -125,6 +133,48 @@ func _init() -> void:
 	await process_frame
 	check(_find_button(menu, "Play") != null, "scores Back restores the main menu")
 	DirAccess.remove_absolute(GameScript.SCORES_PATH)
+
+	# Games History: per-run log, distinct from the top-10 Highscores above
+	var hf := FileAccess.open(GameScript.HISTORY_PATH, FileAccess.WRITE)
+	hf.store_string(JSON.stringify(
+		[{"score": 77, "wave": 4, "kings": 0, "tariffs": 1, "lost": 2, "won": false}]))
+	hf = null
+	check(await _click_button(menu, "Games History"), "Games History button clickable")
+	await process_frame
+	check(_find_label(menu, "77") != null, "history list shows the stored run")
+	check(await _click_button(menu, "← Back"), "history Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "history Back restores the main menu")
+	DirAccess.remove_absolute(GameScript.HISTORY_PATH)
+
+	# Guide: shared rules reference (identical copy lives in the in-game menu)
+	check(await _click_button(menu, "Guide"), "Guide button clickable")
+	await process_frame
+	check(_find_label(menu, "Objective") != null, "Guide panel shows its rules text")
+	check(await _click_button(menu, "← Back"), "Guide Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "Guide Back restores the main menu")
+
+	# About: credits/version
+	check(await _click_button(menu, "About"), "About button clickable")
+	await process_frame
+	check(_find_label(menu, "NO KINGS") != null, "About panel shows its heading")
+	check(await _click_button(menu, "← Back"), "About Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "About Back restores the main menu")
+
+	# Settings: the Sound toggle round-trips to user://settings.json (clean
+	# slate came from the SETTINGS_PATH wipe at the top) — the shell 06
+	# (animations) and 07 (difficulty) hang their own rows off
+	check(await _click_button(menu, "Settings"), "Settings button clickable")
+	await process_frame
+	check(await _click_button(menu, "Sound: On"), "Sound toggle clickable")
+	await process_frame
+	check(not Settings.load_settings().sound_on, "Sound toggle persists to disk")
+	check(await _click_button(menu, "← Back"), "Settings Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "Settings Back restores the main menu")
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
 
 	print("---")
 	if fails == 0:

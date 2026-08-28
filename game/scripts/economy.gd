@@ -72,6 +72,21 @@ static func record_score(g) -> int:
 	return rank
 
 
+const HISTORY_CAP := 50 # newest-first log; capped so the file can't grow forever
+
+
+## Games History: every real run's end-screen summary (05-menus-and-settings)
+## — distinct from the ranked top-10 Highscores above.
+static func record_history(g, won: bool) -> void:
+	var history: Array = g.load_history()
+	history.push_front({
+		"score": g.score, "wave": g.wave, "kings": g.kings_defeated,
+		"tariffs": g.tariffs_seen.size(), "lost": g.lost_player, "won": won,
+	})
+	var f := FileAccess.open(g.HISTORY_PATH, FileAccess.WRITE)
+	f.store_string(JSON.stringify(history.slice(0, HISTORY_CAP)))
+
+
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
 
 static func activate_tariff(g, tier: String) -> void:

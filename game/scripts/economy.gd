@@ -64,6 +64,11 @@ static func gain(g, amount: int) -> int:
 ## (issue 18) is that same board position, Vector2i(-1,-1) when it doesn't
 ## apply, so a handler can grant something to the attacking piece itself
 ## (Obedience-Flavored Tap Water, Holy Lint) instead of just reading its id.
+## `return_to_start`/`move_to_backrow` (issue 24) are output flags for
+## handlers that want to reposition the capturing piece — the ctx itself is
+## stashed on `g.last_capture_ctx` (a Dictionary reference survives the call
+## boundary this int return value can't) so `_move_player` can read them back
+## AFTER its own board mutation runs; see artefact_hooks.gd's header.
 static func capture_score(g, victim_id: String, attacker_id: String = "",
 		attacker_buffed: bool = false, attacker_pos: Vector2i = Vector2i(-1, -1)) -> int:
 	var base: int = g.defs[victim_id].value
@@ -73,9 +78,11 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 		"attacker_pos": attacker_pos,
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
+		"return_to_start": false, "move_to_backrow": false,
 	})
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
+	g.last_capture_ctx = ctx
 	return ctx.pts
 
 

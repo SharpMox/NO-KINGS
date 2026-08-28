@@ -883,10 +883,19 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 
 
 ## A uniformly random Piece Buff key, optionally restricted to one tier
-## ("Tactical Piece Buff" in several issue-18 effect texts).
+## ("Tactical Piece Buff" in several issue-18 effect texts). RANDOM GRANTS
+## only — excludes `self_harming` entries (today just Slow: it makes the
+## piece move/capture like a Pawn, a debuff on its own holder) so "the piece
+## gets +1 Piece Buff" artefacts (Holy Lint, MK-Ultra Sugar Cube, Crop Circle
+## Plank, Obedience-Flavored Tap Water, Sugar Free Chemtrail Can, Zodiac
+## Crossword Puzzle, Holy Grail Coaster, Scientology E-Meter, Xenu OT III
+## Season Pass, Sleeper Agent Pillow…) never actively penalise the player
+## (ruled 2026-08-28). The player's own Buff Box pick (game.gd
+## _open_buff_pick) reads Items.PIECE_BUFFS directly, not this function, so
+## choosing Slow deliberately (e.g. onto an enemy) is untouched.
 static func _random_buff_key(rng: RandomNumberGenerator, tier := "") -> String:
-	var pool: Array = Items.PIECE_BUFFS if tier == "" \
-		else Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.tier == tier)
+	var pool: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
+		return not b.get("self_harming", false) and (tier == "" or b.tier == tier))
 	return pool[rng.randi() % pool.size()].key
 
 

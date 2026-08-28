@@ -60,7 +60,9 @@ static func queue(g, n: int) -> void:
 			Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
 	if n % Tuning.MILESTONE_WAVES == 0:
 		var ctx := ArtefactHooks.run(g, "on_milestone", {"refill": Tuning.CLOCK_REFILL_MS})
-		g.clock_ms += ctx.refill # Recession (issue 13) halves this via the same hook
+		Economy.add_clock(g, ctx.refill, "milestone") # Recession (issue 13) halves
+			# ctx.refill via the same on_milestone hook, BEFORE this call — issue
+			# 35 routes the actual application through the Clock choke point
 		g.fx_at = Vector2(g.hud.wave_label.get_global_rect().get_center())
 		Economy.earn(g, Tuning.MILESTONE_SCORE_BONUS)
 		# reinforcement drip from the army's own mix (balance 2026-07-06:

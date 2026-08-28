@@ -32,6 +32,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
 	g.pending_reinforce = bool(cfg.get("pending_reinforce", false))
 	g.kings_defeated = int(cfg.get("kings_defeated", 0))
+	g.king_ids_defeated = cfg.get("king_ids_defeated", []).duplicate()
 	g.next_army = str(cfg.get("army", g.next_army)) # milestone drip draws from it
 	g.lost_player = int(cfg.get("lost_player", 0))
 	g.lost_enemy = int(cfg.get("lost_enemy", 0))
@@ -91,7 +92,8 @@ static func to_config(g) -> Dictionary:
 		"wave": g.wave, "turns_since_wave": g.turns_since_wave,
 		"early_clear_awarded": g.early_clear_awarded,
 		"pending_reinforce": g.pending_reinforce,
-		"kings_defeated": g.kings_defeated, "army": g.next_army,
+		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
+		"army": g.next_army,
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "clock_s": g.clock_ms / 1000.0,

@@ -253,7 +253,7 @@ func refresh() -> void:
 	score_label.text = "★%d" % g.score
 	gold_label.text = "$%d" % g.gold
 	var next_in: int = g._cadence() - g.turns_since_wave
-	var wave_txt := "King!" if g._king_alive() \
+	var wave_txt := ("King: %s" % g._king_name()) if g._king_alive() \
 		else ("in %d" % maxi(next_in, 0)) if g.wave < Waves.WAVES.size() else "done"
 	wave_label.text = "wave %d/%d · %s" % [g.wave, Waves.WAVES.size(), wave_txt]
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger

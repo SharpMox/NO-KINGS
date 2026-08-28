@@ -22,6 +22,7 @@ const Items := preload("res://data/items.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Settings := preload("res://scripts/settings.gd")
+const Kings := preload("res://data/kings.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -85,6 +86,7 @@ var state := State.SETUP
 var wave := 0            # last spawned wave number
 var turns_since_wave := 0
 var kings_defeated := 0  # 1 = endless unlocked; end screens show it
+var king_ids_defeated: Array = []  # roster (Kings.name_of), same order as falls
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -590,6 +592,15 @@ func _king_alive() -> bool:
 	return Rules.find_king(board, Rules.ENEMY).x >= 0
 
 
+## Display name of the King currently on the board, or "King" if there is
+## none / it wasn't spawned with an identity (hand-written test scenarios).
+func _king_name() -> String:
+	var k := Rules.find_king(board, Rules.ENEMY)
+	if k.x < 0:
+		return "King"
+	return Kings.name_of(board[k].get("king_id", ""))
+
+
 
 
 
@@ -954,6 +965,7 @@ func _setup_to_stock(from: Vector2i) -> void:
 func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var boxed := false
 	var king_captured := false
+	var captured_king_id := ""
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
@@ -1031,6 +1043,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			return _refresh()
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
+			captured_king_id = victim.get("king_id", "")
 		else:
 			captured.append(victim.id)
 			boxed = victim.get("buff", false)
@@ -1047,7 +1060,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	moved_this_turn.append(to)
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
-		if _king_down():
+		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
 	# last enemy — no point sitting on an empty board (game-feel 2026-07-06)
@@ -1075,13 +1088,17 @@ func _is_long_range(id: String) -> bool:
 	return false
 
 
-func _king_down() -> bool:
+func _king_down(defeated_id := "") -> bool:
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
 	Economy.earn(self, Tuning.WIN_SCORE_BONUS)
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
+		if defeated_id == "":
+			defeated_id = board[k].get("king_id", "")
 		board.erase(k)
+	if defeated_id != "":
+		king_ids_defeated.append(defeated_id)
 	if wave >= Waves.WAVES.size():
 		_game_over(true, "FULL CLEAR — every King has fallen")
 		return true

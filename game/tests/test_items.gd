@@ -2599,6 +2599,83 @@ func _init() -> void:
 	no_receipt.queue_free()
 	await process_frame
 
+	# --- issue 28: audit the 3 unwired 5-Wave-Milestone artefacts + a general
+	# REGISTRY-coverage guard + echo x milestone coverage ---
+
+	# Mar-a-Lago Toilet Papers / Yalta Cocktail Napkin / Roanoke Hex Kit have
+	# no REGISTRY wiring (their Outcomes say deliberately unimplemented) —
+	# must stay `implemented: false` so Items._build_artefact_effects() never
+	# offers a dead artefact to the player.
+	for unwired_key in ["mar-a-lago-toilet-papers", "yalta-cocktail-napkin", "roanoke-hex-kit"]:
+		var unwired_found := false
+		for cat in Items.ARTEFACT_CATALOG:
+			if cat.key == unwired_key:
+				unwired_found = true
+				check(not cat.get("implemented", false),
+					"%s stays implemented: false (no REGISTRY wiring exists to fire it)" % cat.name)
+		check(unwired_found, "%s is in the catalog" % unwired_key)
+
+	# General guard: every artefact flagged implemented: true must have a
+	# REGISTRY entry, OR be one of these documented standing-rule exceptions
+	# — artefacts read directly off g.artefacts / a held-count instead of
+	# dispatched through ArtefactHooks.run(). Adding a name here must be a
+	# deliberate act, never a silent workaround for a genuinely missed
+	# REGISTRY line (that's exactly the class of bug this test exists to
+	# catch — see the audit above).
+	var no_registry_exceptions := {
+		# Shop.roll/price + game.gd's _box_options read g.artefacts directly
+		# (shop-drawer-ui/08's deferred pass; artefact_hooks.gd's issue 18
+		# no-hook-list comment, next to the REGISTRY const)
+		"chocolate-key-cake": true, "alleged-weather-balloon": true,
+		"sub-antarctic-visa": true, "majestic-12-secret-handshake-diagram": true,
+		# standing shop.gd/game.gd rules, each its own credit-line/direct read
+		# (artefact_hooks.gd's issue 18/26/31 no-hook-list comments)
+		"agartha-welcome-mat": true, "templar-debit-card": true,
+		"nazca-boarding-pass": true, "nuclear-football-menu": true,
+		"doomsday-clock-snooze-button": true,
+		# game.gd's _artefact_count(key) reads (Buff Box offer size/cost,
+		# game.gd:1544-1568) — same standing-rule pattern, in game.gd instead
+		"numbers-station-sudoku": true, "bohemian-grove-friendship-bracelet": true,
+		# issue 21's echo/meta-trigger layer: pure observers that only ever
+		# dispatch through ArtefactHooks._run_meta_triggers, never the normal
+		# REGISTRY loop (artefact_hooks.gd's own "no REGISTRY entry" comment)
+		"polybius-cartridge": true, "max-headroom-mask": true,
+		"red-diary-s-missing-pages": true, "cern-ctrl-z-shortcut": true,
+		"bilderberg-hotel-slippers": true, "illuminati-nwo-booster-pack": true,
+		"100-genuine-original-mona-lisa": true, "deja-vu-glitch": true,
+	}
+	var unregistered := []
+	for cat in Items.ARTEFACT_CATALOG:
+		if cat.get("implemented", false) and not ArtefactHooks.REGISTRY.has(cat.key) \
+				and not no_registry_exceptions.has(cat.key):
+			unregistered.append(cat.key)
+	check(unregistered.is_empty(),
+		"every implemented: true artefact has a REGISTRY entry or a documented exception (missing: %s)" % [unregistered])
+
+	# Echo + a 5-Wave Milestone artefact together (issue 28): John Titor's
+	# Crypto Wallet acquired wave 2 (its own beat-1 milestone is wave 6, see
+	# the earlier John Titor coverage above) held with Max Headroom Mask,
+	# which echoes any Wave artefact that fired on_wave_clear. Before the
+	# fix, the echo dispatch fell back to acquired_wave=1, so
+	# _milestone5_hit(6, 1) == false and the echo silently paid nothing;
+	# fixed, it carries this copy's real acquired_wave=2 and
+	# _milestone5_hit(6, 2) == true, so the echo pays out too.
+	var echo_milestone := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 2, "gold": 0, "artefacts": ["john-titor-s-crypto-wallet", "max-headroom-mask"]})
+	await process_frame
+	echo_milestone.clock_ms = 25000.0 # +5 Gold per firing (int(25.0 / 5.0))
+	for n in range(3, 7): # clear waves 2..5: not this copy's beat yet
+		WaveLogic.queue(echo_milestone, n)
+	check(echo_milestone.gold == 0,
+		"John Titor's Crypto Wallet + Max Headroom Mask: no payout before the copy's own beat (wave 6)")
+	WaveLogic.queue(echo_milestone, 7) # clears wave 6: this copy's own beat 1 (2+4)
+	check(echo_milestone.gold == 10,
+		"John Titor's Crypto Wallet + Max Headroom Mask: the normal dispatch (+5) AND Max " +
+		"Headroom's echo (+5, using THIS copy's own acquired_wave, not the wave-1 default) both " +
+		"pay out on the copy's own beat (10, not 5)")
+	echo_milestone.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

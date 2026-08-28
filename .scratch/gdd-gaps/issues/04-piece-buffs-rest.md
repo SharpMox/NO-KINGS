@@ -1,6 +1,6 @@
 # 04 — Piece Buffs: the remaining 9
 
-Status: in progress — timed model + Reflect done, 6 dormant buffs left
+Status: in progress — 10 of 12 buffs done; Multicapture + Bomb left
 
 ## Parent
 
@@ -67,27 +67,33 @@ Shipped this round:
   `Rules.moves_for` now asks `BuffLogic.moves_of` for the move set, which is the single
   place the Pawn downgrade lives.
 
-### Left to build — 6 dormant buffs
+### Round 2 (2026-08-28) — Range ruled, four more shipped
 
-**Range** ⚠️ still undefined. "+2 extra squares beyond its normal range" has the same hole
-the Pawn ruling just closed for reduction: `moves_for` only limits *rides*, an unbounded
-rider is already infinite, and a leaper has no "range" to extend. Needs its own ruling —
-the obvious candidate is the inverse of Slow (the piece moves as the *next* piece up its
-promotion chain), but that is a guess, not the catalog.
+**Range ruled by the user:** *"for each capture the piece could make it can also reach all
+tiles around that tile, capture only."* Written onto its Notion page. It is defined
+identically for leapers, bounded riders and unbounded riders — the thing "+2 squares"
+could not be — and is naturally bounded because capture destinations only ever include
+squares that actually hold an enemy. Consumed by the capture, not by any move, so
+repositioning does not waste it. Notable consequence, accepted: a rider can take a piece
+standing *behind* its blocker.
 
-**Taunt** — the next enemy capture attempt is forced onto this piece. Needs `ai_action`
-to prefer a taunted target over its normal highest-value/lowest-attacker pick.
+**Aura confirmed** by the user as the score reading. Notion updated from provisional.
 
-**Stun** — the enemy that captures this piece loses its next turn. Needs a stunned marker
-the AI skips, and a tick at the end of the enemy turn.
+Shipped this round: **Range**, **Taunt** (overrides `_best_capture`'s value heuristic
+entirely), **Stun** (`stunned` marker the AI filters out of `legal_moves`; 2 ticks, because
+buffs age at the start of each *player* turn, so 2 keeps the attacker out for exactly one
+enemy turn), **Trap** (both capture paths — the victim still enters Captured Stock).
+
+### Left to build — 2
 
 **Multicapture** — the next capture hits every enemy along the move's line in sequence.
-Rides stop at the first occupied square today, so this sweeps on past it.
-
-**Trap** — when this piece is captured, the attacker dies too.
+Rides stop at the first occupied square today, so this sweeps past it. Needs a decision
+for leaps, which have no line to sweep.
 
 **Bomb** — on capturing or being captured, destroys itself, the other piece, and
-everything within 1 square. Interacts with Trap and Reflect; settle precedence.
+everything within 1 square. ⚠️ **Precedence must be settled first**: Reflect, Trap and Bomb
+all fire on being captured. Suggested order — Reflect (repels before the capture resolves)
+> Bomb (area) > Trap (single) — but that is a proposal, not a ruling.
 
 ## Blocked by
 

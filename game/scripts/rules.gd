@@ -69,7 +69,32 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 					_add_dest(board, from, pos, piece.owner, m.mode, out)
 					if board.has(pos):
 						break # rides stop at the first occupied square
+	if mode_filter != "move" and BuffLogic.has(piece, "range"):
+		for at in range_halo(board, from, out):
+			if not out.has(at):
+				out.append(at)
 	return out
+
+
+## Range buff (ruled 2026-08-28): every enemy this piece can already capture
+## also exposes the enemies standing around it — capture-only, one level deep.
+## Defined the same way for leapers, bounded riders and unbounded riders, which
+## is what the catalog's "+2 extra squares" could not be. In practice it reaches
+## one enemy deeper into a cluster, and lets a rider take past its blocker.
+static func range_halo(board: Dictionary, from: Vector2i, dests: Array[Vector2i]) -> Array[Vector2i]:
+	var owner: int = board[from].owner
+	var extra: Array[Vector2i] = []
+	for d in dests:
+		if not board.has(d) or board[d].owner == owner:
+			continue # only squares this piece can actually capture on
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var at := d + Vector2i(dx, dy)
+				if at == from or not in_bounds(at) or extra.has(at):
+					continue
+				if board.has(at) and board[at].owner != owner:
+					extra.append(at)
+	return extra
 
 
 ## Display-annotated variant of moves_for — same legality, grouped by shape so
@@ -252,6 +277,8 @@ static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
 	# full legality only when in check (must not miss a resolving move);
 	# otherwise the fast path — king moves stay safety-checked, pins ignored
 	var moves := legal_moves(board, ENEMY, defs, in_check)
+	moves = moves.filter(func(m: Dictionary) -> bool: # Stun: this piece sits it out
+		return not BuffLogic.has(board[m.from], "stunned"))
 	if moves.is_empty():
 		return {}
 	if in_check:
@@ -293,6 +320,12 @@ static func _has_capture(board: Dictionary, moves: Array[Dictionary]) -> bool:
 
 
 static func _best_capture(board: Dictionary, moves: Array[Dictionary], defs: Dictionary) -> Dictionary:
+	# Taunt overrides the value heuristic entirely: if a taunting piece can be
+	# taken at all, it is the target.
+	var taunts := moves.filter(func(m: Dictionary) -> bool:
+		return board.has(m.to) and BuffLogic.has(board[m.to], "taunt"))
+	if not taunts.is_empty():
+		return taunts[0]
 	var best := {}
 	var best_target := -1
 	var best_attacker := 1000

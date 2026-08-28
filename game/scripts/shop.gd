@@ -19,8 +19,8 @@ const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
 
 ## Rarity order low -> high (GDD Artefacts DB). A hidden slot (Sub-Antarctic
 ## Visa) samples from strictly above the lowest rarity present in the
-## rollable pool — "one rarity higher" without a baseline-roll to compare
-## against, since the normal 4-slot artefact roll isn't rarity-weighted at all.
+## rollable pool — "one rarity higher" than a baseline roll, layered on top
+## of the issue-20 rarity+depth weighting the normal 4-slot roll now uses too.
 const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Legendary"]
 
 
@@ -32,8 +32,7 @@ static func roll(g) -> void:
 		for i in ROWS.box / BOX_TYPES.size():
 			slots.append({"kind": "box", "key": type, "sold": false})
 
-	var artefact_keys: Array = _sample(Items.ARTEFACT_EFFECTS.map(func(t: Dictionary) -> String:
-			return t.key), ROWS.artefact, g.rng)
+	var artefact_keys: Array = _sample_weighted_artefacts(Items.ARTEFACT_EFFECTS, ROWS.artefact, g)
 	for key in artefact_keys:
 		slots.append({"kind": "artefact", "key": key, "sold": false})
 	for key in _sample_biased_artefacts(g, _extra_artefact_slots(g), artefact_keys):
@@ -95,7 +94,7 @@ static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
 			pool = biased
 	if pool.is_empty(): # every candidate excluded or unrated: fall back
 		pool = Items.ARTEFACT_EFFECTS.filter(func(t: Dictionary) -> bool: return not exclude.has(t.key))
-	return _sample(pool.map(func(t: Dictionary) -> String: return t.key), n, g.rng)
+	return _sample_weighted_artefacts(pool, n, g)
 
 
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King
@@ -128,7 +127,8 @@ static func price(g, slot: Dictionary) -> int:
 			tier = _catalog(slot).tier
 			base = float(Tuning.SHOP_ITEM_PRICE[tier])
 		"artefact":
-			base = float(Tuning.SHOP_ARTEFACT_PRICE)
+			var rarity := rarity_of(slot)
+			base = float(Tuning.SHOP_ARTEFACT_PRICE.get(rarity, Tuning.SHOP_ARTEFACT_PRICE[""]))
 			if slot.get("biased", false):
 				base *= 1.5
 		_:
@@ -136,6 +136,12 @@ static func price(g, slot: Dictionary) -> int:
 	var ctx := ArtefactHooks.run(g, "on_price",
 		{"base": base, "amount": base, "kind": slot.kind, "tier": tier})
 	return maxi(roundi(ctx.amount), 0)
+
+
+## "" for non-artefact slots and the 7 core artefacts that predate the
+## rarity catalog — legibility (modals.gd) and pricing both fall back on it.
+static func rarity_of(slot: Dictionary) -> String:
+	return str(_catalog(slot).get("rarity", "")) if slot.kind == "artefact" else ""
 
 
 static func description(slot: Dictionary) -> String:
@@ -209,6 +215,16 @@ static func _sample(pool: Array, n: int, rng: RandomNumberGenerator) -> Array:
 	var out := []
 	for i in mini(n, open.size()):
 		out.append(open.pop_at(rng.randi() % open.size()))
+	return out
+
+
+## n distinct artefact keys, weighted by rarity + depth (issue 20 — shares
+## Tuning.weighted_artefact_pick with box.gd's single-pick roll).
+static func _sample_weighted_artefacts(entries: Array, n: int, g) -> Array:
+	var open := entries.duplicate()
+	var out := []
+	for i in mini(n, open.size()):
+		out.append(open.pop_at(Tuning.weighted_artefact_pick(open, g.score, g.rng)).key)
 	return out
 
 

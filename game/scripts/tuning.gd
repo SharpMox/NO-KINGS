@@ -57,8 +57,65 @@ const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
 # Shop prices (money-and-shop PRD; playtest placeholders on the x10 economy —
 # income is thin, so they sit low; piece slots charge the catalog value)
 const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}
-const SHOP_ARTEFACT_PRICE := 100
+# Per-rarity (issue 20: closes the Shop page's "Artefact 100 flat" open
+# question). Doubles per tier, same shape as SHOP_ITEM_PRICE's tier jumps —
+# a Legendary should cost meaningfully more than a Common, not the same 100
+# every rarity paid before. "" is the 7 core artefacts that predate the
+# rarity catalog (items.gd ARTEFACT_EFFECTS_CORE) — priced as Common.
+const SHOP_ARTEFACT_PRICE := {"": 50, "Common": 50, "Uncommon": 100, "Rare": 200, "Legendary": 400}
 const SHOP_BOX_PRICE := 50
+
+# Artefact rarity draw weight (issue 20), population-independent — a
+# Legendary should feel rare regardless of how many Legendaries the catalog
+# has. Ratio ~10:4:2:1 at run start, mirrored by SHOP_ARTEFACT_PRICE's own
+# doubling curve (rarer to find, costs more to buy).
+const ARTEFACT_RARITY_WEIGHT_START := {
+	"": 100.0, "Common": 100.0, "Uncommon": 40.0, "Rare": 20.0, "Legendary": 10.0}
+# Decision: rarity is depth-gated (.scratch/gdd-gaps/issues/20, 2026-08-28) —
+# Legendary/Rare probability rises with depth while Common tapers, keyed off
+# cumulative Score (what the Shop's own restock cadence already uses —
+# SHOP_RESTOCK_BASE/STEP — so box.gd and shop.gd share one depth signal).
+# Linear ramp from WEIGHT_START (score 0) to WEIGHT_DEEP (score >= the cap);
+# "" (the 7 core artefacts, no rarity) stays flat — they predate the rarity
+# system and aren't part of the gate.
+const ARTEFACT_RARITY_WEIGHT_DEEP := {
+	"": 100.0, "Common": 20.0, "Uncommon": 45.0, "Rare": 45.0, "Legendary": 35.0}
+const ARTEFACT_RARITY_DEPTH_CAP_SCORE := 5000 # ~3rd shop restock (4500); curve shape, not a design decision
+
+static func artefact_rarity_weight(rarity: String, score: int) -> float:
+	var t := clampf(float(score) / float(ARTEFACT_RARITY_DEPTH_CAP_SCORE), 0.0, 1.0)
+	var lo: float = ARTEFACT_RARITY_WEIGHT_START.get(rarity, ARTEFACT_RARITY_WEIGHT_START["Common"])
+	var hi: float = ARTEFACT_RARITY_WEIGHT_DEEP.get(rarity, ARTEFACT_RARITY_WEIGHT_DEEP["Common"])
+	return lerpf(lo, hi, t)
+
+
+## Weighted-random index into `pool` (an Array of Dictionaries carrying a
+## `rarity` field, "" if untagged) — shared by box.gd's single-pick roll and
+## shop.gd's sample-without-replacement stock roll.
+static func weighted_artefact_pick(pool: Array, score: int, rng: RandomNumberGenerator) -> int:
+	var weights: Array[float] = []
+	var total := 0.0
+	for e in pool:
+		var w := artefact_rarity_weight(str(e.get("rarity", "")), score)
+		weights.append(w)
+		total += w
+	var r := rng.randf() * total
+	for i in weights.size():
+		r -= weights[i]
+		if r <= 0.0 or i == weights.size() - 1:
+			return i
+	return pool.size() - 1
+
+
+## Rarity legibility (issue 20) — box-pick and Shop tiles color by this so a
+## Legendary no longer looks identical to a Common.
+const ARTEFACT_RARITY_COLOR := {
+	"": Color(0.8, 0.8, 0.82),
+	"Common": Color(0.8, 0.8, 0.82),
+	"Uncommon": Color(0.4, 0.85, 0.45),
+	"Rare": Color(0.35, 0.6, 1.0),
+	"Legendary": Color(1.0, 0.72, 0.15),
+}
 # Restock cadence (GDD Shop page): the shelf refreshes on cumulative score,
 # not on waves. The 1st costs BASE, and every later one costs STEP more than
 # the last — 1000 / 2500 / 4500 / 7000. Placeholders: a median Crown run ends

@@ -35,6 +35,10 @@ static var is_scenario := false
 ## Starting stock for a fresh run (menu's army select sets it; saves carry
 ## their stock in next_config instead, so this only matters when empty).
 static var next_army: String = Tuning.DEFAULT_ARMY
+## Difficulty rank (07-difficulty-ranks): menu's rank picker sets it, locked
+## for the run — a save/Continue restores it via SaveConfig instead of
+## re-reading this, same split as next_army above.
+static var next_rank: String = Tuning.DEFAULT_RANK
 
 const SAVE_PATH := "user://save.json"
 const SCORES_PATH := "user://scores.json"
@@ -255,7 +259,9 @@ func _ready() -> void:
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
 	if next_config.is_empty():
-		stock = Tuning.ARMIES[next_army].duplicate()
+		# rank lever (c): higher ranks trim that many pieces off the front of
+		# the army — the cheap, numerous troops (07-difficulty-ranks)
+		stock = Tuning.ARMIES[next_army].slice(Tuning.RANKS.find(next_rank))
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
@@ -405,7 +411,10 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if not game_menu_open and not win_open and not shop_open() and not backgrounded: # these pause the clock
+		# rank lever (a): Officer/Autocrat keep the clock running through the
+		# Shop, so shopping costs real time (07-difficulty-ranks)
+		var shop_pauses := shop_open() and next_rank == Tuning.RANKS[0]
+		if not game_menu_open and not win_open and not shop_pauses and not backgrounded:
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0

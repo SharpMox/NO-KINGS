@@ -1,6 +1,6 @@
 # 24 — Artefacts: combat & positioning rules (zones, dodge, forced moves)
 
-Status: todo
+Status: done (partial — see Outcome)
 
 ## Parent
 
@@ -50,3 +50,89 @@ artefact-awareness into code that's deliberately artefact-agnostic today.
 
 - 15 — trigger engine
 - 19 — Special + prereq triage (this file is one of its splits)
+
+## Outcome
+
+PR #126 (`feat/artefact-combat-positioning`), branched off main after #125
+(the ctx-contract fix). 4 of the 14 artefacts shipped; 88 -> 92 of 180
+implemented. `game/tests/run_all.sh` ALL GREEN, 9 new `test_items.gd` checks.
+
+**Shipped**, all via the shared "post-move ctx flag" mechanism this file's
+acceptance criteria called for:
+- **USS Eldridge Invisibility Paint** and **Royal Fiat (Undamaged)**:
+  `Economy.capture_score` now stashes its `on_capture` ctx on
+  `g.last_capture_ctx` (a Dictionary reference, so it survives the call
+  boundary the existing `int` return can't) right before returning. Both
+  gate on `turn_capture_index == 0 and attacker_pos.x >= 0` (first Capture
+  this Turn, a real attacker — same pattern as CIA Heart Attack Gun /
+  Obedience-Flavored Tap Water). `_move_player` snapshots
+  `return_to_start`/`move_to_backrow` into locals right after its own (first)
+  `capture_score` call — before Multicapture's second call can overwrite
+  `g.last_capture_ctx` — then applies whichever one fired right after its
+  own `board[to] = board[from]` slide. Royal Fiat's landing tile: the first
+  empty back-row (y=0) square scanning x=0..BOARD_W-1 (ruled 2026-08-28, no
+  GDD guidance on ties); a full back row is a no-op, the piece stays on
+  `to`. Holding both at once (rare — both Rare-rarity): return_to_start wins
+  the tie, since it fully undoes the move rather than partially redirecting
+  it. Neither flag is read outside the plain-capture path — Trap/Bomb/
+  Multicapture's branches `return` before reaching it, which reads as "the
+  piece already didn't end its move at `to` for other reasons."
+- **Fireproof Pajamas**: `on_piece_lost` grew a `cancel` output flag
+  (mirroring `on_item_consume`'s), scoped to `ctx.reason == "destroyed"` —
+  `_destroy` is already the single choke point every Item/Tariff kill funnels
+  through (Drone Strike, Air Strike, Sniper, bomb detonation via `_detonate`,
+  the jd_vance Tariff), so one guard there covers all of them. Captures/Trap/
+  Reflect don't set `reason == "destroyed"`, so ordinary combat is untouched.
+  `_lose_player_piece` now returns its ctx (was void) and only increments
+  `lost_player` when the loss isn't cancelled; the other 4 existing call
+  sites already ignored the return value, so this is additive.
+- **Hoffa's Cement Shoes**: reuses `on_piece_lost`'s `reason == "captured"` +
+  `attacker_pos` gate (Tutankhamun's Death Thong's exact condition) to set a
+  new `destroy_attacker` output flag, once per Wave
+  (`g.hoffa_used_this_wave`, reset `on_wave_clear` — the
+  "satoshi-s-private-key"-style two-hook shape). The enemy-move loop
+  (`_run_enemy_actions`) reads the flag straight off `_lose_player_piece`'s
+  return and, when set, removes the attacker too — Trap's existing mutual-
+  destruction branch, just artefact-gated instead of BuffLogic-gated, and
+  once per Wave instead of every time.
+
+**Left `implemented: false`** (quality over count — each is a real follow-up,
+not a guess):
+- **Cheyenne Mountain Doorbell** / **Winchester Salt Lined Doors**: still
+  need the design ruling this file's own acceptance criteria called for —
+  where a zone rule plugs into `Rules.legal_moves`/AI target selection (a
+  parameter? a passed-in artefact set?) before either can ship. Worth its
+  own `grill-with-docs` pass, not a call to make inside a batch PR.
+  Notion question.
+- **Bovine Tractor Beam** / **Roanoke Hex Kit**: both are player-initiated
+  targeting actions (a new Item-like UI flow + a recharge-state field for
+  Roanoke), not something `ArtefactHooks` dispatch can express — out of
+  scope for a hook-registry slice.
+- **Inflatable Vietcong Torpedo** / **UAP Breath Mint**: both need a new
+  pre-capture "would be captured" choke point in the enemy-move loop
+  (nothing dispatches there today — Reflect/Shield/Trap/Bomb are all
+  hardcoded BuffLogic checks, not registry hooks) plus an undecided design
+  ruling (Torpedo: a modal gold-payment choice, timing unclear from the GDD
+  text; Breath Mint: which of 8 adjacent squares). Deferred rather than
+  opening a new branch in the same combat loop two other concurrently-active
+  branches (`feat/artefact-buff-lifecycle`, `feat/artefact-capture-ledger`)
+  are also touching, under an unresolved design question. Notion question
+  for the Torpedo's choice timing; Breath Mint's landing square is a smaller
+  ruling that could ship alongside a future pre-capture hook.
+- **Zapruder's Director's Cut**: needs a recorded "last action" shape
+  spanning move/capture/item/merge — each with different replay semantics —
+  before "repeat it" means anything. Not attempted; a guess here would be
+  wrong more often than right.
+- **Pegasus Free Trial**: needs a per-piece exception to
+  `moved_this_turn`'s flat `Array[Vector2i]`-membership lock (Blitz already
+  depends on its exact shape via `.erase()`). Redesigning that data
+  structure's semantics mid-batch, while other branches also touch move
+  sites, was judged too risky for this slice; deferred rather than rushed.
+- **Alien Pet Rocks**: needs a new `moved_this_wave` Set threaded through
+  every move/place site, reset in `WaveLogic.queue` — explicitly flagged in
+  this file as invasive; out of scope for a 4-artefact batch.
+- **Curtain Rods Bag (Rifle-Shaped)**: needs a ctx flag threaded through
+  `capture_score` into `earn()` so a single capture can suppress its own
+  Gold payout — the exact "flag survives the call boundary" gap issue 26 is
+  scoped to close for Zeta Reticuli Souvenir Map. Deferred to that issue
+  rather than duplicating the fix here.

@@ -380,6 +380,76 @@
 ##   `_process`'s per-frame Clock tick, shop.gd's `can_buy`/`buy`) — the same
 ##   no-hook pattern chocolate-key-cake already used (see REGISTRY's comment
 ##   there), not a gap in the engine.
+##
+## issue 21 (echo and meta-triggers, split out of 19 because it's one real
+## system — a meta-layer over run() itself, not a scatter of one-offs) grew
+## run()'s own contract: `fired` (built inline, not a new field on `g`) is
+## the subset of `held + tariffs` that actually dispatched this call — not
+## just which keys are held, the distinction Bilderberg Hotel Slippers'
+## effect text needs ("two or more of your Artefacts trigger", not "own").
+## A dedicated pass, `_run_meta_triggers`, runs once after the normal
+## dispatch loop and reads `fired` to run the family of artefacts that react
+## to another artefact's own trigger:
+## - Polybius Cartridge / Max Headroom Mask / Red Diary's Missing Pages: for
+##   every key in `fired` (hook-scoped to on_capture / on_wave_clear+
+##   on_wave_spawn / on_piece_lost respectively), one extra `_dispatch` per
+##   held copy — "Capture"/"Wave"/"on losing a piece" Artefact in their GDD
+##   text means "fired via this hook", not a `bonus` tag (none of the three
+##   carry a Capture/Wave bonus tag in data/artefacts.js — Special only).
+## - CERN Ctrl+Z Shortcut: for every *distinct* key in `fired` that is held
+##   2+ times (REGISTRY already implied this; nothing read it before this
+##   slice), one extra `_dispatch` per held CERN copy — flat, not scaled by
+##   how many duplicates the key itself has.
+## - Bilderberg Hotel Slippers / Illuminati: NWO Booster Pack: pure
+##   observers, no `_dispatch` of their own — +15 Gold (any hook, `fired.
+##   size() >= 2`) / +2 Gold+20 Score per on_capture entry in `fired`,
+##   scaled by held copies.
+## - 100% Genuine Original Mona Lisa: the first entry in `fired` (any hook)
+##   each Turn is echoed once per held copy. "Each Turn, including enemy
+##   Turns" is `g.mona_lisa_turn_done`, reset by `run()` itself (below, NOT
+##   in `_run_meta_triggers` — it must be false before *this* call's own
+##   dispatch loop runs, so the reset call's own first fire is still
+##   eligible) at both on_turn_start (player) and on_enemy_turn_start
+##   (Economy.enemy_actions, the one hook every enemy turn already dispatches
+##   before anything else can) — the only two "a Turn just began" choke
+##   points that already exist, so no new call site.
+## - Déjà Vu Glitch: "first Score/Gold gain each Turn: they trigger again"
+##   reads as the WHOLE gain repeating, not a second run through every
+##   handler (that would double-charge reason-gated handlers like Naruto Run
+##   Manual's early-clear bonus, and Economy.earn's own ctx never survives
+##   the call boundary to re-invoke anyway — the exact gap issue 26 is
+##   scoped to close) — so this scales the hook's own already-computed
+##   `ctx.amount` by `(1 + held copies)` once, gated by its own
+##   `dejavu_score_turn_done`/`dejavu_gold_turn_done` (on_turn_start only;
+##   Score/Gold gains don't happen on enemy Turns today).
+##
+## RE-ENTRANCY RULE (issue 21): every extra trigger the meta pass produces
+## goes straight through `_dispatch`, never back through `run()` — so an
+## echo can never itself be observed by `_run_meta_triggers` (that pass only
+## ever runs once, off the single `fired` snapshot the normal loop built) and
+## a chain or a ping-pong between two held echo artefacts is structurally
+## impossible, not just guarded. `g.artefact_echo_depth` is the
+## belt-and-suspenders backstop for a future handler that DID call `run()`
+## from inside `_dispatch` — `run()` only calls `_run_meta_triggers` at
+## depth 0. Stacking stays additive (N held copies of an echo artefact = N
+## extra `_dispatch` calls, not compounding) and ordering stays
+## irrelevant (the meta pass reads `fired`, built from the same key-sorted
+## `held + tariffs` loop the header's ORDERING rule already covers, and
+## every echoed `_dispatch` targets one already-determined key — nothing
+## about the echo pass itself depends on iteration order). Covered by
+## test_items.gd ("two echo artefacts + a percentage artefact stay bounded
+## and order-independent").
+##
+## Illuminati Fridge Magnet, Deep State Yearbook and New World Order
+## Gerrymandering stay unimplemented — real design rulings, not guesses (see
+## .scratch/gdd-gaps/issues/21's Outcome). So do Ecdysis Sheddings ("copies
+## the last Artefact you bought" needs a way to invoke an arbitrary key's
+## handler under a hook/ctx shape it wasn't built for — on_purchase's ctx
+## has none of on_capture's `victim_id`/`attacker_id` fields a copied Greed
+## or Sphinx's Booger would read) and Troll Farm Employee of the Month
+## ("Wave Artefacts also trigger on Wave start" would hand on_wave_clear's
+## handlers an on_wave_spawn ctx missing `gold_spent`/`gold_base`/`captures`
+## — most of them would silently pay out on zeroed fields).
 
 ## issue 22 (split out of 19: "the reactive on_tariff_apply/on_tariff_charge
 ## hooks can't express changing whether/how a Tariff applies") added the
@@ -644,6 +714,20 @@ const REGISTRY := {
 
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
 	"zero-point-energy-drink": ["on_gold_zero"],
+
+	# --- issue 21: echo and meta-triggers ---
+	# Capstone Polish is a plain on_purchase handler, scoped like the other
+	# "on acquiring/buying" artefacts above (putin's-golden-toilet-brush,
+	# sleeper-agent-pillow, mao's-loyalty-badge, casino-invisible-clock) —
+	# box-granted artefacts stay the known, already-deferred gap (issue 16's
+	# held-back note, repeated in 17/18/19).
+	"capstone-polish": ["on_purchase"],
+	# Polybius Cartridge, Max Headroom Mask, Red Diary's Missing Pages, CERN
+	# Ctrl+Z Shortcut, Bilderberg Hotel Slippers, Illuminati: NWO Booster
+	# Pack, 100% Genuine Original Mona Lisa and Déjà Vu Glitch deliberately
+	# have NO REGISTRY entry — they never dispatch through the normal loop
+	# below, only through _run_meta_triggers reading `held`/`fired` directly
+	# (see the issue 21 header section).
 }
 
 
@@ -661,10 +745,91 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
 	var tariffs: Array = [] if g.tariffs_suppressed else g.tariffs_active.duplicate()
 	tariffs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
+	# issue 21: "a Turn just began" is the only reset these two echo flags
+	# need, and both of the choke points that mean that already dispatch
+	# through here — must happen BEFORE this call's own loop below so a
+	# Mona Lisa/Déjà Vu fire on THIS turn-start/gain is still eligible.
+	if hook == "on_turn_start" or hook == "on_enemy_turn_start":
+		g.mona_lisa_turn_done = false
+	if hook == "on_turn_start":
+		g.dejavu_score_turn_done = false
+		g.dejavu_gold_turn_done = false
+	var fired: Array = [] # issue 21: keys that actually dispatched this call,
+		# not just held — Bilderberg Hotel Slippers' own contract
 	for t in held + tariffs:
 		if REGISTRY.get(t.key, []).has(hook):
 			_dispatch(g, t.key, hook, ctx)
+			fired.append(t.key)
+	if g.artefact_echo_depth == 0: # re-entrancy guard, see header
+		g.artefact_echo_depth += 1
+		_run_meta_triggers(g, hook, ctx, fired, held)
+		g.artefact_echo_depth -= 1
 	return ctx
+
+
+## The echo/meta layer (issue 21, header). Never calls run() — every extra
+## trigger goes straight through _dispatch, so nothing here can ever be
+## observed by a second pass of itself. `fired`/`held` are the same-call
+## snapshots run() already built; `counts` is just `held` grouped by key,
+## for CERN's duplicate check.
+static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, held: Array) -> void:
+	var counts := {}
+	for t in held:
+		counts[t.key] = counts.get(t.key, 0) + 1
+
+	var n_poly: int = counts.get("polybius-cartridge", 0)
+	if n_poly > 0 and hook == "on_capture":
+		for key in fired:
+			for i in n_poly:
+				_dispatch(g, key, hook, ctx)
+
+	var n_headroom: int = counts.get("max-headroom-mask", 0)
+	if n_headroom > 0 and (hook == "on_wave_clear" or hook == "on_wave_spawn"):
+		for key in fired:
+			for i in n_headroom:
+				_dispatch(g, key, hook, ctx)
+
+	var n_diary: int = counts.get("red-diary-s-missing-pages", 0)
+	if n_diary > 0 and hook == "on_piece_lost":
+		for key in fired:
+			for i in n_diary:
+				_dispatch(g, key, hook, ctx)
+
+	var n_cern: int = counts.get("cern-ctrl-z-shortcut", 0)
+	if n_cern > 0:
+		var seen := {}
+		for key in fired:
+			if seen.has(key):
+				continue
+			seen[key] = true
+			if counts.get(key, 0) >= 2:
+				for i in n_cern:
+					_dispatch(g, key, hook, ctx)
+
+	var n_bilderberg: int = counts.get("bilderberg-hotel-slippers", 0)
+	if n_bilderberg > 0 and fired.size() >= 2:
+		g.gold += 15 * n_bilderberg
+
+	var n_nwo: int = counts.get("illuminati-nwo-booster-pack", 0)
+	if n_nwo > 0 and hook == "on_capture" and not fired.is_empty():
+		g.gold += 2 * n_nwo * fired.size()
+		g.score += 20 * n_nwo * fired.size()
+
+	var n_mona: int = counts.get("100-genuine-original-mona-lisa", 0)
+	if n_mona > 0 and not g.mona_lisa_turn_done and not fired.is_empty():
+		g.mona_lisa_turn_done = true
+		var first_key: String = fired[0]
+		for i in n_mona:
+			_dispatch(g, first_key, hook, ctx)
+
+	var n_dejavu: int = counts.get("deja-vu-glitch", 0)
+	if n_dejavu > 0:
+		if hook == "on_score_change" and not g.dejavu_score_turn_done:
+			g.dejavu_score_turn_done = true
+			ctx.amount *= (1.0 + n_dejavu)
+		elif hook == "on_gold_change" and not g.dejavu_gold_turn_done:
+			g.dejavu_gold_turn_done = true
+			ctx.amount *= (1.0 + n_dejavu)
 
 
 ## Player-owned board pieces of the given id — the "2+/3+ of your same-type
@@ -1471,3 +1636,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		# economy.gd/shop.gd's spend_gold) ---
 		["zero-point-energy-drink", "on_gold_zero"]:
 			g.actions_left += 2
+
+		# --- issue 21: echo and meta-triggers (the rest of the family runs
+		# through _run_meta_triggers above, off `held`/`fired` directly —
+		# Capstone Polish is the one plain direct-effect handler here) ---
+		["capstone-polish", "on_purchase"]:
+			if ctx.kind == "artefact":
+				g.score += 150
+				g.clock_ms += 5000

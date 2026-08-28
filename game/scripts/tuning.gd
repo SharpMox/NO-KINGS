@@ -12,7 +12,15 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
 const STUN_MISSES := 2            # Stun: turns the attacker loses, its own
                                    # side's turns (user call 2026-08-28)
-const ENEMY_ACTIONS_PER_TURN := 1  # playtest override 2026-07-02 (GDD says 2)
+const ENEMY_ACTIONS_PER_TURN := 1  # playtest override, re-justified 2026-08-28 (Issue 11,
+                                   # gdd-gaps divergence #2 — GDD says 2). Re-run under the
+                                   # current wave catalog + tariffs + unified action economy,
+                                   # not just carried over from the 2026-07-02 playtest: a
+                                   # 60-run fleet sweep (Crown/Wild Hunt/Old Guard, 20 each)
+                                   # at 2 actions/turn put every run at 0/60 wins (was 2/60 at
+                                   # 1) and collapsed median survival from wave 17.5 to wave 8
+                                   # (mean 26.3 -> 9.7, mostly Resource starvation). 2 remains
+                                   # too strong for the current economy; 1 stays.
 const ENEMY_TURN_PAUSE := 0.4      # beat before/after the enemy acts (feel 2026-07-06)
 
 const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count

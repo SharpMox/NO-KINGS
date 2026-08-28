@@ -1,6 +1,6 @@
 # 39 — Notion drift guard
 
-Status: todo — INDEPENDENT
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -38,3 +38,20 @@ multi-source queries are gated, so query each catalog separately.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in `786579b` (PR #149). `tools/check-notion-drift.mjs` (216 lines) diffs the
+Notion GDD catalogs against their repo mirrors (`data/artefacts.js`, `game/data/items.gd`,
+`data/pieces-codex.js`, `game/data/tariffs.gd`) and prints every disagreement. It is
+**report-only** and never writes to either side — which side is stale is a judgement call
+each time, and both directions have happened.
+
+It takes a Notion snapshot as input, because a plain Node script cannot call the Notion
+MCP tools; the file header carries the exact SQL to run and the JSON shape to save.
+
+**First run found 59 real drift findings on `main`** — Demote's grammar differing in
+Notion, ~30 stale `(needs: …)` notes left in catalog rows, and Silk Road Coupon /
+Mar-a-Lago Deed saying "Shop restock" in Notion where the repo implements "5-Wave
+Milestone". Those are recorded as findings, not auto-fixed. Usage is documented in
+`CLAUDE.md`.

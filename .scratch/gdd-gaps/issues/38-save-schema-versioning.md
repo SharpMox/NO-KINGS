@@ -1,6 +1,6 @@
 # 38 — Save schema versioning
 
-Status: todo — INDEPENDENT
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -39,3 +39,15 @@ loads a pre-versioning save and succeeds.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in `51aacdf` (PR #148). `save_config.gd` gained `SAVE_VERSION := 1`, an empty
+`_MIGRATIONS := {}` table and `migrate(cfg)`, which walks a save forward one version at a
+time. `_MIGRATIONS` is empty on purpose — version 1 is today's schema, and the machinery
+exists so the *first* reshaping change has somewhere to go rather than being invented
+under pressure.
+
+The header documents the rule that motivated the slice: an **additive** field read with a
+default is safe forever and needs no migration; a **reshaped** field read with a default
+is a silent corruption and always needs one. Covered by 22 lines in `test_save.gd`.

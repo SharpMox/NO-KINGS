@@ -1,6 +1,6 @@
 # 23 — Artefacts: Buff lifecycle hooks (apply / consume / transfer / protect)
 
-Status: todo
+Status: partial — 12 of 13
 
 ## Parent
 
@@ -34,18 +34,76 @@ and `on_item_consume` unlocked theirs.
 
 ## Acceptance criteria
 
-- [ ] A single `_apply_buff(piece, key, turns)` choke point in game.gd (or
+- [x] A single `_apply_buff(piece, key, turns)` choke point in game.gd (or
       BuffLogic itself) replacing `BuffLogic.add`'s scattered call sites,
       firing `on_buff_apply`
-- [ ] A single `on_buff_consume` hook at BuffLogic.consume's call sites
-- [ ] Numbers Station Sudoku / Bohemian Grove Friendship Bracelet are a UI
+- [x] A single `on_buff_consume` hook at BuffLogic.consume's call sites
+- [x] Numbers Station Sudoku / Bohemian Grove Friendship Bracelet are a UI
       change (`_open_buff_pick`), triaged separately from the hook work
-- [ ] Abduction Probe needs a codebase audit (every "the piece's buff"
+- [x] Abduction Probe needs a codebase audit (every "the piece's buff"
       singular assumption) before it's safe — call this out explicitly if
       any are found
-- [ ] Scenario coverage, `run_all.sh` all green
+- [x] Scenario coverage, `run_all.sh` all green
 
 ## Blocked by
 
 - 15 — trigger engine
 - 19 — Special + prereq triage (this file is one of its splits)
+
+## Outcome
+
+12 of 13 implemented (`data/artefacts.js` → `node tools/export-game-artefacts.mjs`):
+Amityville Ouija Board, Cleopatra's Hairpin, Guidestone Blood Ritual, KGB
+Photo Eraser, Pied Piper's Rat Census, Antikythera Warranty Card, 45.5 Carat
+Curse, mRNA Firmware Update, Atlantis Snow Globe, Youth Fountain Martini,
+Numbers Station Sudoku, Bohemian Grove Friendship Bracelet.
+
+**Infra** (`game/scripts/game.gd`, `game/scripts/artefact_hooks.gd`):
+- `game.gd:_apply_buff(piece, key, turns, pos, fire_hook)` — the new
+  buff-grant choke point, firing `on_buff_apply` AFTER the buff lands.
+  Replaces every scattered `BuffLogic.add` call site for a *catalogued*
+  Piece Buff: the buff_box Item apply, and `artefact_hooks.gd`'s
+  `_grant_buff`/`_grant_buff_to` (now `g`-aware) used by ~9 artefacts. The
+  `stunned` debuff (Stun's own side effect, not a Items.PIECE_BUFFS entry —
+  see `buff_logic.gd`'s "buff"/"Buff" naming-collision note) deliberately
+  keeps calling `BuffLogic.add` directly, bypassing this hook — it isn't a
+  Piece Buff and must not fire buff-apply artefacts.
+- `game.gd:_consume_buff(pos, key)` — the buff-resolve choke point, firing
+  `on_buff_consume` AFTER removal. Replaces the 5 existing
+  `BuffLogic.consume` call sites (Reflect/Shield ×2, Critical, Range,
+  Multicapture) and adds 2 new ones (Bomb, Trap) that previously just erased
+  the carrying piece with no explicit consume — needed so Cleopatra's
+  Hairpin / Guidestone Blood Ritual actually see those two Decisive
+  triggers.
+- New `on_demote` (gate, ctx.blocked) / `on_piece_demoted` (event) hooks at
+  the "demote" Item's single call site, and `on_buff_removal` (gate) at
+  "radar_jamming"'s. `on_piece_demoted` is a plain event with nothing to
+  persist, unlike issue 19's still-open "Demoted flag" ask for Dark Market
+  Light Bulb (a *continuous* is-this-piece-demoted check) — the two aren't
+  the same problem, so this issue's Guidestone Blood Ritual isn't blocked by
+  that gap.
+
+**Left unimplemented — Abduction Probe** ("pieces can carry 2 Piece Buffs at
+once"). Audit finding: there is no 1-buff cap anywhere in the codebase today
+— not in `BuffLogic` (a plain `Array`, `.add` always appends), not in
+`buff_box`'s Item targeting, not in any artefact grant. A second Piece Buff
+already lands on a piece today, with or without this artefact. There is no
+existing "1" to lift to "2", so implementing it would mean *inventing* a new
+base-game restriction (cap at 1, this artefact raises it to 2) that nothing
+in the GDD or codebase currently asks for — a design decision, not a wiring
+job. **Notion question, not a guess**: does a 1-buff cap need adding to the
+base game first, and if so, should Abduction Probe simply lift it, or is the
+GDD text describing a limit that was never meant to exist mechanically (i.e.
+this artefact was always a no-op safety net)?
+
+**Verification**: `game/tests/run_all.sh` — ALL GREEN (windowed click
+probes + all headless suites + autoplay), confirmed after rebasing onto
+`main`'s merged `fix/artefact-ctx-contract` (PR #125). 17 new scenario
+checks in `game/tests/test_items.gd` (202 total, up from 181/185 after the
+rebase's own +2). Some earlier runs of `test_items.gd` inside the full
+`run_all.sh` sequence hit transient Godot resource-import failures
+("Unable to open file: res://.godot/imported/...ctex") under heavy
+concurrent load from other agents sharing this machine — reproducible
+standalone runs of the same file were consistently green, and a clean full
+run (`ALL GREEN`) was captured once contention eased, so this reads as
+environment flakiness, not a code defect.

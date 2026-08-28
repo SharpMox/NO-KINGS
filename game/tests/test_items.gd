@@ -650,6 +650,41 @@ func _init() -> void:
 	tungsten.queue_free()
 	await process_frame
 
+	# --- issue 20 regression: the slice 20 fleet sweep caught Tungsten-Filled
+	# Gold Bar + Popemobile Piggy Bank as a degenerate pair (score ~11-13x an
+	# organic baseline) because both wrote g.score straight from inside their
+	# on_gold_change dispatch instead of through Economy.earn's ctx.score_bonus
+	# channel — held together, held score should be the plain additive sum
+	# of each one's own bonus (2x + 10x), not doubled or compounded
+	var tungsten_pope := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["tungsten-filled-gold-bar", "popemobile-piggy-bank"]})
+	await process_frame
+	Economy.earn(tungsten_pope, 100)
+	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
+	check(tungsten_pope.score == 100 + 200 + 1000,
+		"Tungsten (+200, 2x) and Popemobile (+1000, 10x) add on top of the +100 base — the correct sum, not doubled")
+	tungsten_pope.queue_free()
+	await process_frame
+
+	# El Dorado Body Glitter: 5% of Score gains paid as Gold, off the
+	# immutable ctx.base — must give the same payout whether or not another
+	# on_score_change handler (Bermuda Triangulation, key-sorts before
+	# "el-dorado-body-glitter" so it dispatches first) already inflated the
+	# running ctx.amount. Pre-fix, El Dorado read ctx.amount and would have
+	# paid 5% of the Bermuda-inflated 150 (= 8 Gold, for a buggy total of 133)
+	# instead of 5% of the untouched 100 base.
+	var el_dorado_order := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["el-dorado-body-glitter", "bermuda-triangulation"],
+		"clock_s": 10})
+	await process_frame
+	Economy.earn(el_dorado_order, 100)
+	check(el_dorado_order.score == 150, "Bermuda Triangulation: +50% Score under 60s Clock")
+	check(el_dorado_order.gold == 130,
+		"El Dorado's 5% Gold bonus is off the 100 base (+5), not the Bermuda-inflated 150 (+8) — " +
+		"125 (100 base +25% Bermuda Gold) + 5 (El Dorado) = 130, order-independent")
+	el_dorado_order.queue_free()
+	await process_frame
+
 	# Zurich Gnome Figurine: at Wave end, refund 10% of Gold spent in the Shop
 	var zurich := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["zurich-gnome-figurine"], "gold": 100})

@@ -201,6 +201,12 @@ static func all() -> Array:
 			"items": ["counter_intel", "blitz"],
 			"artefacts": ["elvish-hard-hat"],
 			"gold": 100, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: slice 35 (Clock-gain choke point — lifesteal, King refill, Black Knight)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["king", 1, 2, 4], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],
+			"artefacts": ["lifesteal", "black-knight-morse-code"],
+			"gold": 100, "score": 0, "clock_s": 90.0, "wave": 99, "kings_defeated": 1,
+			"stock": ["pawn"]}}, # a recurring King refill on top of lifesteal/Black
+			# Knight's own Clock hooks, and a 3rd-Turn cadence within easy reach
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

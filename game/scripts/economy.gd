@@ -16,12 +16,16 @@ const CloudSave := preload("res://scripts/cloud_save.gd")
 ## checked centrally by ArtefactHooks.run) sets ctx.charged. When it does,
 ## on_tariff_charge (issue 19) fires right after — "whenever a Tariff charges
 ## you" — a single choke point since every call site already funnels through
-## here.
+## here. `base`/`amount` (issue 22) let Ark Grounding Cable scale the amount
+## before it's deducted — same immutable-base/additive-amount contract as
+## on_score_change, off ctx.base, never the running ctx.amount.
 static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
-	var ctx := ArtefactHooks.run(g, "on_charge", {"key": key, "charged": false})
+	var ctx := ArtefactHooks.run(g, "on_charge",
+		{"key": key, "charged": false, "base": float(amount), "amount": float(amount)})
 	if ctx.charged:
-		g.gold = maxi(g.gold - amount, 0)
-		ArtefactHooks.run(g, "on_tariff_charge", {"key": key, "amount": amount})
+		var charged_amount := roundi(ctx.amount)
+		g.gold = maxi(g.gold - charged_amount, 0)
+		ArtefactHooks.run(g, "on_tariff_charge", {"key": key, "amount": charged_amount})
 
 
 ## Award a gain: score counts the raw amount (up-only performance metric),
@@ -157,11 +161,20 @@ static func activate_tariff_by_key(g, key: String) -> void:
 
 ## Single choke point for every Tariff taking effect (oneoff or persistent) —
 ## "whenever a new Tariff is applied" (artefact hook 19) fires here, once,
-## regardless of which of the two activate_* callers led here.
+## regardless of which of the two activate_* callers led here. `cancel`
+## (issue 22) is Salvation Gift Card's veto — mirrors on_item_consume's
+## ctx.cancel (issue 19): the tariff never takes effect, but same-hook reward
+## handlers (e.g. Merchants of Death Sample Case) still fire regardless of
+## key-sort order, the same precedent as on_piece_lost's Fireproof Pajamas
+## (artefact hook 24) rather than reordering the dispatch to favor one
+## handler over another.
 static func apply_tariff(g, t: Dictionary) -> void:
 	g.tariffs_seen.append(t.name)
 	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
-	ArtefactHooks.run(g, "on_tariff_apply", {"key": t.key, "tier": t.get("tier", "")})
+	var ctx := ArtefactHooks.run(g, "on_tariff_apply",
+		{"key": t.key, "tier": t.get("tier", ""), "cancel": false})
+	if ctx.cancel:
+		return
 	if t.kind == "oneoff":
 		match t.key:
 			"forced_audit":

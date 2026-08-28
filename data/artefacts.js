@@ -20,6 +20,13 @@
    the full triage of what shipped, what split into new issues, and what's
    still an open Notion question (Dark Market Light Bulb's "Demoted" clause,
    the retired "Shop visit" term on 2 still-unimplemented artefacts).
+   2026-08-28 (issue 22): 4 tariff-interception artefacts flipped to
+   implemented: true (Panama Papers Shredder, Amber Room Bubble Wrap, Ark
+   Grounding Cable, Salvation Gift Card) on the filter/scale/cancel shapes
+   added to on_charge/on_gold_gain/on_tariff_apply. Exhibit 399 (tariff
+   choice) and SETI's Red Marker (tariff inversion) stay unimplemented —
+   both need a design ruling first, see game/scripts/artefact_hooks.gd's
+   header and .scratch/gdd-gaps/issues/22's Outcome.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -248,7 +255,7 @@ var ARTEFACTS = [
     effect: "Inverted pieces give double Score and Gold on Capture",
     conspiracy: "Modern flat Earth", url: "https://en.wikipedia.org/wiki/Modern_flat_Earth_beliefs",
     summary: "The disc, the ice wall, NASA the deceiver — revived in the internet era into a genuine movement. Its chosen 'true map' is the azimuthal equidistant projection, i.e. the UN logo, which delights everyone involved." },
-  { name: "Panama Papers Shredder", rarity: "Uncommon", type: "Passive", bonus: ["Special"], status: "KEEP",
+  { name: "Panama Papers Shredder", rarity: "Uncommon", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
     effect: "Mild Tariffs don't affect you (needs: tariff filtering)",
     conspiracy: "The Panama Papers", url: "https://en.wikipedia.org/wiki/Panama_Papers",
     summary: "2016: 11.5 million leaked files from one Panamanian law firm exposed the offshore shells of presidents, oligarchs and celebrities. The conspiracy that turned out to be simply, boringly, spectacularly true." },
@@ -344,7 +351,7 @@ var ARTEFACTS = [
     effect: "While the Clock is under 60s: +50% Score gain and +25% Gold gain",
     conspiracy: "The Bermuda Triangle", url: "https://en.wikipedia.org/wiki/Bermuda_Triangle",
     summary: "The patch of Atlantic where ships and planes are said to vanish and compasses to spin. Insurers price it as ordinary ocean; the legend prices it considerably higher." },
-  { name: "Amber Room Bubble Wrap", rarity: "Uncommon", type: "Passive", bonus: ["Gold"], status: "KEEP",
+  { name: "Amber Room Bubble Wrap", rarity: "Uncommon", type: "Passive", bonus: ["Gold"], status: "KEEP", implemented: true,
     effect: "Your Gold gains ignore Inflation and other gold-reducing Tariffs",
     conspiracy: "The lost Amber Room", url: "https://en.wikipedia.org/wiki/Amber_Room",
     summary: "A chamber paneled entirely in amber and gold — looted by the Wehrmacht in 1941, last seen crated in Königsberg in 1945, then gone. Divers, miners and con men have been finding it ever since; none has produced a panel." },
@@ -555,7 +562,7 @@ var ARTEFACTS = [
     effect: "When a \"Wave\" Artefact triggers: it triggers an additional time",
     conspiracy: "The Max Headroom hijacking", url: "https://en.wikipedia.org/wiki/Max_Headroom_signal_hijacking",
     summary: "Chicago, 1987: someone in a Max Headroom mask hijacked two TV broadcasts in one night, rambled, was spanked with a flyswatter, and vanished forever. Never caught, never explained — the signal that fired twice." },
-  { name: "Salvation Gift Card", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
+  { name: "Salvation Gift Card", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP", implemented: true,
     effect: "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone (needs: tariff cancel)",
     conspiracy: "The sale of indulgences", url: "https://en.wikipedia.org/wiki/Indulgence",
     summary: "Salvation with a receipt: the medieval trade in paid pardons, jingled into legend by Tetzel — 'when the coin in the coffer rings.' The paperwork that made Luther pick up a hammer." },
@@ -626,7 +633,7 @@ var ARTEFACTS = [
     effect: "On declining a Box Pick: +Gold equal to the Shop value of the offered pieces (needs: decline option)",
     conspiracy: "Cicada 3301", url: "https://en.wikipedia.org/wiki/Cicada_3301",
     summary: "The internet's anonymous recruitment puzzle — solve everything and someone, somewhere, maybe hires you. You did not make the cut, but the severance is surprisingly generous." },
-  { name: "Ark Grounding Cable", rarity: "Rare", type: "Passive", bonus: ["Special"], status: "KEEP",
+  { name: "Ark Grounding Cable", rarity: "Rare", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
     effect: "Tariff penalties are reduced by 50% (needs: tariff scaling)",
     conspiracy: "The Ark of the Covenant", url: "https://en.wikipedia.org/wiki/Ark_of_the_Covenant",
     summary: "The Ark-as-capacitor theory holds the gold-clad chest was an electrical device — touch it ungrounded and see what happened to Uzzah. Properly earthed, the surge dissipates by half." },

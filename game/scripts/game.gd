@@ -109,6 +109,9 @@ var nibiru_wave_streak := 0 # Nibiru Hide-and-Seek Trophy: grows +1 per Wave
 	# clear, reset to 0 on_piece_lost (artefact_hooks.gd, artefact hook 19)
 var hoffa_used_this_wave := false # Hoffa's Cement Shoes: once per Wave, reset
 	# on_wave_clear (artefact_hooks.gd, artefact hook 24)
+var salvation_charged := true # Salvation Gift Card: ready to veto the next
+	# Tariff applied; consumed on use, restored on_wave_clear at wave%5==0
+	# (artefact hook 22)
 var last_capture_ctx: Dictionary = {} # this move's on_capture ctx (Economy.
 	# capture_score) — read back by _move_player after its own board mutation
 	# for USS Eldridge / Royal Fiat's post-move reposition (artefact hook 24)

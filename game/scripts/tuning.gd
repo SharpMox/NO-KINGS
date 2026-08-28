@@ -67,36 +67,27 @@ const SHOP_BOX_PRICE := 50
 
 # Artefact rarity draw weight (issue 20), population-independent — a
 # Legendary should feel rare regardless of how many Legendaries the catalog
-# has. Ratio ~10:4:2:1 at run start, mirrored by SHOP_ARTEFACT_PRICE's own
-# doubling curve (rarer to find, costs more to buy).
+# has. Ratio ~10:4:2:1, mirrored by SHOP_ARTEFACT_PRICE's own doubling curve
+# (rarer to find, costs more to buy). Flat for the whole run — depth-gating
+# (rarity odds rising with cumulative Score) was reverted 2026-08-28: this is
+# a roguelike, a lucky early Legendary is a good story, and the Shop already
+# gates rarity by price. "" is the 7 core artefacts (no rarity, predate the
+# system) — always Common-weighted.
 const ARTEFACT_RARITY_WEIGHT_START := {
 	"": 100.0, "Common": 100.0, "Uncommon": 40.0, "Rare": 20.0, "Legendary": 10.0}
-# Decision: rarity is depth-gated (.scratch/gdd-gaps/issues/20, 2026-08-28) —
-# Legendary/Rare probability rises with depth while Common tapers, keyed off
-# cumulative Score (what the Shop's own restock cadence already uses —
-# SHOP_RESTOCK_BASE/STEP — so box.gd and shop.gd share one depth signal).
-# Linear ramp from WEIGHT_START (score 0) to WEIGHT_DEEP (score >= the cap);
-# "" (the 7 core artefacts, no rarity) stays flat — they predate the rarity
-# system and aren't part of the gate.
-const ARTEFACT_RARITY_WEIGHT_DEEP := {
-	"": 100.0, "Common": 20.0, "Uncommon": 45.0, "Rare": 45.0, "Legendary": 35.0}
-const ARTEFACT_RARITY_DEPTH_CAP_SCORE := 5000 # ~3rd shop restock (4500); curve shape, not a design decision
 
-static func artefact_rarity_weight(rarity: String, score: int) -> float:
-	var t := clampf(float(score) / float(ARTEFACT_RARITY_DEPTH_CAP_SCORE), 0.0, 1.0)
-	var lo: float = ARTEFACT_RARITY_WEIGHT_START.get(rarity, ARTEFACT_RARITY_WEIGHT_START["Common"])
-	var hi: float = ARTEFACT_RARITY_WEIGHT_DEEP.get(rarity, ARTEFACT_RARITY_WEIGHT_DEEP["Common"])
-	return lerpf(lo, hi, t)
+static func artefact_rarity_weight(rarity: String) -> float:
+	return ARTEFACT_RARITY_WEIGHT_START.get(rarity, ARTEFACT_RARITY_WEIGHT_START["Common"])
 
 
 ## Weighted-random index into `pool` (an Array of Dictionaries carrying a
 ## `rarity` field, "" if untagged) — shared by box.gd's single-pick roll and
 ## shop.gd's sample-without-replacement stock roll.
-static func weighted_artefact_pick(pool: Array, score: int, rng: RandomNumberGenerator) -> int:
+static func weighted_artefact_pick(pool: Array, rng: RandomNumberGenerator) -> int:
 	var weights: Array[float] = []
 	var total := 0.0
 	for e in pool:
-		var w := artefact_rarity_weight(str(e.get("rarity", "")), score)
+		var w := artefact_rarity_weight(str(e.get("rarity", "")))
 		weights.append(w)
 		total += w
 	var r := rng.randf() * total

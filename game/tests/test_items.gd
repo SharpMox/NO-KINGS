@@ -13,6 +13,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const Waves := preload("res://data/waves.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -641,29 +642,31 @@ func _init() -> void:
 	tinfoil.queue_free()
 	await process_frame
 
-	# Tungsten-Filled Gold Bar: Gold gains also add 2x their amount as Score
+	# Tungsten-Filled Gold Bar: +20% Score gain (rebalanced 2026-08-28 — was
+	# "2x their amount as Score", an unconditional 3x Score multiplier since
+	# Gold is earned 1:1 with Score, wildly out of scale with the catalog)
 	var tungsten := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["tungsten-filled-gold-bar"]})
 	await process_frame
 	Economy.earn(tungsten, 100)
 	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
-	check(tungsten.score == 300, "Tungsten-Filled Gold Bar: +100 base, +200 (2x the Gold) Score")
+	check(tungsten.score == 120, "Tungsten-Filled Gold Bar: +100 base, +20 (20% of the Gold) Score")
 	tungsten.queue_free()
 	await process_frame
 
 	# --- issue 20 regression: the slice 20 fleet sweep caught Tungsten-Filled
-	# Gold Bar + Popemobile Piggy Bank as a degenerate pair (score ~11-13x an
-	# organic baseline) because both wrote g.score straight from inside their
-	# on_gold_change dispatch instead of through Economy.earn's ctx.score_bonus
-	# channel — held together, held score should be the plain additive sum
-	# of each one's own bonus (2x + 10x), not doubled or compounded
+	# Gold Bar + Popemobile Piggy Bank as a degenerate pair because both wrote
+	# g.score straight from inside their on_gold_change dispatch instead of
+	# through Economy.earn's ctx.score_bonus channel — held together, held
+	# score should be the plain additive sum of each one's own bonus (20% +
+	# 50%, rebalanced 2026-08-28 — was 2x + 10x), not doubled or compounded
 	var tungsten_pope := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["tungsten-filled-gold-bar", "popemobile-piggy-bank"]})
 	await process_frame
 	Economy.earn(tungsten_pope, 100)
 	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
-	check(tungsten_pope.score == 100 + 200 + 1000,
-		"Tungsten (+200, 2x) and Popemobile (+1000, 10x) add on top of the +100 base — the correct sum, not doubled")
+	check(tungsten_pope.score == 100 + 20 + 50,
+		"Tungsten (+20, 20%) and Popemobile (+50, 50%) add on top of the +100 base — the correct sum, not doubled")
 	tungsten_pope.queue_free()
 	await process_frame
 
@@ -860,16 +863,48 @@ func _init() -> void:
 	sg.queue_free()
 	await process_frame
 
+	# --- fix (ruled 2026-08-28): RANDOM artefact buff grants must never hand
+	# out a self-harming buff — today only Slow (it makes its own holder move
+	# and capture like a Pawn, a debuff on its own holder). The player's own
+	# Buff Box pick (_open_buff_pick, game.gd) is untouched: choosing Slow
+	# deliberately (e.g. onto an enemy) is legitimate. ---
+	check(Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.key == "slow")[0]
+			.get("self_harming", false),
+		"Slow is flagged self_harming in the catalog")
+	check(not Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.key == "smog")[0]
+			.get("self_harming", false),
+		"Smog (debuffs adjacent ENEMIES, not its own holder) stays unflagged — a genuine buff")
+	var rbk_rng := RandomNumberGenerator.new()
+	rbk_rng.seed = 7
+	var seen_slow := false
+	var seen_other := {}
+	for i in 500:
+		var k: String = ArtefactHooks._random_buff_key(rbk_rng)
+		if k == "slow":
+			seen_slow = true
+		seen_other[k] = true
+	check(not seen_slow, "RANDOM grants (_random_buff_key) never draw Slow, even over 500 rolls")
+	check(seen_other.size() == Items.PIECE_BUFFS.size() - 1,
+		"every OTHER Piece Buff is still reachable by a random grant (%d of %d)"
+			% [seen_other.size(), Items.PIECE_BUFFS.size() - 1])
+	check(Items.PIECE_BUFFS.duplicate().any(func(b: Dictionary) -> bool: return b.key == "slow"),
+		"the player's own Buff Box pool (_open_buff_pick's source) still includes Slow")
+
 	# --- issue 18 (Shop/Item/Buff batch): Buff-tag artefacts go through
 	# BuffLogic.add, not a parallel path ---
 
-	# Crop Circle Plank: "5-Wave Milestone" fires off the just-cleared wave
-	# number directly (on_wave_clear), not the engine's own 10-wave
-	# on_milestone cadence — see artefact_hooks.gd's silk-road-coupon note
+	# Crop Circle Plank: "5-Wave Milestone" is PER-ARTEFACT (ruled 2026-08-28)
+	# — this held copy counts its own 5 waves from its own acquisition, fired
+	# off the just-cleared wave (on_wave_clear), not the engine's own GLOBAL
+	# 10-wave on_milestone cadence. acquired_wave is forced to 1 here so the
+	# test can isolate the handler's own cadence math (_milestone5_hit) from
+	# the separate acquisition-stamping coverage below — wave 5 clearing is
+	# then this copy's beat 5 (1 + 4), a real 5-Wave Milestone.
 	var crop := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
 		["knight", 0, 4, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "artefacts": ["crop-circle-plank"], "gold": 50})
 	await process_frame
+	crop.artefacts[0].acquired_wave = 1
 	WaveLogic.queue(crop, crop.wave + 1) # clears wave 5: a real 5-Wave Milestone
 	var buffed := 0
 	for pos in crop.board:
@@ -880,10 +915,11 @@ func _init() -> void:
 	crop.queue_free()
 	await process_frame
 
-	# it does NOT fire clearing wave 6 or 7 (not a multiple of 5)
+	# it does NOT fire clearing wave 6 or 7 (not this copy's own multiple of 5)
 	var crop_off := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2],
 		["rook", 1, 7, 10]], "wave": 6, "artefacts": ["crop-circle-plank"], "gold": 50})
 	await process_frame
+	crop_off.artefacts[0].acquired_wave = 1
 	WaveLogic.queue(crop_off, crop_off.wave + 1)
 	check(crop_off.gold == 50, "Crop Circle Plank: no-op on a wave clear that isn't a multiple of 5")
 	crop_off.queue_free()
@@ -907,14 +943,15 @@ func _init() -> void:
 
 	# Holy Lint: On Capture, the capturing piece gets +1 Piece Buff (no gate) —
 	# exercises attacker_pos end to end through a real board capture.
-	# Seed pinned: an unpinned rng.randi() % 12 lands on "critical" or "range"
-	# 2/12 of the time, and _move_player consumes either on this very capture
-	# (game.gd's "Range is spent by the capture, not by repositioning"), which
-	# flaked this check ~1 run in 3 on identical code. Seed "1" is a durable
-	# roll ("stun", a dormant buff untouched by this capture path) — verified
-	# deterministic across repeated runs.
+	# Seed pinned: Holy Lint's random draw covers every tier, including Bomb/
+	# Trap/Multicapture — self-consuming hazards of their own (a freshly
+	# granted Bomb would detonate THIS capture, same class of bug as Critical/
+	# Range below, just not in this fix's scope) that a random roll would
+	# occasionally hit and destroy the piece the test then inspects. Seed 4
+	# is a durable roll ("stun", a dormant buff untouched by this capture
+	# path either way) — verified deterministic across repeated runs.
 	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
-		"wave": 3, "artefacts": ["holy-lint"], "seed": "1"})
+		"wave": 3, "artefacts": ["holy-lint"], "seed": "4"})
 	await process_frame
 	lint.actions_left = 5
 	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
@@ -922,6 +959,69 @@ func _init() -> void:
 	check(lint_buffs.size() == 1 and lint_buffs[0].key == "stun",
 		"Holy Lint: the capturing piece gets +1 Piece Buff (stun, seed 1)")
 	lint.queue_free()
+	await process_frame
+
+	# --- fix (ruled 2026-08-28): grant-on-capture (Obedience-Flavored Tap
+	# Water, Holy Lint) must land AFTER critical/range are consumed by the
+	# SAME capture that granted them — a reward banked for the NEXT capture,
+	# not this one. Before the fix, a granted Critical doubled the capture
+	# that granted it (capture_multiplier read the just-mutated board[from]
+	# synchronously) and a granted Range was immediately spent for zero
+	# effect (the comment above, on Holy Lint, is the flake this caused).
+	# Seeds are found live, mirroring _random_buff_key's own pool + roll, so
+	# this doesn't hardcode an RNG index that could silently drift.
+	var tac_pool: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
+		return not b.get("self_harming", false) and b.tier == "Tactical")
+	var crit_idx := -1
+	var range_idx := -1
+	for i in tac_pool.size():
+		if tac_pool[i].key == "critical":
+			crit_idx = i
+		elif tac_pool[i].key == "range":
+			range_idx = i
+	var find_rng := RandomNumberGenerator.new()
+	var crit_seed := -1
+	var range_seed := -1
+	for s in 5000:
+		if crit_seed < 0:
+			find_rng.seed = s
+			if find_rng.randi() % tac_pool.size() == crit_idx:
+				crit_seed = s
+		if range_seed < 0:
+			find_rng.seed = s
+			if find_rng.randi() % tac_pool.size() == range_idx:
+				range_seed = s
+		if crit_seed >= 0 and range_seed >= 0:
+			break
+	check(crit_seed >= 0 and range_seed >= 0, "(setup) found seeds landing a granted Critical and a granted Range")
+
+	var gc := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 2, 3], ["pawn", 1, 5, 5], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["obedience-flavored-tap-water"]})
+	await process_frame
+	var gc_pawn_val: int = gc.defs.pawn.value
+	gc.actions_left = 3
+	gc.rng.seed = crit_seed # the very next rng draw is _random_buff_key's, inside this capture
+	gc._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this wave: Tap Water grants Critical
+	check(gc.score == gc_pawn_val,
+		"a Critical granted by THIS capture doesn't double THIS capture's own score")
+	check(BuffLogic.has(gc.board[Vector2i(2, 3)], "critical"),
+		"the granted Critical survives on the attacker after the capture that granted it")
+	gc.score = 0
+	gc._move_player(Vector2i(2, 3), Vector2i(5, 5)) # a second, unrelated capture
+	check(gc.score == gc_pawn_val * 2,
+		"the banked Critical doubles the NEXT capture — it really works as a reward")
+	gc.queue_free()
+	await process_frame
+
+	var gr := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["obedience-flavored-tap-water"]})
+	await process_frame
+	gr.actions_left = 3
+	gr.rng.seed = range_seed
+	gr._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this wave: Tap Water grants Range
+	check(BuffLogic.has(gr.board[Vector2i(2, 3)], "range"),
+		"the granted Range survives on the attacker after the capture that granted it, not spent for zero effect")
+	gr.queue_free()
 	await process_frame
 
 	# Frame 25: On Wave clear, +1 Tactical Item, -10 Gold
@@ -1189,7 +1289,9 @@ func _init() -> void:
 	var montauk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "stock": ["pawn"], "artefacts": ["montauk-eggo-waffle"]})
 	await process_frame
-	WaveLogic.queue(montauk, 6) # Wave 5 just cleared -> "5-Wave Milestone" fires this on_wave_clear
+	montauk.artefacts[0].acquired_wave = 1 # per-artefact cadence (2026-08-28):
+		# isolate the handler's own math from acquisition-stamping coverage below
+	WaveLogic.queue(montauk, 6) # Wave 5 just cleared -> this copy's own "5-Wave Milestone" fires this on_wave_clear
 	check(montauk.stock == ["sergeant"],
 		"Montauk Eggo Waffle: the only Stock piece Ranks Up on the 5-Wave Milestone")
 	montauk.queue_free()
@@ -1673,7 +1775,9 @@ func _init() -> void:
 	Economy.activate_tariff_by_key(salvation, "regulation")
 	check(salvation.tariffs_active.size() == 1 and salvation.tariffs_active[0].key == "regulation",
 		"Salvation Gift Card: a second Tariff applies normally once spent")
-	WaveLogic.queue(salvation, 6) # clears wave 5 (5-Wave Milestone): recharges
+	salvation.artefacts[0].acquired_wave = 1 # per-artefact cadence (2026-08-28):
+		# isolate the handler's own math from acquisition-stamping coverage below
+	WaveLogic.queue(salvation, 6) # clears wave 5, this copy's own 5-Wave Milestone: recharges
 	check(salvation.salvation_charged, "Salvation Gift Card: recharges at the 5-Wave Milestone")
 	salvation.queue_free()
 	await process_frame
@@ -1793,11 +1897,14 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
-	# Assembly Manual) — on_wave_clear + g.wave % 5 == 0, silk-road-coupon's
-	# cadence, not the 10-wave on_milestone hook ---
+	# Assembly Manual) — on_wave_clear + _milestone5_hit, PER-ARTEFACT
+	# (ruled 2026-08-28), silk-road-coupon's cadence, not the GLOBAL 10-wave
+	# on_milestone hook. acquired_wave forced to 1 to isolate the handler's
+	# own cadence math from the acquisition-stamping coverage below.
 	var arkb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 99999, "artefacts": ["ark-s-bunkbed"]})
 	await process_frame
+	arkb.artefacts[0].acquired_wave = 1
 	arkb.actions_left = 20
 	var arkb_idx1 := -1
 	for j in arkb.shop_stock.size():
@@ -1834,6 +1941,7 @@ func _init() -> void:
 	var trojan := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "artefacts": ["trojan-horse-assembly-manual"]})
 	await process_frame
+	trojan.artefacts[0].acquired_wave = 1
 	check(not trojan.box_open, "(control) no Box open before the Wave-5 clear")
 	WaveLogic.queue(trojan, 6) # clears wave 5 -> 5-Wave Milestone
 	check(trojan.box_open,
@@ -2138,6 +2246,91 @@ func _init() -> void:
 	bz.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
+
+	# --- fix (ruled 2026-08-28): the "5-Wave Milestone" is PER-ARTEFACT, not
+	# the GLOBAL beat every held copy used to check (g.wave % 5 == 0). Each
+	# held copy counts its own 5 waves from its own acquisition wave (stamped
+	# on g.artefacts entries — ArtefactHooks._milestone5_hit) ---
+
+	# core fix: two copies of the same artefact, acquired on different waves,
+	# fire on DIFFERENT wave-clears — not in lockstep. Manna Vending Machine
+	# (+2 Items per firing) makes each copy's own firing directly countable.
+	var m5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["manna-vending-machine"]}) # copy A: acquired wave 1
+	await process_frame
+	for t in Items.ARTEFACT_EFFECTS: # copy B: acquired wave 3 (held from the
+		if t.key == "manna-vending-machine": # start, same as two Shop buys on
+			var copy_b: Dictionary = t.duplicate() # different waves would produce)
+			copy_b.acquired_wave = 3
+			m5.artefacts.append(copy_b)
+			break
+	check(m5.artefacts.size() == 2, "two held copies, acquired on different waves")
+	for n in range(2, 6): # clear waves 1..4: neither copy is due yet
+		WaveLogic.queue(m5, n)
+	check(m5.items.size() == 0, "neither copy fires before its own beat 5 (waves 1-4 cleared)")
+	WaveLogic.queue(m5, 6) # clears wave 5: copy A's beat 5 (1+4) — copy B's is wave 7 (3+4)
+	check(m5.items.size() == 2, "only copy A (acquired wave 1) fires clearing wave 5")
+	WaveLogic.queue(m5, 7) # clears wave 6: neither copy's beat
+	check(m5.items.size() == 2, "no double-fire clearing wave 6")
+	WaveLogic.queue(m5, 8) # clears wave 7: copy B's beat 5 (3+4)
+	check(m5.items.size() == 4, "copy B (acquired wave 3) fires on its OWN beat, clearing wave 7 — not lockstepped with copy A")
+	m5.queue_free()
+	await process_frame
+
+	# acquisition-wave stamping: every acquisition path stamps g.wave, and
+	# never mutates the shared Items.ARTEFACT_EFFECTS catalog entry
+	var catalog_entry: Dictionary
+	for t in Items.ARTEFACT_EFFECTS:
+		if t.key == "manna-vending-machine":
+			catalog_entry = t
+			break
+	check(not catalog_entry.has("acquired_wave"),
+		"the shared catalog entry itself is never stamped (each acquisition duplicates it)")
+
+	# Shop buy
+	var buyer := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 7, "gold": 99999})
+	await process_frame
+	buyer.actions_left = 5
+	buyer.shop_stock.append({"kind": "artefact", "key": "manna-vending-machine", "sold": false})
+	Shop.buy(buyer, buyer.shop_stock.size() - 1)
+	check(buyer.artefacts.size() == 1 and buyer.artefacts[0].acquired_wave == 7,
+		"Shop buy stamps acquired_wave to the current wave")
+	buyer.queue_free()
+	await process_frame
+
+	# Box pick
+	var boxer := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 9})
+	await process_frame
+	boxer._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": catalog_entry})
+	check(boxer.artefacts.size() == 1 and boxer.artefacts[0].acquired_wave == 9,
+		"Box pick stamps acquired_wave to the current wave")
+	boxer.queue_free()
+	await process_frame
+
+	# save/load round-trip: each held copy's own acquired_wave survives
+	var saver := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["manna-vending-machine"]})
+	await process_frame
+	for t in Items.ARTEFACT_EFFECTS:
+		if t.key == "manna-vending-machine":
+			var b2: Dictionary = t.duplicate()
+			b2.acquired_wave = 3
+			saver.artefacts.append(b2)
+			break
+	var m5_cfg: Dictionary = saver._to_config()
+	saver.queue_free()
+	await process_frame
+	var m5_restored := _boot(JSON.parse_string(JSON.stringify(m5_cfg)))
+	await process_frame
+	var restored_waves: Array = []
+	for t in m5_restored.artefacts:
+		restored_waves.append(int(t.acquired_wave))
+	restored_waves.sort()
+	check(restored_waves == [1, 3],
+		"save -> load preserves each held copy's own acquired_wave (%s)" % [restored_waves])
+	m5_restored.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

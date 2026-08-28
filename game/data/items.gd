@@ -72,6 +72,13 @@ const PIECE_BUFFS: Array = [
 	{"key": "reflect", "name": "Reflect", "tier": "Decisive", "model": "dormant",
 		"description": "Stops the next capture attempt, then takes the attacker's tile and captures it."},
 	{"key": "slow", "name": "Slow", "tier": "Tactical", "model": "timed", "turns": 1,
+		"self_harming": true, # a DEBUFF on its own holder (ruled 2026-08-28) — a
+			# RANDOM artefact grant must never hand a piece this by accident (see
+			# artefact_hooks.gd's _random_buff_key); the player's own Buff Box
+			# pick still offers it (game.gd _open_buff_pick reads PIECE_BUFFS
+			# directly), since choosing Slow deliberately (e.g. onto an enemy)
+			# is legitimate. Smog debuffs *adjacent enemies*, not its holder, so
+			# it stays a genuine buff and carries no flag.
 		"description": "This piece moves and captures like a Pawn until the end of the next enemy turn."},
 	{"key": "aura", "name": "Aura", "tier": "Strategic", "model": "timed", "turns": 2,
 		"description": "For 2 player turns, adjacent allies score double on their captures."},

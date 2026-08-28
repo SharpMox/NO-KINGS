@@ -66,15 +66,14 @@ func _init() -> void:
 	check(game.artefacts.size() == 1, "picking a Artefact adds a run-long passive")
 	check(not game.box_open, "choosing closes the box")
 
-	# --- issue 20: rarity weighting + depth gating ---
-	check(Tuning.artefact_rarity_weight("Common", 0) == 100.0
-			and Tuning.artefact_rarity_weight("Legendary", 0) == 10.0,
-		"at Score 0 Common outweighs Legendary 10:1")
-	check(Tuning.artefact_rarity_weight("Common", Tuning.ARTEFACT_RARITY_DEPTH_CAP_SCORE) == 20.0
-			and Tuning.artefact_rarity_weight("Legendary", Tuning.ARTEFACT_RARITY_DEPTH_CAP_SCORE) == 35.0,
-		"deep into a run Common tapers below Legendary")
-	check(Tuning.artefact_rarity_weight("", 0) == Tuning.artefact_rarity_weight("", 999999),
-		"the 7 core (unrated) artefacts aren't depth-gated")
+	# --- issue 20 (rarity weighting), depth gating reverted 2026-08-28: flat
+	# for the whole run — a roguelike lets a lucky early Legendary be a good
+	# story, and the Shop already gates rarity by price (SHOP_ARTEFACT_PRICE)
+	check(Tuning.artefact_rarity_weight("Common") == 100.0
+			and Tuning.artefact_rarity_weight("Legendary") == 10.0,
+		"Common outweighs Legendary 10:1")
+	check(Tuning.artefact_rarity_weight("") == Tuning.artefact_rarity_weight("Common"),
+		"the 7 core (unrated) artefacts weigh the same as Common")
 
 	var pool := [{"rarity": "Common"}, {"rarity": "Legendary"}]
 	var wrng := RandomNumberGenerator.new()
@@ -82,23 +81,15 @@ func _init() -> void:
 	var common_n := 0
 	var legend_n := 0
 	for i in 2000:
-		if Tuning.weighted_artefact_pick(pool, 0, wrng) == 0:
+		if Tuning.weighted_artefact_pick(pool, wrng) == 0:
 			common_n += 1
 		else:
 			legend_n += 1
 	check(common_n > legend_n * 5,
-		"at Score 0 the weighted pick strongly favors Common (%d vs %d)" % [common_n, legend_n])
-	var common_deep := 0
-	var legend_deep := 0
-	for i in 2000:
-		if Tuning.weighted_artefact_pick(pool, Tuning.ARTEFACT_RARITY_DEPTH_CAP_SCORE, wrng) == 0:
-			common_deep += 1
-		else:
-			legend_deep += 1
-	check(legend_deep > common_deep,
-		"deep into a run the weighted pick favors Legendary over Common (%d vs %d)" % [legend_deep, common_deep])
+		"the weighted pick strongly favors Common (%d vs %d)" % [common_n, legend_n])
 
-	# integration: _box_options depth-gates by game.score, not just the Tuning curve
+	# integration: _box_options' rarity mix doesn't shift with game.score —
+	# no depth signal reaches it any more
 	game.score = 0
 	var low := {}
 	for i in 400:
@@ -107,7 +98,7 @@ func _init() -> void:
 				var r: String = str(o.payload.get("rarity", ""))
 				if r != "":
 					low[r] = low.get(r, 0) + 1
-	game.score = 50000 # far past the depth cap
+	game.score = 50000 # what used to be "far past the depth cap"
 	var high := {}
 	for i in 400:
 		for o in game._box_options():
@@ -123,8 +114,8 @@ func _init() -> void:
 		high_total += v
 	var low_common_share := float(low.get("Common", 0)) / float(maxi(1, low_total))
 	var high_common_share := float(high.get("Common", 0)) / float(maxi(1, high_total))
-	check(low_common_share > high_common_share,
-		"Common's share of _box_options artefact rolls drops as Score rises (%.2f -> %.2f)"
+	check(absf(low_common_share - high_common_share) < 0.15,
+		"Common's share of _box_options artefact rolls stays flat regardless of Score (%.2f vs %.2f)"
 			% [low_common_share, high_common_share])
 
 	game.queue_free()

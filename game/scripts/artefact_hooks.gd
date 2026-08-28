@@ -697,9 +697,10 @@ const REGISTRY := {
 	# hook at all, see game.gd's _deploy_tiles) ---
 	"hitler-s-argentinian-passport": ["on_deploy"],
 
-	# --- issue 26: "5-Wave Milestone" (on_wave_clear + g.wave % 5 == 0, the
-	# silk-road-coupon/crop-circle-plank cadence — a different one than
-	# on_milestone's own 10-wave clock-refill trigger, see there) ---
+	# --- issue 26: "5-Wave Milestone" (on_wave_clear + _milestone5_hit, the
+	# silk-road-coupon/crop-circle-plank cadence — PER-ARTEFACT, ruled
+	# 2026-08-28; a different one than on_milestone's own GLOBAL 10-wave
+	# clock-refill trigger, see there) ---
 	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
 	"trojan-horse-assembly-manual": ["on_wave_clear"],
 
@@ -758,7 +759,7 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		# not just held — Bilderberg Hotel Slippers' own contract
 	for t in held + tariffs:
 		if REGISTRY.get(t.key, []).has(hook):
-			_dispatch(g, t.key, hook, ctx)
+			_dispatch(g, t.key, hook, ctx, t.get("acquired_wave", 1))
 			fired.append(t.key)
 	if g.artefact_echo_depth == 0: # re-entrancy guard, see header
 		g.artefact_echo_depth += 1
@@ -882,11 +883,34 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+## "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, not the GLOBAL
+## 10-wave beat (Tuning.MILESTONE_WAVES / on_milestone, wave_logic.gd's clock
+## refill + score chunk — untouched, a genuinely different cadence). Each held
+## copy counts its own 5 waves from its own acquisition — ruled 2026-08-28,
+## matching .scratch/shop-gdd-sync/PRD.md ("each Artefact counts its own 5
+## waves from acquisition"). The acquisition wave itself counts as beat 1, so
+## a copy acquired on wave W fires when W+4, W+9, W+14… clears — two copies
+## acquired on different waves legitimately fire on different beats. Called
+## from `on_wave_clear` handlers, where `wave` is the just-cleared wave
+## (wave_logic.gd's queue() dispatches on_wave_clear before bumping g.wave).
+static func _milestone5_hit(wave: int, acquired_wave: int) -> bool:
+	return wave >= acquired_wave and (wave - acquired_wave) % 5 == 4
+
+
 ## A uniformly random Piece Buff key, optionally restricted to one tier
-## ("Tactical Piece Buff" in several issue-18 effect texts).
+## ("Tactical Piece Buff" in several issue-18 effect texts). RANDOM GRANTS
+## only — excludes `self_harming` entries (today just Slow: it makes the
+## piece move/capture like a Pawn, a debuff on its own holder) so "the piece
+## gets +1 Piece Buff" artefacts (Holy Lint, MK-Ultra Sugar Cube, Crop Circle
+## Plank, Obedience-Flavored Tap Water, Sugar Free Chemtrail Can, Zodiac
+## Crossword Puzzle, Holy Grail Coaster, Scientology E-Meter, Xenu OT III
+## Season Pass, Sleeper Agent Pillow…) never actively penalise the player
+## (ruled 2026-08-28). The player's own Buff Box pick (game.gd
+## _open_buff_pick) reads Items.PIECE_BUFFS directly, not this function, so
+## choosing Slow deliberately (e.g. onto an enemy) is untouched.
 static func _random_buff_key(rng: RandomNumberGenerator, tier := "") -> String:
-	var pool: Array = Items.PIECE_BUFFS if tier == "" \
-		else Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.tier == tier)
+	var pool: Array = Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool:
+		return not b.get("self_harming", false) and (tier == "" or b.tier == tier))
 	return pool[rng.randi() % pool.size()].key
 
 
@@ -947,7 +971,16 @@ static func _on_enemy_half(pos: Vector2i) -> bool:
 	return pos.y >= Tuning.BOARD_H / 2
 
 
-static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
+## `acquired_wave` (issue: "5-Wave Milestone" ruled per-artefact, not global —
+## see _milestone5_hit below) is the wave this specific held copy entered
+## g.artefacts (stamped on every acquisition path: save_config.gd, shop.gd,
+## the box-pick/--artefacts spots in game.gd). Defaults to 1 for the
+## _run_meta_triggers echo calls below, which re-dispatch by bare key with no
+## specific copy in hand — a known, documented gap (a milestone-5 artefact
+## echoed by Max Headroom Mask/Polybius Cartridge/etc. falls back to the
+## wave-1 cadence for that extra dispatch only; real gameplay/test coverage
+## doesn't combine them today, see the fix's PR notes).
+static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int = 1) -> void:
 	match [key, hook]:
 		["greed", "on_capture"]:
 			if ctx.victim_id == "pawn":
@@ -1012,11 +1045,17 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 
 		# --- issue 16: Gold gain also pays Score (mirror of the above) ---
 		["tungsten-filled-gold-bar", "on_gold_change"]:
-			# issue 20 fix: ctx.base + ctx.score_bonus, same reasoning as
-			# El Dorado above — was g.score += roundi(ctx.amount) * 2.
-			ctx.score_bonus += ctx.base * 2
+			# Rebalanced 2026-08-28: "+20% Score gain" — was "2x their amount as
+			# Score", an unconditional 3x Score multiplier (Gold is earned 1:1
+			# with Score) wildly out of scale with the catalog (Tinfoil Hat is
+			# +15% at the same Common rarity). ctx.score_bonus, same reasoning
+			# as El Dorado above.
+			ctx.score_bonus += ctx.base * 0.20
 		["popemobile-piggy-bank", "on_gold_change"]:
-			ctx.score_bonus += ctx.base * 10
+			# Rebalanced 2026-08-28: "+50% Score gain" — was "10x" (an
+			# unconditional 11x Score multiplier at Uncommon). Same reasoning
+			# as Tungsten-Filled Gold Bar above.
+			ctx.score_bonus += ctx.base * 0.50
 
 		# --- issue 16: on_capture triggers ---
 		["suspiciously-large-femur", "on_capture"]:
@@ -1164,15 +1203,15 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			if g.silk_road_active:
 				ctx.amount -= ctx.base * 0.50
 		["silk-road-coupon", "on_wave_clear"]:
-			# "5-Wave Milestone" (12 effect texts) is a different cadence than
-			# on_milestone's own 10-wave clock-refill trigger, so this checks
-			# the just-cleared wave directly rather than piggybacking that hook.
-			if g.wave % 5 == 0:
+			# "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, a different
+			# cadence than on_milestone's own GLOBAL 10-wave clock-refill
+			# trigger — see _milestone5_hit's header above.
+			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
 
 		# --- issue 18: Buff-tag triggers, all through BuffLogic.add ---
 		["crop-circle-plank", "on_wave_clear"]:
-			if g.wave % 5 == 0: # "5-Wave Milestone" — see silk-road-coupon's on_wave_clear case above
+			if _milestone5_hit(g.wave, acquired_wave): # "5-Wave Milestone" — see silk-road-coupon's on_wave_clear case above
 				var pool := _player_positions(g)
 				for i in mini(2, pool.size()):
 					var idx: int = g.rng.randi() % pool.size()
@@ -1182,11 +1221,15 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["mk-ultra-sugar-cube", "on_deploy"]:
 			_grant_buff(g, ctx.pos, "Tactical")
 		["obedience-flavored-tap-water", "on_capture"]:
+			# Doesn't grant here — game.gd's _move_player applies it AFTER this
+			# capture's own critical/range consumption (ruled 2026-08-28, see
+			# economy.gd's ctx.grant_buffs comment), so the new buff survives
+			# for the NEXT capture instead of being doubled/wasted by this one.
 			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
-				_grant_buff(g, ctx.attacker_pos, "Tactical")
+				ctx.grant_buffs.append("Tactical")
 		["holy-lint", "on_capture"]:
 			if ctx.attacker_pos.x >= 0:
-				_grant_buff(g, ctx.attacker_pos)
+				ctx.grant_buffs.append("")
 		["scientology-e-meter", "on_wave_clear"]:
 			# "the piece" — Wave clear has no single trigger piece, so this
 			# reads it as a random ally (same reading as Xenu OT III below).
@@ -1202,7 +1245,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 					break
 				_grant_buff(g, xe_pool[g.rng.randi() % xe_pool.size()])
 		["sugar-free-chemtrail-can", "on_wave_clear"]:
-			if g.wave % 5 == 0:
+			if _milestone5_hit(g.wave, acquired_wave):
 				for pos in _player_positions(g):
 					_grant_buff(g, pos)
 		["sleeper-agent-pillow", "on_purchase"]:
@@ -1222,7 +1265,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			g.items.append(tac_pool[g.rng.randi() % tac_pool.size()])
 			g.gold = maxi(g.gold - 10, 0)
 		["manna-vending-machine", "on_wave_clear"]:
-			if g.wave % 5 == 0:
+			if _milestone5_hit(g.wave, acquired_wave):
 				for i in 2:
 					g.items.append(Items.ITEMS[g.rng.randi() % Items.ITEMS.size()])
 		["mao-s-loyalty-badge", "on_purchase"]:
@@ -1375,7 +1418,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 					and (ctx.attacker_buffed or _ranked(g.defs, ctx.attacker_id)):
 				g.gold += roundi(ctx.base) # +100% Gold
 		["montauk-eggo-waffle", "on_wave_clear"]:
-			if g.wave % 5 == 0:
+			if _milestone5_hit(g.wave, acquired_wave):
 				var candidates: Array = []
 				for i in g.stock.size():
 					var e = g.stock[i]
@@ -1556,7 +1599,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 				g.salvation_charged = false
 				ctx.cancel = true
 		["salvation-gift-card", "on_wave_clear"]:
-			if g.wave % 5 == 0: # same cadence as Silk Road Coupon (issue 18)
+			if _milestone5_hit(g.wave, acquired_wave): # same cadence as Silk Road Coupon (issue 18)
 				g.salvation_charged = true
 
 		# --- issue 26: spawn roster modifiers (on_wave_roster, WaveLogic.queue
@@ -1595,17 +1638,17 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			ctx.skip_action = true
 
 		# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
-		# Assembly Manual) — see silk-road-coupon's on_wave_clear case above
-		# for why this checks g.wave % 5 == 0 directly instead of on_milestone
+		# Assembly Manual) — per-artefact cadence, see silk-road-coupon's
+		# on_wave_clear case / _milestone5_hit's header above
 		["ark-s-bunkbed", "on_wave_clear"]:
-			if g.wave % 5 == 0:
+			if _milestone5_hit(g.wave, acquired_wave):
 				g.arks_bunkbed_used = false # the new Milestone recharges it
 		["ark-s-bunkbed", "on_purchase"]:
 			if ctx.kind == "piece" and not g.arks_bunkbed_used:
 				g.stock.append(ctx.key)
 				g.arks_bunkbed_used = true
 		["trojan-horse-assembly-manual", "on_wave_clear"]:
-			if g.wave % 5 == 0 and not g.box_open: # don't clobber an open Box Pick
+			if _milestone5_hit(g.wave, acquired_wave) and not g.box_open: # don't clobber an open Box Pick
 				g._open_box_pick()
 
 		# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,

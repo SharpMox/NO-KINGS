@@ -1,8 +1,8 @@
 extends SceneTree
 ## Settings persistence: user://settings.json round-trips, defaults hold for
 ## an untouched or partial file, and unknown/legacy keys survive a save
-## (06's animations toggle and 07's difficulty picker add rows here without
-## this module changing). Run headless:
+## (07's difficulty picker adds a row here without this module changing).
+## Run headless:
 ##   godot --headless --path game -s tests/test_settings.gd
 
 const Settings := preload("res://scripts/settings.gd")
@@ -23,15 +23,22 @@ func _init() -> void:
 
 	check(Settings.load_settings().sound_on == true,
 		"no file on disk falls back to the default (sound on)")
+	check(Settings.load_settings().animations_on == true,
+		"no file on disk falls back to the default (animations on)")
 
 	Settings.save_settings({"sound_on": false})
 	check(Settings.load_settings().sound_on == false,
 		"a saved value survives a fresh load_settings() call — the relaunch case")
 
-	# a future key added by 06/07 must not get clobbered by this module
 	Settings.save_settings({"sound_on": true, "animations_on": false})
 	var reloaded := Settings.load_settings()
 	check(reloaded.sound_on == true and reloaded.animations_on == false,
+		"animations_on round-trips independently of sound_on")
+
+	# a future key added by 07 (difficulty) must not get clobbered by this module
+	Settings.save_settings({"sound_on": true, "animations_on": true, "difficulty": "hard"})
+	var reloaded2 := Settings.load_settings()
+	check(reloaded2.difficulty == "hard",
 		"keys this module doesn't own still round-trip")
 
 	Settings.apply({"sound_on": false})

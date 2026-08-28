@@ -96,7 +96,7 @@ var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
 	set(value): # every gain/loss anywhere pops floating feedback (round 4);
 		# popups anchor to the piece/effect that caused them (game-feel pass)
-		if value != score and is_node_ready() and not autoplay:
+		if value != score and is_node_ready() and not autoplay and animations_on:
 			var d := value - score
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
@@ -193,12 +193,18 @@ var tariff_panel: PanelContainer:
 	get: return modals.tariff_panel
 var pending_merge: Array = [] # the two sources awaiting confirmation
 var game_menu_open := false
+var animations_on := true # Settings toggle (06); false short-circuits the
+	# `anims` queue via the same seam autoplay already uses — see _add_*
+var backgrounded := false # OS focus lost (app switch/call/notification, 06):
+	# same pause state as the in-game menu — see _process and _enemy_turn
 
 
 func _ready() -> void:
 	# CLI bypasses (--autoplay/--scenario) and the click probes boot Game.tscn
 	# straight, skipping the Menu's own apply() — so this scene applies too.
-	Settings.apply(Settings.load_settings())
+	var settings_data := Settings.load_settings()
+	Settings.apply(settings_data)
+	animations_on = settings_data.get("animations_on", true)
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	autoplay_exit = autoplay
@@ -399,7 +405,7 @@ func _process(delta: float) -> void:
 			_place(stock[rng.randi() % stock.size()], open[rng.randi() % open.size()])
 		return
 	if state == State.PLAYER_TURN:
-		if not game_menu_open and not win_open and not shop_open(): # these pause the clock
+		if not game_menu_open and not win_open and not shop_open() and not backgrounded: # these pause the clock
 			clock_ms -= delta * 1000.0
 		if clock_ms <= 0:
 			clock_ms = 0
@@ -419,7 +425,7 @@ func _process(delta: float) -> void:
 ## Turn/wave transition feedback: board-outline glow + a sliding banner
 ## (game-feel pass 2026-07-06). Stacked banners offset so they never overlap.
 func _add_turn_fx(text: String, color: Color) -> void:
-	if autoplay:
+	if autoplay or not animations_on:
 		return
 	var slot := 0
 	for a in anims:
@@ -479,13 +485,25 @@ func _enemy_turn() -> void:
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1
 	else:
-		if not autoplay:
+		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
+		await _wait_while_backgrounded() # 06: no enemy turn resolves while backgrounded
 		await _run_enemy_actions()
 	if state != State.GAME_OVER:
-		if not autoplay:
+		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
+		await _wait_while_backgrounded()
 		_begin_player_turn()
+
+
+## OS backgrounding (06): app switch/call/notification must freeze the run
+## exactly like the in-game menu — no enemy action may resolve mid-background.
+## Polls rather than engine-pausing the tree, so it hangs off the same
+## flag-based seam as game_menu_open/win_open/shop_open() instead of a second
+## pause mechanism.
+func _wait_while_backgrounded() -> void:
+	while backgrounded:
+		await get_tree().process_frame
 
 
 func _run_enemy_actions() -> void:
@@ -493,11 +511,13 @@ func _run_enemy_actions() -> void:
 	if Economy.tariff_on(self, "filibuster"):
 		actions += 1
 	for i in actions:
+		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs)
 		if act.is_empty():
 			return
-		if not autoplay:
+		if not autoplay and animations_on:
 			await get_tree().create_timer(0.35).timeout
+		await _wait_while_backgrounded()
 		if board.has(act.to) and BuffLogic.repels_capture(board[act.to]):
 			# Shield works against the AI too: the attempt is spent, nothing
 			# moves. Reflect kills the attacker and takes its tile.
@@ -552,7 +572,7 @@ func _run_enemy_actions() -> void:
 
 
 func _add_slide(from: Vector2i, to: Vector2i) -> void:
-	if autoplay:
+	if autoplay or not animations_on:
 		return
 	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0})
 
@@ -560,14 +580,14 @@ func _add_slide(from: Vector2i, to: Vector2i) -> void:
 ## Floating label at a tile — the same anim the score popups use, for effects
 ## that have no score to show (a buff landing, a capture repelled).
 func _add_float(at: Vector2i, text: String, color: Color) -> void:
-	if autoplay:
+	if autoplay or not animations_on:
 		return
 	anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": text,
 		"at_px": _tile_px(at) + Vector2(tile, tile) / 2, "color": color})
 
 
 func _add_pop(at: Vector2i) -> void:
-	if autoplay:
+	if autoplay or not animations_on:
 		return
 	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0})
 
@@ -710,6 +730,12 @@ func _notification(what: int) -> void:
 			_set_drawer.call_deferred(drawer_autoclosed)
 			drawer_autoclosed = ""
 		queue_redraw()
+	# 06: app switch, phone call or notification — same pause state as the
+	# in-game menu (clock stopped, no enemy turns), via `backgrounded`.
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		backgrounded = true
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+		backgrounded = false
 
 
 func _input(event: InputEvent) -> void:
@@ -1652,6 +1678,8 @@ func _connect_hud() -> void:
 			placing_id = ""
 			placing_cap = false
 			_clear_selection())
+	hud.settings_changed.connect(func(data: Dictionary) -> void:
+		animations_on = data.get("animations_on", true)) # live — no restart needed
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.

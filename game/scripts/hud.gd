@@ -25,6 +25,7 @@ signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
+signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
 
 var g # the Game node — read-only from here; mutations go up via signals
 
@@ -185,7 +186,8 @@ func build(game) -> void:
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
 	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true)
-	var settings_panel := Settings.build(game_menu, func() -> void: gm_box.visible = true)
+	var settings_panel := Settings.build(game_menu, func() -> void: gm_box.visible = true,
+		func(data: Dictionary) -> void: settings_changed.emit(data))
 	var guide_btn := Button.new()
 	guide_btn.text = "Guide"
 	guide_btn.add_theme_font_size_override("font_size", 20)

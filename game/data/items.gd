@@ -63,6 +63,8 @@ const PIECE_BUFFS: Array = [
 		"description": "The next enemy capture attempt is forced to target this piece."},
 	{"key": "stun", "name": "Stun", "tier": "Tactical", "model": "dormant",
 		"description": "The next piece that captures this one loses its following 2 turns."},
+	{"key": "bomb", "name": "Bomb", "tier": "Decisive", "model": "dormant",
+		"description": "On capturing or being captured, destroys itself, the other piece, and everything within 1 square."},
 	{"key": "trap", "name": "Trap", "tier": "Decisive", "model": "dormant",
 		"description": "When this piece is captured, the attacking piece is captured too."},
 	{"key": "range", "name": "Range", "tier": "Tactical", "model": "dormant",

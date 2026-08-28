@@ -267,10 +267,11 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 	return false
 
 
-## One greedy enemy action. Returns {from, to} or {} when the enemy has no
-## legal move. Priority (GDD Enemy AI Behaviors + grilled advance rule):
-## resolve check (prefer capture) > best trade (max target value, min attacker
-## value) > advance the most advanced non-King piece toward the player row.
+## One greedy enemy action. Priority (GDD Enemy AI Behaviors + grilled advance
+## rule): resolve check (prefer capture) > protect the King (capture a piece
+## threatening it, else retreat it to safety) > best trade (max target value,
+## min attacker value) > advance the most advanced non-King piece toward the
+## player row. Returns {from, to} or {} when the enemy has no legal move.
 static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
@@ -284,6 +285,20 @@ static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
 	if in_check:
 		# legal_moves already filtered to check-resolving moves; prefer a capture.
 		return _best_capture(board, moves, defs) if _has_capture(board, moves) else moves[0]
+	if king.x >= 0:
+		# Rule 2, "protect the King at all cost": not yet in check, but a player
+		# piece already covers a square next to it (one action away from a
+		# multi-action turn combo: reposition + capture in the same player
+		# turn, which the enemy would never get a turn to react to). Take out
+		# the threat if a legal move can; otherwise pull the King to whichever
+		# of its legal squares leaves the fewest threats standing. Simplest
+		# defensible scope (2026-08-28): capture-the-threat + retreat, no path
+		# interposition/blocking.
+		var threats := _king_threats(board, king, defs)
+		if not threats.is_empty():
+			var defend := _defend_king(board, moves, king, threats, defs)
+			if not defend.is_empty():
+				return defend
 	if _has_capture(board, moves):
 		return _best_capture(board, moves, defs)
 	# only commit pieces INTO the back row once enough force is massed nearby —
@@ -337,5 +352,43 @@ static func _best_capture(board: Dictionary, moves: Array[Dictionary], defs: Dic
 		if target > best_target or (target == best_target and attacker < best_attacker):
 			best_target = target
 			best_attacker = attacker
+			best = m
+	return best
+
+
+## Player pieces that already cover a square in the King's 8-neighborhood —
+## one move away from a same-turn reposition-then-capture combo the enemy
+## would get no turn to react to. Positions, not moves: several destinations
+## can belong to the same attacker.
+static func _king_threats(board: Dictionary, king: Vector2i, defs: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for pos in board:
+		if board[pos].owner != PLAYER:
+			continue
+		for to in moves_for(board, pos, defs, "capture"):
+			if absi(to.x - king.x) <= 1 and absi(to.y - king.y) <= 1 and not out.has(pos):
+				out.append(pos)
+				break
+	return out
+
+
+## Protect-the-King response: capture a threatening piece if a legal move
+## reaches one, else retreat the King to whichever of its own legal squares
+## leaves the fewest threats standing. {} if neither is possible this turn.
+static func _defend_king(board: Dictionary, moves: Array[Dictionary], king: Vector2i,
+		threats: Array[Vector2i], defs: Dictionary) -> Dictionary:
+	var strikes := moves.filter(func(m: Dictionary) -> bool: return threats.has(m.to))
+	if not strikes.is_empty():
+		return _best_capture(board, strikes, defs)
+	var retreats := moves.filter(func(m: Dictionary) -> bool: return m.from == king)
+	var best := {}
+	var best_left := threats.size() + 1
+	for m in retreats:
+		var sim := board.duplicate(true)
+		sim[m.to] = sim[m.from]
+		sim.erase(m.from)
+		var left := _king_threats(sim, m.to, defs).size()
+		if left < best_left:
+			best_left = left
 			best = m
 	return best

@@ -142,6 +142,28 @@ func _init() -> void:
 	fresh.queue_free()
 	await process_frame
 
+	# --- issue 38: schema versioning. A save written before `save_version`
+	# existed must still load — proven against a hand-built v0 fixture, not a
+	# live save, so the check keeps working once no v0 saves exist anywhere.
+	const SaveConfig := preload("res://scripts/save_config.gd")
+	var v0 := {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"score": 120, "gold": 45}
+	check(not v0.has("save_version"), "the v0 fixture genuinely predates the field")
+	var walked: Dictionary = SaveConfig.migrate(v0.duplicate(true))
+	check(int(walked.save_version) == SaveConfig.SAVE_VERSION,
+		"migrate() walks an unversioned save up to the current version")
+	var old_save := _boot(v0.duplicate(true))
+	await process_frame
+	check(old_save.score == 120 and old_save.gold == 45,
+		"a pre-versioning save still loads with its state intact")
+	old_save.queue_free()
+	await process_frame
+
+	var stamped: Dictionary = _boot({"board": [["rook", 1, 7, 10]], "wave": 3})._to_config()
+	await process_frame
+	check(int(stamped.get("save_version", -1)) == SaveConfig.SAVE_VERSION,
+		"every save written now carries the current version")
+
 	print("---")
 	if fails == 0:
 		print("ALL SAVE CHECKS OK")

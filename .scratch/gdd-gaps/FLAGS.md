@@ -66,6 +66,12 @@ found. Collected here so they are not lost in Outcome sections:
   a real GDD/code mismatch. Those artefacts currently hook `on_wave_clear` and check
   `g.wave % 5` directly.
 - Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
+- **Tier 5 kills Blitz outright.** With one action per turn, the move spends the turn before
+  Blitz's already-moved target filter can ever match. Measured, not theorised; flagged rather
+  than compensated for, since the tier spec calls for a flat action cut.
+- **Tier 5 may simply be too harsh.** 24-run sweep: median survival wave 38.5 -> 9.5, 0/24
+  wins, every loss to resource starvation. That is the measurement, not a verdict — a top
+  tier is allowed to be brutal, but it wants a play test before it is called balanced.
 
 ## Housekeeping
 

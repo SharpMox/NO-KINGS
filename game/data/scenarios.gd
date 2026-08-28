@@ -53,6 +53,9 @@ static func all() -> Array:
 		{"name": "Win screen: wave 50 (capture King)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
 			"wave": 50, "score": 1000}},
+		{"name": "Win screen: named King (identity, issue 09)", "cfg": {
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10, {"king_id": "nero"}]],
+			"wave": 50, "score": 1000}},
 		{"name": "Win screen: full clear @ wave 200 (capture King)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
 			"wave": 200, "score": 5000}},

@@ -35,6 +35,29 @@
 ##   "" for most gains; a few call sites tag one (e.g. "early_clear") so a
 ##   handler can scope itself to that specific gain without seeing every
 ##   other earn() in the game.
+##
+## on_score_change/on_gold_change CONTRACT (tightened by issue 20, after the
+## fleet sweep caught two violations — see .scratch/gdd-gaps/issues/20):
+## `base` is the only INPUT a handler may read to size its effect; `amount`
+## is the OUTPUT for handlers that modify *this hook's own resource* (every
+## percentage handler does `ctx.amount += ctx.base * pct`, off `base`, never
+## off the running `amount` — reading `amount` makes the result depend on
+## which other held keys happened to sort earlier, exactly the
+## order-dependence the ORDERING rule above exists to rule out). A handler
+## that pays a *different* resource as a side effect (El Dorado Body
+## Glitter: Score -> Gold; Tungsten-Filled Gold Bar / Popemobile Piggy Bank:
+## Gold -> Score) is a converter, not a percentage modifier on its own hook —
+## it must still size itself off `base`, and must hand the payout back
+## through the matching ctx output field (`gold_bonus` on on_score_change,
+## `score_bonus` on on_gold_change, both pre-seeded 0.0 by Economy.earn and
+## applied exactly once, after both ctx dispatches finish) rather than
+## writing `g.score`/`g.gold` straight from inside the handler. Before this
+## fix all three converters read the running `amount`, and the two Gold->Score
+## ones additionally free-wrote `g.score` mid-dispatch instead of routing
+## through `score_bonus` — order-dependent and impossible to reason about as
+## a single deterministic value. Covered by test_items.gd ("Tungsten +
+## Popemobile score bonuses add, not compound" and "El Dorado's Gold bonus
+## doesn't depend on other Score handlers' dispatch order").
 ## - on_capture ctx grew `attacker_id`/`attacker_buffed` (board[from].id /
 ##   whether it carries a Piece Buff, read while the piece is still on the
 ##   board — "" / false from the two direct-call test sites, which every
@@ -482,14 +505,19 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 			if ctx.reason == "early_clear" and g.turns_since_wave <= 2:
 				ctx.amount += ctx.base * 9.0 # "x10 Score" = +9x more
 		["el-dorado-body-glitter", "on_score_change"]:
-			g.gold += roundi(ctx.amount * 0.05) # reads the (possibly
-				# already-modified) score ctx, pays a slice straight to Gold
+			# issue 20 fix: off the immutable base (never the running amount —
+			# see the on_score_change/on_gold_change CONTRACT in the header),
+			# handed back through ctx.gold_bonus so Economy.earn applies it
+			# exactly once instead of free-writing g.gold mid-dispatch.
+			ctx.gold_bonus += ctx.base * 0.05
 
 		# --- issue 16: Gold gain also pays Score (mirror of the above) ---
 		["tungsten-filled-gold-bar", "on_gold_change"]:
-			g.score += roundi(ctx.amount) * 2
+			# issue 20 fix: ctx.base + ctx.score_bonus, same reasoning as
+			# El Dorado above — was g.score += roundi(ctx.amount) * 2.
+			ctx.score_bonus += ctx.base * 2
 		["popemobile-piggy-bank", "on_gold_change"]:
-			g.score += roundi(ctx.amount) * 10
+			ctx.score_bonus += ctx.base * 10
 
 		# --- issue 16: on_capture triggers ---
 		["suspiciously-large-femur", "on_capture"]:
@@ -872,7 +900,12 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["casino-invisible-clock", "on_purchase"]:
 			g.clock_ms += 25000
 		["2012-doomsday-party-hat", "on_gold_change"]:
-			g.clock_ms += ctx.amount * 500.0 # +5s per 10 Gold
+			# issue 20 fix: ctx.base, not the running ctx.amount (see the
+			# on_score_change/on_gold_change CONTRACT in the header) — Clock
+			# has no ctx output field of its own, so the direct g.clock_ms
+			# write stays (same sanctioned pattern as lifesteal on_capture),
+			# only the read source changes.
+			g.clock_ms += ctx.base * 500.0 # +5s per 10 Gold
 		["fort-knox-iou", "on_score_change"]:
 			if g.gold < 10:
 				ctx.amount += ctx.base * 0.5

@@ -124,6 +124,52 @@ El Dorado ×3 + Naruto Run Manual ×3 (chosen to probe this) scored 10,380 — o
 above the Crown baseline, so the practical exposure was small in this sweep, but the
 architecture gap is the same shape as the headline finding and worth the same follow-up.
 
+### Correction (branch `fix/artefact-ctx-contract`): the 103,924/430,830 figures were NOT a double-count
+
+Re-derived while fixing this: `g.score += roundi(ctx.amount) * 2/10` inside a single
+`Economy.earn()` call is not itself a duplicate-counting bug. Tungsten/Popemobile's
+`on_gold_change` dispatch (where the mid-dispatch `g.score` write happened) runs
+*after* `earn()` has already applied the same call's `on_score_change` result to
+`g.score` — so the two writes are sequential, additive contributions within one call, not
+two writes of the same quantity. Traced by hand and confirmed with an exact-value unit
+test (`Economy.earn(g, 100)` with both held → `g.score == 100 + 200 + 1000 == 1300`,
+matching the existing "Tungsten alone" test's `100 + 200 == 300`) — the isolated pair's
+per-call arithmetic was already correct before this fix, since neither handler mutates
+`ctx.amount` itself, so `ctx.amount == ctx.base` throughout when only these two are held.
+**The 103,924/430,830 sweep totals are the accumulated effect, over an entire multi-hundred-turn
+run, of a genuinely powerful catalog-specified passive** (2x/10x Score per Gold gain,
+firing on every gold-granting event of the run) compounding with itself via the extra
+Gold/longer survival it funds — not a per-transaction bug.
+
+**The real, provable defect is narrower: order-dependence.** All three converters
+(El Dorado Body Glitter, Tungsten-Filled Gold Bar, Popemobile Piggy Bank) read the
+*running* `ctx.amount` instead of the immutable `ctx.base` to size a cross-resource
+side payment. That doesn't move the isolated Tungsten+Popemobile pair's numbers (nothing
+else touches `ctx.amount` in that test), but it does bite any mixed loadout where another
+`on_score_change`/`on_gold_change` percentage artefact's key happens to sort earlier —
+the payout then silently depends on alphabetical key order rather than the transaction's
+real value, exactly the order-dependence the header's own ORDERING rule exists to
+prevent. Measured, hand-derived and confirmed by an exact-value regression test
+(`test_items.gd`, "El Dorado's Gold bonus doesn't depend on other Score handlers'
+dispatch order"): El Dorado Body Glitter + Bermuda Triangulation, `Economy.earn(g, 100)`
+with the Clock under 60s — pre-fix, El Dorado read Bermuda's already-inflated
+`ctx.amount` (150) and paid **133 Gold** (125 base+Bermuda, +8 off the inflated amount);
+fixed, El Dorado reads the untouched `ctx.base` (100) and pays the correct **130 Gold**
+(125 +5). Fixed in `artefact_hooks.gd`/`economy.gd`: all handlers now read `ctx.base`,
+and the two Gold→Score converters route their payout through a new `ctx.score_bonus`
+field (mirroring a new `ctx.gold_bonus` for El Dorado) that `Economy.earn()` applies
+exactly once, instead of a handler free-writing `g.score`/`g.gold` mid-dispatch. A 4th
+handler with the identical read bug, `2012-doomsday-party-hat` (added by issue 19 after
+this sweep ran), was caught by the same audit and fixed the same way.
+
+**Separate, NOT addressed by the correctness fix**: Tungsten-Filled Gold Bar +
+Popemobile Piggy Bank compounding to 11-54x an organic baseline over a full run is a
+plausible **balance** concern in its own right — the catalog text (2x/10x Score per Gold
+gain, additive per copy, firing every gold-granting event) is powerful by design and the
+fix does not change its magnitude for the isolated pair. Worth its own look
+(cap, cooldown, or accepted as an intentional high-roll combo) as a follow-up issue,
+separate from this correctness fix.
+
 Action-stacking (10× `move`, or 5× `move` + Cia's Exploding Cigar + I Am Not A Robot
 Checkbox — extra actions/turn) did **not** produce runaway score or an unending run: it
 mainly extended turn count before an eventual Resource-starvation loss (1082 and 1218

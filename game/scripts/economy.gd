@@ -30,15 +30,20 @@ static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> v
 ## gain (e.g. an early-clear-only multiplier) — most callers leave it "".
 ## Score/Gold percentage artefacts hook in here (issue 16), ADDITIVE off an
 ## immutable ctx.base so multiple copies/artefacts never compound (matches
-## the on_capture stacking rule in artefact_hooks.gd).
+## the on_capture stacking rule in artefact_hooks.gd). `gold_bonus`/
+## `score_bonus` (issue 20) are the cross-resource side-payment channels for
+## converter handlers (El Dorado Body Glitter, Tungsten-Filled Gold Bar,
+## Popemobile Piggy Bank) — pre-seeded 0.0, applied exactly once here, never
+## written by a handler directly (see artefact_hooks.gd's CONTRACT comment).
 static func earn(g, amount: int, reason: String = "") -> void:
 	var score_ctx := ArtefactHooks.run(g, "on_score_change",
-		{"base": float(amount), "amount": float(amount), "reason": reason})
+		{"base": float(amount), "amount": float(amount), "reason": reason, "gold_bonus": 0.0})
 	g.score += roundi(score_ctx.amount)
 	var gold_amount := gain(g, amount)
 	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
-		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason})
-	g.gold += roundi(gold_ctx.amount)
+		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
+	g.gold += roundi(gold_ctx.amount) + roundi(score_ctx.gold_bonus)
+	g.score += roundi(gold_ctx.score_bonus)
 	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 

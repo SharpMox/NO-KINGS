@@ -1,0 +1,2199 @@
+[
+ {
+  "key": "27-club-punch-card",
+  "name": "27 Club Punch Card",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 Score (needs: streak tracking)",
+  "conspiracy": "The 27 Club",
+  "implemented": false
+ },
+ {
+  "key": "tinfoil-hat",
+  "name": "Tinfoil Hat",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "+15% Score gain; -5% Gold gain",
+  "conspiracy": "Tin foil hat",
+  "implemented": false
+ },
+ {
+  "key": "area-51-parking-permit",
+  "name": "Area 51 Parking Permit",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "+3 Item held capacity (needs: item cap)",
+  "conspiracy": "Area 51",
+  "implemented": false
+ },
+ {
+  "key": "fort-knox-iou",
+  "name": "Fort Knox IOU",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Item"
+  ],
+  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item (needs: gold-threshold)",
+  "conspiracy": "Fort Knox's missing gold",
+  "implemented": false
+ },
+ {
+  "key": "fema-summer-camp-flyer",
+  "name": "FEMA Summer Camp Flyer",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "At Turn end: +2 Gold per enemy piece on your half of the Board (needs: zone check)",
+  "conspiracy": "FEMA camps",
+  "implemented": false
+ },
+ {
+  "key": "zurich-gnome-figurine",
+  "name": "Zurich Gnome Figurine",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "At Wave end: refund 10% of Gold spent in the Shop",
+  "conspiracy": "Swiss bank secrecy",
+  "implemented": false
+ },
+ {
+  "key": "nero-s-marshmallow-stick",
+  "name": "Nero's Marshmallow Stick",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Each Capture in a Turn gives +25% more Score and Gold than the previous one; resets at Turn end",
+  "conspiracy": "The Great Fire of Rome",
+  "implemented": false
+ },
+ {
+  "key": "pre-scratched-lottery-ticket",
+  "name": "Pre-Scratched Lottery Ticket",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Every 5th Shop purchase: free (needs: purchase counter)",
+  "conspiracy": "The Hot Lotto fraud",
+  "implemented": false
+ },
+ {
+  "key": "tungsten-filled-gold-bar",
+  "name": "Tungsten-Filled Gold Bar",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "Gold gains also add 2x their amount as Score",
+  "conspiracy": "Fake gold bars",
+  "implemented": false
+ },
+ {
+  "key": "crop-circle-plank",
+  "name": "Crop Circle Plank",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On 5-Wave Milestone: 2 random allied pieces get +1 Piece Buff; -10 Gold",
+  "conspiracy": "Crop circles",
+  "implemented": false
+ },
+ {
+  "key": "mar-a-lago-toilet-papers",
+  "name": "Mar-a-Lago Toilet Papers",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "On 5-Wave Milestone: a random Shop item becomes free; all other Shop prices +10%",
+  "conspiracy": "The Mar-a-Lago documents",
+  "implemented": false
+ },
+ {
+  "key": "suspiciously-large-femur",
+  "name": "Suspiciously Large Femur",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +3 Gold",
+  "conspiracy": "The hidden giant skeletons",
+  "implemented": false
+ },
+ {
+  "key": "daylight-savings-jar",
+  "name": "Daylight Savings Jar",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "While the Clock is over 90s: +20% Score and +10% Gold gain; while under 30s: -20% Score and -10% Gold gain",
+  "conspiracy": "The Daylight Saving racket",
+  "implemented": false
+ },
+ {
+  "key": "phantom-punch-glove",
+  "name": "Phantom Punch Glove",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On capturing a higher-value piece with a lower-value piece: double Score; on capturing a lower-value piece with a higher-value one: half Score",
+  "conspiracy": "The phantom punch",
+  "implemented": false
+ },
+ {
+  "key": "naruto-run-manual",
+  "name": "Naruto Run Manual",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On clearing a Wave in 3 turns or less: x2 Score",
+  "conspiracy": "Storm Area 51",
+  "implemented": false
+ },
+ {
+  "key": "social-credit-report-card",
+  "name": "Social Credit Report Card",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -10 Score",
+  "conspiracy": "The social credit system",
+  "implemented": false
+ },
+ {
+  "key": "mk-ultra-sugar-cube",
+  "name": "MK-Ultra Sugar Cube",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Deploy: the deployed piece gets +1 Tactical Piece Buff",
+  "conspiracy": "Project MKUltra",
+  "implemented": false
+ },
+ {
+  "key": "frog-pride-flag",
+  "name": "Frog Pride Flag",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "The next piece you Deploy after losing a piece gains +1 Piece Buff (needs: deploy hook)",
+  "conspiracy": "Gay frogs",
+  "implemented": false
+ },
+ {
+  "key": "hoffa-s-cement-shoes",
+  "name": "Hoffa's Cement Shoes",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Special",
+   "Piece"
+  ],
+  "effect": "Once per Wave: when one of your pieces is captured, the capturer sinks with it — both are removed (needs: mutual destruction)",
+  "conspiracy": "The disappearance of Jimmy Hoffa",
+  "implemented": false
+ },
+ {
+  "key": "witness-protection-mustache",
+  "name": "Witness Protection Mustache",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "On Rank Up: +20s Clock",
+  "conspiracy": "Witness protection",
+  "implemented": false
+ },
+ {
+  "key": "5g-microchips",
+  "name": "5G Microchips",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "On Turn start: +1s Clock per allied piece on the Board, -1s per enemy piece on the Board",
+  "conspiracy": "5G panic",
+  "implemented": false
+ },
+ {
+  "key": "frame-25",
+  "name": "Frame 25",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On Wave clear: +1 Tactical Item; -10 Gold",
+  "conspiracy": "Subliminal advertising",
+  "implemented": false
+ },
+ {
+  "key": "satoshi-s-private-key",
+  "name": "Satoshi's Private Key",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: +2 Gold per allied piece on the Board; on losing a piece: -2 Gold",
+  "conspiracy": "Satoshi Nakamoto",
+  "implemented": false
+ },
+ {
+  "key": "capstone-polish",
+  "name": "Capstone Polish",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Time"
+  ],
+  "effect": "On acquiring an Artefact: +150 Score and +5s Clock",
+  "conspiracy": "Pyramidology",
+  "implemented": false
+ },
+ {
+  "key": "golden-buddha-bobblehead",
+  "name": "Golden Buddha Bobblehead",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: +5% of your current Gold",
+  "conspiracy": "Yamashita's gold",
+  "implemented": false
+ },
+ {
+  "key": "charlemagne-s-birth-certificate",
+  "name": "Charlemagne's Birth Certificate",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "On Wave clear: +10s Clock",
+  "conspiracy": "The phantom time hypothesis",
+  "implemented": false
+ },
+ {
+  "key": "nigerian-prince-wire-transfer",
+  "name": "Nigerian Prince Wire Transfer",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On Wave start: +100 Score, +10 Gold, and -3s Clock",
+  "conspiracy": "The advance-fee scam",
+  "implemented": false
+ },
+ {
+  "key": "curtain-rods-bag-rifle-shaped",
+  "name": "Curtain Rods Bag (Rifle-Shaped)",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On your first Capture each Wave: double Score, but it pays no Gold",
+  "conspiracy": "JFK assassination theories",
+  "implemented": false
+ },
+ {
+  "key": "obedience-flavored-tap-water",
+  "name": "Obedience-Flavored Tap Water",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On your first Capture each Wave: the capturing piece gets +1 Tactical Piece Buff",
+  "conspiracy": "Water fluoridation",
+  "implemented": false
+ },
+ {
+  "key": "cia-heart-attack-gun",
+  "name": "CIA Heart Attack Gun",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On your first Capture with a Ranked or Buffed piece each Turn: +100% Gold",
+  "conspiracy": "The heart attack gun",
+  "implemented": false
+ },
+ {
+  "key": "dihydrogen-monoxide-battery",
+  "name": "Dihydrogen Monoxide Battery",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On your first Tactical Item use each Wave: the Item is not consumed",
+  "conspiracy": "The water-fuelled car",
+  "implemented": false
+ },
+ {
+  "key": "walt-s-cryonic-capsule",
+  "name": "Walt's Cryonic Capsule",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On Wave clear: the last piece you lost this Wave returns to your Stock (needs: loss tracking + stock return)",
+  "conspiracy": "The frozen Walt Disney legend",
+  "implemented": false
+ },
+ {
+  "key": "pandemic-toilet-paper-pallet",
+  "name": "Pandemic Toilet Paper Pallet",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Every 2nd purchase in the same Shop visit costs 50% less (needs: purchase counter)",
+  "conspiracy": "Panic buying",
+  "implemented": false
+ },
+ {
+  "key": "denazification-visa",
+  "name": "Denazification Visa",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Tactical Items cost 50% less in the Shop",
+  "conspiracy": "Operation Paperclip",
+  "implemented": false
+ },
+ {
+  "key": "numbers-station-sudoku",
+  "name": "Numbers Station Sudoku",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "The Buff Box offers 4 Piece Buff choices instead of 3; each pick costs 5 Gold",
+  "conspiracy": "Numbers stations",
+  "implemented": false
+ },
+ {
+  "key": "alleged-weather-balloon",
+  "name": "Alleged Weather Balloon",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "The Shop stocks +1 Item slot; it only offers Tactical Items (needs: shop layout change)",
+  "conspiracy": "Roswell",
+  "implemented": false
+ },
+ {
+  "key": "amityville-ouija-board",
+  "name": "Amityville Ouija Board",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "When one of your Piece Buffs of any tier triggers: +10 Gold",
+  "conspiracy": "The Amityville Horror",
+  "implemented": false
+ },
+ {
+  "key": "mrna-firmware-update",
+  "name": "mRNA Firmware Update",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Piece",
+   "Buff"
+  ],
+  "effect": "Every 3rd Piece Buff you apply: the piece also Ranks Up (needs: rank hook)",
+  "conspiracy": "The vaccine microchip claim",
+  "implemented": false
+ },
+ {
+  "key": "men-in-black-prescription-sunglasses",
+  "name": "Men in Black Prescription Sunglasses",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "While 2+ of your same-type pieces are on the Board: their Captures give +25% Score",
+  "conspiracy": "The Men in Black",
+  "implemented": false
+ },
+ {
+  "key": "skull-and-bones-coffin",
+  "name": "Skull and Bones Coffin",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "While holding 200+ Gold: +20% Score gain; Shop prices +5%",
+  "conspiracy": "Skull and Bones",
+  "implemented": false
+ },
+ {
+  "key": "the-red-phone",
+  "name": "The Red Phone",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "While the Clock is under 30s: +100% Score gain and +50% Gold gain",
+  "conspiracy": "The Moscow–Washington hotline",
+  "implemented": false
+ },
+ {
+  "key": "bilderberg-hotel-slippers",
+  "name": "Bilderberg Hotel Slippers",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold",
+   "Special"
+  ],
+  "effect": "Whenever two or more of your Artefacts trigger on the same event: +15 Gold (needs: trigger tracking)",
+  "conspiracy": "The Bilderberg meeting",
+  "implemented": false
+ },
+ {
+  "key": "sphinx-s-booger",
+  "name": "Sphinx's Booger",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +10 Gold",
+  "conspiracy": "The Sphinx's nose",
+  "implemented": false
+ },
+ {
+  "key": "chupacabra-chew-toy",
+  "name": "Chupacabra Chew Toy",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Capture: +2 Gold; +10 more Gold if the captured piece had captured one of yours (needs: per-piece capture memory)",
+  "conspiracy": "The Chupacabra",
+  "implemented": false
+ },
+ {
+  "key": "bielefeld-library-card",
+  "name": "Bielefeld Library Card",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On Wave clear: +500 Score if you captured nothing that Wave",
+  "conspiracy": "The Bielefeld Conspiracy",
+  "implemented": false
+ },
+ {
+  "key": "alien-pet-rocks",
+  "name": "Alien Pet Rocks",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "At Wave end: +2 Gold per allied piece that did not move this Wave (needs: movement tracking)",
+  "conspiracy": "Stonehenge",
+  "implemented": false
+ },
+ {
+  "key": "el-dorado-body-glitter",
+  "name": "El Dorado Body Glitter",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "5% of Score gains are also paid as Gold",
+  "conspiracy": "El Dorado",
+  "implemented": false
+ },
+ {
+  "key": "jet-fuel-vial",
+  "name": "Jet Fuel Vial",
+  "rarity": "Common",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Once per Shop visit: pay 20 Gold to bring the Shop's whole stock down; it is rebuilt fresh (needs: reroll system)",
+  "conspiracy": "Controlled demolition claims",
+  "implemented": false
+ },
+ {
+  "key": "manna-vending-machine",
+  "name": "Manna Vending Machine",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On 5-Wave Milestone: +2 Items",
+  "conspiracy": "The Manna Machine",
+  "implemented": false
+ },
+ {
+  "key": "spare-organ-receipt",
+  "name": "Spare Organ Receipt",
+  "rarity": "Common",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Fuse: refund 50% of the consumed piece's value as Gold (needs: fuse-value hook)",
+  "conspiracy": "The organ-theft legend",
+  "implemented": false
+ },
+ {
+  "key": "denver-bunker-timeshare",
+  "name": "Denver Bunker Timeshare",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Gold",
+   "Item"
+  ],
+  "effect": "While all your Item slots are full: +30% Gold gain (needs: item cap)",
+  "conspiracy": "Denver Airport",
+  "implemented": false
+ },
+ {
+  "key": "putin-s-golden-toilet-brush",
+  "name": "Putin's Golden Toilet Brush",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Shop"
+  ],
+  "effect": "Whenever you buy in the Shop: +5 Score per Gold spent",
+  "conspiracy": "Putin's Palace",
+  "implemented": false
+ },
+ {
+  "key": "deja-vu-glitch",
+  "name": "Déjà Vu Glitch",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On your first Score gain and first Gold gain each Turn: they trigger again (needs: gain multiplier)",
+  "conspiracy": "The simulation hypothesis",
+  "implemented": false
+ },
+ {
+  "key": "wuhan-vial-label",
+  "name": "Wuhan Vial Label",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Enemy Waves spawn +1 extra piece; Captures give +25% more Gold (needs: spawn modifier)",
+  "conspiracy": "The lab leak question",
+  "implemented": false
+ },
+ {
+  "key": "azimuthal-pancake-map",
+  "name": "Azimuthal Pancake Map",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Inverted pieces give double Score and Gold on Capture",
+  "conspiracy": "Modern flat Earth",
+  "implemented": false
+ },
+ {
+  "key": "panama-papers-shredder",
+  "name": "Panama Papers Shredder",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Mild Tariffs don't affect you (needs: tariff filtering)",
+  "conspiracy": "The Panama Papers",
+  "implemented": false
+ },
+ {
+  "key": "silk-road-coupon",
+  "name": "Silk Road Coupon",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "On 5-Wave Milestone: Shop prices -50% until the next Wave",
+  "conspiracy": "Silk Road",
+  "implemented": false
+ },
+ {
+  "key": "sleeper-agent-pillow",
+  "name": "Sleeper Agent Pillow",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On buying a Piece in the Shop: it arrives with a random Tactical Piece Buff",
+  "conspiracy": "The Manchurian candidate",
+  "implemented": false
+ },
+ {
+  "key": "holy-lint",
+  "name": "Holy Lint",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Capture: +1 Piece Buff",
+  "conspiracy": "The Shroud of Turin",
+  "implemented": false
+ },
+ {
+  "key": "qanon-profile-picture",
+  "name": "QAnon Profile Picture",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On clearing a Wave without losing a piece: +200 Score and +20 Gold",
+  "conspiracy": "QAnon",
+  "implemented": false
+ },
+ {
+  "key": "holy-grail-coaster",
+  "name": "Holy Grail Coaster",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Rank Up: the piece gets +1 Piece Buff",
+  "conspiracy": "The Holy Grail",
+  "implemented": false
+ },
+ {
+  "key": "casino-invisible-clock",
+  "name": "Casino Invisible Clock",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "On Shop purchase: +25s Clock",
+  "conspiracy": "Casino design",
+  "implemented": false
+ },
+ {
+  "key": "arms-fair-goodie-bag",
+  "name": "Arms Fair Goodie Bag",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Strategic Item use: +25 Gold",
+  "conspiracy": "War profiteering",
+  "implemented": false
+ },
+ {
+  "key": "doomsday-clock-snooze-button",
+  "name": "Doomsday Clock Snooze Button",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "The first time the Clock drops below 30s each Wave: +25s Clock (needs: threshold hook)",
+  "conspiracy": "The Doomsday Clock",
+  "implemented": false
+ },
+ {
+  "key": "scientology-e-meter",
+  "name": "Scientology E-Meter",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Wave clear: -5 Gold, +1 Piece Buff",
+  "conspiracy": "Scientology auditing",
+  "implemented": false
+ },
+ {
+  "key": "xenu-ot-iii-season-pass",
+  "name": "Xenu OT III Season Pass",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Wave clear: -15 Gold, +3 Piece Buffs",
+  "conspiracy": "Xenu",
+  "implemented": false
+ },
+ {
+  "key": "trilateral-meeting-stickers",
+  "name": "Trilateral Meeting Stickers",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: +5 Gold per Artefact you own",
+  "conspiracy": "The Trilateral Commission",
+  "implemented": false
+ },
+ {
+  "key": "money-printer-service-manual",
+  "name": "Money Printer Service Manual",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: +10% of your current Gold",
+  "conspiracy": "Federal Reserve lore",
+  "implemented": false
+ },
+ {
+  "key": "zodiac-crossword-puzzle",
+  "name": "Zodiac Crossword Puzzle",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On Wave clear: the ally piece with the most Captures that Wave gets +1 Piece Buff (needs: per-piece capture tracking)",
+  "conspiracy": "The Zodiac ciphers",
+  "implemented": false
+ },
+ {
+  "key": "voynich-dictionary",
+  "name": "Voynich Dictionary",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On your first Capture each Wave: double Score and Gold",
+  "conspiracy": "The Voynich manuscript",
+  "implemented": false
+ },
+ {
+  "key": "cia-press-pass",
+  "name": "CIA Press Pass",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Pieces carrying a Piece Buff give double Score and +50% Gold on Capture",
+  "conspiracy": "Operation Mockingbird",
+  "implemented": false
+ },
+ {
+  "key": "bohemian-grove-friendship-bracelet",
+  "name": "Bohemian Grove Friendship Bracelet",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "The Buff Box offers 5 Piece Buff choices instead of 3",
+  "conspiracy": "Bohemian Grove",
+  "implemented": false
+ },
+ {
+  "key": "chocolate-key-cake",
+  "name": "Chocolate Key Cake",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "The Shop stocks +2 Item slots (needs: shop layout change)",
+  "conspiracy": "Iran–Contra",
+  "implemented": false
+ },
+ {
+  "key": "cleopatra-s-hairpin",
+  "name": "Cleopatra's Hairpin",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "When one of your Decisive Piece Buffs (Trap, Reflect, Bomb) triggers: +100 Gold",
+  "conspiracy": "The death of Cleopatra",
+  "implemented": false
+ },
+ {
+  "key": "merchants-of-death-sample-case",
+  "name": "Merchants of Death Sample Case",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Whenever a new Tariff is applied: +100 Gold",
+  "conspiracy": "Merchants of Death",
+  "implemented": false
+ },
+ {
+  "key": "guidestone-blood-ritual",
+  "name": "Guidestone Blood Ritual",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Whenever a piece (ally or enemy) is Demoted or consumes/loses a Piece Buff: +25 Gold",
+  "conspiracy": "The Georgia Guidestones",
+  "implemented": false
+ },
+ {
+  "key": "inflatable-vietcong-torpedo",
+  "name": "Inflatable Vietcong Torpedo",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Special",
+   "Piece"
+  ],
+  "effect": "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives (needs: dodge + choice)",
+  "conspiracy": "The Gulf of Tonkin incident",
+  "implemented": false
+ },
+ {
+  "key": "snowden-s-rubik-s-cube",
+  "name": "Snowden's Rubik's Cube",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Once per Box: you may reroll the offered Picks (needs: box reroll)",
+  "conspiracy": "PRISM",
+  "implemented": false
+ },
+ {
+  "key": "bermuda-triangulation",
+  "name": "Bermuda Triangulation",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "While the Clock is under 60s: +50% Score gain and +25% Gold gain",
+  "conspiracy": "The Bermuda Triangle",
+  "implemented": false
+ },
+ {
+  "key": "amber-room-bubble-wrap",
+  "name": "Amber Room Bubble Wrap",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Your Gold gains ignore Inflation and other gold-reducing Tariffs",
+  "conspiracy": "The lost Amber Room",
+  "implemented": false
+ },
+ {
+  "key": "black-knight-morse-code",
+  "name": "Black Knight Morse Code",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Time"
+  ],
+  "effect": "Every 3rd Turn: your Score and Clock gains that Turn are doubled (needs: turn counter)",
+  "conspiracy": "The Black Knight satellite",
+  "implemented": false
+ },
+ {
+  "key": "dyatlov-geiger-counter",
+  "name": "Dyatlov Geiger Counter",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "While 3+ of your pieces are on the enemy half of the Board: +100% Score gain (needs: zone check)",
+  "conspiracy": "The Dyatlov Pass incident",
+  "implemented": false
+ },
+ {
+  "key": "hollow-moon-cross-section",
+  "name": "Hollow Moon Cross-Section",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Artefacts cost 25% less in the Shop",
+  "conspiracy": "The Hollow Moon",
+  "implemented": false
+ },
+ {
+  "key": "john-titor-s-crypto-wallet",
+  "name": "John Titor's Crypto Wallet",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On 5-Wave Milestone: +1 Gold per 5 seconds left on the Clock",
+  "conspiracy": "John Titor",
+  "implemented": false
+ },
+ {
+  "key": "popemobile-piggy-bank",
+  "name": "Popemobile Piggy Bank",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "Gold gains also add 10x their amount as Score",
+  "conspiracy": "The Vatican bank scandal",
+  "implemented": false
+ },
+ {
+  "key": "moon-landing-slate",
+  "name": "Moon Landing Slate",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On clearing a Wave in 2 turns or less: x10 Score (early-clear tracking exists)",
+  "conspiracy": "The moon landing hoax",
+  "implemented": false
+ },
+ {
+  "key": "tape-eraser-magnet",
+  "name": "Tape Eraser Magnet",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On using your last held Item: +100 Score and +50 Gold",
+  "conspiracy": "The 18½-minute gap",
+  "implemented": false
+ },
+ {
+  "key": "alien-autopsy-bloopers",
+  "name": "Alien Autopsy Bloopers",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: +2 Gold per piece in your Captured Stock",
+  "conspiracy": "The alien autopsy film",
+  "implemented": false
+ },
+ {
+  "key": "tunguska-toothpicks",
+  "name": "Tunguska Toothpicks",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Time"
+  ],
+  "effect": "Whenever a Tariff charges you: +150 Score and +5s Clock",
+  "conspiracy": "The Tunguska event",
+  "implemented": false
+ },
+ {
+  "key": "dark-market-light-bulb",
+  "name": "Dark Market Light Bulb",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Ranked pieces give double Gold on Capture; Demoted pieces give no Score on Capture",
+  "conspiracy": "The Phoebus cartel",
+  "implemented": false
+ },
+ {
+  "key": "kgb-photo-eraser",
+  "name": "KGB Photo Eraser",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On losing a piece carrying a Piece Buff: the Buff transfers to the nearest ally (needs: buff transfer)",
+  "conspiracy": "Soviet photo retouching",
+  "implemented": false
+ },
+ {
+  "key": "lusitania-hardtack-crate",
+  "name": "Lusitania \"Hardtack\" Crate",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On losing a piece carrying a Piece Buff: +150 Gold and +150 Score",
+  "conspiracy": "The Lusitania",
+  "implemented": false
+ },
+ {
+  "key": "atlantis-snow-globe",
+  "name": "Atlantis Snow Globe",
+  "rarity": "Uncommon",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your pieces cannot be Demoted (needs: demotion immunity)",
+  "conspiracy": "Atlantis",
+  "implemented": false
+ },
+ {
+  "key": "templar-severance-gold-one-pile",
+  "name": "Templar Severance Gold (One Pile)",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On losing a Ranked piece: +150 Gold",
+  "conspiracy": "The Knights Templar",
+  "implemented": false
+ },
+ {
+  "key": "bible-gag-reel-scroll",
+  "name": "Bible Gag Reel Scroll",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On Box Pick: you may reject the contents once and reroll them (needs: box reroll)",
+  "conspiracy": "The Vatican Secret Archives",
+  "implemented": false
+ },
+ {
+  "key": "youth-fountain-martini",
+  "name": "Youth Fountain Martini",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On the first Piece Buff consumed each Wave: it is re-applied to the same piece",
+  "conspiracy": "The Fountain of Youth",
+  "implemented": false
+ },
+ {
+  "key": "tutankhamun-s-death-thong",
+  "name": "Tutankhamun's Death Thong",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Whenever an enemy piece captures one of your pieces: the capturer gets a Slow debuff (needs: enemy auto-debuff)",
+  "conspiracy": "The curse of the pharaohs",
+  "implemented": false
+ },
+ {
+  "key": "diplomatic-migraine-ray",
+  "name": "Diplomatic Migraine Ray",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On Wave start: the strongest enemy piece gets a Slow debuff (needs: enemy auto-debuff)",
+  "conspiracy": "Havana syndrome",
+  "implemented": false
+ },
+ {
+  "key": "doomsday-autoclicker",
+  "name": "Doomsday Autoclicker",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Time"
+  ],
+  "effect": "On Decisive Item use: +200 Score and +10s Clock",
+  "conspiracy": "Dead Hand",
+  "implemented": false
+ },
+ {
+  "key": "illuminati-nwo-booster-pack",
+  "name": "Illuminati: NWO Booster Pack",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Whenever a \"Capture\" Artefact triggers: +2 Gold and +20 Score (needs: artefact-trigger event)",
+  "conspiracy": "The Illuminati card game",
+  "implemented": false
+ },
+ {
+  "key": "deep-state-yearbook",
+  "name": "Deep State Yearbook",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On buying an Artefact: each other Artefact you own pays +5 Gold",
+  "conspiracy": "The deep state",
+  "implemented": false
+ },
+ {
+  "key": "bigfoot-toenail-clipping",
+  "name": "Bigfoot Toenail Clipping",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On Rank Up: add a copy of the piece's base-chain piece to your Stock (needs: chain lookup)",
+  "conspiracy": "Bigfoot",
+  "implemented": false
+ },
+ {
+  "key": "backmasked-vinyl",
+  "name": "Backmasked Vinyl",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On losing a Ranked piece: a copy of its base-chain piece is added to your Stock (needs: chain lookup)",
+  "conspiracy": "Backmasking",
+  "implemented": false
+ },
+ {
+  "key": "mao-s-loyalty-badge",
+  "name": "Mao's Loyalty Badge",
+  "rarity": "Uncommon",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On buying a Tactical Item in the Shop: a second random Tactical Item is free",
+  "conspiracy": "The Mao badge craze",
+  "implemented": false
+ },
+ {
+  "key": "antikythera-warranty-card",
+  "name": "Antikythera Warranty Card",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Buff",
+   "Special"
+  ],
+  "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects (needs: buff protection)",
+  "conspiracy": "The Antikythera mechanism",
+  "implemented": false
+ },
+ {
+  "key": "2-3-trillion-receipt",
+  "name": "$2.3 Trillion Receipt",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Enemies destroyed by Items award their Score and Gold value (needs: destroy-score hook)",
+  "conspiracy": "The missing trillions",
+  "implemented": false
+ },
+ {
+  "key": "pigeon-charging-cable",
+  "name": "Pigeon Charging Cable",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Enemy Waves spawn 1 fewer piece (needs: spawn modifier)",
+  "conspiracy": "Birds Aren't Real",
+  "implemented": false
+ },
+ {
+  "key": "33rd-degree-fidelity-card",
+  "name": "33rd Degree Fidelity Card",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "Every 3rd Tactical Item used: gain a Strategic Item; every 3rd Strategic: gain a Decisive (needs: use counters)",
+  "conspiracy": "The 33rd degree",
+  "implemented": false
+ },
+ {
+  "key": "loch-ness-stool-sample",
+  "name": "Loch Ness Stool Sample",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "Every 1000 Score gained: open a random Piece Box (needs: score threshold)",
+  "conspiracy": "The Loch Ness Monster",
+  "implemented": false
+ },
+ {
+  "key": "new-world-order-gerrymandering",
+  "name": "New World Order Gerrymandering",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "Gold paid by other Artefacts is increased by 25%",
+  "conspiracy": "The New World Order",
+  "implemented": false
+ },
+ {
+  "key": "stargate-divination-crystal",
+  "name": "Stargate Divination Crystal",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "If your first Action of a Turn is a Capture: +1 Action",
+  "conspiracy": "The Stargate Project",
+  "implemented": false
+ },
+ {
+  "key": "elvish-hard-hat",
+  "name": "Elvish Hard Hat",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "If your first Action of a Turn is an Item or ability: +1 Action",
+  "conspiracy": "The Demolition Elves",
+  "implemented": false
+ },
+ {
+  "key": "majestic-12-secret-handshake-diagram",
+  "name": "Majestic 12 Secret Handshake Diagram",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "Item Boxes only offer Strategic and Decisive Items",
+  "conspiracy": "Majestic 12",
+  "implemented": false
+ },
+ {
+  "key": "yalta-cocktail-napkin",
+  "name": "Yalta Cocktail Napkin",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On 5-Wave Milestone: choose one — +100 Gold / +1 Item / +15s Clock (needs: choice UI)",
+  "conspiracy": "The Yalta Conference",
+  "implemented": false
+ },
+ {
+  "key": "sugar-free-chemtrail-can",
+  "name": "Sugar Free Chemtrail Can",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "On 5-Wave Milestone: every allied piece on the Board gets +1 Piece Buff",
+  "conspiracy": "Chemtrails",
+  "implemented": false
+ },
+ {
+  "key": "montauk-eggo-waffle",
+  "name": "Montauk Eggo Waffle",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On 5-Wave Milestone: one random Stock piece Ranks Up (needs: stock rank-up)",
+  "conspiracy": "The Montauk Project",
+  "implemented": false
+ },
+ {
+  "key": "trojan-horse-assembly-manual",
+  "name": "Trojan Horse Assembly Manual",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On 5-Wave Milestone: open a free Box (needs: box grant)",
+  "conspiracy": "The Trojan Horse",
+  "implemented": false
+ },
+ {
+  "key": "library-of-alexandria-matchbox",
+  "name": "Library of Alexandria Matchbox",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On Capture: +1 Gold and +10 Score per piece in your Stock",
+  "conspiracy": "The burning of the Library of Alexandria",
+  "implemented": false
+ },
+ {
+  "key": "d-b-cooper-s-parachute",
+  "name": "D.B. Cooper's Parachute",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On losing a piece: refund 75% of its value as Gold",
+  "conspiracy": "D.B. Cooper",
+  "implemented": false
+ },
+ {
+  "key": "nostradamus-mad-libs",
+  "name": "Nostradamus Mad Libs",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On opening a Box: +1 extra pick (needs: box multi-pick)",
+  "conspiracy": "Nostradamus",
+  "implemented": false
+ },
+ {
+  "key": "flight-19-blackbox",
+  "name": "Flight 19 Blackbox",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On losing a piece: +1 Tactical Item",
+  "conspiracy": "Flight 19",
+  "implemented": false
+ },
+ {
+  "key": "terracotta-draft-card",
+  "name": "Terracotta Draft Card",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On Wave clear: +1 random Piece to your Stock",
+  "conspiracy": "Qin Shi Huang's tomb",
+  "implemented": false
+ },
+ {
+  "key": "definitely-not-russia-patch",
+  "name": "'Definitely Not Russia' Patch",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "The first piece you lose each Wave doesn't count as a loss for your Artefacts and penalties (needs: loss masking)",
+  "conspiracy": "The Wagner Group",
+  "implemented": false
+ },
+ {
+  "key": "stockholm-syndrome-pamphlet",
+  "name": "Stockholm Syndrome Pamphlet",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On Wave clear: move 1 piece from your Captured Stock into your Stock (needs: capture conversion)",
+  "conspiracy": "Stockholm syndrome",
+  "implemented": false
+ },
+ {
+  "key": "uss-eldridge-invisibility-paint",
+  "name": "USS Eldridge Invisibility Paint",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On your first Capture each Turn: the capturing piece returns to its starting position",
+  "conspiracy": "The Philadelphia Experiment",
+  "implemented": false
+ },
+ {
+  "key": "wardenclyffe-aaa-batteries",
+  "name": "Wardenclyffe AAA Batteries",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "On your first Item use each Wave: the Item is not consumed",
+  "conspiracy": "Free energy suppression",
+  "implemented": false
+ },
+ {
+  "key": "epstein-s-black-book",
+  "name": "Epstein's Black Book",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On your next Box Pick: take all 5 contents; this Artefact is then consumed (needs: consumable artefacts)",
+  "conspiracy": "The Epstein case",
+  "implemented": false
+ },
+ {
+  "key": "2012-doomsday-party-hat",
+  "name": "2012 Doomsday Party Hat",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Time"
+  ],
+  "effect": "Per 10 Gold gained: +5s Clock",
+  "conspiracy": "The 2012 phenomenon",
+  "implemented": false
+ },
+ {
+  "key": "agartha-welcome-mat",
+  "name": "Agartha Welcome Mat",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "Shop purchases can take your Gold negative, down to -100 (needs: credit system)",
+  "conspiracy": "The Hollow Earth",
+  "implemented": false
+ },
+ {
+  "key": "polybius-cartridge",
+  "name": "Polybius Cartridge",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "When a \"Capture\" Artefact triggers: it triggers an additional time",
+  "conspiracy": "Polybius",
+  "implemented": false
+ },
+ {
+  "key": "max-headroom-mask",
+  "name": "Max Headroom Mask",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "When a \"Wave\" Artefact triggers: it triggers an additional time",
+  "conspiracy": "The Max Headroom hijacking",
+  "implemented": false
+ },
+ {
+  "key": "salvation-gift-card",
+  "name": "Salvation Gift Card",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone (needs: tariff cancel)",
+  "conspiracy": "The sale of indulgences",
+  "implemented": false
+ },
+ {
+  "key": "pied-piper-s-rat-census",
+  "name": "Pied Piper's Rat Census",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "When you apply a Piece Buff: one adjacent ally gets a copy (needs: buff copy)",
+  "conspiracy": "The Pied Piper of Hamelin",
+  "implemented": false
+ },
+ {
+  "key": "super-soldier-multivitamins",
+  "name": "Super Soldier Multivitamins",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "While 3+ allied pieces carry Piece Buffs: +1 Action per Turn",
+  "conspiracy": "Super soldier programs",
+  "implemented": false
+ },
+ {
+  "key": "holy-dna-kit",
+  "name": "Holy DNA Kit",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% Score and Gold",
+  "conspiracy": "The Priory of Sion",
+  "implemented": false
+ },
+ {
+  "key": "seed-vault-secret-hatch",
+  "name": "Seed Vault Secret Hatch",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "While holding 3+ unused Items: +1 Action per Turn",
+  "conspiracy": "The doomsday vault",
+  "implemented": false
+ },
+ {
+  "key": "oak-island-wishing-well",
+  "name": "Oak Island Wishing Well",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Once per Turn: you may pay 25 Gold for +400 Score (needs: gold sink action)",
+  "conspiracy": "The Oak Island money pit",
+  "implemented": false
+ },
+ {
+  "key": "nuclear-football-menu",
+  "name": "Nuclear Football Menu",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "While the Clock is under 60s: using Items doesn't spend an Action",
+  "conspiracy": "The nuclear football",
+  "implemented": false
+ },
+ {
+  "key": "i-am-not-a-robot-checkbox",
+  "name": "'I Am Not a Robot' Checkbox",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "While you have 8+ pieces on the Board: +1 Action per Turn",
+  "conspiracy": "The Dead Internet theory",
+  "implemented": false
+ },
+ {
+  "key": "illuminati-fridge-magnet",
+  "name": "Illuminati Fridge Magnet",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "While you own Artefacts of every rarity: +50% Gold gain",
+  "conspiracy": "The Illuminati",
+  "implemented": false
+ },
+ {
+  "key": "abduction-probe",
+  "name": "Abduction Probe",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Buff"
+  ],
+  "effect": "Your pieces can carry 2 Piece Buffs at once (needs: multi-buff per piece)",
+  "conspiracy": "Abduction implants",
+  "implemented": false
+ },
+ {
+  "key": "haarp-volume-knob",
+  "name": "HAARP Volume Knob",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold (needs: spawn modifier)",
+  "conspiracy": "HAARP",
+  "implemented": false
+ },
+ {
+  "key": "zeta-reticuli-souvenir-map",
+  "name": "Zeta Reticuli Souvenir Map",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock (needs: capture conversion)",
+  "conspiracy": "The Hill abduction",
+  "implemented": false
+ },
+ {
+  "key": "roanoke-hex-kit",
+  "name": "Roanoke Hex Kit",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone (needs: piece removal)",
+  "conspiracy": "The Roanoke Colony",
+  "implemented": false
+ },
+ {
+  "key": "seti-s-red-marker",
+  "name": "SETI's Red Marker",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On acquiring this Artefact: one random active Tariff is inverted into its equivalent bonus (needs: tariff inversion)",
+  "conspiracy": "The Wow! signal",
+  "implemented": false
+ },
+ {
+  "key": "fireproof-pajamas",
+  "name": "Fireproof Pajamas",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your pieces cannot be destroyed by Item or Tariff effects (needs: destruction immunity)",
+  "conspiracy": "Spontaneous human combustion",
+  "implemented": false
+ },
+ {
+  "key": "red-diary-s-missing-pages",
+  "name": "Red Diary's Missing Pages",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "When one of your 'on losing a piece' Artefacts triggers: it triggers an additional time (needs: artefact echo)",
+  "conspiracy": "The death of Marilyn Monroe",
+  "implemented": false
+ },
+ {
+  "key": "cicada-rejection-letter",
+  "name": "Cicada Rejection Letter",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On declining a Box Pick: +Gold equal to the Shop value of the offered pieces (needs: decline option)",
+  "conspiracy": "Cicada 3301",
+  "implemented": false
+ },
+ {
+  "key": "ark-grounding-cable",
+  "name": "Ark Grounding Cable",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Tariff penalties are reduced by 50% (needs: tariff scaling)",
+  "conspiracy": "The Ark of the Covenant",
+  "implemented": false
+ },
+ {
+  "key": "moscovium-glow-stick",
+  "name": "Moscovium Glow Stick",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Score",
+   "Gold"
+  ],
+  "effect": "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed (needs: consumable artefacts + gain multiplier)",
+  "conspiracy": "Bob Lazar and Element 115",
+  "implemented": false
+ },
+ {
+  "key": "sub-antarctic-visa",
+  "name": "Sub-Antarctic Visa",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Shop"
+  ],
+  "effect": "The Shop stocks +1 hidden slot offering Artefacts at +50% price but one rarity higher (needs: shop layout change + rarity bias)",
+  "conspiracy": "Antarctica",
+  "implemented": false
+ },
+ {
+  "key": "zero-point-energy-drink",
+  "name": "Zero-Point Energy Drink",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "On reaching exactly 0 Gold: +2 Actions that Turn (needs: gold threshold hook)",
+  "conspiracy": "Zero-point energy",
+  "implemented": false
+ },
+ {
+  "key": "45-5-carat-curse",
+  "name": "45.5 Carat Curse",
+  "rarity": "Rare",
+  "type": "Passive",
+  "bonus": [
+   "Gold",
+   "Score"
+  ],
+  "effect": "+45% Gold and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs (needs: buff strip)",
+  "conspiracy": "The Hope Diamond curse",
+  "implemented": false
+ },
+ {
+  "key": "royal-fiat-undamaged",
+  "name": "Royal Fiat (Undamaged)",
+  "rarity": "Rare",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your first piece to Capture each Turn is moved to your back row after capturing (needs: forced retreat)",
+  "conspiracy": "The Diana conspiracy theories",
+  "implemented": false
+ },
+ {
+  "key": "cia-exploding-cigar",
+  "name": "CIA Exploding Cigar",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "+1 Action per Turn",
+  "conspiracy": "The plots against Castro",
+  "implemented": false
+ },
+ {
+  "key": "hellfire-club-discord-invite",
+  "name": "Hellfire Club Discord Invite",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "+2 Actions per Turn, but you cannot Pass while Actions remain (needs: forced-action rule)",
+  "conspiracy": "The Hellfire Club",
+  "implemented": false
+ },
+ {
+  "key": "shrinkflation-cereal-box",
+  "name": "Shrinkflation Cereal Box",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Score",
+   "Gold",
+   "Time"
+  ],
+  "effect": "At every Turn end: +10 Gold, +10 Score, +1s Clock; Shop prices +50%",
+  "conspiracy": "Shrinkflation",
+  "implemented": false
+ },
+ {
+  "key": "all-seeing-eye-contact-lens",
+  "name": "All-Seeing Eye Contact Lens",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Box Picks show all 3 box types' contents at once (needs: combined box UI)",
+  "conspiracy": "The Eye of Providence",
+  "implemented": false
+ },
+ {
+  "key": "ecdysis-sheddings",
+  "name": "Ecdysis Sheddings",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Copies the effect of the last other Artefact you bought (needs: artefact-copy dispatch)",
+  "conspiracy": "The reptilian elite",
+  "implemented": false
+ },
+ {
+  "key": "hitler-s-argentinian-passport",
+  "name": "Hitler's Argentinian Passport",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "Deploying doesn't spend an Action (needs: free-deploy rule)",
+  "conspiracy": "Hitler survival theories",
+  "implemented": false
+ },
+ {
+  "key": "alien-rocket-toy",
+  "name": "Alien Rocket Toy",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On a piece's 3rd Capture: it Ranks Up (needs: per-piece capture counter)",
+  "conspiracy": "Ancient astronauts",
+  "implemented": false
+ },
+ {
+  "key": "rapture-insurance-policy",
+  "name": "Rapture Insurance Policy",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Score"
+  ],
+  "effect": "On Game Over Screen: convert all your Gold into Score at 20x rate",
+  "conspiracy": "The Rapture Index",
+  "implemented": false
+ },
+ {
+  "key": "nibiru-hide-and-seek-trophy",
+  "name": "Nibiru Hide-and-Seek Trophy",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Gold"
+  ],
+  "effect": "On Wave clear: pays Gold starting at +10, growing +10 per Wave; collapses to 0 and restarts when you lose a piece",
+  "conspiracy": "Nibiru",
+  "implemented": false
+ },
+ {
+  "key": "jon-burrows-fake-id",
+  "name": "Jon Burrows' Fake ID",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On Wave clear: the first piece you lost that Wave returns to your Stock (needs: per-wave loss tracking)",
+  "conspiracy": "Elvis lives",
+  "implemented": false
+ },
+ {
+  "key": "y2k-patch-floppy-disk",
+  "name": "Y2K Patch Floppy Disk",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "On Wave start: the enemy's first Turn is skipped (needs: turn-skip hook)",
+  "conspiracy": "The Y2K bug",
+  "implemented": false
+ },
+ {
+  "key": "pegasus-free-trial",
+  "name": "Pegasus Free Trial",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Pieces at the end of their Rank chain can move twice each Turn",
+  "conspiracy": "Pegasus spyware",
+  "implemented": false
+ },
+ {
+  "key": "exhibit-399",
+  "name": "Exhibit 399",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "When a Tariff would be applied: you choose between 2 options (needs: tariff choice)",
+  "conspiracy": "The Warren Commission",
+  "implemented": false
+ },
+ {
+  "key": "defense-lobbyist-business-card",
+  "name": "Defense Lobbyist Business Card",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Item"
+  ],
+  "effect": "Whenever you use a non-Tactical Item: gain a random Tactical Item (needs: grant hook)",
+  "conspiracy": "The military-industrial complex",
+  "implemented": false
+ },
+ {
+  "key": "fifa-complimentary-yacht",
+  "name": "FIFA Complimentary Yacht",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "You may spend 50 Gold to gain +1 Action, any number of times per Turn (needs: gold-action exchange)",
+  "conspiracy": "The FIFA corruption case",
+  "implemented": false
+ },
+ {
+  "key": "troll-farm-employee-of-the-month",
+  "name": "Troll Farm Employee of the Month",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your \"Wave\" Artefacts also trigger on Wave start (needs: dual-trigger dispatch)",
+  "conspiracy": "The troll farm",
+  "implemented": false
+ },
+ {
+  "key": "cern-ctrl-z-shortcut",
+  "name": "CERN Ctrl+Z Shortcut",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your duplicate Artefacts trigger one extra time (needs: duplicate detection)",
+  "conspiracy": "CERN doomsday lore",
+  "implemented": false
+ },
+ {
+  "key": "cheyenne-mountain-doorbell",
+  "name": "Cheyenne Mountain Doorbell",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Your pieces on your back row cannot be captured (needs: capture-immunity zone)",
+  "conspiracy": "Cheyenne Mountain",
+  "implemented": false
+ },
+ {
+  "key": "nazca-boarding-pass",
+  "name": "Nazca Boarding Pass",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "You may Deploy onto any empty square (needs: free deploy placement)",
+  "conspiracy": "The Nazca Lines",
+  "implemented": false
+ },
+ {
+  "key": "zapruder-s-director-s-cut",
+  "name": "Zapruder's Director's Cut",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Action"
+  ],
+  "effect": "Once per Wave: you may repeat your previous Action without spending an Action (needs: action replay)",
+  "conspiracy": "The Zapruder film",
+  "implemented": false
+ },
+ {
+  "key": "templar-debit-card",
+  "name": "Templar Debit Card",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Shop",
+   "Special"
+  ],
+  "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
+  "conspiracy": "The Knights Templar",
+  "implemented": false
+ },
+ {
+  "key": "uap-breath-mint",
+  "name": "UAP Breath Mint",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Once per Wave: when one of your pieces would be captured, it instead moves 1 square away (needs: dodge)",
+  "conspiracy": "The Pentagon UAP videos",
+  "implemented": false
+ },
+ {
+  "key": "winchester-salt-lined-doors",
+  "name": "Winchester Salt Lined Doors",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Enemy pieces cannot move onto your back row (needs: zone denial)",
+  "conspiracy": "The Winchester Mystery House",
+  "implemented": false
+ },
+ {
+  "key": "100-genuine-original-mona-lisa",
+  "name": "100% Genuine Original Mona Lisa",
+  "rarity": "Legendary",
+  "type": "Passive",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Each Turn, including enemy Turns: your first Artefact trigger is copied and triggers again (needs: artefact echo)",
+  "conspiracy": "The Mona Lisa theft",
+  "implemented": false
+ },
+ {
+  "key": "bovine-tractor-beam",
+  "name": "Bovine Tractor Beam",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Special"
+  ],
+  "effect": "Once per Wave: move one enemy piece anywhere on your side of the Board (needs: forced move)",
+  "conspiracy": "Cattle mutilations",
+  "implemented": false
+ },
+ {
+  "key": "ark-s-bunkbed",
+  "name": "Ark's Bunkbed",
+  "rarity": "Legendary",
+  "type": "Trigger",
+  "bonus": [
+   "Piece"
+  ],
+  "effect": "On buying a Piece: a second copy joins your Stock; once per 5-Wave Milestone (needs: piece duplication)",
+  "conspiracy": "The searches for Noah's Ark",
+  "implemented": false
+ }
+]

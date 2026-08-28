@@ -1,6 +1,13 @@
 # PRD: GDD gap bridge
 
-Status: in progress
+Status: all 26 slices worked; 135/180 artefacts implemented
+
+> **Wrap-up 2026-08-28.** Every slice 01-26 has been worked and merged to `main`, which is
+> ALL GREEN on the full suite (windowed click probes + 18 headless suites + autoplay).
+> Slices marked `partial` are deliberate: their remainders were triaged into issues 21-26,
+> and what is left after those is catalogued in each Outcome as either a named design
+> question or a system that has its own ticket. 45 of the 180 artefacts remain
+> unimplemented, every one of them accounted for rather than silently skipped.
 
 ## Problem Statement
 

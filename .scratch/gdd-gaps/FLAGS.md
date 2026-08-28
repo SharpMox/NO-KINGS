@@ -49,6 +49,24 @@ Each was a judgement call needed to ship; none was specced.
   two-step box (divergence #10) and every other item resolves on use, so it enters the
   inventory like any item. Recorded on its Notion page.
 
+## Open design questions raised by implementation
+
+Each was surfaced by an agent that declined to guess, and each is written up where it was
+found. Collected here so they are not lost in Outcome sections:
+
+- **Holy Lint's grant timing** — issue 27. ~17% of its rolls are consumed by the very
+  capture that granted them.
+- **Tungsten-Filled Gold Bar + Popemobile Piggy Bank** compound to 11-54x baseline score
+  over a full run. Confirmed *not* a double-count bug (see issue 20's Outcome) — a
+  genuinely powerful catalog-specified pair. Balance call outstanding.
+- **Abduction Probe** ("pieces can carry 2 Piece Buffs at once") — there is no 1-buff cap
+  anywhere in the code today, so implementing it means inventing a base-game restriction
+  nothing currently asks for.
+- **`on_milestone` fires every 10 waves but several artefacts say "5-Wave Milestone"** —
+  a real GDD/code mismatch. Those artefacts currently hook `on_wave_clear` and check
+  `g.wave % 5` directly.
+- Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
+
 ## Housekeeping
 
 - **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens

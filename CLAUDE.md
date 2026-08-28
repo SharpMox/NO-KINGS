@@ -92,14 +92,71 @@ nothing and read it at load time. The one thing to re-run is
 
 ---
 
-## The game (planned — Godot)
+## The game (Godot 4.7 — built, and the larger half of this repo)
 
-Not started yet. When it is, this is the intended setup:
+Portrait 480×800, desktop-first. The MVP shipped and then some: ~30 merged slices, a
+5-tier difficulty system, 12 Piece Buffs, a 16-King cast, 141 of 180 Artefacts, cloud-save
+scaffolding, and a 22-suite test harness.
 
-- **Backlog lives in Linear.** Use the `mcp__linear__*` tools (`list_issues`, `get_issue`,
-  `save_issue`, `save_comment`, …). Each issue is one unit of work; one issue → one branch → one PR.
+### Where the work lives
+
+- **The backlog is `.scratch/gdd-gaps/`** — `PRD.md` (the map), `issues/NN-*.md` (one slice
+  each, with a `Status:` line and an `## Outcome` when done), and `FLAGS.md` (non-blocking
+  findings and open design questions, so they don't rot in PR descriptions).
+  **There is no Linear.** Earlier revisions of this file said there was; there never was.
+- One slice → one branch → one PR, same as the reference site.
+- **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,
+  Artefacts, Tariffs, Piece Buffs). When Notion and the code disagree, that is a finding —
+  see the drift checker below — and which side is stale is a judgement call each time. Both
+  directions have happened.
 - **Load the relevant Godot skill before writing GDScript:** `godot-best-practices`,
   `godot-gdscript-patterns`, `godot-ui`, `godot-mcp`. When in doubt, load all four.
+
+### Architecture
+
+`game.gd` is the live node — board state, turn flow, input, `_draw`. Everything else in
+`game/scripts/` is a **pure logic module operating on `g` or on plain Dictionaries**, with no
+nodes of its own: `rules.gd` (movement/legality/AI), `item_logic.gd`, `buff_logic.gd`,
+`merge_logic.gd`, `wave_logic.gd`, `economy.gd`, `shop.gd`, `box.gd`, `save_config.gd`.
+That split is why the headless suites can drive real game logic without a window.
+
+**`artefact_hooks.gd` is the shared dispatch layer for BOTH Artefacts and Tariffs.** Read its
+header before touching it — it documents the hook list and two rules that are load-bearing:
+
+- **ctx contract.** Handlers return values through `ctx`; they compute percentages off the
+  immutable `ctx.base`, never the running `ctx.amount`; and they never write `g.score`/
+  `g.gold` mid-dispatch — cross-resource side-payments go through `ctx.gold_bonus` /
+  `ctx.score_bonus`, applied exactly once by `Economy.earn`. Four handlers broke this and
+  produced an order-dependent payout before it was written down.
+- **Stacking is additive per held copy, and `run()` key-sorts** so a value touched by several
+  artefacts never depends on acquisition order.
+
+Gold, Score and the Clock all route through `Economy` (`earn`/`gain`/`add_clock`) — that
+single choke point is the only reason hooking them was cheap. Anything new that a future
+effect might want to modify should get the same treatment.
+
+**ADR-0002** (`docs/adr/`): a Stock entry is a bare id String or a Dictionary carrying the
+piece's opaque state. Stock never interprets that state, so per-piece additions (buffs,
+capture ledgers, peak rank) ride through save/load and Extraction for free.
+
+### Conventions learned the hard way
+
+- **Generated data is generated.** `data/*.js` are the source; `tools/export-game-*.mjs`
+  write `game/data/*.json`. **Never hand-edit the JSON** — re-run the exporter, including
+  after a merge conflict in it.
+- **Tests pin their RNG seed.** `_boot()` defaults to a fixed seed in every suite; opt out
+  explicitly and say why. Before this, 170 of 171 fixtures ran on `randomize()` and the
+  suite produced false failures that made every "ALL GREEN" claim unfalsifiable.
+- **Verify independently.** Do not take a green claim — including your own subagents' — at
+  face value on a branch you are about to merge. Re-run it. That has caught real
+  discrepancies more than once.
+- **Saves are versioned.** `save_config.gd` carries `save_version`; its header explains
+  which changes are additive (default and carry on) and which need a migration. An additive
+  field read with a default is safe forever; a *reshaped* field read with a default is a
+  silent corruption.
+- **Ambiguity goes back to Notion as a question, not into code as a guess.** Half this
+  backlog existed to undo guesses. If a catalog entry cannot be implemented faithfully,
+  leave it `implemented: false` and write down why.
 - **Scope discipline.** No defensive code, speculative features, or backwards-compat
   shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the change.
 - **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the

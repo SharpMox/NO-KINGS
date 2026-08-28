@@ -46,7 +46,10 @@ No test exercises echo + milestone together, which is why it was invisible.
 
 ## Acceptance criteria
 
-- [ ] John Titor's Crypto Wallet moved onto the per-artefact 5-wave helper
+- [x] John Titor's Crypto Wallet moved onto the per-artefact 5-wave helper
+      (`fix/blitz-and-crypto-wallet`, 2026-08-28 — user-reported; registered
+      on `on_wave_clear` + `_milestone5_hit`, same as silk-road-coupon /
+      crop-circle-plank / ark-s-bunkbed)
 - [ ] The three unwired artefacts confirmed `implemented: false`, or wired
 - [ ] Decision recorded on whether random grants are tier-restricted
 - [ ] Echo layer carries the artefact entry (not just its key) so `acquired_wave` survives

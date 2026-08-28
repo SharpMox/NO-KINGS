@@ -1542,6 +1542,78 @@ func _init() -> void:
 	bgf.queue_free()
 	await process_frame
 
+	# --- issue 25: per-piece capture ledger (split from 19) — game.gd
+	# _note_capture, fired from both the player's _move_player capture branch
+	# and the enemy's _run_enemy_actions capture branch, plus the three
+	# artefacts that read it.
+	var ledger_p := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	ledger_p._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(ledger_p.board[Vector2i(2, 5)].get("captures", 0) == 1
+		and ledger_p.board[Vector2i(2, 5)].get("wave_captures", 0) == 1,
+		"issue 25: the player's OWN capturing piece gets its ledger bumped (_move_player)")
+	ledger_p.queue_free()
+	await process_frame
+
+	var ledger_e := _boot({"board": [["pawn", 0, 2, 6], ["rook", 1, 2, 8], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	await ledger_e._run_enemy_actions()
+	check(ledger_e.board.has(Vector2i(2, 6)) and ledger_e.board[Vector2i(2, 6)].owner == 1
+		and ledger_e.board[Vector2i(2, 6)].get("captures", 0) == 1,
+		"issue 25: the enemy's OWN capturing piece gets its ledger bumped too (_run_enemy_actions, no on_capture/scoring)")
+	ledger_e.queue_free()
+	await process_frame
+
+	# Chupacabra Chew Toy: +2 Gold on Capture, +10 more if the captured piece
+	# had captured one of yours (a lifetime captures > 0 on the victim)
+	var chup_fresh := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["chupacabra-chew-toy"]})
+	await process_frame
+	var chup_base: int = chup_fresh.defs.pawn.value # captures also earn base Gold via Economy.earn
+	chup_fresh._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(chup_fresh.gold == chup_base + 2, "Chupacabra Chew Toy: +2 Gold on a Capture of a piece with no capture history")
+	chup_fresh.queue_free()
+	await process_frame
+
+	var chup_marked := _boot({"board": [["queen", 0, 2, 2],
+			["pawn", 1, 2, 3, {"captures": 1}], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["chupacabra-chew-toy"]})
+	await process_frame
+	var chup_marked_base: int = chup_marked.defs.pawn.value
+	chup_marked._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(chup_marked.gold == chup_marked_base + 12,
+		"Chupacabra Chew Toy: +10 more Gold when the captured piece had captured one of yours")
+	chup_marked.queue_free()
+	await process_frame
+
+	# Alien Rocket Toy: on a piece's 3rd (lifetime) Capture, it Ranks Up
+	var rocket := _boot({"board": [["pawn", 0, 2, 2, {"captures": 2}], ["pawn", 1, 3, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["alien-rocket-toy"]})
+	await process_frame
+	rocket._move_player(Vector2i(2, 2), Vector2i(3, 3)) # diagonal: pawns only capture on the diagonal
+	check(rocket.board[Vector2i(3, 3)].id == "sergeant" and rocket.board[Vector2i(3, 3)].get("captures", 0) == 3,
+		"Alien Rocket Toy: the 3rd Capture Ranks the piece Up (pawn -> sergeant)")
+	rocket.queue_free()
+	await process_frame
+
+	# Zodiac Crossword Puzzle: On Wave clear, the ally with the most Captures
+	# THAT WAVE (not lifetime) gets +1 Piece Buff — resets every Wave
+	var zodiac := _boot({"board": [
+			["queen", 0, 2, 1, {"wave_captures": 3}], ["pawn", 0, 3, 1, {"wave_captures": 1}],
+			["rook", 1, 7, 10]],
+		"wave": 4, "artefacts": ["zodiac-crossword-puzzle"]})
+	await process_frame
+	WaveLogic.queue(zodiac, zodiac.wave + 1)
+	check(BuffLogic.of(zodiac.board[Vector2i(2, 1)]).size() == 1,
+		"Zodiac Crossword Puzzle: the ally with the most Captures that Wave gets +1 Piece Buff")
+	check(BuffLogic.of(zodiac.board[Vector2i(3, 1)]).is_empty(),
+		"Zodiac Crossword Puzzle: the ally with fewer Captures that Wave gets nothing")
+	check(not zodiac.board[Vector2i(2, 1)].has("wave_captures")
+		and not zodiac.board[Vector2i(3, 1)].has("wave_captures"),
+		"Zodiac Crossword Puzzle: the Wave-scoped ledger resets for every piece at the next Wave, win or lose")
+	zodiac.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

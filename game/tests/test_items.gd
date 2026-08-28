@@ -13,6 +13,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const Waves := preload("res://data/waves.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -859,6 +860,33 @@ func _init() -> void:
 		"Stargate Divination Crystal refunds the capture's action before the auto-pass check — the turn stays open")
 	sg.queue_free()
 	await process_frame
+
+	# --- fix (ruled 2026-08-28): RANDOM artefact buff grants must never hand
+	# out a self-harming buff — today only Slow (it makes its own holder move
+	# and capture like a Pawn, a debuff on its own holder). The player's own
+	# Buff Box pick (_open_buff_pick, game.gd) is untouched: choosing Slow
+	# deliberately (e.g. onto an enemy) is legitimate. ---
+	check(Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.key == "slow")[0]
+			.get("self_harming", false),
+		"Slow is flagged self_harming in the catalog")
+	check(not Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.key == "smog")[0]
+			.get("self_harming", false),
+		"Smog (debuffs adjacent ENEMIES, not its own holder) stays unflagged — a genuine buff")
+	var rbk_rng := RandomNumberGenerator.new()
+	rbk_rng.seed = 7
+	var seen_slow := false
+	var seen_other := {}
+	for i in 500:
+		var k: String = ArtefactHooks._random_buff_key(rbk_rng)
+		if k == "slow":
+			seen_slow = true
+		seen_other[k] = true
+	check(not seen_slow, "RANDOM grants (_random_buff_key) never draw Slow, even over 500 rolls")
+	check(seen_other.size() == Items.PIECE_BUFFS.size() - 1,
+		"every OTHER Piece Buff is still reachable by a random grant (%d of %d)"
+			% [seen_other.size(), Items.PIECE_BUFFS.size() - 1])
+	check(Items.PIECE_BUFFS.duplicate().any(func(b: Dictionary) -> bool: return b.key == "slow"),
+		"the player's own Buff Box pool (_open_buff_pick's source) still includes Slow")
 
 	# --- issue 18 (Shop/Item/Buff batch): Buff-tag artefacts go through
 	# BuffLogic.add, not a parallel path ---

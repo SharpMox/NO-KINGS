@@ -1191,11 +1191,15 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary) -> void:
 		["mk-ultra-sugar-cube", "on_deploy"]:
 			_grant_buff(g, ctx.pos, "Tactical")
 		["obedience-flavored-tap-water", "on_capture"]:
+			# Doesn't grant here — game.gd's _move_player applies it AFTER this
+			# capture's own critical/range consumption (ruled 2026-08-28, see
+			# economy.gd's ctx.grant_buffs comment), so the new buff survives
+			# for the NEXT capture instead of being doubled/wasted by this one.
 			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
-				_grant_buff(g, ctx.attacker_pos, "Tactical")
+				ctx.grant_buffs.append("Tactical")
 		["holy-lint", "on_capture"]:
 			if ctx.attacker_pos.x >= 0:
-				_grant_buff(g, ctx.attacker_pos)
+				ctx.grant_buffs.append("")
 		["scientology-e-meter", "on_wave_clear"]:
 			# "the piece" — Wave clear has no single trigger piece, so this
 			# reads it as a random ally (same reading as Xenu OT III below).

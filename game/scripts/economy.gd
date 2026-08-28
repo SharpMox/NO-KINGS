@@ -108,6 +108,14 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
 		"return_to_start": false, "move_to_backrow": false,
+		"grant_buffs": [], # tiers ("" = any) an on_capture handler wants to hand
+			# the attacker (Obedience-Flavored Tap Water, Holy Lint) — an OUTPUT
+			# list, not applied here: _move_player reads it back off
+			# g.last_capture_ctx (same shape as return_to_start/move_to_backrow
+			# above) and lands the grant AFTER its own critical/range
+			# consumption, so the new buff is banked for the NEXT capture
+			# instead of being doubled/spent by this one (ruled 2026-08-28 —
+			# see game.gd's _move_player).
 	})
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1

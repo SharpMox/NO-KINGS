@@ -544,7 +544,6 @@ const REGISTRY := {
 	"alien-autopsy-bloopers": ["on_wave_clear"],
 	"golden-buddha-bobblehead": ["on_wave_clear"],
 	"nigerian-prince-wire-transfer": ["on_wave_spawn"],
-	"john-titor-s-crypto-wallet": ["on_milestone"],
 	"putin-s-golden-toilet-brush": ["on_purchase"],
 	"rapture-insurance-policy": ["on_game_over"],
 	# --- issue 17: Action/Time/Piece batch (8 artefacts, no needs-note) ---
@@ -703,6 +702,10 @@ const REGISTRY := {
 	# clock-refill trigger, see there) ---
 	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
 	"trojan-horse-assembly-manual": ["on_wave_clear"],
+	# was left on on_milestone (the GLOBAL 10-wave beat) when the other 8 were
+	# converted above — paid at half the intended rate; moved to this
+	# per-artefact cadence 2026-08-28 (user-reported)
+	"john-titor-s-crypto-wallet": ["on_wave_clear"],
 
 	# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
 	# WaveLogic.queue) ---
@@ -1134,8 +1137,6 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.score += 100
 			g.gold += 10
 			g.clock_ms = maxf(g.clock_ms - 3000.0, 0.0)
-		["john-titor-s-crypto-wallet", "on_milestone"]:
-			g.gold += int(g.clock_ms / 1000.0 / 5.0)
 		["putin-s-golden-toilet-brush", "on_purchase"]:
 			g.score += 5 * ctx.price
 		["rapture-insurance-policy", "on_game_over"]:
@@ -1208,6 +1209,9 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# trigger — see _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
+		["john-titor-s-crypto-wallet", "on_wave_clear"]:
+			if _milestone5_hit(g.wave, acquired_wave): # see silk-road-coupon's case above
+				g.gold += int(g.clock_ms / 1000.0 / 5.0)
 
 		# --- issue 18: Buff-tag triggers, all through BuffLogic.add ---
 		["crop-circle-plank", "on_wave_clear"]:

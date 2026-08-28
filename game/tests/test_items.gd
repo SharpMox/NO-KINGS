@@ -925,6 +925,32 @@ func _init() -> void:
 	crop_off.queue_free()
 	await process_frame
 
+	# John Titor's Crypto Wallet: was left wired to on_milestone (the GLOBAL
+	# 10-wave beat) when the rest of this "5-Wave Milestone" batch moved to
+	# the per-artefact on_wave_clear + _milestone5_hit cadence — paid at half
+	# the intended rate. Acquired wave 2: fires clearing wave 6 (2+4, beat 1)
+	# and wave 11 (2+9, beat 2). Waves 8-10 are jumped directly (g.wave set,
+	# not queued one by one) so the test never calls WaveLogic.queue with the
+	# GLOBAL milestone wave (10) itself — that fires its OWN clock refill +
+	# score/gold bonus (wave_logic.gd's `n % MILESTONE_WAVES == 0` block),
+	# unrelated to this artefact and just noise for this assertion; the
+	# separate control test below isolates that wave on purpose instead.
+	var cw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 2, "artefacts": ["john-titor-s-crypto-wallet"], "gold": 0})
+	await process_frame
+	cw.artefacts[0].acquired_wave = 2
+	cw.clock_ms = 25000.0 # 25s left -> +5 Gold per firing (int(25.0 / 5.0))
+	for n in range(3, 7): # clear waves 2..5: not this copy's beat yet
+		WaveLogic.queue(cw, n)
+	check(cw.gold == 0, "no payout before the copy's own beat 5 (acquired wave 2 -> W+4 = wave 6)")
+	WaveLogic.queue(cw, 7) # clears wave 6: this copy's beat 1 (2+4)
+	check(cw.gold == 5, "fires on its own 5-wave beat, +1 Gold per 5s left on the Clock (25s -> +5)")
+	cw.wave = 11 # skip straight past 8/9/10 (see comment above)
+	WaveLogic.queue(cw, 12) # clears wave 11: this copy's beat 2 (2+9)
+	check(cw.gold == 10, "fires again on its own next 5-wave beat (W+9), not the global cadence")
+	cw.queue_free()
+	await process_frame
+
 	# MK-Ultra Sugar Cube: On Deploy, the deployed piece gets a Tactical buff
 	var mkultra := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["mk-ultra-sugar-cube"], "stock": ["pawn"], "gold": 100})

@@ -48,6 +48,11 @@
    .scratch/gdd-gaps/issues/31's Outcome. Dark Market Light Bulb stays
    unimplemented: its "Demoted" clause is undefined, a Notion question, not
    a guess.
+   2026-08-28 (issue 35): Black Knight Morse Code flipped to implemented: true
+   and its "(needs: turn counter)" note cleared — a Clock-gain choke point
+   (Economy.add_clock/on_clock_change) and a run-long Turn counter
+   (g.turn_number) now exist, so it's an ordinary two-hook artefact; see
+   game/scripts/artefact_hooks.gd's header.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -376,8 +381,8 @@ var ARTEFACTS = [
     effect: "Your Gold gains ignore Inflation and other gold-reducing Tariffs",
     conspiracy: "The lost Amber Room", url: "https://en.wikipedia.org/wiki/Amber_Room",
     summary: "A chamber paneled entirely in amber and gold — looted by the Wehrmacht in 1941, last seen crated in Königsberg in 1945, then gone. Divers, miners and con men have been finding it ever since; none has produced a panel." },
-  { name: "Black Knight Morse Code", rarity: "Uncommon", type: "Trigger", bonus: ["Score", "Time"], status: "KEEP",
-    effect: "Every 3rd Turn: your Score and Clock gains that Turn are doubled (needs: turn counter)",
+  { name: "Black Knight Morse Code", rarity: "Uncommon", type: "Trigger", bonus: ["Score", "Time"], status: "KEEP", implemented: true,
+    effect: "Every 3rd Turn: your Score and Clock gains that Turn are doubled",
     conspiracy: "The Black Knight satellite", url: "https://en.wikipedia.org/wiki/Black_Knight_satellite_conspiracy_theory",
     summary: "A 13,000-year-old alien satellite in polar orbit, say the theorists; a lost thermal blanket, says NASA. Either way something up there keeps beeping, steady as a metronome." },
   { name: "Dyatlov Geiger Counter", rarity: "Uncommon", type: "Passive", bonus: ["Score"], status: "KEEP", implemented: true,

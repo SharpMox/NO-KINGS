@@ -74,6 +74,26 @@ static func gain(g, amount: int) -> int:
 	return roundi(ctx.amount)
 
 
+## Clock choke point (issue 35), mirroring earn()/gain(): every direct
+## `clock_ms +=` gain site — milestone/King refills, the Continue bonus, the
+## early-clear and turn-end bonuses, and every artefact/item/tariff that
+## grants time — now routes through here instead, so on_clock_change (Black
+## Knight Morse Code's first listener) has one place to hook. Same
+## immutable-base/additive-amount ctx contract as on_score_change/
+## on_gold_change (artefact_hooks.gd header CONTRACT). `ms` can be negative —
+## a Clock *loss* (e.g. Nigerian Prince Wire Transfer) routes through the
+## same call, so on_clock_change sees the whole picture; a handler that only
+## wants to react to gains (Black Knight) guards `ctx.base > 0` itself,
+## same as Score/Gold handlers gate on their own `reason`/conditions.
+## The one deliberate exception is game.gd's `_process` per-frame drain —
+## a continuous tick, not a discrete gain, so hooking it would fire every
+## frame; see the comment at that call site.
+static func add_clock(g, ms: float, reason: String = "") -> void:
+	var ctx := ArtefactHooks.run(g, "on_clock_change",
+		{"base": ms, "amount": ms, "reason": reason})
+	g.clock_ms = maxf(g.clock_ms + ctx.amount, 0.0)
+
+
 ## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
 ## still intact when the two call sites in game.gd call this) — "" / false
 ## when no attacker applies (e.g. direct test calls), which every

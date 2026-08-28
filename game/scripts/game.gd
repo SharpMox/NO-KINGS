@@ -122,8 +122,9 @@ var wave_lost_ids: Array = [] # ids of player pieces lost this Wave, in order
 	# WaveLogic.queue(), appended in _lose_player_piece — distinct from the
 	# run-wide lost_player counter above
 var arks_bunkbed_used := false # Ark's Bunkbed: this 5-Wave Milestone window's
-	# free duplicate already granted; reset on_wave_clear when g.wave % 5 == 0
-	# (the "5-Wave Milestone" cadence, issue 26 — see artefact_hooks.gd)
+	# free duplicate already granted; reset on_wave_clear when this HELD COPY's
+	# own per-artefact "5-Wave Milestone" cadence hits (ArtefactHooks.
+	# _milestone5_hit, ruled 2026-08-28 — see artefact_hooks.gd)
 var lottery_purchase_count := 0 # Pre-Scratched Lottery Ticket: Shop
 	# purchases made while held (issue 26) — read by Shop.price()
 var doomsday_snooze_used_this_wave := false # Doomsday Clock Snooze Button:
@@ -326,7 +327,10 @@ func _ready() -> void:
 		for key in args[args.find("--artefacts") + 1].split(","): # loadout, comma-separated keys, on top of whatever the boot path above granted
 			for t in Items.ARTEFACT_EFFECTS:
 				if t.key == key:
-					artefacts.append(t)
+					var inst: Dictionary = t.duplicate() # per-copy acquisition
+						# wave stamp (artefact_hooks.gd's "5-Wave Milestone")
+					inst.acquired_wave = wave
+					artefacts.append(inst)
 	if shop_stock.is_empty(): # fresh run, or a save from before the shop
 		Shop.roll(self)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
@@ -1231,12 +1235,22 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
 		return_to_start = last_capture_ctx.get("return_to_start", false)
 		move_to_backrow = last_capture_ctx.get("move_to_backrow", false)
+		var grant_buffs: Array = last_capture_ctx.get("grant_buffs", [])
 		if BuffLogic.has(board[from], "critical"):
 			_consume_buff(from, "critical")
 			_add_float(to, "Critical!", COL_MERGE)
 		# Range is spent by the capture, not by repositioning
 		if BuffLogic.has(board[from], "range"):
 			_consume_buff(from, "range")
+		# Grant-on-capture (Obedience-Flavored Tap Water, Holy Lint) lands here,
+		# AFTER critical/range are consumed above — ruled 2026-08-28: a granted
+		# buff is a reward banked for the NEXT capture, not this one. Landing it
+		# any earlier let a newly-granted critical double THIS capture (its
+		# score multiplier reads board[from] synchronously, right after the
+		# on_capture dispatch above) or a newly-granted range get consumed here
+		# for zero effect.
+		for tier in grant_buffs:
+			ArtefactHooks._grant_buff(self, from, tier)
 		if BuffLogic.has(victim, "stun"): # cuts both ways
 			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
 			_add_float(from, "Stunned!", COL_MERGE)
@@ -1797,7 +1811,7 @@ func _box_options(only_kind := "") -> Array:
 			if t.key == "majestic-12-secret-handshake-diagram":
 				allowed_tiers = ["Strategic", "Decisive"]
 				break
-	return Box.roll_options(rng, only_kind, allowed_tiers, score)
+	return Box.roll_options(rng, only_kind, allowed_tiers)
 
 
 
@@ -1810,7 +1824,12 @@ func _box_choose(opt: Dictionary) -> void:
 		"item":
 			items.append(opt.payload)
 		"artefact":
-			artefacts.append(opt.payload)
+			var entry: Dictionary = opt.payload.duplicate() # never mutate the
+				# shared catalog Dictionary rolled by Box.roll_options — stamp a
+				# per-copy acquisition wave (artefact_hooks.gd's "5-Wave
+				# Milestone" cadence)
+			entry.acquired_wave = wave
+			artefacts.append(entry)
 		"score":
 			Economy.earn(self, opt.value)
 	_box_close()

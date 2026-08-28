@@ -20,7 +20,8 @@ const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
 ## Rarity order low -> high (GDD Artefacts DB). A hidden slot (Sub-Antarctic
 ## Visa) samples from strictly above the lowest rarity present in the
 ## rollable pool — "one rarity higher" than a baseline roll, layered on top
-## of the issue-20 rarity+depth weighting the normal 4-slot roll now uses too.
+## of the issue-20 flat rarity weighting the normal 4-slot roll uses too
+## (depth-gating reverted 2026-08-28 — see tuning.gd).
 const RARITY_ORDER := ["Common", "Uncommon", "Rare", "Legendary"]
 
 
@@ -246,7 +247,11 @@ static func buy(g, index: int) -> bool:
 		"item":
 			g.items.append(_catalog(slot))
 		"artefact":
-			g.artefacts.append(_catalog(slot)) # stacks like box copies
+			var entry: Dictionary = _catalog(slot).duplicate() # never mutate the
+				# shared catalog Dictionary — stamp a per-copy acquisition wave
+				# (artefact_hooks.gd's per-artefact "5-Wave Milestone" cadence)
+			entry.acquired_wave = g.wave
+			g.artefacts.append(entry) # stacks like box copies
 	ArtefactHooks.run(g, "on_purchase", {"kind": slot.kind, "key": slot.key, "price": cost})
 	return true
 
@@ -260,13 +265,13 @@ static func _sample(pool: Array, n: int, rng: RandomNumberGenerator) -> Array:
 	return out
 
 
-## n distinct artefact keys, weighted by rarity + depth (issue 20 — shares
+## n distinct artefact keys, weighted by rarity (issue 20 — shares
 ## Tuning.weighted_artefact_pick with box.gd's single-pick roll).
 static func _sample_weighted_artefacts(entries: Array, n: int, g) -> Array:
 	var open := entries.duplicate()
 	var out := []
 	for i in mini(n, open.size()):
-		out.append(open.pop_at(Tuning.weighted_artefact_pick(open, g.score, g.rng)).key)
+		out.append(open.pop_at(Tuning.weighted_artefact_pick(open, g.rng)).key)
 	return out
 
 

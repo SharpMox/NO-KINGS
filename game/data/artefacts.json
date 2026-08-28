@@ -291,7 +291,7 @@
   ],
   "effect": "On acquiring an Artefact: +150 Score and +5s Clock",
   "conspiracy": "Pyramidology",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "golden-buddha-bobblehead",
@@ -509,9 +509,9 @@
    "Gold",
    "Special"
   ],
-  "effect": "Whenever two or more of your Artefacts trigger on the same event: +15 Gold (needs: trigger tracking)",
+  "effect": "Whenever two or more of your Artefacts trigger on the same event: +15 Gold",
   "conspiracy": "The Bilderberg meeting",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "sphinx-s-booger",
@@ -645,9 +645,9 @@
    "Score",
    "Gold"
   ],
-  "effect": "On your first Score gain and first Gold gain each Turn: they trigger again (needs: gain multiplier)",
+  "effect": "On your first Score gain and first Gold gain each Turn: they trigger again",
   "conspiracy": "The simulation hypothesis",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "wuhan-vial-label",
@@ -1221,9 +1221,9 @@
    "Score",
    "Gold"
   ],
-  "effect": "Whenever a \"Capture\" Artefact triggers: +2 Gold and +20 Score (needs: artefact-trigger event)",
+  "effect": "Whenever a \"Capture\" Artefact triggers: +2 Gold and +20 Score",
   "conspiracy": "The Illuminati card game",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "deep-state-yearbook",
@@ -1586,7 +1586,7 @@
   ],
   "effect": "When a \"Capture\" Artefact triggers: it triggers an additional time",
   "conspiracy": "Polybius",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "max-headroom-mask",
@@ -1598,7 +1598,7 @@
   ],
   "effect": "When a \"Wave\" Artefact triggers: it triggers an additional time",
   "conspiracy": "The Max Headroom hijacking",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "salvation-gift-card",
@@ -1791,9 +1791,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "When one of your 'on losing a piece' Artefacts triggers: it triggers an additional time (needs: artefact echo)",
+  "effect": "When one of your 'on losing a piece' Artefacts triggers: it triggers an additional time",
   "conspiracy": "The death of Marilyn Monroe",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cicada-rejection-letter",
@@ -2083,9 +2083,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your duplicate Artefacts trigger one extra time (needs: duplicate detection)",
+  "effect": "Your duplicate Artefacts trigger one extra time",
   "conspiracy": "CERN doomsday lore",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cheyenne-mountain-doorbell",
@@ -2168,9 +2168,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Each Turn, including enemy Turns: your first Artefact trigger is copied and triggers again (needs: artefact echo)",
+  "effect": "Each Turn, including enemy Turns: your first Artefact trigger is copied and triggers again",
   "conspiracy": "The Mona Lisa theft",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bovine-tractor-beam",

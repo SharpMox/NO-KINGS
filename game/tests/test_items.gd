@@ -1921,6 +1921,194 @@ func _init() -> void:
 	agartha_control.queue_free()
 	await process_frame
 
+	# --- issue 21: echo and meta-triggers (ArtefactHooks._run_meta_triggers) ---
+
+	# Polybius Cartridge: a Capture Artefact (Greed) triggers one extra time
+	var poly := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["greed", "polybius-cartridge"]})
+	await process_frame
+	var poly_base: int = poly.defs.pawn.value
+	check(Economy.capture_score(poly, "pawn") == poly_base + 20,
+		"Polybius Cartridge: a Capture Artefact (Greed) triggers an extra time (+10 twice)")
+	poly.queue_free()
+	await process_frame
+
+	# Max Headroom Mask: a Wave Artefact triggers an extra time — both on Wave
+	# clear (Zurich Gnome Figurine, +10% Gold spent) and Wave spawn (Nigerian
+	# Prince Wire Transfer), the same queue() call fires both hooks
+	var headroom := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 100, "score": 0,
+		"artefacts": ["zurich-gnome-figurine", "nigerian-prince-wire-transfer", "max-headroom-mask"]})
+	await process_frame
+	headroom.gold_spent_shop_this_wave = 40
+	WaveLogic.queue(headroom, headroom.wave + 1)
+	check(headroom.score == 200 and headroom.gold == 128,
+		"Max Headroom Mask: doubles a Wave Artefact's trigger on both Wave clear " +
+		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +10/+100 twice, 108+20=128 Gold, 200 Score)")
+	headroom.queue_free()
+	await process_frame
+
+	# Red Diary's Missing Pages: an on_piece_lost Artefact (D.B. Cooper's
+	# Parachute) triggers one extra time
+	var diary := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 4, "gold": 0, "artefacts": ["d-b-cooper-s-parachute", "red-diary-s-missing-pages"]})
+	await process_frame
+	var diary_val: int = diary.defs.pawn.value
+	await diary._run_enemy_actions()
+	check(diary.gold == 2 * roundi(diary_val * 0.75),
+		"Red Diary's Missing Pages: an on_piece_lost Artefact triggers an extra time")
+	diary.queue_free()
+	await process_frame
+
+	# CERN Ctrl+Z Shortcut: a key held 2+ times (two Greeds) gets ONE flat
+	# extra trigger, not one per duplicate; a singly-held key gets none
+	var cern := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["greed", "greed", "cern-ctrl-z-shortcut"]})
+	await process_frame
+	var cern_base: int = cern.defs.pawn.value
+	check(Economy.capture_score(cern, "pawn") == cern_base + 30,
+		"CERN Ctrl+Z Shortcut: two held Greeds (a duplicate) get one flat extra trigger (+10x3, not +10x4)")
+	cern.queue_free()
+	await process_frame
+
+	var cern_single := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["score", "cern-ctrl-z-shortcut"]})
+	await process_frame
+	var cern_single_base: int = cern_single.defs.pawn.value
+	check(Economy.capture_score(cern_single, "pawn") == cern_single_base + 10,
+		"CERN Ctrl+Z Shortcut: a singly-held Artefact (Score) gets no extra trigger")
+	cern_single.queue_free()
+	await process_frame
+
+	# Bilderberg Hotel Slippers: +15 Gold only when 2+ Artefacts actually
+	# fired this call — "fired", not "held" (Score alone never triggers it)
+	var bilder := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["greed", "score", "bilderberg-hotel-slippers"]})
+	await process_frame
+	var bilder_base: int = bilder.defs.pawn.value
+	var bilder_pts := Economy.capture_score(bilder, "pawn")
+	check(bilder_pts == bilder_base + 20 and bilder.gold == 15,
+		"Bilderberg Hotel Slippers: +15 Gold when 2+ of your Artefacts (Greed+Score) trigger on the same event")
+	bilder.queue_free()
+	await process_frame
+
+	var bilder_one := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["score", "bilderberg-hotel-slippers"]})
+	await process_frame
+	Economy.capture_score(bilder_one, "queen") # only Score fires (Greed isn't held)
+	check(bilder_one.gold == 0, "Bilderberg Hotel Slippers: no bonus when only one Artefact triggers")
+	bilder_one.queue_free()
+	await process_frame
+
+	# Illuminati: NWO Booster Pack: +2 Gold/+20 Score per Capture Artefact
+	# trigger this call, scaling with how many actually fired
+	var nwo := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["greed", "illuminati-nwo-booster-pack"]})
+	await process_frame
+	var nwo_base: int = nwo.defs.pawn.value
+	var nwo_pts := Economy.capture_score(nwo, "pawn")
+	check(nwo_pts == nwo_base + 10 and nwo.gold == 2 and nwo.score == 20,
+		"Illuminati: NWO Booster Pack: +2 Gold/+20 Score when one Capture Artefact triggers (Greed)")
+	nwo.queue_free()
+	await process_frame
+
+	var nwo2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["greed", "score", "illuminati-nwo-booster-pack"]})
+	await process_frame
+	Economy.capture_score(nwo2, "pawn") # Greed + Score both fire on_capture: 2 triggers
+	check(nwo2.gold == 4 and nwo2.score == 40,
+		"Illuminati: NWO Booster Pack: scales with the number of Capture Artefact triggers (2 -> double)")
+	nwo2.queue_free()
+	await process_frame
+
+	# 100% Genuine Original Mona Lisa: only the Turn's FIRST Artefact trigger
+	# (any hook) is echoed, including a fresh echo when the enemy Turn begins
+	var mona := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["greed", "100-genuine-original-mona-lisa"]})
+	await process_frame
+	var mona_base: int = mona.defs.pawn.value
+	check(Economy.capture_score(mona, "pawn") == mona_base + 20,
+		"100% Genuine Original Mona Lisa: the first Artefact trigger of the Turn (Greed) is echoed")
+	check(Economy.capture_score(mona, "pawn") == mona_base + 10,
+		"100% Genuine Original Mona Lisa: only the FIRST trigger of the Turn echoes, not every later one")
+	mona.queue_free()
+	await process_frame
+
+	var mona_enemy := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
+		"wave": 4, "gold": 0,
+		"artefacts": ["greed", "d-b-cooper-s-parachute", "100-genuine-original-mona-lisa"]})
+	await process_frame
+	var mona_enemy_val: int = mona_enemy.defs.pawn.value
+	Economy.capture_score(mona_enemy, "pawn") # consumes this player Turn's echo via Greed
+	await mona_enemy._run_enemy_actions() # on_enemy_turn_start resets the flag for a fresh echo
+	check(mona_enemy.gold == 2 * roundi(mona_enemy_val * 0.75),
+		"100% Genuine Original Mona Lisa: on_enemy_turn_start resets the echo — the enemy Turn " +
+		"gets its own first-trigger echo even after the player Turn already used one")
+	mona_enemy.queue_free()
+	await process_frame
+
+	# Déjà Vu Glitch: only the Turn's first Score/Gold gain is doubled (per
+	# copy: N copies -> (1+N)x), later gains the same Turn are untouched
+	var dejavu := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["deja-vu-glitch", "deja-vu-glitch"]})
+	await process_frame
+	Economy.earn(dejavu, 100)
+	check(dejavu.score == 300 and dejavu.gold == 300,
+		"Déjà Vu Glitch: two held copies triple (not double) the Turn's first Score/Gold gain")
+	Economy.earn(dejavu, 50)
+	check(dejavu.score == 350 and dejavu.gold == 350,
+		"Déjà Vu Glitch: only the Turn's FIRST Score/Gold gain doubles — later gains are untouched")
+	dejavu.queue_free()
+	await process_frame
+
+	# Capstone Polish: +150 Score / +5s Clock on acquiring an Artefact
+	var capstone := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 9999, "score": 0, "artefacts": ["capstone-polish"]})
+	await process_frame
+	var capstone_clock0: float = capstone.clock_ms
+	for i in capstone.shop_stock.size():
+		if capstone.shop_stock[i].kind == "artefact":
+			Shop.buy(capstone, i)
+			break
+	check(capstone.score == 150 and capstone.clock_ms == capstone_clock0 + 5000,
+		"Capstone Polish: +150 Score and +5s Clock on acquiring an Artefact")
+	capstone.queue_free()
+	await process_frame
+
+	# --- the risky one: two echo artefacts (Polybius + CERN, both hooked to
+	# on_capture) plus a percentage Artefact (Tinfoil Hat) on the resulting
+	# gain — must be a single deterministic bounded number, not an infinite
+	# loop, and identical regardless of REGISTRY-array insertion order.
+	# Held: Greed x2 (the Capture Artefact being echoed, also CERN's
+	# duplicate) + Polybius (+1 extra trigger PER fired Greed = +2) + CERN
+	# (+1 flat extra trigger for the duplicated key = +1) -> 5 total Greed
+	# dispatches (2 main + 2 Polybius + 1 CERN), pts = base + 50. Then
+	# Tinfoil Hat's +15%/-5% applies once, off that same immutable base.
+	var order_1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0,
+		"artefacts": ["greed", "greed", "polybius-cartridge", "cern-ctrl-z-shortcut", "tinfoil-hat"]})
+	await process_frame
+	var order_2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0,
+		"artefacts": ["tinfoil-hat", "greed", "cern-ctrl-z-shortcut", "greed", "polybius-cartridge"]})
+	await process_frame
+	var risky_base: int = order_1.defs.pawn.value
+	var pts_1 := Economy.capture_score(order_1, "pawn")
+	var pts_2 := Economy.capture_score(order_2, "pawn")
+	check(pts_1 == risky_base + 50 and pts_2 == risky_base + 50,
+		"two echo Artefacts stacked on the same Capture Artefact stay bounded at a fixed, computed " +
+		"total (2 main + 2 Polybius + 1 CERN = 5 Greed dispatches), not a hang and not runaway growth")
+	check(pts_1 == pts_2, "the same held keys in a different acquisition order give the same result")
+	Economy.earn(order_1, pts_1)
+	Economy.earn(order_2, pts_2)
+	check(order_1.score == roundi(pts_1 * 1.15) and order_1.gold == roundi(pts_1 * 0.95),
+		"Tinfoil Hat's percentage still applies once, off the echoed capture's own immutable base")
+	check(order_1.score == order_2.score and order_1.gold == order_2.gold,
+		"the full capture+earn pipeline stays order-independent with two echo Artefacts stacked")
+	order_1.queue_free()
+	order_2.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

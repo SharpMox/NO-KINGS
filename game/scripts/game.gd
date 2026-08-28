@@ -137,6 +137,15 @@ var mrna_apply_count := 0 # mRNA Firmware Update: Piece Buffs applied to your
 	# pieces so far — every 3rd also Ranks Up (artefact hook 23)
 var youth_fountain_wave := -1 # Youth Fountain Martini: wave its one free
 	# buff-consume re-apply already fired this Wave, -1 = not yet (hook 23)
+var artefact_echo_depth := 0 # ArtefactHooks re-entrancy guard (artefact hook 21):
+	# >0 while the meta/echo pass itself is running, so a handler that somehow
+	# re-entered ArtefactHooks.run() could never trigger a second echo pass
+var mona_lisa_turn_done := false # 100% Genuine Original Mona Lisa: this Turn's
+	# (player or enemy) first Artefact trigger already echoed; reset in
+	# ArtefactHooks.run() at on_turn_start/on_enemy_turn_start
+var dejavu_score_turn_done := false # Déjà Vu Glitch: this Turn's first Score
+	# gain already doubled; reset in ArtefactHooks.run() at on_turn_start
+var dejavu_gold_turn_done := false # same idea, first Gold gain each Turn
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:

@@ -630,6 +630,91 @@ func _init() -> void:
 	await process_frame
 	check(not game.tariff_panel.visible, "tariff overlay closes")
 
+	# Arrow Planning: decorative-only drawing mode (gdd-gaps/10) — toggle,
+	# draw, clear-one (redraw), Clear-all, lifetime clears at turn end
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Arrows"), "Arrows button clickable")
+	await process_frame
+	check(game.arrow_mode, "Arrows toggles arrow mode on")
+	var qpx2: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
+	_click(qpx2)
+	await process_frame
+	check(game.selected == Vector2i(-1, -1), "arrow mode stops board taps from selecting")
+
+	var a_to: Vector2 = game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2
+	var a_press := InputEventMouseButton.new()
+	a_press.button_index = MOUSE_BUTTON_LEFT
+	a_press.pressed = true
+	a_press.position = qpx2
+	a_press.global_position = qpx2
+	var a_motion := InputEventMouseMotion.new()
+	a_motion.position = a_to
+	a_motion.global_position = a_to
+	var a_release := InputEventMouseButton.new()
+	a_release.button_index = MOUSE_BUTTON_LEFT
+	a_release.pressed = false
+	a_release.position = a_to
+	a_release.global_position = a_to
+
+	root.push_input(a_press.duplicate())
+	await process_frame
+	root.push_input(a_motion.duplicate())
+	await process_frame
+	root.push_input(a_release.duplicate())
+	await process_frame
+	check(game.arrows.size() == 1 and game.arrows[0].from == Vector2i(2, 2)
+			and game.arrows[0].to == Vector2i(4, 4),
+		"dragging on the board draws an arrow")
+	check(not game.board.has(Vector2i(4, 4)) and game.selected == Vector2i(-1, -1),
+		"arrow drawing never places, moves or selects anything")
+
+	root.push_input(a_press.duplicate())
+	await process_frame
+	root.push_input(a_motion.duplicate())
+	await process_frame
+	root.push_input(a_release.duplicate())
+	await process_frame
+	check(game.arrows.is_empty(), "redrawing the same arrow clears it (clear-one)")
+
+	root.push_input(a_press.duplicate())
+	await process_frame
+	root.push_input(a_motion.duplicate())
+	await process_frame
+	root.push_input(a_release.duplicate())
+	await process_frame
+	check(game.arrows.size() == 1, "a fresh arrow can be redrawn")
+	check(await _click_button_in(game.hud, "Clear"), "Clear button clickable")
+	await process_frame
+	check(game.arrows.is_empty(), "Clear removes every arrow")
+
+	check(await _click_button_in(game.hud, "Arrows"), "Arrows button toggles off")
+	await process_frame
+	check(not game.arrow_mode, "arrow mode is off again")
+	_click(qpx2)
+	await process_frame
+	check(game.selected == Vector2i(2, 2), "board taps select pieces again once arrow mode is off")
+	_click(qpx2) # deselect before the lifetime check below
+	await process_frame
+
+	check(await _click_button_in(game.hud, "Arrows"), "Arrows re-enabled")
+	await process_frame
+	root.push_input(a_press.duplicate())
+	await process_frame
+	root.push_input(a_motion.duplicate())
+	await process_frame
+	root.push_input(a_release.duplicate())
+	await process_frame
+	check(game.arrows.size() == 1, "an arrow exists before PASS")
+	_click(game.pass_button.get_global_rect().get_center())
+	await _await_player_turn(game)
+	check(game.arrows.is_empty(), "arrows clear at turn end (scratchpad, never saved)")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

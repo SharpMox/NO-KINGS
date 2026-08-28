@@ -26,6 +26,8 @@ signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
 signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
+signal arrow_toggle_pressed
+signal arrow_clear_pressed
 
 var g # the Game node — read-only from here; mutations go up via signals
 
@@ -39,6 +41,8 @@ var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
 var tariff_button := Button.new() # top-row tariff count; opens the overlay
+var arrow_button := Button.new() # Arrow Planning: toggles decorative drawing mode
+var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
@@ -72,6 +76,10 @@ func build(game) -> void:
 	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	tariff_button.pressed.connect(func() -> void: tariff_pressed.emit())
 	top.add_child(tariff_button)
+	arrow_button.text = "Arrows"
+	arrow_button.add_theme_font_size_override("font_size", 13)
+	arrow_button.pressed.connect(func() -> void: arrow_toggle_pressed.emit())
+	top.add_child(arrow_button)
 
 	var menu_btn := Button.new()
 	menu_btn.text = "☰"
@@ -79,7 +87,7 @@ func build(game) -> void:
 	menu_btn.position = Vector2(vp.x - 34, 3)
 	# both top-row buttons get flat compact styling so they fit inside the
 	# top strip without overflowing onto the board (2026-07-08)
-	for b: Button in [tariff_button, menu_btn]:
+	for b: Button in [tariff_button, arrow_button, menu_btn]:
 		var compact := StyleBoxFlat.new()
 		compact.bg_color = Color(0.22, 0.22, 0.26)
 		compact.set_corner_radius_all(4)
@@ -135,6 +143,15 @@ func build(game) -> void:
 	multi_confirm_btn.visible = false
 	multi_confirm_btn.pressed.connect(func() -> void: multi_confirm_pressed.emit())
 	add_child(multi_confirm_btn)
+	# floating Clear-all for Arrow Planning: only worth showing while the mode
+	# is on (top bar has no room to spare — money-and-shop already fills it)
+	arrow_clear_button.text = "Clear"
+	arrow_clear_button.add_theme_font_size_override("font_size", 17)
+	arrow_clear_button.position = Vector2(vp.x / 2 - 70, vp.y - 96)
+	arrow_clear_button.custom_minimum_size = Vector2(140, 40)
+	arrow_clear_button.visible = false
+	arrow_clear_button.pressed.connect(func() -> void: arrow_clear_pressed.emit())
+	add_child(arrow_clear_button)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
 	# self_modulate: the red tint must not bleed into the blue counter child
@@ -282,6 +299,9 @@ func refresh() -> void:
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
 	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
 		+ ("·off" if g.tariffs_suppressed else "")
+	# armed-placement tint (2026-07-07 palette) marks the toggle as active
+	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
+	arrow_clear_button.visible = g.arrow_mode
 	multi_confirm_btn.visible = g.item_active >= 0 and not g.item_selected.is_empty() \
 		and g.items[g.item_active].target == "multi"
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()

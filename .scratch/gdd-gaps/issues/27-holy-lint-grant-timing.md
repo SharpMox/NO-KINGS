@@ -1,6 +1,6 @@
 # 27 — Holy Lint's grant is eaten by its own capture
 
-Status: todo (design question)
+Status: done (2026-08-28)
 
 ## Parent
 
@@ -39,6 +39,29 @@ Two defensible readings, and picking one is a design call:
 
 Reading 2 looks better, but it changes ordering inside `_move_player`, which several
 Piece Buffs and artefacts now depend on — so it wants a deliberate pass, not a patch.
+
+## Outcome (2026-08-28)
+
+Both halves resolved by the user, then implemented in `fix/artefact-rulings`.
+
+**Ruling 1 — `slow` is excluded from RANDOM grants.** The deeper problem turned out not to
+be the timing at all: `slow` is a *debuff* (the piece moves and captures like a Pawn), so an
+artefact reading "+1 Piece Buff" could actively penalise the player's own piece. It is now
+flagged `self_harming` in the catalog and filtered out of random grants across every
+grant-on-capture artefact. `smog` stays — it debuffs *adjacent enemies*, so it is a genuine
+buff for its holder. The Buff Box's player-chosen sub-pick still offers everything, because
+choosing Slow deliberately (onto an enemy) is legitimate.
+
+**Ruling 2 — the grant lands after the capture.** Reading 2 from below. Grant-on-capture
+artefacts now append to a `ctx.grant_buffs` output list which `_move_player` applies *after*
+the critical/range consumption block, so the buff is banked for the next capture. User's
+framing: "it really works as a reward."
+
+**Correction to this issue's original diagnosis.** It claimed ~17% of rolls "do nothing".
+Re-reading the code showed that was imprecise: `capture_multiplier` is evaluated *after*
+`capture_score` in the same expression, so a rolled `critical` was doubling the current
+capture rather than being wasted. Only `range` was genuinely inert. The real defect was the
+`slow` case nobody had named.
 
 ## Acceptance criteria
 

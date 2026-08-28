@@ -7,6 +7,7 @@ const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
+const CloudSave := preload("res://scripts/cloud_save.gd")
 
 static var window_sized := false # once per launch, not on every return to menu
 
@@ -38,6 +39,12 @@ func _ready() -> void:
 	if args.has("--autoplay") or args.has("--scenario"):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
 		return
+	# pull the cloud mirror before deciding what's on disk (12): a no-op on
+	# desktop today, but on iOS/Android (once the native plugin lands) this
+	# is what makes a fresh install offer "Continue" from another device.
+	CloudSave.sync_file("run", GameScript.SAVE_PATH)
+	CloudSave.sync_file("scores", GameScript.SCORES_PATH)
+	CloudSave.sync_file("history", GameScript.HISTORY_PATH)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)

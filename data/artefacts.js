@@ -37,6 +37,12 @@
    real Box kind, Zeta Reticuli's multi-site capture redirect, every artefact
    needing brand-new player-facing UI). 27 Club Punch Card's -50 Score penalty
    re-texted to Gold, same issue-16 ruling as Social Credit Report Card.
+   2026-08-28 (issue 31): 3 capture-context artefacts flipped to
+   implemented: true (Curtain Rods Bag, Templar Debit Card, $2.3 Trillion
+   Receipt) — see game/scripts/artefact_hooks.gd's header and
+   .scratch/gdd-gaps/issues/31's Outcome. Dark Market Light Bulb stays
+   unimplemented: its "Demoted" clause is undefined, a Notion question, not
+   a guess.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -152,7 +158,7 @@ var ARTEFACTS = [
     effect: "On Wave start: +100 Score, +10 Gold, and -3s Clock",
     conspiracy: "The advance-fee scam", url: "https://en.wikipedia.org/wiki/Advance-fee_scam",
     summary: "A deposed prince needs only your account details to move his fortune — a scam so old it predates email by two centuries as the 'Spanish Prisoner'. It pays out up front and collects forever, which is exactly this artefact." },
-  { name: "Curtain Rods Bag (Rifle-Shaped)", rarity: "Common", type: "Trigger", bonus: ["Score"], status: "KEEP",
+  { name: "Curtain Rods Bag (Rifle-Shaped)", rarity: "Common", type: "Trigger", bonus: ["Score"], status: "KEEP", implemented: true,
     effect: "On your first Capture each Wave: double Score, but it pays no Gold",
     conspiracy: "JFK assassination theories", url: "https://en.wikipedia.org/wiki/John_F._Kennedy_assassination_conspiracy_theories",
     summary: "Oswald carried a long paper package into the Book Depository that morning and told his coworker it was curtain rods. The quotation marks have carried sixty years of doubt." },
@@ -466,7 +472,7 @@ var ARTEFACTS = [
     effect: "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects (needs: buff protection)",
     conspiracy: "The Antikythera mechanism", url: "https://en.wikipedia.org/wiki/Antikythera_mechanism",
     summary: "A corroded lump from a Greek shipwreck that turned out to be a 2,000-year-old geared astronomical computer — technology with no known peer for a millennium after. The favorite exhibit of every lost-knowledge theory." },
-  { name: "$2.3 Trillion Receipt", rarity: "Rare", type: "Passive", bonus: ["Score","Gold"], status: "KEEP",
+  { name: "$2.3 Trillion Receipt", rarity: "Rare", type: "Passive", bonus: ["Score","Gold"], status: "KEEP", implemented: true,
     effect: "Enemies destroyed by Items award their Score and Gold value (needs: destroy-score hook)",
     conspiracy: "The missing trillions", url: "https://en.wikipedia.org/wiki/Military_budget_of_the_United_States",
     summary: "On September 10, 2001, Rumsfeld said the Pentagon could not track $2.3 trillion in transactions. The next day buried the story — and birthed a theory that the accounting office was precisely what got hit." },
@@ -750,7 +756,7 @@ var ARTEFACTS = [
     effect: "Once per Wave: you may repeat your previous Action without spending an Action (needs: action replay)",
     conspiracy: "The Zapruder film", url: "https://en.wikipedia.org/wiki/Zapruder_film",
     summary: "26 seconds of home movie that became the most analyzed film in history — run back frame by frame for sixty years. The director's cut includes one extra take per showing." },
-  { name: "Templar Debit Card", rarity: "Legendary", type: "Passive", bonus: ["Shop","Special"], status: "KEEP",
+  { name: "Templar Debit Card", rarity: "Legendary", type: "Passive", bonus: ["Shop","Special"], status: "KEEP", implemented: true,
     effect: "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
     conspiracy: "The Knights Templar", url: "https://en.wikipedia.org/wiki/Knights_Templar",
     summary: "Real history: the Templars invented proto-banking — deposit in Paris, present your letter, withdraw in Jerusalem, centuries before anyone said wire transfer. The card still works, and it takes your other currency." },

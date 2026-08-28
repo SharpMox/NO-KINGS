@@ -209,7 +209,8 @@ const PURCHASABLE := ["piece", "item", "artefact", "box"]
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
-			and g.actions_left >= 1 and g.gold + _credit(g) >= price(g, slot)
+			and g.actions_left >= 1 \
+			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot)
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold
@@ -223,6 +224,18 @@ static func _credit(g) -> int:
 	return 0
 
 
+## Templar Debit Card (issue 31): "pay Shop costs with Score, 10 Score per 1
+## Gold" — same shape as _credit above (a standing rule read directly off
+## g.artefacts, not a hook). Gold-equivalent of the held Score, floored;
+## can_buy() adds it to the funds check, buy() spends the Gold-uncovered
+## remainder of a purchase as Score.
+static func _score_credit(g) -> int:
+	for t in g.artefacts:
+		if t.key == "templar-debit-card":
+			return g.score / 10 # int division floors
+	return 0
+
+
 ## Debit gold + 1 action, mark the slot SOLD, grant the good; returns
 ## whether the purchase happened. Buying never ends the turn (a purchase is
 ## not a board action). A bought box grants nothing here — the caller opens
@@ -233,9 +246,17 @@ static func buy(g, index: int) -> bool:
 		return false
 	var cost := price(g, slot)
 	var before: int = g.gold
-	g.gold = maxi(g.gold - cost, -_credit(g)) # Economy.spend_gold would cycle
-		# back through this file (economy.gd preloads Shop), so this inlines
-		# the same debit + on_gold_zero dispatch it does — see there.
+	var gold_floor := -_credit(g)
+	var gold_pay: int = mini(cost, maxi(g.gold - gold_floor, 0))
+	g.gold -= gold_pay # Economy.spend_gold would cycle back through this file
+		# (economy.gd preloads Shop), so this inlines the same debit +
+		# on_gold_zero dispatch it does — see there.
+	var score_pay := cost - gold_pay # Templar Debit Card (issue 31): whatever
+		# Gold (+ Agartha's credit line) can't cover pays as Score, 10:1 —
+		# only nonzero when the card is held, since can_buy() only admits
+		# this purchase by counting _score_credit(g) into the funds check.
+	if score_pay > 0:
+		g.score -= score_pay * 10
 	if before > 0 and g.gold == 0:
 		ArtefactHooks.run(g, "on_gold_zero", {}) # Zero-Point Energy Drink (26)
 	g.actions_left -= 1

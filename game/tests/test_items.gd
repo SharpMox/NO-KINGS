@@ -642,29 +642,31 @@ func _init() -> void:
 	tinfoil.queue_free()
 	await process_frame
 
-	# Tungsten-Filled Gold Bar: Gold gains also add 2x their amount as Score
+	# Tungsten-Filled Gold Bar: +20% Score gain (rebalanced 2026-08-28 — was
+	# "2x their amount as Score", an unconditional 3x Score multiplier since
+	# Gold is earned 1:1 with Score, wildly out of scale with the catalog)
 	var tungsten := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["tungsten-filled-gold-bar"]})
 	await process_frame
 	Economy.earn(tungsten, 100)
 	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
-	check(tungsten.score == 300, "Tungsten-Filled Gold Bar: +100 base, +200 (2x the Gold) Score")
+	check(tungsten.score == 120, "Tungsten-Filled Gold Bar: +100 base, +20 (20% of the Gold) Score")
 	tungsten.queue_free()
 	await process_frame
 
 	# --- issue 20 regression: the slice 20 fleet sweep caught Tungsten-Filled
-	# Gold Bar + Popemobile Piggy Bank as a degenerate pair (score ~11-13x an
-	# organic baseline) because both wrote g.score straight from inside their
-	# on_gold_change dispatch instead of through Economy.earn's ctx.score_bonus
-	# channel — held together, held score should be the plain additive sum
-	# of each one's own bonus (2x + 10x), not doubled or compounded
+	# Gold Bar + Popemobile Piggy Bank as a degenerate pair because both wrote
+	# g.score straight from inside their on_gold_change dispatch instead of
+	# through Economy.earn's ctx.score_bonus channel — held together, held
+	# score should be the plain additive sum of each one's own bonus (20% +
+	# 50%, rebalanced 2026-08-28 — was 2x + 10x), not doubled or compounded
 	var tungsten_pope := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["tungsten-filled-gold-bar", "popemobile-piggy-bank"]})
 	await process_frame
 	Economy.earn(tungsten_pope, 100)
 	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
-	check(tungsten_pope.score == 100 + 200 + 1000,
-		"Tungsten (+200, 2x) and Popemobile (+1000, 10x) add on top of the +100 base — the correct sum, not doubled")
+	check(tungsten_pope.score == 100 + 20 + 50,
+		"Tungsten (+20, 20%) and Popemobile (+50, 50%) add on top of the +100 base — the correct sum, not doubled")
 	tungsten_pope.queue_free()
 	await process_frame
 

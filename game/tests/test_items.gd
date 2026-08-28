@@ -377,6 +377,79 @@ func _init() -> void:
 	rj.queue_free()
 	await process_frame
 
+	# --- slice 04, timed model: "reduced movement range" = moves and captures
+	# like a Pawn (user ruling 2026-08-28), and timed buffs age one player turn
+	# an enemy sits on the diagonal: capture-mode destinations only list squares
+	# that actually hold an enemy (Rules._add_dest)
+	var sl := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 3],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	var full: int = Rules.moves_for(sl.board, Vector2i(2, 2), sl.defs).size()
+	BuffLogic.add(sl.board[Vector2i(2, 2)], "slow", 1)
+	var slowed: Array = Rules.moves_for(sl.board, Vector2i(2, 2), sl.defs)
+	check(slowed.size() < full, "Slow cuts the queen down from her full move set")
+	check(slowed.has(Vector2i(2, 3)) and not slowed.has(Vector2i(2, 5)),
+		"a slowed piece steps one square forward, like a Pawn")
+	check(Rules.moves_for(sl.board, Vector2i(2, 2), sl.defs, "capture").has(Vector2i(3, 3)),
+		"a slowed piece captures one square diagonally forward, like a Pawn")
+	sl._begin_player_turn()
+	check(Rules.moves_for(sl.board, Vector2i(2, 2), sl.defs).size() == full,
+		"Slow expires after one player turn and the queen is whole again")
+	sl.queue_free()
+	await process_frame
+
+	# Smog projects the same Pawn downgrade onto ADJACENT ENEMIES only
+	var sm := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 3, 3],
+		["rook", 1, 7, 7], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	var far_moves: int = Rules.moves_for(sm.board, Vector2i(7, 7), sm.defs).size()
+	BuffLogic.add(sm.board[Vector2i(2, 2)], "smog", 2)
+	check(Rules.moves_for(sm.board, Vector2i(3, 3), sm.defs).size() < far_moves,
+		"Smog downgrades the adjacent enemy")
+	check(Rules.moves_for(sm.board, Vector2i(7, 7), sm.defs).size() == far_moves,
+		"a distant enemy is untouched")
+	check(Rules.moves_for(sm.board, Vector2i(2, 2), sm.defs).size() > 4,
+		"Smog does not debuff its own carrier")
+	sm._begin_player_turn()
+	check(Rules.moves_for(sm.board, Vector2i(3, 3), sm.defs).size() < far_moves,
+		"Smog still runs on its second player turn")
+	sm._begin_player_turn()
+	check(not BuffLogic.has(sm.board[Vector2i(2, 2)], "smog"),
+		"Smog expires after two player turns")
+	check(Rules.moves_for(sm.board, Vector2i(3, 3), sm.defs).size() > 4,
+		"the formerly smogged enemy moves freely again")
+	sm.queue_free()
+	await process_frame
+
+	# Aura doubles captures for ADJACENT ALLIES, not for its own carrier
+	var au := _boot({"board": [["queen", 0, 2, 2], ["knight", 0, 3, 3],
+		["rook", 1, 3, 5], ["rook", 1, 2, 5], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	au.actions_left = 9
+	check(BuffLogic.capture_multiplier(au.board, Vector2i(3, 3)) == 1, "no aura, no bonus")
+	BuffLogic.add(au.board[Vector2i(2, 2)], "aura", 2)
+	check(BuffLogic.capture_multiplier(au.board, Vector2i(3, 3)) == 2,
+		"an ally beside the Aura carrier scores double")
+	check(BuffLogic.capture_multiplier(au.board, Vector2i(2, 2)) == 1,
+		"the Aura carrier itself gets no bonus")
+	au.queue_free()
+	await process_frame
+
+	# Reflect: the attempt is stopped AND the attacker dies on its own tile
+	var rf := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	rf.actions_left = 5
+	BuffLogic.add(rf.board[Vector2i(2, 5)], "reflect")
+	rf._move_player(Vector2i(2, 2), Vector2i(2, 5))
+	check(not rf.board.has(Vector2i(2, 5)), "the reflecting piece vacates its tile")
+	check(rf.board.has(Vector2i(2, 2)) and rf.board[Vector2i(2, 2)].id == "rook"
+			and rf.board[Vector2i(2, 2)].owner == 1,
+		"Reflect kills the attacker and takes its tile")
+	check(not BuffLogic.has(rf.board[Vector2i(2, 2)], "reflect"), "Reflect is consumed")
+	rf.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

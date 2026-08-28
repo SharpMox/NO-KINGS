@@ -423,6 +423,8 @@ func _begin_player_turn() -> void:
 	actions_max = actions_left
 	moved_this_turn.clear()
 	turn_action_count = 0
+	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
+		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		WaveLogic.queue(self, wave + 1)
@@ -479,9 +481,18 @@ func _run_enemy_actions() -> void:
 		if not autoplay:
 			await get_tree().create_timer(0.35).timeout
 		if board.has(act.to) and BuffLogic.repels_capture(board[act.to]):
-			# Shield works against the AI too: the attempt is spent, nothing moves
-			BuffLogic.consume(board[act.to], "shield")
-			_add_float(act.to, "Blocked", COL_MERGE)
+			# Shield works against the AI too: the attempt is spent, nothing
+			# moves. Reflect kills the attacker and takes its tile.
+			if BuffLogic.reflects_capture(board[act.to]):
+				BuffLogic.consume(board[act.to], "reflect")
+				_add_float(act.from, "Reflected!", COL_CAPTURE)
+				lost_enemy += 1
+				_add_pop(act.from)
+				board[act.from] = board[act.to]
+				board.erase(act.to)
+			else:
+				BuffLogic.consume(board[act.to], "shield")
+				_add_float(act.to, "Blocked", COL_MERGE)
 			queue_redraw()
 			continue
 		if board.has(act.to):
@@ -901,8 +912,17 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
 		# GDD Pieces & Movement: a repelled attacker returns to its starting
 		# tile and nothing is captured. The attempt still costs the action.
-		BuffLogic.consume(board[to], "shield")
-		_add_float(to, "Blocked", COL_MERGE)
+		# Reflect goes further — the defender takes the attacker's tile.
+		if BuffLogic.reflects_capture(board[to]):
+			BuffLogic.consume(board[to], "reflect")
+			_add_float(from, "Reflected!", COL_CAPTURE)
+			lost_player += 1
+			_add_pop(from)
+			board[from] = board[to] # the defender counter-attacks into the tile
+			board.erase(to)
+		else:
+			BuffLogic.consume(board[to], "shield")
+			_add_float(to, "Blocked", COL_MERGE)
 		Economy.charge(self, "move_cost")
 		actions_left -= 1
 		turn_action_count += 1
@@ -914,7 +934,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if board.has(to): # capture
 		var victim: Dictionary = board[to]
 		Economy.earn(self, Economy.capture_score(self, victim.id)
-			* BuffLogic.capture_multiplier(board[from]))
+			* BuffLogic.capture_multiplier(board, from))
 		if BuffLogic.has(board[from], "critical"):
 			BuffLogic.consume(board[from], "critical")
 			_add_float(to, "Critical!", COL_MERGE)
@@ -1112,6 +1132,14 @@ func _open_buff_pick() -> void:
 	modals.show_buff_pick(offer)
 
 
+## Catalogued life of a timed buff, in player turns (0 = dormant).
+func _buff_turns(key: String) -> int:
+	for b in Items.PIECE_BUFFS:
+		if b.key == key:
+			return int(b.get("turns", 0))
+	return 0
+
+
 func _buff_chosen(key: String) -> void:
 	buff_pick_open = false
 	modals.hide_buff_pick()
@@ -1217,7 +1245,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[b].erase("buff")
 			BuffLogic.clear(board[b])
 		"buff_box":
-			BuffLogic.add(board[b], _buff_pick)
+			BuffLogic.add(board[b], _buff_pick, _buff_turns(_buff_pick))
 			_add_float(b, BuffLogic.name_of(_buff_pick), COL_MERGE)
 			_buff_pick = ""
 		"demote":

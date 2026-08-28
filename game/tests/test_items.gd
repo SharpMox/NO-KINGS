@@ -262,7 +262,7 @@ func _init() -> void:
 		"Demote drops the id to base but the peak-rank stamp survives")
 	check(ArtefactHooks._demoted(dmlb.defs, demoted_piece),
 		"below its own peak rank: Demoted")
-	Economy.capture_score(dmlb, "knight", "pawn", false, Vector2i(3, 2)) # attacker unranked: no Gold bonus
+	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(3, 2)) # attacker unranked: no Gold bonus
 	check(dmlb.last_capture_ctx.pts == 0,
 		"Dark Market Light Bulb: Demoted attacker gives no Score on Capture")
 	check(dmlb.gold == 0, "Dark Market Light Bulb: an unranked (not just Demoted) attacker gets no Gold bonus")
@@ -273,7 +273,7 @@ func _init() -> void:
 	var reranked_piece: Dictionary = dmlb.board[Vector2i(3, 2)]
 	check(not ArtefactHooks._demoted(dmlb.defs, reranked_piece),
 		"re-promoting past the old peak clears Demoted (ruled option b, not \"was ever demoted\")")
-	Economy.capture_score(dmlb, "knight", "sergeant", false, Vector2i(3, 2))
+	Economy.capture_score(dmlb, "pawn", "sergeant", false, Vector2i(3, 2))
 	check(dmlb.gold == dmlb_pawn_val, "Dark Market Light Bulb: a Ranked attacker gives double Gold on Capture")
 	check(dmlb.last_capture_ctx.pts == dmlb_pawn_val,
 		"Dark Market Light Bulb: Score is untouched once Demoted has cleared")

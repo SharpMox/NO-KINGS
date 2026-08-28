@@ -76,6 +76,8 @@ const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)
 const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
+const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
+	# outside the blue/red side palette — decorative, not player or enemy state
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
@@ -126,6 +128,11 @@ var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var drag_moved := false # the pointer left the origin tile (tap vs aborted drag)
 var drag_reselect := false # the pressed piece was already selected (re-click)
+# Arrow Planning (Notion): purely decorative — never read by rules/AI. A
+# scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
+var arrow_mode := false # while on, board drags draw arrows instead of selecting
+var arrows: Array[Dictionary] = [] # {from: Vector2i, to: Vector2i}
+var arrow_from := Vector2i(-1, -1) # arrow drag in progress
 var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
 var pool_click_ms := 0
 var pool_drag_id := "" # stock piece mid-drag from the strip (game-feel pass)
@@ -369,9 +376,31 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 
 
 
+## Arrow Planning: a button toggle, guarded like the other HUD actions that
+## must not fire mid-modal or mid-item-target (item targeting owns board taps).
+func _on_arrow_toggle() -> void:
+	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
+			or preview_open or game_menu_open or win_open or item_active >= 0:
+		return
+	arrow_mode = not arrow_mode
+	arrow_from = Vector2i(-1, -1)
+	if arrow_mode: # entering the mode drops any selection/armed placement —
+		placing_id = ""    # the board stops selecting pieces while it's on
+		placing_cap = false
+		_clear_selection()
+	_refresh()
+
+
+func _on_arrow_clear() -> void:
+	arrows.clear()
+	queue_redraw()
+
+
 func _on_pass() -> void:
 	if box_open or buff_pick_open or game_menu_open or win_open:
 		return
+	arrows.clear() # scratchpad: never survives past the turn it was drawn in
+	queue_redraw()
 	if state == State.SETUP:
 		if hud.drawer_open != "": # setup done: full board for the run
 			_set_drawer("")
@@ -807,7 +836,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
+		arrow_from = Vector2i(-1, -1)
 		return
+	if arrow_mode and item_active < 0: # item targeting still owns board taps
+		return _arrow_input(event)
 	if event is InputEventMouseMotion:
 		if drag_from.x >= 0:
 			if _tile_at(event.position) != drag_from:
@@ -888,6 +920,35 @@ func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color) -> void:
 	var side := Vector2(-dir.y, dir.x)
 	draw_colored_polygon(PackedVector2Array([to_px,
 		to_px - dir * 14.0 + side * 8.0, to_px - dir * 14.0 - side * 8.0]), col)
+
+
+## Arrow Planning: drag draws a decorative arrow; redrawing the same one
+## removes it (clear-one). Purely visual — never reaches rules/AI/legality.
+func _arrow_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		if arrow_from.x >= 0:
+			queue_redraw() # ghost line follows the pointer
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var at := _tile_at(event.position)
+		if event.pressed:
+			arrow_from = at
+		elif arrow_from.x >= 0:
+			var from := arrow_from
+			arrow_from = Vector2i(-1, -1)
+			if at.x >= 0 and at != from:
+				var idx := _arrow_index(from, at)
+				if idx >= 0:
+					arrows.remove_at(idx) # redrawing an existing arrow clears it
+				else:
+					arrows.append({"from": from, "to": at})
+			queue_redraw()
+
+
+func _arrow_index(from: Vector2i, to: Vector2i) -> int:
+	for i in arrows.size():
+		if arrows[i].from == from and arrows[i].to == to:
+			return i
+	return -1
 
 
 func _tile_at(screen: Vector2) -> Vector2i:
@@ -1618,6 +1679,15 @@ func _draw() -> void:
 	if pool_drag_id != "" and textures.has(pool_drag_id): # stock drag ghost
 		draw_texture_rect(piece_tex(pool_drag_id),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
+	# Arrow Planning: drawn last so the decorative overlay always sits on top;
+	# arrows persist independent of arrow_mode (toggling off just stops adding
+	# more) and are cleared at turn end (scratchpad, never saved)
+	for a in arrows:
+		_draw_move_arrow(_tile_px(a.from) + half, _tile_px(a.to) + half, COL_ARROW)
+	if arrow_from.x >= 0:
+		var arrow_cur := _tile_at(get_global_mouse_position())
+		if arrow_cur.x >= 0 and arrow_cur != arrow_from:
+			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW)
 
 
 ## Token art for a piece; the player token unless a side is named.
@@ -1681,6 +1751,8 @@ func _connect_hud() -> void:
 			_setup_to_stock(selected))
 	hud.shop_pressed.connect(_open_shop)
 	hud.drawer_changed.connect(_after_drawer_change)
+	hud.arrow_toggle_pressed.connect(_on_arrow_toggle)
+	hud.arrow_clear_pressed.connect(_on_arrow_clear)
 	hud.menu_toggled.connect(func(open: bool) -> void:
 		game_menu_open = open
 		if open:

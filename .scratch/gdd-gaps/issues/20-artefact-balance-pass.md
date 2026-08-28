@@ -37,6 +37,19 @@ loadouts and surface the combinations a human would take weeks to find.
 - [ ] Per-rarity pricing decided, and the Shop page's open question closed
 - [ ] `run_all.sh` all green
 
+## Decision: rarity is depth-gated (2026-08-28)
+
+The page asks whether rarity is gated by progression or purely random. **Gate it.**
+
+Legendaries appearing on wave 2 flattens the run — the whole pressure model is a ramp, and
+a Legendary in the first shop stock removes the ramp's early half. Weight the draw so
+Legendary and Rare probability rises with depth (wave, or cumulative Score, whichever the
+restock cadence already uses) while Common tapers.
+
+Exact curve is a tuning constant, not a design decision — start linear, then let the fleet
+sweep in this slice's own acceptance criteria say whether it needs shaping.
+
+
 ## Blocked by
 
 - 16 / 17 / 18 / 19 — enough of the catalog implemented to be worth balancing

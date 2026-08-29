@@ -197,3 +197,44 @@ Shipped in PR #176.
   process) to rule out the contention flake CLAUDE.md warns about.
 
 **Deferred, per spec:** subtheme Boxes (strategic-items, rarity-tier) — noted, not built.
+
+## Outcome
+
+Shipped in PR #176 — the largest slice in the backlog.
+
+- **9 Boxes**: `box.gd` carries `SIZES` (small 3/1, big 5/1, huge 7/2) x `THEMES`
+  (piece/artefact/item). `Shop.BOX_TYPES` became `Shop.BOX_THEMES`; `SHOP_BOX_PRICE`
+  became `{"small": 50, "big": 100, "huge": 200}`, theme-independent as specced.
+- **Stock-time rolling**: `Shop.roll()` rolls each Box's contents and stores them as
+  additive `contents` + `size` fields on the JSON-safe slot; `_open_box_pick(slot)` reads
+  `slot.contents` and never re-rolls. Proven the way it has to be — `test_shop.gd` captures
+  `shop_stock[bi].contents` *before* the purchase click and asserts `box_offer` equals it
+  after opening. `test_save.gd` proves both fields survive a round trip.
+- **Removed**: the Score Box, the mixed Box, the untyped `_open_box_pick()` path, and
+  `SCORE_BOX_CHUNKS` (its only reader was the deleted mixed-offer branch).
+- **Box-carrier gone**, all six sites, plus two follow-ons the issue did not anticipate:
+  `data/waves.gd`'s now-orphaned `BUFFS` dict, and **`pass_after_box`**, dead once its only
+  producer was removed. `item_logic.gd`'s radar_jamming targeting dropped its carrier half.
+  `save_config.gd`'s legacy `"buff"`-string parse was left as harmless read-compat.
+
+**A live bug the rework surfaced:** Trojan Horse Assembly Manual — already implemented —
+called the no-arg `_open_box_pick()` that this slice deletes. Fixed with `Box.random_slot(g)`,
+which is also the spec's "an effect that says only 'a Box' rolls one of the 9 at random"
+rule arriving at its first real consumer.
+
+**The RNG-stream ripple, and why the two edited assertions are not masking a regression.**
+Rolling every Box's contents at stock time makes `Shop.roll` (called on every boot) consume
+more RNG, shifting downstream draws for every pinned seed. A full sweep found exactly two
+affected assertions, and both were verified as legitimate rather than accepted:
+
+- `test_items_artefacts_1.gd` (Holy Lint) still asserts `lint_buffs.size() == 1` — that
+  exactly one Piece Buff was granted, which *is* the behaviour under test. The named key is
+  a determinism anchor, and it moved `stun` -> `reflect`; both are dormant buffs that do not
+  self-trigger on that capture path, re-checked against the Bomb/Trap/Multicapture hazard
+  list.
+- `test_tiers.gd` still asserts the 5 Tier-3+ Box slots stay **grouped 2/2/1 by theme**. The
+  grouping is unchanged; only the theme names moved, because the themes did.
+
+This is the failure mode to watch on any future stock-time change: an assertion that names a
+specific RNG outcome is fragile, and "update the expected value until it passes" is how a
+real regression gets buried. Both were checked against what the test exists to prove.

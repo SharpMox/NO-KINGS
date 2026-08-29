@@ -76,8 +76,13 @@ immediately — so a handler **cannot** open a modal and wait for a choice there
 
 **Resolve it by deferring, not by suspending:** the ally half queues the reward
 (`pending_bounty_boxes += 1` or similar) and the 1-of-3 choice opens at the **start of your
-next turn**, when a modal is safe. `pass_after_box` is the existing precedent for deferring
-a Box-related step across a boundary.
+next turn**, when a modal is safe.
+
+An earlier revision of this issue named `pass_after_box` as the precedent for deferring a
+Box step across a turn boundary. **That flag no longer exists** — slice 47 removed it along
+with the box-carrier enemy that was its only producer. So this slice builds the deferral
+queue itself rather than following an existing pattern. It is still only a counter plus a
+check at turn start; the point is not to go looking for a precedent that was deleted.
 
 **Why deferring is legitimate here and not for Inflatable Vietcong Torpedo:** the Torpedo's
 choice *changes the outcome of the capture itself* (pay 15 Gold and the piece survives), so

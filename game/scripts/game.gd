@@ -191,6 +191,14 @@ var actions_left := 0 # unified: move, place, merge, item — 1 action each
 var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
+var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
+	# many Box choices are queued. _lose_player_piece is synchronous — called
+	# mid enemy-move loop among other sites — so it cannot itself open a modal
+	# and wait; it queues here instead. Drained one at a time from
+	# _begin_player_turn (a modal is always safe there); any extra copies
+	# queued the same Enemy Turn wait for a later Turn rather than chaining.
+	# The enemy half (you capture the carrier) never touches this — it opens
+	# _open_bounty_pick() immediately, same Turn, since that's already safe.
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
@@ -635,6 +643,10 @@ func _begin_player_turn() -> void:
 			AutoplayBot.reinforce(self)
 		else:
 			modals.show_reinforce()
+	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
+		# the deferred payout — see pending_bounty_boxes' own comment
+		pending_bounty_boxes -= 1
+		_open_bounty_pick()
 
 
 func _enemy_turn() -> void:
@@ -1366,6 +1378,15 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				board.erase(also)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
+		if BuffLogic.has(victim, "piece_bounty"): # Bounty (issue 48), enemy
+			# half — still your Turn, so the choice pick is safe right here.
+			# Fires once, ahead of the bomb/trap/normal branches below so it's
+			# never skipped by their own early returns; consumed now while
+			# `to` still holds the victim (untouched by score/critical/range/
+			# grant-on-capture/stun/multicapture above, none of which read
+			# this buff).
+			_consume_buff(to, "piece_bounty")
+			_open_bounty_pick()
 		if victim.id != "king" and (BuffLogic.has(victim, "bomb")
 				or BuffLogic.has(board[from], "bomb")):
 			# Precedence ruled 2026-08-28: Reflect > Bomb > Trap. Reflect
@@ -1897,6 +1918,11 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 	if not ctx.cancel:
 		lost_player += 1
 		wave_lost_ids.append(board[pos].id)
+		if BuffLogic.has(board[pos], "piece_bounty"): # Bounty (issue 48), ally
+			# half — queue it, see pending_bounty_boxes' own comment for why
+			# this can't open the choice pick here
+			_consume_buff(pos, "piece_bounty")
+			pending_bounty_boxes += 1
 	return ctx
 
 
@@ -1979,6 +2005,29 @@ func _consume_buff(pos: Vector2i, key: String) -> void:
 ## (_open_buff_pick), not a REGISTRY hook (issue 23), so it just counts here.
 func _artefact_count(key: String) -> int:
 	return artefacts.filter(func(a: Dictionary) -> bool: return a.key == key).size()
+
+
+## Bounty Piece Buff (issue 48): 1-of-3 random Boxes, then the chosen one
+## opens via the normal Box flow below. Shared by both halves — the enemy
+## half calls this immediately from _move_player's capture block (still your
+## Turn, a modal is safe); the ally half defers to _begin_player_turn via
+## pending_bounty_boxes (see its own comment). Each offer is its own
+## independent Box.random_slot roll (issue 47: contents rolled when offered,
+## not at open time), same as Trojan Horse Assembly Manual's single free Box.
+## Autoplay resolves immediately with `rng`, same shape as
+## _open_buff_pick/_open_yalta_pick, so the bot never stalls on a modal — no
+## "decline" consolation either, since forfeiting still spends the trigger
+## (the Buff is already consumed by the caller before this runs).
+func _open_bounty_pick() -> void:
+	var offer := [Box.random_slot(self), Box.random_slot(self), Box.random_slot(self)]
+	if autoplay:
+		return _open_box_pick(offer[rng.randi() % offer.size()])
+	var choices := []
+	for slot in offer:
+		choices.append({"label": "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()],
+			"value": slot})
+	_open_choice_pick("✦ Bounty — choose a Box:", choices, "Forfeit (no box)",
+		_open_box_pick, Callable())
 
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---

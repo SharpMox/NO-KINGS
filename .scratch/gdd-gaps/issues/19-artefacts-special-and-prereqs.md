@@ -1,6 +1,6 @@
 # 19 — Artefacts: Special, and the prerequisite backlog
 
-Status: partial — 29 of 121
+Status: closed (2026-08-29) — remainder redistributed to issues 52-55
 
 ## Parent
 
@@ -217,3 +217,12 @@ slot, so it stays correct regardless of future pool growth.
 `game/data/scenarios.gd` gained "Artefacts: slice 19 (Special + prereqs)"
 holding a representative sample across all 4 new hooks, swept by
 `test_scenarios`. `game/tests/run_all.sh` — ALL GREEN.
+
+## Closed 2026-08-29
+
+This was an umbrella tracking slice (29 of 121 at its last count). Every Artefact it still listed
+as outstanding now has a specific home in issues **52-55**, which between them cover all 22
+remaining unimplemented Artefacts with the user's rulings attached.
+
+Tracking progress by these thematic umbrellas stopped being useful once the remainder was
+small enough to enumerate directly. Kept for history; do not work from this file.

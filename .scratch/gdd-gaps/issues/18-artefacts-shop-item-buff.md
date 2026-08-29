@@ -1,6 +1,6 @@
 # 18 — Artefacts: Shop, Item & Buff
 
-Status: partial — 19 of 44 Shop/Item/Buff-tagged (20 artefacts flipped this
+Status: closed (2026-08-29) — remainder redistributed to issues 52-55
 slice; see Outcome)
 
 ## Parent
@@ -201,3 +201,12 @@ GREEN. Two headless-only runs flaked under heavy concurrent-agent CPU
 contention on this machine (a different check failed each time, always
 passed in isolation); with a quiet system the full suite passed twice
 consecutively, including the click probes.
+
+## Closed 2026-08-29
+
+This was an umbrella tracking slice (19 of 44 at its last count). Every Artefact it still listed
+as outstanding now has a specific home in issues **52-55**, which between them cover all 22
+remaining unimplemented Artefacts with the user's rulings attached.
+
+Tracking progress by these thematic umbrellas stopped being useful once the remainder was
+small enough to enumerate directly. Kept for history; do not work from this file.

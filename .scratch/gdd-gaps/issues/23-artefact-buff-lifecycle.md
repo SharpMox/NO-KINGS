@@ -1,6 +1,6 @@
 # 23 — Artefacts: Buff lifecycle hooks (apply / consume / transfer / protect)
 
-Status: partial — 12 of 13
+Status: done (2026-08-29) — 12 of 13; Abduction Probe rehomed to issue 53
 
 ## Parent
 
@@ -107,3 +107,12 @@ concurrent load from other agents sharing this machine — reproducible
 standalone runs of the same file were consistently green, and a clean full
 run (`ALL GREEN`) was captured once contention eased, so this reads as
 environment flakiness, not a code defect.
+
+## Closed 2026-08-29
+
+The single outstanding entry, **Abduction Probe**, moved to issue 53, where the user's
+ruling gives it a real meaning: base Piece Buff capacity is **2** and the Probe adds **+1**
+(to 3). This file's note that "no 1-buff cap exists in the data" was exactly right — issue
+53 introduces that cap, which is why the Artefact needs re-texting from "can carry 2".
+
+Everything else in the table shipped.

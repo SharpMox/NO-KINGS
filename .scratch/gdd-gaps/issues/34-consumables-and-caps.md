@@ -1,6 +1,6 @@
 # 34 — Consumable artefacts & caps
 
-Status: blocked — NEEDS DESIGN DECISIONS (do not start without them)
+Status: superseded (2026-08-29) — all three decisions answered
 
 ## Parent
 
@@ -34,3 +34,19 @@ three Box kinds (Item / Artefact / Score). Either it is a fourth kind or the tex
 ## Blocked by
 
 - the three decisions above
+
+## Superseded 2026-08-29
+
+All three decisions answered by the user:
+
+1. **Do consumable Artefacts exist as a category?** **Yes.** Moscovium Glow Stick (issue 52)
+   and Epstein's Black Book (issue 49) are the first two. Note Black Book's rule is the
+   subtle one: it is consumed *only* when you take more than you were already entitled to.
+2. **Is there an Item cap, and what is the base?** **Yes, base 3** (issue 53). A Piece Buff
+   cap of **2** was introduced alongside it — neither existed before, so both nerf the
+   current game and must refuse cleanly on every path.
+3. **Is "Piece Box" a real Box kind?** **Yes.** Slice 47's rework gives 9 Boxes — 3 sizes x
+   3 themes (Pieces / Artefacts / Items) — so Loch Ness Stool Sample's text was right and
+   the prototype was behind.
+
+Nothing left here. Kept for the decision record.

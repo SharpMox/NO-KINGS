@@ -1,6 +1,6 @@
 # 16 — Artefacts: Gold & Score
 
-Status: partial — 31 of 54
+Status: closed (2026-08-29) — remainder redistributed to issues 52-55
 
 ## Parent
 
@@ -143,3 +143,12 @@ Tinfoil Hats: +30%/-10%, not compounding), a Gold→Score cross-effect
 Social Credit debit-Gold ruling (both branches), and the turn-escalation
 math (Nero's Marshmallow Stick). `game/data/scenarios.gd` gained "Artefacts:
 Gold/Score batch (issue 16)" holding 7 of the 31, swept by `test_scenarios`.
+
+## Closed 2026-08-29
+
+This was an umbrella tracking slice (31 of 54 at its last count). Every Artefact it still listed
+as outstanding now has a specific home in issues **52-55**, which between them cover all 22
+remaining unimplemented Artefacts with the user's rulings attached.
+
+Tracking progress by these thematic umbrellas stopped being useful once the remainder was
+small enough to enumerate directly. Kept for history; do not work from this file.

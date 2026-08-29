@@ -108,9 +108,9 @@ func _init() -> void:
 	for slot in s3.shop_stock:
 		if slot.kind == "box":
 			box_types[slot.key] = box_types.get(slot.key, 0) + 1
-	check(box_types.get("item", 0) == 2 and box_types.get("artefact", 0) == 2
-			and box_types.get("score", 0) == 1,
-		"the 5 Tier-3+ box slots stay grouped by type, the odd one off the last type (%s)"
+	check(box_types.get("piece", 0) == 2 and box_types.get("artefact", 0) == 2
+			and box_types.get("item", 0) == 1,
+		"the 5 Tier-3+ box slots stay grouped by theme, the odd one off the last theme (%s)"
 			% str(box_types))
 	s3.queue_free()
 	await process_frame

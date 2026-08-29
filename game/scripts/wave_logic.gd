@@ -37,7 +37,6 @@ static func queue(g, n: int) -> void:
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
 		g.pending_reinforce = true
-	var buff_id: String = Waves.BUFFS.get(n, "")
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	# King identity picked here, once, so the wave banner can name it (issue 09
 	# selection rule: tier-ordered by King-wave depth, sampled within the tier)
@@ -49,9 +48,6 @@ static func queue(g, n: int) -> void:
 		var entry := {"id": id}
 		if id == "king":
 			entry.king_id = king.id
-		if id == buff_id: # first spawned piece of the flagged type carries the box
-			entry.buff = true
-			buff_id = ""
 		g.pending_spawn.append(entry)
 	if Tuning.TARIFFS_SCHEDULED: # off for now — see Tuning.TARIFFS_SCHEDULED
 		if n == 2:
@@ -94,7 +90,5 @@ static func spawn_pending(g) -> void:
 		if g.board.has(spot): # arrival captures a friendly blockading the row
 			g.lost_player += 1
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
-		if entry.get("buff", false):
-			g.board[spot].buff = true
 		if entry.has("king_id"):
 			g.board[spot].king_id = entry.king_id

@@ -225,16 +225,20 @@ var buff_pick_open := false # generic "choose 1 of N, then continue" modal
 	# it; the Buff Box sub-pick was the first caller, never a special case.
 var _choice_on_chosen: Callable # continuation for the open choice pick
 var _choice_on_cancelled: Callable # ditto, run on cancel (may be invalid)
-var pass_after_box := false # auto-pass deferred until the pick resolves
-var box_offer: Array = [] # current Box offer (issue 46) — Nostradamus Mad
-	# Libs picks from what's left of it, Reroll replaces it wholesale
-var box_picks_left := 0 # Nostradamus Mad Libs: +1 extra pick per held copy,
-	# taken from the same offer (not a fresh roll)
+var box_offer: Array = [] # current Box offer — the stocked slot's pre-rolled
+	# `contents` (issue 47), revealed as-is; Nostradamus Mad Libs picks from
+	# what's left of it, Reroll replaces it wholesale
+var box_picks_left := 0 # extra picks left beyond the first: a Box's own
+	# native picks-1 (Huge grants 2, issue 47) plus +1 per held Nostradamus
+	# Mad Libs, taken from the same offer (not a fresh roll)
 var box_rerolls_left := 0 # Bible Gag Reel Scroll + Snowden's Rubik's Cube:
 	# functionally identical 1-reroll-per-copy budget for the current Box —
 	# stacks additively, per-Box (reseeded fresh in _open_box_pick)
-var box_only_kind := "" # only_kind pinned for the life of the current Box, so
-	# a Reroll re-rolls the same typed pool (e.g. an Item Box stays Item-only)
+var box_only_kind := "" # the current Box's theme ("piece"/"artefact"/"item",
+	# issue 47 — every Box is typed), pinned for its life so a Reroll re-rolls
+	# the same theme
+var box_size := "" # the current Box's size ("small"/"big"/"huge"), pinned
+	# the same way — a Reroll keeps the same choice/pick shape too
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
@@ -1274,7 +1278,6 @@ func _setup_to_stock(from: Vector2i) -> void:
 
 
 func _move_player(from: Vector2i, to: Vector2i) -> void:
-	var boxed := false
 	var king_captured := false
 	var captured_king_id := ""
 	var return_to_start := false # USS Eldridge Invisibility Paint (artefact hook 24)
@@ -1408,7 +1411,6 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			captured_king_id = victim.get("king_id", "")
 		else:
 			captured.append(victim.id)
-			boxed = victim.get("buff", false)
 		_add_pop(to)
 	Economy.charge(self, "move_cost")
 	if _is_long_range(board[from].id):
@@ -1443,12 +1445,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
 	# last enemy — no point sitting on an empty board (game-feel 2026-07-06)
 	if (actions_left == 0 or _board_cleared()) and state == State.PLAYER_TURN:
-		if boxed: # resolve the box first; the pick UI defers the auto-pass
-			pass_after_box = true
-		else:
-			return _on_pass()
-	if boxed:
-		return _open_box_pick()
+		return _on_pass()
 	_refresh()
 
 
@@ -1804,11 +1801,9 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 					var hit := b + Vector2i(dx, dy)
 					if board.has(hit) and board[hit].id != "king":
 						_destroy(hit, true)
-		"radar_jamming": # strips the box-carrier flag AND any piece buffs
-			board[b].erase("buff")
-			# Antikythera Warranty Card: "Piece Buffs cannot be removed by
-			# Tariffs or enemy effects" — the box-carrier flag isn't a Piece
-			# Buff (buff_logic.gd header), so only BuffLogic.clear is gated.
+		"radar_jamming": # strips target's Piece Buffs (Antikythera Warranty
+			# Card: "Piece Buffs cannot be removed by Tariffs or enemy
+			# effects" — gates this)
 			if not ArtefactHooks.run(self, "on_buff_removal", {"pos": b, "blocked": false}).blocked:
 				BuffLogic.clear(board[b])
 		"buff_box":
@@ -1988,14 +1983,21 @@ func _artefact_count(key: String) -> int:
 
 # --- box pick (GDD Game Flow — Box Pick; clock keeps ticking, input modal) ---
 
-func _open_box_pick(only_kind := "") -> void:
+## `slot` is a shop_stock Box slot ({kind:"box", key:theme, size, contents,
+## sold}) — issue 47: contents are rolled once, at Shop-stock time
+## (Shop.roll), and stored on the slot. Opening only ever REVEALS box_offer =
+## slot.contents, never re-rolls it — that's what makes the stock-time peek
+## (a future Artefact) and the eventual open guaranteed to agree.
+func _open_box_pick(slot: Dictionary) -> void:
 	box_open = true
 	Economy.charge(self, "box_cost") # once per Box — a Reroll must NOT re-charge this (issue 46)
-	box_only_kind = only_kind
-	box_picks_left = _artefact_count("nostradamus-mad-libs")
+	box_only_kind = slot.key
+	box_size = slot.size
+	var native_picks: int = Box.SIZES[slot.size].picks # Huge grants 2 (issue 47)
+	box_picks_left = (native_picks - 1) + _artefact_count("nostradamus-mad-libs")
 	box_rerolls_left = _artefact_count("bible-gag-reel-scroll") \
 		+ _artefact_count("snowden-s-rubik-s-cube") # functionally identical, additive
-	box_offer = _box_options(only_kind)
+	box_offer = slot.contents.duplicate(true)
 	if autoplay: # bot: random pick (or skip), and exercise the reroll branch
 		# too — every new path must stay inside this branch or the bot deadlocks
 		# on a modal nobody is there to click (issue 46)
@@ -2004,30 +2006,24 @@ func _open_box_pick(only_kind := "") -> void:
 			return _box_close()
 		if box_rerolls_left > 0 and rng.randf() < 0.5:
 			box_rerolls_left -= 1
-			box_offer = _box_options(only_kind)
+			box_offer = _box_options(box_only_kind, box_size)
 		return _box_choose(box_offer[rng.randi() % box_offer.size()])
 	modals.show_box(box_offer)
 
 
-
-
-func _box_options(only_kind := "") -> Array:
-	var allowed_tiers: Array = []
-	if only_kind == "item": # Majestic 12 Secret Handshake Diagram (18): Item
-		for t in artefacts: # Boxes only, not the mixed capture-driven Box Pick
-			if t.key == "majestic-12-secret-handshake-diagram":
-				allowed_tiers = ["Strategic", "Decisive"]
-				break
-	return Box.roll_options(rng, only_kind, allowed_tiers)
-
-
-
-
+## Thin passthrough to Box.roll_options — a fresh roll for the current Box's
+## theme/size, used by a Reroll (below) and by autoplay's own reroll branch
+## above. Never called at open time; only stock-time rolling and interactive
+## rerolls produce a fresh offer.
+func _box_options(theme: String, size: String) -> Array:
+	return Box.roll_options(self, theme, size)
 
 
 func _box_choose(opt: Dictionary) -> void:
 	fx_at = get_viewport_rect().size / 2.0
 	match opt.kind:
+		"piece":
+			stock.append(opt.payload) # lands in Stock, like a Shop piece purchase (issue 47)
 		"item":
 			items.append(opt.payload)
 		"artefact":
@@ -2039,17 +2035,15 @@ func _box_choose(opt: Dictionary) -> void:
 			entry.acquired_wave = wave
 			entry.rarity = ArtefactHooks.rarity_of(entry.key)
 			artefacts.append(entry)
-		"score":
-			Economy.earn(self, opt.value)
-	# Nostradamus Mad Libs (issue 46): take an extra pick from what's left of
-	# THIS offer, not a fresh roll — stop as soon as either the budget or the
-	# offer itself runs out (2 held copies = 3 picks = the whole offer).
+	# Nostradamus Mad Libs (issue 46) + a Box's own native picks (Huge, issue
+	# 47): take an extra pick from what's left of THIS offer, not a fresh
+	# roll — stop as soon as either the budget or the offer itself runs out.
 	box_offer.erase(opt)
 	if box_picks_left > 0 and not box_offer.is_empty():
 		box_picks_left -= 1
 		if autoplay:
 			return _box_choose(box_offer[rng.randi() % box_offer.size()])
-		modals.show_box(box_offer) # reopen with what's left — box_open/pass_after_box stay untouched
+		modals.show_box(box_offer) # reopen with what's left — box_open stays untouched
 	else:
 		_box_close()
 
@@ -2061,18 +2055,14 @@ func _box_choose(opt: Dictionary) -> void:
 ## re-charge box_cost — that only ever happens once, in _open_box_pick.
 func _box_reroll() -> void:
 	box_rerolls_left -= 1
-	box_offer = _box_options(box_only_kind)
+	box_offer = _box_options(box_only_kind, box_size)
 	modals.show_box(box_offer)
 
 
 func _box_close() -> void:
 	box_open = false
 	box_panel.visible = false
-	if pass_after_box:
-		pass_after_box = false
-		_on_pass()
-	else:
-		_refresh()
+	_refresh()
 
 
 ## Debug: place the army, spawn wave 1, save a PNG of the board, quit.
@@ -2173,8 +2163,6 @@ func _draw() -> void:
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
 		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
-		if p.get("buff", false): # box carrier: gold badge
-			draw_circle(px + Vector2(tile - 9, 9), 6, Color(0.95, 0.78, 0.15))
 	if selected.x >= 0 and board.has(selected): # animated pulse on the selection
 		var t := Time.get_ticks_msec() / 1000.0
 		var pulse := 0.5 + 0.5 * sin(t * 5.0)
@@ -2344,7 +2332,7 @@ func _connect_modals() -> void:
 		if shop_stock[index].kind == "box": # the roll modal IS the grant
 			if modals.shop_panel:
 				modals.shop_panel.visible = false
-			return _open_box_pick(shop_stock[index].key) # typed: rolls its kind
+			return _open_box_pick(shop_stock[index]) # reveals its stock-time roll
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())

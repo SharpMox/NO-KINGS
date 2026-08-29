@@ -42,10 +42,12 @@ func _init() -> void:
 		"tariffs": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
-		"pending": [{"id": "bishop"}, {"id": "pawn", "buff": true}],
+		"pending": [{"id": "bishop"}, {"id": "pawn"}],
 		"score": 470, "gold": 35, "clock_s": 812.5, "shop_restocks": 2,
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
-			{"kind": "box", "key": "box", "sold": false}],
+			{"kind": "box", "key": "item", "size": "big", "sold": false,
+				"contents": [{"kind": "item", "name": "Blitz", "tier": "Tactical",
+					"description": "d", "payload": {"key": "blitz"}}]}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
 	}
 	var a := _boot(rich)
@@ -71,6 +73,10 @@ func _init() -> void:
 	check(b.gold == 35, "gold restored")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")
+	check(b.shop_stock[1].size == "big" and b.shop_stock[1].contents.size() == 1
+			and b.shop_stock[1].contents[0].name == "Blitz",
+		"a stocked Box's size + rolled contents survive the save round-trip (issue 47) — "
+		+ "additive fields, no migration needed")
 	check(b.shop_restocks == 2, "the restock marker survives (no reroll-scumming)")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
@@ -87,7 +93,9 @@ func _init() -> void:
 	for pos in b.board:
 		if b.board[pos].get("buff", false):
 			buffed += 1
-	check(buffed == 2, "box carriers survive the round trip")
+	check(buffed == 1, "the legacy box-carrier flag on a board piece (pre-issue-47 saves) survives " +
+		"the round trip — issue 47 removed the flag's transfer onto a newly spawned piece " +
+		"(wave_logic.gd), so a pending-spawn entry carrying it no longer produces a second one")
 
 	# --- issue 25: a piece's capture ledger (lifetime `captures` + Wave-scoped
 	# `wave_captures`) survives the JSON round-trip on both board and Stock —

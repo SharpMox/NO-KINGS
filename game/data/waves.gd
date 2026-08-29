@@ -3,16 +3,6 @@
 ## The catalog's procedural extension past 150 is not implemented — the run
 ## ends at the wave-150 full clear (grilled 2026-07-03).
 
-## Waves whose spawn includes ONE box-carrying enemy (GDD buff flags): the value
-## names which spawned piece type carries the box (opens Box Pick on capture).
-const BUFFS := {
-	3: "pawn", 7: "bishop", 12: "bishop", 17: "knight", 22: "knight",
-	28: "rook", 34: "rook", 40: "bishop", 45: "knight", 49: "rook",
-	55: "rook", 60: "knight", 65: "bishop", 74: "knight", 78: "rook",
-	85: "bishop", 92: "knight", 98: "rook", 105: "rook", 112: "knight",
-	120: "bishop", 128: "knight", 135: "rook", 142: "bishop", 148: "knight",
-}
-
 const WAVES: Array = [
 	# waves 1-19 softened 2026-07-06: the old run of all-bishop walls (8/12/14)
 	# killed the walker armies before their merge economy could start —

@@ -51,9 +51,9 @@ static func tile_valid(board: Dictionary, defs: Dictionary, key: String, a: Vect
 				return enemy and not king and Rules.is_attacked(board, pos, Rules.PLAYER, defs)
 			"asset_recovery":
 				return occupied and not king
-			"radar_jamming": # box-carrier flag or any piece buff
-				return occupied and (board[pos].get("buff", false)
-					or not board[pos].get("buffs", []).is_empty())
+			"radar_jamming": # any Piece Buff — the box-carrier flag it also
+				# used to strip is gone (issue 47)
+				return occupied and not board[pos].get("buffs", []).is_empty()
 			"tactical_reposition", "decoy_swap":
 				return occupied and not king
 			"rapid_deployment":

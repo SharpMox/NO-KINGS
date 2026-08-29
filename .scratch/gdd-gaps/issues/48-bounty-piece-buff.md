@@ -1,6 +1,6 @@
 # 48 — Bounty, a new Piece Buff
 
-Status: todo — SPECCED (user design 2026-08-29) · **after 47**
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -108,3 +108,37 @@ depend on issue 33's decision #2.**
 - issue 47 (the 9 Boxes must exist to pick 3 of them)
 - **not** issue 33's decision #2 — see the two-halves note above; deferring the ally-side
   reward to the start of your next turn sidesteps the suspension problem entirely
+
+## Outcome
+
+Shipped in PR #179. Piece Buffs 12 -> 13.
+
+- **Key is `piece_bounty`**, not `bounty` — the legacy core Artefact still holds that key.
+  The Buff takes the *name* per the user's ruling; reconciling the two is issue 50's job,
+  and comments at the `PIECE_BUFFS` entry and both consume sites say so.
+- **Ally half deferred exactly as analysed.** `_lose_player_piece` consumes the buff
+  through the existing `_consume_buff` choke point (so other on-consume effects still see
+  the trigger) and increments `pending_bounty_boxes`. `_begin_player_turn()` drains **one
+  per Turn start**; extra copies queued in the same window wait for a later Turn rather
+  than chaining. Built fresh — `pass_after_box` was deleted by slice 47, as this issue was
+  corrected to say.
+- **Enemy half** opens immediately during the player's own turn.
+
+**The ally-half test is the one that matters, and it is the right shape.** An ally carrying
+the buff is captured via `_run_enemy_actions()`; the test then asserts `pending_bounty_boxes
+== 1` **and `buff_pick_open == false`** — proving no modal opened mid-enemy-turn, which is
+the whole reason for the deferral. Only after `_begin_player_turn()` does it assert the
+modal is open, press a **real panel button** (`.pressed.emit()`, not a synthetic call),
+resolve the Box, and assert `stock`/`items`/`artefacts` actually grew. A reward landed, not
+just a modal closed. A second test proves only one of two same-window payouts resolves per
+Turn.
+
+Reachable from `_random_buff_key` deliberately (no `self_harming` flag, so the existing
+filter includes it with no code change); verified across 300 seeds. Added to the Notion
+Piece Buffs DB.
+
+**RNG ripple, second occurrence:** growing `PIECE_BUFFS` to 13 changed `_random_buff_key`'s
+modulo and moved Holy Lint's pinned seed-4 assertion from `reflect` to `shield`. The new
+value was probed directly rather than guessed, and `shield` re-checked against the same
+Bomb/Trap/Multicapture hazard list. Only affected assertion in the full sweep. See the new
+FLAGS.md entry — that assertion has now churned twice in two slices and is worth reshaping.

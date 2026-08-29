@@ -1,6 +1,6 @@
 # 55 — Meta-dispatch and capture conversion (the last 3)
 
-Status: todo — SPECCED (engineering calls, no user input needed)
+Status: done
 
 ## Parent
 
@@ -90,3 +90,61 @@ you bought it, but say so explicitly.
 ## Blocked by
 
 - issue 52 (only for Ecdysis's consumable-copy case; the rest is independent)
+
+## Outcome
+
+Shipped in PR feat/meta-dispatch-and-conversion-55 — all 3. Catalog 169 -> 172 implemented
+in this branch (this file also carries 7 other still-`implemented: false` entries belonging
+to other, independently in-flight issues — this slice's own scope was exactly these 3).
+
+- **Zeta Reticuli Souvenir Map** — a new run-long `g.run_capture_count` (game.gd), never
+  reset, feeds `on_capture`'s ctx as `run_capture_index` (economy.gd's `capture_score`,
+  same 0-based idiom as its wave/turn siblings). The handler sets an OUTPUT flag,
+  `ctx.to_stock`, on every 3rd capture of the run; game.gd's four capture-resolution sites
+  (plain, Bomb, Trap, Multicapture's 2nd victim) read it back off `g.last_capture_ctx` the
+  same way `return_to_start`/`move_to_backrow` already are, and divert into `stock` via a
+  new `_capture_to_stock()` helper mirroring Extraction's own "duplicate, strip owner, bare
+  id if that's all that's left" (ADR-0002) — no new schema. `run_capture_count` is NOT
+  persisted across saves, matching the sibling per-artefact run-long counters that already
+  aren't (`nibiru_wave_streak`, `club27_streak`, `lottery_purchase_count`,
+  `pallet_purchase_count`) — an accepted existing gap, not a new one.
+- **Troll Farm Employee of the Month** — no REGISTRY entry, lives entirely in
+  `_run_meta_triggers` (same shape as Max Headroom Mask/Polybius/etc.): on
+  `on_wave_spawn`, walks `held` for every key registered on `on_wave_clear` and
+  `_dispatch`es it there directly (never through `run()`), passing each entry's own
+  `acquired_wave` (issue 28's fix). **Wave-start ctx decision**: `on_wave_clear`'s usual
+  `{clean, turns, captures, gold_spent, gold_base}` is a snapshot of the wave that just
+  ended, meaningless at Wave start — built fresh instead: `clean = true` (no losses yet
+  this brand-new wave, vacuously and correctly true), `turns = 0`, `captures = 0`,
+  `gold_spent = 0` (all genuinely zero — `WaveLogic.queue()` already reset the underlying
+  counters before firing `on_wave_spawn`), `gold_base = g.gold` (the one field that's just
+  "current Gold", read live so a percentage handler stays correct). A handler that reads
+  `g.wave` directly instead of ctx (John Titor's Crypto Wallet, Silk Road Coupon) sees the
+  already-bumped NEW wave at this point, so its milestone cadence ends up keyed to the
+  STARTING wave rather than the wave that just cleared — a consequence of reusing the
+  handler body unmodified, not a deliberate narrative choice.
+- **Ecdysis Sheddings** — also no REGISTRY entry. `g.ecdysis_copy_key` (String, "" =
+  inert) is set in `run()` itself, unconditional of what's held, whenever
+  `hook == on_purchase`, `ctx.kind == "artefact"`, and the bought key isn't Ecdysis's own
+  — box grants and effect grants never fire `on_purchase` (shop.gd's `buy()` is the only
+  call site), so they can't set it, no extra guard needed. **Consumable-copy decision**:
+  the key is never cleared when the copied Artefact is later consumed/removed
+  (`_consume_artefact`) — it's a fact about the run ("you bought it"), decoupled from
+  whether that key is still in `g.artefacts`, so a later-consumed copy (Moscovium Glow
+  Stick, issue 52, not yet implemented) keeps being copied. Dispatch: for every held
+  Ecdysis entry, if `REGISTRY[g.ecdysis_copy_key]` lists the hook currently firing,
+  `_dispatch` the copied key at that hook using THIS Ecdysis entry's own `acquired_wave`
+  (Ecdysis itself is "the second copy", so its own cadence applies, not the original's).
+  Guarded twice against copying another Ecdysis: recording never sets the key to
+  `"ecdysis-sheddings"`, and dispatch refuses that key outright regardless.
+- **Echo-depth guard**: proved by direct assertion (`g.artefact_echo_depth == 0` after
+  dispatch) in three cases — Ecdysis alone, and the Ecdysis + Troll Farm + a bought Wave
+  Artefact combo named in this issue as the one most likely to loop. That combo resolves
+  to exactly 3 bounded dispatches per Wave boundary (normal Wave-clear + Ecdysis's mirror
+  of it + Troll Farm's Wave-start echo of the real copy) because neither Troll Farm nor
+  Ecdysis has a REGISTRY entry and `_dispatch` never calls `run()` — Troll Farm's extra
+  dispatch can't be seen or re-mirrored by Ecdysis's own block, which is scoped to
+  whichever hook the *outer* `run()` call is dispatching.
+- Tests in `test_items_artefacts_4.gd` (kept all 7 split suite files, no new ones); seeds
+  pinned via `_boot`'s default seed. `game/tests/run_all.sh` ran foreground, alone: `ALL
+  GREEN`.

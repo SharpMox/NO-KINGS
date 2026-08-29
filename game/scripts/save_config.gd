@@ -63,6 +63,11 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.gold = int(cfg.get("gold", 0))
 	g.score_gained_total = int(cfg.get("score_gained_total", 0)) # issue 49,
 		# Loch Ness Stool Sample — additive, defaults to 0 for any older save
+	g.run_capture_count = int(cfg.get("run_capture_count", 0)) # issue 55, Zeta
+		# Reticuli Souvenir Map — run-long, so it MUST survive a resume or the
+		# "every 3rd Capture" cadence silently restarts at 0 on load. Same shape
+		# and reasoning as turn_number (35) and score_gained_total (49);
+		# additive, so no migration.
 	g.shop_stock = cfg.get("shop_stock", []).duplicate(true)
 	g.shop_restocks = int(cfg.get("shop_restocks", 0)) # no reroll-scumming
 	# GDD Game Flow — Run: restore the run's RNG so a resumed save rolls what an
@@ -144,6 +149,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	# scenarios written before this field existed) so a resumed save doesn't
 	# double-count the Turn it was saved on.
 	g.turn_number = int(cfg.get("turn_number", g.turn_number))
+	g.ecdysis_copy_key = str(cfg.get("ecdysis_copy_key", "")) # issue 55, additive
 
 
 ## The inverse of apply(): the live run as a JSON-safe config Dictionary.
@@ -182,6 +188,7 @@ static func to_config(g) -> Dictionary:
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "score_gained_total": g.score_gained_total,
+		"run_capture_count": g.run_capture_count, # issue 55, Zeta Reticuli
 		"clock_s": g.clock_ms / 1000.0,
 		"shop_stock": g.shop_stock.duplicate(true),
 		"shop_restocks": g.shop_restocks,
@@ -189,4 +196,5 @@ static func to_config(g) -> Dictionary:
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"tariffs_off": g.tariffs_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
+		"ecdysis_copy_key": g.ecdysis_copy_key,
 	}

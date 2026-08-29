@@ -80,7 +80,46 @@ static func roll_options(g, theme: String, size: String) -> Array:
 ## shaped slot (contents rolled right now, at grant time) so the caller can
 ## hand it straight to game.gd's _open_box_pick like any Shop-bought Box.
 static func random_slot(g) -> Dictionary:
-	var theme: String = THEMES[g.rng.randi() % THEMES.size()]
+	return random_slot_for_theme(g, THEMES[g.rng.randi() % THEMES.size()])
+
+
+## Same shape as random_slot, but the theme is pinned — Loch Ness Stool
+## Sample (49): "open a random Piece Box" is a random SIZE of a fixed theme,
+## not a random Box of any theme.
+static func random_slot_for_theme(g, theme: String) -> Dictionary:
 	var size: String = SIZE_KEYS[g.rng.randi() % SIZE_KEYS.size()]
 	return {"kind": "box", "key": theme, "size": size, "sold": false,
 		"contents": roll_options(g, theme, size)}
+
+
+## Comma-joined display names of a Box's contents — All-Seeing Eye Contact
+## Lens (49, rewritten): "Boxes reveal their contents before you buy or
+## choose them." Gates only on the CALLER showing this (modals.gd, only when
+## the Artefact is held); the contents themselves are already pre-rolled and
+## stored unchanged at stock time (issue 47), so a reveal built from
+## `slot.contents` can never disagree with what opening the Box later yields.
+static func contents_names(contents: Array) -> String:
+	var names := []
+	for opt in contents:
+		names.append(str(opt.name))
+	return ", ".join(names)
+
+
+## Shop-price valuation of one rolled option — Cicada Rejection Letter (49):
+## "+Gold equal to the Shop value of the offered pieces" re-texted to "the
+## Box's contents, whatever kind they are". Mirrors Shop.price()'s base
+## formula per kind, but operates on a Box OPTION's shape ({kind, payload,
+## ...}), not a shop_stock slot's ({kind, key, ...}) — the two are NOT
+## interchangeable (Shop.price reads slot.key/slot.tier via _catalog(slot)).
+## No on_price hook, no Sub-Antarctic Visa bias: a Box option never carries
+## `biased`, and the user's ruling is "Shop prices" as the flat base value.
+static func content_value(g, opt: Dictionary) -> int:
+	match opt.kind:
+		"piece":
+			return int(g.defs[opt.payload].value)
+		"item":
+			return int(Tuning.SHOP_ITEM_PRICE[opt.payload.tier])
+		"artefact":
+			return int(Tuning.SHOP_ARTEFACT_PRICE.get(opt.payload.get("rarity", ""),
+				Tuning.SHOP_ARTEFACT_PRICE[""]))
+	return 0

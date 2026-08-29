@@ -173,6 +173,16 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   now stalled by launching it in the background and then waiting on a task that had
   already finished, losing their turn with the work uncommitted and unpushed. Call it
   directly and let it block until it prints its verdict.
+- **A/B a suspected flake by INTERLEAVING runs, not by batching them.** Running 15 on a
+  branch, then 20 on `main`, and comparing the rates is invalid when the flake is
+  load-sensitive: the two batches ran under different machine load, so the comparison
+  measures the load, not the branch. This produced a confident and **wrong** conclusion on
+  2026-08-29 — 3/15 on a branch against 0/20 on `main` "proved" the branch broke it, the PR
+  was blocked, and an interleaved 20-and-20 in the same window then came back 0 and 0.
+  Alternate the two in a single loop so both see identical conditions, using a second
+  `git worktree` rather than checking branches out back and forth. And weigh a
+  *reachability* argument ("that code cannot execute at the failure site") above a rate
+  comparison — it is the stronger evidence.
 - **Never run two suites at once.** The click probes are *windowed* — they open a real
   Godot window and drive real input. Two concurrent runs fight over window focus and the
   probes fail for no reason in the code. This has already produced one false failure

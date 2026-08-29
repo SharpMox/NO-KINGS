@@ -138,7 +138,7 @@ Items") already ships and now names a real thing.
 
 ## Outcome
 
-Shipped in PR #TBD.
+Shipped in PR #176.
 
 - **9 Boxes.** `box.gd`'s `SIZES` ({choices, picks}: small 3/1, big 5/1, huge 7/2) x
   `THEMES` (piece/artefact/item) replace `Shop.BOX_TYPES := ["item","artefact","score"]`

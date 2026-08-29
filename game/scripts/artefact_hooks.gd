@@ -651,6 +651,7 @@ const REGISTRY := {
 	"naruto-run-manual": ["on_score_change"],
 	"moon-landing-slate": ["on_score_change"],
 	"el-dorado-body-glitter": ["on_score_change"],
+	"loch-ness-stool-sample": ["on_score_change"], # issue 49
 	"tungsten-filled-gold-bar": ["on_gold_change"],
 	"popemobile-piggy-bank": ["on_gold_change"],
 	"suspiciously-large-femur": ["on_capture"],
@@ -1321,6 +1322,21 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# handed back through ctx.gold_bonus so Economy.earn applies it
 			# exactly once instead of free-writing g.gold mid-dispatch.
 			ctx.gold_bonus += ctx.base * 0.05
+		["loch-ness-stool-sample", "on_score_change"]:
+			# "Every 1000 Score gained" (issue 49) — a run-long cumulative
+			# tracker off ctx.base (never the running g.score, which can DROP
+			# via Templar Debit Card's Score-as-payment): each dispatch call
+			# (once per held copy, same as every other stacking handler here)
+			# advances g.score_gained_total by this gain's base amount, and a
+			# crossed 1000-multiple opens one random Piece Box. `not g.box_open`
+			# mirrors Trojan Horse Assembly Manual's own "don't clobber an open
+			# Box Pick" guard just below — a crossing that lands while a Box is
+			# already open (e.g. mid box-skip consolation) is silently dropped,
+			# same precedent, rather than queued.
+			var before: int = g.score_gained_total
+			g.score_gained_total += roundi(ctx.base)
+			if int(g.score_gained_total / 1000.0) > int(before / 1000.0) and not g.box_open:
+				g._open_box_pick(Box.random_slot_for_theme(g, "piece"))
 
 		# --- issue 16: Gold gain also pays Score (mirror of the above) ---
 		["tungsten-filled-gold-bar", "on_gold_change"]:

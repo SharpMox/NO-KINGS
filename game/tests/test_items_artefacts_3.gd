@@ -16,6 +16,7 @@ const Items := preload("res://data/items.gd")
 const Waves := preload("res://data/waves.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -936,6 +937,169 @@ func _init() -> void:
 		check(not hb.box_open, "autoplay (seed %d) resolves a Huge Box's 2 native picks — no modal, no hang" % s)
 		hb.queue_free()
 		await process_frame
+
+	# --- issue 49: the four Box-dependent Artefacts (needs Box 47) ---
+
+	# Loch Ness Stool Sample: a run-long cumulative "Score GAINED" tracker,
+	# never the running (spendable) g.score — crossing each 1000 opens a
+	# random Piece Box. `not g.box_open` mirrors Trojan Horse Assembly
+	# Manual's own guard, so this drives Economy.earn directly rather than
+	# through a real capture (isolates the threshold math from board setup).
+	var loch := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["loch-ness-stool-sample"]})
+	await process_frame
+	check(not loch.box_open, "(setup) no Box open yet")
+	Economy.earn(loch, 999)
+	check(not loch.box_open and loch.score_gained_total == 999,
+		"Loch Ness Stool Sample: 999 Score gained does not yet cross the 1000 threshold")
+	Economy.earn(loch, 1)
+	check(loch.box_open and loch.box_only_kind == "piece",
+		"Loch Ness Stool Sample: crossing 1000 Score gained opens a random Piece Box")
+	loch._box_close() # free the guard so the next earn() can trigger again
+	# "gained, not current": spending Score (Templar Debit Card pays Shop
+	# purchases 10 Score : 1 Gold via a direct g.score -=, bypassing
+	# Economy.earn entirely) must not touch the tracker or re-trigger.
+	loch.score -= 500 # simulate that spend directly, same as shop.gd:280
+	check(loch.score_gained_total == 1000,
+		"...and spending Score afterward leaves the GAINED tracker untouched")
+	Economy.earn(loch, 999) # gained now 1999 — still short of the next 2000
+	check(not loch.box_open, "...999 more gained (net of the spend) does not re-cross a threshold")
+	Economy.earn(loch, 1) # gained now 2000
+	check(loch.box_open, "...the SAME real threshold (2000) still fires once actually reached")
+	loch.queue_free()
+	await process_frame
+
+	# Cicada Rejection Letter: valuation is the Shop base-price formula for
+	# EACH content kind, summed over whatever is still in box_offer at the
+	# moment of decline (the full offer here — nothing picked first), on top
+	# of the existing flat BOX_SKIP_CONSOLATION. Computed independently of
+	# Box.content_value (the function under test) from raw catalog data, so
+	# this is a real correctness check, not a tautology.
+	var cic_piece := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["cicada-rejection-letter"]})
+	await process_frame
+	cic_piece._open_box_pick(_box_slot(cic_piece, "piece", "small"))
+	var expect_piece := 0
+	for opt in cic_piece.box_offer:
+		expect_piece += int(cic_piece.defs[opt.payload].value)
+	cic_piece._on_box_skipped()
+	check(cic_piece.gold == Tuning.BOX_SKIP_CONSOLATION + expect_piece,
+		"Cicada Rejection Letter: declining a Piece Box pays g.defs[id].value per piece, on top of the flat consolation")
+	cic_piece.queue_free()
+	await process_frame
+
+	var cic_item := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["cicada-rejection-letter"]})
+	await process_frame
+	cic_item._open_box_pick(_box_slot(cic_item, "item", "small"))
+	var expect_item := 0
+	for opt in cic_item.box_offer:
+		expect_item += int(Tuning.SHOP_ITEM_PRICE[opt.payload.tier])
+	cic_item._on_box_skipped()
+	check(cic_item.gold == Tuning.BOX_SKIP_CONSOLATION + expect_item,
+		"Cicada Rejection Letter: declining an Item Box pays Tuning.SHOP_ITEM_PRICE[tier] per item")
+	cic_item.queue_free()
+	await process_frame
+
+	# Huge (7 choices) proves the payout scales with size — intended, not a
+	# bug (issue 49) — and covers the artefact-kind valuation at the same time.
+	var cic_artefact := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["cicada-rejection-letter"]})
+	await process_frame
+	cic_artefact._open_box_pick(_box_slot(cic_artefact, "artefact", "huge"))
+	check(cic_artefact.box_offer.size() == 7, "(setup) Huge Box declines 7 contents")
+	var expect_artefact := 0
+	for opt in cic_artefact.box_offer:
+		var rarity: String = str(opt.payload.get("rarity", ""))
+		expect_artefact += int(Tuning.SHOP_ARTEFACT_PRICE.get(rarity, Tuning.SHOP_ARTEFACT_PRICE[""]))
+	cic_artefact._on_box_skipped()
+	check(cic_artefact.gold == Tuning.BOX_SKIP_CONSOLATION + expect_artefact,
+		"Cicada Rejection Letter: declining a Huge Artefact Box pays Tuning.SHOP_ARTEFACT_PRICE[rarity] per artefact, scaled to all 7")
+	cic_artefact.queue_free()
+	await process_frame
+
+	# Epstein's Black Book: NOT consumed by a Box's own native picks, spent
+	# only the moment a pick exceeds that entitlement — then takes everything
+	# that's left. Big (native 1 pick, 5 choices) matches the catalog's
+	# original "all 5 contents" wording exactly.
+	var bb1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["epstein-s-black-book"]})
+	await process_frame
+	bb1._open_box_pick(_box_slot(bb1, "item", "big"))
+	bb1._box_choose(bb1.box_offer[0]) # the Box's own normal 1 pick
+	check(bb1._artefact_count("epstein-s-black-book") == 1,
+		"Epstein's Black Book: NOT consumed by a Big Box's normal 1 pick")
+	check(bb1.box_open, "...it offers one more free look instead of closing")
+	bb1._on_box_skipped() # decline that look
+	check(bb1._artefact_count("epstein-s-black-book") == 1 and not bb1.box_open,
+		"...declining the free look leaves it untouched (\"it waits\") and closes the Box normally")
+	bb1.queue_free()
+	await process_frame
+
+	var bb2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["epstein-s-black-book"]})
+	await process_frame
+	bb2._open_box_pick(_box_slot(bb2, "item", "big"))
+	bb2._box_choose(bb2.box_offer[0]) # pick 1 — native, not consumed
+	check(bb2._artefact_count("epstein-s-black-book") == 1, "(setup) not consumed after the native pick")
+	bb2._box_choose(bb2.box_offer[0]) # pick 2 — the FIRST excess pick
+	check(bb2._artefact_count("epstein-s-black-book") == 0,
+		"Epstein's Black Book: consumed exactly on the first pick beyond entitlement")
+	var bb2_picks := 2
+	while bb2.box_open:
+		bb2._box_choose(bb2.box_offer[0])
+		bb2_picks += 1
+	check(bb2_picks == 5, "...and then takes every remaining content — all 5, Big's full offer")
+	bb2.queue_free()
+	await process_frame
+
+	# Composition with Nostradamus Mad Libs (issue 46): entitlement is native
+	# + Nostradamus TOGETHER, so Black Book only spends beyond BOTH — the
+	# reading issue 49 asked to be documented and tested explicitly.
+	var bb3 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["epstein-s-black-book", "nostradamus-mad-libs"]})
+	await process_frame
+	bb3._open_box_pick(_box_slot(bb3, "item", "big")) # native 1 + Nostradamus 1 = 2 entitled
+	bb3._box_choose(bb3.box_offer[0]) # pick 1 — native
+	bb3._box_choose(bb3.box_offer[0]) # pick 2 — the Nostradamus-granted pick, STILL entitled
+	check(bb3._artefact_count("epstein-s-black-book") == 1,
+		"Epstein's Black Book + Nostradamus Mad Libs: not consumed while still within THEIR combined entitlement")
+	bb3._box_choose(bb3.box_offer[0]) # pick 3 — beyond native+Nostradamus together
+	check(bb3._artefact_count("epstein-s-black-book") == 0,
+		"...consumed only once picks exceed everything else already entitled to (native + Nostradamus)")
+	bb3.queue_free()
+	await process_frame
+
+	# autoplay must resolve Black Book's bonus-round branch too, no modal.
+	var bb_auto_hit := false
+	for s in range(1, 9):
+		var ab := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"wave": 3, "gold": 0, "artefacts": ["epstein-s-black-book"], "seed": s})
+		await process_frame
+		ab.autoplay = true
+		ab._open_box_pick(_box_slot(ab, "item", "big"))
+		check(not ab.box_open, "autoplay (seed %d) resolves Epstein's Black Book's bonus round — no modal, no hang" % s)
+		if ab._artefact_count("epstein-s-black-book") == 0:
+			bb_auto_hit = true
+		ab.queue_free()
+		await process_frame
+	check(bb_auto_hit, "Epstein's Black Book: autoplay exercises the consume-on-excess-pick branch itself")
+
+	# All-Seeing Eye Contact Lens: the reveal is read straight off the same
+	# pre-rolled `contents` issue 47 already stores on the slot, so it must
+	# equal exactly what opening the Box actually yields — the acceptance
+	# test the issue calls out by name.
+	var eye := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["all-seeing-eye-contact-lens"]})
+	await process_frame
+	var eye_slot := _box_slot(eye, "artefact", "huge")
+	var revealed := Box.contents_names(eye_slot.contents)
+	eye._open_box_pick(eye_slot)
+	check(eye.box_offer.size() == 7, "(setup) Huge Box has 7 entries")
+	check(Box.contents_names(eye.box_offer) == revealed,
+		"All-Seeing Eye Contact Lens: revealed contents equal exactly what the Box yields on open")
+	eye.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

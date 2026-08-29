@@ -572,6 +572,17 @@ func _init() -> void:
 		# into Rules.legal_moves/ai_action/is_checkmate — same standing-rule
 		# shape as Nazca Boarding Pass, never an on_* dispatch.
 		"cheyenne-mountain-doorbell": true, "winchester-salt-lined-doors": true,
+		# issue 49: the Box-dependent batch. Epstein's Black Book and Cicada
+		# Rejection Letter are the SAME issue-46 _artefact_count(key) standing
+		# rule as Nostradamus/Bible Gag Reel Scroll/Snowden's Rubik's Cube
+		# above — read directly in game.gd's _box_choose/_decline_box_pick,
+		# not dispatched through ArtefactHooks.run(). All-Seeing Eye Contact
+		# Lens is a pure display gate (modals.gd's _shop_detail, game.gd's
+		# _open_bounty_pick), same standing-rule shape, no on_* hook to fire
+		# on at all — it never changes what a Box yields, only whether the
+		# UI shows it beforehand (issue 47 already rolls unconditionally).
+		"epstein-s-black-book": true, "cicada-rejection-letter": true,
+		"all-seeing-eye-contact-lens": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:

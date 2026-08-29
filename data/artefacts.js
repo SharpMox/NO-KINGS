@@ -83,6 +83,22 @@
    doesn't exist in data/tariffs.gd (issue 22 already flagged this exact gap
    and declined to guess one; issue 54 didn't supply one either) — a Notion
    question, not attempted.
+   2026-08-30 (issue 55): Zeta Reticuli Souvenir Map, Troll Farm Employee of
+   the Month, and Ecdysis Sheddings flipped to implemented: true — a run-long
+   capture counter (game.gd's run_capture_count) plus a Stock-conversion
+   OUTPUT flag on on_capture (ADR-0002: the piece's state rides along, same as
+   Extraction) for Zeta; a straight-to-_dispatch re-trigger of every held
+   on_wave_clear Artefact from on_wave_spawn for Troll Farm; and a
+   last-Artefact-bought record (g.ecdysis_copy_key, purchases only) mirrored
+   as an unregistered second copy of that key's dispatch for Ecdysis — see
+   game/scripts/artefact_hooks.gd's header for the full rationale of all
+   three, including the two-Ecdysis and Ecdysis+Troll-Farm non-recursion
+   arguments. This was issue 55's entire scope (the last 3 named in its own
+   text); the other still-`implemented: false` entries in this file at the
+   time of this change (Jet Fuel Vial, Oak Island Wishing Well, Roanoke Hex
+   Kit, SETI's Red Marker, Moscovium Glow Stick, FIFA Complimentary Yacht,
+   Zapruder's Director's Cut, Bovine Tractor Beam) belong to other,
+   independently in-flight issues, not this one.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -667,8 +683,8 @@ var ARTEFACTS = [
     effect: "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold",
     conspiracy: "HAARP", url: "https://en.wikipedia.org/wiki/High-frequency_Active_Auroral_Research_Program",
     summary: "An Alaskan array of 180 antennas for heating the ionosphere — blamed for hurricanes, earthquakes and moods. The knob was right there the whole time. Turn it up and the weather gets productive." },
-  { name: "Zeta Reticuli Souvenir Map", rarity: "Rare", type: "Trigger", bonus: ["Piece"], status: "KEEP",
-    effect: "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock (needs: capture conversion)",
+  { name: "Zeta Reticuli Souvenir Map", rarity: "Rare", type: "Trigger", bonus: ["Piece"], status: "KEEP", implemented: true,
+    effect: "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock",
     conspiracy: "The Hill abduction", url: "https://en.wikipedia.org/wiki/Barney_and_Betty_Hill_incident",
     summary: "New Hampshire, 1961: the first famous alien-abduction account, complete with a star map drawn under hypnosis. Specimens get taken aboard for the collection — every third one, per the schedule." },
   { name: "Roanoke Hex Kit", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
@@ -733,8 +749,8 @@ var ARTEFACTS = [
     effect: "Boxes reveal their contents before you buy or choose them",
     conspiracy: "The Eye of Providence", url: "https://en.wikipedia.org/wiki/Eye_of_Providence",
     summary: "The unfinished pyramid with the floating eye, printed on every dollar since 1935. To theorists it's the Illuminati signing their work in your wallet; to the designers it was Providence watching a young nation. The eye stays open." },
-  { name: "Ecdysis Sheddings", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
-    effect: "Copies the effect of the last other Artefact you bought (needs: artefact-copy dispatch)",
+  { name: "Ecdysis Sheddings", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
+    effect: "Copies the effect of the last other Artefact you bought",
     conspiracy: "The reptilian elite", url: "https://en.wikipedia.org/wiki/Reptilian_conspiracy_theory",
     summary: "David Icke's contribution: the ruling families are shapeshifting reptilians in human suits, betrayed by frame glitches in interview footage. Millions of views per 'slip'. The shed skin is the evidence that never gets bagged." },
   { name: "Hitler's Argentinian Passport", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP", implemented: true,
@@ -777,8 +793,8 @@ var ARTEFACTS = [
     effect: "You may spend 50 Gold to gain +1 Action, any number of times per Turn (needs: gold-action exchange)",
     conspiracy: "The FIFA corruption case", url: "https://en.wikipedia.org/wiki/2015_FIFA_corruption_case",
     summary: "Dawn raids on a Zurich luxury hotel, 2015: football's governing body indicted for decades of bribes — World Cup votes sold for cash, watches and better. The yacht is a small token of appreciation for your continued cooperation." },
-  { name: "Troll Farm Employee of the Month", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
-    effect: "Your \"Wave\" Artefacts also trigger on Wave start (needs: dual-trigger dispatch)",
+  { name: "Troll Farm Employee of the Month", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
+    effect: "Your \"Wave\" Artefacts also trigger on Wave start",
     conspiracy: "The troll farm", url: "https://en.wikipedia.org/wiki/Internet_Research_Agency",
     summary: "A St. Petersburg office block where employees worked scheduled shifts posting as fictional Americans — quotas, bonuses, and a 2018 US indictment naming the company. Astroturf, professionalized down to the rota." },
   { name: "CERN Ctrl+Z Shortcut", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,

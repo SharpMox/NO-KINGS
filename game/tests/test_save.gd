@@ -49,6 +49,7 @@ func _init() -> void:
 				"contents": [{"kind": "item", "name": "Blitz", "tier": "Tactical",
 					"description": "d", "payload": {"key": "blitz"}}]}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
+		"ecdysis_copy_key": "greed", # issue 55
 	}
 	var a := _boot(rich)
 	await process_frame

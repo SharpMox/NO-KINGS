@@ -602,6 +602,10 @@ func _init() -> void:
 		# const), so every listener on that hook sees it regardless of
 		# key-sort order — it never dispatches through the normal loop itself.
 		"definitely-not-russia-patch": true,
+		# issue 55: Troll Farm Employee of the Month / Ecdysis Sheddings —
+		# same "pure _run_meta_triggers observer" shape as the issue-21 batch
+		# above, see artefact_hooks.gd's own header.
+		"troll-farm-employee-of-the-month": true, "ecdysis-sheddings": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:
@@ -991,6 +995,148 @@ func _init() -> void:
 	check(peg2.actions_left == peg2_actions_before,
 		"Pegasus Free Trial: per piece — a second end-of-chain piece gets its own free move, not one shared")
 	peg2.queue_free()
+	await process_frame
+
+	# --- issue 55: meta-dispatch and capture conversion (the last 3) ---
+
+	# Zeta Reticuli Souvenir Map: every 3rd Capture of the RUN (not the Wave
+	# or Turn) goes to Stock instead of Captured Stock, state intact — the
+	# 3rd victim below carries a manually-stamped `captures` field (the
+	# per-piece ledger, issue 25) to prove Stock keeps it, not just the id
+	# (ADR-0002). A bystander rook far away keeps the board from clearing
+	# (and auto-passing) after the 3rd capture.
+	var zeta := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["pawn", 1, 4, 2],
+			["pawn", 1, 5, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["zeta-reticuli-souvenir-map"]})
+	await process_frame
+	zeta.actions_left = 10
+	zeta.board[Vector2i(5, 2)]["captures"] = 3 # arbitrary piece state to carry over
+	zeta._move_player(Vector2i(2, 2), Vector2i(3, 2)) # 1st Capture
+	check(zeta.captured.count("pawn") == 1 and zeta.stock.is_empty(),
+		"Zeta Reticuli Souvenir Map: the 1st Capture is unaffected")
+	zeta._move_player(Vector2i(3, 2), Vector2i(4, 2)) # 2nd Capture
+	check(zeta.captured.count("pawn") == 2 and zeta.stock.is_empty(),
+		"Zeta Reticuli Souvenir Map: the 2nd Capture is unaffected")
+	zeta._move_player(Vector2i(4, 2), Vector2i(5, 2)) # 3rd Capture — diverted
+	check(zeta.captured.count("pawn") == 2 and zeta.stock.size() == 1,
+		"Zeta Reticuli Souvenir Map: the 3rd Capture lands in Stock instead of Captured Stock")
+	check(zeta.stock[0] is Dictionary and zeta.stock[0].id == "pawn"
+			and zeta.stock[0].get("captures", -1) == 3 and not zeta.stock[0].has("owner"),
+		"Zeta Reticuli Souvenir Map: the Stock entry keeps the piece's state intact (captures " +
+		"ledger = 3), owner stripped — same shape as Extraction (ADR-0002)")
+	zeta.queue_free()
+	await process_frame
+
+	# Troll Farm Employee of the Month: a held on_wave_clear Artefact pays
+	# TWICE across one Wave boundary — once at the normal Wave clear, once
+	# more from the Wave-start echo. Trilateral Meeting Stickers (+5 Gold per
+	# held Artefact, no ctx read) makes the math ctx-independent.
+	var troll_a := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 0,
+		"artefacts": ["trilateral-meeting-stickers", "troll-farm-employee-of-the-month"]})
+	await process_frame
+	WaveLogic.queue(troll_a, 2)
+	check(troll_a.gold == 20,
+		"Troll Farm Employee of the Month: a Wave Artefact (Trilateral Meeting Stickers) pays " +
+		"twice across one Wave boundary — Wave clear (5x2=10) + the Wave-start echo (10) = 20")
+	troll_a.queue_free()
+	await process_frame
+
+	# Troll Farm re-triggering a 5-Wave Milestone Artefact (John Titor's
+	# Crypto Wallet, acquired Wave 2 -> beats at Wave 6, 11, …) uses THAT
+	# copy's own acquired_wave, not a wave-1 default (issue 28's exact bug) —
+	# the Wave-start echo re-checks the milestone against the already-bumped
+	# NEW wave, so it can hit (Wave 6) even on a boundary whose normal
+	# Wave-clear dispatch (for Wave 5, not this copy's beat) didn't pay.
+	var troll_b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 2, "gold": 0,
+		"artefacts": ["john-titor-s-crypto-wallet", "troll-farm-employee-of-the-month"]})
+	await process_frame
+	troll_b.clock_ms = 25000.0 # +5 Gold per firing (int(25.0 / 5.0))
+	for n in range(3, 6): # clear Waves 2, 3, 4: none is this copy's own beat
+		WaveLogic.queue(troll_b, n)
+	check(troll_b.gold == 0,
+		"Troll Farm + John Titor's Crypto Wallet: no payout before Wave 6 (this copy's own beat)")
+	WaveLogic.queue(troll_b, 6) # Wave 5 clears (not a beat); Wave 6 STARTS as one
+	check(troll_b.gold == 5,
+		"Troll Farm Employee of the Month: the Wave-start echo of a 5-Wave Milestone Artefact " +
+		"uses THIS copy's own acquired_wave (2) — it pays on Wave 6 (its beat) even though the " +
+		"ordinary Wave 5 Wave-clear dispatch just before it did not")
+	troll_b.queue_free()
+	await process_frame
+
+	# Ecdysis Sheddings: inert before any purchase, then mirrors the last
+	# OTHER Artefact bought as a genuine second copy (Greed: +10 per Capture).
+	var ecdy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 9999, "artefacts": ["ecdysis-sheddings"]})
+	await process_frame
+	check(ecdy.ecdysis_copy_key == "", "Ecdysis Sheddings: inert (no copy key) before anything is bought")
+	var ecdy_base: int = ecdy.defs.pawn.value
+	check(Economy.capture_score(ecdy, "pawn") == ecdy_base,
+		"Ecdysis Sheddings: copies nothing before any purchase — a plain Capture is unaffected")
+	ecdy.actions_left = 5
+	ecdy.shop_stock.append({"kind": "artefact", "key": "greed", "sold": false})
+	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
+	check(ecdy.ecdysis_copy_key == "greed", "Ecdysis Sheddings: records the last Artefact bought (Greed)")
+	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 20,
+		"Ecdysis Sheddings: mirrors the bought Greed as a second copy (+10 real, +10 mirrored = +20)")
+	# Buying a SECOND Ecdysis must not overwrite the copy key with its own —
+	# "other" excludes it — or two copies would chase each other.
+	ecdy.actions_left = 5
+	ecdy.shop_stock.append({"kind": "artefact", "key": "ecdysis-sheddings", "sold": false})
+	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
+	check(ecdy.ecdysis_copy_key == "greed",
+		"Ecdysis Sheddings: buying ANOTHER Ecdysis does not overwrite the copied key")
+	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 30,
+		"Ecdysis Sheddings: two held copies each independently mirror Greed (+10 real + 10 + 10 " +
+		"= +30) — bounded, no chase")
+	check(ecdy.artefact_echo_depth == 0,
+		"Ecdysis Sheddings: the echo-depth guard is back at 0 after dispatch (no leak)")
+	ecdy.queue_free()
+	await process_frame
+
+	# A Box-granted Artefact never fires on_purchase, so it can't set the
+	# copy key — "Box grants ... do not set it" (issue 55).
+	var ecdy_box := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["ecdysis-sheddings"]})
+	await process_frame
+	var score_catalog: Dictionary
+	for t in Items.ARTEFACT_EFFECTS:
+		if t.key == "score":
+			score_catalog = t
+			break
+	ecdy_box._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": score_catalog})
+	check(ecdy_box.ecdysis_copy_key == "",
+		"Ecdysis Sheddings: a Box-granted Artefact does not set the copied key")
+	ecdy_box.queue_free()
+	await process_frame
+
+	# The risky combo named in the issue: Ecdysis copying a bought Wave
+	# Artefact while Troll Farm is also held. Bounded, deterministic dispatch
+	# count across one Wave boundary proves neither the two-Ecdysis nor the
+	# Ecdysis+Troll-Farm shape can recurse: normal Wave-clear (1) + Ecdysis's
+	# mirror of it (1, hook == on_wave_clear) + Troll Farm's Wave-start echo
+	# of the real copy (1, hook == on_wave_spawn, never re-mirrored by
+	# Ecdysis since Trilateral doesn't listen on_wave_spawn) = 3 dispatches,
+	# not an infinite chain.
+	var ecdy_troll := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 9999,
+		"artefacts": ["troll-farm-employee-of-the-month", "ecdysis-sheddings"]})
+	await process_frame
+	ecdy_troll.actions_left = 5
+	ecdy_troll.shop_stock.append({"kind": "artefact", "key": "trilateral-meeting-stickers", "sold": false})
+	Shop.buy(ecdy_troll, ecdy_troll.shop_stock.size() - 1)
+	check(ecdy_troll.ecdysis_copy_key == "trilateral-meeting-stickers",
+		"setup: buying Trilateral Meeting Stickers records it as Ecdysis's copy target")
+	ecdy_troll.gold = 0 # isolate the Wave-boundary payout from the purchase's own spend
+	WaveLogic.queue(ecdy_troll, 2)
+	check(ecdy_troll.gold == 45,
+		"Ecdysis Sheddings + Troll Farm Employee of the Month + a bought Wave Artefact: exactly " +
+		"3 bounded dispatches across one Wave boundary (5 Gold x 3 held Artefacts x 3 dispatches " +
+		"= 45), not an infinite chain")
+	check(ecdy_troll.artefact_echo_depth == 0,
+		"Ecdysis + Troll Farm combo: the echo-depth guard is back at 0 after dispatch (no leak)")
+	ecdy_troll.queue_free()
 	await process_frame
 
 	print("---")

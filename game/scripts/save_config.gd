@@ -144,6 +144,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	# scenarios written before this field existed) so a resumed save doesn't
 	# double-count the Turn it was saved on.
 	g.turn_number = int(cfg.get("turn_number", g.turn_number))
+	g.ecdysis_copy_key = str(cfg.get("ecdysis_copy_key", "")) # issue 55, additive
 
 
 ## The inverse of apply(): the live run as a JSON-safe config Dictionary.
@@ -189,4 +190,5 @@ static func to_config(g) -> Dictionary:
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"tariffs_off": g.tariffs_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
+		"ecdysis_copy_key": g.ecdysis_copy_key,
 	}

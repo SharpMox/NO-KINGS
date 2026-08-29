@@ -10,6 +10,14 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # move/capture, place, merge/fuse, item use
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
+
+const ITEM_CAP_BASE := 3          # issue 53 (user ruling): held Items were
+                                   # unbounded before this — Area 51 Parking
+                                   # Permit raises it, +3 per copy (item_logic.gd)
+const PIECE_BUFF_CAP_BASE := 2    # issue 53 (user ruling): a board piece's
+                                   # buffs Array was unbounded before this —
+                                   # Abduction Probe raises it, +1 per copy
+                                   # (buff_logic.gd)
 ## Automatic tariff scheduling — OFF for now (user call 2026-08-28), pending
 ## the combined Kings + Tariffs design pass. This ONLY stops the every-10-waves
 ## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and

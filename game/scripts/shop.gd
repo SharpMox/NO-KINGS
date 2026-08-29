@@ -9,6 +9,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Box := preload("res://scripts/box.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
 ## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
@@ -231,7 +232,11 @@ static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
 			and g.actions_left >= 1 \
-			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot)
+			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
+			and (slot.kind != "item" or ItemLogic.has_room(g)) # issue 53: never
+				# sell an Item slot the player has no capacity to hold — a Box
+				# still sells fine even at capacity (it might not roll an Item;
+				# _box_choose's own ItemLogic.grant refuses that pick if it does)
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold

@@ -938,9 +938,9 @@
    "Special",
    "Piece"
   ],
-  "effect": "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives (needs: dodge + choice)",
+  "effect": "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives",
   "conspiracy": "The Gulf of Tonkin incident",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "snowden-s-rubik-s-cube",
@@ -1901,9 +1901,9 @@
   "bonus": [
    "Action"
   ],
-  "effect": "+2 Actions per Turn, but you cannot Pass while Actions remain (needs: forced-action rule)",
+  "effect": "+2 Actions per Turn, but you cannot Pass while Actions remain",
   "conspiracy": "The Hellfire Club",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "shrinkflation-cereal-box",
@@ -2023,9 +2023,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Pieces at the end of their Rank chain can move twice each Turn",
+  "effect": "The first move or capture each Turn by a piece at the end of its Rank chain costs no Action",
   "conspiracy": "Pegasus spyware",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "exhibit-399",
@@ -2035,9 +2035,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "When a Tariff would be applied: you choose between 2 options (needs: tariff choice)",
+  "effect": "When a Tariff would be applied: you choose between 2 options",
   "conspiracy": "The Warren Commission",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "defense-lobbyist-business-card",
@@ -2144,9 +2144,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Once per Wave: when one of your pieces would be captured, it instead moves 1 square away (needs: dodge)",
+  "effect": "Once per Wave: when one of your pieces would be captured, it instead moves 1 square away",
   "conspiracy": "The Pentagon UAP videos",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "winchester-salt-lined-doors",

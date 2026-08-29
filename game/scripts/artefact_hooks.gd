@@ -601,6 +601,57 @@
 ##   (on_score_change + on_clock_change, both gated `g.turn_number % 3 == 0`)
 ##   — see REGISTRY/_dispatch below.
 ##
+## issue 54 closed issue 33's parked group (decisions #2/#3/#4) plus the
+## dormant Tariff pair:
+## - UAP Breath Mint / Inflatable Vietcong Torpedo (both user-ruled to
+##   auto-resolve, no targeting step, no Gold prompt) extend the EXISTING
+##   repel guard in game.gd's `_run_enemy_actions` — the same "this capture
+##   attempt does not happen" shape BuffLogic.repels_capture and Cheyenne
+##   Mountain Doorbell already use — rather than a second interception point.
+##   Both are standing-rule reads there (`_held(...)`, like Cheyenne), each
+##   still getting a REGISTRY entry purely for their own `on_wave_clear`
+##   reset (`g.uap_used_this_wave`/`g.torpedo_used_this_wave`, same
+##   once-per-Wave idiom as Hoffa's Cement Shoes above — a single flag, not
+##   scaled by held copies).
+## - Hellfire Club Discord Invite (+2 Actions/Turn, on_turn_start like CIA
+##   Exploding Cigar) also gates game.gd's `_on_pass` — "cannot Pass while
+##   Actions remain" is a genuine new restriction (`_on_pass` had no
+##   actions_left check before this), so it's paired with
+##   `_has_legal_action()` (moves, Deploys, Items) as an explicit escape
+##   hatch: the restriction only applies when a legal Action actually
+##   exists, so a fully boxed-in board can never be stuck.
+## - Pegasus Free Trial was reworked by the user away from its original
+##   "pieces at the end of their Rank chain can move twice each Turn" (which
+##   would have redefined `moved_this_turn`, the field Blitz depends on, and
+##   is why issue 33 parked it) to "the first move/capture each Turn by an
+##   end-of-chain piece costs no Action" — the SAME free-move mechanism
+##   Blitz's own rework already built (`blitz_free_move`), granted instead of
+##   item-triggered. Its on_turn_start handler runs after game.gd's own
+##   per-turn `blitz_free_move` cleanup now (that cleanup moved earlier in
+##   `_begin_player_turn`, before the `ArtefactHooks.run(self, "on_turn_start")`
+##   call, specifically so this grant survives it) — never touches
+##   `moved_this_turn`. Boolean grant, not additive: 2 held copies still
+##   grant exactly one free move per eligible piece, same non-stacking
+##   precedent as Y2K Patch Floppy Disk above.
+## - Exhibit 399 ("you choose between 2 options") is wired but genuinely
+##   dormant: Tuning.TARIFFS_SCHEDULED is false (2026-08-29 ruling), so
+##   Tariffs never activate in a live run and this can only be exercised by
+##   calling economy.gd's `apply_tariff`/`activate_tariff_by_key` directly —
+##   done in game/tests/test_items_tariffs.gd. Its on_tariff_apply handler
+##   sets a new `ctx.choice` output flag (mirrors `ctx.cancel`'s shape);
+##   apply_tariff defers the Tariff's actual effect (now split out as
+##   `resolve_tariff`) to game.gd's `_open_exhibit_choice`, which reframes
+##   "2 options" as the existing tariff-cancel mechanism (Salvation Gift
+##   Card's own veto) handed to the player as a real choice via the issue-41
+##   choice-pick seam, instead of firing automatically and with no recharge
+##   limit. `ctx.cancel` is still checked first, so Salvation's automatic
+##   veto wins outright if both are somehow held.
+## - SETI's Red Marker ("one random active Tariff is inverted into its
+##   equivalent bonus") stays unimplemented: it needs a per-Tariff "what's
+##   this one's opposite" table that doesn't exist in data/tariffs.gd — the
+##   exact gap issue 22 already flagged and declined to guess at, and issue
+##   54 didn't supply one either. A Notion question, not attempted.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -920,6 +971,14 @@ const REGISTRY := {
 	"denver-bunker-timeshare": ["on_gold_change"],
 	"alien-pet-rocks": ["on_wave_clear"],
 	"spare-organ-receipt": ["on_fuse"],
+
+	# --- issue 54: dodge (auto-resolving, no targeting/prompt), the dormant
+	# Tariff pair, and two action-economy rules; see header note below ---
+	"uap-breath-mint": ["on_wave_clear"],
+	"inflatable-vietcong-torpedo": ["on_wave_clear"],
+	"hellfire-club-discord-invite": ["on_turn_start"],
+	"pegasus-free-trial": ["on_turn_start"],
+	"exhibit-399": ["on_tariff_apply"],
 }
 
 
@@ -2259,3 +2318,19 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# "a Fuse consumes two pieces" names no distinction, and
 			# commit_merge's own ids are already in scope there either way).
 			g.gold += roundi((g.defs[ctx.a_id].value + g.defs[ctx.b_id].value) * 0.5)
+
+		# --- issue 54: dodge, the dormant Tariff pair, and two action-economy
+		# rules (see this file's own header, above the REGISTRY const) ---
+		["uap-breath-mint", "on_wave_clear"]:
+			g.uap_used_this_wave = false
+		["inflatable-vietcong-torpedo", "on_wave_clear"]:
+			g.torpedo_used_this_wave = false
+		["hellfire-club-discord-invite", "on_turn_start"]:
+			g.actions_left += 2
+		["pegasus-free-trial", "on_turn_start"]:
+			for pos in g.board:
+				if g.board[pos].owner == Rules.PLAYER and g.board[pos].id != "king" \
+						and g.defs[g.board[pos].id].next == null:
+					g.board[pos].blitz_free_move = true
+		["exhibit-399", "on_tariff_apply"]:
+			ctx.choice = true

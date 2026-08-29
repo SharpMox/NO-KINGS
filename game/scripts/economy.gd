@@ -213,14 +213,28 @@ static func activate_tariff_by_key(g, key: String) -> void:
 ## handlers (e.g. Merchants of Death Sample Case) still fire regardless of
 ## key-sort order, the same precedent as on_piece_lost's Fireproof Pajamas
 ## (artefact hook 24) rather than reordering the dispatch to favor one
-## handler over another.
+## handler over another. `choice` (issue 22/54) is Exhibit 399's — the actual
+## effect (resolve_tariff below) is deferred to game.gd's choice-pick
+## callback instead of running here; Salvation's automatic cancel still wins
+## outright if both are somehow held (ctx.cancel is checked first).
 static func apply_tariff(g, t: Dictionary) -> void:
 	g.tariffs_seen.append(t.name)
 	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
 	var ctx := ArtefactHooks.run(g, "on_tariff_apply",
-		{"key": t.key, "tier": t.get("tier", ""), "cancel": false})
+		{"key": t.key, "tier": t.get("tier", ""), "cancel": false, "choice": false})
 	if ctx.cancel:
 		return
+	if ctx.choice:
+		return g._open_exhibit_choice(t)
+	resolve_tariff(g, t)
+
+
+## The Tariff's actual effect — split out of apply_tariff (issue 54) so
+## Exhibit 399 can defer this half behind a player choice while the banner
+## and the on_tariff_apply dispatch above still fire immediately, exactly as
+## they always did (Merchants of Death Sample Case's own reward doesn't wait
+## on the pick either).
+static func resolve_tariff(g, t: Dictionary) -> void:
 	if t.kind == "oneoff":
 		match t.key:
 			"forced_audit":

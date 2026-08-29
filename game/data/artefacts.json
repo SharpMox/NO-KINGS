@@ -950,9 +950,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Once per Box: you may reroll the offered Picks (needs: box reroll)",
+  "effect": "Once per Box: you may reroll the offered Picks",
   "conspiracy": "PRISM",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bermuda-triangulation",
@@ -1159,9 +1159,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On Box Pick: you may reject the contents once and reroll them (needs: box reroll)",
+  "effect": "On Box Pick: you may reject the contents once and reroll them",
   "conspiracy": "The Vatican Secret Archives",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "youth-fountain-martini",
@@ -1464,9 +1464,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On opening a Box: +1 extra pick (needs: box multi-pick)",
+  "effect": "On opening a Box: +1 extra pick",
   "conspiracy": "Nostradamus",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "flight-19-blackbox",

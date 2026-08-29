@@ -50,6 +50,7 @@ func _init() -> void:
 					"description": "d", "payload": {"key": "blitz"}}]}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
 		"ecdysis_copy_key": "greed", # issue 55
+		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
 	}
 	var a := _boot(rich)
 	await process_frame
@@ -71,6 +72,11 @@ func _init() -> void:
 		if JSON.stringify(saved[k]) != JSON.stringify(again.get(k)):
 			print("DIFF %s: %s -> %s" % [k, JSON.stringify(saved[k]), JSON.stringify(again.get(k))])
 	check(b.score == 470, "score restored")
+	check(b.run_capture_count == 7,
+		"issue 55: the run-long Capture counter survives a resume — Zeta Reticuli's "
+		+ "\"every 3rd Capture\" cadence must not restart at 0 on load. The generic "
+		+ "save->load->save identity check cannot catch this: a field missing from the "
+		+ "save entirely is absent from BOTH sides and compares equal.")
 	check(b.gold == 35, "gold restored")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")

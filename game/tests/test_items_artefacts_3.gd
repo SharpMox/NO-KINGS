@@ -130,17 +130,22 @@ func _init() -> void:
 	ppr.queue_free()
 	await process_frame
 
-	var mrna := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["mrna-firmware-update"]})
+	var mrna := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 3], ["pawn", 0, 4, 4],
+			["rook", 1, 7, 10]], "wave": 3, "artefacts": ["mrna-firmware-update"]})
 	await process_frame
 	mrna.actions_left = 5
-	for i in 3:
+	# 3 DIFFERENT pieces, one apply each (issue 53: a Piece Buff cap now
+	# exists — the same piece taking 3 applies of "shield" would hit it and
+	# refuse the 3rd, which is exactly what this loop used to rely on).
+	# mrna_apply_count is a run-wide counter either way, so every 3rd apply
+	# still Ranks Up whichever piece THAT one landed on.
+	for t in [Vector2i(2, 2), Vector2i(3, 3), Vector2i(4, 4)]:
 		mrna.items.append(_item("buff_box", "tile"))
 		mrna._use_item(0)
 		mrna._buff_chosen("shield")
-		mrna._item_click(Vector2i(2, 2))
-	check(mrna.board[Vector2i(2, 2)].id == "sergeant",
-		"mRNA Firmware Update: every 3rd Piece Buff you apply also Ranks Up the piece")
+		mrna._item_click(t)
+	check(mrna.board[Vector2i(4, 4)].id == "sergeant",
+		"mRNA Firmware Update: every 3rd Piece Buff you apply also Ranks Up that piece")
 	mrna.queue_free()
 	await process_frame
 

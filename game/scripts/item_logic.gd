@@ -14,6 +14,37 @@ static func chain_base(defs: Dictionary, id: String) -> String:
 	return id
 
 
+## Held Item capacity (issue 53, user ruling) — base 3, +3 per held Area 51
+## Parking Permit, additive per copy (the header's stacking rule). A
+## structural read off g.artefacts, not a hook — same pattern as
+## Shop._extra_item_slots/_credit (shop.gd), Box's own standing-rule reads.
+static func cap(g) -> int:
+	var permits := 0
+	for t in g.artefacts:
+		if t.key == "area-51-parking-permit":
+			permits += 1
+	return Tuning.ITEM_CAP_BASE + 3 * permits
+
+
+## Room for one more Item right now.
+static func has_room(g) -> bool:
+	return g.items.size() < cap(g)
+
+
+## Grant one Item if there's room; refuses (drops it) when the inventory is
+## full — a full inventory REFUSES the acquisition (issue 53 ruling: simpler,
+## matches "capacity"), rather than forcing a discard. Every Item-granting
+## path (Box pick, Artefact grant, Yalta Cocktail Napkin's own pick) routes
+## new grants through here; the Shop instead keeps a full-capacity Item
+## unbuyable via Shop.can_buy(), so that path never reaches this refusal at
+## all. Returns whether it landed.
+static func grant(g, item: Dictionary) -> bool:
+	if not has_room(g):
+		return false
+	g.items.append(item)
+	return true
+
+
 static func stage_targets(board: Dictionary, defs: Dictionary, key: String, a: Vector2i,
 		moved: Array[Vector2i] = [] as Array[Vector2i]) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []

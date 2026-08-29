@@ -317,15 +317,16 @@
 ##   a REGISTRY hook — issue 18's own held-back note already called this one
 ##   out as "not a hook at all", so it stays off this file's choke points
 ##   entirely, additive per held copy same as everything else here.
-## - Abduction Probe ("pieces can carry 2 Piece Buffs at once") stays
-##   unimplemented after the audit the issue asked for: BuffLogic.add already
-##   appends to a plain Array with no 1-buff cap anywhere — not in BuffLogic,
-##   not in buff_box's Item targeting, not in any artefact grant — so a
-##   second Piece Buff already lands today, artefact or not. There is no
-##   existing cap to lift from 1 to 2, so "implementing" this artefact would
-##   mean introducing a brand-new base-game restriction (default 1, this
-##   artefact raises it to 2) that nothing today asks for — a design
-##   decision, not a wiring job. Notion question, not a guess.
+## - Abduction Probe stayed unimplemented after the audit this note
+##   originally left behind (BuffLogic.add appended to a plain Array with no
+##   cap anywhere — introducing one was a design decision, not a wiring job).
+##   Issue 53 got the user ruling: Piece Buff capacity is a real base-game cap
+##   now, base 2, enforced in game.gd's `_apply_buff` choke point
+##   (BuffLogic.cap()/catalogued_count(), buff_logic.gd) — Abduction Probe
+##   raises it to 3, +1 per held copy, and is re-texted "+1 Piece Buff
+##   capacity" (its old "carry 2 at once" line assumed a base of 1). A
+##   refused 3rd buff is a clean no-op with a floating "Buffs full" label
+##   (same idiom as "Blocked"/"Stunned!"), not a silent drop or a crash.
 ##
 ## issue 25 (split from 19 — 3 artefacts want a capture count kept per
 ## INDIVIDUAL piece, not Economy's run-wide wave/turn_capture_count) added a
@@ -631,6 +632,8 @@ const HOOKS := [
 	"on_action",
 	# --- issue 35: Clock-gain choke point (economy.gd add_clock) ---
 	"on_clock_change",
+	# --- issue 53: a Merge resolving (merge_logic.gd commit_merge) ---
+	"on_fuse",
 ]
 
 ## Artefact key -> hooks it fires on. The source of truth for "does this
@@ -903,6 +906,20 @@ const REGISTRY := {
 	"frog-pride-flag": ["on_piece_lost", "on_deploy"],
 	"y2k-patch-floppy-disk": ["on_wave_spawn", "on_enemy_turn_start"],
 	"pandemic-toilet-paper-pallet": ["on_purchase", "on_price"],
+
+	# --- issue 53: two new base-game caps + four resolved ambiguities.
+	# Area 51 Parking Permit and Abduction Probe deliberately have NO REGISTRY
+	# entry — item_logic.gd's cap()/buff_logic.gd's cap() read g.artefacts
+	# directly (the standing-rule shape, same as chocolate-key-cake above).
+	# 'Definitely Not Russia' Patch ALSO has none: masking "the first loss
+	# each Wave" has to be decided BEFORE on_piece_lost dispatches (every
+	# other handler on that hook needs to see the verdict, not just whichever
+	# handler happens to key-sort after this one — see game.gd
+	# _lose_player_piece), so it's a structural read there instead, same
+	# standing-rule shape as the two caps above. ---
+	"denver-bunker-timeshare": ["on_gold_change"],
+	"alien-pet-rocks": ["on_wave_clear"],
+	"spare-organ-receipt": ["on_fuse"],
 }
 
 
@@ -1573,12 +1590,12 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["frame-25", "on_wave_clear"]:
 			var tac_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 				return it.tier == "Tactical")
-			g.items.append(tac_pool[g.rng.randi() % tac_pool.size()])
+			ItemLogic.grant(g, tac_pool[g.rng.randi() % tac_pool.size()])
 			g.gold = maxi(g.gold - 10, 0)
 		["manna-vending-machine", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave):
 				for i in 2:
-					g.items.append(Items.ITEMS[g.rng.randi() % Items.ITEMS.size()])
+					ItemLogic.grant(g, Items.ITEMS[g.rng.randi() % Items.ITEMS.size()])
 		["mao-s-loyalty-badge", "on_purchase"]:
 			if ctx.kind == "item":
 				var tier := ""
@@ -1589,7 +1606,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				if tier == "Tactical":
 					var pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 						return it.tier == "Tactical")
-					g.items.append(pool[g.rng.randi() % pool.size()])
+					ItemLogic.grant(g, pool[g.rng.randi() % pool.size()])
 
 		# --- issue 13: tariff system ---
 		# The 8 action-cost tariffs share one hook: charge() calls run() once
@@ -1635,31 +1652,44 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.roster.append(extras[g.rng.randi() % extras.size()])
 
 		# --- issue 19: on_piece_lost (game.gd _lose_player_piece) ---
+		# issue 53: every handler below except fireproof-pajamas now also
+		# checks `not ctx.uncounted` — 'Definitely Not Russia' Patch's masked
+		# first-loss-of-the-Wave "doesn't count as a loss for your Artefacts
+		# and penalties" (user ruling), computed once, up front, in
+		# _lose_player_piece itself (see its header) so every listener here
+		# sees the same verdict regardless of key-sort order. Fireproof
+		# Pajamas is the one exception: `cancel` decides whether there's a
+		# loss AT ALL, a question the masking flag doesn't touch — the piece
+		# is still lost either way (header: this is NOT `cancel`).
 		["satoshi-s-private-key", "on_wave_clear"]:
 			g.gold += 2 * g._player_pieces().size()
 		["satoshi-s-private-key", "on_piece_lost"]:
-			g.gold = maxi(g.gold - 2, 0)
+			if not ctx.uncounted:
+				g.gold = maxi(g.gold - 2, 0)
 		["lusitania-hardtack-crate", "on_piece_lost"]:
-			if not BuffLogic.of(g.board[ctx.pos]).is_empty():
+			if not ctx.uncounted and not BuffLogic.of(g.board[ctx.pos]).is_empty():
 				g.gold += 150
 				g.score += 150
 		["templar-severance-gold-one-pile", "on_piece_lost"]:
-			if _ranked(g.defs, ctx.id):
+			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.gold += 150
 		["d-b-cooper-s-parachute", "on_piece_lost"]:
-			g.gold += roundi(g.defs[ctx.id].value * 0.75)
+			if not ctx.uncounted:
+				g.gold += roundi(g.defs[ctx.id].value * 0.75)
 		["nibiru-hide-and-seek-trophy", "on_wave_clear"]:
 			g.nibiru_wave_streak += 1
 			g.gold += 10 * g.nibiru_wave_streak
 		["nibiru-hide-and-seek-trophy", "on_piece_lost"]:
-			g.nibiru_wave_streak = 0
+			if not ctx.uncounted:
+				g.nibiru_wave_streak = 0
 		["flight-19-blackbox", "on_piece_lost"]:
-			g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+			if not ctx.uncounted:
+				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
 		["backmasked-vinyl", "on_piece_lost"]:
-			if _ranked(g.defs, ctx.id):
+			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
 		["tutankhamun-s-death-thong", "on_piece_lost"]:
-			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0:
+			if not ctx.uncounted and ctx.reason == "captured" and ctx.attacker_pos.x >= 0:
 				g._apply_buff(g.board[ctx.attacker_pos], "slow", _buff_turns("slow"), ctx.attacker_pos)
 		["kgb-photo-eraser", "on_piece_lost"]:
 			# Fires before the board entry is erased (header), so the lost
@@ -1668,7 +1698,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# ctx.cancel (issue 24, Fireproof Pajamas) means the piece is NOT
 			# actually lost — skip the transfer or it'd duplicate the Buff.
 			var lost_buffs: Array = BuffLogic.of(g.board[ctx.pos])
-			if not ctx.cancel and not lost_buffs.is_empty():
+			if not ctx.cancel and not ctx.uncounted and not lost_buffs.is_empty():
 				var ally := _nearest_ally(g, ctx.pos)
 				if ally.x >= 0:
 					for b in lost_buffs:
@@ -1698,14 +1728,14 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.tier == "Tactical":
 				g.item_use_tactical_count += 1
 				if g.item_use_tactical_count % 3 == 0:
-					g.items.append(_random_item_of_tier(g.rng, "Strategic"))
+					ItemLogic.grant(g, _random_item_of_tier(g.rng, "Strategic"))
 			elif ctx.tier == "Strategic":
 				g.item_use_strategic_count += 1
 				if g.item_use_strategic_count % 3 == 0:
-					g.items.append(_random_item_of_tier(g.rng, "Decisive"))
+					ItemLogic.grant(g, _random_item_of_tier(g.rng, "Decisive"))
 		["defense-lobbyist-business-card", "on_item_consume"]:
 			if ctx.tier != "Tactical":
-				g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
 
 		# --- issue 19: on_rank_up (merge_logic.gd commit_merge, game.gd "promote") ---
 		["witness-protection-mustache", "on_rank_up"]:
@@ -1802,7 +1832,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.amount += ctx.base * 0.5
 		["fort-knox-iou", "on_wave_clear"]:
 			if g.gold < 10:
-				g.items.append(_random_item_of_tier(g.rng, "Tactical"))
+				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
 
 		# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd) ---
 		["merchants-of-death-sample-case", "on_tariff_apply"]:
@@ -1824,12 +1854,17 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.turn_capture_index == 0 and ctx.attacker_pos.x >= 0:
 				ctx.move_to_backrow = true
 		["fireproof-pajamas", "on_piece_lost"]:
+			# Deliberately NOT gated on ctx.uncounted (issue 53): `cancel`
+			# decides whether the piece is lost AT ALL, a question upstream of
+			# — and unaffected by — 'Definitely Not Russia' Patch's masking of
+			# an already-real loss (header note above).
 			if ctx.reason == "destroyed":
 				ctx.cancel = true
 		["hoffa-s-cement-shoes", "on_wave_clear"]:
 			g.hoffa_used_this_wave = false
 		["hoffa-s-cement-shoes", "on_piece_lost"]:
-			if ctx.reason == "captured" and ctx.attacker_pos.x >= 0 and not g.hoffa_used_this_wave:
+			if not ctx.uncounted and ctx.reason == "captured" \
+					and ctx.attacker_pos.x >= 0 and not g.hoffa_used_this_wave:
 				g.hoffa_used_this_wave = true
 				ctx.destroy_attacker = true
 
@@ -2008,8 +2043,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			else: # belt-and-suspenders: on_piece_lost below already zeroed it
 				g.club27_streak = 0
 		["27-club-punch-card", "on_piece_lost"]:
-			g.club27_streak = 0
-			g.gold = maxi(g.gold - 50, 0)
+			if not ctx.uncounted: # issue 53: a masked loss is not "a loss" for
+				# this penalty either — same guard as every other listener here
+				g.club27_streak = 0
+				g.gold = maxi(g.gold - 50, 0)
 		["27-club-punch-card", "on_score_change"]:
 			if g.club27_streak > 0:
 				ctx.amount += ctx.base * 0.05 * float(g.club27_streak)
@@ -2140,8 +2177,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# Arms on ANY player-piece loss, not per-reason — "losing a piece"
 			# has no qualifier in the catalog text. ctx.cancel (issue 24,
 			# Fireproof Pajamas) means the piece is NOT actually lost — same
-			# skip as KGB Photo Eraser's on_piece_lost handler above.
-			if not ctx.cancel:
+			# skip as KGB Photo Eraser's on_piece_lost handler above. ctx.
+			# uncounted (issue 53) is explicitly named in the ruling ("Frog
+			# Pride Flag's arming") as one of the effects a masked loss hides.
+			if not ctx.cancel and not ctx.uncounted:
 				g.frog_armed = true
 		["frog-pride-flag", "on_deploy"]:
 			# Single flag, not a counter: losing several pieces before the
@@ -2191,3 +2230,32 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# percentage contract as every other on_price handler.
 			if (g.pallet_purchase_count + 1) % 2 == 0:
 				ctx.amount -= ctx.base * 0.5
+
+		# --- issue 53: two new base-game caps + four resolved ambiguities ---
+		["denver-bunker-timeshare", "on_gold_change"]:
+			# Item cap (issue 53): "while all your Item slots are full" reads
+			# ItemLogic.cap(g), not the pre-Area-51 base — a held Parking
+			# Permit raises the cap the same way it raises the bar this
+			# artefact itself has to clear.
+			if g.items.size() >= ItemLogic.cap(g):
+				ctx.amount += ctx.base * 0.30
+		["alien-pet-rocks", "on_wave_clear"]:
+			# "Did not move" (issue 53 ruling): only a move/capture the player
+			# spent an Action on stamps `moved_wave` (game.gd _move_player, the
+			# only 2 call sites — mirrors the existing moved_this_turn idiom).
+			# A Deploy, or an effect-driven shove (Tactical Reposition, Decoy
+			# Swap, Rapid Deployment — all 3 resolve in game.gd _item_apply,
+			# never through _move_player; Royal Fiat's forced retreat rides
+			# the SAME _move_player call as the capture that already earned
+			# this piece its stamp), never sets it, so all of those still pay.
+			var still := 0
+			for pos in g.board:
+				if g.board[pos].owner == Rules.PLAYER and g.board[pos].get("moved_wave", -1) != g.wave:
+					still += 1
+			g.gold += 2 * still
+		["spare-organ-receipt", "on_fuse"]:
+			# User ruling: 50% of BOTH consumed pieces' value, combined — fires
+			# for every merge_logic.gd commit_merge (Rank Up or Fusion alike;
+			# "a Fuse consumes two pieces" names no distinction, and
+			# commit_merge's own ids are already in scope there either way).
+			g.gold += roundi((g.defs[ctx.a_id].value + g.defs[ctx.b_id].value) * 0.5)

@@ -457,6 +457,113 @@ func _init() -> void:
 	trojan.queue_free()
 	await process_frame
 
+	# --- issue 44: Yalta Cocktail Napkin, the choice-modal seam's (issue 41)
+	# first real consumer — "On 5-Wave Milestone: choose one — +100 Gold /
+	# +1 Item / +15s Clock", same per-artefact _milestone5_hit cadence as
+	# silk-road-coupon/ark's-bunkbed/trojan-horse-assembly-manual above ---
+	var yalta_gold := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 0, "artefacts": ["yalta-cocktail-napkin"], "clock_s": 100.0})
+	await process_frame
+	yalta_gold.artefacts[0].acquired_wave = 1
+	check(not yalta_gold.buff_pick_open, "(control) no choice pick open before the Wave-5 clear")
+	WaveLogic.queue(yalta_gold, 6) # clears wave 5 -> 5-Wave Milestone
+	check(yalta_gold.buff_pick_open and yalta_gold.modals.buff_panel != null,
+		"Yalta Cocktail Napkin: a 5-Wave Milestone opens the choice-modal seam")
+	var yalta_clock_before_wait: float = yalta_gold.clock_ms
+	await create_timer(0.2).timeout
+	check(yalta_gold.clock_ms < yalta_clock_before_wait,
+		"Yalta Cocktail Napkin: the Clock keeps ticking while its Milestone pick is open")
+	var yalta_gold_before: int = yalta_gold.gold
+	yalta_gold.modals.choice_chosen.emit("gold")
+	check(not yalta_gold.buff_pick_open and yalta_gold.gold == yalta_gold_before + 100,
+		"Yalta Cocktail Napkin: the 'gold' branch pays +100 Gold through Economy.earn")
+	yalta_gold.queue_free()
+	await process_frame
+
+	var yalta_item := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "artefacts": ["yalta-cocktail-napkin"]})
+	await process_frame
+	yalta_item.artefacts[0].acquired_wave = 1
+	WaveLogic.queue(yalta_item, 6)
+	check(yalta_item.buff_pick_open and yalta_item.items.is_empty(),
+		"(setup) the Milestone pick is open, no Items held yet")
+	yalta_item.modals.choice_chosen.emit("item")
+	check(yalta_item.items.size() == 1 and not yalta_item.buff_pick_open,
+		"Yalta Cocktail Napkin: the 'item' branch appends a random entry from Items.ITEMS — the same pool a Box's item roll draws from")
+	yalta_item.queue_free()
+	await process_frame
+
+	var yalta_clock := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "artefacts": ["yalta-cocktail-napkin"], "clock_s": 100.0})
+	await process_frame
+	yalta_clock.artefacts[0].acquired_wave = 1
+	WaveLogic.queue(yalta_clock, 6)
+	var yalta_clock_before_pick: float = yalta_clock.clock_ms
+	yalta_clock.modals.choice_chosen.emit("clock")
+	check(yalta_clock.clock_ms >= yalta_clock_before_pick + 14500.0 and not yalta_clock.buff_pick_open,
+		"Yalta Cocktail Napkin: the 'clock' branch grants +15s through Economy.add_clock")
+	yalta_clock.queue_free()
+	await process_frame
+
+	var yalta_cancel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 0, "artefacts": ["yalta-cocktail-napkin"]})
+	await process_frame
+	yalta_cancel.artefacts[0].acquired_wave = 1
+	WaveLogic.queue(yalta_cancel, 6)
+	check(yalta_cancel.buff_pick_open, "(setup) the Milestone pick is open")
+	yalta_cancel.modals.choice_pick_cancelled.emit()
+	check(not yalta_cancel.buff_pick_open and yalta_cancel.gold == 0 and yalta_cancel.items.is_empty(),
+		"Yalta Cocktail Napkin: cancelling forfeits the reward — a Milestone isn't a spend, nothing to refund")
+	yalta_cancel.queue_free()
+	await process_frame
+
+	# per-artefact cadence: two held copies acquired on different Waves fire
+	# independently — only the one due copy hits this clear
+	var yalta_stagger := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "artefacts": ["yalta-cocktail-napkin", "yalta-cocktail-napkin"]})
+	await process_frame
+	yalta_stagger.artefacts[0].acquired_wave = 1 # due on this Wave-5 clear
+	yalta_stagger.artefacts[1].acquired_wave = 2 # due on Wave 6's clear instead
+	WaveLogic.queue(yalta_stagger, 6)
+	check(yalta_stagger.buff_pick_open,
+		"Yalta Cocktail Napkin: the copy acquired on Wave 1 hits its own Milestone on the Wave-5 clear")
+	yalta_stagger.modals.choice_chosen.emit("gold")
+	check(not yalta_stagger.buff_pick_open,
+		"Yalta Cocktail Napkin: only the one due copy fired — resolving it leaves nothing else pending")
+	yalta_stagger.queue_free()
+	await process_frame
+
+	# two copies acquired on the SAME Wave both hit the Milestone in the
+	# same synchronous on_wave_clear dispatch pass; the second must not
+	# clobber the first copy's still-open panel (mirrors trojan-horse-
+	# assembly-manual's own `not g.box_open` guard above) — resolving the
+	# first pays exactly one reward, not two
+	var yalta_double := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 0, "artefacts": ["yalta-cocktail-napkin", "yalta-cocktail-napkin"]})
+	await process_frame
+	yalta_double.artefacts[0].acquired_wave = 1
+	yalta_double.artefacts[1].acquired_wave = 1
+	WaveLogic.queue(yalta_double, 6)
+	check(yalta_double.buff_pick_open, "(setup) both copies are due; the first opens the modal")
+	yalta_double.modals.choice_chosen.emit("gold")
+	check(yalta_double.gold == 100 and not yalta_double.buff_pick_open,
+		"Yalta Cocktail Napkin: two copies due on the same Wave still pay exactly one reward, not two")
+	yalta_double.queue_free()
+	await process_frame
+
+	# autoplay resolves the choice itself with rng instead of opening the
+	# modal, so the bot never deadlocks on the panel
+	var yalta_bot := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 0, "artefacts": ["yalta-cocktail-napkin"]})
+	await process_frame
+	yalta_bot.artefacts[0].acquired_wave = 1
+	yalta_bot.autoplay = true
+	WaveLogic.queue(yalta_bot, 6)
+	check(not yalta_bot.buff_pick_open,
+		"Yalta Cocktail Napkin: autoplay resolves the Milestone pick itself — no modal, no hang")
+	yalta_bot.queue_free()
+	await process_frame
+
 	# --- issue 26: per-Wave first/last-lost tracking (Jon Burrows' Fake ID,
 	# Walt's Cryonic Capsule) ---
 	var loss := _boot({"board": [["pawn", 0, 2, 2], ["knight", 0, 3, 2], ["bishop", 0, 4, 2],

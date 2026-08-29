@@ -1391,9 +1391,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On 5-Wave Milestone: choose one — +100 Gold / +1 Item / +15s Clock (needs: choice UI)",
+  "effect": "On 5-Wave Milestone: choose one — +100 Gold / +1 Item / +15s Clock",
   "conspiracy": "The Yalta Conference",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "sugar-free-chemtrail-can",

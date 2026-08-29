@@ -1,6 +1,6 @@
 # 45 — Three Artefacts whose blocker notes went stale
 
-Status: todo — INDEPENDENT (no design decision needed) · **run after slice 43 merges**
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -101,3 +101,38 @@ Checked and genuinely still blocked — recorded so the next pass does not re-ch
 ## Blocked by
 
 - nothing (sequence after 43)
+
+## Outcome
+
+Shipped in PR #163. All three implemented; catalog 146 -> 149.
+
+- **Frog Pride Flag** — `on_piece_lost` arms a flag (skipped when `ctx.cancel` is set,
+  matching KGB Photo Eraser's precedent on the same hook), `on_deploy` consumes it via
+  `_grant_buff`, which routes through `_random_buff_key` internally and so can never hand
+  a piece the `self_harming` `slow` debuff.
+- **Y2K Patch Floppy Disk** — `on_wave_spawn` re-arms each Wave, `on_enemy_turn_start`
+  sets `ctx.actions = 0`. An explicit, commented exception to additive stacking: two
+  copies still skip one Turn, because "the first Turn is skipped" is already true.
+- **Pandemic Toilet Paper Pallet** — `on_purchase` counts, `on_price` does a **pure read**
+  (`ctx.amount -= ctx.base * 0.5` when the next purchase is even), so `Shop.price()`'s
+  per-redraw calls never drift. Counter reset added to `_open_shop`, which is what "the
+  same Shop visit" means.
+
+**Y2K × Filibuster composition** (both write `ctx.actions` on the same hook): `run()`
+iterates `held + tariffs`, so the artefact group always dispatches before the tariff
+group — a structural invariant, not an alphabetical accident, since the two keys are never
+compared. Y2K's zeroed base is therefore what Filibuster's `+1` lands on: held together,
+the enemy's first Turn gets exactly 1 action. Verified by reading rules.gd/artefact_hooks
+directly, not taken on the agent's word, and covered by a test in `test_items_tariffs.gd`.
+
+**Assumption flagged, not buried:** Frog Pride Flag arms on any player-piece loss
+regardless of `reason`, since the catalog text carries no qualifier.
+
+**A false failure and what it taught us.** The agent's first full run reported three
+`game-clicks` failures and it called them contention. That is indistinguishable from a
+cover story until checked, so it was checked: three sequential full runs, all ALL GREEN
+with clean probes. The agent was right — and the contention was largely self-inflicted,
+since four windowed suites were running at once across worktrees. The click probes open a
+**real window**; worktrees isolate the filesystem, not the window server. Written up as a
+standing convention in `CLAUDE.md` (PR #164), including the half that is easier to forget:
+a probe *pass* during a concurrent run is no more trustworthy than a failure.

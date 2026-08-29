@@ -14,6 +14,7 @@ const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 var fails := 0
 
@@ -331,6 +332,12 @@ func _init() -> void:
 			m5.artefacts.append(copy_b)
 			break
 	check(m5.artefacts.size() == 2, "two held copies, acquired on different waves")
+	m5.artefacts.append({"key": "area-51-parking-permit"}) # issue 53: this
+		# test's countable side effect (Manna Vending Machine's Item grants)
+		# would otherwise itself get clipped by the new base Item cap (3)
+		# before all 4 across both copies land — raise it (+3, to 6) so it
+		# stays a clean read of the per-artefact milestone timing, not a
+		# second assertion about the cap (that's test_items.gd's job)
 	for n in range(2, 6): # clear waves 1..4: neither copy is due yet
 		WaveLogic.queue(m5, n)
 	check(m5.items.size() == 0, "neither copy fires before its own beat 5 (waves 1-4 cleared)")
@@ -583,6 +590,18 @@ func _init() -> void:
 		# UI shows it beforehand (issue 47 already rolls unconditionally).
 		"epstein-s-black-book": true, "cicada-rejection-letter": true,
 		"all-seeing-eye-contact-lens": true,
+		# issue 53: the two new base-game caps. Area 51 Parking Permit /
+		# Abduction Probe are read straight off g.artefacts by
+		# item_logic.gd's cap() / buff_logic.gd's cap() at the moment
+		# capacity is checked — same standing-rule shape as Chocolate Key
+		# Cake/Alleged Weather Balloon above, never an on_* dispatch.
+		"area-51-parking-permit": true, "abduction-probe": true,
+		# 'Definitely Not Russia' Patch: the masking verdict is decided
+		# structurally in game.gd's _lose_player_piece BEFORE on_piece_lost
+		# dispatches (artefact_hooks.gd's REGISTRY comment, next to the
+		# const), so every listener on that hook sees it regardless of
+		# key-sort order — it never dispatches through the normal loop itself.
+		"definitely-not-russia-patch": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:
@@ -676,6 +695,75 @@ func _init() -> void:
 		"Winchester Salt Lined Doors: the back-row breach loss is unreachable while held — the card " +
 		"working as written, not a bug (issue 33 addendum)")
 	winch.queue_free()
+	await process_frame
+
+	# --- issue 53: two new base-game caps + four resolved ambiguities.
+	# Spare Organ Receipt / 'Definitely Not Russia' Patch / Alien Pet Rocks —
+	# the two caps (Item, Piece Buff) are covered in test_items.gd /
+	# test_items_buffs.gd, next to their own base-game mechanics. ---
+
+	# Spare Organ Receipt: "On Fuse: refund 50% of both consumed pieces'
+	# value combined as Gold" (user ruling) — merge_logic.gd's commit_merge
+	# fires a new on_fuse hook, the only new call site this slice adds, for
+	# every merge (Rank Up here; a Fusion of two different pieces goes
+	# through the exact same call site).
+	var sor := _boot({"board": [["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["spare-organ-receipt"], "stock": ["pawn", "pawn"], "gold": 0})
+	await process_frame
+	sor.actions_left = 3
+	MergeLogic.commit_merge(sor,
+		{"id": "pawn", "cap": false, "entry": "pawn"},
+		{"id": "pawn", "cap": false, "entry": "pawn"})
+	check(sor.stock == ["sergeant"], "(setup) the merge itself still resolves to a Sergeant")
+	check(sor.gold == 10,
+		"Spare Organ Receipt: 50% of both consumed Pawns' value (10+10) combined = 10 Gold")
+	sor.queue_free()
+	await process_frame
+
+	# 'Definitely Not Russia' Patch: the first piece lost each Wave is still
+	# ACTUALLY lost (not Fireproof Pajamas' ctx.cancel, which saves it) but
+	# masked from every effect reading on_piece_lost — Nibiru Hide-and-Seek
+	# Trophy's streak collapse, lost_player, wave_lost_ids. Only the FIRST
+	# loss each Wave is masked; a second one counts normally.
+	var dnr := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 4], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["definitely-not-russia-patch", "nibiru-hide-and-seek-trophy"]})
+	await process_frame
+	dnr.nibiru_wave_streak = 5 # a streak already banked from prior Waves
+	var dnr_lost_before: int = dnr.lost_player
+	dnr._destroy(Vector2i(2, 2)) # the masked first loss this Wave
+	check(not dnr.board.has(Vector2i(2, 2)),
+		"'Definitely Not Russia' Patch: the piece is still actually gone")
+	check(dnr.nibiru_wave_streak == 5,
+		"'Definitely Not Russia' Patch: masks the loss from Nibiru's streak collapse — it does not reset")
+	check(dnr.lost_player == dnr_lost_before,
+		"'Definitely Not Russia' Patch: the masked loss doesn't count toward lost_player either")
+	dnr._destroy(Vector2i(4, 4)) # a second loss the SAME Wave: not masked
+	check(not dnr.board.has(Vector2i(4, 4)), "a second lost piece is also actually gone")
+	check(dnr.nibiru_wave_streak == 0,
+		"only the FIRST loss each Wave is masked — the second resets Nibiru's streak normally")
+	check(dnr.lost_player == dnr_lost_before + 1, "the second loss counts normally")
+	dnr.queue_free()
+	await process_frame
+
+	# Alien Pet Rocks: "+2 Gold per allied piece that did not move this Wave"
+	# — only a move/capture you spent an Action on counts as moving (user
+	# ruling). A Deploy (game.gd _place) and an effect-driven shove (Tactical
+	# Reposition/Decoy Swap/Rapid Deployment, all resolved in _item_apply,
+	# never through _move_player) both still count as "did not move" and pay.
+	var apr := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 4], ["bishop", 0, 6, 6],
+			["rook", 1, 7, 10]], "wave": 3, "stock": ["knight"],
+			"artefacts": ["alien-pet-rocks"], "items": ["tactical_reposition"], "gold": 0})
+	await process_frame
+	apr.actions_left = 5
+	apr._move_player(Vector2i(2, 2), Vector2i(2, 3)) # the queen: a real, Action-spent move
+	apr._place("knight", Vector2i(0, 0)) # Deployed this Wave — still "did not move"
+	apr._use_item(0)
+	apr._item_click(Vector2i(4, 4)) # stage A: the pawn
+	apr._item_click(Vector2i(4, 5)) # stage B: shoved 1 square — no Action of ITS own
+	WaveLogic.queue(apr, apr.wave + 1) # clears wave 3
+	check(apr.gold == 6, "Alien Pet Rocks: +2 Gold each for the deployed knight, the " +
+		"shoved pawn, and the untouched bishop (6) — the queen that actually moved doesn't pay")
+	apr.queue_free()
 	await process_frame
 
 	print("---")

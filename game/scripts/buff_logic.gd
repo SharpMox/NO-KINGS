@@ -10,10 +10,34 @@
 ## with `buffs` (plural) above if you see it in an old save or scenario.
 
 const Items := preload("res://data/items.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 
 static func of(piece: Dictionary) -> Array:
 	return piece.get("buffs", [])
+
+
+## Piece Buff capacity (issue 53, user ruling) — base 2, +1 per held
+## Abduction Probe, additive per copy. `probes` is the held-copy count;
+## callers read it off g.artefacts (this module stays g-free like the rest
+## of it — see the header).
+static func cap(probes: int) -> int:
+	return Tuning.PIECE_BUFF_CAP_BASE + probes
+
+
+## How many of `piece`'s buffs are catalogued Piece Buffs (Items.PIECE_BUFFS)
+## — what the capacity above counts and caps. Excludes `stunned`, the debuff
+## sharing the same list (module header) that its own 2 call sites apply
+## straight through BuffLogic.add, bypassing the cap entirely.
+static func catalogued_count(piece: Dictionary) -> int:
+	var keys := {}
+	for b in Items.PIECE_BUFFS:
+		keys[b.key] = true
+	var n := 0
+	for b in of(piece):
+		if keys.has(b.key):
+			n += 1
+	return n
 
 
 static func has(piece: Dictionary, key: String) -> bool:

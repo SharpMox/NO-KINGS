@@ -11,6 +11,9 @@ const GameScript := preload("res://scripts/game.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
+const Shop := preload("res://scripts/shop.gd")
+const Economy := preload("res://scripts/economy.gd")
 
 var fails := 0
 
@@ -240,6 +243,60 @@ func _init() -> void:
 	check(dm.board[Vector2i(2, 2)].id == "bishop",
 		"Demote sends the Archbishop back to Bishop, its chain base")
 	dm.queue_free()
+	await process_frame
+
+	# --- Item held capacity (issue 53, user ruling): base 3, unbounded before
+	# this. ItemLogic.grant() is the single choke point every acquisition path
+	# (Box pick, Artefact grant, Yalta's own pick, Shop purchase) now routes
+	# new Items through — a full inventory REFUSES the grant (drops it), the
+	# simpler of the two options and the one that matches "capacity".
+	var ic := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	for i in 3:
+		check(ItemLogic.grant(ic, _item("blitz", "tile")),
+			"Item %d/3 lands under the base cap" % (i + 1))
+	check(ic.items.size() == 3, "base Item capacity is 3")
+	check(not ItemLogic.grant(ic, _item("blitz", "tile")),
+		"a 4th Item is refused at the base cap — the cap genuinely binds")
+	check(ic.items.size() == 3, "the refused grant did not land")
+	ic.artefacts.append({"key": "area-51-parking-permit"})
+	check(ItemLogic.grant(ic, _item("blitz", "tile")),
+		"Area 51 Parking Permit raises the cap (+3, to 6) — the 4th now lands")
+	check(ic.items.size() == 4, "the Item actually landed")
+	ic.queue_free()
+	await process_frame
+
+	# --- the Shop must never sell an Item slot the player has no room to hold
+	var sh := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "gold": 100})
+	await process_frame
+	sh.state = sh.State.PLAYER_TURN
+	sh.actions_left = 2
+	for i in 3:
+		sh.items.append(_item("blitz", "tile")) # at the base cap already
+	var item_slot := {"kind": "item", "key": "blitz", "sold": false}
+	sh.shop_stock = [item_slot]
+	check(not Shop.can_buy(sh, item_slot), "a full inventory can't buy an Item slot")
+	sh.artefacts.append({"key": "area-51-parking-permit"})
+	check(Shop.can_buy(sh, item_slot),
+		"Area 51 Parking Permit's +3 cap reopens the Item slot")
+	sh.queue_free()
+	await process_frame
+
+	# --- Denver Bunker Timeshare: "+30% Gold gain while all your Item slots
+	# are full" — item_logic.gd's cap() (issue 53) is what makes "full" a
+	# reachable condition at all; before this slice there was no cap to fill.
+	var db := _boot({"board": [["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["denver-bunker-timeshare"]})
+	await process_frame
+	db.gold = 0
+	Economy.earn(db, 100)
+	check(db.gold == 100, "Item slots not full: no bonus")
+	for i in 3:
+		db.items.append(_item("blitz", "tile")) # fills the base cap of 3
+	db.gold = 0
+	Economy.earn(db, 100)
+	check(db.gold == 130, "Item slots full: +30% Gold gain")
+	db.queue_free()
 	await process_frame
 
 

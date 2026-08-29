@@ -104,6 +104,11 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		# reading `stock_index` rather than "the last Stock entry" (see above).
 		ArtefactHooks.run(g, "on_rank_up",
 			{"pos": result_tile, "old_id": ids[0], "id": result, "stock_index": stock_index})
+	# Spare Organ Receipt (issue 53): every merge consumes exactly two pieces —
+	# fires for a Rank Up too, not just a Fusion of two different pieces;
+	# "a Fuse consumes two pieces" draws no distinction and both ids are
+	# already in scope here regardless of which branch just ran above.
+	ArtefactHooks.run(g, "on_fuse", {"a_id": ids[0], "b_id": ids[1]})
 	Economy.charge(g, "fuse_cost")
 	g.placing_id = ""
 	g.placing_cap = false

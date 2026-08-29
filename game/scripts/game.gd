@@ -146,6 +146,10 @@ var mrna_apply_count := 0 # mRNA Firmware Update: Piece Buffs applied to your
 	# pieces so far — every 3rd also Ranks Up (artefact hook 23)
 var youth_fountain_wave := -1 # Youth Fountain Martini: wave its one free
 	# buff-consume re-apply already fired this Wave, -1 = not yet (hook 23)
+var dnr_patch_wave := -1 # 'Definitely Not Russia' Patch (issue 53): wave its
+	# one masked loss already used, -1 = not yet — same wave-stamp idiom as
+	# dihydrogen_free_wave/youth_fountain_wave above, so a stale stamp from an
+	# earlier Wave just reads as "not this Wave" with nothing to reset
 var artefact_echo_depth := 0 # ArtefactHooks re-entrancy guard (artefact hook 21):
 	# >0 while the meta/echo pass itself is running, so a handler that somehow
 	# re-entered ArtefactHooks.run() could never trigger a second echo pass
@@ -1335,6 +1339,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			actions_left -= 1
 		_log_action("capture") # blocked attack — still an attempt against a piece
 		moved_this_turn.append(from)
+		board[from].moved_wave = wave # Alien Pet Rocks (issue 53): an Action was
+			# spent on this attempt, same "moved" idiom as moved_this_turn above
 		_clear_selection()
 		if actions_left == 0 and state == State.PLAYER_TURN:
 			return _on_pass()
@@ -1470,6 +1476,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		actions_left -= 1
 	_log_action("capture" if did_capture else "move")
 	moved_this_turn.append(final_pos)
+	board[final_pos].moved_wave = wave # Alien Pet Rocks (issue 53): an Action
+		# was spent moving/capturing — a Deploy or an effect-driven shove
+		# (Tactical Reposition/Decoy Swap/Rapid Deployment, all resolved
+		# elsewhere in game.gd's _item_apply) never reaches this line
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs, _enemy_denied_tiles())):
 		if _king_down(captured_king_id):
@@ -1738,7 +1748,7 @@ func _yalta_chosen(value: String) -> void:
 		"gold":
 			Economy.earn(self, 100, "yalta-cocktail-napkin")
 		"item":
-			items.append(Items.ITEMS[rng.randi() % Items.ITEMS.size()])
+			ItemLogic.grant(self, Items.ITEMS[rng.randi() % Items.ITEMS.size()])
 		"clock":
 			Economy.add_clock(self, 15000.0, "yalta-cocktail-napkin")
 	_refresh()
@@ -1922,11 +1932,22 @@ func _destroy(pos: Vector2i, by_item: bool = false) -> void:
 ## destruction request (the enemy-move loop only). `lost_player` and
 ## `wave_lost_ids` (issue 26: Jon Burrows' Fake ID / Walt's Cryonic Capsule,
 ## read on_wave_clear) only count when the loss isn't cancelled.
+## `uncounted` (issue 53, 'Definitely Not Russia' Patch — a SECOND, distinct
+## flag from `cancel`: the piece is still lost, only hidden from every effect
+## reading this hook) is decided HERE, before dispatch, not by a handler
+## during it — on_piece_lost's own handlers are one key-sorted pass (header:
+## ORDERING), so a handler-set flag would only be visible to whichever
+## handlers happen to sort AFTER it. Deciding it up front means every held
+## on_piece_lost handler (all of them below check `ctx.uncounted`, same as
+## `ctx.cancel`) sees the same verdict regardless of key order.
 func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(-1, -1)) -> Dictionary:
+	var uncounted := _artefact_count("definitely-not-russia-patch") > 0 and dnr_patch_wave != wave
 	var ctx := ArtefactHooks.run(self, "on_piece_lost",
 		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos,
-			"cancel": false, "destroy_attacker": false})
-	if not ctx.cancel:
+			"cancel": false, "destroy_attacker": false, "uncounted": uncounted})
+	if uncounted:
+		dnr_patch_wave = wave
+	if not ctx.cancel and not uncounted:
 		lost_player += 1
 		wave_lost_ids.append(board[pos].id)
 		if BuffLogic.has(board[pos], "piece_bounty"): # Bounty (issue 48), ally
@@ -1992,8 +2013,21 @@ func _consume_item(index: int, it: Dictionary) -> void:
 ## trigger another copy (would ping-pong between two adjacent allies).
 ## Debuffs riding the same buffs list (`stunned`) are NOT Piece Buffs and
 ## call BuffLogic.add directly — they must never reach this choke point.
+## Issue 53 (user ruling): a piece already at Piece Buff capacity (base 2,
+## Abduction Probe +1/copy) REFUSES the grant — no buff lands, on_buff_apply
+## never fires (there's nothing to react to), and every caller here already
+## treats this as fire-and-forget, so a refusal is a clean no-op for THEM.
+## "Fails cleanly and visibly" is the floating label every other buff-landing
+## event already uses (_add_float, same idiom as "Blocked"/"Stunned!" above);
+## silent for an off-board grant (pos.x < 0, e.g. Holy Grail Coaster's Stock
+## case) — there is no tile to float it at, but the refusal itself still
+## holds (still no crash, still no partial state).
 func _apply_buff(piece: Dictionary, key: String, turns: int,
 		pos := Vector2i(-1, -1), fire_hook := true) -> void:
+	if BuffLogic.catalogued_count(piece) >= BuffLogic.cap(_artefact_count("abduction-probe")):
+		if pos.x >= 0:
+			_add_float(pos, "Buffs full", COL_MERGE)
+		return
 	BuffLogic.add(piece, key, turns)
 	if fire_hook:
 		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
@@ -2101,7 +2135,9 @@ func _box_choose(opt: Dictionary) -> void:
 		"piece":
 			stock.append(opt.payload) # lands in Stock, like a Shop piece purchase (issue 47)
 		"item":
-			items.append(opt.payload)
+			ItemLogic.grant(self, opt.payload) # issue 53: refuses at capacity —
+				# the Box pick is spent either way (box_offer.erase(opt) below),
+				# same "acquisition refused" shape as every other grant path
 		"artefact":
 			var entry: Dictionary = opt.payload.duplicate() # never mutate the
 				# shared catalog Dictionary rolled by Box.roll_options — stamp a

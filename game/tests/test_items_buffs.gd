@@ -519,6 +519,36 @@ func _init() -> void:
 		bot_ally.queue_free()
 		await process_frame
 
+	# --- Piece Buff capacity (issue 53, user ruling): base 2, unbounded before
+	# this — Buff Box, Holy Lint, Pied Piper's Rat Census and every random
+	# grant used to stack without limit. game.gd's _apply_buff (the single
+	# choke point every grant path already routed through, issue 23) now
+	# refuses a grant past capacity — cleanly (no crash, no partial state) and
+	# visibly (a floating "Buffs full" label, same idiom as "Blocked"/
+	# "Stunned!"), never a silent no-op.
+	var bc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	var bp := Vector2i(2, 2)
+	bc._apply_buff(bc.board[bp], "shield", 0, bp)
+	bc._apply_buff(bc.board[bp], "critical", 0, bp)
+	check(BuffLogic.of(bc.board[bp]).size() == 2, "base Piece Buff capacity is 2")
+	bc._apply_buff(bc.board[bp], "taunt", 0, bp)
+	check(BuffLogic.of(bc.board[bp]).size() == 2,
+		"a 3rd Piece Buff is refused at the base cap — the cap genuinely binds")
+	check(bc.anims.any(func(a: Dictionary) -> bool: return a.get("text", "") == "Buffs full"),
+		"the refusal surfaces a floating label — not a silent no-op")
+	BuffLogic.add(bc.board[bp], "stunned", 2) # a debuff riding the same list,
+		# NOT a catalogued Piece Buff (buff_logic.gd header) — applied directly,
+		# bypassing _apply_buff, same as its 2 real call sites (Stun landing)
+	check(BuffLogic.catalogued_count(bc.board[bp]) == 2,
+		"stunned doesn't consume a Piece Buff capacity slot")
+	bc.artefacts.append({"key": "abduction-probe"})
+	bc._apply_buff(bc.board[bp], "taunt", 0, bp)
+	check(BuffLogic.has(bc.board[bp], "taunt"),
+		"Abduction Probe raises the cap (+1, to 3) — the 3rd Piece Buff now lands")
+	bc.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL BUFF CHECKS OK")

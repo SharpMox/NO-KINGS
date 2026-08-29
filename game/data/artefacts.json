@@ -31,9 +31,9 @@
   "bonus": [
    "Item"
   ],
-  "effect": "+3 Item held capacity (needs: item cap)",
+  "effect": "+3 Item held capacity",
   "conspiracy": "Area 51",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "fort-knox-iou",
@@ -558,9 +558,9 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "At Wave end: +2 Gold per allied piece that did not move this Wave (needs: movement tracking)",
+  "effect": "At Wave end: +2 Gold per allied piece that did not move this Wave",
   "conspiracy": "Stonehenge",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "el-dorado-body-glitter",
@@ -606,9 +606,9 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Fuse: refund 50% of the consumed piece's value as Gold (needs: fuse-value hook)",
+  "effect": "On Fuse: refund 50% of both consumed pieces' value combined as Gold",
   "conspiracy": "The organ-theft legend",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "denver-bunker-timeshare",
@@ -619,9 +619,9 @@
    "Gold",
    "Item"
   ],
-  "effect": "While all your Item slots are full: +30% Gold gain (needs: item cap)",
+  "effect": "While all your Item slots are full: +30% Gold gain",
   "conspiracy": "Denver Airport",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "putin-s-golden-toilet-brush",
@@ -1500,9 +1500,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "The first piece you lose each Wave doesn't count as a loss for your Artefacts and penalties (needs: loss masking)",
+  "effect": "The first piece you lose each Wave doesn't count as a loss for your Artefacts and penalties",
   "conspiracy": "The Wagner Group",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "stockholm-syndrome-pamphlet",
@@ -1718,9 +1718,9 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "Your pieces can carry 2 Piece Buffs at once (needs: multi-buff per piece)",
+  "effect": "+1 Piece Buff capacity",
   "conspiracy": "Abduction implants",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "haarp-volume-knob",

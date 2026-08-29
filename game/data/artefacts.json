@@ -582,9 +582,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Once per Shop visit: pay 20 Gold to bring the Shop's whole stock down; it is rebuilt fresh (needs: reroll system)",
+  "effect": "Once per Shop visit: pay 20 Gold to restock the Shop",
   "conspiracy": "Controlled demolition claims",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "manna-vending-machine",
@@ -1670,9 +1670,9 @@
    "Score",
    "Gold"
   ],
-  "effect": "Once per Turn: you may pay 25 Gold for +400 Score (needs: gold sink action)",
+  "effect": "Once per Turn: you may pay 25 Gold for +400 Score",
   "conspiracy": "The Oak Island money pit",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nuclear-football-menu",
@@ -1755,9 +1755,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone (needs: piece removal)",
+  "effect": "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone",
   "conspiracy": "The Roanoke Colony",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "seti-s-red-marker",
@@ -1828,9 +1828,9 @@
    "Score",
    "Gold"
   ],
-  "effect": "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed (needs: consumable artefacts + gain multiplier)",
+  "effect": "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed",
   "conspiracy": "Bob Lazar and Element 115",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "sub-antarctic-visa",
@@ -2059,9 +2059,9 @@
   "bonus": [
    "Action"
   ],
-  "effect": "You may spend 50 Gold to gain +1 Action, any number of times per Turn (needs: gold-action exchange)",
+  "effect": "You may spend 50 Gold to gain +1 Action, any number of times per Turn",
   "conspiracy": "The FIFA corruption case",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "troll-farm-employee-of-the-month",
@@ -2119,9 +2119,9 @@
   "bonus": [
    "Action"
   ],
-  "effect": "Once per Wave: you may repeat your previous Action without spending an Action (needs: action replay)",
+  "effect": "Once per Wave: you may repeat your previous Action without spending an Action",
   "conspiracy": "The Zapruder film",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "templar-debit-card",
@@ -2180,9 +2180,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Once per Wave: move one enemy piece anywhere on your side of the Board (needs: forced move)",
+  "effect": "Once per Wave: move one enemy piece anywhere on your side of the Board",
   "conspiracy": "Cattle mutilations",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "ark-s-bunkbed",

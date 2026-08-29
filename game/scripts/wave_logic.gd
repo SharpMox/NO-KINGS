@@ -33,6 +33,8 @@ static func queue(g, n: int) -> void:
 	g.wave_start_lost_player = g.lost_player
 	g.wave_lost_ids = [] # Jon Burrows' Fake ID / Walt's Cryonic Capsule (26)
 	g.doomsday_snooze_used_this_wave = false # Doomsday Clock Snooze Button (26)
+	g.zapruder_used_this_wave = false # Zapruder's Director's Cut (52)
+	g.bovine_used_this_wave = false # Bovine Tractor Beam (52)
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start

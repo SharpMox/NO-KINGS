@@ -216,6 +216,16 @@ static func all() -> Array:
 				# demoted pawn back — the sandbox for "clears on re-promotion"
 			"artefacts": ["dark-market-light-bulb"],
 			"gold": 100, "wave": 4, "stock": ["pawn"]}},
+		{"name": "Artefacts: activation, confirm-gated (issue 52)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["rook", 1, 4, 6]],
+			"artefacts": ["oak-island-wishing-well", "fifa-complimentary-yacht",
+				"moscovium-glow-stick", "roanoke-hex-kit", "zapruder-s-director-s-cut"],
+			"gold": 500, "score": 0, "wave": 10, "stock": ["pawn"]}}, # generous
+			# Gold/wave so the bot's per-frame activation roll (autoplay.gd) has
+			# a real shot at Oak Island/FIFA/Moscovium landing within the sweep
+		{"name": "Artefacts: activation, targeted — Bovine Tractor Beam (issue 52)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 1, 4, 6]],
+			"artefacts": ["bovine-tractor-beam"], "wave": 3, "stock": ["pawn"]}},
 		{"name": "Extraction (rescue pieces to Stock)", "cfg": {
 			"board": [["dragon-king", 0, 2, 2], ["knight", 0, 3, 3], ["pawn", 0, 1, 2],
 				["rook", 1, 4, 8], ["bishop", 1, 2, 7]],

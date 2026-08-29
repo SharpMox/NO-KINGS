@@ -14,6 +14,11 @@ static func step(g) -> void:
 			print("AUTOPLAY CAP: alive after %d steps (wave %d, score %d)" % [g.autoplay_cap, g.wave, g.score])
 			g.get_tree().quit(0)
 		return
+	# Artefact activation (issue 52) costs 0 Actions, so it's tried up front,
+	# independent of actions_left below — a bot that never presses these new
+	# chips would prove nothing about the feature.
+	if g.state == g.State.PLAYER_TURN and g.rng.randf() < 0.25:
+		try_activate_artefact(g)
 	# One random legal action per frame (everything costs one), pass when spent.
 	if g.actions_left > 0:
 		if not g.items.is_empty() and g.rng.randf() < 0.3: # exercise item paths
@@ -61,6 +66,33 @@ static func use_item(g) -> void:
 			return
 	g.items.remove_at(index)
 	g._item_apply(it, a, targets[g.rng.randi() % targets.size()])
+
+
+## Artefact activation (issue 52): one random HELD activatable key, activated
+## if available. The 5 confirm-gated ones resolve instantly under autoplay
+## (g._activate_artefact's own autoplay bypass); Bovine Tractor Beam has no
+## confirm to bypass — its targeting is plain board-click state, so the bot
+## drives both stages itself, the same way use_item above drives a "pair" Item.
+static func try_activate_artefact(g) -> void:
+	var keys: Array = g._activatable_held_keys()
+	if keys.is_empty():
+		return
+	var key: String = keys[g.rng.randi() % keys.size()]
+	if key != "bovine-tractor-beam":
+		if g._artefact_activation_available(key):
+			g._activate_artefact(key)
+		return
+	if not g._artefact_activation_available(key):
+		return
+	g._begin_artefact_targeting(key)
+	if g.artefact_targets.is_empty(): # shouldn't happen (availability already
+		return                        # checked both stages), never leave it stuck
+	var a: Vector2i = g.artefact_targets[g.rng.randi() % g.artefact_targets.size()]
+	g._artefact_target_click(a)
+	if g.artefact_targets.is_empty():
+		return
+	var b: Vector2i = g.artefact_targets[g.rng.randi() % g.artefact_targets.size()]
+	g._artefact_target_click(b)
 
 
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.

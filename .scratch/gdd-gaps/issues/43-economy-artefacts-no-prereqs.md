@@ -1,6 +1,6 @@
 # 43 — The three economy Artefacts with no prerequisites
 
-Status: todo — INDEPENDENT (no design decision needed)
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -84,3 +84,33 @@ Held twice = +50%, additive, consistent with the stacking rule.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in PR #159. All three Artefacts implemented; catalog now 142 -> 145.
+
+**This issue's spec was wrong about the hook, and the implementing agent caught it.**
+It said "Hook: `on_milestone`" for Mar-a-Lago Toilet Papers while *also* citing
+`_milestone5_hit`, which is contradictory. `on_milestone` is the **global 10-Wave
+clock-refill** trigger (`Tuning.MILESTONE_WAVES == 10`, used only by "timer" and the
+Recession tariff). Every per-artefact "5-Wave Milestone" effect hooks **`on_wave_clear` +
+`_milestone5_hit(g.wave, acquired_wave)`**. The agent traced both and followed the
+codebase's live convention over the issue prose, which is the correct precedence order.
+FLAGS.md's `on_milestone` entry was rewritten to describe this as the naming trap it is.
+
+- **Mar-a-Lago Toilet Papers** — `on_wave_clear` + `_milestone5_hit` to pick the free
+  slot, `on_price` to apply. The free slot index is stored, not re-rolled inside
+  `price()`, so it cannot drift between the displayed price and the actual charge.
+- **Deep State Yearbook** — `on_purchase` scoped to `ctx.kind == "artefact"`. `Shop.buy()`
+  appends the bought copy *before* dispatching, so `g.artefacts.size() - 1` naturally
+  excludes it; buying your first-ever copy correctly pays 0.
+- **New World Order Gerrymandering** — implemented as an explicit **post-pass at the tail
+  of `run()`**, after both the key-sorted dispatch loop and the echo/meta layer (Déjà Vu
+  Glitch can also touch these hooks). Adds `0.25 * heldCount * (ctx.amount - ctx.base)`,
+  counted once as an N-multiplier rather than once per held copy, so two copies give
+  exactly +50% and never compound to +56.25%. It deliberately has **no REGISTRY entry**,
+  matching the file's own precedent for the issue-21 echo family. Recorded in FLAGS.md as
+  a called-out exception to the ORDERING rule that must stay last in `run()`.
+
+Verified independently before merge: the 7-file test split intact, `artefacts.json` byte-
+identical to a fresh exporter run (not hand-edited), full suite ALL GREEN.

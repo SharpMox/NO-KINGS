@@ -1,6 +1,6 @@
 # 44 — Yalta Cocktail Napkin, the first consumer of the choice-modal seam
 
-Status: todo — INDEPENDENT (no design decision needed)
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -71,3 +71,34 @@ Recording these so the next pass does not re-derive them:
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in PR #160. Yalta Cocktail Napkin implemented; catalog 145 -> 146.
+
+- `REGISTRY["yalta-cocktail-napkin"] = ["on_wave_clear"]`, gated by `_milestone5_hit` —
+  the per-copy cadence, not `g.wave % 5`.
+- `game.gd` gained `_open_yalta_pick` / `_yalta_chosen` / `_yalta_pick_cancelled`,
+  mirroring the Buff Box trio. Gold via `Economy.earn`, Clock via `Economy.add_clock`,
+  Item as a random pull from `Items.ITEMS`. Cancel is a pure forfeit — a milestone reward
+  is not a spend, so there is nothing to refund and the button text says so.
+- **Autoplay** resolves the pick via `rng` without opening a modal, the same shape
+  `_open_box_pick` uses. A dedicated test boots with `autoplay = true` and asserts
+  `buff_pick_open` never becomes true — without this the bot leg would *hang* rather than
+  fail, which is the worse failure mode.
+- **Clock confirmed ticking while the modal is open** (user ruling 2026-08-29): the test
+  snapshots `clock_ms` after opening, awaits a timer, and asserts it strictly decreased.
+
+**One edge case the issue did not foresee, resolved by the agent:** two held copies
+acquired on the *same* Wave both satisfy `_milestone5_hit` in the same synchronous
+dispatch. Guarded with `not g.buff_pick_open`, following the existing
+`trojan-horse-assembly-manual` precedent (`not g.box_open`) — first copy wins the modal,
+second forfeits rather than clobbering the open panel. Recorded in FLAGS.md as cheap to
+reverse into a queue.
+
+**Merge note:** this conflicted with slice 43 in `test_items_artefacts_4.gd` — both
+slices removed a different entry from the same three-key "unwired artefacts" audit list.
+Resolved by hand to leave only `roanoke-hex-kit`, then re-verified from scratch.
+
+The five other choice-modal Artefacts remain parked; the "Not in scope" table above is
+still current.

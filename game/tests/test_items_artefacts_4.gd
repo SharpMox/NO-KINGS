@@ -565,6 +565,13 @@ func _init() -> void:
 		# read: it multiplies what the normal dispatch + echo layer both
 		# already added to a Gold gain, which only exists once both have run.
 		"new-world-order-gerrymandering": true,
+		# issue 51: the two zone-rule Artefacts. Passive board rules read
+		# straight off held Artefacts at the point the rule is evaluated —
+		# Cheyenne Mountain Doorbell in _run_enemy_actions' repel branch,
+		# Winchester Salt Lined Doors via game.gd._enemy_denied_tiles() fed
+		# into Rules.legal_moves/ai_action/is_checkmate — same standing-rule
+		# shape as Nazca Boarding Pass, never an on_* dispatch.
+		"cheyenne-mountain-doorbell": true, "winchester-salt-lined-doors": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:
@@ -596,6 +603,68 @@ func _init() -> void:
 		"Headroom's echo (+5, using THIS copy's own acquired_wave, not the wave-1 default) both " +
 		"pay out on the copy's own beat (10, not 5)")
 	echo_milestone.queue_free()
+	await process_frame
+
+	# --- issue 51: the two zone-rule Artefacts ---
+
+	# Cheyenne Mountain Doorbell: a player piece on the back row (y=0) cannot
+	# be captured. Control run first (no artefact) proves the scenario is
+	# real — the rook otherwise freely takes the back-row piece — so the
+	# held-artefact run below is proof of the block, not a move that was
+	# never going to happen anyway.
+	var cheyenne_ctrl := _boot({"board": [["rook", 0, 2, 0], ["rook", 1, 2, 3]], "wave": 3})
+	await process_frame
+	await cheyenne_ctrl._run_enemy_actions()
+	check(cheyenne_ctrl.board.get(Vector2i(2, 0), {}).get("owner", -1) == 1,
+		"control: without Cheyenne, an enemy rook freely captures a player piece on the back row")
+	cheyenne_ctrl.queue_free()
+	await process_frame
+
+	var cheyenne := _boot({"board": [["rook", 0, 2, 0], ["rook", 1, 2, 3]], "wave": 3,
+		"artefacts": ["cheyenne-mountain-doorbell"]})
+	await process_frame
+	await cheyenne._run_enemy_actions()
+	check(cheyenne.board.get(Vector2i(2, 0), {}).get("owner", -1) == 0,
+		"Cheyenne Mountain Doorbell: a player piece on the back row survives the capture attempt")
+	check(cheyenne.board.get(Vector2i(2, 3), {}).get("id", "") == "rook"
+			and cheyenne.board[Vector2i(2, 3)].owner == 1,
+		"Cheyenne Mountain Doorbell: the attacker is repelled and stays on its own tile")
+	cheyenne.queue_free()
+	await process_frame
+
+	# Winchester Salt Lined Doors: enemy pieces cannot move onto the back row.
+	# 7 enemy pawns already fill columns 0-6 of row 0 (stuck: no forward or
+	# capture squares) and an enemy rook at (7,1) is one step from filling
+	# the last column — with 8 enemies at y<=2 the AI's back-row "commit"
+	# threshold (BACKROW_COMMIT_COUNT) is met, so without Winchester the
+	# advance heuristic doesn't hold it back either. Control run first, same
+	# reasoning as Cheyenne above: prove the breach is really reachable here
+	# before proving Winchester stops it. A player pawn parked out of both
+	# the rook's lines and any column/row it rides is just so _boot doesn't
+	# hit "Resource starvation" (no player pieces, no stock) before the
+	# enemy turn we're testing even runs.
+	var winchester_board := [["pawn", 1, 0, 0], ["pawn", 1, 1, 0], ["pawn", 1, 2, 0],
+		["pawn", 1, 3, 0], ["pawn", 1, 4, 0], ["pawn", 1, 5, 0], ["pawn", 1, 6, 0], ["rook", 1, 7, 1],
+		["pawn", 0, 0, 5]]
+	var winch_ctrl := _boot({"board": winchester_board, "wave": 3})
+	await process_frame
+	await winch_ctrl._run_enemy_actions()
+	check(winch_ctrl.board.get(Vector2i(7, 0), {}).get("owner", -1) == 1
+			and winch_ctrl._back_row_breached() and winch_ctrl.state == GameScript.State.GAME_OVER,
+		"control: without Winchester, the massed swarm completes the back-row breach")
+	winch_ctrl.queue_free()
+	await process_frame
+
+	var winch := _boot({"board": winchester_board, "wave": 3,
+		"artefacts": ["winchester-salt-lined-doors"]})
+	await process_frame
+	await winch._run_enemy_actions() # driven through ai_action, not just legal_moves
+	check(not winch.board.has(Vector2i(7, 0)),
+		"Winchester Salt Lined Doors: the AI (via ai_action) never lands the rook on the last back-row tile")
+	check(not winch._back_row_breached() and winch.state != GameScript.State.GAME_OVER,
+		"Winchester Salt Lined Doors: the back-row breach loss is unreachable while held — the card " +
+		"working as written, not a bug (issue 33 addendum)")
+	winch.queue_free()
 	await process_frame
 
 	print("---")

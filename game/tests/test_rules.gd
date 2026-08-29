@@ -202,6 +202,32 @@ func _init() -> void:
 	act = Rules.ai_action(b, defs)
 	check(act.is_empty() or act.to.y != 0, "one short of full width still holds")
 
+	# --- Winchester Salt Lined Doors (issue 51): `denied` is a caller-fed
+	# parameter, not something rules.gd reads off g.artefacts. ai_action is
+	# asserted directly (not just legal_moves) — proving the same filter
+	# that binds legal_moves also binds the move ai_action actually picks. ---
+	var back_row: Array[Vector2i] = []
+	for x in Rules.Tuning.BOARD_W:
+		back_row.append(Vector2i(x, 0))
+	# same full-width-swarm fixture that commits to row 0 above; denying that
+	# row leaves every pawn with zero legal moves (their only move is y=0).
+	b = {}
+	for x in Rules.Tuning.BOARD_W:
+		b[Vector2i(x, 1)] = piece("pawn", Rules.ENEMY)
+	check(Rules.legal_moves(b, Rules.ENEMY, defs, true, back_row).is_empty(),
+		"legal_moves: denying the back row leaves the committed swarm with no legal move at all")
+	act = Rules.ai_action(b, defs, back_row)
+	check(act.is_empty(),
+		"ai_action (not just legal_moves) is bound by `denied`: the swarm that would otherwise " +
+		"commit to row 0 has no move left to make")
+	# a piece already standing on a denied square is untouched: it stays put
+	# freely (nothing forces it off) and remains free to leave via any
+	# non-denied destination — only NEW entries onto the row are blocked.
+	b = {Vector2i(3, 0): piece("rook", Rules.ENEMY)}
+	var from_row0 := Rules.legal_moves(b, Rules.ENEMY, defs, true, back_row)
+	check(not from_row0.is_empty() and from_row0.all(func(m: Dictionary) -> bool: return m.to.y != 0),
+		"a rook already on the denied row keeps its non-row0 moves; sideways re-entry onto the row is denied")
+
 	# --- move_paths (display shapes) must flatten to exactly moves_for ---
 	# every piece def, alone and in a crowded scene, both owners
 	var crowd := {

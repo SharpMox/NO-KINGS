@@ -2095,9 +2095,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your pieces on your back row cannot be captured (needs: capture-immunity zone)",
+  "effect": "Your pieces on your back row cannot be captured",
   "conspiracy": "Cheyenne Mountain",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "nazca-boarding-pass",
@@ -2156,9 +2156,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Enemy pieces cannot move onto your back row (needs: zone denial)",
+  "effect": "Enemy pieces cannot move onto your back row",
   "conspiracy": "The Winchester Mystery House",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "100-genuine-original-mona-lisa",

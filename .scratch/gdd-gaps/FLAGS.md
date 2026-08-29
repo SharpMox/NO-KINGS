@@ -114,5 +114,9 @@ found. Collected here so they are not lost in Outcome sections:
 - **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens
   that the painted PNGs replaced; it now only produces `king.svg`. Delete it once King
   art lands, or keep it as the fallback generator and say so in its header.
-- **`data/artefacts.js` and `game/data/` have no shared pipeline yet.** The site knows all
-  180 artefacts; the game hand-writes 7. Slice 14 fixes this.
+- ~~**`data/artefacts.js` and `game/data/` have no shared pipeline yet.**~~ Built by slice
+  14: `tools/export-game-artefacts.mjs` generates `game/data/artefacts.json` from
+  `data/artefacts.js`. The "game hand-writes 7" era is over — those 7 survive as
+  `ARTEFACT_EFFECTS_CORE` (they pre-date the catalog and have no Notion equivalent), and
+  everything else flows through the exporter. **`game/data/artefacts.json` is generated;
+  never hand-edit it.**

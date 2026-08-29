@@ -168,6 +168,11 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.
+- **Run the suite in the FOREGROUND and let it block.** `run_all.sh` takes minutes, which
+  makes backgrounding it and polling look sensible. It isn't: three separate agents have
+  now stalled by launching it in the background and then waiting on a task that had
+  already finished, losing their turn with the work uncommitted and unpushed. Call it
+  directly and let it block until it prints its verdict.
 - **Never run two suites at once.** The click probes are *windowed* — they open a real
   Godot window and drive real input. Two concurrent runs fight over window focus and the
   probes fail for no reason in the code. This has already produced one false failure

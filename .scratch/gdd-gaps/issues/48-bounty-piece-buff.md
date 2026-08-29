@@ -60,6 +60,8 @@ distinct buff key and note the intent to reconcile.
   Confirm it is reachable there deliberately rather than by accident.
 - The trigger fires inside a capture, and `game.gd`'s `_move_player` capture block has a
   delicate order (`Economy.capture_score` runs before `critical`/`range` consumption).
+- Autoplay must resolve both the 1-of-3 choice and the Box itself without a modal, or the
+  bot leg hangs instead of failing.
 
 ### The two halves resolve differently — checked 2026-08-29, and this is NOT blocked
 
@@ -83,8 +85,6 @@ it genuinely needs the turn suspended mid-resolution — which is why it stays p
 issue 33's decision #2. Bounty's Box is a **payout**; it changes nothing about the capture,
 so moving it a few seconds later costs the player nothing. **This slice therefore does not
 depend on issue 33's decision #2.**
-- Autoplay must resolve both the 1-of-3 choice and the Box itself without a modal, or the
-  bot leg hangs instead of failing.
 
 ## Acceptance
 

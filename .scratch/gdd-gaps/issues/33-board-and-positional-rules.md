@@ -117,9 +117,15 @@ Decision #1 is answered (one filter in `legal_moves`, fed from the caller), and 
 zone Artefacts are cleared. Decisions #2 (dodge / mid-capture modal), #3 (Pegasus vs
 `moved_this_turn`) and #4 (capture conversion) stand unchanged.
 
-Note that #2 has a new dependent: issue 48's Bounty Piece Buff pays out on *losing* an
-ally piece, which happens inside the enemy turn loop — the same suspension problem that
-parks Inflatable Vietcong Torpedo.
+Issue 48's Bounty Piece Buff was briefly thought to be a new dependent of #2, since it
+pays out on *losing* an ally piece inside the enemy turn loop. **It is not.** Checked
+2026-08-29: `_lose_player_piece` is synchronous and `ArtefactHooks.run` does not await, so
+no handler can open a modal there — but Bounty's Box is a *payout* that changes nothing
+about the capture, so it can simply be deferred to the start of the player's next turn.
+
+The distinction is the useful part: #2 is only needed when the choice **changes the outcome
+of the capture itself** (Inflatable Vietcong Torpedo: pay 15 Gold and the piece survives).
+A reward that merely follows a capture never needs the turn suspended.
 
 ## Blocked by
 

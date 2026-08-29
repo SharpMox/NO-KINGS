@@ -544,6 +544,85 @@ func _init() -> void:
 	agartha_control.queue_free()
 	await process_frame
 
+	# --- issue 43: economy Artefacts batch (no needs-note) ---
+
+	# Mar-a-Lago Toilet Papers: "On 5-Wave Milestone: a random Shop item
+	# becomes free; all other Shop prices +10%". Same seed with/without the
+	# artefact held rolls the identical Shop stock (holding it doesn't touch
+	# any of Shop.roll's own RNG draws — only Chocolate Key Cake/Alleged
+	# Weather Balloon/Sub-Antarctic Visa do that), so a control boot gives an
+	# exact "+10%" baseline instead of recomputing Tuning's price table here.
+	var mal_control := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 99999})
+	await process_frame
+	var mal := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 99999, "artefacts": ["mar-a-lago-toilet-papers"]})
+	await process_frame
+	mal.artefacts[0].acquired_wave = 1 # isolate the cadence math (ark's-bunkbed
+		# precedent above) from the acquisition-stamping coverage elsewhere
+	check(mal.shop_stock.size() == mal_control.shop_stock.size(),
+		"(sanity) same seed rolls the same Shop stock size with/without the artefact held")
+	WaveLogic.queue(mal, 6) # clears Wave 5 -> 5-Wave Milestone (per-artefact cadence)
+	var mal_free_idx := -1
+	for j in mal.shop_stock.size():
+		if mal.shop_stock[j].get("free_slot", false):
+			mal_free_idx = j
+			break
+	check(mal_free_idx >= 0, "Mar-a-Lago Toilet Papers: a Shop slot is marked free on the Milestone")
+	var mal_price_a := Shop.price(mal, mal.shop_stock[mal_free_idx])
+	var mal_price_b := Shop.price(mal, mal.shop_stock[mal_free_idx])
+	check(mal_price_a == 0 and mal_price_b == mal_price_a,
+		"Mar-a-Lago Toilet Papers: the free slot prices at 0, stable across repeated price() calls")
+	var mal_others_plus_10pct := true
+	for j in mal.shop_stock.size():
+		if j == mal_free_idx:
+			continue
+		var base_price: int = Shop.price(mal_control, mal_control.shop_stock[j])
+		var expected := maxi(roundi(float(base_price) * 1.10), 0)
+		if Shop.price(mal, mal.shop_stock[j]) != expected:
+			mal_others_plus_10pct = false
+	check(mal_others_plus_10pct,
+		"Mar-a-Lago Toilet Papers: every other Shop slot prices +10% over its base — the free slot excluded")
+	mal.queue_free()
+	mal_control.queue_free()
+	await process_frame
+
+	# Deep State Yearbook: "On buying an Artefact: each other Artefact you own
+	# pays +5 Gold". Shop.buy() appends the bought copy to g.artefacts BEFORE
+	# firing on_purchase, so "each OTHER Artefact" is size() - 1 at dispatch
+	# time either way (see the handler's own comment).
+	var ys := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 99999, "artefacts": ["deep-state-yearbook", "greed"]})
+	await process_frame
+	ys.actions_left = 5
+	var ys_idx := -1
+	for j in ys.shop_stock.size():
+		if ys.shop_stock[j].kind == "artefact" and not ys.shop_stock[j].sold:
+			ys_idx = j
+			break
+	check(ys_idx >= 0, "(sanity) the rolled Shop stock has a buyable Artefact slot")
+	var ys_cost := Shop.price(ys, ys.shop_stock[ys_idx])
+	var ys_gold_before: int = ys.gold
+	Shop.buy(ys, ys_idx)
+	check(ys.gold == ys_gold_before - ys_cost + 10,
+		"Deep State Yearbook: buying an Artefact pays +5 Gold for each of the 2 other held Artefacts")
+	ys.queue_free()
+	await process_frame
+
+	var yself := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 99999})
+	await process_frame
+	yself.actions_left = 5
+	yself.shop_stock[0] = {"kind": "artefact", "key": "deep-state-yearbook", "sold": false}
+	check(yself.artefacts.is_empty(), "(sanity) no Artefacts held before the purchase")
+	var yself_cost := Shop.price(yself, yself.shop_stock[0])
+	var yself_gold_before: int = yself.gold
+	Shop.buy(yself, 0)
+	check(yself.gold == yself_gold_before - yself_cost,
+		"Deep State Yearbook: pays nothing when it is your only Artefact (buying its own first copy)")
+	yself.queue_free()
+	await process_frame
+
 
 	print("---")
 	if fails == 0:

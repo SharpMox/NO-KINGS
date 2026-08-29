@@ -503,6 +503,62 @@ func _init() -> void:
 	lint.queue_free()
 	await process_frame
 
+	# --- issue 43: New World Order Gerrymandering — "Gold paid by other
+	# Artefacts is increased by 25%", a run()-tail post-pass (see
+	# artefact_hooks.gd), not an ordinary key-sorted on_gold_change handler:
+	# it multiplies exactly what Daylight Savings Jar's own +10% Gold
+	# handler just added (ctx.amount - ctx.base), never the Gold gain's
+	# unmodified base ---
+	var gerry_control := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["daylight-savings-jar"], "clock_s": 100})
+	await process_frame
+	Economy.earn(gerry_control, 800)
+	check(gerry_control.gold == 880,
+		"(control) Daylight Savings Jar alone: +10% Gold on an 800 base = 880")
+	gerry_control.queue_free()
+	await process_frame
+
+	var gerry_one := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["daylight-savings-jar", "new-world-order-gerrymandering"],
+		"clock_s": 100})
+	await process_frame
+	Economy.earn(gerry_one, 800)
+	check(gerry_one.gold == 900,
+		"New World Order Gerrymandering: +25% of the +80 Daylight Savings Jar added (not +25% of the full 880) = 900")
+	gerry_one.queue_free()
+	await process_frame
+
+	var gerry_two := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["daylight-savings-jar", "new-world-order-gerrymandering",
+			"new-world-order-gerrymandering"], "clock_s": 100})
+	await process_frame
+	Economy.earn(gerry_two, 800)
+	check(gerry_two.gold == 920,
+		"two New World Order Gerrymanderings: +50% of the +80 added (920), not compounding (1.25^2 -> 925)")
+	gerry_two.queue_free()
+	await process_frame
+
+	# The same +25% also applies to ctx.gold_bonus, the Score->Gold
+	# converter channel (El Dorado Body Glitter) — it's Gold an Artefact
+	# paid too, just riding the on_score_change hook rather than on_gold_change.
+	var gerry_eldorado_control := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["el-dorado-body-glitter"]})
+	await process_frame
+	Economy.earn(gerry_eldorado_control, 800)
+	check(gerry_eldorado_control.gold == 840,
+		"(control) El Dorado Body Glitter alone: +40 Gold (5% of the 800 Score base)")
+	gerry_eldorado_control.queue_free()
+	await process_frame
+
+	var gerry_eldorado := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["el-dorado-body-glitter", "new-world-order-gerrymandering"]})
+	await process_frame
+	Economy.earn(gerry_eldorado, 800)
+	check(gerry_eldorado.gold == 850,
+		"New World Order Gerrymandering: +25% of El Dorado's +40 Gold side-payment too = +50, total 850")
+	gerry_eldorado.queue_free()
+	await process_frame
+
 
 	print("---")
 	if fails == 0:

@@ -136,6 +136,10 @@ var doomsday_snooze_used_this_wave := false # Doomsday Clock Snooze Button:
 var dihydrogen_free_wave := -1 # Dihydrogen Monoxide Battery: wave its one free
 	# Tactical Item use already fired this Wave, -1 = not yet (artefact hook 19)
 var wardenclyffe_free_wave := -1 # same idea, Wardenclyffe AAA Batteries' any-tier version
+var mar_a_lago_free_wave := -1 # Mar-a-Lago Toilet Papers: g.wave the free Shop
+	# slot was last (re)picked, -1 = not yet — guards against a 2nd held copy's
+	# own milestone dispatch, in the same on_wave_clear event, clearing the 1st
+	# copy's freshly-tagged slot before it's counted (artefact hook 43)
 var item_use_tactical_count := 0 # 33rd Degree Fidelity Card's per-tier use counters
 var item_use_strategic_count := 0
 var mrna_apply_count := 0 # mRNA Firmware Update: Piece Buffs applied to your

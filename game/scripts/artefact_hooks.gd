@@ -874,6 +874,20 @@ const REGISTRY := {
 	"elvish-hard-hat": ["on_action"],
 	# --- issue 35: Clock-gain choke point + run-long Turn counter ---
 	"black-knight-morse-code": ["on_score_change", "on_clock_change"],
+
+	# --- issue 43: the economy Artefacts with no `(needs: ...)` note ---
+	"mar-a-lago-toilet-papers": ["on_wave_clear", "on_price"],
+	"deep-state-yearbook": ["on_purchase"],
+	# New World Order Gerrymandering deliberately has NO REGISTRY entry, same
+	# shape as the issue-21 echo family above: it never runs through the
+	# normal per-copy _dispatch loop below at all. "Gold paid by other
+	# Artefacts +25%" can only be computed once every other held
+	# artefact/tariff has already added its share to a Gold gain — reading
+	# the running ctx.amount mid-loop is exactly the order-dependence issue
+	# 20 exists to rule out (CONTRACT note, header) — so it's an explicit
+	# post-pass at the tail of run() instead, after the on_gold_change/
+	# on_score_change dispatch (and the echo layer right after it) both
+	# finish. See run().
 }
 
 
@@ -929,6 +943,28 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		g.artefact_echo_depth += 1
 		_run_meta_triggers(g, hook, ctx, fired, held)
 		g.artefact_echo_depth -= 1
+	# issue 43: New World Order Gerrymandering — "Gold paid by other Artefacts
+	# +25%", a deliberate exception to the ORDERING rule above (REGISTRY has
+	# no entry for it; see the comment there). It cannot size itself off
+	# ctx.base like every other percentage handler: the thing it multiplies
+	# is precisely what every OTHER held artefact/tariff just added, which
+	# only exists once the main loop AND the echo layer above (e.g. Déjà Vu
+	# Glitch's on_gold_change/on_score_change multiply) have both run. Counted
+	# once here and applied as a single N-multiplier (not one +=25% per held
+	# copy) so two copies land on a clean +50% of the artefact-added part,
+	# never (1.25^2 - 1) = +56.25% compounding.
+	if hook == "on_gold_change" or hook == "on_score_change":
+		var n_gerrymander := 0
+		for t in held:
+			if t.key == "new-world-order-gerrymandering":
+				n_gerrymander += 1
+		if n_gerrymander > 0:
+			if hook == "on_gold_change":
+				ctx.amount += 0.25 * n_gerrymander * (ctx.amount - ctx.base)
+			elif ctx.has("gold_bonus"): # on_score_change's Score->Gold side
+				# payment (El Dorado Body Glitter) — itself entirely
+				# "Gold paid by an Artefact", not a delta off some base.
+				ctx.gold_bonus += 0.25 * n_gerrymander * ctx.gold_bonus
 	return ctx
 
 
@@ -2003,3 +2039,56 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.amount += ctx.base # double Clock GAINS only — "gains ...
 					# doubled" (catalog text), so a same-Turn Clock LOSS
 					# (e.g. Nigerian Prince Wire Transfer) is left alone
+
+		# --- issue 43: economy Artefacts batch (no needs-note) ---
+		["mar-a-lago-toilet-papers", "on_wave_clear"]:
+			# "5-Wave Milestone" — the silk-road-coupon/crop-circle-plank
+			# PER-ARTEFACT cadence (issue 26/28), not the GLOBAL 10-wave
+			# on_milestone hook (see REGISTRY's issue-26 comment). The free
+			# slot is picked HERE, once, and stamped onto the actual
+			# g.shop_stock Dictionary (a plain field, same shape as roll()'s
+			# own "biased" tag) — never re-rolled inside Shop.price(), which
+			# runs on every redraw and would otherwise flicker the free slot
+			# between frames and desync the UI price from the charged one.
+			# g.mar_a_lago_free_wave gates the reset to once per wave-clear
+			# EVENT (g.wave is the same for every copy dispatched by this
+			# one run() call, WaveLogic.queue() below) rather than once per
+			# copy, so N held copies that all hit this same milestone add N
+			# distinct free slots (the additive stacking rule) instead of
+			# each clearing the previous copy's pick.
+			if _milestone5_hit(g.wave, acquired_wave):
+				if g.mar_a_lago_free_wave != g.wave:
+					for s in g.shop_stock:
+						s.erase("free_slot")
+					g.mar_a_lago_free_wave = g.wave
+				var candidates := []
+				for i in g.shop_stock.size():
+					if not g.shop_stock[i].get("free_slot", false):
+						candidates.append(i)
+				if not candidates.is_empty():
+					g.shop_stock[candidates[g.rng.randi() % candidates.size()]].free_slot = true
+		["mar-a-lago-toilet-papers", "on_price"]:
+			# "+10%" off the immutable base, same additive contract as every
+			# other on_price handler. The free slot's price is forced to 0
+			# below, AFTER this hook returns (Shop.price's own
+			# Pre-Scratched Lottery Ticket override is the precedent: an
+			# absolute override composed here would depend on where this
+			# handler happens to sort against every other discount, and could
+			# go non-zero again if a later-sorting one added back on top) —
+			# so this can add the +10% unconditionally, including to the free
+			# slot, with no observable effect once Shop.price zeroes it.
+			ctx.amount += ctx.base * 0.10
+
+		["deep-state-yearbook", "on_purchase"]:
+			# "Each OTHER Artefact you own pays +5 Gold" — Shop.buy() appends
+			# the bought artefact to g.artefacts BEFORE this dispatch (see
+			# there), so g.artefacts.size() already counts the copy just
+			# bought; "-1" excludes exactly that one, whether it's a
+			# different artefact or (buying your first-ever copy of the
+			# Yearbook itself) the Yearbook's own new copy — either way
+			# "each other Artefact you own" is size() - 1. Direct g.gold
+			# write, same precedent as Putin's Golden Toilet Brush's
+			# on_purchase handler above (this hook has no gold_bonus output
+			# to route through).
+			if ctx.kind == "artefact":
+				g.gold += 5 * (g.artefacts.size() - 1)

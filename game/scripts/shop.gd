@@ -162,6 +162,18 @@ static func price(g, slot: Dictionary) -> int:
 		if t.key == "pre-scratched-lottery-ticket" and (g.lottery_purchase_count + 1) % 5 == 0:
 			amount = 0.0
 			break
+	# Mar-a-Lago Toilet Papers (issue 43): same reasoning as the lottery
+	# ticket override just above — `slot` is the actual Dictionary held in
+	# g.shop_stock (every caller reads it straight out of that array, never a
+	# copy), tagged by the on_wave_clear handler above, so this is an
+	# absolute forced-to-0 override applied after every percentage handler
+	# (including this artefact's own +10%) rather than composed inside the
+	# hook, where a later-sorting discount could add back on top of it.
+	if slot.get("free_slot", false):
+		for t in g.artefacts:
+			if t.key == "mar-a-lago-toilet-papers":
+				amount = 0.0
+				break
 	return maxi(roundi(amount), 0)
 
 

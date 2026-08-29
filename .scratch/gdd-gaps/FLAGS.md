@@ -133,6 +133,21 @@ found. Collected here so they are not lost in Outcome sections:
   Diagnosed 2026-08-29 while wrongly accusing slice 49 of introducing it (see `CLAUDE.md`
   on interleaving A/B runs).
 
+## Cards whose text overpromises what shipped
+
+- **Zapruder's Director's Cut says "repeat your previous Action"** but only repeats a **move
+  or capture** (issue 52). `_log_action` recorded just `{kind}`, so Deploys, Merges, Item
+  uses and Bomb/Trap captures carry no `{from, to}` to replay and are reported unavailable
+  rather than half-replayed. Correct behaviour for an ambiguous card, but a player who uses
+  an Item and then presses it will think it is broken. Either re-text the card to say
+  "move", or extend `_log_action` to carry enough state for the other action kinds.
+- **Abduction Probe / Manna Vending Machine vs the new caps.** The base caps introduced in
+  issue 53 (Items 3, Piece Buffs 2) quietly weakened two already-shipped Artefacts: Manna
+  Vending Machine grants **+2 Items**, wholly wasted at a full inventory of 3, and Fort Knox
+  IOU's +1 Tactical Item has the same exposure. Not a bug — a tight cap is what makes Area
+  51 Parking Permit and Denver Bunker Timeshare meaningful — but worth a look in the tuning
+  pass rather than discovering it in a playtest as "Manna feels broken".
+
 ## Housekeeping
 
 - **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens

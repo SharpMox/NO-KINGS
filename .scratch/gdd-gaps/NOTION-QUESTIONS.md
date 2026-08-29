@@ -9,49 +9,32 @@ House rule they all follow (`CLAUDE.md`): *ambiguity goes back to Notion as a qu
 not into code as a guess.* Half this backlog exists to undo guesses.
 
 Compiled 2026-08-29, against catalog state **152 / 180 implemented**.
+Revised the same day: questions 1 and 4 resolved in a design session; see issues 47-50.
 
 ---
 
-## 1. What is in a Box? — blocks 3 Artefacts
+## 1. ~~What is in a Box?~~ — ANSWERED 2026-08-29
 
-**The single highest-value answer here.** Three separate rows disagree with the code in
-the same direction, which suggests the GDD's Box and the prototype's Box drifted apart
-rather than any one row being wrong.
+The user specced the Box system **upward** rather than re-texting the rows down to the
+prototype. Nine Boxes: three sizes (Small 3/1, Big 5/1, Huge 7/2 choices/picks) x three
+themes (Pieces / Artefacts / Items). Score Boxes and the mixed Box are removed, as is the
+box-carrier enemy. Contents roll at stock time so a Box is a concrete object.
 
-The prototype (`game/scripts/box.gd`, `Box.roll_options`) offers **exactly 3 options**,
-each independently rolled as **Item 40% / Artefact 30% / Score 30%**. It never offers a
-piece. The GDD rows assume otherwise:
-
-| Artefact | Says | Conflict |
-| --- | --- | --- |
-| Cicada Rejection Letter | "+Gold equal to the Shop value of the offered **pieces**" | Boxes offer no pieces, so there is no value to sum |
-| Loch Ness Stool Sample | "open a random **Piece** Box" | There is no Piece Box kind |
-| Epstein's Black Book | "take all **5** contents" | Boxes offer 3, not 5 |
-
-**Question:** should Boxes offer pieces (and be 5 wide), or should these three rows be
-re-texted against the 3-option Item/Artefact/Score Box the game actually has?
-
-Note the prototype's Box already diverges deliberately (`box.gd` header, goal rework
-2026-07-06 — the GDD's two-step pick became one 3-option offer), so this may simply be
-that divergence never being carried back into the catalog.
-
+Full spec in **issue 47**; the four dependent Artefacts in **issue 49**; the replacement
+for loot-on-capture is the new Bounty Piece Buff in **issue 48**.
 ---
 
-## 2. Two Artefacts have the same effect — cosmetic, but probably unintended
+## 2. Two Artefacts have the same effect — still open, low priority
 
-| Artefact | Rarity | Effect |
-| --- | --- | --- |
-| Bible Gag Reel Scroll | Uncommon | "On Box Pick: you may reject the contents once and reroll them" |
-| Snowden's Rubik's Cube | Uncommon | "Once per Box: you may reroll the offered Picks" |
+**Bible Gag Reel Scroll** (Uncommon) — "On Box Pick: you may reject the contents once and
+reroll them" — and **Snowden's Rubik's Cube** (Uncommon) — "Once per Box: you may reroll
+the offered Picks" — are functionally identical.
 
-Functionally identical, same rarity. **Not a blocker, and now shipped** — slice 46 (merged) implements both the
-same way, sharing one reroll budget so they stack additively, and deliberately does not
-invent a difference to justify both existing. If the answer is "one of them should differ",
-that is a small edit to one handler, not a rebuild.
+Both shipped in slice 46, implemented the same way with a shared reroll budget so they
+stack additively. The question stands but answering it is now a small edit to one handler,
+not a rebuild.
 
-**Question:** is one of these meant to be different (a reroll of a *different* thing, more
-rerolls, a reroll that also upgrades rarity), or is this a genuine duplicate to retire?
-
+**Question:** is one meant to differ, or is this a duplicate to retire?
 ---
 
 ## 3. Spare Organ Receipt — which piece is "the consumed piece"?
@@ -69,24 +52,16 @@ Everything else about this one is ready: `commit_merge` has both ids in scope an
 
 ---
 
-## 4. Winchester Salt Lined Doors removes a loss condition — balance call
+## 4. ~~Winchester Salt Lined Doors~~ — WITHDRAWN 2026-08-29
 
-> Enemy pieces cannot move onto your back row
+Raised as a balance blocker; it was neither. "Enemy pieces cannot move onto your back row"
+plainly means enemies never occupy it, so immunity to the back-row breach loss is the card
+working as written, not a side effect. And balance tuning was already ruled to wait until
+every lever is coded, so this re-litigated a settled decision.
 
-You lose the run when **every** back-row tile holds an enemy (`_back_row_breached`). If
-enemies can never enter that row, that condition becomes unreachable, so holding this
-Artefact makes you permanently immune to the breach loss and **only the Clock can end the
-run**.
-
-That may be intended for a Legendary. But it is permanent, not once-per-Wave, and it
-should be an explicit call rather than a side effect of implementing "zone denial".
-
-**Question:** keep it as written, or bound it (expires after N Waves / once per Wave /
-only part of the back row / enemies may enter but not end their move there)?
-
-Technically it is cheap either way — `ai_action` calls `Rules.legal_moves`, so one filter
-binds both sides. See issue 33's addendum.
-
+**Winchester and Cheyenne Mountain Doorbell are cleared to build** — see issue 33's
+addendum, where the go-ahead is now recorded in writing rather than living only in the
+conversation.
 ---
 
 ## 5. 'Definitely Not Russia' Patch — what exactly does it mask?

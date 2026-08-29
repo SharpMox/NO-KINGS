@@ -271,6 +271,65 @@ func _init() -> void:
 	check(game.items.size() + game.artefacts.size() > loot_before
 		or game.score > score_before, "the picked reward is applied")
 
+	# Nostradamus Mad Libs (issue 46): the extra pick reopens the box modal
+	# with what's left of the offer instead of closing it — a second click
+	# is needed to actually close the box.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]],
+		"artefacts": ["nostradamus-mad-libs"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.box_open, "(setup) capturing a box carrier opens the box")
+	var mad_libs_opt1 := _first_option_button(game.box_panel)
+	check(mad_libs_opt1 != null, "(setup) the first offer has a clickable option")
+	_click(mad_libs_opt1.get_global_rect().get_center())
+	await process_frame
+	check(game.box_open,
+		"Nostradamus Mad Libs: the extra pick reopens the box instead of closing it")
+	var mad_libs_opt2 := _first_option_button(game.box_panel)
+	check(mad_libs_opt2 != null, "a second option is offered, from what's left")
+	_click(mad_libs_opt2.get_global_rect().get_center())
+	await process_frame
+	check(not game.box_open, "the second (extra) pick closes the box")
+
+	# Snowden's Rubik's Cube / Bible Gag Reel Scroll (issue 46, functionally
+	# identical): a Reroll button appears on the box modal while the budget
+	# is above zero, clicking it replaces the offer without closing the box,
+	# and it disappears once the budget is spent.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]],
+		"artefacts": ["snowden-s-rubik-s-cube"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.box_open, "(setup) capturing a box carrier opens the box")
+	var reroll_btn := _button_prefix(game.box_panel, "Reroll")
+	check(reroll_btn != null, "Snowden's Rubik's Cube: a Reroll button appears on the box modal")
+	var gold_before_reroll: int = game.gold
+	_click(reroll_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.box_open, "rerolling keeps the box open")
+	check(game.gold == gold_before_reroll,
+		"rerolling doesn't spend Gold here (no box_cost Tariff held in this probe — the box_cost-charged-once " +
+		"proof itself lives in test_items_artefacts_3.gd, with a Tariff held to make it observable)")
+	check(_button_prefix(game.box_panel, "Reroll") == null,
+		"the reroll budget is spent — no Reroll button on the fresh offer")
+
 	# Buff Box sub-pick, riding the generic choice-modal seam (issue 41):
 	# opening it blocks board input, Cancel leaves the item unspent, and
 	# picking a choice resumes targeting exactly like before the migration.
@@ -802,6 +861,19 @@ func _first_option_button(node: Node) -> Button:
 		return node
 	for c in node.get_children():
 		var hit := _first_option_button(c)
+		if hit:
+			return hit
+	return null
+
+
+## First button whose text starts with `prefix` — the box modal's Reroll
+## button (issue 46) carries a dynamic "(N left)" suffix, so it can't be
+## matched by exact text like _click_button_in does.
+func _button_prefix(node: Node, prefix: String) -> Button:
+	if node is Button and node.text.begins_with(prefix):
+		return node
+	for c in node.get_children():
+		var hit := _button_prefix(c, prefix)
 		if hit:
 			return hit
 	return null

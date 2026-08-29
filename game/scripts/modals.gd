@@ -15,6 +15,7 @@ signal merge_confirmed
 signal merge_cancelled
 signal box_chosen(opt: Dictionary)
 signal box_skipped
+signal box_reroll_pressed
 signal win_continue_pressed
 signal win_end_pressed
 signal shop_buy_pressed(index: int)
@@ -705,6 +706,12 @@ func show_box(options: Array) -> void:
 		b.custom_minimum_size = Vector2(420, 0)
 		b.pressed.connect(func() -> void: box_chosen.emit(opt))
 		box.add_child(b)
+	if g.box_rerolls_left > 0: # Bible Gag Reel Scroll / Snowden's Rubik's
+		# Cube (issue 46) — only while the per-Box budget is above zero
+		var reroll := Button.new()
+		reroll.text = "Reroll (%d left)" % g.box_rerolls_left
+		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
+		box.add_child(reroll)
 	var skip := Button.new()
 	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
 	skip.pressed.connect(func() -> void: box_skipped.emit())

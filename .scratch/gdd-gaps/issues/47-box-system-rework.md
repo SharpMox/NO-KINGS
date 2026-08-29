@@ -56,8 +56,26 @@ same rule: roll when offered, store, reveal on open.
 
 - **6 Box slots, unchanged** — 2 per theme (Pieces / Artefacts / Items), with each slot's
   **size rolled independently**.
-- **Price by size only**, ignoring theme. Rising curve Small -> Big -> Huge. The user
-  expects to fine-tune these numbers shortly; pick something defensible and say so.
+- **Price by size only**, ignoring theme.
+
+`SHOP_BOX_PRICE := 50` is currently a single flat value and becomes a size curve. Use the
+**doubling shape the file already uses everywhere else** — `SHOP_ITEM_PRICE` is
+30/60/120, `SHOP_ARTEFACT_PRICE` is 50/100/200/400 — so:
+
+```gdscript
+const SHOP_BOX_PRICE := {"small": 50, "big": 100, "huge": 200}
+```
+
+Small keeps today's 50, so nothing gets cheaper. That prices a Huge (7 choices, 2 picks) at
+the same 200 as two Smalls (6 choices, 2 picks) — you pay the same for picks and buy
+better selection, which is a sane starting shape. **The user expects to tune these
+shortly**; the point is to start from the file's own idiom rather than an invented curve.
+
+`SCORE_BOX_CHUNKS` loses its only consumer when Score Boxes go — delete it rather than
+leaving it orphaned, and check nothing else reads it first.
+
+`BOX_SKIP_CONSOLATION := 20` still applies on decline and is unaffected; Cicada Rejection
+Letter (issue 49) pays *on top of* it.
 
 ## Piece Box contents
 

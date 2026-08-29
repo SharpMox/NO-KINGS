@@ -10,6 +10,7 @@ extends Node
 const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
+const Box := preload("res://scripts/box.gd")
 
 signal merge_confirmed
 signal merge_cancelled
@@ -494,6 +495,17 @@ func _shop_detail(index: int) -> Control:
 		desc.modulate = Color(1, 1, 1, 0.8)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.add_child(desc)
+	# All-Seeing Eye Contact Lens (49): "Boxes reveal their contents before
+	# you buy or choose them" — X-ray gated on holding the Artefact, not on
+	# the roll (issue 47 already rolls every Box unconditionally at stock
+	# time, so there is nothing left to gate but the display).
+	if slot.kind == "box" and g._artefact_count("all-seeing-eye-contact-lens") > 0:
+		var reveal := Label.new()
+		reveal.text = "Contains: %s" % Box.contents_names(slot.contents)
+		reveal.add_theme_font_size_override("font_size", 10)
+		reveal.modulate = Color(1, 1, 1, 0.65)
+		reveal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		info.add_child(reveal)
 	row.add_child(info)
 
 	var buy := Button.new()

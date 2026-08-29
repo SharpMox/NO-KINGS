@@ -1331,9 +1331,9 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "Every 1000 Score gained: open a random Piece Box (needs: score threshold)",
+  "effect": "Every 1000 Score gained: open a random Piece Box",
   "conspiracy": "The Loch Ness Monster",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "new-world-order-gerrymandering",
@@ -1548,9 +1548,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On your next Box Pick: take all 5 contents; this Artefact is then consumed (needs: consumable artefacts)",
+  "effect": "On your next Box Pick: take all of the Box's contents; this Artefact is then consumed the moment you pick more than you were already entitled to",
   "conspiracy": "The Epstein case",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "2012-doomsday-party-hat",
@@ -1803,9 +1803,9 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On declining a Box Pick: +Gold equal to the Shop value of the offered pieces (needs: decline option)",
+  "effect": "On declining a Box Pick: +Gold equal to the Shop value of the Box's contents, whatever kind they are",
   "conspiracy": "Cicada 3301",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "ark-grounding-cable",
@@ -1927,9 +1927,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Box Picks show all 3 box types' contents at once (needs: combined box UI)",
+  "effect": "Boxes reveal their contents before you buy or choose them",
   "conspiracy": "The Eye of Providence",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "ecdysis-sheddings",

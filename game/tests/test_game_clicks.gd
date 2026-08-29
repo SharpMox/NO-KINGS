@@ -730,6 +730,57 @@ func _init() -> void:
 	await process_frame
 	game.state = was_state
 
+	# All-Seeing Eye Contact Lens (issue 49): the Shop's box detail dock
+	# reveals contents only while holding it. A fresh boot so it's definitely
+	# held, then expand whichever Box slot rolled (preferring Huge — 7
+	# entries — when one shows up) and confirm the reveal Label carries the
+	# slot's exact contents WITHOUT breaking the Buy button underneath it —
+	# the concrete risk of a variable-length reveal in a fixed-height dock.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "(setup) Shop button clickable, All-Seeing Eye held")
+	await process_frame
+	var box_slot_index := -1
+	var box_slot_size := ""
+	for idx in game.shop_stock.size():
+		var s: Dictionary = game.shop_stock[idx]
+		if s.kind == "box" and (box_slot_index == -1 or s.size == "huge"):
+			box_slot_index = idx
+			box_slot_size = s.size
+			if s.size == "huge": # the worst case (7 entries) — stop as soon as it's found
+				break
+	check(box_slot_index >= 0, "(setup) a Box slot exists to expand")
+	var box_button: Button = null
+	to_visit = [game.modals.shop_panel]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is Button and n.has_meta("shop_index") and n.get_meta("shop_index") == box_slot_index:
+			box_button = n
+			break
+		to_visit.append_array(n.get_children())
+	check(box_button != null, "(setup) the Box tile is clickable")
+	_click(box_button.get_global_rect().get_center())
+	await process_frame
+	var reveal_label: Label = null
+	to_visit = [game.modals.shop_panel]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is Label and n.text.begins_with("Contains: "):
+			reveal_label = n
+			break
+		to_visit.append_array(n.get_children())
+	var expect_reveal := "Contains: %s" % Box.contents_names(game.shop_stock[box_slot_index].contents)
+	check(reveal_label != null and reveal_label.text == expect_reveal,
+		"All-Seeing Eye Contact Lens: the %s Box's reveal Label shows its exact contents" % box_slot_size)
+	check(await _click_button_in(game.modals.shop_panel, "Buy"),
+		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
+
 	# reinforcement shop: opens pending at turn start, Buy is free and adds
 	# to stock, Done hands the turn back
 	game.queue_free()

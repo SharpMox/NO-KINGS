@@ -247,6 +247,17 @@ var box_only_kind := "" # the current Box's theme ("piece"/"artefact"/"item",
 	# the same theme
 var box_size := "" # the current Box's size ("small"/"big"/"huge"), pinned
 	# the same way — a Reroll keeps the same choice/pick shape too
+var box_black_book_pending := false # Epstein's Black Book (49): true once
+	# this Box's native+Nostradamus entitlement has been offered a free
+	# "extra look" (reopened instead of closed) but not yet spent — the
+	# artefact is consumed only on the pick actually taken from that look,
+	# never on the entitled pick that exhausted the budget. Reset per-Box in
+	# _open_box_pick, same lifetime as box_picks_left/box_rerolls_left.
+var score_gained_total := 0 # run-long cumulative Score GAINED (issue 49,
+	# Loch Ness Stool Sample) — tracks ctx.base off every on_score_change
+	# dispatch, so it only ever goes up even though g.score itself can drop
+	# (Templar Debit Card pays Shop purchases in Score). "Gained, not
+	# current" per the spec: spending must never un-trigger the threshold.
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
@@ -2007,6 +2018,17 @@ func _artefact_count(key: String) -> int:
 	return artefacts.filter(func(a: Dictionary) -> bool: return a.key == key).size()
 
 
+## Remove exactly ONE held copy of `key` — Epstein's Black Book (49) is the
+## first self-consuming Artefact in the catalog, so there's no precedent to
+## reuse: every other artefacts.append() site (Shop.buy, _box_choose's own
+## artefact grant, save_config.gd) has no matching removal path yet.
+func _consume_artefact(key: String) -> void:
+	for i in artefacts.size():
+		if artefacts[i].key == key:
+			artefacts.remove_at(i)
+			return
+
+
 ## Bounty Piece Buff (issue 48): 1-of-3 random Boxes, then the chosen one
 ## opens via the normal Box flow below. Shared by both halves — the enemy
 ## half calls this immediately from _move_player's capture block (still your
@@ -2024,8 +2046,12 @@ func _open_bounty_pick() -> void:
 		return _open_box_pick(offer[rng.randi() % offer.size()])
 	var choices := []
 	for slot in offer:
-		choices.append({"label": "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()],
-			"value": slot})
+		var label := "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()]
+		if _artefact_count("all-seeing-eye-contact-lens") > 0: # X-ray (49):
+			# Bounty's 1-of-3 offer sees inside all three before choosing, same
+			# as a Shop Box slot — see modals.gd's _shop_detail for the Shop half.
+			label += " (%s)" % Box.contents_names(slot.contents)
+		choices.append({"label": label, "value": slot})
 	_open_choice_pick("✦ Bounty — choose a Box:", choices, "Forfeit (no box)",
 		_open_box_pick, Callable())
 
@@ -2046,12 +2072,13 @@ func _open_box_pick(slot: Dictionary) -> void:
 	box_picks_left = (native_picks - 1) + _artefact_count("nostradamus-mad-libs")
 	box_rerolls_left = _artefact_count("bible-gag-reel-scroll") \
 		+ _artefact_count("snowden-s-rubik-s-cube") # functionally identical, additive
+	box_black_book_pending = false # fresh per-Box (Epstein's Black Book, 49)
 	box_offer = slot.contents.duplicate(true)
 	if autoplay: # bot: random pick (or skip), and exercise the reroll branch
 		# too — every new path must stay inside this branch or the bot deadlocks
 		# on a modal nobody is there to click (issue 46)
 		if rng.randf() < 0.1:
-			Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
+			_decline_box_pick()
 			return _box_close()
 		if box_rerolls_left > 0 and rng.randf() < 0.5:
 			box_rerolls_left -= 1
@@ -2090,11 +2117,28 @@ func _box_choose(opt: Dictionary) -> void:
 	box_offer.erase(opt)
 	if box_picks_left > 0 and not box_offer.is_empty():
 		box_picks_left -= 1
-		if autoplay:
-			return _box_choose(box_offer[rng.randi() % box_offer.size()])
-		modals.show_box(box_offer) # reopen with what's left — box_open stays untouched
+	elif box_black_book_pending and not box_offer.is_empty():
+		# Epstein's Black Book (49): this pick is the one that actually
+		# exceeds native + Nostradamus entitlement — the exact "consumed the
+		# moment you pick more than you should have" ruling. Spend the held
+		# copy now and unlock every remaining item through the SAME budget
+		# mechanic (box_picks_left), so "take all contents" falls out of the
+		# normal reopen loop instead of a separate atomic-grant path.
+		box_black_book_pending = false
+		_consume_artefact("epstein-s-black-book")
+		box_picks_left = box_offer.size() - 1
+	elif not box_offer.is_empty() and _artefact_count("epstein-s-black-book") > 0:
+		# Entitlement just ran out. Black Book, while held, offers ONE more
+		# free look at what's left WITHOUT spending itself — "take a Big
+		# Box's normal 1 pick, and it is NOT consumed — it waits" (issue 49).
+		# Only actually taking this look (the elif above, on the next call)
+		# spends it; declining it (Skip) leaves it untouched for the next Box.
+		box_black_book_pending = true
 	else:
-		_box_close()
+		return _box_close()
+	if autoplay:
+		return _box_choose(box_offer[rng.randi() % box_offer.size()])
+	modals.show_box(box_offer) # reopen with what's left — box_open stays untouched
 
 
 ## Bible Gag Reel Scroll / Snowden's Rubik's Cube (issue 46): both grant "1
@@ -2432,5 +2476,24 @@ func _show_tariffs() -> void:
 
 func _on_box_skipped() -> void:
 	fx_at = get_viewport_rect().size / 2.0
-	Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
+	_decline_box_pick()
 	_box_close()
+
+
+## Both decline paths (the interactive Skip button above, and autoplay's own
+## inline decline in _open_box_pick) pay the same flat consolation plus
+## Cicada Rejection Letter's Gold (issue 49): "+Gold equal to the Shop value
+## of the offered pieces" re-texted to "the Box's contents, whatever kind" —
+## valued off whatever is STILL in box_offer at the moment of decline (the
+## full original offer if declined outright, or whatever remains if this is
+## a later round after Nostradamus/Huge/Black Book already took some picks).
+## A Huge Box declining all 7 pays for all 7 — intended, not a bug (issue 49).
+## Stacks additively per held copy, same convention as every other artefact.
+func _decline_box_pick() -> void:
+	Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
+	var n := _artefact_count("cicada-rejection-letter")
+	if n > 0:
+		var value := 0
+		for opt in box_offer:
+			value += Box.content_value(self, opt)
+		gold += value * n

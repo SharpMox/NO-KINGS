@@ -61,6 +61,8 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.captured = cfg.get("captured", []).duplicate()
 	g.score = int(cfg.get("score", 0)) # int(): JSON numbers arrive as floats
 	g.gold = int(cfg.get("gold", 0))
+	g.score_gained_total = int(cfg.get("score_gained_total", 0)) # issue 49,
+		# Loch Ness Stool Sample — additive, defaults to 0 for any older save
 	g.shop_stock = cfg.get("shop_stock", []).duplicate(true)
 	g.shop_restocks = int(cfg.get("shop_restocks", 0)) # no reroll-scumming
 	# GDD Game Flow — Run: restore the run's RNG so a resumed save rolls what an
@@ -179,7 +181,8 @@ static func to_config(g) -> Dictionary:
 		"army": g.next_army, "rank": g.next_tier,
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
-		"score": g.score, "gold": g.gold, "clock_s": g.clock_ms / 1000.0,
+		"score": g.score, "gold": g.gold, "score_gained_total": g.score_gained_total,
+		"clock_s": g.clock_ms / 1000.0,
 		"shop_stock": g.shop_stock.duplicate(true),
 		"shop_restocks": g.shop_restocks,
 		"sanctioned_id": g.sanctioned_id,

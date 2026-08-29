@@ -490,20 +490,23 @@ func _init() -> void:
 	# granted Bomb would detonate THIS capture, same class of bug as Critical/
 	# Range below, just not in this fix's scope) that a random roll would
 	# occasionally hit and destroy the piece the test then inspects. Seed 4
-	# is a durable roll ("reflect", a dormant buff untouched by this capture
+	# is a durable roll ("shield", a dormant buff untouched by this capture
 	# path either way) — verified deterministic across repeated runs. (issue
 	# 47 shifted the RNG stream position here: Shop.roll now rolls every Box's
-	# full contents at boot instead of at open time, so this seed's downstream
-	# draw moved from "stun" to "reflect" — still a safe, non-self-triggering
-	# pick, re-verified against the same Bomb/Trap/Multicapture hazard list.)
+	# full contents at boot instead of at open time, moving this seed's
+	# downstream draw from "stun" to "reflect". Issue 48 shifted it again —
+	# PIECE_BUFFS grew a 13th entry, Bounty, changing _random_buff_key's pool
+	# size and therefore the modulo — from "reflect" to "shield". Still a
+	# safe, non-self-triggering pick, re-verified against the same Bomb/Trap/
+	# Multicapture hazard list both times.)
 	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
 		"wave": 3, "artefacts": ["holy-lint"], "seed": "4"})
 	await process_frame
 	lint.actions_left = 5
 	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
 	var lint_buffs: Array = BuffLogic.of(lint.board[Vector2i(3, 2)])
-	check(lint_buffs.size() == 1 and lint_buffs[0].key == "reflect",
-		"Holy Lint: the capturing piece gets +1 Piece Buff (reflect, seed 4)")
+	check(lint_buffs.size() == 1 and lint_buffs[0].key == "shield",
+		"Holy Lint: the capturing piece gets +1 Piece Buff (shield, seed 4)")
 	lint.queue_free()
 	await process_frame
 

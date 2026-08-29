@@ -4,7 +4,7 @@ Things surfaced while working the slices that are **not blocking**, have no owne
 will quietly rot if they only live in a PR description. None of these is a slice on its
 own; most are a decision or a small piece of art away from closing.
 
-Reviewed 2026-08-28.
+Reviewed 2026-08-29.
 
 ## Art
 
@@ -44,6 +44,17 @@ Each was a judgement call needed to ship; none was specced.
 - **Multicapture picks its extra victim automatically** — the most valuable eligible
   neighbour — so the trigger needs no second targeting step mid-capture. The alternative
   is letting the player choose, which costs a targeting stage.
+- **Yalta Cocktail Napkin held twice, both copies acquired on the same Wave**: the first
+  copy wins the modal that milestone and the second forfeits its pick, rather than
+  queueing a second modal. Follows the existing `trojan-horse-assembly-manual` precedent
+  (`not g.box_open`). Cheap to reverse into a queue if a forfeited reward feels bad — but
+  note it only ever bites when you hold two copies bought on the same Wave.
+- **New World Order Gerrymandering is a post-pass in `run()`, not a REGISTRY handler.**
+  It multiplies "what the other Artefact handlers added" (`ctx.amount - ctx.base`), which
+  is only correct once every other handler *and* the echo layer have run. Implementing it
+  as an ordinary handler that happens to sort last would reintroduce exactly the
+  order-dependence issue 20 was raised to kill. It is a deliberate, called-out exception
+  to the ORDERING rule, and it must stay last in `run()`.
 - **Buff Box resolves on use, not on acquisition.** The GDD fires the sub-pick
   immediately when it is picked from the Item Box's 5 options; the prototype has no
   two-step box (divergence #10) and every other item resolves on use, so it enters the
@@ -54,8 +65,14 @@ Each was a judgement call needed to ship; none was specced.
 Each was surfaced by an agent that declined to guess, and each is written up where it was
 found. Collected here so they are not lost in Outcome sections:
 
-- **Holy Lint's grant timing** — issue 27. ~17% of its rolls are consumed by the very
-  capture that granted them.
+- ~~**Holy Lint's grant timing**~~ — issue 27, closed 2026-08-28. The "~17% of its rolls
+  do nothing" figure recorded here was **wrong** and is corrected for the record:
+  `capture_multiplier` evaluates *after* `capture_score`, so a granted `critical` doubles
+  the very capture that granted it rather than being wasted. Only `range` was genuinely
+  inert. The real defect was narrower and different — `slow` is a **debuff on its own
+  holder**, so a random grant could hand your own piece a penalty. Fixed by flagging it
+  `self_harming` and excluding it from `_random_buff_key` (the player's deliberate Buff
+  Box pick still offers it).
 - **Tungsten-Filled Gold Bar + Popemobile Piggy Bank** compound to 11-54x baseline score
   over a full run. Confirmed *not* a double-count bug (see issue 20's Outcome) — a
   genuinely powerful catalog-specified pair. Balance call outstanding.
@@ -63,17 +80,27 @@ found. Collected here so they are not lost in Outcome sections:
   anywhere in the code today, so implementing it means inventing a base-game restriction
   nothing currently asks for.
 - **`on_milestone` fires every 10 waves but several artefacts say "5-Wave Milestone"** —
-  a real GDD/code mismatch. Those artefacts currently hook `on_wave_clear` and check
-  `g.wave % 5` directly.
+  still true, and still worth a GDD ruling, but it is now a *naming* collision rather than
+  a behavioural bug. `on_milestone` is the global 10-Wave clock-refill trigger
+  (`Tuning.MILESTONE_WAVES == 10`), used only by "timer" and the Recession tariff. Every
+  per-artefact "5-Wave Milestone" effect hooks `on_wave_clear` and calls
+  `_milestone5_hit(g.wave, acquired_wave)` — each held copy counting its own 5 Waves from
+  acquisition (issue 28, user ruling 2026-08-29), **not** the `g.wave % 5` this flag
+  originally described. The trap is that the hook *named* `on_milestone` is not the one a
+  "5-Wave Milestone" artefact wants; issue 43's spec got this wrong and the implementing
+  agent caught it.
 - Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
-- **"Demoted" is undefined** (issue 31). Blocks Dark Market Light Bulb. Two readings that
-  differ for any piece demoted then re-promoted.
-- **There is no Clock-gain choke point** (issue 30). `clock_ms` is mutated directly at ~15
-  sites, unlike Gold and Score which route through `Economy.earn`/`gain`. Blocks Black Knight
-  Morse Code, and any future artefact that wants to modify time. Worth building for its own
-  sake, not just for one artefact.
-- **There is no run-long turn counter** (issue 30) — only `turns_since_wave`, which resets
-  every Wave.
+- ~~**"Demoted" is undefined**~~ — issue 31, closed by slice 42. Resolved with a
+  **peak-rank stamp**: `peak_ranked` is set on any piece the moment it ranks up (at the
+  single `on_rank_up` choke point), so "Demoted" means *was Ranked once and is not now* —
+  which settles the demoted-then-re-promoted reading. Dark Market Light Bulb ships on it.
+- ~~**There is no Clock-gain choke point**~~ — issue 30/35, closed by slice 35.
+  `Economy.add_clock` is now that choke point, matching `earn`/`gain` for Gold and Score;
+  the ~15 direct `clock_ms` mutations route through it. Black Knight Morse Code is
+  unblocked.
+- ~~**There is no run-long turn counter**~~ — issue 30/35, closed by slice 35. A run-long
+  Turn counter now rides in run state and the save, alongside the per-Wave
+  `turns_since_wave`.
 - ~~**Tier 5 kills Blitz outright.**~~ Resolved by the Blitz rework
   (`fix/blitz-and-crypto-wallet`, 2026-08-28, user call): Blitz itself now costs 0 actions
   and the target's next move/capture is free, so it no longer depends on the 2-actions/turn

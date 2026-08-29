@@ -13,6 +13,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const Waves := preload("res://data/waves.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -352,6 +353,34 @@ func _init() -> void:
 	Shop.buy(lottery, free_idx)
 	check(lottery.gold == gold_before_free, "...: the free purchase costs no Gold")
 	lottery.queue_free()
+	await process_frame
+
+	# --- issue 45: Pandemic Toilet Paper Pallet — every 2nd purchase in the
+	# same Shop visit costs 50% less. Uses a synthetic slot (same style as
+	# test_shop.gd's Denazification Visa coverage) so the price math is
+	# checked against a known base, independent of the randomized stock.
+	var pallet := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 9, "gold": 500, "artefacts": ["pandemic-toilet-paper-pallet"]})
+	await process_frame
+	var pallet_slot := {"kind": "piece", "key": "queen", "sold": false}
+	var pallet_base: int = pallet.defs.queen.value
+	check(Shop.price(pallet, pallet_slot) == pallet_base,
+		"Pandemic Toilet Paper Pallet: the 1st purchase (counter 0) pays full price")
+	check(Shop.price(pallet, pallet_slot) == pallet_base,
+		"Pandemic Toilet Paper Pallet: price() is a pure read — calling it again doesn't drift the price")
+	ArtefactHooks.run(pallet, "on_purchase", {"kind": "piece", "key": "queen", "price": pallet_base})
+	check(pallet.pallet_purchase_count == 1,
+		"Pandemic Toilet Paper Pallet: on_purchase counts this Shop visit's purchases")
+	check(Shop.price(pallet, pallet_slot) == roundi(pallet_base * 0.5),
+		"Pandemic Toilet Paper Pallet: the 2nd purchase (counter 1) is 50% off")
+	ArtefactHooks.run(pallet, "on_purchase", {"kind": "piece", "key": "queen", "price": pallet_base})
+	check(Shop.price(pallet, pallet_slot) == pallet_base,
+		"Pandemic Toilet Paper Pallet: the 3rd purchase is back to full price — every 2nd, not sticky")
+	pallet.actions_left = 5
+	pallet._open_shop()
+	check(pallet.pallet_purchase_count == 0,
+		"Pandemic Toilet Paper Pallet: opening the Shop resets the counter — 'the same Shop visit', not the whole run")
+	pallet.queue_free()
 	await process_frame
 
 	# --- issue 26: free-deploy (Hitler's Argentinian Passport) ---

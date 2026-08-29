@@ -155,6 +155,18 @@ var mona_lisa_turn_done := false # 100% Genuine Original Mona Lisa: this Turn's
 var dejavu_score_turn_done := false # Déjà Vu Glitch: this Turn's first Score
 	# gain already doubled; reset in ArtefactHooks.run() at on_turn_start
 var dejavu_gold_turn_done := false # same idea, first Gold gain each Turn
+var frog_armed := false # Frog Pride Flag (issue 45): armed by losing a piece
+	# (on_piece_lost), consumed by the NEXT Deploy (on_deploy) — a single
+	# flag, not one per lost piece: "the next piece" is singular, so losing
+	# several before deploying still only arms once
+var y2k_armed := false # Y2K Patch Floppy Disk (issue 45): (re)armed every
+	# Wave start (on_wave_spawn), consumed by that Wave's first enemy Turn
+	# (on_enemy_turn_start) — see artefact_hooks.gd for the deliberate
+	# exception to the additive-stacking rule this makes
+var pallet_purchase_count := 0 # Pandemic Toilet Paper Pallet (issue 45):
+	# purchases made this Shop visit, reset in _open_shop() below — "the same
+	# Shop visit", not the whole run (contrast Pre-Scratched Lottery Ticket's
+	# lottery_purchase_count above, which never resets)
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -2288,6 +2300,8 @@ func _connect_modals() -> void:
 func _open_shop() -> void:
 	if box_open or buff_pick_open or preview_open or win_open: # one modal at a time
 		return
+	pallet_purchase_count = 0 # Pandemic Toilet Paper Pallet (issue 45): a
+		# fresh Shop visit starts a fresh "every 2nd purchase" count
 	modals.show_shop()
 
 

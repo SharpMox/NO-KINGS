@@ -893,6 +893,13 @@ const REGISTRY := {
 	# post-pass at the tail of run() instead, after the on_gold_change/
 	# on_score_change dispatch (and the echo layer right after it) both
 	# finish. See run().
+
+	# --- issue 45: three Artefacts whose `(needs: ...)` blocker notes went
+	# stale — all three hooks below are live call sites today, checked
+	# against the real code, not the note (see .scratch/gdd-gaps/issues/45) ---
+	"frog-pride-flag": ["on_piece_lost", "on_deploy"],
+	"y2k-patch-floppy-disk": ["on_wave_spawn", "on_enemy_turn_start"],
+	"pandemic-toilet-paper-pallet": ["on_purchase", "on_price"],
 }
 
 
@@ -2107,3 +2114,62 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# to route through).
 			if ctx.kind == "artefact":
 				g.gold += 5 * (g.artefacts.size() - 1)
+
+		# --- issue 45: three Artefacts whose `(needs: ...)` blocker notes went
+		# stale — all three hooks below already have a live call site (see
+		# REGISTRY comment above / .scratch/gdd-gaps/issues/45) ---
+		["frog-pride-flag", "on_piece_lost"]:
+			# Arms on ANY player-piece loss, not per-reason — "losing a piece"
+			# has no qualifier in the catalog text. ctx.cancel (issue 24,
+			# Fireproof Pajamas) means the piece is NOT actually lost — same
+			# skip as KGB Photo Eraser's on_piece_lost handler above.
+			if not ctx.cancel:
+				g.frog_armed = true
+		["frog-pride-flag", "on_deploy"]:
+			# Single flag, not a counter: losing several pieces before the
+			# next Deploy still only arms once ("the next piece", singular —
+			# issue 45's own wording). Consumed here regardless of how many
+			# losses armed it.
+			if g.frog_armed:
+				g.frog_armed = false
+				_grant_buff(g, ctx.pos) # full pool, per _random_buff_key
+					# (Ruling 1, header above) — the catalog text names no tier
+
+		["y2k-patch-floppy-disk", "on_wave_spawn"]:
+			g.y2k_armed = true # (re)arm every Wave — a held copy or two still
+				# only means "the first Turn is skipped" once (see below)
+		["y2k-patch-floppy-disk", "on_enemy_turn_start"]:
+			# Deliberate exception to the additive-stacking rule (header):
+			# two held copies both dispatch this same call, but the flag only
+			# consumes once — the second copy's own dispatch is then a no-op,
+			# so 2 copies still skip exactly ONE Turn, never two.
+			# ctx.actions = 0 is an ABSOLUTE override (there is no "skip"
+			# concept to add to), not a delta off a base — and it composes
+			# safely with Filibuster's own additive "+1" on this same hook
+			# because run() always dispatches the artefacts group before the
+			# tariffs group (header's "Tariff/artefact ordering" note): this
+			# handler's zeroed ctx.actions is always the base Filibuster's
+			# "+1" lands on top of, deterministically, by group order — never
+			# by where "filibuster" happens to alphabetically sort against
+			# "y2k-patch-floppy-disk" (they're in different groups, so that
+			# comparison never even runs). Net result held together: the
+			# enemy's first Turn gets exactly Filibuster's bonus action, not
+			# the normal 1 and not 0 — the same "artefact base, tariff modifies
+			# on top" shape on_milestone/Recession already established.
+			if g.y2k_armed:
+				g.y2k_armed = false
+				ctx.actions = 0
+
+		["pandemic-toilet-paper-pallet", "on_purchase"]:
+			g.pallet_purchase_count += 1
+		["pandemic-toilet-paper-pallet", "on_price"]:
+			# PURE read of the counter — Shop.price() runs this on every
+			# redraw (the same Mar-a-Lago Toilet Papers trap, issue 43's own
+			# comment above), so mutating here would drift the displayed
+			# price between frames. "+1" reads the counter as if the pending
+			# purchase already happened — the 2nd/4th/6th... purchase this
+			# Shop visit (g.pallet_purchase_count reset in game.gd's
+			# _open_shop()) is 50% off the immutable base, same additive
+			# percentage contract as every other on_price handler.
+			if (g.pallet_purchase_count + 1) % 2 == 0:
+				ctx.amount -= ctx.base * 0.5

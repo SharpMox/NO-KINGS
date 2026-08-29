@@ -127,7 +127,25 @@ The distinction is the useful part: #2 is only needed when the choice **changes 
 of the capture itself** (Inflatable Vietcong Torpedo: pay 15 Gold and the piece survives).
 A reward that merely follows a capture never needs the turn suspended.
 
+### Addendum 2026-08-29 (second pass) — this issue is now fully resolved
+
+All four decisions are answered, and every Artefact in the table above has a home:
+
+- **#1 zone rules** — answered; Winchester and Cheyenne shipped in slice 51.
+- **#2 dodge / mid-capture choice** — **dissolved rather than decided.** The user ruled that
+  UAP Breath Mint auto-selects its landing tile (and does nothing when none is free) and that
+  Inflatable Vietcong Torpedo auto-pays when affordable. Both resolve without a prompt, so
+  **nothing in the catalog needs a suspended enemy turn.** Issue 54 builds them.
+- **#3 Pegasus vs `moved_this_turn`** — **made moot.** The user reworked Pegasus Free Trial
+  to "the first move or capture each Turn by an end-of-chain piece costs no Action", which
+  reuses the Blitz free-move mechanism and never touches `moved_this_turn`. Issue 54.
+- **#4 capture conversion** — answered by ADR-0002: a Stock entry already carries opaque
+  piece state, so a converted piece keeps what it had. Issue 55.
+
+Remaining Artefacts from the table are distributed: Bovine Tractor Beam and Zapruder's
+Director's Cut to issue 52 (activation), Alien Pet Rocks and 'Definitely Not Russia' Patch to
+issue 53, Hellfire Club Discord Invite to issue 54.
+
 ## Blocked by
 
-- decisions #2, #3 and #4 above
-- (decision #1 resolved; Winchester and Cheyenne cleared — see the addendum)
+- nothing — all four decisions resolved, work distributed across issues 51-55

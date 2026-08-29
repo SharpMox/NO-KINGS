@@ -1,6 +1,6 @@
 # 33 — Board & positional rules
 
-Status: blocked — NEEDS DESIGN DECISIONS (do not start without them)
+Status: done (2026-08-29) — all four decisions resolved, work distributed across issues 51-55
 
 ## Parent
 

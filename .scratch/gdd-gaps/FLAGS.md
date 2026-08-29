@@ -109,6 +109,19 @@ found. Collected here so they are not lost in Outcome sections:
   wins, every loss to resource starvation. That is the measurement, not a verdict — a top
   tier is allowed to be brutal, but it wants a play test before it is called balanced.
 
+## Fragile tests
+
+- **Holy Lint's pinned-seed assertion names a specific granted buff**, and that has now
+  churned **twice in two slices**: issue 47 moved it `stun` -> `reflect` (rolling Box
+  contents at boot shifted the RNG stream), and issue 48 moved it `reflect` -> `shield`
+  (a 13th Piece Buff changed `_random_buff_key`'s modulo). Both updates were legitimate and
+  were verified rather than rubber-stamped, but the assertion will keep breaking on any
+  change to buff-pool size or RNG-stream position, and each break is an invitation to
+  "update the expected value until it passes" — which is how a real regression gets buried.
+  The behaviour under test is *"Holy Lint grants exactly one Piece Buff"*; the specific key
+  is incidental. Reshaping it to assert `size() == 1` plus membership of the safe
+  non-self-triggering set would keep all its value and stop the churn. Cheap, not urgent.
+
 ## Housekeeping
 
 - **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens

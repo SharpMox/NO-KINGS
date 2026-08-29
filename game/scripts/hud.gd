@@ -278,20 +278,33 @@ func refresh() -> void:
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		turn_label.text = "Place your army (%d left), then START" % g.stock.size()
 		pass_button.text = "START"
+		pass_button.disabled = false
+		pass_button.tooltip_text = ""
 		pass_button.self_modulate = Color(0.55, 1.0, 0.55)
 		pass_count.text = ""
 		pass_label.text = ""
 	elif g.state == g.State.PLAYER_TURN:
 		pass_button.text = ""
-		pass_button.self_modulate = Color(1, 0.5, 0.5)
+		# Hellfire Club Discord Invite (issue 54): "you cannot Pass while
+		# Actions remain" — greyed out AND relabeled, not a silent failed
+		# click, so the block is visible before the player even taps it.
+		var pass_blocked: bool = g._pass_blocked()
+		pass_button.disabled = pass_blocked
+		pass_button.tooltip_text = "Hellfire Club Discord Invite: use an Action before you can Pass" \
+			if pass_blocked else ""
+		pass_button.self_modulate = Color(0.5, 0.5, 0.5) if pass_blocked else Color(1, 0.5, 0.5)
 		pass_count.text = "%d/%d" % [g.actions_left, g.actions_max]
-		pass_label.text = "PASS"
+		pass_label.text = "MUST ACT" if pass_blocked else "PASS"
 		turn_label.text = ""
 	elif g.state == g.State.ENEMY_TURN:
 		turn_label.text = "enemy turn…"
+		pass_button.disabled = false
+		pass_button.tooltip_text = ""
 		pass_count.text = ""
 		pass_label.text = "PASS"
 	elif g.state == g.State.GAME_OVER:
+		pass_button.disabled = false
+		pass_button.tooltip_text = ""
 		turn_label.text = ""
 		pass_count.text = ""
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()

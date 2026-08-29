@@ -766,6 +766,233 @@ func _init() -> void:
 	apr.queue_free()
 	await process_frame
 
+	# --- issue 54: dodge (UAP Breath Mint / Inflatable Vietcong Torpedo, both
+	# auto-resolving — user ruling: no targeting step, no Gold prompt) + two
+	# action-economy rules (Hellfire Club Discord Invite, Pegasus Free Trial).
+	# Both dodges extend BuffLogic.repels_capture's existing guard in
+	# _run_enemy_actions rather than a second interception point. ---
+
+	var uap_ctrl := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3})
+	await process_frame
+	await uap_ctrl._run_enemy_actions()
+	check(uap_ctrl.board.get(Vector2i(4, 5), {}).get("owner", -1) == 1,
+		"control: without UAP Breath Mint, the enemy rook freely captures the player piece")
+	uap_ctrl.queue_free()
+	await process_frame
+
+	var uap := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3,
+		"artefacts": ["uap-breath-mint"]})
+	await process_frame
+	await uap._run_enemy_actions()
+	check(not uap.board.has(Vector2i(4, 5)) and uap.board.get(Vector2i(3, 6), {}).get("owner", -1) == 0,
+		"UAP Breath Mint: dodges to the empty tile farthest from the attacker (3,6) instead of being captured")
+	check(uap.board.get(Vector2i(4, 0), {}).get("owner", -1) == 1,
+		"UAP Breath Mint: the attacker is repelled and stays on its own tile")
+	check(uap.uap_used_this_wave, "UAP Breath Mint: spent for the Wave")
+	uap.queue_free()
+	await process_frame
+
+	# once per Wave: a second attempt the same Wave is captured normally
+	var uap_once := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3,
+		"artefacts": ["uap-breath-mint"]})
+	await process_frame
+	uap_once.uap_used_this_wave = true
+	await uap_once._run_enemy_actions()
+	check(uap_once.board.get(Vector2i(4, 5), {}).get("owner", -1) == 1,
+		"UAP Breath Mint: already spent this Wave — a second attempt is captured normally")
+	WaveLogic.queue(uap_once, uap_once.wave + 1) # clears wave 3 -> on_wave_clear resets it
+	check(not uap_once.uap_used_this_wave, "UAP Breath Mint: re-arms on the Wave boundary")
+	uap_once.queue_free()
+	await process_frame
+
+	# no tile free: the dodge does nothing and the capture proceeds (user
+	# ruling) — a corner traps the defender behind exactly 3 in-bounds
+	# neighbours, all boxed; the attacking Knight leaps straight in, so the
+	# 3 blockers can't obstruct its path the way they would a slider's.
+	var uap_boxed := _boot({"board": [["pawn", 0, 0, 0], ["knight", 1, 2, 1],
+			["pawn", 1, 0, 1], ["pawn", 1, 1, 0], ["pawn", 1, 1, 1]],
+		"wave": 3, "artefacts": ["uap-breath-mint"]})
+	await process_frame
+	check(uap_boxed._uap_dodge_target(Vector2i(0, 0), Vector2i(2, 1)) == Vector2i(-1, -1),
+		"UAP Breath Mint: every in-bounds neighbour occupied -> no dodge target")
+	await uap_boxed._run_enemy_actions()
+	check(uap_boxed.board.get(Vector2i(0, 0), {}).get("owner", -1) == 1,
+		"UAP Breath Mint: no tile free — the dodge does nothing and the capture proceeds")
+	check(not uap_boxed.uap_used_this_wave, "UAP Breath Mint: not spent when the dodge couldn't fire")
+	uap_boxed.queue_free()
+	await process_frame
+
+	var torp_ctrl := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3, "gold": 500})
+	await process_frame
+	await torp_ctrl._run_enemy_actions()
+	check(torp_ctrl.board.get(Vector2i(4, 5), {}).get("owner", -1) == 1,
+		"control: without Inflatable Vietcong Torpedo, the enemy rook freely captures the player piece")
+	torp_ctrl.queue_free()
+	await process_frame
+
+	var torp := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3, "gold": 500,
+		"artefacts": ["inflatable-vietcong-torpedo"]})
+	await process_frame
+	await torp._run_enemy_actions()
+	check(torp.board.get(Vector2i(4, 5), {}).get("owner", -1) == 0,
+		"Inflatable Vietcong Torpedo: pays 15 Gold and the piece survives in place")
+	check(torp.gold == 485, "Inflatable Vietcong Torpedo: 15 Gold is actually deducted")
+	check(torp.board.get(Vector2i(4, 0), {}).get("owner", -1) == 1,
+		"Inflatable Vietcong Torpedo: the attacker is repelled and stays on its own tile")
+	check(torp.torpedo_used_this_wave, "Inflatable Vietcong Torpedo: spent for the Wave")
+	torp.queue_free()
+	await process_frame
+
+	# under 15 Gold: doesn't fire, the capture proceeds, nothing is spent
+	var torp_poor := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3, "gold": 14,
+		"artefacts": ["inflatable-vietcong-torpedo"]})
+	await process_frame
+	await torp_poor._run_enemy_actions()
+	check(torp_poor.board.get(Vector2i(4, 5), {}).get("owner", -1) == 1,
+		"Inflatable Vietcong Torpedo: under 15 Gold — doesn't fire, the capture proceeds")
+	check(torp_poor.gold == 14, "Inflatable Vietcong Torpedo: no Gold spent when it can't afford to fire")
+	torp_poor.queue_free()
+	await process_frame
+
+	# once per Wave + re-arms at the Wave boundary
+	var torp_once := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3, "gold": 500,
+		"artefacts": ["inflatable-vietcong-torpedo"]})
+	await process_frame
+	torp_once.torpedo_used_this_wave = true
+	await torp_once._run_enemy_actions()
+	check(torp_once.board.get(Vector2i(4, 5), {}).get("owner", -1) == 1 and torp_once.gold == 500,
+		"Inflatable Vietcong Torpedo: already spent this Wave — a second attempt is captured normally")
+	WaveLogic.queue(torp_once, torp_once.wave + 1)
+	check(not torp_once.torpedo_used_this_wave, "Inflatable Vietcong Torpedo: re-arms on the Wave boundary")
+	torp_once.queue_free()
+	await process_frame
+
+	# combo: the free dodge is tried before the Gold-cost one — Torpedo's
+	# Gold stays untouched when UAP alone already saved the piece
+	var combo := _boot({"board": [["rook", 0, 4, 5], ["rook", 1, 4, 0]], "wave": 3, "gold": 500,
+		"artefacts": ["uap-breath-mint", "inflatable-vietcong-torpedo"]})
+	await process_frame
+	await combo._run_enemy_actions()
+	check(combo.uap_used_this_wave and not combo.torpedo_used_this_wave and combo.gold == 500,
+		"UAP Breath Mint + Inflatable Vietcong Torpedo: the free dodge fires first, Torpedo's Gold untouched")
+	combo.queue_free()
+	await process_frame
+
+	# --- Hellfire Club Discord Invite: +2 Actions/Turn, but you cannot Pass
+	# while Actions remain — gated on a real legal Action existing, or the
+	# rule would be able to soft-lock a Turn ---
+	var hell_free := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(not hell_free._pass_blocked(), "control: without Hellfire, Pass is never blocked")
+	hell_free.queue_free()
+	await process_frame
+
+	var hell := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["hellfire-club-discord-invite"]})
+	await process_frame
+	check(hell.actions_left == Tuning.actions_per_turn(hell.next_tier) + 2,
+		"Hellfire Club Discord Invite: +2 Actions per Turn")
+	check(hell._pass_blocked(),
+		"Hellfire Club Discord Invite: Pass is blocked while Actions remain and a legal move exists")
+	hell._refresh()
+	check(hell.hud.pass_button.disabled and hell.hud.pass_label.text == "MUST ACT" \
+			and hell.hud.pass_button.tooltip_text != "",
+		"Hellfire Club Discord Invite: the Pass button shows it's disabled and why, not a silent failed click")
+	var hell_state_before: int = hell.state
+	hell._on_pass()
+	check(hell.state == hell_state_before, "Hellfire Club Discord Invite: a blocked Pass is a genuine no-op")
+	hell.queue_free()
+	await process_frame
+
+	# spend every Action: the block lifts once actions_left hits 0
+	var hell_spent := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["hellfire-club-discord-invite"]})
+	await process_frame
+	hell_spent.actions_left = 0
+	check(not hell_spent._pass_blocked(), "Hellfire Club Discord Invite: no block once every Action is spent")
+	hell_spent.queue_free()
+	await process_frame
+
+	# no legal Action anywhere: even with Actions left and Hellfire held,
+	# Pass must still end the Turn — a fully boxed-in pawn, empty Stock, no
+	# Items (the softlock the issue explicitly called out)
+	var hell_stuck := _boot({"board": [["pawn", 0, 2, 5], ["pawn", 1, 2, 6]], "wave": 3,
+		"artefacts": ["hellfire-club-discord-invite"]})
+	await process_frame
+	check(hell_stuck.actions_left > 0 and not hell_stuck._has_legal_action(),
+		"(setup) Actions remain, but the pawn has no legal move, Stock is empty, no Items held")
+	check(not hell_stuck._pass_blocked(),
+		"Hellfire Club Discord Invite: no legal Action anywhere — the block lifts so the Turn can still end")
+	hell_stuck._on_pass()
+	var hell_polls := 0
+	while hell_stuck.state != GameScript.State.PLAYER_TURN and hell_polls < 50:
+		await create_timer(0.05).timeout
+		hell_polls += 1
+	check(hell_stuck.turn_number == 2,
+		"Hellfire Club Discord Invite: Pass actually ends the Turn when nothing else can be done")
+	hell_stuck.queue_free()
+	await process_frame
+
+	# a piece that already moved this Turn doesn't count as a legal Action
+	# either — Rules.legal_moves knows nothing about the once-per-piece-per-
+	# Turn click-select gate (game.gd's own tile-click handler), so without
+	# this filter Hellfire could block Pass on a Turn where nothing is
+	# actually still selectable
+	var hell_moved := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["hellfire-club-discord-invite"]})
+	await process_frame
+	hell_moved.moved_this_turn.append(Vector2i(2, 2))
+	check(not hell_moved._has_legal_action(),
+		"Hellfire Club Discord Invite: a piece that already moved this Turn doesn't count as a legal Action")
+	check(not hell_moved._pass_blocked(),
+		"Hellfire Club Discord Invite: Pass stays allowed once the only piece has already moved")
+	hell_moved.queue_free()
+	await process_frame
+
+	# --- Pegasus Free Trial (REWORKED by the user, 2026-08-29): "the first
+	# move or capture each Turn by a piece at the end of its Rank chain costs
+	# no Action" — reuses Blitz's own blitz_free_move flag, per piece, and
+	# never touches moved_this_turn (which Blitz depends on) ---
+	var peg_ctrl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(not peg_ctrl.board[Vector2i(2, 2)].get("blitz_free_move", false),
+		"control: without Pegasus Free Trial, an end-of-chain piece gets no free move")
+	peg_ctrl.queue_free()
+	await process_frame
+
+	var peg := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 4], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["pegasus-free-trial"]})
+	await process_frame
+	check(peg.board[Vector2i(2, 2)].get("blitz_free_move", false),
+		"Pegasus Free Trial: an end-of-chain piece (Queen, no `next`) is granted a free move at Turn start")
+	check(not peg.board[Vector2i(4, 4)].get("blitz_free_move", false),
+		"Pegasus Free Trial: a piece mid-chain (Pawn, promotes into Sergeant) gets no free move")
+	var peg_actions_before: int = peg.actions_left
+	peg._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(peg.actions_left == peg_actions_before, "Pegasus Free Trial: the first move costs no Action")
+	check(peg.moved_this_turn.has(Vector2i(2, 3)),
+		"Pegasus Free Trial: moved_this_turn still tracks the move normally — untouched by the free-move flag")
+	check(not peg.board[Vector2i(2, 3)].get("blitz_free_move", false),
+		"Pegasus Free Trial: the free-move flag is consumed by that one move")
+	peg._move_player(Vector2i(2, 3), Vector2i(2, 4))
+	check(peg.actions_left == peg_actions_before - 1, "Pegasus Free Trial: the second move costs a normal Action")
+	peg.queue_free()
+	await process_frame
+
+	# per piece: a second end-of-chain piece gets its OWN free move, not one
+	# shared across the whole Turn — same reading as the original "move
+	# twice each Turn" text, which was per piece too
+	var peg2 := _boot({"board": [["queen", 0, 2, 2], ["queen", 0, 4, 4], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["pegasus-free-trial"]})
+	await process_frame
+	var peg2_actions_before: int = peg2.actions_left
+	peg2._move_player(Vector2i(2, 2), Vector2i(2, 3)) # 1st Queen's own free move
+	peg2._move_player(Vector2i(4, 4), Vector2i(4, 5)) # 2nd Queen's own free move
+	check(peg2.actions_left == peg2_actions_before,
+		"Pegasus Free Trial: per piece — a second end-of-chain piece gets its own free move, not one shared")
+	peg2.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ARTEFACTS 4 CHECKS OK")

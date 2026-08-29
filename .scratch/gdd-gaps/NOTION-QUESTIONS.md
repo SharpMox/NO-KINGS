@@ -102,13 +102,17 @@ the part that needs the ruling.
 ## Not questions — recorded so they are not re-raised
 
 - **Exhibit 399** and **SETI's Red Marker** depend on Tariffs, which you removed from runs
-  on 2026-08-29 (`TARIFFS_SCHEDULED := false`) pending the King-mechanics pass. Parked by
-  your decision, not blocked by a gap.
+  on 2026-08-29 (`TARIFFS_SCHEDULED := false`) pending the King-mechanics pass — issue 54
+  built both anyway (dormant, tested directly). Exhibit 399 shipped `implemented: true`;
+  SETI's Red Marker stays `implemented: false` — "equivalent bonus" needs a per-Tariff table
+  that doesn't exist in `data/tariffs.gd`, a genuine open GDD question issue 54 didn't
+  resolve either, not attempted.
 - **All-Seeing Eye Contact Lens**, **Oak Island Wishing Well**, **FIFA Complimentary
   Yacht**, **Zapruder's Director's Cut**, **Roanoke Hex Kit**, **Bovine Tractor Beam** all
   need new interactive UI — issue 32, blocked on design, not on the GDD.
-- **Pegasus Free Trial**, **Zeta Reticuli Souvenir Map**, **UAP Breath Mint**,
-  **Inflatable Vietcong Torpedo**, **Hellfire Club Discord Invite** are issue 33's parked
-  group (decisions #2/#3/#4).
+- **Pegasus Free Trial**, **UAP Breath Mint**, **Inflatable Vietcong Torpedo**, **Hellfire
+  Club Discord Invite** were issue 33's parked group (decisions #2/#3/#4) — all 4 resolved
+  and shipped in issue 54. **Zeta Reticuli Souvenir Map** remains parked (out of issue 54's
+  scope).
 - **Ecdysis Sheddings** and **Troll Farm Employee of the Month** are meta-dispatch — they
   change how `run()` itself behaves and want their own design pass.

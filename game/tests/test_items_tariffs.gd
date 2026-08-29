@@ -228,6 +228,60 @@ func _init() -> void:
 	y2kf.queue_free()
 	await process_frame
 
+	# --- issue 54: Exhibit 399, dormant — Tuning.TARIFFS_SCHEDULED is false
+	# (2026-08-29 ruling), so Tariffs never activate in a live run and this
+	# can only be exercised by driving economy.gd's apply_tariff/
+	# activate_tariff_by_key directly, as below. NOT exercised in a live run.
+	# SETI's Red Marker stays implemented: false (a per-Tariff "equivalent
+	# bonus" table doesn't exist in data/tariffs.gd — issue 22's gap, not
+	# resolved by issue 54 either — a Notion question, not a guess), so it
+	# has no test here. ---
+	check(not Tuning.TARIFFS_SCHEDULED,
+		"(context) Tariffs are off in a live run — Exhibit 399 below is only ever driven directly")
+
+	var ex_ctrl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4})
+	await process_frame
+	Economy.activate_tariff_by_key(ex_ctrl, "move_cost")
+	check(not ex_ctrl.buff_pick_open and ex_ctrl.tariffs_active.size() == 1,
+		"control: without Exhibit 399, a Tariff applies immediately, no choice pick")
+	ex_ctrl.queue_free()
+	await process_frame
+
+	var ex_apply := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4,
+		"artefacts": ["exhibit-399"]})
+	await process_frame
+	Economy.activate_tariff_by_key(ex_apply, "move_cost")
+	check(ex_apply.buff_pick_open and ex_apply.tariffs_active.is_empty(),
+		"Exhibit 399: opens the choice pick instead of applying immediately")
+	ex_apply.modals.choice_chosen.emit(true) # "Let it apply"
+	check(not ex_apply.buff_pick_open and ex_apply.tariffs_active.size() == 1 \
+			and ex_apply.tariffs_active[0].key == "move_cost",
+		"Exhibit 399: 'Let it apply' resolves the Tariff normally")
+	ex_apply.queue_free()
+	await process_frame
+
+	var ex_block := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4,
+		"artefacts": ["exhibit-399"]})
+	await process_frame
+	Economy.activate_tariff_by_key(ex_block, "move_cost")
+	check(ex_block.buff_pick_open, "(setup) the choice pick is open")
+	ex_block.modals.choice_pick_cancelled.emit() # "Block it"
+	check(not ex_block.buff_pick_open and ex_block.tariffs_active.is_empty(),
+		"Exhibit 399: 'Block it' — the Tariff never lands")
+	ex_block.queue_free()
+	await process_frame
+
+	# same-hook reward handlers still fire regardless of the pending pick
+	# (Salvation Gift Card precedent, artefact_hooks.gd header)
+	var ex_reward := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4, "gold": 0,
+		"artefacts": ["exhibit-399", "merchants-of-death-sample-case"]})
+	await process_frame
+	Economy.activate_tariff_by_key(ex_reward, "move_cost")
+	check(ex_reward.gold == 100 and ex_reward.buff_pick_open,
+		"Exhibit 399 + Merchants of Death Sample Case: the reward pays immediately, independent of the pending pick")
+	ex_reward.queue_free()
+	await process_frame
+
 
 	print("---")
 	if fails == 0:

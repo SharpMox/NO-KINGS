@@ -113,6 +113,14 @@ var nibiru_wave_streak := 0 # Nibiru Hide-and-Seek Trophy: grows +1 per Wave
 	# clear, reset to 0 on_piece_lost (artefact_hooks.gd, artefact hook 19)
 var hoffa_used_this_wave := false # Hoffa's Cement Shoes: once per Wave, reset
 	# on_wave_clear (artefact_hooks.gd, artefact hook 24)
+var uap_used_this_wave := false # UAP Breath Mint: once per Wave, reset
+	# on_wave_clear (artefact_hooks.gd, issue 54) — same idiom as Hoffa above
+var torpedo_used_this_wave := false # Inflatable Vietcong Torpedo: once per
+	# Wave, reset on_wave_clear (artefact_hooks.gd, issue 54)
+var exhibit_399_tariff: Dictionary = {} # Exhibit 399 (issue 54, dormant —
+	# TARIFFS_SCHEDULED is false): the Tariff whose apply is paused behind the
+	# choice pick, stashed here so the callback (_exhibit_399_chosen) can
+	# still resolve it after economy.gd's apply_tariff has already returned
 var salvation_charged := true # Salvation Gift Card: ready to veto the next
 	# Tariff applied; consumed on use, restored on_wave_clear at wave%5==0
 	# (artefact hook 22)
@@ -524,6 +532,8 @@ func _on_arrow_clear() -> void:
 func _on_pass() -> void:
 	if box_open or buff_pick_open or game_menu_open or win_open:
 		return
+	if _pass_blocked():
+		return
 	arrows.clear() # scratchpad: never survives past the turn it was drawn in
 	queue_redraw()
 	if state == State.SETUP:
@@ -551,6 +561,55 @@ func _on_pass() -> void:
 		Economy.add_clock(self, Tuning.TURN_END_CLOCK_BONUS_MS, "turn_end") # finishing a turn buys time
 		ArtefactHooks.run(self, "on_turn_end") # Shrinkflation Cereal Box (18)
 		_enemy_turn()
+
+
+## Hellfire Club Discord Invite (issue 54): "you cannot Pass while Actions
+## remain" — gated on _has_legal_action() so a fully boxed-in board can never
+## be stuck with Actions left and nothing to spend them on (the softlock the
+## issue called out explicitly). hud.gd's refresh() reads this too, to grey
+## the Pass button out and say why instead of a silent failed click.
+func _pass_blocked() -> bool:
+	return state == State.PLAYER_TURN and actions_left > 0 \
+		and _held("hellfire-club-discord-invite") and _has_legal_action()
+
+
+## Any legal move/capture, Deploy, or Item use left this Turn? The one
+## question _pass_blocked() above must get right, or Hellfire Club Discord
+## Invite can lock a Turn with no way to end it.
+func _has_legal_action() -> bool:
+	# Rules.legal_moves knows nothing about moved_this_turn — that "one move
+	# per piece per Turn" lock is enforced only at the click-select gate
+	# (elsewhere in this file), so a piece that already moved doesn't count
+	# here even though the engine calls its move geometrically legal. Same
+	# filter autoplay.gd's own step() already applies for the same reason.
+	for m in Rules.legal_moves(board, Rules.PLAYER, defs):
+		if not moved_this_turn.has(m.from):
+			return true
+	if not stock.is_empty() and not _deploy_tiles().is_empty():
+		return true
+	return _has_usable_item()
+
+
+## Held Items with at least one valid use right now. `target == ""` items
+## (Counter-Intel, Surprise Attack) fire immediately, always usable while
+## held. "pair" items (Tactical Reposition, Rapid Deployment, Decoy Swap)
+## need a real 2nd-stage check — a non-empty stage A doesn't guarantee any of
+## its picks has a valid stage B — everything else (tile/area/multi) only
+## ever needs one valid anchor to complete (the rest is a confirm button, not
+## a second dependent pick), same as _use_item's own staging.
+func _has_usable_item() -> bool:
+	for it in items:
+		if it.target == "":
+			return true
+		var stage_a := _item_stage_targets(it, Vector2i(-1, -1))
+		if stage_a.is_empty():
+			continue
+		if it.target != "pair":
+			return true
+		for a in stage_a:
+			if not _item_stage_targets(it, a).is_empty():
+				return true
+	return false
 
 
 func _process(delta: float) -> void:
@@ -631,11 +690,13 @@ func _begin_player_turn() -> void:
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
 	actions_left = Tuning.actions_per_turn(next_tier) # Tier 5: -1 (07-difficulty-ranks)
+	moved_this_turn.clear()
+	for pos in board: # Blitz's free move is scoped "this Turn" — never carries
+		board[pos].erase("blitz_free_move") # over. Cleared BEFORE on_turn_start
+		# dispatches (issue 54) so Pegasus Free Trial's own on_turn_start grant,
+		# right below, isn't wiped out by this same-turn cleanup running after it.
 	ArtefactHooks.run(self, "on_turn_start")
 	actions_max = actions_left
-	moved_this_turn.clear()
-	for pos in board: # Blitz's free move is scoped "this Turn" — never carries over
-		board[pos].erase("blitz_free_move")
 	turn_action_count = 0
 	action_log = []
 	turn_capture_count = 0
@@ -722,7 +783,23 @@ func _run_enemy_actions() -> void:
 		# own terms.
 		var cheyenne_repel: bool = act.to.y == 0 and board.has(act.to) and board[act.to].owner == Rules.PLAYER \
 			and _held("cheyenne-mountain-doorbell")
-		if board.has(act.to) and (BuffLogic.repels_capture(board[act.to]) or cheyenne_repel):
+		# UAP Breath Mint / Inflatable Vietcong Torpedo (issue 54): both auto-
+		# resolve (user ruling — no targeting step, no Gold prompt), so both
+		# extend this same repel guard instead of a second interception
+		# point. Checked only when nothing above has already repelled the
+		# attempt, and UAP (free) before Torpedo (costs Gold) — a held UAP
+		# with an open tile is strictly better for the player than spending
+		# Gold, so it's tried first; Torpedo only fires when UAP couldn't
+		# (unheld, already used this Wave, or no tile free).
+		var already_repelled: bool = board.has(act.to) and (BuffLogic.repels_capture(board[act.to]) or cheyenne_repel)
+		var uap_dodge_to := Vector2i(-1, -1)
+		if not already_repelled and board.has(act.to) and board[act.to].owner == Rules.PLAYER \
+				and _held("uap-breath-mint") and not uap_used_this_wave:
+			uap_dodge_to = _uap_dodge_target(act.to, act.from)
+		var torpedo_fires: bool = not already_repelled and uap_dodge_to.x < 0 \
+			and board.has(act.to) and board[act.to].owner == Rules.PLAYER \
+			and _held("inflatable-vietcong-torpedo") and not torpedo_used_this_wave and gold >= 15
+		if already_repelled or uap_dodge_to.x >= 0 or torpedo_fires:
 			# Shield works against the AI too: the attempt is spent, nothing
 			# moves. Reflect kills the attacker and takes its tile.
 			if BuffLogic.reflects_capture(board[act.to]):
@@ -732,6 +809,15 @@ func _run_enemy_actions() -> void:
 				_add_pop(act.from)
 				board[act.from] = board[act.to]
 				board.erase(act.to)
+			elif uap_dodge_to.x >= 0:
+				uap_used_this_wave = true
+				board[uap_dodge_to] = board[act.to]
+				board.erase(act.to)
+				_add_float(uap_dodge_to, "Dodged!", COL_MERGE)
+			elif torpedo_fires:
+				torpedo_used_this_wave = true
+				Economy.spend_gold(self, 15)
+				_add_float(act.to, "Paid Off", COL_MERGE)
 			else:
 				if BuffLogic.repels_capture(board[act.to]):
 					_consume_buff(act.to, "shield")
@@ -800,6 +886,31 @@ func _run_enemy_actions() -> void:
 	for pos in board: # Stun ages on the stunned side's own turn boundary
 		if board[pos].owner == Rules.ENEMY:
 			BuffLogic.tick_side(board[pos])
+
+
+## UAP Breath Mint (issue 54): auto-picks a landing square for the piece at
+## `pos`, preferring the empty neighbour farthest from `attacker` — same
+## "the trigger resolves itself, no targeting step" precedent as
+## multicapture's auto-picked victim (buff_logic.gd:multicapture_target).
+## Vector2i(-1,-1) when every neighbour is occupied or off-board: the user
+## ruling is the dodge does nothing and the capture proceeds.
+func _uap_dodge_target(pos: Vector2i, attacker: Vector2i) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_dist := -1
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var to := pos + Vector2i(dx, dy)
+			if to.x < 0 or to.x >= Tuning.BOARD_W or to.y < 0 or to.y >= Tuning.BOARD_H:
+				continue
+			if board.has(to):
+				continue
+			var dist := to.distance_squared_to(attacker)
+			if dist > best_dist:
+				best_dist = dist
+				best = to
+	return best
 
 
 func _add_slide(from: Vector2i, to: Vector2i) -> void:
@@ -1758,6 +1869,34 @@ func _yalta_chosen(value: String) -> void:
 ## just forfeit it and close (issue 44).
 func _yalta_pick_cancelled() -> void:
 	pass
+
+
+## Exhibit 399 (issue 54, dormant — Tuning.TARIFFS_SCHEDULED is false, so this
+## can only be reached by driving economy.gd's apply_tariff directly, in
+## tests): "you choose between 2 options" reframed as the tariff-cancel
+## mechanism Salvation Gift Card already has (economy.gd's resolve_tariff),
+## just handed to the player as a real choice instead of firing
+## automatically and with no recharge limit. `t` is stashed because
+## apply_tariff's on_tariff_apply dispatch has already returned by the time
+## this opens — the mutation itself waits for the pick, same shape as every
+## other choice-modal consumer here (Yalta/Bounty above).
+func _open_exhibit_choice(t: Dictionary) -> void:
+	exhibit_399_tariff = t
+	if autoplay: # bot: let it apply, never stall on a modal
+		return _exhibit_399_chosen(true)
+	_open_choice_pick("✦ Exhibit 399 — %s: choose one:" % t.name,
+		[{"label": "Let it apply", "value": true}], "Block it",
+		_exhibit_399_chosen, _exhibit_399_blocked)
+
+
+func _exhibit_399_chosen(_value: bool) -> void:
+	Economy.resolve_tariff(self, exhibit_399_tariff)
+	exhibit_399_tariff = {}
+	_refresh()
+
+
+func _exhibit_399_blocked() -> void:
+	exhibit_399_tariff = {} # "Block it": the Tariff never lands, nothing to undo
 
 
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.

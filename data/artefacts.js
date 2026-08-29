@@ -64,6 +64,25 @@
    Decisive buff (Bomb/Trap/Reflect) that often would be a much bigger power
    swing than their catalog text asks for; see artefact_hooks.gd's own
    comments at those 3 call sites and .scratch/gdd-gaps/issues/42's Outcome.
+   2026-08-29 (issue 54): 5 of the 6 remaining artefacts flipped to
+   implemented: true. UAP Breath Mint / Inflatable Vietcong Torpedo both
+   auto-resolve (user ruling: no targeting step, no Gold prompt) and extend
+   BuffLogic's existing repel path in game.gd's _run_enemy_actions. Hellfire
+   Club Discord Invite gates game.gd's _on_pass with a "no legal Action"
+   escape hatch (Rules.legal_moves/_deploy_tiles/_has_usable_item) so the new
+   Pass restriction can never softlock a Turn. Pegasus Free Trial was
+   reworked by the user away from its old "move twice" text (which would
+   have redefined moved_this_turn, the field Blitz depends on) to "first
+   move/capture each Turn is free", reusing Blitz's own blitz_free_move flag
+   per end-of-chain piece instead. Exhibit 399 is wired (economy.gd's
+   apply_tariff now defers to game.gd's _open_choice_pick, issue 41's seam)
+   but dormant — Tuning.TARIFFS_SCHEDULED is false (2026-08-29), so it is
+   never exercised in a live run, only driven directly in
+   game/tests/test_items_tariffs.gd. SETI's Red Marker stays unimplemented:
+   "inverted into its equivalent bonus" needs a per-Tariff bonus table that
+   doesn't exist in data/tariffs.gd (issue 22 already flagged this exact gap
+   and declined to guess one; issue 54 didn't supply one either) — a Notion
+   question, not attempted.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -376,8 +395,8 @@ var ARTEFACTS = [
     effect: "Whenever a piece (ally or enemy) is Demoted or consumes/loses a Piece Buff: +25 Gold",
     conspiracy: "The Georgia Guidestones", url: "https://en.wikipedia.org/wiki/Georgia_Guidestones",
     summary: "Granite slabs commissioned in 1980 by a pseudonymous 'R.C. Christian', engraving commandments for a post-catastrophe world — population capped at 500 million. Read as the elite's carved confession; bombed in 2022." },
-  { name: "Inflatable Vietcong Torpedo", rarity: "Uncommon", type: "Trigger", bonus: ["Special", "Piece"], status: "KEEP",
-    effect: "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives (needs: dodge + choice)",
+  { name: "Inflatable Vietcong Torpedo", rarity: "Uncommon", type: "Trigger", bonus: ["Special", "Piece"], status: "KEEP", implemented: true,
+    effect: "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives",
     conspiracy: "The Gulf of Tonkin incident", url: "https://en.wikipedia.org/wiki/Gulf_of_Tonkin_incident",
     summary: "The second attack of August 4, 1964 — the one that authorized the Vietnam War — never happened. The NSA's own declassified history says so. Sailors shot at radar ghosts and Congress shot at the ghosts' report." },
   { name: "Snowden's Rubik's Cube", rarity: "Uncommon", type: "Trigger", bonus: ["Special"], status: "KEEP", implemented: true,
@@ -702,8 +721,8 @@ var ARTEFACTS = [
     effect: "+1 Action per Turn",
     conspiracy: "The plots against Castro", url: "https://en.wikipedia.org/wiki/Assassination_attempts_on_Fidel_Castro",
     summary: "The CIA ran over 600 schemes against Castro — exploding cigars, poisoned wetsuits, an exploding seashell. All real, all declassified, none successful. He died at 90, in bed, undefeated by novelty items." },
-  { name: "Hellfire Club Discord Invite", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP",
-    effect: "+2 Actions per Turn, but you cannot Pass while Actions remain (needs: forced-action rule)",
+  { name: "Hellfire Club Discord Invite", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP", implemented: true,
+    effect: "+2 Actions per Turn, but you cannot Pass while Actions remain",
     conspiracy: "The Hellfire Club", url: "https://en.wikipedia.org/wiki/Hellfire_Club",
     summary: "Eighteenth-century England's aristocratic secret clubs — mock rites in caves, 'do what thou wilt' over the door, statesmen among the members. The template for every elite-debauchery theory since: the powerful, at play, unwatched." },
   { name: "Shrinkflation Cereal Box", rarity: "Legendary", type: "Passive", bonus: ["Score","Gold","Time"], status: "KEEP", implemented: true,
@@ -742,12 +761,12 @@ var ARTEFACTS = [
     effect: "On Wave start: the enemy's first Turn is skipped",
     conspiracy: "The Y2K bug", url: "https://en.wikipedia.org/wiki/Year_2000_problem",
     summary: "Two-digit years were going to fail at midnight, and the world spent hundreds of billions patching before the clock struck. Nothing fell over — leaving the eternal argument: catastrophe averted, or the greatest invoice ever written?" },
-  { name: "Pegasus Free Trial", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
-    effect: "Pieces at the end of their Rank chain can move twice each Turn",
+  { name: "Pegasus Free Trial", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
+    effect: "The first move or capture each Turn by a piece at the end of its Rank chain costs no Action",
     conspiracy: "Pegasus spyware", url: "https://en.wikipedia.org/wiki/Pegasus_(spyware)",
     summary: "Commercial spyware sold to governments that takes over a phone with zero clicks — found on the devices of journalists, activists and heads of state. The conspiracies were true; they were also invoiced." },
-  { name: "Exhibit 399", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP",
-    effect: "When a Tariff would be applied: you choose between 2 options (needs: tariff choice)",
+  { name: "Exhibit 399", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
+    effect: "When a Tariff would be applied: you choose between 2 options",
     conspiracy: "The Warren Commission", url: "https://en.wikipedia.org/wiki/Warren_Commission",
     summary: "The Commission's 26 volumes concluded one man acted alone — and Exhibit 399, the 'magic bullet' recovered improbably pristine from a stretcher, became the most argued-over object in American history. Most Americans never bought it." },
   { name: "Defense Lobbyist Business Card", rarity: "Legendary", type: "Trigger", bonus: ["Item"], status: "KEEP", implemented: true,
@@ -782,8 +801,8 @@ var ARTEFACTS = [
     effect: "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
     conspiracy: "The Knights Templar", url: "https://en.wikipedia.org/wiki/Knights_Templar",
     summary: "Real history: the Templars invented proto-banking — deposit in Paris, present your letter, withdraw in Jerusalem, centuries before anyone said wire transfer. The card still works, and it takes your other currency." },
-  { name: "UAP Breath Mint", rarity: "Legendary", type: "Trigger", bonus: ["Special"], status: "KEEP",
-    effect: "Once per Wave: when one of your pieces would be captured, it instead moves 1 square away (needs: dodge)",
+  { name: "UAP Breath Mint", rarity: "Legendary", type: "Trigger", bonus: ["Special"], status: "KEEP", implemented: true,
+    effect: "Once per Wave: when one of your pieces would be captured, it instead moves 1 square away",
     conspiracy: "The Pentagon UAP videos", url: "https://en.wikipedia.org/wiki/Pentagon_UFO_videos",
     summary: "The Navy's own released footage of the 'Tic Tac' — an object doing physics-defying sidesteps that pilots could not explain. The mint does one such maneuver per wave." },
   { name: "Winchester Salt Lined Doors", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,

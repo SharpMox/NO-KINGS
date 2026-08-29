@@ -76,9 +76,10 @@ found. Collected here so they are not lost in Outcome sections:
 - **Tungsten-Filled Gold Bar + Popemobile Piggy Bank** compound to 11-54x baseline score
   over a full run. Confirmed *not* a double-count bug (see issue 20's Outcome) — a
   genuinely powerful catalog-specified pair. Balance call outstanding.
-- **Abduction Probe** ("pieces can carry 2 Piece Buffs at once") — there is no 1-buff cap
-  anywhere in the code today, so implementing it means inventing a base-game restriction
-  nothing currently asks for.
+- ~~**Abduction Probe**~~ — resolved 2026-08-29. The user ruled the base Piece Buff cap is
+  **2** and the Probe adds **+1** (to 3). Issue 53 introduced that cap, which had to be
+  invented — it did not exist before — so the Artefact was re-texted from "can carry 2",
+  which by then described the base game.
 - **`on_milestone` fires every 10 waves but several artefacts say "5-Wave Milestone"** —
   still true, and still worth a GDD ruling, but it is now a *naming* collision rather than
   a behavioural bug. `on_milestone` is the global 10-Wave clock-refill trigger

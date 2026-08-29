@@ -165,6 +165,15 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.
+- **Never run two suites at once.** The click probes are *windowed* — they open a real
+  Godot window and drive real input. Two concurrent runs fight over window focus and the
+  probes fail for no reason in the code. This has already produced one false failure
+  (2026-08-29: three `game-clicks` cases failed while four suites ran in parallel across
+  worktrees; all three passed on every one of three sequential re-runs). It matters most
+  with parallel agents, where each worktree is a separate checkout but they all share one
+  display: **serialise the suite runs**, don't parallelise them. A probe failure during a
+  concurrent run is not evidence of a bug, and — just as important — a *pass* during one
+  is not evidence of correctness either. Re-run alone before believing either result.
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

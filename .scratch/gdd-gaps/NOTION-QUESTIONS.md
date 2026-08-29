@@ -99,6 +99,50 @@ the part that needs the ruling.
 "slots full" condition becomes reachable. See issue 53.
 ---
 
+## 10. SETI's Red Marker — what is a Tariff's "equivalent bonus"?
+
+> On acquiring this Artefact: one random active Tariff is inverted into its equivalent bonus
+
+**The only Artefact left unimplemented for a design reason** (issue 54 declined to guess).
+`data/tariffs.gd` has no inverse for anything, and the 13 Tariffs split into two groups that
+behave very differently under "invert":
+
+**The 8 `action`-kind Tariffs invert cleanly** — they all read "X costs extra gold", so the
+inverse is "X *pays* gold". No design needed, it falls straight out of the existing
+`Economy.charge` seam:
+
+`move_cost` · `ability_cost` · `capture_cost` · `pass_cost` · `long_range_cost` ·
+`box_cost` · `deploy_cost` · `fuse_cost`
+
+**The `persistent` ones mostly have no inverse at all:**
+
+| Tariff | Effect | Natural inverse? |
+| --- | --- | --- |
+| Inflation | All Gold gains reduced 10% (stacks) | **Yes** — +10% Gold gains |
+| Sanctions | One random piece type can no longer be placed | **No** — the un-sanctioned state is just the base game |
+| Regulation | Pawns can no longer be merged | **No** — same problem |
+
+So "invert Sanctions" has no meaning unless a bonus is *invented* for it, which is exactly
+the kind of guess the house rule forbids.
+
+**Options:**
+
+1. **Scope it to cost Tariffs.** "One random active **cost** Tariff is inverted — it pays
+   instead of charging." Fully derivable, needs no new design, ships immediately. Inflation
+   can come along too, since it inverts cleanly.
+2. **Author an explicit inverse per Tariff**, inventing bonuses for Sanctions and Regulation
+   (e.g. "one piece type deploys free", "Pawns merge at no Action cost").
+3. **Retire or re-text** the Artefact.
+
+I'd take **1** — it needs nothing invented and the excluded Tariffs are exactly the two
+that have no coherent opposite. But it does mean SETI reads as weaker than its text implies,
+so it is your call.
+
+Note this is moot in live play until Tariffs return: `TARIFFS_SCHEDULED` is `false`, so
+SETI cannot fire in a real run today either way.
+
+---
+
 ## Not questions — recorded so they are not re-raised
 
 - **Exhibit 399** and **SETI's Red Marker** depend on Tariffs, which you removed from runs

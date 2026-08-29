@@ -510,11 +510,13 @@ func _init() -> void:
 	# --- issue 28: audit the 3 unwired 5-Wave-Milestone artefacts + a general
 	# REGISTRY-coverage guard + echo x milestone coverage ---
 
-	# Mar-a-Lago Toilet Papers / Yalta Cocktail Napkin / Roanoke Hex Kit have
-	# no REGISTRY wiring (their Outcomes say deliberately unimplemented) —
-	# must stay `implemented: false` so Items._build_artefact_effects() never
-	# offers a dead artefact to the player.
-	for unwired_key in ["mar-a-lago-toilet-papers", "yalta-cocktail-napkin", "roanoke-hex-kit"]:
+	# Yalta Cocktail Napkin / Roanoke Hex Kit have no REGISTRY wiring (their
+	# Outcomes say deliberately unimplemented) — must stay `implemented:
+	# false` so Items._build_artefact_effects() never offers a dead artefact
+	# to the player. Mar-a-Lago Toilet Papers was the 3rd of this originally-
+	# unwired trio; issue 43 wired it (on_wave_clear + on_price) and flipped
+	# it to implemented: true — see test_items_artefacts_3.gd.
+	for unwired_key in ["yalta-cocktail-napkin", "roanoke-hex-kit"]:
 		var unwired_found := false
 		for cat in Items.ARTEFACT_CATALOG:
 			if cat.key == unwired_key:
@@ -551,6 +553,12 @@ func _init() -> void:
 		"red-diary-s-missing-pages": true, "cern-ctrl-z-shortcut": true,
 		"bilderberg-hotel-slippers": true, "illuminati-nwo-booster-pack": true,
 		"100-genuine-original-mona-lisa": true, "deja-vu-glitch": true,
+		# issue 43: New World Order Gerrymandering — a run()-tail post-pass
+		# (artefact_hooks.gd's own REGISTRY comment, next to the const),
+		# neither an echo/meta-trigger observer nor a standing g.artefacts
+		# read: it multiplies what the normal dispatch + echo layer both
+		# already added to a Gold gain, which only exists once both have run.
+		"new-world-order-gerrymandering": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:

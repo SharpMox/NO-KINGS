@@ -131,7 +131,7 @@
   ],
   "effect": "On 5-Wave Milestone: a random Shop item becomes free; all other Shop prices +10%",
   "conspiracy": "The Mar-a-Lago documents",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "suspiciously-large-femur",
@@ -1235,7 +1235,7 @@
   ],
   "effect": "On buying an Artefact: each other Artefact you own pays +5 Gold",
   "conspiracy": "The deep state",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "bigfoot-toenail-clipping",
@@ -1345,7 +1345,7 @@
   ],
   "effect": "Gold paid by other Artefacts is increased by 25%",
   "conspiracy": "The New World Order",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "stargate-divination-crystal",

@@ -101,8 +101,11 @@ scaffolding, and a 22-suite test harness.
 ### Where the work lives
 
 - **The backlog is `.scratch/gdd-gaps/`** — `PRD.md` (the map), `issues/NN-*.md` (one slice
-  each, with a `Status:` line and an `## Outcome` when done), and `FLAGS.md` (non-blocking
-  findings and open design questions, so they don't rot in PR descriptions).
+  each, with a `Status:` line and an `## Outcome` when done), `FLAGS.md` (non-blocking
+  findings and open design questions, so they don't rot in PR descriptions), and
+  `NOTION-QUESTIONS.md` (the open GDD questions, each blocking at least one Artefact —
+  **read it before implementing any Artefact**, so an already-known ambiguity isn't
+  rediscovered or, worse, guessed at).
   **There is no Linear.** Earlier revisions of this file said there was; there never was.
 - One slice → one branch → one PR, same as the reference site.
 - **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,

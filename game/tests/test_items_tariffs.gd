@@ -182,6 +182,52 @@ func _init() -> void:
 	salvation.queue_free()
 	await process_frame
 
+	# --- issue 45: Y2K Patch Floppy Disk (on_wave_spawn arms, on_enemy_turn_
+	# start consumes) — grouped here, not in an items_artefacts_*.gd file,
+	# because its own spec calls out checking the Filibuster interaction
+	var y2k := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"]})
+	await process_frame
+	check(Economy.enemy_actions(y2k) == Tuning.ENEMY_ACTIONS_PER_TURN,
+		"(control) unarmed (no Wave has started yet): a normal enemy Turn")
+	WaveLogic.queue(y2k, y2k.wave + 1) # Wave 4 starts: on_wave_spawn arms Y2K
+	check(Economy.enemy_actions(y2k) == 0,
+		"Y2K Patch Floppy Disk: the enemy's first Turn of the Wave has 0 actions")
+	check(Economy.enemy_actions(y2k) == Tuning.ENEMY_ACTIONS_PER_TURN,
+		"Y2K Patch Floppy Disk: only the first enemy Turn is skipped — the next is normal")
+	y2k.queue_free()
+	await process_frame
+
+	# held twice: still skips exactly ONE Turn, not two — the explicit
+	# exception to additive stacking (artefact_hooks.gd's own comment there)
+	var y2k2 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["y2k-patch-floppy-disk", "y2k-patch-floppy-disk"]})
+	await process_frame
+	WaveLogic.queue(y2k2, y2k2.wave + 1)
+	check(Economy.enemy_actions(y2k2) == 0,
+		"Y2K Patch Floppy Disk x2: the first enemy Turn is still 0 actions, not negative")
+	check(Economy.enemy_actions(y2k2) == Tuning.ENEMY_ACTIONS_PER_TURN,
+		"Y2K Patch Floppy Disk x2: the second enemy Turn is normal — 2 held copies don't skip 2 Turns")
+	y2k2.queue_free()
+	await process_frame
+
+	# Y2K + Filibuster on the same hook: run() always dispatches the
+	# artefacts group before the tariffs group (header's "Tariff/artefact
+	# ordering" note), so Y2K's zeroed ctx.actions is always the base
+	# Filibuster's own "+1" composes on top of — deterministic by group
+	# order, never by where the two keys happen to alphabetically sort
+	# (they're in different groups, so that comparison never runs).
+	var y2kf := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"], "tariffs": ["filibuster"]})
+	await process_frame
+	WaveLogic.queue(y2kf, y2kf.wave + 1)
+	check(Economy.enemy_actions(y2kf) == 1,
+		"Y2K + Filibuster: the first enemy Turn gets exactly Filibuster's own +1 (Y2K's base cancelled, not the tariff's)")
+	check(Economy.enemy_actions(y2kf) == Tuning.ENEMY_ACTIONS_PER_TURN + 1,
+		"Y2K + Filibuster: the second enemy Turn is Filibuster's usual +1 on top of the normal Turn")
+	y2kf.queue_free()
+	await process_frame
+
 
 	print("---")
 	if fails == 0:

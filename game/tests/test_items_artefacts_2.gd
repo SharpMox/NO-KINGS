@@ -249,6 +249,28 @@ func _init() -> void:
 	tutan.queue_free()
 	await process_frame
 
+	# --- issue 45: Frog Pride Flag (on_piece_lost arms, on_deploy consumes) —
+	# a single armed flag, not one per lost piece
+	var frog := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "stock": ["knight", "knight"], "artefacts": ["frog-pride-flag"]})
+	await process_frame
+	check(not frog.frog_armed, "(control) nothing armed before any piece is lost")
+	frog._destroy(Vector2i(2, 2)) # lose one piece: arms the flag
+	frog._destroy(Vector2i(3, 2)) # lose a SECOND piece before deploying —
+		# still just armed once ("the next piece" is singular)
+	check(frog.frog_armed, "Frog Pride Flag: armed after losing a piece")
+	frog.actions_left = 5
+	frog._place("knight", Vector2i(0, 0)) # the next Deploy consumes the flag
+	check(not frog.frog_armed, "Frog Pride Flag: the flag is consumed by the Deploy")
+	check(not BuffLogic.of(frog.board[Vector2i(0, 0)]).is_empty(),
+		"Frog Pride Flag: two losses before deploying still grant only the next piece +1 Piece Buff")
+	frog.actions_left = 5
+	frog._place("knight", Vector2i(1, 0)) # a second Deploy with no new loss in between
+	check(BuffLogic.of(frog.board[Vector2i(1, 0)]).is_empty(),
+		"Frog Pride Flag: losing 2 pieces armed it only ONCE — this Deploy gets nothing")
+	frog.queue_free()
+	await process_frame
+
 	# --- issue 19: on_item_consume — each artefact boots alone (any single-item
 	# use also satisfies Tape Eraser Magnet's "last held" gate, so it gets its
 	# own isolated boot rather than entangling its math with the others)

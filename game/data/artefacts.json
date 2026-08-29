@@ -215,9 +215,9 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "The next piece you Deploy after losing a piece gains +1 Piece Buff (needs: deploy hook)",
+  "effect": "The next piece you Deploy after losing a piece gains +1 Piece Buff",
   "conspiracy": "Gay frogs",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "hoffa-s-cement-shoes",
@@ -398,9 +398,9 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Every 2nd purchase in the same Shop visit costs 50% less (needs: purchase counter)",
+  "effect": "Every 2nd purchase in the same Shop visit costs 50% less",
   "conspiracy": "Panic buying",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "denazification-visa",
@@ -2011,9 +2011,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On Wave start: the enemy's first Turn is skipped (needs: turn-skip hook)",
+  "effect": "On Wave start: the enemy's first Turn is skipped",
   "conspiracy": "The Y2K bug",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "pegasus-free-trial",

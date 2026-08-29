@@ -58,12 +58,31 @@ distinct buff key and note the intent to reconcile.
 - `_random_buff_key` (`artefact_hooks.gd`) is the pool for *random* grants. Bounty is pure
   upside on either target, so it is safe to include — it needs no `self_harming` flag.
   Confirm it is reachable there deliberately rather than by accident.
-- The trigger fires inside a capture. `game.gd`'s `_move_player` capture block has a
-  delicate order (`Economy.capture_score` runs before `critical`/`range` consumption), and
-  losses run through `on_piece_lost` inside the enemy turn loop. **Opening a modal from
-  inside the enemy's turn is the same suspension problem that parks Inflatable Vietcong
-  Torpedo in issue 33** — check whether the ally-loss half hits it before assuming both
-  halves are equally cheap. If it does, say so rather than working around it.
+- The trigger fires inside a capture, and `game.gd`'s `_move_player` capture block has a
+  delicate order (`Economy.capture_score` runs before `critical`/`range` consumption).
+
+### The two halves resolve differently — checked 2026-08-29, and this is NOT blocked
+
+**Enemy half (you capture an enemy carrying Bounty)** happens during *your* turn, so the
+Box can open immediately. This path is already proven: the box-carrier code issue 47
+deletes did exactly this (`game.gd:1427`, `if boxed: return _open_box_pick()`).
+
+**Ally half (you lose a piece carrying Bounty)** runs through `_lose_player_piece`, the
+synchronous choke point called from five sites including the enemy-move loop.
+`ArtefactHooks.run` does not await — handlers set `ctx` fields and the loop continues
+immediately — so a handler **cannot** open a modal and wait for a choice there.
+
+**Resolve it by deferring, not by suspending:** the ally half queues the reward
+(`pending_bounty_boxes += 1` or similar) and the 1-of-3 choice opens at the **start of your
+next turn**, when a modal is safe. `pass_after_box` is the existing precedent for deferring
+a Box-related step across a boundary.
+
+**Why deferring is legitimate here and not for Inflatable Vietcong Torpedo:** the Torpedo's
+choice *changes the outcome of the capture itself* (pay 15 Gold and the piece survives), so
+it genuinely needs the turn suspended mid-resolution — which is why it stays parked on
+issue 33's decision #2. Bounty's Box is a **payout**; it changes nothing about the capture,
+so moving it a few seconds later costs the player nothing. **This slice therefore does not
+depend on issue 33's decision #2.**
 - Autoplay must resolve both the 1-of-3 choice and the Box itself without a modal, or the
   bot leg hangs instead of failing.
 
@@ -82,3 +101,5 @@ distinct buff key and note the intent to reconcile.
 ## Blocked by
 
 - issue 47 (the 9 Boxes must exist to pick 3 of them)
+- **not** issue 33's decision #2 — see the two-halves note above; deferring the ally-side
+  reward to the start of your next turn sidesteps the suspension problem entirely

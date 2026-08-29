@@ -1,6 +1,6 @@
 # 54 — Dodge, dormant Tariff pair, and two action-economy rules
 
-Status: done (2026-08-30)
+Status: done (2026-08-30) — 5 of 6; SETI's Red Marker deferred, see Outcome
 
 ## Parent
 
@@ -201,3 +201,39 @@ to Notion as a question, not into code as a guess.
 
 Non-regression suite: `game/tests/run_all.sh`, foreground, full run (windowed click probes +
 27 headless suites + full autoplay). Final line: `ALL GREEN`.
+
+## Outcome
+
+Shipped in PR #187 — **5 of 6**. Catalog 164 -> 169.
+
+- **UAP Breath Mint / Inflatable Vietcong Torpedo** both hook the *same* guard in
+  `_run_enemy_actions` that `BuffLogic.repels_capture` and Cheyenne Mountain Doorbell
+  already use — no second interception point, and nothing suspends the enemy turn. UAP
+  auto-picks the empty neighbour farthest from the attacker and is a genuine no-op when none
+  is free; Torpedo auto-pays 15 Gold only when affordable. Held together, **UAP (free) is
+  tried before Torpedo (costs Gold)** — a sensible ordering worth keeping in mind.
+- **Hellfire Club Discord Invite** — `_on_pass` gates on `_pass_blocked()`, and the Pass
+  button greys out, relabels to "MUST ACT" and explains itself rather than failing silently.
+  The softlock case is handled: when no legal action exists the block lifts and Pass works.
+- **Pegasus Free Trial** — grants Blitz's own `blitz_free_move` flag to every end-of-chain
+  piece at `on_turn_start`. `moved_this_turn` is read but **never written**, so Blitz's
+  dependency on it is untouched. Boolean rather than additive: two held copies still grant
+  one free move per eligible piece.
+- **Exhibit 399** — wired via a new `ctx.choice` flag and an `apply_tariff`/`resolve_tariff`
+  split, using the issue-41 choice seam. **Never exercised in a live run**: `TARIFFS_SCHEDULED`
+  is `false`, so it is driven only directly from `test_items_tariffs.gd`. That is the
+  accepted consequence of building it dormant.
+
+**A real bug the agent found by writing the test first.** `_has_legal_action` initially
+trusted `Rules.legal_moves`, which knows nothing about `moved_this_turn` — the per-piece
+per-Turn lock. Without filtering, Hellfire could report a legal action that the player
+cannot actually take, i.e. a softlock. Caught by a regression test written before the helper
+was trusted, which is the right order.
+
+**The one deferred: SETI's Red Marker.** "Inverted into its equivalent bonus" has no
+referent — `data/tariffs.gd` defines no inverse for anything. Left `implemented: false`
+with a reason rather than guessed, per the house rule. Written up as question 10 in
+`NOTION-QUESTIONS.md`, where the analysis is sharper than "needs a table": the 8 `action`
+Tariffs invert trivially (charge -> pay) and Inflation inverts cleanly, but **Sanctions and
+Regulation have no coherent opposite** — their inverse is just the base game. Scoping the
+Artefact to cost Tariffs would ship it with nothing invented.

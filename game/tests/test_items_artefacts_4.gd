@@ -547,6 +547,11 @@ func _init() -> void:
 		# game.gd's _artefact_count(key) reads (Buff Box offer size/cost,
 		# game.gd:1544-1568) — same standing-rule pattern, in game.gd instead
 		"numbers-station-sudoku": true, "bohemian-grove-friendship-bracelet": true,
+		# issue 46: the Box Pick flow batch — same _artefact_count(key) standing
+		# rule as the Buff Box pair above, read directly in _open_box_pick /
+		# _box_choose (game.gd) instead of dispatched through ArtefactHooks.run()
+		"nostradamus-mad-libs": true, "bible-gag-reel-scroll": true,
+		"snowden-s-rubik-s-cube": true,
 		# issue 21's echo/meta-trigger layer: pure observers that only ever
 		# dispatch through ArtefactHooks._run_meta_triggers, never the normal
 		# REGISTRY loop (artefact_hooks.gd's own "no REGISTRY entry" comment)

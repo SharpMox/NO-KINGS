@@ -226,6 +226,15 @@ var buff_pick_open := false # generic "choose 1 of N, then continue" modal
 var _choice_on_chosen: Callable # continuation for the open choice pick
 var _choice_on_cancelled: Callable # ditto, run on cancel (may be invalid)
 var pass_after_box := false # auto-pass deferred until the pick resolves
+var box_offer: Array = [] # current Box offer (issue 46) — Nostradamus Mad
+	# Libs picks from what's left of it, Reroll replaces it wholesale
+var box_picks_left := 0 # Nostradamus Mad Libs: +1 extra pick per held copy,
+	# taken from the same offer (not a fresh roll)
+var box_rerolls_left := 0 # Bible Gag Reel Scroll + Snowden's Rubik's Cube:
+	# functionally identical 1-reroll-per-copy budget for the current Box —
+	# stacks additively, per-Box (reseeded fresh in _open_box_pick)
+var box_only_kind := "" # only_kind pinned for the life of the current Box, so
+	# a Reroll re-rolls the same typed pool (e.g. an Item Box stays Item-only)
 var item_active := -1 # items[] index being targeted, -1 = none
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
@@ -1957,14 +1966,23 @@ func _artefact_count(key: String) -> int:
 
 func _open_box_pick(only_kind := "") -> void:
 	box_open = true
-	Economy.charge(self, "box_cost")
-	var options := _box_options(only_kind)
-	if autoplay: # bot: random pick (or skip) — exercises every branch
+	Economy.charge(self, "box_cost") # once per Box — a Reroll must NOT re-charge this (issue 46)
+	box_only_kind = only_kind
+	box_picks_left = _artefact_count("nostradamus-mad-libs")
+	box_rerolls_left = _artefact_count("bible-gag-reel-scroll") \
+		+ _artefact_count("snowden-s-rubik-s-cube") # functionally identical, additive
+	box_offer = _box_options(only_kind)
+	if autoplay: # bot: random pick (or skip), and exercise the reroll branch
+		# too — every new path must stay inside this branch or the bot deadlocks
+		# on a modal nobody is there to click (issue 46)
 		if rng.randf() < 0.1:
 			Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
 			return _box_close()
-		return _box_choose(options[rng.randi() % options.size()])
-	modals.show_box(options)
+		if box_rerolls_left > 0 and rng.randf() < 0.5:
+			box_rerolls_left -= 1
+			box_offer = _box_options(only_kind)
+		return _box_choose(box_offer[rng.randi() % box_offer.size()])
+	modals.show_box(box_offer)
 
 
 
@@ -1999,7 +2017,28 @@ func _box_choose(opt: Dictionary) -> void:
 			artefacts.append(entry)
 		"score":
 			Economy.earn(self, opt.value)
-	_box_close()
+	# Nostradamus Mad Libs (issue 46): take an extra pick from what's left of
+	# THIS offer, not a fresh roll — stop as soon as either the budget or the
+	# offer itself runs out (2 held copies = 3 picks = the whole offer).
+	box_offer.erase(opt)
+	if box_picks_left > 0 and not box_offer.is_empty():
+		box_picks_left -= 1
+		if autoplay:
+			return _box_choose(box_offer[rng.randi() % box_offer.size()])
+		modals.show_box(box_offer) # reopen with what's left — box_open/pass_after_box stay untouched
+	else:
+		_box_close()
+
+
+## Bible Gag Reel Scroll / Snowden's Rubik's Cube (issue 46): both grant "1
+## reroll of the offer", so they're implemented identically and stack
+## additively via box_rerolls_left. A reroll replaces the offer wholesale
+## (not the Nostradamus Mad Libs "pick from what's left") and must NOT
+## re-charge box_cost — that only ever happens once, in _open_box_pick.
+func _box_reroll() -> void:
+	box_rerolls_left -= 1
+	box_offer = _box_options(box_only_kind)
+	modals.show_box(box_offer)
 
 
 func _box_close() -> void:
@@ -2270,6 +2309,7 @@ func _connect_modals() -> void:
 		_refresh())
 	modals.box_chosen.connect(_box_choose)
 	modals.box_skipped.connect(_on_box_skipped)
+	modals.box_reroll_pressed.connect(_box_reroll)
 	modals.win_continue_pressed.connect(_on_win_continue)
 	modals.win_end_pressed.connect(func() -> void:
 		win_open = false

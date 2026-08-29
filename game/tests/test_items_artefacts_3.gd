@@ -1,7 +1,8 @@
 extends SceneTree
 ## Artefacts, part 3: Piece Buff lifecycle hooks (issue 23), the per-piece
 ## capture ledger (issue 25, its tariff-interception subsection moved to
-## test_items_tariffs.gd), and the economy/Shop/Box batch (issue 26).
+## test_items_tariffs.gd), the economy/Shop/Box batch (issue 26), and the
+## Box Pick flow Artefacts — extra pick + reroll (issue 46).
 ## Split out of test_items.gd (issue 37).
 ## Run headless:  godot --headless --path game -s tests/test_items_artefacts_3.gd
 
@@ -758,6 +759,160 @@ func _init() -> void:
 		"Deep State Yearbook: pays nothing when it is your only Artefact (buying its own first copy)")
 	yself.queue_free()
 	await process_frame
+
+	# --- issue 46: Box Pick flow Artefacts — Nostradamus Mad Libs (+1 extra
+	# pick, from the same offer), Bible Gag Reel Scroll + Snowden's Rubik's
+	# Cube (functionally identical: 1 reroll each, stacking additively) ---
+
+	# Nostradamus Mad Libs: 1 copy takes 2 of the 3 offered options, picking
+	# the same box_offer[0] each round so the count is deterministic
+	# regardless of which kind rolls into that slot.
+	var mad1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs"]})
+	await process_frame
+	mad1._open_box_pick()
+	check(mad1.box_open and mad1.box_offer.size() == 3, "(setup) the Box opens with a 3-option offer")
+	var mad1_picks := 0
+	while mad1.box_open:
+		mad1._box_choose(mad1.box_offer[0])
+		mad1_picks += 1
+	check(mad1_picks == 2, "Nostradamus Mad Libs: 1 copy banks 2 rewards (the base pick + 1 extra)")
+	mad1.queue_free()
+	await process_frame
+
+	# 2 copies = 3 picks, i.e. the whole offer — stops when it's exhausted,
+	# not capped below that for its own sake.
+	var mad2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs", "nostradamus-mad-libs"]})
+	await process_frame
+	mad2._open_box_pick()
+	var mad2_picks := 0
+	while mad2.box_open:
+		mad2._box_choose(mad2.box_offer[0])
+		mad2_picks += 1
+	check(mad2_picks == 3, "Nostradamus Mad Libs: 2 held copies take the whole offer (3 picks), no further cap")
+	mad2.queue_free()
+	await process_frame
+
+	# pass_after_box bookkeeping: _box_close is what fires the deferred pass,
+	# so it must NOT fire on the first (non-final) pick of an extra-pick
+	# sequence — only _box_choose's own recursion re-shows the modal, box_open
+	# and pass_after_box both stay put across the repeat.
+	var deferred := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs"]})
+	await process_frame
+	deferred._open_box_pick()
+	deferred.pass_after_box = true # simulate "this Box was opened by the last Action"
+	deferred._box_choose(deferred.box_offer[0])
+	check(deferred.box_open and deferred.pass_after_box,
+		"Nostradamus Mad Libs: the first (non-final) pick keeps the Box open and the deferred pass still queued")
+	deferred._box_choose(deferred.box_offer[0])
+	check(not deferred.box_open and not deferred.pass_after_box,
+		"Nostradamus Mad Libs: the final pick closes the Box and fires the deferred pass")
+	deferred.queue_free()
+	await process_frame
+
+	# Bible Gag Reel Scroll + Snowden's Rubik's Cube: both hold "1 reroll",
+	# stack additively (holding one of each, same as 2 copies of either), a
+	# reroll replaces the offer wholesale, and — the trap this slice exists
+	# for — box_cost is charged exactly once across a Box with rerolls,
+	# never re-charged by _box_reroll.
+	var rr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 100, "tariffs": ["box_cost"],
+		"artefacts": ["bible-gag-reel-scroll", "snowden-s-rubik-s-cube"]})
+	await process_frame
+	var rr_gold_before: int = rr.gold
+	rr._open_box_pick()
+	check(rr.gold == rr_gold_before - 10,
+		"box_cost charges once on Box open (Mild tariff, 10 Gold — Tuning.TARIFF_ACTION_COST)")
+	check(rr.box_rerolls_left == 2,
+		"Bible Gag Reel Scroll + Snowden's Rubik's Cube: 1 reroll each, stacking to 2")
+	var rr_offer_before: Array = rr.box_offer.duplicate(true)
+	rr._box_reroll()
+	check(rr.box_rerolls_left == 1, "a reroll spends one charge from the budget")
+	check(rr.box_offer != rr_offer_before, "a reroll replaces the offer")
+	check(rr.gold == rr_gold_before - 10,
+		"a reroll does NOT re-charge box_cost (the trap this slice exists for)")
+	rr._box_reroll()
+	check(rr.box_rerolls_left == 0, "the second reroll spends the second stacked charge")
+	check(rr.gold == rr_gold_before - 10,
+		"...still exactly one box_cost charge across both rerolls")
+	rr.queue_free()
+	await process_frame
+
+	# two copies of the SAME key stack the same way as one of each
+	var two_snow := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"]})
+	await process_frame
+	two_snow._open_box_pick()
+	check(two_snow.box_rerolls_left == 2,
+		"two copies of Snowden's Rubik's Cube alone also stack to 2 rerolls")
+	two_snow.queue_free()
+	await process_frame
+
+	# the reroll budget is per-Box and does not leak into the next one
+	var leak := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"]})
+	await process_frame
+	leak._open_box_pick()
+	leak._box_reroll()
+	check(leak.box_rerolls_left == 0, "(setup) the budget is spent on this Box")
+	leak._box_choose(leak.box_offer[0])
+	check(not leak.box_open, "(setup) the Box resolved")
+	leak._open_box_pick()
+	check(leak.box_rerolls_left == 1, "the reroll budget resets fresh on the next Box — no leak from the last one")
+	leak.queue_free()
+	await process_frame
+
+	# a reroll respects the only_kind pin for the life of the Box (a typed
+	# Item Box stays Item-only after rerolling, same as its initial offer)
+	var typed := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"]})
+	await process_frame
+	typed._open_box_pick("item")
+	typed._box_reroll()
+	var typed_all_items := true
+	for o in typed.box_offer:
+		if o.kind != "item":
+			typed_all_items = false
+	check(typed_all_items, "Reroll re-rolls within the same only_kind pin as the Box it belongs to")
+	typed.queue_free()
+	await process_frame
+
+	# autoplay: both new paths must stay inside _open_box_pick's autoplay
+	# branch or the bot deadlocks on a modal nobody is there to click.
+	# box_picks_left/box_rerolls_left aren't reset until the next Box opens,
+	# so a value below the seeded starting point after resolution proves the
+	# branch actually ran (not just "didn't hang").
+	var extra_pick_branch_hit := false
+	for s in range(1, 9):
+		var mb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs", "nostradamus-mad-libs"], "seed": s})
+		await process_frame
+		mb.autoplay = true
+		mb._open_box_pick()
+		check(not mb.box_open, "autoplay (seed %d) resolves the Box itself — no modal, no hang" % s)
+		if mb.box_picks_left < 2:
+			extra_pick_branch_hit = true
+		mb.queue_free()
+		await process_frame
+	check(extra_pick_branch_hit,
+		"Nostradamus Mad Libs: autoplay exercises the extra-pick recursion itself, not just under the modal")
+
+	var reroll_branch_hit := false
+	for s in range(1, 16):
+		var rb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"], "seed": s})
+		await process_frame
+		rb.autoplay = true
+		rb._open_box_pick()
+		check(not rb.box_open, "autoplay (seed %d) resolves the Box itself — no modal, no hang" % s)
+		if rb.box_rerolls_left == 0:
+			reroll_branch_hit = true
+		rb.queue_free()
+		await process_frame
+	check(reroll_branch_hit,
+		"Snowden's Rubik's Cube: autoplay exercises the reroll branch itself, not just under the modal")
 
 
 	print("---")

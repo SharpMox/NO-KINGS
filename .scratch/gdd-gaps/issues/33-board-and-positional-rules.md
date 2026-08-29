@@ -76,31 +76,52 @@ and it should stay that way. So the denied-square set is computed by the caller
 (`game.gd`, from the held Artefacts) and passed *into* `legal_moves` as a parameter —
 never read from game state inside `Rules`.
 
-### The real question Winchester raises — and it is a balance one, not a technical one
+### Winchester makes the back-row breach loss unreachable — and that is just the effect
 
-> **Winchester Salt Lined Doors removes a loss condition outright.**
+You lose the run when every back-row tile holds an enemy. If enemy pieces cannot move onto
+your back row, that cannot happen, so holding Winchester means only the Clock can end the
+run.
 
-You lose the run when every back-row tile holds an enemy. If enemy pieces *cannot move
-onto your back row at all*, that can never happen — so holding Winchester makes you
-permanently immune to the breach loss, and only the Clock can end the run.
+An earlier revision of this addendum called that a "side effect" and raised it as a
+blocking balance question. **Both framings were wrong** (user, 2026-08-29): "Enemy pieces
+cannot move onto your back row" straightforwardly *means* enemies never occupy the back
+row, so breach immunity is the plain reading of the card, not something the implementation
+sneaks in. And the user had already ruled that balance tuning waits until every gameplay
+lever is coded, so raising it as a blocker re-litigated a settled decision.
 
-That may well be intended for a Legendary. But it is a much larger effect than "zone
-denial" sounds, it is permanent rather than once-per-Wave, and it should be an explicit
-call rather than something that arrives as a side effect of the implementation. Options,
-if it reads as too strong: make it expire (N Waves / once per Wave), restrict it to a
-subset of the back row, or let enemies enter but not *end their move* there.
+Recorded because the failure is worth remembering, not the conclusion.
 
-**Cheyenne Mountain Doorbell has no such problem** — capture immunity on `y = 0` does not
-touch the breach condition, since a breach only counts enemy occupancy. It is the safer
-of the two to build first, which is the reverse of the order previously assumed.
+**Cheyenne Mountain Doorbell** is unaffected either way — capture immunity on `y = 0` does
+not touch the breach condition, which only counts enemy occupancy.
+
+### GO-AHEAD: Winchester and Cheyenne are cleared to build
+
+Ruled by the user (originally before the 2026-08-29 compaction, and re-confirmed after).
+**Written here because the first ruling existed only in conversation** — when context
+compacted, this file still said "blocked", the durable record won, and the decision was
+re-derived from scratch. Rulings go in the issue file when they are made.
+
+Both are implementable now:
+
+- **Winchester Salt Lined Doors** — enemies cannot move onto `y = 0`. One filter in
+  `Rules.legal_moves`, denied set passed in by `game.gd`.
+- **Cheyenne Mountain Doorbell** — player pieces on `y = 0` cannot be captured. Hook the
+  existing repel path (`BuffLogic.repels_capture` is the precedent for "this capture
+  attempt does not happen"), keeping `rules.gd` pure.
+
+Order is free; Cheyenne is the simpler of the two.
 
 ### What still needs a ruling
 
-Decision #1 is answered (one filter, in `legal_moves`, fed from the caller). Decisions #2
-(dodge / mid-capture modal), #3 (Pegasus vs `moved_this_turn`) and #4 (capture conversion)
-stand unchanged. Added to them: the Winchester balance call above.
+Decision #1 is answered (one filter in `legal_moves`, fed from the caller), and the two
+zone Artefacts are cleared. Decisions #2 (dodge / mid-capture modal), #3 (Pegasus vs
+`moved_this_turn`) and #4 (capture conversion) stand unchanged.
+
+Note that #2 has a new dependent: issue 48's Bounty Piece Buff pays out on *losing* an
+ally piece, which happens inside the enemy turn loop — the same suspension problem that
+parks Inflatable Vietcong Torpedo.
 
 ## Blocked by
 
-- decisions #2, #3 and #4 above, plus the Winchester balance call
-- (decision #1 is resolved — see the addendum)
+- decisions #2, #3 and #4 above
+- (decision #1 resolved; Winchester and Cheyenne cleared — see the addendum)

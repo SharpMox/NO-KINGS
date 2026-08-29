@@ -55,11 +55,25 @@ static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
 static func earn(g, amount: int, reason: String = "") -> void:
 	var score_ctx := ArtefactHooks.run(g, "on_score_change",
 		{"base": float(amount), "amount": float(amount), "reason": reason, "gold_bonus": 0.0})
-	g.score += roundi(score_ctx.amount)
+	var score_amount := roundi(score_ctx.amount)
 	var gold_amount := gain(g, amount)
 	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
 		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
-	g.gold += roundi(gold_ctx.amount) + roundi(score_ctx.gold_bonus)
+	var gold_gain := roundi(gold_ctx.amount)
+	if g.moscovium_active: # Moscovium Glow Stick (issue 52): "Score and Gold
+		# gains are tripled" — a deliberate multiplicative exception
+		# (artefact_hooks.gd header), applied here directly rather than
+		# through the REGISTRY/run() per-held-copy dispatch: the effect must
+		# keep working AFTER the artefact consumes itself and leaves
+		# g.artefacts, when there is no held copy left to dispatch from.
+		# Scoped to this call's own base gain (score_amount / the post-
+		# Inflation gold_gain), not the cross-resource gold_bonus/score_bonus
+		# converter payments below, which are a different artefact's own
+		# conversion, layered on top.
+		score_amount *= 3
+		gold_gain *= 3
+	g.score += score_amount
+	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
 	g.score += roundi(gold_ctx.score_bonus)
 	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 

@@ -720,6 +720,42 @@ func _init() -> void:
 	await process_frame
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
+	# Jet Fuel Vial (issue 52): a Shop-only control, restock button appears
+	# only while it's held — confirm-gated, same as every untargeted
+	# activation (user ruling).
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 100, "artefacts": ["jet-fuel-vial"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	await process_frame
+	check(await _click_button_in(game.modals.shop_panel, "Restock ($20)"),
+		"the Restock button shows and is clickable while Jet Fuel Vial is held")
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"clicking Restock opens the confirm modal (untargeted activation)")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the restock confirm")
+	await process_frame
+	check(not game.buff_pick_open and game.gold == 100 and not game.jet_fuel_used_this_visit,
+		"cancelling the restock confirm costs nothing")
+	check(await _click_button_in(game.modals.shop_panel, "Restock ($20)"), "Restock clickable again after a cancel")
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the restock confirm")
+	await process_frame
+	check(game.gold == 80 and game.jet_fuel_used_this_visit,
+		"confirming restocks the Shop: 20 Gold spent, the once-per-Shop-visit charge used")
+	var restock_btn: Button = _button_prefix(game.modals.shop_panel, "Restock")
+	check(restock_btn != null and restock_btn.disabled,
+		"the Restock button greys out once used this Shop visit — visibly unavailable, not silently inert")
+	_click(restock_btn.get_global_rect().get_center()) # Godot doesn't fire
+		# `pressed` on a disabled Button — this must be a genuine no-op
+	await process_frame
+	check(not game.buff_pick_open, "clicking the disabled Restock button opens nothing")
+
 	# the Shop is reachable in any state, not just your turn (GDD Shop page)
 	var was_state: int = game.state
 	game.state = game.State.ENEMY_TURN
@@ -896,6 +932,91 @@ func _init() -> void:
 	_click(game.pass_button.get_global_rect().get_center())
 	await _await_player_turn(game)
 	check(game.arrows.is_empty(), "arrows clear at turn end (scratchpad, never saved)")
+
+	# --- Artefact activation (issue 52): the Activate section, confirm/
+	# cancel, and Bovine Tractor Beam's targeted cancel. New interactive UI —
+	# Godot headless drops GUI picking, which is why this probe exists.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 1, "gold": 100, "score": 0,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"artefacts": ["oak-island-wishing-well"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	# (the empty-vs-held Activate-section sizing itself is asserted headlessly
+	# in test_items_artefacts_4.gd; this probe exists for CLICKABILITY, which
+	# headless can't verify — Godot headless drops GUI picking)
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
+	await process_frame
+	check(game.hud.activate_box.get_child_count() == 1,
+		"the drawer shows exactly one Activate chip")
+	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
+		"the Activate chip is clickable")
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"clicking an untargeted Activate chip opens the confirm modal (user ruling: no target = confirm)")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
+	await process_frame
+	check(not game.buff_pick_open and game.gold == 100 and not game.oak_island_used_this_turn \
+			and game._artefact_count("oak-island-wishing-well") == 1,
+		"cancelling the confirm costs nothing — no Gold, no charge, Artefact untouched")
+	# the confirm modal is the only thing that closed — this activation never
+	# touches the drawer (unlike a targeted Item), so the chip is still
+	# directly clickable with no need to reopen Inventory
+	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
+		"the Activate chip is clickable again after a cancel, drawer untouched")
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
+	await process_frame
+	check(not game.buff_pick_open and game.gold == 475 and game.score == 400,
+		"confirming activates it: 25 Gold spent, +400 Score (earn() also grants " +
+		"the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+
+	# Bovine Tractor Beam: the one TARGETED activation — no confirm modal;
+	# tapping the chip again mid-targeting cancels instead (user ruling).
+	# Targeting DOES hand the drawer back to the board (same as a targeted
+	# Item), so cancelling requires reopening Inventory to reach the chip.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 1,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"artefacts": ["bovine-tractor-beam"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
+	await process_frame
+	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+		"the Bovine Tractor Beam chip is clickable")
+	await process_frame
+	check(not game.buff_pick_open and game.artefact_targeting_key == "bovine-tractor-beam" \
+			and game.hud.drawer_open == "",
+		"clicking Bovine's chip stages targeting and hands the board back — no confirm modal (it has a target instead)")
+	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A: the enemy Rook
+	await process_frame
+	check(game.artefact_target_stage_a == Vector2i(7, 10), "tapping the enemy Rook on the board stages it")
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
+	await process_frame
+	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+		"the chip stays clickable mid-targeting (to cancel)")
+	await process_frame
+	check(game.artefact_targeting_key == "" and game.board.has(Vector2i(7, 10)) \
+			and not game.bovine_used_this_wave and game._artefact_count("bovine-tractor-beam") == 1,
+		"tapping the chip again CANCELS FROM TARGETING — no move, no charge, Artefact untouched")
+	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
+	await process_frame
+	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A again
+	await process_frame
+	var bovine_dest: Vector2i = game.artefact_targets[0]
+	_click(game._tile_px(bovine_dest) + Vector2(game.tile, game.tile) / 2) # stage B: commit
+	await process_frame
+	check(game.artefact_targeting_key == "" and not game.board.has(Vector2i(7, 10)) \
+			and game.board.get(bovine_dest, {}).get("id", "") == "rook" and game.bovine_used_this_wave,
+		"completing both taps relocates the enemy piece and spends the once-per-Wave charge")
 
 	print("---")
 	if fails == 0:

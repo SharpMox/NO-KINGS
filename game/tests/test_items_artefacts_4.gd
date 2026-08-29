@@ -2,8 +2,11 @@ extends SceneTree
 ## Artefacts, part 4: the echo/meta-trigger layer (issue 21), the Blitz
 ## rework and its Tier-5 interaction, the per-artefact 5-Wave Milestone fix,
 ## runtime rarity metadata + Illuminati Fridge Magnet (issue 29),
-## capture-context effects (issue 31), and the issue 28 audit (unwired
-## artefacts, REGISTRY-coverage guard, echo x milestone coverage).
+## capture-context effects (issue 31), the issue 28 audit (unwired
+## artefacts, REGISTRY-coverage guard, echo x milestone coverage), and
+## Artefact activation (issue 52) — the last 7 catalog entries and the new
+## on-demand affordance (Activate section, confirm/cancel, Bovine's
+## targeting, autoplay).
 ## Split out of test_items.gd (issue 37).
 ## Run headless:  godot --headless --path game -s tests/test_items_artefacts_4.gd
 
@@ -15,6 +18,8 @@ const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Rules := preload("res://scripts/rules.gd")
+const AutoplayBot := preload("res://scripts/autoplay.gd")
 
 var fails := 0
 
@@ -514,24 +519,17 @@ func _init() -> void:
 	no_receipt.queue_free()
 	await process_frame
 
-	# --- issue 28: audit the 3 unwired 5-Wave-Milestone artefacts + a general
-	# REGISTRY-coverage guard + echo x milestone coverage ---
-
-	# Roanoke Hex Kit has no REGISTRY wiring (its Outcome says deliberately
-	# unimplemented) — must stay `implemented: false` so
-	# Items._build_artefact_effects() never offers a dead artefact to the
-	# player. It is the last of the originally-unwired trio: issue 43 wired
-	# Mar-a-Lago Toilet Papers (on_wave_clear + on_price) and issue 44 wired
-	# Yalta Cocktail Napkin (the choice-modal seam's first real consumer) —
-	# both are covered in test_items_artefacts_3.gd.
-	for unwired_key in ["roanoke-hex-kit"]:
-		var unwired_found := false
-		for cat in Items.ARTEFACT_CATALOG:
-			if cat.key == unwired_key:
-				unwired_found = true
-				check(not cat.get("implemented", false),
-					"%s stays implemented: false (no REGISTRY wiring exists to fire it)" % cat.name)
-		check(unwired_found, "%s is in the catalog" % unwired_key)
+	# --- issue 28: audit (originally) the 3 unwired 5-Wave-Milestone
+	# artefacts + a general REGISTRY-coverage guard + echo x milestone
+	# coverage. Roanoke Hex Kit was the last of that unwired trio — issue 43
+	# wired Mar-a-Lago Toilet Papers (on_wave_clear + on_price) and issue 44
+	# wired Yalta Cocktail Napkin (the choice-modal seam's first real
+	# consumer), both covered in test_items_artefacts_3.gd. Issue 52 wired
+	# Roanoke Hex Kit too, on a DIFFERENT seam than REGISTRY (player-triggered
+	# activation, game.gd's _roanoke_activate) — it is no longer unwired, so
+	# this block no longer asserts it stays implemented: false; it is instead
+	# one of the 7 documented REGISTRY exceptions below (activation keys are
+	# never dispatched by ArtefactHooks.run() at all).
 
 	# General guard: every artefact flagged implemented: true must have a
 	# REGISTRY entry, OR be one of these documented standing-rule exceptions
@@ -606,6 +604,20 @@ func _init() -> void:
 		# same "pure _run_meta_triggers observer" shape as the issue-21 batch
 		# above, see artefact_hooks.gd's own header.
 		"troll-farm-employee-of-the-month": true, "ecdysis-sheddings": true,
+		# issue 52: Artefact activation. Player-triggered ("on use"/"you may
+		# pay"), not a passive listener on any hook — game.gd's own
+		# _activate_artefact/_artefact_confirmed dispatch table (plus
+		# _jet_fuel_restock_confirmed for the Shop-only 7th) is the whole
+		# mechanism, deliberately separate from ArtefactHooks' REGISTRY/run()
+		# engine (built for "every HELD copy fires automatically on a hook" —
+		# see artefact_hooks.gd's header for why that shape doesn't fit an
+		# on-demand, player-picks-when ability). Moscovium Glow Stick
+		# especially: it must keep working after consuming itself and leaving
+		# g.artefacts, when there is no held copy left for run() to dispatch.
+		"oak-island-wishing-well": true, "fifa-complimentary-yacht": true,
+		"moscovium-glow-stick": true, "roanoke-hex-kit": true,
+		"zapruder-s-director-s-cut": true, "bovine-tractor-beam": true,
+		"jet-fuel-vial": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:
@@ -1137,6 +1149,298 @@ func _init() -> void:
 	check(ecdy_troll.artefact_echo_depth == 0,
 		"Ecdysis + Troll Farm combo: the echo-depth guard is back at 0 after dispatch (no leak)")
 	ecdy_troll.queue_free()
+	await process_frame
+
+	# --- issue 52: Artefact activation ---
+
+	# Oak Island Wishing Well: confirm-gated, untargeted, once per Turn
+	var oak := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 100, "score": 0, "artefacts": ["oak-island-wishing-well"]})
+	await process_frame
+	check(oak._artefact_activation_available("oak-island-wishing-well"),
+		"Oak Island Wishing Well: available (held, affordable, not used this Turn)")
+	oak._artefact_confirmed("oak-island-wishing-well")
+	check(oak.gold == 475 and oak.score == 400,
+		"Oak Island Wishing Well: confirmed activation pays 25 Gold for +400 Score (earn() " +
+		"also grants the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+	check(not oak._artefact_activation_available("oak-island-wishing-well"),
+		"Oak Island Wishing Well: unavailable again — once per Turn already spent")
+	oak._begin_player_turn() # next Turn: the once-per-Turn charge recharges
+	check(oak._artefact_activation_available("oak-island-wishing-well"),
+		"Oak Island Wishing Well: available again next Turn")
+	oak.queue_free()
+	await process_frame
+
+	# FIFA Complimentary Yacht: no per-Turn limit, the deliberate exception
+	var fifa := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 150, "artefacts": ["fifa-complimentary-yacht"]})
+	await process_frame
+	var fifa_actions_before: int = fifa.actions_left
+	fifa._artefact_confirmed("fifa-complimentary-yacht")
+	check(fifa.gold == 100 and fifa.actions_left == fifa_actions_before + 1 \
+			and fifa.actions_max == fifa_actions_before + 1,
+		"FIFA Complimentary Yacht: 50 Gold for +1 Action — actions_left AND actions_max both grow")
+	fifa._artefact_confirmed("fifa-complimentary-yacht") # again, same Turn
+	check(fifa.gold == 50 and fifa.actions_left == fifa_actions_before + 2,
+		"FIFA Complimentary Yacht: any number of times per Turn — a 2nd activation the same Turn still works")
+	fifa._artefact_confirmed("fifa-complimentary-yacht") # a 3rd time: gold hits 0
+	check(fifa.gold == 0 and fifa.actions_left == fifa_actions_before + 3,
+		"FIFA Complimentary Yacht: a 3rd activation the same Turn still works — no limit at all")
+	check(not fifa._artefact_activation_available("fifa-complimentary-yacht"),
+		"FIFA Complimentary Yacht: unavailable once Gold drops below 50")
+	fifa.queue_free()
+	await process_frame
+
+	# Moscovium Glow Stick: the first consumable Artefact + the deliberate
+	# multiplicative-stacking exception (artefact_hooks.gd header)
+	var glow := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 0, "score": 0, "artefacts": ["moscovium-glow-stick"]})
+	await process_frame
+	glow._artefact_confirmed("moscovium-glow-stick")
+	check(glow._artefact_count("moscovium-glow-stick") == 0 and glow.moscovium_active,
+		"Moscovium Glow Stick: activation consumes the Artefact and flags the triple-gain window")
+	Economy.earn(glow, 100)
+	check(glow.score == 300 and glow.gold == 300,
+		"Moscovium Glow Stick: Score and Gold gains are tripled while active (100 -> 300 each)")
+	glow._begin_player_turn() # next Turn: "until end of Turn" expires
+	check(not glow.moscovium_active, "Moscovium Glow Stick: the window ends at the next Turn")
+	Economy.earn(glow, 100)
+	check(glow.score == 400 and glow.gold == 400,
+		"Moscovium Glow Stick: back to normal (not tripled) once the window has ended")
+	glow.queue_free()
+	await process_frame
+
+	var glow2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["moscovium-glow-stick", "moscovium-glow-stick"]})
+	await process_frame
+	glow2._artefact_confirmed("moscovium-glow-stick")
+	check(glow2._artefact_count("moscovium-glow-stick") == 1,
+		"Moscovium Glow Stick: activating one held copy leaves a held duplicate untouched")
+	glow2.queue_free()
+	await process_frame
+
+	# Moscovium + Ecdysis Sheddings (issue 55): copying a consumed Artefact's
+	# key must be a safe no-op — Moscovium has no REGISTRY entry, so
+	# REGISTRY.get("moscovium-glow-stick", []) is empty and _run_meta_triggers
+	# never dispatches it, no matter how many hooks fire afterward.
+	var ecdy_glow := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 9999, "score": 0, "artefacts": ["ecdysis-sheddings"]})
+	await process_frame
+	ecdy_glow.actions_left = 5
+	ecdy_glow.shop_stock.append({"kind": "artefact", "key": "moscovium-glow-stick", "sold": false})
+	Shop.buy(ecdy_glow, ecdy_glow.shop_stock.size() - 1)
+	check(ecdy_glow.ecdysis_copy_key == "moscovium-glow-stick",
+		"setup: buying Moscovium Glow Stick records it as Ecdysis's copy target")
+	ecdy_glow._artefact_confirmed("moscovium-glow-stick") # consume the ONLY copy
+	check(ecdy_glow._artefact_count("moscovium-glow-stick") == 0,
+		"setup: Moscovium Glow Stick is now consumed — gone from g.artefacts entirely")
+	check(ecdy_glow.ecdysis_copy_key == "moscovium-glow-stick",
+		"Moscovium + Ecdysis Sheddings: the copied key is never cleared by the copy being consumed")
+	Economy.capture_score(ecdy_glow, "pawn") # on_capture: exercises the full
+		# held+tariff dispatch loop AND _run_meta_triggers' Ecdysis branch
+	check(ecdy_glow.artefact_echo_depth == 0 and ecdy_glow._artefact_count("moscovium-glow-stick") == 0,
+		"Moscovium + Ecdysis Sheddings: a hook firing afterward does not crash or double-consume " +
+		"(Ecdysis's mirror of an un-registered key is an inert no-op)")
+	ecdy_glow.queue_free()
+	await process_frame
+
+	# Roanoke Hex Kit: "vanishes, paying nothing" (_destroy-shaped) + the
+	# per-copy "every 2nd 5-Wave Milestone" recharge
+	var roan := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10], ["pawn", 1, 2, 9]],
+		"wave": 10, "gold": 0, "score": 0, "artefacts": ["roanoke-hex-kit"]})
+	await process_frame
+	roan.artefacts[0].acquired_wave = 1 # this copy's 2nd 5-Wave Milestone
+		# (every 2nd, per held copy) lands at wave 1 + 10*1 - 1 = 10
+	check(roan._artefact_activation_available("roanoke-hex-kit"),
+		"Roanoke Hex Kit: available once its copy's 2nd 5-Wave Milestone (wave 10) is reached")
+	roan._artefact_confirmed("roanoke-hex-kit")
+	check(not roan.board.has(Vector2i(7, 10)) and roan.board.has(Vector2i(2, 9)),
+		"Roanoke Hex Kit: the strongest enemy (Rook) vanishes; the weaker Pawn is untouched")
+	check(roan.score == 0 and roan.gold == 0, "Roanoke Hex Kit: vanishes paying no Score or Gold")
+	check(not roan._artefact_activation_available("roanoke-hex-kit"),
+		"Roanoke Hex Kit: unavailable again until its NEXT even milestone (wave 20)")
+	roan.wave = 19
+	check(not roan._artefact_activation_available("roanoke-hex-kit"),
+		"Roanoke Hex Kit: still unavailable one Wave before its next even milestone")
+	roan.wave = 20
+	check(roan._artefact_activation_available("roanoke-hex-kit"),
+		"Roanoke Hex Kit: available again exactly at its next even milestone (wave 20)")
+	roan.queue_free()
+	await process_frame
+
+	# Zapruder's Director's Cut: repeats the SAME piece's SAME displacement
+	# from its new position — game.gd's own scoping of "previous Action"
+	var zap := _boot({"board": [["rook", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "artefacts": ["zapruder-s-director-s-cut"]})
+	await process_frame
+	zap.actions_left = 5
+	zap._move_player(Vector2i(2, 2), Vector2i(2, 5)) # plain move, no capture
+	check(zap.board.has(Vector2i(2, 5)), "setup: the Rook moved to (2,5)")
+	var zap_actions_before: int = zap.actions_left
+	check(zap._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: available — the last Action was a plain, still-legal move")
+	zap._artefact_confirmed("zapruder-s-director-s-cut")
+	check(zap.board.has(Vector2i(2, 8)) and not zap.board.has(Vector2i(2, 5)),
+		"Zapruder's Director's Cut: repeats the SAME displacement from the piece's new position (2,5 -> 2,8)")
+	check(zap.actions_left == zap_actions_before,
+		"Zapruder's Director's Cut: the repeat spends no Action")
+	check(not zap._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: unavailable again — once per Wave already spent")
+	zap.queue_free()
+	await process_frame
+
+	# Zapruder: a Deploy/Merge/Item leaves no {from, to} — correctly reported
+	# unavailable, never half-replayed
+	var zap_place := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "stock": ["rook"], "artefacts": ["zapruder-s-director-s-cut"]})
+	await process_frame
+	zap_place.actions_left = 5
+	zap_place._place("rook", Vector2i(3, 0))
+	check(not zap_place._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: unavailable when the previous Action was a Deploy (no replay data)")
+	zap_place.queue_free()
+	await process_frame
+
+	# Bovine Tractor Beam: the one TARGETED activation — no confirm, cancels
+	# from targeting instead (user ruling)
+	var bov_notarget := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["bovine-tractor-beam"]}) # an enemy in the initial
+		# config, else _begin_player_turn's "board cleared -> next Wave" branch
+		# (not _any_enemy()) auto-spawns one, defeating "no target" on purpose
+	await process_frame
+	bov_notarget.board.erase(Vector2i(7, 10)) # now genuinely no enemy left
+	check(not bov_notarget._artefact_activation_available("bovine-tractor-beam"),
+		"Bovine Tractor Beam: unavailable with no enemy piece to target")
+	bov_notarget.queue_free()
+	await process_frame
+
+	var bov := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["bovine-tractor-beam"]})
+	await process_frame
+	bov._activate_artefact("bovine-tractor-beam")
+	check(bov.artefact_targeting_key == "bovine-tractor-beam", "setup: targeting is staged")
+	bov._artefact_target_click(Vector2i(7, 10)) # stage A: the enemy Rook
+	check(bov.artefact_target_stage_a == Vector2i(7, 10), "setup: stage A picked (the enemy Rook)")
+	var dest: Vector2i = bov.artefact_targets[0] # an empty tile on the player's side
+	bov._artefact_target_click(dest)
+	check(not bov.board.has(Vector2i(7, 10)) and bov.board.get(dest, {}).get("id", "") == "rook" \
+			and bov.board[dest].owner == Rules.ENEMY,
+		"Bovine Tractor Beam: the enemy piece relocates to the picked tile on the player's side, ownership unchanged")
+	check(bov.artefact_targeting_key == "" and bov.bovine_used_this_wave,
+		"Bovine Tractor Beam: targeting resets and the once-per-Wave charge is spent only on commit")
+	check(not bov._artefact_activation_available("bovine-tractor-beam"),
+		"Bovine Tractor Beam: unavailable again — once per Wave already spent")
+	bov.queue_free()
+	await process_frame
+
+	# Jet Fuel Vial: the Shop-only 7th (not part of the in-run Activate set)
+	var jet := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 9, "gold": 100, "artefacts": ["jet-fuel-vial"]})
+	await process_frame
+	check(not GameScript.ACTIVATABLE_ARTEFACT_KEYS.has("jet-fuel-vial"),
+		"Jet Fuel Vial: NOT part of the in-run Activate set (user ruling: it's a Shop control)")
+	check(jet._jet_fuel_restock_available(),
+		"Jet Fuel Vial: available (held, Shop-visit charge unused, affordable)")
+	jet._jet_fuel_restock_confirmed()
+	check(jet.gold == 80 and jet.jet_fuel_used_this_visit,
+		"Jet Fuel Vial: confirmed restock pays 20 Gold and spends the once-per-Shop-visit charge")
+	check(not jet._jet_fuel_restock_available(),
+		"Jet Fuel Vial: unavailable again — already used this Shop visit")
+	jet._open_shop() # a fresh Shop visit
+	check(jet._jet_fuel_restock_available(), "Jet Fuel Vial: available again on a fresh Shop visit")
+	jet.queue_free()
+	await process_frame
+
+	# Cancel costs nothing — both shapes (acceptance: assert explicitly)
+	var cancel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 100, "score": 0, "artefacts": ["oak-island-wishing-well"]})
+	await process_frame
+	cancel._activate_artefact("oak-island-wishing-well") # opens the confirm modal
+	check(cancel.buff_pick_open, "setup: the confirm modal is open")
+	cancel._choice_pick_cancelled() # "Cancel"
+	check(cancel.gold == 100 and cancel.score == 0 and not cancel.oak_island_used_this_turn \
+			and cancel._artefact_count("oak-island-wishing-well") == 1,
+		"Confirm path: cancelling costs nothing — no Gold, no charge, Artefact untouched")
+	check(cancel._artefact_activation_available("oak-island-wishing-well"),
+		"Confirm path: still available after a cancel")
+	cancel.queue_free()
+	await process_frame
+
+	var jet_cancel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 9, "gold": 100, "artefacts": ["jet-fuel-vial"]})
+	await process_frame
+	jet_cancel._jet_fuel_restock_pressed() # opens the confirm modal
+	jet_cancel._choice_pick_cancelled()
+	check(jet_cancel.gold == 100 and not jet_cancel.jet_fuel_used_this_visit,
+		"Confirm path (Shop): cancelling the restock confirm costs nothing")
+	jet_cancel.queue_free()
+	await process_frame
+
+	var bcancel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["bovine-tractor-beam"]})
+	await process_frame
+	bcancel._activate_artefact("bovine-tractor-beam")
+	bcancel._artefact_target_click(Vector2i(7, 10)) # stage A picked
+	bcancel._activate_artefact("bovine-tractor-beam") # tap the chip again: cancel
+	check(bcancel.artefact_targeting_key == "" and bcancel.board.has(Vector2i(7, 10)) \
+			and not bcancel.bovine_used_this_wave and bcancel._artefact_count("bovine-tractor-beam") == 1,
+		"Targeting path: cancelling MID-STAGE costs nothing — no move, no charge, Artefact untouched")
+	check(bcancel._artefact_activation_available("bovine-tractor-beam"),
+		"Targeting path: still available after a cancel")
+	bcancel.queue_free()
+	await process_frame
+
+	# The Activate section: absent entirely when empty (acceptance: "the
+	# drawer is unchanged from today"), present once something is held
+	var no_activ := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 1})
+	await process_frame
+	no_activ._refresh()
+	check(no_activ.hud.activate_box.get_child_count() == 0 \
+			and no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_H_BASE,
+		"Activate section: absent, drawer at today's height, with no activatable Artefact held")
+	no_activ.queue_free()
+	await process_frame
+
+	var held_activ := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 1,
+		"artefacts": ["fifa-complimentary-yacht"]})
+	await process_frame
+	held_activ._refresh()
+	await process_frame # queue_free() on the rebuilt chip is deferred — let it
+		# resolve before counting, else a stale one lingers alongside the fresh one
+	check(held_activ.hud.activate_box.get_child_count() == 1,
+		"Activate section: exactly one chip once one activatable Artefact is held")
+	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_H_ACTIVATE,
+		"Activate section: the drawer grows one row to fit it")
+	held_activ.queue_free()
+	await process_frame
+
+	# Activation costs 0 Actions — assert directly (acceptance)
+	var free_action := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 100, "artefacts": ["oak-island-wishing-well"]})
+	await process_frame
+	var actions_before_activation: int = free_action.actions_left
+	free_action._artefact_confirmed("oak-island-wishing-well")
+	check(free_action.actions_left == actions_before_activation,
+		"Artefact activation costs 0 Actions (Oak Island Wishing Well, representative of all 6)")
+	free_action.queue_free()
+	await process_frame
+
+	# Autoplay exercises activation without hanging, and sometimes actually
+	# activates — driven directly (headless, no window needed) with a pinned
+	# seed so the outcome is reproducible, not a flake.
+	var bot := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "gold": 500, "artefacts": ["fifa-complimentary-yacht", "moscovium-glow-stick"],
+		"seed": 7})
+	bot.autoplay = true
+	await process_frame
+	var activated := false
+	for i in 200:
+		AutoplayBot.step(bot)
+		if bot.gold != 500 or bot._artefact_count("moscovium-glow-stick") == 0:
+			activated = true
+			break
+	check(activated, "Autoplay: sometimes actually activates a held Artefact (not a silent never-press bot)")
+	bot.queue_free()
 	await process_frame
 
 	print("---")

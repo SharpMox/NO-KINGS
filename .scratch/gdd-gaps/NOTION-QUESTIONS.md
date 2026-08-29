@@ -9,7 +9,9 @@ House rule they all follow (`CLAUDE.md`): *ambiguity goes back to Notion as a qu
 not into code as a guess.* Half this backlog exists to undo guesses.
 
 Compiled 2026-08-29, against catalog state **152 / 180 implemented**.
-Revised the same day: questions 1 and 4 resolved in a design session; see issues 47-50.
+Revised the same day: **questions 1 and 3-7 and 9 all resolved** across two design sessions.
+Only question 2 (the duplicate reroll pair) and question 8 (the `on_milestone` naming
+collision) remain, and neither blocks any Artefact. See issues 47-55.
 
 ---
 
@@ -37,19 +39,9 @@ not a rebuild.
 **Question:** is one meant to differ, or is this a duplicate to retire?
 ---
 
-## 3. Spare Organ Receipt — which piece is "the consumed piece"?
+## 3. ~~Spare Organ Receipt~~ — ANSWERED 2026-08-29
 
-> On Fuse: refund 50% of the consumed piece's value as Gold
-
-A Fuse consumes **two** pieces (`merge_logic.gd` `commit_merge`: both entries are erased,
-one result is produced). The effect text is singular.
-
-**Question:** 50% of the *combined* value of both consumed pieces, or 50% of one — and if
-one, which (the higher, the lower, the second selected)?
-
-Everything else about this one is ready: `commit_merge` has both ids in scope and
-`g.defs[id].value` gives the value, so it is a small hook away once the reading is fixed.
-
+**50% of both consumed pieces combined.** See issue 53.
 ---
 
 ## 4. ~~Winchester Salt Lined Doors~~ — WITHDRAWN 2026-08-29
@@ -64,46 +56,25 @@ addendum, where the go-ahead is now recorded in writing rather than living only 
 conversation.
 ---
 
-## 5. 'Definitely Not Russia' Patch — what exactly does it mask?
+## 5. ~~'Definitely Not Russia' Patch~~ — ANSWERED 2026-08-29
 
-> The first piece you lose each Wave doesn't count as a loss for your Artefacts and
-> penalties
-
-The piece **is** still lost — this is different from Fireproof Pajamas, which sets
-`ctx.cancel` and the piece survives. This one needs a *second* flag meaning "lost, but
-uncounted", and the open part is what that suppresses.
-
-**Question:** does "your Artefacts and penalties" mean every effect that reads
-`on_piece_lost` (e.g. Nibiru Hide-and-Seek Trophy's streak collapse, Frog Pride Flag's
-arming), or only *scoring* penalties? An explicit list is best — this is exactly the kind
-of scope that silently drifts.
-
+Masks the loss from **everything** that reads `on_piece_lost` — one flag, no carve-outs.
+The piece is still lost, so this needs a flag distinct from Fireproof Pajamas' `cancel`
+(which saves the piece). See issue 53.
 ---
 
-## 6. Alien Pet Rocks — what counts as "did not move"?
+## 6. ~~Alien Pet Rocks~~ — ANSWERED 2026-08-29
 
-> At Wave end: +2 Gold per allied piece that did not move this Wave
-
-**Question:** does a piece count as having moved when it was **Deployed** this Wave, or
-when it was moved by an effect rather than by the player (Royal Fiat's forced retreat,
-Tactical Reposition, Decoy Swap, Rapid Deployment)?
-
-The natural reading is "the player did not spend a move on it", but the forced-move cases
-genuinely could go either way, and the answer changes the payout every Wave.
-
+**Only moves you spent an Action on count.** A Deploy does not count as moving, and neither
+does being shoved by an effect — both still pay. See issue 53.
 ---
 
-## 7. Abduction Probe — implementing it means inventing a base rule
+## 7. ~~Abduction Probe~~ — ANSWERED 2026-08-29
 
-> Your pieces can carry 2 Piece Buffs at once
-
-There is **no 1-buff cap anywhere in the code today** — `buff_logic.gd` appends freely to
-a piece's `buffs` array. So this Artefact currently does nothing, and making it do
-something means first introducing a base-game restriction nothing else asks for.
-
-**Question:** is a 1-buff-per-piece cap intended as a base rule (with this Artefact
-lifting it to 2), or should this row be re-texted / retired?
-
+**Base Piece Buff capacity is 2; Abduction Probe gives +1 (to 3).** This introduces a base
+cap where none existed, so it nerfs the current game — every grant path must refuse a 3rd
+buff cleanly. The Artefact's text needs rewriting, since "can carry 2" now describes the
+base game. See issue 53.
 ---
 
 ## 8. "5-Wave Milestone" vs the hook named `on_milestone` — naming, not behaviour
@@ -122,13 +93,10 @@ the part that needs the ruling.
 
 ---
 
-## 9. Item held capacity — blocks 2 Artefacts (this is issue 34)
+## 9. ~~Item held capacity~~ — ANSWERED 2026-08-29
 
-Area 51 Parking Permit ("+3 Item held capacity") and Denver Bunker Timeshare ("While all
-your Item slots are full: +30% Gold gain") both presuppose an Item cap. There is none.
-
-**Question:** what is the base Item capacity? Both rows are one number away from shipping.
-
+**Base capacity 3.** Area 51 Parking Permit takes it to 6; Denver Bunker Timeshare's
+"slots full" condition becomes reachable. See issue 53.
 ---
 
 ## Not questions — recorded so they are not re-raised

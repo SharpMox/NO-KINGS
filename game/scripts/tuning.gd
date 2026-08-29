@@ -72,7 +72,11 @@ const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}
 # every rarity paid before. "" is the 7 core artefacts that predate the
 # rarity catalog (items.gd ARTEFACT_EFFECTS_CORE) — priced as Common.
 const SHOP_ARTEFACT_PRICE := {"": 50, "Common": 50, "Uncommon": 100, "Rare": 200, "Legendary": 400}
-const SHOP_BOX_PRICE := 50
+## Price by SIZE only, theme ignored (issue 47) — doubling shape the file
+## already uses everywhere else (SHOP_ITEM_PRICE, SHOP_ARTEFACT_PRICE). Small
+## keeps the old flat 50, so nothing gets cheaper. Starting curve, expected
+## to get tuned (user call 2026-08-29).
+const SHOP_BOX_PRICE := {"small": 50, "big": 100, "huge": 200}
 
 # Artefact rarity draw weight (issue 20), population-independent — a
 # Legendary should feel rare regardless of how many Legendaries the catalog
@@ -122,7 +126,6 @@ const ARTEFACT_RARITY_COLOR := {
 # near 300, so either these come down or income goes up after a playtest sweep.
 const SHOP_RESTOCK_BASE := 1000
 const SHOP_RESTOCK_STEP := 500
-const SCORE_BOX_CHUNKS: Array = [50, 80, 100, 120, 150, 200]  # score-box pool
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
 # halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most

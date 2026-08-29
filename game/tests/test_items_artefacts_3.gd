@@ -11,12 +11,21 @@ const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Box := preload("res://scripts/box.gd")
 const Items := preload("res://data/items.gd")
 const Waves := preload("res://data/waves.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
+
+
+## A freshly-rolled Box slot, as Shop.roll would stock it (issue 47) — the
+## mechanics tests below (Nostradamus, reroll, box_cost) don't care which
+## theme, so they all use "item" for a stable, easy-to-read offer.
+func _box_slot(g, theme: String, size: String) -> Dictionary:
+	return {"kind": "box", "key": theme, "size": size,
+		"contents": Box.roll_options(g, theme, size), "sold": false}
 
 
 func check(cond: bool, label: String) -> void:
@@ -760,9 +769,13 @@ func _init() -> void:
 	yself.queue_free()
 	await process_frame
 
-	# --- issue 46: Box Pick flow Artefacts — Nostradamus Mad Libs (+1 extra
+	# --- issue 46/47: Box Pick flow Artefacts — Nostradamus Mad Libs (+1 extra
 	# pick, from the same offer), Bible Gag Reel Scroll + Snowden's Rubik's
-	# Cube (functionally identical: 1 reroll each, stacking additively) ---
+	# Cube (functionally identical: 1 reroll each, stacking additively), and
+	# Huge's own native 2-picks-per-Box (issue 47) stacking with Nostradamus
+	# on top. Small Boxes (3 choices, 1 native pick) isolate the issue-46
+	# mechanics from the issue-47 size dimension; a dedicated Huge case below
+	# proves the "Huge + Nostradamus = 3 picks" spec example.
 
 	# Nostradamus Mad Libs: 1 copy takes 2 of the 3 offered options, picking
 	# the same box_offer[0] each round so the count is deterministic
@@ -770,7 +783,7 @@ func _init() -> void:
 	var mad1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs"]})
 	await process_frame
-	mad1._open_box_pick()
+	mad1._open_box_pick(_box_slot(mad1, "item", "small"))
 	check(mad1.box_open and mad1.box_offer.size() == 3, "(setup) the Box opens with a 3-option offer")
 	var mad1_picks := 0
 	while mad1.box_open:
@@ -785,31 +798,13 @@ func _init() -> void:
 	var mad2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs", "nostradamus-mad-libs"]})
 	await process_frame
-	mad2._open_box_pick()
+	mad2._open_box_pick(_box_slot(mad2, "item", "small"))
 	var mad2_picks := 0
 	while mad2.box_open:
 		mad2._box_choose(mad2.box_offer[0])
 		mad2_picks += 1
 	check(mad2_picks == 3, "Nostradamus Mad Libs: 2 held copies take the whole offer (3 picks), no further cap")
 	mad2.queue_free()
-	await process_frame
-
-	# pass_after_box bookkeeping: _box_close is what fires the deferred pass,
-	# so it must NOT fire on the first (non-final) pick of an extra-pick
-	# sequence — only _box_choose's own recursion re-shows the modal, box_open
-	# and pass_after_box both stay put across the repeat.
-	var deferred := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs"]})
-	await process_frame
-	deferred._open_box_pick()
-	deferred.pass_after_box = true # simulate "this Box was opened by the last Action"
-	deferred._box_choose(deferred.box_offer[0])
-	check(deferred.box_open and deferred.pass_after_box,
-		"Nostradamus Mad Libs: the first (non-final) pick keeps the Box open and the deferred pass still queued")
-	deferred._box_choose(deferred.box_offer[0])
-	check(not deferred.box_open and not deferred.pass_after_box,
-		"Nostradamus Mad Libs: the final pick closes the Box and fires the deferred pass")
-	deferred.queue_free()
 	await process_frame
 
 	# Bible Gag Reel Scroll + Snowden's Rubik's Cube: both hold "1 reroll",
@@ -822,7 +817,7 @@ func _init() -> void:
 		"artefacts": ["bible-gag-reel-scroll", "snowden-s-rubik-s-cube"]})
 	await process_frame
 	var rr_gold_before: int = rr.gold
-	rr._open_box_pick()
+	rr._open_box_pick(_box_slot(rr, "item", "small"))
 	check(rr.gold == rr_gold_before - 10,
 		"box_cost charges once on Box open (Mild tariff, 10 Gold — Tuning.TARIFF_ACTION_COST)")
 	check(rr.box_rerolls_left == 2,
@@ -844,7 +839,7 @@ func _init() -> void:
 	var two_snow := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"]})
 	await process_frame
-	two_snow._open_box_pick()
+	two_snow._open_box_pick(_box_slot(two_snow, "item", "small"))
 	check(two_snow.box_rerolls_left == 2,
 		"two copies of Snowden's Rubik's Cube alone also stack to 2 rerolls")
 	two_snow.queue_free()
@@ -854,29 +849,44 @@ func _init() -> void:
 	var leak := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"]})
 	await process_frame
-	leak._open_box_pick()
+	leak._open_box_pick(_box_slot(leak, "item", "small"))
 	leak._box_reroll()
 	check(leak.box_rerolls_left == 0, "(setup) the budget is spent on this Box")
 	leak._box_choose(leak.box_offer[0])
 	check(not leak.box_open, "(setup) the Box resolved")
-	leak._open_box_pick()
+	leak._open_box_pick(_box_slot(leak, "item", "small"))
 	check(leak.box_rerolls_left == 1, "the reroll budget resets fresh on the next Box — no leak from the last one")
 	leak.queue_free()
 	await process_frame
 
-	# a reroll respects the only_kind pin for the life of the Box (a typed
-	# Item Box stays Item-only after rerolling, same as its initial offer)
+	# a reroll respects the theme pin for the life of the Box (issue 47:
+	# every Box is typed, so this is every Box, not a special "typed" case)
 	var typed := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"]})
 	await process_frame
-	typed._open_box_pick("item")
+	typed._open_box_pick(_box_slot(typed, "item", "small"))
 	typed._box_reroll()
 	var typed_all_items := true
 	for o in typed.box_offer:
 		if o.kind != "item":
 			typed_all_items = false
-	check(typed_all_items, "Reroll re-rolls within the same only_kind pin as the Box it belongs to")
+	check(typed_all_items, "Reroll re-rolls within the same theme as the Box it belongs to")
 	typed.queue_free()
+	await process_frame
+
+	# Huge grants 2 native picks (issue 47) — Nostradamus stacks ON TOP, so
+	# Huge + 1 held copy = 3 total picks (the spec's own worked example)
+	var huge := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs"]})
+	await process_frame
+	huge._open_box_pick(_box_slot(huge, "item", "huge"))
+	check(huge.box_picks_left == 2, "Huge (2 native) + 1 Nostradamus copy = 2 extra picks beyond the first")
+	var huge_picks := 0
+	while huge.box_open:
+		huge._box_choose(huge.box_offer[0])
+		huge_picks += 1
+	check(huge_picks == 3, "Huge + Nostradamus Mad Libs = 3 picks total (spec example, issue 47)")
+	huge.queue_free()
 	await process_frame
 
 	# autoplay: both new paths must stay inside _open_box_pick's autoplay
@@ -890,7 +900,7 @@ func _init() -> void:
 			"wave": 3, "gold": 500, "artefacts": ["nostradamus-mad-libs", "nostradamus-mad-libs"], "seed": s})
 		await process_frame
 		mb.autoplay = true
-		mb._open_box_pick()
+		mb._open_box_pick(_box_slot(mb, "item", "small"))
 		check(not mb.box_open, "autoplay (seed %d) resolves the Box itself — no modal, no hang" % s)
 		if mb.box_picks_left < 2:
 			extra_pick_branch_hit = true
@@ -905,7 +915,7 @@ func _init() -> void:
 			"wave": 3, "gold": 500, "artefacts": ["snowden-s-rubik-s-cube"], "seed": s})
 		await process_frame
 		rb.autoplay = true
-		rb._open_box_pick()
+		rb._open_box_pick(_box_slot(rb, "item", "small"))
 		check(not rb.box_open, "autoplay (seed %d) resolves the Box itself — no modal, no hang" % s)
 		if rb.box_rerolls_left == 0:
 			reroll_branch_hit = true
@@ -914,6 +924,18 @@ func _init() -> void:
 	check(reroll_branch_hit,
 		"Snowden's Rubik's Cube: autoplay exercises the reroll branch itself, not just under the modal")
 
+	# autoplay + Huge (issue 47): the bot must resolve a Huge Box's 2 native
+	# picks (no Nostradamus needed) without a modal too — the exact edge the
+	# issue's "Autoplay must resolve every Box path" acceptance test calls out
+	for s in range(1, 9):
+		var hb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"wave": 3, "gold": 500, "seed": s})
+		await process_frame
+		hb.autoplay = true
+		hb._open_box_pick(_box_slot(hb, "item", "huge"))
+		check(not hb.box_open, "autoplay (seed %d) resolves a Huge Box's 2 native picks — no modal, no hang" % s)
+		hb.queue_free()
+		await process_frame
 
 	print("---")
 	if fails == 0:

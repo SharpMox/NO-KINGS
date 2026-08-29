@@ -1,6 +1,6 @@
 extends SceneTree
 ## Wave Catalog data sanity — the 150 designed waves transcribed from the GDD
-## (Draft v1), plus the buff flags and tariff schedule that ride on them.
+## (Draft v1), plus the tariff schedule that rides on them.
 ## Run headless:  godot --headless --path game -s tests/test_waves.gd
 
 const Waves := preload("res://data/waves.gd")
@@ -59,12 +59,6 @@ func _init() -> void:
 			continue
 		curve_ok = curve_ok and Waves.WAVES[n - 1].size() == 6
 	check(curve_ok, "density curve: 5 (waves 51-69), 6 (waves 70-149)")
-
-	# 25 buffed-enemy waves, each flag naming a piece in its own wave
-	check(Waves.BUFFS.size() == 25, "25 buffed-enemy waves")
-	for n in Waves.BUFFS:
-		check(Waves.WAVES[n - 1].has(Waves.BUFFS[n]),
-			"wave %d roster includes its buff carrier %s" % [n, Waves.BUFFS[n]])
 
 	# Tariff schedule: every 10th wave through 150, catalog tiers
 	var tiers := {

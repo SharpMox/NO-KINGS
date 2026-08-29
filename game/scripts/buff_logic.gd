@@ -3,8 +3,11 @@
 ## {"key": String} Dictionaries, so ADR-0002 carries them through Stock and
 ## the save with no schema of its own.
 ##
-## `buff` (singular) is a different thing entirely — the box-carrier flag on a
-## spawned enemy. Don't conflate them.
+## `buff` (singular) used to be a different thing entirely — the box-carrier
+## flag on a spawned enemy, removed with the carrier (issue 47). Nothing sets
+## or reads it live any more; save_config.gd still parses the legacy string
+## for an old save's board piece, harmlessly inert. Still worth not conflating
+## with `buffs` (plural) above if you see it in an old save or scenario.
 
 const Items := preload("res://data/items.gd")
 

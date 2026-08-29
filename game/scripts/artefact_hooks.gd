@@ -304,8 +304,9 @@
 ##   demoted" is a one-shot event with nothing to persist, so it isn't
 ##   blocked by that same gap.
 ## - on_buff_removal fires from game.gd's "radar_jamming" Item case, gating
-##   only the BuffLogic.clear half (the box-carrier `buff` flag it also
-##   strips isn't a Piece Buff — buff_logic.gd's header again). Antikythera
+##   the BuffLogic.clear call (radar_jamming used to also strip the
+##   box-carrier `buff` flag outside this gate — that flag, and the gate-free
+##   erase, are both gone with the carrier, issue 47). Antikythera
 ##   Warranty Card is its only listener. No Tariff or other enemy effect
 ##   currently removes a Piece Buff, so this clause is vacuously satisfied
 ##   everywhere else today; the hook exists for the one mechanism named in
@@ -605,6 +606,7 @@ const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Economy := preload("res://scripts/economy.gd") # issue 35: clock-grant
+const Box := preload("res://scripts/box.gd")
 	# handlers below call Economy.add_clock so the Clock gets the same choke
 	# point as Score/Gold — a real cycle (economy.gd preloads this file back),
 	# which Godot 4 resolves fine for static-func calls (verified empirically;
@@ -1960,7 +1962,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g.arks_bunkbed_used = true
 		["trojan-horse-assembly-manual", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave) and not g.box_open: # don't clobber an open Box Pick
-				g._open_box_pick()
+				g._open_box_pick(Box.random_slot(g)) # "a free Box" = one of the 9, random (issue 47)
 		["yalta-cocktail-napkin", "on_wave_clear"]:
 			# issue 44: first consumer of the issue-41 choice-modal seam.
 			# `not g.buff_pick_open` mirrors trojan-horse-assembly-manual's

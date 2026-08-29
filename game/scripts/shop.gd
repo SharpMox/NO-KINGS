@@ -1,12 +1,14 @@
 ## The Shop — pure logic over the live game node `g`, no nodes (like box.gd).
 ## Owns the randomized 22-slot stock (6 typed boxes / 4 artefacts / 4 items /
 ## 8 distinct base pieces), gold prices, purchase rules, and restocks.
-## Slots are JSON-safe ({kind, key, sold}) so saves carry them verbatim;
-## names and prices are derived on demand. (money-and-shop/04)
+## Slots are JSON-safe ({kind, key, sold}, box slots additionally {size,
+## contents} — issue 47) so saves carry them verbatim; names and prices are
+## derived on demand. (money-and-shop/04)
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Box := preload("res://scripts/box.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
 ## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
@@ -15,7 +17,9 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 ## (slice 15 stacking rule) and read straight off g.artefacts, the same way
 ## Shop.buy already reads slot.kind with no hook indirection.
 const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
-const BOX_TYPES := ["item", "artefact", "score"] # 2 slots each (GDD Shop page)
+## 2 slots each (GDD Shop page); every Box's SIZE is rolled independently in
+## roll() below (issue 47 — Score Box and the mixed Box are both gone).
+const BOX_THEMES := ["piece", "artefact", "item"]
 
 ## Rarity order low -> high (GDD Artefacts DB). A hidden slot (Sub-Antarctic
 ## Visa) samples from strictly above the lowest rarity present in the
@@ -42,11 +46,16 @@ static func _rows(g) -> Dictionary:
 static func roll(g) -> void:
 	var rows := _rows(g)
 	var slots := []
-	var box_base: int = rows.box / BOX_TYPES.size()
-	var box_remainder: int = rows.box % BOX_TYPES.size()
-	for ti in BOX_TYPES.size():
+	var box_base: int = rows.box / BOX_THEMES.size()
+	var box_remainder: int = rows.box % BOX_THEMES.size()
+	for ti in BOX_THEMES.size():
+		var theme: String = BOX_THEMES[ti]
 		for i in box_base + (1 if ti < box_remainder else 0):
-			slots.append({"kind": "box", "key": BOX_TYPES[ti], "sold": false})
+			# size rolled independently per slot (issue 47); contents rolled
+			# NOW, at stock time, and stored — opening only ever reveals this.
+			var size: String = Box.SIZE_KEYS[g.rng.randi() % Box.SIZE_KEYS.size()]
+			slots.append({"kind": "box", "key": theme, "size": size, "sold": false,
+				"contents": Box.roll_options(g, theme, size)})
 
 	var artefact_keys: Array = _sample_weighted_artefacts(Items.ARTEFACT_EFFECTS, rows.artefact, g)
 	for key in artefact_keys:
@@ -64,7 +73,7 @@ static func roll(g) -> void:
 	for key in item_keys:
 		slots.append({"kind": "item", "key": key, "sold": false})
 
-	for id in _sample_pieces(g, rows.piece):
+	for id in sample_pieces(g, rows.piece):
 		slots.append({"kind": "piece", "key": id, "sold": false})
 	g.shop_stock = slots
 
@@ -147,8 +156,8 @@ static func price(g, slot: Dictionary) -> int:
 			base = float(Tuning.SHOP_ARTEFACT_PRICE.get(rarity, Tuning.SHOP_ARTEFACT_PRICE[""]))
 			if slot.get("biased", false):
 				base *= 1.5
-		_:
-			base = float(Tuning.SHOP_BOX_PRICE)
+		_: # box — price by SIZE only, theme ignored (issue 47)
+			base = float(Tuning.SHOP_BOX_PRICE[slot.size])
 	var ctx := ArtefactHooks.run(g, "on_price",
 		{"base": base, "amount": base, "kind": slot.kind, "tier": tier})
 	var amount: float = ctx.amount
@@ -193,7 +202,7 @@ static func display_name(g, slot: Dictionary) -> String:
 			return str(g.defs[slot.key].name)
 		"item", "artefact":
 			return str(_catalog(slot).name)
-	return "%s Box" % str(slot.key).capitalize()
+	return "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()]
 
 
 ## Cumulative score that buys the (n+1)-th restock, given n already banked:
@@ -311,8 +320,10 @@ static func _sample_weighted_artefacts(entries: Array, n: int, g) -> Array:
 	return out
 
 
-## n distinct base pieces, weighted 1/value so heavies are finds, not fixtures.
-static func _sample_pieces(g, n: int) -> Array:
+## n distinct base pieces, weighted 1/value so heavies are finds, not
+## fixtures. Public: box.gd's Piece Box (issue 47) draws from this exact
+## pool + weighting too, so a Box can't skip the merge/promotion ladder.
+static func sample_pieces(g, n: int) -> Array:
 	var open := base_piece_pool(g.defs)
 	var out := []
 	for i in mini(n, open.size()):

@@ -52,26 +52,31 @@ func _init() -> void:
 			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 8,
 		"rows: 6 boxes / 4 artefacts / 4 items / 8 base pieces")
 
-	# boxes are typed, 2 of each (GDD Shop page: 2 Item / 2 Artefact / 2 Score)
+	# boxes are typed, 2 of each theme (issue 47: 9 Boxes = 3 sizes x 3
+	# themes — Pieces/Artefacts/Items — Score Box and the mixed Box are gone),
+	# each slot's SIZE rolled independently
 	var box_types := {}
 	for slot in game.shop_stock:
 		if slot.kind == "box":
 			box_types[slot.key] = box_types.get(slot.key, 0) + 1
-	check(box_types == {"item": 2, "artefact": 2, "score": 2},
-		"the box row is typed 2 Item / 2 Artefact / 2 Score")
-	check(Shop.display_name(game, {"kind": "box", "key": "score"}) == "Score Box",
-		"a typed box names its type")
+			check(slot.size in Box.SIZE_KEYS, "every Box slot carries a rolled size")
+			check(slot.contents.size() == Box.SIZES[slot.size].choices,
+				"a stocked Box's contents match its size's choice count")
+	check(box_types == {"piece": 2, "artefact": 2, "item": 2},
+		"the box row is typed 2 Piece / 2 Artefact / 2 Item")
+	check(Shop.display_name(game, {"kind": "box", "key": "item", "size": "small"}) == "Small Item Box",
+		"a typed box names its size and theme")
 
-	# a typed box rolls only its own kind
-	var score_opts := Box.roll_options(game.rng, "score")
-	check(score_opts.size() == 3 and score_opts.all(func(o: Dictionary) -> bool:
-			return o.kind == "score"),
-		"a Score Box rolls score options only")
-	check(Box.roll_options(game.rng, "item").all(func(o: Dictionary) -> bool:
+	# a typed box rolls only its own theme
+	var piece_opts := Box.roll_options(game, "piece", "small")
+	check(piece_opts.size() == 3 and piece_opts.all(func(o: Dictionary) -> bool:
+			return o.kind == "piece"),
+		"a Piece Box rolls piece options only")
+	check(Box.roll_options(game, "item", "small").all(func(o: Dictionary) -> bool:
 			return o.kind == "item"),
 		"an Item Box rolls item options only")
-	check(Box.roll_options(game.rng).size() == 3,
-		"an untyped roll still mixes kinds (Box Pick path)")
+	check(Box.roll_options(game, "score", "small").is_empty(),
+		"the old Score theme rolls nothing — Score Boxes are gone (issue 47)")
 
 	# pool rules: merge-chain roots minus the King and inversion pieces
 	var pool: Array = Shop.base_piece_pool(game.defs)
@@ -102,7 +107,8 @@ func _init() -> void:
 		"1/value weighting: pawns common, amazonriders rare but possible (%d vs %d)"
 			% [pawn_n, heavy_n])
 
-	# prices: piece = catalog value, item by tier, artefact by rarity, box flat
+	# prices: piece = catalog value, item by tier, artefact by rarity,
+	# box by SIZE only (issue 47), theme ignored
 	var priced_ok := true
 	for slot in game.shop_stock:
 		var want: int
@@ -115,9 +121,11 @@ func _init() -> void:
 			"artefact":
 				want = Tuning.SHOP_ARTEFACT_PRICE[Shop.rarity_of(slot)]
 			_:
-				want = Tuning.SHOP_BOX_PRICE
+				want = Tuning.SHOP_BOX_PRICE[slot.size]
 		priced_ok = priced_ok and Shop.price(game, slot) == want
-	check(priced_ok, "every slot prices by its row's rule (artefact: by rarity)")
+	check(priced_ok, "every slot prices by its row's rule (artefact: by rarity, box: by size)")
+	check(Tuning.SHOP_BOX_PRICE == {"small": 50, "big": 100, "huge": 200},
+		"Box price doubles by size, Small keeps the old flat 50")
 
 	# --- issue 20: rarity legibility (Shop.rarity_of) ---
 	check(Shop.rarity_of({"kind": "piece", "key": "pawn"}) == "",
@@ -201,23 +209,38 @@ func _init() -> void:
 			% (game.items.size() + game.artefacts.size()),
 		"the Inventory count includes both purchases")
 
-	# lootboxes (06): buying debits and opens the 3-option roll right away
-	game.gold = 100
+	# lootboxes (06 / issue 47): buying debits the box's SIZE price and opens
+	# the roll modal revealing EXACTLY what was rolled at stock time — the
+	# acceptance test issue 47 calls for: read a stocked Box's contents,
+	# open it, assert the same entries (never a fresh roll on open)
+	game.gold = 500
 	game.actions_left = 2
+	var box_slot: Dictionary = game.shop_stock[bi]
+	var box_price: int = Shop.price(game, box_slot)
+	var stocked_contents: Array = box_slot.contents.duplicate(true)
 	game._open_shop()
 	game.modals.shop_buy_pressed.emit(bi)
 	check(game.shop_stock[bi].sold, "the box slot goes SOLD")
-	check(game.gold == 100 - Tuning.SHOP_BOX_PRICE and game.actions_left == 1,
-		"a box costs its price + one action")
+	check(game.gold == 500 - box_price and game.actions_left == 1,
+		"a box costs its size's price + one action")
 	check(game.box_open and not game.modals.shop_panel.visible,
 		"buying a box opens the roll modal over a closed shop")
-	var sc0: int = game.score
-	var mo0: int = game.gold
-	game.modals.box_chosen.emit({"kind": "score", "name": "+50 score",
-		"value": 50, "description": ""})
-	check(game.score == sc0 + 50 and game.gold == mo0 + 50,
-		"a rolled score option earns raw score + gold")
-	check(not game.box_open, "the pick closes the roll modal")
+	check(game.box_offer == stocked_contents,
+		"opening reveals EXACTLY the contents rolled at stock time, not a fresh roll")
+
+	var stock_n2: int = game.stock.size()
+	var items_n2: int = game.items.size()
+	var artefacts_n2: int = game.artefacts.size()
+	while game.box_open: # Huge grants 2 native picks (issue 47) — take them all
+		game.modals.box_chosen.emit(game.box_offer[0])
+	match box_slot.key:
+		"piece":
+			check(game.stock.size() > stock_n2, "picking Piece Box options lands them in Stock")
+		"item":
+			check(game.items.size() > items_n2, "picking Item Box options joins the held items")
+		"artefact":
+			check(game.artefacts.size() > artefacts_n2, "picking Artefact Box options applies immediately")
+	check(not game.box_open, "resolving every pick closes the roll modal")
 
 	# restock cadence: cumulative score thresholds, not waves (GDD Shop page).
 	# Thresholds are 1000 / 2500 / 4500 / 7000 — the gap grows 500 each time.

@@ -1,6 +1,6 @@
 # 47 — Box system rework: 9 typed Boxes, rolled at stock time
 
-Status: todo — SPECCED (user rulings 2026-08-29) · **foundation for 48/49**
+Status: done (2026-08-29) · **foundation for 48/49**
 
 ## Parent
 
@@ -135,3 +135,65 @@ Items") already ships and now names a real thing.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in PR #TBD.
+
+- **9 Boxes.** `box.gd`'s `SIZES` ({choices, picks}: small 3/1, big 5/1, huge 7/2) x
+  `THEMES` (piece/artefact/item) replace `Shop.BOX_TYPES := ["item","artefact","score"]`
+  (now `Shop.BOX_THEMES := ["piece","artefact","item"]`, still 2 slots each; each slot's
+  size is rolled independently in `Shop.roll`). `SHOP_BOX_PRICE` became
+  `{"small":50,"big":100,"huge":200}`, priced by size only.
+- **Rolled at stock time, stored, revealed unchanged on open.** `Shop.roll` now calls
+  `Box.roll_options(g, theme, size)` per Box slot and stores the result as an additive
+  `contents` field (alongside a new `size` field) on the JSON-safe shop_stock slot.
+  `game.gd`'s `_open_box_pick(slot: Dictionary)` sets `box_offer = slot.contents.duplicate(true)`
+  — never a fresh roll. Proven directly in `test_shop.gd`: capture `shop_stock[bi].contents`
+  before buying, buy, assert `game.box_offer == stocked_contents`; `test_save.gd` proves the
+  same fields round-trip a save (additive, no migration, per `save_config.gd`'s policy).
+- **Score Box and the mixed Box are gone.** `Tuning.SCORE_BOX_CHUNKS` deleted (its only
+  reader was the old mixed-offer branch, which no longer exists). The untyped
+  `_open_box_pick()`/`_box_options()` paths are gone too — every caller now passes a
+  theme+size (a slot, or `Box.random_slot(g)` for a grant that just says "a Box" — Trojan
+  Horse Assembly Manual's "open a free Box" hook in `artefact_hooks.gd`, which was calling
+  the now-removed no-arg `_open_box_pick()` and needed fixing here to stay correct).
+- **Carrier removed, all six call sites gone:** `wave_logic.gd`'s `entry.buff = true` +
+  the board-spawn transfer, `game.gd`'s `boxed = victim.get("buff", false)` +
+  `if boxed: return _open_box_pick()`, the `radar_jamming` item's `board[b].erase("buff")`,
+  and the gold-badge `_draw` circle. `data/waves.gd`'s now-orphaned `BUFFS` dict (the data
+  driving the carrier assignment) went with it, and `pass_after_box` (only ever set by the
+  removed carrier-capture branch) is gone too. `item_logic.gd`'s radar_jamming targeting
+  rule dropped its `buff` half (only real Piece Buffs are valid targets now) — not one of
+  the six, but a direct, necessary consequence of removing the erase it used to promise.
+  `save_config.gd`'s legacy `"buff"`-string board-config parse is deliberately UNTOUCHED —
+  out of the six sites, harmless read-compat for an old save/scenario, and still exercised
+  by `test_items.gd`'s ADR-0002 opaque-state test and `test_save.gd`'s round-trip.
+- **Nostradamus Mad Libs and Huge compose.** `box_picks_left` now starts at
+  `(native_picks - 1) + nostradamus_count`, so Huge (2 native) + 1 held copy = 3 total
+  picks, asserted directly in `test_items_artefacts_3.gd` and `test_game_clicks.gd`.
+- **`box_cost` still exactly once.** Unchanged single `Economy.charge` call site in
+  `_open_box_pick`; `_box_reroll` never touches `Economy`. Same Tariff-held proof as
+  issue 46, re-verified green.
+- **Autoplay.** The bot never actually shops (no Shop-buying logic in `autoplay.gd`), so
+  the full `--autoplay` CLI leg never opens a Box at all — completed clean (LOSS, wave 50,
+  resource starvation, unrelated to this change). The modal-free resolution branch inside
+  `_open_box_pick` is exercised directly instead: `test_items_artefacts_3.gd` boots with
+  `autoplay=true` across many seeds for the extra-pick, reroll, and Huge-native-2-picks
+  paths and asserts each resolves with `box_open == false` and no modal.
+- **RNG-stream ripple, expected and handled.** Rolling every Box's contents at stock time
+  means `Shop.roll` (called on every fresh boot) now consumes materially more of the RNG
+  stream than before, shifting every downstream seeded draw. Caught by a full headless
+  sweep of all 24 suites: two pinned assertions had to move to match the new deterministic
+  output — `test_items_artefacts_1.gd`'s Holy Lint seed-4 roll (stun -> reflect, still a
+  safe non-self-triggering pick, same reasoning as the original comment) and
+  `test_tiers.gd`'s Tier-3+ box-grouping check (relabelled from the old item/artefact/score
+  vocabulary to piece/artefact/item). No other suite was affected.
+- **Split suites untouched** — all 7 `test_items*` files still present, still wired in
+  `run_all.sh`, all green.
+- **Verification:** `game/tests/run_all.sh` — windowed click probes (rewritten: Box UI is
+  now reached via a Shop purchase, `test_game_clicks.gd`'s new `_buy_a_box` helper), all 24
+  headless suites, and the autoplay leg — ALL GREEN, re-run alone (no contending Godot
+  process) to rule out the contention flake CLAUDE.md warns about.
+
+**Deferred, per spec:** subtheme Boxes (strategic-items, rarity-tier) — noted, not built.

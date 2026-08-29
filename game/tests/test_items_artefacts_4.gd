@@ -534,7 +534,7 @@ func _init() -> void:
 	# REGISTRY line (that's exactly the class of bug this test exists to
 	# catch — see the audit above).
 	var no_registry_exceptions := {
-		# Shop.roll/price + game.gd's _box_options read g.artefacts directly
+		# Shop.roll/price + box.gd's roll_options read g.artefacts directly
 		# (shop-drawer-ui/08's deferred pass; artefact_hooks.gd's issue 18
 		# no-hook-list comment, next to the REGISTRY const)
 		"chocolate-key-cake": true, "alleged-weather-balloon": true,

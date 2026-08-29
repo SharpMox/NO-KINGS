@@ -171,7 +171,8 @@ func _init() -> void:
 	await process_frame
 
 	# Majestic 12 Secret Handshake Diagram: Item Boxes only offer
-	# Strategic/Decisive Items — the mixed Box Pick is unaffected
+	# Strategic/Decisive Items (issue 47: every Box is an Item Box now, no
+	# untyped mixed Box Pick left to be unaffected)
 	var majestic := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["majestic-12-secret-handshake-diagram"]})
 	await process_frame
@@ -179,11 +180,10 @@ func _init() -> void:
 		return it.tier == "Tactical").map(func(it: Dictionary) -> String: return it.key)
 	var saw_only_high_tier := true
 	for i in 20:
-		for opt in majestic._box_options("item"):
+		for opt in majestic._box_options("item", "huge"):
 			if tactical_keys.has(opt.payload.key):
 				saw_only_high_tier = false
 	check(saw_only_high_tier, "Majestic 12: typed Item Boxes never roll a Tactical Item")
-	check(majestic._box_options().size() == 3, "Majestic 12: the mixed Box Pick still rolls freely")
 	majestic.queue_free()
 	await process_frame
 

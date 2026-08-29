@@ -83,8 +83,8 @@ static func all() -> Array:
 		_chain("Long Ma chain", "kirin", "kirin-plus"),
 		_chain("Duchess chain", "alibaba", "bodyguard"),
 		# --- reward economy ---
-		{"name": "Box pick (capture the gold badge)", "cfg": {
-			"board": [["queen", 0, 3, 3], ["pawn", 1, 3, 4, "buff"], ["pawn", 1, 1, 5, "buff"], ["knight", 0, 1, 3]]}},
+		{"name": "Boxes (Shop, issue 47: 9 typed Boxes)", "cfg": {
+			"board": [["queen", 0, 3, 3], ["knight", 0, 1, 3]], "wave": 3, "gold": 2000}},
 		{"name": "Items: full inventory", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 0, 1, 1],
 				["pawn", 1, 2, 6], ["bishop", 1, 4, 6], ["rook", 1, 1, 8], ["knight", 1, 3, 8]],
@@ -230,10 +230,10 @@ static func all() -> Array:
 			"gold": 100, "wave": 11, "stock": ["pawn"]}},
 		# --- tariffs ---
 		{"name": "Tariffs: all action costs", "cfg": {
-			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5, "buff"], ["bishop", 1, 4, 5]],
+			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
 			"tariffs": ["move_cost", "capture_cost", "deploy_cost", "pass_cost",
 				"long_range_cost", "ability_cost", "fuse_cost", "box_cost"],
-			"items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
+			"gold": 500, "items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
 		{"name": "Tariffs: all persistent", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],
 			"tariffs": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],

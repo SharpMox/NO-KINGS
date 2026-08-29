@@ -10,6 +10,7 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 
 var fails := 0
 
@@ -102,18 +103,21 @@ func _init() -> void:
 	f.queue_free()
 	await process_frame
 
-	# --- radar jamming: strips the buff from a buffed piece; only buffed
-	# pieces are valid targets
-	var h := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 5, "buff"],
+	# --- radar jamming: only pieces carrying an actual Piece Buff are valid
+	# targets; jamming strips them (issue 47: the legacy box-carrier flag
+	# this item also used to strip is gone — see test_items_buffs.gd for the
+	# "strips piece buffs" assertion in isolation)
+	var h := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 5],
 		["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
+	BuffLogic.add(h.board[Vector2i(3, 5)], "shield")
 	h.items.append(_item("radar_jamming", "tile"))
 	h._use_item(0)
 	check(h.item_targets.size() == 1 and h.item_targets.has(Vector2i(3, 5)),
 		"radar jamming targets only buffed pieces")
 	h._item_click(Vector2i(3, 5))
-	check(not h.board[Vector2i(3, 5)].get("buff", false),
-		"radar jamming strips the buff")
+	check(BuffLogic.of(h.board[Vector2i(3, 5)]).is_empty(),
+		"radar jamming strips the piece buff")
 	h.queue_free()
 	await process_frame
 

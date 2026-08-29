@@ -407,8 +407,8 @@ func _shop_icon(slot: Dictionary) -> Variant:
 			return g.item_icons[slot.key] if g.item_icons.has(slot.key) else "✦"
 		"artefact":
 			return "◈"
-		_: # box — glyph by the box's typed contents
-			return {"item": "⚔", "artefact": "◈", "score": "★"}.get(slot.key, "📦")
+		_: # box — glyph by the box's theme (issue 47: piece/artefact/item)
+			return {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "📦")
 
 
 ## One icon tile with a price badge; sold tiles grey out but keep their slot
@@ -681,19 +681,23 @@ func hide_choice_pick() -> void:
 
 
 func show_box(options: Array) -> void:
-	var box := _box_vbox("📦 The enemy dropped a box! Pick one:")
+	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
+		# top of a Box's own native picks (Huge = 2 — issue 47)
+	var title := "📦 %s %s Box — pick %d:" % [
+		str(g.box_size).capitalize(), str(g.box_only_kind).capitalize(), picks]
+	var box := _box_vbox(title)
 	for opt in options:
 		var b := Button.new()
 		var header := ""
 		match opt.kind:
+			"piece":
+				header = "♟ %s — Piece · joins Stock" % opt.name
 			"item":
 				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
 			"artefact":
 				var rarity: String = str(opt.payload.get("rarity", ""))
 				header = "◈ %s — Artefact%s · passive, rest of the run" \
 					% [opt.name, (" · %s" % rarity) if rarity != "" else ""]
-			"score":
-				header = "★ %s" % opt.name
 		b.text = header + "\n" + opt.description
 		if opt.kind == "item" and g.item_icons.has(opt.payload.key):
 			b.icon = g.item_icons[opt.payload.key]

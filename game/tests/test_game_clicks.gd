@@ -8,6 +8,7 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
 const ShopScript := preload("res://scripts/shop.gd")
+const Box := preload("res://scripts/box.gd")
 
 var fails := 0
 
@@ -245,60 +246,59 @@ func _init() -> void:
 	check(not game.win_open and game.state == game.State.PLAYER_TURN,
 		"Continue resumes the run into endless")
 
-	# capturing a box carrier opens the randomized one-step box; an option
-	# button applies its reward and closes the panel
+	# Boxes (issue 47 rework: 9 typed Boxes, the box-carrier enemy is gone —
+	# every Box comes from the Shop now). Buying a Box tile opens the roll
+	# modal revealing its pre-rolled contents; an option button applies its
+	# reward and closes the panel once every pick (native + extra) is taken.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 3,
-		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]]}
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	check(game.box_open, "capturing a box carrier opens the box")
+	await _buy_a_box(game)
+	check(game.box_open, "buying a Box opens the roll modal")
 	var opt_btn := _first_option_button(game.box_panel)
 	check(opt_btn != null and "\n" in opt_btn.text,
 		"box options describe themselves (two-line label)")
-	var loot_before: int = game.items.size() + game.artefacts.size()
-	var score_before: int = game.score
-	_click(opt_btn.get_global_rect().get_center())
-	await process_frame
-	check(not game.box_open, "picking an option closes the box")
-	check(game.items.size() + game.artefacts.size() > loot_before
-		or game.score > score_before, "the picked reward is applied")
+	var loot_before: int = game.items.size() + game.artefacts.size() + game.stock.size()
+	var native_picks: int = Box.SIZES[game.box_size].picks
+	for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all
+		_click(_first_option_button(game.box_panel).get_global_rect().get_center())
+		await process_frame
+	check(not game.box_open, "picking every offered option closes the box")
+	check(game.items.size() + game.artefacts.size() + game.stock.size() > loot_before,
+		"the picked reward is applied")
 
-	# Nostradamus Mad Libs (issue 46): the extra pick reopens the box modal
-	# with what's left of the offer instead of closing it — a second click
-	# is needed to actually close the box.
+	# Nostradamus Mad Libs (issue 46/47): the extra pick reopens the box
+	# modal with what's left of the offer instead of closing it — stacks on
+	# TOP of a Box's own native picks, so this Box needs (native + 1) clicks.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 3,
-		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]],
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["nostradamus-mad-libs"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	check(game.box_open, "(setup) capturing a box carrier opens the box")
-	var mad_libs_opt1 := _first_option_button(game.box_panel)
-	check(mad_libs_opt1 != null, "(setup) the first offer has a clickable option")
-	_click(mad_libs_opt1.get_global_rect().get_center())
-	await process_frame
-	check(game.box_open,
-		"Nostradamus Mad Libs: the extra pick reopens the box instead of closing it")
-	var mad_libs_opt2 := _first_option_button(game.box_panel)
-	check(mad_libs_opt2 != null, "a second option is offered, from what's left")
-	_click(mad_libs_opt2.get_global_rect().get_center())
-	await process_frame
-	check(not game.box_open, "the second (extra) pick closes the box")
+	await _buy_a_box(game)
+	check(game.box_open, "(setup) buying the Box opens the roll modal")
+	var mad_libs_total: int = Box.SIZES[game.box_size].picks + 1 # +1 Nostradamus copy
+	var mad_libs_picks := 0
+	while game.box_open:
+		var mad_libs_opt := _first_option_button(game.box_panel)
+		check(mad_libs_opt != null, "an option is offered (pick %d)" % (mad_libs_picks + 1))
+		_click(mad_libs_opt.get_global_rect().get_center())
+		await process_frame
+		mad_libs_picks += 1
+		if mad_libs_picks < mad_libs_total:
+			check(game.box_open,
+				"Nostradamus Mad Libs: pick %d of %d keeps the box open" % [mad_libs_picks, mad_libs_total])
+	check(mad_libs_picks == mad_libs_total,
+		"Nostradamus Mad Libs: native picks + 1 extra = %d total picks taken" % mad_libs_total)
 
 	# Snowden's Rubik's Cube / Bible Gag Reel Scroll (issue 46, functionally
 	# identical): a Reroll button appears on the box modal while the budget
@@ -307,17 +307,14 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 3,
-		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3, "buff"], ["rook", 1, 7, 10]],
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["snowden-s-rubik-s-cube"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	_click(game._tile_px(Vector2i(2, 3)) + Vector2(game.tile, game.tile) / 2)
-	await process_frame
-	check(game.box_open, "(setup) capturing a box carrier opens the box")
+	await _buy_a_box(game)
+	check(game.box_open, "(setup) buying the Box opens the roll modal")
 	var reroll_btn := _button_prefix(game.box_panel, "Reroll")
 	check(reroll_btn != null, "Snowden's Rubik's Cube: a Reroll button appears on the box modal")
 	var gold_before_reroll: int = game.gold
@@ -877,3 +874,30 @@ func _button_prefix(node: Node, prefix: String) -> Button:
 		if hit:
 			return hit
 	return null
+
+
+## Opens the Shop, taps the first affordable Box tile to expand it, then
+## clicks Buy — issue 47: Boxes only come from the Shop now (the box-carrier
+## enemy is gone), so every Box click-probe drives this same real-click path.
+## Assumes the Shop is closed and the player's turn is active on entry.
+func _buy_a_box(game: Node2D) -> void:
+	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	await process_frame
+	var tile: Button = null
+	var tile_index := -1
+	var to_visit: Array = [game.modals.shop_panel]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is Button and n.has_meta("shop_index"):
+			var idx: int = n.get_meta("shop_index")
+			var slot: Dictionary = game.shop_stock[idx]
+			if slot.kind == "box" and ShopScript.can_buy(game, slot):
+				tile = n
+				tile_index = idx
+				break
+		to_visit.append_array(n.get_children())
+	check(tile != null, "(setup) an affordable Box tile exists")
+	_click(tile.get_global_rect().get_center())
+	await process_frame
+	check(await _click_button_in(game.modals.shop_panel, "Buy"), "(setup) Buy clickable on the expanded Box tile")
+	await process_frame

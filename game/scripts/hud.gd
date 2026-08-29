@@ -13,6 +13,10 @@ const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
+const INV_H_BASE := DRAWER_H * 2 + 70.0 # today's height: items + artefacts
+const INV_H_ACTIVATE := DRAWER_H * 3 + 70.0 # +1 row while the Activate
+	# section has content (issue 52) — the drawer is unchanged from today
+	# (INV_H_BASE) whenever no activatable Artefact is held
 
 signal pass_pressed
 signal tariff_pressed
@@ -20,6 +24,7 @@ signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
 signal multi_confirm_pressed # the floating Extract button
 signal item_pressed(index: int)
+signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal promote_pressed(id: String, cap: bool)
 signal return_to_stock_pressed
 signal drawer_changed
@@ -50,7 +55,11 @@ var stock_armed := Control.new() # draws the armed piece on the Stock button
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
-var artefact_box := HBoxContainer.new()
+var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips —
+	# empty (no children) when no activatable Artefact is held, which is what
+	# keeps the drawer's footprint identical to before this feature existed
+var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
+	# moved the 6 activatable keys out into activate_box above)
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
 
@@ -231,11 +240,14 @@ func build(game) -> void:
 	# drawers above the button row, one at a time, overlaying the board, full
 	# width and running to the screen bottom; the button bar re-fronts below so
 	# it stays visible and clickable over them. Inventory stacks the held-items
-	# strip over the artefact strip (money-and-shop/03).
+	# strip over the artefact strip (money-and-shop/03), with the issue-52
+	# Activate section between them, shown/sized only while it has content.
 	artefact_box.add_theme_constant_override("separation", 16)
+	activate_box.add_theme_constant_override("separation", 8)
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
 	inv_box.add_child(item_box)
+	inv_box.add_child(activate_box)
 	inv_box.add_child(artefact_box)
 	var drawer_specs := [ # name, content, x, width, height
 		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
@@ -320,7 +332,17 @@ func refresh() -> void:
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
+	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
+	# issue 52: the inventory drawer only grows for the Activate row when it
+	# actually has content — empty, the drawer is byte-for-byte today's size
+	# (acceptance: "the drawer is unchanged from today" with nothing held).
+	var inv_panel: PanelContainer = drawers["inventory"]
+	var inv_h: float = INV_H_ACTIVATE if not g._activatable_held_keys().is_empty() else INV_H_BASE
+	if inv_panel.custom_minimum_size.y != inv_h:
+		var inv_w: float = inv_panel.custom_minimum_size.x
+		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
+		inv_panel.position = Vector2(inv_panel.position.x, g.get_viewport_rect().size.y - inv_h)
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
@@ -364,6 +386,11 @@ func _stacks() -> Array:
 	return out
 
 
+## issue 52: activatable Artefacts (game.ACTIVATABLE_ARTEFACT_KEYS) get a
+## pressable chip in activate_box instead — this row keeps EXACTLY today's
+## quiet label treatment, for passive Artefacts only. "no artefacts yet"
+## still gates on the whole g.artefacts list (unchanged), not just the
+## passive subset: holding only an activatable Artefact is not "nothing".
 func _rebuild_artefact_strip() -> void:
 	for c in artefact_box.get_children():
 		c.queue_free()
@@ -378,7 +405,7 @@ func _rebuild_artefact_strip() -> void:
 		counts[t.key] = counts.get(t.key, 0) + 1
 	var seen := {}
 	for t in g.artefacts:
-		if seen.has(t.key):
+		if seen.has(t.key) or g.ACTIVATABLE_ARTEFACT_KEYS.has(t.key):
 			continue
 		seen[t.key] = true
 		var l := Label.new()
@@ -386,6 +413,30 @@ func _rebuild_artefact_strip() -> void:
 		l.tooltip_text = t.description
 		l.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
 		artefact_box.add_child(l)
+
+
+## issue 52: the Activate section — entry point 1 ("click the Artefact in
+## the list") and 2 ("a dedicated section in the Items menu") are the SAME
+## widget here, since this codebase's single Inventory drawer already holds
+## both Items and Artefacts (there is no second menu to put a distinct copy
+## in). Empty (no activatable Artefact held) leaves activate_box with zero
+## children — refresh() reads that to keep the drawer at today's height.
+func _rebuild_activate_strip() -> void:
+	for c in activate_box.get_children():
+		c.queue_free()
+	for key in g._activatable_held_keys():
+		var entry: Dictionary = g._artefact_entry(key)
+		var count: int = g._artefact_count(key)
+		var btn := Button.new()
+		btn.text = "⚡%s%s" % [entry.name, " ×%d" % count if count > 1 else ""]
+		var targeting: bool = g.artefact_targeting_key == key
+		btn.disabled = not (g._artefact_activation_available(key) or targeting)
+		btn.tooltip_text = entry.description
+		if targeting: # mid-targeting (Bovine): tint like an active Item, tap
+			# again to cancel — same shape _rebuild_item_strip already uses
+			btn.modulate = Color(0.5, 1.3, 1.3)
+		btn.pressed.connect(func() -> void: artefact_activate_pressed.emit(key))
+		activate_box.add_child(btn)
 
 
 func _rebuild_item_strip() -> void:

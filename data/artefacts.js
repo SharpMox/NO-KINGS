@@ -99,6 +99,34 @@
    Kit, SETI's Red Marker, Moscovium Glow Stick, FIFA Complimentary Yacht,
    Zapruder's Director's Cut, Bovine Tractor Beam) belong to other,
    independently in-flight issues, not this one.
+   2026-08-30 (issue 52): the last 7 flipped to implemented: true — the game's
+   first player-triggered ("on use"/"you may pay") Artefacts, needing a new
+   activation affordance (game/scripts/game.gd: the Artefact strip's Activate
+   section, the Items-menu section it doubles as, and — Jet Fuel Vial only —
+   a Restock button in the Shop). Deliberately NOT routed through
+   artefact_hooks.gd's REGISTRY/run() engine, which dispatches automatically
+   to every HELD copy on a hook; activation is "the player picks WHEN, for
+   one use," a different shape — see game.gd's own activation block for the
+   full design. Jet Fuel Vial re-texted per user ruling 2026-08-29 (the old
+   text's "bring the Shop's whole stock down; it is rebuilt fresh" is just
+   "restock the Shop"); "Shop visit" resolves to the existing _open_shop()
+   boundary issue 45 already established for Pandemic Toilet Paper Pallet.
+   Zapruder's Director's Cut's "repeat your previous Action" is scoped to
+   exactly what action_log's `{kind}` (issue 30) plus a new `{from, to}` on
+   the plain move/capture call site can support: the SAME piece repeating
+   the SAME displacement from its new position, replayed through
+   _move_player itself (bomb/trap/blocked-attack captures, Deploys, Merges
+   and Items carry no replay data and so are correctly reported
+   unavailable, not half-replayed) — see game.gd's _can_repeat_last_action.
+   Moscovium Glow Stick's triple multiplier is the deliberate multiplicative
+   exception artefact_hooks.gd's header requires being called out — applied
+   directly in Economy.earn() off a standing `g.moscovium_active` flag rather
+   than the REGISTRY (the effect must keep working after the artefact
+   consumes itself and leaves g.artefacts, so there is no "held copy" left
+   for run() to dispatch from). Verified safe with Ecdysis Sheddings (issue
+   55): Moscovium has no REGISTRY entry, so Ecdysis's meta-trigger copy of it
+   is an inert no-op (REGISTRY.get("moscovium-glow-stick", []) is empty) —
+   no crash, no double-consume, tested in test_items_artefacts_4.gd.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -294,8 +322,8 @@ var ARTEFACTS = [
     effect: "5% of Score gains are also paid as Gold",
     conspiracy: "El Dorado", url: "https://en.wikipedia.org/wiki/El_Dorado",
     summary: "The gilded king who rafted onto Lake Guatavita dusted in gold — a real Muisca rite inflated by conquistadors into a golden city that swallowed expeditions for three centuries. The golden raft exists; it's in a Bogotá museum." },
-  { name: "Jet Fuel Vial", rarity: "Common", type: "Passive", bonus: ["Shop"], status: "KEEP",
-    effect: "Once per Shop visit: pay 20 Gold to bring the Shop's whole stock down; it is rebuilt fresh (needs: reroll system)",
+  { name: "Jet Fuel Vial", rarity: "Common", type: "Passive", bonus: ["Shop"], status: "KEEP", implemented: true,
+    effect: "Once per Shop visit: pay 20 Gold to restock the Shop",
     conspiracy: "Controlled demolition claims", url: "https://en.wikipedia.org/wiki/World_Trade_Center_controlled_demolition_conspiracy_theories",
     summary: "The claim that the towers were brought down by planted charges, with 'thermite traces in the dust' as its favorite exhibit. Engineering investigations answered at book length; the vial keeps being resold." },
   { name: "Manna Vending Machine", rarity: "Common", type: "Trigger", bonus: ["Item"], status: "KEEP", implemented: true,
@@ -658,7 +686,8 @@ var ARTEFACTS = [
     conspiracy: "The doomsday vault", url: "https://en.wikipedia.org/wiki/Svalbard_Global_Seed_Vault",
     summary: "A seed backup for civilization, drilled into Arctic permafrost behind blast doors. To theorists, the guest book is the tell: why do the world's elites keep visiting a freezer — unless they know the date?" },
   { name: "Oak Island Wishing Well", rarity: "Rare", type: "Trigger", bonus: ["Score", "Gold"], status: "KEEP",
-    effect: "Once per Turn: you may pay 25 Gold for +400 Score (needs: gold sink action)",
+    implemented: true,
+    effect: "Once per Turn: you may pay 25 Gold for +400 Score",
     conspiracy: "The Oak Island money pit", url: "https://en.wikipedia.org/wiki/Oak_Island",
     summary: "A depression in the ground in 1795 became a 200-year excavation: log platforms every ten feet, flood tunnels read as booby traps, six deaths, and a legend that the seventh must die before the treasure surfaces. Nothing has." },
   { name: "Nuclear Football Menu", rarity: "Rare", type: "Passive", bonus: ["Action"], status: "KEEP", implemented: true,
@@ -688,7 +717,8 @@ var ARTEFACTS = [
     conspiracy: "The Hill abduction", url: "https://en.wikipedia.org/wiki/Barney_and_Betty_Hill_incident",
     summary: "New Hampshire, 1961: the first famous alien-abduction account, complete with a star map drawn under hypnosis. Specimens get taken aboard for the collection — every third one, per the schedule." },
   { name: "Roanoke Hex Kit", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
-    effect: "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone (needs: piece removal)",
+    implemented: true,
+    effect: "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone",
     conspiracy: "The Roanoke Colony", url: "https://en.wikipedia.org/wiki/Roanoke_Colony",
     summary: "116 colonists vanished leaving one carved word and no bodies. The kit does the same thing on demand: gone without a trace — which also means no rewards, exactly like the colony." },
   { name: "SETI's Red Marker", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
@@ -712,7 +742,8 @@ var ARTEFACTS = [
     conspiracy: "The Ark of the Covenant", url: "https://en.wikipedia.org/wiki/Ark_of_the_Covenant",
     summary: "The Ark-as-capacitor theory holds the gold-clad chest was an electrical device — touch it ungrounded and see what happened to Uzzah. Properly earthed, the surge dissipates by half." },
   { name: "Moscovium Glow Stick", rarity: "Rare", type: "Trigger", bonus: ["Score","Gold"], status: "KEEP",
-    effect: "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed (needs: consumable artefacts + gain multiplier)",
+    implemented: true,
+    effect: "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed",
     conspiracy: "Bob Lazar and Element 115", url: "https://en.wikipedia.org/wiki/Bob_Lazar",
     summary: "Lazar said Element 115 powered the saucers at S4. Science later made moscovium: half-life 0.65 seconds. Crack the stick — one turn of glory, then it never existed." },
   { name: "Sub-Antarctic Visa", rarity: "Rare", type: "Passive", bonus: ["Shop"], status: "KEEP", implemented: true,
@@ -790,7 +821,8 @@ var ARTEFACTS = [
     conspiracy: "The military-industrial complex", url: "https://en.wikipedia.org/wiki/Military%E2%80%93industrial_complex",
     summary: "The warning came from the general who ran the machine: Eisenhower's 1961 farewell named the 'military-industrial complex' and told the country to guard against it. The rare conspiracy theory delivered as a presidential address." },
   { name: "FIFA Complimentary Yacht", rarity: "Legendary", type: "Passive", bonus: ["Action"], status: "KEEP",
-    effect: "You may spend 50 Gold to gain +1 Action, any number of times per Turn (needs: gold-action exchange)",
+    implemented: true,
+    effect: "You may spend 50 Gold to gain +1 Action, any number of times per Turn",
     conspiracy: "The FIFA corruption case", url: "https://en.wikipedia.org/wiki/2015_FIFA_corruption_case",
     summary: "Dawn raids on a Zurich luxury hotel, 2015: football's governing body indicted for decades of bribes — World Cup votes sold for cash, watches and better. The yacht is a small token of appreciation for your continued cooperation." },
   { name: "Troll Farm Employee of the Month", rarity: "Legendary", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
@@ -810,7 +842,8 @@ var ARTEFACTS = [
     conspiracy: "The Nazca Lines", url: "https://en.wikipedia.org/wiki/Nazca_Lines",
     summary: "Desert figures kilometres long, fully visible only from the air — ancient-astronaut writers read them as runways. With a valid boarding pass, everywhere is a landing strip." },
   { name: "Zapruder's Director's Cut", rarity: "Legendary", type: "Trigger", bonus: ["Action"], status: "KEEP",
-    effect: "Once per Wave: you may repeat your previous Action without spending an Action (needs: action replay)",
+    implemented: true,
+    effect: "Once per Wave: you may repeat your previous Action without spending an Action",
     conspiracy: "The Zapruder film", url: "https://en.wikipedia.org/wiki/Zapruder_film",
     summary: "26 seconds of home movie that became the most analyzed film in history — run back frame by frame for sixty years. The director's cut includes one extra take per showing." },
   { name: "Templar Debit Card", rarity: "Legendary", type: "Passive", bonus: ["Shop","Special"], status: "KEEP", implemented: true,
@@ -830,7 +863,8 @@ var ARTEFACTS = [
     conspiracy: "The Mona Lisa theft", url: "https://en.wikipedia.org/wiki/Vincenzo_Peruggia",
     summary: "Stolen in 1911, recovered in 1913 — and the theory says the Louvre hung back a copy while the original went to a buyer. A fake this good repeats any performance perfectly." },
   { name: "Bovine Tractor Beam", rarity: "Legendary", type: "Trigger", bonus: ["Special"], status: "KEEP",
-    effect: "Once per Wave: move one enemy piece anywhere on your side of the Board (needs: forced move)",
+    implemented: true,
+    effect: "Once per Wave: move one enemy piece anywhere on your side of the Board",
     conspiracy: "Cattle mutilations", url: "https://en.wikipedia.org/wiki/Cattle_mutilation",
     summary: "Thousands of cattle found surgically altered, no tracks, no blood — airlifted, the lore says. The beam lifts what it wants and puts it exactly where you want it." },
   { name: "Ark's Bunkbed", rarity: "Legendary", type: "Trigger", bonus: ["Piece"], status: "KEEP", implemented: true,

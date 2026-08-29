@@ -21,6 +21,7 @@ signal win_continue_pressed
 signal win_end_pressed
 signal shop_buy_pressed(index: int)
 signal shop_closed
+signal shop_restock_pressed # issue 52: Jet Fuel Vial's Restock button
 signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
@@ -303,6 +304,14 @@ func show_shop() -> void:
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(sub)
+	if g._held("jet-fuel-vial"): # issue 52: only while held (user ruling — a
+		# Shop control, not part of the in-run Activate section)
+		var restock := Button.new()
+		restock.text = "Restock ($20)"
+		restock.add_theme_font_size_override("font_size", 13)
+		restock.disabled = not g._jet_fuel_restock_available()
+		restock.pressed.connect(func() -> void: shop_restock_pressed.emit())
+		header.add_child(restock)
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 14)

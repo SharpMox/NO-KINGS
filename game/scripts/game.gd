@@ -299,7 +299,37 @@ var turn_action_count := 0 # moves+placements taken this turn (artefact hook)
 var action_log: Array[Dictionary] = [] # ordered {kind} entries this Turn (issue 30);
 	# kind is one of "move"/"capture"/"place"/"merge"/"item". Cleared in
 	# _begin_player_turn; appended only by _log_action, the choke point every
-	# action site's turn_action_count += 1 already funnelled through.
+	# action site's turn_action_count += 1 already funnelled through. The
+	# plain move/capture call site (_move_player's tail) additionally stamps
+	# {from, to} — Zapruder's Director's Cut's replay data (issue 52); every
+	# other call site leaves those keys absent, which _can_repeat_last_action
+	# reads as "not repeatable" rather than half-replaying a Deploy/Merge/Item.
+
+# --- issue 52: Artefact activation. Player-triggered ("on use"/"you may
+# pay") Artefacts, costing 0 Actions (user ruling) — gated by each key's own
+# once-per-Turn/Wave/Shop-visit limit instead. Deliberately separate from
+# ArtefactHooks' REGISTRY/run() engine (built for "every HELD copy fires
+# automatically on a hook") — see game.gd's _activate_artefact block for why.
+const ACTIVATABLE_ARTEFACT_KEYS := [
+	"oak-island-wishing-well", "fifa-complimentary-yacht", "moscovium-glow-stick",
+	"roanoke-hex-kit", "zapruder-s-director-s-cut", "bovine-tractor-beam",
+] # Jet Fuel Vial is the 7th — a Shop control, not part of this in-run set
+	# (user ruling: "it does not belong in the in-run activation UI")
+var oak_island_used_this_turn := false # reset in _begin_player_turn
+var moscovium_active := false # "until end of Turn" — reset in _begin_player_turn;
+	# read directly by Economy.earn() (economy.gd), NOT the REGISTRY: the
+	# effect must keep tripling gains after the artefact consumes itself and
+	# leaves g.artefacts, when there is no "held copy" left to dispatch from
+var zapruder_used_this_wave := false # reset in WaveLogic.queue()
+var bovine_used_this_wave := false # reset in WaveLogic.queue()
+var jet_fuel_used_this_visit := false # reset in _open_shop() — the same
+	# "Shop visit" boundary issue 45 already established for Pandemic Toilet
+	# Paper Pallet's pallet_purchase_count
+var artefact_targeting_key := "" # Bovine Tractor Beam's staged board pick in
+	# progress, "" = none — the one activation with a target (game's own
+	# item-targeting flow, generalized: item_active plays this role for Items)
+var artefact_target_stage_a := Vector2i(-1, -1) # first pick (an enemy tile)
+var artefact_targets: Array[Vector2i] = [] # valid tiles for the current stage
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
@@ -717,6 +747,8 @@ func _begin_player_turn() -> void:
 	turn_action_count = 0
 	action_log = []
 	turn_capture_count = 0
+	oak_island_used_this_turn = false # Oak Island Wishing Well (52): once per Turn
+	moscovium_active = false # Moscovium Glow Stick (52): "until end of Turn"
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
 		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
@@ -753,6 +785,7 @@ func _enemy_turn() -> void:
 	pool_drag_id = ""
 	pool_drag_cap = false
 	_item_reset()
+	_artefact_targeting_reset() # Bovine Tractor Beam (52): never carries into the enemy turn
 	_refresh()
 	turns_since_wave += 1
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
@@ -1213,7 +1246,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		drag_from = Vector2i(-1, -1)
 		arrow_from = Vector2i(-1, -1)
 		return
-	if arrow_mode and item_active < 0: # item targeting still owns board taps
+	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
+		# item/artefact targeting still owns board taps
 		return _arrow_input(event)
 	if event is InputEventMouseMotion:
 		if drag_from.x >= 0:
@@ -1336,6 +1370,10 @@ func _tile_at(screen: Vector2) -> Vector2i:
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:
+	if artefact_targeting_key != "": # Bovine Tractor Beam (52) staging; board
+		# clicks feed it, same priority Item targeting already has below
+		_artefact_target_click(tile)
+		return
 	if item_active >= 0: # an item is targeting; board clicks feed it
 		_item_click(tile)
 		return
@@ -1620,7 +1658,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		moving_piece.erase("blitz_free_move")
 	else:
 		actions_left -= 1
-	_log_action("capture" if did_capture else "move")
+	_log_action("capture" if did_capture else "move", {"from": from, "to": final_pos})
+		# final_pos, not `to` — USS Eldridge Invisibility Paint/Royal Fiat can
+		# reposition the piece after landing; a replay must find it where it
+		# actually ended up, not the tile it only passed through
 	moved_this_turn.append(final_pos)
 	board[final_pos].moved_wave = wave # Alien Pet Rocks (issue 53): an Action
 		# was spent moving/capturing — a Deploy or an effect-driven shove
@@ -2158,9 +2199,11 @@ func _note_capture(pos: Vector2i) -> void:
 ## Hat) lands before every call site's own actions_left==0 auto-pass check,
 ## so it can never resurrect a turn that would otherwise already have ended —
 ## same shape as Stargate, covered by test_items.gd.
-func _log_action(kind: String) -> void:
+func _log_action(kind: String, data: Dictionary = {}) -> void:
 	ArtefactHooks.run(self, "on_action", {"kind": kind, "first": action_log.is_empty()})
-	action_log.append({"kind": kind})
+	var entry := {"kind": kind}
+	entry.merge(data) # issue 52: {from, to} on the plain move/capture site only
+	action_log.append(entry)
 	turn_action_count += 1
 
 
@@ -2246,6 +2289,271 @@ func _consume_artefact(key: String) -> void:
 		if artefacts[i].key == key:
 			artefacts.remove_at(i)
 			return
+
+
+# --- issue 52: Artefact activation — the 7 catalog entries whose GDD text is
+# "on use"/"you may pay" instead of a passive hook listener. All 3 entry
+# points (the Artefact-strip Activate section, the same section doubling as
+# the Items-menu one — this codebase's single Items+Artefacts drawer has no
+# second menu to put a distinct copy in — and, Jet Fuel Vial only, the Shop's
+# own Restock button) reach the functions below. Deliberately outside
+# ArtefactHooks' REGISTRY/run() — that engine dispatches automatically to
+# every HELD copy on a hook; activation is "the player picks WHEN, for one
+# use," and (Moscovium) must keep working after its own copy is gone from
+# g.artefacts, when there is no held copy left for run() to find.
+
+## Held Artefact entry, first match ("" key = none held) — reused for the
+## confirm modal's name/description and the once-per-copy Roanoke state.
+func _artefact_entry(key: String) -> Dictionary:
+	for t in artefacts:
+		if t.key == key:
+			return t
+	return {}
+
+
+## The 6 in-run activatable keys currently held, in catalog order — empty
+## hides the Activate section entirely (user ruling: the drawer must look
+## exactly as it does today when nobody holds one of these seven).
+func _activatable_held_keys() -> Array:
+	var out := []
+	for key in ACTIVATABLE_ARTEFACT_KEYS:
+		if _held(key):
+			out.append(key)
+	return out
+
+
+## Whether `key` has a use available RIGHT NOW — held, your Turn, no other
+## activation/Item mid-flight, and not already spent this Turn/Wave (or,
+## Oak Island/FIFA Yacht, unaffordable). Shared by the HUD chip's
+## enabled/disabled state and the actual activation call, so a stale tap
+## between the two can never pay out (acceptance: "must be visibly
+## unavailable, not silently inert").
+func _artefact_activation_available(key: String) -> bool:
+	if not _held(key) or state != State.PLAYER_TURN or box_open or buff_pick_open \
+			or win_open or item_active >= 0:
+		return false
+	if artefact_targeting_key != "" and artefact_targeting_key != key:
+		return false # one activation/targeting in flight at a time
+	match key:
+		"oak-island-wishing-well":
+			return not oak_island_used_this_turn and gold >= 25
+		"fifa-complimentary-yacht":
+			return gold >= 50 # no per-Turn limit — the deliberate Legendary exception
+		"moscovium-glow-stick":
+			return true # free, consumed on use — its own limit
+		"roanoke-hex-kit":
+			return _roanoke_available()
+		"zapruder-s-director-s-cut":
+			return not zapruder_used_this_wave and _can_repeat_last_action()
+		"bovine-tractor-beam":
+			return not bovine_used_this_wave and not _enemy_pieces().is_empty() \
+					and not Rules.placement_tiles(board).is_empty()
+	return false
+
+
+func _enemy_pieces() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for pos in board:
+		if board[pos].owner == Rules.ENEMY:
+			out.append(pos)
+	return out
+
+
+## Entry point for the 6 in-run keys (Activate section / Items-menu section).
+## Bovine Tractor Beam is the one with a target (user ruling: the targeting
+## step IS its pause, so it skips the confirm below and cancels from
+## targeting instead); the other 5 confirm since an untargeted activation
+## resolves the instant it's pressed — that press is the only catchable
+## mis-tap.
+func _activate_artefact(key: String) -> void:
+	if not ACTIVATABLE_ARTEFACT_KEYS.has(key):
+		return
+	if key == "bovine-tractor-beam":
+		return _begin_artefact_targeting(key)
+	if not _artefact_activation_available(key):
+		return
+	if autoplay: # bot: resolve immediately, never stall on the modal (issue 52)
+		return _artefact_confirmed(key)
+	var entry := _artefact_entry(key)
+	_open_choice_pick("✦ %s — activate?\n%s" % [entry.name, entry.description],
+		[{"label": "Confirm", "value": key}], "Cancel", _artefact_confirmed, Callable())
+		# Callable() on cancel: nothing has been paid/consumed/charged yet (the
+		# effect body lives entirely in _artefact_confirmed below), so there is
+		# nothing to undo — acceptance: "a cancelled activation costs nothing."
+
+
+## Only reachable via the Confirm button above — re-checks availability since
+## Gold/state can shift between opening the confirm and pressing it.
+func _artefact_confirmed(key: String) -> void:
+	if not _artefact_activation_available(key):
+		return
+	match key:
+		"oak-island-wishing-well":
+			oak_island_used_this_turn = true
+			Economy.spend_gold(self, 25)
+			Economy.earn(self, 400, "oak-island-wishing-well") # +Score (and its
+				# matching Gold, same as every other earn() reward — Yalta
+				# Cocktail Napkin's "+100 Gold" choice already does this too)
+		"fifa-complimentary-yacht":
+			Economy.spend_gold(self, 50)
+			actions_left += 1
+			actions_max += 1 # mid-turn grant, same shape as first_capture_extra
+		"moscovium-glow-stick":
+			moscovium_active = true
+			_consume_artefact(key)
+		"roanoke-hex-kit":
+			_roanoke_activate()
+		"zapruder-s-director-s-cut":
+			zapruder_used_this_wave = true
+			_repeat_last_action()
+	_refresh()
+
+
+## Roanoke Hex Kit: "recharges at every 2nd 5-Wave Milestone" rides the same
+## per-copy 5-Wave cadence artefact_hooks.gd's _milestone5_hit uses (each
+## copy counts its own 5 waves from its own acquired_wave), but "every 2nd"
+## needs a per-copy USE count, not just wave/acquired_wave — milestone N for
+## a copy lands at wave = acquired_wave + 5N - 1, so its (used_count+1)-th
+## EVEN milestone (the 2nd, 4th, 6th…) lands at
+## acquired_wave + 10*(used_count+1) - 1. Stored on the held entry itself
+## (each g.artefacts copy is its own Dictionary) rather than round-tripped
+## through save_config.gd — an accepted existing gap, same as the other
+## per-artefact run-long counters that already aren't (nibiru_wave_streak
+## etc., artefact_hooks.gd's header).
+func _roanoke_available() -> bool:
+	var t := _artefact_entry("roanoke-hex-kit")
+	if t.is_empty():
+		return false
+	var used: int = t.get("roanoke_used_count", 0)
+	var target_wave: int = int(t.acquired_wave) + 10 * (used + 1) - 1
+	return wave >= target_wave and not _enemy_pieces().is_empty()
+
+
+func _strongest_enemy_pos() -> Vector2i:
+	var best := Vector2i(-1, -1)
+	for pos in board:
+		if board[pos].owner == Rules.ENEMY and (best.x < 0
+				or defs[board[pos].id].value > defs[board[best].id].value):
+			best = pos
+	return best
+
+
+## "The strongest enemy piece vanishes, paying no Score or Gold" is
+## _destroy-shaped, not a capture — CONTEXT.md's Destruction/Capture split,
+## the same rule Bomb/Drone Strike/Air Strike/Sniper already follow.
+func _roanoke_activate() -> void:
+	var t := _artefact_entry("roanoke-hex-kit")
+	if t.is_empty():
+		return
+	t.roanoke_used_count = t.get("roanoke_used_count", 0) + 1
+	var pos := _strongest_enemy_pos()
+	if pos.x >= 0:
+		_destroy(pos)
+
+
+## Zapruder's Director's Cut: "repeat your previous Action without spending
+## an Action." _log_action (issue 30) only ever recorded {kind} — not enough
+## to replay a Deploy (which Stock entry), a Merge (which pair) or an Item
+## (which index/targets), and inventing a replay shape for 3 more action
+## kinds is not what this catalog text asks for. Scoped to exactly what the
+## plain move/capture call site in _move_player now also stamps: {from, to}
+## (the piece's OWN starting tile and where it ACTUALLY ended up — final_pos,
+## not a mid-flight tile a repositioning artefact moved it off of again). By
+## the time Zapruder can fire, that piece has already moved from `from` to
+## `to`, so "repeat" means "make that same displacement again, starting from
+## where it is now" — extend the (to - from) vector once more and replay it
+## through _move_player itself, so every rule (legality, buffs, bombs,
+## scoring) re-runs exactly as a normal move would. `blitz_free_move` (Blitz;
+## already reused once for Pegasus Free Trial) skips _move_player's own
+## actions_left -= 1 at whichever of its branches this replay hits, instead
+## of compensating before/after — a compensating add would double-count if
+## _move_player's own auto-pass fired mid-call. Bomb/Trap/blocked-attack
+## captures, Deploys, Merges and Items carry no {from, to} and so are
+## correctly reported unavailable by _can_repeat_last_action, never
+## half-replayed.
+func _can_repeat_last_action() -> bool:
+	if action_log.is_empty():
+		return false
+	var last: Dictionary = action_log.back()
+	if (last.kind != "move" and last.kind != "capture") \
+			or not last.has("from") or not last.has("to"):
+		return false
+	var from: Vector2i = last.to # the piece's CURRENT position
+	if not board.has(from) or board[from].owner != Rules.PLAYER:
+		return false
+	var again: Vector2i = from + (Vector2i(last.to) - Vector2i(last.from))
+	return Rules.moves_for(board, from, defs).has(again)
+
+
+func _repeat_last_action() -> void:
+	var last: Dictionary = action_log.back()
+	var from: Vector2i = last.to
+	var to: Vector2i = from + (Vector2i(last.to) - Vector2i(last.from))
+	board[from].blitz_free_move = true
+	_move_player(from, to)
+
+
+# --- Bovine Tractor Beam: the one targeted activation. Reuses the Item
+# targeting FLOW (staged picks, board-click routing, tap-the-chip-again to
+# cancel) rather than inventing a second one — see artefact_targeting_key's
+# own declaration above for how it parallels item_active.
+
+func _begin_artefact_targeting(key: String) -> void:
+	if artefact_targeting_key == key: # tap again to cancel — same shape as _use_item
+		_artefact_targeting_reset()
+		return _refresh()
+	if not _artefact_activation_available(key):
+		return
+	if hud.drawer_open != "":
+		_set_drawer("")
+	# no autoplay bypass needed here (unlike the 5 confirm-gated activations
+	# above): targeting is plain board-click state, not a blocking modal, so
+	# the bot can just drive it the same way it drives a "pair" Item — see
+	# autoplay.gd's own Bovine branch.
+	artefact_targeting_key = key
+	artefact_target_stage_a = Vector2i(-1, -1)
+	artefact_targets = _artefact_stage_targets(key, Vector2i(-1, -1))
+	_clear_selection()
+	placing_id = ""
+	placing_cap = false
+	_refresh()
+
+
+func _artefact_targeting_reset() -> void:
+	artefact_targeting_key = ""
+	artefact_target_stage_a = Vector2i(-1, -1)
+	artefact_targets = []
+
+
+## Stage A: any enemy piece. Stage B: an empty tile "on your side of the
+## Board" — Rapid Deployment's own Deploy-tile concept (Rules.placement_tiles)
+## is the only "your side" notion this codebase already has, so Bovine reuses
+## it rather than inventing a second, undefined one.
+func _artefact_stage_targets(key: String, a: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if key != "bovine-tractor-beam":
+		return out
+	if a.x < 0:
+		return _enemy_pieces()
+	return Rules.placement_tiles(board)
+
+
+func _artefact_target_click(tile: Vector2i) -> void:
+	if not artefact_targets.has(tile):
+		return
+	if artefact_target_stage_a.x < 0:
+		artefact_target_stage_a = tile
+		artefact_targets = _artefact_stage_targets(artefact_targeting_key, tile)
+		_refresh()
+		return
+	var from := artefact_target_stage_a
+	_artefact_targeting_reset()
+	bovine_used_this_wave = true # charged only now — both picks landed; a
+		# cancel (re-tapping the chip mid-stage) never reaches this line
+	_add_slide(from, tile)
+	board[tile] = board[from]
+	board.erase(from)
+	_refresh()
 
 
 ## Bounty Piece Buff (issue 48): 1-of-3 random Boxes, then the chosen one
@@ -2579,6 +2887,7 @@ func _connect_hud() -> void:
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.multi_confirm_pressed.connect(_item_confirm_multi)
 	hud.item_pressed.connect(_use_item)
+	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
 		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
 	hud.return_to_stock_pressed.connect(func() -> void:
@@ -2650,6 +2959,7 @@ func _connect_modals() -> void:
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())
+	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
 	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
 		stock.append(id) # reinforce is free (money-and-shop/02)
 		modals.show_reinforce())
@@ -2668,6 +2978,7 @@ func _open_shop() -> void:
 		return
 	pallet_purchase_count = 0 # Pandemic Toilet Paper Pallet (issue 45): a
 		# fresh Shop visit starts a fresh "every 2nd purchase" count
+	jet_fuel_used_this_visit = false # Jet Fuel Vial (52): same "Shop visit" boundary
 	modals.show_shop()
 
 
@@ -2675,6 +2986,36 @@ func _open_shop() -> void:
 ## flag: show_shop()/close both move it, and a second source of truth drifts.
 func shop_open() -> bool:
 	return modals.shop_panel != null and modals.shop_panel.visible
+
+
+## Jet Fuel Vial (52): "Once per Shop visit: pay 20 Gold to restock the
+## Shop" — a Shop control, not part of the in-run Activate section (user
+## ruling). Read by modals.gd's Restock button (enabled state) and the
+## confirm below.
+func _jet_fuel_restock_available() -> bool:
+	return _held("jet-fuel-vial") and not jet_fuel_used_this_visit \
+			and state == State.PLAYER_TURN and gold >= 20
+
+
+func _jet_fuel_restock_pressed() -> void:
+	if not _jet_fuel_restock_available():
+		return
+	if autoplay: # bot: resolve immediately, never stall on the modal (issue 52)
+		return _jet_fuel_restock_confirmed()
+	_open_choice_pick("✦ Jet Fuel Vial — restock the Shop?",
+		[{"label": "Confirm", "value": true}], "Cancel",
+		func(_v) -> void: _jet_fuel_restock_confirmed(), Callable())
+
+
+func _jet_fuel_restock_confirmed() -> void:
+	if not _jet_fuel_restock_available(): # re-check (Gold/state may have shifted)
+		return
+	jet_fuel_used_this_visit = true
+	Economy.spend_gold(self, 20)
+	Shop.roll(self)
+	if modals.shop_panel and modals.shop_panel.visible:
+		modals.show_shop() # rebuild: fresh stock + affordability state
+	_refresh()
 
 
 func _show_win_screen() -> void:

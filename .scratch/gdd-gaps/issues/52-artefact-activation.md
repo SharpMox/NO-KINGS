@@ -32,6 +32,41 @@ which is what makes it Legendary.
 An Artefact with no activation available (already used this Turn, not yet recharged, cannot
 afford the cost) must be visibly unavailable rather than silently inert.
 
+### Confirm vs cancel — the rule (user ruling 2026-08-29)
+
+> Confirm when the action has **no target**. When it *does* have a target, the targeting
+> step is the pause, and it needs a way to cancel.
+
+So every activation gives the player exactly one chance to back out, but never two:
+
+| Artefact | Has a target step? | Back-out |
+| --- | --- | --- |
+| Oak Island Wishing Well | no | **Confirm** |
+| FIFA Complimentary Yacht | no | **Confirm** |
+| Moscovium Glow Stick | no | **Confirm** (also the only consumable) |
+| Zapruder's Director's Cut | no | **Confirm** |
+| Roanoke Hex Kit | no — it auto-picks the strongest enemy | **Confirm** |
+| Jet Fuel Vial | no | **Confirm** (in the Shop) |
+| Bovine Tractor Beam | yes | **No confirm** — cancel from targeting |
+
+Note this *overrides* the "no confirm" recommendation in the original mock. The reasoning
+that changed it: an untargeted activation resolves the instant you press it, so the press
+is the only moment a mis-tap can be caught. A targeted one already has a second beat.
+
+**The Clock keeps running through the confirm**, like every other modal (Buff Box, Box
+Pick, the choice seam). Nothing here pauses it.
+
+**Cancelling costs nothing** — no Gold, no charge, no Action. A cancelled activation must
+leave the Artefact exactly as it was, including its once-per-Turn/Wave charge. Assert that
+explicitly; a cancel that silently burns the charge is the kind of bug players notice and
+tests miss.
+
+### The Activate section hides when empty (user ruling 2026-08-29)
+
+Most runs hold none of these seven. An empty "Activate" header would cost a row in a drawer
+that deliberately does not scroll, so when the player holds no activatable Artefact the
+drawer looks exactly as it does today.
+
 ## The seven
 
 | Artefact | Rarity | Effect | Notes |
@@ -76,6 +111,12 @@ readable.
   only from the Shop.
 - Activation costs 0 Actions — assert it directly.
 - Each per-Turn / per-Wave / consumed limit enforced, and unavailable states visible.
+- **The six untargeted Artefacts confirm; Bovine Tractor Beam does not and cancels from
+  targeting instead.** Assert both shapes.
+- **A cancelled activation costs nothing** — assert Gold, the charge and the Artefact itself
+  are all untouched, for both the confirm path and the targeting path.
+- **The Activate section is absent entirely when no activatable Artefact is held** — assert
+  the drawer is unchanged from today in that case.
 - **Click probes extended** — this is new interactive UI, and Godot headless drops GUI
   picking, which is why `run_all.sh` runs the windowed probes first.
 - Tests in the split suites, seeds pinned, asserting observable behaviour.

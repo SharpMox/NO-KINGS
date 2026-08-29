@@ -1641,6 +1641,41 @@ func _buff_pick_cancelled() -> void:
 	_refresh()
 
 
+## Yalta Cocktail Napkin (issue 44): "On 5-Wave Milestone: choose one — +100
+## Gold / +1 Item / +15s Clock". Called from artefact_hooks.gd's on_wave_clear
+## dispatch, one call per held copy that hits its own _milestone5_hit beat.
+## Autoplay resolves immediately with `rng` instead of opening the modal —
+## same pattern as _open_buff_pick / _open_box_pick — so the bot never
+## deadlocks on a panel nobody is there to click.
+func _open_yalta_pick() -> void:
+	var offers := [
+		{"label": "+100 Gold", "value": "gold"},
+		{"label": "+1 Item", "value": "item"},
+		{"label": "+15s Clock", "value": "clock"},
+	]
+	if autoplay:
+		return _yalta_chosen(offers[rng.randi() % offers.size()].value)
+	_open_choice_pick("✦ Yalta Cocktail Napkin — 5-Wave Milestone, pick one:",
+		offers, "Forfeit (no refund)", _yalta_chosen, _yalta_pick_cancelled)
+
+
+func _yalta_chosen(value: String) -> void:
+	match value:
+		"gold":
+			Economy.earn(self, 100, "yalta-cocktail-napkin")
+		"item":
+			items.append(Items.ITEMS[rng.randi() % Items.ITEMS.size()])
+		"clock":
+			Economy.add_clock(self, 15000.0, "yalta-cocktail-napkin")
+	_refresh()
+
+
+## A 5-Wave Milestone reward is not a spend — nothing to refund on Cancel,
+## just forfeit it and close (issue 44).
+func _yalta_pick_cancelled() -> void:
+	pass
+
+
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
 ## `a` = first pick for "pair" items, or (-1,-1).
 func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:

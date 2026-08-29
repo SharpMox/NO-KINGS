@@ -837,6 +837,11 @@ const REGISTRY := {
 	# per-artefact cadence 2026-08-28 (user-reported)
 	"john-titor-s-crypto-wallet": ["on_wave_clear"],
 
+	# --- issue 44: the choice-modal seam's (issue 41) first real consumer —
+	# choose 1 of 3 on the same per-artefact 5-Wave Milestone cadence as
+	# silk-road-coupon/john-titor-s-crypto-wallet above ---
+	"yalta-cocktail-napkin": ["on_wave_clear"],
+
 	# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
 	# WaveLogic.queue) ---
 	"jon-burrows-fake-id": ["on_wave_clear"],
@@ -1949,6 +1954,16 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["trojan-horse-assembly-manual", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave) and not g.box_open: # don't clobber an open Box Pick
 				g._open_box_pick()
+		["yalta-cocktail-napkin", "on_wave_clear"]:
+			# issue 44: first consumer of the issue-41 choice-modal seam.
+			# `not g.buff_pick_open` mirrors trojan-horse-assembly-manual's
+			# `not g.box_open` guard just above — two held copies acquired
+			# on the exact same Wave both hit _milestone5_hit here in the
+			# same synchronous dispatch pass; only the first opens the
+			# modal, the second copy's pick is forfeit for that Wave rather
+			# than clobbering the first copy's still-open panel.
+			if _milestone5_hit(g.wave, acquired_wave) and not g.buff_pick_open:
+				g._open_yalta_pick()
 
 		# --- issue 26: per-Wave first/last-lost tracking (g.wave_lost_ids,
 		# game.gd's _lose_player_piece / WaveLogic.queue) ---

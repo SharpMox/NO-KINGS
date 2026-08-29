@@ -121,6 +121,17 @@ found. Collected here so they are not lost in Outcome sections:
   The behaviour under test is *"Holy Lint grants exactly one Piece Buff"*; the specific key
   is incidental. Reshaping it to assert `size() == 1` plus membership of the safe
   non-self-triggering set would keep all its value and stop the churn. Cheap, not urgent.
+- **The click probes carry a load-sensitive stall.** The signature is `PASS cycles through
+  the enemy turn` timing out, which then cascades into `double-tap opens the piece preview`
+  and `Close button clickable` failing. It reproduces on `main` and on feature branches
+  alike — well under 1% when the machine is quiet, and around 20% when it is busy.
+  Prime suspect: the **real disk-write autosave that fires on every `_begin_player_turn()`**
+  (`FileAccess.open(SAVE_PATH, WRITE)` plus `CloudSave.sync_file`) inside the probe's first
+  boot segment, which never sets `is_scenario`. Under I/O contention that write blows past
+  the probe's tolerance. Worth fixing for its own sake: a load-sensitive stall makes every
+  "ALL GREEN" slightly unfalsifiable, which is exactly what slice 36 existed to eliminate.
+  Diagnosed 2026-08-29 while wrongly accusing slice 49 of introducing it (see `CLAUDE.md`
+  on interleaving A/B runs).
 
 ## Housekeeping
 

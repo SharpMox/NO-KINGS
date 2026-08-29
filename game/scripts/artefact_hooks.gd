@@ -652,6 +652,83 @@
 ##   exact gap issue 22 already flagged and declined to guess at, and issue
 ##   54 didn't supply one either. A Notion question, not attempted.
 ##
+## issue 55 (meta-dispatch and capture conversion — the last 3, all engineering
+## calls per the issue itself, no design ruling needed):
+## - Zeta Reticuli Souvenir Map ("every 3rd Capture: the captured piece goes
+##   to Stock instead of Captured Stock") gets an ordinary REGISTRY entry on
+##   on_capture. `g.run_capture_count` (game.gd) is a NEW run-long counter,
+##   never reset — the existing wave_capture_count/turn_capture_count reset on
+##   their own boundaries and would undercount "every 3rd of the run". Fed
+##   into ctx as `run_capture_index` (economy.gd's capture_score, same 0-based
+##   idiom as its two siblings); the handler below sets an OUTPUT flag,
+##   `ctx.to_stock`, true on every 3rd (run_capture_index % 3 == 2) — read
+##   back off g.last_capture_ctx at game.gd's four capture-resolution sites
+##   (plain capture, Bomb, Trap, Multicapture's second victim) the same way
+##   return_to_start/move_to_backrow already are, diverting the victim into
+##   `stock` instead of `captured` via a small _capture_to_stock() helper that
+##   mirrors Extraction's own "duplicate, strip owner, bare id if that's all
+##   that's left" shape (ADR-0002) — no new schema, the piece's state (buffs,
+##   capture ledger, peak-rank stamp) rides along for free. Not persisted
+##   across saves, same as the sibling per-artefact run-long counters that
+##   already aren't (nibiru_wave_streak, club27_streak, lottery_purchase_count,
+##   pallet_purchase_count, game.gd) — an accepted existing gap, not a new one.
+## - Troll Farm Employee of the Month ("your \"Wave\" Artefacts also trigger on
+##   Wave start") has NO REGISTRY entry — it lives entirely in
+##   _run_meta_triggers, same shape as Max Headroom Mask/Polybius/etc. On
+##   hook == on_wave_spawn, it walks `held` for every key whose REGISTRY list
+##   contains on_wave_clear and re-`_dispatch`es it straight to on_wave_clear
+##   — never through run(), so it can't recurse into its own echo layer (the
+##   file's standing guarantee, see the header note above _run_meta_triggers).
+##   Passes each entry's OWN acquired_wave (issue 28's fix, not a default), so
+##   a re-triggered 5-Wave Milestone artefact fires on its own beat. The ctx
+##   on_wave_clear normally carries ({clean, turns, captures, gold_spent,
+##   gold_base}) is a snapshot of the wave that just ended — meaningless at
+##   Wave START — so this builds a fresh one instead of forwarding the stale
+##   on_wave_spawn ctx: `clean = true` (no losses yet this brand-new wave —
+##   vacuously and correctly true), `turns = 0`, `captures = 0`,
+##   `gold_spent = 0` (all genuinely zero at this instant — WaveLogic.queue()
+##   already reset the underlying counters before firing on_wave_spawn),
+##   `gold_base = g.gold` (the one field that's just "current Gold" — reading
+##   it live keeps a percentage handler correct instead of reading a
+##   fabricated number). A handler that reads g.wave directly instead of ctx
+##   (John Titor's Crypto Wallet, Silk Road Coupon) sees the already-bumped
+##   NEW wave at this point (WaveLogic.queue sets g.wave = n before firing
+##   on_wave_spawn), so its milestone check ends up keyed to the STARTING wave
+##   rather than the wave that just cleared — a direct consequence of reusing
+##   the on_wave_clear handler body unmodified, not a deliberate narrative
+##   choice, and not worth a ctx-shape change to avoid.
+## - Ecdysis Sheddings ("copies the effect of the last other Artefact you
+##   bought") also has no REGISTRY entry, same shape as Troll Farm above.
+##   `g.ecdysis_copy_key` (String, game.gd; "" = inert) is set in run() itself
+##   — unconditional of what's held, same idiom as the turn-start echo-flag
+##   resets at the top of run() — whenever hook == on_purchase, ctx.kind ==
+##   "artefact", and the bought key isn't Ecdysis's own. Box grants and effect
+##   grants never fire on_purchase (shop.gd's buy() is the only call site), so
+##   they can't set this with no extra guard needed. The key is never cleared
+##   by the copied Artefact later being consumed/removed (Epstein's Black
+##   Book-style _consume_artefact) — it's a fact about the run ("you bought
+##   it"), decoupled from whether that key is still in g.artefacts, so a
+##   later-consumed copy (Moscovium Glow Stick, issue 52, not yet implemented)
+##   keeps being copied. Dispatch is in _run_meta_triggers: for every held
+##   Ecdysis entry, if REGISTRY[g.ecdysis_copy_key] lists the hook currently
+##   firing, `_dispatch` (never run()) the copied key at that hook using THIS
+##   Ecdysis entry's own acquired_wave — Ecdysis itself is "the second copy"
+##   the effect text describes, so its own copy is the one whose 5-Wave
+##   cadence should apply, not the original's (which might not even be held
+##   any more). Guarded twice against copying another Ecdysis: recording never
+##   sets the key to "ecdysis-sheddings" (a bought Ecdysis is "not other"),
+##   and dispatch also refuses that key outright even if it somehow got there
+##   — belt and suspenders, one equality check each. Since neither Troll Farm
+##   nor Ecdysis has a REGISTRY entry, and _dispatch never calls run(), the
+##   risky-looking "Ecdysis copies a Wave Artefact while Troll Farm is held"
+##   combo can't recurse: Troll Farm's extra on_wave_clear dispatch (fired
+##   from on_wave_spawn) goes straight to _dispatch, never back through
+##   _run_meta_triggers, so Ecdysis's own block — scoped to whichever hook the
+##   OUTER run() call is dispatching — never sees it and can't pile on again.
+##   Covered by test_items_artefacts_4.gd's three-artefact case (Troll Farm +
+##   Ecdysis + a bought Wave Artefact), asserting the exact bounded dispatch
+##   count across one Wave boundary.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -979,6 +1056,13 @@ const REGISTRY := {
 	"hellfire-club-discord-invite": ["on_turn_start"],
 	"pegasus-free-trial": ["on_turn_start"],
 	"exhibit-399": ["on_tariff_apply"],
+
+	# --- issue 55: meta-dispatch and capture conversion (the last 3). Troll
+	# Farm Employee of the Month and Ecdysis Sheddings deliberately have NO
+	# REGISTRY entry — both live entirely in _run_meta_triggers, same shape as
+	# Max Headroom Mask/Polybius Cartridge/CERN Ctrl+Z Shortcut/etc. above;
+	# see this file's own header for the full rationale of all three. ---
+	"zeta-reticuli-souvenir-map": ["on_capture"],
 }
 
 
@@ -1019,6 +1103,13 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		# accept for that path, not a new gap. See _demoted() below for the
 		# read side (Dark Market Light Bulb).
 		g.board[ctx.pos].peak_ranked = true
+	if hook == "on_purchase" and ctx.get("kind", "") == "artefact" \
+			and ctx.key != "ecdysis-sheddings": # issue 55: Ecdysis Sheddings'
+		# "last OTHER Artefact you bought" — recorded unconditionally of
+		# whether Ecdysis is even held yet (see the header), and never set to
+		# Ecdysis's own key ("other" excludes it — also what keeps two held
+		# copies from chasing each other, see _run_meta_triggers).
+		g.ecdysis_copy_key = ctx.key
 	var fired: Array = [] # issue 21: the held/tariff ENTRIES that actually
 		# dispatched this call, not just held — Bilderberg Hotel Slippers' own
 		# contract. Carries the whole entry (not just t.key) so the echo layer
@@ -1127,6 +1218,39 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 		elif hook == "on_gold_change" and not g.dejavu_gold_turn_done:
 			g.dejavu_gold_turn_done = true
 			ctx.amount *= (1.0 + n_dejavu)
+
+	# issue 55: Troll Farm Employee of the Month — every held on_wave_clear
+	# Artefact ALSO fires at Wave start. Straight to _dispatch (never run()),
+	# so this can't recurse into its own echo layer; each entry's own
+	# acquired_wave rides along (issue 28's fix). See the header for why the
+	# ctx below is built fresh rather than forwarding the (stale) on_wave_spawn
+	# ctx: every field is the genuine "so far this Wave" value at Wave start.
+	var n_troll: int = counts.get("troll-farm-employee-of-the-month", 0)
+	if n_troll > 0 and hook == "on_wave_spawn":
+		var wave_start_ctx := {
+			"clean": true, "turns": 0, "captures": 0,
+			"gold_spent": 0, "gold_base": g.gold,
+		}
+		for t in held:
+			if REGISTRY.get(t.key, []).has("on_wave_clear"):
+				for i in n_troll:
+					_dispatch(g, t.key, "on_wave_clear", wave_start_ctx, t.get("acquired_wave", 1))
+
+	# issue 55: Ecdysis Sheddings — mirrors the last OTHER Artefact bought
+	# (g.ecdysis_copy_key, set in run() above) on every hook it listens on,
+	# once per held Ecdysis copy, using THIS copy's own acquired_wave (Ecdysis
+	# itself is "the second copy" the effect text describes). "" (nothing
+	# bought yet) and the artefact's own key (never actually recorded, but
+	# guarded again here regardless — see the header) are both refused, so two
+	# held copies mirror the same key and never chase each other.
+	var n_ecdysis: int = counts.get("ecdysis-sheddings", 0)
+	if n_ecdysis > 0:
+		var copy_key: String = g.ecdysis_copy_key
+		if copy_key != "" and copy_key != "ecdysis-sheddings" \
+				and REGISTRY.get(copy_key, []).has(hook):
+			for t in held:
+				if t.key == "ecdysis-sheddings":
+					_dispatch(g, copy_key, hook, ctx, t.get("acquired_wave", 1))
 
 
 ## Player-owned board pieces of the given id — the "2+/3+ of your same-type
@@ -2334,3 +2458,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 					g.board[pos].blitz_free_move = true
 		["exhibit-399", "on_tariff_apply"]:
 			ctx.choice = true
+
+		# --- issue 55: meta-dispatch and capture conversion (see this file's
+		# own header for Troll Farm/Ecdysis, both pure _run_meta_triggers
+		# observers with no case here) ---
+		["zeta-reticuli-souvenir-map", "on_capture"]:
+			if (int(ctx.run_capture_index) + 1) % 3 == 0: # every 3rd Capture
+				# of the whole run, 1-based (index 2, 5, 8, … are 0-based)
+				ctx.to_stock = true

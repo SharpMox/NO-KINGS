@@ -106,6 +106,13 @@ var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
 	# hook 16: "clean wave" = lost_player unchanged since this snapshot)
 var wave_capture_count := 0 # captures this wave, reset in WaveLogic.queue()
 var turn_capture_count := 0 # captures this player turn, reset in _begin_player_turn
+var run_capture_count := 0 # issue 55: run-long, never resets (Zeta Reticuli
+	# Souvenir Map's "every 3rd Capture" of the whole run — the two indices
+	# above reset on their own wave/turn boundaries and would undercount).
+	# Not persisted across saves, same as the sibling per-artefact run-long
+	# counters below that already aren't (nibiru_wave_streak, club27_streak,
+	# lottery_purchase_count, pallet_purchase_count) — an accepted existing
+	# gap, not a new one.
 var gold_spent_shop_this_wave := 0 # reset in WaveLogic.queue() (artefact hook 16)
 var silk_road_active := false # Silk Road Coupon's -50% Shop prices, reset in
 	# WaveLogic.queue() every wave (artefact hook 18)
@@ -179,6 +186,16 @@ var pallet_purchase_count := 0 # Pandemic Toilet Paper Pallet (issue 45):
 	# purchases made this Shop visit, reset in _open_shop() below — "the same
 	# Shop visit", not the whole run (contrast Pre-Scratched Lottery Ticket's
 	# lottery_purchase_count above, which never resets)
+var ecdysis_copy_key := "" # issue 55: Ecdysis Sheddings — the last OTHER
+	# Artefact bought (set in ArtefactHooks.run() on on_purchase, kind ==
+	# "artefact", unconditional of whether Ecdysis is held, so the history is
+	# already there once it is; "" = inert, nothing bought yet, which is
+	# correct not a bug). Box grants and effect grants never fire on_purchase
+	# (shop.gd's buy() is the only call site), so they can't set this with no
+	# extra guard needed. Never set to Ecdysis's own key ("other" excludes
+	# it), which is also what keeps two held Ecdysis copies from chasing each
+	# other. Persisted across saves (save_config.gd) — it's a fact about the
+	# run, not a transient per-wave/turn flag.
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
@@ -1473,6 +1490,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
 		return_to_start = last_capture_ctx.get("return_to_start", false)
 		move_to_backrow = last_capture_ctx.get("move_to_backrow", false)
+		var to_stock: bool = last_capture_ctx.get("to_stock", false) # issue 55:
+			# Zeta Reticuli Souvenir Map's OUTPUT flag, snapshotted now for the
+			# same reason return_to_start/move_to_backrow are — Multicapture
+			# below fires its own capture_score call that overwrites
+			# g.last_capture_ctx with a fresh ctx for its OWN victim.
 		var grant_buffs: Array = last_capture_ctx.get("grant_buffs", [])
 		if BuffLogic.has(board[from], "critical"):
 			_consume_buff(from, "critical")
@@ -1500,7 +1522,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
 					board[from].id, attacker_buffed, from, also))
-				captured.append(board[also].id)
+				if last_capture_ctx.get("to_stock", false): # this call's OWN
+						# ctx (issue 55) — read immediately, before anything
+						# else can overwrite g.last_capture_ctx again
+					_capture_to_stock(board[also])
+				else:
+					captured.append(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
 				board.erase(also)
@@ -1526,7 +1553,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				_consume_buff(to, "bomb")
 			if BuffLogic.has(board[from], "bomb"):
 				_consume_buff(from, "bomb")
-			captured.append(victim.id) # the capture itself still resolved
+			if to_stock: # issue 55
+				_capture_to_stock(victim)
+			else:
+				captured.append(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
 			board.erase(from)
@@ -1546,7 +1576,10 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			_add_pop(from)
 			board.erase(from)
 			board.erase(to)
-			captured.append(victim.id)
+			if to_stock: # issue 55
+				_capture_to_stock(victim)
+			else:
+				captured.append(victim.id)
 			if blitz_free:
 				moving_piece.erase("blitz_free_move")
 			else:
@@ -1558,6 +1591,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		if victim.id == "king": # boss piece — never enters Captured Stock
 			king_captured = true
 			captured_king_id = victim.get("king_id", "")
+		elif to_stock: # issue 55: Zeta Reticuli Souvenir Map
+			_capture_to_stock(victim)
 		else:
 			captured.append(victim.id)
 		_add_pop(to)
@@ -2182,6 +2217,17 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 func _consume_buff(pos: Vector2i, key: String) -> void:
 	BuffLogic.consume(board[pos], key)
 	ArtefactHooks.run(self, "on_buff_consume", {"pos": pos, "key": key})
+
+
+## Zeta Reticuli Souvenir Map (issue 55): a captured piece diverted to Stock
+## instead of Captured Stock, with its state intact — same shape as
+## Extraction's own "duplicate, strip owner, bare id if that's all that's
+## left" (ADR-0002: Stock never interprets the state, so buffs/capture
+## ledger/peak-rank ride along for free, no new schema).
+func _capture_to_stock(victim: Dictionary) -> void:
+	var e: Dictionary = victim.duplicate()
+	e.erase("owner")
+	stock.append(e.id if e.size() == 1 else e)
 
 
 ## Held copies of one artefact key — Numbers Station Sudoku / Bohemian Grove

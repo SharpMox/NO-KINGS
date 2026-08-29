@@ -113,6 +113,12 @@ static func add_clock(g, ms: float, reason: String = "") -> void:
 ## attacker_pos also bumps the attacker's own ledger here (g._note_capture)
 ## before the hook runs, so an on_capture handler in the same dispatch (Alien
 ## Rocket Toy) already sees this capture counted.
+## `run_capture_index` (issue 55) is the run-long sibling of wave/turn_capture_
+## index above (g.run_capture_count, never resets). `to_stock` is the same
+## output-flag shape as return_to_start/move_to_backrow — Zeta Reticuli
+## Souvenir Map sets it on the run's every 3rd capture; game.gd's capture
+## sites divert the victim into Stock (state intact, ADR-0002) instead of
+## Captured Stock when it's set.
 static func capture_score(g, victim_id: String, attacker_id: String = "",
 		attacker_buffed: bool = false, attacker_pos: Vector2i = Vector2i(-1, -1),
 		victim_pos: Vector2i = Vector2i(-1, -1)) -> int:
@@ -127,7 +133,15 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 		"attacker_pos": attacker_pos, "victim_captures": victim_captures,
 		"wave_capture_index": g.wave_capture_count, # captures already made
 		"turn_capture_index": g.turn_capture_count, # this wave/turn, 0-based
+		"run_capture_index": g.run_capture_count, # issue 55: same idiom, but
+			# run-long — Zeta Reticuli Souvenir Map's "every 3rd Capture"
+			# needs a count that never resets on a wave/turn boundary, unlike
+			# the two siblings above
 		"return_to_start": false, "move_to_backrow": false,
+		"to_stock": false, # issue 55: Zeta Reticuli Souvenir Map's OUTPUT
+			# flag — set true on the run's every 3rd capture; read back off
+			# g.last_capture_ctx at game.gd's capture sites, same shape as
+			# return_to_start/move_to_backrow above
 		"no_score": false, # issue 42: Dark Market Light Bulb's "Demoted pieces
 			# give no Score" — an OUTPUT flag, not a direct ctx.pts write, so it
 			# doesn't depend on whether a same-hook `+=` handler dispatches
@@ -145,6 +159,7 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 	})
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
+	g.run_capture_count += 1
 	if ctx.no_score:
 		ctx.pts = 0
 	g.last_capture_ctx = ctx

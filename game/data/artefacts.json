@@ -1743,9 +1743,9 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock (needs: capture conversion)",
+  "effect": "Every 3rd Capture: the captured piece is added to your Stock instead of your Captured Stock",
   "conspiracy": "The Hill abduction",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "roanoke-hex-kit",
@@ -1939,9 +1939,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Copies the effect of the last other Artefact you bought (needs: artefact-copy dispatch)",
+  "effect": "Copies the effect of the last other Artefact you bought",
   "conspiracy": "The reptilian elite",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "hitler-s-argentinian-passport",
@@ -2071,9 +2071,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your \"Wave\" Artefacts also trigger on Wave start (needs: dual-trigger dispatch)",
+  "effect": "Your \"Wave\" Artefacts also trigger on Wave start",
   "conspiracy": "The troll farm",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "cern-ctrl-z-shortcut",

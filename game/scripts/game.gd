@@ -676,13 +676,22 @@ func _run_enemy_actions() -> void:
 	var actions := Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
-		var act := Rules.ai_action(board, defs)
+		var act := Rules.ai_action(board, defs, _enemy_denied_tiles())
 		if act.is_empty():
 			return
 		if not autoplay and animations_on:
 			await get_tree().create_timer(0.35).timeout
 		await _wait_while_backgrounded()
-		if board.has(act.to) and BuffLogic.repels_capture(board[act.to]):
+		# Cheyenne Mountain Doorbell (issue 51): a player piece on the back
+		# row cannot be captured — same repel shape as Shield/Reflect (the
+		# attempt is spent, nothing moves) but no Buff is involved, so there
+		# is nothing to consume. Winchester (above) already keeps enemies off
+		# y=0 entirely when both are held, making this branch moot then —
+		# the cards are independently written, so both still apply on their
+		# own terms.
+		var cheyenne_repel: bool = act.to.y == 0 and board.has(act.to) and board[act.to].owner == Rules.PLAYER \
+			and _held("cheyenne-mountain-doorbell")
+		if board.has(act.to) and (BuffLogic.repels_capture(board[act.to]) or cheyenne_repel):
 			# Shield works against the AI too: the attempt is spent, nothing
 			# moves. Reflect kills the attacker and takes its tile.
 			if BuffLogic.reflects_capture(board[act.to]):
@@ -693,7 +702,8 @@ func _run_enemy_actions() -> void:
 				board[act.from] = board[act.to]
 				board.erase(act.to)
 			else:
-				_consume_buff(act.to, "shield")
+				if BuffLogic.repels_capture(board[act.to]):
+					_consume_buff(act.to, "shield")
 				_add_float(act.to, "Blocked", COL_MERGE)
 			queue_redraw()
 			continue
@@ -875,6 +885,20 @@ func _deploy_tiles() -> Array[Vector2i]:
 					out.append(Vector2i(x, y))
 		return out
 	return Rules.placement_tiles(board)
+
+
+## Winchester Salt Lined Doors (issue 51): enemy pieces cannot move onto the
+## back row (y=0) while held. Another standing rule read straight off held
+## Artefacts (see _deploy_tiles above) — computed here, in game.gd, and
+## passed into Rules.legal_moves/ai_action/is_checkmate as a parameter, so
+## rules.gd never gains a g.artefacts reference of its own.
+func _enemy_denied_tiles() -> Array[Vector2i]:
+	if not _held("winchester-salt-lined-doors"):
+		return []
+	var out: Array[Vector2i] = []
+	for x in Tuning.BOARD_W:
+		out.append(Vector2i(x, 0))
+	return out
 
 
 func _game_over(won: bool, reason: String) -> void:
@@ -1413,7 +1437,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	_log_action("capture" if did_capture else "move")
 	moved_this_turn.append(final_pos)
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
-	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs)):
+	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs, _enemy_denied_tiles())):
 		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
@@ -1815,7 +1839,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			var tmp: Dictionary = board[a]
 			board[a] = board[b]
 			board[b] = tmp
-	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs):
+	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs, _enemy_denied_tiles()):
 		if _king_down():
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):

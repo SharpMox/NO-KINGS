@@ -194,13 +194,30 @@ static func is_attacked(board: Dictionary, target: Vector2i, by_owner: int, defs
 ## ignored. ponytail: the full sim is O(pieces² × moves) and made late-game AI
 ## turns take minutes on crowded boards; the greedy AI keeps full safety for
 ## king moves and for check resolution (callers pass strict=true there).
-static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict := true) -> Array[Dictionary]:
+##
+## `denied` (issue 51 — Winchester Salt Lined Doors): destination squares this
+## call must never land on, regardless of piece or mode. rules.gd stays a pure
+## static module with no g.artefacts access, so the caller (game.gd) computes
+## which squares are denied from the held Artefacts and passes the set in —
+## same precedent as _deploy_tiles' Nazca Boarding Pass read. A capture is a
+## move onto the victim's tile in this engine (no piece captures without
+## relocating there — Multicapture is the one exception, but it never targets
+## a player piece, see buff_logic.gd), so filtering `to` here denies capture
+## and plain movement alike with no separate case needed. Filtering is by
+## destination only, not origin: a piece already standing on a denied square
+## is untouched and free to leave; moving to ANOTHER denied square (e.g.
+## sideways along the same row) is still denied — "cannot move onto" reads as
+## about the destination, not the piece's starting side.
+static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict := true,
+		denied: Array[Vector2i] = []) -> Array[Dictionary]:
 	var king := find_king(board, owner)
 	var out: Array[Dictionary] = []
 	for pos in board:
 		if board[pos].owner != owner:
 			continue
 		for to in moves_for(board, pos, defs):
+			if denied.has(to):
+				continue
 			if king.x >= 0 and (strict or pos == king):
 				var sim := board.duplicate(true)
 				sim[to] = sim[pos]
@@ -212,11 +229,12 @@ static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict 
 	return out
 
 
-static func is_checkmate(board: Dictionary, owner: int, defs: Dictionary) -> bool:
+static func is_checkmate(board: Dictionary, owner: int, defs: Dictionary,
+		denied: Array[Vector2i] = []) -> bool:
 	var king := find_king(board, owner)
 	if king.x < 0 or not is_attacked(board, king, 1 - owner, defs):
 		return false
-	return legal_moves(board, owner, defs).is_empty()
+	return legal_moves(board, owner, defs, true, denied).is_empty()
 
 
 ## Merge result for exactly 2 selected piece ids, or "" if invalid.
@@ -272,12 +290,17 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 ## threatening it, else retreat it to safety) > best trade (max target value,
 ## min attacker value) > advance the most advanced non-King piece toward the
 ## player row. Returns {from, to} or {} when the enemy has no legal move.
-static func ai_action(board: Dictionary, defs: Dictionary) -> Dictionary:
+##
+## `denied` (issue 51): forwarded straight into legal_moves — see its header.
+## ai_action calls the same legal_moves the player's own moves come from
+## (rules.gd:280 pre-issue-51), so this one parameter binds the AI too; there
+## is no second move generator to keep in sync.
+static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = []) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
 	# full legality only when in check (must not miss a resolving move);
 	# otherwise the fast path — king moves stay safety-checked, pins ignored
-	var moves := legal_moves(board, ENEMY, defs, in_check)
+	var moves := legal_moves(board, ENEMY, defs, in_check, denied)
 	moves = moves.filter(func(m: Dictionary) -> bool: # Stun: this piece sits it out
 		return not BuffLogic.has(board[m.from], "stunned"))
 	if moves.is_empty():

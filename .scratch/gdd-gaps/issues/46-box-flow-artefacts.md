@@ -1,6 +1,6 @@
 # 46 — Box-flow Artefacts: extra pick and rerolls
 
-Status: todo — INDEPENDENT (no design decision needed) · **run after slice 45 merges**
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -89,3 +89,41 @@ branches under the bot, not just under the modal.
 ## Blocked by
 
 - nothing (sequence after 45)
+
+## Outcome
+
+Shipped in PR #168. All three implemented; catalog 149 -> 152.
+
+- **Nostradamus Mad Libs** — the extra pick comes from the *same* offer, as specced.
+  `_box_choose` erases the taken option and re-shows the modal while picks remain,
+  otherwise closes as before. Two copies take all 3 options; it stops when the offer is
+  exhausted rather than being capped for its own sake.
+- **Bible Gag Reel Scroll + Snowden's Rubik's Cube** — implemented identically, sharing
+  one `box_rerolls_left` budget seeded from the sum of both held counts, so they stack
+  additively. No invented difference between them; the duplicate-effect question went to
+  `NOTION-QUESTIONS.md` (#2) instead of being resolved in code.
+
+**Both traps held.** `Economy.charge(self, "box_cost")` still appears at exactly one site
+(`_open_box_pick`); `_box_reroll` never touches `Economy` at all. The test asserts this the
+only way that actually catches it — boots with a `box_cost` Tariff, checks Gold drops by
+exactly 10 on open, then that it is unchanged across two rerolls. Verified independently
+by grepping every charge site before merge.
+
+**Autoplay** resolves both new branches without ever calling `modals.show_box`: the bot
+rolls a reroll chance before picking, and `_box_choose` recurses for the extra pick. The
+tests prove the branches *ran* (asserting the budgets ended below their seeded values)
+rather than merely proving nothing hung — the weaker assertion would pass even if the
+feature were dead.
+
+**Click probe extended** for the Reroll button: it appears while budget remains, keeps the
+box open when clicked, and disappears once spent. Needed a `_button_prefix` helper because
+the label carries a dynamic "(N left)" suffix.
+
+**One real defect the suite caught:** `test_items_artefacts_4.gd`'s REGISTRY-coverage audit
+failed, because all three of these are UI-only reads via `_artefact_count()` and have no
+REGISTRY entry — the same shape as `numbers-station-sudoku`. Added to that test's
+documented-exception list rather than given hollow REGISTRY entries.
+
+**Process note:** this agent stalled once by backgrounding the suite and waiting on it,
+despite being told not to. Nothing was lost — no run was live and nothing had been pushed,
+so it was resumed with its context intact and finished the slice normally.

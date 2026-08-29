@@ -8,7 +8,7 @@ sections.
 House rule they all follow (`CLAUDE.md`): *ambiguity goes back to Notion as a question,
 not into code as a guess.* Half this backlog exists to undo guesses.
 
-Compiled 2026-08-29, against catalog state **149 / 180 implemented**.
+Compiled 2026-08-29, against catalog state **152 / 180 implemented**.
 
 ---
 
@@ -44,9 +44,10 @@ that divergence never being carried back into the catalog.
 | Bible Gag Reel Scroll | Uncommon | "On Box Pick: you may reject the contents once and reroll them" |
 | Snowden's Rubik's Cube | Uncommon | "Once per Box: you may reroll the offered Picks" |
 
-Functionally identical, same rarity. **Not a blocker** — slice 46 implements both the same
-way and lets them stack additively, which is what the stacking rule already prescribes,
-and deliberately does not invent a difference to justify both existing.
+Functionally identical, same rarity. **Not a blocker, and now shipped** — slice 46 (merged) implements both the
+same way, sharing one reroll budget so they stack additively, and deliberately does not
+invent a difference to justify both existing. If the answer is "one of them should differ",
+that is a small edit to one handler, not a rebuild.
 
 **Question:** is one of these meant to be different (a reroll of a *different* thing, more
 rerolls, a reroll that also upgrades rarity), or is this a genuine duplicate to retire?

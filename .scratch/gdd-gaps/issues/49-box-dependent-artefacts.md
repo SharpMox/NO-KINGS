@@ -1,6 +1,6 @@
 # 49 — The four Box-dependent Artefacts
 
-Status: todo — SPECCED (user rulings 2026-08-29) · **after 47**
+Status: done (2026-08-29)
 
 ## Parent
 
@@ -101,3 +101,42 @@ letting the layout decide it.
 ## Blocked by
 
 - issue 47
+
+## Outcome
+
+Shipped in PR #183. Catalog 154 -> 158.
+
+- **Loch Ness Stool Sample** ships as written — "Piece Box" names a real thing after slice
+  47. Uses a run-long cumulative *Score gained* tracker, so spending never un-triggers it.
+- **Cicada Rejection Letter** — `Box.content_value` values every kind at Shop price: pieces
+  via `g.defs[id].value` (which *is* the piece Shop price), items via `SHOP_ITEM_PRICE`,
+  artefacts via `SHOP_ARTEFACT_PRICE`. Summed over whatever remains in the offer at the
+  moment of decline, paid on top of `BOX_SKIP_CONSOLATION`.
+- **Epstein's Black Book** — consumed *only* on the first pick beyond everything you were
+  already entitled to (native picks + Nostradamus Mad Libs). Take a Big Box's normal 1 pick
+  while holding it and it survives; take a 2nd and it spends. Tested against that exact
+  composition.
+- **All-Seeing Eye Contact Lens** — re-texted to "Boxes reveal their contents before you buy
+  or choose them". Chose a plain name list over count/rarity summaries: every Box is themed
+  since slice 47, so a count-by-kind summary would carry almost no information — the player
+  wants to know *which* pieces. Reads `slot.contents` directly, so the reveal can never
+  disagree with what opening yields.
+
+**The flake investigation, and my own error.** I blocked this PR on 3 click-probe failures
+in 15 runs against 0 in 20 on `main`, and called it conclusive. It was not: those batches
+ran in **different time windows under different machine load**, and the underlying stall is
+load-sensitive, so the comparison measured the machine rather than the branch. An
+interleaved A/B — 20 runs each, alternating in one loop across two worktrees — returned
+**0 and 0**. Slice 49 introduced nothing.
+
+The agent's rebuttal was the stronger evidence and deserved more weight at the time: it ran
+172 to my 15, and showed by **reachability** that the failing checks sit in a boot segment
+holding no Artefacts and never opening a Shop or Box, making both of my proposed mechanisms
+structurally impossible rather than merely unlikely.
+
+The stall is real, pre-existing, and recorded in FLAGS.md; the method is in `CLAUDE.md`.
+
+The agent also closed a genuine gap unprompted: All-Seeing Eye's reveal had **zero** click
+probe coverage. It added one that boots holding the Artefact, expands a Huge Box (the
+7-entry worst case), and asserts both that the reveal matches the slot's contents and that
+the Buy button beside it still clicks.

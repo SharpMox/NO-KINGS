@@ -1,6 +1,6 @@
 # 52 — Artefact activation, and the 7 Artefacts that need it
 
-Status: done — 179/180 (only SETI's Red Marker, blocked by issue 22's dormant tariff
+Status: done (2026-08-30)
 inversion, is left)
 
 ## Parent
@@ -208,3 +208,51 @@ left, blocked by issue 22's dormant tariff-inversion question), exported with
 - Tests split across `test_items_artefacts_4.gd` (all 7 files kept, no new one) + the
   extended click probes; seeds pinned. `game/tests/run_all.sh` ran foreground, alone:
   `ALL GREEN`.
+
+## Outcome
+
+Shipped in PR #190. Catalog **172 -> 179 / 180** — only SETI's Red Marker remains, deferred
+on question 10's Tariff-inversion problem.
+
+**Architecture:** activation lives deliberately *outside* `artefact_hooks.gd`'s
+REGISTRY/`run()` engine, which exists for "every held copy fires automatically on a hook".
+This is player-triggered, so `game.gd` owns its own dispatch
+(`_activate_artefact`/`_artefact_confirmed`/`_jet_fuel_restock_*`), recorded as 7 documented
+REGISTRY exceptions in `test_items_artefacts_4.gd`'s coverage audit.
+
+**Drawer:** with no activatable Artefact held the Inventory drawer is byte-for-byte today's
+`INV_H_BASE = DRAWER_H * 2 + 70` (206px, y=594). Holding one adds an `activate_box` row and
+grows it to `INV_H_ACTIVATE = DRAWER_H * 3 + 70` (274px, y=526), resized live in
+`hud.refresh()` rather than baked in at build time.
+
+**Cancel costs nothing**, verified on both shapes: the confirm path keeps the entire effect
+body inside the Confirm callback, so nothing is paid before the choice; the targeting path
+(Bovine) resets `artefact_targeting_key` without ever reaching the line that sets
+`bovine_used_this_wave` or touches the board.
+
+### Two scope decisions worth revisiting
+
+**1. "A section in the Items menu" and "click it in the list" collapsed into one widget.**
+The user asked for both. This codebase has a single Inventory drawer holding Items *and*
+Artefacts, and the only other menu is the pause menu — which **pauses the Clock**, and so
+directly contradicts the ruling that nothing about activation pauses it. One Activate row
+inside the existing drawer serves both entry points. A narrowing of the request, made
+explicitly rather than silently, and cheap to revisit if a second surface is wanted.
+
+**2. Zapruder's Director's Cut only repeats moves and captures.** `_log_action` recorded
+only `{kind}` — not enough to replay a Deploy, Merge or Item use. Rather than half-replay
+them, the move/capture site now also stamps `{from, to}` and "repeat" extends that same
+displacement vector once more through `_move_player` (full legality, buffs and scoring),
+with the Action cost skipped via `blitz_free_move`. Deploys, Merges, Items and
+Bomb/Trap/blocked captures carry no `{from, to}` and are correctly reported unavailable.
+
+So the card reads "repeat your previous Action" but does nothing after a Deploy or an Item
+— a player will notice. Either re-text it, or extend `_log_action` to carry enough state for
+the other action kinds. **Not a defect in this slice; a known limitation of an ambiguous
+card, chosen over guessing.**
+
+**Moscovium x Ecdysis, closed by construction.** Moscovium's tripled-gain flag is a standing
+bool read in `Economy.earn`, not a REGISTRY entry — because the effect has to keep working
+after the Artefact consumes itself and leaves `g.artefacts`. Having no REGISTRY entry also
+makes Ecdysis Sheddings' mirror of it an inert no-op rather than a crash or double-consume,
+which is the interaction issue 55 left live. Asserted directly.

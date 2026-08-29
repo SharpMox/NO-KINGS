@@ -10,6 +10,7 @@ const Rules := preload("res://scripts/rules.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Items := preload("res://data/items.gd")
 
 var fails := 0
 
@@ -383,6 +384,140 @@ func _init() -> void:
 		"re-promoting past the old peak clears Demoted (ruled option b, not \"was ever demoted\")")
 	pr.queue_free()
 	await process_frame
+
+	# --- Bounty (issue 48): the 13th Piece Buff, Decisive/dormant. Fires on
+	# EITHER half of a capture — you take the carrier (enemy half, resolves
+	# immediately, still your Turn) or you lose the carrier (ally half,
+	# deferred to the start of your next Turn, since _lose_player_piece is
+	# synchronous). Keyed "piece_bounty" — NOT "bounty", which a legacy core
+	# Artefact still holds (issue 50 reconciles the two later).
+	var bounty_def: Dictionary = Items.PIECE_BUFFS.filter(
+		func(b: Dictionary) -> bool: return b.name == "Bounty")[0]
+	check(Items.PIECE_BUFFS.size() == 13, "Bounty is the 13th Piece Buff")
+	check(bounty_def.key == "piece_bounty" and bounty_def.tier == "Decisive"
+			and bounty_def.model == "dormant",
+		"Bounty: Decisive dormant, keyed distinctly from the legacy Artefact")
+	check(not Items.ARTEFACT_EFFECTS_CORE.any(func(a: Dictionary) -> bool: return a.key == bounty_def.key),
+		"Bounty's Buff key does not collide with ARTEFACT_EFFECTS_CORE's 'bounty' key")
+
+	# reachable from the random-grant pool (watch-out: confirm deliberately —
+	# it carries no self_harming flag, so the full-pool filter includes it)
+	var rng_probe := RandomNumberGenerator.new()
+	var saw_bounty := false
+	for i in 300:
+		rng_probe.seed = i
+		if ArtefactHooks._random_buff_key(rng_probe) == "piece_bounty":
+			saw_bounty = true
+			break
+	check(saw_bounty, "Bounty is reachable from _random_buff_key's random-grant pool")
+
+	# enemy half: capturing the carrier opens the choice immediately, same Turn
+	var bn := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bn.actions_left = 5
+	BuffLogic.add(bn.board[Vector2i(2, 5)], "piece_bounty")
+	bn._move_player(Vector2i(2, 2), Vector2i(2, 5)) # capture the carrier
+	check(bn.buff_pick_open and bn.pending_bounty_boxes == 0,
+		"Bounty (enemy half): capturing the carrier opens the 1-of-3 Box choice immediately — nothing queued")
+	var bn_box: Node = bn.modals.buff_panel.get_child(0).get_child(0)
+	check(bn_box.get_child_count() - 2 == 3, "Bounty offers exactly 3 Box choices")
+	(bn_box.get_child(1) as Button).pressed.emit() # pick the first real offer
+	check(bn.box_open, "the chosen Box opens, revealing its pre-rolled contents (issue 47)")
+	var bn_stock: int = bn.stock.size()
+	var bn_items: int = bn.items.size()
+	var bn_artefacts: int = bn.artefacts.size()
+	while bn.box_open:
+		bn._box_choose(bn.box_offer[0])
+	check(not bn.buff_pick_open and not bn.box_open,
+		"Bounty (enemy half): fully resolved, no modal left open")
+	check(bn.stock.size() > bn_stock or bn.items.size() > bn_items or bn.artefacts.size() > bn_artefacts,
+		"Bounty (enemy half): a real reward landed, not just a closed modal")
+	bn.queue_free()
+	await process_frame
+
+	# ally half: losing the carrier queues the payout instead of opening a
+	# modal mid-Enemy-Turn, and it pays out at the START of the next player
+	# Turn. "stock" keeps at least one player piece alive off-board so
+	# _begin_player_turn's own resource-starvation check doesn't short-circuit
+	# it before ever reaching the Bounty payout below.
+	var al := _boot({"board": [["pawn", 0, 2, 6], ["rook", 1, 2, 8],
+		["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"]})
+	await process_frame
+	BuffLogic.add(al.board[Vector2i(2, 6)], "piece_bounty")
+	await al._run_enemy_actions()
+	check(al.board.has(Vector2i(2, 6)) and al.board[Vector2i(2, 6)].owner == 1,
+		"(setup) the enemy captures the Bounty-carrying ally")
+	check(al.pending_bounty_boxes == 1,
+		"Bounty (ally half): losing the carrier queues one payout")
+	check(not al.buff_pick_open,
+		"Bounty (ally half): no modal opens during the Enemy Turn itself")
+	al._begin_player_turn()
+	check(al.pending_bounty_boxes == 0 and al.buff_pick_open,
+		"Bounty (ally half): the deferred choice opens at the START of the player's next Turn")
+	var al_box: Node = al.modals.buff_panel.get_child(0).get_child(0)
+	check(al_box.get_child_count() - 2 == 3, "Bounty offers exactly 3 Box choices")
+	(al_box.get_child(1) as Button).pressed.emit()
+	check(al.box_open, "picking a Box choice opens it")
+	var al_stock: int = al.stock.size()
+	var al_items: int = al.items.size()
+	var al_artefacts: int = al.artefacts.size()
+	while al.box_open:
+		al._box_choose(al.box_offer[0])
+	check(al.stock.size() > al_stock or al.items.size() > al_items or al.artefacts.size() > al_artefacts,
+		"Bounty (ally half) actually pays out on the following Turn — a real reward landed, not just a closed modal")
+	al.queue_free()
+	await process_frame
+
+	# two carriers lost before the player's next Turn queue two payouts, but
+	# only one resolves per Turn start — the second waits for the Turn after
+	# that (ENEMY_ACTIONS_PER_TURN is 1, so two separate enemy actions stand
+	# in for "more than one loss queues before the player next acts")
+	var al2 := _boot({"board": [["pawn", 0, 2, 6], ["pawn", 0, 3, 6],
+		["rook", 1, 2, 8], ["rook", 1, 3, 8], ["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"]})
+	await process_frame
+	BuffLogic.add(al2.board[Vector2i(2, 6)], "piece_bounty")
+	BuffLogic.add(al2.board[Vector2i(3, 6)], "piece_bounty")
+	await al2._run_enemy_actions()
+	await al2._run_enemy_actions()
+	check(al2.pending_bounty_boxes == 2, "(setup) both Bounty-carrying allies are lost before the player acts again")
+	al2._begin_player_turn()
+	check(al2.pending_bounty_boxes == 1 and al2.buff_pick_open,
+		"only one Bounty payout resolves per Turn start — the second stays queued")
+	al2._choice_pick_cancelled() # forfeit this one — the Buff was already spent when it queued
+	check(not al2.buff_pick_open, "(setup) forfeiting closes the panel")
+	al2._begin_player_turn()
+	check(al2.pending_bounty_boxes == 0 and al2.buff_pick_open,
+		"the second queued payout opens on the FOLLOWING Turn, not the same one")
+	al2.queue_free()
+	await process_frame
+
+	# autoplay resolves both steps itself — no modal, no hang, for either half
+	for s in range(1, 6):
+		var bot_enemy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 5],
+			["rook", 1, 7, 10]], "wave": 3, "seed": s})
+		await process_frame
+		bot_enemy.actions_left = 5
+		bot_enemy.autoplay = true
+		BuffLogic.add(bot_enemy.board[Vector2i(2, 5)], "piece_bounty")
+		bot_enemy._move_player(Vector2i(2, 2), Vector2i(2, 5))
+		check(not bot_enemy.buff_pick_open and not bot_enemy.box_open,
+			"autoplay (seed %d): Bounty enemy half resolves both steps — no modal, no hang" % s)
+		bot_enemy.queue_free()
+		await process_frame
+
+		var bot_ally := _boot({"board": [["pawn", 0, 2, 6], ["rook", 1, 2, 8],
+			["rook", 1, 7, 10]], "wave": 3, "seed": s, "stock": ["pawn"]})
+		await process_frame
+		bot_ally.autoplay = true
+		BuffLogic.add(bot_ally.board[Vector2i(2, 6)], "piece_bounty")
+		await bot_ally._run_enemy_actions()
+		check(bot_ally.pending_bounty_boxes == 1, "autoplay (seed %d): the ally half still queues" % s)
+		bot_ally._begin_player_turn()
+		check(bot_ally.pending_bounty_boxes == 0 and not bot_ally.buff_pick_open and not bot_ally.box_open,
+			"autoplay (seed %d): Bounty ally half resolves both steps on the next Turn — no modal, no hang" % s)
+		bot_ally.queue_free()
+		await process_frame
 
 	print("---")
 	if fails == 0:

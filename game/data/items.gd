@@ -86,6 +86,13 @@ const PIECE_BUFFS: Array = [
 		"description": "For 2 player turns, adjacent allies score double on their captures."},
 	{"key": "smog", "name": "Smog", "tier": "Strategic", "model": "timed", "turns": 2,
 		"description": "For 2 player turns, adjacent enemies move and capture like a Pawn."},
+	{"key": "piece_bounty", "name": "Bounty", "tier": "Decisive", "model": "dormant",
+		# NOT "bounty" — a legacy core Artefact already holds that key
+		# (ARTEFACT_EFFECTS_CORE below: "+30 score when capturing a piece
+		# worth 50+"). User ruling (issue 48, 2026-08-29): the Buff takes the
+		# NAME "Bounty"; the Artefact's own rename/retirement to free up its
+		# key is issue 50's job, not this one's. Reconcile there, not here.
+		"description": "When this piece is captured — by you or from you — choose 1 of 3 random Boxes, then open it."},
 ]
 
 ## The 7 game-native artefact effects — pre-date the 180-entry reference-site

@@ -80,16 +80,15 @@ found. Collected here so they are not lost in Outcome sections:
   **2** and the Probe adds **+1** (to 3). Issue 53 introduced that cap, which had to be
   invented — it did not exist before — so the Artefact was re-texted from "can carry 2",
   which by then described the base game.
-- **`on_milestone` fires every 10 waves but several artefacts say "5-Wave Milestone"** —
-  still true, and still worth a GDD ruling, but it is now a *naming* collision rather than
-  a behavioural bug. `on_milestone` is the global 10-Wave clock-refill trigger
-  (`Tuning.MILESTONE_WAVES == 10`), used only by "timer" and the Recession tariff. Every
-  per-artefact "5-Wave Milestone" effect hooks `on_wave_clear` and calls
-  `_milestone5_hit(g.wave, acquired_wave)` — each held copy counting its own 5 Waves from
-  acquisition (issue 28, user ruling 2026-08-29), **not** the `g.wave % 5` this flag
-  originally described. The trap is that the hook *named* `on_milestone` is not the one a
-  "5-Wave Milestone" artefact wants; issue 43's spec got this wrong and the implementing
-  agent caught it.
+- ~~**`on_milestone` fires every 10 waves but several artefacts say "5-Wave Milestone"**~~
+  — RESOLVED 2026-08-30 (issue 58). The hook is renamed `on_clock_refill`, which is what
+  it actually is: the global 10-Wave clock-refill trigger (`Tuning.MILESTONE_WAVES == 10`),
+  used only by "timer" and the Recession tariff. Every per-artefact "5-Wave Milestone"
+  effect keeps hooking `on_wave_clear` and calling `_milestone5_hit(g.wave, acquired_wave)`
+  — each held copy counting its own 5 Waves from acquisition (issue 28, user ruling
+  2026-08-29), unrelated to the renamed hook. The naming collision that made issue 43's
+  spec name the wrong hook (caught by the implementing agent) is gone — pure rename, no
+  behaviour change.
 - Assorted per-artefact ambiguities parked in issues 19, 21, 22, 24 and 26 Outcomes.
 - ~~**"Demoted" is undefined**~~ — issue 31, closed by slice 42. Resolved with a
   **peak-rank stamp**: `peak_ranked` is set on any piece the moment it ranks up (at the

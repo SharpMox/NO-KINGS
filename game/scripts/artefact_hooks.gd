@@ -139,7 +139,7 @@
 ##
 ## Tariff/artefact ordering: run() dispatches the artefacts group before the
 ## tariffs group (two separately-sorted passes, not one merged sort) so a
-## shared hook — only on_milestone today (artefact "timer" + tariff
+## shared hook — only on_clock_refill today (artefact "timer" + tariff
 ## "recession") — keeps computing the artefact-modified base first and
 ## applying the tariff modifier on top, exactly the order the pre-migration
 ## call site used (`refill` built by the artefact hook run, then halved by
@@ -788,7 +788,7 @@ const Box := preload("res://scripts/box.gd")
 
 const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
-	"on_wave_clear", "on_wave_spawn", "on_milestone",
+	"on_wave_clear", "on_wave_spawn", "on_clock_refill",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
 	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
 	"on_item_consume", "on_rank_up", "on_tariff_apply", "on_tariff_charge",
@@ -818,7 +818,7 @@ const REGISTRY := {
 	"lifesteal": ["on_capture"],
 	"first_capture_extra": ["on_capture"],
 	"move": ["on_turn_start"],
-	"timer": ["on_milestone"],
+	"timer": ["on_clock_refill"],
 	# --- issue 16: Gold/Score batch (31 artefacts, no needs-note) ---
 	"tinfoil-hat": ["on_score_change", "on_gold_change"],
 	"daylight-savings-jar": ["on_score_change", "on_gold_change"],
@@ -900,7 +900,7 @@ const REGISTRY := {
 	"sanctions": ["on_sanction_check"],
 	"regulation": ["on_merge_check"],
 	"austerity": ["on_place_cost"],
-	"recession": ["on_milestone"],
+	"recession": ["on_clock_refill"],
 	"filibuster": ["on_enemy_turn_start"],
 	"trade_war": ["on_wave_roster"],
 
@@ -1007,12 +1007,12 @@ const REGISTRY := {
 
 	# --- issue 26: "5-Wave Milestone" (on_wave_clear + _milestone5_hit, the
 	# silk-road-coupon/crop-circle-plank cadence — PER-ARTEFACT, ruled
-	# 2026-08-28; a different one than on_milestone's own GLOBAL 10-wave
+	# 2026-08-28; a different one than on_clock_refill's own GLOBAL 10-wave
 	# clock-refill trigger, see there) ---
 	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
 	"trojan-horse-assembly-manual": ["on_wave_clear"],
-	# was left on on_milestone (the GLOBAL 10-wave beat) when the other 8 were
-	# converted above — paid at half the intended rate; moved to this
+	# was left on on_clock_refill (the GLOBAL 10-wave beat) when the other 8
+	# were converted above — paid at half the intended rate; moved to this
 	# per-artefact cadence 2026-08-28 (user-reported)
 	"john-titor-s-crypto-wallet": ["on_wave_clear"],
 
@@ -1113,6 +1113,11 @@ const REGISTRY := {
 	# referential "on acquiring THIS Artefact", same on_purchase shape as
 	# Capstone Polish's "an Artefact" above ---
 	"seti-s-red-marker": ["on_purchase"],
+
+	# --- issue 58: Bible Gag Reel Scroll, redesigned (was a duplicate of
+	# Snowden's Rubik's Cube's Box reroll, which that Artefact keeps alone
+	# now — see game.gd's box_rerolls_left) ---
+	"bible-gag-reel-scroll": ["on_capture"],
 }
 
 
@@ -1124,7 +1129,7 @@ const REGISTRY := {
 ## Two held sources, dispatched as two separately key-sorted groups —
 ## artefacts (g.artefacts) always before tariffs (g.tariffs_active, skipped
 ## entirely while g.tariffs_suppressed) — see the header for why a single
-## merged sort would be wrong for the one hook (on_milestone) both groups use.
+## merged sort would be wrong for the one hook (on_clock_refill) both groups use.
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	var held: Array = g.artefacts.duplicate()
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
@@ -1354,8 +1359,8 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 
 
 ## "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, not the GLOBAL
-## 10-wave beat (Tuning.MILESTONE_WAVES / on_milestone, wave_logic.gd's clock
-## refill + score chunk — untouched, a genuinely different cadence). Each held
+## 10-wave beat (Tuning.MILESTONE_WAVES / on_clock_refill, wave_logic.gd's
+## clock refill + score chunk — untouched, a genuinely different cadence). Each held
 ## copy counts its own 5 waves from its own acquisition — ruled 2026-08-28,
 ## matching .scratch/shop-gdd-sync/PRD.md ("each Artefact counts its own 5
 ## waves from acquisition"). The acquisition wave itself counts as beat 1, so
@@ -1528,7 +1533,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g.actions_max += 1
 		["move", "on_turn_start"]:
 			g.actions_left += 1
-		["timer", "on_milestone"]:
+		["timer", "on_clock_refill"]:
 			ctx.refill += 5000
 
 		# --- issue 16: percentage Score/Gold gain modifiers ---
@@ -1674,7 +1679,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["golden-buddha-bobblehead", "on_wave_clear"]:
 			g.gold += roundi(ctx.gold_base * 0.05)
 
-		# --- issue 16: on_wave_spawn / on_milestone / on_purchase / on_game_over ---
+		# --- issue 16: on_wave_spawn / on_clock_refill / on_purchase / on_game_over ---
 		["nigerian-prince-wire-transfer", "on_wave_spawn"]:
 			g.score += 100
 			g.gold += 10
@@ -1750,7 +1755,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.amount -= ctx.base * 0.50
 		["silk-road-coupon", "on_wave_clear"]:
 			# "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, a different
-			# cadence than on_milestone's own GLOBAL 10-wave clock-refill
+			# cadence than on_clock_refill's own GLOBAL 10-wave clock-refill
 			# trigger — see _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
@@ -1826,9 +1831,17 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			ItemLogic.grant(g, tac_pool[g.rng.randi() % tac_pool.size()])
 			g.gold = maxi(g.gold - 10, 0)
 		["manna-vending-machine", "on_wave_clear"]:
-			if _milestone5_hit(g.wave, acquired_wave):
-				for i in 2:
-					ItemLogic.grant(g, Items.ITEMS[g.rng.randi() % Items.ITEMS.size()])
+			# issue 58 redesign: was a flat "+2 Items" grant, which issue 53's
+			# base Item cap of 3 made partly/wholly wasted at a full inventory.
+			# A Big Item Box (5 choices, 1 pick) sidesteps the cap instead of
+			# carving a hole in it — same shape as SETI's Red Marker redesign
+			# (issue 56). `not g.box_open` mirrors Trojan Horse Assembly
+			# Manual's own guard (below): two held copies acquired on the
+			# same wave both hitting _milestone5_hit in the same dispatch pass
+			# must not clobber one open Box Pick with a second.
+			if _milestone5_hit(g.wave, acquired_wave) and not g.box_open:
+				g._open_box_pick({"kind": "box", "key": "item", "size": "big",
+					"sold": false, "contents": Box.roll_options(g, "item", "big")})
 		["mao-s-loyalty-badge", "on_purchase"]:
 			if ctx.kind == "item":
 				var tier := ""
@@ -1873,7 +1886,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.blocked = true
 		["austerity", "on_place_cost"]:
 			ctx.cost *= 2
-		["recession", "on_milestone"]:
+		["recession", "on_clock_refill"]:
 			ctx.refill *= 0.5
 		["filibuster", "on_enemy_turn_start"]:
 			ctx.actions += 1
@@ -2354,7 +2367,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["mar-a-lago-toilet-papers", "on_wave_clear"]:
 			# "5-Wave Milestone" — the silk-road-coupon/crop-circle-plank
 			# PER-ARTEFACT cadence (issue 26/28), not the GLOBAL 10-wave
-			# on_milestone hook (see REGISTRY's issue-26 comment). The free
+			# on_clock_refill hook (see REGISTRY's issue-26 comment). The free
 			# slot is picked HERE, once, and stamped onto the actual
 			# g.shop_stock Dictionary (a plain field, same shape as roll()'s
 			# own "biased" tag) — never re-rolled inside Shop.price(), which
@@ -2445,7 +2458,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# comparison never even runs). Net result held together: the
 			# enemy's first Turn gets exactly Filibuster's bonus action, not
 			# the normal 1 and not 0 — the same "artefact base, tariff modifies
-			# on top" shape on_milestone/Recession already established.
+			# on top" shape on_clock_refill/Recession already established.
 			if g.y2k_armed:
 				g.y2k_armed = false
 				ctx.actions = 0
@@ -2545,3 +2558,21 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 					# pick with a second
 					g._open_box_pick({"kind": "box", "key": "artefact", "size": "big",
 						"sold": false, "contents": Box.roll_options(g, "artefact", "big")})
+
+		# --- issue 58: Bible Gag Reel Scroll, redesigned (see REGISTRY note) ---
+		["bible-gag-reel-scroll", "on_capture"]:
+			# User ruling 2026-08-30: Bishop, Cardinal and Archbishop gain
+			# Shield — the mildest dormant Piece Buff, "prevents the next
+			# capture attempt on this piece" — when they capture. Match on
+			# ids, NEVER display names: dragon-horse's display name is
+			# "Cardinal" (the id convention — see CLAUDE.md), so matching
+			# "cardinal" here would silently never fire. A SPECIFIC buff, not
+			# _random_buff_key — this fires on every capture by any of 3
+			# piece types, so it routes through g._apply_buff (issue 23's
+			# choke point) so a piece already at the issue-53 cap (base 2)
+			# gets a clean "Buffs full" float instead of a silently dropped
+			# grant, same as every other _apply_buff caller.
+			if ctx.attacker_pos.x >= 0 \
+					and ["bishop", "dragon-horse", "archbishop"].has(ctx.attacker_id):
+				g._apply_buff(g.board[ctx.attacker_pos], "shield",
+					_buff_turns("shield"), ctx.attacker_pos)

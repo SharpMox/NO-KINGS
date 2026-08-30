@@ -26,17 +26,11 @@ Full spec in **issue 47**; the four dependent Artefacts in **issue 49**; the rep
 for loot-on-capture is the new Bounty Piece Buff in **issue 48**.
 ---
 
-## 2. Two Artefacts have the same effect — still open, low priority
+## 2. ~~Two Artefacts have the same effect~~ — RESOLVED 2026-08-30
 
-**Bible Gag Reel Scroll** (Uncommon) — "On Box Pick: you may reject the contents once and
-reroll them" — and **Snowden's Rubik's Cube** (Uncommon) — "Once per Box: you may reroll
-the offered Picks" — are functionally identical.
-
-Both shipped in slice 46, implemented the same way with a shared reroll budget so they
-stack additively. The question stands but answering it is now a small edit to one handler,
-not a rebuild.
-
-**Question:** is one meant to differ, or is this a duplicate to retire?
+Bible Gag Reel Scroll gets a **new effect** rather than being retired: Bishop, Cardinal and
+Archbishop gain a Piece Buff when they capture. Snowden's Rubik's Cube keeps the Box reroll.
+Spec in **issue 58**, where the remaining open bit is only *which* Buff.
 ---
 
 ## 3. ~~Spare Organ Receipt~~ — ANSWERED 2026-08-29
@@ -77,20 +71,11 @@ buff cleanly. The Artefact's text needs rewriting, since "can carry 2" now descr
 base game. See issue 53.
 ---
 
-## 8. "5-Wave Milestone" vs the hook named `on_milestone` — naming, not behaviour
+## 8. ~~"5-Wave Milestone" vs the hook named `on_milestone`~~ — RESOLVED 2026-08-30
 
-Not blocking, but it has now caused one real spec error and will cause more.
-
-- `on_milestone` is the **global 10-Wave** clock-refill trigger
-  (`Tuning.MILESTONE_WAVES == 10`), used only by "timer" and the Recession tariff.
-- Every per-artefact **"5-Wave Milestone"** effect hooks `on_wave_clear` and calls
-  `_milestone5_hit(g.wave, acquired_wave)` — each held copy counting its own 5 Waves from
-  acquisition (user ruling 2026-08-29).
-
-**Question:** should the GDD use two distinct names for these, so "Milestone" stops
-meaning two different cadences? Renaming the hook in code is cheap; the catalog wording is
-the part that needs the ruling.
-
+The hook is renamed to **`on_clock_refill`**, which is what it actually is (the global
+10-Wave clock refill). The per-Artefact "5-Wave Milestone" cadence keeps `on_wave_clear` +
+`_milestone5_hit`. Naming collision gone. Spec in **issue 58**.
 ---
 
 ## 9. ~~Item held capacity~~ — ANSWERED 2026-08-29

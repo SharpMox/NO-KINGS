@@ -1,0 +1,67 @@
+# 59 — Tier 5 gains: the enemy takes 2 Actions
+
+Status: todo — SPECCED (user ruling 2026-08-30) · **read the warning first**
+
+## Parent
+
+`.scratch/gdd-gaps/PRD.md`
+
+## Why
+
+Divergence #2: the enemy takes **1** Action per turn, the GDD says **2**. That has been a
+playtest override since 2026-07-02, predating the wave-catalog rebalance, the Tariff system
+and the unified Action economy.
+
+The user's resolution (2026-08-30): don't change the base — **make it a difficulty rank, at
+the last rank.**
+
+## Scope
+
+`Tuning.ENEMY_ACTIONS_PER_TURN` becomes tier-aware, in the same shape as the existing
+tier rules in `tuning.gd`:
+
+```gdscript
+static func enemy_actions_per_turn(tier: String) -> int:
+	return ENEMY_ACTIONS_PER_TURN + (1 if tier_index(tier) >= 4 else 0)
+```
+
+The value already flows through `Economy` — `on_enemy_turn_start` is seeded from
+`Tuning.ENEMY_ACTIONS_PER_TURN` (`economy.gd:277`) and Filibuster and Y2K Patch Floppy Disk
+both modify it there — so this is a single-site change, not a sweep. Make sure the tier
+value is what seeds the hook, so those two Artefacts still compose on top of it.
+
+## The warning: difficulties are cumulative, and Tier 5 is already brutal
+
+Confirmed by reading `tuning.gd` — every rule is `tier_index(tier) >= N`, so a tier inherits
+every lower tier's debuff. **Tier 5 today is all four at once:**
+
+| From | Effect |
+| --- | --- |
+| Tier 2+ | the Clock never pauses |
+| Tier 3+ | −1 Shop row of each kind |
+| Tier 4+ | starting Stock halved |
+| Tier 5 | −1 Action per Turn |
+
+This slice adds a **fifth**: the enemy acts twice.
+
+`FLAGS.md` already records a 24-run sweep of Tier 5 as it stands *without* this: median
+survival wave **38.5 -> 9.5**, **0 wins in 24**, every loss to resource starvation. Doubling
+the enemy's Actions on top of that is a large multiplier on an already-unwon tier.
+
+That is not an objection — the user parked Tier-5 tuning as "later" and a top tier is allowed
+to be brutal. But **run the 24-run sweep again after this lands and record the new numbers**,
+so the tuning pass starts from measurement rather than from a guess. If the median drops
+below wave ~5 the tier stops teaching the player anything, which is worth knowing early.
+
+## Acceptance
+
+- Enemy takes 2 Actions at Tier 5, 1 at Tiers 1-4.
+- Filibuster and Y2K Patch Floppy Disk still compose correctly on top of the tier value —
+  assert Y2K still skips exactly one enemy Turn at Tier 5.
+- A fresh autoplay sweep at Tier 5, with the numbers recorded in the Outcome next to the
+  previous 38.5 -> 9.5 / 0-of-24 baseline.
+- `run_all.sh` ALL GREEN, foreground.
+
+## Blocked by
+
+- nothing

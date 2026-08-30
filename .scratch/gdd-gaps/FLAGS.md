@@ -122,21 +122,24 @@ found. Collected here so they are not lost in Outcome sections:
   The behaviour under test is *"Holy Lint grants exactly one Piece Buff"*; the specific key
   is incidental. Reshaping it to assert `size() == 1` plus membership of the safe
   non-self-triggering set would keep all its value and stop the churn. Cheap, not urgent.
-- **The click probes carry a load-sensitive stall.** The signature is `PASS cycles through
-  the enemy turn` timing out, which then cascades into `double-tap opens the piece preview`
-  and `Close button clickable` failing. It reproduces on `main` and on feature branches
-  alike — well under 1% when the machine is quiet, and around 20% when it is busy.
-  **The autosave hypothesis is refuted.** It was the prime suspect — a real disk write
-  (`FileAccess.open(SAVE_PATH, WRITE)` plus `CloudSave.sync_file`) fires on every
-  `_begin_player_turn()` in the probe's first boot segment, which never sets `is_scenario`.
-  But instrumenting that write under synthetic I/O and CPU load showed it completing in
-  **0.001-0.135s even on runs where the probe fails**. The write is not what stalls.
-  Current evidence points instead at general **scheduling contention during the enemy-turn
-  animation window** — the probe waits on animation frames that the OS is not delivering
-  promptly under load. Worth fixing for its own sake: a load-sensitive stall makes every
-  "ALL GREEN" slightly unfalsifiable, which is exactly what slice 36 existed to eliminate.
-  Diagnosed 2026-08-29 while wrongly accusing slice 49 of introducing it (see `CLAUDE.md`
-  on interleaving A/B runs).
+- ~~**The click probes carry a load-sensitive stall.**~~ Fixed 2026-08-30
+  (`fix/click-probe-stall`). Worth keeping for the mechanism, which nobody would guess:
+  `game.gd` freezes the enemy turn **indefinitely** while `backgrounded` is set
+  (`_wait_while_backgrounded`, slice 06) — deliberately unbounded, because a real player
+  might tab away for minutes, and covered headlessly by `test_background.gd`. The click
+  probe drives a **real OS window**, so on a busy machine the window manager delivers a
+  genuine `WM_WINDOW_FOCUS_OUT` with no matching FOCUS_IN, and the enemy turn simply sits
+  frozen past the probe's 4s poll. **Nothing was ever stalling** — the game was correctly
+  obeying a feature the probe had no business triggering, since it drives every click via
+  synthetic `push_input()` and has no real "player tabbed away" to honour.
+  Fix is **probe-side only**; `game.gd` untouched, so this was never player-facing.
+  Two hypotheses were refuted along the way and both are worth remembering as cautionary
+  tales: it was **not** the per-turn autosave write (measured 0.000-0.135s even on failing
+  runs, and it reproduced in a segment where that branch never ran), and it was **not**
+  introduced by slice 49 (see that issue's Outcome — batched A/B comparisons across
+  different machine load produced a confident wrong answer). The confirming measurement was
+  **interleaved**: 30 alternating before/after runs in one continuous load session,
+  3/30 failures -> 0/30.
 
 ## Cards whose text overpromises what shipped
 

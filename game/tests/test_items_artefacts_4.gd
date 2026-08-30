@@ -1413,14 +1413,21 @@ func _init() -> void:
 	check(not GameScript.ACTIVATABLE_ARTEFACT_KEYS.has("jet-fuel-vial"),
 		"Jet Fuel Vial: NOT part of the in-run Activate set (user ruling: it's a Shop control)")
 	check(jet._jet_fuel_restock_available(),
-		"Jet Fuel Vial: available (held, Shop-visit charge unused, affordable)")
+		"Jet Fuel Vial: available (held, Wave charge unused, affordable)")
 	jet._jet_fuel_restock_confirmed()
-	check(jet.gold == 80 and jet.jet_fuel_used_this_visit,
-		"Jet Fuel Vial: confirmed restock pays 20 Gold and spends the once-per-Shop-visit charge")
+	check(jet.gold == 80 and jet.jet_fuel_used_this_wave,
+		"Jet Fuel Vial: confirmed restock pays 20 Gold and spends the once-per-Wave charge")
 	check(not jet._jet_fuel_restock_available(),
-		"Jet Fuel Vial: unavailable again — already used this Shop visit")
-	jet._open_shop() # a fresh Shop visit
-	check(jet._jet_fuel_restock_available(), "Jet Fuel Vial: available again on a fresh Shop visit")
+		"Jet Fuel Vial: unavailable again — already used this Wave")
+	# --- issue 61's failing case: this is the exploit the fix closes.
+	# Closing and reopening the Shop must NOT re-arm the restock charge —
+	# only a Wave boundary may. ---
+	jet._open_shop()
+	check(not jet._jet_fuel_restock_available() and jet.jet_fuel_used_this_wave,
+		"Jet Fuel Vial: issue 61 — closing and reopening the Shop does NOT re-arm the charge (no more unlimited restock-scumming)")
+	WaveLogic.queue(jet, jet.wave + 1)
+	check(jet._jet_fuel_restock_available() and not jet.jet_fuel_used_this_wave,
+		"Jet Fuel Vial: re-arms only on the Wave boundary")
 	jet.queue_free()
 	await process_frame
 
@@ -1444,7 +1451,7 @@ func _init() -> void:
 	await process_frame
 	jet_cancel._jet_fuel_restock_pressed() # opens the confirm modal
 	jet_cancel._choice_pick_cancelled()
-	check(jet_cancel.gold == 100 and not jet_cancel.jet_fuel_used_this_visit,
+	check(jet_cancel.gold == 100 and not jet_cancel.jet_fuel_used_this_wave,
 		"Confirm path (Shop): cancelling the restock confirm costs nothing")
 	jet_cancel.queue_free()
 	await process_frame

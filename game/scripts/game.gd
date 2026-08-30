@@ -183,9 +183,11 @@ var y2k_armed := false # Y2K Patch Floppy Disk (issue 45): (re)armed every
 	# (on_enemy_turn_start) — see artefact_hooks.gd for the deliberate
 	# exception to the additive-stacking rule this makes
 var pallet_purchase_count := 0 # Pandemic Toilet Paper Pallet (issue 45):
-	# purchases made this Shop visit, reset in _open_shop() below — "the same
-	# Shop visit", not the whole run (contrast Pre-Scratched Lottery Ticket's
-	# lottery_purchase_count above, which never resets)
+	# purchases made this Wave, reset on_wave_clear (artefact_hooks.gd) —
+	# issue 61: moved off the "Shop visit" boundary, since the Shop panel can
+	# be closed/reopened at will and _open_shop() no longer resets this
+	# (contrast Pre-Scratched Lottery Ticket's lottery_purchase_count above,
+	# which never resets at all)
 var ecdysis_copy_key := "" # issue 55: Ecdysis Sheddings — the last OTHER
 	# Artefact bought (set in ArtefactHooks.run() on on_purchase, kind ==
 	# "artefact", unconditional of whether Ecdysis is held, so the history is
@@ -313,7 +315,9 @@ var action_log: Array[Dictionary] = [] # ordered {kind} entries this Turn (issue
 
 # --- issue 52: Artefact activation. Player-triggered ("on use"/"you may
 # pay") Artefacts, costing 0 Actions (user ruling) — gated by each key's own
-# once-per-Turn/Wave/Shop-visit limit instead. Deliberately separate from
+# once-per-Turn/Wave limit instead (issue 61: "Shop-visit" retired — the Shop
+# panel can be closed/reopened at will, so it was never a real boundary).
+# Deliberately separate from
 # ArtefactHooks' REGISTRY/run() engine (built for "every HELD copy fires
 # automatically on a hook") — see game.gd's _activate_artefact block for why.
 const ACTIVATABLE_ARTEFACT_KEYS := [
@@ -328,9 +332,10 @@ var moscovium_active := false # "until end of Turn" — reset in _begin_player_t
 	# leaves g.artefacts, when there is no "held copy" left to dispatch from
 var zapruder_used_this_wave := false # reset in WaveLogic.queue()
 var bovine_used_this_wave := false # reset in WaveLogic.queue()
-var jet_fuel_used_this_visit := false # reset in _open_shop() — the same
-	# "Shop visit" boundary issue 45 already established for Pandemic Toilet
-	# Paper Pallet's pallet_purchase_count
+var jet_fuel_used_this_wave := false # Jet Fuel Vial (52): once per Wave,
+	# reset in WaveLogic.queue() — same idiom as zapruder/bovine above (issue
+	# 61: moved off the "Shop visit" boundary, since _open_shop() can't gate
+	# reopening the panel and so was never a real limit)
 var artefact_targeting_key := "" # Bovine Tractor Beam's staged board pick in
 	# progress, "" = none — the one activation with a target (game's own
 	# item-targeting flow, generalized: item_active plays this role for Items)
@@ -3030,10 +3035,10 @@ func _connect_modals() -> void:
 func _open_shop() -> void:
 	if box_open or buff_pick_open or preview_open or win_open: # one modal at a time
 		return
-	pallet_purchase_count = 0 # Pandemic Toilet Paper Pallet (issue 45): a
-		# fresh Shop visit starts a fresh "every 2nd purchase" count
-	jet_fuel_used_this_visit = false # Jet Fuel Vial (52): same "Shop visit" boundary
-	modals.show_shop()
+	modals.show_shop() # issue 61: no per-visit resets here — the panel can be
+		# closed/reopened at will, so nothing about a "visit" is a real
+		# boundary (pallet_purchase_count/jet_fuel_used_this_wave both moved
+		# to a per-Wave reset instead — see WaveLogic.queue()/artefact_hooks.gd)
 
 
 ## The Shop panel is up. Read from the panel itself rather than a mirrored
@@ -3042,12 +3047,13 @@ func shop_open() -> bool:
 	return modals.shop_panel != null and modals.shop_panel.visible
 
 
-## Jet Fuel Vial (52): "Once per Shop visit: pay 20 Gold to restock the
-## Shop" — a Shop control, not part of the in-run Activate section (user
-## ruling). Read by modals.gd's Restock button (enabled state) and the
-## confirm below.
+## Jet Fuel Vial (52): "Once per Wave: pay 20 Gold to restock the Shop" — a
+## Shop control, not part of the in-run Activate section (user ruling). Read
+## by modals.gd's Restock button (enabled state) and the confirm below.
+## Issue 61: moved off the "Shop visit" boundary — closing/reopening the Shop
+## panel (_open_shop()) can no longer re-arm this; only a Wave clear can.
 func _jet_fuel_restock_available() -> bool:
-	return _held("jet-fuel-vial") and not jet_fuel_used_this_visit \
+	return _held("jet-fuel-vial") and not jet_fuel_used_this_wave \
 			and state == State.PLAYER_TURN and gold >= 20
 
 
@@ -3064,7 +3070,7 @@ func _jet_fuel_restock_pressed() -> void:
 func _jet_fuel_restock_confirmed() -> void:
 	if not _jet_fuel_restock_available(): # re-check (Gold/state may have shifted)
 		return
-	jet_fuel_used_this_visit = true
+	jet_fuel_used_this_wave = true
 	Economy.spend_gold(self, 20)
 	Shop.roll(self)
 	if modals.shop_panel and modals.shop_panel.visible:

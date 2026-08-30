@@ -1078,7 +1078,7 @@ const REGISTRY := {
 	# against the real code, not the note (see .scratch/gdd-gaps/issues/45) ---
 	"frog-pride-flag": ["on_piece_lost", "on_deploy"],
 	"y2k-patch-floppy-disk": ["on_wave_spawn", "on_enemy_turn_start"],
-	"pandemic-toilet-paper-pallet": ["on_purchase", "on_price"],
+	"pandemic-toilet-paper-pallet": ["on_purchase", "on_price", "on_wave_clear"],
 
 	# --- issue 53: two new base-game caps + four resolved ambiguities.
 	# Area 51 Parking Permit and Abduction Probe deliberately have NO REGISTRY
@@ -2458,11 +2458,19 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# comment above), so mutating here would drift the displayed
 			# price between frames. "+1" reads the counter as if the pending
 			# purchase already happened — the 2nd/4th/6th... purchase this
-			# Shop visit (g.pallet_purchase_count reset in game.gd's
-			# _open_shop()) is 50% off the immutable base, same additive
-			# percentage contract as every other on_price handler.
+			# Wave (g.pallet_purchase_count, reset on_wave_clear just below —
+			# issue 61 moved this off the "Shop visit" boundary, since
+			# _open_shop() can't gate reopening the panel) is 50% off the
+			# immutable base, same additive percentage contract as every
+			# other on_price handler.
 			if (g.pallet_purchase_count + 1) % 2 == 0:
 				ctx.amount -= ctx.base * 0.5
+		["pandemic-toilet-paper-pallet", "on_wave_clear"]:
+			g.pallet_purchase_count = 0 # issue 61: the count now persists
+				# across a Shop panel close/reopen within a Wave — a small
+				# buff, since progress toward the discount is no longer
+				# silently discarded — and only resets here, at the Wave
+				# boundary, same idiom as Hoffa's Cement Shoes above
 
 		# --- issue 53: two new base-game caps + four resolved ambiguities ---
 		["denver-bunker-timeshare", "on_gold_change"]:

@@ -139,6 +139,19 @@
    Deploy, Merge — the last returning BOTH consumed pieces, user ruling),
    instead of leaving the card dead after any of them — see
    game/scripts/artefact_hooks.gd's header for the full mechanism.
+   2026-08-30 (issue 61): Jet Fuel Vial and Pandemic Toilet Paper Pallet
+   both re-texted off the "Shop visit" boundary onto per-Wave — the Shop
+   panel can be closed and reopened at will, so "Once per Shop visit" was
+   never a real limit (Jet Fuel Vial's restock was free to spam for
+   unlimited reroll-scumming, defeating shop.gd's own documented intent on
+   shop_restocks). User ruling: both move to the same per-Wave boundary
+   already established elsewhere (Hoffa's Cement Shoes, UAP Breath Mint,
+   Inflatable Vietcong Torpedo, Bovine Tractor Beam, Zapruder's Director's
+   Cut) rather than tying the flag to the actual stock roll, which would
+   have Jet Fuel Vial's own restock reset its own flag. The Pallet's count
+   now persists across a Shop close/reopen within a Wave — a small buff, not
+   just a fix, since progress toward the discount is no longer silently
+   discarded. See game/scripts/game.gd/artefact_hooks.gd/wave_logic.gd.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -275,7 +288,7 @@ var ARTEFACTS = [
     conspiracy: "The frozen Walt Disney legend", url: "https://en.wikipedia.org/wiki/Cryonics",
     summary: "The most famous cryonics story is false: Walt Disney was cremated in 1966. The rumor that he waits frozen under Pirates of the Caribbean started within years and has outlived every correction." },
   { name: "Pandemic Toilet Paper Pallet", rarity: "Common", type: "Passive", bonus: ["Shop"], status: "KEEP", implemented: true,
-    effect: "Every 2nd purchase in the same Shop visit costs 50% less",
+    effect: "Every 2nd purchase in the same Wave costs 50% less",
     conspiracy: "Panic buying", url: "https://en.wikipedia.org/wiki/Panic_buying",
     summary: "March 2020: faced with a respiratory virus, humanity bought all the toilet paper on earth. Shelves emptied because everyone believed everyone else would empty them — the rare conspiracy in which everyone was the conspirator." },
   { name: "Denazification Visa", rarity: "Common", type: "Passive", bonus: ["Shop"], status: "KEEP", implemented: true,
@@ -335,7 +348,7 @@ var ARTEFACTS = [
     conspiracy: "El Dorado", url: "https://en.wikipedia.org/wiki/El_Dorado",
     summary: "The gilded king who rafted onto Lake Guatavita dusted in gold — a real Muisca rite inflated by conquistadors into a golden city that swallowed expeditions for three centuries. The golden raft exists; it's in a Bogotá museum." },
   { name: "Jet Fuel Vial", rarity: "Common", type: "Passive", bonus: ["Shop"], status: "KEEP", implemented: true,
-    effect: "Once per Shop visit: pay 20 Gold to restock the Shop",
+    effect: "Once per Wave: pay 20 Gold to restock the Shop",
     conspiracy: "Controlled demolition claims", url: "https://en.wikipedia.org/wiki/World_Trade_Center_controlled_demolition_conspiracy_theories",
     summary: "The claim that the towers were brought down by planted charges, with 'thermite traces in the dust' as its favorite exhibit. Engineering investigations answered at book length; the vial keeps being resold." },
   { name: "Manna Vending Machine", rarity: "Common", type: "Trigger", bonus: ["Item"], status: "KEEP", implemented: true,

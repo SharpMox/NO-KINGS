@@ -152,12 +152,16 @@ const ARTEFACT_RARITY_COLOR := {
 	"Rare": Color(0.35, 0.6, 1.0),
 	"Legendary": Color(1.0, 0.72, 0.15),
 }
-# Restock cadence (GDD Shop page): the shelf refreshes on cumulative score,
-# not on waves. The 1st costs BASE, and every later one costs STEP more than
-# the last — 1000 / 2500 / 4500 / 7000. Placeholders: a median Crown run ends
-# near 300, so either these come down or income goes up after a playtest sweep.
-const SHOP_RESTOCK_BASE := 1000
-const SHOP_RESTOCK_STEP := 500
+# Restock cadence (issue 64, user ruling 2026-08-30): two lanes REPLACE the
+# old rising Score-threshold curve (was BASE=1000/STEP=500 -> 1000/2500/4500/
+# 7000) entirely. Lane A is guaranteed, every SHOP_RESTOCK_WAVES Waves, first
+# at Wave 5; Lane B is Score-driven and resets on every Lane-A restock.
+# LANE_B_SCORE=10,000 calibrated against observed full-run scoring post-x10
+# economy (~8,085 Score per 5-Wave window, three ~45-Wave runs) so a typical
+# window earns slightly under one bonus Lane-B restock — Lane A stays the
+# backbone, Lane B rewards scoring above average.
+const SHOP_RESTOCK_WAVES := 5
+const SHOP_LANE_B_SCORE := 10000
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
 # halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most

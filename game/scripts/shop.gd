@@ -207,32 +207,47 @@ static func display_name(g, slot: Dictionary) -> String:
 	return "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()]
 
 
-## Cumulative score that buys the (n+1)-th restock, given n already banked:
-## 1000 / 2500 / 4500 / 7000 … — the gap itself grows by the step each time.
-static func threshold(n: int) -> int:
-	return Tuning.SHOP_RESTOCK_BASE * (n + 1) + Tuning.SHOP_RESTOCK_STEP * n * (n + 1) / 2
+## Lane A: guaranteed restock every Tuning.SHOP_RESTOCK_WAVES Waves (5, 10,
+## 15…), independent of Score — issue 64 (user ruling 2026-08-30) replaces
+## the old rising Score-threshold curve (Shop.threshold, gone) with exactly
+## two restock sources; this is the first. Wipes Lane B's progress too: a
+## Wave-5 restock discards whatever had accumulated toward the next
+## Score-lane restock, per spec ("resets on every Lane-A restock").
+static func lane_a_restock(g) -> void:
+	g.shop_lane_b_progress = 0
+	g.shop_restocks += 1
+	roll(g)
 
 
-## Restock every threshold the run's score has passed. Called from the single
-## gain site (Economy.earn); a leap over several thresholds banks them all but
-## rolls once — the shelf can only be fresh, not fresher.
-static func maybe_restock(g) -> void:
+## Lane B: g.shop_lane_b_progress banks Score earned (via Economy.earn/
+## earn_gold, the same two call sites the old threshold model used) since
+## the last Lane-A restock, and restocks every Tuning.SHOP_LANE_B_SCORE,
+## continuing to accumulate afterward — only a Lane-A restock (lane_a_restock,
+## above) zeroes it. A single gain crossing several multiples banks them all
+## but rolls once (issue 57's "leap crosses several thresholds" contract,
+## preserved from the old maybe_restock).
+static func add_score_progress(g, amount: int) -> void:
+	if amount <= 0:
+		return
+	g.shop_lane_b_progress += amount
 	var crossed := false
-	while g.score >= threshold(g.shop_restocks):
+	while g.shop_lane_b_progress >= Tuning.SHOP_LANE_B_SCORE:
+		g.shop_lane_b_progress -= Tuning.SHOP_LANE_B_SCORE
 		g.shop_restocks += 1
 		crossed = true
 	if crossed:
 		roll(g)
 
 
-## Purchasable right now: player's turn, an action and the gold to spare,
-## not sold. Kinds outside PURCHASABLE render but stay Buy-disabled.
+## Purchasable right now: player's turn and the gold to spare, not sold.
+## Kinds outside PURCHASABLE render but stay Buy-disabled. No Action gate
+## (issue 64, user ruling): Shop purchases don't spend an Action, so nothing
+## here should require one either.
 const PURCHASABLE := ["piece", "item", "artefact", "box"]
 
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
-			and g.actions_left >= 1 \
 			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
 			and (slot.kind != "item" or ItemLogic.has_room(g)) \
 			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue
@@ -265,10 +280,10 @@ static func _score_credit(g) -> int:
 	return 0
 
 
-## Debit gold + 1 action, mark the slot SOLD, grant the good; returns
-## whether the purchase happened. Buying never ends the turn (a purchase is
-## not a board action). A bought box grants nothing here — the caller opens
-## the roll modal, which IS the grant.
+## Debit gold, mark the slot SOLD, grant the good; returns whether the
+## purchase happened. Buying never spends an Action or ends the turn (issue
+## 64: no Shop interaction of any kind costs one). A bought box grants
+## nothing here — the caller opens the roll modal, which IS the grant.
 static func buy(g, index: int) -> bool:
 	var slot: Dictionary = g.shop_stock[index]
 	if not can_buy(g, slot):
@@ -288,7 +303,6 @@ static func buy(g, index: int) -> bool:
 		g.score -= score_pay * 10
 	if before > 0 and g.gold == 0:
 		ArtefactHooks.run(g, "on_gold_zero", {}) # Zero-Point Energy Drink (26)
-	g.actions_left -= 1
 	slot.sold = true
 	g.gold_spent_shop_this_wave += cost # issue 16: Zurich Gnome Figurine et al.
 	match slot.kind: # grants reuse the existing acquisition paths
@@ -366,24 +380,25 @@ static func sell_softlocks(g, kind: String, entry) -> bool:
 
 
 ## Sellable right now: actually held (never sell/pay out for something not
-## owned), player's turn, an action to spare, and the sale wouldn't trigger
-## the starvation softlock above. Board pieces are never sellable at all —
-## there is no "piece"/"captured" `entry` reachable from a board tile;
-## callers only ever pass a Stock/Captured/Item/Artefact entry.
+## owned), player's turn, and the sale wouldn't trigger the starvation
+## softlock above. No Action gate (issue 64, user ruling — selling is free
+## too). Board pieces are never sellable at all — there is no "piece"/
+## "captured" `entry` reachable from a board tile; callers only ever pass a
+## Stock/Captured/Item/Artefact entry.
 static func can_sell(g, kind: String, entry) -> bool:
 	return held_entries(g, kind).has(entry) \
-			and g.state == g.State.PLAYER_TURN and g.actions_left >= 1 \
+			and g.state == g.State.PLAYER_TURN \
 			and not sell_softlocks(g, kind, entry)
 
 
-## Convertible right now: actually held in Captured Stock, player's turn, an
-## action to spare, and the Gold to cover the conversion price (same rate as
-## sell_price, above). Converting only ever ADDS to Stock (never removes a
-## board/Stock piece), so it can never trigger the starvation softlock the
-## way a sale can.
+## Convertible right now: actually held in Captured Stock, player's turn, and
+## the Gold to cover the conversion price (same rate as sell_price, above).
+## No Action gate (issue 64, user ruling). Converting only ever ADDS to Stock
+## (never removes a board/Stock piece), so it can never trigger the
+## starvation softlock the way a sale can.
 static func can_convert(g, entry) -> bool:
 	return g.captured.has(entry) \
-			and g.state == g.State.PLAYER_TURN and g.actions_left >= 1 \
+			and g.state == g.State.PLAYER_TURN \
 			and g.gold >= sell_price(g, "captured", entry)
 
 

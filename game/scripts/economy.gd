@@ -9,7 +9,8 @@ const Tariffs := preload("res://data/tariffs.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 
-## Issue 57: the Shop's restock thresholds (Shop.threshold) were unreachable —
+## Issue 57: the Shop's restock thresholds (Shop.threshold, since replaced
+## entirely by the issue-64 two-lane restock) were unreachable —
 ## median Crown run ends near Score 300, first threshold is 1000 — so Score
 ## income rises 10x instead of the thresholds dropping. Applied HERE, in
 ## earn() below, the single choke point every ordinary Score gain already
@@ -98,8 +99,11 @@ static func earn(g, amount: int, reason: String = "") -> void:
 		gold_gain *= 3
 	g.score += score_amount
 	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
-	g.score += roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
-	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
+	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
+	g.score += score_bonus_amount
+	Shop.add_score_progress(g, score_amount + score_bonus_amount) # issue 64
+		# Lane B: banks toward the next Score-driven restock (Lane A, every 5
+		# Waves, is independent of this and lives in wave_logic.gd instead)
 
 
 ## Gold gains pass through Inflation (-10% per stack, rounded down). Each
@@ -131,9 +135,10 @@ static func earn_gold(g, amount: int, reason: String = "") -> void:
 		# are tripled" — same deliberate multiplicative exception earn() applies
 		gold_gain *= 3
 	g.gold += gold_gain
-	g.score += roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
-	Shop.maybe_restock(g) # harmless no-op unless a converter artefact's
-		# score_bonus just crossed a threshold
+	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
+	g.score += score_bonus_amount
+	Shop.add_score_progress(g, score_bonus_amount) # issue 64 Lane B: harmless
+		# no-op unless a converter artefact's score_bonus just crossed it
 
 
 ## Clock choke point (issue 35), mirroring earn()/gain(): every direct

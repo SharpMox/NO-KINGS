@@ -38,6 +38,8 @@ var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
+var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
+	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
 var shop_sell_mode := false # issue 60: Sell/Buy toggle on the Shop drawer —
 	# exposed so probes can assert on it, same as shop_expanded_index above
@@ -309,8 +311,9 @@ func show_shop() -> void:
 	title.add_theme_font_size_override("font_size", 22)
 	header.add_child(title)
 	var sub := Label.new()
+	# issue 64: buying/selling/converting are all free of the Action cost now
 	sub.text = ("$%d — sell for 50%%, or convert Captured to Stock" % g.gold) \
-		if shop_sell_mode else ("$%d — price + 1 action" % g.gold)
+		if shop_sell_mode else ("$%d — no Action cost" % g.gold)
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.modulate = Color(1, 1, 1, 0.75)
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -345,6 +348,27 @@ func show_shop() -> void:
 		shop_closed.emit())
 	header.add_child(close)
 	root.add_child(header)
+
+	# issue 64: Lane B restock progress — Score banked toward the next
+	# Score-driven restock (Lane A, every 5 Waves, needs no bar: it's a
+	# guaranteed beat, not something to watch fill). Shown in both Buy and
+	# Sell mode since it reflects Shop state, not the active mode.
+	var lane_b_row := HBoxContainer.new()
+	lane_b_row.add_theme_constant_override("separation", 6)
+	var lane_b_label := Label.new()
+	lane_b_label.text = "Next restock: %d / %d Score" \
+		% [g.shop_lane_b_progress, Tuning.SHOP_LANE_B_SCORE]
+	lane_b_label.add_theme_font_size_override("font_size", 11)
+	lane_b_label.modulate = Color(1, 1, 1, 0.7)
+	lane_b_row.add_child(lane_b_label)
+	root.add_child(lane_b_row)
+	shop_lane_b_bar = ProgressBar.new()
+	shop_lane_b_bar.min_value = 0
+	shop_lane_b_bar.max_value = Tuning.SHOP_LANE_B_SCORE
+	shop_lane_b_bar.value = g.shop_lane_b_progress
+	shop_lane_b_bar.show_percentage = false
+	shop_lane_b_bar.custom_minimum_size = Vector2(0, 10)
+	root.add_child(shop_lane_b_bar)
 
 	var pieces_band := VBoxContainer.new()
 	pieces_band.add_theme_constant_override("separation", 4)

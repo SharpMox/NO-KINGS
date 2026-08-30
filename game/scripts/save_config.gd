@@ -70,6 +70,13 @@ static func apply(g, cfg: Dictionary) -> void:
 		# additive, so no migration.
 	g.shop_stock = cfg.get("shop_stock", []).duplicate(true)
 	g.shop_restocks = int(cfg.get("shop_restocks", 0)) # no reroll-scumming
+	g.shop_lane_b_progress = int(cfg.get("shop_lane_b_progress", 0)) # issue 64:
+		# Score banked toward the next Lane-B restock — run-long and
+		# resettable (Shop.lane_a_restock), so it MUST survive a resume the
+		# same way run_capture_count (55) and score_gained_total (49) do, or a
+		# resumed run silently loses progress toward its next restock.
+		# Additive: a save from before this field existed has no restock
+		# progress banked either, so 0 is the correct default, not a guess.
 	# GDD Game Flow — Run: restore the run's RNG so a resumed save rolls what an
 	# uninterrupted run would have. Seed first — assigning it resets the state.
 	# Both travel as strings: they are int64 and JSON numbers are doubles.
@@ -192,6 +199,9 @@ static func to_config(g) -> Dictionary:
 		"clock_s": g.clock_ms / 1000.0,
 		"shop_stock": g.shop_stock.duplicate(true),
 		"shop_restocks": g.shop_restocks,
+		"shop_lane_b_progress": g.shop_lane_b_progress, # issue 64: must round-trip
+			# with the save or the resumed run's Lane-B progress bar silently
+			# restarts at 0 (issue 55's shipped bug, same class)
 		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"tariffs_off": g.tariffs_suppressed,

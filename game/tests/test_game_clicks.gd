@@ -9,6 +9,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
 const ShopScript := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -693,8 +694,8 @@ func _init() -> void:
 
 	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
 	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for
-	# gold + 1 action, the tile greys SOLD in place, Close dismisses
-	# (money-and-shop/04, shop-drawer-ui/08)
+	# gold only, no Action cost (issue 64), the tile greys SOLD in place,
+	# Close dismisses (money-and-shop/04, shop-drawer-ui/08)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -707,6 +708,21 @@ func _init() -> void:
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
 		"the shop drawer opens")
+
+	# issue 64: the Lane B restock progress bar — a real Control built by
+	# show_shop(), so it needs the windowed probe (headless drops GUI
+	# picking/layout the same way it drops clicks).
+	check(game.modals.shop_lane_b_bar != null, "the Shop drawer builds a Lane B progress bar")
+	check(game.modals.shop_lane_b_bar.max_value == Tuning.SHOP_LANE_B_SCORE,
+		"the bar's range matches the Lane B threshold")
+	check(game.modals.shop_lane_b_bar.value == game.shop_lane_b_progress,
+		"the bar's value reflects g.shop_lane_b_progress on open (0, fresh run)")
+	game.shop_lane_b_progress = 6300
+	game.modals.show_shop() # rebuild, same as reopening after a Score gain
+	await process_frame
+	check(game.modals.shop_lane_b_bar.value == 6300,
+		"the bar tracks g.shop_lane_b_progress after it changes and the drawer rebuilds")
+
 	var tile: Button = null # first affordable piece tile — every slot is visible, none scrolled
 	var tile_index := -1
 	var to_visit: Array = [game.modals.shop_panel]
@@ -731,8 +747,8 @@ func _init() -> void:
 		"Buy clickable in the expanded tile")
 	await process_frame
 	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
-			and game.actions_left == sh_acts - 1,
-		"shop Buy adds the piece and debits gold + one action")
+			and game.actions_left == sh_acts,
+		"shop Buy adds the piece and debits gold, never an Action (issue 64)")
 	check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
 	var sold_tile: Button = null
 	to_visit = [game.modals.shop_panel]
@@ -789,8 +805,8 @@ func _init() -> void:
 		"the Sell button in the expanded detail is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
 	check(game.stock.size() == sell_stock_before - 1 and game.gold == sell_gold_before + 5
-			and game.actions_left == sell_acts_before - 1,
-		"selling the Stock piece removes it, pays Gold, and costs 1 action")
+			and game.actions_left == sell_acts_before,
+		"selling the Stock piece removes it, pays Gold, and costs no Action (issue 64)")
 
 	var cap_tile: Button = null
 	to_visit_sell = [game.modals.shop_panel]
@@ -807,11 +823,12 @@ func _init() -> void:
 	var captured_before: int = game.captured.size()
 	var stock_before2: int = game.stock.size()
 	var gold_before2: int = game.gold
+	var convert_acts_before: int = game.actions_left
 	check(await _click_button_in(game.modals.shop_panel, "Convert ($5)"), "Convert is clickable")
 	await process_frame
 	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
-			and game.gold == gold_before2 - 5,
-		"converting moves the piece from Captured Stock into ordinary Stock and debits Gold")
+			and game.gold == gold_before2 - 5 and game.actions_left == convert_acts_before,
+		"converting moves the piece from Captured Stock into ordinary Stock, debits Gold, costs no Action (issue 64)")
 
 	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
 	await process_frame

@@ -214,7 +214,13 @@ var score := 0:
 		score = value
 var gold := 0 # per-run spend currency; score stays the up-only metric
 var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
-var shop_restocks := 0 # score thresholds banked so far (Shop.threshold)
+var shop_restocks := 0 # total restocks banked so far, either lane — display
+	# only; issue 64 replaced the old score-threshold gate that used to drive
+	# it with Shop.lane_a_restock (every 5 Waves) / Shop.add_score_progress
+	# (every 10,000 Score since the last Lane-A restock)
+var shop_lane_b_progress := 0 # issue 64: Score earned toward the next Lane-B
+	# restock — MUST be saved (save_config.gd), or a resumed run silently
+	# loses progress toward it, same bug class issue 55 shipped once already
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
@@ -3106,9 +3112,9 @@ func _jet_fuel_restock_confirmed() -> void:
 ## same asymmetry Buy already has. `entry` is the exact element from
 ## g.stock/g.captured/g.items/g.artefacts (modals.gd reads it straight off
 ## those arrays to build the Sell UI, same as Shop.buy's `slot` is the exact
-## g.shop_stock element). Costs 1 action, same turn-gating shape as
-## Shop.buy — and like Buy, a sale never force-ends the turn even at 0
-## actions left (a Shop transaction, not a board action).
+## g.shop_stock element). Free, same turn-gating shape as Shop.buy — costs no
+## Action (issue 64, user ruling) and, like Buy, a sale never force-ends the
+## turn (a Shop transaction, not a board action).
 func _sell(kind: String, entry: Variant) -> bool:
 	if not Shop.can_sell(self, kind, entry):
 		return false
@@ -3118,7 +3124,6 @@ func _sell(kind: String, entry: Variant) -> bool:
 		"captured": captured.erase(entry)
 		"item": items.erase(entry)
 		_: artefacts.erase(entry) # "artefact"
-	actions_left -= 1
 	Economy.earn_gold(self, amount, "sell") # AFTER the erase above — Denver
 		# Bunker Timeshare's own on_gold_change check must see the POST-sale
 		# Item count, so selling the Item that empties the last slot doesn't
@@ -3131,8 +3136,9 @@ func _sell(kind: String, entry: Variant) -> bool:
 ## slice (merge/convert/sell are its only exits). Costs the SAME 50% of
 ## value that selling pays out (Shop.sell_price(g, "captured", entry) — see
 ## Tuning.SELL_RATE's header for why that equality is deliberate: convert-
-## then-sell is a wash, with the piece gone). 1 action, same turn-gating and
-## never-force-ends-the-turn shape as Shop.buy/_sell.
+## then-sell is a wash, with the piece gone). Free, no Action (issue 64, user
+## ruling), same turn-gating and never-force-ends-the-turn shape as
+## Shop.buy/_sell.
 func _convert_captured(entry: Variant) -> bool:
 	if not Shop.can_convert(self, entry):
 		return false
@@ -3140,7 +3146,6 @@ func _convert_captured(entry: Variant) -> bool:
 	captured.erase(entry)
 	stock.append(entry) # ADR-0002: captured and stock share the same
 		# bare-id-or-stateful-Dictionary shape, so the entry moves across as-is
-	actions_left -= 1
 	Economy.spend_gold(self, cost)
 	return true
 

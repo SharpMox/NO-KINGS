@@ -126,10 +126,14 @@ found. Collected here so they are not lost in Outcome sections:
   the enemy turn` timing out, which then cascades into `double-tap opens the piece preview`
   and `Close button clickable` failing. It reproduces on `main` and on feature branches
   alike — well under 1% when the machine is quiet, and around 20% when it is busy.
-  Prime suspect: the **real disk-write autosave that fires on every `_begin_player_turn()`**
-  (`FileAccess.open(SAVE_PATH, WRITE)` plus `CloudSave.sync_file`) inside the probe's first
-  boot segment, which never sets `is_scenario`. Under I/O contention that write blows past
-  the probe's tolerance. Worth fixing for its own sake: a load-sensitive stall makes every
+  **The autosave hypothesis is refuted.** It was the prime suspect — a real disk write
+  (`FileAccess.open(SAVE_PATH, WRITE)` plus `CloudSave.sync_file`) fires on every
+  `_begin_player_turn()` in the probe's first boot segment, which never sets `is_scenario`.
+  But instrumenting that write under synthetic I/O and CPU load showed it completing in
+  **0.001-0.135s even on runs where the probe fails**. The write is not what stalls.
+  Current evidence points instead at general **scheduling contention during the enemy-turn
+  animation window** — the probe waits on animation frames that the OS is not delivering
+  promptly under load. Worth fixing for its own sake: a load-sensitive stall makes every
   "ALL GREEN" slightly unfalsifiable, which is exactly what slice 36 existed to eliminate.
   Diagnosed 2026-08-29 while wrongly accusing slice 49 of introducing it (see `CLAUDE.md`
   on interleaving A/B runs).

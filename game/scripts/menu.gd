@@ -235,10 +235,10 @@ func _show_history() -> void:
 		box.add_child(none)
 	for e in runs:
 		var row := Label.new()
-		row.text = "%s — %d · wave %d · %d king%s · %d tariff%s · %d lost" % [
+		row.text = "%s — %d · wave %d · %d king%s · %d king abilit%s · %d lost" % [
 			"Win" if e.get("won", false) else "Loss", int(e.score), int(e.wave),
 			int(e.kings), "" if int(e.kings) == 1 else "s",
-			int(e.tariffs), "" if int(e.tariffs) == 1 else "s", int(e.get("lost", 0))]
+			int(e.tariffs), "y" if int(e.tariffs) == 1 else "ies", int(e.get("lost", 0))]
 		row.add_theme_font_size_override("font_size", 15)
 		box.add_child(row)
 	_button(box, "← Back", 20, func() -> void:

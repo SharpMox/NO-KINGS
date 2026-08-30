@@ -27,10 +27,10 @@ const TEXT := (
 	"artefacts sit in Inventory. The Shop sells pieces, items, artefacts, " +
 	"and boxes for gold, and restocks as your score climbs.\n\n" +
 
-	"Tariffs\n" +
-	"Every 10th wave applies a Tariff — an economic penalty (extra gold " +
-	"cost on an action type, a barred piece, etc.) that lasts until the " +
-	"run ends.\n\n" +
+	"King Abilities\n" +
+	"Every 10th wave applies a King Ability — an economic penalty (extra " +
+	"gold cost on an action type, a barred piece, etc.) that lasts until " +
+	"the run ends.\n\n" +
 
 	"Kings\n" +
 	"A King boss appears periodically. Checkmating one refills your clock " +

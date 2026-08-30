@@ -1,3 +1,10 @@
+## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
+## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
+## (data/kings.gd). Code identifiers below (on_tariff_apply, tariff_on,
+## Tariffs, etc.) are deliberately left as "tariff"; the rename lands with the
+## coming Kings + Tariffs rework, which restructures this dispatch rather than
+## just renaming it.
+##
 ## Artefact trigger engine — drives the live game node `g`. Dispatches artefact
 ## effects at named hook points instead of the ad hoc `for t in artefacts: if
 ## t.key == "move"` that used to be scattered through game.gd/economy.gd/

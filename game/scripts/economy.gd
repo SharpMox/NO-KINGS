@@ -1,3 +1,10 @@
+## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
+## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
+## (data/kings.gd). Code identifiers below (tariff_on, apply_tariff,
+## resolve_tariff, etc.) are deliberately left as "tariff"; the rename lands
+## with the coming Kings + Tariffs rework, which restructures this code
+## rather than just renaming it.
+##
 ## Economy: score charges/gains, capture scoring, high-score persistence, and
 ## the tariff system — drives the live game node `g` (split out of game.gd;
 ## tariff data lives in data/tariffs.gd).

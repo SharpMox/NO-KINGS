@@ -2658,7 +2658,6 @@ func _open_bounty_pick() -> void:
 ## (a future Artefact) and the eventual open guaranteed to agree.
 func _open_box_pick(slot: Dictionary) -> void:
 	box_open = true
-	Economy.charge(self, "box_cost") # once per Box — a Reroll must NOT re-charge this (issue 46)
 	box_only_kind = slot.key
 	box_size = slot.size
 	var native_picks: int = Box.SIZES[slot.size].picks # Huge grants 2 (issue 47)
@@ -2744,8 +2743,9 @@ func _box_choose(opt: Dictionary) -> void:
 ## stacking additively via box_rerolls_left. (Bible Gag Reel Scroll granted
 ## the same thing until issue 58 gave it a new effect — Shield-on-capture —
 ## and dropped out of this counter.) A reroll replaces the offer wholesale
-## (not the Nostradamus Mad Libs "pick from what's left") and must NOT
-## re-charge box_cost — that only ever happens once, in _open_box_pick.
+## (not the Nostradamus Mad Libs "pick from what's left"). issue 65 removed
+## the Tariff on Box Pick entirely — opening a Box costs no Gold under any
+## Tariff state, so there is nothing left for a reroll to re-charge.
 func _box_reroll() -> void:
 	box_rerolls_left -= 1
 	box_offer = _box_options(box_only_kind, box_size)

@@ -342,8 +342,9 @@ func _init() -> void:
 	await process_frame
 	check(game.box_open, "rerolling keeps the box open")
 	check(game.gold == gold_before_reroll,
-		"rerolling doesn't spend Gold here (no box_cost Tariff held in this probe — the box_cost-charged-once " +
-		"proof itself lives in test_items_artefacts_3.gd, with a Tariff held to make it observable)")
+		"rerolling doesn't spend Gold here (opening/rerolling a Box never charges — the Tariff " +
+		"on Box Pick was deleted entirely in issue 65; the under-any-Tariff-state proof lives " +
+		"in test_items_artefacts_3.gd, with a full Mild-tier Tariff load held to make it observable)")
 	check(_button_prefix(game.box_panel, "Reroll") == null,
 		"the reroll budget is spent — no Reroll button on the fresh offer")
 

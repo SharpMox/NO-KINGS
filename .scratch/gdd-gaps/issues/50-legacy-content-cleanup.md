@@ -1,6 +1,6 @@
 # 50 — Legacy content cleanup: only what Notion describes should ship
 
-Status: todo — LATER (user: "later probably") · not urgent, do not start ahead of 47-49
+Status: done (2026-08-30)
 
 ## Parent
 
@@ -88,3 +88,38 @@ Bounty indefinitely.
    enemy, but the Notion Wave Catalog still carries a **"Buffed-enemy flags"** column and a
    **"25 buffed-enemy waves"** total. The sweep flagged these inline rather than rewriting
    them — it is a 150-row table and out of scope for a note. Cleaning it belongs here.
+
+## Outcome
+
+Shipped in PR #219.
+
+**The `bounty` collision:** renamed the legacy core Artefact's **display name only**, to
+**"Skip Tracer's Rolodex"** — the key stays `bounty`. It is load-bearing (saves,
+`data/scenarios.gd`, the Shop all match on it directly) and no player ever sees the key, so
+renaming it would trade real save-migration risk for zero visible benefit; a display-name-only
+rename fully resolves the collision the user's ruling (issue 48) was about. No `_MIGRATIONS`
+entry was needed as a result — nothing in the save shape changed. Updated the Notion Artefacts
+page and the Bounty Piece Buff page's Notes to record the rename.
+
+**The other 6 core Artefacts:** left alone, as specced — the keep-or-retire ruling for them
+(issue 62) hasn't been made. Re-verified `items.gd`'s header comment describing them is still
+accurate.
+
+**Wave Catalog:** removed the vestigial "Buffed-enemy flags" column across all 150 rows and the
+"25 buffed-enemy waves" total from Totals, plus two per-row Notes that referenced the removed
+mechanic by name (waves 3 and 28).
+
+**Notion drift checker:** re-ran against a fresh 180/16/39/21 snapshot — 85 findings, all
+reported rather than fixed (out of this issue's scope). Most Artefact findings are Notion still
+carrying a `(needs: ...)` note for mechanics that are actually built. A few are real semantic
+drift worth a follow-up: Mar-a-Lago Toilet Papers and Silk Road Coupon (Notion says "Shop
+restock", repo says "5-Wave Milestone"), Pegasus Free Trial (different mechanic entirely), Spare
+Organ Receipt (Notion describes one consumed piece, Fuse consumes two). Tariffs: one real gap —
+Notion defines a "Tariff on Promotion" with no `game/data/tariffs.gd` entry at all. Pieces: `king`
+exists in Notion but not `data/pieces-codex.js`, almost certainly intentional (that file's header
+says "curated 38-piece working-set"; the King is the objective piece, not a codex piece) but
+never explicitly logged as an exclusion. Could not confirm or refute the "STATUS triage synced
+2026-07-14" claim in `items.gd`'s header — the checker only sees current Notion state, not
+2026-07-14's, so it stays unverifiable, same as the previous agent found.
+
+`run_all.sh` ALL GREEN, run alone.

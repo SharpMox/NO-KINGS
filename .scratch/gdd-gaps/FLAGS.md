@@ -24,16 +24,16 @@ Reviewed 2026-08-29.
 
 ## Balance / tuning, unvalidated
 
-- **Shop restock thresholds may be unreachable.** The GDD Shop page flags it itself:
-  fleet data has a median Crown run ending near Score 300, and the first threshold is
-  1000. Either the threshold drops or income rises. Nobody has re-run the numbers since
-  the ×10 economy landed.
+- ~~**Shop restock thresholds may be unreachable.**~~ Fixed by issue 57 (Score x10). Post-slice
+  autoplay scores 68700 / 75200 / 72800 across full runs against a first threshold of 1000 —
+  every run cleared it, several banked 5-6 restocks. The median-300 problem is gone.
 - **Buff Box is priced Strategic (60 Gold) on reasoning, not playtesting.** It is a
   lottery over three buffs and can hit a Decisive one, which is why it sits above
   Tactical. Revisit once buffs have actually been played.
-- **Enemy actions per turn is 1, GDD says 2** — divergence #2, a playtest override from
-  2026-07-02 that predates the wave-catalog rebalance, the tariff system and the unified
-  action economy. Slice 11 exists to re-test it with fleet data rather than assume.
+- ~~**Enemy actions per turn is 1, GDD says 2**~~ — divergence #2, resolved by issue 59
+  (user ruling): **baseline stays 1, Tier 5 restores the GDD's 2.** The GDD value became the
+  top-difficulty value rather than the default. Notion's Enemy AI Behaviors page reconciled;
+  issue 11 closed as moot.
 
 ## Tuning artifacts created by Score x10 (issue 57)
 
@@ -177,12 +177,12 @@ found. Collected here so they are not lost in Outcome sections:
   pieces to Stock. Bomb/Trap/blocked-attack captures still carry no `{from, to}` and stay
   correctly unavailable — that part of the original flag was never in scope to fix. Re-texted
   in `data/artefacts.js`.
-- **Abduction Probe / Manna Vending Machine vs the new caps.** The base caps introduced in
-  issue 53 (Items 3, Piece Buffs 2) quietly weakened two already-shipped Artefacts: Manna
-  Vending Machine grants **+2 Items**, wholly wasted at a full inventory of 3, and Fort Knox
-  IOU's +1 Tactical Item has the same exposure. Not a bug — a tight cap is what makes Area
-  51 Parking Permit and Denver Bunker Timeshare meaningful — but worth a look in the tuning
-  pass rather than discovering it in a playtest as "Manna feels broken".
+- **Fort Knox IOU vs the Item cap.** Issue 53's base Item cap of 3 means its *"+1 Tactical
+  Item on Wave clear while under 10 Gold"* is silently dropped at a full inventory. Manna
+  Vending Machine had the same exposure and was **fixed** by issue 58 (it now opens a Big Item
+  Box, so a full inventory becomes a choice rather than a dropped grant) — Fort Knox could take
+  the same treatment if it bothers anyone. Selling (issue 60) also gives the player a way to
+  make room, which softens it.
 
 ## Housekeeping
 

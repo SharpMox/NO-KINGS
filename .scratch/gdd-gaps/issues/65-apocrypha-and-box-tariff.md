@@ -1,6 +1,6 @@
 # 65 — Rename to Apocrypha; delete the Box Pick Tariff
 
-Status: todo — SPECCED (user rulings 2026-08-30) · ready
+Status: done (2026-08-30) — one Notion row left, needs delete access
 
 ## Parent
 
@@ -88,3 +88,37 @@ and leaving a Tariff the user has said should not exist would mislead the rework
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in PR #226.
+
+**Apocrypha** renamed, key `bible-gag-reel-scroll` retained. This needed a small architectural
+addition: `tools/export-game-artefacts.mjs` derived keys by slugifying the name, so a display
+name diverging from its key was previously impossible. It now reads `a.key || slugify(a.name)`,
+with the existing collision check preserved. Apocrypha is the only real user of the override.
+
+**`box_cost` is gone from the entire repo** — verified by `grep -rn` returning nothing. Sites
+removed: the definition, the REGISTRY entry, its key in the shared `on_charge` match arm, the
+`Economy.charge` call, two comments, and **`data/scenarios.gd:245`** — a tariff fixture that
+was not in the issue's list and would have silently no-op'd.
+
+**The six reroll assertions were repointed, not deleted.** They existed to prove a Box Reroll
+does not re-charge the Box (issues 46/47). With `box_cost` gone nothing can double-charge, so
+the original guard was moot — but rather than delete the proof, the block now holds **every
+remaining Mild-tier Tariff at once** and asserts Gold is unchanged across an open plus two
+rerolls. That is a strictly stronger property than the one it replaced, and a comment records
+what the old invariant was and why it lapsed.
+
+**Mild tier 7 -> 6.** King Tariffs' arithmetic recomputed (not estimated) to **46,656 (6^6)**
+sequences, and the derived total to **~37.6 billion** (46,656 x 6,720 x 120).
+
+### Left undone — needs a human or an agent with delete access
+
+The **Tariffs Catalog's "Tariff on Box Pick" row** could not be removed:
+https://app.notion.com/p/36ef1559c99b812b9722d328a410c989
+
+The Notion MCP exposes no delete or archive command, and `agent-browser`'s Chrome has no
+authenticated Notion session. The row was left **completely untouched** rather than
+half-edited into an inconsistent state — the right call, but it means Notion still lists a
+Tariff the game no longer has. **Delete it manually.**

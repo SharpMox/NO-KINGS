@@ -1,6 +1,6 @@
 # 62 — GDD staleness found by the 2026-08-30 audit
 
-Status: todo — NOTION ONLY (no code) · findings verified against the repo
+Status: partial — items 1, 2, 4, 6 DONE (2026-08-30); 3 owned by issue 59; 5 blocked
 
 ## Parent
 
@@ -94,3 +94,38 @@ Box rework · all 10 Artefact texts from the sweep · the Shop-visit retirement.
 ## Blocked by
 
 - item 5 wants issue 57 to land first, and real `agent-browser` access for the full table
+
+## Outcome — items 1, 2, 4 and 6 fixed 2026-08-30
+
+All in Notion; no code involved. Each used the `> Reconciled <date>` convention rather than
+silently overwriting history.
+
+- **#2 (highest impact, done first)** — [Pieces & Movement] and [Game Flow — Player Turn] now
+  state the single `ACTIONS_PER_TURN` = 2 pool up front, and their Move/Place/Merge
+  subsections say "costs 1 action from the shared pool" instead of claiming independent
+  basic-count-plus-bonuses pools. Both copy **Difficulty Ranks**' existing phrasing, so the
+  document now agrees with itself rather than having two right answers in different words.
+- **#1** — a one-line pause pointer added to Overview, King Tariffs, Wave Catalog and Score,
+  each aimed at Fable Prototype Test's addendum. No rules or numbers otherwise touched: the
+  Tariff design is paused, not challenged.
+- **#4** — Clock's "TBD — e.g., 30 min" corrected to "5 minutes (`CLOCK_START_MS`)", noting
+  its other three refill numbers already matched code.
+- **#6** — King Tariffs' Mild count 8 -> 7 and 262,144 -> 117,649.
+
+**A compounding error the audit had not spotted, caught during the fix:** King Tariffs'
+downstream *"~211 billion total sequences"* is computed from the same wrong Mild count
+(8^6 x 8^5-perm x 5^4-perm). Recalculated to **~94.9 billion**. Worth noting because it is the
+shape of error a spot-check misses — the headline number was wrong, and so was everything
+derived from it two paragraphs later.
+
+Also fixed mid-edit: a Notion serialisation quirk where bold wrapping a code span
+(`**\`ACTIONS_PER_TURN\`** = 2**`) round-tripped as literal `****`. Reworded so the code span
+sits outside the bold, verified by re-fetching.
+
+### Still open
+
+- **#3** — Enemy AI Behaviors' action count. **Issue 59 owns it** and will resolve it as
+  "baseline 1, Tier 5 restores 2". Deliberately untouched to avoid a double-fix.
+- **#5** — the Tariffs Catalog's ~10-20x inflated Cost numbers. Blocked twice: it needs
+  `agent-browser` to enumerate the table row by row, and it should land **after** issue 57's
+  Score x10 or the numbers will be stale a second time.

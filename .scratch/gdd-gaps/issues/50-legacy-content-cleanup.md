@@ -75,3 +75,16 @@ Bounty indefinitely.
 ## Blocked by
 
 - nothing structurally, but sequence it after 47-49; the user parked it as "later"
+
+## Two more items, found by the 2026-08-30 GDD sweep
+
+1. **The `bounty` rename still has not happened anywhere.** The Notion Piece Buffs row for the
+   new **Bounty** Buff records that *"the Buff takes the name; the Artefact is renamed/retired
+   separately"* — and that separate step is this issue's, still outstanding. The game ships
+   both a Piece Buff named Bounty (key `piece_bounty`) and a legacy core Artefact named Bounty
+   (key `bounty`), which is exactly the confusion the ruling was meant to end.
+
+2. **The Wave Catalog's buffed-enemy data is vestigial.** Slice 47 removed the box-carrier
+   enemy, but the Notion Wave Catalog still carries a **"Buffed-enemy flags"** column and a
+   **"25 buffed-enemy waves"** total. The sweep flagged these inline rather than rewriting
+   them — it is a 150-row table and out of scope for a note. Cleaning it belongs here.

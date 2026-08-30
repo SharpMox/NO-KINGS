@@ -198,7 +198,7 @@ func _init() -> void:
 	await process_frame
 	BuffLogic.add(carat.board[Vector2i(2, 2)], "shield")
 	Economy.earn(carat, 100)
-	check(carat.gold == 145 and carat.score == 145,
+	check(carat.gold == 145 and carat.score == 1450, # issue 57: Score x10, Gold untouched
 		"45.5 Carat Curse: +45% Gold and Score gain")
 	WaveLogic.queue(carat, carat.wave + 1) # Wave 3 clears — every 3rd Wave strips Buffs
 	check(BuffLogic.of(carat.board[Vector2i(2, 2)]).is_empty(),
@@ -315,7 +315,7 @@ func _init() -> void:
 	await process_frame
 	var haarp_base: int = Waves.WAVES[1].size() # wave 2's designed roster
 	haarp._queue_wave(2) # clears wave 1 and queues wave 2's roster
-	check(haarp.score == 200 and haarp.gold == 15,
+	check(haarp.score == 2000 and haarp.gold == 15, # issue 57: Score x10, Gold untouched
 		"HAARP Volume Knob: +200 Score and +15 Gold on Wave clear")
 	check(haarp.pending_spawn.size() == haarp_base + 1,
 		"HAARP Volume Knob: Wave roster spawns +1 extra piece")
@@ -649,12 +649,12 @@ func _init() -> void:
 	WaveLogic.queue(club27, 2) # clean Wave-1 clear: streak -> 1
 	club27.score = 0
 	Economy.earn(club27, 100)
-	check(club27.score == 105,
+	check(club27.score == 1050, # issue 57: x10
 		"27 Club Punch Card: +5% Score gain per consecutive clean Wave (streak 1)")
 	WaveLogic.queue(club27, 3) # clean Wave-2 clear: streak -> 2
 	club27.score = 0
 	Economy.earn(club27, 100)
-	check(club27.score == 110,
+	check(club27.score == 1100, # issue 57: x10
 		"27 Club Punch Card: the streak compounds (streak 2 = +10%)")
 	club27.gold = 100
 	club27._lose_player_piece(Vector2i(3, 2), "captured")
@@ -968,9 +968,15 @@ func _init() -> void:
 		"wave": 3, "gold": 0, "artefacts": ["loch-ness-stool-sample"]})
 	await process_frame
 	check(not loch.box_open, "(setup) no Box open yet")
-	Economy.earn(loch, 999)
-	check(not loch.box_open and loch.score_gained_total == 999,
-		"Loch Ness Stool Sample: 999 Score gained does not yet cross the 1000 threshold")
+	# issue 57: Economy.earn's `amount` argument lands on Score (and this
+	# tracker) x10'd — 99 -> 990, so the boundary values below are the old
+	# 999/1000/1999/2000 each divided by 10 and re-multiplied back up by the
+	# SAME x10, landing on the identical thresholds (still un-scaled: this
+	# artefact's own "every 1000" is a Score-gained threshold, not touched
+	# by this slice, same as Shop.threshold).
+	Economy.earn(loch, 99)
+	check(not loch.box_open and loch.score_gained_total == 990,
+		"Loch Ness Stool Sample: 990 Score gained does not yet cross the 1000 threshold")
 	Economy.earn(loch, 1)
 	check(loch.box_open and loch.box_only_kind == "piece",
 		"Loch Ness Stool Sample: crossing 1000 Score gained opens a random Piece Box")
@@ -981,8 +987,8 @@ func _init() -> void:
 	loch.score -= 500 # simulate that spend directly, same as shop.gd:280
 	check(loch.score_gained_total == 1000,
 		"...and spending Score afterward leaves the GAINED tracker untouched")
-	Economy.earn(loch, 999) # gained now 1999 — still short of the next 2000
-	check(not loch.box_open, "...999 more gained (net of the spend) does not re-cross a threshold")
+	Economy.earn(loch, 99) # gained now 1990 — still short of the next 2000
+	check(not loch.box_open, "...990 more gained (net of the spend) does not re-cross a threshold")
 	Economy.earn(loch, 1) # gained now 2000
 	check(loch.box_open, "...the SAME real threshold (2000) still fires once actually reached")
 	loch.queue_free()

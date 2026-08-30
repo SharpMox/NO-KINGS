@@ -1256,7 +1256,7 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 	var n_nwo: int = counts.get("illuminati-nwo-booster-pack", 0)
 	if n_nwo > 0 and hook == "on_capture" and not fired.is_empty():
 		g.gold += 2 * n_nwo * fired.size()
-		g.score += 20 * n_nwo * fired.size()
+		g.score += 200 * n_nwo * fired.size() # issue 57: x10, direct write bypasses Economy.earn
 
 	var n_mona: int = counts.get("100-genuine-original-mona-lisa", 0)
 	if n_mona > 0 and not g.mona_lisa_turn_done and not fired.is_empty():
@@ -1588,8 +1588,14 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# Box Pick" guard just below — a crossing that lands while a Box is
 			# already open (e.g. mid box-skip consolation) is silently dropped,
 			# same precedent, rather than queued.
+			# Issue 57: ctx.base here is deliberately the UNSCALED per-event
+			# amount (economy.gd earn()'s dispatch never sees SCORE_MULTIPLIER,
+			# so El Dorado's cross-resource gold_bonus doesn't also inflate) —
+			# but this tracker mirrors the SAME Score the player sees on
+			# g.score, so the x10 is applied explicitly here to keep "every
+			# 1000" meaning every 1000 of the displayed number.
 			var before: int = g.score_gained_total
-			g.score_gained_total += roundi(ctx.base)
+			g.score_gained_total += roundi(ctx.base) * Economy.SCORE_MULTIPLIER
 			if int(g.score_gained_total / 1000.0) > int(before / 1000.0) and not g.box_open:
 				g._open_box_pick(Box.random_slot_for_theme(g, "piece"))
 
@@ -1660,16 +1666,16 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.gold += roundi(ctx.gold_spent * 0.10)
 		["social-credit-report-card", "on_wave_clear"]:
 			if ctx.clean:
-				g.score += 100
+				g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 			else: # issue 16 ruling: the -10 Score penalty debits Gold instead
 				g.gold = maxi(g.gold - 10, 0)
 		["qanon-profile-picture", "on_wave_clear"]:
 			if ctx.clean:
-				g.score += 200
+				g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
 				g.gold += 20
 		["bielefeld-library-card", "on_wave_clear"]:
 			if ctx.captures == 0:
-				g.score += 500
+				g.score += 5000 # issue 57: x10, direct write bypasses Economy.earn
 		["trilateral-meeting-stickers", "on_wave_clear"]:
 			g.gold += 5 * g.artefacts.size()
 		["money-printer-service-manual", "on_wave_clear"]:
@@ -1681,15 +1687,19 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 
 		# --- issue 16: on_wave_spawn / on_clock_refill / on_purchase / on_game_over ---
 		["nigerian-prince-wire-transfer", "on_wave_spawn"]:
-			g.score += 100
+			g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 			g.gold += 10
 			Economy.add_clock(g, -3000.0, "nigerian-prince-wire-transfer") # issue 35:
 				# a Clock LOSS — routed through the same choke point (negative
 				# amount, floored at 0 by add_clock itself)
 		["putin-s-golden-toilet-brush", "on_purchase"]:
-			g.score += 5 * ctx.price
+			g.score += 50 * ctx.price # issue 57: x10 — a flat Score-per-Gold-
+				# spent rate, not a percentage of an existing Score gain, so it
+				# doesn't scale on its own; ctx.price is the (unscaled) Gold
+				# price paid, direct write bypasses Economy.earn
 		["rapture-insurance-policy", "on_game_over"]:
-			g.score += g.gold * 20
+			g.score += g.gold * 200 # issue 57: x10, same reasoning — a flat
+				# Score-per-Gold conversion rate, direct write bypasses earn
 			g.gold = 0
 
 		# --- issue 17: Action/Time/Piece batch ---
@@ -1743,7 +1753,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			ctx.amount += ctx.base * 0.50
 		["shrinkflation-cereal-box", "on_turn_end"]:
 			g.gold += 10
-			g.score += 10
+			g.score += 100 # issue 57: x10, direct write bypasses Economy.earn
 			Economy.add_clock(g, 1000.0, "shrinkflation-cereal-box")
 		["skull-and-bones-coffin", "on_price"]:
 			ctx.amount += ctx.base * 0.05
@@ -1915,7 +1925,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["lusitania-hardtack-crate", "on_piece_lost"]:
 			if not ctx.uncounted and not BuffLogic.of(g.board[ctx.pos]).is_empty():
 				g.gold += 150
-				g.score += 150
+				g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 		["templar-severance-gold-one-pile", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.gold += 150
@@ -1956,11 +1966,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g.gold += 25
 		["doomsday-autoclicker", "on_item_consume"]:
 			if ctx.tier == "Decisive":
-				g.score += 200
+				g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
 				Economy.add_clock(g, 10000, "doomsday-autoclicker")
 		["tape-eraser-magnet", "on_item_consume"]:
 			if ctx.last:
-				g.score += 100
+				g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 				g.gold += 50
 		["dihydrogen-monoxide-battery", "on_item_consume"]:
 			if ctx.tier == "Tactical" and g.dihydrogen_free_wave != g.wave:
@@ -2084,7 +2094,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["merchants-of-death-sample-case", "on_tariff_apply"]:
 			g.gold += 100
 		["tunguska-toothpicks", "on_tariff_charge"]:
-			g.score += 150
+			g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 			Economy.add_clock(g, 5000, "tunguska-toothpicks")
 
 		# --- issue 19: capture conversion, the cheap wave-clear half ---
@@ -2219,7 +2229,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if not extras.is_empty():
 				ctx.roster.append(extras[g.rng.randi() % extras.size()])
 		["haarp-volume-knob", "on_wave_clear"]:
-			g.score += 200
+			g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
 			g.gold += 15
 		["wuhan-vial-label", "on_wave_roster"]:
 			var wuhan_extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
@@ -2320,8 +2330,13 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# _destroy header) — direct writes are fine here exactly as they
 			# are in on_capture/on_wave_clear/on_game_over above; on_destroy
 			# only ever fires for Item-caused kills (game.gd's `by_item`
-			# param), so this never sees Bomb or Tariff destructions.
-			g.score += ctx.value
+			# param), so this never sees Bomb or Tariff destructions. issue 57:
+			# ctx.value is defs[id].value — the SAME number that is also the
+			# piece's Gold/Shop-price (game.gd's on_destroy dispatch, shop.gd
+			# price()) — so only the Score line gets x10; the Gold line stays
+			# on the raw unscaled value, same as every other capture-adjacent
+			# effect that reads defs[].value.
+			g.score += ctx.value * 10
 			g.gold += ctx.value
 
 		# --- issue 21: echo and meta-triggers (the rest of the family runs
@@ -2329,7 +2344,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# Capstone Polish is the one plain direct-effect handler here) ---
 		["capstone-polish", "on_purchase"]:
 			if ctx.kind == "artefact":
-				g.score += 150
+				g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 				Economy.add_clock(g, 5000, "capstone-polish")
 
 		# --- issue 29: Illuminati Fridge Magnet — off the immutable

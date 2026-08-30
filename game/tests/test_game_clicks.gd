@@ -990,7 +990,8 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.gold == 475 and game.score == 400,
+	check(not game.buff_pick_open and game.gold == 475 and game.score == 4000, # issue 57:
+			# Score x10 (400 -> 4000), Gold untouched
 		"confirming activates it: 25 Gold spent, +400 Score (earn() also grants " +
 		"the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
 

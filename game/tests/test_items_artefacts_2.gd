@@ -86,13 +86,15 @@ func _init() -> void:
 	gc.actions_left = 3
 	gc.rng.seed = crit_seed # the very next rng draw is _random_buff_key's, inside this capture
 	gc._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this wave: Tap Water grants Critical
-	check(gc.score == gc_pawn_val,
+	check(gc.score == gc_pawn_val * 10, # issue 57: a real capture routes through
+			# Economy.earn, which x10's Score — gc_pawn_val stays the raw
+			# (unscaled) Gold/Shop-price number
 		"a Critical granted by THIS capture doesn't double THIS capture's own score")
 	check(BuffLogic.has(gc.board[Vector2i(2, 3)], "critical"),
 		"the granted Critical survives on the attacker after the capture that granted it")
 	gc.score = 0
 	gc._move_player(Vector2i(2, 3), Vector2i(5, 5)) # a second, unrelated capture
-	check(gc.score == gc_pawn_val * 2,
+	check(gc.score == gc_pawn_val * 2 * 10, # issue 57: x10
 		"the banked Critical doubles the NEXT capture — it really works as a reward")
 	gc.queue_free()
 	await process_frame
@@ -152,7 +154,8 @@ func _init() -> void:
 	shrink.actions_left = 0 # any non-SETUP pass through _on_pass reaches on_turn_end
 	var clock0: float = shrink.clock_ms
 	shrink._on_pass()
-	check(shrink.gold == 60 and shrink.score == 10, "Shrinkflation Cereal Box: +10 Gold/+10 Score at Turn end")
+	check(shrink.gold == 60 and shrink.score == 100, # issue 57: Score x10, Gold untouched
+		"Shrinkflation Cereal Box: +10 Gold/+10 Score at Turn end")
 	check(shrink.clock_ms > clock0, "Shrinkflation Cereal Box: +1s Clock at Turn end")
 	shrink.queue_free()
 	await process_frame
@@ -163,10 +166,10 @@ func _init() -> void:
 		"wave": 3, "artefacts": ["skull-and-bones-coffin"], "gold": 199})
 	await process_frame
 	Economy.earn(skull, 100)
-	check(skull.score == 100, "Skull and Bones Coffin: no bonus under 200 Gold")
+	check(skull.score == 1000, "Skull and Bones Coffin: no bonus under 200 Gold") # issue 57: x10
 	skull.gold = 200
 	Economy.earn(skull, 100)
-	check(skull.score == 220, "Skull and Bones Coffin: +20% Score gain at 200+ Gold")
+	check(skull.score == 2200, "Skull and Bones Coffin: +20% Score gain at 200+ Gold") # issue 57: x10
 	skull.queue_free()
 	await process_frame
 
@@ -214,7 +217,7 @@ func _init() -> void:
 		"artefacts": ["lusitania-hardtack-crate", "d-b-cooper-s-parachute"]})
 	await process_frame
 	lus._destroy(Vector2i(2, 2)) # the queen carries a Buff and is unranked
-	check(lus.score == 150, "Lusitania \"Hardtack\" Crate: +150 Score for a Buff-carrying piece lost")
+	check(lus.score == 1500, "Lusitania \"Hardtack\" Crate: +150 Score for a Buff-carrying piece lost") # issue 57: x10
 	check(lus.gold == 150 + roundi(lus.defs["queen"].value * 0.75),
 		"Lusitania (+150 Gold) and D.B. Cooper's Parachute (+75% of value) both pay on the same loss")
 	lus.queue_free()
@@ -291,7 +294,7 @@ func _init() -> void:
 	doom.actions_left = 5
 	var clock_doom: float = doom.clock_ms
 	doom._use_item(0)
-	check(doom.score == 200 and doom.clock_ms > clock_doom,
+	check(doom.score == 2000 and doom.clock_ms > clock_doom, # issue 57: x10
 		"Doomsday Autoclicker: +200 Score and +10s Clock on a Decisive Item use")
 	doom.queue_free()
 	await process_frame
@@ -302,7 +305,7 @@ func _init() -> void:
 	tape.items.append({"key": "x3", "name": "x3", "tier": "Tactical", "target": "", "description": ""})
 	tape.actions_left = 5
 	tape._use_item(0) # the ONLY held Item — Tape Eraser Magnet's "last held" gate
-	check(tape.score == 100 and tape.gold == 50,
+	check(tape.score == 1000 and tape.gold == 50, # issue 57: Score x10, Gold untouched
 		"Tape Eraser Magnet: +100 Score and +50 Gold on using your last held Item")
 	tape.queue_free()
 	await process_frame
@@ -439,7 +442,7 @@ func _init() -> void:
 		"wave": 4, "score": 0, "artefacts": ["dyatlov-geiger-counter"]})
 	await process_frame
 	Economy.earn(dya, 100)
-	check(dya.score == 200, "Dyatlov Geiger Counter: +100% Score with 3+ allies on the enemy half")
+	check(dya.score == 2000, "Dyatlov Geiger Counter: +100% Score with 3+ allies on the enemy half") # issue 57: x10
 	dya.queue_free()
 	await process_frame
 
@@ -482,7 +485,7 @@ func _init() -> void:
 	cheap.gold = 5
 	var s0: int = cheap.score
 	Economy.earn(cheap, 100)
-	check(cheap.score == s0 + 150, "Fort Knox IOU: +50% Score gain while holding under 10 Gold")
+	check(cheap.score == s0 + 1500, "Fort Knox IOU: +50% Score gain while holding under 10 Gold") # issue 57: x10
 	cheap.queue_free()
 	await process_frame
 

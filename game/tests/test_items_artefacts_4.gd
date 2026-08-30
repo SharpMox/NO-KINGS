@@ -74,7 +74,8 @@ func _init() -> void:
 	await process_frame
 	headroom.gold_spent_shop_this_wave = 40
 	WaveLogic.queue(headroom, headroom.wave + 1)
-	check(headroom.score == 200 and headroom.gold == 128,
+	check(headroom.score == 2000 and headroom.gold == 128, # issue 57: Score x10 (Nigerian Prince's
+			# direct-write +100/+1000), Gold untouched
 		"Max Headroom Mask: doubles a Wave Artefact's trigger on both Wave clear " +
 		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +10/+100 twice, 108+20=128 Gold, 200 Score)")
 	headroom.queue_free()
@@ -139,7 +140,7 @@ func _init() -> void:
 	await process_frame
 	var nwo_base: int = nwo.defs.pawn.value
 	var nwo_pts := Economy.capture_score(nwo, "pawn")
-	check(nwo_pts == nwo_base + 10 and nwo.gold == 2 and nwo.score == 20,
+	check(nwo_pts == nwo_base + 10 and nwo.gold == 2 and nwo.score == 200, # issue 57: x10
 		"Illuminati: NWO Booster Pack: +2 Gold/+20 Score when one Capture Artefact triggers (Greed)")
 	nwo.queue_free()
 	await process_frame
@@ -148,7 +149,7 @@ func _init() -> void:
 		"wave": 3, "gold": 0, "score": 0, "artefacts": ["greed", "score", "illuminati-nwo-booster-pack"]})
 	await process_frame
 	Economy.capture_score(nwo2, "pawn") # Greed + Score both fire on_capture: 2 triggers
-	check(nwo2.gold == 4 and nwo2.score == 40,
+	check(nwo2.gold == 4 and nwo2.score == 400, # issue 57: x10
 		"Illuminati: NWO Booster Pack: scales with the number of Capture Artefact triggers (2 -> double)")
 	nwo2.queue_free()
 	await process_frame
@@ -185,10 +186,10 @@ func _init() -> void:
 		"wave": 3, "gold": 0, "score": 0, "artefacts": ["deja-vu-glitch", "deja-vu-glitch"]})
 	await process_frame
 	Economy.earn(dejavu, 100)
-	check(dejavu.score == 300 and dejavu.gold == 300,
+	check(dejavu.score == 3000 and dejavu.gold == 300, # issue 57: Score x10, Gold untouched
 		"Déjà Vu Glitch: two held copies triple (not double) the Turn's first Score/Gold gain")
 	Economy.earn(dejavu, 50)
-	check(dejavu.score == 350 and dejavu.gold == 350,
+	check(dejavu.score == 3500 and dejavu.gold == 350, # issue 57: Score x10, Gold untouched
 		"Déjà Vu Glitch: only the Turn's FIRST Score/Gold gain doubles — later gains are untouched")
 	dejavu.queue_free()
 	await process_frame
@@ -202,7 +203,7 @@ func _init() -> void:
 		if capstone.shop_stock[i].kind == "artefact":
 			Shop.buy(capstone, i)
 			break
-	check(capstone.score == 150 and capstone.clock_ms == capstone_clock0 + 5000,
+	check(capstone.score == 1500 and capstone.clock_ms == capstone_clock0 + 5000, # issue 57: x10
 		"Capstone Polish: +150 Score and +5s Clock on acquiring an Artefact")
 	capstone.queue_free()
 	await process_frame
@@ -233,7 +234,7 @@ func _init() -> void:
 	check(pts_1 == pts_2, "the same held keys in a different acquisition order give the same result")
 	Economy.earn(order_1, pts_1)
 	Economy.earn(order_2, pts_2)
-	check(order_1.score == roundi(pts_1 * 1.15) and order_1.gold == roundi(pts_1 * 0.95),
+	check(order_1.score == roundi(pts_1 * 1.15) * 10 and order_1.gold == roundi(pts_1 * 0.95), # issue 57: Score x10
 		"Tinfoil Hat's percentage still applies once, off the echoed capture's own immutable base")
 	check(order_1.score == order_2.score and order_1.gold == order_2.gold,
 		"the full capture+earn pipeline stays order-independent with two echo Artefacts stacked")
@@ -469,10 +470,10 @@ func _init() -> void:
 	await process_frame
 	crb.actions_left = 5
 	crb._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this Wave
-	check(crb.score == 20 and crb.gold == 0,
+	check(crb.score == 200 and crb.gold == 0, # issue 57: Score x10, Gold untouched
 		"Curtain Rods Bag: first Capture each Wave doubles Score (10 -> 20) and pays no Gold")
 	crb._move_player(Vector2i(2, 3), Vector2i(2, 4)) # second Capture this Wave
-	check(crb.score == 30 and crb.gold == 10,
+	check(crb.score == 300 and crb.gold == 10, # issue 57: Score x10, Gold untouched
 		"Curtain Rods Bag: the second Capture the same Wave pays normally")
 	crb.queue_free()
 	await process_frame
@@ -507,10 +508,10 @@ func _init() -> void:
 		"artefacts": ["2-3-trillion-receipt"]})
 	await process_frame
 	receipt._destroy(Vector2i(4, 4), true) # Item-caused (Drone Strike/Air Strike/Sniper)
-	check(receipt.score == 10 and receipt.gold == 10,
+	check(receipt.score == 100 and receipt.gold == 10, # issue 57: Score x10, Gold untouched
 		"$2.3 Trillion Receipt: an enemy destroyed by an Item awards its Score and Gold value")
 	receipt._destroy(Vector2i(5, 5)) # not Item-caused (Bomb's _detonate / jd_vance Tariff path)
-	check(receipt.score == 10 and receipt.gold == 10,
+	check(receipt.score == 100 and receipt.gold == 10, # issue 57: Score x10, Gold untouched
 		"$2.3 Trillion Receipt: non-Item destruction still pays nothing (Destruction default)")
 	receipt.queue_free()
 	await process_frame
@@ -1168,7 +1169,7 @@ func _init() -> void:
 	check(oak._artefact_activation_available("oak-island-wishing-well"),
 		"Oak Island Wishing Well: available (held, affordable, not used this Turn)")
 	oak._artefact_confirmed("oak-island-wishing-well")
-	check(oak.gold == 475 and oak.score == 400,
+	check(oak.gold == 475 and oak.score == 4000, # issue 57: Score x10 (400 -> 4000), Gold untouched
 		"Oak Island Wishing Well: confirmed activation pays 25 Gold for +400 Score (earn() " +
 		"also grants the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
 	check(not oak._artefact_activation_available("oak-island-wishing-well"),
@@ -1208,12 +1209,12 @@ func _init() -> void:
 	check(glow._artefact_count("moscovium-glow-stick") == 0 and glow.moscovium_active,
 		"Moscovium Glow Stick: activation consumes the Artefact and flags the triple-gain window")
 	Economy.earn(glow, 100)
-	check(glow.score == 300 and glow.gold == 300,
+	check(glow.score == 3000 and glow.gold == 300, # issue 57: Score x10, Gold untouched
 		"Moscovium Glow Stick: Score and Gold gains are tripled while active (100 -> 300 each)")
 	glow._begin_player_turn() # next Turn: "until end of Turn" expires
 	check(not glow.moscovium_active, "Moscovium Glow Stick: the window ends at the next Turn")
 	Economy.earn(glow, 100)
-	check(glow.score == 400 and glow.gold == 400,
+	check(glow.score == 4000 and glow.gold == 400, # issue 57: Score x10, Gold untouched
 		"Moscovium Glow Stick: back to normal (not tripled) once the window has ended")
 	glow.queue_free()
 	await process_frame

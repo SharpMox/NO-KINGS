@@ -168,11 +168,15 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.
-- **Run the suite in the FOREGROUND and let it block.** `run_all.sh` takes minutes, which
-  makes backgrounding it and polling look sensible. It isn't: three separate agents have
-  now stalled by launching it in the background and then waiting on a task that had
-  already finished, losing their turn with the work uncommitted and unpushed. Call it
-  directly and let it block until it prints its verdict.
+- **Run the suite in the foreground WITH AN EXPLICIT TIMEOUT: `timeout: 600000`.** This is
+  the single most-repeated mistake in this repo — **four** agents have now lost their turn
+  to it, with work uncommitted and unpushed. The mechanism is not carelessness: `run_all.sh`
+  takes several minutes, the Bash tool's default timeout is **120s**, and on hitting that
+  the harness *auto-backgrounds* the command. So "run it in the foreground" is not
+  achievable by intent alone — without the explicit timeout it gets backgrounded no matter
+  what you meant, and then the agent sits waiting on a task that has already ended.
+  Pass `timeout: 600000` (10 minutes, the maximum) and let it block until it prints its
+  verdict.
 - **A/B a suspected flake by INTERLEAVING runs, not by batching them.** Running 15 on a
   branch, then 20 on `main`, and comparing the rates is invalid when the flake is
   load-sensitive: the two batches ran under different machine load, so the comparison

@@ -82,14 +82,14 @@ func _init() -> void:
 	await process_frame
 	bk.turn_number = 2 # not the cadence
 	Economy.earn(bk, 10)
-	check(bk.score == 10, "Black Knight: no Score doubling off the 3rd Turn")
+	check(bk.score == 100, "Black Knight: no Score doubling off the 3rd Turn") # issue 57: x10
 	var clock_before: float = bk.clock_ms
 	Economy.add_clock(bk, 1000.0, "test")
 	check(bk.clock_ms == clock_before + 1000.0, "Black Knight: no Clock doubling off the 3rd Turn")
 
 	bk.turn_number = 3 # the cadence
 	Economy.earn(bk, 10)
-	check(bk.score == 30, "Black Knight: Score gain doubled on the 3rd Turn (10 + 20)")
+	check(bk.score == 300, "Black Knight: Score gain doubled on the 3rd Turn (10 + 20)") # issue 57: x10
 	clock_before = bk.clock_ms
 	Economy.add_clock(bk, 1000.0, "test")
 	check(bk.clock_ms == clock_before + 2000.0, "Black Knight: Clock gain doubled on the 3rd Turn")

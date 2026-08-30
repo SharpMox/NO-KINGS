@@ -1,6 +1,6 @@
 # 67 — The Family framework + the three seed Families
 
-Status: todo — SPECCED (user rulings 2026-08-30) · family-1 name provisional
+Status: todo — SPECCED (user rulings 2026-08-30) · ready
 
 ## Parent
 
@@ -32,7 +32,10 @@ is chosen, Powers must compose with held Artefacts under the additive stacking r
 
 ## The three seed Families
 
-### 1. The Levy *(name provisional — alternates: The Muster, The Retinue; user asked for a medieval-army term to replace "Crown")*
+### 1. The Muster *(ruled 2026-08-30 — "The Levy" was vetoed by the user: Levy is a common Jewish surname and in a conspiracy-satire game the family name must carry zero chance of an antisemitic reading. "The Muster" fits the mechanics exactly: the Ability IS mustering troops.)*
+
+**The family id / save value stays `"Crown"`** — the existing ARMIES key, load-bearing in
+saves. Display name only, per the standing convention.
 
 *Classic chess: 8 pawns + rook, bishop, knight. Identity: mustering and merging.*
 

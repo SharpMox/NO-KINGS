@@ -1,6 +1,6 @@
 # 56 — SETI's Red Marker and Zapruder's, both redesigned
 
-Status: todo — SPECCED (user redesigns + sub-answers 2026-08-30) · ready
+Status: done
 
 ## Parent
 
@@ -96,3 +96,41 @@ line in this slice, so if anything here wants revisiting after a playtest, it is
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped in PR `feat/marker-and-zapruder-56`. Catalog closes at **180/180**.
+
+- **SETI's Red Marker** is now an ordinary self-referential `on_purchase` REGISTRY handler
+  (`artefact_hooks.gd`): `ctx.kind == "artefact" and ctx.key == "seti-s-red-marker"` fires
+  because `Shop.buy()` appends the bought copy to `g.artefacts` before dispatching
+  `on_purchase`. Both halves always run in the handler body — a random active Tariff is
+  removed (`g.tariffs_active.remove_at(...)`) if the array isn't empty, and a Big Artefact
+  Box (`Box.roll_options(g, "artefact", "big")`, 5 choices/1 pick) opens unconditionally via
+  `g._open_box_pick(...)`, guarded by `not g.box_open` (mirrors Trojan Horse Assembly
+  Manual/Loch Ness Stool Sample's own guard — two held SETI copies dispatching on the same
+  purchase, the documented per-held-copy stacking rule, must not clobber one open Box pick
+  with a second). Re-texted: "On acquiring this Artefact: remove a random active Tariff (if
+  any), and open a Big Artefact Box." Tested in `test_items_tariffs.gd`: the no-Tariff-active
+  case (the only one a live run hits, `TARIFFS_SCHEDULED` false) and the Tariff-removal case,
+  driven directly via `Economy.activate_tariff_by_key` since it can't happen live.
+- **Zapruder's Director's Cut** keeps its issue-52 move/capture replay untouched and adds a
+  resource-return for the 3 kinds a replay can't express, via new `_zapruder_available()`/
+  `_zapruder_resolve()` in `game.gd` (replacing the direct `_can_repeat_last_action()`/
+  `_repeat_last_action()` calls in the activation dispatch table). `_log_action`'s "place"
+  and "item" call sites now stamp `{pos}`/`{item}` the same way the plain move/capture site
+  already stamped `{from, to}`; `merge_logic.gd`'s `commit_merge` snapshots both consumed
+  pieces' ADR-0002 Stock-shaped state into a new `{pieces}` field on the "merge" log entry
+  **before** its existing erase loop discards that state for real — the one ordering detail
+  that would have silently broken the Merge case. Item use returns the Item via
+  `ItemLogic.grant` (refuses at the issue-53 cap of 3, same "spent either way" precedent as
+  every other full-inventory grant path — the once-per-Wave charge is still spent); Deploy
+  un-deploys the piece back to Stock (same "duplicate, strip owner, bare id" shape as
+  `_capture_to_stock`); Merge returns BOTH consumed pieces to Stock, on top of the merge
+  result the player already kept (user ruling — an accepted, bounded duplication of value).
+  Re-texted to describe all 4 branches. Tested in `test_items_artefacts_4.gd`: Deploy, Item
+  (normal + full-inventory refusal), and Merge (both pieces returned, one with buff state
+  intact) — the existing move/capture test is untouched.
+- `data/artefacts.js` / `game/data/artefacts.json` (regenerated via
+  `tools/export-game-artefacts.mjs`) and `.scratch/gdd-gaps/FLAGS.md`'s Zapruder
+  overpromise flag are updated to match.

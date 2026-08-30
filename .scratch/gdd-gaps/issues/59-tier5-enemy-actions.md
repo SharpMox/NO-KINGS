@@ -30,7 +30,34 @@ The value already flows through `Economy` — `on_enemy_turn_start` is seeded fr
 both modify it there — so this is a single-site change, not a sweep. Make sure the tier
 value is what seeds the hook, so those two Artefacts still compose on top of it.
 
-## The warning: difficulties are cumulative, and Tier 5 is already brutal
+## STOP AND READ: both halves of this change are independently measured as unwinnable
+
+Two fleet sweeps already exist in the repo, and they were run separately. This slice stacks
+them.
+
+**1. Enemy at 2 Actions/turn, at BASE difficulty: 0/60 wins.** From `tuning.gd:32`'s own
+comment — a 60-run sweep (Crown / Wild Hunt / Old Guard, 20 each) re-run on 2026-08-28 under
+the current wave catalog, tariffs and unified action economy:
+
+> at 2 actions/turn put every run at **0/60 wins** (was 2/60 at 1) and collapsed median
+> survival from wave 17.5 to wave 8
+
+That is with **no other difficulty modifiers at all**.
+
+**2. Tier 5 as it stands today: 0/24 wins**, median survival 38.5 -> 9.5, every loss to
+resource starvation (`FLAGS.md`).
+
+Tier 5 also carries -1 player Action, halved starting Stock, -1 Shop row and no Clock pause —
+so **Tier 5 + enemy 2 Actions is strictly worse than the scenario that already scored 0/60.**
+This is not "a top tier is allowed to be brutal"; it is a tier that two independent
+measurements say cannot be won.
+
+**That may be exactly what the user wants** — an unwinnable summit is a legitimate design
+choice, and the user has parked Tier-5 tuning as "later". But it should be a decision taken
+with these numbers in hand, not a surprise found in a playtest. Surface it before building,
+and if it goes ahead, the post-landing sweep below is not optional.
+
+## The mechanics: difficulties are cumulative
 
 Confirmed by reading `tuning.gd` — every rule is `tier_index(tier) >= N`, so a tier inherits
 every lower tier's debuff. **Tier 5 today is all four at once:**

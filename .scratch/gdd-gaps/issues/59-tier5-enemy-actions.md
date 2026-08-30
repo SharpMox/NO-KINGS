@@ -65,3 +65,25 @@ below wave ~5 the tier stops teaching the player anything, which is worth knowin
 ## Blocked by
 
 - nothing
+
+## The GDD sweep found this ruling settles a long-standing divergence
+
+Recorded 2026-08-30, from the Notion sweep.
+
+The **[Enemy AI Behaviors](https://app.notion.com/p/367f1559c99b81a8958edbf4a0f30762)** page
+states the AI takes **2 Actions per Turn by default, unconditionally**. The code has
+`ENEMY_ACTIONS_PER_TURN := 1` — *"playtest override, re-justified 2026-08-28"* — which is
+**divergence #2**, open since 2026-07-02 and the reason issue 11 exists.
+
+The user's ruling resolves it without either side simply losing: **baseline stays 1, and Tier
+5 restores the GDD's 2.** The GDD value becomes the top-difficulty value rather than the
+default.
+
+So this slice must also **update that Notion page**, or the sweep just moves the divergence
+rather than closing it. State plainly there: baseline 1, Tier 5 = 2, and that this supersedes
+the unconditional "2 by default" (following the page convention of a `> Reconciled <date>`
+blockquote rather than silently overwriting).
+
+**Issue 11 should be closed at the same time.** It existed to re-test the enemy-action count
+with fleet data; a difficulty rank answers the question differently and makes the re-test
+moot.

@@ -110,3 +110,26 @@ Renamed everywhere a player or designer reads "Tariff":
   renamed string; re-ran the probe alone (no other Godot process) and it passed clean,
   consistent with the documented windowed-probe contention flake from parallel agents
   sharing the display. A second full solo run came back **ALL GREEN**.
+
+## Outcome
+
+Shipped in PR #231. Names and documents only — zero behaviour change, verified by diff
+(+23/-0 on the three core files, all header notes) and a full independent suite run.
+
+Beyond the listed sites, the agent found and renamed two more player-visible surfaces:
+the in-game **Guide text's Tariffs section** (`guide_text.gd`) and the **Games History row
+label** in `menu.gd` (with the y/ies plural handled). Both label-only; the underlying
+fields keep their names per the scope split.
+
+**Known remainder, deliberate:** the 19 catalog row names ("Tariff on Move" ...) survive in
+`tariffs.gd` and the Notion DB title is unchanged — those entries are the design pool whose
+real names come from the per-King assignment pass, and nothing player-visible can render
+them while `TARIFFS_SCHEDULED` is false. The Kings rework owns their renaming, along with
+all code identifiers.
+
+Notion: King Tariffs (concept) retitled to **King Powers & Abilities** with the cadence
+math preserved under a marked LEGACY section; the **Families** page created
+(https://app.notion.com/p/3ccf1559c99b81a584fec27dd061de2c), structure only.
+
+One probe flake sighting during verification was logged as a trail marker in FLAGS.md —
+one occurrence, undiagnosed, passed on re-run.

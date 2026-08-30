@@ -1,3 +1,12 @@
+## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
+## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
+## (data/kings.gd). Code identifiers here (TARIFFS, tariffs_active, key/name
+## fields, etc.) are deliberately left as "tariff" — the coming Kings +
+## Tariffs rework restructures this catalog (entries become the per-King
+## Ability design pool) rather than just renaming it, so renaming twice would
+## be wasted work. Do not read "Tariff" in this file as a stale rename; it is
+## the pre-rework code shape on purpose.
+##
 ## Tariffs Catalog, from the Notion GDD (fetched 2026-07-02). Penalties on the
 ## player, activated on every 10th wave per the Wave Catalog schedule.
 ##

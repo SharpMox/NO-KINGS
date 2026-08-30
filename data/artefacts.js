@@ -127,6 +127,18 @@
    55): Moscovium has no REGISTRY entry, so Ecdysis's meta-trigger copy of it
    is an inert no-op (REGISTRY.get("moscovium-glow-stick", []) is empty) —
    no crash, no double-consume, tested in test_items_artefacts_4.gd.
+   2026-08-30 (issue 56): the catalog closes at 180/180. Both re-texted, user
+   redesigns: SETI's Red Marker's "one random active Tariff is inverted into
+   its equivalent bonus" (unimplementable — no Tariff has a defined inverse)
+   is now "remove a random active Tariff (if any), and open a Big Artefact
+   Box" — the Box always opens, since TARIFFS_SCHEDULED is false and no
+   Tariff is ever active in a live run today; gating the Box on the removal
+   would leave this Artefact dead on arrival all over again. Zapruder's
+   Director's Cut's move/capture replay (issue 52) is unchanged; the redesign
+   ADDS a resource-return for the 3 kinds a replay can't express (Item use,
+   Deploy, Merge — the last returning BOTH consumed pieces, user ruling),
+   instead of leaving the card dead after any of them — see
+   game/scripts/artefact_hooks.gd's header for the full mechanism.
    180 effects. Each entry: { name, rarity, type, bonus[], status, effect, conspiracy,
    url, summary, implemented? (default false; see tools/export-game-artefacts.mjs) }. */
 
@@ -722,7 +734,8 @@ var ARTEFACTS = [
     conspiracy: "The Roanoke Colony", url: "https://en.wikipedia.org/wiki/Roanoke_Colony",
     summary: "116 colonists vanished leaving one carved word and no bodies. The kit does the same thing on demand: gone without a trace — which also means no rewards, exactly like the colony." },
   { name: "SETI's Red Marker", rarity: "Rare", type: "Trigger", bonus: ["Special"], status: "KEEP",
-    effect: "On acquiring this Artefact: one random active Tariff is inverted into its equivalent bonus (needs: tariff inversion)",
+    implemented: true,
+    effect: "On acquiring this Artefact: remove a random active Tariff (if any), and open a Big Artefact Box",
     conspiracy: "The Wow! signal", url: "https://en.wikipedia.org/wiki/Wow!_signal",
     summary: "1977: a 72-second radio burst so anomalous the astronomer circled it and wrote Wow! in red pen. The marker does what red pens do — flips the sign on something." },
   { name: "Fireproof Pajamas", rarity: "Rare", type: "Passive", bonus: ["Special"], status: "KEEP", implemented: true,
@@ -843,7 +856,7 @@ var ARTEFACTS = [
     summary: "Desert figures kilometres long, fully visible only from the air — ancient-astronaut writers read them as runways. With a valid boarding pass, everywhere is a landing strip." },
   { name: "Zapruder's Director's Cut", rarity: "Legendary", type: "Trigger", bonus: ["Action"], status: "KEEP",
     implemented: true,
-    effect: "Once per Wave: you may repeat your previous Action without spending an Action",
+    effect: "Once per Wave, at no Action cost: repeat your previous move or capture; if your last Action was an Item, return it to your inventory; if it was a Deploy, return that piece to Stock; if it was a Merge, return both consumed pieces to Stock",
     conspiracy: "The Zapruder film", url: "https://en.wikipedia.org/wiki/Zapruder_film",
     summary: "26 seconds of home movie that became the most analyzed film in history — run back frame by frame for sixty years. The director's cut includes one extra take per showing." },
   { name: "Templar Debit Card", rarity: "Legendary", type: "Passive", bonus: ["Shop","Special"], status: "KEEP", implemented: true,

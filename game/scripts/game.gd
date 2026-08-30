@@ -304,6 +304,12 @@ var action_log: Array[Dictionary] = [] # ordered {kind} entries this Turn (issue
 	# {from, to} — Zapruder's Director's Cut's replay data (issue 52); every
 	# other call site leaves those keys absent, which _can_repeat_last_action
 	# reads as "not repeatable" rather than half-replaying a Deploy/Merge/Item.
+	# Issue 56 gave the other 3 kinds their OWN data instead, for Zapruder's
+	# resource-return half: "place" stamps {pos} (the deploy tile), "item"
+	# stamps {item} (the consumed Item dict), and merge_logic.gd's
+	# commit_merge stamps "merge" with {pieces} (both consumed pieces'
+	# ADR-0002 Stock-shaped state, snapshotted before the merge discards it
+	# for real) — see _zapruder_available/_zapruder_resolve below.
 
 # --- issue 52: Artefact activation. Player-triggered ("on use"/"you may
 # pay") Artefacts, costing 0 Actions (user ruling) — gated by each key's own
@@ -1445,7 +1451,7 @@ func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
 		var deploy_ctx := ArtefactHooks.run(self, "on_deploy", {"pos": tile, "skip_action": false})
 		if not deploy_ctx.skip_action:
 			actions_left -= 1
-		_log_action("place")
+		_log_action("place", {"pos": tile}) # issue 56: Zapruder's Deploy-return reads this back
 		Economy.charge(self, "deploy_cost")
 		Economy.spend_gold(self, Economy.deploy_cost(self))
 		if actions_left == 0 or _board_cleared(): # last action spent placing
@@ -2030,7 +2036,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
 		actions_left -= it.get("action_cost", 1) # data-driven (Blitz: 0)
-	_log_action("item")
+	_log_action("item", {"item": it}) # issue 56: Zapruder's Item-return reads this back
 	match it.key:
 		"blitz": # Notion 2026-08-28 rework: costs 0 actions itself; the target's
 			# NEXT move/capture this Turn is free (_move_player checks the flag).
@@ -2344,7 +2350,7 @@ func _artefact_activation_available(key: String) -> bool:
 		"roanoke-hex-kit":
 			return _roanoke_available()
 		"zapruder-s-director-s-cut":
-			return not zapruder_used_this_wave and _can_repeat_last_action()
+			return not zapruder_used_this_wave and _zapruder_available()
 		"bovine-tractor-beam":
 			return not bovine_used_this_wave and not _enemy_pieces().is_empty() \
 					and not Rules.placement_tiles(board).is_empty()
@@ -2405,7 +2411,7 @@ func _artefact_confirmed(key: String) -> void:
 			_roanoke_activate()
 		"zapruder-s-director-s-cut":
 			zapruder_used_this_wave = true
-			_repeat_last_action()
+			_zapruder_resolve()
 	_refresh()
 
 
@@ -2451,26 +2457,26 @@ func _roanoke_activate() -> void:
 		_destroy(pos)
 
 
-## Zapruder's Director's Cut: "repeat your previous Action without spending
-## an Action." _log_action (issue 30) only ever recorded {kind} — not enough
-## to replay a Deploy (which Stock entry), a Merge (which pair) or an Item
-## (which index/targets), and inventing a replay shape for 3 more action
-## kinds is not what this catalog text asks for. Scoped to exactly what the
-## plain move/capture call site in _move_player now also stamps: {from, to}
-## (the piece's OWN starting tile and where it ACTUALLY ended up — final_pos,
-## not a mid-flight tile a repositioning artefact moved it off of again). By
-## the time Zapruder can fire, that piece has already moved from `from` to
-## `to`, so "repeat" means "make that same displacement again, starting from
-## where it is now" — extend the (to - from) vector once more and replay it
-## through _move_player itself, so every rule (legality, buffs, bombs,
-## scoring) re-runs exactly as a normal move would. `blitz_free_move` (Blitz;
-## already reused once for Pegasus Free Trial) skips _move_player's own
-## actions_left -= 1 at whichever of its branches this replay hits, instead
-## of compensating before/after — a compensating add would double-count if
-## _move_player's own auto-pass fired mid-call. Bomb/Trap/blocked-attack
-## captures, Deploys, Merges and Items carry no {from, to} and so are
-## correctly reported unavailable by _can_repeat_last_action, never
-## half-replayed.
+## Zapruder's Director's Cut, move/capture half: "repeat your previous Action
+## without spending an Action." _log_action (issue 30) only ever recorded
+## {kind} — not enough to replay a Deploy (which Stock entry), a Merge (which
+## pair) or an Item (which index/targets), and inventing a replay shape for 3
+## more action kinds is not what this catalog text asked for. Scoped to
+## exactly what the plain move/capture call site in _move_player also stamps:
+## {from, to} (the piece's OWN starting tile and where it ACTUALLY ended up —
+## final_pos, not a mid-flight tile a repositioning artefact moved it off of
+## again). By the time Zapruder can fire, that piece has already moved from
+## `from` to `to`, so "repeat" means "make that same displacement again,
+## starting from where it is now" — extend the (to - from) vector once more
+## and replay it through _move_player itself, so every rule (legality, buffs,
+## bombs, scoring) re-runs exactly as a normal move would. `blitz_free_move`
+## (Blitz; already reused once for Pegasus Free Trial) skips _move_player's
+## own actions_left -= 1 at whichever of its branches this replay hits,
+## instead of compensating before/after — a compensating add would
+## double-count if _move_player's own auto-pass fired mid-call.
+## Bomb/Trap/blocked-attack captures carry no {from, to} and so are correctly
+## reported unavailable here, never half-replayed — but a Deploy/Item/Merge
+## (issue 56) now has its OWN replacement path; see _zapruder_available below.
 func _can_repeat_last_action() -> bool:
 	if action_log.is_empty():
 		return false
@@ -2491,6 +2497,54 @@ func _repeat_last_action() -> void:
 	var to: Vector2i = from + (Vector2i(last.to) - Vector2i(last.from))
 	board[from].blitz_free_move = true
 	_move_player(from, to)
+
+
+## Zapruder's Director's Cut (issue 56 redesign): "this complements the
+## existing replay, it does not replace it" — a move/capture still repeats
+## (above); the 3 kinds a replay cannot express instead give back the
+## resource the catalog names for each: the Item you just used, the piece you
+## just Deployed, or both pieces a Merge just consumed. Availability never
+## checks the Item cap (an Item-return activation is always offered — the cap
+## only gates whether _zapruder_resolve's grant actually lands, same
+## "spent either way" shape as every other full-inventory acquisition path,
+## e.g. _box_choose's own ItemLogic.grant).
+func _zapruder_available() -> bool:
+	if action_log.is_empty():
+		return false
+	var last: Dictionary = action_log.back()
+	match last.kind:
+		"move", "capture":
+			return _can_repeat_last_action()
+		"item":
+			return last.has("item")
+		"place":
+			return last.has("pos") and board.has(last.pos) and board[last.pos].owner == Rules.PLAYER
+		"merge":
+			return last.has("pieces")
+	return false
+
+
+func _zapruder_resolve() -> void:
+	var last: Dictionary = action_log.back()
+	match last.kind:
+		"move", "capture":
+			_repeat_last_action()
+		"item":
+			ItemLogic.grant(self, last.item) # refuses at a full inventory (issue 53) —
+				# the once-per-Wave charge above is already spent either way
+		"place":
+			var piece: Dictionary = board[last.pos].duplicate() # same "duplicate,
+				# strip owner, bare id if that's all that's left" shape as
+				# _capture_to_stock (ADR-0002) — the un-deployed piece's state
+				# (buffs, capture ledger, peak-rank) rides along for free
+			piece.erase("owner")
+			stock.append(piece.id if piece.size() == 1 else piece)
+			board.erase(last.pos)
+		"merge":
+			for piece in last.pieces: # both consumed pieces (user ruling) — the
+				# player keeps the merge result too, an accepted duplication
+				# bounded by once-per-Wave on a Legendary
+				stock.append(piece)
 
 
 # --- Bovine Tractor Beam: the one targeted activation. Reuses the Item

@@ -76,12 +76,22 @@ almost certainly the point.
     deployable at all.
   - **Sell it.**
 
-  **Verify a possible existing bug first.** `game.gd:1393` carries the comment *"captured
-  stock deploys like stock (GDD Captured Stock, wired 2026-07-07)"* and the path below it
-  calls `_place(armed_entry, tile, placing_cap)`. If captured pieces can in fact be deployed
-  today, that **contradicts the design** and is a bug this slice should fix, not preserve.
-  Establish which is true before building the conversion — if deploying already works, the
-  conversion has nothing to sell.
+  **Deploying captured pieces directly must be REMOVED — it works today.** This is a design
+  change, not just a gap (user, option A, 2026-08-30). Both the code and the GDD currently
+  allow it:
+  - `game.gd:1393` comments *"captured stock deploys like stock"* and the path below calls
+    `_place(armed_entry, tile, placing_cap)`.
+  - The Notion **Captured Stock** page states it explicitly: *"The player can place captured
+    enemy pieces during their turn — but doing so costs Gold (`PLACEMENT_COST`), like any
+    mid-turn placement."*
+
+  Under the new design that path goes away: a captured piece's only routes out are
+  **convert -> Stock (at a price)**, **merge**, or **sell**. Removing a shipped, documented
+  ability is the largest single behaviour change in this slice — treat it as such, and check
+  what else assumes captured pieces are placeable (`placing_cap`, `pool_drag_cap`, the arming
+  guards at `game.gd:547` and `1156`, and `_place`'s own `cap` parameter).
+
+  **The GDD page must be updated in the same change** so the two never disagree again.
 
   ### Conversion price — the number that closes the arbitrage
 

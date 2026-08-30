@@ -1,6 +1,6 @@
 # 56 — SETI's Red Marker and Zapruder's, both redesigned
 
-Status: done
+Status: done (2026-08-30) — **catalog closed at 180 / 180**
 
 ## Parent
 
@@ -134,3 +134,36 @@ Shipped in PR `feat/marker-and-zapruder-56`. Catalog closes at **180/180**.
 - `data/artefacts.js` / `game/data/artefacts.json` (regenerated via
   `tools/export-game-artefacts.mjs`) and `.scratch/gdd-gaps/FLAGS.md`'s Zapruder
   overpromise flag are updated to match.
+
+## Outcome
+
+Shipped in PR #199. **The catalog is complete: 180 / 180 Artefacts implemented.**
+
+Final card texts:
+
+- **SETI's Red Marker** — *"On acquiring this Artefact: remove a random active Tariff (if
+  any), and open a Big Artefact Box"*
+- **Zapruder's Director's Cut** — *"Once per Wave, at no Action cost: repeat your previous
+  move or capture; if your last Action was an Item, return it to your inventory; if it was a
+  Deploy, return that piece to Stock; if it was a Merge, return both consumed pieces to
+  Stock"*
+
+**SETI opens its Box with no Tariff active** — asserted explicitly, because with
+`TARIFFS_SCHEDULED` false that is the *only* case a live run reaches. A second test drives a
+Tariff directly to cover the removal half. Multiple copies are guarded with `not g.box_open`
+so they cannot clobber each other's Box.
+
+**Zapruder's Item return is refused at a full inventory**, routing through
+`ItemLogic.grant` like every other acquisition path, and the once-per-Wave charge is spent
+either way — consistent with how every other full-inventory grant behaves.
+
+**The detail that made the Merge branch possible at all:** `merge_logic.gd`'s `commit_merge`
+now snapshots both consumed pieces' ADR-0002 Stock-shaped state **before** the erase loop
+discards it. Verified by reading the code, not the report — `g.board[ref].duplicate()` runs
+before `g.board.erase(ref)` in the same iteration, strips `owner`, and collapses to a bare id
+when nothing else remains. By the time Zapruder's activates the originals are otherwise gone
+for good, so a snapshot taken any later would have returned nothing.
+
+**Process note worth keeping:** this agent detected another agent's Godot process and
+**waited rather than running concurrently**, unprompted — the first time the "never run two
+suites at once" rule has been self-enforced.

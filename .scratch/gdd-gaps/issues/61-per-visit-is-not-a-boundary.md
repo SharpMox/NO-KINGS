@@ -1,6 +1,6 @@
 # 61 — "Once per Shop visit" is not a real boundary
 
-Status: todo — BUG, shipped · user caught it 2026-08-30
+Status: todo — SPECCED (user ruling 2026-08-30) · ready
 
 ## Parent
 
@@ -47,24 +47,40 @@ It is still fragile: an accidental close silently discards progress toward the d
 no feedback. Worth deciding whether that is acceptable or whether this counter should also
 move to a sturdier boundary.
 
-## Fix
+## Fix — RULED 2026-08-30
 
-**Recommendation: move Jet Fuel Vial to once per Wave**, using the established idiom — a
-`*_used_this_wave` flag reset on `on_wave_clear`, exactly as Hoffa's Cement Shoes, UAP Breath
-Mint, Inflatable Vietcong Torpedo, Bovine Tractor Beam and Zapruder's Director's Cut all do.
-It is spam-proof, it matches five existing cards, and it needs no new concept.
+**Both move to per Wave, and every mention of "per visit" is removed.** The user's call:
+one boundary instead of two, and the weak one retired outright.
 
-Re-text the card to say "Once per Wave".
+- **Jet Fuel Vial** -> *"Once per Wave: pay 20 Gold to restock the Shop"*
+- **Pandemic Toilet Paper Pallet** -> *"Every 2nd purchase in the same Wave costs 50% less"*
+
+Use the established idiom: a `*_used_this_wave` / per-Wave counter reset on `on_wave_clear`,
+exactly as Hoffa's Cement Shoes, UAP Breath Mint, Inflatable Vietcong Torpedo, Bovine Tractor
+Beam and Zapruder's Director's Cut already do. Delete the `_open_shop()` resets entirely.
+
+**Note the Pallet gets *better* for the player**, not just sturdier: its count now persists
+across Shop visits within a Wave, so closing the panel no longer silently discards progress
+toward the discount. That is a small buff, and intended.
 
 **Alternative considered and rejected:** tying the flag to the actual stock roll rather than
 the panel open. It sounds tighter, but Jet Fuel Vial's own effect *is* a restock, so it would
-reset its own flag and loop — it needs a self-exclusion carve-out that once-per-Wave avoids
-entirely.
+reset its own flag and loop — it needs a self-exclusion carve-out that per-Wave avoids.
 
-**For the Pallet**, decide separately: leaving it per-panel-open is defensible (it only ever
-costs the player, never exploits), but if it moves, it should move to the same Wave boundary
-for consistency rather than inventing a third.
+### Every site to clean
 
+Catalog text (`data/artefacts.js`, then re-export):
+- Jet Fuel Vial, Pandemic Toilet Paper Pallet — both texts above.
+
+Code — the term appears in 10 places, all to be updated or deleted:
+- `game.gd:186-187` (pallet_purchase_count's comment), `316` (the once-per limit comment),
+  `331-332` (jet_fuel_used_this_visit + comment), `3034-3035` (the `_open_shop` resets —
+  **delete both**), `3045` (the docstring), `3050` and `3067` (the flag reads/writes).
+- `artefact_hooks.gd:2461` (the Pallet comment). Line `372` already refers to *"the retired
+  Shop visit term"* — make that accurate rather than aspirational.
+
+Rename the variables too (`jet_fuel_used_this_wave`, and the Pallet counter) so no stale
+"visit" survives in an identifier.
 ## Wider point worth recording
 
 **"Per Shop visit" is not a durable boundary in this codebase**, because the Shop panel can be
@@ -77,7 +93,10 @@ Issue 60 (selling) should not introduce a per-visit limit for the same reason.
 - Jet Fuel Vial cannot restock more than once per Wave regardless of panel open/close —
   **assert it by actually closing and reopening the Shop**, since that is the failing case.
 - Card re-texted in `data/artefacts.js`, exported via `node tools/export-game-artefacts.mjs`.
-- A decision recorded for the Pallet either way.
+- The Pallet's count persists across Shop visits within a Wave — assert that closing and
+  reopening no longer resets it.
+- **No occurrence of "visit" remains** in `data/artefacts.js`, `game.gd` or
+  `artefact_hooks.gd` as a live boundary — grep for it as part of the work.
 - `run_all.sh` ALL GREEN, foreground.
 
 ## Blocked by

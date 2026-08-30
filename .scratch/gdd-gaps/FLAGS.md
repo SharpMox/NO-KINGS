@@ -35,6 +35,30 @@ Reviewed 2026-08-29.
   2026-07-02 that predates the wave-catalog rebalance, the tariff system and the unified
   action economy. Slice 11 exists to re-test it with fleet data rather than assume.
 
+## Tuning artifacts created by Score x10 (issue 57)
+
+- **The Wave-10 milestone bonus now EXACTLY equals the first Shop restock threshold.**
+  `MILESTONE_SCORE_BONUS` is 100, so x10 it pays **1000**; `Shop.threshold(0)` is
+  `SHOP_RESTOCK_BASE` = **1000**. They are equal to the point. So reaching Wave 10 banks the
+  first restock **by itself, regardless of how the run has gone** — before the slice a
+  100-point bonus was nowhere near the 1000 threshold, and the first restock had to be
+  earned by scoring.
+
+  Verified by computing both sides, not inferred. The curve is
+  `threshold(n) = 1000(n+1) + 500·n(n+1)/2` -> 1000 / 2500 / 4500 / 7000, so only the first
+  threshold has this property; the milestone does not trivially cross later ones.
+
+  Not a bug — the slice's whole purpose was to make thresholds reachable, and this is that
+  working. But an exact tie is a coincidence rather than a decision, and it puts the first
+  restock on rails. Adjusting either constant by any amount breaks the tie; worth a look in
+  the tuning pass.
+
+- **Rate coefficients were scaled as flat constants**, which is right but worth recording:
+  Putin's Golden Toilet Brush (`5 * ctx.price` -> 50) and Rapture Insurance Policy
+  (`g.gold * 20` -> 200) are Score-per-unit-of-Gold conversion rates, not percentages, so
+  they do not scale on their own and needed the x10 explicitly. If any *other* effect is later
+  found converting Gold to Score by a coefficient, it needs the same treatment.
+
 ## Rulings I made that are cheap to reverse
 
 Each was a judgement call needed to ship; none was specced.

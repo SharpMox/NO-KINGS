@@ -1,6 +1,6 @@
 # 62 — GDD staleness found by the 2026-08-30 audit
 
-Status: partial — items 1, 2, 4, 6 DONE (2026-08-30); 3 owned by issue 59; 5 blocked
+Status: partial — 1, 2, 3, 4, 6 DONE; only item 5 (Tariffs Catalog costs) remains
 
 ## Parent
 
@@ -124,8 +124,9 @@ sits outside the bold, verified by re-fetching.
 
 ### Still open
 
-- **#3** — Enemy AI Behaviors' action count. **Issue 59 owns it** and will resolve it as
-  "baseline 1, Tier 5 restores 2". Deliberately untouched to avoid a double-fix.
+- ~~**#3**~~ — **DONE.** Issue 59 reconciled Enemy AI Behaviors as "baseline 1, Tier 5 restores
+  2", with the fleet numbers attached, and also closed out Difficulty Ranks' own
+  "contradiction flagged, not resolved" callout — the same divergence had two ends.
 - **#5** — the Tariffs Catalog's ~10-20x inflated Cost numbers. Blocked twice: it needs
   `agent-browser` to enumerate the table row by row, and it should land **after** issue 57's
   Score x10 or the numbers will be stale a second time.

@@ -55,6 +55,8 @@ func _init() -> void:
 			"%s: Shop row delta (Tier 3+)" % t)
 		check(Tuning.actions_per_turn(t) == Tuning.ACTIONS_PER_TURN - (1 if i >= 4 else 0),
 			"%s: actions/turn (Tier 5 only)" % t)
+		check(Tuning.enemy_actions_per_turn(t) == Tuning.ENEMY_ACTIONS_PER_TURN + (1 if i >= 4 else 0),
+			"%s: enemy actions/turn (issue 59 — Tier 5 only)" % t)
 	check(Tuning.tier_index("nonsense") == 0 and Tuning.tier_index("") == 0
 			and Tuning.tier_index("Officer") == 0,
 		"an unrecognized tier string (old save rank name, or unset) falls back to Tier 1")
@@ -222,6 +224,31 @@ func _init() -> void:
 	check(drawn_1 != "" and drawn_1 == drawn_5,
 		"the same Mild draw lands identically at Tier 1 and Tier 5 (no severity shift): %s"
 			% drawn_1)
+
+	# --- issue 59: the enemy takes 2 Actions at Tier 5, 1 at Tiers 1-4 — a
+	# live boot, not just the pure Tuning math above, to prove Economy.
+	# enemy_actions actually reads g.next_tier when it seeds on_enemy_turn_start ---
+	var ea1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(Economy.enemy_actions(ea1) == 1, "Tier 1: the enemy takes 1 action per Turn")
+	ea1.queue_free()
+	await process_frame
+
+	GameScript.next_tier = "Tier 4"
+	var ea4 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(Economy.enemy_actions(ea4) == 1, "Tier 4: still 1 — the enemy-action lever is Tier 5 only")
+	ea4.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
+	GameScript.next_tier = "Tier 5"
+	var ea5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(Economy.enemy_actions(ea5) == 2, "Tier 5: the enemy takes 2 actions per Turn (issue 59)")
+	ea5.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
 
 	# --- save compat: an old save's rank name boots and behaves like Tier 1 ---
 	var old := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,

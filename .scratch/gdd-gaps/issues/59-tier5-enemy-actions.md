@@ -1,6 +1,6 @@
 # 59 — Tier 5 gains: the enemy takes 2 Actions
 
-Status: todo — SPECCED (user ruling 2026-08-30) · **read the warning first**
+Status: done
 
 ## Parent
 
@@ -114,3 +114,49 @@ blockquote rather than silently overwriting).
 **Issue 11 should be closed at the same time.** It existed to re-test the enemy-action count
 with fleet data; a difficulty rank answers the question differently and makes the re-test
 moot.
+
+## Outcome
+
+**`Tuning.enemy_actions_per_turn(tier)`** added exactly as specced — `ENEMY_ACTIONS_PER_TURN
++ (1 if tier_index(tier) >= 4 else 0)`, same shape as `actions_per_turn`/`shop_row_delta`/
+`clock_never_pauses`. `Economy.enemy_actions(g)` (the single seed point, `economy.gd`) now
+reads `Tuning.enemy_actions_per_turn(g.next_tier)` instead of the bare constant, so every
+caller of `_run_enemy_actions` picks up the tier automatically — no other call site touched.
+
+**Filibuster and Y2K Patch Floppy Disk still compose on top of the tier value**, unchanged
+handler logic — they only ever read/write `ctx.actions` on `on_enemy_turn_start`, which is
+now seeded from the tier-aware number instead of the bare constant. Added Tier-5 coverage
+next to the existing Tier-1 cases in `test_items_tariffs.gd`: Y2K alone at Tier 5 zeroes the
+first enemy Turn (0, not 1) and the next Turn is back to the normal Tier-5 2; Y2K + Filibuster
+at Tier 5 is 1 on the first Turn (Y2K's zeroed Tier-5 base + Filibuster's +1) and 3 on the
+next (2 + 1). `test_tiers.gd` also gained a pure-math check across all 5 tiers and a live-boot
+check (`Economy.enemy_actions`) at Tier 1, Tier 4, and Tier 5 — 1/1/2 respectively.
+
+**Fresh Tier-5 autoplay sweep, 24 runs (Crown/Wild Hunt/Old Guard x8, `godot --headless
+--path game -- --autoplay --army <name> --tier "Tier 5"`), against the two pre-existing
+baselines this slice explicitly stacks:**
+
+| Sweep | Wins | Median survival wave |
+| --- | --- | --- |
+| Enemy 2 actions/turn, BASE difficulty (`tuning.gd:32`, 60 runs) | 0/60 | 17.5 -> 8 |
+| Tier 5 today, enemy 1 action/turn (`FLAGS.md`, 24 runs) | 0/24 | 38.5 -> 9.5 |
+| **Tier 5 + enemy 2 actions/turn (this slice, 24 runs)** | **0/24** | **-> 7.5** |
+
+0 wins, every loss `Resource starvation` except one `Back-row breach` (wave range 5-15,
+mode 7-8). Reported honestly, as the issue asked: this is worse than either baseline it
+stacks, which is the expected direction, not a surprise — Tier 5's -1 Action / halved Stock
+/ -1 Shop row was already unwon on its own, and doubling the enemy's Actions on top of an
+already-unwon tier compounds rather than offsets. Median dropped from Tier 5's own 9.5 to
+7.5, under the "~5" threshold the issue flagged as "stops teaching the player anything" —
+worth flagging plainly, but per the issue's own framing this was disclosed and proceeded on
+deliberately; the tuning pass (parked as "later") now starts from this number instead of a
+guess.
+
+**Notion.** [Enemy AI Behaviors](https://app.notion.com/p/367f1559c99b81a8958edbf4a0f30762)
+updated with a `> Reconciled 2026-08-30` blockquote under the "2 Actions per Turn by default"
+line: baseline is 1, Tier 5 restores the GDD's 2 — the unconditional "2 by default" reading
+is superseded, not deleted.
+
+**Issue 11 closed** — see its own Outcome for the note.
+
+`game/tests/run_all.sh` — ALL GREEN (final line: `ALL GREEN`).

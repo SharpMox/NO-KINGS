@@ -12,6 +12,7 @@ const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Economy := preload("res://scripts/economy.gd")
 
@@ -282,6 +283,51 @@ func _init() -> void:
 	sh.queue_free()
 	await process_frame
 
+	# --- Artefact held capacity (issue 60, user ruling): base 5, unbounded
+	# before this. ArtefactHooks.grant() is the single choke point every
+	# acquisition path (Box pick, Shop purchase) now routes new Artefacts
+	# through — same "capacity refuses" shape as ItemLogic.grant above.
+	# Duplicate copies each take a slot: 5 total is 5 copies of anything.
+	var ac := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	for i in 5:
+		check(ArtefactHooks.grant(ac, {"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}),
+			"Artefact %d/5 lands under the base cap" % (i + 1))
+	check(ac.artefacts.size() == 5, "base Artefact capacity is 5")
+	check(not ArtefactHooks.grant(ac, {"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}),
+		"a 6th Artefact is refused at the cap of 5 — the cap genuinely binds")
+	check(ac.artefacts.size() == 5, "the refused grant did not land")
+	ac.queue_free()
+	await process_frame
+
+	# --- the Shop must never sell an Artefact slot the player has no room to
+	# hold — Shop.can_buy mirrors the Item precedent above (issue 53/60).
+	var ash := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "gold": 1000})
+	await process_frame
+	ash.state = ash.State.PLAYER_TURN
+	ash.actions_left = 2
+	for i in 5:
+		ash.artefacts.append({"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}) # at the cap already
+	var artefact_slot := {"kind": "artefact", "key": "score", "sold": false}
+	ash.shop_stock = [artefact_slot]
+	check(not Shop.can_buy(ash, artefact_slot), "a full Artefact inventory can't buy an Artefact slot")
+	ash.queue_free()
+	await process_frame
+
+	# --- issue 60: Box picks refuse an Artefact at the cap too (_box_choose
+	# routes through ArtefactHooks.grant, mirroring the Item pick above) — the
+	# pick is spent either way, but nothing lands.
+	var abx := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	for i in 5:
+		abx.artefacts.append({"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."})
+	var artefact_payload := {"key": "score", "name": "Score", "description": "+100 score on every capture."}
+	abx._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": artefact_payload})
+	check(abx.artefacts.size() == 5,
+		"a Box-picked Artefact is refused at the cap of 5, same as a full Item pick")
+	abx.queue_free()
+	await process_frame
+
 	# --- Denver Bunker Timeshare: "+30% Gold gain while all your Item slots
 	# are full" — item_logic.gd's cap() (issue 53) is what makes "full" a
 	# reachable condition at all; before this slice there was no cap to fill.
@@ -291,11 +337,23 @@ func _init() -> void:
 	db.gold = 0
 	Economy.earn(db, 100)
 	check(db.gold == 100, "Item slots not full: no bonus")
-	for i in 3:
-		db.items.append(_item("blitz", "tile")) # fills the base cap of 3
+	for i in 2:
+		db.items.append(_item("blitz", "tile")) # fills 2/3 of the base cap
+	db.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile",
+		"description": ""}) # a real-tier catalog shape — this is the one sold below
 	db.gold = 0
 	Economy.earn(db, 100)
 	check(db.gold == 130, "Item slots full: +30% Gold gain")
+	# issue 60: SELLING an Item drops the slot count below full and turns the
+	# bonus off — the sale that empties the last slot must NOT itself collect
+	# the bonus (the erase in _sell() happens BEFORE the Gold-gain dispatch).
+	db.state = db.State.PLAYER_TURN
+	db.actions_left = 5
+	var sell_price: int = Shop.sell_price(db, "item", db.items[2])
+	var db_gold_before: int = db.gold
+	db._sell("item", db.items[2])
+	check(db.items.size() == 2 and db.gold == db_gold_before + sell_price,
+		"Item slots no longer full: selling the Item that empties the last slot pays the plain sell price, no +30%")
 	db.queue_free()
 	await process_frame
 

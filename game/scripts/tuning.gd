@@ -18,6 +18,26 @@ const PIECE_BUFF_CAP_BASE := 2    # issue 53 (user ruling): a board piece's
                                    # buffs Array was unbounded before this —
                                    # Abduction Probe raises it, +1 per copy
                                    # (buff_logic.gd)
+const ARTEFACT_CAP_BASE := 5      # issue 60 (user ruling): a third base-game
+                                   # cap, same shape as the two above — held
+                                   # Artefacts were unbounded before this.
+                                   # Duplicate copies each take a slot (g.artefacts
+                                   # holds one entry per copy, same as Items/Piece
+                                   # Buffs), so 5 total is 5 copies of anything,
+                                   # ever. No modifier artefact raises it (none in
+                                   # the catalog grants Artefact capacity).
+
+## Selling (issue 60): Stock pieces, Captured Stock, Items and Artefacts sell
+## for this fraction of their BUY price (g.defs[id].value / SHOP_ITEM_PRICE /
+## SHOP_ARTEFACT_PRICE — never Score, issue 57 scales Score x10 but explicitly
+## not these), rounded DOWN so the spread never vanishes on a cheap item (a
+## 1-Gold item sells for 0, not 1). Captured -> Stock conversion costs the
+## SAME rate — deliberately equal: convert-then-sell then costs 50% and
+## returns 50%, a wash with the piece gone. Below the sell rate and every
+## captured piece is free money; above it and converting is strictly worse
+## than selling and re-buying. 50/50 (both directions of this one constant)
+## is the only pair that is neither (user ruling, delegated 2026-08-30).
+const SELL_RATE := 0.5
 ## Automatic tariff scheduling — OFF for now (user call 2026-08-28), pending
 ## the combined Kings + Tariffs design pass. This ONLY stops the every-10-waves
 ## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and

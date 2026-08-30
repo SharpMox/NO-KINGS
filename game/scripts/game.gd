@@ -542,8 +542,9 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, unit)
 		if selected.x >= 0:
 			return MergeLogic.do_merge(self, selected, unit)
-	# select / deselect the stack: arms placement + merging (captured stock
-	# deploys too since 2026-07-07 — GDD Captured Stock rule, turn only)
+	# select / deselect the stack: arms merging (and Stock placement — issue
+	# 60 removed Captured Stock's own deploy, so an armed captured stack can
+	# now only complete a merge; convert/sell live in the Shop drawer instead)
 	if same_stack:
 		placing_id = ""
 		placing_cap = false
@@ -1234,13 +1235,14 @@ func _input(event: InputEvent) -> void:
 			return MergeLogic.do_merge(self, {"id": id, "cap": cap, "entry": entry},
 				{"id": target.get_meta("id"), "cap": target.get_meta("cap"),
 					"entry": target.get_meta("entry")})
-		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
+		var placeable: bool = not cap and not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
-				else _deploy_tiles().has(t))
+				else _deploy_tiles().has(t)) # issue 60: Captured Stock (cap) no
+			# longer deploys — convert to Stock, merge (above), or sell instead
 		if placeable and (state == State.SETUP
 				or (state == State.PLAYER_TURN and actions_left > 0)):
 			drawer_autoclosed = ""
-			_place(entry, t, cap)
+			_place(entry, t)
 		else: # dropped elsewhere (incl. back on the button = plain tap)
 			if drawer_autoclosed != "": # the drag closed it, nothing happened:
 				_set_drawer.call_deferred(drawer_autoclosed) # give it back
@@ -1395,10 +1397,11 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 				and merge_highlights.has(board[tile].id):
 			return MergeLogic.do_merge(self,
 				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, tile)
-		# captured stock deploys like stock (GDD Captured Stock, wired 2026-07-07)
+		if placing_cap: # issue 60: Captured Stock no longer deploys directly —
+			return       # convert to Stock, merge (above), or sell instead
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else _deploy_tiles().has(tile)
 		if ok and not board.has(tile):
-			_place(armed_entry, tile, placing_cap)
+			_place(armed_entry, tile)
 		return
 	if state == State.SETUP: # free repositioning before the game starts
 		if selected.x >= 0 and legal_dests.has(tile):
@@ -1442,10 +1445,14 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 
 
 ## `entry` is a Stock entry: a bare id String or {id + state} (ADR-0002).
-func _place(entry: Variant, tile: Vector2i, cap := false) -> void:
+## Stock only, since issue 60: Captured Stock no longer deploys directly (it
+## converts to Stock, merges, or sells instead) — every call site already
+## guards `cap`/`placing_cap`/`pool_drag_cap` before reaching here, so this
+## dropped its own `cap` param rather than carry a dead branch.
+func _place(entry: Variant, tile: Vector2i) -> void:
 	var id: String = entry if entry is String else entry.id
 	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
-	(captured if cap else stock).erase(entry)
+	stock.erase(entry)
 	board[tile] = {"id": id, "owner": Rules.PLAYER}
 	if entry is Dictionary: # restore the piece state it left the board with
 		board[tile].merge(entry)
@@ -2700,7 +2707,9 @@ func _box_choose(opt: Dictionary) -> void:
 				# Magnet's "every rarity" check)
 			entry.acquired_wave = wave
 			entry.rarity = ArtefactHooks.rarity_of(entry.key)
-			artefacts.append(entry)
+			ArtefactHooks.grant(self, entry) # issue 60: refuses at the Artefact
+				# cap of 5 — the Box pick is spent either way (box_offer.erase(opt)
+				# below), same "acquisition refused" shape as the Item grant above
 	# Nostradamus Mad Libs (issue 46) + a Box's own native picks (Huge, issue
 	# 47): take an extra pick from what's left of THIS offer, not a fresh
 	# roll — stop as soon as either the budget or the offer itself runs out.
@@ -3022,6 +3031,14 @@ func _connect_modals() -> void:
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
+	modals.shop_sell_pressed.connect(func(kind: String, entry: Variant) -> void:
+		_sell(kind, entry)
+		modals.show_shop() # rebuild: fresh entries + affordability state
+		_refresh())
+	modals.shop_convert_pressed.connect(func(entry: Variant) -> void:
+		_convert_captured(entry)
+		modals.show_shop()
+		_refresh())
 	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
 		stock.append(id) # reinforce is free (money-and-shop/02)
 		modals.show_reinforce())
@@ -3079,6 +3096,53 @@ func _jet_fuel_restock_confirmed() -> void:
 	if modals.shop_panel and modals.shop_panel.visible:
 		modals.show_shop() # rebuild: fresh stock + affordability state
 	_refresh()
+
+
+## Selling (issue 60): Stock pieces, Captured Stock, Items and Artefacts sell
+## for Tuning.SELL_RATE (50%, rounded down) of their buy price — never board
+## pieces (Extraction already covers board -> Stock, deliberately two steps,
+## so `kind` here is only ever "piece"/"captured"/"item"/"artefact"). Gold
+## only, no Score — Economy.earn_gold is the Gold-only half of earn(), the
+## same asymmetry Buy already has. `entry` is the exact element from
+## g.stock/g.captured/g.items/g.artefacts (modals.gd reads it straight off
+## those arrays to build the Sell UI, same as Shop.buy's `slot` is the exact
+## g.shop_stock element). Costs 1 action, same turn-gating shape as
+## Shop.buy — and like Buy, a sale never force-ends the turn even at 0
+## actions left (a Shop transaction, not a board action).
+func _sell(kind: String, entry: Variant) -> bool:
+	if not Shop.can_sell(self, kind, entry):
+		return false
+	var amount := Shop.sell_price(self, kind, entry)
+	match kind:
+		"piece": stock.erase(entry)
+		"captured": captured.erase(entry)
+		"item": items.erase(entry)
+		_: artefacts.erase(entry) # "artefact"
+	actions_left -= 1
+	Economy.earn_gold(self, amount, "sell") # AFTER the erase above — Denver
+		# Bunker Timeshare's own on_gold_change check must see the POST-sale
+		# Item count, so selling the Item that empties the last slot doesn't
+		# also collect that Item-cap bonus on its own way out
+	return true
+
+
+## Captured -> Stock conversion (issue 60): the only way a captured piece
+## becomes deployable again — direct Captured Stock deploy is removed this
+## slice (merge/convert/sell are its only exits). Costs the SAME 50% of
+## value that selling pays out (Shop.sell_price(g, "captured", entry) — see
+## Tuning.SELL_RATE's header for why that equality is deliberate: convert-
+## then-sell is a wash, with the piece gone). 1 action, same turn-gating and
+## never-force-ends-the-turn shape as Shop.buy/_sell.
+func _convert_captured(entry: Variant) -> bool:
+	if not Shop.can_convert(self, entry):
+		return false
+	var cost := Shop.sell_price(self, "captured", entry)
+	captured.erase(entry)
+	stock.append(entry) # ADR-0002: captured and stock share the same
+		# bare-id-or-stateful-Dictionary shape, so the entry moves across as-is
+	actions_left -= 1
+	Economy.spend_gold(self, cost)
+	return true
 
 
 func _show_win_screen() -> void:

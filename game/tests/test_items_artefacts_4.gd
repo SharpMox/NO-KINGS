@@ -1113,6 +1113,12 @@ func _init() -> void:
 		"= +30) — bounded, no chase")
 	check(ecdy.artefact_echo_depth == 0,
 		"Ecdysis Sheddings: the echo-depth guard is back at 0 after dispatch (no leak)")
+	# issue 60: Ecdysis Sheddings copies g.ecdysis_copy_key, never a held
+	# entry — it must not consume an Artefact-cap slot beyond its own held
+	# copy. 3 real acquisitions happened above (the starting Ecdysis, Greed,
+	# a second Ecdysis) and the mirrored Greed effect added none.
+	check(ecdy.artefacts.size() == 3,
+		"Ecdysis Sheddings: mirroring Greed's effect never appends a phantom entry to g.artefacts")
 	ecdy.queue_free()
 	await process_frame
 

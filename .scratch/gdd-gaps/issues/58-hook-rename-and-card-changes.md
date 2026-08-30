@@ -1,6 +1,6 @@
 # 58 — Rename `on_milestone`, and two card changes
 
-Status: todo — SPECCED (user rulings 2026-08-30)
+Status: todo — SPECCED (user rulings 2026-08-30) · ready
 
 ## Parent
 
@@ -59,12 +59,10 @@ The chain is real and verified: `bishop` (value 30) -> `dragon-horse` **"Cardina
 `archbishop` **"Archbishop"** (70). Note the id convention — `dragon-horse` is the id,
 "Cardinal" is only the display name, so **match on ids**, never on display names.
 
-**Which Buff — open, needs the user's pick.** *Recommendation: **Shield*** (Tactical,
-dormant, "prevents the next capture attempt on this piece"). It is thematically right for
-clergy, it is the mildest of the dormant buffs, and the trigger — every capture by any of
-three piece types — is frequent enough that a Strategic or Decisive buff would be far too
-strong on an Uncommon. **Aura** (Strategic, "adjacent allies score double for 2 turns") is
-the ambitious alternative and reads even better thematically, but it is a real power jump.
+**The Buff is SHIELD** (user, 2026-08-30) — Tactical, dormant, "prevents the next capture
+attempt on this piece". The mildest of the dormant buffs, which suits a trigger that fires
+on every capture by any of three piece types; anything Strategic or Decisive would have been
+far too strong on an Uncommon.
 
 **Watch out:** the Piece Buff cap is **2** since issue 53, and this grants on *every* capture
 — so it will hit the cap constantly. It must route through `_apply_buff` (the existing choke
@@ -85,4 +83,4 @@ Rename is optional. If the effect no longer reads as "gag reel", say so and prop
 
 ## Blocked by
 
-- the Buff choice in part 3 (recommendation given)
+- nothing

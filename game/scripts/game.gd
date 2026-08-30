@@ -2656,8 +2656,10 @@ func _open_box_pick(slot: Dictionary) -> void:
 	box_size = slot.size
 	var native_picks: int = Box.SIZES[slot.size].picks # Huge grants 2 (issue 47)
 	box_picks_left = (native_picks - 1) + _artefact_count("nostradamus-mad-libs")
-	box_rerolls_left = _artefact_count("bible-gag-reel-scroll") \
-		+ _artefact_count("snowden-s-rubik-s-cube") # functionally identical, additive
+	box_rerolls_left = _artefact_count("snowden-s-rubik-s-cube") # issue 58: Bible
+		# Gag Reel Scroll gained a new effect (Shield-on-capture for the
+		# bishop/dragon-horse/archbishop chain) and no longer contributes
+		# rerolls — Snowden's Rubik's Cube keeps the Box reroll alone
 	box_black_book_pending = false # fresh per-Box (Epstein's Black Book, 49)
 	box_offer = slot.contents.duplicate(true)
 	if autoplay: # bot: random pick (or skip), and exercise the reroll branch
@@ -2729,9 +2731,10 @@ func _box_choose(opt: Dictionary) -> void:
 	modals.show_box(box_offer) # reopen with what's left — box_open stays untouched
 
 
-## Bible Gag Reel Scroll / Snowden's Rubik's Cube (issue 46): both grant "1
-## reroll of the offer", so they're implemented identically and stack
-## additively via box_rerolls_left. A reroll replaces the offer wholesale
+## Snowden's Rubik's Cube (issue 46): "1 reroll of the offer" per held copy,
+## stacking additively via box_rerolls_left. (Bible Gag Reel Scroll granted
+## the same thing until issue 58 gave it a new effect — Shield-on-capture —
+## and dropped out of this counter.) A reroll replaces the offer wholesale
 ## (not the Nostradamus Mad Libs "pick from what's left") and must NOT
 ## re-charge box_cost — that only ever happens once, in _open_box_pick.
 func _box_reroll() -> void:

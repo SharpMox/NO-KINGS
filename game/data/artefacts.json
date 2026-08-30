@@ -594,7 +594,7 @@
   "bonus": [
    "Item"
   ],
-  "effect": "On 5-Wave Milestone: +2 Items",
+  "effect": "On 5-Wave Milestone: open a Big Item Box",
   "conspiracy": "The Manna Machine",
   "implemented": true
  },
@@ -1159,7 +1159,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On Box Pick: you may reject the contents once and reroll them",
+  "effect": "Bishop, Cardinal and Archbishop gain Shield when they capture",
   "conspiracy": "The Vatican Secret Archives",
   "implemented": true
  },

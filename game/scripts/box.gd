@@ -8,8 +8,9 @@
 ## Contents are rolled ONCE, at Shop-stock time (Shop.roll calls
 ## roll_options and stores the result on the shop_stock slot), never at open
 ## time — game.gd's _open_box_pick reveals exactly what was already rolled.
-## An interactive reroll (Bible Gag Reel Scroll / Snowden's Rubik's Cube,
-## issue 46) calls roll_options again through the same seam.
+## An interactive reroll (Snowden's Rubik's Cube, issue 46 — Bible Gag Reel
+## Scroll shared this until issue 58 gave it a new effect) calls roll_options
+## again through the same seam.
 
 const Items := preload("res://data/items.gd")
 const Tuning := preload("res://scripts/tuning.gd")

@@ -158,6 +158,13 @@ found. Collected here so they are not lost in Outcome sections:
 
 ## Fragile tests
 
+- **One-off probe sighting, undiagnosed (2026-08-30):** during slice 66's first full run,
+  `game-clicks` failed once on *"a drop inside the open drawer places nothing (misinput
+  guard)"* — unrelated to the rename, no other Godot process running, passed clean on two
+  re-runs. One sighting proves nothing (see the interleaving lesson), so this is a trail
+  marker, not a finding: if it appears again, that is twice, and it earns a proper
+  interleaved investigation.
+
 - **Holy Lint's pinned-seed assertion names a specific granted buff**, and that has now
   churned **twice in two slices**: issue 47 moved it `stun` -> `reflect` (rolling Box
   contents at boot shifted the RNG stream), and issue 48 moved it `reflect` -> `shield`

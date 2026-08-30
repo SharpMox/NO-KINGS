@@ -149,7 +149,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	center.add_child(box)
 	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", 32))
 	box.add_child(_overlay_label(reason, 18))
-	var stats := "Score %d · Deepest wave %d\nKings %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
+	var stats := "Score %d · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
 		% [g.score, g.wave, g.kings_defeated, g.tariffs_seen.size(), g.lost_player, g.lost_enemy]
 	if not g.king_ids_defeated.is_empty():
 		var names: Array = g.king_ids_defeated.map(func(id: String) -> String: return Kings.name_of(id))
@@ -190,7 +190,7 @@ func show_win_screen() -> void:
 		if int(e.score) >= g.score:
 			preview += 1
 	box.add_child(_overlay_label(
-		"Score %d · rank #%d if ended now\nWave %d · Tariffs seen %d\nPieces lost %d · Enemies slain %d" \
+		"Score %d · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
 		% [g.score, preview, g.wave, g.tariffs_seen.size(), g.lost_player, g.lost_enemy], 19))
 	box.add_child(_overlay_label("Continue into endless waves?", 20))
 	var cont := Button.new()
@@ -846,7 +846,7 @@ func show_tariffs() -> void:
 	box.add_theme_constant_override("separation", 10)
 	center.add_child(box)
 	var title := Label.new()
-	title.text = "Active tariffs"
+	title.text = "Active King Abilities"
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)

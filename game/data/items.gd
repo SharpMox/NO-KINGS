@@ -37,7 +37,7 @@ const ITEMS: Array = [
 	{"key": "decoy_swap", "name": "Decoy Swap", "tier": "Strategic", "target": "pair",
 		"description": "Swap the positions of any two pieces on the board (ally or enemy, in any combination)."},
 	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
-		"description": "Disable all tariffs until the next Wave."},
+		"description": "Disable all King Abilities until the next Wave."},
 	{"key": "drone_strike", "name": "Drone Strike", "tier": "Decisive", "target": "area",
 		"description": "Destroy all pieces (ally and enemy) within a 3x3 target area. The King is unaffected."},
 	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",

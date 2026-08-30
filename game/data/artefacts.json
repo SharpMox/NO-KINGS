@@ -682,7 +682,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Mild Tariffs don't affect you",
+  "effect": "Mild King Abilities don't affect you",
   "conspiracy": "The Panama Papers",
   "implemented": true
  },
@@ -913,7 +913,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Whenever a new Tariff is applied: +100 Gold",
+  "effect": "Whenever a new King Ability is applied: +100 Gold",
   "conspiracy": "Merchants of Death",
   "implemented": true
  },
@@ -975,7 +975,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Your Gold gains ignore Inflation and other gold-reducing Tariffs",
+  "effect": "Your Gold gains ignore Inflation and other gold-reducing King Abilities",
   "conspiracy": "The lost Amber Room",
   "implemented": true
  },
@@ -1086,7 +1086,7 @@
    "Score",
    "Time"
   ],
-  "effect": "Whenever a Tariff charges you: +150 Score and +5s Clock",
+  "effect": "Whenever a King Ability charges you: +150 Score and +5s Clock",
   "conspiracy": "The Tunguska event",
   "implemented": true
  },
@@ -1282,7 +1282,7 @@
    "Buff",
    "Special"
   ],
-  "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects",
+  "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by King Abilities or enemy effects",
   "conspiracy": "The Antikythera mechanism",
   "implemented": true
  },
@@ -1608,7 +1608,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone",
+  "effect": "When a King Ability would be applied: it is cancelled; recharges at each 5-Wave Milestone",
   "conspiracy": "The sale of indulgences",
   "implemented": true
  },
@@ -1767,7 +1767,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On acquiring this Artefact: remove a random active Tariff (if any), and open a Big Artefact Box",
+  "effect": "On acquiring this Artefact: remove a random active King Ability (if any), and open a Big Artefact Box",
   "conspiracy": "The Wow! signal",
   "implemented": true
  },
@@ -1779,7 +1779,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your pieces cannot be destroyed by Item or Tariff effects",
+  "effect": "Your pieces cannot be destroyed by Item or King Ability effects",
   "conspiracy": "Spontaneous human combustion",
   "implemented": true
  },
@@ -1815,7 +1815,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Tariff penalties are reduced by 50%",
+  "effect": "King Ability penalties are reduced by 50%",
   "conspiracy": "The Ark of the Covenant",
   "implemented": true
  },
@@ -2035,7 +2035,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "When a Tariff would be applied: you choose between 2 options",
+  "effect": "When a King Ability would be applied: you choose between 2 options",
   "conspiracy": "The Warren Commission",
   "implemented": true
  },

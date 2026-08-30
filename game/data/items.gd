@@ -87,11 +87,10 @@ const PIECE_BUFFS: Array = [
 	{"key": "smog", "name": "Smog", "tier": "Strategic", "model": "timed", "turns": 2,
 		"description": "For 2 player turns, adjacent enemies move and capture like a Pawn."},
 	{"key": "piece_bounty", "name": "Bounty", "tier": "Decisive", "model": "dormant",
-		# NOT "bounty" — a legacy core Artefact already holds that key
-		# (ARTEFACT_EFFECTS_CORE below: "+300 score when capturing a piece
-		# worth 50+"). User ruling (issue 48, 2026-08-29): the Buff takes the
-		# NAME "Bounty"; the Artefact's own rename/retirement to free up its
-		# key is issue 50's job, not this one's. Reconcile there, not here.
+		# Keyed "piece_bounty", NOT "bounty" — a legacy core Artefact holds
+		# that key (ARTEFACT_EFFECTS_CORE below). User ruling (issue 48,
+		# 2026-08-29): the Buff takes the NAME "Bounty". Issue 50 renamed
+		# the Artefact's display name to free it up for good.
 		"description": "When this piece is captured — by you or from you — choose 1 of 3 random Boxes, then open it."},
 ]
 
@@ -113,7 +112,15 @@ const ARTEFACT_EFFECTS_CORE: Array = [
 		"description": "+100 score on every capture."},
 	{"key": "timer", "name": "Timer",
 		"description": "Milestone clock refills give +5s more."},
-	{"key": "bounty", "name": "Bounty",
+	{"key": "bounty", "name": "Skip Tracer's Rolodex",
+		# Renamed from "Bounty" (issue 50): the new Piece Buff took that name
+		# (issue 48, user ruling 2026-08-29). Display name only — the key
+		# stays "bounty" because it is load-bearing (saves, data/scenarios.gd,
+		# the shop all match on it directly) and no player ever sees the key,
+		# so a rename there would trade real save-migration risk for zero
+		# visible benefit. See save_config.gd's SAVE_VERSION/_MIGRATIONS
+		# header: this was a candidate for that table and was judged not to
+		# need it.
 		"description": "+300 score when capturing a piece worth 50+."},
 ]
 

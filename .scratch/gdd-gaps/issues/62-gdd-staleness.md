@@ -1,6 +1,6 @@
 # 62 — GDD staleness found by the 2026-08-30 audit
 
-Status: partial — 1, 2, 3, 4, 6 DONE; only item 5 (Tariffs Catalog costs) remains
+Status: done (2026-08-30) — 1, 2, 3, 4, 6 fixed; 5 resolved as "documented, deliberately not renumbered"
 
 ## Parent
 
@@ -127,6 +127,45 @@ sits outside the bold, verified by re-fetching.
 - ~~**#3**~~ — **DONE.** Issue 59 reconciled Enemy AI Behaviors as "baseline 1, Tier 5 restores
   2", with the fleet numbers attached, and also closed out Difficulty Ranks' own
   "contradiction flagged, not resolved" callout — the same divergence had two ends.
-- **#5** — the Tariffs Catalog's ~10-20x inflated Cost numbers. Blocked twice: it needs
-  `agent-browser` to enumerate the table row by row, and it should land **after** issue 57's
-  Score x10 or the numbers will be stale a second time.
+
+## Outcome — item 5 closed 2026-08-30 (issue 63's pass)
+
+**The Cost numbers were deliberately NOT rewritten. That is the finding, not a deferral.**
+
+The whole 21-row table was enumerated (SQL, before the plan gate hit). The audit's framing —
+"~10-20x too high" — turned out to understate the problem in one way and overstate the
+fixability in another. There are **three** divergences, and only one of them is a number:
+
+1. **Currency.** Every Cost and every Description in this table is denominated in **Score**
+   ("costs an additional Y score", Inflation "-10% score gain", Asset Freeze "-50% score",
+   Austerity "double score"). The shipped game charges and reduces **Gold** in every one of
+   those cases. This is the systemic divergence the audit did not see, because it spot-checked
+   Tariff on Box Pick's Cost cell rather than reading the column.
+2. **Shape.** `200 / 500 / 1000` is a three-step ladder. `tuning.gd` has a single flat
+   `TARIFF_ACTION_COST := 10` with no ladder at all. **There is no per-row number to correct
+   this column to** — any triple written today would be invented, which is exactly the
+   "authoritative-looking made-up Gold number" outcome worth avoiding.
+3. **Magnitude.** 200 against a shipped 10 is ~**/20**, not the "~/100" that `tariffs.gd`'s
+   header had claimed for months (200 → /10 → halved 2026-07-06 → 10).
+
+**Issue 57 did not move the target.** The audit assumed it would. It does not: 57 applies
+`Economy.SCORE_MULTIPLIER` at the point of scoring and leaves Gold derived from the raw
+unscaled amount (57's own Outcome says so), and Tariffs charge Gold. The Score x10 only
+becomes relevant *if* the rework decides Tariffs should charge Score after all.
+
+**Recommendation: this is not worth renumbering before the Tariff rework.** Picking a currency
+or inventing a ladder would quietly settle a design question the rework owns, and Tariffs are
+switched off (`Tuning.TARIFFS_SCHEDULED := false`) until it lands, so nothing here is live.
+
+What was done instead — the misleading-ness removed without inventing anything:
+
+- **Tariffs Catalog DB description** (renders directly above the table) now states the shipped
+  constants `TARIFF_ACTION_COST = 10` / `TARIFF_LR_PER_SQUARE = 5`, all three divergences, why
+  the numbers were left alone, and that issue 57 did not move the target.
+- **`game/data/tariffs.gd`'s header corrected** — it had been asserting the wrong ratio
+  ("~/100") and saying nothing about the currency change. It now records /20, Gold-not-Score,
+  and that the reconciliation belongs to the rework.
+
+The 20 Tariff *Description* mismatches the drift checker reports are the same currency
+divergence plus deliberate paraphrase; `check-notion-drift.mjs`'s own header already says to
+expect them and to act only on Name/Tier mismatches there. Tier mismatches: **zero**.

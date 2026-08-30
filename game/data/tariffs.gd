@@ -1,9 +1,16 @@
 ## Tariffs Catalog, from the Notion GDD (fetched 2026-07-02). Penalties on the
 ## player, activated on every 10th wave per the Wave Catalog schedule.
 ##
-## Cost note: upstream costs (200/500/1000) assume a much larger score economy
-## than the MVP's piece-value scale; amounts here live in tuning.gd, scaled
-## ~/100 — flagged for a design pass.
+## Cost note (corrected 2026-08-30, issue 62): the upstream Notion catalog's
+## Cost column is design intent, not shipped values, and diverges three ways —
+## it is denominated in SCORE while this file charges GOLD; it is a three-step
+## ladder (200/500/1000) while tuning.gd has a single flat per-action constant;
+## and the ratio is ~/20, NOT the ~/100 this header claimed for months
+## (TARIFF_ACTION_COST = 10 against an upstream 200, after the 2026-07-06
+## halving). Issue 57's Score x10 did not move that target — it scales Score at
+## the point of scoring and leaves Gold untouched. Not reconciled on purpose:
+## picking a currency or a ladder belongs to the coming Tariff rework, and
+## Tariffs are switched off (Tuning.TARIFFS_SCHEDULED) until it lands.
 ##
 ## kind: "action" (gold cost when the action happens) · "persistent" (rule
 ## modifier for the rest of the run) · "oneoff" (applies instantly).

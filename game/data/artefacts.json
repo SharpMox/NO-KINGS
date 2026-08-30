@@ -44,7 +44,7 @@
    "Score",
    "Item"
   ],
-  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item (needs: gold-threshold)",
+  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item",
   "conspiracy": "Fort Knox's missing gold",
   "implemented": true
  },
@@ -56,7 +56,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "At Turn end: +2 Gold per enemy piece on your half of the Board (needs: zone check)",
+  "effect": "At Turn end: +2 Gold per enemy piece on your half of the Board",
   "conspiracy": "FEMA camps",
   "implemented": true
  },
@@ -459,7 +459,7 @@
    "Piece",
    "Buff"
   ],
-  "effect": "Every 3rd Piece Buff you apply: the piece also Ranks Up (needs: rank hook)",
+  "effect": "Every 3rd Piece Buff you apply: the piece also Ranks Up",
   "conspiracy": "The vaccine microchip claim",
   "implemented": true
  },
@@ -682,7 +682,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Mild Tariffs don't affect you (needs: tariff filtering)",
+  "effect": "Mild Tariffs don't affect you",
   "conspiracy": "The Panama Papers",
   "implemented": true
  },
@@ -718,7 +718,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On Capture: +1 Piece Buff",
+  "effect": "On Capture: the capturing piece gets +1 Piece Buff",
   "conspiracy": "The Shroud of Turin",
   "implemented": true
  },
@@ -1000,7 +1000,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "While 3+ of your pieces are on the enemy half of the Board: +100% Score gain (needs: zone check)",
+  "effect": "While 3+ of your pieces are on the enemy half of the Board: +100% Score gain",
   "conspiracy": "The Dyatlov Pass incident",
   "implemented": true
  },
@@ -1110,7 +1110,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On losing a piece carrying a Piece Buff: the Buff transfers to the nearest ally (needs: buff transfer)",
+  "effect": "On losing a piece carrying a Piece Buff: the Buff transfers to the nearest ally",
   "conspiracy": "Soviet photo retouching",
   "implemented": true
  },
@@ -1135,7 +1135,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Your pieces cannot be Demoted (needs: demotion immunity)",
+  "effect": "Your pieces cannot be Demoted",
   "conspiracy": "Atlantis",
   "implemented": true
  },
@@ -1183,7 +1183,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Whenever an enemy piece captures one of your pieces: the capturer gets a Slow debuff (needs: enemy auto-debuff)",
+  "effect": "Whenever an enemy piece captures one of your pieces: the capturer gets a Slow debuff",
   "conspiracy": "The curse of the pharaohs",
   "implemented": true
  },
@@ -1195,7 +1195,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On Wave start: the strongest enemy piece gets a Slow debuff (needs: enemy auto-debuff)",
+  "effect": "On Wave start: the strongest enemy piece gets a Slow debuff",
   "conspiracy": "Havana syndrome",
   "implemented": true
  },
@@ -1245,7 +1245,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On Rank Up: add a copy of the piece's base-chain piece to your Stock (needs: chain lookup)",
+  "effect": "On Rank Up: add a copy of the piece's base-chain piece to your Stock",
   "conspiracy": "Bigfoot",
   "implemented": true
  },
@@ -1257,7 +1257,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On losing a Ranked piece: a copy of its base-chain piece is added to your Stock (needs: chain lookup)",
+  "effect": "On losing a Ranked piece: a copy of its base-chain piece is added to your Stock",
   "conspiracy": "Backmasking",
   "implemented": true
  },
@@ -1282,7 +1282,7 @@
    "Buff",
    "Special"
   ],
-  "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects (needs: buff protection)",
+  "effect": "Your pieces cannot be Demoted and your Piece Buffs cannot be removed by Tariffs or enemy effects",
   "conspiracy": "The Antikythera mechanism",
   "implemented": true
  },
@@ -1295,7 +1295,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Enemies destroyed by Items award their Score and Gold value (needs: destroy-score hook)",
+  "effect": "Enemies destroyed by Items award their Score and Gold value",
   "conspiracy": "The missing trillions",
   "implemented": true
  },
@@ -1319,7 +1319,7 @@
   "bonus": [
    "Item"
   ],
-  "effect": "Every 3rd Tactical Item used: gain a Strategic Item; every 3rd Strategic: gain a Decisive (needs: use counters)",
+  "effect": "Every 3rd Tactical Item used: gain a Strategic Item; every 3rd Strategic: gain a Decisive",
   "conspiracy": "The 33rd degree",
   "implemented": true
  },
@@ -1415,7 +1415,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On 5-Wave Milestone: one random Stock piece Ranks Up (needs: stock rank-up)",
+  "effect": "On 5-Wave Milestone: one random Stock piece Ranks Up",
   "conspiracy": "The Montauk Project",
   "implemented": true
  },
@@ -1512,7 +1512,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On Wave clear: move 1 piece from your Captured Stock into your Stock (needs: capture conversion)",
+  "effect": "On Wave clear: move 1 piece from your Captured Stock into your Stock",
   "conspiracy": "Stockholm syndrome",
   "implemented": true
  },
@@ -1608,7 +1608,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone (needs: tariff cancel)",
+  "effect": "When a Tariff would be applied: it is cancelled; recharges at each 5-Wave Milestone",
   "conspiracy": "The sale of indulgences",
   "implemented": true
  },
@@ -1620,7 +1620,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "When you apply a Piece Buff: one adjacent ally gets a copy (needs: buff copy)",
+  "effect": "When you apply a Piece Buff: one adjacent ally gets a copy",
   "conspiracy": "The Pied Piper of Hamelin",
   "implemented": true
  },
@@ -1815,7 +1815,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "Tariff penalties are reduced by 50% (needs: tariff scaling)",
+  "effect": "Tariff penalties are reduced by 50%",
   "conspiracy": "The Ark of the Covenant",
   "implemented": true
  },
@@ -1865,7 +1865,7 @@
    "Gold",
    "Score"
   ],
-  "effect": "+45% Gold and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs (needs: buff strip)",
+  "effect": "+45% Gold and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs",
   "conspiracy": "The Hope Diamond curse",
   "implemented": true
  },
@@ -2047,7 +2047,7 @@
   "bonus": [
    "Item"
   ],
-  "effect": "Whenever you use a non-Tactical Item: gain a random Tactical Item (needs: grant hook)",
+  "effect": "Whenever you use a non-Tactical Item: gain a random Tactical Item",
   "conspiracy": "The military-industrial complex",
   "implemented": true
  },
@@ -2132,7 +2132,7 @@
    "Shop",
    "Special"
   ],
-  "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold (needs: score payment)",
+  "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold",
   "conspiracy": "The Knights Templar",
   "implemented": true
  },

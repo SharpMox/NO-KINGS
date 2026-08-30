@@ -398,7 +398,7 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Every 2nd purchase in the same Shop visit costs 50% less",
+  "effect": "Every 2nd purchase in the same Wave costs 50% less",
   "conspiracy": "Panic buying",
   "implemented": true
  },
@@ -582,7 +582,7 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Once per Shop visit: pay 20 Gold to restock the Shop",
+  "effect": "Once per Wave: pay 20 Gold to restock the Shop",
   "conspiracy": "Controlled demolition claims",
   "implemented": true
  },

@@ -760,17 +760,17 @@ func _init() -> void:
 		"clicking Restock opens the confirm modal (untargeted activation)")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the restock confirm")
 	await process_frame
-	check(not game.buff_pick_open and game.gold == 100 and not game.jet_fuel_used_this_visit,
+	check(not game.buff_pick_open and game.gold == 100 and not game.jet_fuel_used_this_wave,
 		"cancelling the restock confirm costs nothing")
 	check(await _click_button_in(game.modals.shop_panel, "Restock ($20)"), "Restock clickable again after a cancel")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the restock confirm")
 	await process_frame
-	check(game.gold == 80 and game.jet_fuel_used_this_visit,
-		"confirming restocks the Shop: 20 Gold spent, the once-per-Shop-visit charge used")
+	check(game.gold == 80 and game.jet_fuel_used_this_wave,
+		"confirming restocks the Shop: 20 Gold spent, the once-per-Wave charge used")
 	var restock_btn: Button = _button_prefix(game.modals.shop_panel, "Restock")
 	check(restock_btn != null and restock_btn.disabled,
-		"the Restock button greys out once used this Shop visit — visibly unavailable, not silently inert")
+		"the Restock button greys out once used this Wave — visibly unavailable, not silently inert")
 	_click(restock_btn.get_global_rect().get_center()) # Godot doesn't fire
 		# `pressed` on a disabled Button — this must be a genuine no-op
 	await process_frame

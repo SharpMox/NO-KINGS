@@ -1,6 +1,6 @@
 # 61 — "Once per Shop visit" is not a real boundary
 
-Status: todo — SPECCED (user ruling 2026-08-30) · ready
+Status: done (2026-08-30)
 
 ## Parent
 
@@ -102,3 +102,44 @@ Issue 60 (selling) should not introduce a per-visit limit for the same reason.
 ## Blocked by
 
 - nothing
+
+## Outcome
+
+Shipped on `fix/retire-per-visit-61`. Both cards moved to per-Wave, `_open_shop()`'s two
+resets deleted outright, and no "Shop visit" boundary survives anywhere in the code.
+
+Final card texts:
+
+- **Jet Fuel Vial** — *"Once per Wave: pay 20 Gold to restock the Shop"*
+- **Pandemic Toilet Paper Pallet** — *"Every 2nd purchase in the same Wave costs 50% less"*
+
+`jet_fuel_used_this_visit` renamed to `jet_fuel_used_this_wave`, reset in
+`WaveLogic.queue()` — no REGISTRY entry, same no-REGISTRY activation family as
+`zapruder_used_this_wave`/`bovine_used_this_wave` (game.gd:335, wave_logic.gd:38).
+`pallet_purchase_count` (game.gd:185, name unchanged — it never had "visit" in it) keeps
+its existing REGISTRY entry (`on_purchase`/`on_price`) and gained an `on_wave_clear` case
+in `artefact_hooks.gd`, same idiom as Hoffa's Cement Shoes/UAP Breath Mint/Inflatable
+Vietcong Torpedo. `game.gd:372`'s note calling "Shop visit" "retired" — written
+aspirationally when it wasn't true yet — is now literally accurate.
+
+Asserted the actual failing case, not just the happy path: `test_items_artefacts_4.gd`
+calls `jet._open_shop()` after spending the Jet Fuel charge and checks it is still spent
+(`jet_fuel_used_this_wave` still true, `_jet_fuel_restock_available()` still false) —
+this exact assertion would have passed before the fix, since the old code cleared the
+flag right there. `test_items_artefacts_3.gd` does the same for the Pallet, closing the
+Shop at an odd purchase count (1, discount pending) so a stray reset — which would drop
+it to an even count with no discount pending — shows up in `Shop.price()`, not just the
+raw counter. Both suites then confirm the counters DO reset via `WaveLogic.queue(g, g.wave
++ 1)`, the established per-Wave idiom. `test_game_clicks.gd`'s click probe renamed
+`jet_fuel_used_this_visit` -> `jet_fuel_used_this_wave` and its "Shop visit" wording.
+
+`node tools/export-game-artefacts.mjs` re-run; `game/data/artefacts.json` carries both new
+texts.
+
+Grepped `data/artefacts.js`, `game.gd` and `artefact_hooks.gd` for "visit" — every
+surviving occurrence narrates the retirement (this issue, and two historical issue-19/26
+changelog entries in `data/artefacts.js` that already called it "the retired 'Shop visit'
+term" ahead of when it actually was) or is unrelated flavor text ("visitors" in other
+artefacts' summaries); none names a live boundary.
+
+`game/tests/run_all.sh` (foreground, alone): **ALL GREEN**.

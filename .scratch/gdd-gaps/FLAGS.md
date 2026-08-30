@@ -132,6 +132,10 @@ found. Collected here so they are not lost in Outcome sections:
 - **Tier 5 may simply be too harsh.** 24-run sweep: median survival wave 38.5 -> 9.5, 0/24
   wins, every loss to resource starvation. That is the measurement, not a verdict — a top
   tier is allowed to be brutal, but it wants a play test before it is called balanced.
+  **Update (issue 59, 2026-08-30):** Tier 5 now also doubles enemy Actions per Turn (GDD
+  parity, difficulty-rank ruling). Re-swept 24 runs post-change: still 0/24 wins, median
+  survival dropped further to wave 7.5. The tuning pass this flag was waiting on is still
+  parked as "later," but now has both numbers to start from.
 
 ## Fragile tests
 

@@ -73,3 +73,11 @@ produced 2 real "Wave-50 King checkmated" wins at 1 action — with the harder,
 actively-defending King AI in place.
 
 `game/tests/run_all.sh` — ALL GREEN.
+
+**Addendum 2026-08-30 (issue 59).** This issue's remaining open thread was "re-test the
+enemy-action count with fleet data if the answer might change" — implicitly, at the single
+global constant this issue was scoped to. The user's 2026-08-30 ruling on divergence #2
+resolved it a different way: not a single global pick between 1 and 2, but a difficulty
+rank, baseline 1 / Tier 5 restores 2 (issue 59). That answers the question this issue was
+tracking in a way a fleet re-test can't improve on — there is no longer a single "the"
+enemy-action count to re-test. Fully closed; no further action here.

@@ -70,8 +70,25 @@ almost certainly the point.
 ### What can be sold
 
 - **Stock pieces** (`g.stock`) — asked for explicitly.
-- **Captured Stock** (`g.captured`) — decide. It is a separate pool and the same argument
-  applies; recommend yes, for consistency.
+- **Captured Stock** (`g.captured`) — **yes, and it gains a second option** (user,
+  2026-08-30): a captured piece can either be **converted into your regular Stock**, or
+  **sold**.
+
+  **Establish what actually differs between the two pools before building the conversion**,
+  because the value of "convert" depends entirely on it, and a quick read of `game.gd` gives
+  conflicting signals:
+  - `game.gd:547` says *"captured only merges, and a merge needs a turn action"* — but that
+    guard is about **arming** a stack, not about what the pool can do.
+  - `game.gd:1393` says *"captured stock deploys like stock"* and does call `_place(...)`
+    with `placing_cap`, so captured pieces evidently **can** be deployed.
+  - `game.gd:548` skips the Sanctions check for captured pieces (`if not cap and
+    Economy.sanctioned(...)`), so captured stock appears to **bypass Sanctions** — which may
+    be the real difference.
+  - `game.gd:485` returns `stock + captured` together for some purposes.
+
+  So: read it properly first and **write down what the difference is**. If it turns out the
+  pools are functionally near-identical, say so — "convert" would then be near-pointless and
+  is worth raising rather than building a no-op.
 - **Items** (`g.items`).
 - **Artefacts** (`g.artefacts`) — yes; the cap of 5 is what makes this matter.
 - **Not** board pieces. Extraction already exists for board -> Stock, so selling a board
@@ -138,5 +155,6 @@ hold.
 
 ## Blocked by
 
-- whether **Captured Stock** is sellable (recommend yes, for consistency) — the only thing
-  still open
+- **what "sellable at price" means for Captured Stock** — the same sell rate as everything
+  else (50%), or deliberately **full** price as an advantage over regular Stock? One word
+  from the user settles it.

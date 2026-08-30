@@ -412,7 +412,7 @@ func _init() -> void:
 	# Crop Circle Plank: "5-Wave Milestone" is PER-ARTEFACT (ruled 2026-08-28)
 	# — this held copy counts its own 5 waves from its own acquisition, fired
 	# off the just-cleared wave (on_wave_clear), not the engine's own GLOBAL
-	# 10-wave on_milestone cadence. acquired_wave is forced to 1 here so the
+	# 10-wave on_clock_refill cadence. acquired_wave is forced to 1 here so the
 	# test can isolate the handler's own cadence math (_milestone5_hit) from
 	# the separate acquisition-stamping coverage below — wave 5 clearing is
 	# then this copy's beat 5 (1 + 4), a real 5-Wave Milestone.
@@ -441,7 +441,7 @@ func _init() -> void:
 	crop_off.queue_free()
 	await process_frame
 
-	# John Titor's Crypto Wallet: was left wired to on_milestone (the GLOBAL
+	# John Titor's Crypto Wallet: was left wired to on_clock_refill (the GLOBAL
 	# 10-wave beat) when the rest of this "5-Wave Milestone" batch moved to
 	# the per-artefact on_wave_clear + _milestone5_hit cadence — paid at half
 	# the intended rate. Acquired wave 2: fires clearing wave 6 (2+4, beat 1)
@@ -465,6 +465,29 @@ func _init() -> void:
 	WaveLogic.queue(cw, 12) # clears wave 11: this copy's beat 2 (2+9)
 	check(cw.gold == 10, "fires again on its own next 5-wave beat (W+9), not the global cadence")
 	cw.queue_free()
+	await process_frame
+
+	# --- issue 58: on_milestone renamed to on_clock_refill — pure rename, no
+	# behaviour change. Its only two listeners, the "timer" artefact and the
+	# Recession tariff, must still fire on the GLOBAL 10-Wave clock refill
+	# (Tuning.MILESTONE_WAVES), unrelated to the PER-ARTEFACT "5-Wave
+	# Milestone" cadence covered above (Crop Circle Plank/John Titor).
+	var refill := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 9, "clock_s": 0, "artefacts": ["timer"]})
+	await process_frame
+	WaveLogic.queue(refill, 10) # starting wave 10: the GLOBAL milestone fires
+	check(refill.clock_ms == Tuning.CLOCK_REFILL_MS + 5000,
+		"the renamed on_clock_refill hook still fires \"timer\": base refill +5s")
+	refill.queue_free()
+	await process_frame
+
+	var refill_recession := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 9, "clock_s": 0, "artefacts": ["timer"], "tariffs": ["recession"]})
+	await process_frame
+	WaveLogic.queue(refill_recession, 10)
+	check(refill_recession.clock_ms == (Tuning.CLOCK_REFILL_MS + 5000) * 0.5,
+		"the renamed on_clock_refill hook still fires Recession: artefact base computed first (Tariff/artefact ordering), tariff halves on top")
+	refill_recession.queue_free()
 	await process_frame
 
 	# MK-Ultra Sugar Cube: On Deploy, the deployed piece gets a Tactical buff

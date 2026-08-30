@@ -465,7 +465,7 @@ func _init() -> void:
 	# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
 	# Assembly Manual) — on_wave_clear + _milestone5_hit, PER-ARTEFACT
 	# (ruled 2026-08-28), silk-road-coupon's cadence, not the GLOBAL 10-wave
-	# on_milestone hook. acquired_wave forced to 1 to isolate the handler's
+	# on_clock_refill hook. acquired_wave forced to 1 to isolate the handler's
 	# own cadence math from the acquisition-stamping coverage below.
 	var arkb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 99999, "artefacts": ["ark-s-bunkbed"]})
@@ -826,21 +826,22 @@ func _init() -> void:
 	mad2.queue_free()
 	await process_frame
 
-	# Bible Gag Reel Scroll + Snowden's Rubik's Cube: both hold "1 reroll",
-	# stack additively (holding one of each, same as 2 copies of either), a
-	# reroll replaces the offer wholesale, and — the trap this slice exists
-	# for — box_cost is charged exactly once across a Box with rerolls,
-	# never re-charged by _box_reroll.
+	# Two held copies of Snowden's Rubik's Cube ("1 reroll" each) stack
+	# additively, a reroll replaces the offer wholesale, and — the trap this
+	# slice exists for — box_cost is charged exactly once across a Box with
+	# rerolls, never re-charged by _box_reroll. (Issue 58: Bible Gag Reel
+	# Scroll used to stack into this same counter — it gained a new effect
+	# and no longer does; game.gd's box_rerolls_left is Snowden-only now.)
 	var rr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 100, "tariffs": ["box_cost"],
-		"artefacts": ["bible-gag-reel-scroll", "snowden-s-rubik-s-cube"]})
+		"artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"]})
 	await process_frame
 	var rr_gold_before: int = rr.gold
 	rr._open_box_pick(_box_slot(rr, "item", "small"))
 	check(rr.gold == rr_gold_before - 10,
 		"box_cost charges once on Box open (Mild tariff, 10 Gold — Tuning.TARIFF_ACTION_COST)")
 	check(rr.box_rerolls_left == 2,
-		"Bible Gag Reel Scroll + Snowden's Rubik's Cube: 1 reroll each, stacking to 2")
+		"Snowden's Rubik's Cube: 2 held copies stack to 2 rerolls")
 	var rr_offer_before: Array = rr.box_offer.duplicate(true)
 	rr._box_reroll()
 	check(rr.box_rerolls_left == 1, "a reroll spends one charge from the budget")
@@ -1117,6 +1118,72 @@ func _init() -> void:
 	check(Box.contents_names(eye.box_offer) == revealed,
 		"All-Seeing Eye Contact Lens: revealed contents equal exactly what the Box yields on open")
 	eye.queue_free()
+	await process_frame
+
+	# --- issue 58: Bible Gag Reel Scroll, redesigned. Was a duplicate of
+	# Snowden's Rubik's Cube (the reroll coverage above); now Bishop, the
+	# dragon-horse (display name "Cardinal" — matched on id, never the
+	# display name, per the repo's id convention) and Archbishop gain
+	# Shield when they capture, through g._apply_buff (issue 23's choke
+	# point), so the issue-53 Piece Buff cap (base 2) still binds. ---
+	var bishop_cap := _boot({"board": [["bishop", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bible-gag-reel-scroll"]})
+	await process_frame
+	bishop_cap.actions_left = 3
+	bishop_cap._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(BuffLogic.has(bishop_cap.board[Vector2i(2, 3)], "shield"),
+		"Bible Gag Reel Scroll: Bishop gains Shield on capture")
+	bishop_cap.queue_free()
+	await process_frame
+
+	var dh_cap := _boot({"board": [["dragon-horse", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bible-gag-reel-scroll"]})
+	await process_frame
+	dh_cap.actions_left = 3
+	dh_cap._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(BuffLogic.has(dh_cap.board[Vector2i(2, 3)], "shield"),
+		"Bible Gag Reel Scroll: dragon-horse (display name \"Cardinal\") gains Shield on capture — matched on id, not display name")
+	dh_cap.queue_free()
+	await process_frame
+
+	var ab_cap := _boot({"board": [["archbishop", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bible-gag-reel-scroll"]})
+	await process_frame
+	ab_cap.actions_left = 3
+	ab_cap._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(BuffLogic.has(ab_cap.board[Vector2i(2, 3)], "shield"),
+		"Bible Gag Reel Scroll: Archbishop gains Shield on capture")
+	ab_cap.queue_free()
+	await process_frame
+
+	var other_cap := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bible-gag-reel-scroll"]})
+	await process_frame
+	other_cap.actions_left = 3
+	other_cap._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(BuffLogic.of(other_cap.board[Vector2i(2, 3)]).is_empty(),
+		"Bible Gag Reel Scroll: does NOT fire for a Queen capturing (ids only — bishop/dragon-horse/archbishop)")
+	other_cap.queue_free()
+	await process_frame
+
+	# the Piece Buff cap (issue 53, base 2) still binds — a refused grant
+	# floats "Buffs full" (same idiom as test_items_buffs.gd's cap coverage),
+	# never a silent no-op, since this routes through g._apply_buff like
+	# every other grant path
+	var capped := _boot({"board": [["bishop", 0, 2, 2], ["pawn", 1, 2, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["bible-gag-reel-scroll"]})
+	await process_frame
+	capped.actions_left = 3
+	BuffLogic.add(capped.board[Vector2i(2, 2)], "critical", 0)
+	BuffLogic.add(capped.board[Vector2i(2, 2)], "range", 0)
+	check(BuffLogic.catalogued_count(capped.board[Vector2i(2, 2)]) == 2,
+		"(setup) Bishop is already at the base Piece Buff cap")
+	capped._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(not BuffLogic.has(capped.board[Vector2i(2, 3)], "shield"),
+		"Bible Gag Reel Scroll: a piece already at the Piece Buff cap refuses the Shield grant")
+	check(capped.anims.any(func(a: Dictionary) -> bool: return a.get("text", "") == "Buffs full"),
+		"the refusal surfaces the same \"Buffs full\" float as every other _apply_buff refusal")
+	capped.queue_free()
 	await process_frame
 
 	print("---")

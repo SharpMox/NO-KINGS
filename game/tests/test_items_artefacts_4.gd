@@ -329,7 +329,10 @@ func _init() -> void:
 
 	# core fix: two copies of the same artefact, acquired on different waves,
 	# fire on DIFFERENT wave-clears — not in lockstep. Manna Vending Machine
-	# (+2 Items per firing) makes each copy's own firing directly countable.
+	# opens a Big Item Box (issue 58 redesign — was a flat "+2 Items", which
+	# issue 53's Item cap made partly/wholly wasted) on each copy's own
+	# firing, which makes each firing directly observable via box_open/
+	# box_only_kind/box_size, same as the old items.size() count was.
 	var m5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "artefacts": ["manna-vending-machine"]}) # copy A: acquired wave 1
 	await process_frame
@@ -340,21 +343,20 @@ func _init() -> void:
 			m5.artefacts.append(copy_b)
 			break
 	check(m5.artefacts.size() == 2, "two held copies, acquired on different waves")
-	m5.artefacts.append({"key": "area-51-parking-permit"}) # issue 53: this
-		# test's countable side effect (Manna Vending Machine's Item grants)
-		# would otherwise itself get clipped by the new base Item cap (3)
-		# before all 4 across both copies land — raise it (+3, to 6) so it
-		# stays a clean read of the per-artefact milestone timing, not a
-		# second assertion about the cap (that's test_items.gd's job)
 	for n in range(2, 6): # clear waves 1..4: neither copy is due yet
 		WaveLogic.queue(m5, n)
-	check(m5.items.size() == 0, "neither copy fires before its own beat 5 (waves 1-4 cleared)")
+	check(not m5.box_open, "neither copy fires before its own beat 5 (waves 1-4 cleared)")
 	WaveLogic.queue(m5, 6) # clears wave 5: copy A's beat 5 (1+4) — copy B's is wave 7 (3+4)
-	check(m5.items.size() == 2, "only copy A (acquired wave 1) fires clearing wave 5")
+	check(m5.box_open and m5.box_only_kind == "item" and m5.box_size == "big" \
+			and m5.box_offer.size() == 5,
+		"only copy A (acquired wave 1) fires clearing wave 5, opening a Big Item Box (5 choices)")
+	m5._box_choose(m5.box_offer[0]) # resolve copy A's Box so it doesn't block copy B's later
+	check(not m5.box_open, "(setup) copy A's Box resolves on its one pick (Big = 1 pick)")
 	WaveLogic.queue(m5, 7) # clears wave 6: neither copy's beat
-	check(m5.items.size() == 2, "no double-fire clearing wave 6")
+	check(not m5.box_open, "no double-fire clearing wave 6")
 	WaveLogic.queue(m5, 8) # clears wave 7: copy B's beat 5 (3+4)
-	check(m5.items.size() == 4, "copy B (acquired wave 3) fires on its OWN beat, clearing wave 7 — not lockstepped with copy A")
+	check(m5.box_open and m5.box_only_kind == "item" and m5.box_size == "big",
+		"copy B (acquired wave 3) fires on its OWN beat, clearing wave 7 — not lockstepped with copy A")
 	m5.queue_free()
 	await process_frame
 
@@ -557,8 +559,11 @@ func _init() -> void:
 		"numbers-station-sudoku": true, "bohemian-grove-friendship-bracelet": true,
 		# issue 46: the Box Pick flow batch — same _artefact_count(key) standing
 		# rule as the Buff Box pair above, read directly in _open_box_pick /
-		# _box_choose (game.gd) instead of dispatched through ArtefactHooks.run()
-		"nostradamus-mad-libs": true, "bible-gag-reel-scroll": true,
+		# _box_choose (game.gd) instead of dispatched through ArtefactHooks.run().
+		# Bible Gag Reel Scroll used to be a 3rd member of this batch — issue 58
+		# gave it a new effect (Shield-on-capture) with a real REGISTRY entry,
+		# so it's no longer an exception here.
+		"nostradamus-mad-libs": true,
 		"snowden-s-rubik-s-cube": true,
 		# issue 21's echo/meta-trigger layer: pure observers that only ever
 		# dispatch through ArtefactHooks._run_meta_triggers, never the normal
@@ -582,8 +587,8 @@ func _init() -> void:
 		"cheyenne-mountain-doorbell": true, "winchester-salt-lined-doors": true,
 		# issue 49: the Box-dependent batch. Epstein's Black Book and Cicada
 		# Rejection Letter are the SAME issue-46 _artefact_count(key) standing
-		# rule as Nostradamus/Bible Gag Reel Scroll/Snowden's Rubik's Cube
-		# above — read directly in game.gd's _box_choose/_decline_box_pick,
+		# rule as Nostradamus/Snowden's Rubik's Cube above — read directly
+		# in game.gd's _box_choose/_decline_box_pick,
 		# not dispatched through ArtefactHooks.run(). All-Seeing Eye Contact
 		# Lens is a pure display gate (modals.gd's _shop_detail, game.gd's
 		# _open_bounty_pick), same standing-rule shape, no on_* hook to fire

@@ -242,7 +242,7 @@ static func all() -> Array:
 		{"name": "Tariffs: all action costs", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
 			"tariffs": ["move_cost", "capture_cost", "deploy_cost", "pass_cost",
-				"long_range_cost", "ability_cost", "fuse_cost", "box_cost"],
+				"long_range_cost", "ability_cost", "fuse_cost"],
 			"gold": 500, "items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
 		{"name": "Tariffs: all persistent", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],

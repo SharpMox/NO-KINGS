@@ -22,8 +22,8 @@ var fails := 0
 
 
 ## A freshly-rolled Box slot, as Shop.roll would stock it (issue 47) — the
-## mechanics tests below (Nostradamus, reroll, box_cost) don't care which
-## theme, so they all use "item" for a stable, easy-to-read offer.
+## mechanics tests below (Nostradamus, reroll) don't care which theme, so
+## they all use "item" for a stable, easy-to-read offer.
 func _box_slot(g, theme: String, size: String) -> Dictionary:
 	return {"kind": "box", "key": theme, "size": size,
 		"contents": Box.roll_options(g, theme, size), "sold": false}
@@ -893,31 +893,42 @@ func _init() -> void:
 	await process_frame
 
 	# Two held copies of Snowden's Rubik's Cube ("1 reroll" each) stack
-	# additively, a reroll replaces the offer wholesale, and — the trap this
-	# slice exists for — box_cost is charged exactly once across a Box with
-	# rerolls, never re-charged by _box_reroll. (Issue 58: Bible Gag Reel
-	# Scroll used to stack into this same counter — it gained a new effect
-	# and no longer does; game.gd's box_rerolls_left is Snowden-only now.)
+	# additively and a reroll replaces the offer wholesale. (Issue 58: Bible
+	# Gag Reel Scroll — since renamed Apocrypha, issue 65, key unchanged —
+	# used to stack into this same counter; it gained a new effect and no
+	# longer does, so game.gd's box_rerolls_left is Snowden-only now.)
+	#
+	# This block used to also prove the Tariff on Box Pick was charged
+	# exactly once across a Box with rerolls, never re-charged by
+	# _box_reroll — the trap issues 46/47 existed to guard against. Issue 65
+	# deleted that Tariff entirely (user ruling: it shouldn't exist), which
+	# removes the only thing that could ever double-charge, so that guard is
+	# now moot. What replaces it is the stronger property the acceptance
+	# criteria call for directly: opening a Box, and rerolling it, costs no
+	# Gold under ANY Tariff state — asserted below with every remaining
+	# Mild-tier tariff held at once.
 	var rr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 100, "tariffs": ["box_cost"],
+		"wave": 3, "gold": 100,
+		"tariffs": ["move_cost", "ability_cost", "capture_cost", "pass_cost",
+			"long_range_cost", "inflation"],
 		"artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"]})
 	await process_frame
 	var rr_gold_before: int = rr.gold
 	rr._open_box_pick(_box_slot(rr, "item", "small"))
-	check(rr.gold == rr_gold_before - 10,
-		"box_cost charges once on Box open (Mild tariff, 10 Gold — Tuning.TARIFF_ACTION_COST)")
+	check(rr.gold == rr_gold_before,
+		"opening a Box costs no Gold under any Tariff state (Tariff on Box Pick removed, issue 65)")
 	check(rr.box_rerolls_left == 2,
 		"Snowden's Rubik's Cube: 2 held copies stack to 2 rerolls")
 	var rr_offer_before: Array = rr.box_offer.duplicate(true)
 	rr._box_reroll()
 	check(rr.box_rerolls_left == 1, "a reroll spends one charge from the budget")
 	check(rr.box_offer != rr_offer_before, "a reroll replaces the offer")
-	check(rr.gold == rr_gold_before - 10,
-		"a reroll does NOT re-charge box_cost (the trap this slice exists for)")
+	check(rr.gold == rr_gold_before,
+		"a reroll still costs no Gold under any Tariff state")
 	rr._box_reroll()
 	check(rr.box_rerolls_left == 0, "the second reroll spends the second stacked charge")
-	check(rr.gold == rr_gold_before - 10,
-		"...still exactly one box_cost charge across both rerolls")
+	check(rr.gold == rr_gold_before,
+		"...still no Gold spent across both rerolls")
 	rr.queue_free()
 	await process_frame
 

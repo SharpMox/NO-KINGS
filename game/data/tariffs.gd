@@ -26,8 +26,6 @@ const TARIFFS: Array = [
 		"description": "Ending your turn costs extra gold."},
 	{"key": "long_range_cost", "name": "Tariff on Long-Range", "tier": "Mild", "kind": "action",
 		"description": "Moving a Bishop or Rook costs extra gold per square."},
-	{"key": "box_cost", "name": "Tariff on Box Pick", "tier": "Mild", "kind": "action",
-		"description": "Opening a box costs extra gold."},
 	{"key": "inflation", "name": "Inflation", "tier": "Mild", "kind": "persistent",
 		"description": "All gold gains reduced 10% (stacks)."},
 	{"key": "deploy_cost", "name": "Tariff on Deploy", "tier": "Moderate", "kind": "action",

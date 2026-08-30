@@ -39,7 +39,10 @@ function slugify(name) {
 const seen = new Map(); // key -> name, to report collisions with both sides
 const out = [];
 for (const a of ARTEFACTS) {
-  const key = slugify(a.name);
+  // `key` is an explicit override for entries whose display name changed
+  // after the key went live (saves, data/scenarios.gd, the Shop) — see
+  // Apocrypha (issue 65). Falls back to the derived slug otherwise.
+  const key = a.key || slugify(a.name);
   if (seen.has(key)) {
     throw new Error(`key collision: "${a.name}" and "${seen.get(key)}" both slugify to "${key}"`);
   }

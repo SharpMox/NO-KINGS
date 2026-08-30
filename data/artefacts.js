@@ -536,7 +536,7 @@ var ARTEFACTS = [
     effect: "On losing a Ranked piece: +150 Gold",
     conspiracy: "The Knights Templar", url: "https://en.wikipedia.org/wiki/Knights_Templar",
     summary: "Warrior-bankers grown richer than kings — arrested en masse on Friday, October 13, 1307, and dissolved with extreme prejudice. Senior members received a memorable exit package, one way or another." },
-  { name: "Bible Gag Reel Scroll", rarity: "Uncommon", type: "Trigger", bonus: ["Special"], status: "KEEP", implemented: true,
+  { name: "Apocrypha", key: "bible-gag-reel-scroll", rarity: "Uncommon", type: "Trigger", bonus: ["Special"], status: "KEEP", implemented: true,
     effect: "Bishop, Cardinal and Archbishop gain Shield when they capture",
     conspiracy: "The Vatican Secret Archives", url: "https://en.wikipedia.org/wiki/Vatican_Apostolic_Archive",
     summary: "53 miles of shelving nobody may browse. Somewhere in there, the lore insists, is a file on everyone — and a Bishop, Cardinal or Archbishop who captures gets handed theirs: insurance against the next attempt on them." },

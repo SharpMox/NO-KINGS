@@ -481,7 +481,7 @@
 ##   Bubble Wrap ("ignore Inflation and other gold-reducing Tariffs") both
 ##   dispatch before the tariff they're gating (artefacts-before-tariffs
 ##   ordering, header above) and set a ctx flag the gated tariff's own case
-##   reads — `on_charge`'s 6 Mild action-cost keys check `ctx.mild_blocked`
+##   reads — `on_charge`'s 5 Mild action-cost keys check `ctx.mild_blocked`
 ##   (split from the 2 Moderate keys, deploy_cost/fuse_cost, which don't);
 ##   `on_gold_gain`'s Inflation checks `ctx.gain_immune`, set by either
 ##   artefact (a boolean gate, not a percentage — no compounding to reason
@@ -893,7 +893,6 @@ const REGISTRY := {
 	"capture_cost": ["on_charge"],
 	"pass_cost": ["on_charge"],
 	"long_range_cost": ["on_charge"],
-	"box_cost": ["on_charge"],
 	"deploy_cost": ["on_charge"],
 	"fuse_cost": ["on_charge"],
 	"inflation": ["on_gold_gain"],
@@ -1894,7 +1893,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 					ItemLogic.grant(g, pool[g.rng.randi() % pool.size()])
 
 		# --- issue 13: tariff system ---
-		# The 8 action-cost tariffs share one hook: charge() calls run() once
+		# The 7 action-cost tariffs share one hook: charge() calls run() once
 		# per charge with ctx.key set to the specific tariff it's charging,
 		# and only the matching held key may set ctx.charged — with several
 		# cost tariffs held at once (common; see data/scenarios.gd "Tariffs:
@@ -1905,7 +1904,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# Mild-tier action costs only — Panama Papers Shredder (issue 22) sets
 		# ctx.mild_blocked before these dispatch (artefacts-before-tariffs
 		# ordering); the 2 Moderate keys below don't check it.
-		["move_cost", "on_charge"], ["ability_cost", "on_charge"], ["capture_cost", "on_charge"], ["pass_cost", "on_charge"], ["long_range_cost", "on_charge"], ["box_cost", "on_charge"]:
+		["move_cost", "on_charge"], ["ability_cost", "on_charge"], ["capture_cost", "on_charge"], ["pass_cost", "on_charge"], ["long_range_cost", "on_charge"]:
 			if ctx.key == key and not ctx.get("mild_blocked", false):
 				ctx.charged = true
 		["deploy_cost", "on_charge"], ["fuse_cost", "on_charge"]:
@@ -2235,7 +2234,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 
 		# --- issue 22: tariff interception (see header) ---
 		["panama-papers-shredder", "on_charge"]:
-			ctx.mild_blocked = true # only the 6 Mild-tier keys' case checks this
+			ctx.mild_blocked = true # only the 5 Mild-tier keys' case checks this
 		["panama-papers-shredder", "on_gold_gain"]:
 			ctx.gain_immune = true # Inflation is the one Mild on_gold_gain tariff
 		["amber-room-bubble-wrap", "on_gold_gain"]:

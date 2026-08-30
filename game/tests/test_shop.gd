@@ -11,6 +11,7 @@ const Box := preload("res://scripts/box.gd")
 const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
+const Rules := preload("res://scripts/rules.gd")
 
 var fails := 0
 
@@ -361,6 +362,189 @@ func _init() -> void:
 	check(artefact_price == roundi(Tuning.SHOP_ARTEFACT_PRICE[""] * 1.25),
 		"Hollow Moon's -25% and Shrinkflation's +50% compose additively off the same base")
 	priced.queue_free()
+	await process_frame
+
+	# --- issue 60: selling — Stock pieces, Captured Stock, Items and
+	# Artefacts sell for Tuning.SELL_RATE (50%), rounded DOWN, Gold only
+	# (never Score — the price sources are the same Buy already reads:
+	# g.defs[id].value, SHOP_ITEM_PRICE, SHOP_ARTEFACT_PRICE).
+	var sl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0})
+	await process_frame
+	sl.state = sl.State.PLAYER_TURN
+	sl.actions_left = 5
+	sl.stock.append("pawn") # value 10 -> sells for 5
+	var pawn_value: int = sl.defs.pawn.value
+	check(Shop.sell_price(sl, "piece", "pawn") == floori(pawn_value * Tuning.SELL_RATE),
+		"a Stock piece sells for SELL_RATE of g.defs[id].value, floored")
+	var sl_stock_n: int = sl.stock.size()
+	check(sl._sell("piece", "pawn"),
+		"selling a Stock piece succeeds on the player's turn with an action to spare")
+	check(sl.stock.size() == sl_stock_n - 1, "the sold piece leaves Stock")
+	check(sl.gold == floori(pawn_value * Tuning.SELL_RATE) and sl.score == 0,
+		"selling pays Gold only, never Score")
+	check(sl.actions_left == 4, "selling costs 1 action, same as buying")
+
+	sl.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical", "description": ""})
+	check(Shop.sell_price(sl, "item", sl.items[0]) == floori(Tuning.SHOP_ITEM_PRICE["Tactical"] * Tuning.SELL_RATE),
+		"an Item sells for SELL_RATE of its tier's SHOP_ITEM_PRICE, floored")
+	var gold_before_item: int = sl.gold
+	sl._sell("item", sl.items[0])
+	check(sl.items.is_empty() and sl.gold == gold_before_item + floori(Tuning.SHOP_ITEM_PRICE["Tactical"] * Tuning.SELL_RATE),
+		"selling an Item removes it and pays its own sell price")
+
+	sl.artefacts.append({"key": "greed", "name": "Greed", "rarity": ""})
+	check(Shop.sell_price(sl, "artefact", sl.artefacts[0]) == floori(Tuning.SHOP_ARTEFACT_PRICE[""] * Tuning.SELL_RATE),
+		"a core (\"\" rarity) Artefact sells at the Common rate, floored")
+	var gold_before_art: int = sl.gold
+	sl._sell("artefact", sl.artefacts[0])
+	check(sl.artefacts.is_empty() and sl.gold == gold_before_art + floori(Tuning.SHOP_ARTEFACT_PRICE[""] * Tuning.SELL_RATE),
+		"selling an Artefact removes it and pays its own sell price")
+
+	check(not sl._sell("piece", "pawn"), "selling a piece not actually held is a silent no-op refusal")
+	sl.queue_free()
+	await process_frame
+
+	# --- issue 60: board pieces are never sellable — Extraction (board ->
+	# Stock) stays the only way off the board, deliberately two steps.
+	# There is no "board" kind at all; can_sell only ever receives an entry
+	# already in Stock/Captured/Items/Artefacts, so this is a structural
+	# guarantee, not a runtime check — confirmed by can_sell's own match.
+	check(not ["piece", "captured", "item", "artefact"].has("board"),
+		"(documentation) selling has no board-piece kind to accidentally reach")
+
+	# --- issue 60: the softlock guard — mirrors _begin_player_turn()'s own
+	# "Resource starvation" game-over check. An empty board + the LAST Stock
+	# piece + no merge partner in the pool must refuse the sale that would
+	# create that exact state; the same sale is fine with a board piece
+	# still up, or with a merge partner still in the pool.
+	var lock := _boot({"board": [], "stock": ["pawn"], "wave": 3, "gold": 0})
+	await process_frame
+	lock.state = lock.State.PLAYER_TURN
+	lock.actions_left = 5
+	check(Shop.sell_softlocks(lock, "piece", "pawn"),
+		"selling the last Stock piece off an empty board with no merge partner triggers the guard")
+	check(not lock._sell("piece", "pawn"), "the sale is refused outright")
+	check(lock.stock == ["pawn"], "the piece stays put — refused, not silently dropped")
+	lock.stock.append("pawn") # a second pawn IS a merge partner
+	check(not Shop.sell_softlocks(lock, "piece", lock.stock[0]),
+		"a merge partner left in the pool means the sale is safe (a merge is still a path forward)")
+	check(lock._sell("piece", lock.stock[0]), "so the sale is allowed")
+	lock.board[Vector2i(0, 0)] = {"id": "pawn", "owner": Rules.PLAYER}
+	lock.stock = ["pawn"] # back to the last piece, no partner — but the
+		# board is no longer empty, so starvation can't trigger at all
+	check(not Shop.sell_softlocks(lock, "piece", "pawn"),
+		"a board piece still up means the sale can never trigger the starvation shape")
+	lock.queue_free()
+	await process_frame
+
+	# --- issue 60: Captured Stock's only exits are merge, convert, and sell —
+	# direct deployment is REMOVED (game.gd:1393 used to call _place for it).
+	# Both interaction paths that used to reach it (tap-to-place and
+	# drag-to-drop) are checked directly, headless.
+	var cap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 1000})
+	await process_frame
+	cap.state = cap.State.PLAYER_TURN
+	cap.actions_left = 5
+	cap.captured.append("pawn")
+	var target := Vector2i(-1, -1)
+	for t in cap._deploy_tiles():
+		if not cap.board.has(t):
+			target = t
+			break
+	check(target.x >= 0, "(sanity) an open, EMPTY Deploy tile exists")
+	# tap path: arm the captured stack, then tap an empty Deploy tile
+	cap.placing_id = "pawn"
+	cap.placing_cap = true
+	cap.armed_entry = "pawn"
+	cap._on_tile_clicked(target)
+	check(not cap.board.has(target) and cap.captured == ["pawn"],
+		"tapping a Deploy tile with a Captured stack armed does nothing — no direct deploy")
+	cap.placing_id = ""
+	cap.placing_cap = false
+	# drag path: release a captured drag over an empty Deploy tile
+	cap.pool_drag_id = "pawn"
+	cap.pool_drag_cap = true
+	cap.armed_entry = "pawn"
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = cap._tile_px(target) + Vector2(cap.tile, cap.tile) / 2
+	cap._input(release)
+	check(not cap.board.has(target) and cap.captured == ["pawn"],
+		"dropping a Captured drag on a Deploy tile does nothing — no direct deploy")
+	cap.queue_free()
+	await process_frame
+
+	# --- issue 60: Captured -> Stock conversion, the only way a captured
+	# piece becomes deployable again — costs the SAME 50% Tuning.SELL_RATE
+	# as selling (the deliberate equality: convert-then-sell is a wash).
+	var cv := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 100})
+	await process_frame
+	cv.state = cv.State.PLAYER_TURN
+	cv.actions_left = 5
+	cv.captured.append("pawn")
+	var convert_cost := Shop.sell_price(cv, "captured", "pawn")
+	check(convert_cost == floori(cv.defs.pawn.value * Tuning.SELL_RATE),
+		"Captured -> Stock conversion costs the same rate as selling")
+	var gold_before_convert: int = cv.gold
+	check(cv._convert_captured("pawn"), "conversion succeeds with enough Gold and an action to spare")
+	check(cv.captured.is_empty() and cv.stock == ["pawn"],
+		"the piece moves from Captured Stock into ordinary Stock")
+	check(cv.gold == gold_before_convert - convert_cost, "conversion debits the Gold cost")
+	var target2 := Vector2i(-1, -1)
+	for t in cv._deploy_tiles():
+		if not cv.board.has(t):
+			target2 = t
+			break
+	check(target2.x >= 0, "(sanity) an open, EMPTY Deploy tile exists")
+	cv._place("pawn", target2)
+	check(cv.board.has(target2) and cv.board[target2].id == "pawn" and cv.stock.is_empty(),
+		"the converted piece now deploys normally, like any other Stock piece")
+	cv.queue_free()
+	await process_frame
+
+	# --- issue 60: convert-then-sell is a wash — the piece is simply gone,
+	# not free money and not a strict loss beyond that.
+	var wash := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 1000})
+	await process_frame
+	wash.state = wash.State.PLAYER_TURN
+	wash.actions_left = 5
+	wash.captured.append("pawn")
+	var wash_gold_before: int = wash.gold
+	wash._convert_captured("pawn")
+	wash._sell("piece", "pawn")
+	check(wash.gold == wash_gold_before, "convert (-50%) then sell (+50%) nets exactly zero, piece gone")
+	wash.queue_free()
+	await process_frame
+
+	# --- issue 60: the full UI round-trip through the modal signals (same
+	# wiring shop_buy_pressed already exercises elsewhere in this file) —
+	# Sell mode toggle, a Sell action, and a Convert action.
+	var ui := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 1000})
+	await process_frame
+	ui.state = ui.State.PLAYER_TURN
+	ui.actions_left = 5
+	ui.stock.append("pawn")
+	ui.captured.append("pawn")
+	ui._open_shop()
+	check(ui.modals.shop_panel.visible and not ui.modals.shop_sell_mode,
+		"the Shop opens fresh in Buy mode")
+	ui.modals.shop_sell_mode = true
+	ui.modals.show_shop()
+	check(ui.modals.shop_sell_mode, "the Sell toggle switches modes")
+	var ui_stock_before: int = ui.stock.size()
+	ui.modals.shop_sell_pressed.emit("piece", ui.stock[0])
+	check(ui.stock.size() == ui_stock_before - 1, "shop_sell_pressed sells through the same wiring shop_buy_pressed uses")
+	var ui_captured_before: int = ui.captured.size()
+	ui.modals.shop_convert_pressed.emit(ui.captured[0])
+	check(ui.captured.size() == ui_captured_before - 1 and ui.stock.has("pawn"),
+		"shop_convert_pressed converts through the same wiring")
+	ui.queue_free()
 	await process_frame
 
 	print("---")

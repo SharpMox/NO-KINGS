@@ -534,8 +534,10 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
 
-	# clearing the last enemy auto-passes the turn; first, a captured piece
-	# deploys like stock (GDD Captured Stock, wired 2026-07-07)
+	# clearing the last enemy auto-passes the turn; first, confirm a captured
+	# stack arms (for a merge) but a Deploy-tile tap does NOT place it (issue
+	# 60 removed direct Captured Stock deploy — convert/sell live in the Shop
+	# drawer's Sell mode instead, exercised earlier in this file)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 3, "captured": ["rook"],
@@ -556,8 +558,16 @@ func _init() -> void:
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	check(game.board.has(Vector2i(5, 0)) and game.captured.is_empty(),
-		"captured piece deploys onto the zone")
+	check(not game.board.has(Vector2i(5, 0)) and game.captured == ["rook"] and game.placing_cap,
+		"tapping a Deploy tile no longer places a Captured stack — it stays armed, inert")
+	# still armed (nothing clears it on a rejected deploy, same as any other
+	# invalid tap on an armed stack) — deselect directly, same effect as
+	# tapping the same stack again (exercised on regular Stock earlier in
+	# this file), before the wave-clear check below
+	game.placing_id = ""
+	game.placing_cap = false
+	game._clear_selection()
+	game._refresh()
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
@@ -739,6 +749,92 @@ func _init() -> void:
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	await process_frame
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
+
+	# Selling + Captured -> Stock conversion (issue 60): the Shop drawer's
+	# Sell/Buy toggle swaps in held Stock/Captured/Item/Artefact tiles for
+	# the shop_stock ones, so Sell can never be confused with Buy. A
+	# Captured Stock tile's detail dock offers BOTH Convert and Sell.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	await process_frame
+	check(await _click_button_in(game.modals.shop_panel, "Sell"), "the Sell toggle is clickable")
+	await process_frame
+	check(game.modals.shop_sell_mode, "the Shop drawer switches to Sell mode")
+
+	var piece_tile: Button = null
+	var to_visit_sell: Array = [game.modals.shop_panel]
+	while not to_visit_sell.is_empty():
+		var n: Node = to_visit_sell.pop_back()
+		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "piece":
+			piece_tile = n
+			break
+		to_visit_sell.append_array(n.get_children())
+	check(piece_tile != null, "a Stock sell tile exists")
+	_click(piece_tile.get_global_rect().get_center())
+	await process_frame
+	check(game.modals.sell_expanded_kind == "piece" and game.modals.sell_expanded_index == 0,
+		"tapping a Stock sell tile expands it")
+	var sell_stock_before: int = game.stock.size()
+	var sell_gold_before: int = game.gold
+	var sell_acts_before: int = game.actions_left
+	check(await _click_button_in(game.modals.shop_panel, "Sell (+$5)"),
+		"the Sell button in the expanded detail is clickable (pawn value 10, 50% floored = 5)")
+	await process_frame
+	check(game.stock.size() == sell_stock_before - 1 and game.gold == sell_gold_before + 5
+			and game.actions_left == sell_acts_before - 1,
+		"selling the Stock piece removes it, pays Gold, and costs 1 action")
+
+	var cap_tile: Button = null
+	to_visit_sell = [game.modals.shop_panel]
+	while not to_visit_sell.is_empty():
+		var n: Node = to_visit_sell.pop_back()
+		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "captured":
+			cap_tile = n
+			break
+		to_visit_sell.append_array(n.get_children())
+	check(cap_tile != null, "a Captured Stock sell tile exists")
+	_click(cap_tile.get_global_rect().get_center())
+	await process_frame
+	check(game.modals.sell_expanded_kind == "captured", "tapping a Captured tile expands it")
+	var captured_before: int = game.captured.size()
+	var stock_before2: int = game.stock.size()
+	var gold_before2: int = game.gold
+	check(await _click_button_in(game.modals.shop_panel, "Convert ($5)"), "Convert is clickable")
+	await process_frame
+	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
+			and game.gold == gold_before2 - 5,
+		"converting moves the piece from Captured Stock into ordinary Stock and debits Gold")
+
+	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
+	await process_frame
+	check(not game.modals.shop_sell_mode, "the Shop drawer is back in Buy mode")
+
+	# Direct deploy is gone (issue 60): arm the drawer's Captured stack (the
+	# same tap that used to arm a deploy) and confirm tapping a Deploy tile
+	# does nothing — only merge/convert/sell remain.
+	game.stock.append("pawn") # a fresh Stock piece so the drawer has both
+	game._refresh()
+	var deploy_target := Vector2i(-1, -1)
+	for t in game._deploy_tiles():
+		if not game.board.has(t):
+			deploy_target = t
+			break
+	check(deploy_target.x >= 0, "(sanity) an open Deploy tile exists")
+	game.placing_id = "pawn"
+	game.placing_cap = true
+	game.armed_entry = "pawn"
+	game._on_tile_clicked(deploy_target)
+	check(not game.board.has(deploy_target),
+		"tapping a Deploy tile with a Captured stack armed no longer deploys it")
+	game.placing_id = ""
+	game.placing_cap = false
 
 	# Jet Fuel Vial (issue 52): a Shop-only control, restock button appears
 	# only while it's held — confirm-gated, same as every untargeted

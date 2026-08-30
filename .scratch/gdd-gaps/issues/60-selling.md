@@ -1,6 +1,6 @@
 # 60 — Selling: Stock pieces, Items and Artefacts
 
-Status: todo — SPECCED · ready (rates set 2026-08-30 by user delegation)
+Status: done (2026-08-30, PR TBD)
 
 ## Parent
 
@@ -187,3 +187,31 @@ Round **down** so the spread never vanishes on cheap items — a 1-Gold item mus
 ## Blocked by
 
 - nothing
+
+## Outcome (2026-08-30)
+
+Implemented as specced, both rates at 50% floored (`Tuning.SELL_RATE`).
+
+- **Selling**: `Shop.sell_price`/`Shop.can_sell`/`game._sell` — Stock pieces, Captured
+  Stock, Items and Artefacts; never board pieces. Gold only (`Economy.earn_gold`, the
+  Gold-only half of `earn()`), 1 action, same turn-gating as Buy. UI lives in the Shop
+  drawer's new Sell/Buy toggle (`modals.gd` `shop_sell_mode`) — same 4-zone geometry as
+  Buy, reading held entries instead of `g.shop_stock` slots.
+- **Artefact cap of 5**: `ArtefactHooks.cap`/`has_room`/`grant`, mirroring
+  `item_logic.gd` exactly. Every acquisition path routed through it: `Shop.can_buy`
+  (mirrors the Item precedent), `Shop.buy` (existing append, now gated by `can_buy`),
+  `_box_choose`. Save/load and the `--artefacts` CLI flag stay uncapped on purpose (they
+  restore/force existing state, not a fresh grant). Confirmed Ecdysis Sheddings copies a
+  key (`g.ecdysis_copy_key`), never a held entry — it does not consume a slot.
+- **Captured Stock deploy removed**: `_place()` dropped its `cap` param (Stock only
+  now); `_on_tile_clicked` and the drag-drop handler in `_input` both refuse to place a
+  `cap` (Captured) stack, merge only. `_convert_captured` is the only path back to
+  deployable, at the same 50% rate as selling (a deliberate wash, piece gone either way).
+- **Softlock guard**: `Shop.sell_softlocks` mirrors `_begin_player_turn()`'s own
+  "Resource starvation" game-over check exactly and refuses a Stock/Captured sale that
+  would trigger it — not a new invented threshold.
+- **Exploit loops**: re-verified closed by the Artefact cap, with tests asserting the
+  exact arithmetic (Deep State Yearbook nets -5 at a full cycle; Mao's Loyalty Badge
+  never nets positive).
+- Notion **Captured Stock** page updated in the same change — rates un-hedged from
+  "proposed" to locked, action cost and the softlock guard documented.

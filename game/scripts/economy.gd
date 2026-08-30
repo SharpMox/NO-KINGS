@@ -112,6 +112,30 @@ static func gain(g, amount: int) -> int:
 	return roundi(ctx.amount)
 
 
+## Gold-only gain (issue 60): selling and Captured -> Stock conversion pay/
+## charge Gold with no Score involved — the same asymmetry Buy already has
+## (Shop.buy debits Gold only, never grants Score). Mirrors earn()'s Gold
+## half exactly (Inflation via gain(), on_gold_change for Denver Bunker
+## Timeshare et al., the Moscovium triple, and score_bonus for a Gold->Score
+## converter like Popemobile Piggy Bank) without the Score/SCORE_MULTIPLIER
+## half, so a sale doesn't also score. Called from game.gd's _sell(), AFTER
+## the sold entry is already removed — Denver Bunker Timeshare's "+30% Gold
+## while Items are full" must see the POST-sale Item count, so selling the
+## Item that fills the last slot correctly does NOT get its own bonus.
+static func earn_gold(g, amount: int, reason: String = "") -> void:
+	var gold_amount := gain(g, amount)
+	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
+		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
+	var gold_gain := roundi(gold_ctx.amount)
+	if g.moscovium_active: # Moscovium Glow Stick (52): "Score and Gold gains
+		# are tripled" — same deliberate multiplicative exception earn() applies
+		gold_gain *= 3
+	g.gold += gold_gain
+	g.score += roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
+	Shop.maybe_restock(g) # harmless no-op unless a converter artefact's
+		# score_bonus just crossed a threshold
+
+
 ## Clock choke point (issue 35), mirroring earn()/gain(): every direct
 ## `clock_ms +=` gain site — milestone/King refills, the Continue bonus, the
 ## early-clear and turn-end bonuses, and every artefact/item/tariff that

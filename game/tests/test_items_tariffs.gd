@@ -9,6 +9,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
+const Shop := preload("res://scripts/shop.gd")
 
 var fails := 0
 
@@ -232,10 +233,6 @@ func _init() -> void:
 	# (2026-08-29 ruling), so Tariffs never activate in a live run and this
 	# can only be exercised by driving economy.gd's apply_tariff/
 	# activate_tariff_by_key directly, as below. NOT exercised in a live run.
-	# SETI's Red Marker stays implemented: false (a per-Tariff "equivalent
-	# bonus" table doesn't exist in data/tariffs.gd — issue 22's gap, not
-	# resolved by issue 54 either — a Notion question, not a guess), so it
-	# has no test here. ---
 	check(not Tuning.TARIFFS_SCHEDULED,
 		"(context) Tariffs are off in a live run — Exhibit 399 below is only ever driven directly")
 
@@ -280,6 +277,44 @@ func _init() -> void:
 	check(ex_reward.gold == 100 and ex_reward.buff_pick_open,
 		"Exhibit 399 + Merchants of Death Sample Case: the reward pays immediately, independent of the pending pick")
 	ex_reward.queue_free()
+	await process_frame
+
+	# --- issue 56: SETI's Red Marker, redesigned — "on acquiring this
+	# Artefact: remove a random active Tariff (if any), and open a Big
+	# Artefact Box." The Box opening is UNCONDITIONAL — the one thing that
+	# matters, since TARIFFS_SCHEDULED is false above, so the no-Tariff-
+	# active case (asserted first) is the only one a live run ever exercises.
+	var seti_live := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 999})
+	await process_frame
+	check(seti_live.tariffs_active.is_empty(), "setup: no Tariff active — the live-run case")
+	seti_live.state = seti_live.State.PLAYER_TURN
+	seti_live.actions_left = 2
+	seti_live.shop_stock = [{"kind": "artefact", "key": "seti-s-red-marker", "sold": false}]
+	Shop.buy(seti_live, 0)
+	check(seti_live.tariffs_active.is_empty(),
+		"SETI's Red Marker: still no Tariff active — nothing to remove, and that's fine")
+	check(seti_live.box_open and seti_live.box_only_kind == "artefact" and seti_live.box_size == "big",
+		"SETI's Red Marker: opens a Big Artefact Box regardless — the whole point of the redesign")
+	check(seti_live.box_offer.size() == 5, "Big Box: 5 choices")
+	seti_live.queue_free()
+	await process_frame
+
+	# The Tariff-removal half, driven directly — it can't happen in a live
+	# run (TARIFFS_SCHEDULED is false), so this exercises it the same way
+	# Exhibit 399 above does.
+	var seti_tar := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 999, "tariffs": ["move_cost"]})
+	await process_frame
+	check(seti_tar.tariffs_active.size() == 1, "setup: one Tariff active, driven directly")
+	seti_tar.state = seti_tar.State.PLAYER_TURN
+	seti_tar.actions_left = 2
+	seti_tar.shop_stock = [{"kind": "artefact", "key": "seti-s-red-marker", "sold": false}]
+	Shop.buy(seti_tar, 0)
+	check(seti_tar.tariffs_active.is_empty(), "SETI's Red Marker: removes the one active Tariff")
+	check(seti_tar.box_open and seti_tar.box_only_kind == "artefact" and seti_tar.box_size == "big",
+		"SETI's Red Marker: still opens its Big Artefact Box when a Tariff WAS removed too")
+	seti_tar.queue_free()
 	await process_frame
 
 

@@ -1767,9 +1767,9 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On acquiring this Artefact: one random active Tariff is inverted into its equivalent bonus (needs: tariff inversion)",
+  "effect": "On acquiring this Artefact: remove a random active Tariff (if any), and open a Big Artefact Box",
   "conspiracy": "The Wow! signal",
-  "implemented": false
+  "implemented": true
  },
  {
   "key": "fireproof-pajamas",
@@ -2119,7 +2119,7 @@
   "bonus": [
    "Action"
   ],
-  "effect": "Once per Wave: you may repeat your previous Action without spending an Action",
+  "effect": "Once per Wave, at no Action cost: repeat your previous move or capture; if your last Action was an Item, return it to your inventory; if it was a Deploy, return that piece to Stock; if it was a Merge, return both consumed pieces to Stock",
   "conspiracy": "The Zapruder film",
   "implemented": true
  },

@@ -77,16 +77,27 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	if not pair_ok(g, ids[0], ids[1]):
 		return
 	var result := Rules.merge_result(ids, g.defs, g.fusions)
-	g.actions_left -= 1
-	g._log_action("merge")
+	# issue 56: snapshot both consumed pieces' ADR-0002 Stock-shaped state
+	# BEFORE the erase loop below discards it for real — Zapruder's
+	# Director's Cut reads this back off the action_log entry to return both
+	# pieces to Stock later, when they no longer exist anywhere else to read.
+	var consumed_states := []
 	var result_tile := Vector2i(-1, -1)
 	for ref in [a, b]:
 		if ref is Vector2i:
 			result_tile = ref # later selections win
+			var state: Dictionary = g.board[ref].duplicate()
+			state.erase("owner")
+			consumed_states.append(state.id if state.size() == 1 else state)
 			g.board.erase(ref)
 		else: # a unit from a stack: remove one copy by value — the exact entry,
-			# so a stateful copy is consumed and its state discarded (ADR-0002)
+			# so a stateful copy is consumed and its state discarded (ADR-0002).
+			# `ref.entry` (or the bare id, same fallback the erase below uses)
+			# is already Stock-shaped — no owner field to strip.
+			consumed_states.append(ref.get("entry", ref.id))
 			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
+	g.actions_left -= 1
+	g._log_action("merge", {"pieces": consumed_states})
 	var stock_index := -1
 	if result_tile.x >= 0:
 		g.board[result_tile] = {"id": result, "owner": Rules.PLAYER}

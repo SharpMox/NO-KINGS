@@ -6,7 +6,10 @@ extends SceneTree
 ## artefacts, REGISTRY-coverage guard, echo x milestone coverage), and
 ## Artefact activation (issue 52) — the last 7 catalog entries and the new
 ## on-demand affordance (Activate section, confirm/cancel, Bovine's
-## targeting, autoplay).
+## targeting, autoplay) — plus issue 56's redesign of Zapruder's Director's
+## Cut (Item/Deploy/Merge resource-return, complementing the move/capture
+## replay) and SETI's Red Marker (on-purchase Tariff removal + Box open),
+## which closed the catalog at 180/180.
 ## Split out of test_items.gd (issue 37).
 ## Run headless:  godot --headless --path game -s tests/test_items_artefacts_4.gd
 
@@ -1289,16 +1292,86 @@ func _init() -> void:
 	zap.queue_free()
 	await process_frame
 
-	# Zapruder: a Deploy/Merge/Item leaves no {from, to} — correctly reported
-	# unavailable, never half-replayed
+	# Zapruder's Director's Cut (issue 56 redesign): complements the
+	# move/capture replay above — for the 3 kinds a replay can't express, it
+	# gives back the resource instead. Deploy: the deployed piece un-deploys,
+	# back to Stock.
 	var zap_place := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
 		"wave": 1, "stock": ["rook"], "artefacts": ["zapruder-s-director-s-cut"]})
 	await process_frame
 	zap_place.actions_left = 5
 	zap_place._place("rook", Vector2i(3, 0))
+	check(zap_place._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: available after a Deploy too — it returns the piece instead of repeating")
+	zap_place._artefact_confirmed("zapruder-s-director-s-cut")
+	check(not zap_place.board.has(Vector2i(3, 0)) and zap_place.stock == ["rook"],
+		"Zapruder's Director's Cut: the just-Deployed piece is un-deployed, back in Stock")
 	check(not zap_place._artefact_activation_available("zapruder-s-director-s-cut"),
-		"Zapruder's Director's Cut: unavailable when the previous Action was a Deploy (no replay data)")
+		"Zapruder's Director's Cut: unavailable again — once per Wave already spent")
 	zap_place.queue_free()
+	await process_frame
+
+	# Item use: the Item itself comes back.
+	var zap_item := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "artefacts": ["zapruder-s-director-s-cut"]})
+	await process_frame
+	zap_item.actions_left = 5
+	zap_item.items.append({"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic",
+		"target": "", "description": ""})
+	zap_item._use_item(0) # target "" resolves instantly, no tile click needed
+	check(zap_item.items.is_empty(), "setup: Counter-Intel consumed")
+	check(zap_item._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: available after an Item use")
+	zap_item._artefact_confirmed("zapruder-s-director-s-cut")
+	check(zap_item.items.size() == 1 and zap_item.items[0].key == "counter_intel",
+		"Zapruder's Director's Cut: the used Item is back in the inventory")
+	zap_item.queue_free()
+	await process_frame
+
+	# Item return refused at a full inventory (issue 53's cap of 3) — the
+	# once-per-Wave charge is still spent, same "spent either way" precedent
+	# as every other full-inventory grant (e.g. _box_choose's ItemLogic.grant).
+	var zap_full := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "artefacts": ["zapruder-s-director-s-cut"]})
+	await process_frame
+	zap_full.actions_left = 5
+	zap_full.items.append({"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic",
+		"target": "", "description": ""})
+	zap_full._use_item(0) # the Item Zapruder will try (and fail) to return
+	for i in 3: # refill to the cap with something else, as if drawn meanwhile
+		zap_full.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical",
+			"target": "tile", "action_cost": 0, "description": ""})
+	check(zap_full.items.size() == 3, "setup: inventory refilled to the cap (3) after the Item was used")
+	check(zap_full._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: still available — availability doesn't check the cap")
+	zap_full._artefact_confirmed("zapruder-s-director-s-cut")
+	check(zap_full.items.size() == 3 and zap_full.items.all(func(it: Dictionary) -> bool: return it.key == "blitz"),
+		"Zapruder's Director's Cut: the return is refused at a full inventory")
+	check(not zap_full._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: the once-per-Wave charge is spent either way")
+	zap_full.queue_free()
+	await process_frame
+
+	# Merge: BOTH consumed pieces return to Stock, state intact (ADR-0002) —
+	# on top of the merge result the player already kept (user ruling: the
+	# duplication is accepted, bounded by once-per-Wave on a Legendary).
+	var zap_merge := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "stock": ["pawn"], "artefacts": ["zapruder-s-director-s-cut"]})
+	await process_frame
+	zap_merge.stock.append({"id": "pawn", "buff": true})
+	zap_merge.actions_left = 5
+	MergeLogic.commit_merge(zap_merge,
+		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}},
+		{"id": "pawn", "cap": false, "entry": "pawn"})
+	check(zap_merge.stock == ["sergeant"], "setup: the merge consumed both pawns, leaving only the result")
+	check(zap_merge._artefact_activation_available("zapruder-s-director-s-cut"),
+		"Zapruder's Director's Cut: available after a Merge")
+	zap_merge._artefact_confirmed("zapruder-s-director-s-cut")
+	check(zap_merge.stock.size() == 3 and zap_merge.stock.has("sergeant") \
+			and zap_merge.stock.has("pawn") and zap_merge.stock.has({"id": "pawn", "buff": true}),
+		"Zapruder's Director's Cut: both consumed pieces return to Stock (one with its state intact), " +
+		"alongside the merge result the player already kept")
+	zap_merge.queue_free()
 	await process_frame
 
 	# Bovine Tractor Beam: the one TARGETED activation — no confirm, cancels

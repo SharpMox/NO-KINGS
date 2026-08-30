@@ -143,12 +143,13 @@ found. Collected here so they are not lost in Outcome sections:
 
 ## Cards whose text overpromises what shipped
 
-- **Zapruder's Director's Cut says "repeat your previous Action"** but only repeats a **move
-  or capture** (issue 52). `_log_action` recorded just `{kind}`, so Deploys, Merges, Item
-  uses and Bomb/Trap captures carry no `{from, to}` to replay and are reported unavailable
-  rather than half-replayed. Correct behaviour for an ambiguous card, but a player who uses
-  an Item and then presses it will think it is broken. Either re-text the card to say
-  "move", or extend `_log_action` to carry enough state for the other action kinds.
+- ~~**Zapruder's Director's Cut says "repeat your previous Action"** but only repeats a
+  **move or capture**~~ — resolved 2026-08-30 (issue 56, user redesign). The card now
+  COMPLEMENTS the move/capture replay instead of leaving the other 3 kinds dead: an Item use
+  returns the Item, a Deploy returns the piece to Stock, and a Merge returns both consumed
+  pieces to Stock. Bomb/Trap/blocked-attack captures still carry no `{from, to}` and stay
+  correctly unavailable — that part of the original flag was never in scope to fix. Re-texted
+  in `data/artefacts.js`.
 - **Abduction Probe / Manna Vending Machine vs the new caps.** The base caps introduced in
   issue 53 (Items 3, Piece Buffs 2) quietly weakened two already-shipped Artefacts: Manna
   Vending Machine grants **+2 Items**, wholly wasted at a full inventory of 3, and Fort Knox

@@ -729,6 +729,51 @@
 ##   Ecdysis + a bought Wave Artefact), asserting the exact bounded dispatch
 ##   count across one Wave boundary.
 ##
+## issue 56 closed the catalog at 180/180 with two user redesigns of the two
+## cards whose original text was unimplementable:
+## - SETI's Red Marker ("one random active Tariff is inverted into its
+##   equivalent bonus", issue 22/54's dormant gap — no per-Tariff inverse
+##   table exists or was ever supplied) is now "on acquiring this Artefact:
+##   remove a random active Tariff and open a Big Artefact Box." An ordinary
+##   self-referential on_purchase handler (REGISTRY/_dispatch below) — the
+##   one thing that matters is that the Box opens UNCONDITIONALLY, not only
+##   when a Tariff happened to be removed: Tuning.TARIFFS_SCHEDULED is false,
+##   so no Tariff is ever active in a live run today, and a Box gated on the
+##   removal would leave this Artefact dead on arrival all over again, the
+##   exact defect the redesign exists to fix. Big (5 choices, 1 pick, user
+##   ruling). Covered by test_items_artefacts_4.gd (no Tariff active — the
+##   live-run case) and test_items_tariffs.gd (a Tariff removed, driven
+##   directly via Economy.activate_tariff_by_key since it can't happen live).
+## - Zapruder's Director's Cut ("repeat your previous Action") shipped in
+##   issue 52 scoped to move/capture only, since _log_action (issue 30) only
+##   ever recorded {kind} — an Item use, Deploy or Merge had nothing to
+##   replay and were correctly, but uselessly, reported unavailable. Rather
+##   than invent a replay shape for the other 3 kinds, the user redesigned
+##   the card to COMPLEMENT the existing replay: give back the resource a
+##   replay can't express instead of trying to repeat the action itself. Item
+##   use -> the Item returns to the inventory (ItemLogic.grant, so the issue
+##   53 cap of 3 REFUSES it exactly like every other grant path — the once-
+##   per-Wave charge is still spent, same "spent either way" precedent as
+##   _box_choose's own full-inventory grants); Deploy -> the deployed piece
+##   un-deploys, back to Stock; Merge -> BOTH consumed pieces return to Stock
+##   (user ruling — more generous than a single piece, and consistent with
+##   Spare Organ Receipt's own "both" reading, issue 53), on top of the merge
+##   result the player already kept (an accepted, bounded duplication of
+##   value: once per Wave, on a Legendary). game.gd's _log_action call sites
+##   for "place"/"item" now stamp {pos}/{item} the same way the plain
+##   move/capture site already stamped {from, to}; merge_logic.gd's
+##   commit_merge snapshots both consumed pieces' ADR-0002 Stock-shaped state
+##   into a NEW {pieces} field on its own "merge" entry, BEFORE its existing
+##   erase loop discards that state for real (the same "duplicate, strip
+##   owner, bare id if that's all that's left" shape _capture_to_stock/
+##   Extraction already use — no new schema). All of this lives in game.gd's
+##   _zapruder_available/_zapruder_resolve (activation stays outside this
+##   file's REGISTRY/run() engine, same as every other issue-52 activatable —
+##   see game.gd's own header note there), not here; the REGISTRY/_dispatch
+##   entries below are unchanged from issue 52. Covered by
+##   test_items_artefacts_4.gd: all 4 Action kinds, the Item-cap refusal, and
+##   a Merge returning both pieces with state intact.
+##
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -1063,6 +1108,11 @@ const REGISTRY := {
 	# Max Headroom Mask/Polybius Cartridge/CERN Ctrl+Z Shortcut/etc. above;
 	# see this file's own header for the full rationale of all three. ---
 	"zeta-reticuli-souvenir-map": ["on_capture"],
+
+	# --- issue 56: SETI's Red Marker, redesigned (see header) — self-
+	# referential "on acquiring THIS Artefact", same on_purchase shape as
+	# Capstone Polish's "an Artefact" above ---
+	"seti-s-red-marker": ["on_purchase"],
 }
 
 
@@ -2466,3 +2516,24 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if (int(ctx.run_capture_index) + 1) % 3 == 0: # every 3rd Capture
 				# of the whole run, 1-based (index 2, 5, 8, … are 0-based)
 				ctx.to_stock = true
+
+		# --- issue 56: SETI's Red Marker, redesigned (see header) ---
+		["seti-s-red-marker", "on_purchase"]:
+			# "On acquiring THIS Artefact" — self-referential (unlike Capstone
+			# Polish's "an Artefact", any purchase, above). Shop.buy() appends
+			# the bought copy to g.artefacts BEFORE calling run() (see there),
+			# so ctx.key == this key on the very dispatch for buying it. BOTH
+			# halves always run — the Box opening unconditionally is the whole
+			# point of the redesign (TARIFFS_SCHEDULED is false today, so the
+			# Tariff-removal half never actually fires in a live run, only in
+			# test_items_tariffs.gd driving g.tariffs_active directly).
+			if ctx.kind == "artefact" and ctx.key == "seti-s-red-marker":
+				if not g.tariffs_active.is_empty():
+					g.tariffs_active.remove_at(g.rng.randi() % g.tariffs_active.size())
+				if not g.box_open: # mirrors Trojan Horse Assembly Manual/Loch Ness
+					# Stool Sample's own guard above — two held SETI copies both
+					# dispatching on the SAME purchase (stacks per held copy,
+					# same as Deep State Yearbook) must not clobber one open Box
+					# pick with a second
+					g._open_box_pick({"kind": "box", "key": "artefact", "size": "big",
+						"sold": false, "contents": Box.roll_options(g, "artefact", "big")})

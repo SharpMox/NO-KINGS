@@ -129,6 +129,13 @@ Decide, and extend the **windowed click probes** — this is interactive UI.
 - Click probes extended for the new UI.
 - Tests in the split suites, seeds pinned. `run_all.sh` ALL GREEN, foreground.
 
+## Do not use a "per Shop visit" limit here
+
+Issue 61: `_open_shop()` resets the per-visit counters and nothing gates reopening the Shop,
+so "per visit" means "per panel open" and the player can reset it at will. If selling wants a
+rate limit, use **per Turn**, **per Wave** or **per restock** — the boundaries that actually
+hold.
+
 ## Blocked by
 
 - whether **Captured Stock** is sellable (recommend yes, for consistency) — the only thing

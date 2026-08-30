@@ -1,6 +1,6 @@
 # 60 — Selling: Stock pieces, Items and Artefacts
 
-Status: todo — SPECCED (user rulings 2026-08-30) · one small question left
+Status: todo — SPECCED · ready (rates set 2026-08-30 by user delegation)
 
 ## Parent
 
@@ -169,7 +169,21 @@ so "per visit" means "per panel open" and the player can reset it at will. If se
 rate limit, use **per Turn**, **per Wave** or **per restock** — the boundaries that actually
 hold.
 
+## The rates: both 50%
+
+The user delegated this call (2026-08-30: *"use your recommendation for slice 60"*).
+
+- **`Tuning.SELL_RATE` = 50%**, rounded **down**, for Stock pieces, Captured Stock, Items and
+  Artefacts alike.
+- **Captured -> Stock conversion also costs 50%** of the piece's value.
+
+Equal rates is the load-bearing part, not the number. Convert-then-sell then costs 50% and
+returns 50% — **a wash, with the piece gone**. Set conversion below the sell rate and every
+captured piece becomes free money; set it above and conversion is strictly worse than selling
+and re-buying, which makes it pointless. 50/50 is the only pair that is neither.
+
+Round **down** so the spread never vanishes on cheap items — a 1-Gold item must not sell for 1.
+
 ## Blocked by
 
-- **the conversion price** — recommending 50% of value, which makes convert-then-sell a wash
-  and closes the only arbitrage in the feature. Anything below the sell rate is free money.
+- nothing

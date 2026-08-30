@@ -15,6 +15,15 @@
  *
  *  Editing this file does NOT affect encyclopedia/index.html — it has its
  *  own canonical dataset in pieces-encyclopedia.js.
+ *
+ *  `king` is DELIBERATELY EXCLUDED (logged 2026-08-30, issue 63). The Notion
+ *  Pieces DB carries 39 rows — these 38 plus the King — so
+ *  tools/check-notion-drift.mjs reports it as "in Notion only" on every run.
+ *  That is expected, not drift: the King is the boss piece, never a codex
+ *  entry, and the pages this file feeds (codex / promotion / fusion /
+ *  inversion) have nothing to say about a piece with no chain, no fusion and
+ *  no inverse. It exists on the game side only (game/assets/pieces/king.svg,
+ *  the one piece still on the monochrome-art fallback path).
  * ============================================================ */
 var PIECES_CODEX = [
     {

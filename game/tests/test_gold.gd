@@ -1,6 +1,8 @@
 extends SceneTree
-## Gold: every gain raises score by the raw amount (up-only metric) and
-## gold by the Inflation-taxed amount — Inflation never touches score.
+## Gold: every gain raises score by 10x the raw amount (issue 57's
+## SCORE_MULTIPLIER, economy.gd earn()) and gold by the Inflation-taxed raw
+## amount, unscaled — Inflation never touches score, and the x10 never
+## touches gold.
 ## Run headless:  godot --headless --path game -s tests/test_gold.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -42,11 +44,12 @@ func _init() -> void:
 
 	check(game.gold == 0, "a run starts broke")
 	Economy.earn(game, 50)
-	check(game.score == 50 and game.gold == 50, "earn raises score and gold 1:1")
+	check(game.score == 500 and game.gold == 50, # issue 57: score x10, gold 1:1 with the raw amount
+		"earn raises score x10 and gold 1:1 with the raw amount")
 
 	Economy.activate_tariff_by_key(game, "inflation")
 	Economy.earn(game, 100)
-	check(game.score == 150, "Inflation never touches score")
+	check(game.score == 1500, "Inflation never touches score") # issue 57: x10
 	check(game.gold == 140, "Inflation taxes gold (-10% per stack)")
 
 	# --- every former score cost hits gold instead (issue 02) ---

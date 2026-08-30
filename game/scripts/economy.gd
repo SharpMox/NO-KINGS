@@ -9,6 +9,22 @@ const Tariffs := preload("res://data/tariffs.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 
+## Issue 57: the Shop's restock thresholds (Shop.threshold) were unreachable —
+## median Crown run ends near Score 300, first threshold is 1000 — so Score
+## income rises 10x instead of the thresholds dropping. Applied HERE, in
+## earn() below, the single choke point every ordinary Score gain already
+## routes through (piece captures, wave-clear/early-clear/milestone/win
+## bonuses, flat Artefact Score grants that call Economy.earn) — not by
+## multiplying `defs[id].value`, which is ALSO the Gold/Shop-price number
+## (shop.gd price()/on_capture threshold comparisons/_sample_pieces
+## weighting all read it unscaled) and would 10x every price. Gold from the
+## same gain stays untouched: gain() below derives Gold from the raw
+## `amount`, never the x10'd Score. Handlers that write g.score directly,
+## bypassing earn() (a handful of on_wave_clear/on_purchase/on_game_over/
+## on_item_consume/on_tariff_charge/on_piece_lost/on_destroy effects in
+## artefact_hooks.gd), are x10'd individually at their own literal instead.
+const SCORE_MULTIPLIER := 10
+
 
 ## Gold cost charged when a tariffed action happens. Dispatches on_charge
 ## (issue 13) with ctx.key set to the specific tariff being charged; the
@@ -52,10 +68,18 @@ static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
 ## converter handlers (El Dorado Body Glitter, Tungsten-Filled Gold Bar,
 ## Popemobile Piggy Bank) — pre-seeded 0.0, applied exactly once here, never
 ## written by a handler directly (see artefact_hooks.gd's CONTRACT comment).
+## Issue 57: the on_score_change dispatch itself stays off the UNSCALED
+## `amount` — every percentage handler (and El Dorado's ctx.gold_bonus,
+## computed off this same immutable base) is unaffected by SCORE_MULTIPLIER,
+## so a Score-based Gold conversion doesn't also inflate 10x. Only the
+## dispatch's OUTPUT (`score_amount`, and the symmetric Gold->Score
+## `gold_ctx.score_bonus`) is scaled, right before it lands on g.score —
+## mathematically identical to scaling every percentage handler's own
+## literal, since `(base + base*pct) * k == (base*k) + (base*k)*pct`.
 static func earn(g, amount: int, reason: String = "") -> void:
 	var score_ctx := ArtefactHooks.run(g, "on_score_change",
 		{"base": float(amount), "amount": float(amount), "reason": reason, "gold_bonus": 0.0})
-	var score_amount := roundi(score_ctx.amount)
+	var score_amount := roundi(score_ctx.amount) * SCORE_MULTIPLIER
 	var gold_amount := gain(g, amount)
 	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
 		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
@@ -74,7 +98,7 @@ static func earn(g, amount: int, reason: String = "") -> void:
 		gold_gain *= 3
 	g.score += score_amount
 	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
-	g.score += roundi(gold_ctx.score_bonus)
+	g.score += roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
 	Shop.maybe_restock(g) # the shelf refreshes on score, not on waves
 
 

@@ -79,9 +79,11 @@ func _init() -> void:
 	g._move_player(Vector2i(2, 2), Vector2i(2, 4)) # capture the last enemy
 	var early: int = g._cadence() # cleared with the whole cadence to spare
 	check(g.early_clear_awarded, "clearing before the wave flags the bonus")
-	check(g.score == 10 + early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
+	check(g.score == (10 + early * Tuning.EARLY_CLEAR_SCORE_PER_TURN) * 10, # issue 57: x10
+			# — the capture and the early-clear bonus are separate Economy.earn
+			# calls, each independently x10'd by SCORE_MULTIPLIER
 		"early clear pays +%d score on top of the capture" \
-		% (early * Tuning.EARLY_CLEAR_SCORE_PER_TURN))
+		% (early * Tuning.EARLY_CLEAR_SCORE_PER_TURN * 10))
 	check(g.clock_ms >= clock0 + early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN \
 		+ Tuning.TURN_END_CLOCK_BONUS_MS - 500,
 		"early clear refills the clock per spare turn")

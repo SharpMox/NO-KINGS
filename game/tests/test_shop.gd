@@ -249,16 +249,26 @@ func _init() -> void:
 		"thresholds step 1000 / 2500 / 4500 / 7000")
 
 	var before := JSON.stringify(game.shop_stock)
+	# issue 57: pre-bank past 3 thresholds so the wave-10 milestone's own
+	# Score bonus (Tuning.MILESTONE_SCORE_BONUS, now x10'd by Economy.earn's
+	# SCORE_MULTIPLIER — 100 -> 1000) can't incidentally cross a NEW
+	# threshold on its own and confound this check. Isolates "waves alone
+	# don't force a restock" from the score-threshold checks right below,
+	# which already cover threshold-crossing.
+	game.score = 5000
+	game.shop_restocks = 3
 	game._queue_wave(10)
 	check(JSON.stringify(game.shop_stock) == before,
 		"the 10-wave milestone no longer rerolls the shop")
 
 	game.score = 0
 	game.shop_restocks = 0
-	Economy.earn(game, 999)
+	Economy.earn(game, 99) # issue 57: Economy.earn's amount is x10'd on its
+		# way to Score (SCORE_MULTIPLIER) — 99 lands at 990, still short of
+		# threshold(0)=1000
 	check(JSON.stringify(game.shop_stock) == before and game.shop_restocks == 0,
 		"score below the threshold leaves the stock alone")
-	Economy.earn(game, 1)
+	Economy.earn(game, 1) # +10 Score -> exactly 1000
 	check(JSON.stringify(game.shop_stock) != before, "crossing 1000 restocks")
 	check(game.shop_restocks == 1, "the restock counter advances")
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
@@ -269,7 +279,7 @@ func _init() -> void:
 	# one gain crossing several thresholds restocks once, not once per threshold
 	game.score = 0
 	game.shop_restocks = 0
-	Economy.earn(game, 5000)
+	Economy.earn(game, 500) # issue 57: x10'd to 5000 Score by SCORE_MULTIPLIER
 	check(game.shop_restocks == 3,
 		"a single huge gain banks every threshold it crossed (next: 7000)")
 

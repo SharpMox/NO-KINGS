@@ -79,7 +79,8 @@ func _init() -> void:
 		"wave": 3, "artefacts": ["tinfoil-hat", "tinfoil-hat"]})
 	await process_frame
 	Economy.earn(tinfoil, 100)
-	check(tinfoil.score == 130, "two Tinfoil Hats: +15% Score each stacks to +30%, not +30.25%")
+	check(tinfoil.score == 1300, # issue 57: x10 (percentage math unchanged: 100 * 1.30)
+		"two Tinfoil Hats: +15% Score each stacks to +30%, not +30.25%")
 	check(tinfoil.gold == 90, "two Tinfoil Hats: -5% Gold each stacks to -10%, not -9.75%")
 	tinfoil.queue_free()
 	await process_frame
@@ -92,7 +93,8 @@ func _init() -> void:
 	await process_frame
 	Economy.earn(tungsten, 100)
 	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
-	check(tungsten.score == 120, "Tungsten-Filled Gold Bar: +100 base, +20 (20% of the Gold) Score")
+	check(tungsten.score == 1200, # issue 57: x10 (+100 base, +20 20%-of-Gold Score bonus, both x10'd)
+		"Tungsten-Filled Gold Bar: +100 base, +20 (20% of the Gold) Score")
 	tungsten.queue_free()
 	await process_frame
 
@@ -107,7 +109,7 @@ func _init() -> void:
 	await process_frame
 	Economy.earn(tungsten_pope, 100)
 	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
-	check(tungsten_pope.score == 100 + 20 + 50,
+	check(tungsten_pope.score == (100 + 20 + 50) * 10, # issue 57: x10
 		"Tungsten (+20, 20%) and Popemobile (+50, 50%) add on top of the +100 base — the correct sum, not doubled")
 	tungsten_pope.queue_free()
 	await process_frame
@@ -124,7 +126,7 @@ func _init() -> void:
 		"clock_s": 10})
 	await process_frame
 	Economy.earn(el_dorado_order, 100)
-	check(el_dorado_order.score == 150, "Bermuda Triangulation: +50% Score under 60s Clock")
+	check(el_dorado_order.score == 1500, "Bermuda Triangulation: +50% Score under 60s Clock") # issue 57: x10
 	check(el_dorado_order.gold == 130,
 		"El Dorado's 5% Gold bonus is off the 100 base (+5), not the Bermuda-inflated 150 (+8) — " +
 		"125 (100 base +25% Bermuda Gold) + 5 (El Dorado) = 130, order-independent")
@@ -147,11 +149,12 @@ func _init() -> void:
 		"wave": 3, "artefacts": ["social-credit-report-card"], "gold": 100, "score": 500})
 	await process_frame
 	WaveLogic.queue(social, social.wave + 1) # clean: no pieces lost since wave start
-	check(social.score == 600, "Social Credit Report Card: +100 Score on a clean Wave clear")
+	check(social.score == 1500, "Social Credit Report Card: +100 Score on a clean Wave clear") # issue 57:
+		# x10 on the GAIN (100 -> 1000), starting score was a preset 500: 500 + 1000 = 1500
 	check(social.gold == 100, "Social Credit Report Card: no Gold change on a clean clear")
 	social.lost_player += 1 # a piece falls during the next wave
 	WaveLogic.queue(social, social.wave + 1)
-	check(social.score == 600, "Social Credit Report Card: Score stays up-only after losing a piece")
+	check(social.score == 1500, "Social Credit Report Card: Score stays up-only after losing a piece")
 	check(social.gold == 90, "Social Credit Report Card: the -10 Score penalty debits Gold instead (issue 16 ruling)")
 	social.queue_free()
 	await process_frame

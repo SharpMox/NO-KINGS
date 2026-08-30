@@ -10,6 +10,7 @@ const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const Rules := preload("res://scripts/rules.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
 ## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
@@ -233,10 +234,12 @@ static func can_buy(g, slot: Dictionary) -> bool:
 			and g.state == g.State.PLAYER_TURN \
 			and g.actions_left >= 1 \
 			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
-			and (slot.kind != "item" or ItemLogic.has_room(g)) # issue 53: never
-				# sell an Item slot the player has no capacity to hold — a Box
-				# still sells fine even at capacity (it might not roll an Item;
-				# _box_choose's own ItemLogic.grant refuses that pick if it does)
+			and (slot.kind != "item" or ItemLogic.has_room(g)) \
+			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue
+				# 53/60: never sell an Item or Artefact slot the player has no
+				# capacity to hold — a Box still sells fine even at capacity
+				# (it might not roll one; _box_choose's own grant refuses that
+				# pick if it does)
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold
@@ -304,6 +307,84 @@ static func buy(g, index: int) -> bool:
 			g.artefacts.append(entry) # stacks like box copies
 	ArtefactHooks.run(g, "on_purchase", {"kind": slot.kind, "key": slot.key, "price": cost})
 	return true
+
+
+# --- selling + Captured -> Stock conversion (issue 60) ---
+
+## Sell/convert value for a held entry: the same price sources price() reads
+## for the Shop's own Buy price, at Tuning.SELL_RATE, rounded down (never a
+## percentage/artefact-price hook — Buy's on_price modifiers are Shop-stock
+## specific, e.g. the hidden slot's own +50%, and don't apply to something
+## already owned). `kind` is "piece" (Stock), "captured" (Captured Stock),
+## "item" or "artefact"; `entry` is the actual g.stock/g.captured/g.items/
+## g.artefacts element (a bare id String for piece/captured, a catalog
+## Dictionary for item/artefact). Captured -> Stock conversion charges this
+## exact number too (game.gd._convert_captured) — deliberately the same
+## constant, not a second one (Tuning.SELL_RATE's own header explains why).
+static func sell_price(g, kind: String, entry) -> int:
+	var base: float
+	match kind:
+		"piece", "captured":
+			var id: String = entry if entry is String else entry.id
+			base = float(g.defs[id].value)
+		"item":
+			base = float(Tuning.SHOP_ITEM_PRICE[entry.tier])
+		_: # "artefact"
+			base = float(Tuning.SHOP_ARTEFACT_PRICE.get(entry.get("rarity", ""), Tuning.SHOP_ARTEFACT_PRICE[""]))
+	return floori(base * Tuning.SELL_RATE)
+
+
+## The live array a held entry of `kind` lives in — the single place both
+## can_sell's "is it actually held" check and modals.gd's Sell-mode UI (whose
+## own _sell_entries delegates here) read from, so the two can never disagree
+## about what's sellable.
+static func held_entries(g, kind: String) -> Array:
+	match kind:
+		"piece": return g.stock
+		"captured": return g.captured
+		"item": return g.items
+		_: return g.artefacts # "artefact"
+
+
+## Softlock guard: mirrors game.gd's own _begin_player_turn() "Resource
+## starvation" game-over check exactly (no player board pieces, empty Stock,
+## no merge left in the pool) rather than inventing a new threshold — that
+## check runs at the START of the NEXT turn with no regard for Gold, so
+## simulating the SAME condition here and refusing the sale that would
+## trigger it is the correct mirror. Only a Stock or Captured sale can ever
+## reach it; an Item/Artefact sale never touches board or Stock.
+static func sell_softlocks(g, kind: String, entry) -> bool:
+	if kind != "piece" and kind != "captured":
+		return false
+	if not g._player_pieces().is_empty():
+		return false
+	var stock_after: Array = g.stock.duplicate()
+	var captured_after: Array = g.captured.duplicate()
+	(stock_after if kind == "piece" else captured_after).erase(entry)
+	return stock_after.is_empty() \
+			and not Rules.has_merge(stock_after + captured_after, g.defs, g.fusions)
+
+
+## Sellable right now: actually held (never sell/pay out for something not
+## owned), player's turn, an action to spare, and the sale wouldn't trigger
+## the starvation softlock above. Board pieces are never sellable at all —
+## there is no "piece"/"captured" `entry` reachable from a board tile;
+## callers only ever pass a Stock/Captured/Item/Artefact entry.
+static func can_sell(g, kind: String, entry) -> bool:
+	return held_entries(g, kind).has(entry) \
+			and g.state == g.State.PLAYER_TURN and g.actions_left >= 1 \
+			and not sell_softlocks(g, kind, entry)
+
+
+## Convertible right now: actually held in Captured Stock, player's turn, an
+## action to spare, and the Gold to cover the conversion price (same rate as
+## sell_price, above). Converting only ever ADDS to Stock (never removes a
+## board/Stock piece), so it can never trigger the starvation softlock the
+## way a sale can.
+static func can_convert(g, entry) -> bool:
+	return g.captured.has(entry) \
+			and g.state == g.State.PLAYER_TURN and g.actions_left >= 1 \
+			and g.gold >= sell_price(g, "captured", entry)
 
 
 ## n distinct picks from a key array, uniform.

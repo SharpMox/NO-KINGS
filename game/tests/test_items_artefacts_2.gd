@@ -310,6 +310,20 @@ func _init() -> void:
 	tape.queue_free()
 	await process_frame
 
+	# --- issue 60: SELLING your last held Item is not USING it — Tape Eraser
+	# Magnet listens on on_item_consume only, which _sell() never dispatches
+	var tape_sell := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 0, "score": 0, "artefacts": ["tape-eraser-magnet"]})
+	await process_frame
+	tape_sell.items.append({"key": "x3", "name": "x3", "tier": "Tactical", "description": ""})
+	tape_sell.state = tape_sell.State.PLAYER_TURN
+	tape_sell.actions_left = 5
+	tape_sell._sell("item", tape_sell.items[0]) # the ONLY held Item
+	check(tape_sell.score == 0 and tape_sell.gold == 15, # 50% of Tactical's 30, no +100/+50
+		"Tape Eraser Magnet does not fire on selling your last held Item, only on using it")
+	tape_sell.queue_free()
+	await process_frame
+
 	var lobbyist := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "artefacts": ["defense-lobbyist-business-card"]})
 	await process_frame

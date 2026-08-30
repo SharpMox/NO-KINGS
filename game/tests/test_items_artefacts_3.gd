@@ -788,6 +788,72 @@ func _init() -> void:
 	yself.queue_free()
 	await process_frame
 
+	# --- issue 60: the Artefact cap of 5 closes Deep State Yearbook's buy/
+	# sell loop arithmetically (60-selling.md's own worked example) — 4
+	# pre-held Artefacts (incl. Yearbook itself) + buying a 5th (hits the cap
+	# exactly) pays 5*4=20 Gold; a Common Artefact costs 50 and sells back at
+	# 25 (50% floored) — pay 50, receive 20, sell for 25: net -5, a loss.
+	var common_key := ""
+	for e in Items.ARTEFACT_EFFECTS: # excludes on_purchase/on_price holders —
+		# this test's own math (a flat -5 net) must not also pick up some
+		# unrelated artefact's own purchase-Gold or price effect
+		var hooks: Array = ArtefactHooks.REGISTRY.get(e.key, [])
+		if e.get("rarity", "") == "Common" and e.key != "deep-state-yearbook" and e.key != "greed" \
+				and not hooks.has("on_purchase") and not hooks.has("on_price"):
+			common_key = e.key
+			break
+	check(common_key != "", "(sanity) a Common-rarity Artefact exists to buy in this test")
+	var loop := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 99999,
+		"artefacts": ["deep-state-yearbook", "greed", "greed", "greed"]})
+	await process_frame
+	loop.actions_left = 5
+	check(loop.artefacts.size() == 4, "(sanity) 4 Artefacts held, 1 slot free under the cap of 5")
+	loop.shop_stock[0] = {"kind": "artefact", "key": common_key, "sold": false}
+	var loop_cost := Shop.price(loop, loop.shop_stock[0])
+	check(loop_cost == 50, "(sanity) a Common Artefact costs 50 Gold")
+	var loop_gold_before: int = loop.gold
+	Shop.buy(loop, 0)
+	check(loop.artefacts.size() == 5, "the purchase fills the Artefact cap exactly")
+	check(loop.gold == loop_gold_before - 50 + 20,
+		"Deep State Yearbook pays its maximum, 5*4=20 Gold, at the cap")
+	var bought: Dictionary = loop.artefacts.back()
+	check(bought.key == common_key, "(sanity) the just-bought copy is the last entry")
+	loop.state = loop.State.PLAYER_TURN
+	var sell_amount := Shop.sell_price(loop, "artefact", bought)
+	check(sell_amount == 25, "(sanity) selling it back pays 25 (50% of 50, floored)")
+	loop._sell("artefact", bought)
+	check(loop.gold == loop_gold_before - 50 + 20 + 25,
+		"the full buy-then-sell cycle nets -5 Gold — a loss, at every collection size (issue 60)")
+	loop.queue_free()
+	await process_frame
+
+	# --- issue 60: Mao's Loyalty Badge's free-Item loop is break-even at
+	# best (60-selling.md) — buy one Tactical Item, get a second free, sell
+	# both back at 50%: no Gold gain, bounded by the Item cap of 3 regardless.
+	var mao := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 99999, "artefacts": ["mao-s-loyalty-badge"]})
+	await process_frame
+	mao.actions_left = 5
+	mao.shop_stock[0] = {"kind": "item", "key": "blitz", "sold": false} # Blitz is Tactical
+	var tac_idx := 0
+	var mao_gold_before: int = mao.gold
+	var tac_cost: int = Shop.price(mao, mao.shop_stock[tac_idx])
+	Shop.buy(mao, tac_idx)
+	check(mao.items.size() == 2, "Mao's Loyalty Badge: a second random Tactical Item is free")
+	var mao_after_buy: int = mao.gold
+	check(mao_after_buy == mao_gold_before - tac_cost, "only the bought Item's own cost is paid")
+	mao.state = mao.State.PLAYER_TURN
+	var sold_both := 0
+	while not mao.items.is_empty():
+		sold_both += Shop.sell_price(mao, "item", mao.items[0])
+		mao._sell("item", mao.items[0])
+	check(mao.gold == mao_after_buy + sold_both, "(sanity) both Items sold back")
+	check(mao.gold <= mao_gold_before,
+		"Mao's Loyalty Badge's free-Item loop never nets a Gold gain (buy 1, sell 2 at 50%, at best break-even)")
+	mao.queue_free()
+	await process_frame
+
 	# --- issue 46/47: Box Pick flow Artefacts — Nostradamus Mad Libs (+1 extra
 	# pick, from the same offer), Bible Gag Reel Scroll + Snowden's Rubik's
 	# Cube (functionally identical: 1 reroll each, stacking additively), and

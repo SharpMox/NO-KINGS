@@ -1387,6 +1387,35 @@ static func rarity_of(key: String) -> String:
 	return ""
 
 
+## Held Artefact capacity (issue 60, user ruling) — base 5, same choke-point
+## shape as item_logic.gd's Item cap (issue 53: cap/has_room/grant), placed
+## here rather than there since this is a structural read off g.artefacts
+## itself. Every acquisition path routes through grant() below: Shop purchase
+## (Shop.can_buy mirrors ItemLogic.has_room's own precedent), Box pick
+## (game.gd _box_choose), and the CLI/save-load bootstrap paths that predate
+## any cap and stay uncapped on purpose (a resumed save must never shed
+## Artefacts a since-changed cap would now refuse). Ecdysis Sheddings copies
+## a KEY (g.ecdysis_copy_key), never a held entry — it never calls grant()
+## and so never consumes a slot itself, on top of its own held copy.
+static func cap(g) -> int:
+	return Tuning.ARTEFACT_CAP_BASE
+
+
+static func has_room(g) -> bool:
+	return g.artefacts.size() < cap(g)
+
+
+## Grant one Artefact entry if there's room; refuses (drops it) when full —
+## same "capacity refuses" ruling as ItemLogic.grant. Callers stamp
+## acquired_wave/rarity on `entry` themselves before calling this, same as
+## every existing artefacts.append() site already did. Returns whether it landed.
+static func grant(g, entry: Dictionary) -> bool:
+	if not has_room(g):
+		return false
+	g.artefacts.append(entry)
+	return true
+
+
 const RARITIES := ["Common", "Uncommon", "Rare", "Legendary"]
 
 ## Illuminati Fridge Magnet's "own Artefacts of every rarity" check — reads

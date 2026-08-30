@@ -1,6 +1,6 @@
 # 60 — Selling: Stock pieces, Items and Artefacts
 
-Status: todo — NEEDS DESIGN DECISIONS (the exploit below is the blocking one)
+Status: todo — SPECCED (user rulings 2026-08-30) · one small question left
 
 ## Parent
 
@@ -15,49 +15,55 @@ already-shipped Artefacts into.
 
 ---
 
-## THE BLOCKER: two pay-on-purchase Artefacts become infinite Gold
+## The exploit, re-examined — NOT a blocker (2026-08-30)
 
-Buying **costs no Action** (`shop.gd`'s own header: *"not a board action"*), so a buy/sell
-cycle is limited only by the Clock. Two shipped Artefacts pay out on purchase:
+An earlier revision of this issue called the buy/sell loop **infinite**. That was wrong, and
+the user was right to push back. Two mechanics bound it, both of which should have been
+checked before the claim was made:
 
-### Deep State Yearbook (Uncommon) — the severe one
+- **`Shop.can_buy` requires `not slot.sold`.** Each slot is buyable exactly once, and a stock
+  carries only **4 Artefact slots** and **4 Item slots** (`Shop.ROWS`). A loop therefore caps
+  at 4 purchases per stock, not unlimited.
+- **Restocks are Score-gated**, not free: `while g.score >= threshold(g.shop_restocks)`. You
+  cannot spin the Shop at will. Jet Fuel Vial buys exactly one extra restock per visit.
 
-> On buying an Artefact: each other Artefact you own pays +5 Gold
+So it is a bounded per-visit gain that scales with collection size — which, as the user put
+it, reads as *a good interaction for the Artefacts to have* rather than a defect.
 
-The payout scales with **how many Artefacts you hold**, not with what you paid. Hold 20,
-buy a Common Artefact for 50 Gold, receive **5 × 19 = 95 Gold**. Sell it back at 50% (25) and
-you net **+70 per cycle**, forever. A lower sell rate does not fix this — the payout is
-independent of price, so a large enough collection always outruns the spread.
+### And the new Artefact cap of 5 closes it arithmetically
 
-### Mao's Loyalty Badge (Uncommon)
+With at most 5 held Artefacts, **Deep State Yearbook's maximum payout is 4 x 5 = 20 Gold**.
+The cheapest Artefact costs 50 (`SHOP_ARTEFACT_PRICE`, Common). At a 50% sell rate a full
+cycle is: pay 50, receive 20, sell back 25 -> **net -5**. It loses money at *every* collection
+size, because the cap ends the scaling that made it dangerous in the first place.
 
-> On buying a Tactical Item in the Shop: a second random Tactical Item is free
-
-Buy one Tactical Item at 30 Gold, receive **two**. At a 50% sell rate that is 15 + 15 = 30 —
-exact break-even, so it is a free, unbounded Item generator even without profit. Above 50% it
-is straight profit.
-
-(**Ark's Bunkbed** duplicates a bought Piece but is capped *once per 5-Wave Milestone*, so it
-is bounded and fine. **Sleeper Agent Pillow** grants a Buff, not value.)
-
-### Options — one of these must be chosen before this can ship
-
-1. **Artefacts cannot be sold.** Kills the Deep State Yearbook loop outright and shrinks the
-   feature to Pieces + Items. Mao's still needs option 3 or 4.
-2. **Sell price is a flat low rate AND the pay-on-purchase Artefacts are capped** — e.g. Deep
-   State Yearbook fires once per Wave, Mao's once per Shop visit. Keeps the feature whole;
-   changes two shipped cards.
-3. **You cannot sell something you acquired this Shop visit.** Blocks the tight loop, but the
-   Yearbook loop still works across visits — it only slows it down.
-4. **Selling pays Score, not Gold.** Removes the Gold cycle entirely, since the exploit needs
-   Gold back to re-buy. Changes what the feature *is*, but it is the most robustly
-   loop-proof.
-
-*Recommendation: **2**.* It keeps the feature the user actually asked for and treats the two
-cards as what they are — effects written before selling existed, which never anticipated a
-Gold-out path. Capping them is a smaller change than amputating the feature.
+No special-casing needed, and neither card has to change. **Mao's Loyalty Badge** is
+break-even at 50% (buy one Item at 30, get two, sell both for 15 each) — a free Item
+generator with no Gold gain, bounded by 4 Item slots per stock and by the Item cap of 3.
+That is mild and, again, an interaction rather than a bug.
 
 ---
+
+## The Artefact cap: 5 (user, 2026-08-30)
+
+A third base-game cap, alongside Items (3) and Piece Buffs (2) from issue 53. Same shape as
+those: a single choke point, refused cleanly and visibly at the limit, never a silent drop.
+
+**Decide and document:**
+- **Do duplicate copies each take a slot?** Almost certainly yes — stacking is per held copy
+  (`g.artefacts` holds one entry per copy, and every percentage effect is additive per copy),
+  so a cap on entries is a cap on copies. Say so explicitly, because it materially changes
+  stacking strategy: 5 total means at most 5 copies of anything, ever.
+- **Every acquisition path must respect it** — Shop purchase, Box pick, and Artefact-granting
+  effects. `Shop.can_buy` already has the precedent from issue 53's Item cap
+  (`ItemLogic.has_room`); mirror it so the Shop never sells an Artefact you cannot hold.
+- **The 7 game-native core Artefacts count too** (`ARTEFACT_EFFECTS_CORE`) — they are ordinary
+  entries in `g.artefacts`.
+- **Ecdysis Sheddings copies a key, it does not hold a copy**, so it should not consume a
+  slot. Confirm.
+
+This is what makes selling matter: with a hard cap, selling is how you make room, which is
+almost certainly the point.
 
 ## Scope, once the above is decided
 
@@ -67,7 +73,7 @@ Gold-out path. Capping them is a smaller change than amputating the feature.
 - **Captured Stock** (`g.captured`) — decide. It is a separate pool and the same argument
   applies; recommend yes, for consistency.
 - **Items** (`g.items`).
-- **Artefacts** (`g.artefacts`) — pending the decision above.
+- **Artefacts** (`g.artefacts`) — yes; the cap of 5 is what makes this matter.
 - **Not** board pieces. Extraction already exists for board -> Stock, so selling a board
   piece is two steps, deliberately.
 
@@ -125,5 +131,5 @@ Decide, and extend the **windowed click probes** — this is interactive UI.
 
 ## Blocked by
 
-- the exploit decision above (options 1-4)
-- whether Captured Stock is sellable
+- whether **Captured Stock** is sellable (recommend yes, for consistency) — the only thing
+  still open

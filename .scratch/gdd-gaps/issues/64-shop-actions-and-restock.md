@@ -1,6 +1,6 @@
 # 64 — Shop interactions cost no Action; two-lane restock
 
-Status: todo — SPECCED (user rulings 2026-08-30) · ready
+Status: done (2026-08-30)
 
 ## Parent
 
@@ -94,3 +94,41 @@ class of bug as issue 55's unsaved run-long capture counter; do not repeat it.
 ## Blocked by
 
 - the value of X, and whether Lane A replaces or supplements the existing threshold curve
+
+## Outcome (2026-08-30)
+
+Implemented as specced.
+
+- **No Action cost**: `Shop.can_buy`/`buy`, `Shop.can_sell`/`can_convert`, and
+  `game._sell`/`_convert_captured` all dropped their `actions_left` gate/spend. The
+  `State.PLAYER_TURN` gate stays. Re-ran issue 60's no-net-gain assertions (Deep State
+  Yearbook nets -5 at the Artefact cap, Mao's Loyalty Badge never nets positive,
+  `tests/test_items_artefacts_3.gd`) with the brake gone — still hold, since they were
+  never about actions in the first place; they're bounded by `not slot.sold`, the
+  Artefact cap of 5, and Score-gated restocks, none of which changed.
+- **Two-lane restock**: `Shop.threshold`/`maybe_restock` (the old 1000/2500/4500/7000
+  cumulative-score curve, `Tuning.SHOP_RESTOCK_BASE`/`STEP`) are gone entirely, replaced
+  by `Shop.lane_a_restock` (called from `wave_logic.gd`'s `queue()` on `n % 5 == 0` —
+  Waves 5, 10, 15…, unconditional) and `Shop.add_score_progress` (called from
+  `Economy.earn`/`earn_gold` with the exact Score just added; banks every
+  `Tuning.SHOP_LANE_B_SCORE` = 10,000, a leap crossing several multiples banks them all
+  but rolls once, same contract issue 57 established). Lane A also zeroes
+  `g.shop_lane_b_progress`.
+- **`g.shop_restocks`**: kept, unchanged shape (`int`, additive, defaults 0) — it's now a
+  plain "restocks so far, either lane" display counter instead of the threshold-model's
+  gate value. No migration: an old save's stale count is harmless, it just means the
+  history predates this slice.
+- **New persisted field**: `g.shop_lane_b_progress` (`save_config.gd`, additive,
+  defaults 0) — Score banked toward the next Lane-B restock. This is exactly issue 55's
+  trap: a run-long counter that resets on a specific event and MUST survive a resume.
+  Proved with a dedicated save round-trip assertion in `tests/test_save.gd` (non-zero
+  value in, same value out) — the file's own header explains why the generic "save ->
+  load -> save is identical" check can't catch a missing field (absent from both sides,
+  compares equal), same reasoning `run_capture_count`'s check already documents there.
+- **Progress bar**: `modals.gd`'s Shop drawer header now carries a `ProgressBar`
+  (`shop_lane_b_bar`, exposed for probes) + a "Next restock: N / 10,000 Score" label, in
+  both Buy and Sell mode. Covered by the windowed click probe
+  (`tests/test_game_clicks.gd`) — bar exists, range matches
+  `Tuning.SHOP_LANE_B_SCORE`, and its value tracks `g.shop_lane_b_progress` across a
+  drawer rebuild.
+- `game/tests/run_all.sh` — ALL GREEN (all 7 item-suite files kept, no restructuring).

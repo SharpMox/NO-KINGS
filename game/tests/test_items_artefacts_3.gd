@@ -1049,8 +1049,8 @@ func _init() -> void:
 	# tracker) x10'd — 99 -> 990, so the boundary values below are the old
 	# 999/1000/1999/2000 each divided by 10 and re-multiplied back up by the
 	# SAME x10, landing on the identical thresholds (still un-scaled: this
-	# artefact's own "every 1000" is a Score-gained threshold, not touched
-	# by this slice, same as Shop.threshold).
+	# artefact's own "every 1000" is its own fixed Score-gained threshold,
+	# separate from — and unaffected by — issue 64's Shop restock lanes).
 	Economy.earn(loch, 99)
 	check(not loch.box_open and loch.score_gained_total == 990,
 		"Loch Ness Stool Sample: 990 Score gained does not yet cross the 1000 threshold")

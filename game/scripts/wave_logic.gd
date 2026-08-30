@@ -8,6 +8,7 @@ const Tariffs := preload("res://data/tariffs.gd")
 const Kings := preload("res://data/kings.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Shop := preload("res://scripts/shop.gd")
 
 
 static func queue(g, n: int) -> void:
@@ -42,6 +43,8 @@ static func queue(g, n: int) -> void:
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
 		g.pending_reinforce = true
+	if n % Tuning.SHOP_RESTOCK_WAVES == 0: # issue 64 Lane A: guaranteed
+		Shop.lane_a_restock(g) # restock every 5 Waves, independent of Score
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	# King identity picked here, once, so the wave banner can name it (issue 09
 	# selection rule: tier-ordered by King-wave depth, sampled within the tier)

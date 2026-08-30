@@ -1,7 +1,10 @@
 extends SceneTree
 ## The Shop: 22-slot randomized stock (6 typed boxes / 4 artefacts / 4 items /
-## 8 distinct base pieces), priced in gold, purchases cost 1 action, bought
-## slots go SOLD. Restocks on cumulative-score thresholds (GDD Shop page).
+## 8 distinct base pieces), priced in gold, no Action cost on any interaction
+## (issue 64). Bought slots go SOLD. Restocks on two lanes (issue 64): every
+## 5 Waves (Lane A, guaranteed), or 10,000 Score since the last Lane-A
+## restock (Lane B, resets on every Lane-A restock) — the old cumulative-
+## score threshold curve (Shop.threshold) is gone entirely.
 ## Pure logic in scripts/shop.gd over the live game node.
 ## Run headless:  godot --headless --path game -s tests/test_shop.gd
 
@@ -140,7 +143,7 @@ func _init() -> void:
 		check(Shop.rarity_of({"kind": "artefact", "key": sample.key}) == sample.rarity,
 			"an implemented catalog artefact's rarity round-trips through the shop slot")
 
-	# purchases: gold + one action, slot goes SOLD, the piece lands in stock
+	# purchases: gold only, no Action cost (issue 64), slot goes SOLD, the piece lands in stock
 	var pi := -1
 	for i in game.shop_stock.size():
 		if game.shop_stock[i].kind == "piece":
@@ -149,18 +152,16 @@ func _init() -> void:
 	var slot: Dictionary = game.shop_stock[pi]
 	var cost: int = Shop.price(game, slot)
 	var s0: int = game.score
-	game.actions_left = 2
+	game.actions_left = 0 # issue 64: proven at ZERO actions left, not just "some" —
+		# a Shop purchase must never need one
 	game.gold = cost - 1
 	check(not Shop.can_buy(game, slot), "short on gold -> not buyable")
 	game.gold = cost
-	game.actions_left = 0
-	check(not Shop.can_buy(game, slot), "no actions left -> not buyable")
-	game.actions_left = 2
-	check(Shop.can_buy(game, slot), "affordable + an action -> buyable")
+	check(Shop.can_buy(game, slot), "affordable, with no actions left -> still buyable")
 	var stock_n: int = game.stock.size()
 	Shop.buy(game, pi)
-	check(game.gold == 0 and game.actions_left == 1,
-		"buying debits the price and one action")
+	check(game.gold == 0 and game.actions_left == 0,
+		"buying debits the price and never touches actions_left")
 	check(game.shop_stock[pi].sold, "a bought slot is SOLD")
 	check(game.stock.size() == stock_n + 1 and game.stock.back() == slot.key,
 		"the piece lands in stock")
@@ -171,7 +172,7 @@ func _init() -> void:
 
 	# items and artefacts are purchasable (05)
 	game.gold = 9999
-	game.actions_left = 4
+	game.actions_left = 0 # issue 64: still zero — no Shop purchase ever needs one
 	var ii := -1
 	var ti := -1
 	var bi := -1
@@ -202,7 +203,7 @@ func _init() -> void:
 		"a bought artefact applies immediately and stacks")
 	check(game.shop_stock[ii].sold and game.shop_stock[ti].sold,
 		"item and artefact slots go SOLD")
-	check(game.actions_left == 2, "each purchase cost one action")
+	check(game.actions_left == 0, "neither purchase touched actions_left (issue 64)")
 	game._refresh()
 	check(game.hud.item_box.get_child_count() == game.items.size(),
 		"bought items show in the Inventory drawer strip")
@@ -215,15 +216,15 @@ func _init() -> void:
 	# acceptance test issue 47 calls for: read a stocked Box's contents,
 	# open it, assert the same entries (never a fresh roll on open)
 	game.gold = 500
-	game.actions_left = 2
+	game.actions_left = 0 # issue 64: still zero — a box purchase is no exception
 	var box_slot: Dictionary = game.shop_stock[bi]
 	var box_price: int = Shop.price(game, box_slot)
 	var stocked_contents: Array = box_slot.contents.duplicate(true)
 	game._open_shop()
 	game.modals.shop_buy_pressed.emit(bi)
 	check(game.shop_stock[bi].sold, "the box slot goes SOLD")
-	check(game.gold == 500 - box_price and game.actions_left == 1,
-		"a box costs its size's price + one action")
+	check(game.gold == 500 - box_price and game.actions_left == 0,
+		"a box costs its size's price only, no Action (issue 64)")
 	check(game.box_open and not game.modals.shop_panel.visible,
 		"buying a box opens the roll modal over a closed shop")
 	check(game.box_offer == stocked_contents,
@@ -243,46 +244,55 @@ func _init() -> void:
 			check(game.artefacts.size() > artefacts_n2, "picking Artefact Box options applies immediately")
 	check(not game.box_open, "resolving every pick closes the roll modal")
 
-	# restock cadence: cumulative score thresholds, not waves (GDD Shop page).
-	# Thresholds are 1000 / 2500 / 4500 / 7000 — the gap grows 500 each time.
-	check(Shop.threshold(0) == 1000 and Shop.threshold(1) == 2500
-			and Shop.threshold(2) == 4500 and Shop.threshold(3) == 7000,
-		"thresholds step 1000 / 2500 / 4500 / 7000")
+	# --- issue 64: restock cadence — two lanes replace the old cumulative-
+	# score threshold curve (Shop.threshold) entirely.
 
+	# Lane A: guaranteed every Tuning.SHOP_RESTOCK_WAVES Waves (5, 10, 15…),
+	# independent of Score — and wipes whatever Lane B progress had banked.
 	var before := JSON.stringify(game.shop_stock)
-	# issue 57: pre-bank past 3 thresholds so the wave-10 milestone's own
-	# Score bonus (Tuning.MILESTONE_SCORE_BONUS, now x10'd by Economy.earn's
-	# SCORE_MULTIPLIER — 100 -> 1000) can't incidentally cross a NEW
-	# threshold on its own and confound this check. Isolates "waves alone
-	# don't force a restock" from the score-threshold checks right below,
-	# which already cover threshold-crossing.
-	game.score = 5000
-	game.shop_restocks = 3
-	game._queue_wave(10)
-	check(JSON.stringify(game.shop_stock) == before,
-		"the 10-wave milestone no longer rerolls the shop")
-
 	game.score = 0
 	game.shop_restocks = 0
-	Economy.earn(game, 99) # issue 57: Economy.earn's amount is x10'd on its
-		# way to Score (SCORE_MULTIPLIER) — 99 lands at 990, still short of
-		# threshold(0)=1000
-	check(JSON.stringify(game.shop_stock) == before and game.shop_restocks == 0,
-		"score below the threshold leaves the stock alone")
-	Economy.earn(game, 1) # +10 Score -> exactly 1000
-	check(JSON.stringify(game.shop_stock) != before, "crossing 1000 restocks")
+	game.shop_lane_b_progress = 4200 # some accumulated Lane B progress, to prove Lane A resets it
+	game._queue_wave(4) # not a multiple of 5
+	check(JSON.stringify(game.shop_stock) == before and game.shop_lane_b_progress == 4200,
+		"Wave 4 is not a Lane-A beat — no restock, Lane B progress untouched")
+	game._queue_wave(5) # first Lane-A beat
+	check(JSON.stringify(game.shop_stock) != before, "Wave 5 fires the guaranteed Lane-A restock")
 	check(game.shop_restocks == 1, "the restock counter advances")
+	check(game.shop_lane_b_progress == 0, "Lane A wipes whatever Lane B progress had accumulated")
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
 			return sl.sold).is_empty(),
 		"a restock clears every SOLD flag")
 	check(game.shop_stock.size() == 22, "a restock refills all 22 slots")
+	before = JSON.stringify(game.shop_stock)
+	game._queue_wave(6)
+	check(JSON.stringify(game.shop_stock) == before, "Wave 6 is not a Lane-A beat — no restock")
+	game._queue_wave(10) # second Lane-A beat
+	check(JSON.stringify(game.shop_stock) != before, "Wave 10 fires the next Lane-A restock")
+	check(game.shop_restocks == 2, "the restock counter keeps counting Lane-A restocks")
 
-	# one gain crossing several thresholds restocks once, not once per threshold
+	# Lane B: 10,000 Score since the last Lane-A restock — keeps accumulating
+	# (not resetting) after firing on its own; only Lane A resets it.
+	before = JSON.stringify(game.shop_stock)
 	game.score = 0
 	game.shop_restocks = 0
-	Economy.earn(game, 500) # issue 57: x10'd to 5000 Score by SCORE_MULTIPLIER
-	check(game.shop_restocks == 3,
-		"a single huge gain banks every threshold it crossed (next: 7000)")
+	game.shop_lane_b_progress = 0
+	Economy.earn(game, 999) # x10'd by SCORE_MULTIPLIER -> 9990, still short of 10,000
+	check(JSON.stringify(game.shop_stock) == before and game.shop_restocks == 0,
+		"progress below 10,000 leaves the stock alone")
+	check(game.shop_lane_b_progress == 9990, "Lane B progress tracks Score earned so far")
+	Economy.earn(game, 1) # +10 Score -> exactly 10,000
+	check(JSON.stringify(game.shop_stock) != before, "crossing 10,000 Score restocks (Lane B)")
+	check(game.shop_restocks == 1, "the restock counter advances")
+	check(game.shop_lane_b_progress == 0, "the crossed 10,000 is consumed, no remainder left")
+
+	# one gain crossing several 10,000 multiples banks them all but rolls
+	# once (issue 57's "leap crosses several thresholds" contract, preserved)
+	game.shop_restocks = 0
+	game.shop_lane_b_progress = 0
+	Economy.earn(game, 2500) # x10'd to 25,000 Score by SCORE_MULTIPLIER -> crosses 10,000 twice
+	check(game.shop_restocks == 2, "a single huge gain banks every 10,000 multiple it crossed")
+	check(game.shop_lane_b_progress == 5000, "the remainder past the last crossed multiple is kept")
 
 	# always openable, and it pauses the run clock (GDD Shop page). Buying
 	# stays turn-gated: outside your turn the shelf is a readable catalog.
@@ -372,18 +382,18 @@ func _init() -> void:
 		"wave": 3, "gold": 0, "score": 0})
 	await process_frame
 	sl.state = sl.State.PLAYER_TURN
-	sl.actions_left = 5
+	sl.actions_left = 0 # issue 64: proven at ZERO actions left — selling never needs one
 	sl.stock.append("pawn") # value 10 -> sells for 5
 	var pawn_value: int = sl.defs.pawn.value
 	check(Shop.sell_price(sl, "piece", "pawn") == floori(pawn_value * Tuning.SELL_RATE),
 		"a Stock piece sells for SELL_RATE of g.defs[id].value, floored")
 	var sl_stock_n: int = sl.stock.size()
 	check(sl._sell("piece", "pawn"),
-		"selling a Stock piece succeeds on the player's turn with an action to spare")
+		"selling a Stock piece succeeds on the player's turn with zero actions left")
 	check(sl.stock.size() == sl_stock_n - 1, "the sold piece leaves Stock")
 	check(sl.gold == floori(pawn_value * Tuning.SELL_RATE) and sl.score == 0,
 		"selling pays Gold only, never Score")
-	check(sl.actions_left == 4, "selling costs 1 action, same as buying")
+	check(sl.actions_left == 0, "selling never touches actions_left (issue 64)")
 
 	sl.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical", "description": ""})
 	check(Shop.sell_price(sl, "item", sl.items[0]) == floori(Tuning.SHOP_ITEM_PRICE["Tactical"] * Tuning.SELL_RATE),
@@ -484,16 +494,17 @@ func _init() -> void:
 		"wave": 3, "gold": 100})
 	await process_frame
 	cv.state = cv.State.PLAYER_TURN
-	cv.actions_left = 5
+	cv.actions_left = 0 # issue 64: proven at ZERO actions left — conversion never needs one
 	cv.captured.append("pawn")
 	var convert_cost := Shop.sell_price(cv, "captured", "pawn")
 	check(convert_cost == floori(cv.defs.pawn.value * Tuning.SELL_RATE),
 		"Captured -> Stock conversion costs the same rate as selling")
 	var gold_before_convert: int = cv.gold
-	check(cv._convert_captured("pawn"), "conversion succeeds with enough Gold and an action to spare")
+	check(cv._convert_captured("pawn"), "conversion succeeds with enough Gold and zero actions left")
 	check(cv.captured.is_empty() and cv.stock == ["pawn"],
 		"the piece moves from Captured Stock into ordinary Stock")
 	check(cv.gold == gold_before_convert - convert_cost, "conversion debits the Gold cost")
+	check(cv.actions_left == 0, "conversion never touches actions_left (issue 64)")
 	var target2 := Vector2i(-1, -1)
 	for t in cv._deploy_tiles():
 		if not cv.board.has(t):

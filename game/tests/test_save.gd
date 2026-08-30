@@ -44,6 +44,7 @@ func _init() -> void:
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn"}],
 		"score": 470, "gold": 35, "clock_s": 812.5, "shop_restocks": 2,
+		"shop_lane_b_progress": 6300, # issue 64, Lane B restock progress
 		"shop_stock": [{"kind": "piece", "key": "pawn", "sold": true},
 			{"kind": "box", "key": "item", "size": "big", "sold": false,
 				"contents": [{"kind": "item", "name": "Blitz", "tier": "Tactical",
@@ -85,6 +86,11 @@ func _init() -> void:
 		"a stocked Box's size + rolled contents survive the save round-trip (issue 47) — "
 		+ "additive fields, no migration needed")
 	check(b.shop_restocks == 2, "the restock marker survives (no reroll-scumming)")
+	check(b.shop_lane_b_progress == 6300,
+		"issue 64: Lane B's restock progress (Score banked since the last Lane-A restock) "
+		+ "survives a resume — same trap issue 55's run_capture_count caught above: a field "
+		+ "missing from the save is absent from BOTH sides of the generic identity check and "
+		+ "compares equal, so this asserts the actual restored VALUE instead")
 	check(b.wave == 23 and b.turns_since_wave == 4, "wave clock restored")
 	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")

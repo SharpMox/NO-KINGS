@@ -1,6 +1,6 @@
 # 56 — SETI's Red Marker and Zapruder's, both redesigned
 
-Status: todo — SPECCED (user redesigns 2026-08-30) · two sub-questions open, see below
+Status: todo — SPECCED (user redesigns + sub-answers 2026-08-30) · ready
 
 ## Parent
 
@@ -39,10 +39,7 @@ only opens as a consequence of a removal, this Artefact is *still* dead on arriv
 is the exact problem the redesign exists to fix. So: always open the Box; removing a Tariff
 is the extra when one happens to be active.
 
-**Open sub-question — which size Artefact Box?** Boxes are Small (3 choices/1 pick), Big
-(5/1) or Huge (7/2). *Recommendation: **Big**.* It is a Rare, the effect is one-shot, and
-the Tariff-removal half is worth nothing in the current game — Big keeps it a real reward
-on its own. Small if it plays too strong.
+**Box size: BIG** (user, 2026-08-30) — 5 choices, 1 pick.
 
 ---
 
@@ -70,11 +67,14 @@ replacing it, so the card does something useful whatever you did last:
 The alternative reading — *replace* the replay entirely — would leave the card dead after a
 move, which is the same defect in a new place. Not taken.
 
-**Open sub-question — a Merge consumes two pieces. Which comes back?** Returning both would
-undo the Merge while leaving you the result, which is clearly too strong.
-*Recommendation: **one piece, the higher-value of the two.*** Note the parallel: Spare Organ
-Receipt (issue 53) refunds 50% of **both** consumed pieces as Gold, so there is precedent
-for "both" in the Gold case — but Gold is divisible and pieces are not.
+**A Merge returns BOTH consumed pieces, to Stock** (user, 2026-08-30). More generous than
+the one-piece option that was on the table, and consistent with Spare Organ Receipt (issue
+53), which refunds 50% of *both*.
+
+Note the consequence, accepted: the player keeps the merged result **and** gets both inputs
+back, so a Merge + Zapruder's is a net duplication of value. That is bounded by once per
+Wave on a Legendary, which is what makes it acceptable — but it is the strongest single
+line in this slice, so if anything here wants revisiting after a playtest, it is this.
 
 **Watch out:**
 - The Item return must respect the **Item cap of 3** (issue 53). If the inventory is full,
@@ -95,5 +95,4 @@ for "both" in the Gold case — but Gold is divisible and pieces are not.
 
 ## Blocked by
 
-- the two sub-questions above (both have recommendations; neither blocks starting the SETI
-  half, which only needs the Box size)
+- nothing

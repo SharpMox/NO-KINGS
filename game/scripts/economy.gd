@@ -339,6 +339,7 @@ static func deploy_cost(g) -> int:
 	return ArtefactHooks.run(g, "on_place_cost", {"cost": Tuning.PLACEMENT_COST}).cost
 
 
-## Enemy actions this turn, +1 under Filibuster.
+## Enemy actions this turn — 2 at Tier 5, 1 at Tiers 1-4 (issue 59), +1 under Filibuster.
 static func enemy_actions(g) -> int:
-	return ArtefactHooks.run(g, "on_enemy_turn_start", {"actions": Tuning.ENEMY_ACTIONS_PER_TURN}).actions
+	return ArtefactHooks.run(g, "on_enemy_turn_start",
+		{"actions": Tuning.enemy_actions_per_turn(g.next_tier)}).actions

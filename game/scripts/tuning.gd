@@ -38,6 +38,10 @@ const ENEMY_ACTIONS_PER_TURN := 1  # playtest override, re-justified 2026-08-28 
                                    # 1) and collapsed median survival from wave 17.5 to wave 8
                                    # (mean 26.3 -> 9.7, mostly Resource starvation). 2 remains
                                    # too strong for the current economy; 1 stays.
+                                   # Issue 59 (user ruling 2026-08-30): rather than pick one
+                                   # value for the whole game, GDD's 2 becomes a difficulty
+                                   # rank — see enemy_actions_per_turn() below. Baseline stays
+                                   # 1; Tier 5 restores 2.
 const ENEMY_TURN_PAUSE := 0.4      # beat before/after the enemy acts (feel 2026-07-06)
 
 const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
@@ -168,7 +172,7 @@ const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 #   2: the Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)
 #   3: Shop stocks 1 fewer of each kind
 #   4: starting Stock halved per piece type, rounding up (singletons survive)
-#   5: -1 action per turn
+#   5: -1 action per turn, enemy actions per turn 2 instead of 1 (issue 59)
 const TIERS := ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5"]
 const DEFAULT_TIER := TIERS[0]
 
@@ -184,6 +188,11 @@ static func shop_row_delta(tier: String) -> int:
 
 static func actions_per_turn(tier: String) -> int:
 	return ACTIONS_PER_TURN - (1 if tier_index(tier) >= 4 else 0)
+
+## Issue 59: Tier 5 restores the GDD's 2 actions/turn (baseline stays 1, see
+## ENEMY_ACTIONS_PER_TURN above for the fleet-sweep numbers on 2 as a global default).
+static func enemy_actions_per_turn(tier: String) -> int:
+	return ENEMY_ACTIONS_PER_TURN + (1 if tier_index(tier) >= 4 else 0)
 
 ## Starting Stock: Tier 4+ halves each distinct piece type, rounding UP so
 ## singletons survive — e.g. Crown's 8 pawns -> 4, its lone rook stays 1.

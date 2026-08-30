@@ -229,6 +229,37 @@ func _init() -> void:
 	y2kf.queue_free()
 	await process_frame
 
+	# issue 59: Tier 5 doubles the enemy's base — Y2K still skips exactly ONE
+	# enemy Turn on top of that tier value, and Filibuster's +1 still composes
+	# on top of Y2K's zeroed base, same as at Tier 1 above.
+	GameScript.next_tier = "Tier 5"
+	var y2k5 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"]})
+	await process_frame
+	check(Economy.enemy_actions(y2k5) == 2,
+		"(control) Tier 5, unarmed: the enemy's base Turn is 2 actions (issue 59)")
+	WaveLogic.queue(y2k5, y2k5.wave + 1)
+	check(Economy.enemy_actions(y2k5) == 0,
+		"Y2K at Tier 5: the enemy's first Turn of the Wave is still 0 actions, not 1")
+	check(Economy.enemy_actions(y2k5) == 2,
+		"Y2K at Tier 5: the next Turn is back to the normal Tier-5 2 actions")
+	y2k5.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
+	GameScript.next_tier = "Tier 5"
+	var y2kf5 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"], "tariffs": ["filibuster"]})
+	await process_frame
+	WaveLogic.queue(y2kf5, y2kf5.wave + 1)
+	check(Economy.enemy_actions(y2kf5) == 1,
+		"Y2K + Filibuster at Tier 5: the first enemy Turn is still exactly Filibuster's own +1 (Y2K's Tier-5 base cancelled)")
+	check(Economy.enemy_actions(y2kf5) == 3,
+		"Y2K + Filibuster at Tier 5: the second enemy Turn is Filibuster's +1 on top of the normal Tier-5 2 actions")
+	y2kf5.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
 	# --- issue 54: Exhibit 399, dormant — Tuning.TARIFFS_SCHEDULED is false
 	# (2026-08-29 ruling), so Tariffs never activate in a live run and this
 	# can only be exercised by driving economy.gd's apply_tariff/

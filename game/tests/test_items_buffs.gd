@@ -390,7 +390,8 @@ func _init() -> void:
 	# immediately, still your Turn) or you lose the carrier (ally half,
 	# deferred to the start of your next Turn, since _lose_player_piece is
 	# synchronous). Keyed "piece_bounty" — NOT "bounty", which a legacy core
-	# Artefact still holds (issue 50 reconciles the two later).
+	# Artefact's KEY still holds (issue 50 renamed that Artefact's display
+	# name to "Skip Tracer's Rolodex" so only the Buff is called Bounty).
 	var bounty_def: Dictionary = Items.PIECE_BUFFS.filter(
 		func(b: Dictionary) -> bool: return b.name == "Bounty")[0]
 	check(Items.PIECE_BUFFS.size() == 13, "Bounty is the 13th Piece Buff")
@@ -399,6 +400,8 @@ func _init() -> void:
 		"Bounty: Decisive dormant, keyed distinctly from the legacy Artefact")
 	check(not Items.ARTEFACT_EFFECTS_CORE.any(func(a: Dictionary) -> bool: return a.key == bounty_def.key),
 		"Bounty's Buff key does not collide with ARTEFACT_EFFECTS_CORE's 'bounty' key")
+	check(not Items.ARTEFACT_EFFECTS_CORE.any(func(a: Dictionary) -> bool: return a.name == "Bounty"),
+		"issue 50: the legacy core Artefact no longer shares the Buff's name (only one 'Bounty' in play)")
 
 	# reachable from the random-grant pool (watch-out: confirm deliberately —
 	# it carries no self_harming flag, so the full-pool filter includes it)

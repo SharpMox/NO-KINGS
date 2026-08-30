@@ -50,8 +50,21 @@ func _click(at: Vector2) -> void:
 
 ## Poll until the enemy turn hands control back (animations + ENEMY_TURN_PAUSE
 ## make its duration a tunable, not a constant) — up to 4s.
+##
+## Diagnosed under artificial load (fix/click-probe-stall): a real OS
+## window can have its focus flicker under a busy machine, and the WM
+## sometimes delivers a genuine NOTIFICATION_WM_WINDOW_FOCUS_OUT to this
+## probe's window with no matching FOCUS_IN before the poll below gives up.
+## game.gd correctly (06, test_background.gd) freezes the enemy turn
+## indefinitely while `backgrounded` — that pause has no timeout by design,
+## since a real player might tab away for minutes. This probe drives every
+## click via synthetic root.push_input(), never real OS input, so it has no
+## "player tabbed away" to honor; forcing the flag clear each poll costs at
+## most one 0.1s tick and stops a WM focus hiccup from freezing the enemy
+## turn for the rest of the run.
 func _await_player_turn(game: Node2D) -> void:
 	for i in 40:
+		game.backgrounded = false
 		if game.state == game.State.PLAYER_TURN:
 			return
 		await create_timer(0.1).timeout
@@ -69,6 +82,13 @@ func _init() -> void:
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 		"captured": ["pawn", "pawn"],
 	}
+	# Hygiene fix, not the flake's cause (see _await_player_turn): every other
+	# boot in this file, and every other test in the suite, sets is_scenario
+	# to keep probes off the real save file — this one predates the autosave
+	# feature by a day (git history) and was never updated. It has no real
+	# on-disk-write test depending on it (test_save.gd round-trips _to_config()
+	# in memory, never this file-write path), so there is nothing to preserve.
+	GameScript.is_scenario = true
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame

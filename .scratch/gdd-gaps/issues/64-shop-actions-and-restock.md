@@ -1,6 +1,6 @@
 # 64 — Shop interactions cost no Action; two-lane restock
 
-Status: todo — SPECCED (user rulings 2026-08-30) · one number open
+Status: todo — SPECCED (user rulings 2026-08-30) · ready
 
 ## Parent
 
@@ -53,28 +53,33 @@ wipes whatever progress had accumulated toward the score lane.
 
 **Show a progress bar** so the player can see Lane B filling.
 
-### The open number: what is X?
+### X = 10,000 (user, 2026-08-30)
 
-The user wrote "X(?)" — genuinely undecided. **Do not guess silently.** Some grounding, now
-that issue 57's ×10 has landed:
-- Post-×10 autoplay full runs score **68,700 / 75,200 / 72,800**; a wave-9 loss scored 2,800.
-- The existing threshold curve is 1000 / 2500 / 4500 / 7000, i.e. rising.
-- Five Waves is a meaningful chunk of a run — a run reaching Wave 45 sees ~9 Lane-A restocks.
+Checked against the post-x10 economy before being set, because the first proposal would not
+have worked:
 
-X wants to be small enough that a *good* five waves earns a bonus restock, and large enough
-that it is not automatic. Propose a value with the arithmetic behind it and get it confirmed
-before building — this is a tuning number and the user has been explicit that they want to
-tune with real levers in place.
+- A **single median capture now scores 500** (median piece value 50, x10 at `Economy.earn`).
+- Observed full runs score **68,700 / 75,200 / 72,800 over ~45 Waves** = **~8,085 Score per
+  5-Wave window**.
 
-### Also decide
+So the originally-suggested **250 would have fired ~32 times per window**, making Lane A
+meaningless — it was a pre-x10 number carried over. At **10,000**, a typical window earns
+**slightly under one** bonus restock, so the guaranteed lane stays the backbone and Lane B
+rewards scoring above average. That is the intended shape.
 
-- **Does Lane A replace the existing Score-threshold curve, or sit alongside it?** The user
-  described Lane B as "scoring X in between those milestones", which reads as **replacing** the
-  old `threshold(n)` curve with a simpler reset-on-milestone counter — not stacking a third
-  mechanism on top. Confirm before building; `Shop.threshold`/`maybe_restock`/`shop_restocks`
-  and the save field all hang off the current model.
-- **What happens to `shop_restocks`**, which currently counts banked thresholds and is
-  persisted in the save.
+### Lane A REPLACES the old rising curve (user, 2026-08-30)
+
+`Shop.threshold(n)`'s 1000 / 2500 / 4500 / 7000 curve goes away. Restocks come from exactly
+two sources: the 5-Wave beat, and the resettable 10,000-Score counter.
+
+The user noted the curve "might come out later" anyway, so removing it now is not a loss.
+
+**What that means for existing state:** `Shop.threshold`, `Shop.maybe_restock` and
+`g.shop_restocks` all hang off the old model, and `shop_restocks` is **persisted in the save**.
+Decide whether it survives as a plain count of restocks-so-far (harmless, and possibly still
+wanted for display) or is replaced by the new Lane-B progress value — which must itself be
+saved, or a resumed run silently loses its progress toward the next restock. That is the same
+class of bug as issue 55's unsaved run-long capture counter; do not repeat it.
 
 ## Acceptance
 

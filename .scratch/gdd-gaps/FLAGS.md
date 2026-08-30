@@ -59,6 +59,25 @@ Reviewed 2026-08-29.
   they do not scale on their own and needed the x10 explicitly. If any *other* effect is later
   found converting Gold to Score by a coefficient, it needs the same treatment.
 
+## Standing design principles (user rulings — read before triaging a "bug")
+
+- **Big interactions stay. At worst cap them, never remove them.** User, 2026-08-30, on the
+  buy/sell loop around Deep State Yearbook and Mao's Loyalty Badge:
+
+  > *This kind of interaction is big for players so we want to keep those anyway, at worst we
+  > cap them but never remove.*
+
+  This changes how a finding should be triaged. When something looks exploitable, the question
+  is **"what bounds it?"**, not "how do we close it?" — and if the answer is "nothing", the
+  fix is a **cap**, not a deletion. Two findings this session were framed as exploits needing
+  closure and both turned out to be bounded interactions worth keeping: the buy/sell loop
+  (bounded by `not slot.sold`, Score-gated restocks, and the Artefact cap making Deep State
+  Yearbook's payout a guaranteed net loss) and Mao's Loyalty Badge (break-even, bounded by
+  4 Item slots per stock and the Item cap).
+
+  The corollary: **do not propose removing an Artefact because it combos well.** Propose the
+  bound.
+
 ## Rulings I made that are cheap to reverse
 
 Each was a judgement call needed to ship; none was specced.

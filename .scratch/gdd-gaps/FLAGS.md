@@ -17,10 +17,8 @@ Reviewed 2026-08-29.
   `Pawn-Dark`, `Rook-Dark` and `Knight-Dark` are near-black with almost no outline
   contrast. Against the dark brown square (`#b58863`) the near-black ones read as holes
   rather than pieces. The Light set is consistent; this is a Dark-set value problem.
-- **Two source filenames are wrong** in `Documents/NO KINGS - PIECES DESIGNS/`:
-  `Dragonlord.png` is missing its `-Dark` suffix and `Queztalcoatl-Light.png` is a typo.
-  Both were imported from their intended targets, so the game is fine — but the next
-  import from that folder will hit them again.
+- ~~**Two source filenames are wrong**~~ — fixed by the user 2026-08-30, verified:
+  `Dragonlord-Dark.png` and `Quetzalcoatl-Light.png` are now correct in the designs folder.
 
 ## Balance / tuning, unvalidated
 

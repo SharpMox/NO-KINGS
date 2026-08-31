@@ -20,6 +20,7 @@
 ##   is_available() -> bool
 ##   push(key: String, envelope: Dictionary) -> bool
 ##   pull(key: String) -> Variant   # envelope Dictionary, or null
+##   account_id() -> String         # issue 83: stable account id, "" if none
 
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 const GameCenter := preload("res://scripts/cloud/cloud_backend_game_center.gd")

@@ -7,6 +7,7 @@ extends SceneTree
 
 const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
+const Account := preload("res://scripts/account.gd")
 
 var fails := 0
 
@@ -63,6 +64,11 @@ func _init() -> void:
 		push_error("WATCHDOG: probe still running after 120s — force quit")
 		quit(1))
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
+	# issue 83: an account must exist before the main menu is reachable at all.
+	# Every assertion below drives the MAIN menu, so establish one first — the
+	# login screen itself is probed at the end, on a fresh menu.
+	Account._reset_cache()
+	Account.start_guest()
 	var menu: Node = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(menu)
 	await process_frame
@@ -234,6 +240,35 @@ func _init() -> void:
 	await process_frame
 	check(_find_button(menu, "Play") != null, "Settings Back restores the main menu")
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
+
+	# --- issue 83: the login screen itself ---
+	# Driven through, not bypassed. --skip-login exists for the CLI, but a
+	# bypass that is the ONLY tested path is exactly how this repo once shipped
+	# a fully dead main menu (CLAUDE.md, "UI first, bypasses second").
+	menu.queue_free()
+	await process_frame
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Account.ACCOUNT_PATH))
+	Account._reset_cache()
+	check(Account.needs_login(), "a fresh install is back to needing login")
+	var fresh: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(fresh)
+	await process_frame
+	await process_frame
+	check(_find_button(fresh, "Play") == null,
+		"the login screen is IN FRONT of the main menu, not beside it")
+	check(_find_button(fresh, "Play as Guest") != null, "the login screen renders")
+	check(_find_button(fresh, "Sign in with Google") != null, "Google sign-in offered")
+	check(_find_button(fresh, "Sign in with Apple") != null, "Apple sign-in offered")
+	# desktop has no backend, so this must say so rather than appear to work
+	check(await _click_button(fresh, "Sign in with Google"), "Google button clickable")
+	await process_frame
+	check(_find_label(fresh, "isn\'t available") != null,
+		"an unavailable backend says so instead of silently doing nothing")
+	check(Account.needs_login(), "and a failed sign-in creates NO account")
+	check(await _click_button(fresh, "Play as Guest"), "Guest button clickable")
+	await process_frame
+	check(_find_button(fresh, "Play") != null, "Guest reaches the main menu")
+	check(not Account.needs_login(), "Guest created a real account")
 
 	print("---")
 	if fails == 0:

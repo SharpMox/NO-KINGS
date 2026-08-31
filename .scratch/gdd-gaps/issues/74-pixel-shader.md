@@ -1,6 +1,7 @@
 # 74 — Pixel filter/shader experiment (UI overlay)
 
-Status: spike done (2026-08-31) — works, NOT enabled; needs a call
+Status: done (2026-08-31) — every quantising approach rejected; **hard-edged text shipped
+instead**, and the shader deleted. See the final Outcome at the bottom.
 
 ## Parent
 
@@ -87,3 +88,64 @@ it — pixelating the board while leaving every label crisp. That is the version
 next, and it is a small change from here.
 
 Left as a spike rather than a feature, per the issue's own framing.
+
+---
+
+## FINAL Outcome (2026-08-31) — the filter is deleted; hard-edged text shipped
+
+The recommendation above ("scope it to the board, under the HUD") was overtaken: the user's
+call was the opposite — **the filter goes on the menus, and art dodges it entirely**, because
+the piece tokens are already painted pixel art and quantising them distorts rather than
+stylises. The filter shipped on menus at 3x, and was then rejected on sight.
+
+### Every quantising approach was tried and rejected
+
+| Approach | Result | Why it failed |
+| --- | --- | --- |
+| Full-screen post-effect, 3x | roughened edges only | quantising something already drawn at full resolution |
+| SubViewport downscale, AA on | *"looks blurry, not a good pixelated effect"* (user) | magnified font antialiasing, not pixels |
+| SubViewport downscale, AA off, 3x | genuine hard pixels, **small text broken** | a vector font has too little grid at 8px — "Settings" rendered as *Sellings* |
+| Same at 2x | moderate effect, text legible | still a degraded letterform, not a designed one |
+| Same at 1x | crisp text, no distortion | **chosen** — see below |
+
+Screenshots for all of it in `74-assets/`: `pixel-off/3x/5x.png` (post-effect),
+`subviewport-true-3x.png` (SubViewport, AA on), `subviewport-noAA-3x.png`, `noAA-2x.png`,
+`noAA-1x.png`.
+
+### The diagnosis worth keeping
+
+**The blur was font antialiasing, not resolution.** Godot antialiases fonts by default, so
+rendering at 1/N and upscaling nearest-neighbour turns every soft grey edge pixel into an
+NxN grey blob. That reads as blur no matter what the shader does — which is why the
+post-effect and the SubViewport failed the same way despite being different techniques.
+
+Underneath that sits the real ceiling: **a downscaled-then-upscaled vector font is a damaged
+letterform, not a designed one.** No factor fixes it, because the tradeoff runs one
+direction the whole way — more pixel look, less legibility. A pixel/bitmap font (glyphs
+authored to sit on the grid at 8px) is the only thing that gives both, and that is an asset
+decision, not a code one. **Recorded here so it is not rediscovered:** if a retro UI is
+wanted later, start by importing a pixel font, not by writing another shader.
+
+### What actually shipped
+
+`Settings._crisp_text()` — turn font antialiasing OFF project-wide
+(`FONT_ANTIALIASING_NONE` + `SUBPIXEL_POSITIONING_DISABLED` + `HINTING_NONE` on a duplicate
+of `ThemeDB.fallback_font`, reassigned to the fallback so it reaches every Control with no
+per-scene wiring; guarded so it no-ops after the first boot). It rides on `Settings.apply()`,
+which both `menu.gd` and `game.gd` already call once at every boot.
+
+That is the 1x row of the table: **native resolution, no downscale, no shader.** It touches
+only glyph rasterisation, so it satisfies the requirement every filter kept failing —
+**the painted tokens are left exactly as drawn** — with no CanvasLayer ordering contortion
+and no coordinate-space shift for the windowed click probes.
+
+It is project-wide rather than menu-only (the game HUD gets it too), so the HUD's text sits
+with the pixel-art tokens instead of contrasting with them. Not gated behind a Settings
+toggle — it is a look, not a preference; add one if it turns out to be contentious.
+
+**Deleted:** `game/scripts/pixel_filter.gd`, `game/shaders/pixelate.gdshader`, the `--pixel`
+CLI flag and both call sites. At 1x a pixelate pass is arithmetically the identity, so
+keeping the shader would have been dead code with a config knob on it.
+
+`game/tests/run_all.sh` — **ALL GREEN** (foreground, alone). No test changed: the effect is
+purely visual and the probes were never sensitive to it.

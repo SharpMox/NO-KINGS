@@ -98,7 +98,9 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button(menu, "Play"), "Play button clickable")
 	await process_frame
-	check(_find_button(menu, "Crown") != null, "Play opens the army select")
+	check(_find_button(menu, "The Muster") != null, "Play opens the army select") # issue
+		# 67: "Crown" is still the save id (Tuning.ARMIES key) — the BUTTON now
+		# shows the Family's display name, "The Muster" ("The Levy" was vetoed)
 	check(await _click_button(menu, "← Back"), "army Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "army Back restores the main menu")

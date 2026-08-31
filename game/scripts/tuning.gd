@@ -188,6 +188,17 @@ const ARMIES := {
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 
+## Family framework (issue 67, ratified 2026-08-30): a fresh run has never
+## had a non-zero starting-Gold concept before this slice — `g.gold` began
+## every fresh boot at its bare declaration value, 0, uniformly for every
+## army. The GDD ruling's "baseline Gold" / "~half Gold" / (issue 68's
+## sibling slice) "triple baseline Gold" all presuppose a real number, and
+## issue 68 states outright "All numbers are ballpark and tunable later
+## (standing user stance)" for that same design session's Families — so this
+## is picked on that authority, not invented in a vacuum: pinned to
+## SHOP_ITEM_PRICE's own "Tactical" tier above, enough for one early buy.
+const FAMILY_BASELINE_GOLD := SHOP_ITEM_PRICE["Tactical"] # 30
+
 # Difficulty tiers (07-difficulty-ranks, redesigned 2026-08-28 — user call):
 # 5 numbered tiers, picked pre-run, locked for the run (Continue into
 # endless keeps it), NOT a leaderboard weight — comfort only. Levers are

@@ -21,6 +21,14 @@ static func step(g) -> void:
 		try_activate_artefact(g)
 	# One random legal action per frame (everything costs one), pass when spent.
 	if g.actions_left > 0:
+		# The Family Ability (67) costs 1 Action, unlike Artefact activation
+		# above — tried here, inside the actions_left gate, alongside items/
+		# merges/moves rather than up front. A bot that never presses it
+		# would prove nothing about the feature; try_activate_family_ability
+		# returns false (no-op, falls through) when unavailable so an
+		# unlucky roll never wastes a frame.
+		if g.rng.randf() < 0.15 and try_activate_family_ability(g):
+			return
 		if not g.items.is_empty() and g.rng.randf() < 0.3: # exercise item paths
 			use_item(g)
 			return
@@ -93,6 +101,27 @@ static func try_activate_artefact(g) -> void:
 		return
 	var b: Vector2i = g.artefact_targets[g.rng.randi() % g.artefact_targets.size()]
 	g._artefact_target_click(b)
+
+
+## The Family Ability (67): The Muster's Call the Banners is the one
+## targeted case (a Stock pick, not a board tile) — resolved via `rng` the
+## same way _open_box_pick/every other autoplay modal is, so the bot never
+## stalls on the confirm modal or leaves targeting stuck. Wild Hunt/Old
+## Guard are untargeted — g._activate_family_ability's own autoplay bypass
+## (mirroring _activate_artefact's) resolves those immediately. Returns
+## whether it actually activated.
+static func try_activate_family_ability(g) -> bool:
+	if not g._family_ability_available():
+		return false
+	if g.next_army != "Crown":
+		g._activate_family_ability()
+		return true
+	g._begin_family_targeting()
+	if g.stock.is_empty(): # availability already checked this; never leave
+		g._family_targeting_reset() # targeting stuck with nothing to pick
+		return false
+	g._family_target_stock(g.stock[g.rng.randi() % g.stock.size()], false)
+	return true
 
 
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.

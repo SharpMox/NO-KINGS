@@ -1482,14 +1482,21 @@ func _init() -> void:
 	bcancel.queue_free()
 	await process_frame
 
-	# The Activate section: absent entirely when empty (acceptance: "the
-	# drawer is unchanged from today"), present once something is held
+	# The Activate section: issue 67 made it PERMANENT — every run holds a
+	# Family Ability chip now, so "absent entirely when empty" (issue 52's
+	# original acceptance) no longer applies; the section holds at least
+	# that one chip even with no activatable Artefact held. Probed directly
+	# rather than assumed: this used to read 0/INV_H_BASE, now reads
+	# 1/INV_H_ACTIVATE (the Family Ability chip alone).
 	var no_activ := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 1})
 	await process_frame
 	no_activ._refresh()
-	check(no_activ.hud.activate_box.get_child_count() == 0 \
-			and no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_H_BASE,
-		"Activate section: absent, drawer at today's height, with no activatable Artefact held")
+	await process_frame # queue_free() on the boot's own first-built chip is
+		# deferred — let it resolve before counting (same reason held_activ
+		# below already does this)
+	check(no_activ.hud.activate_box.get_child_count() == 1 \
+			and no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_H_ACTIVATE,
+		"Activate section: the Family Ability chip alone (no activatable Artefact held)")
 	no_activ.queue_free()
 	await process_frame
 
@@ -1499,8 +1506,9 @@ func _init() -> void:
 	held_activ._refresh()
 	await process_frame # queue_free() on the rebuilt chip is deferred — let it
 		# resolve before counting, else a stale one lingers alongside the fresh one
-	check(held_activ.hud.activate_box.get_child_count() == 1,
-		"Activate section: exactly one chip once one activatable Artefact is held")
+	check(held_activ.hud.activate_box.get_child_count() == 2,
+		"Activate section: the Artefact chip PLUS the Family Ability chip (issue 67 added the " +
+		"latter — this used to assert 1 before the Family Ability chip existed)")
 	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_H_ACTIVATE,
 		"Activate section: the drawer grows one row to fit it")
 	held_activ.queue_free()

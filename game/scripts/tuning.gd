@@ -72,6 +72,17 @@ const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
 const BACKROW_COMMIT_COUNT := BOARD_W
 const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
 
+## issue 90: a King wave is TWO segments (user ruling, 2026-08-31) — this many
+## turns of buffed enemies BEFORE the King arrives, then the fight proper.
+## Wave-scoped King Powers only feel like anything because the wave is long.
+const KING_SEGMENT_TURNS := 15
+
+## How many Piece Buffs a segment-1 spawn arrives carrying. Reuses the 12
+## shipped buffs rather than inventing an enemy-only stat line: the player
+## already knows what each does, and WHICH buffs appear is a per-King flavour
+## lever for free.
+const KING_SEGMENT_BUFFS := 1
+
 const CLOCK_START_MS := 15 * 60 * 1000  # 30 → 5 (2026-07-07) → 15 (issue 78,
                                         # user call 2026-08-31). Tier 3+ cuts it
                                         # back to CLOCK_START_MS_HARD below, so

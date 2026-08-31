@@ -5,7 +5,7 @@
 const Rules := preload("res://scripts/rules.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
-const Families := preload("res://scripts/families.gd")
+const Armies := preload("res://scripts/armies.gd")
 
 
 ## The piece the current selection would merge FROM: an armed pool stack
@@ -35,7 +35,7 @@ static func partner_ids(g) -> Dictionary:
 	var out := {}
 	var origin := origin_id(g)
 	if origin == "" or g.state != g.State.PLAYER_TURN \
-			or (g.actions_left <= 0 and not Families.merge_free(g)): # Close Ranks (67)
+			or (g.actions_left <= 0 and not Armies.merge_free(g)): # Close Ranks (67)
 		return out
 	var all: Array = g._pool()
 	for pos in g._player_pieces():
@@ -55,7 +55,7 @@ static func partner_ids(g) -> Dictionary:
 ## the result piece (the bot skips straight to the commit). Cancel keeps the
 ## origin selected so another partner can be picked.
 static func do_merge(g, a: Variant, b: Variant) -> void:
-	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Families.merge_free(g)):
+	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)):
 		return
 	var ids := []
 	for ref in [a, b]:
@@ -71,7 +71,7 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
 ## target wins); pool-only merges go to Stock.
 static func commit_merge(g, a: Variant, b: Variant) -> void:
-	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Families.merge_free(g)):
+	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)):
 		return
 	var ids := []
 	for ref in [a, b]:
@@ -98,7 +98,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 			# is already Stock-shaped — no owner field to strip.
 			consumed_states.append(ref.get("entry", ref.id))
 			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
-	if not Families.merge_free(g): # Close Ranks (The Muster, issue 67)
+	if not Armies.merge_free(g): # Close Ranks (The Muster, issue 67)
 		g.actions_left -= 1
 	g._log_action("merge", {"pieces": consumed_states})
 	var stock_index := -1
@@ -127,7 +127,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	g.placing_id = ""
 	g.placing_cap = false
 	g._clear_selection()
-	if (g.actions_left == 0 and not Families.merge_free(g)) or g._board_cleared():
+	if (g.actions_left == 0 and not Armies.merge_free(g)) or g._board_cleared():
 		# last action spent on the merge — Close Ranks (67) never spends one,
 		# so a free merge at 0 actions_left must not auto-pass; it just leaves
 		# the Turn exactly as spent as it already was

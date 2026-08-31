@@ -38,8 +38,8 @@ static func queue(g, n: int) -> void:
 	g.bovine_used_this_wave = false # Bovine Tractor Beam (52)
 	g.jet_fuel_used_this_wave = false # Jet Fuel Vial (52; issue 61 — moved off
 		# the "Shop visit" boundary onto the same no-REGISTRY activation
-		# family as zapruder/bovine above, so it resets the same way here)
-	g.family_ability_used_this_wave = false # the Family Ability (67), same idiom
+		# army as zapruder/bovine above, so it resets the same way here)
+	g.army_ability_used_this_wave = false # the Army Ability (67), same idiom
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start

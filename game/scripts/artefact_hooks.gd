@@ -419,7 +419,7 @@
 ## just which keys are held, the distinction Bilderberg Hotel Slippers'
 ## effect text needs ("two or more of your Artefacts trigger", not "own").
 ## A dedicated pass, `_run_meta_triggers`, runs once after the normal
-## dispatch loop and reads `fired` to run the family of artefacts that react
+## dispatch loop and reads `fired` to run the army of artefacts that react
 ## to another artefact's own trigger:
 ## - Polybius Cartridge / Max Headroom Mask / Red Diary's Missing Pages: for
 ##   every key in `fired` (hook-scoped to on_capture / on_wave_clear+
@@ -1072,7 +1072,7 @@ const REGISTRY := {
 	"mar-a-lago-toilet-papers": ["on_wave_clear", "on_price"],
 	"deep-state-yearbook": ["on_purchase"],
 	# New World Order Gerrymandering deliberately has NO REGISTRY entry, same
-	# shape as the issue-21 echo family above: it never runs through the
+	# shape as the issue-21 echo army above: it never runs through the
 	# normal per-copy _dispatch loop below at all. "Gold paid by other
 	# Artefacts +25%" can only be computed once every other held
 	# artefact/tariff has already added its share to a Gold gain — reading
@@ -2359,7 +2359,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.score += ctx.value * 10
 			g.gold += ctx.value
 
-		# --- issue 21: echo and meta-triggers (the rest of the family runs
+		# --- issue 21: echo and meta-triggers (the rest of the army runs
 		# through _run_meta_triggers above, off `held`/`fired` directly —
 		# Capstone Polish is the one plain direct-effect handler here) ---
 		["capstone-polish", "on_purchase"]:

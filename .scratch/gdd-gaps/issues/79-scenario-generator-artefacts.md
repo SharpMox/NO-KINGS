@@ -1,6 +1,6 @@
 # 79 — Scenario generator + the 180 Artefact sandboxes + a menu that survives them
 
-Status: todo
+Status: done (2026-08-31)
 
 ## Parent
 
@@ -53,3 +53,71 @@ free — or make sections collapsible, which 77 was built to allow without restr
 ## Blocked by
 
 - nothing
+
+## Outcome (2026-08-31)
+
+**180 generated sandboxes, one per Artefact; 240 scenarios total; the menu is now 17 headers
+on a single screen with no scrolling at all.**
+
+### The generator
+
+`game/data/scenarios_artefacts.gd`. Boards are authored per **trigger family** (nine of them),
+not per Artefact — `ArtefactHooks.REGISTRY` maps each key to its hooks, so the board that makes
+it fire is derived rather than guessed. Each entry is `template + the Artefact held + a pinned
+seed` (`abs(hash(key))`, so a sandbox lays out identically every time and a future diff of the
+file reads as a real change). `scenarios.gd` keeps its hand-written list in `_hand_written()`
+and `all()` returns that plus the generated set.
+
+| Family | Count | Family | Count |
+| --- | --- | --- | --- |
+| Passive | 41 | Shop | 16 |
+| Wave clear | 35 | Turn | 16 |
+| Capture | 23 | Items | 7 |
+| Losses | 19 | Buffs | 5 |
+| Economy | 18 | | |
+
+**41 land in Passive, not the ~33 issue 73 estimated.** 139 Artefacts carry a REGISTRY entry,
+not 147. The estimate predates slice 69 removing the 7 game-native core effects; the generator
+reads the live REGISTRY, so the split is accurate to the code rather than to the note.
+
+Passive entries are **labelled "Passive" in their own name** and get a board where their
+condition is visibly true (Gold, Score, Stock, Captured and an Item all populated) — the
+issue's requirement that a scenario which cannot be made to fire says so, rather than silently
+doing nothing.
+
+Names are `"Artefact <Family>: <Name>"` **deliberately**: `menu.gd` derives sections from the
+text before the first `:` or `(`, so this groups all 180 into nine sections with **no menu-side
+special case at all**. The prefix contains neither character, so an Artefact name containing
+`(` cannot break the cut.
+
+### The menu: sections collapse, and start collapsed
+
+77's sectioning was right for 53 entries and insufficient for 240 — the last section would
+have been minutes of dragging away. Headers became flat Buttons that toggle their rows;
+everything starts closed. The whole catalog is one screenful of headers, at the cost of one
+click to reach any entry. **That trade is only worth it at this size, which is why 77 did not
+make it.**
+
+### The probe change matters more than it looks
+
+Reachability is now a **two-step** property, and the probe asserts both steps: headers exist,
+every section starts collapsed (0 rows showing), a header click expands and re-labels, and the
+last entry of the last section is then reachable. **A probe that only searched for the button
+by text would have passed against a list that never expands** — `_find_button` is
+visible-first, so it would simply have found nothing and the old assertion would have failed
+for the wrong reason. The final config-staging click reuses that same entry, which also proves
+the expanded state survives Back-and-reopen (Back hides the list, it does not rebuild it).
+
+### Suite runtime — reported as the issue asked
+
+| | Before | After | Delta |
+| --- | --- | --- | --- |
+| `test_scenarios.gd` | 17.9s (60 cases) | **75.9s (240 cases)** | **+58s** |
+| `run_all.sh` total | — | **132.9s** | — |
+
+~0.3s per scenario, unchanged per-case — the cost is purely the 180 extra boots. At 133s for
+the whole suite this does **not** warrant splitting `scenarios.gd` into swept and sandbox-only
+sets; issue 73's trigger for that split ("if the count ever grows enough to slow the suite")
+is not met. Revisit if slices 80-82 push it past a few minutes.
+
+`game/tests/run_all.sh` — **ALL GREEN**, foreground, alone.

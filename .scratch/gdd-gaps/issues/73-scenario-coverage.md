@@ -1,56 +1,51 @@
 # 73 — A test scenario per Artefact, per piece, per King
 
-Status: todo — READY for Artefacts + pieces · Kings blocked on design
+Status: todo — RESPECCED 2026-08-31 (user clarification) · sandbox menu, not tests
 
 ## Parent
 
 `.scratch/gdd-gaps/PRD.md`
 
-## What this is
+## What this is — corrected
 
-`game/data/scenarios.gd` holds hand-built TEST scenarios, and `test_scenarios.gd` boots and
-bot-plays every one automatically. The ask: **one scenario per Artefact (180), per piece
-(39), and per King (16)**.
+**The user means the manual sandbox menu, not executable tests.**
 
-## Why this is worth doing, stated precisely
+> *"When i say scenarios its the menu with the setups for me to use. You dont have to make
+> them executable test for the testing suites."*
 
-The suite already asserts these things in unit form. What a scenario adds is different:
-it proves the thing **survives a real bot-played run** — dispatch, save/load, autoplay and
-the wave loop all touching it — rather than a hand-built fixture. Several bugs this project
-shipped were only visible in that integration path.
+So the deliverable is **hand-authored setups the user can load and play** from the in-game
+menu, to explore an Artefact, a piece, or a King by hand. Not assertions, not coverage.
 
-## The thing to decide before generating 235 scenarios
+That makes this dramatically cheaper than the original spec, and it removes the objection
+that killed it: **there is no suite-runtime risk**, because nobody is asserting anything.
 
-**Hand-written or generated?** 180 hand-written Artefact scenarios is weeks of work and will
-rot the moment a card changes. A **generated** scenario per Artefact — boot with that
-Artefact held, a fixed board, a pinned seed, bot-play N turns, assert no crash and no
-assertion trip — is cheap, uniform, and regenerates when the catalog does.
+**One thing to keep in mind rather than design around:** `test_scenarios.gd` automatically
+boots and bot-plays everything in `game/data/scenarios.gd`. So new sandbox entries get a free
+smoke test — they must at least *boot and not crash* — but nobody has to write an assertion,
+and a scenario that merely sets up an interesting board is a perfectly good scenario.
 
-Recommendation: **generate**, from `artefacts.json` / `pieces.json` / `kings.gd`, with a
-handful of hand-written scenarios kept for genuinely tricky interactions.
+If the count ever grows enough to slow the suite, that is the moment to split the file into
+"swept" and "sandbox-only" sets — not before.
 
-**Runtime is the real constraint.** `test_scenarios.gd` already boots and plays every
-scenario, and the suite takes ~6 minutes today. Adding 235 bot-played scenarios could take it
-past the point where anyone runs it before committing — which would quietly destroy the
-discipline that has caught most of this project's bugs. **Measure the per-scenario cost
-first**, then decide: full sweep nightly, sampled subset per run, or a separate opt-in target.
+## What to build
 
-## Split
+Sandbox entries grouped so the menu stays navigable at 480x800 (the Family menu just needed
+tightening at six entries — a flat list of 200+ will not work):
 
-- **73a — Artefacts (180).** Ready.
-- **73b — pieces (39).** Ready. Cheaper and higher-value per scenario: every piece's movement
-  and promotion path exercised in a real run.
-- **73c — Kings (16).** **Blocked** — Kings have no mechanics yet (Powers/Abilities are the
-  next design session). Nothing to test until they exist.
+- **Per Artefact** — board + the Artefact held, set up so its effect can actually fire.
+  Generating these from `artefacts.json` is still the sane approach for coverage, but they
+  are for *playing*, so a generated stub that never triggers the effect is worthless. Prefer
+  a smaller set of genuinely useful setups over 180 mechanical ones.
+- **Per piece** — a board showing that piece's movement and its promotion chain.
+- **Per King** — **blocked**: Kings have no mechanics yet.
 
 ## Acceptance
 
-- Generated scenarios, seeds pinned, regenerable from the catalogs.
-- **A measured statement of what it does to suite runtime**, and a chosen strategy if it is
-  more than ~2 minutes.
-- `run_all.sh` ALL GREEN (`timeout: 600000`, alone).
+- Entries load from the menu and are playable by hand.
+- The menu remains navigable at 480x800 — grouped/scrollable, not a flat list.
+- Everything still boots under `test_scenarios.gd`'s automatic sweep.
+- `run_all.sh` ALL GREEN, and **report what it did to suite runtime**.
 
 ## Blocked by
 
-- the generate-vs-handwrite call and the runtime strategy (73a/73b)
-- the Kings design session (73c)
+- Kings design (the King set only)

@@ -163,16 +163,16 @@ found. Collected here so they are not lost in Outcome sections:
   marker, not a finding: if it appears again, that is twice, and it earns a proper
   interleaved investigation.
 
-- **Holy Lint's pinned-seed assertion names a specific granted buff**, and that has now
-  churned **twice in two slices**: issue 47 moved it `stun` -> `reflect` (rolling Box
-  contents at boot shifted the RNG stream), and issue 48 moved it `reflect` -> `shield`
-  (a 13th Piece Buff changed `_random_buff_key`'s modulo). Both updates were legitimate and
-  were verified rather than rubber-stamped, but the assertion will keep breaking on any
-  change to buff-pool size or RNG-stream position, and each break is an invitation to
-  "update the expected value until it passes" — which is how a real regression gets buried.
-  The behaviour under test is *"Holy Lint grants exactly one Piece Buff"*; the specific key
-  is incidental. Reshaping it to assert `size() == 1` plus membership of the safe
-  non-self-triggering set would keep all its value and stop the churn. Cheap, not urgent.
+- ~~**Holy Lint's pinned-seed assertion names a specific granted buff**~~ — fixed 2026-08-31.
+  It churned **twice** (`stun` -> `reflect` when issue 47 moved the RNG stream by rolling Box
+  contents at boot; `reflect` -> `shield` when issue 48 added a 13th Piece Buff and changed
+  `_random_buff_key`'s modulo). Each update was verified rather than rubber-stamped, but every
+  break was an invitation to "update the expected value until it passes" — which is how a real
+  regression gets buried inside a rename.
+  Now asserts the **behaviour**: exactly one Buff granted, and not one of the self-triggering
+  hazards (`bomb`/`trap`/`multicapture`) that would resolve during the very capture that
+  granted it. Immune to stream shifts and pool-size changes by construction — and it now
+  *enforces* the hazard check that was previously only a comment a human had to re-read.
 - ~~**The click probes carry a load-sensitive stall.**~~ Fixed 2026-08-30
   (`fix/click-probe-stall`). Worth keeping for the mechanism, which nobody would guess:
   `game.gd` freezes the enemy turn **indefinitely** while `backgrounded` is set

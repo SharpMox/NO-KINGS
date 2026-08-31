@@ -4,6 +4,7 @@ extends Control
 
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
+const PixelFilter := preload("res://scripts/pixel_filter.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
@@ -30,14 +31,11 @@ func _ready() -> void:
 	# again, while the menus are flat vector UI and are where the retro look
 	# actually reads (user call 2026-08-31). --pixel <n> overrides the factor so
 	# a screenshot can compare; --pixel 0 turns it off entirely.
-	var pf := preload("res://scripts/pixel_filter.gd").new()
+	var pf := PixelFilter.new()
 	add_child(pf)
 	var override := pf.factor_from_args(OS.get_cmdline_user_args())
-	# Default OFF pending the user's look at the screenshots: on flat vector UI
-	# the effect mostly just roughens text edges — there is no art here to
-	# pixelate, so it removes font smoothing rather than adding a retro look.
-	# Flip this default to 2.0-3.0 if that reads as wanted.
-	pf.set_factor(override if OS.get_cmdline_user_args().has("--pixel") else 0.0)
+	pf.set_factor(override if OS.get_cmdline_user_args().has("--pixel")
+		else PixelFilter.MENU_FACTOR)
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
 	Settings.apply(Settings.load_settings())

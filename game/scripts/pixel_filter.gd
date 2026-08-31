@@ -14,6 +14,18 @@ extends CanvasLayer
 
 const SHADER := preload("res://shaders/pixelate.gdshader")
 
+## The menu's factor (user call 2026-08-31: 3x reads well on flat UI).
+const MENU_FACTOR := 3.0
+
+## The layer this sits on. ANY ART ADDED TO A FILTERED SCREEN MUST RENDER ABOVE
+## THIS to dodge the filter — a full-screen post-effect quantises everything
+## composited below it, and hand-drawn art distorts rather than stylises. That
+## is why the in-game board is not filtered at all: its UI must sit above the
+## board, so "filter the UI, exempt the art" would need art above the filter
+## and UI below it, which contradicts the visual stacking. If Artefact art
+## later appears in a menu, give it a CanvasLayer above LAYER.
+const LAYER := 128
+
 var rect: ColorRect
 
 
@@ -25,7 +37,7 @@ static func factor_from_args(args: PackedStringArray) -> float:
 
 
 func _ready() -> void:
-	layer = 128 # above the HUD and every modal
+	layer = LAYER
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
 	rect = ColorRect.new()

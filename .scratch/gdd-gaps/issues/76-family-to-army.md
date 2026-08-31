@@ -1,6 +1,6 @@
 # 76 — "Family" -> "Army"; "Family" becomes the word for a piece chain
 
-Status: partial (2026-08-31) — code rename DONE; the chain sense is not
+Status: done (2026-08-31) — both halves
 
 ## Parent
 
@@ -82,7 +82,24 @@ moved.**
   renaming a persisted key is not additive and earns no player-visible gain. `test_save.gd`
   caught the fixture mismatch that created, which is what it is for.
 
-### Still to do — the second half
+### The second half — done 2026-08-31
+
+**"Family" now means a piece chain in the GDD.** Verified directly rather than taken on
+report: **Pieces & Movement** reads *"There are 8 Families"*, and the **Armies** page
+cross-references the new sense (*"a piece chain (Pawn -> Ranger -> Archer is a Family of
+pieces)"*). No page called Families survives, so the two senses cannot be confused.
+
+The agent also reconciled two pages that were not in its brief and turned out to be stale:
+**Army / Queen Choice** (still described 11-piece compositions with no Power and no Ability)
+and **King Powers & Abilities**. Finding those was worth more than the rename itself.
+
+**Not done, and deliberately out of scope:** the reference *site* (`codex.html`,
+`promotion.html`, `graph.html`, `fusion.html`, `inversion.html`) still says "chain" in prose.
+That is public documentation rather than game or design text, its "chain" usage is tangled
+with internal identifiers like `PROMOTION_CHAINS` and CSS comments, and the user's ruling was
+about the game's terminology. Worth a separate decision rather than a silent sweep.
+
+**Superseded note — the original text below is kept for the record:**
 
 **"Family" has not yet been reassigned to mean a piece chain.** `promotions.js`, the codex and
 promotion pages, `guide_text.gd`, and the Notion side (retitle the Armies page; decide whether

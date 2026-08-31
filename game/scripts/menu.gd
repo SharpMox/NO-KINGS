@@ -4,7 +4,6 @@ extends Control
 
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
-const PixelFilter := preload("res://scripts/pixel_filter.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
@@ -26,18 +25,9 @@ var settings_panel: CenterContainer
 
 
 func _ready() -> void:
-	# issue 74: the pixel filter, on the MENU rather than the board — the board's
-	# tokens are already painted pixel art and gain nothing from being quantised
-	# again, while the menus are flat vector UI and are where the retro look
-	# actually reads (user call 2026-08-31). --pixel <n> overrides the factor so
-	# a screenshot can compare; --pixel 0 turns it off entirely.
-	var pf := PixelFilter.new()
-	add_child(pf)
-	var override := pf.factor_from_args(OS.get_cmdline_user_args())
-	pf.set_factor(override if OS.get_cmdline_user_args().has("--pixel")
-		else PixelFilter.MENU_FACTOR)
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
+	# Carries issue 74's hard-edged text as well as the sound setting.
 	Settings.apply(Settings.load_settings())
 	# real boots only — the click probes instantiate the menu by hand and inject
 	# clicks at 480×800 coords, which a mid-probe resize would break

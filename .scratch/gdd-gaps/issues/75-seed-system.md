@@ -1,6 +1,6 @@
 # 75 — Player-facing seeded runs
 
-Status: partial (2026-08-31) — mechanism done, UI half remains
+Status: done (2026-08-31)
 
 ## Parent
 
@@ -78,10 +78,17 @@ Identical to the turn count; a different seed diverges completely.
 `test_seed.gd` asserts **both** directions deliberately — same-seed-reproduces alone would pass
 even if the seed were ignored entirely, since the game would then be deterministic by accident.
 
-### Still to do
+### The UI half, shipped separately
 
-- A **seed field on the new-run screen**, and the seed shown on the **results screen**.
-- **Decide whether to display the build version beside a shared seed.** Seeds are only stable
-  within a build; any content change that shifts how many rolls happen invalidates them
-  (slices 47 and 48 each did this to a pinned-seed test). Without the version, players will
-  report working-as-designed seeds as bugs.
+- **Seed field on the difficulty screen** — the last step before a run starts, so it cannot be
+  lost by backing out of a later step. Empty means random, exactly as before. `focus_mode` is
+  `FOCUS_CLICK` deliberately: a text field that took focus on show would swallow the windowed
+  click probes' keystrokes.
+- **The results screen shows `seed <x> · build <y>`.** The build is there on purpose — a seed
+  only reproduces within the build it was rolled in, since any content change that shifts how
+  many rolls happen moves every downstream result (slices 47 and 48 each did exactly that to a
+  pinned-seed test). Without the version, a seed that stops working after a patch looks like a
+  bug rather than expected behaviour.
+
+  Note `application/config/version` is unset in `project.godot`, so it currently renders
+  "dev". Setting a real version is worth doing before seeds are shared publicly.

@@ -16,6 +16,7 @@ var main_box: VBoxContainer
 var test_scroll: ScrollContainer
 var army_center: ScrollContainer
 var rank_center: CenterContainer
+var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
 var about_center: CenterContainer
@@ -223,9 +224,30 @@ func _ready() -> void:
 	rank_pick.text = "Choose your difficulty"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
+	# issue 75: the seed field. Sits on the LAST screen before a run starts, so
+	# it is the final thing set and cannot be lost by backing out of a later
+	# step. Empty = a fresh random seed, exactly as before.
+	var seed_row := VBoxContainer.new()
+	seed_row.add_theme_constant_override("separation", 2)
+	var seed_label := Label.new()
+	seed_label.text = "SEED — leave blank for random"
+	seed_label.add_theme_font_size_override("font_size", 11)
+	seed_label.modulate = Color(1, 1, 1, 0.55)
+	seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	seed_row.add_child(seed_label)
+	seed_field = LineEdit.new()
+	seed_field.placeholder_text = "any word or number"
+	seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	seed_field.custom_minimum_size = Vector2(240, 0)
+	# must NOT take focus on show — the windowed click probes drive real input,
+	# and a focused text field would swallow their keystrokes
+	seed_field.focus_mode = Control.FOCUS_CLICK
+	seed_row.add_child(seed_field)
+	rank_box.add_child(seed_row)
 	for tier_name in Tuning.TIERS:
 		_button(rank_box, tier_name, 26, func() -> void:
 			GameScript.next_tier = tier_name
+			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
 			GameScript.next_config = {}
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))

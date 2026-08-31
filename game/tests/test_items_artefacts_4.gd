@@ -55,13 +55,17 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 func _init() -> void:
 	# --- issue 21: echo and meta-triggers (ArtefactHooks._run_meta_triggers) ---
 
-	# Polybius Cartridge: a Capture Artefact (Greed) triggers one extra time
+	# Polybius Cartridge: a Capture Artefact (Library of Alexandria Matchbox —
+	# issue 69 repointed the "greed"/"score" game-native fixtures used here to
+	# catalog equivalents; the Matchbox's "+1 Gold and +10 Score per piece in
+	# your Stock" is a literal flat +10 per copy with 1 Stock piece, the same
+	# arithmetic "greed" used) triggers one extra time
 	var poly := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "polybius-cartridge"]})
+		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "polybius-cartridge"]})
 	await process_frame
 	var poly_base: int = poly.defs.pawn.value
 	check(Economy.capture_score(poly, "pawn") == poly_base + 20,
-		"Polybius Cartridge: a Capture Artefact (Greed) triggers an extra time (+10 twice)")
+		"Polybius Cartridge: a Capture Artefact (Library of Alexandria Matchbox) triggers an extra time (+10 twice)")
 	poly.queue_free()
 	await process_frame
 
@@ -93,86 +97,104 @@ func _init() -> void:
 	diary.queue_free()
 	await process_frame
 
-	# CERN Ctrl+Z Shortcut: a key held 2+ times (two Greeds) gets ONE flat
-	# extra trigger, not one per duplicate; a singly-held key gets none
+	# CERN Ctrl+Z Shortcut: a key held 2+ times (two held Matchboxes) gets ONE
+	# flat extra trigger, not one per duplicate; a singly-held key gets none
 	var cern := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "greed", "cern-ctrl-z-shortcut"]})
+		"wave": 3, "stock": ["pawn"],
+		"artefacts": ["library-of-alexandria-matchbox", "library-of-alexandria-matchbox", "cern-ctrl-z-shortcut"]})
 	await process_frame
 	var cern_base: int = cern.defs.pawn.value
 	check(Economy.capture_score(cern, "pawn") == cern_base + 30,
-		"CERN Ctrl+Z Shortcut: two held Greeds (a duplicate) get one flat extra trigger (+10x3, not +10x4)")
+		"CERN Ctrl+Z Shortcut: two held Matchboxes (a duplicate) get one flat extra trigger (+10x3, not +10x4)")
 	cern.queue_free()
 	await process_frame
 
 	var cern_single := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["score", "cern-ctrl-z-shortcut"]})
+		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "cern-ctrl-z-shortcut"]})
 	await process_frame
 	var cern_single_base: int = cern_single.defs.pawn.value
 	check(Economy.capture_score(cern_single, "pawn") == cern_single_base + 10,
-		"CERN Ctrl+Z Shortcut: a singly-held Artefact (Score) gets no extra trigger")
+		"CERN Ctrl+Z Shortcut: a singly-held Artefact (Matchbox) gets no extra trigger")
 	cern_single.queue_free()
 	await process_frame
 
 	# Bilderberg Hotel Slippers: +15 Gold only when 2+ Artefacts actually
-	# fired this call — "fired", not "held" (Score alone never triggers it)
+	# fired this call — "fired", not "held". Voynich Dictionary ("double
+	# Score and Gold on your first Capture each Wave") is the active
+	# contributor here (pure ctx.pts, no gold side effect of its own, so
+	# Bilderberg's own +15 Gold stays exactly isolated); the Matchbox is held
+	# with no Stock piece so it fires (counts toward "2 Artefacts triggered")
+	# but contributes nothing, same inert-bystander role "Score" played before
+	# issue 69 repointed this fixture off the removed game-native keys.
 	var bilder := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 0, "artefacts": ["greed", "score", "bilderberg-hotel-slippers"]})
+		"wave": 3, "gold": 0,
+		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "bilderberg-hotel-slippers"]})
 	await process_frame
 	var bilder_base: int = bilder.defs.pawn.value
 	var bilder_pts := Economy.capture_score(bilder, "pawn")
-	check(bilder_pts == bilder_base + 20 and bilder.gold == 15,
-		"Bilderberg Hotel Slippers: +15 Gold when 2+ of your Artefacts (Greed+Score) trigger on the same event")
+	check(bilder_pts == bilder_base * 2 and bilder.gold == 15,
+		"Bilderberg Hotel Slippers: +15 Gold when 2+ of your Artefacts trigger on the same event")
 	bilder.queue_free()
 	await process_frame
 
 	var bilder_one := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 0, "artefacts": ["score", "bilderberg-hotel-slippers"]})
+		"wave": 3, "gold": 0, "artefacts": ["library-of-alexandria-matchbox", "bilderberg-hotel-slippers"]})
 	await process_frame
-	Economy.capture_score(bilder_one, "queen") # only Score fires (Greed isn't held)
+	Economy.capture_score(bilder_one, "queen") # only the Matchbox fires (its only other Artefact isn't held)
 	check(bilder_one.gold == 0, "Bilderberg Hotel Slippers: no bonus when only one Artefact triggers")
 	bilder_one.queue_free()
 	await process_frame
 
 	# Illuminati: NWO Booster Pack: +2 Gold/+20 Score per Capture Artefact
-	# trigger this call, scaling with how many actually fired
+	# trigger this call, scaling with how many actually fired. Voynich
+	# Dictionary is the active fired key (0 gold side effect of its own, so
+	# NWO's own +2/+20 stays exactly isolated).
 	var nwo := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 0, "score": 0, "artefacts": ["greed", "illuminati-nwo-booster-pack"]})
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["voynich-dictionary", "illuminati-nwo-booster-pack"]})
 	await process_frame
 	var nwo_base: int = nwo.defs.pawn.value
 	var nwo_pts := Economy.capture_score(nwo, "pawn")
-	check(nwo_pts == nwo_base + 10 and nwo.gold == 2 and nwo.score == 200, # issue 57: x10
-		"Illuminati: NWO Booster Pack: +2 Gold/+20 Score when one Capture Artefact triggers (Greed)")
+	check(nwo_pts == nwo_base * 2 and nwo.gold == 2 and nwo.score == 200, # issue 57: x10
+		"Illuminati: NWO Booster Pack: +2 Gold/+20 Score when one Capture Artefact triggers (Voynich Dictionary)")
 	nwo.queue_free()
 	await process_frame
 
 	var nwo2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 0, "score": 0, "artefacts": ["greed", "score", "illuminati-nwo-booster-pack"]})
+		"wave": 3, "gold": 0, "score": 0,
+		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "illuminati-nwo-booster-pack"]})
 	await process_frame
-	Economy.capture_score(nwo2, "pawn") # Greed + Score both fire on_capture: 2 triggers
+	Economy.capture_score(nwo2, "pawn") # Voynich + Matchbox both fire on_capture: 2 triggers
 	check(nwo2.gold == 4 and nwo2.score == 400, # issue 57: x10
 		"Illuminati: NWO Booster Pack: scales with the number of Capture Artefact triggers (2 -> double)")
 	nwo2.queue_free()
 	await process_frame
 
 	# 100% Genuine Original Mona Lisa: only the Turn's FIRST Artefact trigger
-	# (any hook) is echoed, including a fresh echo when the enemy Turn begins
+	# (any hook) is echoed, including a fresh echo when the enemy Turn begins.
+	# Voynich Dictionary (issue 69 repoint of "greed") only actually adds
+	# anything on the Wave's FIRST Capture (its own condition), so the
+	# formula below is "*3"/no bonus rather than the old flat "+20"/"+10" —
+	# probed directly against the real dispatch count, not guessed: main (1)
+	# + Mona's echo of that same first-trigger entry (1) = 2 extra dispatches
+	# of +mona_base on top of the initial ctx.pts == mona_base.
 	var mona := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "100-genuine-original-mona-lisa"]})
+		"wave": 3, "artefacts": ["voynich-dictionary", "100-genuine-original-mona-lisa"]})
 	await process_frame
 	var mona_base: int = mona.defs.pawn.value
-	check(Economy.capture_score(mona, "pawn") == mona_base + 20,
-		"100% Genuine Original Mona Lisa: the first Artefact trigger of the Turn (Greed) is echoed")
-	check(Economy.capture_score(mona, "pawn") == mona_base + 10,
-		"100% Genuine Original Mona Lisa: only the FIRST trigger of the Turn echoes, not every later one")
+	check(Economy.capture_score(mona, "pawn") == mona_base * 3,
+		"100% Genuine Original Mona Lisa: the first Artefact trigger of the Turn (Voynich Dictionary) is echoed")
+	check(Economy.capture_score(mona, "pawn") == mona_base,
+		"100% Genuine Original Mona Lisa: only the FIRST trigger of the Turn echoes, not every later one " +
+		"— Voynich's own condition (first Capture of the WAVE) is also long past by this second call")
 	mona.queue_free()
 	await process_frame
 
 	var mona_enemy := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 2, 5]],
 		"wave": 4, "gold": 0,
-		"artefacts": ["greed", "d-b-cooper-s-parachute", "100-genuine-original-mona-lisa"]})
+		"artefacts": ["voynich-dictionary", "d-b-cooper-s-parachute", "100-genuine-original-mona-lisa"]})
 	await process_frame
 	var mona_enemy_val: int = mona_enemy.defs.pawn.value
-	Economy.capture_score(mona_enemy, "pawn") # consumes this player Turn's echo via Greed
+	Economy.capture_score(mona_enemy, "pawn") # consumes this player Turn's echo via Voynich Dictionary
 	await mona_enemy._run_enemy_actions() # on_enemy_turn_start resets the flag for a fresh echo
 	check(mona_enemy.gold == 2 * roundi(mona_enemy_val * 0.75),
 		"100% Genuine Original Mona Lisa: on_enemy_turn_start resets the echo — the enemy Turn " +
@@ -212,25 +234,28 @@ func _init() -> void:
 	# on_capture) plus a percentage Artefact (Tinfoil Hat) on the resulting
 	# gain — must be a single deterministic bounded number, not an infinite
 	# loop, and identical regardless of REGISTRY-array insertion order.
-	# Held: Greed x2 (the Capture Artefact being echoed, also CERN's
-	# duplicate) + Polybius (+1 extra trigger PER fired Greed = +2) + CERN
-	# (+1 flat extra trigger for the duplicated key = +1) -> 5 total Greed
-	# dispatches (2 main + 2 Polybius + 1 CERN), pts = base + 50. Then
-	# Tinfoil Hat's +15%/-5% applies once, off that same immutable base.
+	# Held: Voynich Dictionary x2 (issue 69 repoint of "greed" — the Capture
+	# Artefact being echoed, also CERN's duplicate) + Polybius (+1 extra
+	# trigger PER fired Voynich = +2) + CERN (+1 flat extra trigger for the
+	# duplicated key = +1) -> 5 total Voynich dispatches (2 main + 2 Polybius
+	# + 1 CERN), each adding +risky_base (Voynich's own "double Score" is a
+	# +base add, not the old keys' literal +10), on top of the initial
+	# ctx.pts == risky_base -> pts = risky_base * 6. Then Tinfoil Hat's
+	# +15%/-5% applies once, off that same immutable base.
 	var order_1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0,
-		"artefacts": ["greed", "greed", "polybius-cartridge", "cern-ctrl-z-shortcut", "tinfoil-hat"]})
+		"artefacts": ["voynich-dictionary", "voynich-dictionary", "polybius-cartridge", "cern-ctrl-z-shortcut", "tinfoil-hat"]})
 	await process_frame
 	var order_2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0,
-		"artefacts": ["tinfoil-hat", "greed", "cern-ctrl-z-shortcut", "greed", "polybius-cartridge"]})
+		"artefacts": ["tinfoil-hat", "voynich-dictionary", "cern-ctrl-z-shortcut", "voynich-dictionary", "polybius-cartridge"]})
 	await process_frame
 	var risky_base: int = order_1.defs.pawn.value
 	var pts_1 := Economy.capture_score(order_1, "pawn")
 	var pts_2 := Economy.capture_score(order_2, "pawn")
-	check(pts_1 == risky_base + 50 and pts_2 == risky_base + 50,
+	check(pts_1 == risky_base * 6 and pts_2 == risky_base * 6,
 		"two echo Artefacts stacked on the same Capture Artefact stay bounded at a fixed, computed " +
-		"total (2 main + 2 Polybius + 1 CERN = 5 Greed dispatches), not a hang and not runaway growth")
+		"total (2 main + 2 Polybius + 1 CERN = 5 Voynich dispatches), not a hang and not runaway growth")
 	check(pts_1 == pts_2, "the same held keys in a different acquisition order give the same result")
 	Economy.earn(order_1, pts_1)
 	Economy.earn(order_2, pts_2)
@@ -1087,38 +1112,41 @@ func _init() -> void:
 	await process_frame
 
 	# Ecdysis Sheddings: inert before any purchase, then mirrors the last
-	# OTHER Artefact bought as a genuine second copy (Greed: +10 per Capture).
+	# OTHER Artefact bought as a genuine second copy (Library of Alexandria
+	# Matchbox: +10 per Capture with 1 Stock piece — issue 69 repoint of
+	# "greed", which is no longer a real catalog key the Shop can even grant).
 	var ecdy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 9999, "artefacts": ["ecdysis-sheddings"]})
+		"wave": 3, "gold": 9999, "stock": ["pawn"], "artefacts": ["ecdysis-sheddings"]})
 	await process_frame
 	check(ecdy.ecdysis_copy_key == "", "Ecdysis Sheddings: inert (no copy key) before anything is bought")
 	var ecdy_base: int = ecdy.defs.pawn.value
 	check(Economy.capture_score(ecdy, "pawn") == ecdy_base,
 		"Ecdysis Sheddings: copies nothing before any purchase — a plain Capture is unaffected")
 	ecdy.actions_left = 5
-	ecdy.shop_stock.append({"kind": "artefact", "key": "greed", "sold": false})
+	ecdy.shop_stock.append({"kind": "artefact", "key": "library-of-alexandria-matchbox", "sold": false})
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
-	check(ecdy.ecdysis_copy_key == "greed", "Ecdysis Sheddings: records the last Artefact bought (Greed)")
+	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
+		"Ecdysis Sheddings: records the last Artefact bought (Library of Alexandria Matchbox)")
 	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 20,
-		"Ecdysis Sheddings: mirrors the bought Greed as a second copy (+10 real, +10 mirrored = +20)")
+		"Ecdysis Sheddings: mirrors the bought Matchbox as a second copy (+10 real, +10 mirrored = +20)")
 	# Buying a SECOND Ecdysis must not overwrite the copy key with its own —
 	# "other" excludes it — or two copies would chase each other.
 	ecdy.actions_left = 5
 	ecdy.shop_stock.append({"kind": "artefact", "key": "ecdysis-sheddings", "sold": false})
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
-	check(ecdy.ecdysis_copy_key == "greed",
+	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
 		"Ecdysis Sheddings: buying ANOTHER Ecdysis does not overwrite the copied key")
 	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 30,
-		"Ecdysis Sheddings: two held copies each independently mirror Greed (+10 real + 10 + 10 " +
+		"Ecdysis Sheddings: two held copies each independently mirror the Matchbox (+10 real + 10 + 10 " +
 		"= +30) — bounded, no chase")
 	check(ecdy.artefact_echo_depth == 0,
 		"Ecdysis Sheddings: the echo-depth guard is back at 0 after dispatch (no leak)")
 	# issue 60: Ecdysis Sheddings copies g.ecdysis_copy_key, never a held
 	# entry — it must not consume an Artefact-cap slot beyond its own held
-	# copy. 3 real acquisitions happened above (the starting Ecdysis, Greed,
-	# a second Ecdysis) and the mirrored Greed effect added none.
+	# copy. 3 real acquisitions happened above (the starting Ecdysis, the
+	# Matchbox, a second Ecdysis) and the mirrored Matchbox effect added none.
 	check(ecdy.artefacts.size() == 3,
-		"Ecdysis Sheddings: mirroring Greed's effect never appends a phantom entry to g.artefacts")
+		"Ecdysis Sheddings: mirroring the Matchbox's effect never appends a phantom entry to g.artefacts")
 	ecdy.queue_free()
 	await process_frame
 
@@ -1127,12 +1155,12 @@ func _init() -> void:
 	var ecdy_box := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["ecdysis-sheddings"]})
 	await process_frame
-	var score_catalog: Dictionary
+	var box_catalog: Dictionary
 	for t in Items.ARTEFACT_EFFECTS:
-		if t.key == "score":
-			score_catalog = t
+		if t.key == "library-of-alexandria-matchbox":
+			box_catalog = t
 			break
-	ecdy_box._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": score_catalog})
+	ecdy_box._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": box_catalog})
 	check(ecdy_box.ecdysis_copy_key == "",
 		"Ecdysis Sheddings: a Box-granted Artefact does not set the copied key")
 	ecdy_box.queue_free()

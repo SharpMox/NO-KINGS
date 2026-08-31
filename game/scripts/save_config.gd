@@ -15,9 +15,14 @@
 ##
 ##   MIGRATING — a field whose MEANING or SHAPE changed, so an old value would
 ##   be silently misread. That needs a bump plus an entry in `_MIGRATIONS`,
-##   because a default cannot repair it. There are none yet; the table is here
-##   so the first one has an obvious home rather than becoming another ad-hoc
-##   guard scattered through apply().
+##   because a default cannot repair it. The table's first entry (1 -> 2,
+##   issue 69) is exactly this: removing the 7 game-native core Artefacts
+##   (first_capture_extra/greed/move/lifesteal/score/timer/bounty) is NOT
+##   additive — a v1 save can hold copies of those keys in `artefacts`, which
+##   would load as held effects with no REGISTRY/dispatch entry: inert
+##   entries silently occupying Artefact-cap slots (base 5, see
+##   artefact_hooks.gd's cap()). A default can't repair that; the entries
+##   have to be filtered out.
 ##
 ## The distinction matters: an additive field that is read with a default is
 ## safe forever, but a reshaped field read with a default is a silent
@@ -32,21 +37,42 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 ## Bumped ONLY for a migrating change (see the header). Additive fields do not
 ## bump it.
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 
-## version -> Callable(cfg) that reshapes a save of that version into the next
-## one. Applied in order, so a v0 save walks every step up to SAVE_VERSION.
-## Empty on purpose: nothing has needed reshaping yet.
-const _MIGRATIONS := {}
+## issue 69: the 7 game-native core Artefacts, removed — see items.gd's
+## header (the old ARTEFACT_EFFECTS_CORE) and .scratch/gdd-gaps/issues/69.
+const _REMOVED_ARTEFACT_KEYS_69 := [
+	"first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty",
+]
+
+## 1 -> 2 (issue 69): drop any held copy of a removed core Artefact key from
+## `artefacts`, and clear `ecdysis_copy_key` if it names one — an un-migrated
+## save would otherwise load the removed key as a held effect with no
+## REGISTRY/dispatch entry (inert, but still occupying an Artefact-cap slot),
+## or have Ecdysis Sheddings mirror a key nothing dispatches. Handles both
+## `artefacts` entry shapes apply() already reads (a bare key String, or a
+## `{key, acquired_wave, rarity}` Dictionary).
+static func _migrate_1_to_2(cfg: Dictionary) -> Dictionary:
+	var kept := []
+	for entry in cfg.get("artefacts", []):
+		var key: String = entry if entry is String else str(entry.key)
+		if not _REMOVED_ARTEFACT_KEYS_69.has(key):
+			kept.append(entry)
+	cfg.artefacts = kept
+	if _REMOVED_ARTEFACT_KEYS_69.has(str(cfg.get("ecdysis_copy_key", ""))):
+		cfg.ecdysis_copy_key = ""
+	return cfg
 
 
-## Walk a loaded config up to SAVE_VERSION. A config with no `save_version` is
-## version 0 — every save written before the field existed.
+## Walk a loaded config up to SAVE_VERSION, one version at a time. A config
+## with no `save_version` is version 0 — every save written before the field
+## existed. Each step that reshapes something gets its own `match` case here;
+## a version with nothing to reshape just falls through untouched.
 static func migrate(cfg: Dictionary) -> Dictionary:
 	var v: int = int(cfg.get("save_version", 0))
 	while v < SAVE_VERSION:
-		if _MIGRATIONS.has(v):
-			cfg = _MIGRATIONS[v].call(cfg)
+		match v:
+			1: cfg = _migrate_1_to_2(cfg)
 		v += 1
 	cfg["save_version"] = SAVE_VERSION
 	return cfg

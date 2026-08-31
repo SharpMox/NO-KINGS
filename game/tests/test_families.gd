@@ -115,16 +115,23 @@ func _init() -> void:
 	crown_merge.queue_free()
 	await process_frame
 
-	# --- Power: Blood in the Air (Wild Hunt) stacks ADDITIVELY with the core
-	# first_capture_extra Artefact — two refunds, not deduped (issue 67) ---
+	# --- Power: Blood in the Air (Wild Hunt) stacks ADDITIVELY with an
+	# Action-refund Artefact — two refunds, not deduped (issue 67). Repointed
+	# (issue 69) at Stargate Divination Crystal after the original
+	# first_capture_extra core Artefact was removed: same "first Capture of
+	# the Turn refunds its Action" shape, so the invariant this test proves
+	# — Families.blood_in_the_air's own independent check at the same
+	# capture_score call site (economy.gd) stacks rather than dedupes with a
+	# REGISTRY-dispatched Artefact doing the identical thing — survives
+	# unchanged. ---
 	var blood := _boot({"army": "Wild Hunt", "wave": 1,
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3]],
-		"artefacts": ["first_capture_extra"]})
+		"artefacts": ["stargate-divination-crystal"]})
 	await process_frame
 	var actions_max_before: int = blood.actions_max
 	blood._move_player(Vector2i(2, 2), Vector2i(2, 3)) # the Turn's first action: a capture
 	check(blood.actions_max == actions_max_before + 2,
-		"Blood in the Air + first_capture_extra: BOTH refund the Turn's first capture " +
+		"Blood in the Air + Stargate Divination Crystal: BOTH refund the Turn's first capture " +
 		"(actions_max %d -> %d, +2 not +1 — the standing 'big interactions stay' rule)"
 		% [actions_max_before, blood.actions_max])
 	blood.queue_free()

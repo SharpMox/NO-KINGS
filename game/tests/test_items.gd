@@ -129,7 +129,7 @@ func _init() -> void:
 	# survives; destruction is not capture (CONTEXT.md: Destruction)
 	var ds := _boot({"board": [["queen", 0, 0, 1], ["pawn", 1, 3, 5], ["bishop", 1, 2, 4],
 		["pawn", 0, 4, 6], ["king", 1, 3, 4], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "score"], "score": 100})
+		"wave": 3, "artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox"], "score": 100})
 	await process_frame
 	ds.gold = 100
 	ds.items.append(_item("drone_strike", "area"))
@@ -291,10 +291,12 @@ func _init() -> void:
 	var ac := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	for i in 5:
-		check(ArtefactHooks.grant(ac, {"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}),
+		check(ArtefactHooks.grant(ac, {"key": "library-of-alexandria-matchbox", "name": "Library of Alexandria Matchbox",
+				"rarity": "Rare", "description": "On Capture: +1 Gold and +10 Score per piece in your Stock."}),
 			"Artefact %d/5 lands under the base cap" % (i + 1))
 	check(ac.artefacts.size() == 5, "base Artefact capacity is 5")
-	check(not ArtefactHooks.grant(ac, {"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}),
+	check(not ArtefactHooks.grant(ac, {"key": "library-of-alexandria-matchbox", "name": "Library of Alexandria Matchbox",
+			"rarity": "Rare", "description": "On Capture: +1 Gold and +10 Score per piece in your Stock."}),
 		"a 6th Artefact is refused at the cap of 5 — the cap genuinely binds")
 	check(ac.artefacts.size() == 5, "the refused grant did not land")
 	ac.queue_free()
@@ -307,8 +309,9 @@ func _init() -> void:
 	ash.state = ash.State.PLAYER_TURN
 	ash.actions_left = 2
 	for i in 5:
-		ash.artefacts.append({"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."}) # at the cap already
-	var artefact_slot := {"kind": "artefact", "key": "score", "sold": false}
+		ash.artefacts.append({"key": "library-of-alexandria-matchbox", "name": "Library of Alexandria Matchbox",
+			"rarity": "Rare", "description": "On Capture: +1 Gold and +10 Score per piece in your Stock."}) # at the cap already
+	var artefact_slot := {"kind": "artefact", "key": "voynich-dictionary", "sold": false}
 	ash.shop_stock = [artefact_slot]
 	check(not Shop.can_buy(ash, artefact_slot), "a full Artefact inventory can't buy an Artefact slot")
 	ash.queue_free()
@@ -320,8 +323,10 @@ func _init() -> void:
 	var abx := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	for i in 5:
-		abx.artefacts.append({"key": "greed", "name": "Greed", "rarity": "", "description": "+100 score per Pawn captured."})
-	var artefact_payload := {"key": "score", "name": "Score", "description": "+100 score on every capture."}
+		abx.artefacts.append({"key": "library-of-alexandria-matchbox", "name": "Library of Alexandria Matchbox",
+			"rarity": "Rare", "description": "On Capture: +1 Gold and +10 Score per piece in your Stock."})
+	var artefact_payload := {"key": "voynich-dictionary", "name": "Voynich Dictionary",
+		"description": "On your first Capture each Wave: double Score and Gold."}
 	abx._box_choose({"kind": "artefact", "name": "x", "description": "x", "payload": artefact_payload})
 	check(abx.artefacts.size() == 5,
 		"a Box-picked Artefact is refused at the cap of 5, same as a full Item pick")

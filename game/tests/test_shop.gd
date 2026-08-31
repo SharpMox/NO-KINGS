@@ -135,7 +135,8 @@ func _init() -> void:
 	check(Shop.rarity_of({"kind": "piece", "key": "pawn"}) == "",
 		"pieces carry no rarity")
 	check(Shop.rarity_of({"kind": "artefact", "key": "greed"}) == "",
-		"the 7 core artefacts predate the rarity catalog")
+		"an unrecognized artefact key falls back to no rarity — \"greed\" is a stand-in for " +
+		"one of the 7 game-native keys issue 69 removed, briefly reachable in an un-migrated old save")
 	var rated := Items.ARTEFACT_CATALOG.filter(func(e: Dictionary) -> bool:
 		return e.get("implemented", false))
 	if not rated.is_empty():
@@ -366,7 +367,7 @@ func _init() -> void:
 		"wave": 3, "artefacts": ["hollow-moon-cross-section", "shrinkflation-cereal-box"], "gold": 500})
 	await process_frame
 
-	var artefact_slot := {"kind": "artefact", "key": "greed", "sold": false} # core key: rarity ""
+	var artefact_slot := {"kind": "artefact", "key": "greed", "sold": false} # unrecognized key (issue 69): rarity ""
 	var artefact_price := Shop.price(priced, artefact_slot)
 	# base 50 ("" rarity), -25% (Hollow Moon) +50% (Shrinkflation) = +25% additive net
 	check(artefact_price == roundi(Tuning.SHOP_ARTEFACT_PRICE[""] * 1.25),
@@ -403,9 +404,9 @@ func _init() -> void:
 	check(sl.items.is_empty() and sl.gold == gold_before_item + floori(Tuning.SHOP_ITEM_PRICE["Tactical"] * Tuning.SELL_RATE),
 		"selling an Item removes it and pays its own sell price")
 
-	sl.artefacts.append({"key": "greed", "name": "Greed", "rarity": ""})
+	sl.artefacts.append({"key": "greed", "name": "Greed", "rarity": ""}) # unrecognized key (issue 69)
 	check(Shop.sell_price(sl, "artefact", sl.artefacts[0]) == floori(Tuning.SHOP_ARTEFACT_PRICE[""] * Tuning.SELL_RATE),
-		"a core (\"\" rarity) Artefact sells at the Common rate, floored")
+		"a no-rarity (\"\") Artefact sells at the Common rate, floored")
 	var gold_before_art: int = sl.gold
 	sl._sell("artefact", sl.artefacts[0])
 	check(sl.artefacts.is_empty() and sl.gold == gold_before_art + floori(Tuning.SHOP_ARTEFACT_PRICE[""] * Tuning.SELL_RATE),

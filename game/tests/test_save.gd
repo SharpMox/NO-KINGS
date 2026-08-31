@@ -38,7 +38,10 @@ func _init() -> void:
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1, "buff"], ["rook", 1, 4, 10]],
 		"stock": ["pawn", {"id": "ferz", "buff": true}],
 		"captured": ["knight", "knight", "bishop"],
-		"items": ["blitz", "sniper"], "artefacts": ["greed", "greed", "move"],
+		"items": ["blitz", "sniper"],
+		# issue 69 repointed "greed"/"move" (removed game-native keys) to
+		# surviving catalog Artefacts of the same held-copy shape.
+		"artefacts": ["voynich-dictionary", "voynich-dictionary", "cia-exploding-cigar"],
 		"tariffs": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
@@ -50,7 +53,7 @@ func _init() -> void:
 				"contents": [{"kind": "item", "name": "Blitz", "tier": "Tactical",
 					"description": "d", "payload": {"key": "blitz"}}]}],
 		"skip_enemy_turns": 1, "tariffs_off": true,
-		"ecdysis_copy_key": "greed", # issue 55
+		"ecdysis_copy_key": "voynich-dictionary", # issue 55
 		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
 		"family_ability_used_this_wave": true, # issue 67
 	}
@@ -194,6 +197,40 @@ func _init() -> void:
 	check(old_save.score == 120 and old_save.gold == 45,
 		"a pre-versioning save still loads with its state intact")
 	old_save.queue_free()
+	await process_frame
+
+	# --- issue 69: v1 -> v2 migration. Removing the 7 game-native core
+	# Artefacts (first_capture_extra/greed/move/lifesteal/score/timer/bounty)
+	# is NOT additive — an old v1 save can hold a removed key in `artefacts`
+	# and/or point `ecdysis_copy_key` at one. Proven two ways: directly
+	# against SaveConfig.migrate() (fails if _MIGRATIONS were emptied back
+	# out, independent of apply()'s own incidental catalog-match filtering
+	# of `artefacts`), and against a live boot's restored state — not
+	# identity, the generic save->load->save check above can't catch this
+	# class of bug (same trap run_capture_count/family_ability_used_this_wave
+	# caught above).
+	var v1_migrate := {"save_version": 1,
+		"artefacts": ["greed", "voynich-dictionary", "move"], "ecdysis_copy_key": "greed"}
+	var migrated: Dictionary = SaveConfig.migrate(v1_migrate.duplicate(true))
+	check(int(migrated.save_version) == SaveConfig.SAVE_VERSION,
+		"issue 69: migrate() walks a v1 save up to the current version")
+	check(migrated.artefacts == ["voynich-dictionary"],
+		"issue 69: migrate() filters the removed core Artefact keys (\"greed\", \"move\") " +
+		"out of a v1 save's held artefacts, leaving the surviving catalog key")
+	check(migrated.ecdysis_copy_key == "",
+		"issue 69: migrate() clears ecdysis_copy_key when it names a removed core Artefact key")
+
+	var v1_boot := {"save_version": 1, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["greed", "voynich-dictionary", "move"], "ecdysis_copy_key": "greed"}
+	var migrated_run := _boot(v1_boot.duplicate(true))
+	await process_frame
+	check(migrated_run.artefacts.size() == 1 and migrated_run.artefacts[0].key == "voynich-dictionary",
+		"issue 69: a v1 save containing \"greed\" loads cleanly with the removed entry gone")
+	check(migrated_run.ecdysis_copy_key == "",
+		"issue 69: a v1 save's ecdysis_copy_key naming a removed core Artefact is cleared on load — " +
+		"apply() copies this field verbatim with no catalog check of its own, so this assertion " +
+		"fails outright if the migration were absent")
+	migrated_run.queue_free()
 	await process_frame
 
 	var stamped: Dictionary = _boot({"board": [["rook", 1, 7, 10]], "wave": 3})._to_config()

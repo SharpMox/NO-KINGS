@@ -157,6 +157,15 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	if rank > 0:
 		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
 	box.add_child(_overlay_label(stats, 19))
+	# issue 75: show the seed so a good run can be replayed or shared. The BUILD
+	# is shown beside it deliberately — a seed only reproduces within the build
+	# it was rolled in, because any content change that shifts how many rolls
+	# happen moves every downstream result (slices 47 and 48 each did exactly
+	# that to a pinned-seed test). Without the version, a seed that stops
+	# working after a patch looks like a bug rather than the expected behaviour.
+	if g.next_seed != "":
+		box.add_child(_overlay_label("seed  %s   ·   build %s"
+			% [g.next_seed, ProjectSettings.get_setting("application/config/version", "dev")], 12))
 	var restart := Button.new()
 	restart.text = "Restart"
 	restart.add_theme_font_size_override("font_size", 26)

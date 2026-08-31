@@ -210,9 +210,11 @@ found. Collected here so they are not lost in Outcome sections:
 
 ## Housekeeping
 
-- **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens
-  that the painted PNGs replaced; it now only produces `king.svg`. Delete it once King
-  art lands, or keep it as the fallback generator and say so in its header.
+- ~~**`tools/generate-piece-art.py` is mostly orphaned.**~~ Resolved 2026-08-31 by taking the
+  second branch the flag itself offered: King art has **not** landed (only `king.svg` exists;
+  `dragon-king-*.png` is a different piece), so the generator stays as the fallback and its
+  header now says so — including the trigger for deleting it later, which is
+  `king-light.png`/`king-dark.png` arriving.
 - ~~**`data/artefacts.js` and `game/data/` have no shared pipeline yet.**~~ Built by slice
   14: `tools/export-game-artefacts.mjs` generates `game/data/artefacts.json` from
   `data/artefacts.js`. The "game hand-writes 7" era is over — those 7 survive as

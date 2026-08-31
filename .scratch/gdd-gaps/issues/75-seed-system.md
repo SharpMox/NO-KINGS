@@ -1,0 +1,62 @@
+# 75 — Player-facing seeded runs
+
+Status: todo — READY · smaller than it looks
+
+## Parent
+
+`.scratch/gdd-gaps/PRD.md`
+
+## The ask
+
+> *"the game's RNG and AI moves will need to be the same in an exactly similar setup. So we
+> can do seeded runs with crazy seeds that give perfect RNG."*
+
+## The hard part is already done — audited, not assumed
+
+Three properties that would each normally be weeks of work, all already true:
+
+1. **Nothing bypasses the run's RNG.** A repo-wide grep for bare `randi()` / `randf()` /
+   `randomize()` / `randi_range()` / `randf_range()` outside `g.rng` returns **nothing**.
+   Every roll — waves, boxes, shop stock, buff grants, artefact procs — goes through the one
+   generator.
+2. **The AI is pure.** `rules.gd` contains no RNG at all. `ai_action` is a deterministic
+   function of the board, so identical state gives an identical move.
+3. **Seed *and* stream position are both saved** (`save_config.gd`: `seed` + `rng_state`), so
+   a resumed run continues the same stream rather than restarting it.
+
+The suite has depended on this daily for weeks: pinned-seed tests assert *which specific buff*
+a roll produces, and when slices 47/48 shifted the stream those assertions moved predictably
+rather than randomly. That is determinism demonstrated in production, not theory.
+
+**So "same seed + same setup -> same run" already holds.** This slice is only the surface.
+
+## What to build
+
+1. **`--seed <value>` CLI flag**, alongside the existing `--army` / `--tier` / `--artefacts`
+   flags in `game.gd`. Trivial, and it makes the rest testable.
+2. **A seed field on the new-run screen.** Empty = random, as today. Accept any string —
+   hash it to an int rather than demanding digits, so "crazy seeds" can be words.
+3. **Show the seed on the results screen**, so a good run can be shared.
+
+## The caveat that must be stated in-game, not just here
+
+**Seeds are only stable within a build.** Any change to how many rolls happen — a new
+Artefact, a reordered draw, a different wave roster — shifts every downstream result. Slices
+47 and 48 each did exactly this to a pinned-seed test.
+
+So a seed shared today will not reproduce after a content patch. That is normal for the genre,
+but if seeds are shareable, **the build version should be displayed next to the seed** or
+players will report "broken seeds" as bugs. Recommend showing `seed @ version`.
+
+## Acceptance
+
+- `--seed` works and is covered by a test: same seed twice -> identical outcome; different
+  seeds -> different. **Assert both directions** — a test that only checks "same seed matches"
+  passes trivially if the seed is ignored entirely and the game is deterministic by accident.
+- The new-run field accepts arbitrary strings; empty stays random.
+- Seed visible on the results screen, with the build version beside it.
+- `run_all.sh` ALL GREEN (`timeout: 600000`, blocking, alone).
+
+## Blocked by
+
+- nothing

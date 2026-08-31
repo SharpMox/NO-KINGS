@@ -1,6 +1,6 @@
 # 69 — Remove the six legacy core Artefacts
 
-Status: todo — SPECCED (user ruling 2026-08-30) · **after 67 lands** · one question open
+Status: todo — SPECCED (user rulings 2026-08-30/31) · ready
 
 ## Parent
 
@@ -15,10 +15,16 @@ Status: todo — SPECCED (user ruling 2026-08-30) · **after 67 lands** · one q
 This completes the original slice-50 principle — *only what the Notion DB describes
 remains* — for six of the seven. The catalog becomes exactly the 180.
 
-**Open question — the seventh.** `bounty` / **"Skip Tracer's Rolodex"** is the same
-category (game-native, not in Notion) but was not in the list the user answered, and it was
-*renamed* only yesterday. Remove it too, or does the rename mean it stays? One word
-settles it; do not remove it without that word.
+**The seventh goes too** (user, 2026-08-31). `bounty` / **"Skip Tracer's Rolodex"**
+(*"+300 score when capturing a piece worth 50+"*) is removed with the rest, so the rule has
+no exceptions: **the catalog is exactly the 180 in Notion.**
+
+Its rename yesterday (issue 50) becomes moot work — noted without regret, since the
+alternative was leaving a name collision standing while the question was open.
+
+So **all seven** of `ARTEFACT_EFFECTS_CORE` go, and the constant itself should disappear
+rather than be left as an empty array. `_build_artefact_effects` collapses to "the catalog
+entries flagged implemented" — which is now all 180.
 
 ## Why this is the first real save-migration customer
 
@@ -57,5 +63,4 @@ These keys are load-bearing and REMOVAL is not additive:
 
 ## Blocked by
 
-- slice 67 (shares fixtures and the stacking test)
-- the Skip Tracer's Rolodex question
+- nothing (slice 67 landed 2026-08-31)

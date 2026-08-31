@@ -1,6 +1,6 @@
 # 73 — A test scenario per Artefact, per piece, per King
 
-Status: todo — SPECCED (user rulings 2026-08-31) · ready
+Status: SPLIT (2026-08-31) — see 79 / 80 / 81 / 82; this file is now the parent spec
 
 ## Parent
 

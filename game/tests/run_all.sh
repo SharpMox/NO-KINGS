@@ -68,7 +68,7 @@ fi
 
 for t in rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
 	items items_tariffs items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
-	box scenarios background tiers intro seed account sync; do
+	box scenarios background tiers intro seed account sync leaderboard; do
 	run "test_$t" --headless -s "tests/test_$t.gd"
 done
 

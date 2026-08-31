@@ -190,6 +190,11 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button(menu, "Scores"), "Scores button clickable")
 	await process_frame
+	# issue 85: the board says WHICH board it is. An unreachable cloud is the
+	# normal case, so it must read as a state rather than look like an error.
+	check(_find_label(menu, "Local scores") != null or _find_label(menu, "Cloud scores") != null,
+		"the Scores screen states whether cloud scores are included")
+	await process_frame
 	check(_find_label(menu, "512") != null, "score list shows the stored run")
 	check(await _click_button(menu, "← Back"), "scores Back clickable")
 	await process_frame

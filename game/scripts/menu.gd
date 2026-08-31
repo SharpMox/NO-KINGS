@@ -85,6 +85,9 @@ func _ready() -> void:
 	# itself: a visible full-rect ScrollContainer eats every click beneath it
 	test_scroll = ScrollContainer.new()
 	test_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	# issue 77: vertical only — a long scenario name must wrap or clip, never
+	# push the list sideways
+	test_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	test_scroll.offset_left = 60
 	test_scroll.offset_top = 30
 	test_scroll.offset_right = -60
@@ -97,13 +100,62 @@ func _ready() -> void:
 	test_scroll.add_child(test_box)
 	var head := Label.new()
 	head.text = "Test scenarios"
-	head.add_theme_font_size_override("font_size", 28)
+	head.add_theme_font_size_override("font_size", 22)
 	test_box.add_child(head)
+	# issue 77: 53 scenarios in one flat column is unscannable. Sections are
+	# DERIVED from the names rather than stored, so scenarios.gd is untouched
+	# and anything added later groups itself by how it is named.
+	#
+	# The cut is at the first ":" OR "(", whichever comes first. Splitting on
+	# ":" alone breaks on names whose colon sits inside parentheses
+	# ("Recurring King (wave 100: ...)" -> a section literally called
+	# "Recurring King (wave 100"). Cutting at "(" too fixes those and folds
+	# "Piece Buffs (Buff Box: ...)" in with the other Piece Buffs entries.
+	#
+	# Sections with a single member collapse into "Other" — without that the
+	# 53 split into 20 sections, 12 of them singletons, which is no more
+	# scannable than the flat list it replaced.
+	var groups := {}
 	for s in Scenarios.all():
-		_button(test_box, s.name, 17, func() -> void:
-			GameScript.next_config = s.cfg
-			GameScript.is_scenario = true # scenarios never autosave
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		var cuts: Array[int] = []
+		for ch in [":", "("]:
+			var at: int = s.name.find(ch)
+			if at > 0:
+				cuts.append(at)
+		cuts.sort()
+		var sec: String = s.name.substr(0, cuts[0]).strip_edges() if not cuts.is_empty() else "General"
+		if not groups.has(sec):
+			groups[sec] = []
+		groups[sec].append(s)
+	var singles := []
+	for sec in groups:
+		if groups[sec].size() == 1:
+			singles.append(sec)
+	for sec in singles:
+		if not groups.has("Other"):
+			groups["Other"] = []
+		groups["Other"].append(groups[sec][0])
+		groups.erase(sec)
+	var ordered := groups.keys()
+	ordered.sort_custom(func(a: String, b: String) -> bool:
+		# biggest first, "Other" always last however big it gets
+		if a == "Other":
+			return false
+		if b == "Other":
+			return true
+		return groups[a].size() > groups[b].size())
+	for sec in ordered:
+		var sec_head := Label.new()
+		sec_head.text = "%s  (%d)" % [sec.to_upper(), groups[sec].size()]
+		sec_head.add_theme_font_size_override("font_size", 11)
+		sec_head.modulate = Color(1, 1, 1, 0.55) # same dimmed-header idiom the
+			# inventory drawer's Activate section uses
+		test_box.add_child(sec_head)
+		for s in groups[sec]:
+			_button(test_box, s.name, 15, func() -> void:
+				GameScript.next_config = s.cfg
+				GameScript.is_scenario = true # scenarios never autosave
+				get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)

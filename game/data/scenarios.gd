@@ -290,6 +290,114 @@ static func _hand_written() -> Array:
 				["inv-kirin-plus", 0, 6, 0], ["inv-kirin-plus-plus", 0, 0, 0],
 				["pawn", 1, 3, 10], ["rook", 1, 5, 10]],
 			"captured": ["ferz", "rook", "wazir", "bishop"], "score": 500}},
+		# --- issue 81: hand-built combo boards ---
+		# Named for the QUESTION each answers, not for the Artefact it holds.
+		# These are the boards a generator cannot produce, because the point is
+		# an interaction rather than a trigger: every one settles something this
+		# backlog has actually argued about, so it can be re-settled in seconds
+		# instead of by reading dispatch code.
+		{"name": "Combo: does an Item grant refuse cleanly at the cap of 3?", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
+			"items": ["blitz", "shield", "promote"], "wave": 9, "gold": 400, "score": 1000}},
+		{"name": "Combo: does the Shop refuse to sell a 6th Artefact?", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"artefacts": ["jet-fuel-vial", "denver-bunker-timeshare", "tape-eraser-magnet",
+				"deep-state-yearbook", "mao-s-loyalty-badge"],
+			"wave": 9, "gold": 900, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo: does a Piece Buff grant float \"Buffs full\" at the cap of 2?", "cfg": {
+			# Bible grants Shield on EVERY capture by these three ids, so the
+			# cap is reached within a couple of moves rather than engineered
+			"board": [["bishop", 0, 2, 2], ["archbishop", 0, 5, 2],
+				["pawn", 1, 3, 3], ["pawn", 1, 4, 3], ["pawn", 1, 2, 4], ["pawn", 1, 5, 4]],
+			"artefacts": ["bible-gag-reel-scroll"], "score": 1000, "gold": 200}},
+		{"name": "Combo: Bible fires for all three chain ids and no other piece", "cfg": {
+			"board": [["bishop", 0, 1, 2], ["dragon-horse", 0, 3, 2], ["archbishop", 0, 5, 2],
+				["rook", 0, 7, 2],
+				["pawn", 1, 2, 3], ["pawn", 1, 4, 3], ["pawn", 1, 6, 3], ["pawn", 1, 7, 3]],
+			"artefacts": ["bible-gag-reel-scroll"], "score": 1000, "gold": 200}},
+		{"name": "Combo: is the Deep State Yearbook buy/sell loop really a net loss?", "cfg": {
+			# 4 x 5 held = 20 Gold back on a 50-Gold Common at a 50% sell rate:
+			# -5 per full cycle, at EVERY collection size, because the cap of 5
+			# ends the scaling that made it look infinite
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"artefacts": ["deep-state-yearbook", "jet-fuel-vial", "tape-eraser-magnet",
+				"denver-bunker-timeshare", "mao-s-loyalty-badge"],
+			"wave": 9, "gold": 600, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo: can Mao's Loyalty Badge ever net positive Gold?", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"artefacts": ["mao-s-loyalty-badge"],
+			"wave": 9, "gold": 400, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo: does selling an Item switch Denver Bunker's +30% off?", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
+			"artefacts": ["denver-bunker-timeshare"],
+			"items": ["blitz", "shield", "promote"], "wave": 9, "gold": 300, "score": 1000}},
+		{"name": "Combo: Tape Eraser Magnet — selling is not using, so it must not fire", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
+			"artefacts": ["tape-eraser-magnet"], "items": ["blitz"],
+			"wave": 9, "gold": 300, "score": 1000}},
+		{"name": "Combo: Captured Stock merges and converts, but cannot deploy", "cfg": {
+			"board": ZONE_PAWNS + [["queen", 0, 3, 2]],
+			"captured": ["rook", "rook", "knight", "pawn"], "stock": ["pawn"],
+			"wave": 9, "gold": 400, "score": 1000}},
+		{"name": "Combo: Jet Fuel Vial is spent across a Shop close/reopen, not reset", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
+			"artefacts": ["jet-fuel-vial"], "wave": 9, "gold": 400, "score": 1000,
+			"stock": ["pawn"]}},
+		{"name": "Combo: the Pallet's count survives a Shop close at an odd purchase", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
+			"artefacts": ["pandemic-toilet-paper-pallet"], "wave": 9, "gold": 600,
+			"score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo: two Snowden copies stack their Box rerolls", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"],
+			"wave": 9, "gold": 600, "score": 1000}},
+		{"name": "Combo: Ecdysis copies a KEY, so it must not consume an Artefact slot", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"artefacts": ["ecdysis-sheddings", "jet-fuel-vial", "deep-state-yearbook",
+				"tape-eraser-magnet"],
+			"wave": 9, "gold": 600, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo: Hellfire Club at low resources — the softlock shape", "cfg": {
+			"board": [["pawn", 0, 3, 1], ["rook", 1, 3, 8]],
+			"artefacts": ["hellfire-club-discord-invite"], "gold": 0, "score": 200}},
+		# Army Power / Artefact overlaps: one board per Army, each on the
+		# resource its Power touches, so a doubled-up effect is visible rather
+		# than inferred from two separate readings
+		{"name": "Combo Army: Crown — free merges against a Stock full of pairs", "cfg": {
+			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2]],
+			"stock": ["rook", "rook", "knight", "knight", "bishop", "bishop"],
+			"wave": 9, "gold": 400, "score": 1000}},
+		{"name": "Combo Army: Wild Hunt — first-capture refund with multiple targets", "cfg": {
+			"army": "Wild Hunt",
+			"board": [["queen", 0, 3, 2], ["rook", 0, 5, 2],
+				["pawn", 1, 3, 4], ["pawn", 1, 5, 4], ["pawn", 1, 2, 3]],
+			"items": ["blitz", "blitz"], "wave": 5, "gold": 300, "score": 1000}},
+		{"name": "Combo Army: Old Guard — its Power against a scoring board", "cfg": {
+			"army": "Old Guard",
+			"board": [["queen", 0, 2, 2], ["knight", 0, 4, 2],
+				["pawn", 1, 2, 5], ["bishop", 1, 3, 4]],
+			"wave": 5, "gold": 300, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo Army: Syndicate — its Power against a Shop full of Gold", "cfg": {
+			"army": "Syndicate", "board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"wave": 9, "gold": 800, "score": 1000, "stock": ["pawn"]}},
+		{"name": "Combo Army: Cult — its Power against a Buff-granting board", "cfg": {
+			"army": "Cult",
+			"board": [["bishop", 0, 2, 2], ["archbishop", 0, 5, 2],
+				["pawn", 1, 3, 3], ["pawn", 1, 4, 3]],
+			"artefacts": ["bible-gag-reel-scroll"], "wave": 5, "gold": 300, "score": 1000}},
+		{"name": "Combo Army: Horde — its Power against a wide spawn", "cfg": {
+			"army": "Horde", "board": [["queen", 0, 3, 2], ["rook", 0, 5, 2]],
+			"wave": 3, "gold": 300, "score": 1000, "stock": ["pawn", "pawn", "pawn"]}},
+		{"name": "Combo: the Army Ability costs an Action, Artefact activation does not", "cfg": {
+			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2]],
+			"stock": ["rook", "rook"], "artefacts": ["jet-fuel-vial"],
+			"wave": 9, "gold": 400, "score": 1000}},
+		{"name": "Combo: all three caps full at once (Items 3, Buffs 2, Artefacts 5)", "cfg": {
+			"board": [["bishop", 0, 2, 2], ["archbishop", 0, 5, 2],
+				["pawn", 1, 3, 3], ["pawn", 1, 4, 3]],
+			"items": ["blitz", "shield", "promote"],
+			"artefacts": ["bible-gag-reel-scroll", "jet-fuel-vial", "deep-state-yearbook",
+				"tape-eraser-magnet", "denver-bunker-timeshare"],
+			"wave": 9, "gold": 900, "score": 2000, "stock": ["pawn"]}},
 		# --- loss conditions ---
 		{"name": "Loss: clock-out (10s)", "cfg": {
 			"board": ZONE_PAWNS, "clock_s": 10.0}},

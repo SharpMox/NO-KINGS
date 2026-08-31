@@ -441,6 +441,11 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	autoplay_exit = autoplay
+	if args.has("--pixel"): # issue 74 spike — must come BEFORE --screenshot,
+		# which captures and quits on the spot
+		var pf := preload("res://scripts/pixel_filter.gd").new()
+		add_child(pf)
+		pf.set_factor(pf.factor_from_args(args))
 	if args.has("--screenshot"):
 		screenshot_dir = args[args.find("--screenshot") + 1]
 		if not autoplay: # with --autoplay, the end screen is captured instead

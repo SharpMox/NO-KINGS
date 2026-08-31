@@ -482,6 +482,9 @@ func _ready() -> void:
 	if next_config.is_empty():
 		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
 		stock = Tuning.starting_stock(next_army, next_tier)
+		clock_ms = float(Tuning.clock_start_ms(next_tier)) # issue 78: 15 min,
+			# or 5 at Tier 3+. Set HERE, not at the var declaration — next_tier
+			# is only meaningful once the run actually starts.
 		# issue 67: the other 3 determinants of a Family's kit (Stock, above,
 		# was already per-army). Starting Artefacts stays empty for all three
 		# seed Families — none of them specify one.

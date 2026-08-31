@@ -110,6 +110,12 @@ var turn_number := 0 # run-long counter (issue 35), incremented once at the
 	# "every 3rd Turn" reads it. Round-tripped through save_config.gd.
 var kings_defeated := 0  # 1 = endless unlocked; end screens show it
 var king_ids_defeated: Array = []  # roster (Kings.name_of), same order as falls
+## issue 89: the run's King line-up — one costume tier, its four Kings in a
+## shuffled order. Rolled ONCE at run start and saved, never re-derived: a
+## re-roll on load would hand a resumed run a different King than the one it
+## was about to fight.
+var king_tier := ""
+var king_order: Array = []
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -505,6 +511,12 @@ func _ready() -> void:
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
 	if next_config.is_empty():
+		# issue 89: roll the King line-up here, from the run RNG (seeded just
+		# above), so the same seed always meets the same four Kings in the same
+		# order — the reproducibility guarantee issue 75 shipped.
+		var line_up := Kings.roll_run(rng)
+		king_tier = line_up.tier
+		king_order = line_up.order
 		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
 		stock = Tuning.starting_stock(next_army, next_tier)
 		clock_ms = float(Tuning.clock_start_ms(next_tier)) # issue 78: 15 min,

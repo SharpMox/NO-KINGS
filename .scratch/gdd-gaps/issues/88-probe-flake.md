@@ -1,6 +1,6 @@
 # 88 — The intermittent click-probe failure
 
-Status: todo — reproduced, undiagnosed
+Status: OPEN — not reproduced in 82 runs, but that result is caveated (2026-08-31)
 
 ## Parent
 
@@ -71,3 +71,60 @@ any pass rate.
 ## Blocked by
 
 - nothing — but scheduled **after** 79-87 per the user (2026-08-31)
+
+
+## Attempt 1 (2026-08-31) — not reproduced, and the result is NOT clean
+
+**82 sequential runs, 0 failures**: 26 game-clicks, 26 menu-clicks, then 30 interleaved.
+
+If the rate were still 1-in-20, the chance of seeing zero failures across 82 runs is about
+**1.5%** (0.95^82). That is strong evidence the rate has dropped — *if the measurement counts*.
+
+### Why it may not count
+
+**The Godot EDITOR was open the whole time** — pid 58525, running 9h43m, discovered only when
+the new hunt script refused to start. That is precisely the contention condition CLAUDE.md
+warns about, and its rule is explicit that **a pass under contention is not evidence of
+correctness** any more than a failure under one is evidence of a bug.
+
+The honest reading is narrower than "0/82 proves it is gone":
+
+- Contention causes *false failures*, so seeing none despite it is mildly reassuring.
+- But the repo's own rule exists because this exact class of reasoning has produced a
+  confident wrong answer here before (2026-08-29, twice). **So this issue stays OPEN.**
+
+### The other reason a zero here proves less than it looks
+
+**The probes have been substantially rewritten since the flake was seen.** Slice 79 replaced
+the whole scenario-list assertion block (sections now collapse, so reachability became a
+two-step property), 83 added the login-screen block and a guest-account precondition, and 85
+added a Scores status assertion. **The assertion that failed may no longer exist.**
+
+And it cannot be checked, because **the original failing case was never recorded** — the hunt
+was interrupted mid-way and the output discarded. That is the single most costly detail here,
+and it is why attempt 1 produced a tool rather than a diagnosis.
+
+### What was built instead: `game/tests/flake_hunt.sh`
+
+```sh
+game/tests/flake_hunt.sh [runs]   # default 40 of each probe, interleaved
+```
+
+It keeps the **full output of every failing run**, which is exactly what the last hunt lacked.
+Both of CLAUDE.md's hard-won rules are baked in: it **interleaves** rather than batching (a
+batched A/B measures machine load, not the branch), and it **refuses to start** when another
+Godot process is up rather than merely warning as `run_all.sh` does — a hunt's entire output is
+a pass/fail rate, and a rate measured under contention is not a rate for anything.
+
+### Next step
+
+Re-run with the editor closed:
+
+```sh
+pkill -f '[Gg]odot'          # or just close the editor window
+game/tests/flake_hunt.sh 40  # 80 runs, clean
+```
+
+A clean 0/80 would take P(miss) under 1.7% and justify closing this as
+**not-reproducible-after-the-probe-rewrites**. A failure gives the case name and full output
+the diagnosis needs. Either outcome is worth more than the current one.

@@ -125,6 +125,10 @@ static func apply(g, cfg: Dictionary) -> void:
 	# King wave with no King, which would be a softlock and not a cosmetic gap.
 	g.king_tier = str(cfg.get("king_tier", ""))
 	g.king_order = cfg.get("king_order", []).duplicate()
+	# issue 90: a save taken mid-segment-1 must still produce its King. Additive
+	# — a pre-90 save has none, and a King wave restored without one would be
+	# unwinnable rather than merely different.
+	g.pending_king = cfg.get("pending_king", {}).duplicate()
 	g.next_army = str(cfg.get("army", g.next_army)) # milestone drip draws from it
 	# issue 76: the SAVE KEY stays "family_ability_used_this_wave" while the
 	# in-memory symbol became army_*. Renaming a persisted key is not additive
@@ -238,6 +242,7 @@ static func to_config(g) -> Dictionary:
 		"pending_reinforce": g.pending_reinforce,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
+		"pending_king": g.pending_king.duplicate(), # issue 90
 		"army": g.next_army, "rank": g.next_tier,
 		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,

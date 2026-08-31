@@ -9,6 +9,8 @@ const Kings := preload("res://data/kings.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Items := preload("res://data/items.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 
 
 static func queue(g, n: int) -> void:
@@ -56,7 +58,12 @@ static func queue(g, n: int) -> void:
 	for id in roster:
 		var entry := {"id": id}
 		if id == "king":
+			# issue 90: the King does NOT arrive with its wave. Segment 1 is
+			# Tuning.KING_SEGMENT_TURNS turns of buffed enemies; the King is
+			# held here and released by game.gd's turn advance.
 			entry.king_id = king.id
+			g.pending_king = entry
+			continue
 		g.pending_spawn.append(entry)
 	if Tuning.TARIFFS_SCHEDULED: # off for now — see Tuning.TARIFFS_SCHEDULED
 		if n == 2:
@@ -83,6 +90,24 @@ static func spawn(g, n: int) -> void:
 	spawn_pending(g)
 
 
+## True when wave `n` is a King wave. Reads the catalog rather than a flag, so
+## it cannot drift from what actually spawns.
+static func is_king_wave(n: int) -> bool:
+	return n >= 1 and n <= Waves.WAVES.size() and Waves.WAVES[n - 1].has("king")
+
+
+## issue 90: release the held King once segment 1 is over. Called from the turn
+## advance; a no-op when no King is pending.
+static func release_king_if_due(g) -> void:
+	if g.pending_king.is_empty():
+		return
+	if g.turns_since_wave < Tuning.KING_SEGMENT_TURNS:
+		return
+	g.pending_spawn.append(g.pending_king)
+	g.pending_king = {}
+	g._add_turn_fx("THE KING ARRIVES", Color(1.0, 0.45, 0.35))
+
+
 static func spawn_pending(g) -> void:
 	while not g.pending_spawn.is_empty():
 		# spawns land on any top-row tile not held by an enemy; a friendly piece
@@ -92,12 +117,35 @@ static func spawn_pending(g) -> void:
 			var pos := Vector2i(x, Tuning.SPAWN_ROW)
 			if not g.board.has(pos) or g.board[pos].owner == Rules.PLAYER:
 				open.append(pos)
+		# issue 90: THE KING MUST ALWAYS LAND. Ordinary spawns spill to the next
+		# player turn when the row is full of enemies, which is fine because the
+		# wave advances anyway. A King cannot spill: the wave is barred from
+		# advancing while it is pending, and segment 1 deliberately fills the row
+		# with buffed enemies — so "wait for space" is a stall the player may not
+		# be able to clear. It displaces one of its own instead.
+		var next_is_king: bool = not g.pending_spawn.is_empty() \
+			and g.pending_spawn[0].has("king_id")
 		if open.is_empty():
-			return # row full of enemies — spill to next player turn
+			if not next_is_king:
+				return # row full of enemies — spill to next player turn
+			open = []
+			for x in Tuning.BOARD_W:
+				open.append(Vector2i(x, Tuning.SPAWN_ROW))
 		var spot: Vector2i = open[g.rng.randi() % open.size()]
 		var entry: Dictionary = g.pending_spawn.pop_front()
-		if g.board.has(spot): # arrival captures a friendly blockading the row
-			g.lost_player += 1
+		if g.board.has(spot) and g.board[spot].owner == Rules.PLAYER:
+			g.lost_player += 1 # arrival captures a friendly blockading the row
+		# an enemy displaced by a King arrival is simply absorbed: it is not a
+		# player capture, so it must not score, pay Gold or fire on_capture
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
 		if entry.has("king_id"):
 			g.board[spot].king_id = entry.king_id
+		elif is_king_wave(g.wave):
+			# issue 90: segment-1 enemies arrive buffed. BuffLogic.add rather
+			# than g._apply_buff — the latter is the PLAYER's grant choke point
+			# and fires on_buff_apply, which would run the player's Artefacts
+			# on an enemy spawn.
+			for _i in Tuning.KING_SEGMENT_BUFFS:
+				var pool: Array = Items.PIECE_BUFFS
+				var pick: Dictionary = pool[g.rng.randi() % pool.size()]
+				BuffLogic.add(g.board[spot], pick.key)

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The 38 NO KINGS pieces mapped by origin: eight promotion chains, five void mirrors, nine fusion products. Click any piece for its full record and relations.">
+  <meta name="description" content="The 38 NO KINGS pieces mapped by origin: eight Families, five void mirrors, nine fusion products. Click any piece for its full record and relations.">
   <title>NO KINGS / Codex</title>
   <link rel="stylesheet" href="assets/nav.css">
   <script src="assets/theme-init.js"></script>
@@ -16,7 +16,7 @@
   <style>
   /* ============================================================
    *  Codex — one map of the whole system. Every piece is placed by
-   *  how it comes to exist (chain, mirror, or fusion), clicking a
+   *  how it comes to exist (Family, mirror, or fusion), clicking a
    *  card opens a side panel whose relation boxes wire themselves
    *  back to the map through the gutters.
    *  Follows artefacts.html, the design pilot: it does NOT link
@@ -105,7 +105,7 @@
   .lg-box.mirror{border-style:dashed;border-color:color-mix(in srgb,var(--violet-hi) 40%,var(--border-soft))}
 
   /* ---------- The map: a single flow of fixed-size cards, ordered
-       chain by chain (each void mirror right after its twin), forged
+       Family by Family (each void mirror right after its twin), forged
        pieces last. Grid tracks keep every row aligned. ---------- */
   .atlas{--tw:88px;display:grid;grid-template-columns:repeat(auto-fill,var(--tw));
     justify-content:space-between;align-items:start;gap:24px 20px}
@@ -281,7 +281,7 @@
 <div id="site-nav" data-page="codex"></div>
 
 <header class="hero"><h1><em>Codex</em></h1>
-<p>All 38 pieces of NO KINGS, placed by how each one comes to exist: eight promotion chains, five mirrors, nine fusions.</p></header>
+<p>All 38 pieces of NO KINGS, placed by how each one comes to exist: eight Families, five mirrors, nine fusions.</p></header>
 
 <main>
 <section class="cx">
@@ -326,13 +326,13 @@ const crop = p => renderBoard(p);   /* crop is done with a CSS scale so it can a
 
 /* relationship maps, all derived from the shared data files */
 const PROM = {}, DEM = {};
-for (const {ids:[b,m,e]} of PROMOTION_CHAINS){ PROM[b]=m; PROM[m]=e; DEM[m]=b; DEM[e]=m; }
+for (const {ids:[b,m,e]} of PROMOTION_FAMILIES){ PROM[b]=m; PROM[m]=e; DEM[m]=b; DEM[e]=m; }
 const INV = {};
 for (const {lhs,rhs} of INVERSION_PAIRS){ if(LOOKUP[lhs]&&LOOKUP[rhs]){ INV[lhs]=rhs; INV[rhs]=lhs; } }
 const RECIPES = {};
 for (const kind of ['synergistic','additive'])
   for (const f of FUSIONS[kind]) if (LOOKUP[f.out]) (RECIPES[f.out] = RECIPES[f.out] || []).push(f);
-const CHAIN_IDS = new Set(PROMOTION_CHAINS.flatMap(c => c.ids));
+const CHAIN_IDS = new Set(PROMOTION_FAMILIES.flatMap(c => c.ids));
 const MIRROR_IDS = new Set(Object.keys(INV).filter(id => !CHAIN_IDS.has(id) && !RECIPES[id]));
 const FORGED = PIECES_CODEX.filter(p => !CHAIN_IDS.has(p.id) && !MIRROR_IDS.has(p.id));
 const FUSE_WITH_INTO = {};
@@ -345,14 +345,14 @@ for (const kind of ['additive','synergistic'])
 
 /* ============ the map ============ */
 /* promotion-only: reached by promoting, and by nothing else */
-const PROMO_ONLY = new Set(PROMOTION_CHAINS.flatMap(c => c.ids.slice(1)).filter(id => !RECIPES[id]));
+const PROMO_ONLY = new Set(PROMOTION_FAMILIES.flatMap(c => c.ids.slice(1)).filter(id => !RECIPES[id]));
 function tileHTML(p, cls){
   const kind = cls || (PROMO_ONLY.has(p.id) ? 'promo' : '');
   return `<button class="tile ${kind}" data-id="${p.id}">
     <span class="fp">${crop(p)}<span class="nm">${esc(p.name)}</span></span></button>`;
 }
 $('#atlas').innerHTML = `
-  ${PROMOTION_CHAINS.flatMap(c => c.ids.flatMap(id => {
+  ${PROMOTION_FAMILIES.flatMap(c => c.ids.flatMap(id => {
     const mir = INV[id] && MIRROR_IDS.has(INV[id]) ? INV[id] : null;
     return [tileHTML(LOOKUP[id])].concat(mir ? [tileHTML(LOOKUP[mir],'mirror')] : []);
   })).join('')}

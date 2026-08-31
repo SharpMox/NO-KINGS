@@ -11,7 +11,7 @@
   <script src="assets/board.js"></script>
   <script src="data/pieces-codex.js"></script>
   <script src="data/inversions.js"></script>
-  <!-- chain order for the wall; no inversion data comes from here -->
+  <!-- Family order for the wall; no inversion data comes from here -->
   <script src="data/promotions.js"></script>
   <style>
   /* ============================================================
@@ -157,9 +157,9 @@
 /* deck motion: back-out curve, slight overshoot */
 
 
-/* ===== C / STACKS — each chain is a wallet stack; every name strip stays readable ===== */
+/* ===== C / STACKS — each Family is a wallet stack; every name strip stays readable ===== */
 /* Chains flow instead of sitting in a grid: each one is only as wide as its
-   own arrangement needs, so a fanned chain takes a full hand's width while a
+   own arrangement needs, so a fanned Family takes a full hand's width while a
    stacked one takes a single card's, and a row packs whatever fits. */
 /* ---------- Piece filter bar ----------
    Full-bleed so the sticky blur reaches the window edges, content on the same
@@ -194,13 +194,13 @@
 .filt .n{font:700 9.5px/1 var(--mono);color:#141024;background:var(--lime);
   border-radius:var(--rad-pill);padding:3px 6px}
 .filt .n:empty{display:none}
-/* Each column is its own 3-row group - a promotion chain, base over mid over
+/* Each column is its own 3-row group - a Family, base over mid over
    end - and the groups wrap. So the eleven columns sit in one band when there
    is room and cut into two, then three, stacked bands as it narrows, without
    ever scrolling sideways. */
 /* The groups sit in one grid rather than wrapping as flex items: uniform
    tracks mean every column lines up whatever the width, instead of each band
-   sizing itself. Each group is still a chain stacked three deep, and the
+   sizing itself. Each group is still a Family stacked three deep, and the
    column gap is what reads as the grouping. */
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
   gap:8px;flex:1 1 auto;padding:11px 14px 11px 0}
@@ -231,7 +231,7 @@
 }
 .decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
   gap:34px 26px;padding-top:26px;
-  /* Card width is solved backwards from "three fanned chains per row": a fan is
+  /* Card width is solved backwards from "three fanned Families per row": a fan is
      3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
      gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
      narrow pages simply wrap to two rather than shrinking the cards to nothing. */
@@ -355,7 +355,7 @@ html{overflow-x:clip}
    top of a collapsed stack */
 
 
-/* line close-up: the whole chain, left to right */
+/* line close-up: the whole Family, left to right */
 dialog.line{border:0;padding:0;background:transparent;width:min(1004px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
 dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
 .line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
@@ -526,19 +526,19 @@ const LOOKUP = {};
 PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
 const nm = id => LOOKUP[id] ? LOOKUP[id].name : id;
 
-// Ordered by promotion chain: the Pawn line's three pairs first, then each
-// other chain's three kept together, then the two pairs in no chain at all.
-// A pair often bridges two chains - Mage is the Mage line, Seer the Seer line -
+// Ordered by Family: the Pawn line's three pairs first, then each
+// other Family's three kept together, then the two pairs in no Family at all.
+// A pair often bridges two Families - Mage is the Mage line, Seer the Seer line -
 // so it sorts by the lower of the two, which is what holds each trio together.
 const STAGE_OF = {};
-PROMOTION_CHAINS.forEach((c, ci) => c.ids.forEach((id, si) => STAGE_OF[id] = { ci, si }));
-const chainKey = v => {
+PROMOTION_FAMILIES.forEach((c, ci) => c.ids.forEach((id, si) => STAGE_OF[id] = { ci, si }));
+const familyKey = v => {
   const a = STAGE_OF[v.lhs], b = STAGE_OF[v.rhs];
   const ci = Math.min(a ? a.ci : 99, b ? b.ci : 99);
   const si = a && a.ci === ci ? a.si : b && b.ci === ci ? b.si : 99;
   return ci * 100 + si;
 };
-const PAIRS = [...INVERSION_PAIRS].sort((x, y) => chainKey(x) - chainKey(y));
+const PAIRS = [...INVERSION_PAIRS].sort((x, y) => familyKey(x) - familyKey(y));
 const IDS = v => [v.lhs, v.rhs];
 const LABEL = v => `${nm(v.lhs)} \u21C4 ${nm(v.rhs)}`;
 // the halves are peers, so both cards carry the family - which the data gives
@@ -683,7 +683,7 @@ const piece = id => ((p) => {
             <p class="ds">${esc(p.description_codex || p.description || '')}</p></div>`;
 })(LOOKUP[id]);
 
-// FLIP: chains that get pushed to another row are told where they used to be
+// FLIP: Families that get pushed to another row are told where they used to be
 // and then animated back to zero, so a reflow reads as movement.
 function flip(mutate) {
   const items = $$('.stk');

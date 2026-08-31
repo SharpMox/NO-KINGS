@@ -1,6 +1,6 @@
 // Exports the 38 codex pieces into game/data/pieces.json for the Godot game,
 // plus the full fusion table. The enemy King rides along as a 39th def but is
-// a boss ENTITY, not a roster piece: no chain, no fusions, never obtainable.
+// a boss ENTITY, not a roster piece: no Family, no fusions, never obtainable.
 // Run manually after editing data/pieces-codex.js or data/promotions.js:
 //   node tools/export-game-pieces.mjs
 import { createRequire } from "node:module";
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PIECES = require(join(root, "data/pieces-codex.js"));
-const CHAINS = require(join(root, "data/promotions.js"));
+const FAMILIES = require(join(root, "data/promotions.js"));
 const FUSIONS = require(join(root, "data/fusions.js"));
 
 
@@ -82,9 +82,9 @@ function convertMoves(piece) {
   });
 }
 
-const next = {}; // chain successor per id
-for (const chain of CHAINS) {
-  const [base, mid, end] = chain.ids;
+const next = {}; // Family successor per id
+for (const family of FAMILIES) {
+  const [base, mid, end] = family.ids;
   next[base] = mid;
   next[mid] = end;
 }

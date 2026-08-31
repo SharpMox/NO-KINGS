@@ -1,6 +1,6 @@
 # 76 — "Family" -> "Army"; "Family" becomes the word for a piece chain
 
-Status: todo — SPECCED (user ruling 2026-08-31) · ready
+Status: partial (2026-08-31) — code rename DONE; the chain sense is not
 
 ## Parent
 
@@ -67,3 +67,37 @@ Reassign the freed word. A promotion chain is now a **Family** of pieces.
 ## Blocked by
 
 - nothing (but sequence after slice 69 — both touch `test_families.gd` fixtures)
+
+## Outcome — half done
+
+**Shipped in PR #250: the code rename.** `families.gd` -> `armies.gd`, `Families` -> `Armies`,
+every display string, and all `family_*` symbols -> `army_*`. **No id, catalog key or save key
+moved.**
+
+- **The clobber trap was real and avoided.** `test_armies.gd` already held 7
+  army-composition assertions; renaming `test_families.gd` over it would have destroyed them
+  silently — green suite, no error, coverage gone. Merged instead: **80 + 7 = 87** assertions,
+  verified by count.
+- **One persisted field**, `family_ability_used_this_wave`. Symbol renamed, **save key kept** —
+  renaming a persisted key is not additive and earns no player-visible gain. `test_save.gd`
+  caught the fixture mismatch that created, which is what it is for.
+
+### Still to do — the second half
+
+**"Family" has not yet been reassigned to mean a piece chain.** `promotions.js`, the codex and
+promotion pages, `guide_text.gd`, and the Notion side (retitle the Armies page; decide whether
+chains get a new Families page or fold into Promotions) are all untouched.
+
+That half is doc-heavy and independent of the code, so it wants its own pass. **Until it
+lands, "Family" means nothing in the product** — which is a safe intermediate state, but not
+the finished one.
+
+### Note on the two agent stalls
+
+Two agents were dispatched for this and both stalled with no progress for 600s, the second
+almost immediately. The environment was healthy (load 2.2, disk 14%, git instant, no stray
+processes). During the same window this session hit
+*"claude-sonnet-5 is temporarily unavailable, so auto mode cannot determine the safety of
+Bash"* — a **transient safety-classifier outage**, which would hang an agent's Bash call
+exactly the way the watchdog described. The task was not the problem; it was completed by
+hand shortly after without difficulty.

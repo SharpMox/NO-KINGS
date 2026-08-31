@@ -26,3 +26,9 @@ static func pull(_key: String) -> Variant:
 	# TODO(native plugin): read the Play Games Saved Games snapshot named
 	# _key and return its envelope Dictionary, or null if there isn't one.
 	return null
+
+
+## issue 83: the signed-in account's stable id, or "" when there is none.
+## Part of the backend contract alongside is_available/push/pull.
+static func account_id() -> String:
+	return ""

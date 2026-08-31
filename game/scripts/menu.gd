@@ -9,6 +9,14 @@ const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
+const Account := preload("res://scripts/account.gd")
+
+## The local saves an account owns. Passed to Account.sign_in so the rebind
+## restamps them — the guest's progress comes with them because it was never a
+## separate history, it was this one under the old id.
+static func _SAVE_PATHS() -> Array:
+	return [GameScript.SAVE_PATH, GameScript.SCORES_PATH, GameScript.HISTORY_PATH]
+
 
 static var window_sized := false # once per launch, not on every return to menu
 
@@ -22,6 +30,7 @@ var history_scroll: ScrollContainer
 var about_center: CenterContainer
 var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
+var login_center: CenterContainer # issue 83, first run only
 
 
 func _ready() -> void:
@@ -82,6 +91,57 @@ func _ready() -> void:
 	# scripts/settings.gd) so the two entry points can't drift apart
 	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true)
+
+	# issue 83: the login screen. Shown ONLY on a first run — once an account
+	# exists, needs_login() is false forever and this never appears again.
+	#
+	# Guest is a real account, not the absence of one: it owns saves exactly as
+	# a signed-in account does, which is what lets sign-in REBIND that progress
+	# instead of merging two histories.
+	login_center = CenterContainer.new()
+	login_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	login_center.visible = false
+	add_child(login_center)
+	var login_box := VBoxContainer.new()
+	login_box.add_theme_constant_override("separation", 18)
+	login_center.add_child(login_box)
+	var login_head := Label.new()
+	login_head.text = "NO KINGS"
+	login_head.add_theme_font_size_override("font_size", 40)
+	login_box.add_child(login_head)
+	var login_note := Label.new()
+	login_note.add_theme_font_size_override("font_size", 13)
+	login_note.modulate = Color(1, 1, 1, 0.6)
+	login_note.text = "Your progress follows your account."
+	login_box.add_child(login_note)
+	var finish_login := func() -> void:
+		login_center.visible = false
+		main_box.visible = true
+	for prov in [Account.GOOGLE, Account.APPLE]:
+		_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
+			# The backends are stubs until 86/87; is_available() is false on
+			# desktop and on a platform with no plugin yet. Say so plainly
+			# rather than appearing to sign in and silently doing nothing.
+			if not CloudSave.backend.is_available():
+				login_note.text = "%s sign-in isn't available on this device yet." \
+					% prov.capitalize()
+				return
+			Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+			finish_login.call())
+	_button(login_box, "Play as Guest", 22, func() -> void:
+		Account.start_guest()
+		finish_login.call())
+	# The gate. --screenshot bypasses it too: a capture run on a machine with no
+	# account would otherwise photograph the login screen instead of the menu,
+	# which is a silent trap on any fresh checkout rather than a real result.
+	#
+	# The windowed probes deliberately do NOT take this bypass — they establish
+	# an account and then drive the login screen for real. A bypass that is the
+	# only tested path is exactly how this repo once green-lit a dead main menu.
+	if Account.needs_login() and not args.has(Account.SKIP_ARG) \
+			and not args.has("--screenshot"):
+		main_box.visible = false
+		login_center.visible = true
 
 	# scenario submenu: scrollable list, hidden until TEST — hide the SCROLL
 	# itself: a visible full-rect ScrollContainer eats every click beneath it

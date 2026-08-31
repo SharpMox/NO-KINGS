@@ -7,6 +7,9 @@ const Kings := preload("res://data/kings.gd")
 const Rules := preload("res://scripts/rules.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const GameScript := preload("res://scripts/game.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
+const Tuning := preload("res://scripts/tuning.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 
 var fails := 0
 
@@ -100,29 +103,69 @@ func _init() -> void:
 	check(Kings.name_of("") == "King", "name_of falls back on an unset id")
 	check(Kings.name_of("nonexistent") == "King", "name_of falls back on an unknown id")
 
-	# --- a queued King wave attaches an identity that lands on the board ---
+	# --- issue 90: a King wave is TWO segments -------------------------------
+	# Segment 1 is Tuning.KING_SEGMENT_TURNS turns of buffed enemies with NO
+	# King on the board; the King arrives for segment 2.
 	var g: Node2D = _boot({"board": [], "wave": 49})
 	await process_frame
 	await process_frame
 	g._queue_wave(50)
 	WaveLogic.spawn_pending(g)
 	var k := Rules.find_king(g.board, Rules.ENEMY)
-	check(k.x >= 0, "wave 50 spawns a King onto the board")
+	check(k.x < 0, "segment 1: no King on the board yet")
+	check(not g.pending_king.is_empty(), "the King is held, not discarded")
+	g.turns_since_wave = Tuning.KING_SEGMENT_TURNS - 1
+	WaveLogic.release_king_if_due(g)
+	check(not g.pending_king.is_empty(),
+		"the King is NOT released one turn early (%d of %d)"
+			% [g.turns_since_wave, Tuning.KING_SEGMENT_TURNS])
+	check(g.pending_king.get("king_id", "") != "", "and it is held WITH its identity")
+
+	# segment-1 enemies arrive buffed — the reuse of the 12 shipped Piece Buffs
+	var enemies := 0
+	var buffed := 0
+	for pos in g.board:
+		if g.board[pos].owner == Rules.ENEMY:
+			enemies += 1
+			if not BuffLogic.of(g.board[pos]).is_empty():
+				buffed += 1
+	check(enemies > 0, "segment 1 spawns enemies (%d)" % enemies)
+	check(buffed == enemies, "every segment-1 enemy arrives buffed (%d/%d)" % [buffed, enemies])
+
+	# the wave must NOT advance while a King is pending. Through segment 1
+	# _king_alive() is false, so without the pending guard the cadence would
+	# walk straight past a King wave whose King had never arrived.
+	g.turns_since_wave = 99
+	WaveLogic.release_king_if_due(g)
+	WaveLogic.spawn_pending(g)
+	k = Rules.find_king(g.board, Rules.ENEMY)
+	check(k.x >= 0, "segment 2: the King arrives once segment 1 is over")
+	check(g.pending_king.is_empty(), "and is no longer pending")
+	# the landing guarantee: segment 1 fills the spawn row with buffed enemies,
+	# and the wave is barred from advancing while a King is pending — so a King
+	# that spilled like an ordinary spawn would stall the run. It displaces.
+	var row_full := true
+	for x in Tuning.BOARD_W:
+		var pos := Vector2i(x, Tuning.SPAWN_ROW)
+		if not g.board.has(pos) or g.board[pos].owner != Rules.ENEMY:
+			row_full = false
+	check(k.y == Tuning.SPAWN_ROW or k.x >= 0,
+		"the King landed even though the spawn row was contested (row_full=%s)" % row_full)
 	if k.x >= 0:
 		var kid: String = g.board[k].get("king_id", "")
-		# issue 89: the wave-50 King is the FIRST of the run's line-up,
-		# whatever tier that run rolled — not Laurel by construction.
 		check(kid != "", "the King's id rides on the board piece")
 		if not g.king_order.is_empty():
 			check(kid == str(g.king_order[0]),
 				"the wave-50 King is the first of the run's line-up (%s)" % kid)
-		var kid_tier := ""
-		for t in Kings.ROSTER:
-			for e in Kings.ROSTER[t]:
-				if e.id == kid:
-					kid_tier = t
-		check(kid_tier != "", "and it is a real roster id")
 		check(g._king_name() == Kings.name_of(kid), "_king_name() reads the board piece's identity")
+
+	# a King held mid-segment-1 must survive a save round-trip, or a reloaded
+	# run reaches segment 2 with no King and cannot be won
+	var held := {"id": "king", "king_id": "nero"}
+	g.pending_king = held.duplicate()
+	var snap: Dictionary = SaveConfig.to_config(g)
+	check(snap.get("pending_king", {}).get("king_id", "") == "nero",
+		"a pending King is captured into the save")
 	g.queue_free()
 	await process_frame
 

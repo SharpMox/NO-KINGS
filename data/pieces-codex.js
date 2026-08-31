@@ -21,7 +21,7 @@
  *  tools/check-notion-drift.mjs reports it as "in Notion only" on every run.
  *  That is expected, not drift: the King is the boss piece, never a codex
  *  entry, and the pages this file feeds (codex / promotion / fusion /
- *  inversion) have nothing to say about a piece with no chain, no fusion and
+ *  inversion) have nothing to say about a piece with no Family, no fusion and
  *  no inverse. It exists on the game side only (game/assets/pieces/king.svg,
  *  the one piece still on the monochrome-art fallback path).
  * ============================================================ */
@@ -464,7 +464,7 @@ var PIECES_CODEX = [
       letter: 'Yl',
       betza: 'FADCG + 4L',
       origin: 'Invented',
-      description: 'Final form of the Long Ma promotion chain. Twenty-eight leap targets: Ferz (1,1), Alfil (2,2), Dabbaba (2,0), Camel (1,3), Tripper (3,3), and Fourleaper (4,0). Every component is colour-bound.',
+      description: 'Final form of the Long Ma Family. Twenty-eight leap targets: Ferz (1,1), Alfil (2,2), Dabbaba (2,0), Camel (1,3), Tripper (3,3), and Fourleaper (4,0). Every component is colour-bound.',
       description_codex: 'Reaches 28 colour-bound squares — leaping one or two squares diagonally, two squares orthogonally, a three-by-one or three-by-three jump, or four squares orthogonally. Promotes from Qi Lin.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [

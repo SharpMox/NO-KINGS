@@ -558,11 +558,11 @@
   // Matrix axes drop pieces that don't appear on a row/column with any interaction.
   const PIECES = ALL_PIECES.filter(p => !RESULT_ONLY_IDS.has(p.id));     // 31 axis pieces
 
-  // Self-merge → next stage in its chain (if any).
+  // Self-merge → next stage in its Family (if any).
   const promotionMap = new Map();
-  for (const chain of PROMOTION_CHAINS) {
-    for (let i = 0; i < chain.ids.length - 1; i++) {
-      promotionMap.set(chain.ids[i], chain.ids[i + 1]);
+  for (const Family of PROMOTION_FAMILIES) {
+    for (let i = 0; i < Family.ids.length - 1; i++) {
+      promotionMap.set(Family.ids[i], Family.ids[i + 1]);
     }
   }
   // Cross-merge → fusion lookup (symmetric, sorted key).
@@ -911,9 +911,9 @@
     NET.nodeById = new Map(NET.nodes.map(n => [n.id, n]));
     NET.edges = [];
     // Promotion edges.
-    for (const chain of PROMOTION_CHAINS) {
-      for (let i = 0; i < chain.ids.length - 1; i++) {
-        NET.edges.push({ kind: 'promotion', from: chain.ids[i], to: chain.ids[i + 1], directed: true });
+    for (const Family of PROMOTION_FAMILIES) {
+      for (let i = 0; i < Family.ids.length - 1; i++) {
+        NET.edges.push({ kind: 'promotion', from: Family.ids[i], to: Family.ids[i + 1], directed: true });
       }
     }
     // Fusion edges (both additive and synergistic from the codex data):
@@ -949,9 +949,9 @@
     const mainOrder = [];
     const placed = new Set();
     for (const title of CHAIN_ORDER) {
-      const chain = PROMOTION_CHAINS.find(c => c.title === title);
-      if (!chain) continue;
-      for (const id of chain.ids) {
+      const Family = PROMOTION_FAMILIES.find(c => c.title === title);
+      if (!Family) continue;
+      for (const id of Family.ids) {
         if (!placed.has(id) && !VOID_IDS.has(id)) { mainOrder.push(id); placed.add(id); }
       }
     }
@@ -959,7 +959,7 @@
       if (!placed.has(n.id) && !VOID_IDS.has(n.id)) { mainOrder.push(n.id); placed.add(n.id); }
     }
     // Place the main ring (33 non-Void pieces). Start at -3 pi / 4 so the
-    // first chain begins down-left of centre and the ring reads clockwise.
+    // first Family begins down-left of centre and the ring reads clockwise.
     const angleByMain = new Map();
     for (let i = 0; i < mainOrder.length; i++) {
       const n = NET.nodeById.get(mainOrder[i]);

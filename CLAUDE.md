@@ -30,7 +30,7 @@ tests, no servers. Deployed as plain static files (note the `.nojekyll`).
 - `index.html` — redirects to the codex.
 - `codex.html` — the 38 curated pieces; card + list views, filters, piece relations.
 - `graph.html` — two tabs: a force-directed relationship **Graph** and a merge/fusion **Matrix**.
-- `promotion.html` · `fusion.html` · `inversion.html` — the 8 promotion chains, the fusions, and the inversion pairs.
+- `promotion.html` · `fusion.html` · `inversion.html` — the 8 Families (promotion chains), the fusions, and the inversion pairs.
 - `betza.html` — Betza "funny notation" reference + a live sandbox that renders any string.
 - `encyclopedia/index.html` — 100-piece visual reference, grouped by family/origin.
 - `artefacts.html` — the 180 artefacts as a **density map wired to a ledger**: a sticky
@@ -66,7 +66,7 @@ shared a11y), `board.js` (SVG board / movement-diagram renderer), `theme.js` (li
 toggle, `fp-theme` in localStorage), `tabs.js` (per-page tab persistence).
 
 **Data is the single source of truth** in `data/`: `pieces-codex.js` (38 pieces),
-`pieces-encyclopedia.js` (100), `promotions.js` (8 chains), `fusions.js` (additive +
+`pieces-encyclopedia.js` (100), `promotions.js` (8 Families), `fusions.js` (additive +
 synergistic), `inversions.js` (14 pairs). Pages load these via `<script src>` and derive
 everything (graph edges, matrix cells, card relations, counts) from them. **Do not keep
 inline copies of this data** — past bugs came from pages duplicating `PIECES`/`FUSIONS`

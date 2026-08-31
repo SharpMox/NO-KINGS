@@ -51,6 +51,10 @@ func _ready() -> void:
 	if args.has("--autoplay") or args.has("--scenario"):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
 		return
+	# issue 84: send anything queued while offline BEFORE pulling the mirror.
+	# Draining after the pull would resolve this device's progress against a
+	# cloud copy that is missing the very sessions still sitting in the queue.
+	CloudSave.drain_queue()
 	# pull the cloud mirror before deciding what's on disk (12): a no-op on
 	# desktop today, but on iOS/Android (once the native plugin lands) this
 	# is what makes a fresh install offer "Continue" from another device.

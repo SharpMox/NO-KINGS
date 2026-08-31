@@ -73,9 +73,24 @@ inline copies of this data** — past bugs came from pages duplicating `PIECES`/
 inline and drifting; load the shared file instead.
 
 A `data/` edit therefore reaches every page with **no rebuild** — the pages hardcode
-nothing and read it at load time. The one thing to re-run is
-`node tools/export-game-pieces.mjs`, which regenerates `game/data/pieces.json` +
-`fusions.json` for the Godot side.
+nothing and read it at load time. Two exporters carry the same data to the Godot side:
+
+- `node tools/export-game-pieces.mjs` -> `game/data/pieces.json` + `fusions.json`
+- `node tools/export-game-artefacts.mjs` -> `game/data/artefacts.json`
+
+> **`data/artefacts.js` feeds BOTH the game and the public reference site.** This is easy to
+> forget, because game work touches it constantly (every Artefact slice edits it and re-runs
+> the exporter) while `artefacts.html` reads the very same file directly, at load time, with
+> no build step in between. A malformed entry, a missing `bonus` array or a renamed field
+> breaks a public page that no Godot test covers.
+>
+> So after editing `data/artefacts.js`, the Godot suite passing is **not** sufficient. Check
+> the site too: `python3 -m http.server`, load `artefacts.html`, confirm zero console errors.
+> A quick structural check catches most of it:
+> ```sh
+> node -e 'eval(require("fs").readFileSync("data/artefacts.js","utf8"));
+>   console.log(ARTEFACTS.length, ARTEFACTS.filter(a=>!a.name||!a.effect||!Array.isArray(a.bonus)).length)'
+> ```
 
 ### Conventions
 

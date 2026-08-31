@@ -1,6 +1,6 @@
 # 67 — The Family framework + the three seed Families
 
-Status: todo — SPECCED (user rulings 2026-08-30) · ready
+Status: done (2026-08-31)
 
 ## Parent
 
@@ -92,3 +92,25 @@ Shield Wall routes through `_apply_buff`; pieces at the buff cap get the floatin
 
 - slice 66 (the Notion Families page + display terms) — code seams are independent, but
   land 66 first to avoid doc collisions
+
+## Outcome
+
+Shipped in PR #235. `families.gd` (92 lines) + `test_families.gd` (287) + 16 touched files.
+
+All three safety catches landed as real assertions, not claims:
+- Selling as Old Guard raises Gold by **exactly** the sell price — the 150% money printer
+  never existed.
+- A 'Definitely Not Russia'-masked loss pays **no** refund, paired with a sanity assertion
+  that the *second* loss that Wave does refund, so it cannot pass vacuously.
+- Wild Hunt's Power stacks additively with `first_capture_extra` rather than being deduped.
+
+**Provenance note.** The implementing agent hit the weekly usage limit mid-task and died
+with everything uncommitted. The work survived in its worktree and was salvaged rather than
+redone. The two remaining failures were exactly the ones it had named as its next step:
+
+1. The Activate section now holds **two** chips (every run has a Family, so it is never
+   Artefact-only) — the probe still asserted one.
+2. **Call the Banners' targeting switches the drawer to Stock**, putting the chip out of
+   reach, so cancelling needs Inventory reopened first — the same reach-the-chip step
+   Bovine's board-targeting already uses. A genuine flow consequence of targeting a Stock
+   entry rather than a tile, and worth remembering for any future Stock-targeted ability.

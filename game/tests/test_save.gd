@@ -52,6 +52,7 @@ func _init() -> void:
 		"skip_enemy_turns": 1, "tariffs_off": true,
 		"ecdysis_copy_key": "greed", # issue 55
 		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
+		"family_ability_used_this_wave": true, # issue 67
 	}
 	var a := _boot(rich)
 	await process_frame
@@ -79,6 +80,11 @@ func _init() -> void:
 		+ "save->load->save identity check cannot catch this: a field missing from the "
 		+ "save entirely is absent from BOTH sides and compares equal.")
 	check(b.gold == 35, "gold restored")
+	check(b.family_ability_used_this_wave == true,
+		"issue 67: the Family Ability's once-per-Wave flag survives a resume — same trap as "
+		+ "run_capture_count/shop_lane_b_progress above, a field missing from the save is "
+		+ "absent from BOTH sides of the generic identity check and compares equal, so this "
+		+ "asserts the actual restored VALUE instead of trusting the identity check alone")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")
 	check(b.shop_stock[1].size == "big" and b.shop_stock[1].contents.size() == 1

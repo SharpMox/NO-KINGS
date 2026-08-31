@@ -25,6 +25,7 @@ const Scenarios := preload("res://data/scenarios.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Kings := preload("res://data/kings.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Families := preload("res://scripts/families.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -347,6 +348,23 @@ var artefact_targeting_key := "" # Bovine Tractor Beam's staged board pick in
 	# item-targeting flow, generalized: item_active plays this role for Items)
 var artefact_target_stage_a := Vector2i(-1, -1) # first pick (an enemy tile)
 var artefact_targets: Array[Vector2i] = [] # valid tiles for the current stage
+
+# --- issue 67: the Family Ability — 1/Wave, 1 Action, same confirm-vs-
+# targeting back-out shape as an Artefact activation above, but its own state
+# (there is exactly one Ability per run, so no "key" is needed the way
+# ACTIVATABLE_ARTEFACT_KEYS needs one per held Artefact). `family_ability_
+# used_this_wave` is persisted (additive save field, save_config.gd) — the
+# once-per-Wave idiom's own "assert the restored value" requirement (a
+# missing field the generic identity check can't catch).
+var family_ability_used_this_wave := false # reset in WaveLogic.queue()
+var family_targeting := false # The Muster's Call the Banners: tap a Stock
+	# stack to target it — the only Family Ability with a target, so a bare
+	# bool (not a key string like artefact_targeting_key) is enough
+var hounds_free_turn := false # Wild Hunt's Loose the Hounds: "this Turn"
+	# only, so it resets in _begin_player_turn, NOT WaveLogic.queue() — a
+	# per-turn scratch flag needs no save round-trip (SaveConfig.apply's own
+	# header: "a save is always taken at a turn start")
+
 var tariffs_active: Array = [] # action + persistent tariffs, run-long
 var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
 var tariffs_seen: Array = [] # every activation, for the end screens
@@ -456,6 +474,15 @@ func _ready() -> void:
 	if next_config.is_empty():
 		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
 		stock = Tuning.starting_stock(next_army, next_tier)
+		# issue 67: the other 3 determinants of a Family's kit (Stock, above,
+		# was already per-army). Starting Artefacts stays empty for all three
+		# seed Families — none of them specify one.
+		var kit := Families.entry(next_army)
+		gold = int(kit.starting_gold)
+		for key in kit.starting_items:
+			for it in Items.ITEMS:
+				if it.key == key:
+					items.append(it)
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
@@ -520,13 +547,15 @@ func _clear_selection() -> void:
 
 
 func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
-	var id: String = entry if entry is String else entry.id
 	if pool_drag_id != "":
 		# mid-drag: hiding the drawer (drag-out close) force-releases the held
 		# button, which fires a spurious tap inside the visibility cascade and
 		# corrupts the strip rebuild (found 2026-07-08). Real taps clear the
 		# drag in _input before this signal arrives.
 		return
+	if family_targeting: # Call the Banners: this tap IS the target (issue 67)
+		return _family_target_stock(entry, cap)
+	var id: String = entry if entry is String else entry.id
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
 			or preview_open or game_menu_open or win_open:
 		return
@@ -767,6 +796,7 @@ func _begin_player_turn() -> void:
 	turn_capture_count = 0
 	oak_island_used_this_turn = false # Oak Island Wishing Well (52): once per Turn
 	moscovium_active = false # Moscovium Glow Stick (52): "until end of Turn"
+	hounds_free_turn = false # Loose the Hounds (67): "this Turn" only
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
 		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
@@ -1680,6 +1710,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			final_pos = dest
 	if blitz_free:
 		moving_piece.erase("blitz_free_move")
+	elif hounds_free_turn and not did_capture: # Loose the Hounds (67): moves
+		# free this Turn, captures still pay — did_capture already excludes
+		# every capture that reached this shared branch (repel/bomb/trap
+		# captures return early above, each with their own unconditional charge)
+		pass
 	else:
 		actions_left -= 1
 	_log_action("capture" if did_capture else "move", {"from": from, "to": final_pos})
@@ -2194,6 +2229,19 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 			# this can't open the choice pick here
 			_consume_buff(pos, "piece_bounty")
 			pending_bounty_boxes += 1
+		if Families.hold_the_line(self): # Old Guard (67): refund the lost
+			# piece's full value in Gold. A structural check AFTER dispatch —
+			# same shape as lost_player/the bounty buff just above, never a
+			# g.gold write from inside a REGISTRY handler (ctx contract).
+			# `not ctx.cancel and not uncounted` (this branch's own gate) is
+			# the SAME condition every other on_piece_lost side effect here
+			# already uses: Fireproof Pajamas' veto and 'Definitely Not
+			# Russia' Patch's mask both apply to this refund for free, no
+			# separate check needed. Selling never reaches this function at
+			# all (_sell erases straight from g.stock and calls
+			# Economy.earn_gold on its own) — the "no 150% money printer"
+			# safety catch the issue calls out.
+			Economy.earn_gold(self, defs[ctx.id].value, "family_hold_the_line")
 	return ctx
 
 
@@ -2354,7 +2402,8 @@ func _activatable_held_keys() -> Array:
 ## unavailable, not silently inert").
 func _artefact_activation_available(key: String) -> bool:
 	if not _held(key) or state != State.PLAYER_TURN or box_open or buff_pick_open \
-			or win_open or item_active >= 0:
+			or win_open or item_active >= 0 or family_targeting: # issue 67: one
+			# activation/targeting in flight at a time, Family Ability included
 		return false
 	if artefact_targeting_key != "" and artefact_targeting_key != key:
 		return false # one activation/targeting in flight at a time
@@ -2625,6 +2674,122 @@ func _artefact_target_click(tile: Vector2i) -> void:
 	_add_slide(from, tile)
 	board[tile] = board[from]
 	board.erase(from)
+	_refresh()
+
+
+# --- issue 67: the Family Ability. Same Activate-section seam as the 6
+# Artefact activations above, deliberately DIFFERENT cost (1 Action, gated
+# and spent here — Artefact activation/the Shop are both 0) and back-out
+# rule (slice 52): The Muster's Call the Banners has a target, so it skips
+# the confirm modal and cancels from targeting like Bovine Tractor Beam;
+# Wild Hunt/Old Guard's Abilities are untargeted, so an accidental tap is
+# only catchable via a confirm, like Oak Island Wishing Well.
+
+## Mirrors _artefact_activation_available's shape: held (every run always
+## holds exactly one Family, unlike an Artefact), your Turn, no other
+## activation/targeting/Item mid-flight, not already spent this Wave, and —
+## the deliberate contrast with every Artefact activation above — an Action
+## to spend. The Muster's Call the Banners additionally needs a Stock entry
+## to target.
+func _family_ability_available() -> bool:
+	if state != State.PLAYER_TURN or box_open or buff_pick_open or win_open \
+			or item_active >= 0 or actions_left < 1 or family_ability_used_this_wave:
+		return false
+	if artefact_targeting_key != "":
+		return false # one activation/targeting in flight at a time
+	if next_army == "Crown":
+		return not stock.is_empty()
+	return true
+
+
+## Entry point for the HUD chip (game.gd's own hud.family_ability_pressed
+## connection, _connect_hud below).
+func _activate_family_ability() -> void:
+	if next_army == "Crown":
+		return _begin_family_targeting()
+	if not _family_ability_available():
+		return
+	if autoplay: # bot: resolve immediately, never stall on the modal (issue 52)
+		return _family_ability_confirmed()
+	var kit := Families.entry(next_army)
+	_open_choice_pick("✦ %s — activate?\n%s" % [kit.ability_name, kit.ability_desc],
+		[{"label": "Confirm", "value": true}], "Cancel",
+		func(_v) -> void: _family_ability_confirmed(), Callable())
+		# Callable() on cancel: nothing paid/consumed yet — the effect body
+		# lives entirely in _family_ability_confirmed, same as
+		# _artefact_confirmed's own "a cancelled activation costs nothing"
+
+
+## Only reachable via Confirm (untargeted) or a completed Stock tap (Muster,
+## _family_target_stock below) — re-checks availability since Gold/state/
+## actions can shift between opening the confirm and pressing it.
+func _family_ability_confirmed() -> void:
+	if not _family_ability_available():
+		return
+	match next_army:
+		"Wild Hunt": # Loose the Hounds: this Turn's moves are free; captures
+			# still pay (checked at _move_player's own actions_left -= 1 site)
+			hounds_free_turn = true
+		"Old Guard": # Shield Wall: back two rows (y=0,1) — _apply_buff's own
+			# cap refusal floats "Buffs full" per piece already at capacity,
+			# which is correct and visible (no special-casing needed here)
+			for pos in _player_pieces():
+				if pos.y < 2:
+					_apply_buff(board[pos], "shield", 0, pos)
+	family_ability_used_this_wave = true
+	actions_left -= 1
+	_log_action("family_ability") # a REAL Action spend (unlike Artefact
+		# activation, which is 0-cost and deliberately not logged) — this
+		# must bump turn_action_count, or a capture made right after
+		# activating Loose the Hounds would misread g.turn_action_count == 0
+		# and wrongly qualify as "the Turn's first capture" a second time for
+		# Blood in the Air / first_capture_extra
+	if actions_left == 0 and state == State.PLAYER_TURN:
+		return _on_pass()
+	_refresh()
+
+
+# --- The Muster's Call the Banners: the one targeted Family Ability. Not the
+# board-targeting flow above (Bovine Tractor Beam) — it targets a STOCK
+# entry, tapped off the pool strip, so it reuses _on_stack_pressed's own tap
+# routing instead (see the `family_targeting` check at that function's top).
+
+func _begin_family_targeting() -> void:
+	if family_targeting: # tap the chip again to cancel — same shape as
+		# _begin_artefact_targeting's own "tap again" cancel
+		_family_targeting_reset()
+		return _refresh()
+	if not _family_ability_available():
+		return
+	if hud.drawer_open != "stock":
+		_set_drawer("stock") # the target lives in the Stock strip, not the board
+	family_targeting = true
+	_clear_selection()
+	placing_id = ""
+	placing_cap = false
+	_refresh()
+
+
+func _family_targeting_reset() -> void:
+	family_targeting = false
+
+
+## `entry` is the exact g.stock element tapped (ADR-0002: bare id String or a
+## Dictionary carrying state) — duplicated VERBATIM into Stock, never
+## interpreted, same "Stock never interprets the state" rule that lets
+## Asset Recovery/Extraction/Zeta Reticuli Souvenir Map already copy a piece
+## into Stock for free. `cap` (a Captured Stock tap) is refused: the Ability
+## text is "a target piece from YOUR Stock", not Captured Stock.
+func _family_target_stock(entry: Variant, cap: bool) -> void:
+	if cap or not stock.has(entry):
+		return
+	_family_targeting_reset()
+	stock.append(entry.duplicate(true) if entry is Dictionary else entry)
+	family_ability_used_this_wave = true
+	actions_left -= 1
+	_log_action("family_ability") # see _family_ability_confirmed's own comment
+	if actions_left == 0 and state == State.PLAYER_TURN:
+		return _on_pass()
 	_refresh()
 
 
@@ -2965,6 +3130,7 @@ func _connect_hud() -> void:
 	hud.multi_confirm_pressed.connect(_item_confirm_multi)
 	hud.item_pressed.connect(_use_item)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
+	hud.family_ability_pressed.connect(_activate_family_ability)
 	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
 		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
 	hud.return_to_stock_pressed.connect(func() -> void:

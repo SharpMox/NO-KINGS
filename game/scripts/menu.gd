@@ -8,6 +8,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
+const Families := preload("res://scripts/families.gd")
 
 static var window_sized := false # once per launch, not on every return to menu
 
@@ -116,11 +117,13 @@ func _ready() -> void:
 	army_box.add_theme_constant_override("separation", 12)
 	army_center.add_child(army_box)
 	var pick := Label.new()
-	pick.text = "Choose your army"
+	pick.text = "Choose your Family" # issue 67: replaces the Army pick
 	pick.add_theme_font_size_override("font_size", 28)
 	army_box.add_child(pick)
-	for army_name in Tuning.ARMIES:
-		_button(army_box, army_name, 26, func() -> void:
+	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
+		# (load-bearing in the save's `army` field) — only the button's
+		# display text differs, via Families.display_name
+		_button(army_box, Families.display_name(army_name), 26, func() -> void:
 			GameScript.next_army = army_name
 			army_center.visible = false
 			rank_center.visible = true)
@@ -130,6 +133,14 @@ func _ready() -> void:
 		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		roster.modulate = Color(1, 1, 1, 0.7)
 		army_box.add_child(roster)
+		var kit: Dictionary = Families.entry(army_name)
+		var powers := Label.new()
+		powers.text = "%s · %s" % [kit.power_name, kit.ability_name]
+		powers.add_theme_font_size_override("font_size", 12)
+		powers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		powers.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
+			# in-game Family Ability chip's own tint (hud.gd)
+		army_box.add_child(powers)
 	_button(army_box, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)

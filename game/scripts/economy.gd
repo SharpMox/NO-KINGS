@@ -15,6 +15,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
+const Families := preload("res://scripts/families.gd")
 
 ## Issue 57: the Shop's restock thresholds (Shop.threshold, since replaced
 ## entirely by the issue-64 two-lane restock) were unreachable —
@@ -231,6 +232,18 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 			# instead of being doubled/spent by this one (ruled 2026-08-28 —
 			# see game.gd's _move_player).
 	})
+	if Families.blood_in_the_air(g) and g.turn_action_count == 0: # Wild Hunt
+		# (67): "your first capture each Turn refunds its Action" — the exact
+		# same condition/effect as the core `first_capture_extra` Artefact's
+		# own on_capture handler (artefact_hooks.gd _dispatch), deliberately
+		# NOT folded into that handler: held together the two must stack
+		# ADDITIVELY (two refunds), so this is its own independent check at
+		# the same call site, not a second REGISTRY entry reading the same
+		# ctx. g.turn_action_count is still 0 here — this call always runs
+		# BEFORE the caller's own _log_action increments it (game.gd
+		# _move_player), same ordering first_capture_extra relies on.
+		g.actions_left += 1
+		g.actions_max += 1
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
 	g.run_capture_count += 1

@@ -73,25 +73,44 @@ func _init() -> void:
 	check(await _click_button(menu, "TEST"), "TEST button visible")
 	await process_frame
 	check(_find_button(menu, "← Back") != null, "TEST opens the scenario list")
-	# issue 77: the list is sectioned, and the point of sectioning is that
-	# every entry stays REACHABLE. Assert a scenario from the LAST section —
-	# the deepest thing in the list — is actually there. The six-Army menu
-	# overflow was exactly this bug: content existed but a real player could
-	# not get to it, and only a windowed probe saw it.
+	# issue 77: the list is sectioned, and the point of sectioning is that every
+	# entry stays REACHABLE. The six-Army menu overflow was exactly this bug:
+	# content existed but a real player could not get to it, and only a windowed
+	# probe saw it.
+	#
+	# issue 79: sections now COLLAPSE and start collapsed, because the 180
+	# generated Artefact sandboxes take this list to 240 entries. So
+	# reachability is a two-step property — the header must open, and the entry
+	# must then be clickable — and both steps are asserted here. A probe that
+	# only looked for the button by text would pass against a list that never
+	# expands, since _find_button is visible-first.
+	var headers: Array[Button] = []
+	for sec_child in menu.test_scroll.get_child(0).get_children():
+		if sec_child is Button and sec_child.text.begins_with("▸"):
+			headers.append(sec_child)
+	check(headers.size() >= 5,
+		"scenarios are grouped into collapsible sections (%d headers)" % headers.size())
+	var showing := 0
+	for sec_child in menu.test_scroll.get_child(0).get_children():
+		if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
+				and not sec_child.text.begins_with("▸"):
+			showing += 1
+	check(showing == 0, "every section starts collapsed (%d rows showing)" % showing)
+
+	# open the LAST section and reach its LAST entry — the deepest thing here
+	var last_head: Button = headers[headers.size() - 1]
+	check(await _click_button(menu, last_head.text), "a section header is clickable")
+	await process_frame
+	check(last_head.text.begins_with("▾"), "the opened header reads as expanded")
 	var deepest := ""
 	for sec_child in menu.test_scroll.get_child(0).get_children():
-		if sec_child is Button and sec_child.text != "← Back":
+		if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
+				and not sec_child.text.begins_with("▸") \
+				and not sec_child.text.begins_with("▾"):
 			deepest = sec_child.text
-	check(deepest != "", "the sectioned list renders scenario buttons")
+	check(deepest != "", "opening a section reveals its scenario buttons")
 	check(_find_button(menu, deepest) != null,
-		"the LAST scenario in the list is reachable, not clipped past the viewport (%s)"
-			% deepest)
-	# and the section headers themselves rendered
-	var headers := 0
-	for sec_child in menu.test_scroll.get_child(0).get_children():
-		if sec_child is Label and sec_child.text.ends_with(")"):
-			headers += 1
-	check(headers >= 5, "scenarios are grouped into sections (%d headers)" % headers)
+		"the LAST scenario of the LAST section is reachable, not clipped (%s)" % deepest)
 
 	# Back returns to the main menu
 	check(await _click_button(menu, "← Back"), "Back button clickable")
@@ -103,7 +122,10 @@ func _init() -> void:
 	await _click_button(menu, "TEST")
 	await process_frame
 	GameScript.next_config = {}
-	check(await _click_button(menu, "King wave (checkmate to win)"), "scenario button clickable")
+	# `deepest` rather than a named scenario: it is inside the section opened
+	# above, so this also proves the expanded state SURVIVES Back-and-reopen —
+	# Back only hides the list, it does not rebuild it.
+	check(await _click_button(menu, deepest), "scenario button clickable")
 	await process_frame
 	check(not GameScript.next_config.is_empty(), "scenario click stages its config")
 

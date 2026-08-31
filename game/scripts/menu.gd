@@ -146,18 +146,37 @@ func _ready() -> void:
 		if b == "Other":
 			return true
 		return groups[a].size() > groups[b].size())
+	# issue 79: sections COLLAPSE, and start collapsed. 77's sectioning was
+	# enough for 53 entries; the 180 generated Artefact sandboxes take the list
+	# to 240, and a 240-row scroll is the flat list all over again — the last
+	# section would be minutes of dragging away. Collapsed-by-default turns the
+	# whole catalog into nine headers on one screen, at the cost of one extra
+	# click to reach any entry. That trade is only worth it at this size, which
+	# is why 77 did not make it.
 	for sec in ordered:
-		var sec_head := Label.new()
-		sec_head.text = "%s  (%d)" % [sec.to_upper(), groups[sec].size()]
+		var rows: Array[Button] = []
+		var sec_head := Button.new()
+		sec_head.flat = true # a header that happens to be clickable, not a CTA
 		sec_head.add_theme_font_size_override("font_size", 11)
 		sec_head.modulate = Color(1, 1, 1, 0.55) # same dimmed-header idiom the
 			# inventory drawer's Activate section uses
+		var relabel := func(open: bool) -> void:
+			sec_head.text = "%s  %s  (%d)" % ["▾" if open else "▸",
+				sec.to_upper(), groups[sec].size()]
+		relabel.call(false)
 		test_box.add_child(sec_head)
 		for s in groups[sec]:
-			_button(test_box, s.name, 15, func() -> void:
+			var row := _button(test_box, s.name, 15, func() -> void:
 				GameScript.next_config = s.cfg
 				GameScript.is_scenario = true # scenarios never autosave
 				get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+			row.visible = false
+			rows.append(row)
+		sec_head.pressed.connect(func() -> void:
+			var open := not rows[0].visible
+			for r in rows:
+				r.visible = open
+			relabel.call(open))
 	_button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
@@ -379,9 +398,10 @@ func _army_summary(army: Array) -> String:
 	return " · ".join(parts)
 
 
-func _button(parent: Container, text: String, size: int, on_press: Callable) -> void:
+func _button(parent: Container, text: String, size: int, on_press: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.add_theme_font_size_override("font_size", size)
 	b.pressed.connect(on_press)
 	parent.add_child(b)
+	return b

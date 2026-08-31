@@ -166,6 +166,66 @@ func _init() -> void:
 	var snap: Dictionary = SaveConfig.to_config(g)
 	check(snap.get("pending_king", {}).get("king_id", "") == "nero",
 		"a pending King is captured into the save")
+
+	# --- issue 91: the Power/Ability engine ---------------------------------
+	# Trump is the only King whose kit is ruled; the other 15 no-op by design.
+	check(Kings.kit_of("donald_trump").has("power_name"), "Trump has a kit")
+	check(Kings.kit_of("nero").is_empty(), "a King with no kit yet returns {}")
+
+	# the Power comes on with the WAVE, and is live through segment 1 — before
+	# the King is on the board at all (ruling 6)
+	var t: Node2D = _boot({"board": [], "wave": 49})
+	await process_frame
+	await process_frame
+	t.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
+	t._queue_wave(50)
+	check(t.king_power_tariff != "", "the King's Power is in force during segment 1")
+	check(Kings.active_id(t) == "donald_trump",
+		"and the active King is resolved from the HELD King, not the board")
+	var live := false
+	for a in t.tariffs_active:
+		if a.get("key", "") == t.king_power_tariff:
+			live = true
+	check(live, "the Power's Tariff is actually active, not just recorded")
+
+	# ...and it does NOT outlive its wave. A Power that leaked into wave 51
+	# would be a permanent difficulty increase nobody chose.
+	t._queue_wave(51)
+	check(t.king_power_tariff == "", "the Power is cleared when the wave ends")
+	var leaked := false
+	for a in t.tariffs_active:
+		if a.get("key", "") == "inflation":
+			leaked = true
+	check(not leaked, "and its Tariff is removed, not left running")
+
+	# the Ability needs the King ON THE BOARD: during segment 1 the Power is
+	# live but the King has not arrived, and an Ability from a King the player
+	# cannot see or attack would be unanswerable
+	t._queue_wave(50)
+	check(not Kings.fire_ability(t), "no Ability during segment 1 — the King is not there yet")
+	check(not t.king_ability_used_this_wave, "and nothing is spent by the attempt")
+
+	t.turns_since_wave = 99
+	WaveLogic.release_king_if_due(t)
+	WaveLogic.spawn_pending(t)
+	t.board[Vector2i(3, 2)] = {"id": "queen", "owner": Rules.PLAYER}
+	t.board[Vector2i(4, 2)] = {"id": "pawn", "owner": Rules.PLAYER}
+	var before: int = t._player_pieces().size()
+	check(Kings.fire_ability(t), "segment 2: the Ability fires")
+	check(t.king_ability_used_this_wave, "and marks itself used")
+	check(t._player_pieces().size() == before - 1,
+		"JD Vance destroyed a player piece (%d -> %d)" % [before, t._player_pieces().size()])
+	check(not Kings.fire_ability(t), "ONCE per Wave — a second attempt does nothing")
+
+	# a King with no kit must not consume an Action for an Ability it lacks
+	t.king_ability_used_this_wave = false
+	for pos in t.board:
+		if t.board[pos].get("id", "") == "king":
+			t.board[pos].king_id = "nero"
+	check(not Kings.fire_ability(t), "a kitless King fires nothing")
+	check(not t.king_ability_used_this_wave, "and is charged no Action for it")
+	t.queue_free()
+	await process_frame
 	g.queue_free()
 	await process_frame
 

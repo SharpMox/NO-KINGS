@@ -42,6 +42,7 @@ static func queue(g, n: int) -> void:
 		# the "Shop visit" boundary onto the same no-REGISTRY activation
 		# army as zapruder/bovine above, so it resets the same way here)
 	g.army_ability_used_this_wave = false # the Army Ability (67), same idiom
+	g.king_ability_used_this_wave = false # the King Ability (91), same idiom again
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
@@ -55,6 +56,10 @@ static func queue(g, n: int) -> void:
 	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
 		Color(1.0, 0.8, 0.3))
 	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # Trade War (issue 13)
+	# issue 91: the King's Power comes on with its WAVE, not with the King —
+	# ruling 6 makes it live for both segments, so the 15 turns before the King
+	# lands already carry that King's identity.
+	Kings.apply_power(g, king.get("id", "") if not king.is_empty() else "")
 	for id in roster:
 		var entry := {"id": id}
 		if id == "king":
@@ -103,7 +108,12 @@ static func release_king_if_due(g) -> void:
 		return
 	if g.turns_since_wave < Tuning.KING_SEGMENT_TURNS:
 		return
-	g.pending_spawn.append(g.pending_king)
+	# push_front, not append: the King is the event of the wave and must not
+	# queue behind ordinary spawns. Appending let a full spawn row stop the
+	# queue BEFORE reaching the King — the landing guarantee below only
+	# inspects the head of the queue, so a King sitting behind a spilled
+	# spawn never got the chance to displace.
+	g.pending_spawn.push_front(g.pending_king)
 	g.pending_king = {}
 	g._add_turn_fx("THE KING ARRIVES", Color(1.0, 0.45, 0.35))
 

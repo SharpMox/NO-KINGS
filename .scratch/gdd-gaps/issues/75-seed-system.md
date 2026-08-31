@@ -1,6 +1,6 @@
 # 75 — Player-facing seeded runs
 
-Status: todo — READY · smaller than it looks
+Status: partial (2026-08-31) — mechanism done, UI half remains
 
 ## Parent
 
@@ -60,3 +60,28 @@ players will report "broken seeds" as bugs. Recommend showing `seed @ version`.
 ## Blocked by
 
 - nothing
+
+## Outcome — mechanism shipped, UI half remains
+
+`--seed <anything>` (PR #253). Digits used as-is; anything else hashed, so words work.
+
+**Proved end to end rather than asserted:**
+
+```
+--seed no-kings-42  ->  WIN, wave 50, score 105500, 666 turns
+--seed no-kings-42  ->  WIN, wave 50, score 105500, 666 turns
+--seed different    ->  LOSS, wave 47, score 78400
+```
+
+Identical to the turn count; a different seed diverges completely.
+
+`test_seed.gd` asserts **both** directions deliberately — same-seed-reproduces alone would pass
+even if the seed were ignored entirely, since the game would then be deterministic by accident.
+
+### Still to do
+
+- A **seed field on the new-run screen**, and the seed shown on the **results screen**.
+- **Decide whether to display the build version beside a shared seed.** Seeds are only stable
+  within a build; any content change that shifts how many rolls happen invalidates them
+  (slices 47 and 48 each did this to a pinned-seed test). Without the version, players will
+  report working-as-designed seeds as bugs.

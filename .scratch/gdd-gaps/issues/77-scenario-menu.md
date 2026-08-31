@@ -1,6 +1,6 @@
 # 77 — Scenario menu: fit the screen, vertical scroll, subsections
 
-Status: todo — SPECCED (user ruling 2026-08-31) · ready
+Status: done (2026-08-31)
 
 ## Parent
 

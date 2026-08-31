@@ -22,6 +22,7 @@
 ##   pull(key: String) -> Variant   # envelope Dictionary, or null
 ##   account_id() -> String         # issue 83: stable account id, "" if none
 
+const SyncQueue := preload("res://scripts/sync_queue.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 const GameCenter := preload("res://scripts/cloud/cloud_backend_game_center.gd")
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
@@ -53,8 +54,22 @@ static func _envelope(payload: Variant) -> Dictionary:
 ## plugin yet — offline play must never block or fail on this.
 static func push(key: String, payload: Variant) -> bool:
 	if not backend.is_available():
+		# issue 84: unreachable is not a failure, it is deferred. Offline play
+		# while signed in must never block or prompt — the push is queued and
+		# drained on reconnect.
+		SyncQueue.enqueue(key, payload)
 		return false
 	return backend.push(key, _envelope(payload))
+
+
+## issue 84: send everything queued while offline. Safe to call at any boot —
+## a no-op with an empty queue or an unavailable backend. A push that fails
+## mid-drain keeps its queue entry; the rest of the queue is not lost with it.
+static func drain_queue() -> int:
+	if not backend.is_available():
+		return 0
+	return SyncQueue.drain(func(key: String, payload: Variant) -> bool:
+		return backend.push(key, _envelope(payload)))
 
 
 ## Pull the cloud envelope for a named save, or null if there is none / the
@@ -74,9 +89,28 @@ static func pull(key: String) -> Variant:
 static func resolve(local_ts: int, local_payload: Variant, remote: Variant) -> Variant:
 	if not (remote is Dictionary) or not remote.has("data") or not remote.has("ts"):
 		return local_payload
+	# issue 84 — HIGHEST WAVE WINS, ahead of the timestamp. The user's rule for
+	# the same account on two devices, and it works precisely because progress
+	# here is monotonic: deepest-wave only ever increases, so "highest wins" is
+	# well-defined and needs no timestamps, no three-way merge and no clock
+	# agreement between devices. Do not add one.
+	#
+	# Falls through to last-write-wins when either side carries no wave (scores
+	# and history are not run states), or when the waves are equal.
+	var local_wave := _wave_of(local_payload)
+	var remote_wave := _wave_of(remote.data)
+	if local_wave >= 0 and remote_wave >= 0 and local_wave != remote_wave:
+		return local_payload if local_wave > remote_wave else remote.data
 	if local_payload != null and int(remote.ts) <= local_ts:
 		return local_payload
 	return remote.data
+
+
+## The wave a payload reached, or -1 when it is not a run state at all.
+static func _wave_of(payload: Variant) -> int:
+	if not (payload is Dictionary) or not payload.has("wave"):
+		return -1
+	return int(payload.wave)
 
 
 ## Full mirror step for one on-disk save at `path`: pull the cloud copy,

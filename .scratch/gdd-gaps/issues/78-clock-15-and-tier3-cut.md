@@ -1,6 +1,6 @@
 # 78 — Clock starts at 15 minutes; Tier 3+ cuts it back to 5
 
-Status: todo — SPECCED (user ruling 2026-08-31) · ready
+Status: done (2026-08-31) — **and it unlocked the endgame**
 
 ## Parent
 
@@ -71,3 +71,46 @@ between low and high difficulty rather than shifting everything.
 ## Blocked by
 
 - nothing
+
+## Outcome — the sweep changed what this slice is
+
+`CLOCK_START_MS` 5 -> 15 min; `CLOCK_START_MS_HARD` (5 min) applies at Tier 3+ via
+`Tuning.clock_start_ms(tier)`.
+
+### The measured result: the game is now winnable, and Kings are reachable
+
+A 6-run Tier-1 autoplay sweep, after:
+
+| run | result | wave | score |
+| --- | --- | --- | --- |
+| 1 | **WIN — Wave-50 King checkmated** | 50 | 104,300 |
+| 2 | **WIN — Wave-50 King checkmated** | 50 | 102,400 |
+| 3 | **WIN — Wave-50 King checkmated** | 50 | 104,300 |
+| 4 | **WIN — Wave-50 King checkmated** | 50 | 103,200 |
+| 5 | LOSS — resource starvation | 49 | 90,800 |
+| 6 | LOSS — resource starvation | 8 | 900 |
+
+**4 of 6 runs now win.** Before this slice, runs ended around **wave 43-46** and *no run had
+ever reached a King*.
+
+Two things changed, not one:
+
+1. **Kings are now content players actually meet.** The parked "Kings appear at wave 50, runs
+   end at 45" problem is **solved as a side effect**. The 16-King cast and their Powers and
+   Abilities stop being work for an endgame nobody sees — which makes the Kings design session
+   considerably more valuable than it was this morning.
+2. **The binding constraint moved.** Losses are now *resource starvation*, not the Clock. Run 5
+   died at wave 49 with 90k score — a real defeat, not a timeout. That is a better failure
+   mode: the player loses to the board, not the timer.
+
+Run 6 (wave 8) shows the variance is still wide, which is fine — the bot is not a good player.
+
+### Notes
+
+- `test_tiers.gd` asserts the whole ladder plus, explicitly, the **Tier 2 -> Tier 3 boundary**
+  — asserting only Tiers 1 and 5 would pass with the cut placed a rung wrong.
+- **A real ordering bug was caught by the live test**, not the pure-math one: `save_config.gd`
+  read `g.next_tier` 19 lines *before* it was assigned, so every config silently got Tier 1's
+  15 minutes. The pure-math assertions passed the whole time. Fixed by moving the Clock
+  assignment after `next_tier` resolves — and the reason is now a comment there.
+- The save key is `rank`, not `tier` — a test config using `"tier"` is silently ignored.

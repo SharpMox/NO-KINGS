@@ -261,6 +261,35 @@ func _init() -> void:
 	old.queue_free()
 	await process_frame
 
+	# --- issue 78: starting Clock 15 min, cut to 5 at Tier 3+ ---
+	# Pure-math first, across the whole ladder, so an off-by-one in tier_index
+	# cannot hide. Tier 3 is the BOUNDARY and the one that actually matters:
+	# asserting only Tiers 1 and 5 would pass with the cut placed a rung wrong.
+	for i in Tuning.TIERS.size():
+		var t: String = Tuning.TIERS[i]
+		var want: int = Tuning.CLOCK_START_MS_HARD if i >= 2 else Tuning.CLOCK_START_MS
+		check(Tuning.clock_start_ms(t) == want,
+			"%s: starting Clock is %d min (15 at Tiers 1-2, 5 at Tier 3+)"
+				% [t, want / 60000])
+	check(Tuning.clock_start_ms("Tier 2") == 15 * 60 * 1000
+			and Tuning.clock_start_ms("Tier 3") == 5 * 60 * 1000,
+		"the cut lands exactly at the Tier 2 -> Tier 3 boundary, not a rung either side")
+
+	# ...and live, through a real boot: the fresh-run path must read the tier,
+	# not the bare constant.
+	var lo := _boot({"rank": "Tier 1", "board": [["queen", 0, 2, 2]]})
+	await process_frame
+	check(lo.clock_ms > 14.0 * 60_000.0,
+		"Tier 1 boots with the full 15 minutes on the Clock")
+	lo.queue_free()
+	await process_frame
+	var hi := _boot({"rank": "Tier 3", "board": [["queen", 0, 2, 2]]})
+	await process_frame
+	check(hi.clock_ms < 6.0 * 60_000.0,
+		"Tier 3 boots with 5 minutes — the mid-rung cut applies on a real run")
+	hi.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL TIER CHECKS OK")

@@ -72,7 +72,13 @@ const CADENCE_BASE := 6            # GDD Wave Catalog: cadence = 6 + piece count
 const BACKROW_COMMIT_COUNT := BOARD_W
 const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
 
-const CLOCK_START_MS := 5 * 60 * 1000   # 30 min → 5 (user call 2026-07-07)
+const CLOCK_START_MS := 15 * 60 * 1000  # 30 → 5 (2026-07-07) → 15 (issue 78,
+                                        # user call 2026-08-31). Tier 3+ cuts it
+                                        # back to CLOCK_START_MS_HARD below, so
+                                        # this widens the difficulty range rather
+                                        # than shifting it: low tiers get 3x the
+                                        # Clock, high tiers keep what they had.
+const CLOCK_START_MS_HARD := 5 * 60 * 1000  # Tier 3+ (issue 78) — the old value
 const TURN_END_CLOCK_BONUS_MS := 5 * 1000 # +5s for finishing a turn (2026-07-07)
 # Early wave clear (2026-07-07): board emptied N turns before the next wave
 # spawns → +N× these. Amounts are playtest assumptions on the ×10 economy.
@@ -233,6 +239,12 @@ static func tier_index(tier: String) -> int:
 
 static func clock_never_pauses(tier: String) -> bool:
 	return tier_index(tier) >= 1
+
+
+## Starting Clock: Tier 3+ (the mid rung) drops from 15 minutes back to the old
+## 5 (issue 78). Cumulative like every other tier rule, so Tiers 4-5 inherit it.
+static func clock_start_ms(tier: String) -> int:
+	return CLOCK_START_MS_HARD if tier_index(tier) >= 2 else CLOCK_START_MS
 
 static func shop_row_delta(tier: String) -> int:
 	return -1 if tier_index(tier) >= 2 else 0

@@ -441,21 +441,12 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	autoplay_exit = autoplay
-	# issue 74: the pixel filter is deliberately NOT applied in-game. The board
-	# is where the art lives — painted piece tokens now, Artefact art later —
-	# and the user's call is that art dodges the filter entirely, because
-	# quantising a hand-drawn token distorts it rather than stylising it.
-	#
-	# This is not a preference, it is the only clean option: a full-screen
-	# post-effect quantises everything composited BELOW it, so exempting art
-	# would mean drawing art ABOVE the filter — and the UI has to render above
-	# the board, so the two requirements invert. Filtering the menus (which
-	# carry no art) and leaving the game alone satisfies both with no layering
-	# contortions. --pixel still works here for comparison shots.
-	if args.has("--pixel"):
-		var pf := preload("res://scripts/pixel_filter.gd").new()
-		add_child(pf)
-		pf.set_factor(pf.factor_from_args(args))
+	# issue 74: no pixel filter here or anywhere. What shipped is hard-edged text
+	# (Settings._crisp_text, applied by the apply() above), which touches only
+	# glyph rasterisation — so the painted piece tokens are left exactly as
+	# drawn. That was the requirement any quantising filter kept failing: art
+	# has to dodge the effect, but a full-screen post-effect quantises
+	# everything composited below it, and the UI has to render above the board.
 	if args.has("--screenshot"):
 		screenshot_dir = args[args.find("--screenshot") + 1]
 		if not autoplay: # with --autoplay, the end screen is captured instead

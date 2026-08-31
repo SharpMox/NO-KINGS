@@ -10,6 +10,7 @@ const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
 const Account := preload("res://scripts/account.gd")
+const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 ## The local saves an account owns. Passed to Account.sign_in so the rebind
 ## restamps them — the guest's progress comes with them because it was never a
@@ -372,7 +373,16 @@ func _show_scores() -> void:
 	head.text = "High scores"
 	head.add_theme_font_size_override("font_size", 28)
 	box.add_child(head)
-	var scores := GameScript.load_scores()
+	# issue 85: local unioned with the cloud board when there is one. The local
+	# board is NOT replaced — it is exactly what shows when the cloud is
+	# unreachable, which is the normal case rather than a failure.
+	var scores := Leaderboard.board(GameScript.load_scores())
+	var status := Label.new()
+	status.add_theme_font_size_override("font_size", 12)
+	status.modulate = Color(1, 1, 1, 0.55)
+	status.text = "Cloud scores included." if Leaderboard.cloud_available() \
+		else "Local scores — sign in to compare."
+	box.add_child(status)
 	if scores.is_empty():
 		var none := Label.new()
 		none.text = "No runs yet"

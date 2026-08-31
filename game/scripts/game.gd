@@ -63,8 +63,8 @@ static func load_history() -> Array:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(HISTORY_PATH))
 	return parsed if parsed is Array else []
 
-const COL_LIGHT := Color("f0d9b5")
-const COL_DARK := Color("b58863")
+const COL_LIGHT := Color("FFEFD7") # NOKINGSBG palette (issue 70)
+const COL_DARK := Color("646385") # NOKINGSBG palette (issue 70)
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 # side shift for monochrome tokens only — the painted art carries its own colour

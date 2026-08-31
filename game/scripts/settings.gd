@@ -42,18 +42,32 @@ static func apply(data: Dictionary) -> void:
 ## blur; removing it is the entire effect, at native resolution, with no
 ## shader, no viewport and no coordinate-space shift for the click probes.
 ##
-## Mutates the theme fallback rather than a Theme resource so it reaches every
-## Control with no per-scene wiring. Duplicates rather than writing to the
-## built-in, and no-ops once already applied.
+## BOTH font slots have to be hardened, and this is the whole trap:
+## `ThemeDB.fallback_font` is only consulted when nothing else supplies a font,
+## and the DEFAULT THEME supplies one. Hardening the fallback alone therefore
+## sets a property nothing reads — the first version of this shipped exactly
+## that, changed no pixels, and every assertion about it still passed because
+## they read back the property that had just been written.
+##
+## `test_settings.gd` now asks a live Label and Button what they RESOLVE
+## (`get_theme_font("font")`) instead, which is the only form of this assertion
+## that can fail when the effect is absent.
 static func _crisp_text() -> void:
-	var f := ThemeDB.fallback_font
+	var theme := ThemeDB.get_default_theme()
+	theme.default_font = _hardened(theme.default_font)
+	ThemeDB.fallback_font = _hardened(ThemeDB.fallback_font)
+
+
+## A copy of `f` with antialiasing off — or `f` untouched when it is not a
+## FontFile or is already hard, so repeated boots do not re-duplicate.
+static func _hardened(f: Font) -> Font:
 	if not (f is FontFile) or f.antialiasing == TextServer.FONT_ANTIALIASING_NONE:
-		return
+		return f
 	var hard: FontFile = f.duplicate()
 	hard.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 	hard.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	hard.hinting = TextServer.HINTING_NONE
-	ThemeDB.fallback_font = hard
+	return hard
 
 
 ## Shared, full-rect, initially-hidden Settings panel built as a child of

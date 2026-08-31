@@ -149,3 +149,33 @@ keeping the shader would have been dead code with a config knob on it.
 
 `game/tests/run_all.sh` — **ALL GREEN** (foreground, alone). No test changed: the effect is
 purely visual and the probes were never sensitive to it.
+
+---
+
+## CORRECTION (2026-08-31) — the first version shipped as a no-op
+
+**PR #267's `_crisp_text()` changed no pixels.** It hardened `ThemeDB.fallback_font`, which is
+only consulted when nothing else supplies a font — and `ThemeDB.get_default_theme()` supplies
+one. Every Control resolved the default theme's font, still antialiased.
+
+Caught by looking at a fresh `--screenshot` capture and noticing the title still had soft grey
+edges, then asking a live Label what it actually resolves:
+
+```
+fallback_font AA after apply(): 0     <- the property was set
+default theme has its own font: true
+what a Label RESOLVES:          AA=1  <- ...and nothing read it
+```
+
+**Why the tests missed it:** there were none for it, and the obvious one would not have helped.
+An assertion that reads back `ThemeDB.fallback_font.antialiasing` passes against the broken
+version — it confirms the write, not the effect. The only assertion that can fail here is one
+that asks a **live Control** what it resolves.
+
+**Fixed**: both slots are hardened (`theme.default_font` and `ThemeDB.fallback_font`), via a
+shared `_hardened()` helper. `test_settings.gd` gained two assertions that construct a real
+Label and Button and check `get_theme_font("font")`. **Proven to catch the defect**: stubbing
+out the `theme.default_font` line makes both fail; with the fix they pass.
+
+Shipped result: `74-assets/shipped-crisp-menu.png` — this is the 1x look the user approved,
+now actually rendering.

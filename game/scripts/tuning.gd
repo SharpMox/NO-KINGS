@@ -185,6 +185,22 @@ const ARMIES := {
 		# are income; alibaba leaps 2 so it earns too)
 		"ferz", "ferz", "ferz", "ferz", "wazir", "wazir", "wazir", "wazir",
 		"knight", "alibaba", "alibaba"],
+	# issue 68: three more Families, same "one shape, ballpark numbers"
+	# license as the three above (issue 68's own header: "all numbers are
+	# ballpark and tunable later").
+	"Syndicate": [ # money: a thin kit (6 pawns + knight, 130) — Insider
+		# Rates and triple starting Gold carry this family, not piece count
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "knight"],
+	"Cult": [ # buffs: "standard stock" (issue 68) read as Crown's own
+		# classic-chess kit verbatim — the family's identity is Communion/
+		# Ritual/2 starting Artefacts, not a piece gimmick (no source for a
+		# different shape, so the un-modified baseline stands)
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
+		"rook", "bishop", "knight"],
+	"Horde": [ # swarm: 14 pawns, no majors — merge fuel, not an army
+		# (issue 68's own text)
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
+		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn"],
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 

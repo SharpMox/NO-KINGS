@@ -14,7 +14,7 @@ static var window_sized := false # once per launch, not on every return to menu
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
-var army_center: CenterContainer
+var army_center: ScrollContainer
 var rank_center: CenterContainer
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
@@ -108,12 +108,22 @@ func _ready() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
 
-	# army select: Play goes here; each army is a button + composition line
-	army_center = CenterContainer.new()
+	# army select: Play goes here; each army is a button + composition line.
+	# ScrollContainer, not CenterContainer (issue 68): 6 Families' worth of
+	# buttons + roster + Power/Ability lines overflow the fixed 480x800
+	# portrait window — the same scrollable-list shape test_scroll/
+	# history_scroll/guide_scroll already use below, so every entry (and the
+	# trailing Back button) stays reachable regardless of Family count.
+	army_center = ScrollContainer.new()
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	army_center.offset_left = 40
+	army_center.offset_top = 30
+	army_center.offset_right = -40
+	army_center.offset_bottom = -30
 	army_center.visible = false
 	add_child(army_center)
 	var army_box := VBoxContainer.new()
+	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	army_box.add_theme_constant_override("separation", 12)
 	army_center.add_child(army_box)
 	var pick := Label.new()

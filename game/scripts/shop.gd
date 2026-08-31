@@ -11,6 +11,7 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
+const Families := preload("res://scripts/families.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
 ## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
@@ -185,6 +186,12 @@ static func price(g, slot: Dictionary) -> int:
 			if t.key == "mar-a-lago-toilet-papers":
 				amount = 0.0
 				break
+	if Families.insider_rates(g): # The Syndicate's Insider Rates (issue 68):
+		# Shop buy prices -25% — a flat final multiplier, same seam as the two
+		# absolute overrides just above (0 * 0.75 is still 0, so ordering
+		# against them doesn't matter); Buy only, never sell_price()/
+		# sell_payout() below share this constant.
+		amount *= 0.75
 	return maxi(roundi(amount), 0)
 
 
@@ -336,16 +343,35 @@ static func buy(g, index: int) -> bool:
 ## exact number too (game.gd._convert_captured) — deliberately the same
 ## constant, not a second one (Tuning.SELL_RATE's own header explains why).
 static func sell_price(g, kind: String, entry) -> int:
-	var base: float
+	return floori(_sell_base(g, kind, entry) * Tuning.SELL_RATE)
+
+
+## The buy-price-equivalent base a held entry's sell/convert value scales off
+## — split out of sell_price (issue 68) so sell_payout below can apply a
+## different rate to the SAME base without duplicating this lookup.
+static func _sell_base(g, kind: String, entry) -> float:
 	match kind:
 		"piece", "captured":
 			var id: String = entry if entry is String else entry.id
-			base = float(g.defs[id].value)
+			return float(g.defs[id].value)
 		"item":
-			base = float(Tuning.SHOP_ITEM_PRICE[entry.tier])
+			return float(Tuning.SHOP_ITEM_PRICE[entry.tier])
 		_: # "artefact"
-			base = float(Tuning.SHOP_ARTEFACT_PRICE.get(entry.get("rarity", ""), Tuning.SHOP_ARTEFACT_PRICE[""]))
-	return floori(base * Tuning.SELL_RATE)
+			return float(Tuning.SHOP_ARTEFACT_PRICE.get(entry.get("rarity", ""), Tuning.SHOP_ARTEFACT_PRICE[""]))
+
+
+## The Syndicate's Insider Rates (issue 68): an actual SELL payout is +25%
+## (50% -> 62.5%), floored ONCE against the raw base — not 1.25x an
+## already-floored sell_price(), which would silently disagree with "62.5%"
+## on an odd value (e.g. a 7-value piece: floor(7*0.625)=4, not
+## floor(floor(7*0.5)*1.25)=3). Every REAL sell call site (game.gd._sell,
+## modals.gd's Sell-mode display) reads this, never sell_price() above —
+## Captured -> Stock conversion (game.gd._convert_captured, modals.gd's
+## Convert-mode display) keeps reading sell_price() at the flat rate; see
+## Families.insider_rates' own header for why that split is deliberate.
+static func sell_payout(g, kind: String, entry) -> int:
+	var rate := Tuning.SELL_RATE * 1.25 if Families.insider_rates(g) else Tuning.SELL_RATE
+	return floori(_sell_base(g, kind, entry) * rate)
 
 
 ## The live array a held entry of `kind` lives in — the single place both

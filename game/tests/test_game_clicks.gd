@@ -1229,6 +1229,73 @@ func _init() -> void:
 			and game.family_ability_used_this_wave,
 		"tapping the Stock stack duplicates it (2 pawns in Stock now) and spends the once-per-Wave charge")
 
+	# --- issue 68: Hostile Takeover (The Syndicate) — the OTHER targeted
+	# Family Ability, a BOARD target (not a Stock one), so it follows Bovine
+	# Tractor Beam's flow above: no confirm modal, targeting hands the drawer
+	# back to the board, tap-the-chip-again cancels.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"army": "Syndicate", "wave": 1, "gold": 1000,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for Hostile Takeover")
+	await process_frame
+	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
+		"the Hostile Takeover chip is clickable")
+	await process_frame
+	check(not game.buff_pick_open and game.family_board_targeting and game.hud.drawer_open == "",
+		"clicking Hostile Takeover stages targeting and hands the board back — no confirm modal (it has a target instead)")
+	check(await _click_button_in(game.hud, "Inventory 0"),
+		"Inventory reopens to reach the chip mid-targeting")
+	await process_frame
+	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
+		"the chip stays clickable mid-targeting (to cancel)")
+	await process_frame
+	check(not game.family_board_targeting and game.board.has(Vector2i(7, 10)) \
+			and not game.family_ability_used_this_wave and game.gold == 1000,
+		"tapping the chip again CANCELS FROM TARGETING — no purchase, no charge, board untouched")
+	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
+		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
+	await process_frame
+	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # the enemy Rook: commit
+	await process_frame
+	check(not game.family_board_targeting and not game.board.has(Vector2i(7, 10)) \
+			and game.stock.has("rook") and game.family_ability_used_this_wave,
+		"tapping the enemy Rook completes Hostile Takeover: it leaves the board and joins Stock")
+
+	# --- issue 68: Conscription (The Horde) — untargeted, same confirm shape
+	# as Shield Wall/Oak Island above.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"army": "Horde", "wave": 1,
+		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for Conscription")
+	await process_frame
+	check(await _click_button_in(game.hud.activate_box, "★Conscription"),
+		"the Conscription chip is clickable")
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"clicking untargeted Conscription opens the confirm modal, same as an untargeted Artefact")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
+	await process_frame
+	check(not game.buff_pick_open and game.stock.is_empty() and not game.family_ability_used_this_wave,
+		"cancelling the confirm costs nothing — no pawns added, Wave flag untouched")
+	check(await _click_button_in(game.hud.activate_box, "★Conscription"),
+		"the chip is clickable again after a cancel, drawer untouched")
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
+	await process_frame
+	check(not game.buff_pick_open and game.family_ability_used_this_wave \
+			and game.stock.size() == 2 and game.stock.count("pawn") == 2,
+		"confirming activates it: 2 pawns added to Stock")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

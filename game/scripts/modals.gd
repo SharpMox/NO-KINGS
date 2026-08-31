@@ -650,7 +650,7 @@ func _sell_tile(kind: String, index: int) -> Button:
 	if kind == "captured": # a visual tell distinct from ordinary Stock
 		btn.modulate = Color(1.0, 0.85, 0.6)
 	var price := Label.new()
-	price.text = "+$%d" % Shop.sell_price(g, kind, entry)
+	price.text = "+$%d" % Shop.sell_payout(g, kind, entry)
 	price.add_theme_font_size_override("font_size", 10)
 	price.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
@@ -719,7 +719,7 @@ func _sell_detail(kind: String, index: int) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 2)
 	var name := Label.new()
-	name.text = "%s — sell +$%d" % [_sell_name(kind, entry, id), Shop.sell_price(g, kind, entry)]
+	name.text = "%s — sell +$%d" % [_sell_name(kind, entry, id), Shop.sell_payout(g, kind, entry)]
 	name.add_theme_font_size_override("font_size", 16)
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(name)
@@ -761,7 +761,7 @@ func _sell_detail(kind: String, index: int) -> Control:
 			shop_convert_pressed.emit(entry))
 		buttons.add_child(convert)
 	var sell := Button.new()
-	sell.text = "Sell (+$%d)" % Shop.sell_price(g, kind, entry)
+	sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
 	sell.disabled = not Shop.can_sell(g, kind, entry)
 	sell.add_theme_font_size_override("font_size", 13)
 	sell.pressed.connect(func() -> void:

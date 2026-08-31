@@ -12,6 +12,7 @@ const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Economy := preload("res://scripts/economy.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Shop := preload("res://scripts/shop.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -53,7 +54,7 @@ func _boot_fresh(army: String) -> Node2D:
 
 func _init() -> void:
 	# --- catalog sanity ---
-	check(Families.CATALOG.size() == 3, "three seed Families")
+	check(Families.CATALOG.size() == 6, "six Families: issue 67's three seeds + issue 68's three more")
 	for id in Tuning.ARMIES:
 		check(Families.CATALOG.has(id), "%s: every Army id has a Family entry (load-bearing save key)" % id)
 	check(Families.display_name("Crown") == "The Muster",
@@ -279,6 +280,254 @@ func _init() -> void:
 			and not cancel.family_ability_used_this_wave,
 		"Call the Banners: cancelling FROM TARGETING costs nothing — no duplicate, no charge")
 	cancel.queue_free()
+	await process_frame
+
+	# ================= issue 68: three more Families =================
+
+	# --- kit application on a fresh boot ---
+	var syndicate := _boot_fresh("Syndicate")
+	await process_frame
+	check(syndicate.gold == Tuning.FAMILY_BASELINE_GOLD * 3, "The Syndicate: TRIPLE baseline Gold")
+	check(syndicate.items.is_empty(), "The Syndicate: no starting Items")
+	check(syndicate.stock == Tuning.ARMIES["Syndicate"], "The Syndicate: the thin 6-pawn + knight kit")
+	syndicate.queue_free()
+	await process_frame
+
+	var cult := _boot_fresh("Cult")
+	await process_frame
+	check(cult.gold == Tuning.FAMILY_BASELINE_GOLD, "The Cult: baseline Gold")
+	check(cult.items.size() == 1 and cult.items[0].key == "buff_box", "The Cult: 1 Buff Box item")
+	check(cult.stock == Tuning.ARMIES["Cult"], "The Cult: \"standard stock\" (Crown's own classic-chess kit)")
+	check(cult.artefacts.size() == 2, "The Cult: 2 random Artefacts granted at run start")
+	cult.queue_free()
+	await process_frame
+
+	var horde := _boot_fresh("Horde")
+	await process_frame
+	check(horde.gold == Tuning.FAMILY_BASELINE_GOLD, "The Horde: baseline Gold")
+	check(horde.items.is_empty(), "The Horde: no starting Items")
+	check(horde.stock.size() == 14 and horde.stock.all(func(id: String) -> bool: return id == "pawn"),
+		"The Horde: 14 pawns, no majors")
+	horde.queue_free()
+	await process_frame
+
+	# --- Power: Insider Rates (The Syndicate) — Shop buy -25%, sell +25%,
+	# Captured -> Stock conversion UNCHANGED (issue 68's explicit safety catch:
+	# conversion is not a Shop purchase, and discounting it would reopen the
+	# convert/sell arbitrage SELL_RATE's own header (tuning.gd) closed) ---
+	var rates := _boot({"army": "Syndicate", "gold": 1000, "wave": 1,
+		"captured": ["pawn"], "board": [["pawn", 0, 1, 0], ["rook", 1, 7, 10]]})
+	await process_frame
+	var syn_pawn_value: int = rates.defs["pawn"].value
+	var piece_slot := {"kind": "piece", "key": "pawn", "sold": false}
+	check(Shop.price(rates, piece_slot) == maxi(roundi(syn_pawn_value * 0.75), 0),
+		"Insider Rates: Shop buy price is the pawn's value x0.75")
+	check(Shop.sell_payout(rates, "piece", "pawn") == floori(syn_pawn_value * Tuning.SELL_RATE * 1.25),
+		"Insider Rates: an actual sell payout is 50% x1.25 = 62.5% of value, floored")
+	var flat_conversion := floori(syn_pawn_value * Tuning.SELL_RATE)
+	check(Shop.sell_price(rates, "captured", "pawn") == flat_conversion,
+		"REQUIRED ASSERTION: the Captured -> Stock conversion rate stays the flat 50% under " +
+		"Insider Rates — it is not a Shop purchase, and discounting it would reopen the " +
+		"convert/sell arbitrage that equal rates deliberately closed")
+	var conv_gold_before: int = rates.gold
+	check(rates._convert_captured("pawn"), "(setup) converting the captured pawn succeeds")
+	check(rates.gold == conv_gold_before - flat_conversion,
+		"the ACTUAL Gold spent converting matches the unmodified 50% rate, not the discounted 62.5%")
+	rates.queue_free()
+	await process_frame
+
+	var no_rates := _boot({"army": "Crown", "wave": 1, "board": [["rook", 1, 7, 10]]})
+	await process_frame
+	check(Shop.price(no_rates, piece_slot) == syn_pawn_value
+			and Shop.sell_payout(no_rates, "piece", "pawn") == floori(syn_pawn_value * Tuning.SELL_RATE),
+		"(sanity) Insider Rates is scoped to the Syndicate — a non-Syndicate Family pays/receives base rates")
+	no_rates.queue_free()
+	await process_frame
+
+	# --- Ability: Hostile Takeover (The Syndicate) — targeted at the BOARD
+	# (Bovine Tractor Beam's flow, not Call the Banners' Stock-tap one) ---
+	var strip := _boot({"army": "Syndicate", "gold": 1000, "wave": 1,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 3, {"buffs": [{"key": "shield"}]}]]})
+	await process_frame
+	strip.actions_left = 2
+	var pv: int = strip.defs["pawn"].value
+	var gold_before: int = strip.gold
+	var score_before: int = strip.score
+	var wcc_before: int = strip.wave_capture_count
+	var tcc_before: int = strip.turn_capture_count
+	var rcc_before: int = strip.run_capture_count
+	strip._begin_family_board_targeting()
+	check(strip.family_board_targeting and strip.family_board_targets.has(Vector2i(3, 3))
+			and strip.hud.drawer_open == "",
+		"Hostile Takeover stages targeting on the BOARD (drawer hands back, same as Bovine) — " +
+		"the buffed enemy pawn is a valid, affordable target")
+	strip._family_board_target_click(Vector2i(3, 3))
+	check(not strip.board.has(Vector2i(3, 3)), "Hostile Takeover: the piece leaves the board")
+	check(strip.stock.has("pawn") and typeof(strip.stock[strip.stock.find("pawn")]) == TYPE_STRING,
+		"Hostile Takeover: the piece joins Stock as a BARE id — state (its Shield buff) stripped, " +
+		"you bought the soldier, not their buffs")
+	check(strip.gold == gold_before - pv * 2,
+		"Hostile Takeover: pays exactly 200%% of the target's value (%d)" % (pv * 2))
+	check(strip.score == score_before and strip.wave_capture_count == wcc_before
+			and strip.turn_capture_count == tcc_before and strip.run_capture_count == rcc_before,
+		"REQUIRED ASSERTION: Hostile Takeover is a PURCHASE, not a capture — Score and every " +
+		"capture ledger (wave/turn/run capture counts) are completely unchanged; no on_capture " +
+		"dispatch, no Gold reward")
+	check(strip.actions_left == 1 and strip.family_ability_used_this_wave,
+		"Hostile Takeover spends its 1 Action and the once-per-Wave flag")
+	strip.queue_free()
+	await process_frame
+
+	# King exclusion (Air Strike/Sniper precedent)
+	var king_only := _boot({"army": "Syndicate", "gold": 1000, "wave": 1,
+		"board": [["queen", 0, 2, 2], ["king", 1, 7, 10]]})
+	await process_frame
+	check(king_only._affordable_takeover_targets().is_empty(),
+		"Hostile Takeover: the King is NEVER a valid target (Air Strike/Sniper precedent)")
+	check(not king_only._family_ability_available(),
+		"(sanity) with only the King on the enemy side, the Ability is correctly unavailable")
+	king_only.queue_free()
+	await process_frame
+
+	# affordability exclusion
+	var poor := _boot({"army": "Syndicate", "gold": 1, "wave": 1,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	check(poor._affordable_takeover_targets().is_empty(),
+		"Hostile Takeover: an enemy piece the player can't afford at 200% is excluded from targeting")
+	poor.queue_free()
+	await process_frame
+
+	# tap-again-to-cancel (a cancelled activation costs nothing)
+	var cancel_takeover := _boot({"army": "Syndicate", "gold": 1000, "wave": 1,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	cancel_takeover.actions_left = 1
+	var gold_before2: int = cancel_takeover.gold
+	cancel_takeover._begin_family_board_targeting()
+	cancel_takeover._begin_family_board_targeting() # tap the (virtual) chip again
+	check(not cancel_takeover.family_board_targeting and cancel_takeover.board.has(Vector2i(7, 10))
+			and cancel_takeover.gold == gold_before2 and cancel_takeover.actions_left == 1
+			and not cancel_takeover.family_ability_used_this_wave,
+		"REQUIRED ASSERTION: Hostile Takeover cancelled FROM TARGETING costs nothing — " +
+		"no purchase, no Gold spent, no Action, no Wave charge")
+	cancel_takeover.queue_free()
+	await process_frame
+
+	# --- Power: Communion (The Cult) — Piece Buff cap 3 (base 2 +1), and
+	# additive stacking with Abduction Probe to cap 4 ---
+	var comm_only := _boot({"army": "Cult", "wave": 1, "board": [["pawn", 0, 1, 0], ["rook", 1, 7, 10]]})
+	await process_frame
+	var comm_piece: Dictionary = comm_only.board[Vector2i(1, 0)]
+	for i in 3:
+		comm_only._apply_buff(comm_piece, "critical", 0, Vector2i(1, 0))
+	check(BuffLogic.catalogued_count(comm_piece) == 3, "Communion alone: cap is 3 (base 2 + 1) — the 3rd grant lands")
+	comm_only._apply_buff(comm_piece, "range", 0, Vector2i(1, 0))
+	check(BuffLogic.catalogued_count(comm_piece) == 3,
+		"a 4th grant at Communion's own cap (3, no Abduction Probe) correctly REFUSES")
+	comm_only.queue_free()
+	await process_frame
+
+	var comm_probe := _boot({"army": "Cult", "wave": 1, "board": [["pawn", 0, 1, 0], ["rook", 1, 7, 10]],
+		"artefacts": ["abduction-probe"]})
+	await process_frame
+	var stacked_piece: Dictionary = comm_probe.board[Vector2i(1, 0)]
+	for i in 4:
+		comm_probe._apply_buff(stacked_piece, "critical", 0, Vector2i(1, 0))
+	check(BuffLogic.catalogued_count(stacked_piece) == 4,
+		"REQUIRED ASSERTION: Communion (+1) and Abduction Probe (+1) stack ADDITIVELY off the " +
+		"base cap of 2 -> 4, NOT deduped — the 4th grant lands")
+	comm_probe._apply_buff(stacked_piece, "range", 0, Vector2i(1, 0)) # a 5th: must be refused
+	check(BuffLogic.catalogued_count(stacked_piece) == 4,
+		"a 5th grant at the stacked cap (4) correctly REFUSES, same cap-refusal shape as issue 53/67's own tests")
+	comm_probe.queue_free()
+	await process_frame
+
+	# --- Ability: Ritual (The Cult) — targeted at the BOARD, safe pool only ---
+	var safe_probe := RandomNumberGenerator.new()
+	var saw_slow := false
+	for i in 300:
+		safe_probe.seed = i
+		if ArtefactHooks._random_buff_key(safe_probe) == "slow":
+			saw_slow = true
+			break
+	check(not saw_slow,
+		"Ritual's underlying pick (ArtefactHooks._random_buff_key, the SAFE pool) never returns " +
+		"the self_harming Slow buff, across 300 seeds")
+
+	var ritual := _boot({"army": "Cult", "wave": 1, "board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	ritual.actions_left = 2
+	ritual._begin_family_board_targeting()
+	check(ritual.family_board_targeting and ritual.family_board_targets == [Vector2i(2, 2)]
+			and ritual.hud.drawer_open == "",
+		"Ritual stages targeting on the BOARD — only the player's own piece is a valid target")
+	ritual._family_board_target_click(Vector2i(2, 2))
+	check(BuffLogic.catalogued_count(ritual.board[Vector2i(2, 2)]) == 1,
+		"Ritual: the target gains exactly one random Buff")
+	check(ritual.actions_left == 1 and ritual.family_ability_used_this_wave,
+		"Ritual spends its 1 Action and the once-per-Wave flag")
+	ritual.queue_free()
+	await process_frame
+
+	# tap-again-to-cancel
+	var cancel_ritual := _boot({"army": "Cult", "wave": 1, "board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	cancel_ritual.actions_left = 1
+	cancel_ritual._begin_family_board_targeting()
+	cancel_ritual._begin_family_board_targeting() # tap the (virtual) chip again
+	check(not cancel_ritual.family_board_targeting
+			and BuffLogic.catalogued_count(cancel_ritual.board[Vector2i(2, 2)]) == 0
+			and cancel_ritual.actions_left == 1 and not cancel_ritual.family_ability_used_this_wave,
+		"Ritual: cancelling FROM TARGETING costs nothing — no Buff granted, no Action, no Wave charge")
+	cancel_ritual.queue_free()
+	await process_frame
+
+	# --- Power: Endless Ranks (The Horde) — pawn deploys cost no Gold ---
+	var horde_deploy := _boot({"army": "Horde", "gold": 50, "wave": 1,
+		"stock": ["pawn"], "board": [["rook", 1, 7, 10]]})
+	await process_frame
+	horde_deploy.actions_left = 2
+	var gold_before3: int = horde_deploy.gold
+	horde_deploy._place("pawn", Vector2i(2, 0))
+	check(horde_deploy.gold == gold_before3, "Endless Ranks: deploying a pawn as Horde costs no Gold")
+	horde_deploy.queue_free()
+	await process_frame
+
+	var horde_major := _boot({"army": "Horde", "gold": 50, "wave": 1,
+		"stock": ["knight"], "board": [["rook", 1, 7, 10]]})
+	await process_frame
+	horde_major.actions_left = 2
+	var major_cost := Economy.deploy_cost(horde_major)
+	var gold_before4: int = horde_major.gold
+	horde_major._place("knight", Vector2i(2, 0))
+	check(horde_major.gold == gold_before4 - major_cost,
+		"Endless Ranks is scoped to PAWNS only — a non-pawn deploy still pays even as Horde")
+	horde_major.queue_free()
+	await process_frame
+
+	var crown_deploy := _boot({"army": "Crown", "gold": 50, "wave": 1,
+		"stock": ["pawn"], "board": [["rook", 1, 7, 10]]})
+	await process_frame
+	crown_deploy.actions_left = 2
+	var pawn_cost := Economy.deploy_cost(crown_deploy)
+	var gold_before5: int = crown_deploy.gold
+	crown_deploy._place("pawn", Vector2i(2, 0))
+	check(crown_deploy.gold == gold_before5 - pawn_cost,
+		"(sanity) Endless Ranks is scoped to the Horde — a non-Horde Family still pays for a pawn deploy")
+	crown_deploy.queue_free()
+	await process_frame
+
+	# --- Ability: Conscription (The Horde) — untargeted, confirm modal ---
+	var consc := _boot({"army": "Horde", "wave": 1, "board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	consc.actions_left = 2
+	consc._family_ability_confirmed()
+	check(consc.stock.size() == 2 and consc.stock.count("pawn") == 2,
+		"Conscription: adds exactly 2 pawns to Stock, as bare ids")
+	check(consc.actions_left == 1 and consc.family_ability_used_this_wave,
+		"Conscription spends its 1 Action and the once-per-Wave flag")
+	consc.queue_free()
 	await process_frame
 
 	print("---")

@@ -360,6 +360,14 @@ var family_ability_used_this_wave := false # reset in WaveLogic.queue()
 var family_targeting := false # The Muster's Call the Banners: tap a Stock
 	# stack to target it — the only Family Ability with a target, so a bare
 	# bool (not a key string like artefact_targeting_key) is enough
+var family_board_targeting := false # issue 68: Hostile Takeover (Syndicate)/
+	# Ritual (Cult) — a target on the BOARD, not in a drawer, so these reuse
+	# Bovine Tractor Beam's own targeting FLOW instead of family_targeting's
+	# Stock-tap one; a bare bool is still enough (still exactly one Family
+	# Ability per run, so no per-key string is needed)
+var family_board_targets: Array[Vector2i] = [] # valid tiles for the current
+	# board-targeted Family Ability (Hostile Takeover: affordable enemies,
+	# King excluded; Ritual: any of your own pieces)
 var hounds_free_turn := false # Wild Hunt's Loose the Hounds: "this Turn"
 	# only, so it resets in _begin_player_turn, NOT WaveLogic.queue() — a
 	# per-turn scratch flag needs no save round-trip (SaveConfig.apply's own
@@ -483,6 +491,23 @@ func _ready() -> void:
 			for it in Items.ITEMS:
 				if it.key == key:
 					items.append(it)
+		var starting_artefact_count: int = kit.get("starting_artefact_count", 0)
+		if starting_artefact_count > 0: # issue 68: The Cult's 2 random
+			# Artefacts — weighted the same way every other "n random
+			# Artefacts" grant in this codebase already is
+			# (Shop._sample_weighted_artefacts, shared with the Shop's own
+			# 4-slot roll and Sub-Antarctic Visa's hidden slot). No cap check
+			# needed: ARTEFACT_CAP_BASE is 5 and this is a fresh run with none
+			# held yet, so 2 always fits.
+			for key in Shop._sample_weighted_artefacts(Items.ARTEFACT_EFFECTS, starting_artefact_count, self):
+				for t in Items.ARTEFACT_EFFECTS:
+					if t.key == key:
+						var inst: Dictionary = t.duplicate() # per-copy stamps,
+							# same shape as the --artefacts debug loop below
+						inst.acquired_wave = wave
+						inst.rarity = ArtefactHooks.rarity_of(key)
+						artefacts.append(inst)
+						break
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
@@ -834,6 +859,7 @@ func _enemy_turn() -> void:
 	pool_drag_cap = false
 	_item_reset()
 	_artefact_targeting_reset() # Bovine Tractor Beam (52): never carries into the enemy turn
+	_family_board_targeting_reset() # issue 68: Hostile Takeover/Ritual, same reasoning
 	_refresh()
 	turns_since_wave += 1
 	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
@@ -1423,6 +1449,12 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		# clicks feed it, same priority Item targeting already has below
 		_artefact_target_click(tile)
 		return
+	if family_board_targeting: # issue 68: Hostile Takeover/Ritual staging —
+		# same priority as Bovine's own board-targeting above (the two can
+		# never be active together, gated at _family_ability_available/
+		# _artefact_activation_available)
+		_family_board_target_click(tile)
+		return
 	if item_active >= 0: # an item is targeting; board clicks feed it
 		_item_click(tile)
 		return
@@ -1501,7 +1533,12 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 			actions_left -= 1
 		_log_action("place", {"pos": tile}) # issue 56: Zapruder's Deploy-return reads this back
 		Economy.charge(self, "deploy_cost")
-		Economy.spend_gold(self, Economy.deploy_cost(self))
+		if not (Families.endless_ranks(self) and id == "pawn"): # issue 68:
+			# Endless Ranks (The Horde) waives the base deploy cost for pawns
+			# only — majors still pay (though Horde's own kit fields none).
+			# The tariff surcharge above (Economy.charge) is a different
+			# mechanism and stays live either way.
+			Economy.spend_gold(self, Economy.deploy_cost(self))
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -2313,7 +2350,11 @@ func _consume_item(index: int, it: Dictionary) -> void:
 ## holds (still no crash, still no partial state).
 func _apply_buff(piece: Dictionary, key: String, turns: int,
 		pos := Vector2i(-1, -1), fire_hook := true) -> void:
-	if BuffLogic.catalogued_count(piece) >= BuffLogic.cap(_artefact_count("abduction-probe")):
+	var buff_cap := BuffLogic.cap(_artefact_count("abduction-probe")
+			+ (1 if Families.communion(self) else 0)) # issue 68: Communion
+		# (The Cult) sums into the SAME cap() call, additive with Abduction
+		# Probe — "Communion + Abduction Probe = cap 4," never deduped
+	if BuffLogic.catalogued_count(piece) >= buff_cap:
 		if pos.x >= 0:
 			_add_float(pos, "Buffs full", COL_MERGE)
 		return
@@ -2402,8 +2443,9 @@ func _activatable_held_keys() -> Array:
 ## unavailable, not silently inert").
 func _artefact_activation_available(key: String) -> bool:
 	if not _held(key) or state != State.PLAYER_TURN or box_open or buff_pick_open \
-			or win_open or item_active >= 0 or family_targeting: # issue 67: one
-			# activation/targeting in flight at a time, Family Ability included
+			or win_open or item_active >= 0 or family_targeting or family_board_targeting:
+			# issue 67/68: one activation/targeting in flight at a time, either
+			# Family Ability targeting flavor included
 		return false
 	if artefact_targeting_key != "" and artefact_targeting_key != key:
 		return false # one activation/targeting in flight at a time
@@ -2697,8 +2739,14 @@ func _family_ability_available() -> bool:
 		return false
 	if artefact_targeting_key != "":
 		return false # one activation/targeting in flight at a time
-	if next_army == "Crown":
-		return not stock.is_empty()
+	match next_army:
+		"Crown":
+			return not stock.is_empty()
+		"Syndicate": # Hostile Takeover: an enemy piece (King excluded) whose
+			# 200% cost the current Gold can actually cover
+			return not _affordable_takeover_targets().is_empty()
+		"Cult": # Ritual: any of your own pieces to grant the Buff to
+			return not _player_pieces().is_empty()
 	return true
 
 
@@ -2707,6 +2755,11 @@ func _family_ability_available() -> bool:
 func _activate_family_ability() -> void:
 	if next_army == "Crown":
 		return _begin_family_targeting()
+	if next_army == "Syndicate" or next_army == "Cult": # issue 68: both
+		# target the BOARD, so they follow Bovine Tractor Beam's flow
+		# (_begin_family_board_targeting) rather than Call the Banners' own
+		# Stock-tap one — see that function's own header for why
+		return _begin_family_board_targeting()
 	if not _family_ability_available():
 		return
 	if autoplay: # bot: resolve immediately, never stall on the modal (issue 52)
@@ -2736,6 +2789,10 @@ func _family_ability_confirmed() -> void:
 			for pos in _player_pieces():
 				if pos.y < 2:
 					_apply_buff(board[pos], "shield", 0, pos)
+		"Horde": # Conscription (issue 68): 2 pawns straight to Stock as bare
+			# ids — a freshly conscripted pawn carries no state to preserve
+			stock.append("pawn")
+			stock.append("pawn")
 	family_ability_used_this_wave = true
 	actions_left -= 1
 	_log_action("family_ability") # a REAL Action spend (unlike Artefact
@@ -2791,6 +2848,98 @@ func _family_target_stock(entry: Variant, cap: bool) -> void:
 	if actions_left == 0 and state == State.PLAYER_TURN:
 		return _on_pass()
 	_refresh()
+
+
+# --- issue 68: Hostile Takeover (Syndicate) / Ritual (Cult) — the two
+# board-targeted Family Abilities. Reuses Bovine Tractor Beam's targeting FLOW
+# (staged board pick, board-click routing, tap-the-chip-again to cancel), not
+# Call the Banners' Stock-tap one above: the target here lives on the board.
+# One stage only (unlike Bovine's two), so no artefact_targeting_key-style
+# shared key is needed — family_board_targeting is a bare bool, same
+# reasoning family_targeting's own declaration already gives.
+
+## Hostile Takeover: any enemy piece except the King (Air Strike/Sniper
+## precedent, item_logic.gd's own "not king" filters) the player can
+## currently afford at 200% of its value.
+func _affordable_takeover_targets() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for pos in _enemy_pieces():
+		if board[pos].id != "king" and gold >= defs[board[pos].id].value * 2:
+			out.append(pos)
+	return out
+
+
+func _begin_family_board_targeting() -> void:
+	if family_board_targeting: # tap the chip again to cancel — same shape as
+		# _begin_artefact_targeting's own "tap again" cancel
+		_family_board_targeting_reset()
+		return _refresh()
+	if not _family_ability_available():
+		return
+	if hud.drawer_open != "":
+		_set_drawer("") # the target lives on the board, same as Bovine Tractor Beam
+	family_board_targeting = true
+	family_board_targets = _family_board_target_tiles()
+	_clear_selection()
+	placing_id = ""
+	placing_cap = false
+	_refresh()
+
+
+func _family_board_targeting_reset() -> void:
+	family_board_targeting = false
+	family_board_targets = []
+
+
+func _family_board_target_tiles() -> Array[Vector2i]:
+	match next_army:
+		"Syndicate":
+			return _affordable_takeover_targets()
+		"Cult":
+			return _player_pieces()
+	return []
+
+
+func _family_board_target_click(tile: Vector2i) -> void:
+	if not family_board_targets.has(tile):
+		return
+	_family_board_targeting_reset()
+	match next_army:
+		"Syndicate":
+			_hostile_takeover_resolve(tile)
+		"Cult":
+			_ritual_resolve(tile)
+	family_ability_used_this_wave = true
+	actions_left -= 1
+	_log_action("family_ability") # see _family_ability_confirmed's own comment
+	if actions_left == 0 and state == State.PLAYER_TURN:
+		return _on_pass()
+	_refresh()
+
+
+## Hostile Takeover: a PURCHASE, not a capture (issue 68's explicit ruling) —
+## pay 200% of the target's value, then remove it exactly the way every other
+## non-Item Destruction already does: _destroy's own by_item=false default —
+## no Score, no Gold, no on_capture dispatch, no capture ledger (CONTEXT.md's
+## Destruction/Capture split; the same reason Bomb/Drone Strike pay nothing).
+## The bare id then joins Stock (state stripped — "you bought the soldier,
+## not their buffs," issue 68's own recommendation), the same duplicate/
+## strip/bare-id shape _zapruder_resolve's "place" branch and
+## _capture_to_stock (ADR-0002) already use. `id` is read before _destroy
+## erases the board entry.
+func _hostile_takeover_resolve(pos: Vector2i) -> void:
+	var id: String = board[pos].id
+	Economy.spend_gold(self, defs[id].value * 2)
+	_destroy(pos)
+	stock.append(id)
+
+
+## Ritual: a random Buff from the SAFE pool. ArtefactHooks._grant_buff already
+## routes through _random_buff_key (never self_harming) and through
+## _apply_buff's own cap refusal (Communion's +1 folds into that same call —
+## see the comment there), so no special-casing is needed at this call site.
+func _ritual_resolve(pos: Vector2i) -> void:
+	ArtefactHooks._grant_buff(self, pos)
 
 
 ## Bounty Piece Buff (issue 48): 1-of-3 random Boxes, then the chosen one
@@ -3284,7 +3433,9 @@ func _jet_fuel_restock_confirmed() -> void:
 func _sell(kind: String, entry: Variant) -> bool:
 	if not Shop.can_sell(self, kind, entry):
 		return false
-	var amount := Shop.sell_price(self, kind, entry)
+	var amount := Shop.sell_payout(self, kind, entry) # issue 68: Insider Rates'
+		# sell-payout bonus lives here, never in Shop.sell_price() itself —
+		# _convert_captured below keeps calling sell_price() at the flat rate
 	match kind:
 		"piece": stock.erase(entry)
 		"captured": captured.erase(entry)

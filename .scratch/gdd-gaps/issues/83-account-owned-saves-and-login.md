@@ -1,6 +1,6 @@
 # 83 — Account-owned saves, the login screen, and Guest
 
-Status: todo
+Status: done (2026-08-31, PR #271)
 
 ## Parent
 
@@ -58,3 +58,41 @@ go **through** the login screen at least once as well as around it.
 ## Blocked by
 
 - nothing
+
+## Outcome (2026-08-31) — shipped in PR #271
+
+**Saves carry an owner id; the login screen is first-run only; a guest's progress survives
+sign-in by rebinding.**
+
+`scripts/account.gd` owns `user://account.json`, deliberately **separate from the save files**:
+it survives a deleted run, and a save being rebound must not also be the thing recording who it
+is bound to.
+
+- **Guest is a real account, not the absence of one.** It owns saves exactly as a signed-in
+  account does — which is what makes sign-in a *rebind* rather than a merge. There is only ever
+  one history, so nothing is ever merged.
+- `SaveConfig.capture()` routes through `Account.stamp()`. **Additive, so no migration**: a
+  pre-account save has no `owner`, reads back as `""`, and loads. `save_config.gd`'s header is
+  explicit that an additive field is safe forever while a reshaped one is silent corruption —
+  which is exactly why this slice had to come first.
+- **Google/Apple say when they are unavailable.** The backends are stubs until 86/87, so
+  `is_available()` is false on desktop; the screen states that rather than appearing to sign in
+  and doing nothing. `account_id()` joined the backend contract.
+
+### The probe drives the login screen, it does not skip it
+
+`--skip-login` exists, and the probes deliberately **do not use it** — a bypass that is the
+only tested path is how this repo once green-lit a fully dead main menu. The probe deletes the
+account, asserts the login screen renders **in front of** the main menu, clicks an unavailable
+provider and asserts it says so *and creates no account*, then goes through Guest.
+
+`--screenshot` **does** bypass the gate: a capture run on a machine with no account would
+otherwise photograph the login screen instead of the menu, which is a silent trap on any fresh
+checkout rather than a real result.
+
+18 assertions in `test_account.gd`, the load-bearing one being that a guest's score and wave
+survive the rebind **intact**, plus 9 in the click probe.
+
+**This slice also fixed issue 74 shipping as a no-op** — see 74's CORRECTION section.
+
+`run_all.sh` **156.0s ALL GREEN**, foreground, alone.

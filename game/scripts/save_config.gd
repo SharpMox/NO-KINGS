@@ -84,7 +84,6 @@ static func apply(g, cfg: Dictionary) -> void:
 		g.rng.seed = int(cfg.seed)
 	if cfg.has("rng_state"): # mid-stream, not back at the top of it
 		g.rng.state = int(cfg.rng_state)
-	g.clock_ms = cfg.get("clock_s", Tuning.CLOCK_START_MS / 1000.0) * 1000.0
 	# default: all designed waves done, so nothing spawns into the sandbox
 	g.wave = int(cfg.get("wave", Waves.WAVES.size()))
 	g.turns_since_wave = int(cfg.get("turns_since_wave", 0))
@@ -102,6 +101,11 @@ static func apply(g, cfg: Dictionary) -> void:
 	# any other unrecognized value falls back to Tier 1 baseline everywhere
 	# Tuning reads next_tier (tier_index() returns 0 for an unknown string).
 	g.next_tier = str(cfg.get("rank", g.next_tier)) # locked at run start, Continue keeps it
+	# issue 78: the Clock fallback follows the tier, so a config with no clock_s
+	# still gets its tier's start (15 min, or 5 at Tier 3+). MUST come after
+	# next_tier is resolved just above — reading it earlier silently gave every
+	# config Tier 1's 15 minutes.
+	g.clock_ms = cfg.get("clock_s", Tuning.clock_start_ms(g.next_tier) / 1000.0) * 1000.0
 	g.lost_player = int(cfg.get("lost_player", 0))
 	g.lost_enemy = int(cfg.get("lost_enemy", 0))
 	g.pending_spawn = cfg.get("pending", []).duplicate(true)

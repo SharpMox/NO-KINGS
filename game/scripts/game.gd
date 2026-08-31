@@ -116,6 +116,8 @@ var king_ids_defeated: Array = []  # roster (Kings.name_of), same order as falls
 ## was about to fight.
 var king_tier := ""
 var king_order: Array = []
+## issue 90: the King held back through segment 1 of its wave, or {}.
+var pending_king: Dictionary = {}
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -902,7 +904,13 @@ func _enemy_turn() -> void:
 	_army_board_targeting_reset() # issue 68: Hostile Takeover/Ritual, same reasoning
 	_refresh()
 	turns_since_wave += 1
-	if wave < Waves.WAVES.size() and not _king_alive() and turns_since_wave >= _cadence():
+	WaveLogic.release_king_if_due(self) # issue 90: segment 1 -> segment 2
+	# `pending_king.is_empty()` is load-bearing, not defensive. Through segment
+	# 1 there is no King on the board, so `_king_alive()` is false — without
+	# this the cadence would queue the NEXT wave and walk straight past a King
+	# wave whose King had not arrived yet.
+	if wave < Waves.WAVES.size() and not _king_alive() and pending_king.is_empty() \
+			and turns_since_wave >= _cadence():
 		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1

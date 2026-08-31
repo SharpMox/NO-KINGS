@@ -73,6 +73,25 @@ func _init() -> void:
 	check(await _click_button(menu, "TEST"), "TEST button visible")
 	await process_frame
 	check(_find_button(menu, "← Back") != null, "TEST opens the scenario list")
+	# issue 77: the list is sectioned, and the point of sectioning is that
+	# every entry stays REACHABLE. Assert a scenario from the LAST section —
+	# the deepest thing in the list — is actually there. The six-Army menu
+	# overflow was exactly this bug: content existed but a real player could
+	# not get to it, and only a windowed probe saw it.
+	var deepest := ""
+	for sec_child in menu.test_scroll.get_child(0).get_children():
+		if sec_child is Button and sec_child.text != "← Back":
+			deepest = sec_child.text
+	check(deepest != "", "the sectioned list renders scenario buttons")
+	check(_find_button(menu, deepest) != null,
+		"the LAST scenario in the list is reachable, not clipped past the viewport (%s)"
+			% deepest)
+	# and the section headers themselves rendered
+	var headers := 0
+	for sec_child in menu.test_scroll.get_child(0).get_children():
+		if sec_child is Label and sec_child.text.ends_with(")"):
+			headers += 1
+	check(headers >= 5, "scenarios are grouped into sections (%d headers)" % headers)
 
 	# Back returns to the main menu
 	check(await _click_button(menu, "← Back"), "Back button clickable")

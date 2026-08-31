@@ -1,6 +1,6 @@
 # 72 — Login: Google, Apple, Guest — and offline
 
-Status: todo — NEEDS DECISIONS (large; likely splits)
+Status: todo — SPECCED (user rulings 2026-08-31) · ready to split
 
 ## Parent
 
@@ -27,20 +27,31 @@ is a much smaller job than it sounds, and the backend choice is already abstract
 3. **Guest with local persistence** — closest to done; the local save already works.
 4. **Offline** — the interesting design work, see below.
 
-## Offline is the part that needs thought, not code
+## Answered 2026-08-31
 
-The questions that decide the shape:
+**1. A guest keeps their progress when they sign in. Yes.**
 
-- **Can a guest upgrade to a real account later, keeping their data?** (Almost always yes —
-  and it decides whether local saves are keyed by account from day one.)
-- **What happens when a signed-in player is offline?** Play normally and sync later, is the
-  usual answer — which means a **queue of unsynced runs**, and a conflict rule for when the
-  same account played on two devices.
-- **Does the leaderboard work offline?** `Economy.record_score` writes a local leaderboard
-  today; a cloud one needs a merge rule.
+The consequence, and the reason this had to be answered before any code: **saves are keyed by
+account from day one**, with a local pseudo-account that gets *rebound* on sign-in rather than
+copied. Retrofitting this later would mean migrating every existing save — and the migration
+table now has exactly one entry (issue 69), so it is proven but not free.
 
-**Do not build until these are answered** — an auth flow built on the wrong assumption about
-guest upgrades is expensive to unpick, because it reaches into how every save is keyed.
+Concretely: the save carries an owner id. Guest runs are owned by a stable local id. Signing
+in rewrites that id to the real account and pushes; it never merges two histories, because
+until sign-in there is only one.
+
+**2. Offline while signed in: play normally, queue for sync.** Conflict rule when the same
+account has played on two devices: **highest wave reached wins.** That works precisely because
+progress here is monotonic — Score and deepest-wave only ever increase, so "highest wins" is
+well-defined and needs no timestamps or three-way merge.
+
+**3. Leaderboards go cloud, with the same merge rule.** The local board (`Economy.record_score`)
+stays as the offline view.
+
+Worth noting the pairing: **the seed system (issue 75) is what makes a cloud leaderboard
+meaningful.** Same seed, same board, genuinely comparable runs — otherwise a leaderboard is
+just comparing luck. If seeded leaderboards are ever wanted, the seed and the build version are
+both already displayed on the results screen for exactly this reason.
 
 ## Acceptance
 

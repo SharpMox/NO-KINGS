@@ -49,7 +49,7 @@ static func queue(g, n: int) -> void:
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	# King identity picked here, once, so the wave banner can name it (issue 09
 	# selection rule: tier-ordered by King-wave depth, sampled within the tier)
-	var king: Dictionary = Kings.select(g.rng, n) if roster.has("king") else {}
+	var king: Dictionary = Kings.select(g.rng, n, g.king_order) if roster.has("king") else {}
 	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
 		Color(1.0, 0.8, 0.3))
 	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # Trade War (issue 13)

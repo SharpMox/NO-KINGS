@@ -146,16 +146,23 @@ found. Collected here so they are not lost in Outcome sections:
   (`fix/blitz-and-crypto-wallet`, 2026-08-28, user call): Blitz itself now costs 0 actions
   and the target's next move/capture is free, so it no longer depends on the 2-actions/turn
   math this flag was measuring against.
-- **Tier 5 may simply be too harsh.** 24-run sweep: median survival wave 38.5 -> 9.5, 0/24
-  wins, every loss to resource starvation. That is the measurement, not a verdict — a top
-  tier is allowed to be brutal, but it wants a play test before it is called balanced.
-  **Update (issue 59, 2026-08-30):** Tier 5 now also doubles enemy Actions per Turn (GDD
-  parity, difficulty-rank ruling). Re-swept 24 runs post-change: still 0/24 wins, median
-  survival dropped further to wave 7.5. The tuning pass this flag was waiting on is still
-  parked as "later," but now has both numbers to start from.
+- **Tier 5 is unwinnable, and the gap to Tier 1 is now enormous.** Re-measured 2026-08-31,
+  after the Score x10, Clock-to-15 and enemy-2-Actions changes all landed:
 
-## Fragile tests
+  | | wins | median wave |
+  | --- | --- | --- |
+  | **Tier 1** (6 runs) | **4 — all by checkmating the Wave-50 King** | 50 |
+  | **Tier 5** (8 runs) | 0 | **8.5** |
 
+  Tier 5 dies at wave 8 while Tier 1 finishes the game. Every Tier-5 loss but one was resource
+  starvation; the exception was a back-row breach at wave 11.
+
+  The earlier reading (median 38.5 -> 9.5, 0/24) is superseded — the shape is the same but the
+  spread between tiers is far wider now, because slice 78 raised the Clock to 15 minutes at
+  Tiers 1-2 while Tier 3+ keeps 5. That was the intent, so this is the lever working; the open
+  question is whether a 50-vs-8 spread across five rungs is the *distribution* wanted, or
+  whether the middle rungs need to carry more of it. Measurement, not a verdict — the user has
+  parked tuning until every lever is coded, and Kings are the last one.
 - **One-off probe sighting, undiagnosed (2026-08-30):** during slice 66's first full run,
   `game-clicks` failed once on *"a drop inside the open drawer places nothing (misinput
   guard)"* — unrelated to the rename, no other Godot process running, passed clean on two
@@ -210,9 +217,11 @@ found. Collected here so they are not lost in Outcome sections:
 
 ## Housekeeping
 
-- **`tools/generate-piece-art.py` is mostly orphaned.** It generated the 38 svg tokens
-  that the painted PNGs replaced; it now only produces `king.svg`. Delete it once King
-  art lands, or keep it as the fallback generator and say so in its header.
+- ~~**`tools/generate-piece-art.py` is mostly orphaned.**~~ Resolved 2026-08-31 by taking the
+  second branch the flag itself offered: King art has **not** landed (only `king.svg` exists;
+  `dragon-king-*.png` is a different piece), so the generator stays as the fallback and its
+  header now says so — including the trigger for deleting it later, which is
+  `king-light.png`/`king-dark.png` arriving.
 - ~~**`data/artefacts.js` and `game/data/` have no shared pipeline yet.**~~ Built by slice
   14: `tools/export-game-artefacts.mjs` generates `game/data/artefacts.json` from
   `data/artefacts.js`. The "game hand-writes 7" era is over — those 7 survive as

@@ -18,6 +18,9 @@ const ZONE_PAWNS := [["pawn", 0, 1, 0], ["pawn", 0, 4, 0]]
 ## ArtefactHooks.REGISTRY rather than hand-written.
 const Generated := preload("res://data/scenarios_artefacts.gd")
 
+## issue 80: likewise one per piece, derived from data/pieces.json.
+const GeneratedPieces := preload("res://data/scenarios_pieces.gd")
+
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
@@ -25,7 +28,7 @@ static func _chain(title: String, base: String, mid: String) -> Dictionary:
 
 
 static func all() -> Array:
-	return _hand_written() + Generated.all()
+	return _hand_written() + Generated.all() + GeneratedPieces.all()
 
 
 static func _hand_written() -> Array:

@@ -13,6 +13,11 @@
 
 const ZONE_PAWNS := [["pawn", 0, 1, 0], ["pawn", 0, 4, 0]]
 
+## issue 79: the 180 generated per-Artefact sandboxes are appended by all(),
+## not listed here — see scenarios_artefacts.gd for why they are derived from
+## ArtefactHooks.REGISTRY rather than hand-written.
+const Generated := preload("res://data/scenarios_artefacts.gd")
+
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
@@ -20,6 +25,10 @@ static func _chain(title: String, base: String, mid: String) -> Dictionary:
 
 
 static func all() -> Array:
+	return _hand_written() + Generated.all()
+
+
+static func _hand_written() -> Array:
 	return [
 		# --- core interactions ---
 		{"name": "Movement & drag", "cfg": {

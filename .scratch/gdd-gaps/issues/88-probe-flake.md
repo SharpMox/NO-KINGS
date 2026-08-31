@@ -1,6 +1,6 @@
 # 88 — The intermittent click-probe failure
 
-Status: OPEN — not reproduced in 82 runs, but that result is caveated (2026-08-31)
+Status: done (2026-08-31) — closed as NOT REPRODUCIBLE on a clean machine, not as fixed
 
 ## Parent
 
@@ -128,3 +128,40 @@ game/tests/flake_hunt.sh 40  # 80 runs, clean
 A clean 0/80 would take P(miss) under 1.7% and justify closing this as
 **not-reproducible-after-the-probe-rewrites**. A failure gives the case name and full output
 the diagnosis needs. Either outcome is worth more than the current one.
+
+
+## Attempt 2 (2026-08-31) — clean machine, 80 runs, 0 failures. CLOSED.
+
+The editor was closed, so `flake_hunt.sh` ran instead of refusing. **Two batches of 40
+interleaved runs: 80 total, 0 failures**, plus a full `run_all.sh` (159.5s, ALL GREEN) on
+merged `main` immediately before.
+
+If the rate were still 1-in-20, the chance of zero failures across 80 clean runs is **1.65%**
+(0.95^80) — under the 1.7% threshold attempt 1 set in advance as the bar for closing this.
+
+### Closed as NOT REPRODUCIBLE, which is not the same as fixed
+
+Stating the limit plainly, because the distinction is the whole value of this entry:
+
+- **This does not prove there is no bug.** It proves the rate is far below 1-in-20 on this
+  machine, with these probes, today. A 1-in-500 defect would sail through 80 runs.
+- **Nothing was diagnosed and nothing was fixed.** No mechanism was found, and the original
+  failing case was never recorded, so there is nothing to write a regression test against.
+- **The probes were substantially rewritten between the sighting and the hunt** — slice 79
+  replaced the scenario-list assertions (reachability became a two-step property once sections
+  collapsed), 83 added the login block, 85 added a Scores assertion. The most likely
+  explanation is that the assertion which failed no longer exists. That is a *plausible*
+  account, not a demonstrated one, and it is recorded as such.
+
+The issue's acceptance allowed exactly this outcome — *"a documented finding if it turns out to
+be environmental (that is a legitimate outcome here and closes the issue honestly)"*. Attempt 1
+also found a genuine environmental factor: the editor had been open 9h43m during that batch,
+which is the contention condition CLAUDE.md says not to trust a pass under.
+
+### What is left behind
+
+`game/tests/flake_hunt.sh`. If a probe ever fails intermittently again, run it **first** rather
+than re-deriving the method: it keeps the full output of every failing run (the thing attempt 1
+lacked and could not reconstruct), interleaves rather than batching, and refuses to start under
+contention. **Reopen this issue with the captured log rather than opening a new one** — the
+history above is most of the value.

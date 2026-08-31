@@ -124,29 +124,32 @@ func _ready() -> void:
 	add_child(army_center)
 	var army_box := VBoxContainer.new()
 	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	army_box.add_theme_constant_override("separation", 12)
+	# issue 68 tightened this from 12: six Families' worth of entries have to
+	# fit 480x800 without scrolling. The ScrollContainer above stays as the
+	# safety net for a seventh.
+	army_box.add_theme_constant_override("separation", 5)
 	army_center.add_child(army_box)
 	var pick := Label.new()
 	pick.text = "Choose your Family" # issue 67: replaces the Army pick
-	pick.add_theme_font_size_override("font_size", 28)
+	pick.add_theme_font_size_override("font_size", 22)
 	army_box.add_child(pick)
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Families.display_name
-		_button(army_box, Families.display_name(army_name), 26, func() -> void:
+		_button(army_box, Families.display_name(army_name), 18, func() -> void:
 			GameScript.next_army = army_name
 			army_center.visible = false
 			rank_center.visible = true)
 		var roster := Label.new()
 		roster.text = _army_summary(Tuning.ARMIES[army_name])
-		roster.add_theme_font_size_override("font_size", 13)
+		roster.add_theme_font_size_override("font_size", 11)
 		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		roster.modulate = Color(1, 1, 1, 0.7)
 		army_box.add_child(roster)
 		var kit: Dictionary = Families.entry(army_name)
 		var powers := Label.new()
 		powers.text = "%s · %s" % [kit.power_name, kit.ability_name]
-		powers.add_theme_font_size_override("font_size", 12)
+		powers.add_theme_font_size_override("font_size", 10)
 		powers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		powers.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Family Ability chip's own tint (hud.gd)

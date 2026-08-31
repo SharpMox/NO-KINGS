@@ -8,7 +8,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
-const Families := preload("res://scripts/families.gd")
+const Armies := preload("res://scripts/armies.gd")
 
 static var window_sized := false # once per launch, not on every return to menu
 
@@ -109,11 +109,11 @@ func _ready() -> void:
 		main_box.visible = true)
 
 	# army select: Play goes here; each army is a button + composition line.
-	# ScrollContainer, not CenterContainer (issue 68): 6 Families' worth of
+	# ScrollContainer, not CenterContainer (issue 68): 6 Armies' worth of
 	# buttons + roster + Power/Ability lines overflow the fixed 480x800
 	# portrait window — the same scrollable-list shape test_scroll/
 	# history_scroll/guide_scroll already use below, so every entry (and the
-	# trailing Back button) stays reachable regardless of Family count.
+	# trailing Back button) stays reachable regardless of Army count.
 	army_center = ScrollContainer.new()
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	army_center.offset_left = 40
@@ -124,19 +124,19 @@ func _ready() -> void:
 	add_child(army_center)
 	var army_box := VBoxContainer.new()
 	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# issue 68 tightened this from 12: six Families' worth of entries have to
+	# issue 68 tightened this from 12: six Armies' worth of entries have to
 	# fit 480x800 without scrolling. The ScrollContainer above stays as the
 	# safety net for a seventh.
 	army_box.add_theme_constant_override("separation", 5)
 	army_center.add_child(army_box)
 	var pick := Label.new()
-	pick.text = "Choose your Family" # issue 67: replaces the Army pick
+	pick.text = "Choose your Army" # issue 67: replaces the Army pick
 	pick.add_theme_font_size_override("font_size", 22)
 	army_box.add_child(pick)
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
-		# display text differs, via Families.display_name
-		_button(army_box, Families.display_name(army_name), 18, func() -> void:
+		# display text differs, via Armies.display_name
+		_button(army_box, Armies.display_name(army_name), 18, func() -> void:
 			GameScript.next_army = army_name
 			army_center.visible = false
 			rank_center.visible = true)
@@ -146,13 +146,13 @@ func _ready() -> void:
 		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		roster.modulate = Color(1, 1, 1, 0.7)
 		army_box.add_child(roster)
-		var kit: Dictionary = Families.entry(army_name)
+		var kit: Dictionary = Armies.entry(army_name)
 		var powers := Label.new()
 		powers.text = "%s · %s" % [kit.power_name, kit.ability_name]
 		powers.add_theme_font_size_override("font_size", 10)
 		powers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		powers.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
-			# in-game Family Ability chip's own tint (hud.gd)
+			# in-game Army Ability chip's own tint (hud.gd)
 		army_box.add_child(powers)
 	_button(army_box, "← Back", 20, func() -> void:
 		army_center.visible = false

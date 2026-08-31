@@ -1,6 +1,6 @@
 # 70 — Reskin the board to the NOKINGSBG palette
 
-Status: todo — READY (colours sampled 2026-08-31)
+Status: done (2026-08-31)
 
 ## Parent
 
@@ -47,3 +47,16 @@ board. Report anything that reads badly rather than silently retuning it.
 ## Blocked by
 
 - nothing (but see the Dark-set note — user's eye wanted before calling it done)
+
+## Outcome
+
+Shipped in PR #240 — two constants, `COL_LIGHT` -> `FFEFD7`, `COL_DARK` -> `646385`.
+
+The overlay colours tuned against the old warm-brown board (`COL_PLACE`/`COL_MOVE`/
+`COL_SELECT` blues, `COL_MERGE` cyan, `COL_ARROW` orange) were **left alone** — they now sit
+on cool purple instead of warm brown, which is a real change in context, but nothing read
+badly enough to justify retuning without the user's eye on it.
+
+**The Dark-token warning stands and is now live**: the new dark square is darker than the old
+one, so the near-black `Pawn-Dark`/`Rook-Dark`/`Knight-Dark` tokens read worse against it, not
+better. That is the `FLAGS.md` Dark-set entry, unchanged and now more visible.

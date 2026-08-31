@@ -24,8 +24,36 @@ static func save_settings(data: Dictionary) -> void:
 
 ## Mutes/unmutes the Master bus from a loaded settings Dictionary. Call once
 ## at every boot (Menu and Game scenes) so a relaunch respects the choice.
+## Also applies the hard-edged text rendering (74) — not a user pref, it rides
+## here because this is already the "runs once at every boot, idempotent" hook.
 static func apply(data: Dictionary) -> void:
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not data.get("sound_on", true))
+	_crisp_text()
+
+
+## issue 74: turn OFF font antialiasing project-wide, so text renders as hard
+## pixels instead of soft grey edges and sits with the pixel-art tokens.
+##
+## This is what survived the pixel-filter spike. A full-screen pixelate shader
+## and a SubViewport downscale were both tried and both rejected by the user:
+## downscaling a vector font and upscaling it back reads as damage, not as
+## retro, and the smaller the render the worse the glyphs break (see
+## `.scratch/gdd-gaps/issues/74-assets/`). Antialiasing was the whole of the
+## blur; removing it is the entire effect, at native resolution, with no
+## shader, no viewport and no coordinate-space shift for the click probes.
+##
+## Mutates the theme fallback rather than a Theme resource so it reaches every
+## Control with no per-scene wiring. Duplicates rather than writing to the
+## built-in, and no-ops once already applied.
+static func _crisp_text() -> void:
+	var f := ThemeDB.fallback_font
+	if not (f is FontFile) or f.antialiasing == TextServer.FONT_ANTIALIASING_NONE:
+		return
+	var hard: FontFile = f.duplicate()
+	hard.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	hard.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	hard.hinting = TextServer.HINTING_NONE
+	ThemeDB.fallback_font = hard
 
 
 ## Shared, full-rect, initially-hidden Settings panel built as a child of

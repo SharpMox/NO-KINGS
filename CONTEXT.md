@@ -23,7 +23,7 @@ One of three preset 12-piece starting stocks chosen on the army-select screen be
 _Avoid_: "team", "deck", "loadout"
 
 **Signature piece**:
-The piece (and its merge chain) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
+The piece (and its Family) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
 
 **Tariff**:
 A player penalty activated on every 10th wave per the Wave Catalog. Three kinds: **action** (money surcharge when the taxed action happens), **persistent** (rule modifier for the rest of the run, e.g. Inflation), **oneoff** (applies instantly on activation).

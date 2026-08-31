@@ -1245,7 +1245,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On Rank Up: add a copy of the piece's base-chain piece to your Stock",
+  "effect": "On Rank Up: add a copy of the piece's base Family piece to your Stock",
   "conspiracy": "Bigfoot",
   "implemented": true
  },
@@ -1257,7 +1257,7 @@
   "bonus": [
    "Piece"
   ],
-  "effect": "On losing a Ranked piece: a copy of its base-chain piece is added to your Stock",
+  "effect": "On losing a Ranked piece: a copy of its base Family piece is added to your Stock",
   "conspiracy": "Backmasking",
   "implemented": true
  },
@@ -2023,7 +2023,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "The first move or capture each Turn by a piece at the end of its Rank chain costs no Action",
+  "effect": "The first move or capture each Turn by a piece at the end of its Family costs no Action",
   "conspiracy": "Pegasus spyware",
   "implemented": true
  },

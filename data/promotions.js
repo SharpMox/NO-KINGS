@@ -1,7 +1,7 @@
-/* Promotion chains for codex pieces. 8 chains × 3 stages.
+/* Promotion Families for codex pieces. 8 Families × 3 stages.
    Each entry: { title, ids: [base, mid, end] }.
    Used by graph.html (self-merge lookup) and potentially promotion.html. */
-var PROMOTION_CHAINS = [
+var PROMOTION_FAMILIES = [
   { title: "Pawn",    ids: ["pawn",    "sergeant",        "arrow-pawn"]    },
   { title: "Ferz",    ids: ["ferz",    "elephant-modern", "high-priestess"] },
   { title: "Wazir",   ids: ["wazir",   "war-machine",     "champion"]      },
@@ -12,4 +12,4 @@ var PROMOTION_CHAINS = [
   { title: "Alibaba", ids: ["alibaba", "bodyguard",       "queen"]         }
 ];
 
-if (typeof module !== "undefined" && module.exports) module.exports = PROMOTION_CHAINS;
+if (typeof module !== "undefined" && module.exports) module.exports = PROMOTION_FAMILIES;

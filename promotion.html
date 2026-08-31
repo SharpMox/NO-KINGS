@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="The 8 NO KINGS promotion chains as card stacks: fuse two identical pieces and the pair climbs one step, base to mid to end.">
+  <meta name="description" content="The 8 NO KINGS Families as card stacks: fuse two identical pieces and the pair climbs one step, base to mid to end.">
   <title>NO KINGS / Promotions</title>
   <link rel="stylesheet" href="assets/nav.css">
   <script src="assets/theme-init.js"></script>
@@ -13,7 +13,7 @@
   <script src="data/promotions.js"></script>
   <style>
   /* ============================================================
-   *  Promotions — every chain is a wallet stack of three cards.
+   *  Promotions — every Family is a wallet stack of three cards.
    *  Follows artefacts.html, the design pilot: it does NOT link
    *  assets/site.css and carries its own tokens, but shares
    *  assets/nav.{css,js} and assets/theme.js so the header and the
@@ -125,8 +125,8 @@
     -webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.07em}
   .hero p{margin:16px 0 0;max-width:50ch;font-size:16.5px;color:var(--text-soft)}
 
-  /* The wall of chains runs wider than the --wrap column the hero and footer
-     use, because three fanned chains need the room. Hero and footer are
+  /* The wall of Families runs wider than the --wrap column the hero and footer
+     use, because three fanned Families need the room. Hero and footer are
      unaffected: they are outside main and set their own max-width. */
   /* No cap and a 10px gutter: the wall takes the whole window so the cards
      come out as large as the solve allows. Hero and footer keep the --wrap
@@ -151,9 +151,9 @@
 /* deck motion: back-out curve, slight overshoot */
 
 
-/* ===== C / STACKS — each chain is a wallet stack; every name strip stays readable ===== */
+/* ===== C / STACKS — each Family is a wallet stack; every name strip stays readable ===== */
 /* Chains flow instead of sitting in a grid: each one is only as wide as its
-   own arrangement needs, so a fanned chain takes a full hand's width while a
+   own arrangement needs, so a fanned Family takes a full hand's width while a
    stacked one takes a single card's, and a row packs whatever fits. */
 /* ---------- Piece filter bar ----------
    Full-bleed so the sticky blur reaches the window edges, content on the same
@@ -188,13 +188,13 @@
 .filt .n{font:700 9.5px/1 var(--mono);color:#141024;background:var(--lime);
   border-radius:var(--rad-pill);padding:3px 6px}
 .filt .n:empty{display:none}
-/* Each column is its own 3-row group - a promotion chain, base over mid over
+/* Each column is its own 3-row group - a Family, base over mid over
    end - and the groups wrap. So the eleven columns sit in one band when there
    is room and cut into two, then three, stacked bands as it narrows, without
    ever scrolling sideways. */
 /* The groups sit in one grid rather than wrapping as flex items: uniform
    tracks mean every column lines up whatever the width, instead of each band
-   sizing itself. Each group is still a chain stacked three deep, and the
+   sizing itself. Each group is still a Family stacked three deep, and the
    column gap is what reads as the grouping. */
 .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(98px,1fr));
   gap:16px 20px;flex:1 1 auto;padding:11px 14px 11px 0}
@@ -226,12 +226,12 @@
 }
 .decks{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:center;
   gap:34px 26px;padding-top:26px;
-  /* Card width is solved backwards from "three fanned chains per row": a fan is
+  /* Card width is solved backwards from "three fanned Families per row": a fan is
      3*cw - 40 wide (three cards less two 20px overlaps), three of those plus two
      gaps must fit the page, so cw = (usable + 68) / 9. Clamped at both ends, so
      narrow pages simply wrap to two rather than shrinking the cards to nothing. */
   --cw-fit:clamp(144px, calc((100vw - 36px + 68px) / 9), 184px);
-  /* 1 is the three-per-row fit. Raising it trades a chain per row for bigger
+  /* 1 is the three-per-row fit. Raising it trades a Family per row for bigger
      cards; at 1.2 the wall drops to two across. */
   --card-scale:1;
   --cw:calc(var(--cw-fit) * var(--card-scale));
@@ -335,13 +335,13 @@ html{overflow-x:clip}
   font-size:12.5px;line-height:1;height:44px}
 .dcard .stg{font:700 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
 /* the stage ladder borrows the artefact rarity ramp (dark-theme values from
-   artefacts.html), so climbing a chain reads in the same colour language as
+   artefacts.html), so climbing a Family reads in the same colour language as
    climbing a rarity */
 .dcard:nth-of-type(1) .stg{color:var(--r-uncommon)}
 .dcard:nth-of-type(2) .stg{color:var(--r-rare)}
 .dcard:nth-of-type(3) .stg{color:var(--r-legendary)}
 
-/* line close-up: the whole chain, left to right */
+/* line close-up: the whole Family, left to right */
 dialog.line{border:0;padding:0;background:transparent;width:min(1090px,100vw);max-width:100vw;max-height:100dvh;color:var(--text)}
 dialog.line::backdrop{background:rgba(8,4,18,.72);backdrop-filter:blur(5px)}
 .line-in{position:relative;border-radius:26px;padding:26px 28px 30px;isolation:isolate;
@@ -362,7 +362,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
   .line-in{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 .line-in h2{margin:0 0 14px;font-size:26px;letter-spacing:-.02em}
-/* the chain drawn as its metro line: one coloured track, three stations */
+/* the Family drawn as its metro line: one coloured track, three stations */
 .metro-strip{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:52px;margin-bottom:6px}
 .metro-strip::before{content:"";position:absolute;top:11px;left:calc(100%/6);right:calc(100%/6);
   height:5px;border-radius:3px;background:var(--hue);opacity:.85}
@@ -436,7 +436,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 
 <header class="hero">
   <h1><em>Promotions</em></h1>
-  <p>8 promotion chains. Fuse two identical pieces and the pair climbs one step.</p>
+  <p>8 Families. Fuse two identical pieces and the pair climbs one step.</p>
 </header>
 
 <div class="bar" id="bar">
@@ -453,7 +453,7 @@ dialog.line::backdrop{background:rgba(8,4,18,.42)!important;
 </main>
 
 <footer class="foot">
-  <p class="foot-lead">8 thematic promotion chains, base to mid to end. Promotion happens when fusing 2 of the same piece.</p>
+  <p class="foot-lead">8 thematic Families, base to mid to end. Promotion happens when fusing 2 of the same piece.</p>
   <p>Sourced from the <a href="https://en.wikipedia.org/wiki/List_of_fairy_chess_pieces" target="_blank" rel="noopener">Wikipedia article on fairy chess pieces</a> and <a href="https://en.wikipedia.org/wiki/Fairy_chess_piece" target="_blank" rel="noopener">Betza's notation</a>. Built as a single static HTML file — no servers, no frameworks.</p>
 </footer>
 
@@ -464,18 +464,18 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 
 const LOOKUP = {};
 PIECES_CODEX.forEach(p => LOOKUP[p.id] = p);
-const CH = PROMOTION_CHAINS;
+const CH = PROMOTION_FAMILIES;
 // every line and line title in the accent lime, per direction
-// one line colour for every chain, taken from the theme so light mode follows
+// one line colour for every Family, taken from the theme so light mode follows
 const HUES = Array(CH.length).fill('var(--lime)');
 const mini = p => renderBoard(p).replace('viewBox="0 0 324 324"', 'viewBox="72 72 180 180"');
 const STAGES = ['Base','Mid','End'];
 
-// NO KINGS line names: the codex display name of the chain's base piece,
+// NO KINGS line names: the codex display name of the Family's base piece,
 // not the encyclopedia title stored in promotions.js.
 const TITLE = c => (LOOKUP[c.ids[0]] ? LOOKUP[c.ids[0]].name : c.title);
 
-/* A — metro map. Two geometries: on a phone the chain title moves above its
+/* A — metro map. Two geometries: on a phone the Family title moves above its
    line and the stations pull in, so all three fit without side-scrolling. */
 /* C — wallet decks; click opens the full line, left to right */
 // three little cards in the same arrangement as the deck below, so the glyph
@@ -527,7 +527,7 @@ function openLine(c, hue) {
      }).join('')}</div>`;
   dlg.showModal();
 }
-// FLIP: chains that get pushed to another row are told where they used to be
+// FLIP: Families that get pushed to another row are told where they used to be
 // and then animated back to zero, so a reflow reads as movement.
 function flip(mutate) {
   const items = $$('.stk');
@@ -553,29 +553,29 @@ function markFx(fx, fan, what) {
 // everywhere; pieces this page never shows are rendered but disabled.
 const nm = id => (LOOKUP[id] ? LOOKUP[id].name : id);
 const PRESENT = new Set(CH.flatMap(c => c.ids));
-// Order drives the 3-row grid: each promotion chain takes a column, base over
-// mid over end, then whatever belongs to no chain fills the columns after.
-const CHAIN_IDS = PROMOTION_CHAINS.flatMap(c => c.ids).filter(id => !nm(id).startsWith('Void '));
+// Order drives the 3-row grid: each Family takes a column, base over
+// mid over end, then whatever belongs to no Family fills the columns after.
+const CHAIN_IDS = PROMOTION_FAMILIES.flatMap(c => c.ids).filter(id => !nm(id).startsWith('Void '));
 const FILTER_IDS = [...CHAIN_IDS, ...PIECES_CODEX.map(p => p.id)
   .filter(id => !CHAIN_IDS.includes(id) && !nm(id).startsWith('Void '))
   .sort((a, b) => nm(a).localeCompare(nm(b)))];
 const bar = $('#bar'), filt = bar.querySelector('.filt');
 const allBtn = $('.fx-row .fx-all');
 allBtn.innerHTML = FX;
-markFx(allBtn, true, 'every chain');
+markFx(allBtn, true, 'every Family');
 allBtn.addEventListener('click', () => {
   const decks = $$('.deck');
   const fan = !decks.some(d => d.classList.contains('fan'));
   flip(() => {
     decks.forEach(d => d.classList.toggle('fan', fan));
     $$('.stk .fx').forEach(fx => markFx(fx, fan, 'the cards'));
-    markFx(allBtn, fan, 'every chain');
+    markFx(allBtn, fan, 'every Family');
   });
 });
 const chip = id =>
   `<button class="chip" type="button" data-id="${id}" aria-pressed="false"` +
   `${PRESENT.has(id) ? '' : ' disabled'}>${esc(nm(id))}</button>`;
-// three at a time, so each group is one chain and the groups wrap as bands
+// three at a time, so each group is one Family and the groups wrap as bands
 $('#chips').innerHTML = FILTER_IDS.reduce((out, id, i) =>
   (i % 3 ? out : [...out, FILTER_IDS.slice(i, i + 3)]), [])
   .map(g => `<div class="cgroup">${g.map(chip).join('')}</div>`).join('');

@@ -51,21 +51,28 @@ func _item(key: String, target: String) -> Dictionary:
 
 func _init() -> void:
 	# --- artefact trigger engine (slice 15): stacking is additive per copy,
-	# and the result never depends on acquisition order
+	# and the result never depends on acquisition order. issue 69 removed the
+	# original "greed"/"score"/"bounty" fixtures this proved itself against
+	# (game-native, pre-catalog) — repointed at catalog equivalents with the
+	# same on_capture flat-Score shape: Library of Alexandria Matchbox
+	# ("+1 Gold and +10 Score per piece in your Stock" — a literal flat +10
+	# per copy with 1 piece in Stock, same arithmetic "greed"/"score" used).
 	var stack := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "greed"]})
+		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "library-of-alexandria-matchbox"]})
 	await process_frame
 	var pawn_base: int = stack.defs.pawn.value
 	check(Economy.capture_score(stack, "pawn") == pawn_base + 20,
-		"two Greeds stack additively (+10 each), not multiplicatively")
+		"two Library of Alexandria Matchboxes stack additively (+10 each), not multiplicatively")
 	stack.queue_free()
 	await process_frame
 
 	var order_a := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["greed", "score", "bounty"]})
+		"wave": 3, "stock": ["pawn"],
+		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "suspiciously-large-femur"]})
 	await process_frame
 	var order_b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["bounty", "score", "greed"]})
+		"wave": 3, "stock": ["pawn"],
+		"artefacts": ["suspiciously-large-femur", "library-of-alexandria-matchbox", "voynich-dictionary"]})
 	await process_frame
 	check(Economy.capture_score(order_a, "pawn") == Economy.capture_score(order_b, "pawn"),
 		"capture score is independent of artefact acquisition order")
@@ -176,7 +183,7 @@ func _init() -> void:
 
 	# --- slice 17 (Action/Time/Piece, no-prerequisite subset) ---
 
-	# CIA Exploding Cigar: flat +1 action every turn, like "move"
+	# CIA Exploding Cigar: flat +1 action every turn
 	var cig := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["cia-exploding-cigar"]})
 	await process_frame
@@ -471,25 +478,31 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 58: on_milestone renamed to on_clock_refill — pure rename, no
-	# behaviour change. Its only two listeners, the "timer" artefact and the
-	# Recession tariff, must still fire on the GLOBAL 10-Wave clock refill
-	# (Tuning.MILESTONE_WAVES), unrelated to the PER-ARTEFACT "5-Wave
-	# Milestone" cadence covered above (Crop Circle Plank/John Titor).
+	# behaviour change. Its two listeners were the "timer" artefact and the
+	# Recession tariff; issue 69 removed "timer" (no catalog artefact has
+	# taken its place on this hook), so only the tariff remains to prove the
+	# hook still fires on the GLOBAL 10-Wave clock refill (Tuning.
+	# MILESTONE_WAVES), unrelated to the PER-ARTEFACT "5-Wave Milestone"
+	# cadence covered above (Crop Circle Plank/John Titor). The
+	# artefact-computed-first/tariff-halves-on-top ordering this block used to
+	# also prove is moot with no artefact left on the hook — the ordering
+	# guarantee itself is unchanged (see this file's own header note above),
+	# just currently unexercised by anything other than the tariff.
 	var refill := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 9, "clock_s": 0, "artefacts": ["timer"]})
+		"wave": 9, "clock_s": 0})
 	await process_frame
 	WaveLogic.queue(refill, 10) # starting wave 10: the GLOBAL milestone fires
-	check(refill.clock_ms == Tuning.CLOCK_REFILL_MS + 5000,
-		"the renamed on_clock_refill hook still fires \"timer\": base refill +5s")
+	check(refill.clock_ms == Tuning.CLOCK_REFILL_MS,
+		"the renamed on_clock_refill hook still fires: base refill, no artefact left on the hook")
 	refill.queue_free()
 	await process_frame
 
 	var refill_recession := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 9, "clock_s": 0, "artefacts": ["timer"], "tariffs": ["recession"]})
+		"wave": 9, "clock_s": 0, "tariffs": ["recession"]})
 	await process_frame
 	WaveLogic.queue(refill_recession, 10)
-	check(refill_recession.clock_ms == (Tuning.CLOCK_REFILL_MS + 5000) * 0.5,
-		"the renamed on_clock_refill hook still fires Recession: artefact base computed first (Tariff/artefact ordering), tariff halves on top")
+	check(refill_recession.clock_ms == Tuning.CLOCK_REFILL_MS * 0.5,
+		"the renamed on_clock_refill hook still fires Recession: halves the base refill")
 	refill_recession.queue_free()
 	await process_frame
 

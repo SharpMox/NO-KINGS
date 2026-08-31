@@ -101,8 +101,9 @@ const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}
 # Per-rarity (issue 20: closes the Shop page's "Artefact 100 flat" open
 # question). Doubles per tier, same shape as SHOP_ITEM_PRICE's tier jumps —
 # a Legendary should cost meaningfully more than a Common, not the same 100
-# every rarity paid before. "" is the 7 core artefacts that predate the
-# rarity catalog (items.gd ARTEFACT_EFFECTS_CORE) — priced as Common.
+# every rarity paid before. "" priced as Common — a fallback for an
+# unrecognized key (e.g. one of the 7 game-native keys issue 69 removed,
+# briefly reachable in an un-migrated old save).
 const SHOP_ARTEFACT_PRICE := {"": 50, "Common": 50, "Uncommon": 100, "Rare": 200, "Legendary": 400}
 ## Price by SIZE only, theme ignored (issue 47) — doubling shape the file
 ## already uses everywhere else (SHOP_ITEM_PRICE, SHOP_ARTEFACT_PRICE). Small

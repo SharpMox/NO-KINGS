@@ -600,7 +600,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "items": ["blitz"], "artefacts": ["greed"]}
+		"wave": 3, "items": ["blitz"], "artefacts": ["library-of-alexandria-matchbox"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame

@@ -757,7 +757,7 @@ func _init() -> void:
 	# firing on_purchase, so "each OTHER Artefact" is size() - 1 at dispatch
 	# time either way (see the handler's own comment).
 	var ys := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 99999, "artefacts": ["deep-state-yearbook", "greed"]})
+		"wave": 3, "gold": 99999, "artefacts": ["deep-state-yearbook", "library-of-alexandria-matchbox"]})
 	await process_frame
 	ys.actions_left = 5
 	var ys_idx := -1
@@ -798,14 +798,16 @@ func _init() -> void:
 		# this test's own math (a flat -5 net) must not also pick up some
 		# unrelated artefact's own purchase-Gold or price effect
 		var hooks: Array = ArtefactHooks.REGISTRY.get(e.key, [])
-		if e.get("rarity", "") == "Common" and e.key != "deep-state-yearbook" and e.key != "greed" \
+		if e.get("rarity", "") == "Common" and e.key != "deep-state-yearbook" \
+				and e.key != "library-of-alexandria-matchbox" \
 				and not hooks.has("on_purchase") and not hooks.has("on_price"):
 			common_key = e.key
 			break
 	check(common_key != "", "(sanity) a Common-rarity Artefact exists to buy in this test")
 	var loop := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 99999,
-		"artefacts": ["deep-state-yearbook", "greed", "greed", "greed"]})
+		"artefacts": ["deep-state-yearbook", "library-of-alexandria-matchbox",
+			"library-of-alexandria-matchbox", "library-of-alexandria-matchbox"]})
 	await process_frame
 	loop.actions_left = 5
 	check(loop.artefacts.size() == 4, "(sanity) 4 Artefacts held, 1 slot free under the cap of 5")

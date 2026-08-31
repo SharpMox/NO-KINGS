@@ -79,12 +79,54 @@ was literally 48 new effects.
 
 Trump's kit is open to a better proposal; the user invited one.
 
-## Open, blocking the per-King design
+## 6. The Power is live for the WHOLE King wave — both segments
 
-- Power live during segment 1, or only once the King is on the board?
-- What "buffed" means for the segment-1 enemies.
-- Larry: what he is mechanically, beyond "near-impossible".
-- Does the tier choice surface in the difficulty picker now, or stay random-only?
+So the 15 turns of buffed enemies are *that King's* 15 turns, not generic filler, and the
+Power telegraphs who is arriving: the player reads it and knows what is coming.
+
+## 7. "Buffed" means Piece Buffs on the spawns
+
+Reuses the 12 shipped Piece Buffs — enemy spawns arrive already carrying one or two. Nothing
+new to build, the player already knows what each buff does, and **which** buffs appear is a
+per-King flavour lever for free.
+
+Note the interaction to check when building: the Piece Buff cap is 2 (issue 53) and every
+grant routes through `_apply_buff`. Enemy spawns carrying buffs must respect the same choke
+point rather than writing buffs directly, or the cap becomes player-only.
+
+## 8. Kits are LITERALLY BESPOKE — ~48 new effects
+
+The user was asked directly whether "bespoke" meant new naming over pooled mechanics or
+genuinely new effects, with the cost stated (*"~48 mechanics to design and implement from
+scratch — a program of work several times the size of the Armies slice"*), and chose **new
+effects**. That is the ruling; the 19-entry pool is no longer the raw material.
+
+**The one exception is the user's own worked example:** Trump keeps **Tariff** (his Power,
+ruled in slice 66) and **Diplomatic Visit – JD Vance**, both existing pool entries. So the rule
+is "bespoke unless an existing effect is genuinely the right answer", with Trump as the case
+where it is.
+
+**Scope consequence, recorded so it is not a surprise:** 16 Powers + ~32-48 Abilities is not a
+slice, it is a program. It should be split per costume tier (four Kings at a time) so each
+lands reviewable, and it is larger than everything remaining in the 79-88 range combined.
+
+## 9. Larry is PARKED
+
+Wave 201 stays unimplemented for now. Nothing reaches wave 200 today, so deferring costs
+nothing. Ship the 16 Kings first.
+
+## Defaulted, not asked (say so if wrong)
+
+**Tier choice stays random-only** for now, with the difficulty picker left as the obvious place
+it could later hang off. The user's phrasing was *"randomly by default but we can add that
+selection with the difficulty choice"* — "can add" reads as a door left open, not a
+requirement, so nothing is built for it yet.
+
+## Still open, blocking the per-King design
+
+- The 48 effects themselves — this is the design work, now confirmed as greenfield.
+- Whether segment 1 and segment 2 are two `wave` entries or one wave with a phase flag.
+  Affects `wave_logic.gd` and the Endless pacing, and is worth settling before any King ships.
 
 ---
 

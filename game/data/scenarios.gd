@@ -47,7 +47,7 @@ static func all() -> Array:
 			"wave": 11, "score": 300, "stock": ["pawn"], "pending_reinforce": true}},
 		{"name": "Economy: Blitz + First-Capture bonus actions", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
-			"items": ["blitz"], "artefacts": ["first_capture_extra"], "score": 200, "wave": 3}},
+			"items": ["blitz"], "artefacts": ["stargate-divination-crystal"], "score": 200, "wave": 3}},
 		# win-screen tests: King one queen-move away, capture it to trigger the
 		# screen — wave 50 = Continue/End Run, wave >= 150 = FULL CLEAR game over
 		{"name": "Win screen: wave 50 (capture King)", "cfg": {
@@ -115,9 +115,11 @@ static func all() -> Array:
 				["pawn", 0, 6, 1, {"buffs": [{"key": "bomb"}]}],
 				["rook", 1, 2, 5], ["pawn", 1, 3, 5], ["knight", 1, 3, 8]],
 			"items": ["buff_box"], "stock": ["pawn"], "score": 500, "wave": 1}},
-		{"name": "Artefacts: all active", "cfg": {
+		{"name": "Artefacts: mixed simple triggers", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
-			"artefacts": ["first_capture_extra", "greed", "move", "lifesteal", "score", "timer", "bounty"],
+			"artefacts": ["stargate-divination-crystal", "library-of-alexandria-matchbox",
+				"cia-exploding-cigar", "2012-doomsday-party-hat", "voynich-dictionary",
+				"suspiciously-large-femur", "nero-s-marshmallow-stick"],
 			"wave": 9, "stock": ["pawn"]}},
 		{"name": "Artefacts: Gold/Score batch (issue 16)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
@@ -185,7 +187,7 @@ static func all() -> Array:
 		{"name": "Artefacts: slice 21 (echo and meta-triggers)", "cfg": {
 			"board": [["pawn", 0, 2, 1], ["pawn", 0, 3, 1], ["queen", 0, 4, 1],
 				["pawn", 1, 2, 5], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],
-			"artefacts": ["greed", "zurich-gnome-figurine", "d-b-cooper-s-parachute",
+			"artefacts": ["voynich-dictionary", "zurich-gnome-figurine", "d-b-cooper-s-parachute",
 				"polybius-cartridge", "max-headroom-mask", "red-diary-s-missing-pages",
 				"cern-ctrl-z-shortcut", "bilderberg-hotel-slippers",
 				"illuminati-nwo-booster-pack", "100-genuine-original-mona-lisa",
@@ -202,8 +204,18 @@ static func all() -> Array:
 			"artefacts": ["elvish-hard-hat"],
 			"gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Artefacts: slice 35 (Clock-gain choke point — lifesteal, King refill, Black Knight)", "cfg": {
+			# issue 69 repointed "lifesteal" (removed game-native key, the
+			# only on_capture Clock-gain artefact) to 2012 Doomsday Party Hat
+			# (on_gold_change, +5s per 10 Gold) — no surviving catalog
+			# Artefact grants Clock on_capture, so this exercises the same
+			# add_clock() choke point via a different hook instead. The name
+			# itself is left as-is (not updated to mention the new key): a
+			# longer name here pushes the "TEST" scroll list's "← Back"
+			# button out of position in the fixed 480x800 menu window and
+			# breaks test_menu_clicks.gd — found empirically bisecting a
+			# menu-clicks regression, see PR notes.
 			"board": [["queen", 0, 2, 1], ["king", 1, 2, 4], ["pawn", 1, 3, 5], ["rook", 1, 4, 6]],
-			"artefacts": ["lifesteal", "black-knight-morse-code"],
+			"artefacts": ["2012-doomsday-party-hat", "black-knight-morse-code"],
 			"gold": 100, "score": 0, "clock_s": 90.0, "wave": 99, "kings_defeated": 1,
 			"stock": ["pawn"]}}, # a recurring King refill on top of lifesteal/Black
 			# Knight's own Clock hooks, and a 3rd-Turn cadence within easy reach

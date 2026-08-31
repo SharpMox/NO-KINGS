@@ -38,17 +38,15 @@ func _init() -> void:
 
 ## The catalog and the code must agree on which keys are implemented: every
 ## catalog entry flagged implemented must have a matching ARTEFACT_EFFECTS
-## entry (the code actually backs it), keys must be unique across the 180,
-## and none may collide with a core key (a collision would silently shadow
-## a shipped effect).
+## entry (the code actually backs it), and keys must be unique across the
+## 180. (issue 69 removed the 7 game-native core keys and the "collides with
+## a core key" check that used to guard against — ARTEFACT_EFFECTS is now
+## built solely from this catalog, so a collision within it is impossible.)
 func _artefact_catalog_errors() -> Array:
 	var errors := []
 	var catalog: Array = Items.ARTEFACT_CATALOG
 	if catalog.size() != 180:
 		errors.append("artefact catalog: expected 180 entries, got %d" % catalog.size())
-	var core_keys := {}
-	for e in Items.ARTEFACT_EFFECTS_CORE:
-		core_keys[e.key] = true
 	var effect_keys := {}
 	for e in Items.ARTEFACT_EFFECTS:
 		effect_keys[e.key] = true
@@ -57,8 +55,6 @@ func _artefact_catalog_errors() -> Array:
 		if seen.has(e.key):
 			errors.append("artefact catalog: duplicate key %s" % e.key)
 		seen[e.key] = true
-		if core_keys.has(e.key):
-			errors.append("artefact catalog: key %s collides with a core key" % e.key)
 		if e.get("implemented", false) and not effect_keys.has(e.key):
 			errors.append("artefact catalog: %s marked implemented but code has no matching effect" % e.key)
 	return errors

@@ -8,10 +8,14 @@
 ## Artefact trigger engine — drives the live game node `g`. Dispatches artefact
 ## effects at named hook points instead of the ad hoc `for t in artefacts: if
 ## t.key == "move"` that used to be scattered through game.gd/economy.gd/
-## wave_logic.gd. Fine for the 7 core effects (data/items.gd:ARTEFACT_EFFECTS_
-## CORE); unworkable for the 180-entry catalog (data/artefacts.json) slices
-## 16-20 wire in one at a time. This is that slice 13 (hook architecture)
-## arriving against a real consumer — see .scratch/gdd-gaps/issues/13 and 15.
+## wave_logic.gd. Fine for a handful of game-native effects; unworkable for
+## the 180-entry catalog (data/artefacts.json) slices 16-20 wire in one at a
+## time. This is that slice 13 (hook architecture) arriving against a real
+## consumer — see .scratch/gdd-gaps/issues/13 and 15. (The 7 original
+## game-native effects this REGISTRY first proved itself against —
+## first_capture_extra/greed/move/lifesteal/score/timer/bounty — were
+## themselves removed in issue 69, once the 180-entry catalog covered
+## everything Notion describes; see items.gd's header.)
 ##
 ## HOOKS lists every trigger point the GDD effect texts imply. REGISTRY maps
 ## an artefact key to the hooks it listens on; ADD_HANDLER (the match in
@@ -21,17 +25,20 @@
 ## STACKING: the same artefact can be held more than once — each copy is its
 ## own entry in g.artefacts (save_config.gd, shop.gd). run() dispatches once
 ## per held copy, so percentage/flat modifiers from repeats are ADDITIVE: two
-## Greeds add +10 and +10, not +10 compounded multiplicatively. This is how
-## the 7 core effects already behaved (each copy ran its own loop iteration
-## pre-migration) and is simplest to reason about at 180 artefacts. A
+## held copies of a flat-Score artefact add their two contributions, not
+## compounded multiplicatively. This is how the 7 original game-native
+## effects behaved (each copy ran its own loop iteration pre-migration, before
+## issue 69 removed them) and is simplest to reason about at 180 artefacts. A
 ## multiplicative artefact would be a deliberate, called-out exception inside
-## its own handler. Covered by test_items.gd ("two Greeds stack additively").
+## its own handler. Covered by test_items_artefacts_1.gd ("two Library of
+## Alexandria Matchboxes stack additively").
 ##
 ## ORDERING: run() sorts the held artefacts by key before dispatching, so a
 ## value built from several artefacts touching the same number never depends
 ## on acquisition order. Handlers must be commutative for a fixed multiset of
-## keys — true of all 7 today (every one just adds to a counter). Covered by
-## test_items.gd ("Greed+Score" order doesn't change the total).
+## keys — true of every REGISTRY entry today (each just adds to a counter).
+## Covered by test_items_artefacts_1.gd ("capture score is independent of
+## artefact acquisition order").
 ##
 ## issue 16 (Gold/Score batch) added:
 ## - on_score_change / on_gold_change (Economy.earn/economy.gd), ctx =
@@ -146,13 +153,16 @@
 ##
 ## Tariff/artefact ordering: run() dispatches the artefacts group before the
 ## tariffs group (two separately-sorted passes, not one merged sort) so a
-## shared hook — only on_clock_refill today (artefact "timer" + tariff
-## "recession") — keeps computing the artefact-modified base first and
-## applying the tariff modifier on top, exactly the order the pre-migration
-## call site used (`refill` built by the artefact hook run, then halved by
-## Recession right after it, outside the hook). A single alphabetical sort
-## across both groups would have flipped that for any key sorting before
-## "timer" and changed the milestone refill's number.
+## shared hook keeps computing the artefact-modified base first and applying
+## the tariff modifier on top, exactly the order the pre-migration call site
+## used. on_clock_refill was the one shared hook this mattered for (artefact
+## "timer" + tariff "recession": `refill` built by the artefact hook run,
+## then halved by Recession right after it, outside the hook) — "timer" was
+## removed in issue 69 (no catalog artefact has taken its place on this hook
+## since), so the tariff is currently the hook's only registrant, but the
+## dispatch-order guarantee stays in place for whichever artefact reaches it
+## next. A single alphabetical sort across both groups would have flipped
+## that ordering for any key sorting before "timer".
 ##
 ## Oneoff tariffs (forced_audit, hostile_takeover, asset_seizure, jd_vance,
 ## asset_freeze) stay on Economy.apply_tariff's own `match t.key` — that's
@@ -819,13 +829,6 @@ const HOOKS := [
 ## Artefact key -> hooks it fires on. The source of truth for "does this
 ## artefact do anything at this hook" — _dispatch is just the handler body.
 const REGISTRY := {
-	"greed": ["on_capture"],
-	"score": ["on_capture"],
-	"bounty": ["on_capture"],
-	"lifesteal": ["on_capture"],
-	"first_capture_extra": ["on_capture"],
-	"move": ["on_turn_start"],
-	"timer": ["on_clock_refill"],
 	# --- issue 16: Gold/Score batch (31 artefacts, no needs-note) ---
 	"tinfoil-hat": ["on_score_change", "on_gold_change"],
 	"daylight-savings-jar": ["on_score_change", "on_gold_change"],
@@ -1379,8 +1382,9 @@ static func _milestone5_hit(wave: int, acquired_wave: int) -> bool:
 
 
 ## Catalog rarity for an artefact key ("Common"/"Uncommon"/"Rare"/"Legendary"),
-## "" for the 7 core keys (items.gd's ARTEFACT_EFFECTS_CORE, which predate the
-## catalog and carry no rarity at all) or an unrecognized key. Every
+## "" for an unrecognized key — e.g. an old save still holding one of the 7
+## game-native keys issue 69 removed, before save_config.gd's migration
+## strips it. Every
 ## acquisition path (shop.gd's buy, game.gd's _box_choose and --artefacts
 ## flag, save_config.gd's apply()) stamps `rarity` onto the held copy
 ## directly via this lookup — the same "stamp at acquisition" pattern
@@ -1552,25 +1556,6 @@ static func _on_enemy_half(pos: Vector2i) -> bool:
 ## THAT copy's own beat, not the wave-1 default").
 static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int = 1) -> void:
 	match [key, hook]:
-		["greed", "on_capture"]:
-			if ctx.victim_id == "pawn":
-				ctx.pts += 10
-		["score", "on_capture"]:
-			ctx.pts += 10
-		["bounty", "on_capture"]:
-			if ctx.base >= 50:
-				ctx.pts += 30
-		["lifesteal", "on_capture"]:
-			Economy.add_clock(g, 2000, "lifesteal")
-		["first_capture_extra", "on_capture"]:
-			if g.turn_action_count == 0:
-				g.actions_left += 1
-				g.actions_max += 1
-		["move", "on_turn_start"]:
-			g.actions_left += 1
-		["timer", "on_clock_refill"]:
-			ctx.refill += 5000
-
 		# --- issue 16: percentage Score/Gold gain modifiers ---
 		["tinfoil-hat", "on_score_change"]:
 			ctx.amount += ctx.base * 0.15

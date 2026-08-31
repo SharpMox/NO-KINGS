@@ -1,6 +1,6 @@
 # 71 — Cinematic intro
 
-Status: todo — NEEDS TWO DECISIONS
+Status: todo — SPECCED (user rulings 2026-08-31) · ready
 
 ## Parent
 
@@ -10,14 +10,37 @@ Status: todo — NEEDS TWO DECISIONS
 
 `~/Downloads/LarryIntro.mp4` — 1.3 MB.
 
-## What has to be decided first
+## Decided (user, 2026-08-31)
 
-1. **When does it play?** Options: on first launch only (stored in settings), every launch
-   with a skip, or from a menu entry. First-launch-only is the usual answer for a 1.3 MB
-   intro; every-launch needs a skip on the first frame or it becomes an obstacle.
-2. **Does it block the menu?** If it plays on launch it must be skippable by any input, and
-   the click probes need to know how to get past it or **every windowed probe breaks** —
-   `test_menu_clicks.gd` boots straight into the menu today.
+- **Plays at the very start**, every launch.
+- **Skippable with clicks** — any click ends it and goes straight to the menu.
+
+## The asset is already converted and committed
+
+`game/assets/video/larry_intro.ogv` — Ogg Theora, 128x228, 11.3s, no audio, **288 KB**
+(down from the 1.3 MB MP4; Theora came out smaller here because the source was oddly
+high-bitrate for its resolution). Converted with `ffmpeg2theora`, since Homebrew's current
+ffmpeg build no longer ships `libtheora`.
+
+**Nothing plays it yet** — that is this slice.
+
+## ⚠️ The probe problem — solve this first, not last
+
+`test_menu_clicks.gd` and `test_game_clicks.gd` boot straight into the menu today. **An
+intro in front of it breaks every windowed probe**, which is the suite's only real-input
+coverage and has caught bugs headless testing structurally cannot (the six-Family menu
+overflow, hours ago).
+
+Do **not** solve this with a timing hack ("wait 12 seconds"), which makes every probe run
+slower and flakier — the suite already has one load-sensitive stall on record.
+
+**Use a bypass the probes can set deterministically**: a `GameScript`/settings flag, or the
+same `next_config` seam the probes already use, that skips the intro entirely. State clearly
+in the PR which mechanism you chose and why the probes cannot race it.
+
+Since the video is **128x228 in a 480x800 window**, also decide how it is presented — letterboxed
+at native size, or scaled up. Native-size pixel art scaled 3x with nearest-neighbour filtering
+would suit the source; smooth-scaling 128px art to full width will look soft. Show a screenshot.
 
 ## Godot notes
 

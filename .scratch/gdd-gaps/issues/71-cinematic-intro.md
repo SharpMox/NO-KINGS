@@ -1,6 +1,6 @@
 # 71 — Cinematic intro
 
-Status: todo — SPECCED (user rulings 2026-08-31) · ready
+Status: done — shipped on feat/cinematic-intro-71
 
 ## Parent
 
@@ -63,3 +63,51 @@ noticeably larger out.
 ## Blocked by
 
 - the two decisions above
+
+## Outcome
+
+New `scenes/Intro.tscn` + `scripts/intro.gd`, set as `project.godot`'s
+`run/main_scene` (was `Menu.tscn`).
+
+**Probe safety — no bypass flag needed.** Every `tests/test_*.gd`, including
+`test_menu_clicks.gd`/`test_game_clicks.gd`, `extends SceneTree` and runs via
+`godot -s tests/test_X.gd` — Godot's `-s` flag replaces the engine's main loop
+with the script's own `SceneTree` and never loads `run/main_scene` at all. Both
+click probes instantiate `Menu.tscn` directly (`load(...).instantiate();
+root.add_child(menu)`), so `Intro.tscn` is structurally unreachable from them —
+not raced-and-usually-winning, but never on their code path in the first
+place. Confirmed by running `game/tests/run_all.sh` twice in a row (`timeout:
+600000`, `menu-clicks`/`game-clicks` both green both times) despite two other
+Godot processes running concurrently on the machine (other agents' sessions —
+`run_all.sh`'s own contention check warned but didn't block).
+
+The one real launch mode that *does* go through `main_scene` without wanting
+the intro is the existing CLI bypasses — `--autoplay`, `--scenario`,
+`--screenshot` (the same three `menu.gd` already special-cases, including
+`run_all.sh`'s own final `autoplay` step, which boots with no `-s` flag).
+`intro.gd` extracts a static `should_bypass(args)` predicate and skips straight
+to `Menu.tscn` when any of those are present — unit-tested headless in the new
+`tests/test_intro.gd`.
+
+**Presentation**: 128×228 source, nearest-neighbour 3× (384×684), letterboxed
+and centered in the 480×800 canvas — smooth-scaling would have gone soft.
+Screenshot attached to the PR.
+
+**Edge cases**:
+- Natural end: the video's `finished` signal fires reliably (verified
+  headless, fired at ~11.6s against an 11.3s clip) and hands off to the Menu —
+  it does not hang on the last frame.
+- First-frame click: a synthetic click on the very first rendered frame
+  advances cleanly with no crash, verified windowed. An `_advanced` guard
+  makes `_advance()` idempotent so the `finished` signal and a click can never
+  double-fire a scene change, whichever lands first.
+
+**New test**: `tests/test_intro.gd` (headless, added to `run_all.sh`) covers
+`should_bypass()` for all three CLI flags plus a control case, and the
+idempotent-advance guard via two direct `_advance()` calls. It does not probe
+real click routing — this repo's own click-probe headers already document that
+headless Godot drops GUI picking, and since the intro is deliberately
+unreachable from the two existing windowed probes, a third windowed suite
+would only re-prove `_gui_input` fires (verified manually instead, see above)
+at real window-boot cost, for coverage the cheaper headless guard test already
+gives.

@@ -544,8 +544,22 @@ func _init() -> void:
 	lint.actions_left = 5
 	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
 	var lint_buffs: Array = BuffLogic.of(lint.board[Vector2i(3, 2)])
-	check(lint_buffs.size() == 1 and lint_buffs[0].key == "shield",
-		"Holy Lint: the capturing piece gets +1 Piece Buff (shield, seed 4)")
+	# Assert the BEHAVIOUR (exactly one Buff, and a safe one), not which key the
+	# RNG happened to land on. Naming the key made this assertion churn three
+	# times in three slices — stun -> reflect (47 moved the stream by rolling
+	# Box contents at boot), reflect -> shield (48 added a 13th Buff and changed
+	# _random_buff_key's modulo) — and every churn is an invitation to "update
+	# the expected value until it goes green", which is how a real regression
+	# gets buried. What Holy Lint actually promises is "+1 Piece Buff"; the key
+	# is incidental, so long as it is not one that self-triggers on the very
+	# capture that granted it.
+	const LINT_HAZARDS := ["bomb", "trap", "multicapture"] # would resolve
+		# during this same capture and mask the grant
+	check(lint_buffs.size() == 1,
+		"Holy Lint: the capturing piece gets exactly +1 Piece Buff")
+	check(not lint_buffs.is_empty() and not LINT_HAZARDS.has(lint_buffs[0].key),
+		"...and it is a safe, non-self-triggering Buff (got %s)"
+			% (lint_buffs[0].key if not lint_buffs.is_empty() else "none"))
 	lint.queue_free()
 	await process_frame
 

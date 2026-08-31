@@ -1,6 +1,6 @@
 # 72 — Login: Google, Apple, Guest — and offline
 
-Status: todo — SPECCED (user rulings 2026-08-31) · ready to split
+Status: SPLIT (2026-08-31) — see 83 / 84 / 85 / 86 / 87; this file is now the parent spec
 
 ## Parent
 

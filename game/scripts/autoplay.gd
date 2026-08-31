@@ -103,24 +103,34 @@ static func try_activate_artefact(g) -> void:
 	g._artefact_target_click(b)
 
 
-## The Family Ability (67): The Muster's Call the Banners is the one
-## targeted case (a Stock pick, not a board tile) — resolved via `rng` the
-## same way _open_box_pick/every other autoplay modal is, so the bot never
-## stalls on the confirm modal or leaves targeting stuck. Wild Hunt/Old
-## Guard are untargeted — g._activate_family_ability's own autoplay bypass
-## (mirroring _activate_artefact's) resolves those immediately. Returns
-## whether it actually activated.
+## The Family Ability (67/68): The Muster's Call the Banners is one targeted
+## case (a Stock pick, not a board tile) — resolved via `rng` the same way
+## _open_box_pick/every other autoplay modal is, so the bot never stalls on
+## the confirm modal or leaves targeting stuck. Hostile Takeover (Syndicate)/
+## Ritual (Cult) are the other targeted case, a board pick — driven the same
+## two-call way try_activate_artefact drives Bovine Tractor Beam above. Wild
+## Hunt/Old Guard/Horde are untargeted — g._activate_family_ability's own
+## autoplay bypass (mirroring _activate_artefact's) resolves those
+## immediately. Returns whether it actually activated.
 static func try_activate_family_ability(g) -> bool:
 	if not g._family_ability_available():
 		return false
-	if g.next_army != "Crown":
-		g._activate_family_ability()
+	if g.next_army == "Crown":
+		g._begin_family_targeting()
+		if g.stock.is_empty(): # availability already checked this; never leave
+			g._family_targeting_reset() # targeting stuck with nothing to pick
+			return false
+		g._family_target_stock(g.stock[g.rng.randi() % g.stock.size()], false)
 		return true
-	g._begin_family_targeting()
-	if g.stock.is_empty(): # availability already checked this; never leave
-		g._family_targeting_reset() # targeting stuck with nothing to pick
-		return false
-	g._family_target_stock(g.stock[g.rng.randi() % g.stock.size()], false)
+	if g.next_army == "Syndicate" or g.next_army == "Cult":
+		g._begin_family_board_targeting()
+		if g.family_board_targets.is_empty(): # availability already checked
+			g._family_board_targeting_reset() # this; never leave it stuck
+			return false
+		var t: Vector2i = g.family_board_targets[g.rng.randi() % g.family_board_targets.size()]
+		g._family_board_target_click(t)
+		return true
+	g._activate_family_ability()
 	return true
 
 

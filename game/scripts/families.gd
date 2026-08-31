@@ -49,6 +49,37 @@ const CATALOG := {
 		"ability_desc": "Every piece on your back two rows gains Shield.",
 		"ability_targeted": false,
 	},
+	"Syndicate": {
+		"display_name": "The Syndicate",
+		"starting_gold": Tuning.FAMILY_BASELINE_GOLD * 3,
+		"starting_items": [],
+		"power_name": "Insider Rates",
+		"power_desc": "Shop buy prices -25%, sell payouts +25%.",
+		"ability_name": "Hostile Takeover",
+		"ability_desc": "Pay 200% of a target enemy piece's value: it leaves the board and joins your Stock.",
+		"ability_targeted": true,
+	},
+	"Cult": {
+		"display_name": "The Cult",
+		"starting_gold": Tuning.FAMILY_BASELINE_GOLD,
+		"starting_items": ["buff_box"],
+		"starting_artefact_count": 2, # issue 68: 2 random Artefacts at run start
+		"power_name": "Communion",
+		"power_desc": "Your Piece Buff cap is 3.",
+		"ability_name": "Ritual",
+		"ability_desc": "Grant a target piece a random Buff.",
+		"ability_targeted": true,
+	},
+	"Horde": {
+		"display_name": "The Horde",
+		"starting_gold": Tuning.FAMILY_BASELINE_GOLD,
+		"starting_items": [],
+		"power_name": "Endless Ranks",
+		"power_desc": "Pawn deploys cost no Gold.",
+		"ability_name": "Conscription",
+		"ability_desc": "Add 2 pawns to your Stock.",
+		"ability_targeted": false,
+	},
 }
 
 
@@ -90,3 +121,29 @@ static func blood_in_the_air(g) -> bool:
 ## hook placement gives the "no 150% money printer" safety catch for free.
 static func hold_the_line(g) -> bool:
 	return g.next_army == "Old Guard"
+
+
+## Insider Rates (The Syndicate, issue 68): read by shop.gd's price()/
+## sell_payout(). Deliberately NOT read by shop.gd's sell_price() — the
+## Captured -> Stock conversion cost (game.gd._convert_captured) and a plain
+## sell payout share that one function, and conversion must stay at the flat
+## Tuning.SELL_RATE: "it is not a Shop purchase, and discounting it would
+## reopen the convert/sell arbitrage that equal rates deliberately closed"
+## (issue 68's own ruling; see SELL_RATE's own header for the arbitrage).
+static func insider_rates(g) -> bool:
+	return g.next_army == "Syndicate"
+
+
+## Communion (The Cult, issue 68): +1 Piece Buff cap, additive with Abduction
+## Probe — read by game.gd's _apply_buff alongside its existing
+## _artefact_count("abduction-probe") term so the two SUM (base 2 + probe +
+## Communion), never dedupe: "Communion + Abduction Probe = cap 4" (issue 68).
+static func communion(g) -> bool:
+	return g.next_army == "Cult"
+
+
+## Endless Ranks (The Horde, issue 68): pawn deploys cost no Gold — read by
+## game.gd's _place(), scoped there to `id == "pawn"` (majors still pay full
+## price, though Horde's own kit fields none).
+static func endless_ranks(g) -> bool:
+	return g.next_army == "Horde"

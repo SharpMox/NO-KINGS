@@ -453,7 +453,8 @@ func _add_family_ability_chip() -> void:
 	var kit: Dictionary = Families.entry(g.next_army)
 	var btn := Button.new()
 	btn.text = "★%s" % kit.ability_name
-	var targeting: bool = g.family_targeting
+	var targeting: bool = g.family_targeting or g.family_board_targeting # issue
+		# 68: Hostile Takeover/Ritual's board-targeting flavor gets the same tint
 	btn.disabled = not (g._family_ability_available() or targeting)
 	btn.tooltip_text = "%s (1 Action)\n%s" % [kit.power_name + " — always on. " \
 		+ kit.ability_name, kit.ability_desc]

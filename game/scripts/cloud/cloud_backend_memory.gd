@@ -24,3 +24,9 @@ static func pull(key: String) -> Variant:
 
 static func reset() -> void:
 	_store = {}
+
+
+## issue 83: the signed-in account's stable id, or "" when there is none.
+## Part of the backend contract alongside is_available/push/pull.
+static func account_id() -> String:
+	return "memory-account"

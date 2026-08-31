@@ -33,6 +33,9 @@ const Waves := preload("res://data/waves.gd")
 const Items := preload("res://data/items.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+## issue 83: every save carries the account that owns it. Additive — a save
+## written before this has no `owner`, reads back as "", and needs no migration.
+const Account := preload("res://scripts/account.gd")
 
 
 ## Bumped ONLY for a migrating change (see the header). Additive fields do not
@@ -220,7 +223,7 @@ static func to_config(g) -> Dictionary:
 			# reloaded save keeps each held copy's own "5-Wave Milestone" cadence
 			# and rarity (issue 29) — the catalog fallback covers an in-memory
 			# entry that predates the stamp, same as apply()'s own fallback
-	return {
+	return Account.stamp({
 		"save_version": SAVE_VERSION,
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,
@@ -246,4 +249,4 @@ static func to_config(g) -> Dictionary:
 		"tariffs_off": g.tariffs_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
 		"ecdysis_copy_key": g.ecdysis_copy_key,
-	}
+	})

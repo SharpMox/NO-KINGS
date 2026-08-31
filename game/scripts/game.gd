@@ -41,6 +41,16 @@ static var next_army: String = Tuning.DEFAULT_ARMY
 ## for the run — a save/Continue restores it via SaveConfig instead of
 ## re-reading this, same split as next_army above.
 static var next_tier: String = Tuning.DEFAULT_TIER
+## issue 75: "" means roll a fresh random seed, as before. Set from --seed or
+## the new-run screen. Kept as the raw String the player typed so it can be
+## shown back to them verbatim on the results screen.
+static var next_seed: String = ""
+
+
+## Any string -> a stable seed. Digits are used as-is so "12345" behaves like
+## the number a player expects; anything else is hashed, so words work too.
+static func seed_of(text: String) -> int:
+	return int(text) if text.is_valid_int() else int(hash(text))
 
 const SAVE_PATH := "user://save.json"
 const SCORES_PATH := "user://scores.json"
@@ -443,6 +453,8 @@ func _ready() -> void:
 		next_army = args[args.find("--army") + 1]
 	if args.has("--tier"): # balance fleets: run the bot at a specific difficulty tier
 		next_tier = args[args.find("--tier") + 1]
+	if args.has("--seed"): # issue 75: reproduce a run exactly
+		next_seed = args[args.find("--seed") + 1]
 	_layout_board()
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
@@ -469,7 +481,14 @@ func _ready() -> void:
 	# GDD Game Flow — Run: one seed per run, captured so a save resumes the same
 	# stream. SaveConfig.apply below overrides both when restoring a save, and a
 	# scenario may pin "seed" to replay a bug exactly.
-	rng.randomize()
+	# issue 75: a seed makes the whole run reproducible. Nothing in the game
+	# rolls outside this generator (no bare randi/randf anywhere) and rules.gd's
+	# AI is pure, so an identical seed + identical setup replays move for move.
+	# Any string is accepted — hashed, so "crazy seeds" can be words.
+	if next_seed != "":
+		rng.seed = seed_of(next_seed)
+	else:
+		rng.randomize()
 	add_child(hud)
 	hud.build(self)
 	_connect_hud()

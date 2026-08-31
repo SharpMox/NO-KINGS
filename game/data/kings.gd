@@ -23,6 +23,7 @@
 ## 51-200 are Endless, so Kings 2-4 are post-win content.
 
 const Waves := preload("res://data/waves.gd")
+const Economy := preload("res://scripts/economy.gd")
 
 const LAUREL := "laurel"
 const HAT := "hat"
@@ -120,3 +121,98 @@ static func name_of(id: String) -> String:
 			if k.id == id:
 				return k.name
 	return "King"
+
+
+## KING KITS (issue 91) — one Power and one Ability each, mirroring the Army
+## structure exactly (user ruling, 2026-09-01: "32, a power and an ability for
+## each king"). That symmetry is the point: the engine seams already exist, and
+## a player reads a King the same way they read their own Army.
+##
+##   POWER   — static, live for the WHOLE King wave (both segments, ruling 6).
+##   ABILITY — once per Wave, costs the King one of its Actions (ruling 4).
+##             An Action spent on an Ability is an Action not spent attacking,
+##             which is the visible tradeoff the player plays around.
+##
+## ONLY DONALD TRUMP'S KIT IS FILLED IN. It is the one that was ruled — Tariff
+## is his Power (slice 66) and Diplomatic Visit – JD Vance his Ability (design
+## session). The other 15 are deliberately absent and the engine no-ops on
+## them, so this slice ships a working engine without inventing 30 effects that
+## are the user's to design.
+const KITS := {
+	"donald_trump": {
+		"power_name": "Tariff",
+		"power_desc": "Tariffs are in force for the whole of this King's wave.",
+		"power_tariff": "inflation",
+		"ability_name": "Diplomatic Visit – JD Vance",
+		"ability_desc": "Destroys your highest-value piece on the board.",
+		"ability_tariff": "jd_vance",
+	},
+}
+
+
+## A King's kit, or {} for the 15 that have none yet.
+static func kit_of(id: String) -> Dictionary:
+	return KITS.get(id, {})
+
+
+## The King whose Power is live, or "" when none is. Covers BOTH segments of a
+## King wave (ruling 6): during segment 1 the King is still held in
+## `pending_king` and is not on the board, but its Power is already in force —
+## which is what gives those 15 turns that King's identity rather than making
+## them generic filler.
+static func active_id(g) -> String:
+	if not g.pending_king.is_empty():
+		return str(g.pending_king.get("king_id", ""))
+	for pos in g.board:
+		var piece: Dictionary = g.board[pos]
+		if piece.get("id", "") == "king" and piece.has("king_id"):
+			return str(piece.king_id)
+	return ""
+
+
+## Bring a King's Power into force for its wave, and clear the previous one.
+## Called from WaveLogic.queue for EVERY wave: a non-King wave passes "" and
+## the effect is the clearing half, so a Power cannot outlive its wave — the
+## ruling is "only during that King's wave", and a Power that leaked into wave
+## 51 would be a permanent difficulty increase nobody chose.
+static func apply_power(g, king_id: String) -> void:
+	if g.king_power_tariff != "":
+		for i in range(g.tariffs_active.size() - 1, -1, -1):
+			if g.tariffs_active[i].get("key", "") == g.king_power_tariff:
+				g.tariffs_active.remove_at(i)
+		g.king_power_tariff = ""
+	if king_id == "":
+		return
+	var kit := kit_of(king_id)
+	var key: String = str(kit.get("power_tariff", ""))
+	if key == "":
+		return # one of the 15 Kings with no kit yet — the engine no-ops
+	Economy.activate_tariff_by_key(g, key)
+	g.king_power_tariff = key
+	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], Color(1.0, 0.55, 0.4))
+
+
+## Spend the King's once-per-Wave Ability. Returns true when it fired, so the
+## caller can charge it an Action.
+##
+## Requires the King to actually be ON THE BOARD: during segment 1 the Power is
+## live but the King has not arrived, and an Ability from a King the player
+## cannot yet see or attack would be unanswerable.
+static func fire_ability(g) -> bool:
+	if g.king_ability_used_this_wave:
+		return false
+	var id := ""
+	for pos in g.board:
+		var piece: Dictionary = g.board[pos]
+		if piece.get("id", "") == "king" and piece.has("king_id"):
+			id = str(piece.king_id)
+	if id == "":
+		return false
+	var kit := kit_of(id)
+	var key: String = str(kit.get("ability_tariff", ""))
+	if key == "":
+		return false # no kit yet: no Ability, and no Action charged for one
+	g.king_ability_used_this_wave = true
+	g._add_turn_fx("%s: %s" % [name_of(id), kit.ability_name], Color(1.0, 0.35, 0.3))
+	Economy.activate_tariff_by_key(g, key)
+	return true

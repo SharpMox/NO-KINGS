@@ -118,6 +118,12 @@ var king_tier := ""
 var king_order: Array = []
 ## issue 90: the King held back through segment 1 of its wave, or {}.
 var pending_king: Dictionary = {}
+## issue 91: the King Ability is once per Wave, same idiom as the Army's
+## (army_ability_used_this_wave) — reset by WaveLogic.queue.
+var king_ability_used_this_wave := false
+## issue 91: the Tariff key a King's Power put in force, so it can be taken
+## back out when the wave ends. "" when no Power is live.
+var king_power_tariff := ""
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -938,6 +944,13 @@ func _wait_while_backgrounded() -> void:
 
 func _run_enemy_actions() -> void:
 	var actions := Economy.enemy_actions(self)
+	# issue 91: the King Ability COSTS THE KING AN ACTION. Spending it here,
+	# out of the same budget the attacks come from, is what makes it a tradeoff
+	# the player can see and play around rather than a free extra effect. It
+	# fires only with an Action to spend, so an enemy turn zeroed by Y2K Patch
+	# Floppy Disk buys no Ability either.
+	if actions > 0 and Kings.fire_ability(self):
+		actions -= 1
 	for i in actions:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs, _enemy_denied_tiles())

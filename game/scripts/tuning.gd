@@ -192,14 +192,14 @@ const ARMIES := {
 		# are income; alibaba leaps 2 so it earns too)
 		"ferz", "ferz", "ferz", "ferz", "wazir", "wazir", "wazir", "wazir",
 		"knight", "alibaba", "alibaba"],
-	# issue 68: three more Families, same "one shape, ballpark numbers"
+	# issue 68: three more Armies, same "one shape, ballpark numbers"
 	# license as the three above (issue 68's own header: "all numbers are
 	# ballpark and tunable later").
 	"Syndicate": [ # money: a thin kit (6 pawns + knight, 130) — Insider
-		# Rates and triple starting Gold carry this family, not piece count
+		# Rates and triple starting Gold carry this army, not piece count
 		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "knight"],
 	"Cult": [ # buffs: "standard stock" (issue 68) read as Crown's own
-		# classic-chess kit verbatim — the family's identity is Communion/
+		# classic-chess kit verbatim — the army's identity is Communion/
 		# Ritual/2 starting Artefacts, not a piece gimmick (no source for a
 		# different shape, so the un-modified baseline stands)
 		"pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
@@ -211,16 +211,16 @@ const ARMIES := {
 }
 const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 
-## Family framework (issue 67, ratified 2026-08-30): a fresh run has never
+## Army framework (issue 67, ratified 2026-08-30): a fresh run has never
 ## had a non-zero starting-Gold concept before this slice — `g.gold` began
 ## every fresh boot at its bare declaration value, 0, uniformly for every
 ## army. The GDD ruling's "baseline Gold" / "~half Gold" / (issue 68's
 ## sibling slice) "triple baseline Gold" all presuppose a real number, and
 ## issue 68 states outright "All numbers are ballpark and tunable later
-## (standing user stance)" for that same design session's Families — so this
+## (standing user stance)" for that same design session's Armies — so this
 ## is picked on that authority, not invented in a vacuum: pinned to
 ## SHOP_ITEM_PRICE's own "Tactical" tier above, enough for one early buy.
-const FAMILY_BASELINE_GOLD := SHOP_ITEM_PRICE["Tactical"] # 30
+const ARMY_BASELINE_GOLD := SHOP_ITEM_PRICE["Tactical"] # 30
 
 # Difficulty tiers (07-difficulty-ranks, redesigned 2026-08-28 — user call):
 # 5 numbered tiers, picked pre-run, locked for the run (Continue into

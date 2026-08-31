@@ -11,14 +11,14 @@ const Economy := preload("res://scripts/economy.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
-const Families := preload("res://scripts/families.gd")
+const Armies := preload("res://scripts/armies.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 const INV_H_BASE := DRAWER_H * 2 + 70.0 # pre-issue-52 height: items + artefacts
 	# only — unreachable since issue 67, kept so nothing breaks reading it
 const INV_H_ACTIVATE := DRAWER_H * 3 + 70.0 # +1 row while the Activate
-	# section has content (issue 52). Issue 67: the Family Ability chip is
-	# now unconditionally in that section (every run holds a Family), so this
+	# section has content (issue 52). Issue 67: the Army Ability chip is
+	# now unconditionally in that section (every run holds a Army), so this
 	# is the drawer's permanent height going forward, not a conditional one
 
 signal pass_pressed
@@ -28,7 +28,7 @@ signal stack_drag_started(entry: Variant, cap: bool)
 signal multi_confirm_pressed # the floating Extract button
 signal item_pressed(index: int)
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
-signal family_ability_pressed # issue 67: the Family Ability chip pressed
+signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal promote_pressed(id: String, cap: bool)
 signal return_to_stock_pressed
 signal drawer_changed
@@ -60,7 +60,7 @@ var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips
-	# for activatable Artefacts; issue 67 added the Family Ability chip here
+	# for activatable Artefacts; issue 67 added the Army Ability chip here
 	# too (always present, unlike the Artefact ones — every run holds one)
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
 	# moved the 6 activatable keys out into activate_box above)
@@ -339,7 +339,7 @@ func refresh() -> void:
 	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
 	# issue 52 grew the drawer only when the Activate row had content; issue
-	# 67 made that permanent — the Family Ability chip means it always does.
+	# 67 made that permanent — the Army Ability chip means it always does.
 	var inv_panel: PanelContainer = drawers["inventory"]
 	var inv_h := INV_H_ACTIVATE
 	if inv_panel.custom_minimum_size.y != inv_h:
@@ -440,22 +440,22 @@ func _rebuild_activate_strip() -> void:
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		btn.pressed.connect(func() -> void: artefact_activate_pressed.emit(key))
 		activate_box.add_child(btn)
-	_add_family_ability_chip()
+	_add_army_ability_chip()
 
 
-## issue 67: the Family Ability chip — same activate_box row as the Artefact
-## chips above, but every run always holds exactly one (a Family replaces
+## issue 67: the Army Ability chip — same activate_box row as the Artefact
+## chips above, but every run always holds exactly one (a Army replaces
 ## the Army pick), so this is unconditional, not gated on "is one held" the
 ## way the Artefact loop above is. "Visually distinct from Artefact chips"
 ## (acceptance): a ★ glyph instead of ⚡ and a warm gold tint at rest,
 ## instead of the Artefact chips' plain default button styling.
-func _add_family_ability_chip() -> void:
-	var kit: Dictionary = Families.entry(g.next_army)
+func _add_army_ability_chip() -> void:
+	var kit: Dictionary = Armies.entry(g.next_army)
 	var btn := Button.new()
 	btn.text = "★%s" % kit.ability_name
-	var targeting: bool = g.family_targeting or g.family_board_targeting # issue
+	var targeting: bool = g.army_targeting or g.army_board_targeting # issue
 		# 68: Hostile Takeover/Ritual's board-targeting flavor gets the same tint
-	btn.disabled = not (g._family_ability_available() or targeting)
+	btn.disabled = not (g._army_ability_available() or targeting)
 	btn.tooltip_text = "%s (1 Action)\n%s" % [kit.power_name + " — always on. " \
 		+ kit.ability_name, kit.ability_desc]
 	if targeting:
@@ -464,7 +464,7 @@ func _add_family_ability_chip() -> void:
 	else:
 		btn.modulate = Color(1.35, 1.2, 0.75) # at-rest: warm gold, distinct
 			# from an Artefact chip's plain default tint
-	btn.pressed.connect(func() -> void: family_ability_pressed.emit())
+	btn.pressed.connect(func() -> void: army_ability_pressed.emit())
 	activate_box.add_child(btn)
 
 

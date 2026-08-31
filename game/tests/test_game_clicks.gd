@@ -1085,8 +1085,8 @@ func _init() -> void:
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
 	check(game.hud.activate_box.get_child_count() == 2,
-		"the drawer shows two Activate chips: the Artefact's and the Family " +
-		"Ability's (issue 67 — every run has a Family, so the section is never " +
+		"the drawer shows two Activate chips: the Artefact's and the Army " +
+		"Ability's (issue 67 — every run has a Army, so the section is never " +
 		"Artefact-only)")
 	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
 		"the Activate chip is clickable")
@@ -1155,7 +1155,7 @@ func _init() -> void:
 			and game.board.get(bovine_dest, {}).get("id", "") == "rook" and game.bovine_used_this_wave,
 		"completing both taps relocates the enemy piece and spends the once-per-Wave charge")
 
-	# --- issue 67: the Family Ability chip — same Activate section, but 1
+	# --- issue 67: the Army Ability chip — same Activate section, but 1
 	# Action (not 0) and its own confirm-vs-targeting shapes. Old Guard's
 	# Shield Wall is untargeted (confirm modal, same shape as Oak Island
 	# above); The Muster's Call the Banners is targeted, but at a STOCK
@@ -1169,24 +1169,24 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for the Family Ability chip")
+	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for the Army Ability chip")
 	await process_frame
 	check(await _click_button_in(game.hud.activate_box, "★Shield Wall"),
-		"the Family Ability chip is clickable — visually distinct glyph (★, not ⚡)")
+		"the Army Ability chip is clickable — visually distinct glyph (★, not ⚡)")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
-		"clicking an untargeted Family Ability opens the confirm modal, same as an untargeted Artefact")
+		"clicking an untargeted Army Ability opens the confirm modal, same as an untargeted Artefact")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
 	await process_frame
 	check(not game.buff_pick_open and game.actions_left == Tuning.ACTIONS_PER_TURN \
-			and not game.family_ability_used_this_wave,
+			and not game.army_ability_used_this_wave,
 		"cancelling the confirm costs nothing — no Action spent, Wave flag untouched")
 	check(await _click_button_in(game.hud.activate_box, "★Shield Wall"),
 		"the chip is clickable again after a cancel, drawer untouched")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.family_ability_used_this_wave \
+	check(not game.buff_pick_open and game.army_ability_used_this_wave \
 			and game.actions_left == Tuning.ACTIONS_PER_TURN - 1 \
 			and game.board[Vector2i(2, 0)].get("buffs", []).size() == 1,
 		"confirming activates it: 1 Action spent, the back-row pawn gains Shield")
@@ -1205,7 +1205,7 @@ func _init() -> void:
 	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
 		"the Call the Banners chip is clickable")
 	await process_frame
-	check(not game.buff_pick_open and game.family_targeting and game.hud.drawer_open == "stock",
+	check(not game.buff_pick_open and game.army_targeting and game.hud.drawer_open == "stock",
 		"clicking Call the Banners stages targeting and switches straight to the Stock drawer — no confirm modal")
 	# Targeting switched the drawer to Stock (that IS its targeting surface),
 	# so the chip is out of reach until Inventory is reopened — the same
@@ -1216,7 +1216,7 @@ func _init() -> void:
 	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
 		"tapping the chip again mid-targeting cancels (slice 52's rule)")
 	await process_frame
-	check(not game.family_targeting and game.stock.size() == 1 and not game.family_ability_used_this_wave,
+	check(not game.army_targeting and game.stock.size() == 1 and not game.army_ability_used_this_wave,
 		"cancelling FROM TARGETING costs nothing — no duplicate, no charge")
 	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
 		"the chip is clickable again after a targeting cancel")
@@ -1225,12 +1225,12 @@ func _init() -> void:
 	var pawn_stack: Button = game.pool_box.get_child(0)
 	_click(pawn_stack.get_global_rect().get_center()) # the tap IS the target — no separate confirm
 	await process_frame
-	check(not game.family_targeting and game.stock.size() == 2 and game.stock.count("pawn") == 2 \
-			and game.family_ability_used_this_wave,
+	check(not game.army_targeting and game.stock.size() == 2 and game.stock.count("pawn") == 2 \
+			and game.army_ability_used_this_wave,
 		"tapping the Stock stack duplicates it (2 pawns in Stock now) and spends the once-per-Wave charge")
 
 	# --- issue 68: Hostile Takeover (The Syndicate) — the OTHER targeted
-	# Family Ability, a BOARD target (not a Stock one), so it follows Bovine
+	# Army Ability, a BOARD target (not a Stock one), so it follows Bovine
 	# Tractor Beam's flow above: no confirm modal, targeting hands the drawer
 	# back to the board, tap-the-chip-again cancels.
 	game.queue_free()
@@ -1246,7 +1246,7 @@ func _init() -> void:
 	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
 		"the Hostile Takeover chip is clickable")
 	await process_frame
-	check(not game.buff_pick_open and game.family_board_targeting and game.hud.drawer_open == "",
+	check(not game.buff_pick_open and game.army_board_targeting and game.hud.drawer_open == "",
 		"clicking Hostile Takeover stages targeting and hands the board back — no confirm modal (it has a target instead)")
 	check(await _click_button_in(game.hud, "Inventory 0"),
 		"Inventory reopens to reach the chip mid-targeting")
@@ -1254,16 +1254,16 @@ func _init() -> void:
 	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
 		"the chip stays clickable mid-targeting (to cancel)")
 	await process_frame
-	check(not game.family_board_targeting and game.board.has(Vector2i(7, 10)) \
-			and not game.family_ability_used_this_wave and game.gold == 1000,
+	check(not game.army_board_targeting and game.board.has(Vector2i(7, 10)) \
+			and not game.army_ability_used_this_wave and game.gold == 1000,
 		"tapping the chip again CANCELS FROM TARGETING — no purchase, no charge, board untouched")
 	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
 		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # the enemy Rook: commit
 	await process_frame
-	check(not game.family_board_targeting and not game.board.has(Vector2i(7, 10)) \
-			and game.stock.has("rook") and game.family_ability_used_this_wave,
+	check(not game.army_board_targeting and not game.board.has(Vector2i(7, 10)) \
+			and game.stock.has("rook") and game.army_ability_used_this_wave,
 		"tapping the enemy Rook completes Hostile Takeover: it leaves the board and joins Stock")
 
 	# --- issue 68: Conscription (The Horde) — untargeted, same confirm shape
@@ -1285,14 +1285,14 @@ func _init() -> void:
 		"clicking untargeted Conscription opens the confirm modal, same as an untargeted Artefact")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.stock.is_empty() and not game.family_ability_used_this_wave,
+	check(not game.buff_pick_open and game.stock.is_empty() and not game.army_ability_used_this_wave,
 		"cancelling the confirm costs nothing — no pawns added, Wave flag untouched")
 	check(await _click_button_in(game.hud.activate_box, "★Conscription"),
 		"the chip is clickable again after a cancel, drawer untouched")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.family_ability_used_this_wave \
+	check(not game.buff_pick_open and game.army_ability_used_this_wave \
 			and game.stock.size() == 2 and game.stock.count("pawn") == 2,
 		"confirming activates it: 2 pawns added to Stock")
 

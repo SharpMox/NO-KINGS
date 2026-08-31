@@ -55,7 +55,10 @@ func _init() -> void:
 		"skip_enemy_turns": 1, "tariffs_off": true,
 		"ecdysis_copy_key": "voynich-dictionary", # issue 55
 		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
-		"family_ability_used_this_wave": true, # issue 67
+		"family_ability_used_this_wave": true, # issue 67 — note the SAVE KEY
+			# deliberately kept its old name in issue 76 while the in-memory
+			# symbol became army_*: renaming a persisted key is not additive and
+			# would need a migration for no player-visible gain
 	}
 	var a := _boot(rich)
 	await process_frame
@@ -83,8 +86,8 @@ func _init() -> void:
 		+ "save->load->save identity check cannot catch this: a field missing from the "
 		+ "save entirely is absent from BOTH sides and compares equal.")
 	check(b.gold == 35, "gold restored")
-	check(b.family_ability_used_this_wave == true,
-		"issue 67: the Family Ability's once-per-Wave flag survives a resume — same trap as "
+	check(b.army_ability_used_this_wave == true,
+		"issue 67: the Army Ability's once-per-Wave flag survives a resume — same trap as "
 		+ "run_capture_count/shop_lane_b_progress above, a field missing from the save is "
 		+ "absent from BOTH sides of the generic identity check and compares equal, so this "
 		+ "asserts the actual restored VALUE instead of trusting the identity check alone")
@@ -207,7 +210,7 @@ func _init() -> void:
 	# out, independent of apply()'s own incidental catalog-match filtering
 	# of `artefacts`), and against a live boot's restored state — not
 	# identity, the generic save->load->save check above can't catch this
-	# class of bug (same trap run_capture_count/family_ability_used_this_wave
+	# class of bug (same trap run_capture_count/army_ability_used_this_wave
 	# caught above).
 	var v1_migrate := {"save_version": 1,
 		"artefacts": ["greed", "voynich-dictionary", "move"], "ecdysis_copy_key": "greed"}

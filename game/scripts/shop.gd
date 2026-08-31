@@ -11,7 +11,7 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
-const Families := preload("res://scripts/families.gd")
+const Armies := preload("res://scripts/armies.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
 ## pass shop-drawer-ui/08 deferred: Chocolate Key Cake / Alleged Weather
@@ -186,7 +186,7 @@ static func price(g, slot: Dictionary) -> int:
 			if t.key == "mar-a-lago-toilet-papers":
 				amount = 0.0
 				break
-	if Families.insider_rates(g): # The Syndicate's Insider Rates (issue 68):
+	if Armies.insider_rates(g): # The Syndicate's Insider Rates (issue 68):
 		# Shop buy prices -25% — a flat final multiplier, same seam as the two
 		# absolute overrides just above (0 * 0.75 is still 0, so ordering
 		# against them doesn't matter); Buy only, never sell_price()/
@@ -368,9 +368,9 @@ static func _sell_base(g, kind: String, entry) -> float:
 ## modals.gd's Sell-mode display) reads this, never sell_price() above —
 ## Captured -> Stock conversion (game.gd._convert_captured, modals.gd's
 ## Convert-mode display) keeps reading sell_price() at the flat rate; see
-## Families.insider_rates' own header for why that split is deliberate.
+## Armies.insider_rates' own header for why that split is deliberate.
 static func sell_payout(g, kind: String, entry) -> int:
-	var rate := Tuning.SELL_RATE * 1.25 if Families.insider_rates(g) else Tuning.SELL_RATE
+	var rate := Tuning.SELL_RATE * 1.25 if Armies.insider_rates(g) else Tuning.SELL_RATE
 	return floori(_sell_base(g, kind, entry) * rate)
 
 

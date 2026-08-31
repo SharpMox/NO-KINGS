@@ -118,8 +118,12 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.kings_defeated = int(cfg.get("kings_defeated", 0))
 	g.king_ids_defeated = cfg.get("king_ids_defeated", []).duplicate()
 	g.next_army = str(cfg.get("army", g.next_army)) # milestone drip draws from it
-	g.family_ability_used_this_wave = bool(cfg.get("family_ability_used_this_wave", false))
-		# issue 67: additive — an old save predates the Family Ability, so
+	# issue 76: the SAVE KEY stays "family_ability_used_this_wave" while the
+	# in-memory symbol became army_*. Renaming a persisted key is not additive
+	# and would need a migration; SAVE_VERSION 2's first entry was just spent
+	# on issue 69's real removal, and a cosmetic rename does not earn a second.
+	g.army_ability_used_this_wave = bool(cfg.get("family_ability_used_this_wave", false))
+		# issue 67: additive — an old save predates the Army Ability, so
 		# "not used yet" is the correct default, not a guess (same shape
 		# every other *_used_this_wave field would need if it were persisted)
 	# "rank" key kept for save compat (07-difficulty-ranks rework: 3 named
@@ -226,7 +230,7 @@ static func to_config(g) -> Dictionary:
 		"pending_reinforce": g.pending_reinforce,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
 		"army": g.next_army, "rank": g.next_tier,
-		"family_ability_used_this_wave": g.family_ability_used_this_wave, # issue 67
+		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "score_gained_total": g.score_gained_total,

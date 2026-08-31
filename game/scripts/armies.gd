@@ -1,5 +1,5 @@
-## Family catalog + Power lookups (issue 67) — pure logic module over the
-## live game node `g`, same split as merge_logic.gd/item_logic.gd. A Family
+## Army catalog + Power lookups (issue 67) — pure logic module over the
+## live game node `g`, same split as merge_logic.gd/item_logic.gd. A Army
 ## REPLACES the Army pick at run start: it determines Starting Stock (still
 ## Tuning.ARMIES, keyed by the same id), Starting Gold, Starting Items, plus
 ## a static Power (always on) and a once-per-Wave Ability (1 Action — a
@@ -21,7 +21,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const CATALOG := {
 	"Crown": {
 		"display_name": "The Muster",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD,
 		"starting_items": ["promote"],
 		"power_name": "Close Ranks",
 		"power_desc": "Merges cost no Action.",
@@ -31,7 +31,7 @@ const CATALOG := {
 	},
 	"Wild Hunt": {
 		"display_name": "Wild Hunt",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD / 2,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD / 2,
 		"starting_items": ["blitz", "blitz"],
 		"power_name": "Blood in the Air",
 		"power_desc": "Your first capture each Turn refunds its Action.",
@@ -41,7 +41,7 @@ const CATALOG := {
 	},
 	"Old Guard": {
 		"display_name": "Old Guard",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD / 2,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD / 2,
 		"starting_items": ["extraction"],
 		"power_name": "Hold the Line",
 		"power_desc": "When you lose a piece, refund its full value in Gold.",
@@ -51,7 +51,7 @@ const CATALOG := {
 	},
 	"Syndicate": {
 		"display_name": "The Syndicate",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD * 3,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD * 3,
 		"starting_items": [],
 		"power_name": "Insider Rates",
 		"power_desc": "Shop buy prices -25%, sell payouts +25%.",
@@ -61,7 +61,7 @@ const CATALOG := {
 	},
 	"Cult": {
 		"display_name": "The Cult",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD,
 		"starting_items": ["buff_box"],
 		"starting_artefact_count": 2, # issue 68: 2 random Artefacts at run start
 		"power_name": "Communion",
@@ -72,7 +72,7 @@ const CATALOG := {
 	},
 	"Horde": {
 		"display_name": "The Horde",
-		"starting_gold": Tuning.FAMILY_BASELINE_GOLD,
+		"starting_gold": Tuning.ARMY_BASELINE_GOLD,
 		"starting_items": [],
 		"power_name": "Endless Ranks",
 		"power_desc": "Pawn deploys cost no Gold.",
@@ -83,7 +83,7 @@ const CATALOG := {
 }
 
 
-## `id`'s catalog entry, falling back to the default family for an
+## `id`'s catalog entry, falling back to the default army for an
 ## unrecognized/old-save id — same "unknown value falls back to baseline"
 ## shape Tuning.tier_index already uses for an old save's Tier string.
 static func entry(id: String) -> Dictionary:

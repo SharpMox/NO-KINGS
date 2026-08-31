@@ -21,13 +21,13 @@ static func step(g) -> void:
 		try_activate_artefact(g)
 	# One random legal action per frame (everything costs one), pass when spent.
 	if g.actions_left > 0:
-		# The Family Ability (67) costs 1 Action, unlike Artefact activation
+		# The Army Ability (67) costs 1 Action, unlike Artefact activation
 		# above — tried here, inside the actions_left gate, alongside items/
 		# merges/moves rather than up front. A bot that never presses it
-		# would prove nothing about the feature; try_activate_family_ability
+		# would prove nothing about the feature; try_activate_army_ability
 		# returns false (no-op, falls through) when unavailable so an
 		# unlucky roll never wastes a frame.
-		if g.rng.randf() < 0.15 and try_activate_family_ability(g):
+		if g.rng.randf() < 0.15 and try_activate_army_ability(g):
 			return
 		if not g.items.is_empty() and g.rng.randf() < 0.3: # exercise item paths
 			use_item(g)
@@ -103,34 +103,34 @@ static func try_activate_artefact(g) -> void:
 	g._artefact_target_click(b)
 
 
-## The Family Ability (67/68): The Muster's Call the Banners is one targeted
+## The Army Ability (67/68): The Muster's Call the Banners is one targeted
 ## case (a Stock pick, not a board tile) — resolved via `rng` the same way
 ## _open_box_pick/every other autoplay modal is, so the bot never stalls on
 ## the confirm modal or leaves targeting stuck. Hostile Takeover (Syndicate)/
 ## Ritual (Cult) are the other targeted case, a board pick — driven the same
 ## two-call way try_activate_artefact drives Bovine Tractor Beam above. Wild
-## Hunt/Old Guard/Horde are untargeted — g._activate_family_ability's own
+## Hunt/Old Guard/Horde are untargeted — g._activate_army_ability's own
 ## autoplay bypass (mirroring _activate_artefact's) resolves those
 ## immediately. Returns whether it actually activated.
-static func try_activate_family_ability(g) -> bool:
-	if not g._family_ability_available():
+static func try_activate_army_ability(g) -> bool:
+	if not g._army_ability_available():
 		return false
 	if g.next_army == "Crown":
-		g._begin_family_targeting()
+		g._begin_army_targeting()
 		if g.stock.is_empty(): # availability already checked this; never leave
-			g._family_targeting_reset() # targeting stuck with nothing to pick
+			g._army_targeting_reset() # targeting stuck with nothing to pick
 			return false
-		g._family_target_stock(g.stock[g.rng.randi() % g.stock.size()], false)
+		g._army_target_stock(g.stock[g.rng.randi() % g.stock.size()], false)
 		return true
 	if g.next_army == "Syndicate" or g.next_army == "Cult":
-		g._begin_family_board_targeting()
-		if g.family_board_targets.is_empty(): # availability already checked
-			g._family_board_targeting_reset() # this; never leave it stuck
+		g._begin_army_board_targeting()
+		if g.army_board_targets.is_empty(): # availability already checked
+			g._army_board_targeting_reset() # this; never leave it stuck
 			return false
-		var t: Vector2i = g.family_board_targets[g.rng.randi() % g.family_board_targets.size()]
-		g._family_board_target_click(t)
+		var t: Vector2i = g.army_board_targets[g.rng.randi() % g.army_board_targets.size()]
+		g._army_board_target_click(t)
 		return true
-	g._activate_family_ability()
+	g._activate_army_ability()
 	return true
 
 

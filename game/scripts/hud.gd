@@ -284,6 +284,15 @@ func set_drawer(which: String) -> void:
 
 
 func refresh() -> void:
+	# issue 101: the Shop button STAYS but is disabled before the unlock Wave
+	# (user ruling) — a hidden button reads as "this game has no Shop", a
+	# greyed one reads as "not yet". It carries the Wave, because a disabled
+	# control with no reason is the failure the ruling was one step away from.
+	var shop_locked: bool = g.wave < Tuning.SHOP_UNLOCK_WAVE
+	shop_button.disabled = shop_locked
+	shop_button.text = "Shop (W%d)" % Tuning.SHOP_UNLOCK_WAVE if shop_locked else "Shop"
+	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
+		if shop_locked else ""
 	clock_label.text = g._clock_text()
 	score_label.text = "★%d" % g.score
 	gold_label.text = "$%d" % g.gold

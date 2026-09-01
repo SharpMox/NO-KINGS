@@ -1,6 +1,6 @@
 # 101 — Shop gated to wave 5+, and auto-opens on restock
 
-Status: todo — **RULED 2026-09-01: gate the PANEL, closed until the end of wave 5.**
+Status: done (2026-09-02) — gate the PANEL, closed before Wave 5; button kept, disabled
 
 ## Parent
 
@@ -70,3 +70,52 @@ Consequences to handle rather than discover:
 ## Blocked by
 
 Nothing.
+
+## Outcome (2026-09-02)
+
+`Tuning.SHOP_UNLOCK_WAVE = 5`, deliberately equal to `SHOP_RESTOCK_WAVES` so the unlock lands
+on the first Lane A restock — the first Shop a player sees is a freshly stocked one, and the
+unlock and the auto-open are one event rather than two.
+
+- **`_open_shop` refuses below the unlock Wave** and says *when* ("The Shop opens on Wave 5"),
+  never a silent no-op. The old "always openable, in any state — the GDD makes the Shop the
+  one surface the player can reach at will" comment was **rewritten**, not left contradicting
+  the code.
+- **The button stays and is disabled**, reading `Shop (W5)` with a matching tooltip.
+- **Auto-open** is queued as `pending_shop_open` and drained at the player-turn-start seam
+  that `pending_reinforce` already uses — the restock happens mid-transition where a Box pick
+  may already hold a modal, and `_open_shop` refuses over one, so opening inline would
+  silently skip the very Wave the auto-open exists for. It survives a save round-trip
+  (additive field, defaults false) and never fires under autoplay, which has no way to close
+  a panel.
+
+### The gate is on the panel only, and that was a correction mid-slice
+
+The first cut also gated `Shop.can_buy`, for bot fidelity — and **broke seven suites**, which
+drive `can_buy` directly at low Waves to test Shop mechanics that have nothing to do with the
+unlock. That gate was an addition of mine, not the ruling. Reverted: a player can only reach a
+purchase through the panel, so gating the panel is behaviourally complete for them.
+
+**The fidelity concern is real and is now recorded where it belongs**: autoplay buys through
+`Shop.buy` without opening the panel (issue 103's `try_shop`), so once 103 merges, `try_shop`
+must carry the Wave check itself. Without it the bot shops from Wave 1 while a player cannot,
+and 103's measurements stop describing the real game. Noted in `shop.gd`'s own header.
+
+### Test surface
+
+Four probe boots reached the Shop button and booted below the unlock Wave — including one via
+the `_buy_a_box` helper, which the first fix missed entirely because the failure surfaced 600
+lines from its cause. Found by mapping every Shop-reaching call back to its nearest boot
+rather than by bumping every `"wave": 3` in the file, which would have hidden real breakage.
+
+Both halves of the ruling are asserted: `test_shop.gd` covers refusal at Wave 4 and opening at
+Wave 5; `test_game_clicks.gd` covers the button being live post-unlock and **disabled, labelled
+and unclickable** before it.
+
+`run_all.sh` ALL GREEN, foreground, alone.
+
+### Left open, deliberately
+
+The cost named when the ruling was made stands: the Shop is the only surface showing Item and
+Artefact descriptions, so Waves 1-4 are now played without a reference. No replacement was
+built — that is a design call, not an oversight.

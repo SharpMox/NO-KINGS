@@ -42,18 +42,26 @@ Three priced actions, three current states:
 | **Convert** (Captured -> Stock) | `Shop.sell_price(g, "captured", entry)`, per entry | only inside the Shop |
 | **Merge** | 1 Action + `fuse_cost` tariff charge (**0 Gold** unless a tariff is live) | no — and it has no Gold price until **98** |
 
-### The rule that makes this correct
+### Show BOTH the base price and the computed one (user ruling, 2026-09-01)
 
-**Display the computed price, never the constant.** Every one of these is modified at runtime:
+Every one of these is modified at runtime:
 
-- deploy cost is **doubled** by Qin Shi Huang's Great Wall, and **zeroed for pawns** by The
-  Horde's Endless Ranks — and it passes through `on_place_cost`, which Artefacts also modify
+- deploy cost is **doubled** by Qin Shi Huang's Great Wall and **zeroed for pawns** by The
+  Horde's Endless Ranks, and it passes through `on_place_cost`, which Artefacts also modify
 - conversion is per-entry (it scales with the piece's value)
 - merge, once 98 lands, will compose with `fuse_cost`
 
-So the UI must call `Economy.deploy_cost(g)` / `Shop.sell_price(...)` and render *that*.
-Rendering `Tuning.PLACEMENT_COST` would show 20 to a Horde player deploying a pawn for free —
-a lie in the UI is worse than no number.
+So the UI renders **base -> effective**, not one or the other. Showing only the computed
+number hides *that* something is modifying it; showing only the constant is a lie (20 Gold for
+a Horde pawn that deploys free). Both together make the modifier legible, which is the point —
+a player should be able to see their Power working.
+
+Presentation: the base struck through or dimmed beside the effective price, and **shown only
+when they differ** — printing "20 -> 20" on every entry is noise on a 480x800 screen.
+
+Source of truth is the live call (`Economy.deploy_cost(g)`, `Shop.sell_price(...)`) for the
+effective figure and the `Tuning` constant for the base. Never re-derive the effective price by
+reimplementing the modifiers in the UI — that is a second copy of the rules that will drift.
 
 ### Where
 
@@ -71,10 +79,11 @@ a lie in the UI is worse than no number.
 
 ## Acceptance
 
-- Deploy, convert and merge each show their **computed** price before commitment, on the entry
-  and on the confirm screen.
-- A Horde pawn deploy displays free; a Qin Shi Huang deploy displays double. Asserted, not
-  eyeballed — this is the case that proves the price is computed rather than hardcoded.
+- Deploy, convert and merge each show **base and effective** price before commitment, on the
+  entry and on the confirm screen, with the base shown only when it differs.
+- A Horde pawn deploy displays `20 -> 0`; a Qin Shi Huang deploy displays `20 -> 40`.
+  Asserted, not eyeballed — this is the case that proves the price is read from the live call
+  rather than hardcoded or re-derived.
 - Unaffordable actions are visually distinct from affordable ones.
 - `CONVERT_RATE` exists and is >= `SELL_RATE`, with the arbitrage direction noted at the
   constant.

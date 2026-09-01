@@ -44,8 +44,10 @@ gets misled).
 
 Consequences to handle rather than discover:
 
-- **The Shop entry point must visibly not-exist before wave 5**, not merely refuse. A button
-  that opens nothing reads as a bug; either hide it or show the unlock wave on it.
+- **The Shop button stays, disabled** (user ruling, 2026-09-01) — not hidden. A button that
+  is present but greyed reads as "not yet", where a missing button reads as "this game has no
+  Shop". It must carry **why**: the unlock wave on the button or beside it, since a disabled
+  control with no reason is the failure mode this ruling is one step away from.
 - **First open is end of wave 5, which is also the first Lane A restock** (`SHOP_RESTOCK_WAVES`
   = 5). The gate and the first restock coincide by construction — good, but it means the
   auto-open and the unlock are the *same event* the first time, and the code should not fire
@@ -57,8 +59,8 @@ Consequences to handle rather than discover:
 
 ## Acceptance
 
-- The Shop cannot be opened before the end of wave 5, and the entry point communicates that
-  rather than silently doing nothing.
+- The Shop cannot be opened before the end of wave 5. **The button remains visible and
+  disabled**, and states the unlock wave rather than just being dead.
 - It **auto-opens** at the end of wave 5 and on each Lane A restock wave, queued behind any
   modal already open (never dropped), and never under Kim Jong Un's Juche.
 - `game.gd:3487`'s "always openable" comment is rewritten to match the new rule.

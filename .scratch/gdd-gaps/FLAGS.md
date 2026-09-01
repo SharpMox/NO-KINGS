@@ -106,6 +106,30 @@ Each was a judgement call needed to ship; none was specced.
 Each was surfaced by an agent that declined to guess, and each is written up where it was
 found. Collected here so they are not lost in Outcome sections:
 
+- **Holding duplicate Artefacts to stack them — intended, or a bug?** User, 2026-09-01:
+  *"feels like a bug, lets leave it for now but note it down."* **Not actioned; recorded.**
+
+  What the code says today: it is deliberate, documented and tested. `artefact_hooks.gd`'s
+  header specifies it — *"the same artefact can be held more than once; each copy is its own
+  entry in `g.artefacts`. `run()` dispatches once per held copy, so percentage/flat modifiers
+  from repeats are ADDITIVE"* — with the reasoning that additive-per-copy is the simplest
+  behaviour to reason about across 180 Artefacts, and that a multiplicative one would be a
+  called-out exception inside its own handler. `run()` also key-sorts so the result never
+  depends on acquisition order (issue 20).
+
+  It is load-bearing in at least four places, which is why this is not a small revert:
+  `test_items_artefacts_1.gd` asserts *"two Library of Alexandria Matchboxes stack
+  additively"*; slice 81 ships a board for **two Snowden copies stacking rerolls**;
+  **Abduction Probe** raises the Piece Buff cap **+1 per held copy** (issue 53's ruling, and
+  see issue 99 — the effects that push past the cap were deliberately kept on 2026-09-01);
+  and the standing principle *"big interactions stay, at worst cap them, never remove them"*
+  points at bounding it rather than removing it.
+
+  So if it is judged a bug, the fix is most likely a **cap on copies** (or on the stacked
+  magnitude), not de-duplication at dispatch — de-duping would silently change four shipped
+  behaviours and one shipped scenario board. Worth a deliberate decision in the balance pass
+  rather than an incidental one.
+
 - **The `suppresses` declarations of issue 94 are unverified, and a mistake in one is
   invisible.** Grilled 2026-09-01: the slice ships hand-written `fires`/`suppresses` lists
   on the 42 Item/Buff/Army effects with **no test proving them true** (user ruling — the

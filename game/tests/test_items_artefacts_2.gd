@@ -370,7 +370,7 @@ func _init() -> void:
 	# same-id merge (Rank Up), both board- and Stock-landing cases
 	var rankup := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "stock": ["pawn", "pawn"],
-		"artefacts": ["witness-protection-mustache", "holy-grail-coaster", "bigfoot-toenail-clipping"]})
+		"artefacts": ["witness-protection-mustache", "holy-grail-coaster", "bigfoot-toenail-clipping"], "gold": 300})
 	await process_frame
 	var clock_rankup: float = rankup.clock_ms
 	MergeLogic.commit_merge(rankup, Vector2i(2, 2), Vector2i(3, 2)) # board merge: lands on Vector2i(3, 2)

@@ -29,8 +29,11 @@ const GeneratedCombos := preload("res://data/scenarios_combos.gd")
 
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
+	# issue 98: merging now costs Gold, so a chain sandbox needs a budget or it
+	# demonstrates nothing — the board exists to walk a promotion chain by hand.
 	return {"name": "Promote: %s" % title, "cfg": {
-		"board": ZONE_PAWNS, "stock": [base, base, mid, mid], "score": 500}}
+		"board": ZONE_PAWNS, "stock": [base, base, mid, mid], "score": 500,
+		"gold": 300}}
 
 
 static func all() -> Array:
@@ -87,12 +90,12 @@ static func _hand_written() -> Array:
 			"wave": 50, "score": 1000}},
 		# --- merging ---
 		{"name": "Merge: promotion pair (pool)", "cfg": {
-			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"]}},
+			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"], "gold": 300}},
 		{"name": "Merge: fusions (bishop+rook, knight+rook, ...)", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "rook", "bishop", "knight", "kirin"],
-			"stock": ["alibaba", "wazir"]}},
+			"stock": ["alibaba", "wazir"], "gold": 300}},
 		{"name": "Merge: on the board", "cfg": {
-			"board": ZONE_PAWNS + [["ferz", 0, 2, 1], ["ferz", 0, 3, 1], ["bishop", 0, 4, 1], ["rook", 0, 5, 1]]}},
+			"board": ZONE_PAWNS + [["ferz", 0, 2, 1], ["ferz", 0, 3, 1], ["bishop", 0, 4, 1], ["rook", 0, 5, 1]], "gold": 300}},
 		_chain("Pawn chain", "pawn", "sergeant"),
 		_chain("Seer chain", "ferz", "elephant-modern"),
 		_chain("Mage chain", "wazir", "war-machine"),

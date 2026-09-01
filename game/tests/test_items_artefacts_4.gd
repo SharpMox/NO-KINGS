@@ -758,7 +758,10 @@ func _init() -> void:
 	# every merge (Rank Up here; a Fusion of two different pieces goes
 	# through the exact same call site).
 	var sor := _boot({"board": [["rook", 1, 7, 10]], "wave": 3,
-		"artefacts": ["spare-organ-receipt"], "stock": ["pawn", "pawn"], "gold": 0})
+		"artefacts": ["spare-organ-receipt"], "stock": ["pawn", "pawn"],
+		"gold": Tuning.MERGE_COST}) # issue 98: merging costs Gold now, so start
+			# with exactly its price — the +10 payout assertion below is
+			# unchanged, because MERGE_COST in and MERGE_COST out cancel
 	await process_frame
 	sor.actions_left = 3
 	MergeLogic.commit_merge(sor,
@@ -1396,7 +1399,7 @@ func _init() -> void:
 	# on top of the merge result the player already kept (user ruling: the
 	# duplication is accepted, bounded by once-per-Wave on a Legendary).
 	var zap_merge := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
-		"wave": 1, "stock": ["pawn"], "artefacts": ["zapruder-s-director-s-cut"]})
+		"wave": 1, "stock": ["pawn"], "artefacts": ["zapruder-s-director-s-cut"], "gold": 300})
 	await process_frame
 	zap_merge.stock.append({"id": "pawn", "buff": true})
 	zap_merge.actions_left = 5

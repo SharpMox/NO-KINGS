@@ -106,6 +106,18 @@ Each was a judgement call needed to ship; none was specced.
 Each was surfaced by an agent that declined to guess, and each is written up where it was
 found. Collected here so they are not lost in Outcome sections:
 
+- **The `suppresses` declarations of issue 94 are unverified, and a mistake in one is
+  invisible.** Grilled 2026-09-01: the slice ships hand-written `fires`/`suppresses` lists
+  on the 42 Item/Buff/Army effects with **no test proving them true** (user ruling — the
+  generated boards are their own check). That is fine for `fires`, where a wrong line makes
+  a board where nothing happens and you notice on opening it. It is not symmetric for
+  `suppresses`: a wrong entry there describes an effect silently no-op'ing, and the whole
+  point of that relation is that nothing happens *and nothing reports it*. Nothing consumes
+  `suppresses` yet, so this costs nothing today — but the anti-combo slice that eventually
+  reads it inherits an unchecked map. The cheap fix if it ever bites is the trace already
+  sketched in 94's grilling: ~5 lines in `ArtefactHooks.run` recording fired hook names,
+  and `g._use_item(0)` (already used throughout `test_items.gd`) to drive each producer.
+
 - ~~**Holy Lint's grant timing**~~ — issue 27, closed 2026-08-28. The "~17% of its rolls
   do nothing" figure recorded here was **wrong** and is corrected for the record:
   `capture_multiplier` evaluates *after* `capture_score`, so a granted `critical` doubles

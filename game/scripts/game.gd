@@ -259,6 +259,12 @@ var actions_left := 0 # unified: move, place, merge, item — 1 action each
 var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
+## issue 101: a Lane A restock asks the Shop to open itself. Drained at the
+## same player-turn-start seam as pending_reinforce above, for the same reason:
+## the restock happens mid-wave-transition, where a modal may already be up
+## (a Wave clear can raise a Box pick), and _open_shop refuses over one. Held
+## as a flag so the open QUEUES rather than being dropped.
+var pending_shop_open := false
 var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 	# many Box choices are queued. _lose_player_piece is synchronous — called
 	# mid enemy-move loop among other sites — so it cannot itself open a modal
@@ -895,6 +901,11 @@ func _begin_player_turn() -> void:
 			AutoplayBot.reinforce(self)
 		else:
 			modals.show_reinforce()
+	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
+		pending_shop_open = false
+		if not autoplay: # the bot buys through Shop.buy and never opens the
+			_open_shop() # panel (autoplay.gd try_shop) — opening it here would
+				# only stall a run that has no way to close it
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -3485,10 +3496,20 @@ func _connect_modals() -> void:
 
 
 ## Shop entry: player's turn only, never over another modal.
-## Always openable, in any state — the GDD makes the Shop the one surface the
-## player can reach at will. Buying is still turn-gated (Shop.can_buy), so
-## outside your turn it is a readable catalog with dead Buy buttons.
+##
+## LOCKED BEFORE Tuning.SHOP_UNLOCK_WAVE (issue 101, user ruling 2026-09-01).
+## This file previously said "always openable, in any state — the GDD makes the
+## Shop the one surface the player can reach at will"; that is no longer true
+## and the comment is rewritten rather than left contradicting the code. From
+## the unlock Wave on, the old rule resumes: openable in any state, with buying
+## still turn-gated by Shop.can_buy, so outside your turn it is a readable
+## catalog with dead Buy buttons.
 func _open_shop() -> void:
+	if wave < Tuning.SHOP_UNLOCK_WAVE:
+		_add_turn_fx("The Shop opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE,
+			Color(1.0, 0.8, 0.4)) # says WHEN, not just "no" — a refusal with
+			# no reason reads as a bug (issue 101's own acceptance)
+		return
 	if Kings.power_is(self, "juche"): # Kim Jong Un: Juche — the Shop is closed
 		_add_turn_fx("Juche: the Shop is closed", Color(1.0, 0.5, 0.4))
 		return

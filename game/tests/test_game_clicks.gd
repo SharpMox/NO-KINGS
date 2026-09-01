@@ -273,7 +273,8 @@ func _init() -> void:
 	# reward and closes the panel once every pick (native + extra) is taken.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5, # issue 101: the Shop is locked before
+		# Tuning.SHOP_UNLOCK_WAVE, and _buy_a_box drives the real Shop button
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -298,7 +299,7 @@ func _init() -> void:
 	# TOP of a Box's own native picks, so this Box needs (native + 1) clicks.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["nostradamus-mad-libs"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -327,7 +328,7 @@ func _init() -> void:
 	# and it disappears once the budget is spent.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["snowden-s-rubik-s-cube"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -699,7 +700,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500}
+		"wave": 5, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -708,6 +709,42 @@ func _init() -> void:
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
 		"the shop drawer opens")
+	# issue 101: before the unlock Wave the button STAYS and is DISABLED (user
+	# ruling — a hidden button reads as "this game has no Shop"), and it names
+	# the Wave, because a greyed control with no reason is the failure the
+	# ruling was one step away from.
+	check(not game.hud.shop_button.disabled and game.hud.shop_button.text == "Shop",
+		"the Shop button is live and unlabelled from the unlock Wave on")
+
+	# ...and the locked half of the same ruling, on its own boot one Wave short
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(game.hud.shop_button.disabled,
+		"the Shop button is DISABLED the Wave before it unlocks")
+	check("%d" % Tuning.SHOP_UNLOCK_WAVE in game.hud.shop_button.text,
+		"and says which Wave it opens on (%s)" % game.hud.shop_button.text)
+	check(not await _click_button_in(game.hud, "Shop"),
+		"a disabled Shop button is not the plain \"Shop\" control any more")
+
+	# restore what the checks below expect: an unlocked run with the Shop drawer
+	# OPEN. The locked-state boot above consumed the instance they were written
+	# against, and leaving it would fail them on state, not on behaviour.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "Shop reopens after the locked-state check")
+	await process_frame
 
 	# issue 64: the Lane B restock progress bar — a real Control built by
 	# show_shop(), so it needs the windowed probe (headless drops GUI
@@ -774,7 +811,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
+		"wave": 5, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -860,7 +897,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 100, "artefacts": ["jet-fuel-vial"]}
+		"wave": 5, "gold": 100, "artefacts": ["jet-fuel-vial"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -909,7 +946,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
+		"wave": 5, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1270,7 +1307,7 @@ func _init() -> void:
 	# as Shield Wall/Oak Island above.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"army": "Horde", "wave": 1,
+	GameScript.next_config = {"army": "Horde", "wave": 5,
 		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)

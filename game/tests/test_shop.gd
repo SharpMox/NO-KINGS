@@ -45,7 +45,7 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 
 
 func _init() -> void:
-	var game: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	var game: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5})
 	await process_frame
 
 	var kinds := {}
@@ -231,6 +231,19 @@ func _init() -> void:
 	check(game.box_offer == stocked_contents,
 		"opening reveals EXACTLY the contents rolled at stock time, not a fresh roll")
 
+	# --- issue 101: the Shop is locked before Tuning.SHOP_UNLOCK_WAVE --------
+	var locked: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500})
+	locked._open_shop()
+	check(locked.modals.shop_panel == null or not locked.modals.shop_panel.visible,
+		"the Shop does not open the Wave before it unlocks")
+	locked.wave = Tuning.SHOP_UNLOCK_WAVE
+	locked._open_shop()
+	check(locked.modals.shop_panel != null and locked.modals.shop_panel.visible,
+		"and opens on the unlock Wave itself")
+	locked.queue_free()
+	await process_frame
+
 	var stock_n2: int = game.stock.size()
 	var items_n2: int = game.items.size()
 	var artefacts_n2: int = game.artefacts.size()
@@ -295,8 +308,9 @@ func _init() -> void:
 	check(game.shop_restocks == 2, "a single huge gain banks every 10,000 multiple it crossed")
 	check(game.shop_lane_b_progress == 5000, "the remainder past the last crossed multiple is kept")
 
-	# always openable, and it pauses the run clock (GDD Shop page). Buying
-	# stays turn-gated: outside your turn the shelf is a readable catalog.
+	# openable in any STATE once unlocked (issue 101 gates it by WAVE, not by
+	# state), and it pauses the run clock (GDD Shop page). Buying stays
+	# turn-gated: outside your turn the shelf is a readable catalog.
 	game.state = game.State.ENEMY_TURN
 	game._open_shop()
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
@@ -537,7 +551,7 @@ func _init() -> void:
 	# wiring shop_buy_pressed already exercises elsewhere in this file) —
 	# Sell mode toggle, a Sell action, and a Convert action.
 	var ui := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 1000})
+		"wave": 5, "gold": 1000})
 	await process_frame
 	ui.state = ui.State.PLAYER_TURN
 	ui.actions_left = 5

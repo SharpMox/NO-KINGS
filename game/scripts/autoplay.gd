@@ -4,6 +4,7 @@
 
 const Rules := preload("res://scripts/rules.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Shop := preload("res://scripts/shop.gd") # issue 103
 
 
 static func step(g) -> void:
@@ -12,6 +13,11 @@ static func step(g) -> void:
 		# not a failure: the bot surviving this long just means no crash surfaced
 		if g.autoplay_exit:
 			print("AUTOPLAY CAP: alive after %d steps (wave %d, score %d)" % [g.autoplay_cap, g.wave, g.score])
+			# issue 103: a capped run MUST still emit its row. It is the run
+			# that lived longest, so dropping it biases the batch against the
+			# bot's best play — which is the opposite of what this harness is
+			# for. Filed as its own result (CAP), never as a LOSS.
+			print(g._telemetry_csv("CAP", "Outlived the step cap"))
 			g.get_tree().quit(0)
 		return
 	# Artefact activation (issue 52) costs 0 Actions, so it's tried up front,
@@ -29,8 +35,15 @@ static func step(g) -> void:
 		# unlucky roll never wastes a frame.
 		if g.rng.randf() < 0.15 and try_activate_army_ability(g):
 			return
-		if not g.items.is_empty() and g.rng.randf() < 0.3: # exercise item paths
-			use_item(g)
+		# issue 103: economy before board actions. Both are cheap no-ops when
+		# they do not apply, and neither costs an Action (Shop purchases are
+		# free by issue 64; conversion is Gold-only), so this cannot starve the
+		# turn budget the way an extra board move would.
+		if try_shop(g):
+			return
+		if try_convert(g):
+			return
+		if not g.items.is_empty() and g.rng.randf() < 0.3 and use_item(g):
 			return
 		if g.turn_action_count == 0 and not g.stock.is_empty(): # ≤1 placement/turn,
 			var tiles := Rules.placement_tiles(g.board)        # like the old economy
@@ -51,29 +64,112 @@ static func step(g) -> void:
 	g._on_pass()
 
 
-static func use_item(g) -> void:
-	var index: int = g.rng.randi() % g.items.size()
-	var it: Dictionary = g.items[index]
-	if it.target == "":
-		g._use_item(index)
-		return
-	var a := Vector2i(-1, -1)
-	var targets: Array[Vector2i] = g._item_stage_targets(it, a)
-	if targets.is_empty():
-		g.items.remove_at(index) # discard unusable (e.g. sniper with no valid mark)
-		return
-	if it.target == "multi": # pick one random piece and confirm
-		g._use_item(index)
-		g.item_selected.append(targets[g.rng.randi() % targets.size()])
-		return g._item_confirm_multi()
-	if it.target == "pair":
-		a = targets[g.rng.randi() % targets.size()]
-		targets = g._item_stage_targets(it, a)
+## issue 103. Two bugs lived here, and both corrupted every balance run:
+##
+## 1. The tile/pair paths did `g.items.remove_at(index)` and called _item_apply
+##    directly, BYPASSING _consume_item — the choke point that fires
+##    on_item_consume and honours the "the Item is not consumed" veto. So the 7
+##    Artefacts listening on that hook were inert in every measured run, and
+##    Dihydrogen Monoxide Battery / Wardenclyffe AAA Batteries could never fire
+##    at all. The UI path is _consume_item then _item_apply; this now matches it.
+## 2. An Item with no legal target was DISCARDED. It left the inventory without
+##    ever being used, which is why item_use read 0 while the bot "used items".
+##    Now an untargetable Item is simply skipped and kept for a later turn.
+##
+## Returns whether an Item was actually used, so the caller does not burn its
+## turn slot on a no-op.
+static func use_item(g) -> bool:
+	# Rotate the starting index off the SEEDED stream (g.rng) rather than
+	# Array.shuffle(), which draws from the global RNG — a pinned seed has to
+	# reproduce a run exactly (issue 75), and the playtest harness depends on it.
+	var start: int = g.rng.randi() % g.items.size()
+	for k in g.items.size():
+		var index: int = (start + k) % g.items.size()
+		var it: Dictionary = g.items[index]
+		if it.target == "":
+			g._use_item(index) # _use_item consumes instant Items itself
+			return true
+		var a := Vector2i(-1, -1)
+		var targets: Array[Vector2i] = g._item_stage_targets(it, a)
 		if targets.is_empty():
-			g.items.remove_at(index)
-			return
-	g.items.remove_at(index)
-	g._item_apply(it, a, targets[g.rng.randi() % targets.size()])
+			continue # keep it: unusable THIS turn is not unusable forever
+		if it.key == "buff_box":
+			# Buff Box is the one Item whose effect needs state the direct
+			# _item_apply path below never sets: _item_click assigns
+			# `_buff_pick = pending_buff`, and pending_buff is only filled by
+			# the buff-pick step inside _use_item. Applying it directly grants
+			# a buff with an EMPTY key — a meaningless entry occupying one of
+			# the two cap slots. So this one goes through the real UI path,
+			# which autoplay can drive because _open_buff_pick has its own
+			# bot bypass (game.gd: "take one so the flow is exercised").
+			g._use_item(index)
+			if g.item_active < 0 or g.item_targets.is_empty():
+				continue
+			g._item_click(g.item_targets[g.rng.randi() % g.item_targets.size()])
+			return true
+		if it.target == "multi": # pick one random piece and confirm
+			g._use_item(index)
+			g.item_selected.append(targets[g.rng.randi() % targets.size()])
+			g._item_confirm_multi() # consumes via _consume_item itself
+			return true
+		if it.target == "pair":
+			a = targets[g.rng.randi() % targets.size()]
+			targets = g._item_stage_targets(it, a)
+			if targets.is_empty():
+				continue
+		g._consume_item(index, it) # the hook + veto path the UI uses
+		g._item_apply(it, a, targets[g.rng.randi() % targets.size()])
+		return true
+	return false
+
+
+## issue 103: SHOP. The bot bought NOTHING, ever — the measured cause of death
+## was "Resource starvation" in runs that ended holding five figures of unspent
+## Gold, while the Shop sells pieces. That made every tier-difficulty number
+## this project has quoted a measurement of the bot's floor.
+##
+## Buys through Shop.buy — the same function the panel calls — rather than
+## driving the modal. Autoplay deliberately avoids modals (see
+## try_activate_artefact's own bypass), and Shop purchases cost no Action
+## (issue 64), so nothing about the turn budget changes.
+##
+## BOXES ARE SKIPPED: Shop.buy grants nothing for a box (the roll modal IS the
+## grant, shop.gd), so buying one the bot never opens would burn Gold for
+## nothing.
+const LOW_STOCK := 3 # below this, deployable material is the binding constraint
+
+
+static func try_shop(g) -> bool:
+	# Pieces first while Stock is thin — that is the resource the bot actually
+	# runs out of. Otherwise take the cheapest thing it can hold, so a full
+	# wallet keeps converting into board presence.
+	var passes: Array = [["item", "artefact", "piece"]]
+	if g.stock.size() < LOW_STOCK:
+		passes.push_front(["piece"])
+	for kinds in passes:
+		var pick := -1
+		for i in g.shop_stock.size():
+			var slot: Dictionary = g.shop_stock[i]
+			if not kinds.has(slot.kind) or not Shop.can_buy(g, slot):
+				continue
+			if pick < 0 or Shop.price(g, slot) < Shop.price(g, g.shop_stock[pick]):
+				pick = i
+		if pick >= 0:
+			return Shop.buy(g, pick)
+	return false
+
+
+## issue 103: Captured Stock -> Stock. Captured pieces can merge but never
+## deploy (issue 60), so a bot with an empty Stock and a full Captured Stock is
+## out of deployable material while holding the cure. Costs Gold, which is
+## exactly the point — it is the other half of the same starvation.
+static func try_convert(g) -> bool:
+	if not g.stock.is_empty() or g.captured.is_empty():
+		return false
+	for e in g.captured.duplicate():
+		if g._convert_captured(e):
+			return true
+	return false
 
 
 ## Artefact activation (issue 52): one random HELD activatable key, activated

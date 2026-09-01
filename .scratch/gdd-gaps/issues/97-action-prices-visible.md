@@ -1,6 +1,6 @@
 # 97 — Every priced action shows its price, and conversion costs more
 
-Status: todo — **RULED 2026-09-01** (was "conversion should cost Gold", which already shipped)
+Status: done (2026-09-02) for deploy + convert; the MERGE price waits on 98
 
 ## Parent
 
@@ -94,3 +94,56 @@ reimplementing the modifiers in the UI — that is a second copy of the rules th
 - The merge price half needs **98** (no Gold price to display until then).
 - The exact `CONVERT_RATE` value is a balance-pass number; the split can ship with a
   placeholder equal to today's behaviour + the ruling's direction.
+
+## Outcome (2026-09-02) — shipped together, one branch
+
+**96 — the Captured section.** `_rebuild_pool_strip` now emits a `VSeparator` and a
+two-line label at the Stock -> Captured boundary (`_stacks()` already returned stock first,
+so the first captured stack *is* the boundary). The label reads **"CAPTURED / no deploy"** —
+it carries the RULE, not just the name, because the constraint is the reason the section
+exists and a label saying only "Captured" would leave the player to discover the rule by
+being refused.
+
+Before this, the only signals were a warm tint and a `" (captured)"` **tooltip** — and this
+is a portrait touch game, so on the target platform the tooltip does not exist. A player
+could not tell which of their pieces were placeable.
+
+**97 — prices on the entries.** Every pool entry carries its own price badge: deploy cost for
+a Stock piece, conversion cost for a Captured one. Shown as **base -> effective when they
+differ**, per the ruling:
+
+```
+Crown:  btn$20    btn$20   | [CAPTURED/no deploy] btn$22
+Horde:  btn$20>0  btn$20   | [CAPTURED/no deploy] btn$22
+```
+
+The Horde row is the proof the number is computed rather than hardcoded: Endless Ranks makes
+its **pawn** free while the rook beside it still costs 20. Read from the live calls
+(`Economy.deploy_cost`, `Shop.convert_price`), never re-derived in the HUD — a second copy of
+the modifier rules would drift. Unaffordable prices render red.
+
+**The rate split.** `Tuning.CONVERT_RATE = 0.75` against `SELL_RATE = 0.5`, with
+`Shop.convert_price()` split out of `sell_price()`. The direction is the safety property, not
+the value: convert-above-sell is safe, convert-below-sell is the money pump issue 68 closed by
+keeping the rates equal.
+
+### Three existing tests encoded the old equal-rate world
+
+- **`test_shop`: "convert (-50%) then sell (+50%) nets exactly zero"** — the arbitrage test.
+  It now asserts the loop **loses** money, which is a *stronger* invariant than the wash it
+  replaces, and it pins the direction rather than the numbers so tuning cannot silently
+  invert it.
+- **`test_armies`: Insider Rates must not discount a conversion.** The number moved; the
+  property did not. Re-pinned against `CONVERT_RATE`.
+- **`test_game_clicks`** hardcoded `"Convert ($5)"` and a `- 5` debit. Both now read the live
+  price, so a future tuning pass does not break the probe.
+
+Three positional `pool_box.get_child(0)` lookups also assumed a buttons-only strip and now
+take the first **Button** via a helper — 96 put a separator in front of them.
+
+`run_all.sh` ALL GREEN, foreground, alone.
+
+### Not done here
+
+The **merge** price. `Economy.charge(g, "fuse_cost")` is a tariff hook that charges 0 Gold
+unless a Fuse Tax is live, so there is no merge price to display until **98** gives it one.

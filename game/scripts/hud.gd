@@ -8,6 +8,7 @@ extends CanvasLayer
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Shop := preload("res://scripts/shop.gd") # issue 96/97: convert price
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
@@ -379,6 +380,28 @@ func refresh() -> void:
 		inv_panel.position = Vector2(inv_panel.position.x, g.get_viewport_rect().size.y - inv_h)
 
 
+## issue 97: can the player currently pay for this entry's action? Drives the
+## price colour only — the real refusals stay where they are (Economy/Shop).
+func _pool_affordable(cap: bool, entry: Variant) -> bool:
+	return g.gold >= (Shop.convert_price(g, entry) if cap else Economy.deploy_cost(g))
+
+
+## issue 96: the divider between Stock and Captured Stock. Carries the RULE
+## that makes the pool different ("no deploy"), not just a name — the
+## constraint is the reason the section exists, and a label that only said
+## "Captured" would leave the player to discover the rule by being refused.
+func _add_captured_header() -> void:
+	var sep := VSeparator.new()
+	sep.custom_minimum_size = Vector2(10, 0)
+	pool_box.add_child(sep)
+	var lbl := Label.new()
+	lbl.text = "CAPTURED\nno deploy"
+	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8))
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pool_box.add_child(lbl)
+
+
 ## The pool-strip stack button under a screen point (drag drop target).
 func stack_button_at(screen: Vector2) -> Button:
 	if not pool_box.is_visible_in_tree(): # stock drawer closed: no targets
@@ -522,7 +545,19 @@ func _rebuild_item_strip() -> void:
 func _rebuild_pool_strip() -> void:
 	for c in pool_box.get_children():
 		c.queue_free()
+	var captured_marked := false
 	for st in _stacks():
+		# issue 96: Captured Stock becomes its own LABELLED section rather than
+		# a tinted tail of the same run of buttons. The two pools obey different
+		# rules — a Captured entry can merge, convert and sell but can NEVER be
+		# deployed (issue 60) — and the only signals for that were a warm tint
+		# and a tooltip suffix. This is a portrait TOUCH game: the tooltip does
+		# not exist on a phone, so a player could not tell which of their pieces
+		# were placeable. _stacks() returns stock first then captured, so the
+		# first captured stack is the boundary.
+		if st.cap and not captured_marked:
+			captured_marked = true
+			_add_captured_header()
 		var btn := Button.new()
 		var id: String = st.id
 		var cap: bool = st.cap
@@ -555,6 +590,33 @@ func _rebuild_pool_strip() -> void:
 				badge.offset_left = -16
 				badge.offset_bottom = 12
 			btn.add_child(badge)
+		# issue 97: the price of acting on this entry, on the entry itself —
+		# deploy cost for a Stock piece, conversion cost for a Captured one.
+		# BOTH the base and the effective number when they differ, because
+		# showing only the effective one hides that a modifier exists and
+		# showing only the base is a lie: a Horde pawn deploys FREE (Endless
+		# Ranks) and a Qin Shi Huang deploy costs double (The Great Wall).
+		# Read from the live calls, never re-derived here — re-implementing the
+		# modifiers in the HUD would be a second copy of the rules, and it
+		# would drift.
+		var price := Label.new()
+		if cap:
+			price.text = "$%d" % Shop.convert_price(g, st.entry)
+		else:
+			var base: int = Tuning.PLACEMENT_COST
+			var eff: int = Economy.deploy_cost(g)
+			if id == "pawn" and Armies.endless_ranks(g):
+				eff = 0 # Endless Ranks is scoped to pawns at _place, so the
+					# generic deploy_cost() does not know about it
+			price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
+		price.add_theme_font_size_override("font_size", 10)
+		price.add_theme_color_override("font_color",
+			Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
+		price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+		price.add_theme_constant_override("outline_size", 4)
+		price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		price.offset_top = -13
+		btn.add_child(price)
 		if show_promote:
 			# round ▲ badge floating over the stack's top-right corner: it
 			# overhangs the drawer's top edge and pokes out a little to the

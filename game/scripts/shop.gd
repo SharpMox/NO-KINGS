@@ -349,11 +349,19 @@ static func buy(g, index: int) -> bool:
 ## already owned). `kind` is "piece" (Stock), "captured" (Captured Stock),
 ## "item" or "artefact"; `entry` is the actual g.stock/g.captured/g.items/
 ## g.artefacts element (a bare id String for piece/captured, a catalog
-## Dictionary for item/artefact). Captured -> Stock conversion charges this
-## exact number too (game.gd._convert_captured) — deliberately the same
-## constant, not a second one (Tuning.SELL_RATE's own header explains why).
+## Dictionary for item/artefact). Captured -> Stock conversion NO LONGER shares
+## this constant — issue 97 split it into Tuning.CONVERT_RATE so converting can
+## cost more than selling pays. See convert_price() below.
 static func sell_price(g, kind: String, entry) -> int:
 	return floori(_sell_base(g, kind, entry) * Tuning.SELL_RATE)
+
+
+## issue 97: what a Captured -> Stock conversion COSTS. Split out of
+## sell_price() (user ruling: "make it cost more"), off the same base so the
+## two rates stay comparable — see Tuning.CONVERT_RATE for why the direction
+## of the split is the safety property and not the value.
+static func convert_price(g, entry) -> int:
+	return floori(_sell_base(g, "captured", entry) * Tuning.CONVERT_RATE)
 
 
 ## The buy-price-equivalent base a held entry's sell/convert value scales off

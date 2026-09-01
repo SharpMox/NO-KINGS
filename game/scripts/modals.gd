@@ -761,7 +761,7 @@ func _sell_detail(kind: String, index: int) -> Control:
 	buttons.add_theme_constant_override("separation", 4)
 	if kind == "captured":
 		var convert := Button.new()
-		convert.text = "Convert ($%d)" % Shop.sell_price(g, "captured", entry)
+		convert.text = "Convert ($%d)" % Shop.convert_price(g, entry) # issue 97
 		convert.disabled = not Shop.can_convert(g, entry)
 		convert.add_theme_font_size_override("font_size", 13)
 		convert.pressed.connect(func() -> void:

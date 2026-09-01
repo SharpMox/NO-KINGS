@@ -124,6 +124,9 @@ var king_ability_used_this_wave := false
 ## issue 91: the Tariff key a King's Power put in force, so it can be taken
 ## back out when the wave ends. "" when no Power is live.
 var king_power_tariff := ""
+## issue 92: the King whose Power is in force, or "". Distinct from the board
+## King: the Power is live through segment 1, before the King has arrived.
+var king_power_id := ""
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -1717,7 +1720,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 						# else can overwrite g.last_capture_ctx again
 					_capture_to_stock(board[also])
 				else:
-					captured.append(board[also].id)
+					if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
+						captured.append(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
 				board.erase(also)
@@ -1746,7 +1750,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				captured.append(victim.id) # the capture itself still resolved
+				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
+					captured.append(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
 			board.erase(from)
@@ -1769,7 +1774,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				captured.append(victim.id)
+				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
+					captured.append(victim.id)
 			if blitz_free:
 				moving_piece.erase("blitz_free_move")
 			else:

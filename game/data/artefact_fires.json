@@ -1,0 +1,72 @@
+{
+	"2012-doomsday-party-hat": [
+		"on_clock_change"
+	],
+	"5g-microchips": [
+		"on_clock_change"
+	],
+	"bible-gag-reel-scroll": [
+		"on_buff_apply"
+	],
+	"capstone-polish": [
+		"on_clock_change"
+	],
+	"casino-invisible-clock": [
+		"on_clock_change"
+	],
+	"charlemagne-s-birth-certificate": [
+		"on_clock_change"
+	],
+	"deep-state-yearbook": [
+		"on_gold_zero",
+		"on_purchase"
+	],
+	"diplomatic-migraine-ray": [
+		"on_buff_apply"
+	],
+	"doomsday-autoclicker": [
+		"on_clock_change"
+	],
+	"kgb-photo-eraser": [
+		"on_buff_apply"
+	],
+	"mar-a-lago-toilet-papers": [
+		"on_clock_refill",
+		"on_price",
+		"on_wave_roster",
+		"on_wave_spawn"
+	],
+	"nigerian-prince-wire-transfer": [
+		"on_clock_change"
+	],
+	"pandemic-toilet-paper-pallet": [
+		"on_price"
+	],
+	"pied-piper-s-rat-census": [
+		"on_buff_apply"
+	],
+	"seti-s-red-marker": [
+		"on_gold_zero",
+		"on_purchase"
+	],
+	"shrinkflation-cereal-box": [
+		"on_clock_change"
+	],
+	"silk-road-coupon": [
+		"on_clock_refill",
+		"on_wave_roster",
+		"on_wave_spawn"
+	],
+	"tunguska-toothpicks": [
+		"on_clock_change"
+	],
+	"tutankhamun-s-death-thong": [
+		"on_buff_apply"
+	],
+	"witness-protection-mustache": [
+		"on_clock_change"
+	],
+	"youth-fountain-martini": [
+		"on_buff_apply"
+	]
+}

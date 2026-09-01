@@ -50,6 +50,13 @@ static func queue(g, n: int) -> void:
 		g.pending_reinforce = true
 	if n % Tuning.SHOP_RESTOCK_WAVES == 0: # issue 64 Lane A: guaranteed
 		Shop.lane_a_restock(g) # restock every 5 Waves, independent of Score
+		# issue 101: and the Shop opens ITSELF on a restock Wave (user ruling).
+		# Queued through g, not opened here: _open_shop refuses over another
+		# modal (a Wave clear can raise a Box pick first), and dropping the
+		# open in that case would silently skip the restock Wave — the one
+		# Wave the auto-open exists for. SHOP_UNLOCK_WAVE == SHOP_RESTOCK_WAVES,
+		# so the very first restock is also the unlock and this fires once.
+		g.pending_shop_open = true
 	var roster: Array = Waves.WAVES[n - 1].duplicate()
 	# King identity picked here, once, so the wave banner can name it (issue 09
 	# selection rule: tier-ordered by King-wave depth, sampled within the tier)

@@ -1,6 +1,6 @@
 # 94 — The combo detector + the generated Combo boards
 
-Status: todo (grilled 2026-09-01)
+Status: done (2026-09-01) — grilled and built the same day
 
 ## Parent
 
@@ -133,3 +133,74 @@ section** (15 hand-built from 81) rather than making a new one — user ruling. 
 ## Blocked by
 
 Nothing. 79 (generator + menu grouping) and 81 (the `Combo` section) are both done.
+
+## Outcome (2026-09-01)
+
+**34 generated boards in `game/data/scenarios_combos.gd`. 335 scenarios total** on this
+branch (301 + 34), all in 81's existing `Combo` section. 351 once slice 82's 16 King
+sandboxes merge — the two branches both append to `Scenarios.all()`, which is their only
+overlap and a one-line conflict.
+
+### The spec's firing table was wrong in two places, and deriving it caught both
+
+The table in this file was written from memory during grilling. Checking each entry against a
+real `ArtefactHooks.run` call site before coding killed two of them:
+
+- **`ctx.gold_bonus` / `ctx.score_bonus` do NOT fire a hook.** `Economy.earn` applies them
+  with a direct `g.gold += ...` / `g.score += ...` (economy.gd:111-114); they never re-enter
+  the dispatch. `on_gold_change` fired because somebody called `earn()`, not because a
+  handler set a bonus. Counting it would have paired every converter Artefact with every Gold
+  listener for no reason.
+- **`ItemLogic.grant` fires nothing** — it appends to `g.items` (item_logic.gd:41-45).
+  `on_item_consume` fires on USE, not on grant.
+
+Both are now in the script's exclusion list with their reasons, so the next reader does not
+re-add them.
+
+**A third finding, free**: `on_box_open` and `on_shop_restock` are declared in `HOOKS` but
+fired nowhere in `game/scripts`, and nothing listens on either. Dead vocabulary.
+
+### The hook graph is much sparser than the grilling assumed
+
+- **21 of 180 Artefacts fire anything at all** (28 key→hook edges). The ctx contract is why:
+  handlers return values through `ctx` instead of calling into the game, so they mostly
+  cannot cause anything. The real producers are the ones that call out —
+  `Economy.add_clock`, `g._apply_buff`, `WaveLogic.queue`, `Shop.price`, `Shop.buy`.
+- **8 of the 12 Army effects fire nothing**, which is a finding rather than a gap. Most
+  Army Powers MODIFY a value at a call site rather than cause a hook. The sharpest case:
+  **Insider Rates is applied at `shop.gd:189`, after the `on_price` dispatch at
+  `shop.gd:164`** — every `on_price` listener sees the undiscounted price, so the Syndicate's
+  Power reaches none of them. Recorded in `armies.gd`'s header.
+- The four that do produce: Hold the Line (`Economy.earn_gold` → `on_gold_gain`,
+  `on_gold_change`), Shield Wall and Ritual (`_apply_buff` → `on_buff_apply`), Hostile
+  Takeover (`spend_gold` → `on_gold_zero`).
+
+### What the directed rule bought
+
+`on_wave_clear` has **39** listeners and **no** producer, so it generates **zero** boards.
+Undirected it would have emitted 741 pairs of noise. `on_item_consume`'s 112 true-but-
+redundant pairs (16 Items × 7 listeners) collapse to **2** boards.
+
+### Verification
+
+`test_combos.gd` (new, registered in `run_all.sh`) checks what the scenario sweep cannot see:
+
+- every declared hook name is real — a typo would silently drop a producer from every pairing
+- **the directed rule holds for all 115 producer→listener pairs**: every Artefact on a board
+  listens on the hook that board is named for
+- no board exceeds `ARTEFACT_CAP_BASE` (5)
+- every Army board names a real Army — `cfg["army"]` falls back silently otherwise (81 hit this)
+- **53 passed-over producers are recorded**, not silently cut
+
+The boards themselves boot and bot-play under `test_scenarios.gd` like every other scenario.
+
+### Known limitations, stated rather than hidden
+
+- One board per (hook, chunk) means the **first producer by key** represents its hook and the
+  other 53 do not get boards. At `on_capture` that means Multicapture is shown and Trap,
+  Reflect and Wild Hunt's Power are not, though they behave differently. `Combos.dropped()`
+  lists them.
+- The derive script sees **direct calls only**. An Artefact firing a hook through an indirect
+  path is missed — which shows up as a board that never gets generated, not a wrong one.
+- `suppresses` is declared on all 42 hand-written effects and **consumed by nothing**. See
+  FLAGS: a mistake in it is invisible by construction.

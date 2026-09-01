@@ -29,14 +29,34 @@ transparent/black field. Centred, high contrast, simple silhouette — it should
    512 rather than resampling at an awkward ratio.
 2. **The subject is dark on transparency.** On a dark launcher background it will largely
    disappear. The Android **adaptive** icon needs an explicit background layer, not
-   transparency — pick a colour from the art (the purple or the green) rather than leaving it
-   to the launcher.
+   transparency.
+
+   **RULED (user, 2026-09-01): purple background.** Sampled palette, by share of the image:
+
+   | Colour | Share | What it is |
+   | --- | --- | --- |
+   | `#050603` | 88.9% | the near-black field / Larry's body |
+   | `#030837` | 5.0% | deep indigo shadow |
+   | `#542AC0` | 1.7% | **the bright purple horns** |
+   | `#1F143A` | 1.3% | dark purple |
+   | `#FFFFFF` | 1.1% | the eyes |
+   | `#391E7D` | 1.1% | mid purple |
+   | `#A4CF47` | 0.6% | the acid-green grin |
+
+   **Use `#391E7D` (mid purple).** The trap is picking the brightest one: a `#542AC0`
+   background is the *same colour as the horns*, so the horns would vanish into it and Larry
+   would lose his silhouette. `#391E7D` is dark enough that the white eyes and green grin pop,
+   light enough that the near-black body reads as a distinct shape against it.
+
+   Fallback `#1F143A` if the `#542AC0` horns still lack separation at small sizes. **Decide at
+   48x48, not at full size** — that is where the choice is actually load-bearing.
 3. **Safe zone.** Android adaptive icons crop to a circle/squircle; the horns reach high in
    the frame and will be clipped unless the art is inset into the 66% safe zone.
 
 Larry is the **wave-201 King, deliberately parked** (issue 89 ruling — do not build him
-unprompted). Using his likeness as the app icon does not un-park him, but worth naming so
-nobody reads the icon as a commitment to ship the character.
+unprompted). **CONFIRMED intended branding** (user, 2026-09-01): he is the app icon even
+though the character does not ship. Recorded so a future reader does not "fix" the
+inconsistency by swapping the icon or by building the King.
 
 ## Scope
 
@@ -52,6 +72,7 @@ nobody reads the icon as a commitment to ship the character.
 - `project.godot` sets `config/icon`; a fresh export shows it rather than the Godot logo.
 - **Legible at 48x48** — that is the real bar, not how it looks at full size.
 - Nearest-neighbour scaling only; no soft edges on the pixel art.
+- Adaptive background is `#391E7D`, and the `#542AC0` horns still read against it at 48x48.
 - The adaptive icon survives a circular crop with the horns intact.
 - Source art committed, so the icon is regenerable rather than a one-off nobody can reproduce.
 - `run_all.sh` ALL GREEN, foreground, alone (`test_assets.gd` covers asset pairing rules).

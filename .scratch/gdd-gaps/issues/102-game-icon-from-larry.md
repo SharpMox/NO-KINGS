@@ -1,6 +1,6 @@
 # 102 — A game icon, generated from Larry
 
-Status: todo (planned 2026-09-01)
+Status: done (2026-09-01)
 
 ## Parent
 
@@ -87,3 +87,48 @@ Nothing.
 **King is the last piece on the monochrome-SVG fallback path** and needs
 `king-light.png` + `king-dark.png` — dropping those in switches it over with zero code
 change. Different slice, but the art may already be in hand.
+
+## Outcome (2026-09-01)
+
+Shipped. `config/icon="res://icon.png"` in `project.godot`, three launcher icons wired into
+the Android preset, source art committed at `game/assets/icon/larry-source.png`.
+
+### The purple ruling rested on a wrong premise — mine
+
+This slice told the user the art was "a dark subject on transparency" that would vanish on a
+dark launcher, and purple was ruled to solve that. **`Larry.png` is 100% opaque** — measured,
+every pixel alpha 255. `sips` reports `hasAlpha: yes` because the channel exists, not because
+anything is transparent. The black field is *painted*, so:
+
+- the icon can never "vanish" — it is a solid, well-defined square
+- a purple background can never show through it
+
+Making purple show requires keying the near-black out. **That was tried and it destroys the
+art**: Larry's horns are themselves purple (`#542AC0`, `#391E7D`, `#1F143A`), so on a purple
+field the horns disappear and only the white eyes and green grin survive. Rendered and
+compared at 48x48 — the black version keeps horns, eyes, grin and arms; the keyed version
+loses the entire top half of the character.
+
+### What shipped instead
+
+| Asset | Content |
+| --- | --- |
+| `icon.png` (512), `playstore-512`, `main-192` | **the art as drawn**, full bleed |
+| `adaptive-foreground` (432) | Larry inset to 254px, transparent margin |
+| `adaptive-background` (432) | **`#391E7D` purple** — the ruling, applied where Android requires a background layer anyway |
+
+So purple is honoured in the adaptive icon (where a background layer is mandatory and
+genuinely visible around the inset foreground), and the art is left intact everywhere the
+whole square is shown.
+
+**Reversible in one command** if the user prefers purple everywhere despite the horns — the
+keyed variant is a single `colorkey` filter; see the git history of this slice.
+
+### Scaling
+
+All nearest-neighbour (`flags=neighbor`), and every step is an **exact integer divide** of the
+1016px source so no pixel is resampled unevenly: 1016 -> 508 (/2) padded to 512, 1016 -> 254
+(/4) inset in 432, 1016 -> 127 (/8) padded to 192. The 254px foreground sits at 58.8% of 432,
+inside the 66% adaptive safe zone, so the circular crop keeps the horns.
+
+`run_all.sh` ALL GREEN, foreground, alone.

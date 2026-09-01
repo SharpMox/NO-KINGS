@@ -106,7 +106,14 @@ static func _listeners() -> Dictionary:
 	return out
 
 
-static func all() -> Array:
+## THE GRAPH, one entry per board: {hook, producer, listeners, index, total}.
+##
+## Public on purpose. This is what the tests assert on, and the alternative —
+## recovering `hook` and `producer` from the generated display name — is a
+## parser over a string this same file just wrote, which breaks the moment a
+## producer is named something containing the separator. Emitting the structure
+## is both shorter and honest.
+static func pairs() -> Array:
 	_dropped = []
 	var listeners := _listeners()
 	var by_hook := {}
@@ -133,13 +140,29 @@ static func all() -> Array:
 		pool.erase(lead.key) # an Artefact never needs to be its own audience
 		var chunks: int = int(ceil(float(pool.size()) / float(room)))
 		for c in chunks:
-			var chunk: Array = pool.slice(c * room, min((c + 1) * room, pool.size()))
-			out.append(_board(hook, lead, chunk, c, chunks))
+			out.append({
+				"hook": hook,
+				"producer": lead,
+				"listeners": pool.slice(c * room, min((c + 1) * room, pool.size())),
+				"index": c,
+				"total": chunks,
+			})
 	return out
 
 
-static func _board(hook: String, lead: Dictionary, chunk: Array, index: int,
-		total: int) -> Dictionary:
+static func all() -> Array:
+	var out: Array = []
+	for p in pairs():
+		out.append(_board(p))
+	return out
+
+
+static func _board(p: Dictionary) -> Dictionary:
+	var hook: String = p.hook
+	var lead: Dictionary = p.producer
+	var chunk: Array = p.listeners
+	var index: int = p.index
+	var total: int = p.total
 	var board: Array = PLAYER.duplicate(true) + ENEMY.duplicate(true)
 	var cfg := {
 		"board": board,

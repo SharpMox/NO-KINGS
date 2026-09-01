@@ -46,37 +46,39 @@ func _init() -> void:
 				check(known.has(h), "%s.%s declares a real hook: %s" % [id, f, h])
 	check(declared > 0, "the hand-written declarations exist (%d hook names)" % declared)
 
-	# THE DIRECTED RULE. Every Artefact on a board must actually listen on the
-	# hook the board is named for — that is the whole difference between this
-	# and "two effects that share a hook", and 39 on_wave_clear listeners are
-	# what it is protecting against.
+	# THE DIRECTED RULE, asserted on the graph the generator emits rather than
+	# on strings parsed back out of the board names. Every listener on a board
+	# must genuinely listen on that board's hook, and the producer must
+	# genuinely fire it — that is the whole difference between this and "two
+	# effects that share a hook", which 39 on_wave_clear listeners would make
+	# meaningless.
 	var listeners := {}
 	for key in ArtefactHooks.REGISTRY:
 		for hook in ArtefactHooks.REGISTRY[key]:
 			if not listeners.has(hook):
 				listeners[hook] = []
 			listeners[hook].append(key)
-	var producer_keys := {}
-	for p in Combos._producers():
-		producer_keys[p.key] = p.fires
 	var checked := 0
-	for b in boards:
-		var hook: String = b.name.split(" via ")[0].replace("Combo: ", "")
-		check(listeners.has(hook), "%s is a hook something listens on" % hook)
-		for key in b.cfg.artefacts:
-			# the producer itself may sit in `artefacts` without listening —
-			# it is there to BE the producer, not to be the audience
-			if producer_keys.has(key) and not listeners.get(hook, []).has(key):
-				continue
+	for p in Combos.pairs():
+		check(p.producer.fires.has(p.hook),
+			"%s fires %s" % [p.producer.key, p.hook])
+		for key in p.listeners:
 			checked += 1
-			check(listeners.get(hook, []).has(key),
-				"%s listens on %s" % [key, hook])
+			check(listeners.get(p.hook, []).has(key),
+				"%s listens on %s" % [key, p.hook])
+		check(p.listeners.size() <= Tuning.ARTEFACT_CAP_BASE,
+			"%s via %s: at most %d listeners (%d)"
+				% [p.hook, p.producer.key, Tuning.ARTEFACT_CAP_BASE, p.listeners.size()])
+	check(checked > 0, "the directed rule was actually exercised (%d pairs)" % checked)
+
+	# and the boards those pairs turn into hold no more Artefacts than a real
+	# run can (the producer takes a slot too, when it is itself an Artefact)
+	for b in boards:
 		check(b.cfg.artefacts.size() <= Tuning.ARTEFACT_CAP_BASE,
 			"%s holds at most %d Artefacts (%d)"
 				% [b.name, Tuning.ARTEFACT_CAP_BASE, b.cfg.artefacts.size()])
 		check(b.name.begins_with("Combo: "),
 			"%s lands in the Combo section" % b.name)
-	check(checked > 0, "the directed rule was actually exercised (%d pairs)" % checked)
 
 	# An Army board must name a REAL Army: cfg["army"] is read as
 	# str(cfg.get("army", g.next_army)), so an unrecognised name sets an

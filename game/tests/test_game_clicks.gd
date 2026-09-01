@@ -10,6 +10,7 @@ const Settings := preload("res://scripts/settings.gd")
 const ShopScript := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Armies := preload("res://scripts/armies.gd") # issue 100
 
 var fails := 0
 
@@ -361,6 +362,16 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box")
+	# issue 100: the Army POWER is written out in the drawer. It used to live
+	# only in the Ability chip's TOOLTIP and on the army-select screen, and
+	# this is a portrait touch game — a hover tooltip is unreachable once a run
+	# starts, so a Power that changes what is legal was effectively invisible.
+	var kit: Dictionary = Armies.entry(game.next_army)
+	check(kit.power_name in game.hud.army_power_label.text
+			and kit.power_desc in game.hud.army_power_label.text,
+		"the Army Power is readable in the drawer without hovering (%s)" % kit.power_name)
+	check("1 Action" in game.hud.army_power_label.text,
+		"and the Ability's Action cost is stated with it")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")

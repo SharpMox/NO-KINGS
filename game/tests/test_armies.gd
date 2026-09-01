@@ -87,7 +87,7 @@ func _init() -> void:
 
 	# --- Power: Close Ranks (The Muster) — merges cost no Action ---
 	var muster_merge := _boot({"army": "Crown", "wave": 1, "stock": ["pawn", "pawn"],
-		"board": [["rook", 1, 7, 10]]})
+		"board": [["rook", 1, 7, 10]], "gold": 300})
 	await process_frame
 	muster_merge.actions_left = 0 # already spent — a free merge must still work
 	var actions_before: int = muster_merge.actions_left
@@ -104,7 +104,9 @@ func _init() -> void:
 	await process_frame
 
 	# A non-Muster Army still pays for merges (sanity: the Power is scoped, not global)
-	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn", "pawn"], "gold": 0,
+	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn", "pawn"],
+		"gold": Tuning.MERGE_COST, # issue 98: exactly the merge's price, so the
+			# Action assertion below is unchanged and nothing is left over
 		"board": [["rook", 1, 7, 10]]})
 	await process_frame
 	var before_actions: int = crown_merge.actions_left

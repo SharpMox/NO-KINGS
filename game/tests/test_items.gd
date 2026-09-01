@@ -52,7 +52,8 @@ func _init() -> void:
 	# --- review bug 1 (reworked for buttonless merging): removing a selected
 	# piece with an item must drop the selection, not leave a stale board ref
 	var a := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 3})
+		"wave": 3, "gold": 300}) # issue 98: merge highlights are gated on being
+			# able to AFFORD the merge, so an unfunded board shows none
 	await process_frame
 	a._on_tile_clicked(Vector2i(2, 2)) # select the board pawn (partner glows)
 	check(a.merge_highlights.has("pawn"), "selection highlights its merge partner")
@@ -219,7 +220,7 @@ func _init() -> void:
 
 	# --- merge: a stateful entry is a normal merge input — consumed exactly,
 	# state discarded, result is the plain next piece
-	var em := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"]})
+	var em := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"], "gold": 300})
 	await process_frame
 	em.stock.append({"id": "pawn", "buff": true})
 	em.actions_left = 3

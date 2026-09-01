@@ -529,7 +529,10 @@ func _rebuild_pool_strip() -> void:
 			# overhangs the drawer's top edge and pokes out a little to the
 			# right of the icon (the stock scroll doesn't clip)
 			var promote := Button.new()
-			promote.text = "▲"
+			# issue 97: the merge's price, on the control that starts it.
+			# Free under Close Ranks? No — that Power waives the ACTION only
+			# (merge_logic.can_afford_merge), so the Gold shows regardless.
+			promote.text = "▲$%d" % Tuning.MERGE_COST
 			promote.add_theme_font_size_override("font_size", 11)
 			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
 			var round := StyleBoxFlat.new()

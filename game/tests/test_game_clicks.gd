@@ -82,6 +82,7 @@ func _init() -> void:
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 		"captured": ["pawn", "pawn"],
+		"gold": 300, # issue 98: merging costs Gold, and this probe merges
 	}
 	# Hygiene fix, not the flake's cause (see _await_player_turn): every other
 	# boot in this file, and every other test in the suite, sets is_scenario
@@ -164,9 +165,14 @@ func _init() -> void:
 		if b.is_queued_for_deletion():
 			continue
 		for c in b.get_children():
-			if c is Button and c.text == "▲":
+			if c is Button and c.text.begins_with("▲"):
 				badges.append(c)
 	check(not badges.is_empty(), "an armed promotable stack shows the ▲ button")
+	# issue 97/98: the badge carries the merge's PRICE, on the control that
+	# starts the merge. Close Ranks does not make it free — that Power waives
+	# the Action only (merge_logic.can_afford_merge), so the Gold always shows.
+	check(badges[0].text == "▲$%d" % Tuning.MERGE_COST,
+		"and the ▲ badge shows what the merge costs (%s)" % badges[0].text)
 	_click((badges[0] as Button).get_global_rect().get_center())
 	await process_frame
 	check(game.pending_merge.size() == 2, "the ▲ badge asks for merge confirmation")

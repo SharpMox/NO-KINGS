@@ -792,6 +792,7 @@
 ##   a Merge returning both pieces with state intact.
 ##
 const Rules := preload("res://scripts/rules.gd")
+const Kings := preload("res://data/kings.gd") # issue 92: King Powers dispatch here
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
@@ -1185,6 +1186,12 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		if REGISTRY.get(t.key, []).has(hook):
 			_dispatch(g, t.key, hook, ctx, t.get("acquired_wave", 1))
 			fired.append(t)
+	# issue 92: the active King's Power, through the SAME ctx contract and the
+	# same run() call as Artefacts and Tariffs — so a Power participates in the
+	# established ordering instead of being applied before or after everything
+	# else and drifting from it. Kings are not in REGISTRY: only one Power is
+	# ever live, so there is nothing to key-sort for order independence.
+	Kings.power_hook(g, hook, ctx)
 	if g.artefact_echo_depth == 0: # re-entrancy guard, see header
 		g.artefact_echo_depth += 1
 		_run_meta_triggers(g, hook, ctx, fired, held)

@@ -23,7 +23,14 @@
 ## 51-200 are Endless, so Kings 2-4 are post-win content.
 
 const Waves := preload("res://data/waves.gd")
-const Economy := preload("res://scripts/economy.gd")
+const Rules := preload("res://scripts/rules.gd")
+
+## Economy is loaded lazily, NOT preloaded: artefact_hooks.gd preloads this
+## file (issue 92 dispatches King Powers through its run()), and economy.gd
+## preloads artefact_hooks.gd — so a preload here would close the cycle
+## artefact_hooks -> kings -> economy -> artefact_hooks and fail to compile.
+static func _economy() -> GDScript:
+	return load("res://scripts/economy.gd")
 
 const LAUREL := "laurel"
 const HAT := "hat"
@@ -139,6 +146,41 @@ static func name_of(id: String) -> String:
 ## them, so this slice ships a working engine without inventing 30 effects that
 ## are the user's to design.
 const KITS := {
+	# ---- LAUREL (issue 92) --------------------------------------------------
+	"nebuchadnezzar_ii": {
+		"power_name": "The Babylonian Exile",
+		"power_desc": "Pieces you capture this wave are deported — they never reach your Captured Stock.",
+		"power_key": "exile",
+		"ability_name": "The Dream of the Statue",
+		"ability_desc": "Your highest-value piece on the board crumbles to its base form.",
+		"ability_key": "crumble",
+	},
+	"xerxes_i": {
+		"power_name": "The Countless Host",
+		"power_desc": "The enemy takes one extra Action every turn this wave.",
+		"power_key": "host",
+		"ability_name": "Whip the Hellespont",
+		"ability_desc": "Drives every piece you have on the board back one row.",
+		"ability_key": "whip",
+	},
+	"qin_shi_huang": {
+		"power_name": "The Great Wall",
+		"power_desc": "Deploying from your Stock costs double this wave.",
+		"power_key": "wall",
+		"ability_name": "The Terracotta Army",
+		"ability_desc": "Three more of the wave's own pieces march in at once.",
+		"ability_key": "terracotta",
+	},
+	"nero": {
+		"power_name": "Rome Burns",
+		"power_desc": "Your Gold gains are halved this wave.",
+		"power_key": "burns",
+		"ability_name": "The Fire of Rome",
+		"ability_desc": "Every Item you are holding burns.",
+		"ability_key": "fire",
+	},
+
+	# ---- SUIT (ruled in slice 66 + the design session) ----------------------
 	"donald_trump": {
 		"power_name": "Tariff",
 		"power_desc": "Tariffs are in force for the whole of this King's wave.",
@@ -176,6 +218,7 @@ static func active_id(g) -> String:
 ## ruling is "only during that King's wave", and a Power that leaked into wave
 ## 51 would be a permanent difficulty increase nobody chose.
 static func apply_power(g, king_id: String) -> void:
+	g.king_power_id = ""
 	if g.king_power_tariff != "":
 		for i in range(g.tariffs_active.size() - 1, -1, -1):
 			if g.tariffs_active[i].get("key", "") == g.king_power_tariff:
@@ -184,11 +227,13 @@ static func apply_power(g, king_id: String) -> void:
 	if king_id == "":
 		return
 	var kit := kit_of(king_id)
+	if kit.is_empty():
+		return # a King with no kit yet — the engine no-ops
 	var key: String = str(kit.get("power_tariff", ""))
-	if key == "":
-		return # one of the 15 Kings with no kit yet — the engine no-ops
-	Economy.activate_tariff_by_key(g, key)
-	g.king_power_tariff = key
+	if key != "":
+		_economy().activate_tariff_by_key(g, key)
+		g.king_power_tariff = key
+	g.king_power_id = king_id
 	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], Color(1.0, 0.55, 0.4))
 
 
@@ -209,10 +254,120 @@ static func fire_ability(g) -> bool:
 	if id == "":
 		return false
 	var kit := kit_of(id)
-	var key: String = str(kit.get("ability_tariff", ""))
-	if key == "":
+	var bespoke: String = str(kit.get("ability_key", ""))
+	var tariff: String = str(kit.get("ability_tariff", ""))
+	if bespoke == "" and tariff == "":
 		return false # no kit yet: no Ability, and no Action charged for one
 	g.king_ability_used_this_wave = true
 	g._add_turn_fx("%s: %s" % [name_of(id), kit.ability_name], Color(1.0, 0.35, 0.3))
-	Economy.activate_tariff_by_key(g, key)
+	if bespoke != "":
+		_bespoke_ability(g, bespoke)
+	else:
+		_economy().activate_tariff_by_key(g, tariff)
 	return true
+
+
+## THE POWER HOOK (issue 92) — bespoke King Powers, dispatched through the same
+## ctx contract Artefacts and Tariffs use (`artefact_hooks.gd`'s header): return
+## values through `ctx`, compute off the immutable base, never write g.score or
+## g.gold mid-dispatch.
+##
+## Called from ArtefactHooks.run for EVERY hook, so a Power participates in the
+## same ordering as everything else rather than being applied before or after
+## the rest and drifting.
+static func power_hook(g, hook: String, ctx: Dictionary) -> void:
+	if g.king_power_id == "":
+		return
+	var kit := kit_of(g.king_power_id)
+	match [str(kit.get("power_key", "")), hook]:
+		["host", "on_enemy_turn_start"]:
+			# Xerxes: the vast host presses. Same shape as Filibuster, so it
+			# composes with the tier's own enemy-action count rather than
+			# replacing it (issue 59).
+			ctx.actions += 1
+		["wall", "on_place_cost"]:
+			# Qin Shi Huang: the wall is sealed. Doubled rather than blocked —
+			# blocking deploys outright can strand a player into the resource
+			# starvation game-over, which is a softlock dressed as difficulty.
+			ctx.cost *= 2
+		["burns", "on_gold_gain"]:
+			# Nero: extravagance drains the treasury. Respects gain_immune the
+			# same way Inflation does (Panama Papers Shredder / Amber Room
+			# Bubble Wrap), or those Artefacts would silently stop working
+			# against Kings while still working against Tariffs.
+			if not ctx.get("gain_immune", false):
+				ctx.amount *= 0.5
+
+
+## True while the active King's Power deports captures (Nebuchadnezzar II).
+## Read at the Captured Stock append sites rather than dispatched, because
+## "this capture produces no Captured entry" is a branch, not a modified value.
+static func deports_captures(g) -> bool:
+	return str(kit_of(g.king_power_id).get("power_key", "")) == "exile"
+
+
+## The bespoke Abilities. Instantaneous, so they run directly rather than
+## through a hook. Returns false when the King has no bespoke Ability, so the
+## caller can fall through to the Tariff-backed ones.
+static func _bespoke_ability(g, key: String) -> bool:
+	match key:
+		"crumble":
+			# Nebuchadnezzar II: the statue of gold and silver crumbles. Demote
+			# the best piece rather than destroy it — this King takes your
+			# INVESTMENT, which is a different loss from JD Vance's.
+			var best := Vector2i(-1, -1)
+			for pos in g._player_pieces():
+				var d: Dictionary = g.defs[g.board[pos].id]
+				if best.x < 0 or d.value > g.defs[g.board[best].id].value:
+					best = pos
+			if best.x < 0:
+				return true
+			var base := _base_of(g, g.board[best].id)
+			if base != g.board[best].id:
+				g.board[best].id = base
+			return true
+		"whip":
+			# Xerxes I: three hundred lashes for the water. Drives the player's
+			# board back one row, toward their own side — position lost, not
+			# material, so it cannot starve anyone out.
+			var moved: Array = g._player_pieces()
+			moved.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y)
+			for pos in moved:
+				var to := Vector2i(pos.x, pos.y - 1)
+				if to.y >= 0 and not g.board.has(to):
+					g.board[to] = g.board[pos]
+					g.board.erase(pos)
+			return true
+		"terracotta":
+			# Qin Shi Huang: the buried army marches. Drawn from the wave's own
+			# roster so it escalates with the wave instead of being a flat add.
+			var pool: Array = []
+			for pos in g.board:
+				if g.board[pos].owner == Rules.ENEMY and g.board[pos].get("id", "") != "king":
+					pool.append(g.board[pos].id)
+			if pool.is_empty():
+				pool = ["pawn"]
+			for _i in 3:
+				g.pending_spawn.append({"id": pool[g.rng.randi() % pool.size()]})
+			return true
+		"fire":
+			# Nero: everything burns. Items only — Artefacts are the run's
+			# identity and taking those would be a different order of loss.
+			g.items.clear()
+			return true
+	return false
+
+
+## The base of a piece's promotion chain (what `crumble` demotes to).
+static func _base_of(g, id: String) -> String:
+	var parent := {}
+	for k in g.defs:
+		var nxt: Variant = g.defs[k].get("next")
+		if nxt is String and g.defs.has(nxt):
+			parent[nxt] = k
+	var cur := id
+	var guard := 0
+	while parent.has(cur) and guard < 16:
+		cur = parent[cur]
+		guard += 1
+	return cur

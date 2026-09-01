@@ -1,6 +1,6 @@
 # 99 — A piece carries at most 2 Piece Buffs, full stop
 
-Status: **blocked on a ruling** (planned 2026-09-01) — this deletes two shipped effects
+Status: todo — **RULED 2026-09-01: hard 2.** The cap is 2 and nothing raises it.
 
 ## Parent
 
@@ -36,27 +36,55 @@ By that principle the answer is not a hard 2 but a **ceiling**: let the effects 
 but stop the stack somewhere. Cap-of-the-cap at **3** keeps both effects meaningful (each can
 be the one that gets you there) while killing the 4-buff stack that prompted this.
 
-## The options
+## THE RULING (user, 2026-09-01): hard 2
 
-1. **Hard 2** — as asked. Abduction Probe needs a new effect or removal (it has a Notion row
-   and a public artefacts.html entry); The Cult needs a new Power. Largest blast radius.
-2. **Ceiling at 3** — `min(BASE + probes + communion, 3)`. One `min()`. Both effects keep
-   working, the 4-stack dies. Matches the standing ruling.
-3. **Leave it** — the 4-buff stack requires The Cult *and* two Abduction Probes, which is a
-   deliberate, expensive build.
+The cap is **2, and nothing raises it**. The two augmenting effects lose their current
+purpose and both need replacing — that is the bulk of this slice, not the `min()`.
 
-**Recommendation: 2.** It is one line, it honours "cap them, never remove them", and it does
-not orphan a catalog entry that the public site also renders.
+### Exactly two effects augment the cap — the complete list
 
-## Acceptance (once ruled)
+Verified: `BuffLogic.cap()` has **one** call site, `game.gd:2468-2469`:
 
-- The cap is enforced at one choke point (`_apply_buff`), not at each call site.
-- A scenario board showing the cap refusing at the new limit, visibly.
-- If option 1: Abduction Probe and Communion are re-texted in Notion, `data/artefacts.js` and
-  `armies.gd`, and the drift checker run.
+```gdscript
+var buff_cap := BuffLogic.cap(_artefact_count("abduction-probe")
+        + (1 if Armies.communion(self) else 0)) # issue 68: Communion
+```
+
+| Effect | Kind | Current effect | Becomes |
+| --- | --- | --- | --- |
+| **Abduction Probe** | Artefact | +1 cap **per held copy**, additive | a dead Artefact |
+| **Communion** | The Cult's Army **Power** | +1 cap (to 3) | a dead Army Power |
+
+Nothing else touches it. `PIECE_BUFF_CAP_BASE` is read only by `BuffLogic.cap()`.
+
+### What the ruling costs
+
+- **Abduction Probe becomes a no-op Artefact.** It has a Notion row and renders on the public
+  `artefacts.html`, so it needs a **replacement effect**, not deletion — an Artefact that
+  exists in the catalog and does nothing is worse than one that was never added.
+- **The Cult loses its Power entirely.** Communion is that Army's identity — it is the buff
+  Army, and its Ability (Ritual, grant a random Buff) is built around having room to hold
+  buffs. A replacement Power has to keep The Cult *about* buffs without raising the cap.
+  Candidate directions, none ruled: better buffs rather than more (upgrade a granted Buff's
+  tier), buffs that persist through capture, or a free re-roll of a Buff already on a piece.
+
+This is why the slice is blocked on **design**, not on code: `min(..., 2)` is one line, and
+the two replacement effects are the actual work.
+
+## Acceptance
+
+- The cap is 2 at the single choke point (`_apply_buff`), and no effect can raise it.
+- Abduction Probe has a **new effect**, implemented and re-texted in `data/artefacts.js` +
+  Notion; `tools/check-notion-drift.mjs` run and clean for that row.
+- The Cult has a **new Power**, implemented and re-texted in `armies.gd` + Notion.
+- A scenario board showing the cap refusing at 2, visibly (81's precedent: a grant arriving
+  at a full cap must *float a refusal*, not silently drop).
+- The existing issue-68 assertion that "Communion + Abduction Probe = cap 4" is **removed**,
+  not edited to a new number — the behaviour it pins is gone.
 - `run_all.sh` ALL GREEN, foreground, alone.
 
 ## Blocked by
 
-The ruling above. Nothing should be coded until it lands — option 1 and option 2 touch
-different files entirely.
+Two design decisions: **what Abduction Probe does now**, and **what The Cult's Power is now**.
+Both are the user's to make. The `min()` is trivial and should not ship before them, or the
+game briefly contains two effects that do nothing.

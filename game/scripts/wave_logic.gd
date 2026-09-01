@@ -43,6 +43,7 @@ static func queue(g, n: int) -> void:
 		# army as zapruder/bovine above, so it resets the same way here)
 	g.army_ability_used_this_wave = false # the Army Ability (67), same idiom
 	g.king_ability_used_this_wave = false # the King Ability (91), same idiom again
+	g.king_extra_actions = 0 # Total Mobilisation (93) ends with its wave
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
@@ -155,7 +156,10 @@ static func spawn_pending(g) -> void:
 			# than g._apply_buff — the latter is the PLAYER's grant choke point
 			# and fires on_buff_apply, which would run the player's Artefacts
 			# on an enemy spawn.
-			for _i in Tuning.KING_SEGMENT_BUFFS:
+			# Napoleon: La Grande Armee — reinforcements arrive better equipped.
+			var buffs: int = Tuning.KING_SEGMENT_BUFFS \
+				+ (1 if Kings.power_is(g, "grande") else 0)
+			for _i in buffs:
 				var pool: Array = Items.PIECE_BUFFS
 				var pick: Dictionary = pool[g.rng.randi() % pool.size()]
 				BuffLogic.add(g.board[spot], pick.key)

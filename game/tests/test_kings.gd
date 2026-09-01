@@ -172,8 +172,8 @@ func _init() -> void:
 	# --- issue 91: the Power/Ability engine ---------------------------------
 	# Trump is the only King whose kit is ruled; the other 15 no-op by design.
 	check(Kings.kit_of("donald_trump").has("power_name"), "Trump has a kit")
-	check(Kings.kit_of("genghis_khan").is_empty(),
-		"a King with no kit yet returns {} (Hat tier is unbuilt)")
+	check(Kings.kit_of("larry").is_empty(),
+		"an id with no kit returns {} — Larry is parked (ruling 9)")
 
 	# the Power comes on with the WAVE, and is live through segment 1 — before
 	# the King is on the board at all (ruling 6)
@@ -224,8 +224,8 @@ func _init() -> void:
 	t.king_ability_used_this_wave = false
 	for pos in t.board:
 		if t.board[pos].get("id", "") == "king":
-			t.board[pos].king_id = "genghis_khan"
-	check(not Kings.fire_ability(t), "a kitless King fires nothing")
+			t.board[pos].king_id = "larry"
+	check(not Kings.fire_ability(t), "a kitless id fires nothing")
 	check(not t.king_ability_used_this_wave, "and is charged no Action for it")
 	t.queue_free()
 	await process_frame
@@ -317,6 +317,121 @@ func _init() -> void:
 	check(x.artefacts.size() == 1,
 		"...but Artefacts do NOT — they are the run's identity, a different order of loss")
 	x.queue_free()
+	await process_frame
+
+	# --- issue 93: every King has a kit, and every kit is distinct -----------
+	var seen_power := {}
+	var seen_ability := {}
+	var kitted := 0
+	for tier in Kings.ROSTER:
+		for entry in Kings.ROSTER[tier]:
+			var kit: Dictionary = Kings.kit_of(entry.id)
+			check(not kit.is_empty(), "%s has a kit" % entry.name)
+			if kit.is_empty():
+				continue
+			kitted += 1
+			var pk: String = str(kit.get("power_key", kit.get("power_tariff", "")))
+			var ak: String = str(kit.get("ability_key", kit.get("ability_tariff", "")))
+			check(not seen_power.has(pk), "%s's Power is its own (%s)" % [entry.name, pk])
+			check(not seen_ability.has(ak), "%s's Ability is its own (%s)" % [entry.name, ak])
+			seen_power[pk] = true
+			seen_ability[ak] = true
+			check(kit.power_name != "" and kit.power_desc != "" \
+					and kit.ability_name != "" and kit.ability_desc != "",
+				"%s's kit is fully described for the player" % entry.name)
+	check(kitted == 16, "all 16 Kings are built (%d)" % kitted)
+
+	var y: Node2D = _boot({"board": [], "wave": 1})
+	await process_frame
+
+	# --- the hook-driven Powers ---
+	y.king_power_id = "tamerlane"
+	check(int(ArtefactHooks.run(y, "on_score_change", {"amount": 100.0, "base": 100.0}).amount) == 50,
+		"Scorched Earth halves Score gains")
+	y.king_power_id = "genghis_khan"
+	check(ArtefactHooks.run(y, "on_merge_check", {"a": "rook", "b": "rook"}).get("blocked", false),
+		"No Fixed Cities blocks merging")
+	y.king_power_id = "adolf_hitler"
+	var lost_ctx: Dictionary = ArtefactHooks.run(y, "on_piece_lost", {"gold_bonus": 0})
+	check(int(lost_ctx.get("gold_bonus", 0)) == -10,
+		"Total War charges Gold per loss, through ctx.gold_bonus not g.gold")
+
+	# Total Mobilisation must not SHADOW a Power on the same hook — it is
+	# applied outside the match for exactly this reason
+	y.king_power_id = "xerxes_i"
+	y.king_extra_actions = 2
+	var base_e: int = Tuning.enemy_actions_per_turn(y.next_tier)
+	check(Economy.enemy_actions(y) == base_e + 1 + 2,
+		"Total Mobilisation stacks WITH a Power on the same hook (%d)" % Economy.enemy_actions(y))
+	y.king_extra_actions = 0
+
+	# --- the branch Powers ---
+	for spec in [
+		{"id": "ivan_the_terrible", "key": "noitems"},
+		{"id": "kim_jong_un", "key": "juche"},
+		{"id": "joseph_stalin", "key": "purge"},
+		{"id": "mao_zedong", "key": "furnaces"},
+		{"id": "napoleon", "key": "grande"},
+		{"id": "hideki_tojo", "key": "kamikaze"},
+		{"id": "benjamin_netanyahu", "key": "dome"},
+		{"id": "vladimir_putin", "key": "annex"},
+	]:
+		y.king_power_id = spec.id
+		check(Kings.power_is(y, spec.key), "%s's Power reads as %s" % [Kings.name_of(spec.id), spec.key])
+		check(not Kings.power_is(y, "nonexistent"), "...and only as itself")
+
+	# Iron Dome: the King cannot fall while any escort stands
+	y.king_power_id = "benjamin_netanyahu"
+	y.board.clear()
+	y.board[Vector2i(3, 10)] = {"id": "king", "owner": Rules.ENEMY, "king_id": "benjamin_netanyahu"}
+	y.board[Vector2i(4, 10)] = {"id": "rook", "owner": Rules.ENEMY}
+	check(not y._king_down(), "Iron Dome: the King holds while an escort stands")
+	y.board.erase(Vector2i(4, 10))
+	check(y._king_down(), "...and falls once the escort is cleared")
+
+	# --- the Abilities, by consequence ---
+	y.board.clear()
+	y.board[Vector2i(3, 10)] = {"id": "king", "owner": Rules.ENEMY, "king_id": "genghis_khan"}
+	y.board[Vector2i(2, 2)] = {"id": "rook", "owner": Rules.PLAYER}
+	BuffLogic.add(y.board[Vector2i(2, 2)], "shield")
+	y.king_ability_used_this_wave = false
+	check(Kings.fire_ability(y), "The Silent Steppe fires")
+	check(BuffLogic.of(y.board[Vector2i(2, 2)]).is_empty(), "...and strips every Buff")
+
+	y.board[Vector2i(3, 10)].king_id = "tamerlane"
+	y.board[Vector2i(1, 1)] = {"id": "pawn", "owner": Rules.PLAYER}
+	y.board[Vector2i(5, 1)] = {"id": "pawn", "owner": Rules.PLAYER}
+	y.board[Vector2i(6, 1)] = {"id": "queen", "owner": Rules.PLAYER}
+	y.king_ability_used_this_wave = false
+	check(Kings.fire_ability(y), "The Pyramid of Skulls fires")
+	check(y.board.has(Vector2i(6, 1)), "...and takes the WEAKEST, leaving the best standing")
+
+	y.board[Vector2i(3, 10)].king_id = "ivan_the_terrible"
+	y.king_ability_used_this_wave = false
+	var mine_before: int = y._player_pieces().size()
+	check(Kings.fire_ability(y), "Kill the Tsarevich fires")
+	check(y._player_pieces().size() == mine_before - 1,
+		"...and turns a piece rather than destroying it — it still fights, just not for you")
+
+	y.board[Vector2i(3, 10)].king_id = "hideki_tojo"
+	y.king_ability_used_this_wave = false
+	y.clock_ms = 60000.0
+	check(Kings.fire_ability(y), "Total Attrition fires")
+	check(int(y.clock_ms) == 30000, "...and halves the Clock (%d)" % int(y.clock_ms))
+
+	y.board[Vector2i(3, 10)].king_id = "adolf_hitler"
+	y.king_ability_used_this_wave = false
+	y.king_extra_actions = 0
+	check(Kings.fire_ability(y), "Total Mobilisation fires")
+	check(y.king_extra_actions == 1, "...and persists for the rest of the wave")
+
+	y.board[Vector2i(3, 10)].king_id = "vladimir_putin"
+	y.king_ability_used_this_wave = false
+	var before_shuffle: int = y._player_pieces().size()
+	check(Kings.fire_ability(y), "Disinformation fires")
+	check(y._player_pieces().size() == before_shuffle,
+		"...and costs no material at all — it destroys the plan, not the army")
+	y.queue_free()
 	await process_frame
 	g.queue_free()
 	await process_frame

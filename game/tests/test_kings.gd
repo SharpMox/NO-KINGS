@@ -12,6 +12,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const GeneratedKings := preload("res://data/scenarios_kings.gd") # issue 82
 
 var fails := 0
 
@@ -433,6 +434,39 @@ func _init() -> void:
 		"...and costs no material at all — it destroys the plan, not the army")
 	y.queue_free()
 	await process_frame
+
+	# --- issue 82: the generated sandboxes actually arrive Power-live --------
+	# Asserts the observable consequence, never `king_power_id` itself: the
+	# field is exactly what the generator sets, so reading it back would pass
+	# even if nothing downstream honoured it. One per dispatch shape — a ctx
+	# value (place cost), a `blocked` gate (merge), and a branch read at its
+	# call site (deports_captures).
+	var sandboxes := {}
+	for s in GeneratedKings.all():
+		sandboxes[s.cfg.king_power_id] = s.cfg
+	check(sandboxes.size() == 16, "one sandbox per King")
+
+	var wall: Node2D = await _boot(sandboxes["qin_shi_huang"])
+	check(Economy.deploy_cost(wall) == Tuning.PLACEMENT_COST * 2,
+		"The Great Wall doubles deploy cost from the sandbox's first turn")
+	wall.queue_free()
+	await process_frame
+
+	var nomerge: Node2D = await _boot(sandboxes["genghis_khan"])
+	check(not Economy.merge_ok(nomerge, "pawn", "pawn"),
+		"No Fixed Cities blocks merging from the sandbox's first turn")
+	nomerge.queue_free()
+	await process_frame
+
+	var exile: Node2D = await _boot(sandboxes["nebuchadnezzar_ii"])
+	check(Kings.deports_captures(exile),
+		"The Babylonian Exile deports captures from the sandbox's first turn")
+	# and the Ability is reachable with no wave transition to unlock it
+	check(Kings.fire_ability(exile), "the sandbox's Ability fires on demand")
+	check(not Kings.fire_ability(exile), "...once per Wave, as everywhere else")
+	exile.queue_free()
+	await process_frame
+
 	g.queue_free()
 	await process_frame
 

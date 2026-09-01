@@ -80,6 +80,11 @@ Items marked **[+]** were added 2026-09-01 on top of the user's original list.
 6. **[+] Hold duplicates on purpose.** Stacking is **additive per held copy** and `run()`
    key-sorts so order never matters (`artefact_hooks.gd` header). Two copies of a percentage
    Artefact is a real, documented build — not a wasted slot.
+   **CAUTION — under review.** The user flagged this as *"suspicious, feels like a bug"* on
+   2026-09-01 (see FLAGS). It is deliberate and tested today, but if it is later bounded or
+   removed, a bot taught to lean on it would silently become a bot tuned for a rule that no
+   longer exists. **Instrument it, do not optimise into it** until the question is settled:
+   count duplicate holdings, and leave duplicate-seeking out of the buy heuristic for now.
 7. **[+] Buy Boxes as a distinct decision.** Boxes are their own Shop kind (9 typed, issue 47)
    priced by size — a gamble with a different expected value from buying the thing directly.
 8. **[+] Reroll economics.** Restocks are capped and deliberately not reroll-scummable

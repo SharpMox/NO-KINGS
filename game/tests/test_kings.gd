@@ -10,6 +10,8 @@ const GameScript := preload("res://scripts/game.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
+const Economy := preload("res://scripts/economy.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -170,7 +172,8 @@ func _init() -> void:
 	# --- issue 91: the Power/Ability engine ---------------------------------
 	# Trump is the only King whose kit is ruled; the other 15 no-op by design.
 	check(Kings.kit_of("donald_trump").has("power_name"), "Trump has a kit")
-	check(Kings.kit_of("nero").is_empty(), "a King with no kit yet returns {}")
+	check(Kings.kit_of("genghis_khan").is_empty(),
+		"a King with no kit yet returns {} (Hat tier is unbuilt)")
 
 	# the Power comes on with the WAVE, and is live through segment 1 — before
 	# the King is on the board at all (ruling 6)
@@ -221,10 +224,99 @@ func _init() -> void:
 	t.king_ability_used_this_wave = false
 	for pos in t.board:
 		if t.board[pos].get("id", "") == "king":
-			t.board[pos].king_id = "nero"
+			t.board[pos].king_id = "genghis_khan"
 	check(not Kings.fire_ability(t), "a kitless King fires nothing")
 	check(not t.king_ability_used_this_wave, "and is charged no Action for it")
 	t.queue_free()
+	await process_frame
+
+	# --- issue 92: the LAUREL tier, four Powers and four Abilities -----------
+	for spec in [
+		{"id": "nebuchadnezzar_ii", "power": "exile", "ability": "crumble"},
+		{"id": "xerxes_i", "power": "host", "ability": "whip"},
+		{"id": "qin_shi_huang", "power": "wall", "ability": "terracotta"},
+		{"id": "nero", "power": "burns", "ability": "fire"},
+	]:
+		var kit: Dictionary = Kings.kit_of(spec.id)
+		check(kit.get("power_key", "") == spec.power and kit.get("ability_key", "") == spec.ability,
+			"%s has its Power and Ability" % Kings.name_of(spec.id))
+		check(kit.power_desc != "" and kit.ability_desc != "",
+			"%s's kit is described for the player" % Kings.name_of(spec.id))
+
+	# Xerxes' Power composes with the TIER's enemy-action count rather than
+	# replacing it — the same property issue 59 required of Filibuster
+	var x: Node2D = _boot({"board": [], "wave": 1})
+	await process_frame
+	var base_actions: int = Economy.enemy_actions(x)
+	x.king_power_id = "xerxes_i"
+	check(Economy.enemy_actions(x) == base_actions + 1,
+		"The Countless Host: +1 enemy Action on top of the tier's own (%d -> %d)"
+			% [base_actions, Economy.enemy_actions(x)])
+	x.king_power_id = ""
+	check(Economy.enemy_actions(x) == base_actions, "and it stops when the Power ends")
+
+	# Nero halves Gold gains, and must respect gain_immune exactly as Inflation
+	# does — or Panama Papers Shredder silently stops working against Kings
+	# while still working against Tariffs
+	x.king_power_id = "nero"
+	var ctx_gold: Dictionary = ArtefactHooks.run(x, "on_gold_gain", {"amount": 100.0, "base": 100.0})
+	check(int(ctx_gold.amount) == 50, "Rome Burns: Gold gains halved (%d)" % int(ctx_gold.amount))
+	var ctx_imm: Dictionary = ArtefactHooks.run(x, "on_gold_gain",
+		{"amount": 100.0, "base": 100.0, "gain_immune": true})
+	check(int(ctx_imm.amount) == 100, "...and gain_immune is respected, as Inflation does")
+
+	# Qin Shi Huang doubles deploy cost — doubled, NOT blocked: blocking deploys
+	# outright can strand a player into the resource-starvation game over
+	x.king_power_id = "qin_shi_huang"
+	var ctx_cost: Dictionary = ArtefactHooks.run(x, "on_place_cost", {"cost": 30.0, "base": 30.0})
+	check(int(ctx_cost.cost) == 60, "The Great Wall: deploys cost double (%d)" % int(ctx_cost.cost))
+
+	# Nebuchadnezzar deports captures
+	x.king_power_id = "nebuchadnezzar_ii"
+	check(Kings.deports_captures(x), "The Babylonian Exile deports captures")
+	x.king_power_id = "nero"
+	check(not Kings.deports_captures(x), "and no other King does")
+
+	# --- the four Abilities ---
+	x.king_power_id = ""
+	x.board.clear()
+	x.board[Vector2i(3, 10)] = {"id": "king", "owner": Rules.ENEMY, "king_id": "nebuchadnezzar_ii"}
+	x.board[Vector2i(3, 3)] = {"id": "archbishop", "owner": Rules.PLAYER}
+	x.board[Vector2i(4, 3)] = {"id": "pawn", "owner": Rules.PLAYER}
+	x.king_ability_used_this_wave = false
+	check(Kings.fire_ability(x), "The Dream of the Statue fires")
+	check(x.board[Vector2i(3, 3)].id != "archbishop",
+		"...and the best piece crumbled to its base (%s)" % x.board[Vector2i(3, 3)].id)
+	check(x._player_pieces().size() == 2,
+		"crumble DEMOTES rather than destroys — it takes the investment, not the piece")
+
+	x.board[Vector2i(3, 10)].king_id = "xerxes_i"
+	x.king_ability_used_this_wave = false
+	var before_whip: int = x._player_pieces().size()
+	check(Kings.fire_ability(x), "Whip the Hellespont fires")
+	check(x._player_pieces().size() == before_whip,
+		"...and costs POSITION, not material — nobody can be starved out by it")
+
+	x.board[Vector2i(3, 10)].king_id = "qin_shi_huang"
+	x.king_ability_used_this_wave = false
+	x.pending_spawn.clear()
+	check(Kings.fire_ability(x), "The Terracotta Army fires")
+	check(x.pending_spawn.size() == 3, "...and marches in 3 (%d)" % x.pending_spawn.size())
+	var no_king := true
+	for e in x.pending_spawn:
+		if e.get("id", "") == "king":
+			no_king = false
+	check(no_king, "...never duplicating the King itself")
+
+	x.board[Vector2i(3, 10)].king_id = "nero"
+	x.king_ability_used_this_wave = false
+	x.items = [{"key": "blitz"}, {"key": "shield"}]
+	x.artefacts = [{"key": "jet-fuel-vial"}]
+	check(Kings.fire_ability(x), "The Fire of Rome fires")
+	check(x.items.is_empty(), "...and every held Item burns")
+	check(x.artefacts.size() == 1,
+		"...but Artefacts do NOT — they are the run's identity, a different order of loss")
+	x.queue_free()
 	await process_frame
 	g.queue_free()
 	await process_frame

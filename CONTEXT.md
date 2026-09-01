@@ -19,14 +19,19 @@ The wave-100 King wave. Checkmate awards a score bonus + clock refill and the ru
 Checkmating the wave-150 King. Ends the run immediately with a win-flavored end screen; the score is locked.
 
 **Army**:
-One of three preset 12-piece starting stocks chosen on the army-select screen before a run: **Crown** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (fairy walkers, signature ferz/wazir). Chain-base pieces only, totals balanced roughly equal (grilled 2026-07-03). Replaces the fixed `STARTING_STOCK`.
-_Avoid_: "team", "deck", "loadout"
+One of six preset starting kits chosen on the army-select screen before a run: **The Muster** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (fairy walkers, signature ferz/wazir), **The Syndicate**, **The Cult**, **The Horde**. An Army sets Starting Stock, Starting Gold and Starting Items, plus a static **Power** (always on) and a once-per-Wave **Ability** costing 1 Action — a deliberate contrast with Artefact activation and the Shop, both 0 (issues 67, 68). Called "Family" before issue 76.
+_Avoid_: "team", "deck", "loadout", "family"
+_Note_: ids stay the original keys (`Crown`/`Wild Hunt`/`Old Guard`) — load-bearing in the save's `army` field, so display name ≠ id.
+
+**Family**:
+A piece's promotion chain — base → mid → end, plus its fusion-only relatives. Reassigned to this meaning by issue 76, which simultaneously renamed the old "Family" (the starting kit) to **Army**. A piece that promotes into nothing and is promoted into by nothing has no Family.
+_Avoid_: using it for the starting kit — that is an Army.
 
 **Signature piece**:
 The piece (and its Family) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
 
 **Tariff**:
-A player penalty activated on every 10th wave per the Wave Catalog. Three kinds: **action** (money surcharge when the taxed action happens), **persistent** (rule modifier for the rest of the run, e.g. Inflation), **oneoff** (applies instantly on activation).
+A player penalty activated on every 10th wave per the Wave Catalog. Three kinds: **action** (Gold surcharge when the taxed action happens), **persistent** (rule modifier for the rest of the run, e.g. Inflation), **oneoff** (applies instantly on activation).
 _Avoid_: "debuff", "curse"
 
 **Tariff suppression**:
@@ -34,11 +39,23 @@ What Counter-Intel does (grilled 2026-07-17): action and persistent tariffs stop
 
 **Stock entry**:
 One element of the player's Stock: a bare piece id, or `{id + opaque piece state}` for a piece returned from the board carrying state (e.g. a future buff). Stock never interprets the state — see ADR-0002. Distinct-state copies stack separately in the HUD.
-_Avoid_: "inventory" (that's the items/trinkets drawer), "pool"
+_Avoid_: "inventory" (that's the Items/Artefacts drawer), "pool"
 
 **Destruction**:
-An item effect removing a piece from the board outright (Air Strike, Sniper, Drone Strike). Not a capture (grilled 2026-07-17): awards no score or money and fires no per-capture trinket effects; a destroyed ally is gone, not returned to Stock.
+An item effect removing a piece from the board outright (Air Strike, Sniper, Drone Strike). Not a capture (grilled 2026-07-17): awards no Score or Gold and fires no per-capture Artefact effects; a destroyed ally is gone, not returned to Stock.
 _Avoid_: conflating with "capture" — captures are board moves and feed the economy; destruction never does.
+
+**Artefact**:
+A held, persistent effect from the 180-entry catalog (`data/artefacts.js` → `game/data/artefacts.json`), listening at named hook points. Cap 5. Activation costs 0 Actions. Called "Trinket" in earlier revisions of this file and in the pre-rename GDD.
+_Avoid_: "trinket", "relic", "item" (an Item is a separate, consumable catalog).
+
+**Combo**:
+A **directed** relation between two effects (Artefact, Item, Piece Buff, Army Power or Army Ability): one side **fires or gates** a hook the other side **listens** on, so using X measurably changes what Y does. Not "two effects that touch the same resource" and not "two effects that share a hook" — 39 Artefacts listen on `on_wave_clear` and almost none of them interact (grilled 2026-09-01).
+_Avoid_: "synergy", "interaction" (too broad — those cover the undirected case this term deliberately excludes).
+
+**Anti-combo**:
+The inverse relation: X **suppresses** a hook Y listens on, so holding both makes Y silently do nothing. Shield stopping a capture attempt is the reference case — it denies `on_capture` to the 22 Artefacts listening there. Named separately because the failure is invisible by construction: nothing happens, and nothing reports that nothing happened.
+_Avoid_: "conflict", "negative synergy".
 
 ### Godot domain
 

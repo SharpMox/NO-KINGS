@@ -18,6 +18,29 @@
 
 const Tuning := preload("res://scripts/tuning.gd")
 
+## `power_fires` / `ability_fires` (issue 94) — the producer half of the hook
+## graph, in `ArtefactHooks.HOOKS`' vocabulary. See items.gd's header for the
+## relation; the same fields live on Items and Piece Buffs.
+##
+## EIGHT OF THE TWELVE ARE EMPTY, and that is the finding, not an omission.
+## Most Army effects MODIFY a value at a call site rather than causing a hook
+## to fire, so under issue 94's directed rule (`fires(X) ∩ listens(Y)`) they are
+## not producers and generate no boards:
+##
+##   Close Ranks / Blood in the Air / Loose the Hounds — gate `actions_left` at
+##     its own decrement site. No hook exists for spending an Action.
+##   Insider Rates — applied at shop.gd:189, AFTER the on_price dispatch at
+##     shop.gd:164. Every on_price listener sees the undiscounted price, so the
+##     Power reaches none of them.
+##   Communion — widens BuffLogic.cap(). Read, never dispatched.
+##   Endless Ranks — zeroes a pawn's deploy cost at _place, past on_place_cost.
+##   Call the Banners / Conscription — append to Stock, which fires nothing.
+##
+## The four that DO produce: Hold the Line calls Economy.earn_gold (on_gold_gain
+## then on_gold_change), Shield Wall and Ritual both reach _apply_buff
+## (on_buff_apply), and Hostile Takeover spends Gold (on_gold_zero, when the
+## purchase lands the player exactly on 0).
+
 const CATALOG := {
 	"Crown": {
 		"display_name": "The Muster",
@@ -25,8 +48,10 @@ const CATALOG := {
 		"starting_items": ["promote"],
 		"power_name": "Close Ranks",
 		"power_desc": "Merges cost no Action.",
+		"power_fires": [],
 		"ability_name": "Call the Banners",
 		"ability_desc": "Duplicate a target piece from your Stock into your Stock.",
+		"ability_fires": [],
 		"ability_targeted": true,
 	},
 	"Wild Hunt": {
@@ -35,8 +60,10 @@ const CATALOG := {
 		"starting_items": ["blitz", "blitz"],
 		"power_name": "Blood in the Air",
 		"power_desc": "Your first capture each Turn refunds its Action.",
+		"power_fires": [],
 		"ability_name": "Loose the Hounds",
 		"ability_desc": "This Turn, your pieces' moves cost no Actions. Captures still pay.",
+		"ability_fires": [],
 		"ability_targeted": false,
 	},
 	"Old Guard": {
@@ -45,8 +72,10 @@ const CATALOG := {
 		"starting_items": ["extraction"],
 		"power_name": "Hold the Line",
 		"power_desc": "When you lose a piece, refund its full value in Gold.",
+		"power_fires": ["on_gold_gain", "on_gold_change"],
 		"ability_name": "Shield Wall",
 		"ability_desc": "Every piece on your back two rows gains Shield.",
+		"ability_fires": ["on_buff_apply"],
 		"ability_targeted": false,
 	},
 	"Syndicate": {
@@ -55,8 +84,10 @@ const CATALOG := {
 		"starting_items": [],
 		"power_name": "Insider Rates",
 		"power_desc": "Shop buy prices -25%, sell payouts +25%.",
+		"power_fires": [],
 		"ability_name": "Hostile Takeover",
 		"ability_desc": "Pay 200% of a target enemy piece's value: it leaves the board and joins your Stock.",
+		"ability_fires": ["on_gold_zero"],
 		"ability_targeted": true,
 	},
 	"Cult": {
@@ -66,8 +97,10 @@ const CATALOG := {
 		"starting_artefact_count": 2, # issue 68: 2 random Artefacts at run start
 		"power_name": "Communion",
 		"power_desc": "Your Piece Buff cap is 3.",
+		"power_fires": [],
 		"ability_name": "Ritual",
 		"ability_desc": "Grant a target piece a random Buff.",
+		"ability_fires": ["on_buff_apply"],
 		"ability_targeted": true,
 	},
 	"Horde": {
@@ -76,8 +109,10 @@ const CATALOG := {
 		"starting_items": [],
 		"power_name": "Endless Ranks",
 		"power_desc": "Pawn deploys cost no Gold.",
+		"power_fires": [],
 		"ability_name": "Conscription",
 		"ability_desc": "Add 2 pawns to your Stock.",
+		"ability_fires": [],
 		"ability_targeted": false,
 	},
 }

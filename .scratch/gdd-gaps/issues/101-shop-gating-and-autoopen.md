@@ -1,6 +1,6 @@
 # 101 — Shop gated to wave 5+, and auto-opens on restock
 
-Status: todo (planned 2026-09-01) — the gating half contradicts a shipped GDD decision
+Status: todo — **RULED 2026-09-01: gate the PANEL, closed until the end of wave 5.**
 
 ## Parent
 
@@ -36,23 +36,35 @@ place a player can look things up mid-run — descriptions, prices, what exists.
 wave 5 removes the **catalog** as well as the **purchasing**, which is probably not the
 intent.
 
-The likely real goal — "no buying in the opening" — is achievable without closing the surface:
-keep the Shop readable from wave 1 and gate **`Shop.can_buy`** until wave 5. Same economic
-effect, keeps the reference function, and matches how the Shop already behaves outside your
-turn (readable catalog, dead Buy buttons — the pattern exists).
+**RULED (user, 2026-09-01): gate the panel.** The Shop is **closed until the end of wave 5**,
+then opens — and auto-opens at that moment. This deliberately reverses the "always openable"
+property, so the code comment at `game.gd:3487` must be **rewritten, not left contradicting
+the behaviour** (a stale comment asserting the opposite of the code is how the next reader
+gets misled).
 
-**Recommendation**: (a) as asked; for (b), gate buying rather than opening.
+Consequences to handle rather than discover:
+
+- **The Shop entry point must visibly not-exist before wave 5**, not merely refuse. A button
+  that opens nothing reads as a bug; either hide it or show the unlock wave on it.
+- **First open is end of wave 5, which is also the first Lane A restock** (`SHOP_RESTOCK_WAVES`
+  = 5). The gate and the first restock coincide by construction — good, but it means the
+  auto-open and the unlock are the *same event* the first time, and the code should not fire
+  two overlapping opens.
+- **Losing the catalog before wave 5** is the real cost of this ruling: the Shop is currently
+  where a player reads what Items and Artefacts do. Nothing else in the game surfaces those
+  descriptions. Worth deciding whether the pre-wave-5 opening needs a read-only reference
+  somewhere, or whether the first five waves are simply meant to be played blind.
 
 ## Acceptance
 
-- The Shop opens by itself on a Lane A restock wave, queued behind any modal already open,
-  and never under Juche.
-- Purchasing unavailable before wave 5 (or the panel closed entirely, if that is the ruling),
-  with a readable reason in the UI rather than a dead button with no explanation.
+- The Shop cannot be opened before the end of wave 5, and the entry point communicates that
+  rather than silently doing nothing.
+- It **auto-opens** at the end of wave 5 and on each Lane A restock wave, queued behind any
+  modal already open (never dropped), and never under Kim Jong Un's Juche.
+- `game.gd:3487`'s "always openable" comment is rewritten to match the new rule.
 - Scenario boards at wave 4 and wave 5 showing the boundary.
 - Click probes extended; `run_all.sh` ALL GREEN, foreground, alone.
 
 ## Blocked by
 
-A ruling on (b): gate **buying** (recommended) or gate **opening** (as literally asked, and a
-reversal of a GDD decision).
+Nothing.

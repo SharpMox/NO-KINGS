@@ -175,13 +175,6 @@ found. Collected here so they are not lost in Outcome sections:
   question is whether a 50-vs-8 spread across five rungs is the *distribution* wanted, or
   whether the middle rungs need to carry more of it. Measurement, not a verdict — the user has
   parked tuning until every lever is coded, and Kings are the last one.
-- **One-off probe sighting, undiagnosed (2026-08-30):** during slice 66's first full run,
-  `game-clicks` failed once on *"a drop inside the open drawer places nothing (misinput
-  guard)"* — unrelated to the rename, no other Godot process running, passed clean on two
-  re-runs. One sighting proves nothing (see the interleaving lesson), so this is a trail
-  marker, not a finding: if it appears again, that is twice, and it earns a proper
-  interleaved investigation.
-
 - ~~**Holy Lint's pinned-seed assertion names a specific granted buff**~~ — fixed 2026-08-31.
   It churned **twice** (`stun` -> `reflect` when issue 47 moved the RNG stream by rolling Box
   contents at boot; `reflect` -> `shield` when issue 48 added a 13th Piece Buff and changed

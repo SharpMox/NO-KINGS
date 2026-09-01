@@ -62,6 +62,8 @@ several counters will be flat zero, which is the point.
 
 ## Phase 2 — the major strats, by expected leverage
 
+Items marked **[+]** were added 2026-09-01 on top of the user's original list.
+
 **Tier 1 — economic (the whole missing axis)**
 
 1. **Buy from the Shop.** Pieces when Stock is thin, Items/Artefacts when affordable. This
@@ -71,34 +73,75 @@ several counters will be flat zero, which is the point.
 3. **Convert Captured -> Stock** when deployables run low. It costs Gold (`_convert_captured`)
    and turns dead material into placeable material.
 4. **Time purchases around restocks** — Lane A every 5 waves, Lane B on banked Score.
+5. **[+] Sell to make ROOM before a grant lands.** A grant arriving at a full cap is
+   **silently dropped** — FLAGS records exactly this for Fort Knox IOU at the 3-Item cap.
+   Selling ahead of a wave-clear grant converts a dropped reward into a kept one. Pure profit
+   and completely invisible to a bot that never sells.
+6. **[+] Hold duplicates on purpose.** Stacking is **additive per held copy** and `run()`
+   key-sorts so order never matters (`artefact_hooks.gd` header). Two copies of a percentage
+   Artefact is a real, documented build — not a wasted slot.
+7. **[+] Buy Boxes as a distinct decision.** Boxes are their own Shop kind (9 typed, issue 47)
+   priced by size — a gamble with a different expected value from buying the thing directly.
+8. **[+] Reroll economics.** Restocks are capped and deliberately not reroll-scummable
+   (`shop_restocks`). Knowing when to reroll versus buy the visible option is a real choice.
 
 **Tier 2 — tempo and Actions**
 
-5. **Early-clear bonus** — clear inside the cadence for the Score bonus.
-6. **Artefact activation is 0 Actions** — press it whenever it does anything; never a coin flip.
-7. **Army Ability (1 Action)** — fire when it returns more than one Action of value, not on a
-   15% roll.
-8. **Free-action effects** — Blitz, Close Ranks, Blood in the Air; sequence to bank Actions.
+9. **Early-clear bonus** — clear inside the cadence for the Score bonus.
+10. **[+] Clear within the *specific* turn count, not just "early".** The big early-clear
+    Artefacts are threshold effects: Naruto Run Manual needs `turns_since_wave <= 3`, Moon
+    Landing Slate `<= 2` (a x10 Score payout). "Fast" is not the strategy; **3 turns** is.
+11. **Artefact activation is 0 Actions** — press it whenever it does anything; never a coin flip.
+12. **Army Ability (1 Action)** — fire when it returns more than one Action of value, not on a
+    15% roll.
+13. **Free-action effects** — Blitz, Close Ranks, Blood in the Air; sequence to bank Actions.
+14. **[+] The Clock is a resource, and several Artefacts are clock-CONDITIONAL.** Daylight
+    Savings Jar pays above 90s and *penalises* below 30s; The Red Phone doubles Score below
+    30s; Bermuda Triangulation pays below 60s. So spending or preserving Clock deliberately
+    changes payouts — a player holding The Red Phone wants to be in the danger band, which is
+    the opposite of playing safe.
 
 **Tier 3 — material and board**
 
-9. **Bait with cheap deploys** — a pawn placed to be taken, pulling an enemy off its line.
-10. **Trap/Bomb bait** — put Trap or Bomb on the cheap piece you *want* captured.
-11. **Trade discipline** — take captures that gain material; refuse the ones that lose it.
-12. **Merge to climb the chain** (and, once 98 lands, weigh its Gold cost).
+15. **Bait with cheap deploys** — a pawn placed to be taken, pulling an enemy off its line.
+16. **Trap/Bomb bait** — put Trap or Bomb on the cheap piece you *want* captured.
+17. **Trade discipline** — take captures that gain material; refuse the ones that lose it.
+18. **Merge to climb the chain** (and, once 98 lands, weigh its Gold cost).
+19. **[+] Use Demote and Inversion on ENEMIES.** Demote's own text is "ally **or enemy**" —
+    demoting an enemy end-tier piece to its chain base is a large tempo swing, and Inversion
+    neuters an enemy's movement pattern. The bot only ever targets randomly, so hostile use of
+    "buff-shaped" items is entirely unexplored.
+20. **[+] Extraction as damage control.** Pulling pieces off the board before a losing wave
+    returns them to Stock intact — no `on_piece_lost`, no material lost. A retreat option the
+    bot has never once used.
+21. **[+] Defend the back row.** The one Tier-5 loss that was *not* resource starvation was a
+    back-row breach at wave 11, so this is a measured failure mode, not a theory.
+22. **[+] Merge Captured entries instead of converting them.** Captured pieces can merge but
+    never deploy (issue 60). Merging is the **free** way to use them; conversion costs Gold.
+    Two routes to the same material at very different prices.
 
 **Tier 4 — buff and item combos**
 
-13. **Shield** the piece about to be attacked; **Critical** before a high-value capture.
-14. **Multicapture** when two enemies are adjacent; **Aura** before a big capture turn.
-15. **Destruction items** on the highest-value threat, or to break a stalled line.
-16. **Taunt** to choose what the enemy attacks; **Reflect** on what it wants most.
+23. **Shield** the piece about to be attacked; **Critical** before a high-value capture.
+24. **Multicapture** when two enemies are adjacent; **Aura** before a big capture turn.
+25. **Destruction items** on the highest-value threat, or to break a stalled line.
+26. **Taunt** to choose what the enemy attacks; **Reflect** on what it wants most.
+27. **[+] Put the Buff on the right carrier.** Buffs ride the piece (ADR-0002) and travel with
+    it through Stock. Shield on the piece actually under threat, Critical on the one that will
+    swing next — placement is the decision, and with the cap at 2 (issue 99) it is a scarce one.
 
-**Tier 5 — King waves**
+**Tier 5 — King waves and Tariffs**
 
-17. **Bank burst** — hold destruction items and the Ability for the King wave.
-18. **Play around the live Power** — do not plan merges against Genghis, do not bank on the
+28. **Bank burst** — hold destruction items and the Ability for the King wave.
+29. **Play around the live Power** — do not plan merges against Genghis, do not bank on the
     Shop against Kim Jong Un, expect the extra enemy Action against Xerxes.
+30. **[+] Segment 1 is a preparation phase.** A King wave is **two segments** (issue 90):
+    `KING_SEGMENT_TURNS` of buffed enemies with **no King on the board**, and the King's Power
+    is **already live** through it. That is a known-length window to set up in, with the
+    Power's constraint already applying — quite different from fighting the King itself.
+31. **[+] Play around active Tariffs.** Persistent Tariffs are rule modifiers for the rest of
+    the run, and Counter-Intel suppresses every held one for the wave. Timing that suppression
+    against the wave where the Tariffs hurt most is a decision nothing currently makes.
 
 ## Phase 3 — scale
 

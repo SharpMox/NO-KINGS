@@ -16,7 +16,9 @@ const Armies := preload("res://scripts/armies.gd")
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 const INV_H_BASE := DRAWER_H * 2 + 70.0 # pre-issue-52 height: items + artefacts
 	# only — unreachable since issue 67, kept so nothing breaks reading it
-const INV_H_ACTIVATE := DRAWER_H * 3 + 70.0 # +1 row while the Activate
+const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0 # +1 row while the Activate
+	# strip is up, +48 more for issue 100's Army Power line (two wrapped rows
+	# at 13px on a 480-wide portrait screen)
 	# section has content (issue 52). Issue 67: the Army Ability chip is
 	# now unconditionally in that section (every run holds a Army), so this
 	# is the drawer's permanent height going forward, not a conditional one
@@ -60,6 +62,13 @@ var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips
+## issue 100: the Army POWER, written out in the drawer. It was previously
+## readable in exactly two places — the tooltip of the Ability chip, and the
+## army-select screen before the run — and this is a portrait TOUCH game, so
+## once a run starts a hover tooltip is unreachable. Several Powers change what
+## is LEGAL (Close Ranks makes merges free, Endless Ranks makes pawn deploys
+## free), so a player who has forgotten theirs is misreading their own rules.
+var army_power_label := Label.new()
 	# for activatable Artefacts; issue 67 added the Army Ability chip here
 	# too (always present, unlike the Artefact ones — every run holds one)
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
@@ -248,8 +257,13 @@ func build(game) -> void:
 	# Activate section between them, shown/sized only while it has content.
 	artefact_box.add_theme_constant_override("separation", 16)
 	activate_box.add_theme_constant_override("separation", 8)
+	army_power_label.add_theme_font_size_override("font_size", 13)
+	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0, 0)
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
+	inv_box.add_child(army_power_label) # issue 100: above the strips — it is
+		# the standing rule the rest of the drawer operates under
 	inv_box.add_child(item_box)
 	inv_box.add_child(activate_box)
 	inv_box.add_child(artefact_box)
@@ -336,6 +350,14 @@ func refresh() -> void:
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
+	# issue 100: the Power is always on, so it is stated, not offered. The
+	# Ability's 1-Action cost rides along here too — that cost is the
+	# deliberate contrast with Artefact activation and the Shop (both 0), and
+	# it was also tooltip-only until now.
+	var kit: Dictionary = Armies.entry(g.next_army)
+	army_power_label.text = "%s — %s: %s   ·   ★%s (1 Action): %s" % [
+		Armies.display_name(g.next_army), kit.power_name, kit.power_desc,
+		kit.ability_name, kit.ability_desc]
 	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
 	# issue 52 grew the drawer only when the Activate row had content; issue

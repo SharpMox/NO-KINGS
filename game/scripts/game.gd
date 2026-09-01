@@ -3577,7 +3577,7 @@ func _sell(kind: String, entry: Variant) -> bool:
 func _convert_captured(entry: Variant) -> bool:
 	if not Shop.can_convert(self, entry):
 		return false
-	var cost := Shop.sell_price(self, "captured", entry)
+	var cost := Shop.convert_price(self, entry) # issue 97: its own rate now
 	captured.erase(entry)
 	stock.append(entry) # ADR-0002: captured and stock share the same
 		# bare-id-or-stateful-Dictionary shape, so the entry moves across as-is

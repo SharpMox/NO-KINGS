@@ -331,15 +331,18 @@ func _init() -> void:
 		"Insider Rates: Shop buy price is the pawn's value x0.75")
 	check(Shop.sell_payout(rates, "piece", "pawn") == floori(syn_pawn_value * Tuning.SELL_RATE * 1.25),
 		"Insider Rates: an actual sell payout is 50% x1.25 = 62.5% of value, floored")
-	var flat_conversion := floori(syn_pawn_value * Tuning.SELL_RATE)
-	check(Shop.sell_price(rates, "captured", "pawn") == flat_conversion,
-		"REQUIRED ASSERTION: the Captured -> Stock conversion rate stays the flat 50% under " +
+	# issue 97 split conversion onto its own CONVERT_RATE, so the number moved —
+	# but the PROPERTY this pins is unchanged and is the one that matters:
+	# Insider Rates must not discount a conversion, whatever the rate is.
+	var flat_conversion := floori(syn_pawn_value * Tuning.CONVERT_RATE)
+	check(Shop.convert_price(rates, "pawn") == flat_conversion,
+		"REQUIRED ASSERTION: the Captured -> Stock conversion rate is UNDISCOUNTED under " +
 		"Insider Rates — it is not a Shop purchase, and discounting it would reopen the " +
-		"convert/sell arbitrage that equal rates deliberately closed")
+		"convert/sell arbitrage that the rate split deliberately keeps closed")
 	var conv_gold_before: int = rates.gold
 	check(rates._convert_captured("pawn"), "(setup) converting the captured pawn succeeds")
 	check(rates.gold == conv_gold_before - flat_conversion,
-		"the ACTUAL Gold spent converting matches the unmodified 50% rate, not the discounted 62.5%")
+		"the ACTUAL Gold spent converting matches the undiscounted CONVERT_RATE")
 	rates.queue_free()
 	await process_frame
 

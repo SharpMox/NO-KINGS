@@ -497,9 +497,10 @@ func _init() -> void:
 	cv.state = cv.State.PLAYER_TURN
 	cv.actions_left = 0 # issue 64: proven at ZERO actions left — conversion never needs one
 	cv.captured.append("pawn")
-	var convert_cost := Shop.sell_price(cv, "captured", "pawn")
-	check(convert_cost == floori(cv.defs.pawn.value * Tuning.SELL_RATE),
-		"Captured -> Stock conversion costs the same rate as selling")
+	var convert_cost := Shop.convert_price(cv, "pawn")
+	check(convert_cost == floori(cv.defs.pawn.value * Tuning.CONVERT_RATE),
+		"Captured -> Stock conversion charges CONVERT_RATE (issue 97: its own
+		rate now, no longer shared with selling)".replace("\n\t\t", " "))
 	var gold_before_convert: int = cv.gold
 	check(cv._convert_captured("pawn"), "conversion succeeds with enough Gold and zero actions left")
 	check(cv.captured.is_empty() and cv.stock == ["pawn"],
@@ -518,8 +519,13 @@ func _init() -> void:
 	cv.queue_free()
 	await process_frame
 
-	# --- issue 60: convert-then-sell is a wash — the piece is simply gone,
-	# not free money and not a strict loss beyond that.
+	# --- issue 60 + 97: convert-then-sell must LOSE money. It used to be an
+	# exact wash, because conversion and selling shared SELL_RATE. Issue 97
+	# split them (CONVERT_RATE > SELL_RATE, user ruling "make it cost more"),
+	# so the loop is now strictly lossy — which is the SAFE direction and a
+	# stronger guarantee than the wash it replaces. The direction is the
+	# invariant worth pinning here, not the exact number: assert the loop can
+	# never PAY, whatever the two constants are set to.
 	var wash := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 1000})
 	await process_frame
@@ -529,7 +535,11 @@ func _init() -> void:
 	var wash_gold_before: int = wash.gold
 	wash._convert_captured("pawn")
 	wash._sell("piece", "pawn")
-	check(wash.gold == wash_gold_before, "convert (-50%) then sell (+50%) nets exactly zero, piece gone")
+	check(wash.gold < wash_gold_before,
+		"convert-then-sell LOSES money (%d -> %d), so it can never be a pump"
+			% [wash_gold_before, wash.gold])
+	check(wash.captured.is_empty() and not wash.stock.has("pawn"),
+		"...and the piece is gone either way")
 	wash.queue_free()
 	await process_frame
 
@@ -557,6 +567,25 @@ func _init() -> void:
 	check(ui.captured.size() == ui_captured_before - 1 and ui.stock.has("pawn"),
 		"shop_convert_pressed converts through the same wiring")
 	ui.queue_free()
+	await process_frame
+
+	# --- issue 97: conversion has its OWN rate, and it costs MORE than selling
+	# pays. The DIRECTION is the safety property, not the value: convert below
+	# sell is the money pump issue 68 closed by keeping the two rates equal.
+	check(Tuning.CONVERT_RATE >= Tuning.SELL_RATE,
+		"converting never costs less than selling pays (no convert/sell pump)")
+	var conv: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500, "captured": ["rook"]})
+	var conv_pay: int = Shop.sell_payout(conv, "captured", "rook")
+	var conv_cost: int = Shop.convert_price(conv, "rook")
+	check(conv_cost > conv_pay, "converting a rook costs %d, selling it pays %d" % [conv_cost, conv_pay])
+	var conv_gold_before: int = conv.gold
+	check(conv._convert_captured("rook"), "the conversion goes through")
+	check(conv.gold == conv_gold_before - conv_cost,
+		"and debits the CONVERT price, not the sell price")
+	check(conv.stock.has("rook") and not conv.captured.has("rook"),
+		"the piece moves Captured -> Stock")
+	conv.queue_free()
 	await process_frame
 
 	print("---")

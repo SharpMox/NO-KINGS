@@ -242,3 +242,74 @@ So in **every balance run this project has ever measured**:
 This is not a balance question, it is a fidelity bug in the measurement instrument, and it is
 exactly the class of thing this slice exists to surface. The fix is to route the bot through
 `_consume_item` like the UI does, and to stop discarding items it cannot immediately target.
+
+### A third harness bug, found by the improved bot
+
+The first post-change batch showed **19 of 51 runs producing no telemetry at all**. Cause: a
+run that outlives `autoplay_cap` exits through `AUTOPLAY CAP` and never reaches `_game_over`,
+so it never emitted a row.
+
+That was harmless while the bot was weak — the baseline's 90 runs all died before the cap, so
+**0** rows were lost. It became severe the moment the bot got stronger: the runs being dropped
+were the ones that had survived longest, so the batch was **biased against the bot's best
+play** — the exact opposite of what the harness is for, and invisible unless you compare the
+row count to the run count.
+
+Fixed twice over: a capped run now emits its row as its own result (`CAP` — never a `LOSS`,
+which would file the strongest runs as failures), and batch runs get `--steps 8000` so the cap
+stops deciding when runs end. `playtest.sh` also prints `NO ROW` per dropped run, so a future
+silent drop is loud.
+
+**The baseline is unaffected and the comparison stays fair**: it lost 0 rows, so no baseline
+run ever reached its cap and raising it would not have changed a single one.
+
+## Phase 2 outcome — the bot got an economy, and the balance table moved
+
+`try_shop` (buys through `Shop.buy`, the same function the panel calls — boxes skipped,
+because their grant is the roll modal) and `try_convert` (Captured -> Stock when Stock is
+empty), plus the two item-path fixes above.
+
+**90 runs before, 90 after, same seeds, tiers and armies, both serial on an idle machine.**
+
+| | baseline | after |
+| --- | --- | --- |
+| wins | **5** | **55** (+3 unresolved at the cap) |
+| FULL CLEARs | 0 | **15** |
+| resource-starvation deaths | 83 / 90 | 27 / 90 |
+| median Gold unspent at death, starved runs | 1640 | **0** |
+| runs that ever bought anything | **0%** | 100% (median 250 purchases) |
+| runs that ever converted Captured Stock | **0%** | 100% (median 148) |
+| runs that ever used an Item | 16.7% | 95.6% |
+
+| tier | wins before | wins after | median wave before | after |
+| --- | --- | --- | --- | --- |
+| Tier 1 | 0 | 15 | 37.0 | 77.5 |
+| Tier 2 | 0 | 15 | 37.0 | 77.5 |
+| Tier 3 | 3 | 13 (+2 cap) | 36.0 | 98.5 |
+| Tier 4 | 1 | 13 (+1 cap) | 21.0 | 120.5 |
+| **Tier 5** | **0** | **0** | **8.0** | **9.5** |
+
+### The headline for the balance pass
+
+**Tier 5 barely moved: 8.0 -> 9.5 median wave, still 0 wins in 18.** Every other tier
+transformed. So Tier 5's difficulty is REAL, and the rest of the ladder's apparent difficulty
+was mostly the bot refusing to use its economy. The FLAGS table ("Tier 1 wins 4/6, Tier 5
+0/24 at median wave 7.5") was measuring the instrument.
+
+### Two anomalies the balance pass should look at, not conclusions
+
+- **Tier 1 and Tier 2 are byte-identical** in both batches (77.5 / 194970 after; 37.0 / 50000
+  before). Not a coincidence and not a bug: Tier 2's ONLY lever is `clock_never_pauses` —
+  "the Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)" — and the bot
+  never opens a menu, panel, drawer or preview. **Tier 2 is unmeasurable by autoplay by
+  construction**, so no autoplay result can say anything about it. Note also that no run in
+  either batch ended on the Clock at all.
+- **Tier 4 now runs DEEPER than Tier 1** (median wave 120.5 vs 77.5), which inverts the
+  ladder. 18 runs per tier is a small sample and this is recorded as an observation, not a
+  diagnosis.
+
+### Still not done — `sell` is 0%
+
+Selling remains unimplemented, so cap-aware substitution (leverage 2 and 5) is untested. It
+is the obvious next increment, and it matters most exactly where the bot is now failing: at
+the caps, where a grant that arrives with no room is silently dropped.

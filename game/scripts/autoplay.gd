@@ -93,6 +93,20 @@ static func use_item(g) -> bool:
 		var targets: Array[Vector2i] = g._item_stage_targets(it, a)
 		if targets.is_empty():
 			continue # keep it: unusable THIS turn is not unusable forever
+		if it.key == "buff_box":
+			# Buff Box is the one Item whose effect needs state the direct
+			# _item_apply path below never sets: _item_click assigns
+			# `_buff_pick = pending_buff`, and pending_buff is only filled by
+			# the buff-pick step inside _use_item. Applying it directly grants
+			# a buff with an EMPTY key — a meaningless entry occupying one of
+			# the two cap slots. So this one goes through the real UI path,
+			# which autoplay can drive because _open_buff_pick has its own
+			# bot bypass (game.gd: "take one so the flow is exercised").
+			g._use_item(index)
+			if g.item_active < 0 or g.item_targets.is_empty():
+				continue
+			g._item_click(g.item_targets[g.rng.randi() % g.item_targets.size()])
+			return true
 		if it.target == "multi": # pick one random piece and confirm
 			g._use_item(index)
 			g.item_selected.append(targets[g.rng.randi() % targets.size()])

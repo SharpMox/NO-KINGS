@@ -127,6 +127,9 @@ var king_power_tariff := ""
 ## issue 92: the King whose Power is in force, or "". Distinct from the board
 ## King: the Power is live through segment 1, before the King has arrived.
 var king_power_id := ""
+## issue 93: Total Mobilisation adds an enemy Action for the REST of the wave,
+## so it compounds with the turns still to come rather than being a one-off.
+var king_extra_actions := 0
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
@@ -912,6 +915,14 @@ func _enemy_turn() -> void:
 	_artefact_targeting_reset() # Bovine Tractor Beam (52): never carries into the enemy turn
 	_army_board_targeting_reset() # issue 68: Hostile Takeover/Ritual, same reasoning
 	_refresh()
+	# Vladimir Putin: Annexation. Deliberately resolved at the END of the
+	# player's turn and only in the enemy half, so it is a rule the player can
+	# see and play around rather than an unavoidable drip.
+	if Kings.power_is(self, "annex"):
+		for pos in _player_pieces():
+			if pos.y >= Tuning.BOARD_H / 2:
+				board[pos].owner = Rules.ENEMY
+				_add_turn_fx("Annexed", Color(1.0, 0.5, 0.4))
 	turns_since_wave += 1
 	WaveLogic.release_king_if_due(self) # issue 90: segment 1 -> segment 2
 	# `pending_king.is_empty()` is load-bearing, not defensive. Through segment
@@ -1582,6 +1593,15 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 ## guards `cap`/`placing_cap`/`pool_drag_cap` before reaching here, so this
 ## dropped its own `cap` param rather than carry a dead branch.
 func _place(entry: Variant, tile: Vector2i) -> void:
+	# Mao Zedong: Backyard Furnaces — what you deploy arrives worthless.
+	if Kings.power_is(self, "furnaces"):
+		var pid: String = entry.id if entry is Dictionary else str(entry)
+		var base := Kings._base_of(self, pid)
+		if base != pid:
+			if entry is Dictionary:
+				entry.id = base
+			else:
+				entry = base
 	var id: String = entry if entry is String else entry.id
 	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
 	stock.erase(entry)
@@ -1761,6 +1781,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			else:
 				actions_left -= 1
 			_log_action("capture")
+			_kamikaze_after_capture(to)
 			if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 				return _on_pass()
 			return _refresh()
@@ -1856,6 +1877,13 @@ func _is_long_range(id: String) -> bool:
 
 
 func _king_down(defeated_id := "") -> bool:
+	# Benjamin Netanyahu: Iron Dome. Changes the SHAPE of the fight rather than
+	# its numbers — clear the escort before the King can be taken at all.
+	if Kings.power_is(self, "dome"):
+		for pos in board:
+			if board[pos].owner == Rules.ENEMY and board[pos].get("id", "") != "king":
+				_add_turn_fx("Iron Dome holds", Color(0.6, 0.8, 1.0))
+				return false
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
 	Economy.earn(self, Tuning.WIN_SCORE_BONUS)
@@ -1959,6 +1987,9 @@ func _reinforce_ids() -> Array:
 
 
 func _use_item(index: int) -> void:
+	if Kings.power_is(self, "noitems"): # Ivan the Terrible: The Oprichnina
+		_add_turn_fx("The Oprichnina: no Items", Color(1.0, 0.5, 0.4))
+		return
 	if state != State.PLAYER_TURN or box_open:
 		return
 	if item_active == index: # tap again to cancel targeting
@@ -2285,6 +2316,20 @@ func _detonate(at: Vector2i) -> void:
 ## and Gold value" is a DELIBERATE exception to "Destruction pays nothing"
 ## above, scoped exactly to the GDD text: Bomb's _detonate and the jd_vance
 ## Tariff are not Items, so they stay unpaid, same as ever.
+## Hideki Tojo: Kamikaze — a capture costs the capturing piece its neighbour.
+## Taxes the ACT of capturing, which no other King does: every other Power taxes
+## a resource, this one taxes the move the whole game is built on.
+func _kamikaze_after_capture(at: Vector2i) -> void:
+	if not Kings.power_is(self, "kamikaze"):
+		return
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var n: Vector2i = at + d
+		if board.has(n) and board[n].owner == Rules.PLAYER:
+			_add_float(n, "Kamikaze!", COL_CAPTURE)
+			_destroy(n)
+			return
+
+
 func _destroy(pos: Vector2i, by_item: bool = false) -> void:
 	if board[pos].owner == Rules.PLAYER:
 		if _lose_player_piece(pos, "destroyed").cancel:
@@ -2417,6 +2462,9 @@ func _consume_item(index: int, it: Dictionary) -> void:
 ## holds (still no crash, still no partial state).
 func _apply_buff(piece: Dictionary, key: String, turns: int,
 		pos := Vector2i(-1, -1), fire_hook := true) -> void:
+	if Kings.power_is(self, "purge"): # Stalin: The Purge — no Buffs are gained
+		_add_turn_fx("The Purge", Color(1.0, 0.5, 0.4))
+		return
 	var buff_cap := BuffLogic.cap(_artefact_count("abduction-probe")
 			+ (1 if Armies.communion(self) else 0)) # issue 68: Communion
 		# (The Cult) sums into the SAME cap() call, additive with Abduction
@@ -3441,6 +3489,9 @@ func _connect_modals() -> void:
 ## player can reach at will. Buying is still turn-gated (Shop.can_buy), so
 ## outside your turn it is a readable catalog with dead Buy buttons.
 func _open_shop() -> void:
+	if Kings.power_is(self, "juche"): # Kim Jong Un: Juche — the Shop is closed
+		_add_turn_fx("Juche: the Shop is closed", Color(1.0, 0.5, 0.4))
+		return
 	if box_open or buff_pick_open or preview_open or win_open: # one modal at a time
 		return
 	modals.show_shop() # issue 61: no per-visit resets here — the panel can be

@@ -1,6 +1,6 @@
 # 82 — A sandbox per King (16)
 
-Status: blocked — waiting on the Kings design session
+Status: todo — UNBLOCKED 2026-09-01 (all 16 kits shipped in slice 93)
 
 ## Parent
 

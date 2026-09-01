@@ -24,6 +24,9 @@ const GeneratedPieces := preload("res://data/scenarios_pieces.gd")
 ## issue 82: likewise one per King, derived from Kings.ROSTER.
 const GeneratedKings := preload("res://data/scenarios_kings.gd")
 
+## issue 94: the Combo boards, derived from the fires/listens hook graph.
+const GeneratedCombos := preload("res://data/scenarios_combos.gd")
+
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
@@ -32,7 +35,7 @@ static func _chain(title: String, base: String, mid: String) -> Dictionary:
 
 static func all() -> Array:
 	return _hand_written() + Generated.all() + GeneratedPieces.all() \
-		+ GeneratedKings.all()
+		+ GeneratedKings.all() + GeneratedCombos.all()
 
 
 static func _hand_written() -> Array:

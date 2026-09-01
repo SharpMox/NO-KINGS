@@ -10,39 +10,77 @@
 ##   if omitted — the Actions it costs to USE the item itself; separate from
 ##   whatever effect it grants on its target):
 ##   "" (instant) · "tile" (pick one tile) · "pair" (pick a piece, then a destination)
+##
+## `fires` / `suppresses` (issue 94) — the PRODUCER half of the hook graph.
+## `ArtefactHooks.REGISTRY` records what each Artefact LISTENS to; these record
+## what an Item or Piece Buff CAUSES, in the same 34-name vocabulary, so
+## "using this reaches that Artefact" is answerable instead of remembered.
+##
+##   fires      — hooks this effect makes fire. Every Item carries
+##                on_item_consume (game.gd's _consume_item is the single choke
+##                point every Item leaves through) plus whatever its own effect
+##                reaches: Air Strike's _destroy, Promote's on_rank_up.
+##   suppresses — hooks this effect DENIES to everything listening on them.
+##                Shield repels the capture attempt before the capture branch
+##                is reached, so the 22 on_capture Artefacts see nothing.
+##
+## Every entry was traced to a real ArtefactHooks.run() call site, not inferred
+## from the description text. NOTE (FLAGS): `suppresses` has no consumer yet and
+## no test asserts it — a wrong entry there is invisible by construction, which
+## is exactly what the relation describes.
+##
+## Two hooks can never appear here: `on_box_open` and `on_shop_restock` are
+## declared in HOOKS but fired nowhere in game/scripts, and nothing listens on
+## them either. Dead vocabulary, found while deriving this.
 
 const ITEMS: Array = [
 	{"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile", "action_cost": 0,
+		"fires": ["on_item_consume"],
 		"description": "Target Piece: its next move or capture this Turn costs no action."},
 	{"key": "asset_recovery", "name": "Asset Recovery", "tier": "Tactical", "target": "tile",
+		"fires": ["on_item_consume"],
 		"description": "Duplicate a piece on the board to your Stock."},
 	{"key": "demote", "name": "Demote", "tier": "Tactical", "target": "tile",
+		"fires": ["on_item_consume", "on_demote", "on_piece_demoted"],
 		"description": "Convert a target piece (ally or enemy) to its base chain piece. No effect if it has none."},
 	{"key": "promote", "name": "Promote", "tier": "Tactical", "target": "tile",
+		"fires": ["on_item_consume", "on_rank_up"],
 		"description": "Advance a target ally piece to its next tier. No effect if it has none."},
 	{"key": "invert", "name": "Inversion", "tier": "Tactical", "target": "tile",
+		"fires": ["on_item_consume"],
 		"description": "Invert a target piece's move/capture pattern (only pieces with a defined inverse)."},
 	{"key": "extraction", "name": "Extraction", "tier": "Tactical", "target": "multi",
+		"fires": ["on_item_consume"],
 		"description": "Return any number of your pieces from the board to your Stock."},
 	{"key": "tactical_reposition", "name": "Tactical Reposition", "tier": "Tactical", "target": "pair",
+		"fires": ["on_item_consume"],
 		"description": "Move target ally or enemy piece 1 square."},
 	{"key": "air_strike", "name": "Air Strike", "tier": "Strategic", "target": "tile",
+		"fires": ["on_item_consume", "on_destroy"],
 		"description": "Destroy a target enemy piece on the board. No score awarded. Cannot target the King."},
 	{"key": "sniper", "name": "Sniper", "tier": "Strategic", "target": "tile",
+		"fires": ["on_item_consume", "on_destroy"],
 		"description": "Destroy a target enemy piece that could be captured by one of your pieces. Cannot target the King."},
 	{"key": "radar_jamming", "name": "Radar Jamming", "tier": "Strategic", "target": "tile",
+		"fires": ["on_item_consume", "on_buff_removal"],
 		"description": "Remove target's piece Buffs and/or Debuffs."},
 	{"key": "rapid_deployment", "name": "Rapid Deployment", "tier": "Strategic", "target": "pair",
+		"fires": ["on_item_consume"],
 		"description": "Move a target ally piece to any Deploy tile on the board."},
 	{"key": "decoy_swap", "name": "Decoy Swap", "tier": "Strategic", "target": "pair",
+		"fires": ["on_item_consume"],
 		"description": "Swap the positions of any two pieces on the board (ally or enemy, in any combination)."},
 	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
+		"fires": ["on_item_consume"], "suppresses": ["on_tariff_apply", "on_tariff_charge", "on_charge"],
 		"description": "Disable all King Abilities until the next Wave."},
 	{"key": "drone_strike", "name": "Drone Strike", "tier": "Decisive", "target": "area",
+		"fires": ["on_item_consume", "on_destroy", "on_piece_lost"],
 		"description": "Destroy all pieces (ally and enemy) within a 3x3 target area. The King is unaffected."},
 	{"key": "surprise_attack", "name": "Surprise Attack", "tier": "Decisive", "target": "",
+		"fires": ["on_item_consume"], "suppresses": ["on_enemy_turn_start"],
 		"description": "Take an additional player turn immediately after this one. The AI skips its intervening turn."},
 	{"key": "buff_box", "name": "Buff Box", "tier": "Strategic", "target": "tile",
+		"fires": ["on_item_consume", "on_buff_apply"],
 		"description": "Choose 1 of 3 random Piece Buffs, then apply it to a target piece (ally or enemy)."},
 ]
 
@@ -56,22 +94,31 @@ const ITEMS: Array = [
 ## `turns` on a timed buff is its life in player turns.
 const PIECE_BUFFS: Array = [
 	{"key": "shield", "name": "Shield", "tier": "Tactical", "model": "dormant",
+		"fires": ["on_buff_consume"], "suppresses": ["on_capture"],
 		"description": "Prevents the next capture attempt on this piece. Both pieces stay put."},
 	{"key": "critical", "name": "Critical", "tier": "Tactical", "model": "dormant",
+		"fires": ["on_buff_consume"],
 		"description": "The next capture by this piece scores double."},
 	{"key": "multicapture", "name": "Multicapture", "tier": "Strategic", "model": "dormant",
+		"fires": ["on_buff_consume", "on_capture", "on_score_change", "on_gold_change"],
 		"description": "The next capture by this piece also takes one enemy standing beside the piece it captured."},
 	{"key": "taunt", "name": "Taunt", "tier": "Tactical", "model": "dormant",
+		"fires": [],
 		"description": "The next enemy capture attempt is forced to target this piece."},
 	{"key": "stun", "name": "Stun", "tier": "Tactical", "model": "dormant",
+		"fires": [],
 		"description": "The next piece that captures this one loses its following 2 turns."},
 	{"key": "bomb", "name": "Bomb", "tier": "Decisive", "model": "dormant",
+		"fires": ["on_buff_consume", "on_destroy", "on_piece_lost"],
 		"description": "On capturing or being captured, destroys itself, the other piece, and everything within 1 square."},
 	{"key": "trap", "name": "Trap", "tier": "Decisive", "model": "dormant",
+		"fires": ["on_buff_consume", "on_piece_lost"],
 		"description": "When this piece is captured, the attacking piece is captured too."},
 	{"key": "range", "name": "Range", "tier": "Tactical", "model": "dormant",
+		"fires": ["on_buff_consume"],
 		"description": "Until this piece captures, it can also capture any enemy standing beside an enemy it could already take."},
 	{"key": "reflect", "name": "Reflect", "tier": "Decisive", "model": "dormant",
+		"fires": ["on_buff_consume", "on_piece_lost"], "suppresses": ["on_capture"],
 		"description": "Stops the next capture attempt, then takes the attacker's tile and captures it."},
 	{"key": "slow", "name": "Slow", "tier": "Tactical", "model": "timed", "turns": 1,
 		"self_harming": true, # a DEBUFF on its own holder (ruled 2026-08-28) — a
@@ -81,10 +128,13 @@ const PIECE_BUFFS: Array = [
 			# directly), since choosing Slow deliberately (e.g. onto an enemy)
 			# is legitimate. Smog debuffs *adjacent enemies*, not its holder, so
 			# it stays a genuine buff and carries no flag.
+		"fires": [],
 		"description": "This piece moves and captures like a Pawn until the end of the next enemy turn."},
 	{"key": "aura", "name": "Aura", "tier": "Strategic", "model": "timed", "turns": 2,
+		"fires": [],
 		"description": "For 2 player turns, adjacent allies score double on their captures."},
 	{"key": "smog", "name": "Smog", "tier": "Strategic", "model": "timed", "turns": 2,
+		"fires": [],
 		"description": "For 2 player turns, adjacent enemies move and capture like a Pawn."},
 	{"key": "piece_bounty", "name": "Bounty", "tier": "Decisive", "model": "dormant",
 		# Keyed "piece_bounty", NOT "bounty" — historically a legacy core
@@ -94,6 +144,7 @@ const PIECE_BUFFS: Array = [
 		# key collision this comment once guarded against no longer exists —
 		# "piece_bounty" stays as-is regardless, a rename now would be pure
 		# save-format churn for zero benefit.
+		"fires": ["on_buff_consume"],
 		"description": "When this piece is captured — by you or from you — choose 1 of 3 random Boxes, then open it."},
 ]
 

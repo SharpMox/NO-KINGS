@@ -11,6 +11,7 @@ const ShopScript := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Armies := preload("res://scripts/armies.gd") # issue 100
+const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 
 var fails := 0
 
@@ -21,6 +22,18 @@ func check(cond: bool, label: String) -> void:
 		fails += 1
 	else:
 		print("ok: " + label)
+
+
+
+
+## issue 96: the pool strip is no longer buttons-only — a VSeparator and a
+## label mark where Captured Stock begins — so "the first stack" is the first
+## BUTTON, not the first child.
+func _first_pool_stack(game: Node2D) -> Button:
+	for c in game.pool_box.get_children():
+		if c is Button:
+			return c
+	return null
 
 
 func _click_button_in(node: Node, text: String) -> bool:
@@ -153,8 +166,12 @@ func _init() -> void:
 	await process_frame
 	check(game.drawer_open == "stock" and game.pool_box.is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
-	check(game.pool_box.get_child_count() == 1, "2 captured pawns show as one stack")
-	var stack: Button = game.pool_box.get_child(0)
+	# issue 96 added a VSeparator + label before the Captured section, so the
+	# strip is no longer buttons-only — count the STACKS, not the children.
+	var pool_stacks: Array = game.pool_box.get_children().filter(
+		func(n: Node) -> bool: return n is Button)
+	check(pool_stacks.size() == 1, "2 captured pawns show as one stack")
+	var stack: Button = _first_pool_stack(game)
 	_click(stack.get_global_rect().get_center())
 	await process_frame
 	await process_frame
@@ -414,7 +431,7 @@ func _init() -> void:
 	await process_frame
 	check(game.state == game.State.SETUP, "empty config boots into SETUP")
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
-	var stack_btn: Button = game.pool_box.get_child(0)
+	var stack_btn: Button = _first_pool_stack(game)
 	var stock_before: int = game.stock.size()
 	# releasing INSIDE the open drawer must never place under it (2026-07-08)
 	var d_press := InputEventMouseButton.new()
@@ -562,6 +579,18 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Stock 1"), "Stock drawer opens")
 	await process_frame
+	# issue 96: Captured Stock is its own LABELLED section, not a tinted tail.
+	# The two pools obey different rules (a Captured entry can never be
+	# deployed, issue 60) and the only signals were a tint and a tooltip — and
+	# a tooltip does not exist on a phone, which is the target platform.
+	var pool_labels := ""
+	for c in game.hud.pool_box.get_children():
+		if c is Label:
+			pool_labels += c.text
+	check("CAPTURED" in pool_labels,
+		"the Captured section is labelled in the pool strip")
+	check("no deploy" in pool_labels,
+		"and the label carries the rule, not just the name")
 	var cap_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
 	_click(cap_stack.get_global_rect().get_center())
@@ -872,10 +901,16 @@ func _init() -> void:
 	var stock_before2: int = game.stock.size()
 	var gold_before2: int = game.gold
 	var convert_acts_before: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Convert ($5)"), "Convert is clickable")
+	# issue 97: the Convert button carries its price, and that price now comes
+	# from CONVERT_RATE rather than SELL_RATE — so read it from the game rather
+	# than hardcoding a number that moves whenever the rate is tuned.
+	var convert_cost: int = Shop.convert_price(game, game.captured[0])
+	var convert_label := "Convert ($%d)" % convert_cost
+	check(await _click_button_in(game.modals.shop_panel, convert_label),
+		"Convert is clickable (%s)" % convert_label)
 	await process_frame
 	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
-			and game.gold == gold_before2 - 5 and game.actions_left == convert_acts_before,
+			and game.gold == gold_before2 - convert_cost and game.actions_left == convert_acts_before,
 		"converting moves the piece from Captured Stock into ordinary Stock, debits Gold, costs no Action (issue 64)")
 
 	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
@@ -1270,7 +1305,7 @@ func _init() -> void:
 		"the chip is clickable again after a targeting cancel")
 	await process_frame
 	check(game.pool_box.get_child_count() == 1, "(setup) the Stock strip shows the one pawn stack")
-	var pawn_stack: Button = game.pool_box.get_child(0)
+	var pawn_stack: Button = _first_pool_stack(game)
 	_click(pawn_stack.get_global_rect().get_center()) # the tap IS the target — no separate confirm
 	await process_frame
 	check(not game.army_targeting and game.stock.size() == 2 and game.stock.count("pawn") == 2 \

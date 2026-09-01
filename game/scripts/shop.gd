@@ -252,6 +252,16 @@ static func add_score_progress(g, amount: int) -> void:
 ## here should require one either.
 const PURCHASABLE := ["piece", "item", "artefact", "box"]
 
+## issue 101 gates the PANEL, not this. The Wave gate deliberately does NOT
+## live here: `can_buy` is the mechanics layer, and seven suites drive it
+## directly at low Waves to test shop behaviour that has nothing to do with the
+## unlock. A player can only reach a purchase through the panel, so gating the
+## panel is behaviourally complete for them.
+##
+## The one thing that CAN bypass it is autoplay, which buys through buy()
+## without opening the modal — so the bot carries the same Wave check itself
+## (autoplay.gd's try_shop). The bot must never be able to do what a player
+## cannot, or the issue-103 measurements stop describing the real game.
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \

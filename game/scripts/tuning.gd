@@ -179,6 +179,18 @@ const ARTEFACT_RARITY_COLOR := {
 # window earns slightly under one bonus Lane-B restock — Lane A stays the
 # backbone, Lane B rewards scoring above average.
 const SHOP_RESTOCK_WAVES := 5
+
+## issue 101 (user ruling 2026-09-01): the Shop is CLOSED before this Wave —
+## the panel does not open and nothing can be bought. Deliberately equal to
+## SHOP_RESTOCK_WAVES so the unlock lands exactly on the first Lane A restock:
+## the first Shop a player ever sees is a freshly stocked one, and the unlock
+## and the auto-open are the same event rather than two.
+##
+## This REVERSES the previous "always openable" property (game.gd's _open_shop
+## header), which was GDD-sourced. The cost is real and was called out when the
+## ruling was made: the Shop is the only surface that shows Item and Artefact
+## descriptions, so the first four Waves are now played without a reference.
+const SHOP_UNLOCK_WAVE := 5
 const SHOP_LANE_B_SCORE := 10000
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;

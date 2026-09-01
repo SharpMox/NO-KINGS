@@ -414,6 +414,20 @@ var autoplay_exit := false # quit-on-game-over: CLI --autoplay runs only, so the
                            # in-process scenario sweep (test_scenarios) survives
 var autoplay_turns := 0
 var autoplay_cap := 2000 # --steps N overrides, for short scenario sweeps
+
+## issue 103: per-run leverage counters. "Is the bot using everything available
+## to it?" is not answerable by reading the code — it has to be counted, and
+## a leverage the bot never touches shows up here as a flat zero.
+##
+## Deliberately ONE Dictionary rather than a var per counter: the alternative
+## is a dozen fields threaded through save/load for numbers that are pure
+## measurement and must never affect play. Nothing reads this back — it is
+## written, printed at run end, and dropped.
+var telemetry: Dictionary = {}
+
+
+func tally(key: String, n: int = 1) -> void:
+	telemetry[key] = telemetry.get(key, 0) + n
 var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
@@ -1242,6 +1256,57 @@ func _enemy_denied_tiles() -> Array[Vector2i]:
 	return out
 
 
+## issue 103: one CSV line per bot run, prefixed PLAYTEST so a batch runner can
+## grep it out of Godot's own chatter. Column order is FIXED and must stay that
+## way — `tools/playtest.sh` appends these to a single file across hundreds of
+## runs, and a reordered column silently corrupts every earlier row.
+##
+## A leverage the bot never uses reads as a plain 0 here. That is the whole
+## point of the file: "resource starvation" next to shop_open=0 is a bot
+## problem, not a difficulty problem.
+const TELEMETRY_COLUMNS := [
+	# where the run ended up
+	"result", "reason", "wave", "score", "turns", "gold_left", "tier", "army", "seed",
+	# the leverages
+	"shop_open", "shop_buy", "sell", "convert", "item_use", "artefact_activate",
+	"army_ability", "merge", "deploy", "buff_apply", "capture", "piece_lost",
+]
+
+
+static func telemetry_header() -> String:
+	return "PLAYTEST," + ",".join(TELEMETRY_COLUMNS)
+
+
+## `result` is a string, not a win/lose bool, because a run can also END
+## UNRESOLVED: the bot can outlive its step cap, and calling that a LOSS would
+## file the strongest runs as failures. It is its own outcome — see CAP below.
+func _telemetry_csv(result: String, reason: String) -> String:
+	var row := {
+		"result": result,
+		"reason": reason.replace(",", ";"), # never break the column count
+		"wave": wave, "score": score, "turns": autoplay_turns,
+		"gold_left": gold, # unspent at death — the number that exposes a bot
+			# that never converted Gold into material
+		"tier": next_tier, "army": next_army, "seed": rng.seed,
+		"shop_open": telemetry.get("shop_open", 0),
+		"shop_buy": telemetry.get("hook:on_purchase", 0),
+		"sell": telemetry.get("sell", 0),
+		"convert": telemetry.get("convert", 0),
+		"item_use": telemetry.get("hook:on_item_consume", 0),
+		"artefact_activate": telemetry.get("artefact_activate", 0),
+		"army_ability": telemetry.get("action:army_ability", 0),
+		"merge": telemetry.get("hook:on_fuse", 0),
+		"deploy": telemetry.get("hook:on_deploy", 0),
+		"buff_apply": telemetry.get("hook:on_buff_apply", 0),
+		"capture": telemetry.get("hook:on_capture", 0),
+		"piece_lost": telemetry.get("hook:on_piece_lost", 0),
+	}
+	var out: Array = []
+	for col in TELEMETRY_COLUMNS:
+		out.append(str(row[col]))
+	return "PLAYTEST," + ",".join(out)
+
+
 func _game_over(won: bool, reason: String) -> void:
 	state = State.GAME_OVER
 	ArtefactHooks.run(self, "on_game_over") # before record_score: e.g. Rapture
@@ -1257,6 +1322,7 @@ func _game_over(won: bool, reason: String) -> void:
 	_refresh()
 	if autoplay_exit:
 		print("AUTOPLAY RESULT: %s — %s (wave %d, score %d, %d turns)" % ["WIN" if won else "LOSS", reason, wave, score, autoplay_turns])
+		print(_telemetry_csv("WIN" if won else "LOSS", reason)) # issue 103
 		if screenshot_dir != "":
 			_end_shot() # fire-and-forget: capture the end screen, then quit
 		else:
@@ -2421,6 +2487,12 @@ func _note_capture(pos: Vector2i) -> void:
 ## so it can never resurrect a turn that would otherwise already have ended —
 ## same shape as Stargate, covered by test_items.gd.
 func _log_action(kind: String, data: Dictionary = {}) -> void:
+	# issue 103: the Army Ability has THREE commit points — _army_ability_confirmed
+	# (untargeted), _army_target_stock (Crown's Stock pick) and
+	# _army_board_target_click (Syndicate/Cult) — and counting at only the first
+	# would have silently under-reported four of the six Armies. All three call
+	# through here, so this is the one place that sees every action kind.
+	tally("action:" + kind)
 	ArtefactHooks.run(self, "on_action", {"kind": kind, "first": action_log.is_empty()})
 	var entry := {"kind": kind}
 	entry.merge(data) # issue 52: {from, to} on the plain move/capture site only
@@ -2617,6 +2689,9 @@ func _activate_artefact(key: String) -> void:
 func _artefact_confirmed(key: String) -> void:
 	if not _artefact_activation_available(key):
 		return
+	tally("artefact_activate") # issue 103: the single commit point both the
+		# bot path (_activate_artefact's autoplay branch) and the confirm
+		# button reach, so counting here can't double-count or miss one
 	match key:
 		"oak-island-wishing-well":
 			oak_island_used_this_turn = true
@@ -3494,6 +3569,7 @@ func _open_shop() -> void:
 		return
 	if box_open or buff_pick_open or preview_open or win_open: # one modal at a time
 		return
+	tally("shop_open") # issue 103
 	modals.show_shop() # issue 61: no per-visit resets here — the panel can be
 		# closed/reopened at will, so nothing about a "visit" is a real
 		# boundary (pallet_purchase_count/jet_fuel_used_this_wave both moved
@@ -3554,6 +3630,7 @@ func _sell(kind: String, entry: Variant) -> bool:
 	var amount := Shop.sell_payout(self, kind, entry) # issue 68: Insider Rates'
 		# sell-payout bonus lives here, never in Shop.sell_price() itself —
 		# _convert_captured below keeps calling sell_price() at the flat rate
+	tally("sell") # issue 103
 	match kind:
 		"piece": stock.erase(entry)
 		"captured": captured.erase(entry)
@@ -3578,6 +3655,7 @@ func _convert_captured(entry: Variant) -> bool:
 	if not Shop.can_convert(self, entry):
 		return false
 	var cost := Shop.sell_price(self, "captured", entry)
+	tally("convert") # issue 103
 	captured.erase(entry)
 	stock.append(entry) # ADR-0002: captured and stock share the same
 		# bare-id-or-stateful-Dictionary shape, so the entry moves across as-is

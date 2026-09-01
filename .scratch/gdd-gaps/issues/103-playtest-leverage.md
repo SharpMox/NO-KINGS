@@ -168,3 +168,77 @@ parallelism buys nothing worth the risk.
 
 Nothing. **This should land before the balance tuning pass**, because it changes what the
 tuning pass is measuring.
+
+---
+
+## Phase 1 outcome (2026-09-01) — telemetry, and what it immediately caught
+
+**Shipped**: a per-run counter Dictionary on `g` (`tally()`), a `PLAYTEST,...` CSV line at run
+end, `tools/playtest.sh` (serial batch runner) and `tools/playtest-summary.py`.
+
+Two design choices worth keeping:
+
+- **Counting happens at `ArtefactHooks.run`.** Every hook event passes through it exactly
+  once, so captures, deploys, merges, item uses, purchases and buff grants all became counters
+  from a single line, with no call sites touched.
+- **The CSV header is printed BY THE GAME** (`tests/print_telemetry_header.gd`), so the column
+  names cannot drift from what `_telemetry_csv()` emits. A hand-copied header would mislabel
+  every row from the day they diverged, and the batch file spans hundreds of runs.
+
+### The telemetry caught its own bug before it could mislead anyone
+
+The first counter for the Army Ability was placed at `_army_ability_confirmed`, and read
+**0** for a Crown run. The obvious conclusion — "the bot never uses its Ability" — was wrong.
+There are **three** commit points: `_army_ability_confirmed` (untargeted: Wild Hunt, Old
+Guard, Horde), `_army_target_stock` (Crown's Stock pick) and `_army_board_target_click`
+(Syndicate, Cult). Counting at the first would have silently under-reported **four of the six
+Armies**.
+
+All three call `_log_action("army_ability")`, so the counter moved there. The same run then
+read **52**. This is the issue's own rule working: a leverage that looks unused has to be
+proven unused, because the counter is as likely to be wrong as the bot.
+
+### The single measured run that justifies the slice
+
+```
+Tier 1, Crown, seed 7:
+LOSS — Resource starvation (wave 83, score 184700, 1101 turns)
+gold_left=13988
+shop_open=0  shop_buy=0  sell=0  convert=0
+item_use=0   artefact_activate=0  buff_apply=0
+army_ability=52  merge=231  deploy=224  capture=371  piece_lost=185
+```
+
+**It starved of material holding 13,988 unspent Gold**, having never opened the Shop, which
+sells pieces. `item_use=0` despite The Muster starting with a Promote is its own finding: the
+bot's `use_item` **discards** an item it cannot immediately target rather than keeping it for
+a turn when it could be used, so items leave the inventory without ever being consumed.
+
+Resource starvation is the cause of *every Tier-5 loss but one* in the FLAGS balance table.
+That table cannot be used for tuning until this is fixed.
+
+### A second harness bug, found by reading the item path
+
+`item_use=0` is not only "the bot discards items". The bot's item path **bypasses the
+consumption choke point entirely**:
+
+```gdscript
+# autoplay.gd — the bot
+g.items.remove_at(index)          # raw removal, no hook
+g._item_apply(it, a, target)
+
+# game.gd — the real UI path
+_consume_item(item_active, it)    # fires on_item_consume, honours the ctx.cancel veto
+_item_reset()
+_item_apply(it, a, tile)
+```
+
+So in **every balance run this project has ever measured**:
+
+- `on_item_consume` never fired, so its **7 listening Artefacts were silently inert**
+- the **"the Item is not consumed" veto** (Dihydrogen Monoxide Battery, Wardenclyffe AAA
+  Batteries) could never trigger — those Artefacts have never once worked under the bot
+
+This is not a balance question, it is a fidelity bug in the measurement instrument, and it is
+exactly the class of thing this slice exists to surface. The fix is to route the bot through
+`_consume_item` like the UI does, and to stop discarding items it cannot immediately target.

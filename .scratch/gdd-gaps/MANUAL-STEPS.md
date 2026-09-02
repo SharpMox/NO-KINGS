@@ -15,7 +15,7 @@ issue 87 for why it is the harder half.
 
 | Field | Value | Where it came from |
 | --- | --- | --- |
-| Package / application ID | `com.sharpmox.nokings` | `export_presets.cfg:33` |
+| Package / application ID | `com.sharpunk.nokings` | `export_presets.cfg:33` |
 | App name | `No Kings` | `project.godot`, `package/name` |
 | **Debug signing SHA-1** | `BE:78:92:BD:40:CF:62:CC:3A:F1:95:38:C1:1A:0E:C0:04:18:FF:FE` | read from the keystore below |
 | Debug keystore | `~/Library/Application Support/Godot/keystores/debug.keystore` (alias `androiddebugkey`, password `android`) | Godot's generated debug key |
@@ -96,7 +96,7 @@ designed for exactly that split. If you do want it:
    instance, so no iOS build can be produced here at all).
 2. **Apple Developer Program — $99/year.** Needed for the iCloud entitlement *and* for device
    installs.
-3. App Store Connect -> create the app with a bundle id (suggest `com.sharpmox.nokings` to
+3. App Store Connect -> create the app with a bundle id (suggest `com.sharpunk.nokings` to
    match Android).
 4. Enable the **iCloud key-value store** capability, entitlement
    `com.apple.developer.ubiquitous-key-value-store`.

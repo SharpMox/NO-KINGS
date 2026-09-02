@@ -142,3 +142,62 @@ Tools, so that is a second Xcode dependency on top of the export.
 **Do 86 first, leave 87 stubbed.** Android needs one maintained plugin with current releases
 and one Play Console entry. iOS needs two plugins, neither released for Godot 4, compiled from
 source with an Xcode that is not installed, plus a paid account and a device.
+
+## CORRECTION + storage investigation (2026-09-02)
+
+An earlier line here — *"Game Center does not store save data"* — is true of **Game Center**
+and of **Godot's `gamecenter` plugin**, but it was read as "iOS has no save storage". **It
+does. There is no need for a server, a database, or a GDPR estate.**
+
+### iOS save storage, three routes, in order of preference
+
+**1. iCloud key-value store — the answer.** Wrapped by `plugins/icloud` in the same official
+repo, `get_key_value()` is **synchronous**, and the limits are not close to binding for us:
+
+| Apple's limits (iCloud Design Guide) | Our usage |
+| --- | --- |
+| **1 MB total per user** | **~30 KB** — three keys |
+| **1 MB per value** | **~10 KB** — a deliberately heavy `run` |
+| **1024 keys** | **3** (`run`, `scores`, `history`) |
+| key string <= 64 bytes | our keys are 3-7 chars |
+
+The 10 KB figure is **measured, not estimated**: `SaveConfig.to_config()` on a wave-140 state
+with the Artefact cap full, 3 Items, 40 Stock and 40 Captured entries serialises to
+**10,090 bytes** (10,115 in the envelope). The other two keys are bounded by construction —
+`HISTORY_CAP = 50` and scores are `slice(0, 10)`.
+
+So we sit at roughly **3% of the total quota**, with ~100x headroom on the per-value limit.
+The cap only becomes a design question if a save ever grows two orders of magnitude — e.g. by
+embedding a per-turn history. Worth a size assertion at the push site rather than a silent
+truncation, since NSUbiquitousKeyValueStore fails quietly when over quota.
+
+**2. `GKSavedGame` — Apple's true Snapshots analogue, and NOT available to us.** GameKit does
+have a saved-games API, so the platform gap is smaller than "Game Center has no saves"
+suggests. But Godot's plugin does **not** wrap it — read from `plugins/gamecenter/game_center.h`,
+the whole surface is:
+
+```cpp
+Error authenticate();  Error post_score(Dictionary);
+Error award_achievement(Dictionary);  void request_achievements();
+void request_achievement_descriptions();  Error show_game_center(Dictionary);
+Error request_identity_verification_signature();
+int get_pending_event_count();  Variant pop_pending_event();
+```
+
+Auth, leaderboards, achievements, UI. No snapshots. Using it would mean writing a custom
+native plugin — strictly more work than route 1 for no benefit at our data size.
+
+**3. iCloud Documents / CloudKit** — far larger, and unnecessary. Not wrapped by the plugin;
+CloudKit would also drag in exactly the schema-and-quota thinking route 1 avoids.
+
+### The entitlement, and what it does NOT change
+
+iCloud KV needs the `com.apple.developer.ubiquitous-key-value-store` entitlement, which
+requires an **enrolled (paid) Apple Developer account**. That is already on this slice's
+blocker list, so it adds nothing new.
+
+### The floor if iCloud is ever unavailable
+
+Nothing breaks. The design is local-first — `cloud_save.gd` treats local as the source of truth
+and the cloud as a mirror, and `cloud_backend_noop.gd` is the shipped desktop reality today. A
+device with iCloud disabled simply plays offline, which is the same path desktop already takes.

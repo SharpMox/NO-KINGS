@@ -58,6 +58,26 @@ PGS project"). Let it create one unless this game already has a Cloud/Firebase p
 > three-option screen with *"No, my game doesn't use Google APIs"*. That wording is gone —
 > verified against the live console 2026-09-02. Trust the console, not the doc.
 
+#### A4a. The Cloud project it asks for
+
+The dialog will not proceed without one ("Cloud project is a required field"). Click
+**Create new cloud project** — it opens the Google Cloud console in a new tab.
+
+- Name it something obvious, e.g. `no-kings`. The project ID is generated from it.
+- **Do NOT attach a billing account.** Creating a project is free, and the Games API is not a
+  billable service. Google's own PGS docs only mention billing under *viewing and managing
+  quota* (developer.android.com/games/pgs/quota), not under using PGS. If something genuinely
+  blocks on billing, stop and say so rather than entering a card — that would be a finding, not
+  a normal step.
+- Back in the Play Console, click **Refresh cloud projects**, select it, then **Use**.
+
+Two constraints the dialog states, worth not tripping over:
+
+- **A Cloud project can be linked to only ONE PGS project.** Do not reuse a project that
+  already backs another game.
+- **You must be an "owner" of the Cloud project** for it to appear in the list. Creating it
+  yourself satisfies that.
+
 Then **Properties -> Edit properties** and set a display name — required before testing.
 
 ### A5. Create the OAuth credential — **the actual blocker**

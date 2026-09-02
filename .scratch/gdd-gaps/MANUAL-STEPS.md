@@ -111,18 +111,25 @@ You may be asked to configure the OAuth consent screen first. The scopes involve
 > **Give it the DEBUG SHA-1 for now.** A release build is signed with a different key and needs
 > its own credential later. That is expected, not a mistake.
 
-### A6. ENABLE SAVED GAMES — do not skip this
-This is the feature slice 86 actually needs: Play Games **Snapshots** is what
-`cloud_backend_play_games.gd` mirrors saves through. **Sign-in can work perfectly while every
-save silently fails** if it is left off.
+### A6. Saved Games ON, Recall OFF — both live in **Properties**
 
-**It is not its own nav item.** The Setup and management list is *Configuration / Achievements /
-Game Stats / Events / Leaderboards / Publishing / Testers* — no "Saved Games" entry. It is a
-per-game setting inside **Configuration** (alongside the other game properties), and it may
-only appear once the PGS project from A4 exists.
+Not in Configuration and not a nav item of their own (an earlier version of this file said
+both). **Setup and management -> Configuration -> Properties -> Edit properties**, scroll to:
 
-If you cannot find the toggle after A4, say so — the fallback is that Saved Games is implied by
-the `drive.appdata` OAuth scope from A5, and we confirm it works on device instead.
+**Saved games -> `On`.** This is the feature slice 86 needs: Play Games **Snapshots** is what
+`cloud_backend_play_games.gd` mirrors saves through. Sign-in can work perfectly while every
+save silently fails if it is off. The console warns **"Can't be turned off after publishing"** —
+that is a one-way door, and it is the direction we want.
+
+**Recall -> leave `Off`** ("Turn off storage of recall tokens without a Play Games Services
+profile", the default).
+
+Recall is *not* Saved Games. It stores per-player **recall tokens** so a game can restore
+progress for players who have **no PGS profile**, and it exists for games that run their own
+account system and want to bridge to it. We have none: the design is local-first with Snapshots
+as the mirror, keyed to the signed-in player. Turning it on would mean accepting Supplemental
+Terms of Service and holding per-player tokens on Google's side — new data-retention and GDPR
+surface for a capability nothing in this codebase would ever call.
 
 ### A7. Create the leaderboard
 **Setup and management -> Leaderboards -> Create leaderboard.**

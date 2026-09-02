@@ -63,11 +63,17 @@ PGS project"). Let it create one unless this game already has a Cloud/Firebase p
 The dialog will not proceed without one ("Cloud project is a required field"). Click
 **Create new cloud project** — it opens the Google Cloud console in a new tab.
 
-- **Organisation: choose "No organization".** A GCP organisation is not a name you type — it
-  is created by claiming a domain (sharpunk.com) in Cloud Identity or Workspace, which mints
-  new identities like `max@sharpunk.com`. The PGS dialog requires you to be an **owner** of the
-  Cloud project for it to even appear in the list, so creating it under a different identity is
-  a fast route to an ownership mismatch that looks like a bug.
+- **Organisation: take `sharpunk.com` if the dropdown offers it, otherwise "No organization".**
+  A GCP organisation is not a name you type — it exists only if the domain is already claimed
+  in Google Workspace or Cloud Identity, in which case it appears in this dropdown for free and
+  is the tidier choice. If only "No organization" is offered, take it: it is fully functional
+  and projects can be migrated into an organisation later. **Do not set up Cloud Identity just
+  to satisfy this field.**
+
+  The PGS dialog requires you to be an **owner** of the Cloud project for it to appear in its
+  list at all, so create it under the same Google account that owns the Play Console developer
+  account — an ownership mismatch here presents as "my project isn't in the dropdown" rather
+  than as a permissions error.
   **Keep everything on the single Google account that owns the Play Console developer
   account** — whichever that is; check the avatar in both tabs rather than assuming.
   Cloud Identity Free exists if Sharpunk ever becomes a multi-person company, and projects can

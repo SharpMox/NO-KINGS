@@ -148,3 +148,56 @@ required from the user:
 is not installed would be guessing an API surface — the exact thing this repo's conventions
 forbid ("ambiguity goes back as a question, not into code as a guess"), and it could not be
 compiled, let alone verified.
+
+## Fit analysis (2026-09-02): the scope matches, the CONTRACT does not
+
+### Our contract is synchronous, and callers depend on that
+
+`cloud_save.gd` declares:
+
+```
+is_available() -> bool
+push(key, envelope) -> bool     # returns success NOW
+pull(key) -> Variant            # returns the envelope NOW
+account_id() -> String
+```
+
+and its callers consume the return value immediately — `resolve(local_ts, local, pull(key))`,
+and `SyncQueue.drain()` takes a `Callable` that must return `bool` per entry.
+
+### The plugin is async
+
+`SnapshotClient.save_game()` / `load_game()` **emit signals** (`game_saved` / `game_loaded`);
+they do not return the snapshot. So a literal drop-in is impossible: `pull()` cannot return an
+envelope the SDK has not fetched yet.
+
+### Health check — good, and better than the iOS side
+
+| | |
+| --- | --- |
+| licence | MIT |
+| latest release | **v3.4.0, 2026-07-20** (v3.3.0 2026-07-09, v3.2.0 2025-11-22) |
+| stars / open issues | 271 / 11 |
+| org | `godot-sdk-integrations` — the Godot **Foundation's** org |
+| scope | sign-in, leaderboards, Snapshots — exactly this slice, nothing more |
+
+Actively released, correctly scoped, permissively licensed. The choice is sound.
+
+### The resolution: our OWN offline-first design already absorbs async
+
+This is not a rewrite of the seam. `cloud_save.gd` already states that **local is the source of
+truth and the cloud is only a mirror**, and `SyncQueue` already exists for "accepted now,
+delivered later". So:
+
+- **`push()` = enqueue + return true.** That is what it already does when the backend is
+  unavailable (issue 84: *"unreachable is not a failure, it is deferred"*). The async SDK
+  simply becomes another deferred delivery, and `game_saved` drains the entry.
+- **`pull()` = return the last cached snapshot**, and kick an async refresh for next time. Safe
+  precisely because resolution is *highest-wave-wins, else last-write-wins* — a stale mirror
+  loses to local, which is the intended outcome.
+- **`account_id()` = the cached id from the last completed sign-in**, "" before that.
+
+So the contract stays synchronous and honest, and nothing in `cloud_save.gd`, `SyncQueue` or
+their tests has to change shape. **This is worth an ADR** before it is built — it is the
+decision that keeps the seam sync in a world of async SDKs, and a future reader will otherwise
+wonder why `pull()` does not await.

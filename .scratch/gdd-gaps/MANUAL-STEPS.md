@@ -63,6 +63,15 @@ PGS project"). Let it create one unless this game already has a Cloud/Firebase p
 The dialog will not proceed without one ("Cloud project is a required field"). Click
 **Create new cloud project** — it opens the Google Cloud console in a new tab.
 
+- **Organisation: choose "No organization".** A GCP organisation is not a name you type — it
+  is created by claiming a domain (sharpunk.com) in Cloud Identity or Workspace, which mints
+  new identities like `max@sharpunk.com`. The Play Console developer account here is
+  `charp.max@gmail.com`, and the PGS dialog requires you to be an **owner** of the Cloud
+  project for it to even appear in the list. Creating the project under a different identity is
+  a fast route to an ownership mismatch that looks like a bug.
+  **Keep everything on the single Google account that owns the Play Console entry.**
+  Cloud Identity Free does exist if sharpunk ever becomes a multi-person company, and projects
+  can be migrated into an organisation later — so this is deferral, not a closed door.
 - Name it something obvious, e.g. `no-kings`. The project ID is generated from it.
 - **Do NOT attach a billing account.** Creating a project is free, and the Games API is not a
   billable service. Google's own PGS docs only mention billing under *viewing and managing

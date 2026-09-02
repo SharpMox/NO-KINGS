@@ -162,6 +162,19 @@ consumer-facing listings, and a Personal account shows **an individual's name an
 where an Organisation account shows the company's. For anything shipped publicly that alone
 justifies it.
 
+### The signing-in email does NOT set the account type
+
+Easy to misread, and it costs money to act on: the Console shows
+**"Sharpunk · Personal account"** even when a **company email** signs in. Account type is a
+stored classification chosen once at signup (*"Who are you creating an account for?"* ->
+*Yourself* vs *An organisation*); the email on the account is unrelated to it. Changing which
+address logs in does not convert anything.
+
+> **Do NOT create a second developer account to "fix" this.** The `play.google.com/console/signup`
+> flow is a NEW account: another $25, a separate developer ID, and the existing `No Kings` app
+> plus everything built in section A would be stranded on the old one. The conversion path
+> keeps developer ID `5660342400699971142` and everything attached to it.
+
 ### Do it in parallel, not first
 
 **D-U-N-S is the long pole (up to 30 days) and nothing else waits on it.** So:

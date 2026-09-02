@@ -1,6 +1,6 @@
 # 100 — Surface the Army POWER in-run (the Ability button already exists)
 
-Status: todo (planned 2026-09-01) — rescoped, see below
+Status: done (2026-09-02) — rescoped: the Ability button already existed
 
 ## Parent
 
@@ -55,3 +55,37 @@ Artefact activation and the Shop, both 0, and that contrast is currently only in
 ## Blocked by
 
 Nothing.
+
+## Outcome (2026-09-02)
+
+A wrapped line at the top of the Inventory drawer, above the Item/Activate/Artefact strips —
+it is the standing rule the rest of the drawer operates under, so it reads first:
+
+```
+The Muster — Close Ranks: Merges cost no Action.   ·   ★Call the Banners (1 Action):
+Duplicate a target piece from your Stock into your Stock.
+```
+
+The Ability's **1-Action cost** is stated with it. That cost is the deliberate contrast with
+Artefact activation and the Shop (both 0), and it was tooltip-only too.
+
+`INV_H_ACTIVATE` grew by 48px for two wrapped rows at 13px on a 480-wide portrait screen.
+
+### Why this was worth a slice at all
+
+Half the original ask was already built — the Ability **button** has existed since issue 67
+(`hud.gd`'s `_add_army_ability_chip`). What was missing was the **Power**, and it was missing
+in a way that only matters on the real platform: it lived in the Ability chip's `tooltip_text`
+and on the army-select screen. **This is a portrait touch game, and hover tooltips do not
+exist on a phone**, so from the moment a run started the player's always-on Power was
+unreadable.
+
+That is not cosmetic. Several Powers change what is *legal* — Close Ranks makes merges cost no
+Action, Endless Ranks makes pawn deploys cost no Gold — so a player who had forgotten theirs
+was misreading the rules of their own run.
+
+Asserted in `test_game_clicks.gd` (windowed, per the UI-first rule): the drawer text contains
+the active Army's Power name and description, and the Ability's Action cost, **without any
+hover**. Verified across The Muster, The Cult and The Horde.
+
+`run_all.sh` ALL GREEN, foreground, alone.

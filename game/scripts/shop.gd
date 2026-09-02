@@ -252,6 +252,16 @@ static func add_score_progress(g, amount: int) -> void:
 ## here should require one either.
 const PURCHASABLE := ["piece", "item", "artefact", "box"]
 
+## issue 101 gates the PANEL, not this. The Wave gate deliberately does NOT
+## live here: `can_buy` is the mechanics layer, and seven suites drive it
+## directly at low Waves to test shop behaviour that has nothing to do with the
+## unlock. A player can only reach a purchase through the panel, so gating the
+## panel is behaviourally complete for them.
+##
+## The one thing that CAN bypass it is autoplay, which buys through buy()
+## without opening the modal — so the bot carries the same Wave check itself
+## (autoplay.gd's try_shop). The bot must never be able to do what a player
+## cannot, or the issue-103 measurements stop describing the real game.
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
@@ -339,11 +349,19 @@ static func buy(g, index: int) -> bool:
 ## already owned). `kind` is "piece" (Stock), "captured" (Captured Stock),
 ## "item" or "artefact"; `entry` is the actual g.stock/g.captured/g.items/
 ## g.artefacts element (a bare id String for piece/captured, a catalog
-## Dictionary for item/artefact). Captured -> Stock conversion charges this
-## exact number too (game.gd._convert_captured) — deliberately the same
-## constant, not a second one (Tuning.SELL_RATE's own header explains why).
+## Dictionary for item/artefact). Captured -> Stock conversion NO LONGER shares
+## this constant — issue 97 split it into Tuning.CONVERT_RATE so converting can
+## cost more than selling pays. See convert_price() below.
 static func sell_price(g, kind: String, entry) -> int:
 	return floori(_sell_base(g, kind, entry) * Tuning.SELL_RATE)
+
+
+## issue 97: what a Captured -> Stock conversion COSTS. Split out of
+## sell_price() (user ruling: "make it cost more"), off the same base so the
+## two rates stay comparable — see Tuning.CONVERT_RATE for why the direction
+## of the split is the safety property and not the value.
+static func convert_price(g, entry) -> int:
+	return floori(_sell_base(g, "captured", entry) * Tuning.CONVERT_RATE)
 
 
 ## The buy-price-equivalent base a held entry's sell/convert value scales off

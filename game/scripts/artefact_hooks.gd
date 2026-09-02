@@ -1141,6 +1141,13 @@ const REGISTRY := {
 ## entirely while g.tariffs_suppressed) — see the header for why a single
 ## merged sort would be wrong for the one hook (on_clock_refill) both groups use.
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
+	# issue 103: every hook event passes through here exactly once, so counting
+	# them here covers most of the leverage telemetry for one line — captures,
+	# deploys, merges, item uses, purchases and buff grants all become counters
+	# without touching their call sites. The four that are NOT hook events
+	# (opening the Shop, selling, converting Captured Stock, activating an
+	# Artefact or Army Ability) are tallied at their own sites instead.
+	g.tally("hook:" + hook)
 	var held: Array = g.artefacts.duplicate()
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
 	var tariffs: Array = [] if g.tariffs_suppressed else g.tariffs_active.duplicate()

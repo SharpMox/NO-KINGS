@@ -10,6 +10,8 @@ const Settings := preload("res://scripts/settings.gd")
 const ShopScript := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Armies := preload("res://scripts/armies.gd") # issue 100
+const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 
 var fails := 0
 
@@ -20,6 +22,18 @@ func check(cond: bool, label: String) -> void:
 		fails += 1
 	else:
 		print("ok: " + label)
+
+
+
+
+## issue 96: the pool strip is no longer buttons-only — a VSeparator and a
+## label mark where Captured Stock begins — so "the first stack" is the first
+## BUTTON, not the first child.
+func _first_pool_stack(game: Node2D) -> Button:
+	for c in game.pool_box.get_children():
+		if c is Button:
+			return c
+	return null
 
 
 func _click_button_in(node: Node, text: String) -> bool:
@@ -82,6 +96,7 @@ func _init() -> void:
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 		"captured": ["pawn", "pawn"],
+		"gold": 300, # issue 98: merging costs Gold, and this probe merges
 	}
 	# Hygiene fix, not the flake's cause (see _await_player_turn): every other
 	# boot in this file, and every other test in the suite, sets is_scenario
@@ -152,8 +167,12 @@ func _init() -> void:
 	await process_frame
 	check(game.drawer_open == "stock" and game.pool_box.is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
-	check(game.pool_box.get_child_count() == 1, "2 captured pawns show as one stack")
-	var stack: Button = game.pool_box.get_child(0)
+	# issue 96 added a VSeparator + label before the Captured section, so the
+	# strip is no longer buttons-only — count the STACKS, not the children.
+	var pool_stacks: Array = game.pool_box.get_children().filter(
+		func(n: Node) -> bool: return n is Button)
+	check(pool_stacks.size() == 1, "2 captured pawns show as one stack")
+	var stack: Button = _first_pool_stack(game)
 	_click(stack.get_global_rect().get_center())
 	await process_frame
 	await process_frame
@@ -164,9 +183,14 @@ func _init() -> void:
 		if b.is_queued_for_deletion():
 			continue
 		for c in b.get_children():
-			if c is Button and c.text == "▲":
+			if c is Button and c.text.begins_with("▲"):
 				badges.append(c)
 	check(not badges.is_empty(), "an armed promotable stack shows the ▲ button")
+	# issue 97/98: the badge carries the merge's PRICE, on the control that
+	# starts the merge. Close Ranks does not make it free — that Power waives
+	# the Action only (merge_logic.can_afford_merge), so the Gold always shows.
+	check(badges[0].text == "▲$%d" % Tuning.MERGE_COST,
+		"and the ▲ badge shows what the merge costs (%s)" % badges[0].text)
 	_click((badges[0] as Button).get_global_rect().get_center())
 	await process_frame
 	check(game.pending_merge.size() == 2, "the ▲ badge asks for merge confirmation")
@@ -273,7 +297,8 @@ func _init() -> void:
 	# reward and closes the panel once every pick (native + extra) is taken.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5, # issue 101: the Shop is locked before
+		# Tuning.SHOP_UNLOCK_WAVE, and _buy_a_box drives the real Shop button
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -298,7 +323,7 @@ func _init() -> void:
 	# TOP of a Box's own native picks, so this Box needs (native + 1) clicks.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["nostradamus-mad-libs"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -327,7 +352,7 @@ func _init() -> void:
 	# and it disappears once the budget is spent.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3,
+	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["snowden-s-rubik-s-cube"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -361,6 +386,16 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box")
+	# issue 100: the Army POWER is written out in the drawer. It used to live
+	# only in the Ability chip's TOOLTIP and on the army-select screen, and
+	# this is a portrait touch game — a hover tooltip is unreachable once a run
+	# starts, so a Power that changes what is legal was effectively invisible.
+	var kit: Dictionary = Armies.entry(game.next_army)
+	check(kit.power_name in game.hud.army_power_label.text
+			and kit.power_desc in game.hud.army_power_label.text,
+		"the Army Power is readable in the drawer without hovering (%s)" % kit.power_name)
+	check("1 Action" in game.hud.army_power_label.text,
+		"and the Ability's Action cost is stated with it")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")
@@ -402,7 +437,7 @@ func _init() -> void:
 	await process_frame
 	check(game.state == game.State.SETUP, "empty config boots into SETUP")
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
-	var stack_btn: Button = game.pool_box.get_child(0)
+	var stack_btn: Button = _first_pool_stack(game)
 	var stock_before: int = game.stock.size()
 	# releasing INSIDE the open drawer must never place under it (2026-07-08)
 	var d_press := InputEventMouseButton.new()
@@ -550,6 +585,18 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Stock 1"), "Stock drawer opens")
 	await process_frame
+	# issue 96: Captured Stock is its own LABELLED section, not a tinted tail.
+	# The two pools obey different rules (a Captured entry can never be
+	# deployed, issue 60) and the only signals were a tint and a tooltip — and
+	# a tooltip does not exist on a phone, which is the target platform.
+	var pool_labels := ""
+	for c in game.hud.pool_box.get_children():
+		if c is Label:
+			pool_labels += c.text
+	check("CAPTURED" in pool_labels,
+		"the Captured section is labelled in the pool strip")
+	check("no deploy" in pool_labels,
+		"and the label carries the rule, not just the name")
 	var cap_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
 	_click(cap_stack.get_global_rect().get_center())
@@ -699,7 +746,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500}
+		"wave": 5, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -708,6 +755,42 @@ func _init() -> void:
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
 		"the shop drawer opens")
+	# issue 101: before the unlock Wave the button STAYS and is DISABLED (user
+	# ruling — a hidden button reads as "this game has no Shop"), and it names
+	# the Wave, because a greyed control with no reason is the failure the
+	# ruling was one step away from.
+	check(not game.hud.shop_button.disabled and game.hud.shop_button.text == "Shop",
+		"the Shop button is live and unlabelled from the unlock Wave on")
+
+	# ...and the locked half of the same ruling, on its own boot one Wave short
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(game.hud.shop_button.disabled,
+		"the Shop button is DISABLED the Wave before it unlocks")
+	check("%d" % Tuning.SHOP_UNLOCK_WAVE in game.hud.shop_button.text,
+		"and says which Wave it opens on (%s)" % game.hud.shop_button.text)
+	check(not await _click_button_in(game.hud, "Shop"),
+		"a disabled Shop button is not the plain \"Shop\" control any more")
+
+	# restore what the checks below expect: an unlocked run with the Shop drawer
+	# OPEN. The locked-state boot above consumed the instance they were written
+	# against, and leaving it would fail them on state, not on behaviour.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Shop"), "Shop reopens after the locked-state check")
+	await process_frame
 
 	# issue 64: the Lane B restock progress bar — a real Control built by
 	# show_shop(), so it needs the windowed probe (headless drops GUI
@@ -774,7 +857,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
+		"wave": 5, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -824,10 +907,16 @@ func _init() -> void:
 	var stock_before2: int = game.stock.size()
 	var gold_before2: int = game.gold
 	var convert_acts_before: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Convert ($5)"), "Convert is clickable")
+	# issue 97: the Convert button carries its price, and that price now comes
+	# from CONVERT_RATE rather than SELL_RATE — so read it from the game rather
+	# than hardcoding a number that moves whenever the rate is tuned.
+	var convert_cost: int = Shop.convert_price(game, game.captured[0])
+	var convert_label := "Convert ($%d)" % convert_cost
+	check(await _click_button_in(game.modals.shop_panel, convert_label),
+		"Convert is clickable (%s)" % convert_label)
 	await process_frame
 	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
-			and game.gold == gold_before2 - 5 and game.actions_left == convert_acts_before,
+			and game.gold == gold_before2 - convert_cost and game.actions_left == convert_acts_before,
 		"converting moves the piece from Captured Stock into ordinary Stock, debits Gold, costs no Action (issue 64)")
 
 	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
@@ -860,7 +949,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 100, "artefacts": ["jet-fuel-vial"]}
+		"wave": 5, "gold": 100, "artefacts": ["jet-fuel-vial"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -909,7 +998,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
+		"wave": 5, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1222,7 +1311,7 @@ func _init() -> void:
 		"the chip is clickable again after a targeting cancel")
 	await process_frame
 	check(game.pool_box.get_child_count() == 1, "(setup) the Stock strip shows the one pawn stack")
-	var pawn_stack: Button = game.pool_box.get_child(0)
+	var pawn_stack: Button = _first_pool_stack(game)
 	_click(pawn_stack.get_global_rect().get_center()) # the tap IS the target — no separate confirm
 	await process_frame
 	check(not game.army_targeting and game.stock.size() == 2 and game.stock.count("pawn") == 2 \
@@ -1270,7 +1359,7 @@ func _init() -> void:
 	# as Shield Wall/Oak Island above.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"army": "Horde", "wave": 1,
+	GameScript.next_config = {"army": "Horde", "wave": 5,
 		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)

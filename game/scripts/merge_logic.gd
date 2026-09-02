@@ -4,6 +4,7 @@
 
 const Rules := preload("res://scripts/rules.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Tuning := preload("res://scripts/tuning.gd") # issue 98: MERGE_COST
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
 
@@ -28,6 +29,21 @@ static func pair_ok(g, a: String, b: String) -> bool:
 	return Rules.merge_result([a, b], g.defs, g.fusions) != ""
 
 
+## issue 98: can the player pay for a merge right now? An Action AND the Gold.
+##
+## Close Ranks (The Muster) waives the ACTION ONLY. Its text is exactly "Merges
+## cost no Action", so waiving the Gold too would be inventing a second effect
+## the card does not claim — judgement call, no ruling, and the literal reading
+## is the reversible one.
+##
+## No softlock risk (the standing check from issue 92's Great Wall): being
+## unable to afford a merge never strands a run. Merging is optional — moves,
+## captures and passing all stay available at 0 Gold — unlike a blocked DEPLOY,
+## which can strand a player with an empty board.
+static func can_afford_merge(g) -> bool:
+	return g.gold >= Tuning.MERGE_COST
+
+
 ## Ids that complete a merge with the current selection — drives the gold
 ## highlights on pool stacks and board pieces. Empty outside the player turn,
 ## with no selection, or with no action left to pay for the merge.
@@ -35,7 +51,8 @@ static func partner_ids(g) -> Dictionary:
 	var out := {}
 	var origin := origin_id(g)
 	if origin == "" or g.state != g.State.PLAYER_TURN \
-			or (g.actions_left <= 0 and not Armies.merge_free(g)): # Close Ranks (67)
+			or (g.actions_left <= 0 and not Armies.merge_free(g)) \
+			or not can_afford_merge(g): # Close Ranks (67)
 		return out
 	var all: Array = g._pool()
 	for pos in g._player_pieces():
@@ -55,7 +72,8 @@ static func partner_ids(g) -> Dictionary:
 ## the result piece (the bot skips straight to the commit). Cancel keeps the
 ## origin selected so another partner can be picked.
 static func do_merge(g, a: Variant, b: Variant) -> void:
-	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)):
+	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)) \
+			or not can_afford_merge(g):
 		return
 	var ids := []
 	for ref in [a, b]:
@@ -71,7 +89,8 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
 ## target wins); pool-only merges go to Stock.
 static func commit_merge(g, a: Variant, b: Variant) -> void:
-	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)):
+	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)) \
+			or not can_afford_merge(g):
 		return
 	var ids := []
 	for ref in [a, b]:
@@ -100,6 +119,8 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
 	if not Armies.merge_free(g): # Close Ranks (The Muster, issue 67)
 		g.actions_left -= 1
+	Economy.spend_gold(g, Tuning.MERGE_COST) # issue 98: Close Ranks waives the
+		# Action, never the Gold — see can_afford_merge's header
 	g._log_action("merge", {"pieces": consumed_states})
 	var stock_index := -1
 	if result_tile.x >= 0:

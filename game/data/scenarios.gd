@@ -27,6 +27,10 @@ const GeneratedKings := preload("res://data/scenarios_kings.gd")
 ## issue 94: the Combo boards, derived from the fires/listens hook graph.
 const GeneratedCombos := preload("res://data/scenarios_combos.gd")
 
+## issue 95: the STAGED combo boards — hand-built, one per question, picked
+## from 94's graph for disputability rather than derived from it.
+const StagedCombos := preload("res://data/scenarios_staged.gd")
+
 
 static func _chain(title: String, base: String, mid: String) -> Dictionary:
 	return {"name": "Promote: %s" % title, "cfg": {
@@ -35,7 +39,7 @@ static func _chain(title: String, base: String, mid: String) -> Dictionary:
 
 static func all() -> Array:
 	return _hand_written() + Generated.all() + GeneratedPieces.all() \
-		+ GeneratedKings.all() + GeneratedCombos.all()
+		+ GeneratedKings.all() + GeneratedCombos.all() + StagedCombos.all()
 
 
 static func _hand_written() -> Array:

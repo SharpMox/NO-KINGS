@@ -35,3 +35,10 @@ game/.godot/
 # Export artifacts (godot --export-debug Android)
 build/
 .DS_Store
+
+# issue 86: the Godot Android GRADLE build template. Installed by
+# --install-android-build-template and required for Play Games (Godot Android
+# plugins are Android libraries, so they only work on the Gradle path). It is
+# ~1 GB of regenerated SDK scaffolding — never commit it. Recreate with:
+#   godot --headless --path game --install-android-build-template --export-debug "Android" build/nokings.apk
+game/android/

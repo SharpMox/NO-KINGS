@@ -89,3 +89,62 @@ Also note `export_presets.cfg` has `gradle_build/use_gradle_build=false`. **The 
 plugin requires a Gradle build**, because Godot Android plugins are Android libraries — so
 that flag flips as part of wiring the plugin, not before. The plain APK proven above does not
 exercise that path.
+
+## The Gradle path is PROVEN, and the plugin is chosen (2026-09-02)
+
+### Gradle builds work — the second half of the environmental blocker is cleared
+
+The note above said the Play Games plugin needs `gradle_build/use_gradle_build=true` and that
+"the plain APK proven above does not exercise that path". It does now:
+
+```sh
+godot --headless --path game --install-android-build-template \
+      --export-debug "Android" build/nokings-gradle.apk
+```
+
+produces a valid **77.8 MB / 474-file APK** (the non-Gradle one is 28.4 MB) with the Kotlin
+runtime inside it — a real Gradle build, not the prebuilt template.
+
+**The flag is deliberately left at `false`.** This file's own earlier note is right: it flips
+*as part of wiring the plugin, not before*. Turning it on now would add a hard prerequisite
+(the 1 GB `game/android/` template) to every export for zero present benefit. What has changed
+is that the flip is now known-good rather than hypothetical.
+
+`game/android/` is **gitignored** — it is ~1 GB of regenerated SDK scaffolding, and the
+regeneration command is recorded in `.gitignore` beside the rule.
+
+### A store requirement this slice had not recorded
+
+`gradle_build/export_format=0` is **APK**. Google Play requires an **AAB** (`=1`) for new
+applications, so the store build needs that flag as well as a release keystore. Neither is
+needed for device testing, which is what unblocks the rest of this slice.
+
+### The plugin: `godot-sdk-integrations/godot-play-game-services`
+
+MIT, Godot 4.3+, and it lives in the **Godot Foundation's GitHub organisation** (moved there
+October 2024) — community-built rather than engine-official, but under the Foundation's
+umbrella, which is as close to endorsed as an Android plugin gets.
+
+It covers **exactly the three things this slice needs and nothing more**: sign-in,
+leaderboards, and **Snapshots** (cloud saves). Play Games SDK v21.0.0, Android API 35,
+node-based rather than autoload-based, and it **requires the custom Gradle build** — the path
+proven above.
+
+Mapping onto the existing seam is genuinely drop-in: `cloud_backend_play_games.gd` already
+declares `is_available()` / `push()` / `pull()` / `account_id()`, and Snapshots is a
+named-blob store, which is the same shape as `push(key, envelope)`.
+
+### What is STILL blocked, unchanged
+
+Sign-in needs an OAuth client tied to the package name **and the signing certificate
+fingerprint**, both issued by the Play Console. No amount of local work produces those. Still
+required from the user:
+
+1. A Play Console entry for `com.sharpmox.nokings` (one-time $25 developer account).
+2. Leaderboard IDs created there.
+3. An Android device with USB debugging.
+
+**The SDK calls are deliberately not written yet.** Writing them blind against a plugin that
+is not installed would be guessing an API surface — the exact thing this repo's conventions
+forbid ("ambiguity goes back as a question, not into code as a guess"), and it could not be
+compiled, let alone verified.

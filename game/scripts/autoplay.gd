@@ -249,6 +249,14 @@ static func try_merge(g) -> bool:
 	for i in units.size():
 		for j in range(i + 1, units.size()):
 			if MergeLogic.pair_ok(g, units[i].id, units[j].id):
+				# issue 98: do_merge now REFUSES when the Gold is short, and
+				# this function used to report success on "found a legal pair"
+				# rather than on "the merge happened". With a pair in hand and
+				# no Gold that made step() return every frame having done
+				# nothing — a live-lock that burned the whole step budget at
+				# wave 2. Check the payment before claiming the turn's action.
+				if not MergeLogic.can_afford_merge(g):
+					return false # fall through to moves/captures instead
 				MergeLogic.do_merge(g, units[i], units[j])
 				return true
 	return false

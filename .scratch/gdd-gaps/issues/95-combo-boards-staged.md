@@ -1,6 +1,6 @@
 # 95 — Combo boards that stage the interaction, and Item ↔ Item
 
-Status: todo (planned 2026-09-01)
+Status: (b) done (2026-09-02) — 14 staged boards. (a) still blocked, see below.
 
 ## Parent
 
@@ -52,3 +52,48 @@ get opened twice.
 - (a) is blocked on the design question above: nothing currently dispatches to an Item, so
   "Item listens" may not be a declaration at all but a new hook consumer.
 - (b) is not blocked and can ship alone.
+
+## Outcome (2026-09-02) — part (b) only
+
+**14 hand-built boards in `game/data/scenarios_staged.gd`. 365 scenarios total.**
+
+Picked FROM 94's graph (`scenarios_combos.pairs()`) rather than invented, but picked for
+**disputability**: every board answers something a reasonable player would get wrong. Named
+for the question, never for the effect held — 81's rule, and it is also what keeps the board
+honest, since a question cannot assert a wrong answer.
+
+Several build the **control into the same board**, so the answer is a contrast rather than a
+memory of what usually happens:
+
+- *"does a Shield-blocked attack still pay your capture Artefacts?"* — the shielded pawn and a
+  bare one sit at the same distance, so the Score difference between taking them IS the answer
+- *"Reflect kills your attacker — does that pay capture or loss Artefacts?"* — holds one of
+  each, so a single attack settles both halves
+- *"Destruction is not a capture — so what does Air Strike actually pay?"* — one on-destroy
+  listener against two on-capture ones
+- *"which Items survive use with both 'not consumed' Artefacts held?"* — three Items, both veto
+  Artefacts, and Tape Eraser Magnet as the one that must NOT fire
+
+The rest cover hostile Item use (Demoting an **enemy**, which is the half nobody tries),
+Artefact-vs-Artefact vetoes (Radar Jamming against Antikythera Warranty Card, Fireproof Pajamas
+against your own Bomb), Army Powers feeding Artefacts (Hold the Line's refund into the Gold
+percentages, Hostile Takeover landing on exactly 0 Gold to trip Zero-Point Energy Drink, the
+Cult's Ritual into the on-Buff listeners), and the Shop as a trigger surface.
+
+Every key — artefact, item, piece and buff — was validated against the live catalogs rather
+than typed from memory, and every board is inside the 5-Artefact cap.
+
+**Every board carries Gold**, because 98 priced merging and 97 priced conversion: a staged
+board with no budget stops demonstrating anything the moment it needs either. That is the same
+trap 98 found in the hand-written `Promote:` boards.
+
+Shop-triggered boards sit at Wave 9, clear of 101's Wave-5 Shop lock.
+
+`run_all.sh` ALL GREEN, foreground, alone — `test_scenarios` boots and bot-plays all 365.
+
+## Part (a) — Item <-> Item — still blocked, and the blocker is real
+
+Not built, and it should not be until the design question is answered: **nothing in the game
+dispatches TO an Item.** An Item's effect resolves immediately inside `_use_item`'s match, so
+"this Item listens for that one" is not a declaration that can be added — it needs a mechanism
+that does not exist. Writing a `listens` field today would describe nothing.

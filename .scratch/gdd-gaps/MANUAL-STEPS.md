@@ -172,6 +172,25 @@ as the mirror, keyed to the signed-in player. Turning it on would mean accepting
 Terms of Service and holding per-player tokens on Google's side — new data-retention and GDPR
 surface for a capability nothing in this codebase would ever call.
 
+### A6-bis. Target audience: 13+, ruled 2026-09-02
+
+**Play Console -> Policy -> App content -> Target audience and content.** Select **13-15,
+16-17 and 18 and over**. Do NOT select 9-12 or below.
+
+Google treats 9-12 and under as "children in most locales", which triggers the full **Families
+policy**: content review against an age-appropriateness standard, and certified-ads SDKs only.
+This game cannot pass that review — the King roster is Hitler, Stalin, Mao and Kim Jong Un with
+abilities called The Purge and The Pyramid of Skulls — and the ads restriction would constrain
+the (parked) AdMob decision before it is made.
+
+The game is *marketed* at roughly 12-45, which is not the same question: Google asks whether
+the app is CHILD-DIRECTED in theme, characters and framing. A strategy game about twentieth
+century autocrats is not, so 13+ is the honest declaration rather than a convenient one.
+
+'s Children section states exactly this and must keep matching the Console.
+Note the IARC content-rating questionnaire is SEPARATE and will land at PEGI 12 or 16 on the
+historical-violence questions.
+
 ### A7. Create the leaderboard
 **Setup and management -> Leaderboards -> Create leaderboard.**
 

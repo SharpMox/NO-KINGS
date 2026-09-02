@@ -361,7 +361,7 @@ func _init() -> void:
 	# Market Light Bulb (the only consumer today) has its own coverage in
 	# test_items_artefacts_2.gd, alongside the rest of the "Ranked" cluster.
 	var pr := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "items": ["demote", "promote"]})
+		"wave": 4, "items": ["demote", "promote"], "gold": 300})
 	await process_frame
 	pr.actions_left = 10 # merge, demote, promote in one sequence
 	MergeLogic.commit_merge(pr, Vector2i(2, 2), Vector2i(3, 2)) # Rank Up: pawn+pawn -> sergeant

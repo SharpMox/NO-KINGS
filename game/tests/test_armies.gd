@@ -87,7 +87,7 @@ func _init() -> void:
 
 	# --- Power: Close Ranks (The Muster) — merges cost no Action ---
 	var muster_merge := _boot({"army": "Crown", "wave": 1, "stock": ["pawn", "pawn"],
-		"board": [["rook", 1, 7, 10]]})
+		"board": [["rook", 1, 7, 10]], "gold": 300})
 	await process_frame
 	muster_merge.actions_left = 0 # already spent — a free merge must still work
 	var actions_before: int = muster_merge.actions_left
@@ -104,7 +104,9 @@ func _init() -> void:
 	await process_frame
 
 	# A non-Muster Army still pays for merges (sanity: the Power is scoped, not global)
-	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn", "pawn"], "gold": 0,
+	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn", "pawn"],
+		"gold": Tuning.MERGE_COST, # issue 98: exactly the merge's price, so the
+			# Action assertion below is unchanged and nothing is left over
 		"board": [["rook", 1, 7, 10]]})
 	await process_frame
 	var before_actions: int = crown_merge.actions_left
@@ -331,15 +333,18 @@ func _init() -> void:
 		"Insider Rates: Shop buy price is the pawn's value x0.75")
 	check(Shop.sell_payout(rates, "piece", "pawn") == floori(syn_pawn_value * Tuning.SELL_RATE * 1.25),
 		"Insider Rates: an actual sell payout is 50% x1.25 = 62.5% of value, floored")
-	var flat_conversion := floori(syn_pawn_value * Tuning.SELL_RATE)
-	check(Shop.sell_price(rates, "captured", "pawn") == flat_conversion,
-		"REQUIRED ASSERTION: the Captured -> Stock conversion rate stays the flat 50% under " +
+	# issue 97 split conversion onto its own CONVERT_RATE, so the number moved —
+	# but the PROPERTY this pins is unchanged and is the one that matters:
+	# Insider Rates must not discount a conversion, whatever the rate is.
+	var flat_conversion := floori(syn_pawn_value * Tuning.CONVERT_RATE)
+	check(Shop.convert_price(rates, "pawn") == flat_conversion,
+		"REQUIRED ASSERTION: the Captured -> Stock conversion rate is UNDISCOUNTED under " +
 		"Insider Rates — it is not a Shop purchase, and discounting it would reopen the " +
-		"convert/sell arbitrage that equal rates deliberately closed")
+		"convert/sell arbitrage that the rate split deliberately keeps closed")
 	var conv_gold_before: int = rates.gold
 	check(rates._convert_captured("pawn"), "(setup) converting the captured pawn succeeds")
 	check(rates.gold == conv_gold_before - flat_conversion,
-		"the ACTUAL Gold spent converting matches the unmodified 50% rate, not the discounted 62.5%")
+		"the ACTUAL Gold spent converting matches the undiscounted CONVERT_RATE")
 	rates.queue_free()
 	await process_frame
 

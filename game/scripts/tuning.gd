@@ -38,6 +38,24 @@ const ARTEFACT_CAP_BASE := 5      # issue 60 (user ruling): a third base-game
 ## than selling and re-buying. 50/50 (both directions of this one constant)
 ## is the only pair that is neither (user ruling, delegated 2026-08-30).
 const SELL_RATE := 0.5
+
+## issue 97 (user ruling 2026-09-01: "make it cost more"). Converting a Captured
+## piece into deployable Stock now costs MORE than selling pays, instead of
+## sharing SELL_RATE with it.
+##
+## THE DIRECTION IS THE SAFETY PROPERTY, not the value. Equal rates were
+## deliberate: issue 68 refused to discount conversion for The Syndicate because
+## "it is not a Shop purchase, and discounting it would reopen the convert/sell
+## arbitrage that equal rates deliberately closed". Splitting them reopens that
+## question, and only one direction is safe:
+##
+##   CONVERT_RATE >  SELL_RATE  -> safe: convert-then-sell always loses money
+##   CONVERT_RATE <  SELL_RATE  -> a money pump, which is what 68 closed
+##
+## So this may be raised freely and must never drop below SELL_RATE. 0.75 is a
+## first value chosen to be clearly "more" without being prohibitive; the
+## balance pass owns the number, now that issue 103 can measure it.
+const CONVERT_RATE := 0.75
 ## Automatic tariff scheduling — OFF for now (user call 2026-08-28), pending
 ## the combined Kings + Tariffs design pass. This ONLY stops the every-10-waves
 ## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and
@@ -107,6 +125,23 @@ const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone
 
 # x10 economy (2026-07-03): pawn = 10 points, queen = 90, amazon = 120
 const PLACEMENT_COST := 20         # placing mid-turn costs gold (GDD, amount TBD)
+
+## issue 98: a merge costs Gold as well as an Action. Before this a merge was
+## FREE in Gold all run long (Economy.charge(g, "fuse_cost") is the Tariff hook
+## and charges nothing unless a Fuse Tax is live), so the run's main power curve
+## — two bases into a mid, two mids into an end — was gated only by having
+## pairs, and the opening had no resource decision in it.
+##
+## FLAT, not scaled by the result's value (judgement call, no ruling): it is one
+## constant, and it is scarce early for the reason the issue actually asks for —
+## Gold is scarce early — without making end-tier fusions expensive forever,
+## which is a different and much larger change.
+##
+## Below PLACEMENT_COST on purpose: a merge consumes two pieces you already own,
+## so it should not cost more than putting a fresh one on the board.
+##
+## Composes with the `fuse_cost` Tariff charge; it does not replace it.
+const MERGE_COST := 15
 const MILESTONE_SCORE_BONUS := 100 # every 10 waves (GDD, amount TBD)
 const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
 const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)
@@ -179,6 +214,18 @@ const ARTEFACT_RARITY_COLOR := {
 # window earns slightly under one bonus Lane-B restock — Lane A stays the
 # backbone, Lane B rewards scoring above average.
 const SHOP_RESTOCK_WAVES := 5
+
+## issue 101 (user ruling 2026-09-01): the Shop is CLOSED before this Wave —
+## the panel does not open and nothing can be bought. Deliberately equal to
+## SHOP_RESTOCK_WAVES so the unlock lands exactly on the first Lane A restock:
+## the first Shop a player ever sees is a freshly stocked one, and the unlock
+## and the auto-open are the same event rather than two.
+##
+## This REVERSES the previous "always openable" property (game.gd's _open_shop
+## header), which was GDD-sourced. The cost is real and was called out when the
+## ruling was made: the Shop is the only surface that shows Item and Artefact
+## descriptions, so the first four Waves are now played without a reference.
+const SHOP_UNLOCK_WAVE := 5
 const SHOP_LANE_B_SCORE := 10000
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;

@@ -8,6 +8,7 @@ extends CanvasLayer
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Shop := preload("res://scripts/shop.gd") # issue 96/97: convert price
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
@@ -16,7 +17,9 @@ const Armies := preload("res://scripts/armies.gd")
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 const INV_H_BASE := DRAWER_H * 2 + 70.0 # pre-issue-52 height: items + artefacts
 	# only — unreachable since issue 67, kept so nothing breaks reading it
-const INV_H_ACTIVATE := DRAWER_H * 3 + 70.0 # +1 row while the Activate
+const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0 # +1 row while the Activate
+	# strip is up, +48 more for issue 100's Army Power line (two wrapped rows
+	# at 13px on a 480-wide portrait screen)
 	# section has content (issue 52). Issue 67: the Army Ability chip is
 	# now unconditionally in that section (every run holds a Army), so this
 	# is the drawer's permanent height going forward, not a conditional one
@@ -60,6 +63,13 @@ var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips
+## issue 100: the Army POWER, written out in the drawer. It was previously
+## readable in exactly two places — the tooltip of the Ability chip, and the
+## army-select screen before the run — and this is a portrait TOUCH game, so
+## once a run starts a hover tooltip is unreachable. Several Powers change what
+## is LEGAL (Close Ranks makes merges free, Endless Ranks makes pawn deploys
+## free), so a player who has forgotten theirs is misreading their own rules.
+var army_power_label := Label.new()
 	# for activatable Artefacts; issue 67 added the Army Ability chip here
 	# too (always present, unlike the Artefact ones — every run holds one)
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
@@ -248,8 +258,13 @@ func build(game) -> void:
 	# Activate section between them, shown/sized only while it has content.
 	artefact_box.add_theme_constant_override("separation", 16)
 	activate_box.add_theme_constant_override("separation", 8)
+	army_power_label.add_theme_font_size_override("font_size", 13)
+	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0, 0)
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
+	inv_box.add_child(army_power_label) # issue 100: above the strips — it is
+		# the standing rule the rest of the drawer operates under
 	inv_box.add_child(item_box)
 	inv_box.add_child(activate_box)
 	inv_box.add_child(artefact_box)
@@ -284,6 +299,15 @@ func set_drawer(which: String) -> void:
 
 
 func refresh() -> void:
+	# issue 101: the Shop button STAYS but is disabled before the unlock Wave
+	# (user ruling) — a hidden button reads as "this game has no Shop", a
+	# greyed one reads as "not yet". It carries the Wave, because a disabled
+	# control with no reason is the failure the ruling was one step away from.
+	var shop_locked: bool = g.wave < Tuning.SHOP_UNLOCK_WAVE
+	shop_button.disabled = shop_locked
+	shop_button.text = "Shop (W%d)" % Tuning.SHOP_UNLOCK_WAVE if shop_locked else "Shop"
+	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
+		if shop_locked else ""
 	clock_label.text = g._clock_text()
 	score_label.text = "★%d" % g.score
 	gold_label.text = "$%d" % g.gold
@@ -336,6 +360,14 @@ func refresh() -> void:
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_pool_strip()
 	_rebuild_item_strip()
+	# issue 100: the Power is always on, so it is stated, not offered. The
+	# Ability's 1-Action cost rides along here too — that cost is the
+	# deliberate contrast with Artefact activation and the Shop (both 0), and
+	# it was also tooltip-only until now.
+	var kit: Dictionary = Armies.entry(g.next_army)
+	army_power_label.text = "%s — %s: %s   ·   ★%s (1 Action): %s" % [
+		Armies.display_name(g.next_army), kit.power_name, kit.power_desc,
+		kit.ability_name, kit.ability_desc]
 	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
 	# issue 52 grew the drawer only when the Activate row had content; issue
@@ -346,6 +378,28 @@ func refresh() -> void:
 		var inv_w: float = inv_panel.custom_minimum_size.x
 		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
 		inv_panel.position = Vector2(inv_panel.position.x, g.get_viewport_rect().size.y - inv_h)
+
+
+## issue 97: can the player currently pay for this entry's action? Drives the
+## price colour only — the real refusals stay where they are (Economy/Shop).
+func _pool_affordable(cap: bool, entry: Variant) -> bool:
+	return g.gold >= (Shop.convert_price(g, entry) if cap else Economy.deploy_cost(g))
+
+
+## issue 96: the divider between Stock and Captured Stock. Carries the RULE
+## that makes the pool different ("no deploy"), not just a name — the
+## constraint is the reason the section exists, and a label that only said
+## "Captured" would leave the player to discover the rule by being refused.
+func _add_captured_header() -> void:
+	var sep := VSeparator.new()
+	sep.custom_minimum_size = Vector2(10, 0)
+	pool_box.add_child(sep)
+	var lbl := Label.new()
+	lbl.text = "CAPTURED\nno deploy"
+	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8))
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pool_box.add_child(lbl)
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
@@ -491,7 +545,19 @@ func _rebuild_item_strip() -> void:
 func _rebuild_pool_strip() -> void:
 	for c in pool_box.get_children():
 		c.queue_free()
+	var captured_marked := false
 	for st in _stacks():
+		# issue 96: Captured Stock becomes its own LABELLED section rather than
+		# a tinted tail of the same run of buttons. The two pools obey different
+		# rules — a Captured entry can merge, convert and sell but can NEVER be
+		# deployed (issue 60) — and the only signals for that were a warm tint
+		# and a tooltip suffix. This is a portrait TOUCH game: the tooltip does
+		# not exist on a phone, so a player could not tell which of their pieces
+		# were placeable. _stacks() returns stock first then captured, so the
+		# first captured stack is the boundary.
+		if st.cap and not captured_marked:
+			captured_marked = true
+			_add_captured_header()
 		var btn := Button.new()
 		var id: String = st.id
 		var cap: bool = st.cap
@@ -524,12 +590,42 @@ func _rebuild_pool_strip() -> void:
 				badge.offset_left = -16
 				badge.offset_bottom = 12
 			btn.add_child(badge)
+		# issue 97: the price of acting on this entry, on the entry itself —
+		# deploy cost for a Stock piece, conversion cost for a Captured one.
+		# BOTH the base and the effective number when they differ, because
+		# showing only the effective one hides that a modifier exists and
+		# showing only the base is a lie: a Horde pawn deploys FREE (Endless
+		# Ranks) and a Qin Shi Huang deploy costs double (The Great Wall).
+		# Read from the live calls, never re-derived here — re-implementing the
+		# modifiers in the HUD would be a second copy of the rules, and it
+		# would drift.
+		var price := Label.new()
+		if cap:
+			price.text = "$%d" % Shop.convert_price(g, st.entry)
+		else:
+			var base: int = Tuning.PLACEMENT_COST
+			var eff: int = Economy.deploy_cost(g)
+			if id == "pawn" and Armies.endless_ranks(g):
+				eff = 0 # Endless Ranks is scoped to pawns at _place, so the
+					# generic deploy_cost() does not know about it
+			price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
+		price.add_theme_font_size_override("font_size", 10)
+		price.add_theme_color_override("font_color",
+			Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
+		price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+		price.add_theme_constant_override("outline_size", 4)
+		price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		price.offset_top = -13
+		btn.add_child(price)
 		if show_promote:
 			# round ▲ badge floating over the stack's top-right corner: it
 			# overhangs the drawer's top edge and pokes out a little to the
 			# right of the icon (the stock scroll doesn't clip)
 			var promote := Button.new()
-			promote.text = "▲"
+			# issue 97: the merge's price, on the control that starts it.
+			# Free under Close Ranks? No — that Power waives the ACTION only
+			# (merge_logic.can_afford_merge), so the Gold shows regardless.
+			promote.text = "▲$%d" % Tuning.MERGE_COST
 			promote.add_theme_font_size_override("font_size", 11)
 			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
 			var round := StyleBoxFlat.new()

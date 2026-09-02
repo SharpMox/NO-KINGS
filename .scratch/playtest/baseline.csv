@@ -1,0 +1,91 @@
+result,reason,wave,score,turns,gold_left,tier,army,seed,shop_open,shop_buy,sell,convert,item_use,artefact_activate,army_ability,merge,deploy,buff_apply,capture,piece_lost
+LOSS,Resource starvation,45,77700,567,5620,Tier 1,Crown,1,0,0,0,0,0,0,25,103,109,0,163,93
+LOSS,Resource starvation,48,84300,630,6280,Tier 1,Crown,2,0,0,0,0,0,0,22,114,109,0,178,102
+LOSS,Resource starvation,72,152600,909,11375,Tier 1,Crown,3,0,0,0,0,0,0,42,185,188,0,303,154
+LOSS,Resource starvation,16,8800,277,435,Tier 1,Wild Hunt,1,0,0,0,0,0,0,13,19,23,0,37,31
+LOSS,Resource starvation,28,30400,481,2015,Tier 1,Wild Hunt,2,0,0,0,0,0,0,27,45,52,0,87,55
+LOSS,Resource starvation,36,47000,561,3275,Tier 1,Wild Hunt,3,0,0,0,0,0,0,32,62,72,0,117,78
+LOSS,Resource starvation,70,129300,1036,18070,Tier 1,Old Guard,1,0,0,0,0,1,0,63,151,167,108,289,145
+LOSS,Resource starvation,26,15800,476,1880,Tier 1,Old Guard,2,0,0,0,0,1,0,23,31,42,50,62,40
+LOSS,Resource starvation,75,141100,1144,19360,Tier 1,Old Guard,3,0,0,0,0,1,0,70,167,185,129,322,160
+LOSS,Resource starvation,45,60800,561,1690,Tier 1,Syndicate,1,0,0,0,0,0,0,39,76,109,0,123,106
+LOSS,Resource starvation,9,2700,137,0,Tier 1,Syndicate,2,0,0,0,0,0,0,7,5,12,0,11,18
+LOSS,Resource starvation,11,3100,168,40,Tier 1,Syndicate,3,0,0,0,0,0,0,6,8,12,0,13,17
+LOSS,Resource starvation,46,110000,650,6590,Tier 1,Cult,1,0,0,0,0,0,0,42,91,128,43,161,128
+LOSS,Resource starvation,41,56300,554,3920,Tier 1,Cult,2,0,0,0,0,0,1,32,70,87,86,130,88
+LOSS,Resource starvation,38,53000,440,3690,Tier 1,Cult,3,0,0,0,0,0,0,30,64,82,68,119,77
+LOSS,Resource starvation,27,27900,401,1640,Tier 1,Horde,1,0,0,0,0,0,0,20,59,75,0,82,82
+LOSS,Resource starvation,35,41300,561,2640,Tier 1,Horde,2,0,0,0,0,0,0,32,80,115,0,114,124
+LOSS,Resource starvation,25,17900,452,760,Tier 1,Horde,3,0,0,0,0,0,0,23,53,74,0,70,81
+LOSS,Resource starvation,45,77700,567,5620,Tier 2,Crown,1,0,0,0,0,0,0,25,103,109,0,163,93
+LOSS,Resource starvation,48,84300,630,6280,Tier 2,Crown,2,0,0,0,0,0,0,22,114,109,0,178,102
+LOSS,Resource starvation,72,152600,909,11375,Tier 2,Crown,3,0,0,0,0,0,0,42,185,188,0,303,154
+LOSS,Resource starvation,16,8800,277,435,Tier 2,Wild Hunt,1,0,0,0,0,0,0,13,19,23,0,37,31
+LOSS,Resource starvation,28,30400,481,2015,Tier 2,Wild Hunt,2,0,0,0,0,0,0,27,45,52,0,87,55
+LOSS,Resource starvation,36,47000,561,3275,Tier 2,Wild Hunt,3,0,0,0,0,0,0,32,62,72,0,117,78
+LOSS,Resource starvation,70,129300,1036,18070,Tier 2,Old Guard,1,0,0,0,0,1,0,63,151,167,108,289,145
+LOSS,Resource starvation,26,15800,476,1880,Tier 2,Old Guard,2,0,0,0,0,1,0,23,31,42,50,62,40
+LOSS,Resource starvation,75,141100,1144,19360,Tier 2,Old Guard,3,0,0,0,0,1,0,70,167,185,129,322,160
+LOSS,Resource starvation,45,60800,561,1690,Tier 2,Syndicate,1,0,0,0,0,0,0,39,76,109,0,123,106
+LOSS,Resource starvation,9,2700,137,0,Tier 2,Syndicate,2,0,0,0,0,0,0,7,5,12,0,11,18
+LOSS,Resource starvation,11,3100,168,40,Tier 2,Syndicate,3,0,0,0,0,0,0,6,8,12,0,13,17
+LOSS,Resource starvation,46,110000,650,6590,Tier 2,Cult,1,0,0,0,0,0,0,42,91,128,43,161,128
+LOSS,Resource starvation,41,56300,554,3920,Tier 2,Cult,2,0,0,0,0,0,1,32,70,87,86,130,88
+LOSS,Resource starvation,38,53000,440,3690,Tier 2,Cult,3,0,0,0,0,0,0,30,64,82,68,119,77
+LOSS,Resource starvation,27,27900,401,1640,Tier 2,Horde,1,0,0,0,0,0,0,20,59,75,0,82,82
+LOSS,Resource starvation,35,41300,561,2640,Tier 2,Horde,2,0,0,0,0,0,0,32,80,115,0,114,124
+LOSS,Resource starvation,25,17900,452,760,Tier 2,Horde,3,0,0,0,0,0,0,23,53,74,0,70,81
+WIN,Wave-78 King checkmated,78,179700,1020,13760,Tier 3,Crown,1,0,0,0,0,0,0,41,199,212,0,342,171
+LOSS,Resource starvation,56,109400,711,8270,Tier 3,Crown,2,0,0,0,0,0,0,27,137,135,0,221,122
+LOSS,Resource starvation,16,7600,278,290,Tier 3,Crown,3,0,0,0,0,0,0,7,22,25,0,36,32
+LOSS,Resource starvation,37,54600,554,3975,Tier 3,Wild Hunt,1,0,0,0,0,0,0,27,68,75,0,125,78
+LOSS,Resource starvation,15,7100,333,265,Tier 3,Wild Hunt,2,0,0,0,0,0,0,14,19,23,0,37,31
+LOSS,Resource starvation,13,2900,236,65,Tier 3,Wild Hunt,3,0,0,0,0,0,0,13,7,12,0,13,21
+WIN,Wave-61 King checkmated,61,118300,878,16320,Tier 3,Old Guard,1,0,0,0,0,1,0,55,126,146,111,245,134
+WIN,Wave-65 King checkmated,65,128700,1096,18040,Tier 3,Old Guard,2,0,0,0,0,1,0,59,140,156,111,270,144
+LOSS,Resource starvation,44,60700,670,8900,Tier 3,Old Guard,3,0,0,0,0,1,0,40,78,97,67,151,96
+LOSS,Resource starvation,8,1900,117,0,Tier 3,Syndicate,1,0,0,0,0,0,0,7,5,9,0,8,16
+LOSS,Resource starvation,9,1900,123,0,Tier 3,Syndicate,2,0,0,0,0,0,0,6,5,8,0,8,13
+LOSS,Resource starvation,8,1300,108,0,Tier 3,Syndicate,3,0,0,0,0,0,0,5,3,7,0,5,14
+LOSS,Resource starvation,43,121300,497,7000,Tier 3,Cult,1,0,0,0,0,0,0,34,82,89,105,146,81
+LOSS,Resource starvation,9,2500,144,160,Tier 3,Cult,2,0,0,0,0,0,1,8,6,6,12,13,15
+LOSS,Resource starvation,43,64500,570,4740,Tier 3,Cult,3,0,0,0,0,0,0,37,79,87,76,142,87
+LOSS,Resource starvation,26,22700,437,1160,Tier 3,Horde,1,0,0,0,0,0,0,23,60,74,0,77,81
+LOSS,Resource starvation,47,67900,756,4470,Tier 3,Horde,2,0,0,0,0,0,0,44,120,161,0,171,170
+LOSS,Resource starvation,35,41800,526,2610,Tier 3,Horde,3,0,0,0,0,0,0,31,84,106,0,111,109
+LOSS,Resource starvation,48,83200,661,6110,Tier 4,Crown,1,0,0,0,0,0,0,21,110,112,0,179,100
+LOSS,Resource starvation,67,135700,905,10060,Tier 4,Crown,2,0,0,0,0,0,0,37,165,177,0,278,153
+LOSS,Resource starvation,9,2100,134,140,Tier 4,Crown,3,0,0,0,0,0,0,0,5,5,0,11,12
+LOSS,Resource starvation,10,2500,160,125,Tier 4,Wild Hunt,1,0,0,0,0,0,0,7,5,7,0,11,13
+LOSS,Resource starvation,10,3900,202,185,Tier 4,Wild Hunt,2,0,0,0,0,0,0,10,9,11,0,19,14
+LOSS,Resource starvation,29,34500,434,2425,Tier 4,Wild Hunt,3,0,0,0,0,0,0,24,50,52,0,91,47
+WIN,Wave-65 King checkmated,65,126900,972,17810,Tier 4,Old Guard,1,0,0,0,0,1,0,59,139,154,107,266,142
+LOSS,Resource starvation,39,50000,584,7050,Tier 4,Old Guard,2,0,0,0,0,1,0,35,67,81,53,129,79
+LOSS,Resource starvation,98,209300,1414,28805,Tier 4,Old Guard,3,0,0,0,0,1,0,82,238,255,127,459,212
+LOSS,Resource starvation,14,3800,191,0,Tier 4,Syndicate,1,0,0,0,0,0,0,9,7,19,0,12,18
+LOSS,Resource starvation,11,3000,147,30,Tier 4,Syndicate,2,0,0,0,0,0,0,5,6,12,0,13,13
+LOSS,Resource starvation,30,31000,398,990,Tier 4,Syndicate,3,0,0,0,0,0,0,25,42,63,0,67,63
+LOSS,Resource starvation,48,144200,589,7400,Tier 4,Cult,1,0,0,0,0,0,0,38,93,107,39,175,101
+LOSS,Resource starvation,10,5000,163,390,Tier 4,Cult,2,0,0,0,0,0,1,8,6,7,13,12,12
+LOSS,Resource starvation,28,33700,323,2400,Tier 4,Cult,3,0,0,0,0,0,0,24,43,50,43,82,50
+LOSS,Resource starvation,9,1800,142,60,Tier 4,Horde,1,0,0,0,0,0,0,7,11,13,0,12,19
+LOSS,Resource starvation,11,3100,175,120,Tier 4,Horde,2,0,0,0,0,0,0,10,13,21,0,13,27
+LOSS,Resource starvation,11,2600,178,80,Tier 4,Horde,3,0,0,0,0,0,0,10,15,17,0,11,23
+LOSS,Resource starvation,9,1400,76,10,Tier 5,Crown,1,0,0,0,0,0,0,3,5,8,0,11,15
+LOSS,Resource starvation,7,1200,56,50,Tier 5,Crown,2,0,0,0,0,0,0,1,4,5,0,9,12
+LOSS,Back-row breach,6,100,50,40,Tier 5,Crown,3,0,0,0,0,0,0,0,0,0,0,1,6
+LOSS,Resource starvation,6,100,48,25,Tier 5,Wild Hunt,1,0,0,0,0,0,0,4,0,0,0,1,5
+LOSS,Back-row breach,9,1600,80,95,Tier 5,Wild Hunt,2,0,0,0,0,0,0,6,4,4,0,10,9
+LOSS,Resource starvation,6,1000,51,55,Tier 5,Wild Hunt,3,0,0,0,0,0,0,3,3,3,0,6,9
+LOSS,Back-row breach,12,3600,99,490,Tier 5,Old Guard,1,0,0,0,0,1,0,10,9,16,15,20,19
+LOSS,Resource starvation,14,5800,121,790,Tier 5,Old Guard,2,0,0,0,0,1,0,12,13,20,29,28,24
+LOSS,Resource starvation,8,1100,65,240,Tier 5,Old Guard,3,0,0,0,0,1,0,6,4,5,15,9,10
+LOSS,Resource starvation,8,2500,56,10,Tier 5,Syndicate,1,0,0,0,0,0,0,7,4,11,0,9,15
+LOSS,Resource starvation,10,2500,86,0,Tier 5,Syndicate,2,0,0,0,0,0,0,6,3,11,0,8,13
+LOSS,Resource starvation,8,1100,60,0,Tier 5,Syndicate,3,0,0,0,0,0,0,5,1,6,0,3,10
+LOSS,Resource starvation,7,1600,54,90,Tier 5,Cult,1,0,0,0,0,0,0,6,4,5,7,8,11
+LOSS,Resource starvation,9,4900,62,380,Tier 5,Cult,2,0,0,0,0,0,1,7,7,7,11,16,11
+LOSS,Resource starvation,9,1900,72,100,Tier 5,Cult,3,0,0,0,0,0,0,6,6,6,14,14,12
+LOSS,Resource starvation,9,700,68,80,Tier 5,Horde,1,0,0,0,0,0,0,5,1,11,0,3,18
+LOSS,Resource starvation,8,800,65,70,Tier 5,Horde,2,0,0,0,0,0,0,7,2,16,0,5,23
+LOSS,Resource starvation,7,400,54,30,Tier 5,Horde,3,0,0,0,0,0,0,2,2,6,0,4,13

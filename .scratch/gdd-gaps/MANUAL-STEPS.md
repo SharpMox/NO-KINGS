@@ -140,6 +140,23 @@ silently remembers whichever project you last used.
 
 Then return to Play Console -> Credentials and **Refresh**.
 
+### "Publish" means THREE different things here — only one is the store
+
+A real trap in Google's model. None of the steps in this file put the game on the Play Store.
+
+| Action | What it does | Store impact |
+| --- | --- | --- |
+| Auth Platform -> **Publish app** | moves the OAuth CONSENT SCREEN from Testing to In production, so any Google account can consent rather than only listed testers | none |
+| PGS -> **Publish Game** (A9) | publishes the Games Services CONFIGURATION (leaderboards, Saved Games) so it takes effect on a device | none |
+| Play Console -> production track | puts the actual game on the store | **this is the real one, and it is not in this file** |
+
+Publishing the consent screen exposes nothing: it is the "NO KINGS wants access to your Play
+Games profile" dialog. It lists or announces nothing, and no one can discover the game from it.
+
+**Publish it rather than leaving it in Testing**: Testing caps at 100 test users and expires
+refresh tokens after **7 days**, so sign-in works on device and then mysteriously stops a week
+later. The three PGS scopes are verification-exempt, so publishing triggers no review.
+
 ### A5. Create the OAuth credential — **the actual blocker**
 Still in **Configuration**, the **Credentials** section -> **Add credential** -> type
 **Android**. It asks for the package name and the **SHA-1** from the table above. This is the

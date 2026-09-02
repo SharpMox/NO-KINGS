@@ -201,3 +201,41 @@ So the contract stays synchronous and honest, and nothing in `cloud_save.gd`, `S
 their tests has to change shape. **This is worth an ADR** before it is built — it is the
 decision that keeps the seam sync in a world of async SDKs, and a future reader will otherwise
 wonder why `pull()` does not await.
+
+## OPEN RISK: the 100-login cap on sensitive scopes (2026-09-02)
+
+Creating the Android OAuth client surfaced: *"OAuth is limited to 100 sensitive scope logins
+until the OAuth consent screen is verified. This may require a verification process that can
+take several days."*
+
+That sits oddly beside the Auth Platform's own Data Access status, which reads *"Verification
+is not required since your app is not requesting any sensitive or restricted scopes."* Both can
+be true at once — the second only reflects scopes CONFIGURED on the consent screen, and ours
+are requested at runtime instead.
+
+**The unresolved question: does `drive.appdata`, requested by Play Games Saved Games, count
+toward that cap?** Google's sensitive-scope verification page lists five exceptions (personal
+use, testing, service-owned data, internal-only, domain-wide delegation) and **none mention
+Play Games**. A secondary source states the PGS scopes need no verification; that could not be
+confirmed against Google's own docs.
+
+**Not blocking now.** Device testing involves a handful of accounts. It would be fatal at
+launch, where 100 sign-ins is nothing.
+
+**How to settle it, empirically rather than by reading:** after the first successful on-device
+sign-in, the Cloud console's Data Access page shows which scopes were actually requested and
+how they are classified. Check it then. There is also a structural reason to expect no problem:
+PGS sign-in on Android uses the native Play Games flow, not a browser consent screen, which is
+where the unverified-app cap normally applies.
+
+**If it does apply**, the fix is submitting the consent screen for verification — days, not
+weeks, and it can run in the background well before launch. Do not discover this in the week of
+release.
+
+### The client, for the record
+
+Client ID `292256536070-r8mmdpv4m3prpppa714792n908mtofgm.apps.googleusercontent.com`. Android
+OAuth clients carry **no client secret**, so this is not a credential to protect — the security
+boundary is the package name plus the signing fingerprint, which is why the pair is what the
+client binds to. The downloaded JSON is not needed by the plugin, which reads its app id from
+the Play Console configuration.

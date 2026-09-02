@@ -19,6 +19,7 @@ config/icon="res://icon.png"
 [autoload]
 
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+GodotPlayGameServices="*uid://c4tixmu7ug5r"
 
 [display]
 
@@ -29,7 +30,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
 
 [rendering]
 

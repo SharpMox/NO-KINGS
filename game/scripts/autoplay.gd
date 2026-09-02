@@ -5,6 +5,7 @@
 const Rules := preload("res://scripts/rules.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Shop := preload("res://scripts/shop.gd") # issue 103
+const Tuning := preload("res://scripts/tuning.gd") # issue 101: SHOP_UNLOCK_WAVE
 
 
 static func step(g) -> void:
@@ -140,6 +141,14 @@ const LOW_STOCK := 3 # below this, deployable material is the binding constraint
 
 
 static func try_shop(g) -> bool:
+	# issue 101 + 103: the bot buys through Shop.buy without ever opening the
+	# panel, and the Wave gate lives ON THE PANEL — so without this check the
+	# bot would shop from Wave 1 while a player cannot. The whole point of the
+	# 103 harness is that the bot must not be able to do what a player cannot,
+	# or its measurements stop describing the real game. This is the cross-PR
+	# follow-up shop.gd's can_buy header calls for.
+	if g.wave < Tuning.SHOP_UNLOCK_WAVE:
+		return false
 	# Pieces first while Stock is thin — that is the resource the bot actually
 	# runs out of. Otherwise take the cheapest thing it can hold, so a full
 	# wallet keeps converting into board presence.

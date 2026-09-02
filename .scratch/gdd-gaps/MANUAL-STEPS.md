@@ -208,6 +208,21 @@ century autocrats is not, so 13+ is the honest declaration rather than a conveni
 Note the IARC content-rating questionnaire is SEPARATE and will land at PEGI 12 or 16 on the
 historical-violence questions.
 
+### Values produced by A5 (record — the backend needs them)
+
+| Value | |
+| --- | --- |
+| **Play Games Application ID** | **`292256536070`** |
+| OAuth client ID | `292256536070-r8mmdpv4m3prpppa714792n908mtofgm.apps.googleusercontent.com` |
+| Bound to | `com.sharpunk.nokings` + SHA-1 `BE:78:…:FF:FE` |
+
+The **Application ID** is the one the game itself needs: it goes into the Android manifest as
+`com.google.android.gms.games.APP_ID`, and the plugin reads it from there. It is the numeric
+prefix of the OAuth client id, not a separate secret.
+
+Neither value is a credential — an Android OAuth client has no secret, and the security
+boundary is package name + signing fingerprint.
+
 ### A7. Create the leaderboard
 **Setup and management -> Leaderboards -> Create leaderboard.**
 

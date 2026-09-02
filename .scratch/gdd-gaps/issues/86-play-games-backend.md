@@ -81,7 +81,7 @@ export and the APK is valid, but a store build will want one.
 Play Games sign-in needs an **OAuth client tied to the package name AND the signing
 certificate fingerprint**, both of which are issued by the Play Console. So:
 
-1. A Play Console entry for `com.sharpmox.nokings` (one-time $25 developer account).
+1. A Play Console entry for `com.sharpunk.nokings` (one-time $25 developer account).
 2. Leaderboard IDs created in that console.
 3. An Android device with USB debugging.
 
@@ -140,7 +140,7 @@ Sign-in needs an OAuth client tied to the package name **and the signing certifi
 fingerprint**, both issued by the Play Console. No amount of local work produces those. Still
 required from the user:
 
-1. A Play Console entry for `com.sharpmox.nokings` (one-time $25 developer account).
+1. A Play Console entry for `com.sharpunk.nokings` (one-time $25 developer account).
 2. Leaderboard IDs created there.
 3. An Android device with USB debugging.
 

@@ -12,6 +12,27 @@
 ## to change.
 
 
+## --- Play Games identifiers, issued by the Play Console (issue 86) ----------
+## Not secrets. An Android OAuth client has no client secret; the security
+## boundary is the package name plus the signing certificate fingerprint, which
+## is what the credential binds to.
+
+## Goes into the Android manifest as `com.google.android.gms.games.APP_ID`; the
+## plugin reads it from there rather than from GDScript. Recorded here so the
+## value has one home in the repo.
+const APP_ID := "292256536070"
+
+## The GLOBAL Play Games leaderboard, created 2026-09-02.
+##
+## NOTE THIS IS NOT scripts/leaderboard.gd. That module (issue 85) is a
+## PERSONAL cross-device board: your own top ten, mirrored through the cloud
+## save and unioned per entry. This id addresses a board Google hosts and ranks
+## every player on. The two are complementary, and submitting to this one needs
+## a seam that does not exist yet — it is not part of the
+## is_available/push/pull/account_id contract this file implements.
+const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
+
+
 static func is_available() -> bool:
 	return false # TODO(native plugin): true once Play Games Saved Games is wired
 

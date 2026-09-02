@@ -45,11 +45,20 @@ Test and release / Monitor and improve / Grow users / Monetize with Play*, then 
 is collapsed — expand it. There is no top-level "Play Games Services" entry.
 
 ### A4. Create the Games Services project
-**Setup and management -> Configuration.** It asks how the game uses Google APIs; for a new
-game pick **"No, my game doesn't use Google APIs"**, which creates a fresh PGS project and
-links it to `No Kings`.
+**Setup and management -> Configuration** asks *"Which Play Games Services project do you want
+to use?"* with exactly two radio options:
 
-Then **Properties -> Edit properties** and give it a display name — required before testing.
+- **Create new Play Game Services project**  <- pick this
+- Use an existing Play Games Services project
+
+It then asks for a **Google Cloud project** to link ("Choose a cloud project to link with your
+PGS project"). Let it create one unless this game already has a Cloud/Firebase project.
+
+> Google's own docs (developer.android.com/games/pgs/console/setup) still describe an older
+> three-option screen with *"No, my game doesn't use Google APIs"*. That wording is gone —
+> verified against the live console 2026-09-02. Trust the console, not the doc.
+
+Then **Properties -> Edit properties** and set a display name — required before testing.
 
 ### A5. Create the OAuth credential — **the actual blocker**
 Still in **Configuration**, the **Credentials** section -> **Add credential** -> type
@@ -64,11 +73,17 @@ You may be asked to configure the OAuth consent screen first. The scopes involve
 > its own credential later. That is expected, not a mistake.
 
 ### A6. ENABLE SAVED GAMES — do not skip this
-**Setup and management -> Saved Games -> enable.**
-
 This is the feature slice 86 actually needs: Play Games **Snapshots** is what
-`cloud_backend_play_games.gd` mirrors saves through. Sign-in can work perfectly while every
-save silently fails if this is left off.
+`cloud_backend_play_games.gd` mirrors saves through. **Sign-in can work perfectly while every
+save silently fails** if it is left off.
+
+**It is not its own nav item.** The Setup and management list is *Configuration / Achievements /
+Game Stats / Events / Leaderboards / Publishing / Testers* — no "Saved Games" entry. It is a
+per-game setting inside **Configuration** (alongside the other game properties), and it may
+only appear once the PGS project from A4 exists.
+
+If you cannot find the toggle after A4, say so — the fallback is that Saved Games is implied by
+the `drive.appdata` OAuth scope from A5, and we confirm it works on device instead.
 
 ### A7. Create the leaderboard
 **Setup and management -> Leaderboards -> Create leaderboard.**

@@ -182,6 +182,16 @@ found. Collected here so they are not lost in Outcome sections:
   (`fix/blitz-and-crypto-wallet`, 2026-08-28, user call): Blitz itself now costs 0 actions
   and the target's next move/capture is free, so it no longer depends on the 2-actions/turn
   math this flag was measuring against.
+- **SUPERSEDED 2026-09-02 by issue 103 — read this first.** The table below was produced by a
+  bot that **never opened the Shop** (0 buys, 0 sells, 0 conversions across 90 runs, dying of
+  "resource starvation" on a median of 1640 unspent Gold). After teaching it to buy and
+  convert, the same 90 runs went **5 wins -> 55, with 15 FULL CLEARs**. Tier 1 went 0 -> 15
+  wins, Tier 4 1 -> 13. **Tier 5 barely moved: median wave 8.0 -> 9.5, still 0/18** — so Tier
+  5's difficulty is real and the rest of the ladder's was mostly the instrument. Also: **Tier
+  1 and Tier 2 are byte-identical** in both batches, because Tier 2's only lever is
+  `clock_never_pauses` and the bot opens no menus — Tier 2 is unmeasurable by autoplay by
+  construction. Re-measure with `tools/playtest.sh` before tuning anything.
+
 - **Tier 5 is unwinnable, and the gap to Tier 1 is now enormous.** Re-measured 2026-08-31,
   after the Score x10, Clock-to-15 and enemy-2-Actions changes all landed:
 

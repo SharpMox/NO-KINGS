@@ -1,6 +1,6 @@
 # 103 — Make the bot use every leverage, then playtest at scale
 
-Status: todo (planned 2026-09-01) — **gates the balance pass**
+Status: done (2026-09-02) — Phases 1 and 2 shipped; Phase 3 (runs in the hundreds) belongs to the balance pass, which this unblocked
 
 ## Parent
 

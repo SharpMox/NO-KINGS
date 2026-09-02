@@ -156,15 +156,33 @@ The conversion does not require abandoning the account: you create a new **payme
 of the organisation type, verify it, and link it to the existing developer account. Account
 type cannot be edited on an existing payments profile, which is why a new one is needed.
 
-**The deciding question is whether Sharpunk is a registered legal entity.** If it is not, this
-is not available at any price. If it is, one further factor is worth checking before choosing:
-Google requires consumer-facing developer contact details to be displayed on the store listing,
-and a Personal account shows an individual's name and address where an Organisation account
-shows the business's.
+**RESOLVED 2026-09-02: Sharpunk is a registered French company.** So the Organisation account
+is available, and is the right call — Google displays developer contact details on
+consumer-facing listings, and a Personal account shows **an individual's name and address**
+where an Organisation account shows the company's. For anything shipped publicly that alone
+justifies it.
 
-**Either way, do not block slice 86 on this.** The existing Personal account already works for
-everything in section A — sign-in, Saved Games, leaderboards and device testing. This is a
-publishing/identity decision, not a technical one.
+### Do it in parallel, not first
+
+**D-U-N-S is the long pole (up to 30 days) and nothing else waits on it.** So:
+
+1. **Request the D-U-N-S now** — dnb.com, free. A registered French company is already in the
+   Sirene registry and often already has a D&B record, so this can come back far faster than
+   the 30-day worst case. You will need the SIREN/SIRET and the registered address.
+2. **Meanwhile continue section A on the existing Personal account.** Sign-in, Saved Games,
+   leaderboards and device testing do not care about account type.
+3. **Convert when the D-U-N-S arrives**: new payments profile of the organisation type ->
+   verify -> link to the existing developer account.
+
+The developer account **ID stays the same** through that conversion (`5660342400699971142`),
+so the PGS project, the OAuth credential and the leaderboard ids created in section A are
+expected to survive it — they are bound to the app and the PGS project, not to the payments
+profile. Worth confirming rather than assuming at conversion time, but it is not a reason to
+delay section A.
+
+One thing to check before filing: the address that becomes public is the company's **siège
+social**. If Sharpunk is registered at a home address, an Organisation account does not hide it
+— a domiciliation service would.
 
 ---
 

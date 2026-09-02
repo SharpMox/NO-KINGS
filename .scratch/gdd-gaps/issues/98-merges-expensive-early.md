@@ -102,3 +102,22 @@ sandboxes whose purpose is walking a promotion chain by hand. They now carry a b
 
 15 is a first value, not a measured one. Issue 103 can now measure it — the harness reports
 `merge` counts and Gold per run — and the balance pass owns the figure.
+
+### A live-lock this slice introduced, and how it was found
+
+`autoplay.try_merge` reported success on **"found a legal pair"**, not on "the merge
+happened". Pricing merges made `do_merge` refuse when the Gold is short, so a bot holding a
+mergeable pair with no Gold returned `true` from `try_merge`, `step()` returned having done
+nothing, and the next frame retried the identical unaffordable merge — **a live-lock that
+burned the entire step budget at wave 2**.
+
+`run_all.sh` was **ALL GREEN throughout**: the autoplay suite asserts the bot does not crash,
+not that it makes progress. Nothing in the test surface could see this.
+
+It surfaced only on an **integration branch** merging all seven slices, where the same seed
+that reaches wave 91 on slice 103 alone reached **wave 2**. The A/B that identified it
+compared 103 alone against the integrated tree, then bisected — the stall was not visible from
+any single PR.
+
+Fixed at the source: `try_merge` checks `can_afford_merge` before claiming the turn's action,
+and falls through to moves and captures otherwise.

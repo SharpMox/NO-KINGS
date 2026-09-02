@@ -124,6 +124,20 @@ scope and would normally imply one.
 immediately for PGS, and Testing caps you at 100 test users with tokens that expire after 7
 days — which surfaces later as a device sign-in that mysteriously stops working.
 
+If the page says *"Google Auth Platform not configured yet"*, click **Get started** — it is a
+four-step wizard: app name + support email, **Audience: External**, contact email, agree and
+create. Internal is only selectable for Workspace users inside your own organisation.
+
+Afterwards, on the same left nav:
+
+- **Audience -> Publish app.** It lands in *Testing*, which caps at 100 test users and expires
+  tokens after 7 days. That later presents as "sign-in randomly stopped working on my phone".
+- **Data Access ->** add `games`, `games_lite`, `drive.appdata` if the Play Console asks. If
+  the UI warns about sensitive scopes, proceed — those three are exempt under PGS.
+
+Check the **project selector** reads `NO KINGS` before touching anything; the Cloud console
+silently remembers whichever project you last used.
+
 Then return to Play Console -> Credentials and **Refresh**.
 
 ### A5. Create the OAuth credential — **the actual blocker**

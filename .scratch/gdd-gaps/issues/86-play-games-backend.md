@@ -239,3 +239,31 @@ OAuth clients carry **no client secret**, so this is not a credential to protect
 boundary is the package name plus the signing fingerprint, which is why the pair is what the
 client binds to. The downloaded JSON is not needed by the plugin, which reads its app id from
 the Play Console configuration.
+
+## Shipping size, measured (2026-09-02)
+
+The 78 MB debug APK is **not** what anyone downloads. Built as an AAB — the format Google
+Play requires for new apps:
+
+| Artefact | Size | Why |
+| --- | --- | --- |
+| Non-Gradle APK | 28.4 MB | native libs deflated |
+| Gradle APK (debug) | 78.5 MB | Gradle stores native libs UNCOMPRESSED (`method 01:01`) so the OS can mmap them; install size unchanged |
+| **AAB (debug)** | **28.9 MB** | libs stored compressed again (`24.3 MB` from `72.7 MB` raw) |
+
+So the plugin's real cost is **~0.7 MB**, and the scary 78 MB was packaging, not payload.
+
+**A release build will be smaller still.** The engine templates differ:
+
+```
+android_debug.apk    121.2 MB   (libgodot_android.so, arm64: 72.7 MB raw)
+android_release.apk   99.8 MB   (libgodot_android.so, arm64: 67.9 MB raw)
+```
+
+That is ~4.8 MB less engine before compression, plus no debug symbols and R8 on the dex — so
+a release AAB should land comfortably under the debug 28.9 MB. Only one ABI is built
+(`arm64-v8a`), so Play's per-device split has little left to strip; the download will be close
+to the AAB size.
+
+`export_format` is left at **0 (APK)** for now: an AAB cannot be `adb install`ed, and device
+testing needs an APK. Flip it to 1 for store submission — see the publishing checklist.

@@ -98,10 +98,23 @@ nothing and read it at load time. Two exporters carry the same data to the Godot
   `@media (max-width: 560px)` (the established breakpoint). Prove desktop is untouched
   with a before/after pixel-diff at 1280px (target **0px**); anything intentionally
   site-wide is the exception and should be called out.
-- **Verify in a real browser.** Serve with `python3 -m http.server` and drive Playwright
-  (installed under `/tmp/node_modules`) to check: every page returns 200, zero console
-  errors in light + dark, no horizontal overflow on mobile, plus visual spot-checks.
+- **Verify in a real browser, with `agent-browser`.** Serve with `python3 -m http.server`,
+  then drive `agent-browser` (on PATH) to check: every page returns 200, zero
+  console errors in light + dark, no horizontal overflow on mobile, plus visual spot-checks.
   Run `node --check` on extracted inline scripts after editing JS.
+
+  ```sh
+  agent-browser open "http://localhost:8899/privacy.html" --viewport 390x844
+  agent-browser console --level error
+  agent-browser eval "document.documentElement.scrollWidth - window.innerWidth"   # expect 0
+  agent-browser screenshot /path/out.png
+  ```
+
+  **Not Playwright.** This file used to say Playwright was installed under
+  `/tmp/node_modules`; that install is broken (the `playwright` package there has no
+  `package.json`, so both `require` and ESM import fail) and it is a temp directory that
+  will not survive. `agent-browser` is on PATH, needs no project dependency, and drove the
+  whole check first time. Verified 2026-09-02 while adding privacy.html/terms.html.
 - **Match the surrounding page.** Styles/scripts are inline per page — keep edits in the
   same idiom and density as the file you're touching.
 

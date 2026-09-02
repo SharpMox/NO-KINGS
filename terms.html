@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Terms of use for the NO KINGS game: the licence to play it, what is not promised, and the law that applies.">
+  <title>NO KINGS / Terms</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
+  <style>
+  /* Same prose treatment as privacy.html — see the note there. Kept inline
+     per the site's convention that page-specific styles do not enter
+     site.css, rather than factored out for two pages. */
+  /* site.css styles `header h1` (size, weight, the lime->violet gradient) but
+     each page owns its hero CONTAINER width — see codex.html. A prose page
+     wants the title on the same reading column as the text, not centred on
+     the site's much wider --wrap, so both share one measure. */
+  :root { --doc-measure: 46rem; }
+  .hero { max-width: var(--doc-measure); margin: 0 auto; padding: 48px 20px 18px; }
+  .hero p { margin: 14px 0 0; max-width: 52ch; font-size: 16.5px; color: var(--text-soft); }
+  .doc { max-width: var(--doc-measure); margin: 0 auto; padding: 0 20px 72px; }
+  .doc h2 { margin: 44px 0 12px; font-size: 20px; line-height: 1.3; }
+  .doc h2:first-of-type { margin-top: 8px; }
+  .doc p, .doc li { line-height: 1.65; }
+  .doc ul { padding-left: 22px; margin: 10px 0; }
+  .doc li { margin: 6px 0; }
+  .doc .stamp { color: var(--text-soft, inherit); font-size: 14px; margin-bottom: 4px; }
+  .todo { background: #ffe9a8; color: #4a3600; padding: 1px 7px; border-radius: 4px;
+          font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+  .callout { border-left: 3px solid var(--accent); padding: 12px 16px; margin: 20px 0;
+             background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 0 6px 6px 0; }
+  .callout p { margin: 0; }
+  @media (max-width: 560px) {
+    .hero { padding: 34px 16px 14px; }
+    .doc { padding: 0 16px 56px; }
+    .doc h2 { font-size: 18px; }
+  }
+  </style>
+</head>
+<body>
+
+<div id="site-nav" data-page="terms"></div>
+
+<header class="hero">
+  <h1><em>Terms</em></h1>
+  <p>The licence to play NO KINGS, what is not promised, and the law that applies.</p>
+</header>
+
+<main class="doc">
+  <p class="stamp">Last updated: <span class="todo">TODO date</span> · Applies to the NO KINGS mobile game.</p>
+
+  <div class="callout">
+    <p><strong>The short version.</strong> Play it as much as you like. It is offered as-is,
+    with no promise that it is bug-free or that your saves survive. The game and its artwork
+    remain ours. French law applies.</p>
+  </div>
+
+  <h2>Who you are agreeing with</h2>
+  <p>NO KINGS is published by Sharpunk, a company registered in France
+  (<span class="todo">TODO SIREN</span>, registered office
+  <span class="todo">TODO address</span>). Installing or playing the game means accepting
+  these terms. Contact: <span class="todo">TODO contact email</span>.</p>
+
+  <h2>Your licence to play</h2>
+  <p>You get a personal, non-exclusive, non-transferable licence to install and play NO KINGS
+  on devices you control, for your own non-commercial use. That licence lasts as long as you
+  keep the game installed.</p>
+  <p>You may not resell or redistribute the game, take it apart to extract its assets, or pass
+  off its artwork as your own. Streaming, recording and publishing your own play is welcome and
+  needs no permission.</p>
+
+  <h2>What belongs to whom</h2>
+  <p>The game, its code, its artwork, its name and its characters belong to Sharpunk. Playing
+  the game grants no ownership in any of it. Your saved progress is yours.</p>
+
+  <h2>What is not promised</h2>
+  <p>The game is provided <strong>as-is</strong>. We do not promise it is free of defects, that
+  it runs on every device, that it remains available, or that cloud saves and leaderboards are
+  always reachable — those depend on Google Play Games, which is outside our control.</p>
+  <p>Back up anything you would be upset to lose. Progress can be lost through device failure,
+  uninstallation, or a platform-side problem we cannot fix.</p>
+
+  <h2>Liability</h2>
+  <p>To the extent French law allows, Sharpunk is not liable for indirect or consequential loss
+  arising from playing the game, including lost progress or lost time. Nothing here limits
+  liability that cannot lawfully be limited — in particular liability for death or personal
+  injury caused by negligence, or for fraud.</p>
+  <p>If you bought the game or anything inside it as a consumer in the EU, your statutory
+  consumer rights are unaffected by these terms.</p>
+
+  <h2>Cloud saves and leaderboards</h2>
+  <p>These are optional and provided through Google Play Games. Using them also means accepting
+  Google's terms. We can neither restore a save Google has lost nor remove a leaderboard entry
+  on your behalf — see the <a href="privacy.html">privacy policy</a> for how to manage both
+  yourself.</p>
+  <p>We may reset a leaderboard, or remove entries from it, where a score was obtained by
+  manipulating the game or the service.</p>
+
+  <h2>Changes and availability</h2>
+  <p>The game may be updated, changed or withdrawn. These terms may change too; the date at the
+  top shows when. Continuing to play after a change means accepting the revised terms.</p>
+
+  <h2>Governing law</h2>
+  <p>These terms are governed by French law. If you are a consumer, you keep the protection of
+  the mandatory rules of the country you live in, and any dispute may be brought before the
+  courts that have jurisdiction there.</p>
+</main>
+
+<footer class="foot">
+  <p class="foot-lead">Offered as-is, played however you like, still ours.</p>
+  <p><a href="privacy.html">Privacy policy</a> · <a href="codex.html">Back to the codex</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
+</body>
+</html>

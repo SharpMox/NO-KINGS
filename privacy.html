@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Privacy policy for the NO KINGS game: what leaves your device, what does not, and how to remove it.">
+  <title>NO KINGS / Privacy</title>
+  <link rel="stylesheet" href="assets/site.css">
+  <link rel="stylesheet" href="assets/nav.css">
+  <script src="assets/theme-init.js"></script>
+  <style>
+  /* ============================================================
+   *  Privacy — a prose page. Everything visual comes from
+   *  assets/site.css (palette, typography, nav, footer); this
+   *  block only sets the reading column and the spacing rhythm
+   *  that prose needs and the card/grid pages do not.
+   * ============================================================ */
+  /* site.css styles `header h1` (size, weight, the lime->violet gradient) but
+     each page owns its hero CONTAINER width — see codex.html. A prose page
+     wants the title on the same reading column as the text, not centred on
+     the site's much wider --wrap, so both share one measure. */
+  :root { --doc-measure: 46rem; }
+  .hero { max-width: var(--doc-measure); margin: 0 auto; padding: 48px 20px 18px; }
+  .hero p { margin: 14px 0 0; max-width: 52ch; font-size: 16.5px; color: var(--text-soft); }
+  .doc { max-width: var(--doc-measure); margin: 0 auto; padding: 0 20px 72px; }
+  .doc h2 { margin: 44px 0 12px; font-size: 20px; line-height: 1.3; }
+  .doc h2:first-of-type { margin-top: 8px; }
+  .doc h3 { margin: 26px 0 8px; font-size: 16px; color: var(--text); }
+  .doc p, .doc li { line-height: 1.65; }
+  .doc ul { padding-left: 22px; margin: 10px 0; }
+  .doc li { margin: 6px 0; }
+  .doc table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14.5px; }
+  .doc th, .doc td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .doc th { font-weight: 600; }
+  .doc .stamp { color: var(--text-soft, inherit); font-size: 14px; margin-bottom: 4px; }
+  /* Unresolved facts are marked so they cannot ship by accident — they are
+     loud on purpose, not styled to blend in. */
+  .todo { background: #ffe9a8; color: #4a3600; padding: 1px 7px; border-radius: 4px;
+          font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+  .callout { border-left: 3px solid var(--accent); padding: 12px 16px; margin: 20px 0;
+             background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 0 6px 6px 0; }
+  .callout p { margin: 0; }
+  @media (max-width: 560px) {
+    .hero { padding: 34px 16px 14px; }
+    .doc { padding: 0 16px 56px; }
+    .doc h2 { font-size: 18px; }
+    .doc table { font-size: 13.5px; }
+    .doc th, .doc td { padding: 8px 6px; }
+  }
+  </style>
+</head>
+<body>
+
+<div id="site-nav" data-page="privacy"></div>
+
+<header class="hero">
+  <h1><em>Privacy</em></h1>
+  <p>What leaves your device, what does not, and how to remove it.</p>
+</header>
+
+<main class="doc">
+  <p class="stamp">Last updated: <span class="todo">TODO date</span> · Applies to the NO KINGS mobile game.</p>
+
+  <div class="callout">
+    <p><strong>The short version.</strong> NO KINGS has no servers, no analytics, no advertising
+    and no third-party tracking. Everything the game stores stays on your device unless you
+    choose to sign in to Google Play Games — and even then, your saves go to <em>your own</em>
+    Google account storage, not to us. We never receive them.</p>
+  </div>
+
+  <h2>Who is responsible</h2>
+  <p>NO KINGS is published by Sharpunk, a company registered in France
+  (<span class="todo">TODO SIREN</span>, registered office
+  <span class="todo">TODO address</span>). For anything in this policy, contact
+  <span class="todo">TODO contact email</span>.</p>
+
+  <h2>What the game stores on your device</h2>
+  <p>The game keeps its state in your device's private application storage. Nothing here is
+  transmitted anywhere, and it is removed when you uninstall the game.</p>
+  <ul>
+    <li>The current run — board state, score, wave, and what you are carrying.</li>
+    <li>A local high-score table and a short history of recent runs.</li>
+    <li>Your settings, such as sound and animation preferences.</li>
+  </ul>
+
+  <h2>What happens if you sign in to Google Play Games</h2>
+  <p>Signing in is optional. The game is fully playable without it, and declining costs you
+  nothing but cloud backup and leaderboards. If you do sign in:</p>
+
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Where it goes</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Your Google Play Games player ID</td>
+        <td>Stays with Google. The game reads it to know which account a save belongs to.</td>
+        <td>So a save restored on a new device is yours and not someone else's.</td>
+      </tr>
+      <tr>
+        <td>Your save data (a few kilobytes)</td>
+        <td><strong>Your own</strong> Google Drive application-data folder, via Play Games Saved Games.</td>
+        <td>So progress survives a reinstall or a new phone.</td>
+      </tr>
+      <tr>
+        <td>Your score and Play Games display name</td>
+        <td>Google's leaderboard for this game.</td>
+        <td>Only if you post a score to the leaderboard.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>In every case Google is the party actually holding the data, under
+  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's own privacy policy</a>.
+  Sharpunk operates no server for this game and holds no copy of your saves, your account
+  identifier or your scores.</p>
+
+  <h3>Data leaving the EU</h3>
+  <p>Google processes this data on infrastructure that may sit outside the European Union.
+  That transfer is governed by Google's terms and safeguards, not by ours, because the data
+  never passes through our hands.</p>
+
+  <h2>What the game does not do</h2>
+  <ul>
+    <li>No analytics or telemetry SDK of any kind.</li>
+    <li>No advertising, and no advertising identifier is read.</li>
+    <li>No crash-reporting service.</li>
+    <li>No social, attribution or marketing SDKs.</li>
+    <li>No sale or sharing of personal data — there is none to sell.</li>
+  </ul>
+
+  <h2>How long anything is kept</h2>
+  <p>Local data lasts until you delete it or uninstall the game. Cloud saves and leaderboard
+  entries live in your Google account for as long as you keep them.</p>
+
+  <h2>Removing your data</h2>
+  <ul>
+    <li><strong>Local data:</strong> uninstall the game, or clear its storage in your device settings.</li>
+    <li><strong>Cloud saves:</strong> delete them from the Play Games app, under your profile's
+      saved-games list for NO KINGS.</li>
+    <li><strong>Leaderboard entries and your Play Games profile:</strong> managed in your Google
+      account, since they belong to Google's service rather than to us.</li>
+  </ul>
+
+  <h2>Your rights</h2>
+  <p>Under the GDPR you have the right to access, correct, erase and port your personal data,
+  and to object to or restrict its processing. Because Sharpunk holds none of your data for
+  this game, requests about saves, scores or your player profile are answered by Google, and
+  the routes above are the fastest way to act on them. For anything concerning Sharpunk
+  specifically, write to <span class="todo">TODO contact email</span>.</p>
+  <p>If you believe your data has been mishandled you may complain to the French supervisory
+  authority, the <a href="https://www.cnil.fr/" target="_blank" rel="noopener">CNIL</a>.</p>
+
+  <h2>Children</h2>
+  <p><span class="todo">TODO confirm audience</span> — NO KINGS is not directed at children
+  under 15, and the game does not knowingly collect data from them. This section must match
+  the target-audience declaration made in the Google Play Console.</p>
+
+  <h2>Changes</h2>
+  <p>If the game gains a feature that changes any of the above — a different platform's cloud
+  save, or anything that transmits data — this page is updated before that feature ships, and
+  the date at the top changes with it.</p>
+</main>
+
+<footer class="foot">
+  <p class="foot-lead">NO KINGS stores what it must, on your device, and asks Google to hold the rest under your own account.</p>
+  <p><a href="terms.html">Terms of use</a> · <a href="codex.html">Back to the codex</a>. Built as a single static HTML file — no servers, no frameworks.</p>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/theme.js"></script>
+</body>
+</html>

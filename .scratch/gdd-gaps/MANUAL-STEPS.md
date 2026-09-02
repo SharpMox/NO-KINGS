@@ -65,13 +65,17 @@ The dialog will not proceed without one ("Cloud project is a required field"). C
 
 - **Organisation: choose "No organization".** A GCP organisation is not a name you type — it
   is created by claiming a domain (sharpunk.com) in Cloud Identity or Workspace, which mints
-  new identities like `max@sharpunk.com`. The Play Console developer account here is
-  `charp.max@gmail.com`, and the PGS dialog requires you to be an **owner** of the Cloud
-  project for it to even appear in the list. Creating the project under a different identity is
+  new identities like `max@sharpunk.com`. The PGS dialog requires you to be an **owner** of the
+  Cloud project for it to even appear in the list, so creating it under a different identity is
   a fast route to an ownership mismatch that looks like a bug.
-  **Keep everything on the single Google account that owns the Play Console entry.**
-  Cloud Identity Free does exist if sharpunk ever becomes a multi-person company, and projects
-  can be migrated into an organisation later — so this is deferral, not a closed door.
+  **Keep everything on the single Google account that owns the Play Console developer
+  account** — whichever that is; check the avatar in both tabs rather than assuming.
+  Cloud Identity Free exists if Sharpunk ever becomes a multi-person company, and projects can
+  be migrated into an organisation later — so this is deferral, not a closed door.
+
+  > This file previously named a specific Gmail address here as the Play Console owner. That
+  > was inferred from the local dev environment, not from the Console, and was wrong. The
+  > developer account is **Sharpunk**, ID `5660342400699971142`, type **Personal**.
 - Name it something obvious, e.g. `no-kings`. The project ID is generated from it.
 - **Do NOT attach a billing account.** Creating a project is free, and the Games API is not a
   billable service. Google's own PGS docs only mention billing under *viewing and managing
@@ -130,6 +134,37 @@ with an unhelpful error. This step is skipped constantly and costs an hour of co
 PGS settings have their own **Publish Game** action, separate from publishing the app. The
 configuration must be published before it takes effect on a device — the app itself does not
 need to be published.
+
+---
+
+## A-bis. Play Console account type: Personal vs Organisation
+
+Separate decision from the GCP organisation above, and easy to conflate. The existing
+developer account is **Sharpunk / Personal account / ID 5660342400699971142**.
+
+**Switching to an Organisation account requires, per Play Console Help:**
+
+| Requirement | Cost |
+| --- | --- |
+| **D-U-N-S number** (mandatory) | free from Dun & Bradstreet, **up to 30 days** if you do not have one |
+| Official organisation documents | you must be a **real registered legal entity** |
+| Identity document for the account owner | — |
+| Website verified in Google Search Console | sharpunk.com is already owned, so cheap |
+| Google fee | **none** — no second $25 |
+
+The conversion does not require abandoning the account: you create a new **payments profile**
+of the organisation type, verify it, and link it to the existing developer account. Account
+type cannot be edited on an existing payments profile, which is why a new one is needed.
+
+**The deciding question is whether Sharpunk is a registered legal entity.** If it is not, this
+is not available at any price. If it is, one further factor is worth checking before choosing:
+Google requires consumer-facing developer contact details to be displayed on the store listing,
+and a Personal account shows an individual's name and address where an Organisation account
+shows the business's.
+
+**Either way, do not block slice 86 on this.** The existing Personal account already works for
+everything in section A — sign-in, Saved Games, leaderboards and device testing. This is a
+publishing/identity decision, not a technical one.
 
 ---
 

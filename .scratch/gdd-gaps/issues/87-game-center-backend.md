@@ -201,3 +201,9 @@ blocker list, so it adds nothing new.
 Nothing breaks. The design is local-first — `cloud_save.gd` treats local as the source of truth
 and the cloud as a mirror, and `cloud_backend_noop.gd` is the shipped desktop reality today. A
 device with iCloud disabled simply plays offline, which is the same path desktop already takes.
+
+## Bundle id ruled (2026-09-02)
+
+**`com.sharpunk.nokings`** — the same id as Android (user ruling). Reverse-DNS of a domain
+actually owned, and App Store Connect bundle ids are as permanent as Play application ids, so
+this is decided before the entry exists rather than after.

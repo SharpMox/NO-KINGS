@@ -4,7 +4,7 @@ Everything in this file needs an account, a payment, a device or a GUI login. No
 be done from the dev loop, which is why these two slices are stalled while the rest of the
 backlog is merged.
 
-Ordered so that **the first three unblock Android entirely**. iOS is deliberately last — see
+Ordered so that **section A unblocks Android entirely**. iOS is deliberately last — see
 issue 87 for why it is the harder half.
 
 ---
@@ -35,33 +35,57 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 Console -> **Create app**. Name `No Kings`, type **Game**, free. Nothing needs uploading yet —
 the entry alone is what issues the credentials.
 
-### A3. Create the Play Games Services project and link it
-Console -> **Play Games Services -> Setup and management -> Configuration**. Create a new
-Games Services project and link it to the `No Kings` app.
+### A3. Find Play Games Services — it is NOT top-level
+Everything below lives under one collapsed menu:
 
-### A4. Create the OAuth client — **this is the actual blocker**
-Games Services -> **Credentials -> Add credential -> Android**. It will ask for the package
-name and the **SHA-1** above. This is what cannot be produced locally: the credential is bound
-to *both* the package name *and* the signing certificate.
+> **Grow users -> Play Games Services -> Setup and management**
 
-> **Give it the DEBUG SHA-1 above for now.** A release build is signed with a different key and
-> needs its own credential added later — that is normal and expected, not a mistake.
+If the sidebar only shows *Dashboard / Statistics / Publishing overview / Protected with Play /
+Test and release / Monitor and improve / Grow users / Monetize with Play*, then **Grow users**
+is collapsed — expand it. There is no top-level "Play Games Services" entry.
 
-### A5. Create the leaderboard(s)
-Games Services -> **Leaderboards -> Create leaderboard**.
+### A4. Create the Games Services project
+**Setup and management -> Configuration.** It asks how the game uses Google APIs; for a new
+game pick **"No, my game doesn't use Google APIs"**, which creates a fresh PGS project and
+links it to `No Kings`.
+
+Then **Properties -> Edit properties** and give it a display name — required before testing.
+
+### A5. Create the OAuth credential — **the actual blocker**
+Still in **Configuration**, the **Credentials** section -> **Add credential** -> type
+**Android**. It asks for the package name and the **SHA-1** from the table above. This is the
+one thing that cannot be produced locally: the credential binds to *both* the package name
+*and* the signing certificate.
+
+You may be asked to configure the OAuth consent screen first. The scopes involved are
+`games`, `games_lite` and **`drive.appdata`** — the last is what Saved Games uses.
+
+> **Give it the DEBUG SHA-1 for now.** A release build is signed with a different key and needs
+> its own credential later. That is expected, not a mistake.
+
+### A6. ENABLE SAVED GAMES — do not skip this
+**Setup and management -> Saved Games -> enable.**
+
+This is the feature slice 86 actually needs: Play Games **Snapshots** is what
+`cloud_backend_play_games.gd` mirrors saves through. Sign-in can work perfectly while every
+save silently fails if this is left off.
+
+### A7. Create the leaderboard
+**Setup and management -> Leaderboards -> Create leaderboard.**
 
 - Name: `High Score`
 - Format: **Integer**, higher is better
-- **Copy the leaderboard ID** it generates (looks like `CgkI...`). Paste it back to me — the
-  code needs it as a constant, and there is no way to guess it.
+- **Copy the leaderboard ID** it generates (looks like `CgkI...`) and send it to me. The code
+  needs it as a constant and there is no way to guess it.
 
-### A6. Add yourself as a tester
-Games Services -> **Testers**. Add your own Google account, or sign-in fails on device with an
-unhelpful error. This step is skipped constantly and costs an hour of confusion.
+### A8. Add yourself as a tester
+**Setup and management -> Testers.** Add your own Google account, or on-device sign-in fails
+with an unhelpful error. This step is skipped constantly and costs an hour of confusion.
 
-### A7. Download the plugin config
-Games Services -> **Configuration** offers a resources/config block. Save it — the plugin needs
-the app id from it.
+### A9. Publish the Games Services configuration
+PGS settings have their own **Publish Game** action, separate from publishing the app. The
+configuration must be published before it takes effect on a device — the app itself does not
+need to be published.
 
 ---
 
@@ -96,8 +120,8 @@ designed for exactly that split. If you do want it:
    instance, so no iOS build can be produced here at all).
 2. **Apple Developer Program — $99/year.** Needed for the iCloud entitlement *and* for device
    installs.
-3. App Store Connect -> create the app with a bundle id (suggest `com.sharpunk.nokings` to
-   match Android).
+3. App Store Connect -> create the app with bundle id **`com.sharpunk.nokings`** (user
+   ruling 2026-09-02: match Android). Bundle ids are as permanent as Android's.
 4. Enable the **iCloud key-value store** capability, entitlement
    `com.apple.developer.ubiquitous-key-value-store`.
 5. Create the leaderboard in App Store Connect and copy its id back to me.
@@ -108,12 +132,12 @@ designed for exactly that split. If you do want it:
 
 ---
 
-## What I do the moment A1-A7 are done
+## What I do the moment A1-A9 are done
 
 1. Install `godot-sdk-integrations/godot-play-game-services` into `addons/`.
 2. Flip `gradle_build/use_gradle_build=true` — **already proven to build** (77.8 MB APK).
 3. Fill in `cloud_backend_play_games.gd` against the cache-and-defer shape in issue 86's fit
    analysis, so the synchronous contract survives the async SDK.
-4. Wire the leaderboard id from A5.
+4. Wire the leaderboard id from A7.
 5. Build, install to the device from B, and verify sign-in, a save round-trip and a
    leaderboard submit **on the device** — the only verification that counts here.

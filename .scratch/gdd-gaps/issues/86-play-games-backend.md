@@ -1,6 +1,6 @@
 # 86 — Google Play Games backend (Android)
 
-Status: in progress — **toolchain installed and an APK builds (2026-09-01)**; blocked on a Play Console entry
+Status: in progress — Console done, plugin installed and reaching the APK (2026-09-02); NEXT is the backend implementation, then device verification
 
 ## Parent
 

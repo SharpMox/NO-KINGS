@@ -99,6 +99,33 @@ Two constraints the dialog states, worth not tripping over:
 
 Then **Properties -> Edit properties** and set a display name — required before testing.
 
+### A5a. Configure the OAuth consent screen FIRST
+
+**Add credential is greyed out until this exists.** The Credentials page offers a **Configure**
+link that sends you to the Cloud console — recent versions call this **Google Auth Platform**
+(tabs: Branding / Audience / Clients) rather than "OAuth consent screen".
+
+| Field | Value |
+| --- | --- |
+| User type / Audience | **External** (a public game) |
+| App name | `No Kings` |
+| User support email | a Sharpunk address |
+| Developer contact email | same |
+| Scopes | `games`, `games_lite`, `drive.appdata` |
+
+**`drive.appdata` is what Saved Games uses** — it is why A6 and this step are connected.
+
+**No verification review is required.** All three PGS scopes are exempt from Google's app
+verification when used with Play Games Services, so there is no security assessment standing
+between this and launch. Worth knowing because `drive.appdata` looks like a sensitive Drive
+scope and would normally imply one.
+
+**Publish the consent screen rather than leaving it in Testing.** Google recommends publishing
+immediately for PGS, and Testing caps you at 100 test users with tokens that expire after 7
+days — which surfaces later as a device sign-in that mysteriously stops working.
+
+Then return to Play Console -> Credentials and **Refresh**.
+
 ### A5. Create the OAuth credential — **the actual blocker**
 Still in **Configuration**, the **Credentials** section -> **Add credential** -> type
 **Android**. It asks for the package name and the **SHA-1** from the table above. This is the

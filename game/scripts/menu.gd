@@ -67,12 +67,28 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# would still say guest. The player would then be silently syncing one
 	# account's cloud data into another account's saves.
 	#
-	# Guarded on signed_in() rather than a flag so it is idempotent: a guest or a
-	# fresh install binds, an already-bound account does nothing.
-	if not Account.signed_in():
+	# Idempotent by comparing the STORED owner to the live player id, rather than
+	# just asking whether we are signed in. A plain signed_in() check binds a
+	# guest and then never looks again — so a player who switches Google account
+	# on the device keeps saves owned by the OLD id while the cloud syncs under
+	# the new one, and resolve() does not read owners, so the two accounts'
+	# progress quietly merges. Comparing ids covers the first bind and the switch
+	# with the same branch, and costs nothing on the common path where they match.
+	var id: String = CloudSave.backend.account_id()
+	if id != "" and Account.owner() != id:
 		# GOOGLE, because Play Games is the only provider that reaches this
 		# signal. Game Center is issue 87 and will need its own path.
-		Account.sign_in(Account.GOOGLE, CloudSave.backend.account_id(), _SAVE_PATHS())
+		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
+	# An account can bind with no button pressed — the silent sign-in at boot —
+	# so the UI it invalidates is corrected here rather than in the button.
+	if is_instance_valid(sync_button):
+		sync_button.visible = false
+	# And if the login screen is still up, it is now asking for something that
+	# already happened. Dismiss it rather than making the player sign in again
+	# to a session they are already in.
+	if login_center != null and login_center.visible:
+		login_center.visible = false
+		main_box.visible = true
 	for key: String in _SYNC_KEYS():
 		Bridge.fetch(key)
 
@@ -87,6 +103,12 @@ var about_center: CenterContainer
 var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
+
+## The main menu's "Sign in to sync", for a guest. A MEMBER rather than a local
+## because _on_sign_in_finished has to hide it: an account can bind without any
+## button being pressed — the plugin signs in silently at boot — and a local
+## would leave it advertising sign-in to an account that just signed in.
+var sync_button: Button
 
 
 func _ready() -> void:
@@ -161,7 +183,6 @@ func _ready() -> void:
 	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
 	# unreachable by any player. This is the entry point that makes it real.
 	# Hidden once signed in, and on any platform that cannot sync at all.
-	var sync_button: Button = null
 	if Account.provider() == Account.GUEST and Bridge.supported():
 		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
 			main_box.visible = false

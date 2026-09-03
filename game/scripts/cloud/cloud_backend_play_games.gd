@@ -40,13 +40,28 @@ const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
 ## directions is a cyclic reference.
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 
+## Safe to preload: account.gd preloads nothing, so there is no cycle back to
+## this file the way there would be with cloud_save.gd.
+const Account := preload("res://scripts/account.gd")
+
 
 ## Whether there is an ACCOUNT to sync with right now — not whether this device
 ## could ever do cloud. Every caller of this (push/pull/sync_file, and
 ## leaderboard.cloud_available) means the former. `Bridge.supported()` answers
 ## the latter, and the login screen uses that one instead. See ADR 0003.
 static func is_available() -> bool:
-	return Bridge.signed_in
+	# Signed in AND the signed-in player is the one this install's saves belong
+	# to. The second half matters because the local files are stamped with an
+	# owner: if the device's Google account changes, every sync path — push,
+	# pull, sync_file, the leaderboard — would otherwise carry one account's
+	# progress into another's cloud, and resolve() compares waves rather than
+	# owners so the deeper run simply wins. One condition here makes the whole
+	# cloud inert on a mismatch, instead of guarding six call sites.
+	#
+	# It reads false during the moment between signing in and binding, which is
+	# correct: there is no agreed account yet. menu.gd binds first and fetches
+	# after, so nothing is lost by that ordering.
+	return Bridge.signed_in and Account.owner() == Bridge.player_id
 
 
 ## Accepted for delivery, not confirmed written: the SDK reports the outcome

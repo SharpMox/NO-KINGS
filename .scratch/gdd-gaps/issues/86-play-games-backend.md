@@ -410,3 +410,42 @@ Re-saving the chosen winner is therefore the only lever the plugin offers, and t
    and it is the one thing most likely to be subtly wrong.
 4. Settle the OPEN RISK above by checking the Cloud console's Data Access page after the first
    real sign-in.
+
+## OPEN DESIGN QUESTION: what should a Google account switch do?
+
+Found in the final auth review (2026-09-03). The data loss is stopped; the
+product behaviour is not decided, and deciding it is a user call.
+
+**What was wrong.** `menu.gd` rebound the account whenever the stored owner
+differed from the signed-in player id. That is right for a guest — issue 83's
+whole ruling — and wrong for a player who changes the device's Google account,
+because `account.gd` says plainly why the rebind is safe: *"it never merges two
+histories, because until sign-in there is only one."* On a switch there are two.
+
+Rebinding restamped account A's saves as B's, and the fetch that follows
+resolved A's local run against B's cloud one. `resolve()` is highest-wave-wins
+and **does not read owners**, so A's deeper run overwrote B's saved game
+permanently; scores and history carry no wave and fell to last-write-wins,
+taking B's outright. Silent, and it destroyed the data of an account the player
+was not even playing at the time.
+
+**What it does now.** A switch does nothing: no rebind, no fetch, and
+`is_available()` reports false while the stored owner and the live player id
+disagree — one condition that makes every cloud path inert rather than six
+guarded call sites. The player keeps playing locally under account A.
+
+**What is undecided.** That is a refusal, not an answer. The honest options:
+
+| Option | Cost |
+| --- | --- |
+| Per-account local saves | The real fix. Saves become account-scoped, so A and B each keep their own; needs a save-path change and a migration |
+| Prompt on switch | "You're signed in as B. Keep playing A's game offline, or switch to B's?" — needs UI and a discard path |
+| Refuse silently (today) | Free, and the cloud silently stops working for a player who did something reasonable |
+
+Today's behaviour is the safest of the three and the worst to explain, which is
+why it is written down here rather than left to be rediscovered. Nothing tells
+the player their cloud has stopped — that is the part most worth fixing first if
+this is picked up.
+
+**Reachability is low** (the player has to change the device's Google account)
+which is why it is not treated as blocking, but the consequence is permanent.

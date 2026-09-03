@@ -244,6 +244,11 @@ func show_win_screen() -> void:
 func show_preview(id: String) -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
+	# Raised for the same reason every other panel is. preview_panel and
+	# box_panel were the only two added to the HUD that never did, so any panel
+	# built later outranked them permanently — and `preview_open` deadens
+	# _unhandled_input while the panel it refers to is hidden behind the Shop.
+	preview_panel.move_to_front()
 	preview_panel.visible = true
 	var center := CenterContainer.new()
 	preview_panel.add_child(center)
@@ -985,6 +990,12 @@ func hide_choice_pick() -> void:
 
 
 func show_box(options: Array) -> void:
+	# Above everything, like every other panel. Without this a Box could open
+	# behind the Shop — reachable on any restock wave that also queues a Bounty
+	# box — while box_open gates every input path in the game. The player saw
+	# the Shop, could not act, and the clock kept draining, because Box Pick is
+	# deliberately excluded from the tier pause list.
+	box_panel.move_to_front()
 	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
 		# top of a Box's own native picks (Huge = 2 — issue 47)
 	var title := "📦 %s %s Box — pick %d:" % [

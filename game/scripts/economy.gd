@@ -265,8 +265,16 @@ static func record_score(g) -> int:
 	scores.append({"score": g.score, "wave": g.wave, "kings": g.kings_defeated})
 	scores.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
 		return int(x.score) > int(y.score))
+	# Null-checked: a failed open here would crash at game over, taking the whole
+	# result screen with it. Closed before the mirror, which reads the file back
+	# through a separate handle. Same shape as the autosave in game.gd.
 	var f := FileAccess.open(g.SCORES_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("scores: could not write %s (error %d)"
+			% [g.SCORES_PATH, FileAccess.get_open_error()])
+		return rank
 	f.store_string(JSON.stringify(scores.slice(0, 10)))
+	f = null # close before the mirror reads the file back through its own handle
 	CloudSave.sync_file("scores", g.SCORES_PATH, Leaderboard.merge) # union, never pick-a-side
 	return rank
 
@@ -283,7 +291,12 @@ static func record_history(g, won: bool) -> void:
 		"tariffs": g.tariffs_seen.size(), "lost": g.lost_player, "won": won,
 	})
 	var f := FileAccess.open(g.HISTORY_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("history: could not write %s (error %d)"
+			% [g.HISTORY_PATH, FileAccess.get_open_error()])
+		return
 	f.store_string(JSON.stringify(history.slice(0, HISTORY_CAP)))
+	f = null # close before the mirror reads it back
 	CloudSave.sync_file("history", g.HISTORY_PATH, Leaderboard.merge_history) # union
 
 

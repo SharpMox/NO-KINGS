@@ -18,6 +18,10 @@ const NATIVE_SIZE := Vector2(128, 228)
 const UPSCALE := 3.0 # nearest-neighbour, suits the pixel-art source — smooth-
 	# scaling 128px art to fill the 480-wide window would look soft
 
+## Comfortably longer than the clip, short enough that a player staring at a
+## stream that never decoded gets to the menu rather than force-quitting.
+const INTRO_MAX_SECONDS := 20.0
+
 var _advanced := false
 
 
@@ -51,9 +55,30 @@ func _ready() -> void:
 	add_child(player)
 	player.play()
 
+	# Deadman timer. `finished` is the only automatic way out of this scene, and
+	# it never fires if the stream fails to decode — which is exactly the kind of
+	# thing that varies across Android hardware we cannot test on. The failure
+	# mode without this is a black screen on the FIRST thing a new player sees,
+	# indistinguishable from a hung app, on a launch path where the only other
+	# exit is knowing to tap. Cheap insurance against an uninstall.
+	#
+	# _advance is idempotent, so a normal playthrough just finds it already gone.
+	get_tree().create_timer(INTRO_MAX_SECONDS).timeout.connect(_advance)
+
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
+		_advance()
+
+
+## Android's hardware Back skips the intro, exactly as a tap does.
+##
+## Needed because quit_on_go_back is now off (project.godot): before that,
+## Back here quit the app, which was at least a response. Without a handler it
+## would do NOTHING on the very first screen of the game — which reads as a
+## frozen app to anyone whose reflex is to press Back.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_advance()
 
 

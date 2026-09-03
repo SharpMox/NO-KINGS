@@ -12,14 +12,36 @@ const Armies := preload("res://scripts/armies.gd")
 const Account := preload("res://scripts/account.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 
+const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
+
+## Every mirrored save, as cloud key -> local file. The single place that
+## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
+static func _SYNC_KEYS() -> Dictionary:
+	return {
+		"run": GameScript.SAVE_PATH,
+		"scores": GameScript.SCORES_PATH,
+		"history": GameScript.HISTORY_PATH,
+	}
+
+
 ## The local saves an account owns. Passed to Account.sign_in so the rebind
 ## restamps them — the guest's progress comes with them because it was never a
 ## separate history, it was this one under the old id.
 static func _SAVE_PATHS() -> Array:
-	return [GameScript.SAVE_PATH, GameScript.SCORES_PATH, GameScript.HISTORY_PATH]
+	return _SYNC_KEYS().values()
 
 
 static var window_sized := false # once per launch, not on every return to menu
+
+
+## A cloud snapshot arrived for `key` — mirror it to disk through the normal
+## resolve path, so the cloud copy only wins where it would have won at boot.
+## The connection dies with this menu instance, so returning to the menu
+## reconnects rather than stacking handlers. (issue 86 / T4)
+func _on_snapshot_loaded(key: String) -> void:
+	var paths := _SYNC_KEYS()
+	if paths.has(key):
+		CloudSave.sync_file(key, paths[key])
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
@@ -59,9 +81,15 @@ func _ready() -> void:
 	# pull the cloud mirror before deciding what's on disk (12): a no-op on
 	# desktop today, but on iOS/Android (once the native plugin lands) this
 	# is what makes a fresh install offer "Continue" from another device.
-	CloudSave.sync_file("run", GameScript.SAVE_PATH)
-	CloudSave.sync_file("scores", GameScript.SCORES_PATH)
-	CloudSave.sync_file("history", GameScript.HISTORY_PATH)
+	for key: String in _SYNC_KEYS():
+		CloudSave.sync_file(key, _SYNC_KEYS()[key])
+	# A snapshot fetched after sign-in lands asynchronously, long after the
+	# sync above has run. Mirroring it to disk is what actually restores
+	# progress on a fresh device. Null off Android, where nothing fetches.
+	# (issue 86 / T4)
+	var bridge := get_node_or_null(^"/root/PlayGamesBridge")
+	if bridge != null:
+		bridge.snapshot_loaded.connect(_on_snapshot_loaded)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -124,15 +152,39 @@ func _ready() -> void:
 		main_box.visible = true
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
-			# The backends are stubs until 86/87; is_available() is false on
-			# desktop and on a platform with no plugin yet. Say so plainly
-			# rather than appearing to sign in and silently doing nothing.
-			if not CloudSave.backend.is_available():
-				login_note.text = "%s sign-in isn't available on this device yet." \
-					% prov.capitalize()
+			var unavailable := "%s sign-in isn't available on this device yet." \
+				% prov.capitalize()
+			# supported() — the PLATFORM question — not is_available(), which
+			# reports whether an ACCOUNT is attached and is therefore false
+			# until sign-in completes. Guarding on that one here would make
+			# signing in impossible: the button would refuse forever. ADR 0003.
+			#
+			# Only Play Games is implemented (86). Game Center is 87 and its
+			# backend is still a stub, so Apple falls through to the same
+			# honest message rather than pretending.
+			if prov != Account.GOOGLE or not Bridge.supported() or bridge == null:
+				login_note.text = unavailable
 				return
-			Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
-			finish_login.call())
+			login_note.text = "Signing in…"
+			# ONE_SHOT: the button can be pressed again after a refusal, and a
+			# handler left connected would fire once per previous attempt.
+			bridge.sign_in_finished.connect(func(ok: bool) -> void:
+				if not ok:
+					login_note.text = unavailable
+					return
+				# Bound only now — account_id() is empty until the player id
+				# lands on the second async hop, and an empty owner id would be
+				# written into account.json permanently for this install.
+				Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+				# THE point of signing in: go and get what this account already
+				# has. Nothing else re-syncs after boot, so without this a new
+				# phone shows an empty history until a full run finishes — which
+				# reads as data loss, not staleness. Each answer arrives on
+				# snapshot_loaded below. (T4)
+				for key: String in _SYNC_KEYS():
+					Bridge.fetch(key)
+				finish_login.call(), CONNECT_ONE_SHOT)
+			Bridge.begin_sign_in())
 	_button(login_box, "Play as Guest", 22, func() -> void:
 		Account.start_guest()
 		finish_login.call())

@@ -33,55 +33,45 @@ const APP_ID := "292256536070"
 const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
 
 
-## --- the snapshot codec (issue 86 / T1) --------------------------------------
-## Play Games Snapshots are BYTES — `PlayGamesSnapshot.content` is a
-## PackedByteArray — so every envelope crosses JSON and utf8 on the way out and
-## back. Kept here rather than in the bridge autoload because it is pure: no
-## Node, no plugin classes, so the desktop suite can reach it. It is the only
-## part of this backend that runs off Android, and the only part under test.
+## The bridge owns the plugin's client Nodes and the cache this file reads.
+## The dependency runs ONE WAY — backend -> bridge — which is why the snapshot
+## codec lives over there rather than here: the bridge needs it too (to decode
+## a loaded snapshot and to settle a conflict), and preloading in both
+## directions is a cyclic reference.
+const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 
 
-static func encode(envelope: Dictionary) -> PackedByteArray:
-	return JSON.stringify(envelope).to_utf8_buffer()
-
-
-## The envelope in `bytes`, or null when there isn't a usable one.
-##
-## Empty bytes are the NORMAL first-run case, not an error: the bridge calls
-## load_game(create_if_not_found = true), which hands back an empty snapshot the
-## first time a device ever syncs. Returning null makes that read as "no cloud
-## copy", which resolve() already handles by keeping local.
-static func decode(bytes: PackedByteArray) -> Variant:
-	if bytes.is_empty():
-		return null
-	# JSON.new().parse(), not JSON.parse_string(): the static helper PRINTS a
-	# parse error, and a corrupt snapshot is a case we HANDLE — it falls back to
-	# local, which is already what resolve() does with a missing remote. Logging
-	# an error for something we recover from cleanly is how a suite teaches
-	# people to scroll past error lines.
-	var json := JSON.new()
-	if json.parse(bytes.get_string_from_utf8()) != OK:
-		return null
-	return json.data if json.data is Dictionary else null
-
-
+## Whether there is an ACCOUNT to sync with right now — not whether this device
+## could ever do cloud. Every caller of this (push/pull/sync_file, and
+## leaderboard.cloud_available) means the former. `Bridge.supported()` answers
+## the latter, and the login screen uses that one instead. See ADR 0003.
 static func is_available() -> bool:
-	return false # TODO(native plugin): true once Play Games Saved Games is wired
+	return Bridge.signed_in
 
 
-static func push(_key: String, _envelope: Dictionary) -> bool:
-	# TODO(native plugin): write _envelope (JSON-safe) to a Play Games
-	# Saved Games snapshot named _key.
-	return false
+## Accepted for delivery, not confirmed written: the SDK reports the outcome
+## later on game_saved, and there is nothing to await. Safe because local stays
+## the source of truth and every boot re-pushes.
+static func push(key: String, envelope: Dictionary) -> bool:
+	return Bridge.save(key, envelope)
 
 
-static func pull(_key: String) -> Variant:
-	# TODO(native plugin): read the Play Games Saved Games snapshot named
-	# _key and return its envelope Dictionary, or null if there isn't one.
-	return null
+## The last snapshot seen for `key`, and a refresh kicked off for next time.
+##
+## Answering from cache is what lets this stay synchronous under an async SDK.
+## Returning stale data — or null before the first snapshot lands — is safe
+## because resolve() is highest-wave-wins then last-write-wins, so a lagging
+## mirror always loses to local. See ADR 0003.
+static func pull(key: String) -> Variant:
+	Bridge.fetch(key)
+	return Bridge.snapshots.get(key)
 
 
 ## issue 83: the signed-in account's stable id, or "" when there is none.
 ## Part of the backend contract alongside is_available/push/pull.
+##
+## Cached from current_player_loaded, which is a SECOND async hop after
+## authentication — so this stays empty between "signed in" and "player
+## loaded", and T3 deliberately waits for the id before binding an account.
 static func account_id() -> String:
-	return ""
+	return Bridge.player_id

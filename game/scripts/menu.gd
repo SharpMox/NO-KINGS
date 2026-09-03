@@ -81,21 +81,34 @@ func _on_sign_in_finished(ok: bool) -> void:
 			login_note.text = "%s sign-in didn't complete. You can try again." \
 				% Account.GOOGLE.capitalize()
 		return
-	# Bound by comparing the STORED owner to the live id, not by asking whether
-	# we are signed in: a signed_in() test binds a guest once and never looks
-	# again, so switching Google account on the device would leave saves owned
-	# by the old id while the cloud synced under the new one — and resolve()
-	# does not read owners, so the two accounts' progress would merge. One
-	# comparison covers the first bind and the switch, and is free when they
-	# match. Empty ids never bind: that would write an owner nothing repairs.
+	# ADOPT the local saves only when there is one history to adopt. account.gd
+	# states the premise the rebind rests on: "it never merges two histories,
+	# because until sign-in there is only one." That is true for a guest, and
+	# FALSE for a player who changes the device's Google account.
+	#
+	# Rebinding on a switch restamps account A's saves as B's, and the fetch
+	# below then resolves A's local run against B's cloud one — highest wave
+	# wins, and resolve() does not read owners — so A's deeper run overwrites
+	# B's saved game permanently. Scores and history carry no wave and fall to
+	# last-write-wins, taking B's outright. Silent, and it destroys the data of
+	# an account the player was not even playing.
+	#
+	# So a switch does NOTHING here: no rebind, no fetch. is_available() also
+	# reports false while the ids disagree, which keeps the rest of the session
+	# from pushing A's progress into B. Keeping the two accounts genuinely
+	# separate needs per-account local saves — a real feature, and a design call
+	# rather than something to guess at. See issue 86.
 	var id: String = CloudSave.backend.account_id()
-	if id != "" and Account.owner() != id:
+	var unbound := not Account.signed_in() # guest, or no account file yet
+	if id != "" and unbound and Account.owner() != id:
 		# GOOGLE, because Play Games is the only provider that reaches this
 		# signal. Game Center is issue 87 and will need its own path.
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
 	if sync_button != null:
 		sync_button.visible = false
 	_finish_login()
+	if Account.owner() != id:
+		return # a different account is signed in; nothing here is safely syncable
 	for key: String in _SYNC_KEYS():
 		Bridge.fetch(key)
 
@@ -365,6 +378,14 @@ func _ready() -> void:
 		22, func() -> void:
 			if Account.needs_login():
 				Account.start_guest()
+				# The player is a guest as of now, so the main menu's sign-in
+				# entry applies to them. Its visibility was decided during
+				# _ready, when there was no account at all and provider() was
+				# "" — so without this it stays hidden until the next launch,
+				# missing exactly the session in which a new player is most
+				# likely to want it.
+				if sync_button != null:
+					sync_button.visible = true
 			_finish_login())
 	# The gate. --screenshot bypasses it too: a capture run on a machine with no
 	# account would otherwise photograph the login screen instead of the menu,

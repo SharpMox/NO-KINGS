@@ -21,6 +21,10 @@ const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 ## sign-in, short enough that a dead one does not strand the player.
 const SIGN_IN_TIMEOUT := 30.0
 
+## The login screen's resting status line. One const so the two places that
+## show it — first build, and every re-open — cannot drift.
+const LOGIN_TAGLINE := "Your progress follows your account."
+
 ## Every mirrored save, as cloud key -> local file. The single place that
 ## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
 static func _SYNC_KEYS() -> Dictionary:
@@ -117,19 +121,13 @@ func _on_sign_in_finished(ok: bool) -> void:
 		for key: String in _SYNC_KEYS():
 			Bridge.fetch(key)
 		return
-	if Account.signed_in():
-		# Bound to a DIFFERENT account. Say so rather than going quiet — the cloud
-		# is off for the session and nothing else on screen would mention it — and
-		# leave the login screen, since staying on it implies a fix that does not
-		# exist. There is no safe one without per-account saves; see issue 86.
-		if sync_button != null:
-			sync_button.text = "Signed in as another account"
-			sync_button.visible = true
-		_finish_login()
-		return
-	# Otherwise: a guest, or a first run with the login screen still up. Nothing
-	# is bound and nothing may be assumed, so leave the screen exactly as it is
-	# and let the player choose.
+	# Nothing to bind and nothing to sync — either a guest/first-run who has not
+	# chosen (leave the screen up for them), or an account SWITCH: signed in as
+	# someone other than this install's owner. A switch has no safe resolution
+	# without per-account saves (issue 86), so the main menu offers no control
+	# for it — a button that cannot help is a worse answer than none. The Scores
+	# screen names the state ("signed in as a different account") for a player
+	# who goes looking; nothing here needs to.
 
 
 ## Dismiss the login screen — but only if it is what the player is looking at.
@@ -338,6 +336,7 @@ func _ready() -> void:
 	# signed in a moment later. See _on_sign_in_finished.
 	if Bridge.supported():
 		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
+			login_note.text = LOGIN_TAGLINE # clear any stale "timed out" / "didn't complete"
 			main_box.visible = false
 			login_center.visible = true)
 		sync_button.visible = Account.provider() == Account.GUEST
@@ -372,7 +371,7 @@ func _ready() -> void:
 	login_note = Label.new()
 	login_note.add_theme_font_size_override("font_size", 13)
 	login_note.modulate = Color(1, 1, 1, 0.6)
-	login_note.text = "Your progress follows your account."
+	login_note.text = LOGIN_TAGLINE
 	login_box.add_child(login_note)
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(

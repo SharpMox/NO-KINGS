@@ -55,52 +55,109 @@ func _on_snapshot_loaded(key: String) -> void:
 ## the login screen on a first run. Either way this is the first moment the
 ## cloud can be read at all, so it is where the fetch belongs. The login button
 ## deliberately does NOT do this: it would only ever cover the first launch.
+## THE ONE PLACE A SIGN-IN VERDICT IS HANDLED — binding, cloud fetch and UI.
+##
+## It used to be two: this, plus a one-shot connected per button press that
+## owned the screen while this owned the account. Keeping them in step needed a
+## `settled` flag shared between the verdict and a timeout, and the two still
+## disagreed about the boot verdict, which arrives with no button pressed and
+## no screen up. One handler cannot disagree with itself.
+##
+## Reached three ways, and it must behave identically for all of them: the
+## plugin's silent check at startup, a button press, and a verdict that lands
+## after the screen gave up waiting. Everything below is therefore written to
+## run with or without the login screen on screen.
 func _on_sign_in_finished(ok: bool) -> void:
+	_sign_in_pending = false
+	_set_providers_disabled(false)
 	if not ok:
-		# Sign-in failed — including the silent check at boot. If this install is
-		# already BOUND to an account, its session has lapsed rather than never
-		# existing, and the entry point back to the login screen is otherwise
-		# guest-only: nothing on screen would offer a retry, and the cloud would
-		# stay dark with no explanation. Revealed only here, so it appears when
-		# there is genuinely something to reconnect to.
+		# Already BOUND means the session lapsed rather than never existing, and
+		# the way back to this screen is otherwise guest-only — so without this
+		# the cloud goes dark with nothing offering a retry.
 		if is_instance_valid(sync_button) and Account.signed_in():
 			sync_button.text = "Reconnect to sync"
 			sync_button.visible = true
+		if is_instance_valid(login_note) and login_center != null and login_center.visible:
+			login_note.text = "Sign-in didn't complete. You can try again."
 		return
-	# BINDING LIVES HERE, not in the login button's one-shot, because this
-	# handler is the only one that sees every success.
-	#
-	# The one-shot ignores a verdict that arrives after the timeout already gave
-	# up — correctly, since it must not yank a player out of whatever they moved
-	# on to. But Google answering late is still Google answering: the bridge is
-	# signed in, the cloud starts syncing, and without this the account file
-	# would still say guest. The player would then be silently syncing one
-	# account's cloud data into another account's saves.
-	#
-	# Idempotent by comparing the STORED owner to the live player id, rather than
-	# just asking whether we are signed in. A plain signed_in() check binds a
-	# guest and then never looks again — so a player who switches Google account
-	# on the device keeps saves owned by the OLD id while the cloud syncs under
-	# the new one, and resolve() does not read owners, so the two accounts'
-	# progress quietly merges. Comparing ids covers the first bind and the switch
-	# with the same branch, and costs nothing on the common path where they match.
+	# Bound by comparing the STORED owner to the live id, not by asking whether
+	# we are signed in: a signed_in() test binds a guest once and never looks
+	# again, so switching Google account on the device would leave saves owned
+	# by the old id while the cloud synced under the new one — and resolve()
+	# does not read owners, so the two accounts' progress would merge. One
+	# comparison covers the first bind and the switch, and is free when they
+	# match. Empty ids never bind: that would write an owner nothing repairs.
 	var id: String = CloudSave.backend.account_id()
 	if id != "" and Account.owner() != id:
 		# GOOGLE, because Play Games is the only provider that reaches this
 		# signal. Game Center is issue 87 and will need its own path.
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
-	# An account can bind with no button pressed — the silent sign-in at boot —
-	# so the UI it invalidates is corrected here rather than in the button.
 	if is_instance_valid(sync_button):
 		sync_button.visible = false
-	# And if the login screen is still up, it is now asking for something that
-	# already happened. Dismiss it rather than making the player sign in again
-	# to a session they are already in.
-	if login_center != null and login_center.visible:
-		login_center.visible = false
-		main_box.visible = true
+	_finish_login()
 	for key: String in _SYNC_KEYS():
 		Bridge.fetch(key)
+
+
+## Dismiss the login screen — but only if it is what the player is looking at.
+## A verdict can land long after they left it for Settings, the Guide or Scores,
+## each of which hides main_box, and showing main_box unconditionally would
+## surface the menu underneath whatever they opened. Signing in never moves the
+## player.
+func _finish_login() -> void:
+	if login_center == null or not login_center.visible:
+		return
+	login_center.visible = false
+	main_box.visible = true
+
+
+func _set_providers_disabled(locked: bool) -> void:
+	for b in provider_buttons:
+		if is_instance_valid(b):
+			b.disabled = locked
+
+
+## Start an interactive sign-in. Everything that happens AFTER this — binding,
+## the UI, the cloud fetch — belongs to _on_sign_in_finished, which also
+## handles the boot verdict this button never sees.
+func _on_provider_pressed(prov: String) -> void:
+	# supported() is the PLATFORM question. is_available() reports whether an
+	# ACCOUNT is attached, which is false until sign-in completes — guarding on
+	# it here would mean the button refused forever. ADR 0003.
+	#
+	# Only Play Games is implemented (86). Game Center is 87 and still a stub,
+	# so Apple gets the same honest message rather than pretending.
+	if prov != Account.GOOGLE or not Bridge.supported():
+		login_note.text = "%s sign-in isn't available on this device yet." % prov.capitalize()
+		return
+	# Already signed in silently, and _on_sign_in_finished has already bound the
+	# account — so there is nothing to do but leave. Without this the press would
+	# depend on the native side re-emitting a verdict for a session it has
+	# already authenticated, and if it does not, the buttons stay locked until
+	# the timeout tells the player a sign-in failed while they were signed in.
+	if Bridge.signed_in:
+		_finish_login()
+		return
+	_sign_in_pending = true
+	login_note.text = "Signing in…"
+	_set_providers_disabled(true) # one press at a time; Guest stays live
+	# Neither native hop is guaranteed to answer — a phone that just lost signal
+	# simply never calls back — and the screen would otherwise sit on "Signing
+	# in…" forever. The guest exit stays available throughout, but the provider
+	# buttons have to come back too.
+	#
+	# `_sign_in_pending` is what makes this and the verdict mutually exclusive:
+	# whichever lands first clears it, and the other finds nothing to do. The
+	# tree check matters because a SceneTreeTimer outlives this menu — the player
+	# can take the guest exit, start a run, and free every node touched here.
+	get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
+		if not is_inside_tree() or not _sign_in_pending:
+			return
+		_sign_in_pending = false
+		login_note.text = "%s sign-in timed out. Check your connection and try again." \
+			% prov.capitalize()
+		_set_providers_disabled(false))
+	Bridge.begin_sign_in()
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
@@ -113,6 +170,13 @@ var about_center: CenterContainer
 var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
+var login_note: Label # the login screen's status line
+var provider_buttons: Array[Button] = [] # Google/Apple; locked during a sign-in
+
+## A sign-in is in flight and no verdict has arrived. Replaces a per-press
+## `settled` box shared between two closures: with one handler there is one
+## piece of state, and the timeout's only job is to ask whether it is still set.
+var _sign_in_pending := false
 
 ## The main menu's "Sign in to sync", for a guest. A MEMBER rather than a local
 ## because _on_sign_in_finished has to hide it: an account can bind without any
@@ -263,129 +327,16 @@ func _ready() -> void:
 	login_head.text = "NO KINGS"
 	login_head.add_theme_font_size_override("font_size", 40)
 	login_box.add_child(login_head)
-	var login_note := Label.new()
+	login_note = Label.new()
 	login_note.add_theme_font_size_override("font_size", 13)
 	login_note.modulate = Color(1, 1, 1, 0.6)
 	login_note.text = "Your progress follows your account."
 	login_box.add_child(login_note)
-	var finish_login := func() -> void:
-		# Only dismisses the login screen if it is actually the thing on screen.
-		# A verdict can arrive long after the player left it — they may be in
-		# Settings, the Guide or Scores, each of which hides main_box — and
-		# unconditionally showing main_box would surface the main menu UNDERNEATH
-		# whatever they opened. Signing in should never move the player.
-		if not login_center.visible:
-			return
-		login_center.visible = false
-		main_box.visible = true
-	var provider_buttons: Array[Button] = []
+	provider_buttons.clear()
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(
-			_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
-				var unavailable := "%s sign-in isn't available on this device yet." \
-					% prov.capitalize()
-				# supported() — the PLATFORM question — not is_available(), which
-				# reports whether an ACCOUNT is attached and is therefore false
-				# until sign-in completes. Guarding on that one here would make
-				# signing in impossible: the button would refuse forever. ADR 0003.
-				#
-				# Only Play Games is implemented (86). Game Center is 87 and its
-				# backend is still a stub, so Apple falls through to the same
-				# honest message rather than pretending.
-				if prov != Account.GOOGLE or not Bridge.supported() or bridge == null:
-					login_note.text = unavailable
-					return
-				# ALREADY signed in, silently. The plugin authenticates an
-				# existing Play Games session on its own at startup, and on a
-				# first run that can land while this screen is still up — the
-				# menu listener takes it, but nothing binds an account, because
-				# the one-shot below is only connected on a press.
-				#
-				# Without this, pressing the button then depends on the native
-				# side re-emitting user_authenticated for a session it has
-				# already authenticated. If it does not, the buttons stay locked
-				# until the timeout and the player is told sign-in failed while
-				# being signed in. Binding directly costs one branch.
-				if Bridge.signed_in:
-					# `id != ""` for the same reason _on_sign_in_finished checks
-					# it: binding an empty owner would write
-					# {"owner": "", "provider": "google"} permanently, and the
-					# other call site's guard would then never repair it, since
-					# it only rebinds on a MISMATCH. The two call sites were
-					# asymmetric; they no longer are.
-					var live_id: String = CloudSave.backend.account_id()
-					if live_id != "":
-						Account.sign_in(prov, live_id, _SAVE_PATHS())
-					if sync_button != null:
-						sync_button.visible = false
-					finish_login.call()
-					return
-				login_note.text = "Signing in…"
-				# Locked while a sign-in is in flight. Each press would otherwise
-				# connect another one-shot AND start another sign-in, so a single
-				# verdict would run the whole completion path once per press.
-				for b in provider_buttons:
-					b.disabled = true
-				# Shared by the verdict and the timeout so whichever arrives
-				# first wins and the other becomes a no-op — without it a late
-				# refusal would overwrite the screen a player had moved on from.
-				var settled := [false]
-				var release := func(note: String) -> void:
-					if settled[0]:
-						return
-					settled[0] = true
-					login_note.text = note
-					for b in provider_buttons:
-						b.disabled = false
-				bridge.sign_in_finished.connect(func(ok: bool) -> void:
-					# Same hazard the timeout guards against, and easier to hit:
-					# the guest button stays live during a sign-in, so the player
-					# can take it, start a run, and free this whole screen while
-					# Google is still thinking. This lambda is connected to the
-					# AUTOLOAD, which outlives the menu, and it touches Buttons
-					# and Labels that would be gone.
-					if not is_inside_tree() or settled[0]:
-						return
-					if not ok:
-						# NOT `unavailable`. Reaching here means the platform was
-						# fine and the sign-in itself did not succeed — most often
-						# because the player dismissed Google's own dialog. Telling
-						# them it "isn't available on this device yet" blames the
-						# device for their choice, and implies retrying is pointless
-						# when it is the one thing that would work.
-						release.call("%s sign-in didn't complete. You can try again."
-							% prov.capitalize())
-						return
-					settled[0] = true
-					# UI ONLY. Both the account binding and the cloud fetch belong
-					# to _on_sign_in_finished, which runs for every success —
-					# including the silent one at boot and one that lands after
-					# this screen's timeout. Doing either here would cover only
-					# the case where a player happened to be watching.
-					for b in provider_buttons:
-						b.disabled = false
-					# No longer a guest, so the main menu's entry point to this
-					# screen goes away. It is built once at _ready and would
-					# otherwise sit there offering to sign in an account that
-					# just did.
-					if sync_button != null:
-						sync_button.visible = false
-					finish_login.call(), CONNECT_ONE_SHOT)
-				# Neither native hop is guaranteed to answer — a phone that just
-				# lost signal simply never calls back — and without this the
-				# screen sits on "Signing in…" with no way forward and no way
-				# back. Guest stays reachable, but only if the buttons return.
-				get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
-					# A SceneTreeTimer outlives this menu: the player can start a
-					# run while the sign-in is still pending, freeing every node
-					# `release` touches. Firing then would write to freed Buttons
-					# and a freed Label. Nothing needs releasing once the screen
-					# is gone, so leaving is the whole answer.
-					if not is_inside_tree():
-						return
-					release.call("%s sign-in timed out. Check your connection and try again."
-						% Account.GOOGLE.capitalize()))
-				Bridge.begin_sign_in()))
+			_button(login_box, "Sign in with %s" % prov.capitalize(), 22,
+				_on_provider_pressed.bind(prov)))
 	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
 	# exit, and the one control that must work when everything else has failed.
 	#
@@ -403,7 +354,7 @@ func _ready() -> void:
 		22, func() -> void:
 			if Account.needs_login():
 				Account.start_guest()
-			finish_login.call())
+			_finish_login())
 	# The gate. --screenshot bypasses it too: a capture run on a machine with no
 	# account would otherwise photograph the login screen instead of the menu,
 	# which is a silent trap on any fresh checkout rather than a real result.

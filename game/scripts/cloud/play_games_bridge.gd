@@ -45,6 +45,18 @@ const _PLUGIN_OK := 0
 ## with". Platform capability is a separate question; see `supported()` in T2.
 static var signed_in := false
 
+## True once sign-in has REACHED A VERDICT this session, either way.
+##
+## Exists because `sign_in_finished` is emitted long before anyone is listening.
+## The plugin checks an existing session at startup and answers in a second or
+## two; the Menu — the only persistent listener — does not exist until the 11.3s
+## intro finishes. So on every normal launch the boot verdict was emitted into
+## nothing and never re-queried, and the account never bound.
+##
+## Paired with `signed_in`, this lets a listener that arrives late reconstruct
+## what it missed instead of waiting for a signal that has already fired.
+static var sign_in_attempted := false
+
 ## The Play Games player id, cached from current_player_loaded. Empty until
 ## sign-in has completed AND the player has been loaded — it arrives on a
 ## SECOND async hop, not with authentication, which is why binding an account
@@ -218,6 +230,7 @@ static func begin_sign_in() -> void:
 func _on_authenticated(is_authenticated: bool) -> void:
 	if not is_authenticated:
 		signed_in = false
+		sign_in_attempted = true
 		sign_in_finished.emit(false)
 		return
 	_players.load_current_player(true)
@@ -228,10 +241,12 @@ func _on_authenticated(is_authenticated: bool) -> void:
 func _on_player_loaded(player: Variant) -> void:
 	if player == null:
 		signed_in = false
+		sign_in_attempted = true
 		sign_in_finished.emit(false)
 		return
 	player_id = str(player.player_id)
 	signed_in = true
+	sign_in_attempted = true
 	sign_in_finished.emit(true)
 
 

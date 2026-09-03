@@ -40,8 +40,10 @@ const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
 ## directions is a cyclic reference.
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 
-## Safe to preload: account.gd preloads nothing, so there is no cycle back to
-## this file the way there would be with cloud_save.gd.
+## Safe to preload: account.gd preloads only sync_queue.gd, which preloads
+## nothing — so no cycle back to this file, the way there would be with
+## cloud_save.gd. Worth restating rather than assuming: a bad preload here fails
+## as a compile error in the dependency role only, which is silent and vicious.
 const Account := preload("res://scripts/account.gd")
 
 

@@ -164,6 +164,21 @@ func _ready() -> void:
 		# an install's life, so "continue from another device" quietly did
 		# nothing for the returning player. (issue 86 / T4)
 		bridge.sign_in_finished.connect(_on_sign_in_finished)
+		# ...and CATCH UP on a verdict that already happened, because connecting
+		# is not enough. The plugin answers its startup check in a second or two;
+		# this menu does not exist until the 11.3s intro finishes, and it is
+		# rebuilt from scratch every time a run ends. So on a normal launch the
+		# boot verdict was emitted while nothing was listening, and nothing ever
+		# asked again — the account never bound, an account switch never
+		# rebound, and the Reconnect button never appeared. The signal is not a
+		# queue; the bridge's cached state is what survives, so read that.
+		#
+		# Deferred so it runs after this _ready has built main_box and
+		# sync_button, which the handler touches.
+		if bridge.signed_in:
+			_on_sign_in_finished.call_deferred(true)
+		elif bridge.sign_in_attempted:
+			_on_sign_in_finished.call_deferred(false)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -292,7 +307,15 @@ func _ready() -> void:
 				# until the timeout and the player is told sign-in failed while
 				# being signed in. Binding directly costs one branch.
 				if Bridge.signed_in:
-					Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+					# `id != ""` for the same reason _on_sign_in_finished checks
+					# it: binding an empty owner would write
+					# {"owner": "", "provider": "google"} permanently, and the
+					# other call site's guard would then never repair it, since
+					# it only rebinds on a MISMATCH. The two call sites were
+					# asymmetric; they no longer are.
+					var live_id: String = CloudSave.backend.account_id()
+					if live_id != "":
+						Account.sign_in(prov, live_id, _SAVE_PATHS())
 					if sync_button != null:
 						sync_button.visible = false
 					finish_login.call()
@@ -324,7 +347,14 @@ func _ready() -> void:
 					if not is_inside_tree() or settled[0]:
 						return
 					if not ok:
-						release.call(unavailable)
+						# NOT `unavailable`. Reaching here means the platform was
+						# fine and the sign-in itself did not succeed — most often
+						# because the player dismissed Google's own dialog. Telling
+						# them it "isn't available on this device yet" blames the
+						# device for their choice, and implies retrying is pointless
+						# when it is the one thing that would work.
+						release.call("%s sign-in didn't complete. You can try again."
+							% prov.capitalize())
 						return
 					settled[0] = true
 					# UI ONLY. Both the account binding and the cloud fetch belong

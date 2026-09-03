@@ -99,10 +99,11 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# separate needs per-account local saves — a real feature, and a design call
 	# rather than something to guess at. See issue 86.
 	var id: String = CloudSave.backend.account_id()
-	var unbound := not Account.signed_in() # guest, or no account file yet
-	if id != "" and unbound and Account.owner() != id:
-		# GOOGLE, because Play Games is the only provider that reaches this
-		# signal. Game Center is issue 87 and will need its own path.
+	# `not signed_in()` is the whole test: it means guest or no account, and a
+	# guest id can never equal a Google one, so comparing them as well would
+	# always be true. GOOGLE because Play Games is the only provider that
+	# reaches this signal; Game Center is issue 87 and needs its own path.
+	if id != "" and not Account.signed_in():
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
 	if sync_button != null:
 		sync_button.visible = false
@@ -119,7 +120,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 ## surface the menu underneath whatever they opened. Signing in never moves the
 ## player.
 func _finish_login() -> void:
-	if login_center == null or not login_center.visible:
+	if not login_center.visible:
 		return
 	login_center.visible = false
 	main_box.visible = true
@@ -127,8 +128,7 @@ func _finish_login() -> void:
 
 func _set_providers_disabled(locked: bool) -> void:
 	for b in provider_buttons:
-		if is_instance_valid(b):
-			b.disabled = locked
+		b.disabled = locked
 
 
 ## Start an interactive sign-in. Everything that happens AFTER this — binding,
@@ -190,17 +190,11 @@ var login_center: CenterContainer # issue 83, first run only
 var login_note: Label # the login screen's status line
 var provider_buttons: Array[Button] = [] # Google/Apple; locked during a sign-in
 
-## Which sign-in attempt is in flight, or 0 for none.
-##
-## A COUNTER, not a bool, because a timeout has to know whether it belongs to
-## the attempt still running. With a shared bool: press, get refused, press
-## again inside 30 seconds — which is exactly what the refusal message invites —
-## and the FIRST press's timer fires on the SECOND press's flag. It would unlock
-## the buttons and report a timeout while a real sign-in was still in flight,
-## and the real verdict would then find nothing pending and say nothing at all.
-##
-## The per-press closure box this replaced had that identity for free; a single
-## member lost it. One int buys it back.
+## Which sign-in attempt is in flight, or 0 for none. A COUNTER not a bool, so
+## a timeout can tell whether it belongs to the attempt still running: press,
+## get refused, press again inside 30s — which the refusal message invites —
+## and with a bool the first press's timer fires on the second press's flag,
+## unlocking the buttons mid-sign-in. Doubles as `was_interactive`.
 var _sign_in_gen := 0
 
 ## The main menu's "Sign in to sync", for a guest. A MEMBER rather than a local

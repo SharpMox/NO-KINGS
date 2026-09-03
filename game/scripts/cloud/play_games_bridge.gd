@@ -47,14 +47,10 @@ static var signed_in := false
 
 ## True once sign-in has REACHED A VERDICT this session, either way.
 ##
-## Exists because `sign_in_finished` is emitted long before anyone is listening.
-## The plugin checks an existing session at startup and answers in a second or
-## two; the Menu — the only persistent listener — does not exist until the 11.3s
-## intro finishes. So on every normal launch the boot verdict was emitted into
-## nothing and never re-queried, and the account never bound.
-##
-## Paired with `signed_in`, this lets a listener that arrives late reconstruct
-## what it missed instead of waiting for a signal that has already fired.
+## `sign_in_finished` fires ~2s after launch; the Menu — its only listener —
+## does not exist until the 11.3s intro ends, and is rebuilt after every run.
+## A signal is not a queue, so a listener arriving late reads this and
+## `signed_in` to reconstruct what it missed.
 static var sign_in_attempted := false
 
 ## The Play Games player id, cached from current_player_loaded. Empty until

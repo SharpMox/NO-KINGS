@@ -77,8 +77,31 @@ static func migrate(cfg: Dictionary) -> Dictionary:
 		match v:
 			1: cfg = _migrate_1_to_2(cfg)
 		v += 1
-	cfg["save_version"] = SAVE_VERSION
+	# Only claim the current version when we actually walked up to it. A save
+	# from a NEWER build falls straight through the loop above, and stamping it
+	# as current would relabel a version we cannot read as one we can — losing
+	# the only evidence that it is unreadable. Callers refuse it via
+	# is_loadable(); this makes a stray one fail honestly rather than silently.
+	if v <= SAVE_VERSION:
+		cfg["save_version"] = SAVE_VERSION
 	return cfg
+
+
+## True when THIS build can load `cfg` at all.
+##
+## Two ways a save arrives unloadable, and cloud sync (issue 86) is what made
+## the second one reachable — before it, saves never crossed devices:
+##
+##   * corrupt or truncated, so JSON.parse_string returned null;
+##   * written by a NEWER build, carrying a save_version this one has no
+##     migration for. migrate() only walks versions UP.
+##
+## Callers check this BEFORE offering to continue a run. A save that fails here
+## is left untouched on disk rather than deleted: the build that wrote it can
+## still read it, and deleting another version's progress to tidy up our own
+## menu would be the worst possible answer.
+static func is_loadable(cfg: Variant) -> bool:
+	return cfg is Dictionary and int(cfg.get("save_version", 0)) <= SAVE_VERSION
 
 
 ## Start the game from a config Dictionary instead of the normal SETUP flow.

@@ -109,6 +109,15 @@ static func _restamp(path: String, account_id: String) -> void:
 		return # scores/history may be Arrays; only owner-stamped Dicts rebind
 	parsed["owner"] = account_id
 	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		# Same guard as _write, and this one fires mid-sign-in: a save that
+		# cannot be reopened for writing would otherwise crash on a null handle
+		# at the exact moment a player is signing in. The stamp is provenance
+		# only — nothing gates loading on it — so failing to rebind one file
+		# costs the player nothing and must not take the sign-in down with it.
+		push_error("account: could not restamp %s (error %d)"
+			% [path, FileAccess.get_open_error()])
+		return
 	f.store_string(JSON.stringify(parsed))
 
 

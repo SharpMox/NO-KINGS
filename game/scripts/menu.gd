@@ -10,6 +10,7 @@ const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
 const Account := preload("res://scripts/account.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
@@ -165,10 +166,23 @@ func _ready() -> void:
 	title.text = "NO KINGS"
 	title.add_theme_font_size_override("font_size", 48)
 	main_box.add_child(title)
+	# Offered on whether the save can actually be READ, not on whether a file is
+	# there. The old check was file_exists alone, which fed JSON.parse_string
+	# straight into the run — so a corrupt file loaded `null`, and a save from a
+	# newer build loaded fields this one does not understand.
+	#
+	# Cloud sync is what made that reachable: sync_file writes whatever resolve()
+	# picks, and resolve() compares waves and timestamps, not schema versions. A
+	# phone on the newer build could hand this one a save it cannot read, and
+	# Continue would break every time it was pressed, forever, with no way to
+	# clear it from the menu. Hiding the button leaves Play working and the other
+	# build's save intact. (issue 86)
+	var saved: Variant = null
 	if FileAccess.file_exists(GameScript.SAVE_PATH):
+		saved = JSON.parse_string(FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+	if SaveConfig.is_loadable(saved):
 		_button(main_box, "Continue", 32, func() -> void:
-			GameScript.next_config = JSON.parse_string(
-				FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+			GameScript.next_config = saved
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "Play", 32, _show_armies)

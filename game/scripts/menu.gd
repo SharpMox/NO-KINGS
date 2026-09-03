@@ -238,7 +238,13 @@ func _ready() -> void:
 					for b in provider_buttons:
 						b.disabled = false
 				bridge.sign_in_finished.connect(func(ok: bool) -> void:
-					if settled[0]:
+					# Same hazard the timeout guards against, and easier to hit:
+					# the guest button stays live during a sign-in, so the player
+					# can take it, start a run, and free this whole screen while
+					# Google is still thinking. This lambda is connected to the
+					# AUTOLOAD, which outlives the menu, and it touches Buttons
+					# and Labels that would be gone.
+					if not is_inside_tree() or settled[0]:
 						return
 					if not ok:
 						release.call(unavailable)
@@ -276,14 +282,24 @@ func _ready() -> void:
 					release.call("%s sign-in timed out. Check your connection and try again."
 						% Account.GOOGLE.capitalize()))
 				Bridge.begin_sign_in()))
-	var guest_button := _button(login_box, "Play as Guest", 22, func() -> void:
-		Account.start_guest()
-		finish_login.call())
-	# Only offered when there is no account yet. Reached from the main menu (a
-	# guest choosing to sign in) this button would call start_guest() again,
-	# minting a NEW guest id and orphaning every save owned by the old one —
-	# the exact data loss the rebind exists to prevent.
-	guest_button.visible = Account.needs_login()
+	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
+	# exit, and the one control that must work when everything else has failed.
+	#
+	# It does two jobs because the screen is reached two ways. On a first run it
+	# creates the guest account. Reached from the main menu by a guest who chose
+	# to sign in, it must NOT call start_guest() again — that would mint a new
+	# guest id and orphan every save the old one owned, the exact data loss the
+	# rebind exists to prevent — so there it is purely a way back out.
+	#
+	# It was previously hidden in that second case, which trapped the player:
+	# every other exit from here requires a SUCCESSFUL sign-in, so a guest who
+	# tapped "Sign in to sync" and then had no network had no way back to the
+	# menu at all. Force-quitting the app was the only escape.
+	_button(login_box, "Play as Guest" if Account.needs_login() else "Continue offline",
+		22, func() -> void:
+			if Account.needs_login():
+				Account.start_guest()
+			finish_login.call())
 	# The gate. --screenshot bypasses it too: a capture run on a machine with no
 	# account would otherwise photograph the login screen instead of the menu,
 	# which is a silent trap on any fresh checkout rather than a real result.

@@ -108,9 +108,13 @@ static func sign_in(new_provider: String, account_id: String,
 	# Anything queued was queued by the PREVIOUS owner, and the queue stamps no
 	# owner of its own — so draining it after a rebind would deliver the old
 	# account's payload to the new account's cloud. A run tombstone crossing that
-	# way nulls the new account's cloud save. The queue holds only the latest
-	# entry per key by design, so dropping it costs at most one deferred push,
-	# which the next sync re-sends.
+	# way nulls the new account's cloud save.
+	#
+	# What is dropped is dropped for good, and that is the right trade rather
+	# than a free one: a tombstone has no re-sender, because sync_file returns
+	# before pushing when the resolved payload is null. But the entry belongs to
+	# an account whose cloud the tombstone was never going to reach anyway, so
+	# delivering it could only ever damage a cloud it did not describe.
 	SyncQueue.clear()
 	_write({"owner": account_id, "provider": new_provider})
 	for path in save_paths:

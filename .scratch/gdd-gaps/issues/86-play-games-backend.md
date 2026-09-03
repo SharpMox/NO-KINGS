@@ -1,6 +1,7 @@
 # 86 — Google Play Games backend (Android)
 
-Status: in progress — Console **published** and plugin installed (2026-09-03); design resolved and sliced into T1-T6 below; NEXT is implementation, then device verification
+Status: **code complete, unverified** (2026-09-03) — T1-T5 implemented, T6 builds; every acceptance
+criterion is met EXCEPT the device-verified one, which is blocked on hardware. See Outcome.
 
 ## Parent
 
@@ -329,3 +330,83 @@ Vertical, in dependency order. T1 and T2 are the seam; T3-T5 are behaviour; T6 i
 `run_all.sh` must stay ALL GREEN throughout — but per this file's own warning, green verifies
 only that the desktop build still works with the backend absent. **T6 is the only verification
 that counts**, and it cannot happen on this machine.
+
+## Outcome (2026-09-03): written and building, NOT verified
+
+T1-T5 are implemented and T6 builds. What follows is deliberately precise about which half of
+the acceptance criteria that satisfies, because this slice's own warning at the top of this file
+exists to stop "green" being mistaken for "works".
+
+| Acceptance criterion | State |
+| --- | --- |
+| Desktop unaffected, `run_all.sh` ALL GREEN | **met** — 32 headless suites, plus both windowed click probes |
+| **Device-verified** sign-in, save round-trip, leaderboard submit | **NOT met — no device has ever run this** |
+
+`adb devices` lists nothing on this machine. No sign-in, no snapshot read or write, and no
+conflict has executed against real Play Games even once. Everything below is compile-time and
+desktop evidence only.
+
+### What shipped
+
+| File | What |
+| --- | --- |
+| `scripts/cloud/play_games_bridge.gd` | new autoload — owns the plugin's client Nodes, the async chain, the static cache, and the codec |
+| `scripts/cloud/cloud_backend_play_games.gd` | the four contract methods, now reading the bridge |
+| `scripts/menu.gd` | real sign-in on the button; `_SYNC_KEYS()` as the one key->path map; post-sign-in re-sync |
+| `tests/test_cloud_save.gd` | codec round-trip + failure paths, and the backend's desktop answers |
+
+### The APK, and the app id
+
+A debug APK builds with the plugin in it: **83.2 MB**, 54 Play Games entries, exit 0, no script
+errors. `gradle_build/use_gradle_build` was already `true` from the plugin install, so T6's flip
+was a no-op.
+
+The Play Games **app id is correctly wired**, which is worth recording because it is silent when
+it is wrong: `export_presets.cfg:43` carries
+`godot_play_game_services/game_id="292256536070"`, and the export log confirms *"added game-id
+292256536070 to [values/strings.xml]"*. With that option blank the plugin only `printerr`s, the
+build still succeeds, and `@string/game_services_project_id` in the manifest resolves to nothing
+— so sign-in would fail on device for a reason nothing in the build output points at.
+
+`export_format` stays **0 (APK)**: an AAB cannot be `adb install`ed and device testing needs an
+APK. Flip to 1 for store submission.
+
+### The trap: a script can compile as an autoload and fail as a dependency
+
+The single most expensive thing found here, and it will bite anything else that preloads an
+autoload script. Autoload identifiers such as `GodotPlayGameServices` resolve **only for scripts
+compiled after the autoloads are registered**. `play_games_bridge.gd` is both an autoload *and* a
+preloaded dependency of `cloud_backend_play_games.gd` — and in the second role that identifier
+does not exist yet, so the file fails to compile.
+
+It presents viciously rather than loudly: the backend silently loses its methods, and a headless
+test dies before reaching `quit()`, leaving Godot spinning forever with **no output at all**
+(the banner is buffered behind `tail`). It looked exactly like an import lock.
+
+The rule that came out of it — **the bridge names no plugin symbol at compile time**:
+
+- the autoload is fetched with `get_node_or_null(^"/root/GodotPlayGameServices")`,
+- the three clients are plain `Node`s, `load()`ed by path at runtime,
+- every signal handler takes `Variant`, never `PlayGamesPlayer` / `PlayGamesSnapshot`,
+- `PlayGamesPluginError.OK` is compared as the literal `0`.
+
+The same one-way-dependency rule moved the codec out of the backend and into the bridge, and
+makes the conflict handler `load()` `cloud_save.gd` at runtime: `cloud_save -> backend -> bridge`
+already runs one way, so a preload back up that chain is a cyclic reference.
+
+### A plugin limitation, verified rather than assumed
+
+`PlayGamesSnapshotsClient` emits `conflict_emitted` but exposes **no `resolveConflict()`**.
+Re-saving the chosen winner is therefore the only lever the plugin offers, and that is what
+`_on_conflict` does. Checked against the addon source.
+
+### What is left
+
+1. **An Android device** — section B of `MANUAL-STEPS.md`. The only blocker.
+2. `adb install build/nokings-t6.apk`, then verify on the device: sign-in completes, a save
+   round-trips, and a second device (or a reinstall) restores progress.
+3. Watch for the **cold-start path specifically** — sign in on a device with existing cloud
+   history and confirm the history appears *without* finishing a run. That is the T4 behaviour,
+   and it is the one thing most likely to be subtly wrong.
+4. Settle the OPEN RISK above by checking the Cloud console's Data Access page after the first
+   real sign-in.

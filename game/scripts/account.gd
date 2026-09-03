@@ -44,10 +44,23 @@ static func _read() -> Dictionary:
 	return _cache
 
 
-static func _write(data: Dictionary) -> void:
+## Returns false when the account could not be persisted.
+##
+## The cache is set either way, so the CURRENT session behaves normally — but a
+## failed write means the file is not there next launch, and needs_login() goes
+## back to true. That presents as the login screen reappearing every single
+## launch with no explanation: a login loop the player cannot break, because
+## nothing they do is wrong. Silently ignoring the failure is what makes it
+## unexplainable, so it is reported rather than swallowed.
+static func _write(data: Dictionary) -> bool:
 	_cache = data
 	var f := FileAccess.open(ACCOUNT_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("account: could not write %s (error %d) — the account will not survive a restart"
+			% [ACCOUNT_PATH, FileAccess.get_open_error()])
+		return false
 	f.store_string(JSON.stringify(data))
+	return true
 
 
 ## True until an account exists — i.e. the first run, and only the first run.

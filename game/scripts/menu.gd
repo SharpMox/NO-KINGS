@@ -99,28 +99,37 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# separate needs per-account local saves — a real feature, and a design call
 	# rather than something to guess at. See issue 86.
 	var id: String = CloudSave.backend.account_id()
-	# `not signed_in()` is the whole test: it means guest or no account, and a
-	# guest id can never equal a Google one, so comparing them as well would
-	# always be true. GOOGLE because Play Games is the only provider that
-	# reaches this signal; Game Center is issue 87 and needs its own path.
-	if id != "" and not Account.signed_in():
+	# ONLY WHEN THE PLAYER ASKED. A verdict that arrives on its own must not
+	# convert a guest who deliberately chose "Play as Guest", and on a first run
+	# it must not answer the login screen's question on their behalf — both were
+	# possible while any successful verdict bound whatever was unbound, and
+	# neither can be undone, because nothing in the game signs you out.
+	#
+	# GOOGLE because Play Games is the only provider that reaches this signal;
+	# Game Center is issue 87 and needs its own path.
+	if id != "" and was_interactive and not Account.signed_in():
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
-	_finish_login()
-	if Account.owner() != id:
-		# Signed in as someone else. Say so instead of going quiet: the cloud is
-		# off for the rest of this session and nothing else on screen would ever
-		# mention it. Not a button that fixes anything — there is no safe fix
-		# without per-account saves — but a player who sees this knows why their
-		# progress stopped syncing, which is the whole complaint.
+	if Account.owner() == id:
+		if sync_button != null:
+			sync_button.visible = false
+		_finish_login()
+		CloudSave.drain_queue() # safe: sign_in() clears a queue owned by anyone else
+		for key: String in _SYNC_KEYS():
+			Bridge.fetch(key)
+		return
+	if Account.signed_in():
+		# Bound to a DIFFERENT account. Say so rather than going quiet — the cloud
+		# is off for the session and nothing else on screen would mention it — and
+		# leave the login screen, since staying on it implies a fix that does not
+		# exist. There is no safe one without per-account saves; see issue 86.
 		if sync_button != null:
 			sync_button.text = "Signed in as another account"
 			sync_button.visible = true
+		_finish_login()
 		return
-	if sync_button != null:
-		sync_button.visible = false
-	CloudSave.drain_queue() # safe now: sign_in() clears a queue owned by anyone else
-	for key: String in _SYNC_KEYS():
-		Bridge.fetch(key)
+	# Otherwise: a guest, or a first run with the login screen still up. Nothing
+	# is bound and nothing may be assumed, so leave the screen exactly as it is
+	# and let the player choose.
 
 
 ## Dismiss the login screen — but only if it is what the player is looking at.
@@ -153,13 +162,18 @@ func _on_provider_pressed(prov: String) -> void:
 	if prov != Account.GOOGLE or not Bridge.supported():
 		login_note.text = "%s sign-in isn't available on this device yet." % prov.capitalize()
 		return
-	# Already signed in silently, and _on_sign_in_finished has already bound the
-	# account — so there is nothing to do but leave. Without this the press would
-	# depend on the native side re-emitting a verdict for a session it has
-	# already authenticated, and if it does not, the buttons stay locked until
-	# the timeout tells the player a sign-in failed while they were signed in.
+	# Already authenticated silently — so there is a session, but this press is
+	# what makes it CONSENTED. Run the verdict path directly rather than calling
+	# begin_sign_in(): the native side may not re-emit for a session it has
+	# already authenticated, and the buttons would then stay locked until the
+	# timeout told the player a sign-in failed while they were signed in.
+	#
+	# The counter is bumped first so the handler sees an interactive attempt and
+	# will bind — this is the path a guest takes to sign in, and it is the only
+	# one that may convert them.
 	if Bridge.signed_in:
-		_finish_login()
+		_sign_in_gen += 1
+		_on_sign_in_finished(true)
 		return
 	_sign_in_gen += 1
 	var gen := _sign_in_gen # this press's identity, for its timer alone

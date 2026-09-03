@@ -57,6 +57,15 @@ func _on_snapshot_loaded(key: String) -> void:
 ## deliberately does NOT do this: it would only ever cover the first launch.
 func _on_sign_in_finished(ok: bool) -> void:
 	if not ok:
+		# Sign-in failed — including the silent check at boot. If this install is
+		# already BOUND to an account, its session has lapsed rather than never
+		# existing, and the entry point back to the login screen is otherwise
+		# guest-only: nothing on screen would offer a retry, and the cloud would
+		# stay dark with no explanation. Revealed only here, so it appears when
+		# there is genuinely something to reconnect to.
+		if is_instance_valid(sync_button) and Account.signed_in():
+			sync_button.text = "Reconnect to sync"
+			sync_button.visible = true
 		return
 	# BINDING LIVES HERE, not in the login button's one-shot, because this
 	# handler is the only one that sees every success.
@@ -197,10 +206,20 @@ func _ready() -> void:
 	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
 	# unreachable by any player. This is the entry point that makes it real.
 	# Hidden once signed in, and on any platform that cannot sync at all.
-	if Account.provider() == Account.GUEST and Bridge.supported():
+	#
+	# BUILT whenever the platform can sync, but only SHOWN to a guest up front.
+	# The other case it exists for is a player already bound to Google whose
+	# session has lapsed — revoked access, or a Play Games account removed from
+	# the device. Their provider is not guest, so a guest-only test left them
+	# with no manual retry at all, dependent on a silent check that had just
+	# failed. It stays hidden until sign-in actually reports failure, so a normal
+	# launch never flashes a Reconnect button at a player who is about to be
+	# signed in a moment later. See _on_sign_in_finished.
+	if Bridge.supported():
 		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
 			main_box.visible = false
 			login_center.visible = true)
+		sync_button.visible = Account.provider() == Account.GUEST
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)

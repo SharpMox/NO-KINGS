@@ -939,6 +939,15 @@ func _begin_player_turn() -> void:
 func _autosave() -> void:
 	if autoplay or is_scenario:
 		return # bot runs and scenarios are not resumable, by design
+	# NOT after the run has ended. _game_over deletes SAVE_PATH and tombstones
+	# the cloud copy precisely so a finished run cannot be resumed — and this
+	# function is now also called on backgrounding, which is exactly what a
+	# player does on the result screen. Without this guard, switching away from
+	# GAME OVER rewrote the save and resurrected the finished run at the next
+	# launch: the same defect the tombstone was added to kill, reintroduced
+	# through a new door.
+	if state == State.GAME_OVER:
+		return
 	# Null-checked because this runs EVERY TURN on a phone, where storage
 	# genuinely fills up. Dereferencing a failed open would crash the run at the
 	# top of a turn — losing far more than the save it was trying to write. The
@@ -3783,6 +3792,15 @@ func _show_preview(id: String) -> void:
 
 ## Opening the tariff overlay deselects, like menus and drawers.
 func _show_tariffs() -> void:
+	# The only modal opener with no guard at all. It is unreachable over another
+	# modal today only because every other panel happens to cover the top bar
+	# button — the same accident that made the pause menu safe over a finished
+	# run until it was guarded explicitly. This one carries no flag of its own,
+	# so opening it over a live Box or pick would leave that modal's flag set
+	# beneath a panel whose Close returns to nothing the player can act on.
+	if box_open or buff_pick_open or preview_open or game_menu_open \
+			or win_open or state == State.GAME_OVER:
+		return
 	placing_id = ""
 	placing_cap = false
 	_clear_selection()

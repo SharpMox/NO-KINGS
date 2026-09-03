@@ -44,6 +44,14 @@ signal menu_toggled(open: bool)
 ## drift apart — the emit in particular, which is what keeps game.gd's
 ## game_menu_open flag in step with what is on screen.
 func toggle_menu(open: bool) -> void:
+	# Never over a finished run. The pause menu raises itself above everything,
+	# including the result overlay, and its Resume button would then restore a
+	# run that is already over — a genuine trap rather than a cosmetic one.
+	# Opening was previously unreachable at GAME_OVER only by accident of child
+	# order and the Shop happening to cover the button, which is not a property
+	# any future panel is obliged to preserve.
+	if open and g != null and g.state == g.State.GAME_OVER:
+		return
 	if open:
 		game_menu.move_to_front() # above every other HUD control
 	game_menu.visible = open

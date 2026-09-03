@@ -51,17 +51,7 @@ func _on_snapshot_loaded(key: String) -> void:
 		CloudSave.sync_file(key, paths[key])
 
 
-## An account is attached — silently at boot for a returning player, or through
-## the login screen on a first run. Either way this is the first moment the
-## cloud can be read at all, so it is where the fetch belongs. The login button
-## deliberately does NOT do this: it would only ever cover the first launch.
 ## THE ONE PLACE A SIGN-IN VERDICT IS HANDLED — binding, cloud fetch and UI.
-##
-## It used to be two: this, plus a one-shot connected per button press that
-## owned the screen while this owned the account. Keeping them in step needed a
-## `settled` flag shared between the verdict and a timeout, and the two still
-## disagreed about the boot verdict, which arrives with no button pressed and
-## no screen up. One handler cannot disagree with itself.
 ##
 ## Reached three ways, and it must behave identically for all of them: the
 ## plugin's silent check at startup, a button press, and a verdict that lands
@@ -69,22 +59,27 @@ func _on_snapshot_loaded(key: String) -> void:
 ## run with or without the login screen on screen.
 func _on_sign_in_finished(ok: bool) -> void:
 	# Whether the PLAYER started this. The boot check fails on every device with
-	# no Google session, and reporting that as "sign-in didn't complete" would
-	# accuse a first-run player of an attempt they never made, on a screen they
-	# have not touched yet. Only an attempt gets a result.
-	var was_interactive := _sign_in_pending
-	_sign_in_pending = false
+	# no Google session, and reporting that as a failed sign-in would accuse a
+	# first-run player of an attempt they never made, on a screen they have not
+	# touched yet. Only an attempt gets a result.
+	var was_interactive := _sign_in_gen != 0
+	_sign_in_gen = 0
 	_set_providers_disabled(false)
 	if not ok:
 		# Already BOUND means the session lapsed rather than never existing, and
 		# the way back to this screen is otherwise guest-only — so without this
 		# the cloud goes dark with nothing offering a retry.
-		if is_instance_valid(sync_button) and Account.signed_in():
+		if sync_button != null and Account.signed_in():
 			sync_button.text = "Reconnect to sync"
 			sync_button.visible = true
-		if was_interactive and is_instance_valid(login_note) \
-				and login_center != null and login_center.visible:
-			login_note.text = "Sign-in didn't complete. You can try again."
+		# NOT gated on the screen being visible. The guest exit stays live during
+		# a sign-in, so a player can take it and leave this screen showing
+		# "Signing in…" — and the note is not rebuilt when the screen is shown
+		# again, so it would still claim that on their next visit. Writing the
+		# real outcome means whatever they come back to is true.
+		if was_interactive:
+			login_note.text = "%s sign-in didn't complete. You can try again." \
+				% Account.GOOGLE.capitalize()
 		return
 	# Bound by comparing the STORED owner to the live id, not by asking whether
 	# we are signed in: a signed_in() test binds a guest once and never looks
@@ -98,7 +93,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 		# GOOGLE, because Play Games is the only provider that reaches this
 		# signal. Game Center is issue 87 and will need its own path.
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
-	if is_instance_valid(sync_button):
+	if sync_button != null:
 		sync_button.visible = false
 	_finish_login()
 	for key: String in _SYNC_KEYS():
@@ -144,7 +139,8 @@ func _on_provider_pressed(prov: String) -> void:
 	if Bridge.signed_in:
 		_finish_login()
 		return
-	_sign_in_pending = true
+	_sign_in_gen += 1
+	var gen := _sign_in_gen # this press's identity, for its timer alone
 	login_note.text = "Signing in…"
 	_set_providers_disabled(true) # one press at a time; Guest stays live
 	# Neither native hop is guaranteed to answer — a phone that just lost signal
@@ -152,14 +148,16 @@ func _on_provider_pressed(prov: String) -> void:
 	# in…" forever. The guest exit stays available throughout, but the provider
 	# buttons have to come back too.
 	#
-	# `_sign_in_pending` is what makes this and the verdict mutually exclusive:
-	# whichever lands first clears it, and the other finds nothing to do. The
-	# tree check matters because a SceneTreeTimer outlives this menu — the player
-	# can take the guest exit, start a run, and free every node touched here.
+	# `_sign_in_gen` makes this and the verdict mutually exclusive: whichever
+	# lands first zeroes it, and the other finds nothing to do. Comparing against
+	# `gen` rather than merely testing non-zero is what stops a timer outliving
+	# its own press and firing on a later one. The tree check matters because a
+	# SceneTreeTimer outlives this menu — the player can take the guest exit,
+	# start a run, and free every node touched here.
 	get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
-		if not is_inside_tree() or not _sign_in_pending:
+		if not is_inside_tree() or _sign_in_gen != gen:
 			return
-		_sign_in_pending = false
+		_sign_in_gen = 0
 		login_note.text = "%s sign-in timed out. Check your connection and try again." \
 			% prov.capitalize()
 		_set_providers_disabled(false))
@@ -179,10 +177,18 @@ var login_center: CenterContainer # issue 83, first run only
 var login_note: Label # the login screen's status line
 var provider_buttons: Array[Button] = [] # Google/Apple; locked during a sign-in
 
-## A sign-in is in flight and no verdict has arrived. Replaces a per-press
-## `settled` box shared between two closures: with one handler there is one
-## piece of state, and the timeout's only job is to ask whether it is still set.
-var _sign_in_pending := false
+## Which sign-in attempt is in flight, or 0 for none.
+##
+## A COUNTER, not a bool, because a timeout has to know whether it belongs to
+## the attempt still running. With a shared bool: press, get refused, press
+## again inside 30 seconds — which is exactly what the refusal message invites —
+## and the FIRST press's timer fires on the SECOND press's flag. It would unlock
+## the buttons and report a timeout while a real sign-in was still in flight,
+## and the real verdict would then find nothing pending and say nothing at all.
+##
+## The per-press closure box this replaced had that identity for free; a single
+## member lost it. One int buys it back.
+var _sign_in_gen := 0
 
 ## The main menu's "Sign in to sync", for a guest. A MEMBER rather than a local
 ## because _on_sign_in_finished has to hide it: an account can bind without any
@@ -338,7 +344,6 @@ func _ready() -> void:
 	login_note.modulate = Color(1, 1, 1, 0.6)
 	login_note.text = "Your progress follows your account."
 	login_box.add_child(login_note)
-	provider_buttons.clear()
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(
 			_button(login_box, "Sign in with %s" % prov.capitalize(), 22,

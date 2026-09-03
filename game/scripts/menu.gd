@@ -68,6 +68,11 @@ func _on_snapshot_loaded(key: String) -> void:
 ## after the screen gave up waiting. Everything below is therefore written to
 ## run with or without the login screen on screen.
 func _on_sign_in_finished(ok: bool) -> void:
+	# Whether the PLAYER started this. The boot check fails on every device with
+	# no Google session, and reporting that as "sign-in didn't complete" would
+	# accuse a first-run player of an attempt they never made, on a screen they
+	# have not touched yet. Only an attempt gets a result.
+	var was_interactive := _sign_in_pending
 	_sign_in_pending = false
 	_set_providers_disabled(false)
 	if not ok:
@@ -77,7 +82,8 @@ func _on_sign_in_finished(ok: bool) -> void:
 		if is_instance_valid(sync_button) and Account.signed_in():
 			sync_button.text = "Reconnect to sync"
 			sync_button.visible = true
-		if is_instance_valid(login_note) and login_center != null and login_center.visible:
+		if was_interactive and is_instance_valid(login_note) \
+				and login_center != null and login_center.visible:
 			login_note.text = "Sign-in didn't complete. You can try again."
 		return
 	# Bound by comparing the STORED owner to the live id, not by asking whether

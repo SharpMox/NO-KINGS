@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+ html,body{margin:0;padding:0}
+ .fg{width:1024px;height:500px;position:relative;overflow:hidden;
+     background:repeating-conic-gradient(#606084 0% 25%, #fcf0d8 0% 50%) 0 0/168px 168px}
+ .fg::after{content:"";position:absolute;inset:0;
+     background:linear-gradient(180deg,rgba(35,21,68,.34) 0%,rgba(35,21,68,0) 42%)}
+ img{position:absolute;image-rendering:pixelated;transform-origin:50% 100%;
+     filter:drop-shadow(0 3px 4px rgba(32,16,56,.5))}
+  .title{position:absolute;left:0;right:0;bottom:0;top:0;z-index:9;
+    display:flex;flex-direction:column;justify-content:flex-end;padding:0 0 34px 46px;
+    background:linear-gradient(90deg,rgba(20,12,38,.82) 0%,rgba(20,12,38,.55) 34%,rgba(20,12,38,0) 62%)}
+  .title h1{margin:0;font-size:82px;line-height:.84;font-weight:800;letter-spacing:-.04em;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:linear-gradient(96deg,#a8d048 0%,#b98cff 92%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 10px rgba(0,0,0,.75))}
+  .title p{margin:14px 0 0;font-size:22px;color:#f2ead9;max-width:17ch;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    text-shadow:0 2px 8px rgba(0,0,0,.85)}
+</style></head><body><div class="fg" id="fg"><div class="title"><h1>NO<br>KINGS</h1><p>Fairy chess against the clock.</p></div></div>
+<script>
+const IDS = ["alibaba", "amazon", "amazonrider", "archbishop", "arrow-pawn", "banshee", "berolina", "bishop", "bodyguard", "buffalo", "champion", "chancellor", "crown-princess", "dragon-horse", "dragon-king", "elephant-modern", "ferz", "gnu", "godzilla", "gryphon", "high-priestess", "inv-arrow-pawn", "inv-kirin-plus", "inv-kirin-plus-plus", "inv-sergeant", "kirin", "kirin-plus", "kirin-plus-plus", "knight", "manticore", "pawn", "queen", "raven", "rook", "sergeant", "squirrel", "war-machine", "wazir"];
+// deterministic: the same crowd every render, so the asset is reproducible
+let s = 20260903;
+const rnd = () => (s = (s*1664525 + 1013904223) % 4294967296) / 4294967296;
+const fg = document.getElementById('fg');
+// back-to-front rows: each row lower, larger and denser, so the crowd reads
+// with depth instead of as scattered stickers
+const ROWS = [
+  {y: 58,  size: 76,  step: 42, dark: .78},
+  {y: 122, size: 92,  step: 50, dark: .62},
+  {y: 196, size: 110, step: 60, dark: .42},
+  {y: 282, size: 132, step: 72, dark: .24},
+  {y: 386, size: 158, step: 86, dark: .10},
+  {y: 512, size: 186, step: 100, dark: .04},
+];
+let k = 0;
+for (const r of ROWS) {
+  for (let x = -46; x < 1078; x += r.step) {
+    const id = IDS[(k*7 + 3) % IDS.length];       // walk the list, not random,
+    k++;                                          // so every piece appears
+    const side = rnd() < r.dark ? 'dark' : 'light';
+    const img = document.createElement('img');
+    img.src = `game/assets/pieces/${id}-${side}.png`;
+    img.style.width = img.style.height = r.size + 'px';
+    img.style.left = (x + (rnd()-.5)*22) + 'px';
+    img.style.top  = (r.y - r.size + (rnd()-.5)*14) + 'px';
+    img.style.transform = `rotate(${(rnd()-.5)*9}deg)`;
+    fg.appendChild(img);
+  }
+}
+</script></body></html>

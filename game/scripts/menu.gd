@@ -145,8 +145,9 @@ func _ready() -> void:
 	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
 	# unreachable by any player. This is the entry point that makes it real.
 	# Hidden once signed in, and on any platform that cannot sync at all.
+	var sync_button: Button = null
 	if Account.provider() == Account.GUEST and Bridge.supported():
-		_button(main_box, "Sign in to sync", 24, func() -> void:
+		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
 			main_box.visible = false
 			login_center.visible = true)
 	_button(main_box, "Settings", 24, func() -> void:
@@ -202,6 +203,23 @@ func _ready() -> void:
 				if prov != Account.GOOGLE or not Bridge.supported() or bridge == null:
 					login_note.text = unavailable
 					return
+				# ALREADY signed in, silently. The plugin authenticates an
+				# existing Play Games session on its own at startup, and on a
+				# first run that can land while this screen is still up — the
+				# menu listener takes it, but nothing binds an account, because
+				# the one-shot below is only connected on a press.
+				#
+				# Without this, pressing the button then depends on the native
+				# side re-emitting user_authenticated for a session it has
+				# already authenticated. If it does not, the buttons stay locked
+				# until the timeout and the player is told sign-in failed while
+				# being signed in. Binding directly costs one branch.
+				if Bridge.signed_in:
+					Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+					if sync_button != null:
+						sync_button.visible = false
+					finish_login.call()
+					return
 				login_note.text = "Signing in…"
 				# Locked while a sign-in is in flight. Each press would otherwise
 				# connect another one-shot AND start another sign-in, so a single
@@ -236,12 +254,25 @@ func _ready() -> void:
 					Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
 					for b in provider_buttons:
 						b.disabled = false
+					# No longer a guest, so the main menu's entry point to this
+					# screen goes away. It is built once at _ready and would
+					# otherwise sit there offering to sign in an account that
+					# just did.
+					if sync_button != null:
+						sync_button.visible = false
 					finish_login.call(), CONNECT_ONE_SHOT)
 				# Neither native hop is guaranteed to answer — a phone that just
 				# lost signal simply never calls back — and without this the
 				# screen sits on "Signing in…" with no way forward and no way
 				# back. Guest stays reachable, but only if the buttons return.
 				get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
+					# A SceneTreeTimer outlives this menu: the player can start a
+					# run while the sign-in is still pending, freeing every node
+					# `release` touches. Firing then would write to freed Buttons
+					# and a freed Label. Nothing needs releasing once the screen
+					# is gone, so leaving is the whole answer.
+					if not is_inside_tree():
+						return
 					release.call("%s sign-in timed out. Check your connection and try again."
 						% Account.GOOGLE.capitalize()))
 				Bridge.begin_sign_in()))

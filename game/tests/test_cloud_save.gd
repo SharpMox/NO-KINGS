@@ -10,6 +10,7 @@ const Memory := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
+const Account := preload("res://scripts/account.gd")
 
 var fails := 0
 
@@ -142,6 +143,31 @@ func _init() -> void:
 	check(PlayGames.pull("run") == null, "pull returns null with nothing cached")
 	check(not PlayGames.push("run", {"ts": 1, "data": {}}),
 		"push reports NOT accepted when there is no snapshot client")
+
+	# --- the ownership gate (issue 86) ---
+	# is_available() = signed in AND the signed-in player owns this install's
+	# saves. The second half is what stops a switched Google account from
+	# carrying one account's progress into another's cloud — resolve() compares
+	# waves, never owners, so without the gate the deeper run simply wins.
+	# The bridge statics are plain vars and Account has a cache seam, so the one
+	# invariant every cloud path rests on is pinned here on desktop instead of
+	# living only in a comment.
+	var acc := FileAccess.open(Account.ACCOUNT_PATH, FileAccess.WRITE)
+	acc.store_string(JSON.stringify({"owner": "player-A", "provider": "google"}))
+	acc = null
+	Account._reset_cache()
+	Bridge.signed_in = true
+	Bridge.player_id = "player-A"
+	check(PlayGames.is_available(), "signed in as the owner: cloud is live")
+	Bridge.player_id = "player-B"
+	check(not PlayGames.is_available(),
+		"signed in as a DIFFERENT account: cloud goes inert, nothing crosses")
+	Bridge.signed_in = false
+	check(not PlayGames.is_available(), "not signed in: cloud inert regardless of owner")
+	# restore: statics survive within this process, and later checks assume defaults
+	Bridge.player_id = ""
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Account.ACCOUNT_PATH))
+	Account._reset_cache()
 
 	print("---")
 	if fails == 0:

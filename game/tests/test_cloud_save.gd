@@ -82,6 +82,24 @@ func _init() -> void:
 	check(FileAccess.get_file_as_string(path) == JSON.stringify({"score": 42}),
 		"sync_file overwrites local when the cloud copy is newer")
 
+	# --- the game-over tombstone (issue 86) ---
+	# Deleting the local save when a run ends is not enough on its own: resolve()
+	# treats "no local file" as the new-device restore case and takes the cloud
+	# copy, so the next sync would pull the finished run back and offer to
+	# Continue it. game.gd pushes a null payload to mean "there is no run", and
+	# what makes that work is sync_file declining to write anything for it.
+	Memory.reset()
+	DirAccess.remove_absolute(path)
+	CloudSave.push("run", {"wave": 12, "score": 500}) # a run in progress, mirrored
+	CloudSave.sync_file("run", path)
+	check(FileAccess.file_exists(path), "an in-progress cloud run restores to disk")
+
+	DirAccess.remove_absolute(path) # the run ends: game.gd deletes the save...
+	CloudSave.push("run", null) # ...and tombstones the cloud copy
+	CloudSave.sync_file("run", path)
+	check(not FileAccess.file_exists(path),
+		"a tombstoned run does NOT come back from the cloud")
+
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting
 

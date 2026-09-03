@@ -1323,8 +1323,19 @@ func _game_over(won: bool, reason: String) -> void:
 	ArtefactHooks.run(self, "on_game_over") # before record_score: e.g. Rapture
 		# Insurance Policy converts Gold to Score, and the converted total is
 		# what gets ranked (issue 16)
-	if not is_scenario and FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
+	if not is_scenario:
+		if FileAccess.file_exists(SAVE_PATH):
+			DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
+		# ...and the CLOUD has to be told, or deleting the local file achieves
+		# nothing. cloud_save.resolve() treats "no local file" as the new-device
+		# restore case and takes the cloud copy wholesale — so the next boot's
+		# sync would pull the finished run straight back and offer to Continue a
+		# game that is already over, every launch, for every player.
+		#
+		# A null payload is the tombstone: resolve() returns null for it, and
+		# sync_file() bails before writing, so the deletion sticks instead of
+		# being undone. (issue 86)
+		CloudSave.push("run", null)
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
 		rank = Economy.record_score(self)

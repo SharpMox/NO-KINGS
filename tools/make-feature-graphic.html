@@ -6,15 +6,9 @@
  .title{position:absolute;inset:0;z-index:9;display:flex;flex-direction:column;
    justify-content:flex-end;padding:0 0 34px 46px;
    background:linear-gradient(90deg,rgba(20,12,38,.86) 0%,rgba(20,12,38,.58) 34%,rgba(20,12,38,0) 64%)}
- .title h1{margin:0;font-size:82px;line-height:.84;font-weight:800;letter-spacing:-.04em;
-   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-   background:linear-gradient(96deg,#a8d048 0%,#b98cff 92%);
-   -webkit-background-clip:text;background-clip:text;color:transparent;
+ .title img{position:static;align-self:flex-start;height:400px;width:auto;image-rendering:pixelated;
    filter:drop-shadow(0 3px 10px rgba(0,0,0,.8))}
- .title p{margin:14px 0 0;font-size:22px;color:#f2ead9;max-width:17ch;
-   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-   text-shadow:0 2px 8px rgba(0,0,0,.9)}
-</style></head><body><div class="fg" id="fg"><div class="title"><h1>NO<br>KINGS</h1><p>Fairy chess against the clock.</p></div></div>
+</style></head><body><div class="fg" id="fg"><div class="title"><img src="/game/assets/icon/title-wordmark.png"></div></div>
 <script>
 const IDS = ["alibaba", "amazon", "amazonrider", "archbishop", "arrow-pawn", "banshee", "berolina", "bishop", "bodyguard", "buffalo", "champion", "chancellor", "crown-princess", "dragon-horse", "dragon-king", "elephant-modern", "ferz", "gnu", "godzilla", "gryphon", "high-priestess", "inv-arrow-pawn", "inv-kirin-plus", "inv-kirin-plus-plus", "inv-sergeant", "kirin", "kirin-plus", "kirin-plus-plus", "knight", "manticore", "pawn", "queen", "raven", "rook", "sergeant", "squirrel", "war-machine", "wazir"];
 // Deterministic: same crowd every render, so the asset is reproducible and a

@@ -55,6 +55,40 @@ static func _MERGER(key: String) -> Callable:
 static var window_sized := false # once per launch, not on every return to menu
 
 
+## Android's hardware Back. Godot's default for it is to quit the app outright,
+## which on a portrait phone game means the primary navigation gesture kills the
+## session from any screen — see quit_on_go_back in project.godot.
+##
+## Back means "up one level": close whatever panel is open and return to the main
+## menu. From the main menu itself there is nowhere up, so it quits, which is what
+## Android users expect at the root of an app.
+##
+## The login screen deliberately does NOT quit and does not dismiss: on a first
+## run the player has to pick something, and "Play as Guest" is right there and
+## always live. Quitting on Back would make a stray gesture look like a crash on
+## the very first screen anyone sees.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+		return
+	if login_center != null and login_center.visible:
+		return
+	# The tier picker goes back to the army picker, not to the main menu, so the
+	# gesture lands where its own Back button does. Checked first because both
+	# are visible in that state.
+	if is_instance_valid(rank_center) and rank_center.visible:
+		rank_center.visible = false
+		army_center.visible = true
+		return
+	var panels: Array[Control] = [test_scroll, army_center, scores_center,
+		history_scroll, about_center, guide_scroll, settings_panel]
+	for p in panels:
+		if is_instance_valid(p) and p.visible:
+			p.visible = false
+			main_box.visible = true
+			return
+	get_tree().quit()
+
+
 ## A cloud snapshot arrived for `key` — mirror it to disk through the normal
 ## resolve path, so the cloud copy only wins where it would have won at boot.
 ## The connection dies with this menu instance, so returning to the menu

@@ -139,6 +139,7 @@ func _overlay_label(text: String, size: int) -> Label:
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:
+	_end_of_run_on_top()
 	for c in overlay.get_children():
 		c.queue_free()
 	var center := CenterContainer.new()
@@ -182,7 +183,33 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 ## Wave-50 win screen: the run pauses on top of the board; Continue enters
 ## endless mode, End Run locks the score in (GDD Game Over & Winner Screens,
 ## trimmed 2026-07-03: no leaderboard rank / pieces-lost summary yet).
+## The run has ended, so nothing may sit above the screen that says so.
+##
+## `overlay` was the ONLY panel added to the HUD that never raised itself, while
+## the pause menu, Shop, merge, reinforce, tariff and buff panels all call
+## move_to_front() when they open. The HUD is a CanvasLayer, so last child wins:
+## anything opened after the overlay was built drew on top of it.
+##
+## That was reachable at Tier 2+, where the clock does not stop for the pause
+## menu or the Shop. Open either, let the clock run out, and GAME OVER rendered
+## BEHIND an opaque panel — the player got a "Paused" screen with a Resume
+## button on a run that was already over, and Resume is meaningless there.
+##
+## Raising the overlay and closing the pause menu makes the end of a run the
+## last word, which is the one thing it has to be.
+func _end_of_run_on_top() -> void:
+	overlay.move_to_front()
+	if g.hud != null and g.hud.game_menu != null:
+		g.hud.game_menu.visible = false
+		# The FLAG as well as the panel. game_menu_open gates input handling and
+		# the clock-pause test in eight places; hiding the panel while leaving it
+		# true would leave the run believing it is still paused by a menu the
+		# player can no longer see.
+		g.game_menu_open = false
+
+
 func show_win_screen() -> void:
+	_end_of_run_on_top()
 	for c in overlay.get_children():
 		c.queue_free()
 	var center := CenterContainer.new()

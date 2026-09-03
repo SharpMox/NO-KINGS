@@ -826,8 +826,16 @@ func _process(delta: float) -> void:
 		# indecision punished". OS-backgrounded pause (slice 06) always wins;
 		# it is not a difficulty lever.
 		var tier_pauses := not Tuning.clock_never_pauses(next_tier) \
-				and (game_menu_open or win_open or shop_open() or drawer_open != "" or preview_open)
-		if not tier_pauses and not backgrounded:
+				and (game_menu_open or shop_open() or drawer_open != "" or preview_open)
+		# `win_open` is NOT on that tier-gated list, and must not be: the victory
+		# screen is not a pause. The run is already won at wave 50 and there is
+		# nothing left to be decisive about, so the difficulty lever has nothing
+		# to bite on. While it was gated, the clock kept draining at Tier 2+ while
+		# the player read their win — and "Clock out" then called show_overlay(),
+		# whose first act is to free the win screen's children. A wave-50 victory
+		# turned into GAME OVER mid-read, with no explanation. A won run cannot be
+		# lost to the clock.
+		if not (tier_pauses or win_open) and not backgrounded:
 			# issue 35: deliberately NOT routed through Economy.add_clock/
 			# on_clock_change — this is a continuous per-frame DRAIN, not a
 			# discrete gain, and hooking it would fire on_clock_change every
@@ -1419,6 +1427,20 @@ func _notification(what: int) -> void:
 		backgrounded = true
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
 		backgrounded = false
+	# Android's hardware Back. Godot quits the app on it by default, and mid-run
+	# that is the worst possible response: the autosave is only written at turn
+	# start (see _save_run), so a stray Back discarded the turn in progress and
+	# looked like a crash. quit_on_go_back is off in project.godot, so this is
+	# now the only handler.
+	#
+	# Back opens the pause menu, or closes it if it is already open — the pause
+	# menu is where Main Menu lives, so leaving a run stays two deliberate taps
+	# rather than one reflex gesture. Once the run is over the overlay owns the
+	# screen and has its own buttons, so Back is ignored rather than resurrecting
+	# a menu on top of it.
+	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if state != State.GAME_OVER:
+			hud.toggle_menu(not game_menu_open)
 
 
 func _input(event: InputEvent) -> void:

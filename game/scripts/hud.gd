@@ -37,6 +37,17 @@ signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
+
+
+## Open or close the in-game menu. Shared by the ☰ button, Resume, and Android's
+## hardware Back (game.gd's NOTIFICATION_WM_GO_BACK_REQUEST) so the three cannot
+## drift apart — the emit in particular, which is what keeps game.gd's
+## game_menu_open flag in step with what is on screen.
+func toggle_menu(open: bool) -> void:
+	if open:
+		game_menu.move_to_front() # above every other HUD control
+	game_menu.visible = open
+	menu_toggled.emit(open)
 signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
 signal arrow_toggle_pressed
 signal arrow_clear_pressed
@@ -120,10 +131,7 @@ func build(game) -> void:
 		compact.content_margin_bottom = 1
 		for style in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(style, compact)
-	menu_btn.pressed.connect(func() -> void:
-		game_menu.move_to_front() # above every other HUD control
-		game_menu.visible = true
-		menu_toggled.emit(true))
+	menu_btn.pressed.connect(func() -> void: toggle_menu(true))
 	add_child(menu_btn)
 
 	# bottom: action count above the button row (Stock / Inventory / Shop / PASS)
@@ -218,9 +226,7 @@ func build(game) -> void:
 	var resume := Button.new()
 	resume.text = "Resume"
 	resume.add_theme_font_size_override("font_size", 26)
-	resume.pressed.connect(func() -> void:
-		game_menu.visible = false
-		menu_toggled.emit(false))
+	resume.pressed.connect(func() -> void: toggle_menu(false))
 	gm_box.add_child(resume)
 
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,

@@ -15,6 +15,12 @@ config/version="0.1.0"
 run/main_scene="res://scenes/Intro.tscn"
 config/features=PackedStringArray("4.7")
 config/icon="res://icon.png"
+; Android's hardware Back is the primary navigation gesture on a portrait phone,
+; and Godot's default for it is to QUIT THE APP from wherever you are — including
+; mid-run, where the autosave is only written at turn start, so a stray Back
+; discarded the turn in progress with no warning. menu.gd and game.gd handle
+; NOTIFICATION_WM_GO_BACK_REQUEST instead and navigate like a Back button should.
+application/config/quit_on_go_back=false
 
 [autoload]
 

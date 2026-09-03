@@ -8,6 +8,7 @@ extends SceneTree
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Memory := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
+const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
 
 var fails := 0
 
@@ -82,6 +83,33 @@ func _init() -> void:
 
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting
+
+	# --- the Play Games snapshot codec (issue 86 / T1) ---
+	# Snapshots are bytes (PlayGamesSnapshot.content is a PackedByteArray), so
+	# every envelope crosses Dictionary -> JSON -> utf8 -> bytes and back. This
+	# is the ONLY part of the Android backend that runs on desktop, and a wrong
+	# round-trip corrupts every cloud save silently rather than failing loudly —
+	# which is exactly why it is the one piece of slice 86 under test.
+	var env := {"ts": 1234, "data": {"score": 7, "wave": 3}}
+	var bytes := PlayGames.encode(env)
+	check(bytes.size() > 0, "encode produces bytes")
+	var back: Variant = PlayGames.decode(bytes)
+	check(back is Dictionary, "decode returns an envelope Dictionary")
+	# Compared field-by-field through int(), not by ==: JSON round-trips every
+	# number to a float, so a decoded envelope never equals an int-literal one.
+	# test_save.gd hits the same wall.
+	check(int(back.get("ts", 0)) == 1234, "the timestamp survives the round-trip")
+	check(back.get("data") is Dictionary, "the nested payload stays a Dictionary")
+	check(int(back.data.get("score", 0)) == 7 and int(back.data.get("wave", 0)) == 3,
+		"payload values survive the round-trip")
+
+	# load_game(create_if_not_found = true) hands back an EMPTY snapshot the
+	# first time a device ever syncs, so empty bytes are the normal first-run
+	# case and must read as "no cloud copy" rather than crash.
+	check(PlayGames.decode(PackedByteArray()) == null, "empty bytes decode to null")
+	check(PlayGames.decode("not json".to_utf8_buffer()) == null, "garbage bytes decode to null")
+	check(PlayGames.decode("[1,2,3]".to_utf8_buffer()) == null,
+		"valid JSON that isn't an envelope decodes to null")
 
 	print("---")
 	if fails == 0:

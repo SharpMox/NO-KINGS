@@ -24,7 +24,14 @@ static func _read() -> Dictionary:
 
 
 static func _write(q: Dictionary) -> void:
+	# Null-checked like every other write. Reachable on Android now that a
+	# blocked sync enqueues; losing the queue costs a deferred push the next
+	# sync re-sends, where crashing costs the session.
 	var f := FileAccess.open(QUEUE_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("sync queue: could not write %s (error %d)"
+			% [QUEUE_PATH, FileAccess.get_open_error()])
+		return
 	f.store_string(JSON.stringify(q))
 
 

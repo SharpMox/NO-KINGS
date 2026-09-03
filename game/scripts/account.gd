@@ -16,6 +16,8 @@
 ## deleted run, and a save that is being rebound must not also be the thing
 ## recording who it is being rebound to.
 
+const SyncQueue := preload("res://scripts/sync_queue.gd")
+
 const ACCOUNT_PATH := "user://account.json"
 
 ## Providers. "guest" is a real account, not the absence of one — it owns saves
@@ -64,8 +66,15 @@ static func _write(data: Dictionary) -> bool:
 
 
 ## True until an account exists — i.e. the first run, and only the first run.
+##
+## An EMPTY owner counts as no account. A file carrying {"owner": ""} would
+## otherwise satisfy this and be unrecoverable: needs_login() false means the
+## login screen never shows, and signed_in() true means nothing rebinds it — so
+## the cloud is off permanently with no button and no message. Nothing writes
+## that today; this makes it a bad state we recover from rather than one careless
+## edit away from being permanent.
 static func needs_login() -> bool:
-	return _read().is_empty()
+	return owner() == ""
 
 
 static func owner() -> String:
@@ -96,6 +105,13 @@ static func start_guest() -> String:
 ## this stays a pure account module with no opinion about what a save is.
 static func sign_in(new_provider: String, account_id: String,
 		save_paths: Array) -> void:
+	# Anything queued was queued by the PREVIOUS owner, and the queue stamps no
+	# owner of its own — so draining it after a rebind would deliver the old
+	# account's payload to the new account's cloud. A run tombstone crossing that
+	# way nulls the new account's cloud save. The queue holds only the latest
+	# entry per key by design, so dropping it costs at most one deferred push,
+	# which the next sync re-sends.
+	SyncQueue.clear()
 	_write({"owner": account_id, "provider": new_provider})
 	for path in save_paths:
 		_restamp(str(path), account_id)

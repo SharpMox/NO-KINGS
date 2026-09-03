@@ -105,11 +105,20 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# reaches this signal; Game Center is issue 87 and needs its own path.
 	if id != "" and not Account.signed_in():
 		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
-	if sync_button != null:
-		sync_button.visible = false
 	_finish_login()
 	if Account.owner() != id:
-		return # a different account is signed in; nothing here is safely syncable
+		# Signed in as someone else. Say so instead of going quiet: the cloud is
+		# off for the rest of this session and nothing else on screen would ever
+		# mention it. Not a button that fixes anything — there is no safe fix
+		# without per-account saves — but a player who sees this knows why their
+		# progress stopped syncing, which is the whole complaint.
+		if sync_button != null:
+			sync_button.text = "Signed in as another account"
+			sync_button.visible = true
+		return
+	if sync_button != null:
+		sync_button.visible = false
+	CloudSave.drain_queue() # safe now: sign_in() clears a queue owned by anyone else
 	for key: String in _SYNC_KEYS():
 		Bridge.fetch(key)
 
@@ -625,8 +634,15 @@ func _show_scores() -> void:
 	var status := Label.new()
 	status.add_theme_font_size_override("font_size", 12)
 	status.modulate = Color(1, 1, 1, 0.55)
-	status.text = "Cloud scores included." if Leaderboard.cloud_available() \
-		else "Local scores — sign in to compare."
+	# Three states, not two: signed in and syncing, signed in as SOMEONE ELSE, or
+	# not signed in. Without the middle one this told a player who was signed in
+	# to go and sign in.
+	if Leaderboard.cloud_available():
+		status.text = "Cloud scores included."
+	elif Bridge.signed_in:
+		status.text = "Local scores — signed in as a different account."
+	else:
+		status.text = "Local scores — sign in to compare."
 	box.add_child(status)
 	if scores.is_empty():
 		var none := Label.new()

@@ -42,6 +42,16 @@ static func _SAVE_PATHS() -> Array:
 	return _SYNC_KEYS().values()
 
 
+## SET-shaped keys sync by per-entry union; the run is a STATE and resolves by
+## picking a side. See leaderboard.gd's header for why a board synced by
+## pick-a-side silently deletes the other device's real entries.
+static func _MERGER(key: String) -> Callable:
+	match key:
+		"scores": return Leaderboard.merge
+		"history": return Leaderboard.merge_history
+	return Callable()
+
+
 static var window_sized := false # once per launch, not on every return to menu
 
 
@@ -52,7 +62,7 @@ static var window_sized := false # once per launch, not on every return to menu
 func _on_snapshot_loaded(key: String) -> void:
 	var paths := _SYNC_KEYS()
 	if paths.has(key):
-		CloudSave.sync_file(key, paths[key])
+		CloudSave.sync_file(key, paths[key], _MERGER(key))
 
 
 ## THE ONE PLACE A SIGN-IN VERDICT IS HANDLED — binding, cloud fetch and UI.
@@ -251,7 +261,7 @@ func _ready() -> void:
 	# desktop today, but on iOS/Android (once the native plugin lands) this
 	# is what makes a fresh install offer "Continue" from another device.
 	for key: String in _SYNC_KEYS():
-		CloudSave.sync_file(key, _SYNC_KEYS()[key])
+		CloudSave.sync_file(key, _SYNC_KEYS()[key], _MERGER(key))
 	# A snapshot fetched after sign-in lands asynchronously, long after the
 	# sync above has run. Mirroring it to disk is what actually restores
 	# progress on a fresh device. Null off Android, where nothing fetches.

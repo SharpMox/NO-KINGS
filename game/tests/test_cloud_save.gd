@@ -11,6 +11,7 @@ const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 const Account := preload("res://scripts/account.gd")
+const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 var fails := 0
 
@@ -100,6 +101,32 @@ func _init() -> void:
 	CloudSave.sync_file("run", path)
 	check(not FileAccess.file_exists(path),
 		"a tombstoned run does NOT come back from the cloud")
+
+	# --- set-shaped keys UNION instead of picking a side (issues 85/86) ---
+	# leaderboard.gd's header warns that resolve() choosing wholesale "silently
+	# deletes the other device's real scores" — but that warning only guarded the
+	# display path. sync_file ran the destructive pick on the scores/history
+	# FILES: two devices ping-pong overwrote each other's boards until only one
+	# side's entries existed anywhere. With a merger, both sides survive.
+	Memory.reset()
+	DirAccess.remove_absolute(path)
+	var sf := FileAccess.open(path, FileAccess.WRITE)
+	sf.store_string(JSON.stringify([{"score": 5, "wave": 2, "kings": 0}]))
+	sf = null
+	Memory.push("scores", {"ts": Time.get_unix_time_from_system() + 3600,
+		"data": [{"score": 9, "wave": 3, "kings": 1}]})
+	CloudSave.sync_file("scores", path, Leaderboard.merge)
+	var board: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	check(board is Array and board.size() == 2,
+		"a set-shaped key UNIONS with a newer cloud copy — no local entry is lost")
+	check(Memory.pull("scores").data.size() == 2,
+		"and the union is pushed back, so the cloud accumulates instead of ping-ponging")
+	# history: identity is the whole entry — the same summary mirrored twice is
+	# one run, a genuinely different one is kept
+	var h1 := {"score": 10, "wave": 4, "kings": 0, "won": false}
+	var h2 := {"score": 70, "wave": 9, "kings": 1, "won": true}
+	check(Leaderboard.merge_history([h1], [h1, h2]).size() == 2,
+		"history unions by whole entry: mirrored duplicates collapse, real runs survive")
 
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting

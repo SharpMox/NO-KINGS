@@ -43,6 +43,27 @@ static func merge(a: Array, b: Array) -> Array:
 	return out.slice(0, CAP)
 
 
+## Games History is a set too — the same union rule as merge() above, keyed by
+## the WHOLE entry: an identical summary on two devices is one run seen twice
+## through the mirror, not two runs. Local order is kept and cloud-only entries
+## append after it; entries carry no timestamp, so true interleaving is
+## unknowable and not worth inventing.
+static func merge_history(a: Array, b: Array) -> Array:
+	var seen := {}
+	var out: Array = []
+	for board in [a, b]:
+		for e in board:
+			var id := JSON.stringify(e)
+			if seen.has(id):
+				continue
+			seen[id] = true
+			out.append(e)
+	# 50 = Economy.HISTORY_CAP, not preloaded here (economy drags in the whole
+	# gameplay chain). Writers re-cap on every record, so drift in this literal
+	# only ever affects the size of one synced file, never what is kept.
+	return out.slice(0, 50)
+
+
 ## The cloud board, or [] when there is no cloud to reach. An unreachable
 ## leaderboard is the NORMAL case (desktop, offline, a platform with no plugin
 ## yet) — never an error state, and never a reason to hide the local board.

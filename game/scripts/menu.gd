@@ -57,6 +57,22 @@ func _on_snapshot_loaded(key: String) -> void:
 func _on_sign_in_finished(ok: bool) -> void:
 	if not ok:
 		return
+	# BINDING LIVES HERE, not in the login button's one-shot, because this
+	# handler is the only one that sees every success.
+	#
+	# The one-shot ignores a verdict that arrives after the timeout already gave
+	# up — correctly, since it must not yank a player out of whatever they moved
+	# on to. But Google answering late is still Google answering: the bridge is
+	# signed in, the cloud starts syncing, and without this the account file
+	# would still say guest. The player would then be silently syncing one
+	# account's cloud data into another account's saves.
+	#
+	# Guarded on signed_in() rather than a flag so it is idempotent: a guest or a
+	# fresh install binds, an already-bound account does nothing.
+	if not Account.signed_in():
+		# GOOGLE, because Play Games is the only provider that reaches this
+		# signal. Game Center is issue 87 and will need its own path.
+		Account.sign_in(Account.GOOGLE, CloudSave.backend.account_id(), _SAVE_PATHS())
 	for key: String in _SYNC_KEYS():
 		Bridge.fetch(key)
 
@@ -184,6 +200,13 @@ func _ready() -> void:
 	login_note.text = "Your progress follows your account."
 	login_box.add_child(login_note)
 	var finish_login := func() -> void:
+		# Only dismisses the login screen if it is actually the thing on screen.
+		# A verdict can arrive long after the player left it — they may be in
+		# Settings, the Guide or Scores, each of which hides main_box — and
+		# unconditionally showing main_box would surface the main menu UNDERNEATH
+		# whatever they opened. Signing in should never move the player.
+		if not login_center.visible:
+			return
 		login_center.visible = false
 		main_box.visible = true
 	var provider_buttons: Array[Button] = []
@@ -250,14 +273,11 @@ func _ready() -> void:
 						release.call(unavailable)
 						return
 					settled[0] = true
-					# Bound only now — account_id() is empty until the player id
-					# lands on the second async hop, and an empty owner id would
-					# be written into account.json permanently for this install.
-					#
-					# The cloud FETCH is deliberately not here: _on_sign_in_finished
-					# owns it, so it also covers the silent sign-in that happens
-					# on every launch after this one.
-					Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+					# UI ONLY. Both the account binding and the cloud fetch belong
+					# to _on_sign_in_finished, which runs for every success —
+					# including the silent one at boot and one that lands after
+					# this screen's timeout. Doing either here would cover only
+					# the case where a player happened to be watching.
 					for b in provider_buttons:
 						b.disabled = false
 					# No longer a guest, so the main menu's entry point to this

@@ -9,6 +9,7 @@ const CloudSave := preload("res://scripts/cloud_save.gd")
 const Memory := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
+const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 
 var fails := 0
 
@@ -91,9 +92,9 @@ func _init() -> void:
 	# round-trip corrupts every cloud save silently rather than failing loudly —
 	# which is exactly why it is the one piece of slice 86 under test.
 	var env := {"ts": 1234, "data": {"score": 7, "wave": 3}}
-	var bytes := PlayGames.encode(env)
+	var bytes := Bridge.encode(env)
 	check(bytes.size() > 0, "encode produces bytes")
-	var back: Variant = PlayGames.decode(bytes)
+	var back: Variant = Bridge.decode(bytes)
 	check(back is Dictionary, "decode returns an envelope Dictionary")
 	# Compared field-by-field through int(), not by ==: JSON round-trips every
 	# number to a float, so a decoded envelope never equals an int-literal one.
@@ -106,10 +107,23 @@ func _init() -> void:
 	# load_game(create_if_not_found = true) hands back an EMPTY snapshot the
 	# first time a device ever syncs, so empty bytes are the normal first-run
 	# case and must read as "no cloud copy" rather than crash.
-	check(PlayGames.decode(PackedByteArray()) == null, "empty bytes decode to null")
-	check(PlayGames.decode("not json".to_utf8_buffer()) == null, "garbage bytes decode to null")
-	check(PlayGames.decode("[1,2,3]".to_utf8_buffer()) == null,
+	check(Bridge.decode(PackedByteArray()) == null, "empty bytes decode to null")
+	check(Bridge.decode("not json".to_utf8_buffer()) == null, "garbage bytes decode to null")
+	check(Bridge.decode("[1,2,3]".to_utf8_buffer()) == null,
 		"valid JSON that isn't an envelope decodes to null")
+
+	# --- the Android backend, answering as it must on DESKTOP (issue 86 / T2) ---
+	# The bridge no-ops off Android, so every one of these is the honest "there
+	# is no cloud here" answer rather than a stub's placeholder. Worth asserting
+	# because the whole desktop suite runs with this autoload live: if it ever
+	# started claiming availability, every sync_file call in the game would
+	# begin talking to a plugin that isn't there.
+	check(not PlayGames.is_available(), "play games reports unavailable off Android")
+	check(not Bridge.supported(), "play games reports the PLATFORM unsupported off Android")
+	check(PlayGames.account_id() == "", "no account id without a signed-in player")
+	check(PlayGames.pull("run") == null, "pull returns null with nothing cached")
+	check(not PlayGames.push("run", {"ts": 1, "data": {}}),
+		"push reports NOT accepted when there is no snapshot client")
 
 	print("---")
 	if fails == 0:

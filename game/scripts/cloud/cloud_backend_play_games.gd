@@ -33,6 +33,38 @@ const APP_ID := "292256536070"
 const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
 
 
+## --- the snapshot codec (issue 86 / T1) --------------------------------------
+## Play Games Snapshots are BYTES — `PlayGamesSnapshot.content` is a
+## PackedByteArray — so every envelope crosses JSON and utf8 on the way out and
+## back. Kept here rather than in the bridge autoload because it is pure: no
+## Node, no plugin classes, so the desktop suite can reach it. It is the only
+## part of this backend that runs off Android, and the only part under test.
+
+
+static func encode(envelope: Dictionary) -> PackedByteArray:
+	return JSON.stringify(envelope).to_utf8_buffer()
+
+
+## The envelope in `bytes`, or null when there isn't a usable one.
+##
+## Empty bytes are the NORMAL first-run case, not an error: the bridge calls
+## load_game(create_if_not_found = true), which hands back an empty snapshot the
+## first time a device ever syncs. Returning null makes that read as "no cloud
+## copy", which resolve() already handles by keeping local.
+static func decode(bytes: PackedByteArray) -> Variant:
+	if bytes.is_empty():
+		return null
+	# JSON.new().parse(), not JSON.parse_string(): the static helper PRINTS a
+	# parse error, and a corrupt snapshot is a case we HANDLE — it falls back to
+	# local, which is already what resolve() does with a missing remote. Logging
+	# an error for something we recover from cleanly is how a suite teaches
+	# people to scroll past error lines.
+	var json := JSON.new()
+	if json.parse(bytes.get_string_from_utf8()) != OK:
+		return null
+	return json.data if json.data is Dictionary else null
+
+
 static func is_available() -> bool:
 	return false # TODO(native plugin): true once Play Games Saved Games is wired
 

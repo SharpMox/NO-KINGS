@@ -912,10 +912,7 @@ func _begin_player_turn() -> void:
 	WaveLogic.spawn_pending(self)
 	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
 		return _game_over(false, "Resource starvation")
-	if not autoplay and not is_scenario: # autosave at every turn start
-		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-		f.store_string(JSON.stringify(SaveConfig.to_config(self)))
-		CloudSave.sync_file("run", SAVE_PATH) # mirror to the platform backend (12)
+	_autosave() # at every turn start
 	_refresh()
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
 		if autoplay:
@@ -934,6 +931,29 @@ func _begin_player_turn() -> void:
 		_open_bounty_pick()
 
 
+## Write the run to disk and mirror it. Called at every turn start, and again
+## when the app is backgrounded — the point at which Android may kill us.
+##
+## The comment at the old call site referred to a `_save_run` that never
+## existed; this is that function, finally.
+func _autosave() -> void:
+	if autoplay or is_scenario:
+		return # bot runs and scenarios are not resumable, by design
+	# Null-checked because this runs EVERY TURN on a phone, where storage
+	# genuinely fills up. Dereferencing a failed open would crash the run at the
+	# top of a turn — losing far more than the save it was trying to write. The
+	# turn continues unsaved instead, which is the position the player was in a
+	# moment earlier anyway.
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("save: could not write %s (error %d) — this turn is not saved"
+			% [SAVE_PATH, FileAccess.get_open_error()])
+		return
+	f.store_string(JSON.stringify(SaveConfig.to_config(self)))
+	f = null # close before the mirror reads the file back through its own handle
+	CloudSave.sync_file("run", SAVE_PATH) # mirror to the platform backend (12)
+
+
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
@@ -947,6 +967,14 @@ func _enemy_turn() -> void:
 	_item_reset()
 	_artefact_targeting_reset() # Bovine Tractor Beam (52): never carries into the enemy turn
 	_army_board_targeting_reset() # issue 68: Hostile Takeover/Ritual, same reasoning
+	# Call the Banners (issue 67), for the SAME reason as the two above — it was
+	# the one targeting mode missing from this list. Left armed, it survived into
+	# the next player turn where nothing on screen showed it: the tint lives on
+	# the Ability chip, and _begin_army_targeting force-closes that drawer. The
+	# next tap on any Stock stack was then eaten by the targeting branch, which
+	# spends an Action and the wave's Ability on a stack the player was only
+	# trying to deploy. Reachable in three taps: activate, PASS, tap Stock.
+	_army_targeting_reset()
 	_refresh()
 	# Vladimir Putin: Annexation. Deliberately resolved at the END of the
 	# player's turn and only in the enemy half, so it is a rule the player can
@@ -1425,6 +1453,16 @@ func _notification(what: int) -> void:
 	# in-game menu (clock stopped, no enemy turns), via `backgrounded`.
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		backgrounded = true
+		# Save on the way out. The autosave otherwise only fires at TURN START,
+		# and backgrounding is the exact moment Android is entitled to kill the
+		# process — so the worst case was losing a whole player turn: the
+		# reinforce picks, the Shop spend, the Box opened, the moves and the
+		# capture, all of it, because the turn had not ended yet.
+		#
+		# Safe to call at any point: to_config() is a pure snapshot of current
+		# state, which is what a resumed run wants regardless of where in the
+		# turn it was taken.
+		_autosave()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
 		backgrounded = false
 	# Android's hardware Back. Godot quits the app on it by default, and mid-run
@@ -3211,6 +3249,14 @@ func _open_bounty_pick() -> void:
 ## slot.contents, never re-rolls it — that's what makes the stock-time peek
 ## (a future Artefact) and the eventual open guaranteed to agree.
 func _open_box_pick(slot: Dictionary) -> void:
+	# A Box already open is a Box being picked from, and every field below is
+	# rewritten wholesale — offer, size, kind, picks, rerolls, Black Book. The
+	# four artefact hooks that can open a Box all check `not g.box_open` before
+	# calling; the Shop's buy path does not, so buying a Box while a Bounty Box
+	# was open behind the Shop destroyed the Bounty Box outright. Guarding here
+	# covers every caller rather than the three that remembered.
+	if box_open:
+		return
 	box_open = true
 	box_only_kind = slot.key
 	box_size = slot.size
@@ -3576,6 +3622,14 @@ func _connect_modals() -> void:
 		win_open = false
 		_game_over(true, "Wave-%d King checkmated" % wave))
 	modals.shop_buy_pressed.connect(func(index: int) -> void:
+		# BEFORE Shop.buy, which takes the gold. _open_box_pick refuses to
+		# clobber a Box that is already open, so buying one here while another
+		# was open would otherwise charge the player and show them nothing.
+		# (The Box now renders above the Shop, so this should be unreachable —
+		# it is the guard that makes that a safety property rather than a
+		# coincidence of draw order.)
+		if box_open:
+			return
 		if not Shop.buy(self, index):
 			return
 		if shop_stock[index].kind == "box": # the roll modal IS the grant

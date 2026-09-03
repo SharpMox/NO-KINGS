@@ -1,6 +1,6 @@
 # 86 — Google Play Games backend (Android)
 
-Status: in progress — Console done, plugin installed and reaching the APK (2026-09-02); NEXT is the backend implementation, then device verification
+Status: in progress — Console **published** and plugin installed (2026-09-03); design resolved and sliced into T1-T6 below; NEXT is implementation, then device verification
 
 ## Parent
 
@@ -267,3 +267,65 @@ to the AAB size.
 
 `export_format` is left at **0 (APK)** for now: an AAB cannot be `adb install`ed, and device
 testing needs an APK. Flip it to 1 for store submission — see the publishing checklist.
+
+## Play Console: DONE (2026-09-03)
+
+Verified in the Console: **Properties → Published**, **Saved games enabled**, project
+`NO KINGS` / id `292256536070` — which matches the `APP_ID` constant already committed in
+`cloud_backend_play_games.gd`. Testers added (A8) and the configuration published (A9).
+
+The setup checklist's remaining open item, *"Add the Play Games Services SDK to your APK to use
+the APIs"*, is **this slice's code**, not a Console step. Installing the plugin (commit
+`3281bba`) put the AAR in the build; the checklist wants the APIs actually *called*. Nothing in
+`game/scripts/` calls them yet, so the checklist is accurate rather than stuck.
+
+**The only remaining non-code blocker is an Android device** (section B of `MANUAL-STEPS.md`).
+
+## Design resolved (grilled 2026-09-03)
+
+Eight decisions, taken against the plugin source rather than its docs. The contract decision is
+recorded as **`docs/adr/0003-synchronous-cloud-contract-over-async-sdk.md`** — the ADR this
+issue said was owed.
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 1 | Where does the plugin's Node live? | **One autoload of ours**, `PlayGamesBridge`, owning the three clients; no-ops off Android |
+| 2 | Does the login button trigger native sign-in? | **Yes** — `sign_in()` then `user_authenticated`; accepts a `menu.gd` edit this issue had not scoped |
+| 3 | Who resolves snapshot conflicts? | **We do, silently.** Google's picker is never shown |
+| 4 | How does a fresh device get its progress? | **Sign-in completion re-syncs** `run`/`scores`/`history`; not deferred to the next run |
+| 5 | What does `is_available()` mean? | **Signed-in session state.** Platform capability becomes a separate method |
+| 6 | Does `push()` enqueue into `SyncQueue`? | **No** — overturns this file's earlier ruling; see the ADR for why |
+| 7 | How much is tested? | **The codec only.** No fake plugin double |
+| 8 | Desktop / web login? | **Parked** as its own slice — see issue 105. `menu.gd`'s buttons are left as they are |
+
+### Two facts the earlier notes had wrong
+
+**The plugin's clients are Nodes, not autoloads.** Their doc comments say *"This autoload
+exposes…"*, but `export_plugin.gd:25` registers exactly one autoload — `GodotPlayGameServices` —
+holding only `android_plugin` and the JSON marshaller. `PlayGamesSignInClient`,
+`PlayGamesSnapshotsClient` and `PlayGamesPlayersClient` are `class_name … extends Node` wiring
+their signals in `_ready()`. `GodotPlayGameServices.initialize()` must also be called manually.
+This is what forces the bridge autoload; a static-func script cannot receive a signal.
+
+**`account_id()` is a second async hop, not a property read.** It arrives via
+`PlayGamesPlayersClient.load_current_player()` → `current_player_loaded(player)` →
+`player.player_id`. So sign-in is a *chain*: `user_authenticated(true)` → `load_current_player()`
+→ `current_player_loaded` → only then bind the account and re-sync. Binding on
+`user_authenticated` alone would stamp an empty owner id into `account.json`, silently.
+
+### Slices
+
+Vertical, in dependency order. T1 and T2 are the seam; T3-T5 are behaviour; T6 is proof.
+
+| Ticket | What | Blocked by |
+| --- | --- | --- |
+| **T1** | `PlayGamesBridge` autoload: `initialize()`, owns the three clients, Android-guarded. Plus the envelope↔`PackedByteArray` codec **and its desktop test** (the one thing here that is testable and silently corrupting if wrong) | — |
+| **T2** | `cloud_backend_play_games.gd`: `is_available()` / `push()` / `pull()` / `account_id()` reading the bridge's cache, plus the new platform-capability method | T1 |
+| **T3** | Sign-in flow: `menu.gd` button → `sign_in()` → `user_authenticated` → `load_current_player()` → bind `Account` on `player_id`. Failure path reuses the existing "isn't available on this device yet" message | T2 |
+| **T4** | Post-sign-in re-sync: fetch `run`/`scores`/`history`; each `game_loaded` caches and re-runs that key's `sync_file` | T3 |
+| **T5** | `conflict_emitted` → resolve with `CloudSave.resolve()` / `Leaderboard.merge()` → re-save. No UI | T2 |
+| **T6** | Flip `gradle_build/use_gradle_build=true`, build, `adb install`, **device-verify** sign-in + save round-trip | T3-T5, **an Android device** |
+
+`run_all.sh` must stay ALL GREEN throughout — but per this file's own warning, green verifies
+only that the desktop build still works with the backend absent. **T6 is the only verification
+that counts**, and it cannot happen on this machine.

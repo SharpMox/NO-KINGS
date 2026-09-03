@@ -14,6 +14,12 @@ const Leaderboard := preload("res://scripts/leaderboard.gd")
 
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 
+## How long the login screen waits for Google before handing the buttons back.
+## Two native round trips (authenticate, then load the player) on a phone that
+## may have just lost signal — generous enough not to cut off a slow-but-working
+## sign-in, short enough that a dead one does not strand the player.
+const SIGN_IN_TIMEOUT := 30.0
+
 ## Every mirrored save, as cloud key -> local file. The single place that
 ## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
 static func _SYNC_KEYS() -> Dictionary:
@@ -42,6 +48,17 @@ func _on_snapshot_loaded(key: String) -> void:
 	var paths := _SYNC_KEYS()
 	if paths.has(key):
 		CloudSave.sync_file(key, paths[key])
+
+
+## An account is attached — silently at boot for a returning player, or through
+## the login screen on a first run. Either way this is the first moment the
+## cloud can be read at all, so it is where the fetch belongs. The login button
+## deliberately does NOT do this: it would only ever cover the first launch.
+func _on_sign_in_finished(ok: bool) -> void:
+	if not ok:
+		return
+	for key: String in _SYNC_KEYS():
+		Bridge.fetch(key)
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
@@ -90,6 +107,15 @@ func _ready() -> void:
 	var bridge := get_node_or_null(^"/root/PlayGamesBridge")
 	if bridge != null:
 		bridge.snapshot_loaded.connect(_on_snapshot_loaded)
+		# Connected HERE, not inside the login button, and this distinction is
+		# load-bearing. The sync above runs while is_available() is still false —
+		# the plugin's own startup auth check has not answered yet — so all three
+		# calls no-op. The answer arrives on this signal, and on every launch
+		# after the first there is no login screen to have connected a listener.
+		# Wiring it only to the button meant the cloud was pulled exactly once in
+		# an install's life, so "continue from another device" quietly did
+		# nothing for the returning player. (issue 86 / T4)
+		bridge.sign_in_finished.connect(_on_sign_in_finished)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -114,6 +140,15 @@ func _ready() -> void:
 		main_box.visible = false
 		guide_scroll.visible = true)
 	_button(main_box, "About", 24, _show_about)
+	# issue 83's ruling — "a guest keeps their progress when they sign in" — had
+	# no way to happen: the login screen only ever appears on a first run, so
+	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
+	# unreachable by any player. This is the entry point that makes it real.
+	# Hidden once signed in, and on any platform that cannot sync at all.
+	if Account.provider() == Account.GUEST and Bridge.supported():
+		_button(main_box, "Sign in to sync", 24, func() -> void:
+			main_box.visible = false
+			login_center.visible = true)
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
@@ -150,44 +185,74 @@ func _ready() -> void:
 	var finish_login := func() -> void:
 		login_center.visible = false
 		main_box.visible = true
+	var provider_buttons: Array[Button] = []
 	for prov in [Account.GOOGLE, Account.APPLE]:
-		_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
-			var unavailable := "%s sign-in isn't available on this device yet." \
-				% prov.capitalize()
-			# supported() — the PLATFORM question — not is_available(), which
-			# reports whether an ACCOUNT is attached and is therefore false
-			# until sign-in completes. Guarding on that one here would make
-			# signing in impossible: the button would refuse forever. ADR 0003.
-			#
-			# Only Play Games is implemented (86). Game Center is 87 and its
-			# backend is still a stub, so Apple falls through to the same
-			# honest message rather than pretending.
-			if prov != Account.GOOGLE or not Bridge.supported() or bridge == null:
-				login_note.text = unavailable
-				return
-			login_note.text = "Signing in…"
-			# ONE_SHOT: the button can be pressed again after a refusal, and a
-			# handler left connected would fire once per previous attempt.
-			bridge.sign_in_finished.connect(func(ok: bool) -> void:
-				if not ok:
+		provider_buttons.append(
+			_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
+				var unavailable := "%s sign-in isn't available on this device yet." \
+					% prov.capitalize()
+				# supported() — the PLATFORM question — not is_available(), which
+				# reports whether an ACCOUNT is attached and is therefore false
+				# until sign-in completes. Guarding on that one here would make
+				# signing in impossible: the button would refuse forever. ADR 0003.
+				#
+				# Only Play Games is implemented (86). Game Center is 87 and its
+				# backend is still a stub, so Apple falls through to the same
+				# honest message rather than pretending.
+				if prov != Account.GOOGLE or not Bridge.supported() or bridge == null:
 					login_note.text = unavailable
 					return
-				# Bound only now — account_id() is empty until the player id
-				# lands on the second async hop, and an empty owner id would be
-				# written into account.json permanently for this install.
-				Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
-				# THE point of signing in: go and get what this account already
-				# has. Nothing else re-syncs after boot, so without this a new
-				# phone shows an empty history until a full run finishes — which
-				# reads as data loss, not staleness. Each answer arrives on
-				# snapshot_loaded below. (T4)
-				for key: String in _SYNC_KEYS():
-					Bridge.fetch(key)
-				finish_login.call(), CONNECT_ONE_SHOT)
-			Bridge.begin_sign_in())
-	_button(login_box, "Play as Guest", 22, func() -> void:
+				login_note.text = "Signing in…"
+				# Locked while a sign-in is in flight. Each press would otherwise
+				# connect another one-shot AND start another sign-in, so a single
+				# verdict would run the whole completion path once per press.
+				for b in provider_buttons:
+					b.disabled = true
+				# Shared by the verdict and the timeout so whichever arrives
+				# first wins and the other becomes a no-op — without it a late
+				# refusal would overwrite the screen a player had moved on from.
+				var settled := [false]
+				var release := func(note: String) -> void:
+					if settled[0]:
+						return
+					settled[0] = true
+					login_note.text = note
+					for b in provider_buttons:
+						b.disabled = false
+				bridge.sign_in_finished.connect(func(ok: bool) -> void:
+					if settled[0]:
+						return
+					if not ok:
+						release.call(unavailable)
+						return
+					settled[0] = true
+					# Bound only now — account_id() is empty until the player id
+					# lands on the second async hop, and an empty owner id would
+					# be written into account.json permanently for this install.
+					#
+					# The cloud FETCH is deliberately not here: _on_sign_in_finished
+					# owns it, so it also covers the silent sign-in that happens
+					# on every launch after this one.
+					Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
+					for b in provider_buttons:
+						b.disabled = false
+					finish_login.call(), CONNECT_ONE_SHOT)
+				# Neither native hop is guaranteed to answer — a phone that just
+				# lost signal simply never calls back — and without this the
+				# screen sits on "Signing in…" with no way forward and no way
+				# back. Guest stays reachable, but only if the buttons return.
+				get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
+					release.call("%s sign-in timed out. Check your connection and try again."
+						% Account.GOOGLE.capitalize()))
+				Bridge.begin_sign_in()))
+	var guest_button := _button(login_box, "Play as Guest", 22, func() -> void:
 		Account.start_guest()
 		finish_login.call())
+	# Only offered when there is no account yet. Reached from the main menu (a
+	# guest choosing to sign in) this button would call start_guest() again,
+	# minting a NEW guest id and orphaning every save owned by the old one —
+	# the exact data loss the rebind exists to prevent.
+	guest_button.visible = Account.needs_login()
 	# The gate. --screenshot bypasses it too: a capture run on a machine with no
 	# account would otherwise photograph the login screen instead of the menu,
 	# which is a silent trap on any fresh checkout rather than a real result.

@@ -104,13 +104,18 @@ func _ready() -> void:
 	_sign_in = (load(_SIGN_IN_SCRIPT) as GDScript).new()
 	_snapshots = (load(_SNAPSHOTS_SCRIPT) as GDScript).new()
 	_players = (load(_PLAYERS_SCRIPT) as GDScript).new()
-	add_child(_sign_in)
-	add_child(_snapshots)
-	add_child(_players)
+	# CONNECTED BEFORE add_child, deliberately. Each client wires itself to the
+	# native plugin in its own _ready(), which fires DURING add_child — so
+	# connecting afterwards leaves a window in which the plugin's startup
+	# authentication check could emit into nothing. Connecting first costs the
+	# same and removes the question; a signal needs no tree to be connected.
 	_sign_in.user_authenticated.connect(_on_authenticated)
 	_players.current_player_loaded.connect(_on_player_loaded)
 	_snapshots.game_loaded.connect(_on_game_loaded)
 	_snapshots.conflict_emitted.connect(_on_conflict)
+	add_child(_sign_in)
+	add_child(_snapshots)
+	add_child(_players)
 
 
 ## --- the snapshot codec (issue 86 / T1) --------------------------------------
@@ -233,8 +238,12 @@ func _on_player_loaded(player: Variant) -> void:
 ## A snapshot arrived. `metadata.unique_name` is the file_name that save_game
 ## was given, i.e. our save key, which is how a single signal serves all three.
 func _on_game_loaded(snapshot: Variant) -> void:
-	if snapshot == null:
-		return # no name to file it under; load_game(create_if_not_found) avoids this
+	# metadata is checked as well as the snapshot: PlayGamesSnapshot only sets it
+	# when the payload dictionary carried one, so a malformed response leaves it
+	# null and `.unique_name` throws. A snapshot we cannot file under a key is a
+	# snapshot we cannot use, so both cases exit the same way.
+	if snapshot == null or snapshot.metadata == null:
+		return
 	var key := str(snapshot.metadata.unique_name)
 	var envelope: Variant = decode(snapshot.content)
 	if envelope is Dictionary:
@@ -255,7 +264,11 @@ func _on_game_loaded(snapshot: Variant) -> void:
 ## exposes no resolveConflict() call, so overwriting is the only lever it gives
 ## us. Verified against the addon source, not assumed.
 func _on_conflict(conflict: Variant) -> void:
-	if conflict == null:
+	# Same metadata guard as _on_game_loaded, and for the same reason: without a
+	# unique_name there is no key to settle the conflict under.
+	if conflict == null or conflict.server_snapshot == null \
+			or conflict.server_snapshot.metadata == null \
+			or conflict.conflicting_snapshot == null:
 		return
 	var mine: Variant = decode(conflict.conflicting_snapshot.content)
 	var theirs: Variant = decode(conflict.server_snapshot.content)

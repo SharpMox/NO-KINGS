@@ -1462,16 +1462,21 @@ func _notification(what: int) -> void:
 	# in-game menu (clock stopped, no enemy turns), via `backgrounded`.
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		backgrounded = true
-		# Save on the way out. The autosave otherwise only fires at TURN START,
-		# and backgrounding is the exact moment Android is entitled to kill the
-		# process — so the worst case was losing a whole player turn: the
-		# reinforce picks, the Shop spend, the Box opened, the moves and the
-		# capture, all of it, because the turn had not ended yet.
+		# DELIBERATELY DOES NOT SAVE, and that is not an oversight.
 		#
-		# Safe to call at any point: to_config() is a pure snapshot of current
-		# state, which is what a resumed run wants regardless of where in the
-		# turn it was taken.
-		_autosave()
+		# Backgrounding is when Android may kill us, so saving here looks
+		# obviously right — it was tried, and it breaks the save schema. A save
+		# records neither `state` nor `actions_left`, because apply() always
+		# ends with _begin_player_turn(): the format assumes every save is taken
+		# at a TURN START. A mid-turn snapshot therefore resumes as a fresh turn,
+		# which hands back actions already spent; a mid-ENEMY-turn one resumes
+		# as the player's turn with the enemy's remaining moves never played,
+		# repeatably; and one taken during SETUP skips the free placement phase.
+		#
+		# Losing the turn in progress is the honest cost of that format, and it
+		# is smaller than silently letting a run dodge enemy turns. Saving here
+		# needs `state` and `actions_left` in the schema first — a version bump,
+		# not a one-line call.
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
 		backgrounded = false
 	# Android's hardware Back. Godot quits the app on it by default, and mid-run
@@ -1486,7 +1491,14 @@ func _notification(what: int) -> void:
 	# screen and has its own buttons, so Back is ignored rather than resurrecting
 	# a menu on top of it.
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		if state != State.GAME_OVER:
+		if state == State.GAME_OVER:
+			# Leaves, rather than doing nothing. "A gesture that silently does
+			# nothing reads as a frozen app" is the reason this handler exists
+			# at all, and the result screen is no exception — Back maps to the
+			# Main Menu button sitting right there. The run is already over and
+			# already scored, so nothing is lost by taking it.
+			get_tree().change_scene_to_file("res://scenes/Menu.tscn")
+		else:
 			hud.toggle_menu(not game_menu_open)
 
 
@@ -3235,6 +3247,21 @@ func _ritual_resolve(pos: Vector2i) -> void:
 ## "decline" consolation either, since forfeiting still spends the trigger
 ## (the Buff is already consumed by the caller before this runs).
 func _open_bounty_pick() -> void:
+	# DEFER rather than drop. Both callers spend something immediately before
+	# calling — the capture path consumes the piece_bounty buff, the turn-start
+	# path decrements pending_bounty_boxes — and another Box can already be open
+	# by then, because an artefact hook on the same score change or wave clear
+	# can open one first. The 1-of-3 offer would then render on top, the player
+	# would choose, and _open_box_pick would refuse to clobber the live Box:
+	# payment taken, nothing given, no message.
+	#
+	# Putting it back on the queue costs the player a turn's delay instead of
+	# the reward. It nets out against the caller that just decremented, which is
+	# exactly the "extra copies wait for a later Turn" rule this counter exists
+	# to express.
+	if box_open or buff_pick_open:
+		pending_bounty_boxes += 1
+		return
 	var offer := [Box.random_slot(self), Box.random_slot(self), Box.random_slot(self)]
 	if autoplay:
 		return _open_box_pick(offer[rng.randi() % offer.size()])
@@ -3645,6 +3672,17 @@ func _connect_modals() -> void:
 			if modals.shop_panel:
 				modals.shop_panel.visible = false
 			return _open_box_pick(shop_stock[index]) # reveals its stock-time roll
+		# An artefact's on_purchase can open a Box of its own — SETI's Red
+		# Marker does. Rebuilding the Shop here would raise a fresh, opaque
+		# shop_panel back on top of that Box, and every further Buy would then
+		# hit the box_open guard and do nothing on a Shop that still looks live.
+		# Step aside and let the Box have the screen, exactly as the box branch
+		# above does.
+		if box_open:
+			if modals.shop_panel:
+				modals.shop_panel.visible = false
+			_refresh()
+			return
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
 	modals.shop_closed.connect(func() -> void: _refresh())

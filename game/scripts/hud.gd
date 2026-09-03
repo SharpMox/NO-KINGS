@@ -37,6 +37,9 @@ signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
+signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
+signal arrow_toggle_pressed
+signal arrow_clear_pressed
 
 
 ## Open or close the in-game menu. Shared by the ☰ button, Resume, and Android's
@@ -50,15 +53,19 @@ func toggle_menu(open: bool) -> void:
 	# Opening was previously unreachable at GAME_OVER only by accident of child
 	# order and the Shop happening to cover the button, which is not a property
 	# any future panel is obliged to preserve.
-	if open and g != null and g.state == g.State.GAME_OVER:
+	# `win_open` as well as GAME_OVER: at the wave-50 victory screen the state is
+	# still PLAYER_TURN, so the GAME_OVER test alone let the pause menu open on
+	# top of it. Raising the overlay closed the mouse route to this button but
+	# not the Back-key one, so the fix that hid the button created the hole.
+	# From there "Main Menu" leaves without ever running _game_over, and the win
+	# is never scored or recorded.
+	if open and g != null and (g.state == g.State.GAME_OVER or g.win_open):
 		return
 	if open:
 		game_menu.move_to_front() # above every other HUD control
 	game_menu.visible = open
 	menu_toggled.emit(open)
-signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
-signal arrow_toggle_pressed
-signal arrow_clear_pressed
+
 
 var g # the Game node — read-only from here; mutations go up via signals
 

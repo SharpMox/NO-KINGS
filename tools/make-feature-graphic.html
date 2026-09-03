@@ -30,11 +30,17 @@ const SIZE = 132, STEP_X = 70, STEP_Y = 94;
 let k = 0, row = 0;
 for (let y = -70; y < 560; y += STEP_Y, row++) {
   const brick = (row % 2) * (STEP_X / 2);   // offset alternate rows so the
+  let col = 0;
   for (let x = -80; x < 1090; x += STEP_X) { // columns never line up as a grid
     const id = IDS[(k*7 + 3) % IDS.length]; // walk, don't randomise: every
     k++;                                     // piece is guaranteed to appear
+    // Side alternates on a checkerboard rather than being rolled per token:
+    // a 30% random draw clumps, leaving whole regions all-blue or all-red.
+    // The flip chance breaks the regularity without letting it clump again.
+    const side = (((row + col) % 2 === 0) !== (rnd() < .24)) ? 'dark' : 'light';
+    col++;
     const img = document.createElement('img');
-    img.src = `/game/assets/pieces/${id}-${rnd() < .30 ? 'dark' : 'light'}.png`;
+    img.src = `/game/assets/pieces/${id}-${side}.png`;
     img.style.width = img.style.height = SIZE + 'px';
     img.style.left = (x + brick + (rnd()-.5)*16) + 'px';
     img.style.top  = (y + (rnd()-.5)*14) + 'px';

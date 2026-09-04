@@ -30,7 +30,8 @@ flowchart TD
   OK -->|yes| OWN{owner == player id?}
   OWN -->|unbound + player asked| BIND[bind · restamp saves<br/>clear old queue]
   OWN -->|match| SYNC[drain queue → fetch keys<br/>run: deeper wins · boards: union]
-  OWN -->|switch| INERT[cloud inert · Scores names it]
+  OWN -->|switch| INERT[cloud inert · Scores names it<br/>a press gets told on the note]
+  OWN -->|unbound · not asked| STAY[nothing binds<br/>the login screen stays up]
   BIND --> SYNC
   SYNC --> MAIN
 ```
@@ -151,17 +152,17 @@ load-bearing ones pinned by desktop tests.
 | Double-press a provider | Buttons lock while an attempt is in flight; Guest never locks |
 | Refused, then retry inside 30s | Generation counter: press #1's timer cannot fire on press #2 |
 | Nothing ever answers | 30s timeout unlocks and explains; the guest exit was live throughout |
-| Verdict arrives after the timeout | A late success still binds and syncs; the player is never moved out of what they switched to |
+| Verdict arrives after the timeout | For a bound account, sync resumes. For an unbound press the consent expired with the timeout — but the retry the message invites succeeds instantly, since the session is now cached |
 | Leave mid-sign-in, start a run | Timer and verdict fire into a freed menu safely; the next menu reconciles from the bridge's cached state |
 | Verdict lands while player is in Settings/Guide/Scores | Login screen dismisses only if it is what is on screen |
 | Boot verdict with no listener (intro) | Cached on the bridge; every new menu reconciles on arrival |
 | Silent success while the login screen is up | Screen stays; only a press may bind; "Play as Guest" is never overridden |
-| Plugin reports an empty player id | Never binds — an empty owner would be permanent, so it is refused everywhere |
+| Plugin reports an empty player id | Never binds — an empty owner would be permanent. Theoretical: the bridge sets the id before any ok verdict |
 | account.json missing / corrupt / empty owner | Login screen returns; guest press rewrites it — recoverable in one launch *(pinned by test)* |
 | account.json unwritable (disk full) | Session runs on the cache; error logged; login returns next launch — escapable every time |
 | Queue crossing accounts | Rebind clears the previous owner's queue *(pinned by test)* |
 | Ownership gate on every cloud path | `is_available()` = signed in AND owner matches *(pinned by test, all three states)* |
-| Two devices' boards | Scores/history sync by per-entry UNION, never pick-a-side *(pinned by test)* |
+| Two devices' boards | Scores/history sync by per-entry UNION, never pick-a-side; history unions as a BAG so identical real runs both survive *(pinned by test)* |
 | Cloud snapshot corrupt or empty | Decodes to null → local kept; empty is the normal first-sync case |
 | Two snapshots conflict | Resolved silently — deeper run, then last write — winner re-saved; Google's picker never shows |
 | Finished run resurrecting from the cloud | Game over pushes a null tombstone; sync declines to restore it *(pinned by test)* |
@@ -173,6 +174,9 @@ load-bearing ones pinned by desktop tests.
 
 ## Known and accepted (documented, not fixed)
 
+- A snapshot CONFLICT still settles pick-a-side (the plugin's conflict path
+  has no merger); self-healing — the next sync re-unions, costing at most one
+  boot's worth of the other side's board entries.
 - A foreign verdict can be adopted by an in-flight press — the SDK's
   `sign_in_finished` carries no attempt id; fixing it re-adds the per-attempt
   bookkeeping the one-handler design deleted.

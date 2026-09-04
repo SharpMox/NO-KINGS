@@ -86,11 +86,10 @@ func _on_sign_in_finished(ok: bool) -> void:
 		if sync_button != null and Account.signed_in():
 			sync_button.text = "Reconnect to sync"
 			sync_button.visible = true
-		# NOT gated on the screen being visible. The guest exit stays live during
-		# a sign-in, so a player can take it and leave this screen showing
-		# "Signing in…" — and the note is not rebuilt when the screen is shown
-		# again, so it would still claim that on their next visit. Writing the
-		# real outcome means whatever they come back to is true.
+		# Written whether or not the screen is still up: the guest exit stays
+		# live during an attempt, so the player may already have left. This text
+		# only needs to be true for a player still watching — a later re-entry
+		# resets the note to the tagline anyway.
 		if was_interactive:
 			login_note.text = "%s sign-in didn't complete. You can try again." \
 				% Account.GOOGLE.capitalize()
@@ -137,7 +136,14 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# without per-account saves (issue 86), so the main menu offers no control
 	# for it — a button that cannot help is a worse answer than none. The Scores
 	# screen names the state ("signed in as a different account") for a player
-	# who goes looking; nothing here needs to.
+	# who goes looking.
+	#
+	# But a PRESS deserves a verdict. A bound player who tapped Google and got
+	# a mismatched account back was left staring at "Signing in…" forever — the
+	# attempt succeeded, just as someone else, so the failure path never wrote a
+	# word. Continue offline remains the exit.
+	if was_interactive and Account.signed_in():
+		login_note.text = "This device is signed in as a different Google account."
 
 
 ## Dismiss the login screen — but only if it is what the player is looking at.

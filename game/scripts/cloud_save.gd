@@ -9,10 +9,9 @@
 ## STATUS — local half only; see the issue's Outcome for the full picture:
 ##   * cloud_backend_noop.gd (desktop) is real and finished: there is no
 ##     cloud on desktop, so it correctly does nothing.
-##   * cloud_backend_game_center.gd (iOS) and cloud_backend_play_games.gd
-##     (Android) are UNIMPLEMENTED STUBS awaiting their native plugin — see
-##     the TODOs in each file. is_available() stays false on both, so no
-##     caller here ever depends on cloud data that doesn't exist yet.
+##   * cloud_backend_play_games.gd (Android, issue 86) and
+##     cloud_backend_ios.gd (iOS, issue 87) are real; each pairs with a bridge
+##     autoload that owns its native plugin.
 ##   * cloud_backend_memory.gd is dev/test-only; production never selects it.
 ##
 ## Backend contract (static funcs called via the preloaded script, same
@@ -24,7 +23,7 @@
 
 const SyncQueue := preload("res://scripts/sync_queue.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
-const GameCenter := preload("res://scripts/cloud/cloud_backend_game_center.gd")
+const CloudIos := preload("res://scripts/cloud/cloud_backend_ios.gd")
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
 
 ## Swappable by tests (cloud_backend_memory.gd); production code never
@@ -35,7 +34,7 @@ static var backend = _default_backend()
 static func _default_backend():
 	match OS.get_name():
 		"iOS":
-			return GameCenter
+			return CloudIos
 		"Android":
 			return PlayGames
 		_:

@@ -12,6 +12,7 @@ const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
 const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
 const Account := preload("res://scripts/account.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
 
 var fails := 0
 
@@ -155,6 +156,39 @@ func _init() -> void:
 	Bridge.snapshots.clear()
 	Bridge._snapshots = null
 	stub.free()
+
+	# --- the iOS backend's pure contract (issue 87 / T5) ---
+	# Same stub-singleton idiom as the Android write-through pin: a six-line
+	# stand-in store makes the pure rules testable on desktop, while the real
+	# plugin calls stay simulator/device work. What is pinned: the round-trip,
+	# the run-deletion contract (no marker value — the key just goes), and the
+	# loud refusal of an oversized save that iCloud would otherwise drop
+	# silently.
+	var ios_store := GDScript.new()
+	ios_store.source_code = """extends RefCounted
+var kv := {}
+func set_key_values(d): for k in d: kv[k] = d[k]
+func get_key_value(k): return kv.get(k, null)
+func synchronize_key_values(): return OK
+func remove_key(k): kv.erase(k)
+"""
+	ios_store.reload()
+	IosBridge._ic = ios_store.new()
+	var IosBackend := preload("res://scripts/cloud/cloud_backend_ios.gd")
+	check(IosBackend.push("run", {"ts": 5, "data": {"wave": 3}}),
+		"ios: a save is accepted")
+	var got: Variant = IosBackend.pull("run")
+	check(got is Dictionary and int(got.get("ts", 0)) == 5,
+		"ios: pull returns our own write immediately — reads are synchronous, no cache to lie")
+	check(IosBackend.push("run", {"ts": 9, "data": null}),
+		"ios: a finished run's push is accepted")
+	check(IosBackend.pull("run") == null,
+		"ios: ...and DELETES the key outright — no marker value needed on this platform")
+	var heavy := {"ts": 1, "data": {"blob": "x".repeat(1_000_000)}}
+	check(not IosBridge.save("run", heavy),
+		"ios: an oversized save is refused loudly, not dropped silently by the store")
+	check(IosBackend.pull("run") == null, "ios: the refused save wrote nothing")
+	IosBridge._ic = null
 
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting

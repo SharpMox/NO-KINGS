@@ -195,6 +195,14 @@ static func supported() -> bool:
 static func save(key: String, envelope: Dictionary) -> bool:
 	if _snapshots == null:
 		return false
+	# WRITE-THROUGH, or the cache lies about our own writes. DEVICE-VERIFIED
+	# (Nothing Phone 2a, 2026-09-04): the game-over tombstone went to the cloud
+	# while this cache still held the run fetched mid-play — so the menu's boot
+	# sync saw "no local file + a cached run", took resolve()'s new-device
+	# restore branch, and resurrected the finished run 13 seconds after the
+	# game deleted it. The desktop tombstone test cannot catch this: the memory
+	# backend has no second cache to go stale.
+	snapshots[key] = envelope
 	_snapshots.save_game(key, key, encode(envelope))
 	return true
 

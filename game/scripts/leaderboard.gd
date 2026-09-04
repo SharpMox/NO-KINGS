@@ -43,20 +43,24 @@ static func merge(a: Array, b: Array) -> Array:
 	return out.slice(0, CAP)
 
 
-## Games History is a set too — the same union rule as merge() above, keyed by
-## the WHOLE entry: an identical summary on two devices is one run seen twice
-## through the mirror, not two runs. Local order is kept and cloud-only entries
-## append after it; entries carry no timestamp, so true interleaving is
-## unknowable and not worth inventing.
+## Games History unions as a BAG, not a set. History legitimately repeats —
+## two byte-identical quick losses are two real runs, and entries carry no
+## timestamp to tell them apart — so an entry appearing N times locally and M
+## times in the cloud is the same runs seen through the mirror: keep
+## max(N, M) copies. A plain set-union silently deleted one of two identical
+## real runs on the first sync. Local order is kept and cloud-only entries
+## append after it; true interleaving is unknowable and not worth inventing.
 static func merge_history(a: Array, b: Array) -> Array:
+	var have := {}
+	for e in a:
+		var id := JSON.stringify(e)
+		have[id] = have.get(id, 0) + 1
+	var out := a.duplicate()
 	var seen := {}
-	var out: Array = []
-	for board in [a, b]:
-		for e in board:
-			var id := JSON.stringify(e)
-			if seen.has(id):
-				continue
-			seen[id] = true
+	for e in b:
+		var id := JSON.stringify(e)
+		seen[id] = seen.get(id, 0) + 1
+		if seen[id] > have.get(id, 0):
 			out.append(e)
 	# 50 = Economy.HISTORY_CAP, not preloaded here (economy drags in the whole
 	# gameplay chain). Writers re-cap on every record, so drift in this literal

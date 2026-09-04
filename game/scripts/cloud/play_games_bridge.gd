@@ -298,6 +298,11 @@ func _on_conflict(conflict: Variant) -> void:
 	# cyclic reference. Reusing resolve() still matters more than avoiding the
 	# indirection — a second copy of the winner-picking rule is exactly how two
 	# rules drift apart.
+	# Set-shaped keys (scores/history) get pick-a-side HERE too — the plugin's
+	# conflict path has no merger, so this is the one layer where "boards always
+	# union" is not literally true. Self-healing: the next sync_file re-unions
+	# the local file into the cloud, so a conflict costs at most one boot's
+	# worth of the other side's entries, never the local ones.
 	var cloud_save := load("res://scripts/cloud_save.gd") as GDScript
 	var winner: Variant = cloud_save.resolve(int(mine.get("ts", 0)), mine.get("data"), theirs)
 	var settled := {"ts": Time.get_unix_time_from_system(), "data": winner}

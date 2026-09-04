@@ -121,12 +121,19 @@ func _init() -> void:
 		"a set-shaped key UNIONS with a newer cloud copy — no local entry is lost")
 	check(Memory.pull("scores").data.size() == 2,
 		"and the union is pushed back, so the cloud accumulates instead of ping-ponging")
-	# history: identity is the whole entry — the same summary mirrored twice is
-	# one run, a genuinely different one is kept
+	# history is a BAG, not a set: entries carry no timestamp, so two identical
+	# quick losses are two real runs and must both survive — while the same run
+	# seen through the mirror twice stays one. max(N, M) copies per entry.
+	# The three asserts together also kill the degenerate implementations: a
+	# "return b" passes none of them, a set-union fails the middle one.
 	var h1 := {"score": 10, "wave": 4, "kings": 0, "won": false}
 	var h2 := {"score": 70, "wave": 9, "kings": 1, "won": true}
-	check(Leaderboard.merge_history([h1], [h1, h2]).size() == 2,
-		"history unions by whole entry: mirrored duplicates collapse, real runs survive")
+	check(Leaderboard.merge_history([h1], [h1]).size() == 1,
+		"a summary mirrored through the cloud stays one run")
+	check(Leaderboard.merge_history([h1, h1], [h1, h2]).size() == 3,
+		"two identical REAL runs both survive the union (bag, not set)")
+	check(Leaderboard.merge_history([h1], [h2]).size() == 2,
+		"local-only and cloud-only entries both survive")
 
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting

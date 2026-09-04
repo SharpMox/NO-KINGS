@@ -1,7 +1,12 @@
 # 86 — Google Play Games backend (Android)
 
-Status: **code complete, unverified** (2026-09-03) — T1-T5 implemented, T6 builds; every acceptance
-criterion is met EXCEPT the device-verified one, which is blocked on hardware. See Outcome.
+Status: **DEVICE-VERIFIED** (2026-09-04, Nothing Phone 2a over wireless adb) — sign-in with real
+consent, binding, silent reconnect, boot sync, score/history push, board union through the real
+cloud, tombstone across relaunch, and reinstall-restore all confirmed on hardware. Three
+device-only defects found and fixed in the same session (phantom silent check, snapshot fetch
+loop, stale bridge cache resurrecting a finished run). Still untested: airplane-mode sign-in,
+guest→Google conversion on device, two-device board union. Aspect-ratio letterboxing on tall
+screens noted for a future slice.
 
 ## Parent
 

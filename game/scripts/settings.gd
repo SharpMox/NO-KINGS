@@ -18,7 +18,14 @@ static func load_settings() -> Dictionary:
 
 
 static func save_settings(data: Dictionary) -> void:
+	# Null-checked like every other write: this one fires on each toggle, so a
+	# failed open would crash the Settings panel out from under the player. The
+	# setting still applies to the running session; it just will not persist.
 	var f := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("settings: could not write %s (error %d)"
+			% [SETTINGS_PATH, FileAccess.get_open_error()])
+		return
 	f.store_string(JSON.stringify(data))
 
 

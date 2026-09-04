@@ -1,6 +1,10 @@
 # 87 — Apple Game Center backend (iOS)
 
-Status: todo — **cannot be verified in this environment, see below**
+Status: **planned, not started** (2026-09-04) — design resolved and sliced into T1-T6 below.
+Deliberately NO CODE until Xcode exists: issue 86's own rule is that SDK calls must not be
+written against a plugin that cannot be installed, and 86's device session proved that plugin
+documentation can be flatly wrong about runtime behaviour. Blocked on Xcode + a paid Apple
+account; the iPhone is available (user, 2026-09-04).
 
 ## Parent
 
@@ -207,3 +211,75 @@ device with iCloud disabled simply plays offline, which is the same path desktop
 **`com.sharpunk.nokings`** — the same id as Android (user ruling). Reverse-DNS of a domain
 actually owned, and App Store Connect bundle ids are as permanent as Play application ids, so
 this is decided before the entry exists rather than after.
+
+## PLAN (grilled 2026-09-04, the night 86 was device-verified)
+
+Rulings: **spec + tickets only, no code** until Xcode exists · **scope = Android parity**
+(Game Center auth for identity + iCloud KV for the three save keys; NO leaderboards — that is
+issue 104's territory) · **structure mirrors Android exactly** (one contract file + one bridge
+autoload) · **plugin binaries get vendored** with a documented rebuild recipe. iPhone: available.
+
+### What 86 taught that changes this design
+
+The Android session found three defects desktop review could not see, and each has an iOS
+echo worth designing against rather than rediscovering:
+
+1. **Do not trust documented startup behaviour.** The Android plugin's "silent check at
+   startup" does not exist at runtime; the bridge must actively ask. The Game Center plugin's
+   `authenticate()` must be treated the same way — call it explicitly at bridge start, never
+   assume an event arrives unprompted. Its events also arrive through a POLLED queue
+   (`get_pending_event_count`/`pop_pending_event`), so the bridge polls on a timer; there is
+   no signal to miss, which removes 86's listener-timing class entirely but adds a poll
+   cadence to choose (1s is plenty; auth is once per session).
+2. **Caches that can disagree with our own writes will.** 86's tombstone raced its own stale
+   snapshot cache. iOS DOES NOT HAVE THIS CLASS: `get_key_value()` is synchronous, so there is
+   NO read cache in the backend at all — `pull()` calls straight through. The only cached
+   state is the Game Center player id, exactly like Android's.
+3. **Fetch loops need a brake.** Android's arrive→sync→pull→refresh echo looped. iOS has no
+   fetch at all (synchronous reads), so the class is absent. Nothing to throttle.
+
+Net: **the iOS backend is STRUCTURALLY SIMPLER than Android's.** No snapshots dict, no
+fetch/cooldown, no write-through discipline, no snapshot_loaded signal — menu's post-sign-in
+"fetch all three keys" becomes a plain sync_file loop, because pull() is honest immediately.
+
+### Design, resolved
+
+- **Files (mirror Android):** `cloud_backend_ios.gd` (contract: is_available/push/pull/
+  account_id + supported()) and `ios_cloud_bridge.gd` (autoload: owns BOTH plugin singletons,
+  polls the Game Center event queue, caches player id, emits sign_in_finished). The misnamed
+  `cloud_backend_game_center.gd` is renamed in the same commit — Game Center never stores
+  saves; iCloud does.
+- **is_available()** = authenticated AND `Account.owner() == player id` — the same ownership
+  gate that stopped cross-account bleed on Android, same single-condition placement.
+- **push()** = `set_key_values({key: JSON string})` with a **size assertion before the write**:
+  NSUbiquitousKeyValueStore fails silently over quota, so a >900KB envelope push_errors and
+  refuses rather than truncating. (Measured usage ~30KB total; the guard is cheap honesty.)
+- **pull()** = `get_key_value(key)` parsed through the same decode discipline as Android
+  (JSON.new().parse, dict-or-null) — synchronous, no cache, no refresh kick.
+- **Tombstone** = `remove_key(key)` — iOS has real deletion (Android does not), so a finished
+  run REMOVES the key; pull() of a missing key is null; resolve() keeps local. The null-data
+  envelope sentinel stays understood for cross-compat but iOS writes none.
+- **Sign-in flow:** zero menu.gd changes. The Apple provider button already routes through the
+  same `_on_provider_pressed`; the bridge exposes the same supported()/signed_in/begin_sign_in
+  surface, so the only edit is the platform guard accepting APPLE when the iOS bridge is
+  supported. The consent rule (only a press binds), the generation counter, the reconcile —
+  all shipped, all provider-agnostic already.
+- **iCloud KV has NO per-account namespacing** — the store follows the device's iCloud
+  account, not the Game Center player. The ownership gate handles the mismatch case exactly
+  as Android does (cloud inert on a switch), and this is recorded here because it is the
+  most likely place iOS behaves differently in practice than on paper.
+
+### Slices
+
+| Ticket | What | Needs |
+| --- | --- | --- |
+| **T1** | Environment: install Xcode, `xcode-select` to it, verify `xcodebuild -version` | ~15GB disk, time |
+| **T2** | Compile godot-ios-plugins from master for 4.7 (engine build, then `generate_xcframework.sh` for `gamecenter` + `icloud`, debug AND release); vendor under `res://ios/plugin/` with the rebuild recipe committed beside them | T1 |
+| **T3** | iOS export preset (bundle id `com.sharpunk.nokings`, plugins enabled, iCloud KV entitlement) + first Xcode build reaching the iPhone — the walking skeleton, no backend yet | T1, T2, **paid Apple account** |
+| **T4** | The backend: `ios_cloud_bridge.gd` + `cloud_backend_ios.gd` (rename included), per the design above | T3, and the API surface re-verified against the COMPILED plugin, not the README |
+| **T5** | Desktop pins for the pure parts (size guard, decode, ownership gate reuse) + `run_all.sh` ALL GREEN | T4 |
+| **T6** | Device script on the iPhone — the 86 script translated: sign-in consent, binding, relaunch reconnect, tombstone-as-deletion across relaunch, wipe-and-restore, and the two-iPhone union if a second iOS device ever exists. **NOT cross-platform**: Play Games Snapshots and iCloud KV are different clouds under different accounts — saves are platform-siloed by design (issue 12's ruling, no server), so an Android phone and an iPhone never see each other's boards. Worth saying in the store listing some day rather than letting players discover it | T3-T5, App Store Connect entry |
+
+**T1-T2 are yours-and-mine at a keyboard with disk space; T3 needs the $99 account. Nothing
+before T4 writes backend code, and T4 re-reads the API from the built artefact first — the
+README lied to us once already this week.**

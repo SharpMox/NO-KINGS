@@ -135,6 +135,27 @@ func _init() -> void:
 	check(Leaderboard.merge_history([h1], [h2]).size() == 2,
 		"local-only and cloud-only entries both survive")
 
+	# --- the bridge cache is write-through (issue 86, device-found) ---
+	# save() must update the read cache in the same breath as the cloud write.
+	# On device the game-over tombstone reached Google while the cache still
+	# held the run fetched mid-play, and the menu's next sync resurrected the
+	# finished run from our own stale cache — 13 seconds after the game deleted
+	# it. A minimal stand-in client makes the pure caching rule testable here;
+	# the SDK call itself stays device-only.
+	var stub_script := GDScript.new()
+	stub_script.source_code = "extends Node\nfunc save_game(_n, _d, _b, _t := 0, _p := 0):\n\tpass\n"
+	stub_script.reload()
+	var stub := Node.new()
+	stub.set_script(stub_script)
+	Bridge._snapshots = stub
+	var tomb := {"ts": 999, "data": null}
+	check(Bridge.save("run", tomb), "save() accepts with a client present")
+	check(Bridge.snapshots.get("run") == tomb,
+		"save() writes through to the cache — a pull can never contradict our own push")
+	Bridge.snapshots.clear()
+	Bridge._snapshots = null
+	stub.free()
+
 	DirAccess.remove_absolute(path)
 	CloudSave.backend = Noop # restore the real default before quitting
 

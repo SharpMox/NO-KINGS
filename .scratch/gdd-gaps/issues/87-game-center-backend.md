@@ -1,6 +1,13 @@
 # 87 — Apple Game Center backend (iOS)
 
-Status: **T1-T3a done, T4 unblocked** (2026-09-04 afternoon). Xcode installed; both plugins
+Status: **T4 MERGED (PR #299); storage half SIMULATOR-VERIFIED** (2026-09-04 evening). The
+iCloud round-trip is proven live on the sim (write, synchronous read-own-write, real sync
+cycle, survives relaunch). Game Center identity is the ONE thing the simulator cannot test —
+GameKit refuses its services without a real provisioning profile, so the first genuine $99
+wall sits exactly there. Remaining: T3b/T6 on the returned iPhone with the paid account.
+A fourth artifact-vs-docs find is patched in our vendored build: the plugin's window lookup
+is Godot-3-shaped and returns nil forever on 4.7 (gamecenter-godot47-window.patch, candidate
+upstream PR). Earlier same day: Xcode installed; both plugins
 compiled from master against the exact 4.7-stable commit, vendored under `game/ios/plugins`
 with the rebuild recipe; the game RUNS on an iPhone 17 Pro simulator unsigned (login screen
 verified on screen); and the probe read the API from the compiled singletons in the running

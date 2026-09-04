@@ -1,10 +1,28 @@
 # 87 — Apple Game Center backend (iOS)
 
-Status: **T4 MERGED (PR #299); storage half SIMULATOR-VERIFIED** (2026-09-04 evening). The
-iCloud round-trip is proven live on the sim (write, synchronous read-own-write, real sync
-cycle, survives relaunch). Game Center identity is the ONE thing the simulator cannot test —
-GameKit refuses its services without a real provisioning profile, so the first genuine $99
-wall sits exactly there. Remaining: T3b/T6 on the returned iPhone with the paid account.
+Status: **T4 MERGED (PR #299); BOTH HALVES SIMULATOR-VERIFIED** (2026-09-04). The iCloud
+round-trip is proven live on the sim (write, synchronous read-own-write, real sync cycle,
+survives relaunch) AND **Game Center sign-in works on the free simulator** — the event came
+back `result: "ok"` with a real player id and an alias, and the bind reached account.json.
+Remaining: T3b/T6 on the returned iPhone.
+
+> **CORRECTION (2026-09-04, and the fifth artifact lesson of the week — this one mine, not
+> upstream's).** An earlier revision of this line said GameKit "refuses its services without
+> a real provisioning profile, so the first genuine $99 wall sits exactly there". **That was
+> wrong.** It was written from a log line — *"Could not load services... missing the
+> com.apple.developer.game-center entitlement"* — captured BEFORE we added that very
+> entitlement, and never re-tested after the entitlement went in. The message named its own
+> fix and I read it as a verdict. Once the entitlement is present (ad-hoc sim signing carries
+> it; see game/ios/plugins/README.md) authentication succeeds on the simulator with no paid
+> account at all.
+>
+> Max caught it by asking the obvious question nobody had asked — *"we never saw a succeeding
+> Apple login?"* — and the first re-test answered it in fourteen seconds. The paid account is
+> still needed for a physical device and the store; it was never the wall described here.
+>
+> The habit this is the fifth instance of: **a claim about runtime behaviour is only as fresh
+> as the last time it was run.** Four of those were the artifacts lying to us; this one was a
+> stale observation of my own, which is the harder kind to notice.
 A fourth artifact-vs-docs find is patched in our vendored build: the plugin's window lookup
 is Godot-3-shaped and returns nil forever on 4.7 (gamecenter-godot47-window.patch, candidate
 upstream PR). Earlier same day: Xcode installed; both plugins
@@ -17,9 +35,10 @@ caused the phantom-silent-check bug; the singleton is `ICloud`, not the gdip's `
 Upstream trap found+patched durably: the official 4.7 iOS template ships an x86_64-only
 simulator lib under an arm64_x86_64 label (recipe in game/ios/plugins/README.md).
 
-GATES REMAINING: T3b/T6 need the $99 account AND a physical iPhone — the borrowed one left
-with its owner (2026-09-04) and returns in a few days. T4 (backend) is simulator-testable and
-needs neither.
+GATES REMAINING: T3b/T6 need a physical iPhone — the borrowed one left with its owner
+(2026-09-04) and returns in a few days — plus the $99 account for real provisioning and the
+store. T4 (backend) needed NEITHER: both its halves, storage and identity, are verified on
+the free simulator.
 
 ## Parent
 
@@ -298,3 +317,23 @@ fetch/cooldown, no write-through discipline, no snapshot_loaded signal — menu'
 **T1-T2 are yours-and-mine at a keyboard with disk space; T3 needs the $99 account. Nothing
 before T4 writes backend code, and T4 re-reads the API from the built artefact first — the
 README lied to us once already this week.**
+
+## Auth review after T4 (2026-09-04) — PR #301
+
+Reviewing the login flow once both platforms shared it found four defects, all in the
+SHARED path, which is why neither platform's tests had caught them:
+
+1. `menu.gd` bound with a hardcoded `Account.GOOGLE` — every iOS sign-in recorded
+   `provider: "google"`. Seen live in account.json on the simulator. Inert today (provider is
+   only compared against GUEST) but false on disk.
+2. The account-switch notice hardcoded "different **Google** account".
+3. `ios_cloud_bridge.supported()` checked only the iCloud singleton, so a build missing
+   GameCenter would offer a button that asks nobody, never answers, and times out on every
+   press forever.
+4. The button read "Sign in with **Apple**" — a different Apple service. A live tester read it
+   and went hunting for a Game Center app that has not existed since iOS 10.
+
+Defect 4 carries the only genuine platform difference in the flow, now in `_RETRY_HINT()`:
+**Play Games presents its own sign-in, so retrying can work; Game Center cannot.** Once iOS
+stops offering the prompt, `authenticate()` is accepted and never answers — so the message
+points at Settings > Game Center instead of inviting a loop that cannot end.

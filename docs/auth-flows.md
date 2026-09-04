@@ -186,3 +186,43 @@ load-bearing ones pinned by desktop tests.
   self-heals next launch.
 - Everything through Google is verified by reading and desktop pins, not yet
   on a device.
+
+## iOS (issue 87): the same flow, with less machinery
+
+The iOS bridge mirrors the Android one's surface exactly — same statics, same
+two signals — so the menu runs ONE sign-in flow and only picks a bridge and a
+native provider per platform. What differs is underneath, and every
+difference removes machinery:
+
+| | Android (Play Games) | iOS (Game Center + iCloud) |
+| --- | --- | --- |
+| Boot question | `is_authenticated()` had to be discovered — the documented silent check never fires | `authenticate()` asked from the poll, retried until the view hierarchy exists |
+| Verdict arrives | two async hops (auth, then player id) | one event carries verdict AND player id |
+| Result delivery | signals (missable — hence the bridge cache + reconcile) | polled queue (unmissable by design; same reconcile still guards menu rebuilds) |
+| Reads | async snapshots → cache → write-through discipline | synchronous — no cache exists, so no cache can lie |
+| Refresh | fetch round-trip + 30s cooldown (the echo loop) | sync kick only; nothing to echo |
+| Finished run | null-payload marker (no delete in the API) | `remove_key` — the key genuinely stops existing |
+| Oversized save | n/a (snapshots are roomy) | loud refusal at 900 KB — the store drops oversize silently |
+
+```mermaid
+flowchart LR
+  subgraph Android
+    A1[/ask: is_authenticated/] --> A2[/verdict/] --> A3[/player id/] --> A4[bind if asked]
+    A4 --> A5[fetch → cache → announce] --> A6[sync_file per key]
+  end
+  subgraph iOS
+    B1[/ask: authenticate<br/>retried till UI exists/] --> B2[/one event:<br/>verdict + player id/] --> B3[bind if asked]
+    B3 --> B4[sync kick → announce] --> B5[sync_file per key]
+  end
+```
+
+Simulator-verified so far: the full ask→event→verdict chain (a signed-out
+simulator correctly answers "local player has not been authenticated"), and
+the six desktop pins covering the contract: synchronous read-your-own-write,
+delete-on-finished-run, and the loud oversize refusal.
+
+Patches this needed, kept beside the vendored binaries in
+`game/ios/plugins/`: the plugin's Godot-3-era window lookup returns nil
+forever on Godot 4.7 (`gamecenter-godot47-window.patch`), and iCloud's store
+needs its entitlement even to initialize — ad-hoc simulator signing carries
+it; real signing arrives with the paid account.

@@ -29,7 +29,27 @@ static func _BRIDGE() -> GDScript:
 static func _NATIVE_PROVIDER() -> String:
 	return Account.APPLE if OS.get_name() == "iOS" else Account.GOOGLE
 
-## How long the login screen waits for Google before handing the buttons back.
+
+## What to CALL the provider on screen. "Apple" names Sign in with Apple — a
+## DIFFERENT Apple service; what we actually use is Game Center, and a player
+## who reads "Apple" goes looking for the wrong thing (observed on the
+## simulator, 2026-09-04: "is there supposed to be a Game Center app?").
+static func _LABEL(prov: String) -> String:
+	return "Game Center" if prov == Account.APPLE else "Google"
+
+
+## Where to send a player whose sign-in does not land. This is the one place
+## the two platforms genuinely differ, and it decides whether a failure is a
+## retry or a dead end: Play Games presents its own sign-in, so retrying can
+## work. Game Center CANNOT — once iOS has stopped offering the prompt (the
+## player is signed out, or dismissed it enough times), authenticate() is
+## accepted and simply never answers. Retrying that forever is the loop; the
+## device's own Settings is the only way through, so the message says so.
+static func _RETRY_HINT(prov: String) -> String:
+	return " Check Settings › Game Center on this device." if prov == Account.APPLE \
+		else " Check your connection."
+
+## How long the login screen waits for the provider before handing the buttons back.
 ## Two native round trips (authenticate, then load the player) on a phone that
 ## may have just lost signal — generous enough not to cut off a slow-but-working
 ## sign-in, short enough that a dead one does not strand the player.
@@ -139,8 +159,8 @@ func _on_sign_in_finished(ok: bool) -> void:
 		# only needs to be true for a player still watching — a later re-entry
 		# resets the note to the tagline anyway.
 		if was_interactive:
-			login_note.text = "%s sign-in didn't complete. You can try again." \
-				% _NATIVE_PROVIDER().capitalize()
+			login_note.text = "%s sign-in didn't complete.%s You can try again." \
+				% [_LABEL(_NATIVE_PROVIDER()), _RETRY_HINT(_NATIVE_PROVIDER())]
 		return
 	# ADOPT the local saves only when there is one history to adopt. account.gd
 	# states the premise the rebind rests on: "it never merges two histories,
@@ -169,7 +189,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# GOOGLE because Play Games is the only provider that reaches this signal;
 	# Game Center is issue 87 and needs its own path.
 	if id != "" and was_interactive and not Account.signed_in():
-		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
+		Account.sign_in(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
 	if Account.owner() == id:
 		if sync_button != null:
 			sync_button.visible = false
@@ -191,7 +211,8 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# attempt succeeded, just as someone else, so the failure path never wrote a
 	# word. Continue offline remains the exit.
 	if was_interactive and Account.signed_in():
-		login_note.text = "This device is signed in as a different Google account."
+		login_note.text = "This device is signed in as a different %s account." \
+			% _LABEL(_NATIVE_PROVIDER())
 
 
 ## Dismiss the login screen — but only if it is what the player is looking at.
@@ -219,10 +240,11 @@ func _on_provider_pressed(prov: String) -> void:
 	# ACCOUNT is attached, which is false until sign-in completes — guarding on
 	# it here would mean the button refused forever. ADR 0003.
 	#
-	# Only Play Games is implemented (86). Game Center is 87 and still a stub,
-	# so Apple gets the same honest message rather than pretending.
+	# Both providers are implemented now (86 Play Games, 87 Game Center); this
+	# refuses the one this platform is not — Google on an iPhone, Apple on
+	# Android — where no amount of retrying could ever succeed.
 	if prov != _NATIVE_PROVIDER() or not _BRIDGE().supported():
-		login_note.text = "%s sign-in isn't available on this device yet." % prov.capitalize()
+		login_note.text = "%s sign-in isn't available on this device yet." % _LABEL(prov)
 		return
 	# Already authenticated silently — so there is a session, but this press is
 	# what makes it CONSENTED. Run the verdict path directly rather than calling
@@ -256,8 +278,8 @@ func _on_provider_pressed(prov: String) -> void:
 		if not is_inside_tree() or _sign_in_gen != gen:
 			return
 		_sign_in_gen = 0
-		login_note.text = "%s sign-in timed out. Check your connection and try again." \
-			% prov.capitalize()
+		login_note.text = "%s sign-in timed out.%s You can try again." \
+			% [_LABEL(prov), _RETRY_HINT(prov)]
 		_set_providers_disabled(false))
 	_BRIDGE().begin_sign_in()
 
@@ -440,7 +462,7 @@ func _ready() -> void:
 	login_box.add_child(login_note)
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(
-			_button(login_box, "Sign in with %s" % prov.capitalize(), 22,
+			_button(login_box, "Sign in with %s" % _LABEL(prov), 22,
 				_on_provider_pressed.bind(prov)))
 	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
 	# exit, and the one control that must work when everything else has failed.

@@ -41,3 +41,23 @@ zip -q "$T/ios.zip" "libgodot.ios.debug.xcframework/ios-arm64_x86_64-simulator/l
 Repeat with `target=template_release` against the release xcframework when a
 release simulator build is ever needed (device builds are unaffected — the
 device slices were always correct).
+
+## Simulator builds (no paid account needed)
+
+Ad-hoc signing carries entitlements on the simulator, which is what lets the
+iCloud store initialize. Build the exported project with:
+
+```sh
+xcodebuild -project nokings.xcodeproj -scheme nokings -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' -configuration Debug \
+  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
+  CODE_SIGN_ENTITLEMENTS=path/to/nokings.entitlements build
+```
+
+with an entitlements plist carrying `com.apple.developer.ubiquity-kvstore-identifier`
+(= the bundle id) and `com.apple.developer.game-center`. Verified on the
+simulator 2026-09-04: the iCloud store registers, syncs with a signed-in
+iCloud account, and values survive relaunches. **Game Center is the one thing
+the simulator cannot test**: GameKit refuses to load its services without a
+real provisioning profile — that wall is exactly where the paid developer
+account starts being necessary.

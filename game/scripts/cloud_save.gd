@@ -143,6 +143,14 @@ static func sync_file(key: String, path: String, merger := Callable()) -> void:
 	if resolved == null:
 		return
 	if resolved != local_payload:
+		# Null-checked like every other write. This one lands the cloud copy on
+		# disk, so a failed open means the mirror simply did not apply — the
+		# local file is untouched and the next sync tries again. Crashing here
+		# would take down whatever was mid-flight: a boot, a save, or a run end.
 		var f := FileAccess.open(path, FileAccess.WRITE)
+		if f == null:
+			push_error("cloud: could not apply the cloud copy to %s (error %d)"
+				% [path, FileAccess.get_open_error()])
+			return
 		f.store_string(JSON.stringify(resolved))
 	push(key, resolved)

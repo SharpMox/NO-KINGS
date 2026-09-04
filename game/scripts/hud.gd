@@ -41,6 +41,32 @@ signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it
 signal arrow_toggle_pressed
 signal arrow_clear_pressed
 
+
+## Open or close the in-game menu. Shared by the ☰ button, Resume, and Android's
+## hardware Back (game.gd's NOTIFICATION_WM_GO_BACK_REQUEST) so the three cannot
+## drift apart — the emit in particular, which is what keeps game.gd's
+## game_menu_open flag in step with what is on screen.
+func toggle_menu(open: bool) -> void:
+	# Never over a finished run. The pause menu raises itself above everything,
+	# including the result overlay, and its Resume button would then restore a
+	# run that is already over — a genuine trap rather than a cosmetic one.
+	# Opening was previously unreachable at GAME_OVER only by accident of child
+	# order and the Shop happening to cover the button, which is not a property
+	# any future panel is obliged to preserve.
+	# `win_open` as well as GAME_OVER: at the wave-50 victory screen the state is
+	# still PLAYER_TURN, so the GAME_OVER test alone let the pause menu open on
+	# top of it. Raising the overlay closed the mouse route to this button but
+	# not the Back-key one, so the fix that hid the button created the hole.
+	# From there "Main Menu" leaves without ever running _game_over, and the win
+	# is never scored or recorded.
+	if open and g != null and (g.state == g.State.GAME_OVER or g.win_open):
+		return
+	if open:
+		game_menu.move_to_front() # above every other HUD control
+	game_menu.visible = open
+	menu_toggled.emit(open)
+
+
 var g # the Game node — read-only from here; mutations go up via signals
 
 var clock_label := Label.new()
@@ -120,10 +146,7 @@ func build(game) -> void:
 		compact.content_margin_bottom = 1
 		for style in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(style, compact)
-	menu_btn.pressed.connect(func() -> void:
-		game_menu.move_to_front() # above every other HUD control
-		game_menu.visible = true
-		menu_toggled.emit(true))
+	menu_btn.pressed.connect(func() -> void: toggle_menu(true))
 	add_child(menu_btn)
 
 	# bottom: action count above the button row (Stock / Inventory / Shop / PASS)
@@ -218,9 +241,7 @@ func build(game) -> void:
 	var resume := Button.new()
 	resume.text = "Resume"
 	resume.add_theme_font_size_override("font_size", 26)
-	resume.pressed.connect(func() -> void:
-		game_menu.visible = false
-		menu_toggled.emit(false))
+	resume.pressed.connect(func() -> void: toggle_menu(false))
 	gm_box.add_child(resume)
 
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,

@@ -140,6 +140,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.wave = int(cfg.get("wave", Waves.WAVES.size()))
 	g.turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	g.early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
+	g.pending_bounty_boxes = int(cfg.get("pending_bounty_boxes", 0))
 	g.pending_reinforce = bool(cfg.get("pending_reinforce", false))
 	g.pending_shop_open = bool(cfg.get("pending_shop_open", false)) # issue 101:
 		# additive — a save from before this field existed had no queued Shop
@@ -270,6 +271,12 @@ static func to_config(g) -> Dictionary:
 		"early_clear_awarded": g.early_clear_awarded,
 		"pending_reinforce": g.pending_reinforce,
 		"pending_shop_open": g.pending_shop_open, # issue 101
+		# The third deferred opener, and it was the one missing. Bounty Boxes
+		# beyond the first wait for a later Turn (issue 48), and the autosave
+		# fires at every turn start — so quitting or an OS kill silently
+		# destroyed every queued Box. Additive with a 0 default, so old saves
+		# read back exactly as they did before.
+		"pending_bounty_boxes": g.pending_bounty_boxes,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
 		"pending_king": g.pending_king.duplicate(), # issue 90

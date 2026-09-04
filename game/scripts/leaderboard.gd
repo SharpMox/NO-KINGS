@@ -43,6 +43,31 @@ static func merge(a: Array, b: Array) -> Array:
 	return out.slice(0, CAP)
 
 
+## Games History unions as a BAG, not a set. History legitimately repeats —
+## two byte-identical quick losses are two real runs, and entries carry no
+## timestamp to tell them apart — so an entry appearing N times locally and M
+## times in the cloud is the same runs seen through the mirror: keep
+## max(N, M) copies. A plain set-union silently deleted one of two identical
+## real runs on the first sync. Local order is kept and cloud-only entries
+## append after it; true interleaving is unknowable and not worth inventing.
+static func merge_history(a: Array, b: Array) -> Array:
+	var have := {}
+	for e in a:
+		var id := JSON.stringify(e)
+		have[id] = have.get(id, 0) + 1
+	var out := a.duplicate()
+	var seen := {}
+	for e in b:
+		var id := JSON.stringify(e)
+		seen[id] = seen.get(id, 0) + 1
+		if seen[id] > have.get(id, 0):
+			out.append(e)
+	# 50 = Economy.HISTORY_CAP, not preloaded here (economy drags in the whole
+	# gameplay chain). Writers re-cap on every record, so drift in this literal
+	# only ever affects the size of one synced file, never what is kept.
+	return out.slice(0, 50)
+
+
 ## The cloud board, or [] when there is no cloud to reach. An unreachable
 ## leaderboard is the NORMAL case (desktop, offline, a platform with no plugin
 ## yet) — never an error state, and never a reason to hide the local board.

@@ -10,16 +10,208 @@ const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
 const Account := preload("res://scripts/account.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+
+const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
+
+## How long the login screen waits for Google before handing the buttons back.
+## Two native round trips (authenticate, then load the player) on a phone that
+## may have just lost signal — generous enough not to cut off a slow-but-working
+## sign-in, short enough that a dead one does not strand the player.
+const SIGN_IN_TIMEOUT := 30.0
+
+## The login screen's resting status line. One const so the two places that
+## show it — first build, and every re-open — cannot drift.
+const LOGIN_TAGLINE := "Your progress follows your account."
+
+## Every mirrored save, as cloud key -> local file. The single place that
+## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
+static func _SYNC_KEYS() -> Dictionary:
+	return {
+		"run": GameScript.SAVE_PATH,
+		"scores": GameScript.SCORES_PATH,
+		"history": GameScript.HISTORY_PATH,
+	}
+
 
 ## The local saves an account owns. Passed to Account.sign_in so the rebind
 ## restamps them — the guest's progress comes with them because it was never a
 ## separate history, it was this one under the old id.
 static func _SAVE_PATHS() -> Array:
-	return [GameScript.SAVE_PATH, GameScript.SCORES_PATH, GameScript.HISTORY_PATH]
+	return _SYNC_KEYS().values()
+
+
+## SET-shaped keys sync by per-entry union; the run is a STATE and resolves by
+## picking a side. See leaderboard.gd's header for why a board synced by
+## pick-a-side silently deletes the other device's real entries.
+static func _MERGER(key: String) -> Callable:
+	match key:
+		"scores": return Leaderboard.merge
+		"history": return Leaderboard.merge_history
+	return Callable()
 
 
 static var window_sized := false # once per launch, not on every return to menu
+
+
+## A cloud snapshot arrived for `key` — mirror it to disk through the normal
+## resolve path, so the cloud copy only wins where it would have won at boot.
+## The connection dies with this menu instance, so returning to the menu
+## reconnects rather than stacking handlers. (issue 86 / T4)
+func _on_snapshot_loaded(key: String) -> void:
+	var paths := _SYNC_KEYS()
+	if paths.has(key):
+		CloudSave.sync_file(key, paths[key], _MERGER(key))
+
+
+## THE ONE PLACE A SIGN-IN VERDICT IS HANDLED — binding, cloud fetch and UI.
+##
+## Reached three ways, and it must behave identically for all of them: the
+## plugin's silent check at startup, a button press, and a verdict that lands
+## after the screen gave up waiting. Everything below is therefore written to
+## run with or without the login screen on screen.
+func _on_sign_in_finished(ok: bool) -> void:
+	# Whether the PLAYER started this. The boot check fails on every device with
+	# no Google session, and reporting that as a failed sign-in would accuse a
+	# first-run player of an attempt they never made, on a screen they have not
+	# touched yet. Only an attempt gets a result.
+	var was_interactive := _sign_in_gen != 0
+	_sign_in_gen = 0
+	_set_providers_disabled(false)
+	if not ok:
+		# Already BOUND means the session lapsed rather than never existing, and
+		# the way back to this screen is otherwise guest-only — so without this
+		# the cloud goes dark with nothing offering a retry.
+		if sync_button != null and Account.signed_in():
+			sync_button.text = "Reconnect to sync"
+			sync_button.visible = true
+		# Written whether or not the screen is still up: the guest exit stays
+		# live during an attempt, so the player may already have left. This text
+		# only needs to be true for a player still watching — a later re-entry
+		# resets the note to the tagline anyway.
+		if was_interactive:
+			login_note.text = "%s sign-in didn't complete. You can try again." \
+				% Account.GOOGLE.capitalize()
+		return
+	# ADOPT the local saves only when there is one history to adopt. account.gd
+	# states the premise the rebind rests on: "it never merges two histories,
+	# because until sign-in there is only one." That is true for a guest, and
+	# FALSE for a player who changes the device's Google account.
+	#
+	# Rebinding on a switch restamps account A's saves as B's, and the fetch
+	# below then resolves A's local run against B's cloud one — highest wave
+	# wins, and resolve() does not read owners — so A's deeper run overwrites
+	# B's saved game permanently. Scores and history carry no wave and fall to
+	# last-write-wins, taking B's outright. Silent, and it destroys the data of
+	# an account the player was not even playing.
+	#
+	# So a switch does NOTHING here: no rebind, no fetch. is_available() also
+	# reports false while the ids disagree, which keeps the rest of the session
+	# from pushing A's progress into B. Keeping the two accounts genuinely
+	# separate needs per-account local saves — a real feature, and a design call
+	# rather than something to guess at. See issue 86.
+	var id: String = CloudSave.backend.account_id()
+	# ONLY WHEN THE PLAYER ASKED. A verdict that arrives on its own must not
+	# convert a guest who deliberately chose "Play as Guest", and on a first run
+	# it must not answer the login screen's question on their behalf — both were
+	# possible while any successful verdict bound whatever was unbound, and
+	# neither can be undone, because nothing in the game signs you out.
+	#
+	# GOOGLE because Play Games is the only provider that reaches this signal;
+	# Game Center is issue 87 and needs its own path.
+	if id != "" and was_interactive and not Account.signed_in():
+		Account.sign_in(Account.GOOGLE, id, _SAVE_PATHS())
+	if Account.owner() == id:
+		if sync_button != null:
+			sync_button.visible = false
+		_finish_login()
+		CloudSave.drain_queue() # safe: sign_in() clears a queue owned by anyone else
+		for key: String in _SYNC_KEYS():
+			Bridge.fetch(key)
+		return
+	# Nothing to bind and nothing to sync — either a guest/first-run who has not
+	# chosen (leave the screen up for them), or an account SWITCH: signed in as
+	# someone other than this install's owner. A switch has no safe resolution
+	# without per-account saves (issue 86), so the main menu offers no control
+	# for it — a button that cannot help is a worse answer than none. The Scores
+	# screen names the state ("signed in as a different account") for a player
+	# who goes looking.
+	#
+	# But a PRESS deserves a verdict. A bound player who tapped Google and got
+	# a mismatched account back was left staring at "Signing in…" forever — the
+	# attempt succeeded, just as someone else, so the failure path never wrote a
+	# word. Continue offline remains the exit.
+	if was_interactive and Account.signed_in():
+		login_note.text = "This device is signed in as a different Google account."
+
+
+## Dismiss the login screen — but only if it is what the player is looking at.
+## A verdict can land long after they left it for Settings, the Guide or Scores,
+## each of which hides main_box, and showing main_box unconditionally would
+## surface the menu underneath whatever they opened. Signing in never moves the
+## player.
+func _finish_login() -> void:
+	if not login_center.visible:
+		return
+	login_center.visible = false
+	main_box.visible = true
+
+
+func _set_providers_disabled(locked: bool) -> void:
+	for b in provider_buttons:
+		b.disabled = locked
+
+
+## Start an interactive sign-in. Everything that happens AFTER this — binding,
+## the UI, the cloud fetch — belongs to _on_sign_in_finished, which also
+## handles the boot verdict this button never sees.
+func _on_provider_pressed(prov: String) -> void:
+	# supported() is the PLATFORM question. is_available() reports whether an
+	# ACCOUNT is attached, which is false until sign-in completes — guarding on
+	# it here would mean the button refused forever. ADR 0003.
+	#
+	# Only Play Games is implemented (86). Game Center is 87 and still a stub,
+	# so Apple gets the same honest message rather than pretending.
+	if prov != Account.GOOGLE or not Bridge.supported():
+		login_note.text = "%s sign-in isn't available on this device yet." % prov.capitalize()
+		return
+	# Already authenticated silently — so there is a session, but this press is
+	# what makes it CONSENTED. Run the verdict path directly rather than calling
+	# begin_sign_in(): the native side may not re-emit for a session it has
+	# already authenticated, and the buttons would then stay locked until the
+	# timeout told the player a sign-in failed while they were signed in.
+	#
+	# The counter is bumped first so the handler sees an interactive attempt and
+	# will bind — this is the path a guest takes to sign in, and it is the only
+	# one that may convert them.
+	if Bridge.signed_in:
+		_sign_in_gen += 1
+		_on_sign_in_finished(true)
+		return
+	_sign_in_gen += 1
+	var gen := _sign_in_gen # this press's identity, for its timer alone
+	login_note.text = "Signing in…"
+	_set_providers_disabled(true) # one press at a time; Guest stays live
+	# Neither native hop is guaranteed to answer — a phone that just lost signal
+	# simply never calls back — and the screen would otherwise sit on "Signing
+	# in…" forever. The guest exit stays available throughout, but the provider
+	# buttons have to come back too.
+	#
+	# `_sign_in_gen` makes this and the verdict mutually exclusive: whichever
+	# lands first zeroes it, and the other finds nothing to do. Comparing against
+	# `gen` rather than merely testing non-zero is what stops a timer outliving
+	# its own press and firing on a later one. The tree check matters because a
+	# SceneTreeTimer outlives this menu — the player can take the guest exit,
+	# start a run, and free every node touched here.
+	get_tree().create_timer(SIGN_IN_TIMEOUT).timeout.connect(func() -> void:
+		if not is_inside_tree() or _sign_in_gen != gen:
+			return
+		_sign_in_gen = 0
+		login_note.text = "%s sign-in timed out. Check your connection and try again." \
+			% prov.capitalize()
+		_set_providers_disabled(false))
+	Bridge.begin_sign_in()
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
@@ -32,6 +224,21 @@ var about_center: CenterContainer
 var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
+var login_note: Label # the login screen's status line
+var provider_buttons: Array[Button] = [] # Google/Apple; locked during a sign-in
+
+## Which sign-in attempt is in flight, or 0 for none. A COUNTER not a bool, so
+## a timeout can tell whether it belongs to the attempt still running: press,
+## get refused, press again inside 30s — which the refusal message invites —
+## and with a bool the first press's timer fires on the second press's flag,
+## unlocking the buttons mid-sign-in. Doubles as `was_interactive`.
+var _sign_in_gen := 0
+
+## The main menu's "Sign in to sync", for a guest. A MEMBER rather than a local
+## because _on_sign_in_finished has to hide it: an account can bind without any
+## button being pressed — the plugin signs in silently at boot — and a local
+## would leave it advertising sign-in to an account that just signed in.
+var sync_button: Button
 
 
 func _ready() -> void:
@@ -59,9 +266,39 @@ func _ready() -> void:
 	# pull the cloud mirror before deciding what's on disk (12): a no-op on
 	# desktop today, but on iOS/Android (once the native plugin lands) this
 	# is what makes a fresh install offer "Continue" from another device.
-	CloudSave.sync_file("run", GameScript.SAVE_PATH)
-	CloudSave.sync_file("scores", GameScript.SCORES_PATH)
-	CloudSave.sync_file("history", GameScript.HISTORY_PATH)
+	for key: String in _SYNC_KEYS():
+		CloudSave.sync_file(key, _SYNC_KEYS()[key], _MERGER(key))
+	# A snapshot fetched after sign-in lands asynchronously, long after the
+	# sync above has run. Mirroring it to disk is what actually restores
+	# progress on a fresh device. Null off Android, where nothing fetches.
+	# (issue 86 / T4)
+	var bridge := get_node_or_null(^"/root/PlayGamesBridge")
+	if bridge != null:
+		bridge.snapshot_loaded.connect(_on_snapshot_loaded)
+		# Connected HERE, not inside the login button, and this distinction is
+		# load-bearing. The sync above runs while is_available() is still false —
+		# the plugin's own startup auth check has not answered yet — so all three
+		# calls no-op. The answer arrives on this signal, and on every launch
+		# after the first there is no login screen to have connected a listener.
+		# Wiring it only to the button meant the cloud was pulled exactly once in
+		# an install's life, so "continue from another device" quietly did
+		# nothing for the returning player. (issue 86 / T4)
+		bridge.sign_in_finished.connect(_on_sign_in_finished)
+		# ...and CATCH UP on a verdict that already happened, because connecting
+		# is not enough. The plugin answers its startup check in a second or two;
+		# this menu does not exist until the 11.3s intro finishes, and it is
+		# rebuilt from scratch every time a run ends. So on a normal launch the
+		# boot verdict was emitted while nothing was listening, and nothing ever
+		# asked again — the account never bound, an account switch never
+		# rebound, and the Reconnect button never appeared. The signal is not a
+		# queue; the bridge's cached state is what survives, so read that.
+		#
+		# Deferred so it runs after this _ready has built main_box and
+		# sync_button, which the handler touches.
+		if bridge.signed_in:
+			_on_sign_in_finished.call_deferred(true)
+		elif bridge.sign_in_attempted:
+			_on_sign_in_finished.call_deferred(false)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
@@ -73,10 +310,23 @@ func _ready() -> void:
 	title.text = "NO KINGS"
 	title.add_theme_font_size_override("font_size", 48)
 	main_box.add_child(title)
+	# Offered on whether the save can actually be READ, not on whether a file is
+	# there. The old check was file_exists alone, which fed JSON.parse_string
+	# straight into the run — so a corrupt file loaded `null`, and a save from a
+	# newer build loaded fields this one does not understand.
+	#
+	# Cloud sync is what made that reachable: sync_file writes whatever resolve()
+	# picks, and resolve() compares waves and timestamps, not schema versions. A
+	# phone on the newer build could hand this one a save it cannot read, and
+	# Continue would break every time it was pressed, forever, with no way to
+	# clear it from the menu. Hiding the button leaves Play working and the other
+	# build's save intact. (issue 86)
+	var saved: Variant = null
 	if FileAccess.file_exists(GameScript.SAVE_PATH):
+		saved = JSON.parse_string(FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+	if SaveConfig.is_loadable(saved):
 		_button(main_box, "Continue", 32, func() -> void:
-			GameScript.next_config = JSON.parse_string(
-				FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+			GameScript.next_config = saved
 			GameScript.is_scenario = false
 			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(main_box, "Play", 32, _show_armies)
@@ -86,6 +336,26 @@ func _ready() -> void:
 		main_box.visible = false
 		guide_scroll.visible = true)
 	_button(main_box, "About", 24, _show_about)
+	# issue 83's ruling — "a guest keeps their progress when they sign in" — had
+	# no way to happen: the login screen only ever appears on a first run, so
+	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
+	# unreachable by any player. This is the entry point that makes it real.
+	# Hidden once signed in, and on any platform that cannot sync at all.
+	#
+	# BUILT whenever the platform can sync, but only SHOWN to a guest up front.
+	# The other case it exists for is a player already bound to Google whose
+	# session has lapsed — revoked access, or a Play Games account removed from
+	# the device. Their provider is not guest, so a guest-only test left them
+	# with no manual retry at all, dependent on a silent check that had just
+	# failed. It stays hidden until sign-in actually reports failure, so a normal
+	# launch never flashes a Reconnect button at a player who is about to be
+	# signed in a moment later. See _on_sign_in_finished.
+	if Bridge.supported():
+		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
+			login_note.text = LOGIN_TAGLINE # clear any stale "timed out" / "didn't complete"
+			main_box.visible = false
+			login_center.visible = true)
+		sync_button.visible = Account.provider() == Account.GUEST
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
@@ -114,28 +384,41 @@ func _ready() -> void:
 	login_head.text = "NO KINGS"
 	login_head.add_theme_font_size_override("font_size", 40)
 	login_box.add_child(login_head)
-	var login_note := Label.new()
+	login_note = Label.new()
 	login_note.add_theme_font_size_override("font_size", 13)
 	login_note.modulate = Color(1, 1, 1, 0.6)
-	login_note.text = "Your progress follows your account."
+	login_note.text = LOGIN_TAGLINE
 	login_box.add_child(login_note)
-	var finish_login := func() -> void:
-		login_center.visible = false
-		main_box.visible = true
 	for prov in [Account.GOOGLE, Account.APPLE]:
-		_button(login_box, "Sign in with %s" % prov.capitalize(), 22, func() -> void:
-			# The backends are stubs until 86/87; is_available() is false on
-			# desktop and on a platform with no plugin yet. Say so plainly
-			# rather than appearing to sign in and silently doing nothing.
-			if not CloudSave.backend.is_available():
-				login_note.text = "%s sign-in isn't available on this device yet." \
-					% prov.capitalize()
-				return
-			Account.sign_in(prov, CloudSave.backend.account_id(), _SAVE_PATHS())
-			finish_login.call())
-	_button(login_box, "Play as Guest", 22, func() -> void:
-		Account.start_guest()
-		finish_login.call())
+		provider_buttons.append(
+			_button(login_box, "Sign in with %s" % prov.capitalize(), 22,
+				_on_provider_pressed.bind(prov)))
+	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
+	# exit, and the one control that must work when everything else has failed.
+	#
+	# It does two jobs because the screen is reached two ways. On a first run it
+	# creates the guest account. Reached from the main menu by a guest who chose
+	# to sign in, it must NOT call start_guest() again — that would mint a new
+	# guest id and orphan every save the old one owned, the exact data loss the
+	# rebind exists to prevent — so there it is purely a way back out.
+	#
+	# It was previously hidden in that second case, which trapped the player:
+	# every other exit from here requires a SUCCESSFUL sign-in, so a guest who
+	# tapped "Sign in to sync" and then had no network had no way back to the
+	# menu at all. Force-quitting the app was the only escape.
+	_button(login_box, "Play as Guest" if Account.needs_login() else "Continue offline",
+		22, func() -> void:
+			if Account.needs_login():
+				Account.start_guest()
+				# The player is a guest as of now, so the main menu's sign-in
+				# entry applies to them. Its visibility was decided during
+				# _ready, when there was no account at all and provider() was
+				# "" — so without this it stays hidden until the next launch,
+				# missing exactly the session in which a new player is most
+				# likely to want it.
+				if sync_button != null:
+					sync_button.visible = true
+			_finish_login())
 	# The gate. --screenshot bypasses it too: a capture run on a machine with no
 	# account would otherwise photograph the login screen instead of the menu,
 	# which is a silent trap on any fresh checkout rather than a real result.
@@ -380,8 +663,15 @@ func _show_scores() -> void:
 	var status := Label.new()
 	status.add_theme_font_size_override("font_size", 12)
 	status.modulate = Color(1, 1, 1, 0.55)
-	status.text = "Cloud scores included." if Leaderboard.cloud_available() \
-		else "Local scores — sign in to compare."
+	# Three states, not two: signed in and syncing, signed in as SOMEONE ELSE, or
+	# not signed in. Without the middle one this told a player who was signed in
+	# to go and sign in.
+	if Leaderboard.cloud_available():
+		status.text = "Cloud scores included."
+	elif Bridge.signed_in:
+		status.text = "Local scores — signed in as a different account."
+	else:
+		status.text = "Local scores — sign in to compare."
 	box.add_child(status)
 	if scores.is_empty():
 		var none := Label.new()

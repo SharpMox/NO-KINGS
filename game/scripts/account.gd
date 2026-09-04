@@ -16,6 +16,8 @@
 ## deleted run, and a save that is being rebound must not also be the thing
 ## recording who it is being rebound to.
 
+const SyncQueue := preload("res://scripts/sync_queue.gd")
+
 const ACCOUNT_PATH := "user://account.json"
 
 ## Providers. "guest" is a real account, not the absence of one — it owns saves
@@ -44,15 +46,35 @@ static func _read() -> Dictionary:
 	return _cache
 
 
-static func _write(data: Dictionary) -> void:
+## Returns false when the account could not be persisted.
+##
+## The cache is set either way, so the CURRENT session behaves normally — but a
+## failed write means the file is not there next launch, and needs_login() goes
+## back to true. That presents as the login screen reappearing every single
+## launch with no explanation: a login loop the player cannot break, because
+## nothing they do is wrong. Silently ignoring the failure is what makes it
+## unexplainable, so it is reported rather than swallowed.
+static func _write(data: Dictionary) -> bool:
 	_cache = data
 	var f := FileAccess.open(ACCOUNT_PATH, FileAccess.WRITE)
+	if f == null:
+		push_error("account: could not write %s (error %d) — the account will not survive a restart"
+			% [ACCOUNT_PATH, FileAccess.get_open_error()])
+		return false
 	f.store_string(JSON.stringify(data))
+	return true
 
 
 ## True until an account exists — i.e. the first run, and only the first run.
+##
+## An EMPTY owner counts as no account. A file carrying {"owner": ""} would
+## otherwise satisfy this and be unrecoverable: needs_login() false means the
+## login screen never shows, and signed_in() true means nothing rebinds it — so
+## the cloud is off permanently with no button and no message. Nothing writes
+## that today; this makes it a bad state we recover from rather than one careless
+## edit away from being permanent.
 static func needs_login() -> bool:
-	return _read().is_empty()
+	return owner() == ""
 
 
 static func owner() -> String:
@@ -83,6 +105,17 @@ static func start_guest() -> String:
 ## this stays a pure account module with no opinion about what a save is.
 static func sign_in(new_provider: String, account_id: String,
 		save_paths: Array) -> void:
+	# Anything queued was queued by the PREVIOUS owner, and the queue stamps no
+	# owner of its own — so draining it after a rebind would deliver the old
+	# account's payload to the new account's cloud. A run tombstone crossing that
+	# way nulls the new account's cloud save.
+	#
+	# What is dropped is dropped for good, and that is the right trade rather
+	# than a free one: a tombstone has no re-sender, because sync_file returns
+	# before pushing when the resolved payload is null. But the entry belongs to
+	# an account whose cloud the tombstone was never going to reach anyway, so
+	# delivering it could only ever damage a cloud it did not describe.
+	SyncQueue.clear()
 	_write({"owner": account_id, "provider": new_provider})
 	for path in save_paths:
 		_restamp(str(path), account_id)
@@ -96,6 +129,15 @@ static func _restamp(path: String, account_id: String) -> void:
 		return # scores/history may be Arrays; only owner-stamped Dicts rebind
 	parsed["owner"] = account_id
 	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		# Same guard as _write, and this one fires mid-sign-in: a save that
+		# cannot be reopened for writing would otherwise crash on a null handle
+		# at the exact moment a player is signing in. The stamp is provenance
+		# only — nothing gates loading on it — so failing to rebind one file
+		# costs the player nothing and must not take the sign-in down with it.
+		push_error("account: could not restamp %s (error %d)"
+			% [path, FileAccess.get_open_error()])
+		return
 	f.store_string(JSON.stringify(parsed))
 
 

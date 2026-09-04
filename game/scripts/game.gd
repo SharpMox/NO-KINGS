@@ -826,7 +826,8 @@ func _process(delta: float) -> void:
 		# indecision punished". OS-backgrounded pause (slice 06) always wins;
 		# it is not a difficulty lever.
 		var tier_pauses := not Tuning.clock_never_pauses(next_tier) \
-				and (game_menu_open or shop_open() or drawer_open != "" or preview_open)
+				and (game_menu_open or shop_open() or drawer_open != "" or preview_open
+				or modals.pause_modal_open())
 		# `win_open` is NOT on that tier-gated list, and must not be: the victory
 		# screen is not a pause. The run is already won at wave 50 and there is
 		# nothing left to be decisive about, so the difficulty lever has nothing
@@ -3685,6 +3686,19 @@ func _connect_modals() -> void:
 			return
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
+	modals.restart_pressed.connect(func() -> void:
+		# Restart means a FRESH ROLL (user ruling 2026-09-04). next_config used
+		# to survive the reload, so a run entered via Continue restarted into
+		# its own mid-run snapshot — Restart meant two different things
+		# depending on how the run began. The army and tier stay: apply() put
+		# them back into the statics, and SETUP reads statics. The seed clears
+		# too — deliberately replaying an exact seed is the seed system's job,
+		# and the seed is printed on this very screen for whoever wants it.
+		# A TEST scenario keeps replaying its scenario, which is what TEST is for.
+		if not is_scenario:
+			next_config = {}
+			next_seed = ""
+		get_tree().reload_current_scene())
 	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
 	modals.shop_sell_pressed.connect(func(kind: String, entry: Variant) -> void:

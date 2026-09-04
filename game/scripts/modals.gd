@@ -12,6 +12,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 
+signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
 signal merge_cancelled
 signal box_chosen(opt: Dictionary)
@@ -126,6 +127,15 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
+## Tier-1 pause parity (user ruling 2026-09-04: the gap was an oversight, not
+## a lever). Reading the tariff list or a merge confirm pauses the clock at
+## Tier 1 exactly like the menu, Shop, drawers and preview already do. Box
+## Pick stays deliberately excluded — GDD: "decisive picks rewarded,
+## indecision punished" — that one IS a difficulty lever.
+func pause_modal_open() -> bool:
+	return (is_instance_valid(tariff_panel) and tariff_panel.visible) 		or (is_instance_valid(merge_panel) and merge_panel.visible)
+
+
 ## Width-capped, wrapping, centered label — end/win screens must never
 ## overflow the 480px design width (fixed 2026-07-07).
 func _overlay_label(text: String, size: int) -> Label:
@@ -170,7 +180,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	var restart := Button.new()
 	restart.text = "Restart"
 	restart.add_theme_font_size_override("font_size", 26)
-	restart.pressed.connect(func() -> void: get_tree().reload_current_scene())
+	restart.pressed.connect(func() -> void: restart_pressed.emit())
 	box.add_child(restart)
 	var menu := Button.new()
 	menu.text = "Main Menu"

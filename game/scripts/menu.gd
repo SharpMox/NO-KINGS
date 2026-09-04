@@ -13,7 +13,21 @@ const Account := preload("res://scripts/account.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 
-const Bridge := preload("res://scripts/cloud/play_games_bridge.gd")
+const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
+const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
+
+
+## ONE sign-in flow, two bridges. The iOS bridge mirrors the Android one's
+## static surface and signals exactly (issue 87 copied issue 86 on purpose),
+## so the menu never branches on platform beyond these two pickers.
+static func _BRIDGE() -> GDScript:
+	return IosBridge if OS.get_name() == "iOS" else PlayBridge
+
+
+## The provider this platform can actually sign into: Game Center on iOS,
+## Play Games elsewhere. The other button refuses with the honest message.
+static func _NATIVE_PROVIDER() -> String:
+	return Account.APPLE if OS.get_name() == "iOS" else Account.GOOGLE
 
 ## How long the login screen waits for Google before handing the buttons back.
 ## Two native round trips (authenticate, then load the player) on a phone that
@@ -126,7 +140,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 		# resets the note to the tagline anyway.
 		if was_interactive:
 			login_note.text = "%s sign-in didn't complete. You can try again." \
-				% Account.GOOGLE.capitalize()
+				% _NATIVE_PROVIDER().capitalize()
 		return
 	# ADOPT the local saves only when there is one history to adopt. account.gd
 	# states the premise the rebind rests on: "it never merges two histories,
@@ -162,7 +176,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 		_finish_login()
 		CloudSave.drain_queue() # safe: sign_in() clears a queue owned by anyone else
 		for key: String in _SYNC_KEYS():
-			Bridge.fetch(key)
+			_BRIDGE().fetch(key)
 		return
 	# Nothing to bind and nothing to sync — either a guest/first-run who has not
 	# chosen (leave the screen up for them), or an account SWITCH: signed in as
@@ -207,7 +221,7 @@ func _on_provider_pressed(prov: String) -> void:
 	#
 	# Only Play Games is implemented (86). Game Center is 87 and still a stub,
 	# so Apple gets the same honest message rather than pretending.
-	if prov != Account.GOOGLE or not Bridge.supported():
+	if prov != _NATIVE_PROVIDER() or not _BRIDGE().supported():
 		login_note.text = "%s sign-in isn't available on this device yet." % prov.capitalize()
 		return
 	# Already authenticated silently — so there is a session, but this press is
@@ -219,7 +233,7 @@ func _on_provider_pressed(prov: String) -> void:
 	# The counter is bumped first so the handler sees an interactive attempt and
 	# will bind — this is the path a guest takes to sign in, and it is the only
 	# one that may convert them.
-	if Bridge.signed_in:
+	if _BRIDGE().signed_in:
 		_sign_in_gen += 1
 		_on_sign_in_finished(true)
 		return
@@ -245,7 +259,7 @@ func _on_provider_pressed(prov: String) -> void:
 		login_note.text = "%s sign-in timed out. Check your connection and try again." \
 			% prov.capitalize()
 		_set_providers_disabled(false))
-	Bridge.begin_sign_in()
+	_BRIDGE().begin_sign_in()
 
 var main_box: VBoxContainer
 var test_scroll: ScrollContainer
@@ -306,7 +320,8 @@ func _ready() -> void:
 	# sync above has run. Mirroring it to disk is what actually restores
 	# progress on a fresh device. Null off Android, where nothing fetches.
 	# (issue 86 / T4)
-	var bridge := get_node_or_null(^"/root/PlayGamesBridge")
+	var bridge := get_node_or_null(
+		"/root/IosCloudBridge" if OS.get_name() == "iOS" else "/root/PlayGamesBridge")
 	if bridge != null:
 		bridge.snapshot_loaded.connect(_on_snapshot_loaded)
 		# Connected HERE, not inside the login button, and this distinction is
@@ -384,7 +399,7 @@ func _ready() -> void:
 	# failed. It stays hidden until sign-in actually reports failure, so a normal
 	# launch never flashes a Reconnect button at a player who is about to be
 	# signed in a moment later. See _on_sign_in_finished.
-	if Bridge.supported():
+	if _BRIDGE().supported():
 		sync_button = _button(main_box, "Sign in to sync", 24, func() -> void:
 			login_note.text = LOGIN_TAGLINE # clear any stale "timed out" / "didn't complete"
 			main_box.visible = false
@@ -702,7 +717,7 @@ func _show_scores() -> void:
 	# to go and sign in.
 	if Leaderboard.cloud_available():
 		status.text = "Cloud scores included."
-	elif Bridge.signed_in:
+	elif _BRIDGE().signed_in:
 		status.text = "Local scores — signed in as a different account."
 	else:
 		status.text = "Local scores — sign in to compare."

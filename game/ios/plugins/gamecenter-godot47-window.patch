@@ -1,0 +1,48 @@
+diff --git a/plugins/gamecenter/game_center.mm b/plugins/gamecenter/game_center.mm
+index 102ec7f..5c4b404 100644
+--- a/plugins/gamecenter/game_center.mm
++++ b/plugins/gamecenter/game_center.mm
+@@ -79,6 +79,25 @@
+ 	ClassDB::bind_method(D_METHOD("pop_pending_event"), &GameCenter::pop_pending_event);
+ };
+ 
++// LOCAL PATCH (NO KINGS, 2026-09-04): Godot 4.7 manages its iOS window via
++// scenes and leaves the app delegate's `window` nil, so the Godot-3-era
++// `delegate.window.rootViewController` below returned nil forever and
++// authenticate()/show_game_center() could never run. Walk the live windows
++// instead. Candidate for an upstream PR.
++static UIViewController *nk_root_controller() {
++	for (UIWindow *w in [UIApplication sharedApplication].windows) {
++		if (w.isKeyWindow && w.rootViewController) {
++			return w.rootViewController;
++		}
++	}
++	for (UIWindow *w in [UIApplication sharedApplication].windows) {
++		if (w.rootViewController) {
++			return w.rootViewController;
++		}
++	}
++	return nil;
++}
++
+ Error GameCenter::authenticate() {
+ 	//if this class isn't available, game center isn't implemented
+ 	if ((NSClassFromString(@"GKLocalPlayer")) == nil) {
+@@ -88,7 +107,7 @@
+ 	GKLocalPlayer *player = [GKLocalPlayer localPlayer];
+ 	ERR_FAIL_COND_V(![player respondsToSelector:@selector(authenticateHandler)], ERR_UNAVAILABLE);
+ 
+-	UIViewController *root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
++	UIViewController *root_controller = nk_root_controller();
+ 	ERR_FAIL_COND_V(!root_controller, FAILED);
+ 
+ 	// This handler is called several times.  First when the view needs to be shown, then again
+@@ -320,7 +339,7 @@
+ 	GKGameCenterViewController *controller = [[GKGameCenterViewController alloc] init];
+ 	ERR_FAIL_COND_V(!controller, FAILED);
+ 
+-	UIViewController *root_controller = [[UIApplication sharedApplication] delegate].window.rootViewController;
++	UIViewController *root_controller = nk_root_controller();
+ 	ERR_FAIL_COND_V(!root_controller, FAILED);
+ 
+ 	controller.gameCenterDelegate = gameCenterDelegate;

@@ -1,10 +1,18 @@
 # 87 — Apple Game Center backend (iOS)
 
-Status: **planned, not started** (2026-09-04) — design resolved and sliced into T1-T6 below.
-Deliberately NO CODE until Xcode exists: issue 86's own rule is that SDK calls must not be
-written against a plugin that cannot be installed, and 86's device session proved that plugin
-documentation can be flatly wrong about runtime behaviour. Blocked on Xcode + a paid Apple
-account; the iPhone is available (user, 2026-09-04).
+Status: **T1-T3a done, T4 unblocked** (2026-09-04 afternoon). Xcode installed; both plugins
+compiled from master against the exact 4.7-stable commit, vendored under `game/ios/plugins`
+with the rebuild recipe; the game RUNS on an iPhone 17 Pro simulator unsigned (login screen
+verified on screen); and the probe read the API from the compiled singletons in the running
+app. Probe findings: ICloud matches its header exactly (sync get_key_value, real remove_key);
+GameCenter additionally exposes `is_authenticated` — the very method whose absence on Android
+caused the phantom-silent-check bug; the singleton is `ICloud`, not the gdip's `iCloud`.
+Upstream trap found+patched durably: the official 4.7 iOS template ships an x86_64-only
+simulator lib under an arm64_x86_64 label (recipe in game/ios/plugins/README.md).
+
+GATES REMAINING: T3b/T6 need the $99 account AND a physical iPhone — the borrowed one left
+with its owner (2026-09-04) and returns in a few days. T4 (backend) is simulator-testable and
+needs neither.
 
 ## Parent
 

@@ -4,6 +4,7 @@ extends SceneTree
 ## save was rebound rather than copied or merged.
 
 const Account := preload("res://scripts/account.gd")
+const SyncQueue := preload("res://scripts/sync_queue.gd")
 
 var fails := 0
 
@@ -21,6 +22,7 @@ func _clean() -> void:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
 	Account._reset_cache()
+	SyncQueue.clear()
 
 
 func _write(path: String, data: Variant) -> void:
@@ -86,6 +88,27 @@ func _init() -> void:
 	var legacy := {"score": 10, "save_version": 2}
 	check(str(legacy.get("owner", "")) == "",
 		"a pre-account save reads back as unowned rather than failing")
+
+	# --- issue 86: an EMPTY owner is not an account ---
+	# A file carrying {"owner": ""} once bypassed the login screen forever while
+	# also refusing every rebind: cloud off permanently, no route back. The rule
+	# that fixed it — needs_login() treats an empty owner as no account — is
+	# load-bearing, so it is pinned here rather than trusted to a comment.
+	_write(Account.ACCOUNT_PATH, {"owner": "", "provider": Account.GOOGLE})
+	Account._reset_cache()
+	check(Account.needs_login(),
+		"an account file with an empty owner still needs login (recoverable, not a dead state)")
+
+	# --- issue 86: a rebind discards the previous owner's sync queue ---
+	# The queue stamps no owner, so an entry queued under account A and drained
+	# after binding to B would land in B's cloud — a run tombstone crossing that
+	# way nulls B's cloud save. sign_in() clearing the queue is the guarantee.
+	_clean()
+	SyncQueue.enqueue("run", null)
+	check(not SyncQueue.is_empty(), "precondition: something is queued")
+	Account.sign_in(Account.GOOGLE, "google-after-queue", [])
+	check(SyncQueue.is_empty(),
+		"signing in clears a queue the previous owner filled — nothing crosses accounts")
 
 	_clean()
 	print("---")

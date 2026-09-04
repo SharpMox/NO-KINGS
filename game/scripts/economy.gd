@@ -15,6 +15,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
+const Leaderboard := preload("res://scripts/leaderboard.gd") # set-union sync
 const Armies := preload("res://scripts/armies.gd")
 
 ## Issue 57: the Shop's restock thresholds (Shop.threshold, since replaced
@@ -266,7 +267,7 @@ static func record_score(g) -> int:
 		return int(x.score) > int(y.score))
 	var f := FileAccess.open(g.SCORES_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify(scores.slice(0, 10)))
-	CloudSave.sync_file("scores", g.SCORES_PATH) # mirror to the platform backend (12)
+	CloudSave.sync_file("scores", g.SCORES_PATH, Leaderboard.merge) # union, never pick-a-side
 	return rank
 
 
@@ -283,7 +284,7 @@ static func record_history(g, won: bool) -> void:
 	})
 	var f := FileAccess.open(g.HISTORY_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify(history.slice(0, HISTORY_CAP)))
-	CloudSave.sync_file("history", g.HISTORY_PATH) # mirror to the platform backend (12)
+	CloudSave.sync_file("history", g.HISTORY_PATH, Leaderboard.merge_history) # union
 
 
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---

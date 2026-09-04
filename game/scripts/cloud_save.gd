@@ -119,7 +119,7 @@ static func _wave_of(payload: Variant) -> int:
 ## copy back up so the mirror stays current. End-to-end no-op while the
 ## backend is unavailable — every desktop run today, and iOS/Android until
 ## their native plugin lands.
-static func sync_file(key: String, path: String) -> void:
+static func sync_file(key: String, path: String, merger := Callable()) -> void:
 	if not backend.is_available():
 		return
 	var local_ts := 0
@@ -127,7 +127,19 @@ static func sync_file(key: String, path: String) -> void:
 	if FileAccess.file_exists(path):
 		local_ts = FileAccess.get_modified_time(path)
 		local_payload = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var resolved: Variant = resolve(local_ts, local_payload, pull(key))
+	var remote: Variant = pull(key)
+	var resolved: Variant
+	# SET-shaped saves (scores, history) UNION per entry instead of picking a
+	# side. leaderboard.gd's header says why: a board is a set of finished runs,
+	# and resolve() choosing wholesale silently deletes the other device's real
+	# entries. That warning only ever guarded the DISPLAY path — this is the
+	# sync half of the same rule, and without it two devices ping-pong
+	# overwrite each other's boards until only one side's entries exist at all.
+	if merger.is_valid() and local_payload is Array \
+			and remote is Dictionary and remote.get("data") is Array:
+		resolved = merger.call(local_payload, remote.data)
+	else:
+		resolved = resolve(local_ts, local_payload, remote)
 	if resolved == null:
 		return
 	if resolved != local_payload:

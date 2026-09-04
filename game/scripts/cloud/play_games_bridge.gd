@@ -124,6 +124,16 @@ func _ready() -> void:
 	add_child(_sign_in)
 	add_child(_snapshots)
 	add_child(_players)
+	# ASK, because the plugin does not tell. Its doc comment says it "does a
+	# check at startup" — DEVICE-VERIFIED FALSE (Nothing Phone 2a, 2026-09-04):
+	# nothing ever arrives in GDScript unprompted, so on every launch after the
+	# first sign-in the verdict never came, sign_in_attempted stayed false, the
+	# menu had nothing to reconcile with, and the cloud stayed dark for the
+	# whole session — no sync, no Reconnect button, Scores claiming "sign in to
+	# compare" to a signed-in player. is_authenticated() actively queries and
+	# answers on the same user_authenticated signal, driving the exact chain the
+	# silent check was assumed to drive.
+	_sign_in.is_authenticated()
 
 
 ## --- the snapshot codec (issue 86 / T1) --------------------------------------
@@ -195,9 +205,28 @@ static func save(key: String, envelope: Dictionary) -> bool:
 ## create_if_not_found is true so a device that has never synced gets an empty
 ## snapshot rather than an error — decode() reads empty content as null, which
 ## resolve() already handles by keeping local.
+## A key is not re-fetched within this window. The number is uncritical — it
+## only has to be longer than one arrive→sync→pull round trip (~1s observed).
+const _FETCH_COOLDOWN_MS := 30_000
+
+## key -> Time.get_ticks_msec() of the last fetch actually fired.
+static var _last_fetch := {}
+
+
 static func fetch(key: String) -> void:
 	if _snapshots == null:
 		return
+	# THROTTLED, or this loops — DEVICE-VERIFIED (Nothing Phone 2a, 2026-09-04:
+	# 344 fetches in 48 seconds). The cycle: a snapshot arrives → the menu
+	# mirrors it via sync_file → sync_file's pull() kicks a "refresh for next
+	# time" → that refresh's snapshot arrives → repeat forever, hammering
+	# Google. Invisible on desktop, where fetch() no-ops. A per-key cooldown
+	# breaks the cycle while keeping pull()'s stale-is-fine refresh semantics:
+	# a genuinely later pull still refreshes, the echo of our own sync does not.
+	var now := Time.get_ticks_msec()
+	if now - int(_last_fetch.get(key, -_FETCH_COOLDOWN_MS)) < _FETCH_COOLDOWN_MS:
+		return
+	_last_fetch[key] = now
 	_snapshots.load_game(key, true)
 
 
@@ -224,6 +253,7 @@ static func begin_sign_in() -> void:
 ## second hop, and binding an account without it would stamp an empty owner id
 ## into account.json — silently, and permanently for that install.
 func _on_authenticated(is_authenticated: bool) -> void:
+	print("[pgs] authenticated: ", is_authenticated) # device-log visibility (logcat -s godot)
 	if not is_authenticated:
 		signed_in = false
 		sign_in_attempted = true
@@ -235,6 +265,7 @@ func _on_authenticated(is_authenticated: bool) -> void:
 ## The second hop. Only here is there both an authenticated session and an id,
 ## so only here is sign-in actually complete.
 func _on_player_loaded(player: Variant) -> void:
+	print("[pgs] player loaded: ", "null" if player == null else str(player.player_id))
 	if player == null:
 		signed_in = false
 		sign_in_attempted = true
@@ -256,6 +287,7 @@ func _on_game_loaded(snapshot: Variant) -> void:
 	if snapshot == null or snapshot.metadata == null:
 		return
 	var key := str(snapshot.metadata.unique_name)
+	print("[pgs] snapshot arrived: ", key)
 	var envelope: Variant = decode(snapshot.content)
 	if envelope is Dictionary:
 		snapshots[key] = envelope

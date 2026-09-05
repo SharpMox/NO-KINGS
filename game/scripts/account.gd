@@ -118,7 +118,75 @@ static func sign_in(new_provider: String, account_id: String,
 	SyncQueue.clear()
 	_write({"owner": account_id, "provider": new_provider})
 	for path in save_paths:
+		# A returning account reclaims what logout parked under ITS id. Another
+		# account's parked saves are named for that account and stay untouched,
+		# which is what keeps progress tied to whoever earned it.
+		_move(_parked(str(path), account_id), str(path))
 		_restamp(str(path), account_id)
+
+
+## Where a save goes when the account owning it logs out. The owner id is IN
+## the filename, and that is the whole mechanism: a different account signing in
+## afterwards finds no save files and starts clean, while the original account
+## signing back in finds its own and gets everything returned.
+##
+## Refusing to RESTAMP would not have been enough. _restamp's own note says the
+## stamp is provenance only and nothing gates loading on it — so files left in
+## place would have handed the next account the previous one's runs, scores and
+## history to play. Parking them makes the stamp mean something without a
+## per-account save system, which is issue 86's open design question and a much
+## larger change.
+const PARKED := ".parked."
+
+
+static func _parked(path: String, account_id: String) -> String:
+	return "%s%s%s" % [path, PARKED, account_id]
+
+
+## Move a save aside or back. Refuses to clobber an existing destination: the
+## file being overwritten would be someone's only copy.
+static func _move(from: String, to: String) -> bool:
+	if not FileAccess.file_exists(from) or FileAccess.file_exists(to):
+		return false
+	var err := DirAccess.rename_absolute(ProjectSettings.globalize_path(from),
+		ProjectSettings.globalize_path(to))
+	if err != OK:
+		push_error("account: could not move %s -> %s (error %d)" % [from, to, err])
+		return false
+	return true
+
+
+## End this device's session, KEEPING the progress for the account that owns it
+## (user ruling, 2026-09-05). Returns false when there was no account to end.
+##
+## Deliberately NOT offered to a guest, and both callers gate on signed_in():
+## start_guest() mints a FRESH id every time, so a guest who logged out could
+## never sign back in as the same id and their parked saves would be orphaned on
+## disk forever. A guest has no session to end anyway.
+##
+## The cloud copy is untouched, and this is a LOCAL unbind only: neither Play
+## Games nor Game Center lets an app end the OS-level session, so the device
+## stays signed in and pressing the provider button again re-binds immediately.
+## That is re-consent, not a second login.
+static func logout(save_paths: Array) -> bool:
+	var id := owner()
+	# A guest is refused HERE, not only in the UI. start_guest() mints a new id
+	# every call, so a guest who logged out could never sign back in as the same
+	# id and their parked saves would be orphaned on disk for good. The button is
+	# hidden for guests; this is the belt behind that brace, and test_account
+	# pins it — it was written as a comment first and the pin proved the code did
+	# not actually do it.
+	if id == "" or provider() == GUEST:
+		return false
+	# Same reason sign_in() clears it: the queue stamps no owner of its own, so
+	# anything still in it belongs to the account being logged out and must not
+	# be delivered to whoever signs in next.
+	SyncQueue.clear()
+	for path in save_paths:
+		_move(str(path), _parked(str(path), id))
+	# An EMPTY owner is the recoverable no-account state needs_login() documents:
+	# the login screen shows, and the next sign_in() rebinds normally.
+	return _write({"owner": "", "provider": ""})
 
 
 static func _restamp(path: String, account_id: String) -> void:

@@ -242,6 +242,12 @@ func build(game) -> void:
 	stock_strip_flow.add_theme_constant_override("h_separation", 5)
 	stock_strip_flow.add_theme_constant_override("v_separation", 5)
 	strip_box.add_child(stock_strip_flow)
+	# REBUILD ON RESIZE, not only on refresh. The strip derives its row count
+	# from its own width, and that width arrives a frame or two after build; on
+	# the phone no game refresh happened to follow, so it kept the empty layout
+	# it computed at 13px wide and showed "Stock 21" with a "+21" chip and no
+	# pieces. Desktop hid this because a later refresh happened to fix it.
+	stock_strip.resized.connect(_rebuild_stock_strip)
 	deck.add_child(stock_strip)
 
 	# status and navigation share one line: wave, tariffs and Arrows on the left,
@@ -733,6 +739,12 @@ func _rebuild_stock_strip() -> void:
 	# an empty strip says why it is empty rather than sitting there blank
 	stock_strip_head.text = "Stock %d" % pool.size() if pool.size() > 0 \
 		else "Stock 0 — captured and extracted pieces land here"
+	# NOTHING to measure before layout has run, and measuring anyway is worse
+	# than waiting: the signature below would cache the answer derived from a
+	# zero width and never recompute. Observed on device — "Stock 21" with a
+	# "+21" chip and not one piece drawn, permanently.
+	if stock_strip.size.x < ICON + 14.0:
+		return # narrower than one tile means layout has not settled
 	var per_row: int = maxi(1, int((stock_strip.size.x - 12.0 + 5.0) / (ICON + 5)))
 	var body_h: float = stock_strip.size.y - stock_strip_head.size.y - 15.0
 	# at least one row: the strip has a minimum height reserved for exactly that
@@ -741,7 +753,10 @@ func _rebuild_stock_strip() -> void:
 	var shown: int = mini(pool.size(), room - 1 if pool.size() > room else room)
 	# rebuilt only when the visible content actually changed: this runs on every
 	# refresh, and freeing/adding ~10 nodes per frame is a real cost for nothing
-	var sig := "%d/%d" % [pool.size(), shown]
+	# the ROOM is part of the signature, not just the content: the strip is
+	# resizable (it absorbs whatever the board leaves), so the same 21 pieces
+	# legitimately draw differently at different heights
+	var sig := "%d/%d/%d" % [pool.size(), shown, room]
 	if sig == _strip_sig:
 		return
 	_strip_sig = sig

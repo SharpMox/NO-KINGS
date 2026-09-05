@@ -11,6 +11,7 @@ const Economy := preload("res://scripts/economy.gd")
 const Shop := preload("res://scripts/shop.gd") # issue 96/97: convert price
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Guide := preload("res://scripts/guide.gd")
+const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
 
@@ -247,8 +248,19 @@ func build(game) -> void:
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
 	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true)
+	# Logging out mid-run LEAVES the run: its save was just parked under the
+	# account that owns it, and staying in a live game whose save now belongs to
+	# nobody would write a fresh unowned one on the next autosave. Back to the
+	# menu, which comes up on the login screen.
 	var settings_panel := Settings.build(game_menu, func() -> void: gm_box.visible = true,
-		func(data: Dictionary) -> void: settings_changed.emit(data))
+		func(data: Dictionary) -> void: settings_changed.emit(data),
+		func() -> void:
+			# load() rather than preload(): menu.gd is a heavy scene script and a
+			# compile-time edge here is the exact class of trap play_games_bridge
+			# documents. Nothing needs it before this button is pressed.
+			var MenuScript: GDScript = load("res://scripts/menu.gd")
+			Account.logout(MenuScript._SAVE_PATHS())
+			game.get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	var guide_btn := Button.new()
 	guide_btn.text = "Guide"
 	guide_btn.add_theme_font_size_override("font_size", 20)

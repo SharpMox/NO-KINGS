@@ -18,7 +18,13 @@ func check(cond: bool, label: String) -> void:
 
 
 func _clean() -> void:
-	for p in [Account.ACCOUNT_PATH, "user://t_run.json", "user://t_scores.json"]:
+	var paths := [Account.ACCOUNT_PATH, "user://t_run.json", "user://t_scores.json"]
+	# ...and anything logout parked, or a failed run leaves saves behind that
+	# silently satisfy the next run's assertions.
+	for owner_id in ["google-alice", "google-bob", "google-solo"]:
+		for base in ["user://t_run.json", "user://t_scores.json"]:
+			paths.append(Account._parked(base, owner_id))
+	for p in paths:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(p))
 	Account._reset_cache()
@@ -109,6 +115,54 @@ func _init() -> void:
 	Account.sign_in(Account.GOOGLE, "google-after-queue", [])
 	check(SyncQueue.is_empty(),
 		"signing in clears a queue the previous owner filled — nothing crosses accounts")
+
+	# ---- LOGOUT: progress stays with the account that earned it -------------
+	# The ruling (user, 2026-09-05) is that logging out must not hand this
+	# device's progress to whoever signs in next, and must give it back to the
+	# account that owned it. Nothing gates LOADING on the owner stamp, so these
+	# pins are about files existing or not, which is what the player actually
+	# experiences.
+	_clean()
+	var RUN := "user://t_run.json"
+	var SCORES := "user://t_scores.json"
+	var paths: Array = [RUN, SCORES]
+	Account.sign_in(Account.GOOGLE, "google-alice", paths)
+	_write(RUN, {"wave": 42, "owner": "google-alice"})
+	_write(SCORES, [{"score": 900}])
+
+	check(Account.logout(paths), "logout succeeds for a signed-in account")
+	check(Account.needs_login(), "after logout the login screen is what comes next")
+	check(not Account.signed_in(), "and the session is over")
+	check(not FileAccess.file_exists(RUN), "the run is gone from where the game reads it")
+	check(FileAccess.file_exists(Account._parked(RUN, "google-alice")),
+		"...parked under the account that owns it, not deleted")
+
+	# A DIFFERENT account arrives on this device.
+	Account.sign_in(Account.GOOGLE, "google-bob", paths)
+	check(not FileAccess.file_exists(RUN),
+		"a different account starts fresh — it does NOT inherit the run")
+	check(not FileAccess.file_exists(SCORES),
+		"...nor the scores, which carry no owner stamp of their own to protect them")
+	check(FileAccess.file_exists(Account._parked(RUN, "google-alice")),
+		"and Alice's parked run is still hers, untouched by Bob signing in")
+
+	# Alice comes back.
+	Account.logout(paths)
+	Account.sign_in(Account.GOOGLE, "google-alice", paths)
+	check(FileAccess.file_exists(RUN), "the returning account gets its run back")
+	var restored: Variant = _read(RUN)
+	check(restored is Dictionary and int(restored.get("wave", 0)) == 42,
+		"...the same run, not an empty one")
+	check(_read(SCORES) is Array and (_read(SCORES) as Array).size() == 1,
+		"...and its scores")
+
+	# A guest has no session to end, and start_guest() would mint a new id that
+	# could never reclaim what was parked — so logout refuses rather than
+	# orphaning it. The UI hides the button too; this is the belt.
+	_clean()
+	Account.start_guest()
+	check(not Account.logout(paths), "logout refuses a guest — a fresh id could never reclaim the saves")
+	check(not Account.needs_login(), "and leaves the guest account intact")
 
 	_clean()
 	print("---")

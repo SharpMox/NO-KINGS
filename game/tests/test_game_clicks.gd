@@ -394,17 +394,33 @@ func _init() -> void:
 	check(kit.power_name in game.hud.army_power_label.text
 			and kit.power_desc in game.hud.army_power_label.text,
 		"the Army Power is readable in the drawer without hovering (%s)" % kit.power_name)
-	check("1 Action" in game.hud.army_power_label.text,
-		"and the Ability's Action cost is stated with it")
+	# design C moved the Ability out of this drawer and onto the deck, so its
+	# cost is asserted where it now lives. The point of the move is the next
+	# check: you can read it WITHOUT opening anything.
+	check("1 Action" in game.hud.army_ability_button.text
+			or "no Action" in game.hud.army_ability_button.text
+			or "next wave" in game.hud.army_ability_button.text,
+		"the Ability states its cost or why it is unavailable (%s)"
+			% game.hud.army_ability_button.text)
+	check(kit.ability_name in game.hud.army_ability_button.text,
+		"and names the ability itself")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
 		"the Buff Box sub-pick opens the generic choice modal")
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	# TOP-LEFT tile, not the middle of the board. The modal centres its option
+	# buttons, and design C pulled the board flush under the top strip, so tile
+	# (2,2) now sits under those buttons: this click was landing ON an option,
+	# picking it, and closing the modal — while the assertion below still passed,
+	# because a consumed click leaves `selected` untouched either way. A corner
+	# tile is over the modal's backdrop, which is what the check is about.
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
+	check(game.modals.buff_panel != null and game.modals.buff_panel.visible,
+		"...and the click did not reach a button behind it either")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel (keeps the item)"),
 		"Cancel clickable on the choice modal")
 	await process_frame

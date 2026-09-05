@@ -780,8 +780,12 @@ func _rebuild_item_strip() -> void:
 		if g.item_icons.has(g.items[i].key):
 			btn.icon = g.item_icons[g.items[i].key]
 			# icon_max_width clamps AND reserves layout space; expand_icon
-			# would let the icon collapse to 0 in a packed strip
-			btn.add_theme_constant_override("icon_max_width", 30)
+			# would let the icon collapse to 0 in a packed strip.
+			# ICON - 8 rather than ICON: this button carries the item NAME beside
+			# its icon, so the glyph is inset to keep the row the same height as
+			# every other strip instead of taller than all of them.
+			btn.add_theme_constant_override("icon_max_width", ICON - 8)
+			btn.custom_minimum_size = Vector2(0, ICON)
 			btn.text = g.items[i].name
 		else:
 			btn.text = "✦" + g.items[i].name
@@ -814,7 +818,9 @@ func _rebuild_pool_strip() -> void:
 		if g.textures.has(id): # piece icon instead of glyph text (round 3)
 			btn.icon = g.piece_tex(id) # Stock is always yours: the player token
 			btn.expand_icon = true
-			btn.custom_minimum_size = Vector2(46, 46)
+			# was 46. Every icon in the game now measures ICON, deliberately just
+			# under a 59px board tile, so a piece reads the same wherever it is.
+			btn.custom_minimum_size = Vector2(ICON, ICON)
 		else:
 			btn.text = g.defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)

@@ -394,17 +394,33 @@ func _init() -> void:
 	check(kit.power_name in game.hud.army_power_label.text
 			and kit.power_desc in game.hud.army_power_label.text,
 		"the Army Power is readable in the drawer without hovering (%s)" % kit.power_name)
-	check("1 Action" in game.hud.army_power_label.text,
-		"and the Ability's Action cost is stated with it")
+	# design C moved the Ability out of this drawer and onto the deck, so its
+	# cost is asserted where it now lives. The point of the move is the next
+	# check: you can read it WITHOUT opening anything.
+	check("1 Action" in game.hud.army_ability_button.text
+			or "no Action" in game.hud.army_ability_button.text
+			or "next wave" in game.hud.army_ability_button.text,
+		"the Ability states its cost or why it is unavailable (%s)"
+			% game.hud.army_ability_button.text)
+	check(kit.ability_name in game.hud.army_ability_button.text,
+		"and names the ability itself")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
 		"the Buff Box sub-pick opens the generic choice modal")
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	# TOP-LEFT tile, not the middle of the board. The modal centres its option
+	# buttons, and design C pulled the board flush under the top strip, so tile
+	# (2,2) now sits under those buttons: this click was landing ON an option,
+	# picking it, and closing the modal — while the assertion below still passed,
+	# because a consumed click leaves `selected` untouched either way. A corner
+	# tile is over the modal's backdrop, which is what the check is about.
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
+	check(game.modals.buff_panel != null and game.modals.buff_panel.visible,
+		"...and the click did not reach a button behind it either")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel (keeps the item)"),
 		"Cancel clickable on the choice modal")
 	await process_frame
@@ -447,7 +463,24 @@ func _init() -> void:
 	d_press.global_position = d_press.position
 	root.push_input(d_press)
 	await process_frame
-	var zone_px: Vector2 = game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2
+	# find a tile the OPEN DRAWER actually covers rather than assuming one. The
+	# drawer used to be anchored to the bottom of the screen; design C opens it
+	# above the deck instead, so the hardcoded (4,0) stopped being underneath it
+	# and this drop was landing on a live square — the guard was still correct,
+	# the coordinate had simply stopped testing it.
+	var drawer_rect: Rect2 = (game.hud.drawers["stock"] as Control).get_global_rect()
+	var zone := Vector2i(-1, -1)
+	for ty in range(12):
+		for tx in range(8):
+			var c: Vector2 = game._tile_px(Vector2i(tx, ty)) \
+				+ Vector2(game.tile, game.tile) / 2
+			if drawer_rect.has_point(c):
+				zone = Vector2i(tx, ty)
+				break
+		if zone.x >= 0:
+			break
+	check(zone.x >= 0, "the open drawer covers at least one board tile to test with")
+	var zone_px: Vector2 = game._tile_px(zone) + Vector2(game.tile, game.tile) / 2
 	var zone_motion := InputEventMouseMotion.new()
 	zone_motion.position = zone_px
 	zone_motion.global_position = zone_px
@@ -460,7 +493,7 @@ func _init() -> void:
 	d_release.global_position = zone_px
 	root.push_input(d_release)
 	await process_frame
-	check(not game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before,
+	check(not game.board.has(zone) and game.stock.size() == stock_before,
 		"a drop inside the open drawer places nothing (misinput guard)")
 
 	# dragging OUT closes the drawer; the drop then lands on the revealed tile
@@ -477,7 +510,7 @@ func _init() -> void:
 	await process_frame
 	root.push_input(d_release.duplicate())
 	await process_frame
-	check(game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before - 1,
+	check(game.board.has(zone) and game.stock.size() == stock_before - 1,
 		"drag from the stock strip places the piece on the zone tile")
 
 	# a CANCELLED drag (invalid drop spot) reopens the drawer it auto-closed
@@ -510,7 +543,7 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(4, 8)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.drawer_open == "", "an outside tap closes the drawer")
-	_click(game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(zone) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame

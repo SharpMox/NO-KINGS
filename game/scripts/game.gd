@@ -605,14 +605,27 @@ func _ready() -> void:
 	_refresh()
 
 
+## The two bands the board sits between. HUD_TOP is the condensed strip that now
+## carries only clock, score, gold and the menu; HUD_DECK is the smallest the
+## control deck under the board can be (design C, user pick 2026-09-05).
+const HUD_TOP := 44.0
+## Raised from 190 when the stock strip joined the deck: the board must leave
+## room for a full row of it, or the strip sizes itself from a height it has not
+## been given yet and collapses on the first frame.
+const HUD_DECK := 268.0
+
+
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
-	var top := 26.0 # below the condensed top bar
-	var bottom: float = vp.y - 46.0 # the button bar
+	var top := HUD_TOP
+	var bottom: float = vp.y - HUD_DECK
 	tile = int(minf((vp.x - 8.0) / Tuning.BOARD_W, (bottom - top) / Tuning.BOARD_H))
-	# centered in the span so the top and bottom gaps match (2026-07-08)
-	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0),
-		roundf(top + (bottom - top - tile * Tuning.BOARD_H) / 2.0))
+	# PULLED UP under the top strip rather than centred in the span (user ruling,
+	# 2026-09-05). Centring split the leftover height into a gap above AND below
+	# the board, and on a 9:20 phone that was ~130px of nothing in two places.
+	# Flush to the top puts every spare pixel in ONE place, under the board,
+	# where the deck expands to fill it.
+	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), top)
 	queue_redraw()
 
 

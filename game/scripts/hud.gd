@@ -108,11 +108,44 @@ var deck_h := 0.0
 ## The bottom row: Ability beside PASS. Held as a member because build() places
 ## it before the power label exists and the final order is set afterwards.
 var act_row: HBoxContainer
+## The stock strip: a live row of the pieces you hold, at board-piece size.
+var stock_strip: PanelContainer
+var stock_strip_head := Label.new()
+var stock_strip_flow := HFlowContainer.new()
+var _strip_sig := "" # last built content, so refresh does not rebuild every frame
+## One size for every menu icon, deliberately just under a board tile so the
+## deck reads as smaller than the board without looking like a different game.
+const ICON := 52
 	# for activatable Artefacts; issue 67 added the Army Ability chip here
 	# too (always present, unlike the Artefact ones — every run holds one)
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
 	# moved the 6 activatable keys out into activate_box above)
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
+
+
+## Deck surface styling, one place. The colours are the prototype's tokens
+## (.scratch/ui-proto/index.html): pill, power badge, ability, PASS. Applying
+## them through a helper is what stops the four surfaces drifting into four
+## slightly different greys the way the old bar did.
+static func _surface(bg: Color, border: Color, radius: int = 8, pad_x: int = 10,
+		pad_y: int = 4) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	if border.a > 0.0:
+		sb.border_color = border
+		sb.set_border_width_all(1)
+	sb.set_corner_radius_all(radius)
+	sb.content_margin_left = pad_x
+	sb.content_margin_right = pad_x
+	sb.content_margin_top = pad_y
+	sb.content_margin_bottom = pad_y
+	return sb
+
+
+static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
+		pad_x: int = 10, pad_y: int = 4) -> void:
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
 
 
 func build(game) -> void:
@@ -184,20 +217,55 @@ func build(game) -> void:
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
 
+	# THE STOCK STRIP (design C). Sits directly under the board, shows the pieces
+	# you actually hold at the same size they appear on the board, and is the
+	# element that ABSORBS leftover height: whatever the board does not use, this
+	# takes, which is what makes a dead band impossible rather than merely absent.
+	stock_strip = PanelContainer.new()
+	stock_strip.add_theme_stylebox_override("panel",
+		_surface(Color(0, 0, 0, 0.19), Color(0, 0, 0, 0), 8, 6, 5))
+	stock_strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# one full row of pieces plus its header, always. Without a floor here the
+	# strip measures itself before layout has given it any height, decides no row
+	# fits, hides, and then never comes back because a hidden node stays 0 tall.
+	stock_strip.custom_minimum_size = Vector2(0, ICON + 22)
+	stock_strip.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed:
+			set_drawer("stock")
+			drawer_changed.emit())
+	var strip_box := VBoxContainer.new()
+	strip_box.add_theme_constant_override("separation", 4)
+	stock_strip.add_child(strip_box)
+	stock_strip_head.add_theme_font_size_override("font_size", 12)
+	stock_strip_head.modulate = Color(1, 1, 1, 0.65)
+	strip_box.add_child(stock_strip_head)
+	stock_strip_flow.add_theme_constant_override("h_separation", 5)
+	stock_strip_flow.add_theme_constant_override("v_separation", 5)
+	strip_box.add_child(stock_strip_flow)
+	deck.add_child(stock_strip)
+
 	# status and navigation share one line: wave, tariffs and Arrows on the left,
 	# the drawers on the right
 	var status := HBoxContainer.new()
 	status.add_theme_constant_override("separation", 5)
 	status.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	deck.add_child(status)
-	status.add_child(wave_label)
+	# pills, not buttons-that-look-like-chrome: these are status first
+	var wave_pill := PanelContainer.new()
+	wave_pill.add_theme_stylebox_override("panel",
+		_surface(Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3))
+	wave_pill.add_child(wave_label)
+	status.add_child(wave_pill)
+	_style_button(tariff_button, Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3)
+	_style_button(arrow_button, Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 14, 10, 3)
 	status.add_child(tariff_button)
 	status.add_child(arrow_button)
+	status.size_flags_vertical = Control.SIZE_SHRINK_CENTER # a status line, not a band
 	# the drawers get their own line. Sharing one with the status pills clipped
 	# Shop off the right edge at 480 wide.
 	var nav_row := HBoxContainer.new()
 	nav_row.add_theme_constant_override("separation", 5)
-	nav_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	nav_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	deck.add_child(nav_row)
 
 	var bar := nav_row
@@ -239,8 +307,8 @@ func build(game) -> void:
 	add_child(arrow_clear_button)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
-	# self_modulate: the red tint must not bleed into the blue counter child
-	pass_button.self_modulate = Color(1, 0.5, 0.5)
+	# green, matching the prototype: PASS ends your turn, it is not a warning
+	_style_button(pass_button, Color(0.125, 0.196, 0.122), Color(0.290, 0.490, 0.278), 8, 11, 6)
 	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pass_button.pressed.connect(func() -> void: pass_pressed.emit())
 	# "2/2 PASS", both vertically centered — the button's own text is only
@@ -251,23 +319,28 @@ func build(game) -> void:
 	pass_box.add_theme_constant_override("separation", 7)
 	pass_box.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
 	pass_count.add_theme_font_size_override("font_size", 15)
-	pass_count.add_theme_color_override("font_color", Color(0.45, 0.7, 1.0))
+	pass_count.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
 	pass_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_count)
 	pass_label.text = "PASS"
 	pass_label.add_theme_font_size_override("font_size", 17)
+	pass_label.add_theme_color_override("font_color", Color(0.902, 0.965, 0.902))
 	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_label)
 	pass_button.add_child(pass_box)
 	# the ABILITY sits beside PASS on the last row: the two most-pressed controls,
 	# lowest on the screen, inside the thumb arc (design C)
 	army_ability_button.add_theme_font_size_override("font_size", 16)
+	_style_button(army_ability_button, Color(0.231, 0.208, 0.141),
+		Color(0.427, 0.373, 0.180), 8, 11, 6)
+	army_ability_button.add_theme_color_override("font_color", Color(0.953, 0.886, 0.675))
+	army_ability_button.add_theme_color_override("font_disabled_color", Color(0.62, 0.62, 0.62))
 	army_ability_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	army_ability_button.pressed.connect(func() -> void: army_ability_pressed.emit())
 	act_row = HBoxContainer.new()
 	act_row.add_theme_constant_override("separation", 5)
-	act_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	act_row.custom_minimum_size = Vector2(0, 52)
+	act_row.size_flags_vertical = Control.SIZE_SHRINK_END
+	act_row.custom_minimum_size = Vector2(0, 60)
 	act_row.add_child(army_ability_button)
 	act_row.add_child(pass_button)
 	deck.add_child(act_row)
@@ -347,15 +420,24 @@ func build(game) -> void:
 	# issue 100 put this at the top of the Inventory drawer. Design C brings it
 	# onto the main view instead: a passive badge you can read without opening
 	# anything, which was half the point of the redesign.
-	deck.add_child(army_power_label)
+	# the Power is passive, so it is a BADGE: readable, and visibly not a button
+	var power_badge := PanelContainer.new()
+	power_badge.add_theme_stylebox_override("panel",
+		_surface(Color(0.165, 0.20, 0.141), Color(0.275, 0.345, 0.235), 8, 10, 5))
+	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
+	power_badge.add_child(army_power_label)
+	deck.add_child(power_badge)
 	# DECK ORDER (design C): status pills, drawers, the passive power, then the
 	# thumb row last. The rows are built in whatever order the rest of build()
 	# needs them, so the order that matters is asserted here rather than implied
 	# by construction sequence.
-	deck.move_child(status, 0)
-	deck.move_child(nav_row, 1)
-	deck.move_child(army_power_label, 2)
-	deck.move_child(act_row, 3)
+	# ORDER (design C): stock strip under the board, then status, drawers, the
+	# passive power, and the thumb row last.
+	deck.move_child(stock_strip, 0)
+	deck.move_child(status, 1)
+	deck.move_child(nav_row, 2)
+	deck.move_child(power_badge, 3)
+	deck.move_child(act_row, 4)
 	# (the power label used to sit here; design C moved it onto the deck) — it is
 		# the standing rule the rest of the drawer operates under
 	inv_box.add_child(item_box)
@@ -446,6 +528,7 @@ func refresh() -> void:
 		pass_button.tooltip_text = ""
 		turn_label.text = ""
 		pass_count.text = ""
+	_rebuild_stock_strip()
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
@@ -638,6 +721,55 @@ func _add_army_ability_chip() -> void:
 			# from an Artefact chip's plain default tint
 	btn.pressed.connect(func() -> void: army_ability_pressed.emit())
 	activate_box.add_child(btn)
+
+
+## Fill the strip with COMPLETE rows only. A half-cut row of pieces reads as a
+## rendering fault rather than as "there is more below", so the surplus is
+## stated as a +N tile instead (the prototype made the same call).
+func _rebuild_stock_strip() -> void:
+	if stock_strip == null:
+		return
+	var pool: Array = g._pool()
+	# an empty strip says why it is empty rather than sitting there blank
+	stock_strip_head.text = "Stock %d" % pool.size() if pool.size() > 0 \
+		else "Stock 0 — captured and extracted pieces land here"
+	var per_row: int = maxi(1, int((stock_strip.size.x - 12.0 + 5.0) / (ICON + 5)))
+	var body_h: float = stock_strip.size.y - stock_strip_head.size.y - 15.0
+	# at least one row: the strip has a minimum height reserved for exactly that
+	var rows: int = maxi(1, int((body_h + 5.0) / (ICON + 5)))
+	var room: int = rows * per_row
+	var shown: int = mini(pool.size(), room - 1 if pool.size() > room else room)
+	# rebuilt only when the visible content actually changed: this runs on every
+	# refresh, and freeing/adding ~10 nodes per frame is a real cost for nothing
+	var sig := "%d/%d" % [pool.size(), shown]
+	if sig == _strip_sig:
+		return
+	_strip_sig = sig
+	for c in stock_strip_flow.get_children():
+		c.queue_free()
+	for i in shown:
+		var e: Variant = pool[i]
+		var id: String = str(e) if e is String else str((e as Dictionary).get("id", ""))
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(ICON, ICON)
+		b.expand_icon = true
+		if g.textures.has(id):
+			b.icon = g.piece_tex(id)
+		else:
+			b.text = id.substr(0, 2)
+		_style_button(b, Color(0.169, 0.169, 0.169), Color(0, 0, 0, 0), 8, 2, 2)
+		b.pressed.connect(func() -> void:
+			set_drawer("stock")
+			drawer_changed.emit())
+		stock_strip_flow.add_child(b)
+	if pool.size() > shown:
+		var more := Label.new()
+		more.custom_minimum_size = Vector2(ICON, ICON)
+		more.text = "+%d" % (pool.size() - shown)
+		more.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		more.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		more.modulate = Color(1, 1, 1, 0.6)
+		stock_strip_flow.add_child(more)
 
 
 func _rebuild_item_strip() -> void:

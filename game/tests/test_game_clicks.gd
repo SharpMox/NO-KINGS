@@ -463,7 +463,24 @@ func _init() -> void:
 	d_press.global_position = d_press.position
 	root.push_input(d_press)
 	await process_frame
-	var zone_px: Vector2 = game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2
+	# find a tile the OPEN DRAWER actually covers rather than assuming one. The
+	# drawer used to be anchored to the bottom of the screen; design C opens it
+	# above the deck instead, so the hardcoded (4,0) stopped being underneath it
+	# and this drop was landing on a live square — the guard was still correct,
+	# the coordinate had simply stopped testing it.
+	var drawer_rect: Rect2 = (game.hud.drawers["stock"] as Control).get_global_rect()
+	var zone := Vector2i(-1, -1)
+	for ty in range(12):
+		for tx in range(8):
+			var c: Vector2 = game._tile_px(Vector2i(tx, ty)) \
+				+ Vector2(game.tile, game.tile) / 2
+			if drawer_rect.has_point(c):
+				zone = Vector2i(tx, ty)
+				break
+		if zone.x >= 0:
+			break
+	check(zone.x >= 0, "the open drawer covers at least one board tile to test with")
+	var zone_px: Vector2 = game._tile_px(zone) + Vector2(game.tile, game.tile) / 2
 	var zone_motion := InputEventMouseMotion.new()
 	zone_motion.position = zone_px
 	zone_motion.global_position = zone_px
@@ -476,7 +493,7 @@ func _init() -> void:
 	d_release.global_position = zone_px
 	root.push_input(d_release)
 	await process_frame
-	check(not game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before,
+	check(not game.board.has(zone) and game.stock.size() == stock_before,
 		"a drop inside the open drawer places nothing (misinput guard)")
 
 	# dragging OUT closes the drawer; the drop then lands on the revealed tile
@@ -493,7 +510,7 @@ func _init() -> void:
 	await process_frame
 	root.push_input(d_release.duplicate())
 	await process_frame
-	check(game.board.has(Vector2i(4, 0)) and game.stock.size() == stock_before - 1,
+	check(game.board.has(zone) and game.stock.size() == stock_before - 1,
 		"drag from the stock strip places the piece on the zone tile")
 
 	# a CANCELLED drag (invalid drop spot) reopens the drawer it auto-closed
@@ -526,7 +543,7 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(4, 8)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.drawer_open == "", "an outside tap closes the drawer")
-	_click(game._tile_px(Vector2i(4, 0)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(zone) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame

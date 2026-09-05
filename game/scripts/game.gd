@@ -609,7 +609,10 @@ func _ready() -> void:
 ## carries only clock, score, gold and the menu; HUD_DECK is the smallest the
 ## control deck under the board can be (design C, user pick 2026-09-05).
 const HUD_TOP := 44.0
-const HUD_DECK := 190.0
+## Raised from 190 when the stock strip joined the deck: the board must leave
+## room for a full row of it, or the strip sizes itself from a height it has not
+## been given yet and collapses on the first frame.
+const HUD_DECK := 268.0
 
 
 func _layout_board() -> void:

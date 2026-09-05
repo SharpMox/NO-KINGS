@@ -279,6 +279,38 @@ func _init() -> void:
 	check(_find_button(fresh, "Play") != null, "Guest reaches the main menu")
 	check(not Account.needs_login(), "Guest created a real account")
 
+	# ---- LOG OUT: the two-step confirm, driven through the real panel --------
+	# The guest above cannot see this row at all (Account.logout refuses a
+	# guest), so sign in first — that is also the only state where the button is
+	# meant to exist.
+	fresh.queue_free()
+	await process_frame
+	Account.sign_in(Account.GOOGLE, "probe-logout-id", [])
+	var out: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(out)
+	await process_frame
+	await process_frame
+	check(await _click_button(out, "Settings"), "Settings opens")
+	await process_frame
+	check(_find_button(out, "Log out") != null, "a signed-in account is offered Log out")
+	check(await _click_button(out, "Log out"), "Log out clickable")
+	await process_frame
+	# CONFIRMATION, not a hair trigger: the first press must ask, never act.
+	check(_find_button(out, "Cancel") != null, "it asks before doing anything")
+	check(not Account.needs_login(), "and nothing has happened yet")
+	check(await _click_button(out, "Cancel"), "Cancel clickable")
+	await process_frame
+	check(not Account.needs_login(), "cancelling leaves the account signed in")
+	check(_find_button(out, "Log out") != null, "and the row returns to its resting state")
+	# Now go through with it.
+	check(await _click_button(out, "Log out"), "Log out clickable again")
+	await process_frame
+	check(await _click_button(out, "Log out"), "confirming is a second, separate press")
+	await process_frame
+	check(Account.needs_login(), "confirmed logout ends the session")
+	check(_find_button(out, "Play as Guest") != null,
+		"and lands on the login screen, with its guest exit relabelled for a device with nothing to continue")
+
 	print("---")
 	if fails == 0:
 		print("ALL MENU CLICKS OK")

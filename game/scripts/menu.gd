@@ -215,6 +215,29 @@ func _on_sign_in_finished(ok: bool) -> void:
 			% _LABEL(_NATIVE_PROVIDER())
 
 
+## Logging out returns to the LOGIN SCREEN, not to guest play: becoming a guest
+## is a decision the player did not make (user ruling, 2026-09-05). Both exits
+## from that screen stay live, so this cannot strand anyone.
+##
+## The device is still signed in natively — no mobile provider lets an app end
+## the OS session — so pressing the provider button again binds immediately and
+## Account.sign_in() hands back everything logout parked. That is the intended
+## round trip, not a leak.
+func _on_logout() -> void:
+	Account.logout(_SAVE_PATHS())
+	main_box.visible = false
+	login_note.text = LOGIN_TAGLINE
+	_set_providers_disabled(false)
+	if sync_button != null:
+		sync_button.visible = false
+	# This button chose its label when the screen was BUILT, and the screen is
+	# not rebuilt on the way here — so without this a logged-out player is
+	# offered "Continue offline" on a device with nothing left to continue.
+	if guest_button != null:
+		guest_button.text = "Play as Guest"
+	login_center.visible = true
+
+
 ## Dismiss the login screen — but only if it is what the player is looking at.
 ## A verdict can land long after they left it for Settings, the Guide or Scores,
 ## each of which hides main_box, and showing main_box unconditionally would
@@ -284,6 +307,7 @@ func _on_provider_pressed(prov: String) -> void:
 	_BRIDGE().begin_sign_in()
 
 var main_box: VBoxContainer
+var guest_button: Button # relabelled by _on_logout; see there
 var test_scroll: ScrollContainer
 var army_center: ScrollContainer
 var rank_center: CenterContainer
@@ -436,7 +460,8 @@ func _ready() -> void:
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart
 	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
-	settings_panel = Settings.build(self, func() -> void: main_box.visible = true)
+	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
+		Callable(), _on_logout)
 
 	# issue 83: the login screen. Shown ONLY on a first run — once an account
 	# exists, needs_login() is false forever and this never appears again.
@@ -477,7 +502,8 @@ func _ready() -> void:
 	# every other exit from here requires a SUCCESSFUL sign-in, so a guest who
 	# tapped "Sign in to sync" and then had no network had no way back to the
 	# menu at all. Force-quitting the app was the only escape.
-	_button(login_box, "Play as Guest" if Account.needs_login() else "Continue offline",
+	guest_button = _button(login_box,
+		"Play as Guest" if Account.needs_login() else "Continue offline",
 		22, func() -> void:
 			if Account.needs_login():
 				Account.start_guest()

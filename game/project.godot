@@ -29,6 +29,7 @@ IosCloudBridge="*res://scripts/cloud/ios_cloud_bridge.gd"
 window/size/viewport_width=480
 window/size/viewport_height=800
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=1
 
 [editor_plugins]

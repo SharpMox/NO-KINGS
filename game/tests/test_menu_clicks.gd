@@ -138,6 +138,15 @@ func _init() -> void:
 	# Play opens the army select; picking an army stages a fresh run.
 	# Fresh menu: the scenario click above tried to change the scene.
 	menu.queue_free()
+	# ...AND the Game that the scene change actually created. This probe rebuilt
+	# the menu but left the game sitting in the tree as a sibling, where its HUD
+	# draws over the menu. It went unnoticed while the HUD's only bottom control
+	# was a 42px bar down at y754; design C's deck reaches y524 on this viewport,
+	# so it began swallowing clicks aimed at the menu's own Back button at y540.
+	# The two never coexist in the real app — change_scene frees one.
+	for stray in root.get_children():
+		if stray.name == "Game":
+			stray.queue_free()
 	await process_frame
 	menu = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(menu)

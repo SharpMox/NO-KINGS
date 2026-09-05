@@ -83,7 +83,16 @@ static func _hardened(f: Font) -> Font:
 ## (optional) fires with the full settings Dictionary after every toggle, so a
 ## caller with a live session (the in-game menu) can apply it without a
 ## restart — the Main Menu has no running game to update, so it's unused there.
-static func build(layer: Node, on_back: Callable, on_change := Callable()) -> CenterContainer:
+const Account := preload("res://scripts/account.gd")
+
+
+## `on_logout` is what makes the Log out row appear at all. Both entry points
+## pass one because they have to do different things afterwards — the Main Menu
+## shows the login screen, the in-game menu has a live run to leave first — but
+## the ROW is built once, here, so the two copies cannot drift apart the way
+## this repo has been bitten by duplicated controls before.
+static func build(layer: Node, on_back: Callable, on_change := Callable(),
+		on_logout := Callable()) -> CenterContainer:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.visible = false
@@ -127,6 +136,53 @@ static func build(layer: Node, on_back: Callable, on_change := Callable()) -> Ce
 		if on_change.is_valid():
 			on_change.call(data))
 	box.add_child(anim)
+
+	# LOG OUT, with the confirm inline rather than as a modal. This panel is
+	# embedded in two different scenes and a modal would have to be built and
+	# positioned correctly in both; a two-step button cannot be wrong in one of
+	# them. Hidden for a guest: Account.logout() refuses them anyway, because a
+	# fresh guest id every time would orphan their parked saves for good.
+	if on_logout.is_valid() and Account.signed_in():
+		var logout_btn := Button.new()
+		logout_btn.text = "Log out"
+		logout_btn.add_theme_font_size_override("font_size", 22)
+		box.add_child(logout_btn)
+
+		var confirm_box := VBoxContainer.new()
+		confirm_box.add_theme_constant_override("separation", 8)
+		confirm_box.visible = false
+		box.add_child(confirm_box)
+		var warn := Label.new()
+		warn.add_theme_font_size_override("font_size", 13)
+		warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		# Says what actually happens, because the honest answer is reassuring:
+		# nothing is deleted here and nothing is lost.
+		warn.text = "Log out of %s?\nYour progress stays with this account and\ncomes back when you sign in again." \
+			% Account.provider().capitalize()
+		confirm_box.add_child(warn)
+		var yes := Button.new()
+		yes.text = "Log out"
+		yes.add_theme_font_size_override("font_size", 20)
+		confirm_box.add_child(yes)
+		var no := Button.new()
+		no.text = "Cancel"
+		no.add_theme_font_size_override("font_size", 20)
+		confirm_box.add_child(no)
+
+		logout_btn.pressed.connect(func() -> void:
+			logout_btn.visible = false
+			confirm_box.visible = true)
+		no.pressed.connect(func() -> void:
+			confirm_box.visible = false
+			logout_btn.visible = true)
+		yes.pressed.connect(func() -> void:
+			# Back to the resting state FIRST: this panel is not rebuilt between
+			# visits, so a confirm left open would greet the next visitor
+			# mid-question — and after a logout the row hides itself anyway.
+			confirm_box.visible = false
+			logout_btn.visible = false
+			center.visible = false
+			on_logout.call())
 
 	var back := Button.new()
 	back.text = "← Back"

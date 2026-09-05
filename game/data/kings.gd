@@ -141,11 +141,16 @@ static func name_of(id: String) -> String:
 ##             An Action spent on an Ability is an Action not spent attacking,
 ##             which is the visible tradeoff the player plays around.
 ##
-## ONLY DONALD TRUMP'S KIT IS FILLED IN. It is the one that was ruled — Tariff
-## is his Power (slice 66) and Diplomatic Visit – JD Vance his Ability (design
-## session). The other 15 are deliberately absent and the engine no-ops on
-## them, so this slice ships a working engine without inventing 30 effects that
-## are the user's to design.
+## ALL 16 KITS ARE FILLED IN (slices 92-93). Trump's was the first and the only
+## one ruled up front — Tariff is his Power (slice 66) and Diplomatic Visit –
+## JD Vance his Ability (design session); the other 15 were designed and
+## shipped afterwards. This comment said the opposite until 2026-09-05, having
+## outlived the two slices that filled the table directly beneath it.
+##
+## ONE Power and ONE Ability per King. The Notion GDD page still describes
+## "2-3 King Abilities" each — that was the aspiration before the design pass,
+## and it is an open question for Max rather than a bug: the shipped cast is
+## 16 x (1 Power + 1 Ability).
 const KITS := {
 	# ---- LAUREL (issue 92) --------------------------------------------------
 	"nebuchadnezzar_ii": {

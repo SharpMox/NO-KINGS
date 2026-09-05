@@ -74,7 +74,12 @@ func _ready() -> void:
 
 
 static func supported() -> bool:
-	return _ic != null # saves are the capability that matters; GC is identity
+	# BOTH, and the identity half is not optional. Saves are what matters, but
+	# a save with no account_id() can never be bound or fetched — so with GC
+	# missing the login button would pass its guard, ask nobody, answer never,
+	# and time out on every press for the life of the install. A control that
+	# cannot succeed is worse than one that is honestly absent.
+	return _ic != null and _gc != null
 
 
 static func begin_sign_in() -> void:

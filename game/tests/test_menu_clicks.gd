@@ -263,7 +263,11 @@ func _init() -> void:
 		"the login screen is IN FRONT of the main menu, not beside it")
 	check(_find_button(fresh, "Play as Guest") != null, "the login screen renders")
 	check(_find_button(fresh, "Sign in with Google") != null, "Google sign-in offered")
-	check(_find_button(fresh, "Sign in with Apple") != null, "Apple sign-in offered")
+	# GAME CENTER, not "Apple" — "Sign in with Apple" is a different Apple
+	# service, and naming it that sent a live tester looking for a Game Center
+	# app that has not existed since iOS 10. (issue 87)
+	check(_find_button(fresh, "Sign in with Game Center") != null,
+		"Game Center sign-in offered, under its real name")
 	# desktop has no backend, so this must say so rather than appear to work
 	check(await _click_button(fresh, "Sign in with Google"), "Google button clickable")
 	await process_frame

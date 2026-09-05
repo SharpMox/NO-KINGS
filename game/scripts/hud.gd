@@ -97,6 +97,17 @@ var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips
 ## is LEGAL (Close Ranks makes merges free, Endless Ranks makes pawn deploys
 ## free), so a player who has forgotten theirs is misreading their own rules.
 var army_power_label := Label.new()
+## The Army Ability, promoted out of the Inventory drawer onto the deck so its
+## readiness is visible without opening a menu (design C).
+var army_ability_button := Button.new()
+## Height of the control deck. Drawers open ABOVE it rather than covering it:
+## the deck is the persistent surface in design C, and a drawer that buries PASS
+## and the Ability takes the two most-pressed controls away exactly when the
+## player is mid-decision.
+var deck_h := 0.0
+## The bottom row: Ability beside PASS. Held as a member because build() places
+## it before the power label exists and the final order is set afterwards.
+var act_row: HBoxContainer
 	# for activatable Artefacts; issue 67 added the Army Ability chip here
 	# too (always present, unlike the Artefact ones — every run holds one)
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
@@ -119,17 +130,18 @@ func build(game) -> void:
 	top.position = Vector2(10, 4)
 	top.custom_minimum_size = Vector2(vp.x - 56, 0)
 	top.add_theme_constant_override("separation", 14)
-	for l in [clock_label, score_label, gold_label, wave_label]:
+	# ONLY the three numbers, plus the menu button at the corner (user ruling,
+	# 2026-09-05). Wave, tariffs and Arrows moved into the deck under the board:
+	# they are status and controls, and the top strip is for what you glance at.
+	for l in [clock_label, score_label, gold_label]:
 		top.add_child(l)
 	add_child(top)
 	tariff_button.add_theme_font_size_override("font_size", 13)
 	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	tariff_button.pressed.connect(func() -> void: tariff_pressed.emit())
-	top.add_child(tariff_button)
 	arrow_button.text = "Arrows"
 	arrow_button.add_theme_font_size_override("font_size", 13)
 	arrow_button.pressed.connect(func() -> void: arrow_toggle_pressed.emit())
-	top.add_child(arrow_button)
 
 	var menu_btn := Button.new()
 	menu_btn.text = "☰"
@@ -159,10 +171,36 @@ func build(game) -> void:
 	turn_label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.1))
 	turn_label.add_theme_constant_override("outline_size", 6)
 	add_child(turn_label)
-	var bar := HBoxContainer.new()
-	bar.position = Vector2(4, vp.y - 46)
-	bar.custom_minimum_size = Vector2(vp.x - 8, 42)
-	bar.add_theme_constant_override("separation", 4)
+	# ---- THE CONTROL DECK (design C, user pick 2026-09-05) ------------------
+	# Everything under the board lives in one column that starts where the board
+	# ends and runs to the bottom edge. That is what removes the dead band: the
+	# board is flush to the top strip, so all the leftover height arrives here in
+	# one piece, and the rows below expand into it rather than leaving a gap.
+	var deck_top: float = g.board_px.y + g.tile * Tuning.BOARD_H + 6.0
+	var deck := VBoxContainer.new()
+	deck.position = Vector2(4, deck_top)
+	deck_h = vp.y - deck_top
+	deck.custom_minimum_size = Vector2(vp.x - 8, deck_h - 6.0)
+	deck.add_theme_constant_override("separation", 6)
+	add_child(deck)
+
+	# status and navigation share one line: wave, tariffs and Arrows on the left,
+	# the drawers on the right
+	var status := HBoxContainer.new()
+	status.add_theme_constant_override("separation", 5)
+	status.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	deck.add_child(status)
+	status.add_child(wave_label)
+	status.add_child(tariff_button)
+	status.add_child(arrow_button)
+	# the drawers get their own line. Sharing one with the status pills clipped
+	# Shop off the right edge at 480 wide.
+	var nav_row := HBoxContainer.new()
+	nav_row.add_theme_constant_override("separation", 5)
+	nav_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	deck.add_child(nav_row)
+
+	var bar := nav_row
 	for name in ["stock", "inventory"]:
 		var b := Button.new()
 		b.text = name.capitalize()
@@ -221,8 +259,18 @@ func build(game) -> void:
 	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_label)
 	pass_button.add_child(pass_box)
-	bar.add_child(pass_button)
-	add_child(bar)
+	# the ABILITY sits beside PASS on the last row: the two most-pressed controls,
+	# lowest on the screen, inside the thumb arc (design C)
+	army_ability_button.add_theme_font_size_override("font_size", 16)
+	army_ability_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	army_ability_button.pressed.connect(func() -> void: army_ability_pressed.emit())
+	act_row = HBoxContainer.new()
+	act_row.add_theme_constant_override("separation", 5)
+	act_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	act_row.custom_minimum_size = Vector2(0, 52)
+	act_row.add_child(army_ability_button)
+	act_row.add_child(pass_button)
+	deck.add_child(act_row)
 
 	game_menu.visible = false
 	game_menu.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -296,7 +344,19 @@ func build(game) -> void:
 	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0, 0)
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
-	inv_box.add_child(army_power_label) # issue 100: above the strips — it is
+	# issue 100 put this at the top of the Inventory drawer. Design C brings it
+	# onto the main view instead: a passive badge you can read without opening
+	# anything, which was half the point of the redesign.
+	deck.add_child(army_power_label)
+	# DECK ORDER (design C): status pills, drawers, the passive power, then the
+	# thumb row last. The rows are built in whatever order the rest of build()
+	# needs them, so the order that matters is asserted here rather than implied
+	# by construction sequence.
+	deck.move_child(status, 0)
+	deck.move_child(nav_row, 1)
+	deck.move_child(army_power_label, 2)
+	deck.move_child(act_row, 3)
+	# (the power label used to sit here; design C moved it onto the deck) — it is
 		# the standing rule the rest of the drawer operates under
 	inv_box.add_child(item_box)
 	inv_box.add_child(activate_box)
@@ -310,7 +370,7 @@ func build(game) -> void:
 		var bg := StyleBoxFlat.new()
 		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
 		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - spec[4]) # bottom-anchored
+		panel.position = Vector2(spec[2], vp.y - deck_h - spec[4]) # above the deck
 		panel.custom_minimum_size = Vector2(spec[3], spec[4])
 		panel.visible = false
 		var sc := ScrollContainer.new()
@@ -320,7 +380,13 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
-	bar.move_to_front() # the button bar stays visible over the stock drawer
+	# NO move_to_front here any more. It existed because the drawer opened OVER
+	# the button bar and the bar had to be raised above it; design C opens the
+	# drawers above the deck instead, so there is nothing to out-rank. Worse, the
+	# raise made the bar the LAST child of the deck, silently dropping the
+	# drawers row to the bottom of the screen and undoing the row order set in
+	# build() - which is exactly how it presented: the tree said one order and
+	# the screen showed another.
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -398,9 +464,27 @@ func refresh() -> void:
 	# deliberate contrast with Artefact activation and the Shop (both 0), and
 	# it was also tooltip-only until now.
 	var kit: Dictionary = Armies.entry(g.next_army)
-	army_power_label.text = "%s — %s: %s   ·   ★%s (1 Action): %s" % [
-		Armies.display_name(g.next_army), kit.power_name, kit.power_desc,
-		kit.ability_name, kit.ability_desc]
+	# the Power stays a statement; it is passive and there is nothing to press
+	army_power_label.text = "%s — %s: %s" % [
+		Armies.display_name(g.next_army), kit.power_name, kit.power_desc]
+	# THE ABILITY WEARS ITS OWN STATE (design C). Availability had to be visible
+	# without opening a menu, and the three states a player can be in are
+	# genuinely different problems: already used this wave, no Action to spend,
+	# or ready. Saying which one it is beats greying the button out and leaving
+	# them to guess.
+	army_ability_button.text = "★ %s" % kit.ability_name
+	if g.army_ability_used_this_wave:
+		army_ability_button.text += "  ·  next wave"
+		army_ability_button.disabled = true
+		army_ability_button.self_modulate = Color(0.62, 0.62, 0.62)
+	elif g.actions_left < 1:
+		army_ability_button.text += "  ·  no Action"
+		army_ability_button.disabled = true
+		army_ability_button.self_modulate = Color(1.0, 0.66, 0.62)
+	else:
+		army_ability_button.text += "  ·  1 Action"
+		army_ability_button.disabled = false
+		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
 	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
 	# issue 52 grew the drawer only when the Activate row had content; issue
@@ -410,7 +494,8 @@ func refresh() -> void:
 	if inv_panel.custom_minimum_size.y != inv_h:
 		var inv_w: float = inv_panel.custom_minimum_size.x
 		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
-		inv_panel.position = Vector2(inv_panel.position.x, g.get_viewport_rect().size.y - inv_h)
+		inv_panel.position = Vector2(inv_panel.position.x,
+			g.get_viewport_rect().size.y - deck_h - inv_h)
 
 
 ## issue 97: can the player currently pay for this entry's action? Drives the

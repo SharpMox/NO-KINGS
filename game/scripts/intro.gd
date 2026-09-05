@@ -15,8 +15,20 @@ extends Control
 const MENU_SCENE := "res://scenes/Menu.tscn"
 const VIDEO := preload("res://assets/video/larry_intro.ogv")
 const NATIVE_SIZE := Vector2(128, 228)
-const UPSCALE := 3.0 # nearest-neighbour, suits the pixel-art source — smooth-
-	# scaling 128px art to fill the 480-wide window would look soft
+## The clip is as WIDE as the device allows: the largest scale that still fits
+## both axes, so nothing is cropped. On a 9:20 phone that is width-bound and
+## the video spans the full screen width; on a squarer 3:5 window it becomes
+## height-bound instead and stops short of the edges, which is the correct
+## answer there — overflowing would crop the frame.
+##
+## This replaces a fixed x3, chosen back when the canvas was always 480x800.
+## That constant left ~48px of black either side on a phone. The old note
+## warned that scaling past x3 "would look soft"; the player keeps
+## TEXTURE_FILTER_NEAREST, so the trade is not softness but uneven pixel
+## blocks at non-integer scales. Ruled acceptable: filling the screen matters
+## more here than perfectly square pixels (user, 2026-09-05).
+static func _scale_for(vp: Vector2) -> float:
+	return minf(vp.x / NATIVE_SIZE.x, vp.y / NATIVE_SIZE.y)
 
 ## Comfortably longer than the clip, short enough that a player staring at a
 ## stream that never decoded gets to the menu rather than force-quitting.
@@ -49,8 +61,9 @@ func _ready() -> void:
 	player.expand = true
 	player.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	player.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	player.size = NATIVE_SIZE * UPSCALE
-	player.position = (get_viewport_rect().size - player.size) / 2.0 # letterboxed, centered
+	var vp := get_viewport_rect().size
+	player.size = NATIVE_SIZE * _scale_for(vp)
+	player.position = (vp - player.size) / 2.0 # centered on whichever axis is left over
 	player.finished.connect(_advance)
 	add_child(player)
 	player.play()

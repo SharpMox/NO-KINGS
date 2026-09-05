@@ -25,7 +25,7 @@
 // (SQL mode; this Notion plan only allows ONE data source per query, so run
 // these four separately, not as a batch):
 //
-//   SELECT Name, Rarity, Notes FROM "collection://9130a407-248b-4c63-896b-759465ab2d46"   -- Artefacts
+//   SELECT Name, Rarity, STATUS, Notes FROM "collection://9130a407-248b-4c63-896b-759465ab2d46" -- Artefacts
 //   SELECT Name, Tier, Description FROM "collection://9cbe7699-3282-4419-b8f2-dabec907825f" -- Items
 //   SELECT "Codex ID", Name, Betza, Letter FROM "collection://1cb5b2b5-d805-4041-8de2-f7715ac16471" -- Pieces
 //   SELECT Name, Tier, Description FROM "collection://1328fb22-abaf-47ee-bd32-1eb3397f5a66" -- Tariffs
@@ -60,6 +60,12 @@
 // deliberate paraphrase of the upstream Notion economy ("scaled ~/100 —
 // flagged for a design pass"), not a verbatim mirror like Items/Artefacts.
 // Name and Tier mismatches on Tariffs are the ones worth acting on.
+//
+// Artefacts' STATUS (the ?/BASIC/REWORK/KEEP/REMOVE design-triage select) is
+// compared verbatim, no normalisation. It was left out originally and drifted
+// silently: Manna Vending Machine and Apocrypha stayed REWORK in Notion long
+// after their redesigns shipped (issues 58/65) and the repo said KEEP —
+// invisible to this tool until 2026-09-04, when it was found by hand.
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -147,15 +153,16 @@ function section(title, lines) {
   totalMismatches += lines.length;
 }
 
-// ---- Artefacts: Name / Rarity / Notes vs Effect ---------------------------
+// ---- Artefacts: Name / Rarity / STATUS / Notes vs Effect -----------------
 section(
   "Artefacts",
   diffCatalog(
     "artefacts",
-    (snapshot.artefacts ?? []).map((r) => ({ key: normName(r.Name), rarity: r.Rarity, notes: r.Notes })),
-    artefactsJs.map((a) => ({ key: normName(a.name), rarity: a.rarity, effect: a.effect })),
+    (snapshot.artefacts ?? []).map((r) => ({ key: normName(r.Name), rarity: r.Rarity, status: r.STATUS, notes: r.Notes })),
+    artefactsJs.map((a) => ({ key: normName(a.name), rarity: a.rarity, status: a.status, effect: a.effect })),
     [
       ["Rarity", "rarity", "rarity"],
+      ["STATUS", "status", "status"],
       ["Effect", "notes", "effect", (a, b) => coreText(a) === coreText(b)],
     ]
   )

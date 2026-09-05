@@ -113,6 +113,7 @@ var stock_strip: PanelContainer
 var stock_strip_head := Label.new()
 var stock_strip_flow := HFlowContainer.new()
 var _strip_sig := "" # last built content, so refresh does not rebuild every frame
+var _strip_retry := 0 # bounded waits for layout; see _rebuild_stock_strip
 ## One size for every menu icon, deliberately just under a board tile so the
 ## deck reads as smaller than the board without looking like a different game.
 const ICON := 52
@@ -242,12 +243,6 @@ func build(game) -> void:
 	stock_strip_flow.add_theme_constant_override("h_separation", 5)
 	stock_strip_flow.add_theme_constant_override("v_separation", 5)
 	strip_box.add_child(stock_strip_flow)
-	# REBUILD ON RESIZE, not only on refresh. The strip derives its row count
-	# from its own width, and that width arrives a frame or two after build; on
-	# the phone no game refresh happened to follow, so it kept the empty layout
-	# it computed at 13px wide and showed "Stock 21" with a "+21" chip and no
-	# pieces. Desktop hid this because a later refresh happened to fix it.
-	stock_strip.resized.connect(_rebuild_stock_strip)
 	deck.add_child(stock_strip)
 
 	# status and navigation share one line: wave, tariffs and Arrows on the left,
@@ -744,7 +739,22 @@ func _rebuild_stock_strip() -> void:
 	# zero width and never recompute. Observed on device — "Stock 21" with a
 	# "+21" chip and not one piece drawn, permanently.
 	if stock_strip.size.x < ICON + 14.0:
-		return # narrower than one tile means layout has not settled
+		# Layout has not settled: the width arrives a frame or two after build,
+		# and on the phone no game refresh happened to follow, so an early
+		# measurement got cached and the strip showed "Stock 21" with a "+21"
+		# chip and no pieces, permanently.
+		#
+		# Retry on the next frame rather than binding to `resized`. That signal
+		# is a feedback loop here — rebuilding changes the children, which
+		# changes the size, which fires resized, which rebuilds — and it cost a
+		# scenario run 2.7 million error lines before test_scenarios caught it.
+		# The counter bounds the retry so a strip that is legitimately narrow
+		# gives up instead of deferring forever.
+		if _strip_retry < 10:
+			_strip_retry += 1
+			_rebuild_stock_strip.call_deferred()
+		return
+	_strip_retry = 0
 	var per_row: int = maxi(1, int((stock_strip.size.x - 12.0 + 5.0) / (ICON + 5)))
 	var body_h: float = stock_strip.size.y - stock_strip_head.size.y - 15.0
 	# at least one row: the strip has a minimum height reserved for exactly that

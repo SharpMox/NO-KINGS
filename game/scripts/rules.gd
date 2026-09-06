@@ -285,16 +285,35 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 	return false
 
 
-## One greedy enemy action. Priority (GDD Enemy AI Behaviors + grilled advance
-## rule): resolve check (prefer capture) > protect the King (capture a piece
-## threatening it, else retreat it to safety) > best trade (max target value,
-## min attacker value) > advance the most advanced non-King piece toward the
-## player row. Returns {from, to} or {} when the enemy has no legal move.
+## One enemy action. Priority (GDD Enemy AI Behaviors + grilled advance
+## rule): resolve check > protect the King (capture a piece threatening it,
+## else retreat it to safety) > a capture worth taking > advance toward the
+## player row. Returns {from, to}, or {} when the enemy has no legal move —
+## or nothing worth doing (see below).
+##
+## ONE-PLY MATERIAL SAFETY (2026-09-06). Both halves used to be greedy —
+## any capture was taken, the deepest advance was made — so the AI hung
+## rooks for defended pawns and fed pieces one at a time into pawn
+## diagonals. Every candidate is now valued by _move_value: what it takes,
+## plus the danger the mover walks away from, minus what it stands to lose
+## where it lands. A capture with a positive net is still taken ahead of any
+## advance; among equals the deeper destination wins, then the more advanced
+## piece (the GDD's "advance the most advanced piece"); and an action with
+## nothing worth doing — every move loses material, or merely shuffles — is
+## HELD, not played: a piece that can only walk into a capture stays put and
+## makes the player come to it.
+## ponytail: one ply, "defended or not" instead of a full exchange chain —
+## an attacker/pin-aware exchange evaluation is the upgrade if this ever
+## plays visibly wrong.
 ##
 ## `denied` (issue 51): forwarded straight into legal_moves — see its header.
-## ai_action calls the same legal_moves the player's own moves come from
-## (rules.gd:280 pre-issue-51), so this one parameter binds the AI too; there
-## is no second move generator to keep in sync.
+## ai_action calls the same legal_moves the player's own moves come from,
+## so this one parameter binds the AI too; there is no second move
+## generator to keep in sync.
+const TAUNT_PRIORITY := 1000 # Taunt: if a taunting piece can be taken, it is
+	# the target, whatever the trade
+
+
 static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = []) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
@@ -305,9 +324,8 @@ static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2
 		return not BuffLogic.has(board[m.from], "stunned"))
 	if moves.is_empty():
 		return {}
-	if in_check:
-		# legal_moves already filtered to check-resolving moves; prefer a capture.
-		return _best_capture(board, moves, defs) if _has_capture(board, moves) else moves[0]
+	if in_check: # every move here resolves the check; take the best-valued one
+		return _pick(board, moves, defs, true)
 	if king.x >= 0:
 		# Rule 2, "protect the King at all cost": not yet in check, but a player
 		# piece already covers a square next to it (one action away from a
@@ -322,8 +340,11 @@ static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2
 			var defend := _defend_king(board, moves, king, threats, defs)
 			if not defend.is_empty():
 				return defend
-	if _has_capture(board, moves):
-		return _best_capture(board, moves, defs)
+	# a capture worth taking beats any advance (GDD: best trade > advance)
+	var captures := moves.filter(func(m: Dictionary) -> bool: return board.has(m.to))
+	var cap := _pick(board, captures, defs, false)
+	if not cap.is_empty():
+		return cap
 	# only commit pieces INTO the back row once enough force is massed nearby —
 	# trickling in one at a time just feeds the player captures
 	var near := 0
@@ -331,51 +352,80 @@ static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2
 		if board[pos].owner == ENEMY and pos.y <= Tuning.BACKROW_NEAR_ROWS:
 			near += 1
 	var commit := near >= Tuning.BACKROW_COMMIT_COUNT
-	var best := {}
-	var best_key := Vector2i(Tuning.BOARD_H, Tuning.BOARD_H)
+	var quiet: Array[Dictionary] = []
 	for m in moves:
-		if board[m.from].id == "king":
-			continue # the King never advances voluntarily
+		if board[m.from].id == "king" or board.has(m.to):
+			continue # the King never advances voluntarily; losing captures were rejected above
 		if not commit and m.to.y == 0:
 			continue # hold at row 1 until the swarm is big enough
-		var key := Vector2i(m.to.y, m.from.y) # min dest row, then most advanced piece
-		if m.to.y < m.from.y and key < best_key:
-			best_key = key
-			best = m
-	if not best.is_empty():
-		return best
-	for m in moves: # fallback shuffle also respects the back-row hold
-		if commit or m.to.y != 0:
-			return m
-	return {} # nothing but back-row entries available: hold this action
+		quiet.append(m)
+	return _pick(board, quiet, defs, false) # {} = nothing worth doing: hold this action
 
 
-static func _has_capture(board: Dictionary, moves: Array[Dictionary]) -> bool:
-	for m in moves:
-		if board.has(m.to):
-			return true
-	return false
-
-
-static func _best_capture(board: Dictionary, moves: Array[Dictionary], defs: Dictionary) -> Dictionary:
-	# Taunt overrides the value heuristic entirely: if a taunting piece can be
-	# taken at all, it is the target.
-	var taunts := moves.filter(func(m: Dictionary) -> bool:
-		return board.has(m.to) and BuffLogic.has(board[m.to], "taunt"))
-	if not taunts.is_empty():
-		return taunts[0]
+## The best move in `moves`: most material, then the deeper destination, then
+## the more advanced piece (deterministic for a seeded run). Unless `must`,
+## a move has to be worth doing — win material, or advance without losing
+## any — and {} means none is.
+static func _pick(board: Dictionary, moves: Array[Dictionary], defs: Dictionary, must: bool) -> Dictionary:
 	var best := {}
-	var best_target := -1
-	var best_attacker := 1000
+	var best_key := Vector3i.ZERO
+	var origin_risk := {} # per piece, not per move: what it stands to lose by staying
 	for m in moves:
-		if not board.has(m.to):
+		var v := _move_value(board, m, defs, origin_risk)
+		if not must and (v < 0 or (v == 0 and m.to.y >= m.from.y)):
 			continue
-		var target: int = defs[board[m.to].id].value
-		var attacker: int = defs[board[m.from].id].value
-		if target > best_target or (target == best_target and attacker < best_attacker):
-			best_target = target
-			best_attacker = attacker
+		var key := Vector3i(-v, m.to.y, m.from.y) # lexicographic
+		if best.is_empty() or key < best_key:
 			best = m
+			best_key = key
+	return best
+
+
+## Net material of one move, one ply deep: the victim's value (a taunting
+## victim outranks everything), plus the exposure the mover leaves behind,
+## minus the exposure where it lands.
+static func _move_value(board: Dictionary, m: Dictionary, defs: Dictionary, origin_risk: Dictionary) -> int:
+	var mover: Dictionary = board[m.from]
+	var v := 0
+	if board.has(m.to):
+		v += int(defs[board[m.to].id].value)
+		if BuffLogic.has(board[m.to], "taunt"):
+			v += TAUNT_PRIORITY
+	if not origin_risk.has(m.from):
+		origin_risk[m.from] = _exposure(board, m.from, defs)
+	v += origin_risk[m.from]
+	var sim := board.duplicate() # shallow: only the keys move (see legal_moves)
+	sim[m.to] = mover
+	sim.erase(m.from)
+	return v - _exposure(sim, m.to, defs)
+
+
+## What the enemy piece on `at` stands to lose to the player: all of it when
+## attacked and undefended, the trade difference when defended, nothing when
+## unattacked. "Defended" asks whether an enemy piece could capture on `at`
+## if a player piece stood there — own pieces never appear in a capture set.
+static func _exposure(board: Dictionary, at: Vector2i, defs: Dictionary) -> int:
+	var cheapest := _cheapest_attacker(board, at, PLAYER, defs)
+	if cheapest < 0:
+		return 0
+	var mv: int = defs[board[at].id].value
+	var probe := board.duplicate()
+	probe[at] = {"id": board[at].id, "owner": PLAYER}
+	if _cheapest_attacker(probe, at, ENEMY, defs) < 0:
+		return mv
+	return maxi(mv - cheapest, 0)
+
+
+## Value of the cheapest `by_owner` piece that can capture on `at`, -1 if none.
+static func _cheapest_attacker(board: Dictionary, at: Vector2i, by_owner: int, defs: Dictionary) -> int:
+	var best := -1
+	for pos in board:
+		if board[pos].owner != by_owner:
+			continue
+		if moves_for(board, pos, defs, "capture").has(at):
+			var v: int = defs[board[pos].id].value
+			if best < 0 or v < best:
+				best = v
 	return best
 
 
@@ -402,7 +452,7 @@ static func _defend_king(board: Dictionary, moves: Array[Dictionary], king: Vect
 		threats: Array[Vector2i], defs: Dictionary) -> Dictionary:
 	var strikes := moves.filter(func(m: Dictionary) -> bool: return threats.has(m.to))
 	if not strikes.is_empty():
-		return _best_capture(board, strikes, defs)
+		return _pick(board, strikes, defs, true) # the threat goes, whatever the trade
 	var retreats := moves.filter(func(m: Dictionary) -> bool: return m.from == king)
 	var best := {}
 	var best_left := threats.size() + 1

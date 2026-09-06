@@ -159,6 +159,44 @@ func _init() -> void:
 	act = Rules.ai_action(b, defs)
 	check(act.from == Vector2i(4, 5), "King stays put; escort advances")
 
+	# --- material safety (2026-09-06): the AI looks one ply ahead at what it
+	# stands to lose where it lands, so it stops hanging pieces and walking
+	# into captures. Player pawns capture diagonally FORWARD (+y).
+	# A rook must not take a pawn that a second pawn defends: -50 for +10.
+	b = {
+		Vector2i(0, 10): piece("rook", Rules.ENEMY),
+		Vector2i(0, 5): piece("pawn", Rules.PLAYER),
+		Vector2i(1, 4): piece("pawn", Rules.PLAYER), # defends (0,5)
+	}
+	act = Rules.ai_action(b, defs)
+	check(not act.is_empty() and act.to != Vector2i(0, 5),
+		"AI declines a poisoned capture (rook for a defended pawn)")
+	# A free knight beats a defended rook: +30 clean vs +50 -40 on the recapture.
+	b = {
+		Vector2i(0, 10): piece("rook", Rules.ENEMY),
+		Vector2i(0, 5): piece("rook", Rules.PLAYER),
+		Vector2i(1, 4): piece("pawn", Rules.PLAYER), # defends (0,5)
+		Vector2i(7, 10): piece("knight", Rules.PLAYER), # hanging, on the rook's row
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.to == Vector2i(7, 10), "AI prefers the free knight over the defended rook")
+	# The only advance for the pawn is onto a square a player pawn covers; the
+	# knight has a safe advance — the knight moves, the pawn is not fed.
+	b = {
+		Vector2i(3, 7): piece("pawn", Rules.ENEMY),
+		Vector2i(6, 10): piece("knight", Rules.ENEMY),
+		Vector2i(2, 5): piece("pawn", Rules.PLAYER), # covers (3,6)
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.from == Vector2i(6, 10), "AI advances the piece that can advance safely, not into a pawn")
+	# With nothing but a losing move available, the enemy holds its action.
+	b = {
+		Vector2i(3, 7): piece("pawn", Rules.ENEMY),
+		Vector2i(2, 5): piece("pawn", Rules.PLAYER),
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty(), "AI holds rather than feed its last piece into a capture")
+
 	# --- protect the King (GDD Rule 2) ---
 	# Not in check (the knight's leap set is [(1,9),(1,5),(2,8),(2,6)], never
 	# (2,9)) but it covers (1,9) and (2,8), both adjacent to the King: a

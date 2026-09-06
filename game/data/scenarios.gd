@@ -421,4 +421,15 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 3, 3],
 				["rook", 1, 0, 0], ["rook", 1, 1, 0], ["rook", 1, 2, 0],
 				["rook", 1, 3, 0], ["rook", 1, 4, 0], ["pawn", 1, 5, 1]]}},
+		# --- enemy AI (2026-09-06: one-ply material safety, rules.gd ai_action) ---
+		# PASS and watch: the rook must NOT take the pawn on (0,5) — the pawn on
+		# (1,4) defends it — and takes the free knight on (7,10) instead.
+		{"name": "Enemy AI: declines a poisoned capture, takes the free piece", "cfg": {
+			"board": [["pawn", 0, 0, 5], ["pawn", 0, 1, 4], ["knight", 0, 7, 10],
+				["rook", 1, 0, 10]], "stock": ["pawn"]}},
+		# PASS and watch: the pawn on (3,7) can only step onto (3,6), which the
+		# player pawn covers, so the enemy holds it and advances the knight.
+		{"name": "Enemy AI: holds a pawn rather than feed it, advances the knight", "cfg": {
+			"board": [["pawn", 0, 2, 5], ["pawn", 1, 3, 7], ["knight", 1, 6, 10]],
+			"stock": ["pawn"]}},
 	]

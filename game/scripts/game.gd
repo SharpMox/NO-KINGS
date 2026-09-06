@@ -1060,7 +1060,7 @@ func _run_enemy_actions() -> void:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs, _enemy_denied_tiles())
 		if act.is_empty():
-			return
+			break # a held action still ends the turn: the Stun ageing below must run
 		if not autoplay and animations_on:
 			await get_tree().create_timer(0.35).timeout
 		await _wait_while_backgrounded()

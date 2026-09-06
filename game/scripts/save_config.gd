@@ -180,6 +180,13 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.clock_ms = cfg.get("clock_s", Tuning.clock_start_ms(g.next_tier) / 1000.0) * 1000.0
 	g.lost_player = int(cfg.get("lost_player", 0))
 	g.lost_enemy = int(cfg.get("lost_enemy", 0))
+	# review pass 1 (2026-09-06): both additive. A resume that left this at 0
+	# made WaveLogic.queue's `clean` compare lost_player against nothing, so
+	# every clean-wave Artefact was denied for the wave in progress; the default
+	# is the restored lost_player itself, which is what a save with no field can
+	# only mean (nothing lost since the snapshot it never took).
+	g.wave_start_lost_player = int(cfg.get("wave_start_lost_player", g.lost_player))
+	g.silk_road_active = bool(cfg.get("silk_road_active", false))
 	g.pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
@@ -286,6 +293,8 @@ static func to_config(g) -> Dictionary:
 		"army": g.next_army, "rank": g.next_tier,
 		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
+		"wave_start_lost_player": g.wave_start_lost_player, # review pass 1
+		"silk_road_active": g.silk_road_active, # review pass 1
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "score_gained_total": g.score_gained_total,
 		"run_capture_count": g.run_capture_count, # issue 55, Zeta Reticuli

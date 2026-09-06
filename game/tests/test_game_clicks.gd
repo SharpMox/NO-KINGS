@@ -1160,6 +1160,15 @@ func _init() -> void:
 	await process_frame
 	check(game.reinforce_panel != null and game.reinforce_panel.visible,
 		"the reinforcement shop opens at turn start")
+	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
+	# holds the player queen, and the control below the tariff section proves
+	# this exact tap selects her with no panel up.
+	game.selected = Vector2i(-1, -1)
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == Vector2i(-1, -1),
+		"NO-5: a board tap under the open reinforcement pick selects nothing")
+	check(game.reinforce_panel.visible, "...and the pick is still open")
 	var r_stock: int = game.stock.size()
 	check(await _click_button_in(game.reinforce_panel, "Buy"), "Buy clickable")
 	await process_frame
@@ -1174,9 +1183,37 @@ func _init() -> void:
 	check(await _click_button_in(game.hud, "⚠1"), "tariff button clickable")
 	await process_frame
 	check(game.tariff_panel != null and game.tariff_panel.visible, "tariff overlay opens")
+
+	# NO-5: the three ad-hoc panels are PanelContainers on a CanvasLayer, and
+	# Container defaults to MOUSE_FILTER_PASS with no MOUSE_FILTER_STOP
+	# ancestor — so a tap in the panel's empty area fell straight through to the
+	# board. Tile (2,2) holds the player queen, so a leaked tap SELECTS her:
+	# this fails loudly rather than passing vacuously the way a click on an
+	# empty tile would. The second assertion is the consumed-click guard — if
+	# the tap had instead landed on the panel's own Close button the overlay
+	# would be gone, and "selected nothing" would have been true for the wrong
+	# reason.
+	game.selected = Vector2i(-1, -1)
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == Vector2i(-1, -1),
+		"NO-5: a board tap under the open tariff overlay selects nothing")
+	check(game.tariff_panel.visible,
+		"...and the overlay is still open — the tap was blocked, not consumed by Close")
+
 	check(await _click_button_in(game.tariff_panel, "Close"), "tariff Close clickable")
 	await process_frame
 	check(not game.tariff_panel.visible, "tariff overlay closes")
+
+	# CONTROL for the NO-5 assertion above: the very same click, with no panel
+	# up, MUST select the queen. Without this the "selects nothing" assertion is
+	# satisfiable by a click that never reached the board at all.
+	game.selected = Vector2i(-1, -1)
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == Vector2i(2, 2),
+		"control: the same tap DOES select once the overlay is closed")
+	game.selected = Vector2i(-1, -1)
 
 	# Arrow Planning: decorative-only drawing mode (gdd-gaps/10) — toggle,
 	# draw, clear-one (redraw), Clear-all, lifetime clears at turn end

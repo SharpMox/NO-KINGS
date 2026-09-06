@@ -1,6 +1,6 @@
 # NO-KINGS
 
-A filterable codex of **38 fairy-chess pieces** — movement diagrams, Betza notation, fantasy
+**An explosive Chess riot.** A filterable codex of **38 pieces** — movement diagrams, Betza notation, fantasy
 renames, and the relations between them (promotions, fusions, inversions).
 
 **▶ Live site: https://nokings.sharpunk.com/**

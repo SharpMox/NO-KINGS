@@ -19,7 +19,7 @@ The wave-100 King wave. Checkmate awards a score bonus + clock refill and the ru
 Checkmating the wave-150 King. Ends the run immediately with a win-flavored end screen; the score is locked.
 
 **Army**:
-One of six preset starting kits chosen on the army-select screen before a run: **The Muster** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (fairy walkers, signature ferz/wazir), **The Syndicate**, **The Cult**, **The Horde**. An Army sets Starting Stock, Starting Gold and Starting Items, plus a static **Power** (always on) and a once-per-Wave **Ability** costing 1 Action — a deliberate contrast with Artefact activation and the Shop, both 0 (issues 67, 68). Called "Family" before issue 76.
+One of six preset starting kits chosen on the army-select screen before a run: **The Muster** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (walkers, signature ferz/wazir), **The Syndicate**, **The Cult**, **The Horde**. An Army sets Starting Stock, Starting Gold and Starting Items, plus a static **Power** (always on) and a once-per-Wave **Ability** costing 1 Action — a deliberate contrast with Artefact activation and the Shop, both 0 (issues 67, 68). Called "Family" before issue 76.
 _Avoid_: "team", "deck", "loadout", "family"
 _Note_: ids stay the original keys (`Crown`/`Wild Hunt`/`Old Guard`) — load-bearing in the save's `army` field, so display name ≠ id.
 

@@ -10,7 +10,7 @@ Status: done (2026-08-31)
 
 One generated board per piece: the piece placed with room to move, plus its Family chain so
 promotion/fusion behaviour can be watched by hand. Mechanical, and the most directly useful
-part of 73 — the fairy pieces are where movement bugs would actually hide.
+part of 73 — the exotic pieces are where movement bugs would actually hide.
 
 Reuses slice 79's generator and its menu grouping; this slice adds a template and a set, not
 infrastructure.

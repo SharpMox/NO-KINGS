@@ -12,6 +12,7 @@ config_version=5
 
 config/name="No Kings"
 config/version="0.1.0"
+config/description="An explosive Chess riot"
 run/main_scene="res://scenes/Intro.tscn"
 config/features=PackedStringArray("4.7")
 config/icon="res://icon.png"

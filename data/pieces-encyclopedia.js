@@ -1,6 +1,6 @@
 /* ============================================================
  *  pieces-encyclopedia.js
- *  Canonical 100-piece fairy-chess dataset (Wikipedia names).
+ *  Canonical 100-piece dataset (Wikipedia names).
  *  Loaded by encyclopedia/index.html as window.PIECES_ENCYCLOPEDIA.
  * ============================================================ */
 var PIECES_ENCYCLOPEDIA = [
@@ -97,7 +97,7 @@ var PIECES_ENCYCLOPEDIA = [
       letter: 'A',
       betza: 'QN',
       origin: 'Modern',
-      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single fairy piece in common use.',
+      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single piece in common use.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -226,7 +226,7 @@ var PIECES_ENCYCLOPEDIA = [
       letter: 'NN',
       betza: 'NN',
       origin: 'Problem chess',
-      description: 'Makes any number of Knight leaps in a single straight line. Blocked if any square along the line is occupied. Invented by T. R. Dawson in 1925 — the archetypal fairy "rider".',
+      description: 'Makes any number of Knight leaps in a single straight line. Blocked if any square along the line is occupied. Invented by T. R. Dawson in 1925 — the archetypal "rider".',
       behaviors: ['long-range', 'leaper'],
       moves: [
         { kind: 'rider', step: [1, 2],  dots: [[1,2], [2,4]] },
@@ -783,7 +783,7 @@ var PIECES_ENCYCLOPEDIA = [
       letter: 'Am',
       betza: 'QNN',
       origin: 'Problem chess',
-      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
+      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range pieces.',
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [
         { kind: 'rays', dirs: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] },
@@ -1388,7 +1388,7 @@ var PIECES_ENCYCLOPEDIA = [
       letter: 'AK',
       betza: 'K',
       origin: 'Problem chess',
-      description: 'Moves identically to a King — one square in any of 8 directions — but its check semantics are inverted: the Anti-King is in "check" when NOT attacked, and the side loses if its Anti-King cannot reach an attacked square. A fairy-chess problem-composition piece.',
+      description: 'Moves identically to a King — one square in any of 8 directions — but its check semantics are inverted: the Anti-King is in "check" when NOT attacked, and the side loses if its Anti-King cannot reach an attacked square. A problem-composition piece.',
       behaviors: ['royal', 'leaper'],
       moves: [
         { kind: 'dots', squares: [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,1],[1,-1],[-1,-1]] }
@@ -1502,7 +1502,7 @@ var PIECES_ENCYCLOPEDIA = [
       letter: 'EM',
       betza: 'FA',
       origin: 'Modern variants',
-      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
+      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger "Elephant".',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
         { kind: 'dots', squares: [

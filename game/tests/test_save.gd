@@ -248,6 +248,53 @@ func _init() -> void:
 	check(int(stamped.get("save_version", -1)) == SaveConfig.SAVE_VERSION,
 		"every save written now carries the current version")
 
+	# --- a71f574: Restart always RE-ROLLS. next_config/next_seed are statics,
+	# so they survived reload_current_scene() and a run entered via Continue
+	# restarted into its own mid-run snapshot forever — one button meaning two
+	# different things depending on how the run began. It shipped untested;
+	# this pins it, because the regression is silent and only reachable through
+	# the Continue-then-Restart sequence.
+	#
+	# Asserted on the statics rather than by driving the button: they are
+	# exactly what game.gd's _ready branches on at the next boot, so they are
+	# the observable consequence, not a flag the test just wrote.
+	#
+	# reload_current_scene() is a no-op here (this SceneTree has no
+	# current_scene) and prints one engine ERROR per press — not a SCRIPT ERROR
+	# and not a non-zero exit, so run_all.sh's failure predicate does not see
+	# it. Do NOT "fix" that by assigning current_scene: the deferred scene
+	# change memdeletes it and `rs` below becomes a freed instance.
+	const Tuning := preload("res://scripts/tuning.gd")
+	var rs := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	GameScript.next_config = {"wave": 42}
+	GameScript.next_seed = "hunter2"
+	GameScript.next_army = "Cult"
+	GameScript.next_tier = "Tier 3"
+	GameScript.is_scenario = false # the real-run branch...
+	rs.modals.restart_pressed.emit()
+	GameScript.is_scenario = true # ...restored with NO await between these two
+		# lines: _autosave is a no-op only while it is true, and this suite must
+		# never write over the player's real save.
+	check(GameScript.next_config.is_empty(),
+		"Restart clears next_config — a Continue-entered run re-rolls instead of replaying its own snapshot")
+	check(GameScript.next_seed == "",
+		"Restart clears next_seed — replaying an exact seed is the seed system's job, not Restart's")
+	check(GameScript.next_army == "Cult" and GameScript.next_tier == "Tier 3",
+		"...but army and tier survive the press: SETUP reads them back off the statics")
+
+	GameScript.next_config = {"wave": 42}
+	GameScript.next_seed = "hunter2"
+	rs.modals.restart_pressed.emit() # is_scenario is true again
+	check(GameScript.next_config == {"wave": 42} and GameScript.next_seed == "hunter2",
+		"a TEST scenario's Restart keeps its config and seed — a scenario must keep replaying")
+	rs.queue_free()
+	await process_frame
+	GameScript.next_army = Tuning.DEFAULT_ARMY
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+	GameScript.next_config = {}
+	GameScript.next_seed = ""
+
 	print("---")
 	if fails == 0:
 		print("ALL SAVE CHECKS OK")

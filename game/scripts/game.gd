@@ -29,7 +29,8 @@ const Armies := preload("res://scripts/armies.gd")
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
-## Boot config for the next Game scene (menu sets it; Restart replays it).
+## Boot config for the next Game scene (menu sets it; Restart CLEARS it —
+## a71f574, so a Continue-entered run re-rolls rather than replaying itself).
 ## Shape documented in data/scenarios.gd — the save file uses the same format.
 static var next_config := {}
 ## TEST-menu / CLI scenario runs never autosave over the real run.

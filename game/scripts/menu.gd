@@ -642,6 +642,11 @@ func _ready() -> void:
 	add_child(army_center)
 	var army_box := VBoxContainer.new()
 	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# On a 9:20 phone the six entries were sized for 480x800 and simply stopped
+	# halfway down, leaving the bottom ~45% empty. Same answer as the in-run
+	# deck: the leftover height goes into the BUTTONS, which makes them easier
+	# to hit, rather than into a void under the last one.
+	army_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	# issue 68 tightened this from 12: six Armies' worth of entries have to
 	# fit 480x800 without scrolling. The ScrollContainer above stays as the
 	# safety net for a seventh.
@@ -654,10 +659,14 @@ func _ready() -> void:
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
-		_button(army_box, Armies.display_name(army_name), 18, func() -> void:
-			GameScript.next_army = army_name
-			army_center.visible = false
-			rank_center.visible = true)
+		var army_btn := _button(army_box, Armies.display_name(army_name), 18,
+			func() -> void:
+				GameScript.next_army = army_name
+				army_center.visible = false
+				rank_center.visible = true)
+		# only the buttons stretch: the roster and power lines under each one
+		# are reference text and stay at their natural height
+		army_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		var roster := Label.new()
 		roster.text = _army_summary(Tuning.ARMIES[army_name])
 		roster.add_theme_font_size_override("font_size", 11)

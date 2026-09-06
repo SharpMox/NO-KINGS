@@ -39,7 +39,8 @@ need to be glanceable.
 
 ## Method worth repeating
 
-Three HTML prototypes at `.scratch/ui-proto/`, rendered at **three real screen formats**
+Three HTML prototypes (deleted 2026-09-06 — they had served their purpose; the method below
+is the part worth keeping), rendered at **three real screen formats**
 (9:20 Nothing Phone, 19.5:9 iPhone, 16:9 older Android) with a **self-audit printed on the
 page**: canvas overflow, biggest gap between rows, and whether Stock stays reachable. Six
 rounds. The audit caught things reading could not: a 316px dead gap, a mid-row clip, one

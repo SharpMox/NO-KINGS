@@ -3,7 +3,7 @@ extends SceneTree
 const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 ## Asserts a token sprite exists for every piece def and an icon for every
-## item (picked 2026-07-17, .scratch/item-icons). A piece needs either the
+## item (icon set picked 2026-07-17). A piece needs either the
 ## side-specific pair (<id>-light.png + <id>-dark.png, the 2026-08-27 designs)
 ## or a single monochrome <id>.svg — a lone half of the pair is a mistake, and
 ## a piece with side art must not also keep a stale svg. Also asserts the

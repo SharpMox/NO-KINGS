@@ -5,7 +5,7 @@
 ## ships the one real, wired toggle that exists today: Sound.
 
 const SETTINGS_PATH := "user://settings.json"
-const DEFAULTS := {"sound_on": true, "animations_on": true}
+const DEFAULTS := {"sound_on": true, "animations_on": true, "crt_on": true}
 
 
 static func load_settings() -> Dictionary:
@@ -36,6 +36,20 @@ static func save_settings(data: Dictionary) -> void:
 static func apply(data: Dictionary) -> void:
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not data.get("sound_on", true))
 	_crisp_text()
+	_crt(data)
+
+
+## The CRT overlay (scripts/crt_overlay.gd, an autoload) follows the toggle.
+## Looked up by path, not preloaded: it is an autoload and this file is a
+## preloaded dependency of half the game — the same trap play_games_bridge
+## documents. Absent (a test that never registered autoloads) means no-op.
+static func _crt(data: Dictionary) -> void:
+	var loop := Engine.get_main_loop()
+	if not (loop is SceneTree):
+		return
+	var overlay: Node = (loop as SceneTree).root.get_node_or_null("CrtOverlay")
+	if overlay != null:
+		overlay.set_enabled(bool(data.get("crt_on", true)))
 
 
 ## issue 74: turn OFF font antialiasing project-wide, so text renders as hard
@@ -136,6 +150,22 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		if on_change.is_valid():
 			on_change.call(data))
 	box.add_child(anim)
+
+	# CRT TV look (2026-09-06): the whole-screen overlay, opt-out. apply() is
+	# what flips the autoload, so the change is immediate on both menus.
+	var crt := Button.new()
+	crt.add_theme_font_size_override("font_size", 22)
+	var relabel_crt := func() -> void:
+		crt.text = "CRT: On" if data.get("crt_on", true) else "CRT: Off"
+	relabel_crt.call()
+	crt.pressed.connect(func() -> void:
+		data.crt_on = not data.get("crt_on", true)
+		save_settings(data)
+		apply(data)
+		relabel_crt.call()
+		if on_change.is_valid():
+			on_change.call(data))
+	box.add_child(crt)
 
 	# LOG OUT, with the confirm inline rather than as a modal. This panel is
 	# embedded in two different scenes and a modal would have to be built and

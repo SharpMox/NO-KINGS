@@ -23,6 +23,7 @@ _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 GodotPlayGameServices="*uid://c4tixmu7ug5r"
 PlayGamesBridge="*res://scripts/cloud/play_games_bridge.gd"
 IosCloudBridge="*res://scripts/cloud/ios_cloud_bridge.gd"
+CrtOverlay="*res://scripts/crt_overlay.gd"
 
 [display]
 

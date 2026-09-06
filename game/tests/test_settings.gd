@@ -41,6 +41,20 @@ func _init() -> void:
 	check(reloaded2.difficulty == "hard",
 		"keys this module doesn't own still round-trip")
 
+	# CRT overlay (2026-09-06): the toggle drives the autoload, on by default.
+	# `-s` scripts register no autoloads, so the overlay is mounted by hand
+	# under its autoload name — which is exactly what Settings._crt looks up.
+	var crt: Node = load("res://scripts/crt_overlay.gd").new()
+	crt.name = "CrtOverlay"
+	root.add_child(crt)
+	await process_frame # Engine.get_main_loop() is unset while this _init runs
+	check(Settings.load_settings().get("crt_on", false) == true, "CRT defaults to on")
+	check(crt.enabled(), "the overlay boots on")
+	Settings.apply({"crt_on": false})
+	check(not crt.enabled(), "apply({crt_on: false}) hides the overlay")
+	Settings.apply({"crt_on": true})
+	check(crt.enabled(), "apply({crt_on: true}) shows it again")
+	crt.queue_free()
 	Settings.apply({"sound_on": false})
 	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")),
 		"apply() mutes the Master bus when sound is off")

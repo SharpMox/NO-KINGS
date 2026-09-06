@@ -497,7 +497,11 @@ func refresh() -> void:
 		else ("in %d" % maxi(next_in, 0)) if g.wave < Waves.WAVES.size() else "done"
 	wave_label.text = "wave %d/%d · %s" % [g.wave, Waves.WAVES.size(), wave_txt]
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
-		turn_label.text = "Place your army (%d left), then START" % g.stock.size()
+		# the "Place your army (N left), then START" reminder used to live here.
+		# Removed 2026-09-06 (user): turn_label sits at vp.y - 70, under the whole
+		# deck in design C, so nobody could read it. Bring it back with the Stock
+		# UI move, where it can sit next to the strip it talks about.
+		turn_label.text = ""
 		pass_button.text = "START"
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""

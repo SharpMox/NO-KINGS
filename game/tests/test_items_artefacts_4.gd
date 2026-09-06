@@ -1574,6 +1574,30 @@ func _init() -> void:
 	bot.queue_free()
 	await process_frame
 
+	# --- review pass 1: QUERY hooks (on_price et al.) are reads, not triggers.
+	# The echo layer used to run on every hook, so a Shop redraw with two
+	# on_price Artefacts held paid Bilderberg's +15 Gold per tile per frame and
+	# spent Mona Lisa's once-per-Turn echo on a discount recompute.
+	var q := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 6, "gold": 100,
+		"artefacts": ["bilderberg-hotel-slippers", "denazification-visa", "hollow-moon-cross-section"]})
+	await process_frame
+	for i in 10:
+		Shop.price(q, q.shop_stock[0])
+	check(q.gold == 100,
+		"Bilderberg Hotel Slippers: a Shop price read is not a trigger — 10 Shop.price() calls pay nothing")
+	q.queue_free()
+	await process_frame
+
+	var ml := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 6,
+		"artefacts": ["100-genuine-original-mona-lisa", "hollow-moon-cross-section"]})
+	await process_frame
+	ml.mona_lisa_turn_done = false
+	Shop.price(ml, ml.shop_stock[0])
+	check(not ml.mona_lisa_turn_done,
+		"100% Genuine Original Mona Lisa: a Shop price read does not spend the Turn's echo")
+	ml.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ARTEFACTS 4 CHECKS OK")

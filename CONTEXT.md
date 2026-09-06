@@ -1,6 +1,6 @@
 # NO-KINGS
 
-A Godot 4 mobile game built by AI agents. The backlog lives in `.scratch/gdd-gaps/` (a PRD plus one file per slice) and the Notion GDD is the design source of truth for the catalogs — **not Linear**, which earlier revisions of this file named but which was never actually used.
+A Godot 4 mobile game built by AI agents. **Live work lives in Linear** (workspace `no-kings`, team `NO`, ids `NO-<n>`), adopted 2026-09-06; `.scratch/gdd-gaps/` (a PRD plus one file per closed slice) is the read-only archive of everything shipped before that. The Notion GDD is the design source of truth for the catalogs. This line read *"not Linear, which was never actually used"* until 2026-09-06 — accurate for the whole archive, and no longer accurate for new work.
 
 > ⚠️ The GitNexus-fork subsection below documents an agent-tooling experiment that is **not part of the shipped game**. It is kept for reference; nothing in `game/` depends on it.
 

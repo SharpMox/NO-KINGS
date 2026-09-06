@@ -134,7 +134,17 @@ scaffolding, and a 22-suite test harness.
   `NOTION-QUESTIONS.md` (the open GDD questions, each blocking at least one Artefact —
   **read it before implementing any Artefact**, so an already-known ambiguity isn't
   rediscovered or, worse, guessed at).
-  **There is no Linear.** Earlier revisions of this file said there was; there never was.
+  **These 106 files are now a READ-ONLY ARCHIVE** (2026-09-06). They hold the history —
+  every `Status:` line and `## Outcome` — and are worth reading, but no new slice goes here.
+- **Live work lives in Linear** (adopted 2026-09-06, user ruling). Workspace `no-kings`,
+  team `NO`, issue ids `NO-<n>`. **A slice lives in exactly one place**: Linear for anything
+  still open, `.scratch/gdd-gaps/issues/` for anything already closed. Only the live items
+  were migrated; the archive was not.
+  This file said *"There is no Linear; there never was"* until 2026-09-06 — that was true
+  for the whole history above it, and is no longer true.
+- **Linear is driven through the signed-in browser, not an MCP** — there has never been a
+  Linear MCP. See the global `~/.claude/CLAUDE.md` for the connect-mode recipe. If the
+  browser session is gone, say so and stop; never fall back silently.
 - One slice → one branch → one PR, same as the reference site.
 - **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,
   Artefacts, Tariffs, Piece Buffs). When Notion and the code disagree, that is a finding —
@@ -292,9 +302,11 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   `game/data/items.gd`, `data/pieces-codex.js`, `game/data/tariffs.gd`) have drifted
   apart unnoticed before and been hand-fixed twice — the second fix still missed a
   row. `tools/check-notion-drift.mjs` diffs them and prints every disagreement; it
-  never writes to either side. It needs a Notion snapshot as input (a plain script
-  can't call the Notion MCP tools) — see the header of that file for the exact SQL
-  to run and the JSON shape to save, then:
+  never writes to either side. It needs a Notion snapshot as input — a plain `node`
+  script cannot reach Notion at all (there is no token in the repo, and the Notion MCP
+  was removed 2026-09-06 in favour of the signed-in browser). Gather the rows through
+  the browser; see the header of that file for the exact SQL and the JSON shape to save,
+  then:
   ```sh
   node tools/check-notion-drift.mjs <snapshot.json>
   ```
@@ -307,7 +319,8 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
 
 Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`. One commit per logical
 change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
-(e.g. `Refs: ENG-42`); reference-site changes don't need one.
+(e.g. `Refs: NO-16`); reference-site changes don't need one. The example here said
+`ENG-42` until 2026-09-06, from a team prefix that never existed.
 
 ## Agent tooling
 

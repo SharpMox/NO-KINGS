@@ -64,7 +64,7 @@ Run `mcp__godot_ai__list_tools` (or the equivalent listing in your CLI) on a liv
 
 ## Setup status (project-level)
 
-- **Pre-bootstrap state** (current): no `project.godot` yet. Tools unavailable until the Godot mobile project is initialized (see the Linear issue for the mobile bootstrap).
+- ~~**Pre-bootstrap state**~~ — stale until 2026-09-06. The Godot project has long existed at `game/` (Godot 4.7, portrait 480x800) with the addon vendored at `game/addons/godot_ai` and enabled in `project.godot`. The tools are available whenever the Godot editor is running; a `ConnectionRefused` on `127.0.0.1:8000` means the editor is closed, not that anything is broken.
 - **Post-bootstrap**: install the addon per the [Godot AI Quick Start](https://github.com/hi-godot/godot-ai#quick-start), enable it in Project Settings, then use the Godot AI dock's "Configure all" to wire MCP across every detected agent CLI.
 
 If you load this skill and the MCP tools don't exist, the project hasn't been bootstrapped yet — say so and exit cleanly. Don't fabricate scene work.

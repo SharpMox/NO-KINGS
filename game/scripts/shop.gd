@@ -436,14 +436,16 @@ static func can_sell(g, kind: String, entry) -> bool:
 
 
 ## Convertible right now: actually held in Captured Stock, player's turn, and
-## the Gold to cover the conversion price (same rate as sell_price, above).
+## the Gold to cover the conversion price (convert_price — review pass 2: this
+## gated on the cheaper sell_price after issue 97 split the rates, letting a
+## short player through to be floored at 0).
 ## No Action gate (issue 64, user ruling). Converting only ever ADDS to Stock
 ## (never removes a board/Stock piece), so it can never trigger the
 ## starvation softlock the way a sale can.
 static func can_convert(g, entry) -> bool:
 	return g.captured.has(entry) \
 			and g.state == g.State.PLAYER_TURN \
-			and g.gold >= sell_price(g, "captured", entry)
+			and g.gold >= convert_price(g, entry)
 
 
 ## n distinct picks from a key array, uniform.

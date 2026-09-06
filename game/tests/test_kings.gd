@@ -356,6 +356,14 @@ func _init() -> void:
 	var lost_ctx: Dictionary = ArtefactHooks.run(y, "on_piece_lost", {"gold_bonus": 0})
 	check(int(lost_ctx.get("gold_bonus", 0)) == -10,
 		"Total War charges Gold per loss, through ctx.gold_bonus not g.gold")
+	# review pass 2: the ctx check above passed while the Power was INERT in
+	# play — nothing at the real loss site ever consumed on_piece_lost's
+	# gold_bonus. Assert the Gold actually leaves at _lose_player_piece.
+	y.board[Vector2i(2, 2)] = {"id": "pawn", "owner": Rules.PLAYER}
+	y.gold = 50
+	y._lose_player_piece(Vector2i(2, 2), "captured")
+	check(y.gold == 40, "review pass 2: Total War — losing a piece costs 10 Gold in play")
+	y.board.erase(Vector2i(2, 2))
 
 	# Total Mobilisation must not SHADOW a Power on the same hook — it is
 	# applied outside the match for exactly this reason

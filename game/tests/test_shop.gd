@@ -521,6 +521,18 @@ func _init() -> void:
 		"the piece moves from Captured Stock into ordinary Stock")
 	check(cv.gold == gold_before_convert - convert_cost, "conversion debits the Gold cost")
 	check(cv.actions_left == 0, "conversion never touches actions_left (issue 64)")
+	# review pass 2: can_convert gated on the cheaper SELL price after issue 97
+	# split the rates, so a player short of the convert price was let through
+	# and spend_gold silently floored them at 0
+	cv.captured.append("rook")
+	var rook_convert := Shop.convert_price(cv, "rook")
+	cv.gold = rook_convert - 1
+	check(not Shop.can_convert(cv, "rook") and not cv._convert_captured("rook"),
+		"review pass 2: a conversion unaffordable at CONVERT_RATE is refused, not floored")
+	cv.gold = rook_convert
+	check(Shop.can_convert(cv, "rook"), "review pass 2: affordable at exactly the convert price")
+	cv.captured.erase("rook")
+	cv.gold = gold_before_convert - convert_cost
 	var target2 := Vector2i(-1, -1)
 	for t in cv._deploy_tiles():
 		if not cv.board.has(t):

@@ -7,6 +7,7 @@ const Waves := preload("res://data/waves.gd")
 const Tariffs := preload("res://data/tariffs.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const WaveLogic := preload("res://scripts/wave_logic.gd")
 
 var fails := 0
 
@@ -112,6 +113,23 @@ func _init() -> void:
 	r._queue_wave(12)
 	check(not r.pending_reinforce, "non-milestone waves pend no shop")
 	r.queue_free()
+	await process_frame
+
+	# review pass 2: a spawn landing on a friendly blockader is a real loss and
+	# must go through _lose_player_piece — a bare `lost_player += 1` hid it from
+	# every loss-triggered Artefact (Satoshi's -2 Gold, wave_lost_ids, Frog…)
+	var blk := _boot({"board": [["queen", 0, 2, 1], ["rook", 1, 7, 7],
+			["pawn", 0, 0, 11], ["pawn", 0, 1, 11], ["pawn", 0, 2, 11], ["pawn", 0, 3, 11],
+			["pawn", 0, 4, 11], ["pawn", 0, 5, 11], ["pawn", 0, 6, 11], ["pawn", 0, 7, 11]],
+		"wave": 2, "artefacts": ["satoshi-s-private-key"], "gold": 20})
+	await process_frame
+	var lost0: int = blk.lost_player
+	blk._queue_wave(3) # 3 pawns pend; Satoshi's own on_wave_clear pays out here
+	var gold0: int = blk.gold
+	WaveLogic.spawn_pending(blk) # every spot is friendly-held: all 3 arrivals capture
+	check(blk.lost_player == lost0 + 3 and blk.wave_lost_ids.size() == 3 and blk.gold == gold0 - 6,
+		"review pass 2: spawn-row captures count as losses for Artefacts (Satoshi -2 each, wave_lost_ids)")
+	blk.queue_free()
 	await process_frame
 
 	print("---")

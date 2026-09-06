@@ -1036,7 +1036,9 @@ func _enemy_turn() -> void:
 ## flag-based seam as game_menu_open/win_open/shop_open() instead of a second
 ## pause mechanism.
 func _wait_while_backgrounded() -> void:
-	while backgrounded:
+	while backgrounded or game_menu_open: # review pass 2: "Paused" froze the
+		# clock and input but not this coroutine — enemy pieces kept resolving
+		# under the overlay
 		await get_tree().process_frame
 
 
@@ -2550,12 +2552,16 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 	var uncounted := _artefact_count("definitely-not-russia-patch") > 0 and dnr_patch_wave != wave
 	var ctx := ArtefactHooks.run(self, "on_piece_lost",
 		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos,
-			"cancel": false, "destroy_attacker": false, "uncounted": uncounted})
+			"cancel": false, "destroy_attacker": false, "uncounted": uncounted,
+			"gold_bonus": 0.0}) # Total War's side-payment channel (Kings.power_hook)
 	if uncounted:
 		dnr_patch_wave = wave
 	if not ctx.cancel and not uncounted:
 		lost_player += 1
 		wave_lost_ids.append(board[pos].id)
+		if ctx.gold_bonus < 0.0: # review pass 2: applied exactly once, here —
+			# nothing consumed this channel before, so Total War was inert in play
+			Economy.spend_gold(self, -roundi(ctx.gold_bonus))
 		if BuffLogic.has(board[pos], "piece_bounty"): # Bounty (issue 48), ally
 			# half — queue it, see pending_bounty_boxes' own comment for why
 			# this can't open the choice pick here

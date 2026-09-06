@@ -14,8 +14,8 @@ NO KINGS — *An explosive Chess riot* (the tagline; the game is described as a 
 > ## ⚠️ Always ship changes via a pull request — never push to `main`
 > **Every change goes on a branch off `main` and lands through a PR.** No direct
 > commits or pushes to `main` — not for one-line fixes, content edits, follow-ups,
-> or "tiny" tweaks. The flow is always: branch → commit → push the branch →
-> `gh pr create`. Do not run `git push origin main` or fast-forward `main` locally.
+> or "tiny" tweaks. The flow is always: branch → commit → rebase on `main` → push the
+> branch → `gh pr create`. Do not run `git push origin main` or fast-forward `main` locally.
 > If the user explicitly asks to push to `main`, confirm that's what they want first.
 
 ---
@@ -128,14 +128,17 @@ scaffolding, and a 22-suite test harness.
 
 ### Where the work lives
 
-- **The backlog is `.scratch/gdd-gaps/`** — `PRD.md` (the map), `issues/NN-*.md` (one slice
-  each, with a `Status:` line and an `## Outcome` when done), `FLAGS.md` (non-blocking
-  findings and open design questions, so they don't rot in PR descriptions), and
-  `NOTION-QUESTIONS.md` (the open GDD questions, each blocking at least one Artefact —
-  **read it before implementing any Artefact**, so an already-known ambiguity isn't
-  rediscovered or, worse, guessed at).
-  **There is no Linear.** Earlier revisions of this file said there was; there never was.
-- One slice → one branch → one PR, same as the reference site.
+- **The backlog is Linear** (user ruling 2026-09-06): the PRD as a project, one issue per
+  slice (status, labels, an outcome comment on close), and non-blocking findings as issues
+  labelled `flag`. Commits and PRs carry `Refs: ENG-NN`. While the Linear MCP was absent the
+  backlog lived in `.scratch/gdd-gaps/` (`PRD.md`, `issues/NN-*.md` with a `Status:` line and
+  an `## Outcome`, `FLAGS.md`); those files are being migrated into Linear and stay readable
+  as history until then. If a session has no Linear MCP, say so rather than silently
+  falling back to the files.
+  `NOTION-QUESTIONS.md` stays in the repo: the open GDD questions, each blocking at least one
+  Artefact — **read it before implementing any Artefact**, so an already-known ambiguity
+  isn't rediscovered or, worse, guessed at.
+- One slice → one branch → one PR, rebased on `main` before pushing, same as the reference site.
 - **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,
   Artefacts, Tariffs, Piece Buffs). When Notion and the code disagree, that is a finding —
   see the drift checker below — and which side is stale is a judgement call each time. Both
@@ -279,13 +282,15 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   from: a file + line, a skill, a doc URL, a commit, an issue, or a direct user
   instruction. No "I think" / "usually" without a pointer — say "no source — assumption"
   so it can be challenged.
-- **Prioritise trusted sources**, highest first:
+- **Prioritise trusted sources**, highest first (order ruled by the user 2026-09-06):
   1. Explicit user instructions in this conversation.
-  2. This `CLAUDE.md`, project docs, ADRs, `.agents/skills/*/SKILL.md`.
-  3. The codebase itself (`git log`, current file contents).
-  4. Official upstream docs (Godot, Linear API, MDN/web platform from canonical domains).
-  5. Locked external skills (`skills-lock.json`).
-  6. General training-data knowledge / blogs / Stack Overflow — lowest; a hypothesis to verify.
+  2. The Notion GDD (the design source of truth).
+  3. This `CLAUDE.md`.
+  4. Project docs: ADRs, `CONTEXT.md`, `.agents/skills/*/SKILL.md`.
+  5. The codebase itself (`git log`, current file contents).
+  6. General knowledge — official upstream docs, locked external skills
+     (`skills-lock.json`), training data, blogs, Stack Overflow — a hypothesis to verify;
+     upstream docs and locked skills have no explicit tier of their own yet.
   Never let a lower tier override a higher one without flagging the conflict.
 - **Before an audit of the GDD catalogs, run the Notion drift checker.** The Notion
   GDD (Artefacts, Items, Pieces, Tariffs) and the repo mirrors (`data/artefacts.js`,

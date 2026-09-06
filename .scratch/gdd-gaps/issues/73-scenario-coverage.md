@@ -72,7 +72,7 @@ and they are the ones that will actually get opened twice.
 ### (c) Per piece — 39, generated
 
 Each piece's movement and its Family chain. Mechanical, and genuinely useful for checking the
-fairy pieces behave.
+exotic pieces behave.
 
 ### The menu will need sub-grouping
 

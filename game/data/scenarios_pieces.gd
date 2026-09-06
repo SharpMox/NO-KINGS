@@ -1,6 +1,6 @@
 ## issue 80: one hand-playable sandbox per piece (39), GENERATED.
 ##
-## The most directly useful part of issue 73 — the fairy pieces are where a
+## The most directly useful part of issue 73 — the exotic pieces are where a
 ## movement bug would actually hide, and this is the fastest way to look at one
 ## move by move.
 ##

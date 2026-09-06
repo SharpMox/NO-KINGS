@@ -1,6 +1,6 @@
 /* ============================================================
  *  board.js
- *  Shared SVG board renderer for every NO-KINGS fairy-piece page.
+ *  Shared SVG board renderer for every NO-KINGS piece page.
  *  Exposes globals: N, SQ, SIZE, svgCenter, squareRect, describeMoves,
  *  renderBoard, renderMove.
  *

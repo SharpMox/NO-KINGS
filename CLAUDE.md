@@ -1,13 +1,13 @@
 # NO-KINGS
 
-A fairy-chess project in two parts:
+NO KINGS — *An explosive Chess riot* (the tagline; the game is described as a Chess riot, never by a variant-genre label — user ruling 2026-09-06). A project in two parts:
 
 1. **The reference site** — what lives in this repo right now: a static HTML/CSS/JS
    site documenting every piece in NO-KINGS (a filterable codex, a relationship
    graph + merge matrix, promotion/fusion/inversion references, a Betza-notation
    sandbox, and a 100-piece encyclopedia).
 2. **The game** *(in progress)* — a Godot 4 mobile game (Android + iOS) of the same
-   fairy-chess system, bootstrapped in `game/` (Godot 4.7, portrait 480×800). The MVP
+   piece system, bootstrapped in `game/` (Godot 4.7, portrait 480×800). The MVP
    is being built desktop-first from the plan-file spec; the Notion GDD is the design
    source of truth.
 

@@ -153,7 +153,7 @@ var PIECES_CODEX = [
       letter: 'My',
       betza: 'FA',
       origin: 'Modern variants',
-      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger fairy "Elephant".',
+      description: 'Combines Ferz (1,1) and Alfil (2,2) — leaps one or two squares diagonally. Eight reachable squares, all on diagonals. Heavily colour-bound. Used in modern variants as a stronger "Elephant".',
       description_codex: 'Leaps one or two squares diagonally — eight reachable squares. Promotes from Seer to Shaman. Fuses with Knight to form Shaman.',
       behaviors: ['compound', 'leaper', 'color-bound'],
       moves: [
@@ -600,7 +600,7 @@ var PIECES_CODEX = [
       letter: 'Co',
       betza: 'QN',
       origin: 'Modern',
-      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single fairy piece in common use.',
+      description: 'Queen + Knight combined — slides along all 8 lines and also leaps in an L. The strongest single piece in common use.',
       description_codex: 'Slides any distance in any of the eight directions; also makes a two-by-one L-shaped jump. Formed by several fusions, including Bishop + Dragonlord and Knight + Queen. Fuses with Knight to form Valkyrie.',
       behaviors: ['compound', 'long-range', 'leaper'],
       moves: [
@@ -742,7 +742,7 @@ var PIECES_CODEX = [
       letter: 'Vk',
       betza: 'QNN',
       origin: 'Problem chess',
-      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range fairy pieces.',
+      description: 'Combines the Queen and Nightrider — slides any distance along all 8 queen lines AND any number of knight leaps in a straight line. One of the most powerful long-range pieces.',
       description_codex: 'Slides any distance in any of the eight directions, or rides any number of two-by-one L-shaped jumps in a single line. Formed by fusing Consul and Knight.',
       behaviors: ['long-range', 'compound', 'leaper'],
       moves: [

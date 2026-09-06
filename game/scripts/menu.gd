@@ -849,7 +849,7 @@ func _show_about() -> void:
 	head.add_theme_font_size_override("font_size", 28)
 	box.add_child(head)
 	var body := Label.new()
-	body.text = "NO KINGS\nA fairy-chess strategy game — MVP build.\nBuilt with Godot 4."
+	body.text = "NO KINGS\nAn explosive Chess riot.\nBuilt with Godot 4."
 	body.add_theme_font_size_override("font_size", 15)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(body)

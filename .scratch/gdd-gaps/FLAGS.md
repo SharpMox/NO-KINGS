@@ -238,6 +238,44 @@ found. Collected here so they are not lost in Outcome sections:
   **interleaved**: 30 alternating before/after runs in one continuous load session,
   3/30 failures -> 0/30.
 
+## Test traps found by the HUD redesign (2026-09-05, issue 106)
+
+Four of these were tests that passed for the wrong reason or hid a real overlap. They cost
+most of a day between them, and every one is the kind that comes back.
+
+- **A probe can pass because its click was CONSUMED.** `test_game_clicks` proved the choice
+  modal blocks board input by clicking tile (2,2). Once the board moved, that coordinate sat
+  under the modal's own option buttons, so the click PICKED an option and closed the modal —
+  and the assertion still passed, because a consumed click leaves `selected` untouched either
+  way. It now clicks a tile over the backdrop and additionally asserts the modal survived.
+- **`test_menu_clicks` leaves a Game instance in the tree while testing the Menu.** The probe
+  rebuilds the menu after the scenario click's scene change but never freed the game that
+  change created, so the game's HUD has always been drawing over the menu. Invisible while
+  the HUD's only bottom control was a 42px bar at y754; the new deck reaches y524 and started
+  swallowing the menu's own Back button at y540. The two never coexist in the real app.
+- **Hardcoded tile coordinates in drag tests are geometry assertions in disguise.** The
+  "drop inside the open drawer places nothing" guard stopped testing anything when drawers
+  moved above the deck; it now FINDS a tile the drawer actually covers.
+- **A failure you can explain is not a failure you have diagnosed.** A suite SIGTERM was read
+  as window-focus contention — which was real and self-inflicted — while a genuine infinite
+  loop sat underneath it. Binding a rebuild to Godot's `resized` is a feedback loop when the
+  rebuild changes its own children: `test_scenarios` hung with 2.7M lines of "Object was
+  deleted while awaiting a callback".
+- **Leaving a game window open makes every windowed probe flaky.** Kill stray `godot --path`
+  processes before running suites; two runs were lost to a window left open for review.
+
+## Layout lessons the device taught (2026-09-05)
+
+- **A control that measures itself before layout will cache nonsense.** The stock strip sizes
+  its rows from its own width, which arrives a frame or two after build. At 13px wide it
+  concluded one tile fitted, drew nothing, and cached that under a signature that never
+  changed — "Stock 21" with a "+21" chip and no pieces, permanently, on the phone. Desktop
+  hid it twice: a fresh run has Stock 0, and when there were pieces a stray refresh happened
+  to recompute it. Wait for a sane width, retry bounded, never bind to `resized`.
+- **Centring content in a span splits empty space into two gaps.** Flush to one edge puts all
+  the slack in one place where something can absorb it. This is why the board is pinned under
+  the top strip rather than centred.
+
 ## Cards whose text overpromises what shipped
 
 - ~~**Zapruder's Director's Cut says "repeat your previous Action"** but only repeats a

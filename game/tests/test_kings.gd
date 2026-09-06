@@ -13,6 +13,7 @@ const SaveConfig := preload("res://scripts/save_config.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const GeneratedKings := preload("res://data/scenarios_kings.gd") # issue 82
+const Items := preload("res://data/items.gd")
 
 var fails := 0
 
@@ -40,6 +41,10 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	return game
+
+
+func defs_of(game: Node2D) -> Dictionary:
+	return game.defs
 
 
 func _init() -> void:
@@ -476,6 +481,66 @@ func _init() -> void:
 	await process_frame
 
 	g.queue_free()
+	await process_frame
+
+	# --- King Ability judgement (2026-09-06). The Ability used to fire the
+	# moment the King stood on the board: before check was considered (a King
+	# in check with one Action spent it on the Ability and never moved), with
+	# nothing to hit (Nero's Fire with no Items held), and ahead of a free
+	# capture. It is now an AI decision: check first, a profitable capture
+	# first, only when it would do something.
+	var chk: Node2D = _boot({"wave": 50, "items": ["blitz"], "board": [
+		["king", 1, 3, 10, {"king_id": "nero"}], ["rook", 0, 3, 2], ["pawn", 0, 6, 1]]})
+	await process_frame
+	chk.autoplay = true # skips the pacing timers, nothing else
+	await chk._run_enemy_actions()
+	var chk_k := Rules.find_king(chk.board, Rules.ENEMY)
+	check(chk_k.x >= 0 and not Rules.is_attacked(chk.board, chk_k, Rules.PLAYER, defs_of(chk))
+			and not chk.king_ability_used_this_wave,
+		"a King in check resolves the check; the Ability waits")
+	chk.queue_free()
+	await process_frame
+
+	var fire: Node2D = _boot({"wave": 50, "board": [
+		["king", 1, 3, 10, {"king_id": "nero"}], ["pawn", 0, 6, 1]]})
+	await process_frame
+	fire.autoplay = true
+	check(not Kings.ability_useful(fire), "Nero's Fire is not worth an Action with no Items to burn")
+	await fire._run_enemy_actions()
+	check(not fire.king_ability_used_this_wave, "…so the King does not fire it")
+	fire.items.append(Items.ITEMS[0])
+	check(Kings.ability_useful(fire), "with an Item held it is")
+	await fire._run_enemy_actions()
+	check(fire.king_ability_used_this_wave and fire.items.is_empty(),
+		"…and it fires on the next turn, burning the Item")
+	fire.queue_free()
+	await process_frame
+
+	# a profitable capture outranks an always-useful Ability (Tojo's Attrition)
+	var cap: Node2D = _boot({"wave": 50, "board": [
+		["king", 1, 3, 10, {"king_id": "hideki_tojo"}], ["rook", 1, 0, 10],
+		["pawn", 0, 0, 4], ["pawn", 0, 6, 1]]})
+	await process_frame
+	cap.autoplay = true
+	var clock0: float = cap.clock_ms
+	await cap._run_enemy_actions()
+	check(cap.board.get(Vector2i(0, 4), {}).get("owner", -1) == Rules.ENEMY
+			and not cap.king_ability_used_this_wave and cap.clock_ms == clock0,
+		"the rook takes the free pawn instead of the King spending the Action on Attrition")
+	await cap._run_enemy_actions()
+	check(cap.king_ability_used_this_wave and cap.clock_ms < clock0,
+		"with no capture left, Attrition fires on the following turn")
+	cap.queue_free()
+	await process_frame
+
+	# usefulness predicates read the board, not the King's mood
+	var parade: Node2D = _boot({"wave": 50, "board": [
+		["king", 1, 3, 10, {"king_id": "kim_jong_un"}], ["pawn", 0, 6, 1]]})
+	await process_frame
+	check(not Kings.ability_useful(parade), "The Parade needs a block of 2+ pieces, not a lone pawn")
+	parade.board[Vector2i(7, 1)] = {"id": "pawn", "owner": Rules.PLAYER}
+	check(Kings.ability_useful(parade), "…two adjacent pieces make it worth firing")
+	parade.queue_free()
 	await process_frame
 
 	print("---")

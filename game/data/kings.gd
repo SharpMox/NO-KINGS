@@ -344,11 +344,7 @@ static func apply_power(g, king_id: String) -> void:
 static func fire_ability(g) -> bool:
 	if g.king_ability_used_this_wave:
 		return false
-	var id := ""
-	for pos in g.board:
-		var piece: Dictionary = g.board[pos]
-		if piece.get("id", "") == "king" and piece.has("king_id"):
-			id = str(piece.king_id)
+	var id := _board_king_id(g)
 	if id == "":
 		return false
 	var kit := kit_of(id)
@@ -363,6 +359,84 @@ static func fire_ability(g) -> bool:
 	else:
 		_economy().activate_tariff_by_key(g, tariff)
 	return true
+
+
+## The King standing on the board, or "" (segment 1, or no King wave).
+static func _board_king_id(g) -> String:
+	for pos in g.board:
+		var piece: Dictionary = g.board[pos]
+		if piece.get("id", "") == "king" and piece.has("king_id"):
+			return str(piece.king_id)
+	return ""
+
+
+## Would firing the on-board King's Ability DO anything right now? The AI's
+## "is this Action worth spending" question (2026-09-06) — before this the
+## Ability fired the moment the King stood on the board, with nothing to hit
+## (Nero's Fire with no Items held, a Barrage on an empty column) and even
+## while in check. Reads the board only; fire_ability itself stays
+## unconditional, so the sandboxes' on-demand trigger is untouched. The
+## caller (game.gd _run_enemy_actions) puts check resolution and a profitable
+## capture ahead of it.
+static func ability_useful(g) -> bool:
+	if g.king_ability_used_this_wave:
+		return false
+	var kit := kit_of(_board_king_id(g))
+	if kit.is_empty():
+		return false
+	var mine: Array = g._player_pieces()
+	match str(kit.get("ability_key", "")):
+		"terracotta", "mobilise", "attrition":
+			return true # always bites: reinforcements, a lasting extra Action, the Clock
+		"crumble":
+			for pos in mine:
+				if _base_of(g, g.board[pos].id) != g.board[pos].id:
+					return true
+			return false
+		"whip":
+			for pos in mine:
+				if pos.y > 0:
+					return true
+			return false
+		"longmarch":
+			for pos in g.board:
+				if g.board[pos].owner == Rules.ENEMY and g.board[pos].get("id", "") != "king" and pos.y > 0:
+					return true
+			return false
+		"fire":
+			return not g.items.is_empty()
+		"strip":
+			for pos in mine:
+				if not BuffLogic.of(g.board[pos]).is_empty():
+					return true
+			return false
+		"pyramid", "turncoat", "strike":
+			return not mine.is_empty()
+		"barrage":
+			var by_col := {}
+			for pos in mine:
+				by_col[pos.x] = by_col.get(pos.x, 0) + 1
+				if by_col[pos.x] >= 2:
+					return true
+			return false
+		"order227":
+			for pos in mine:
+				if pos.y == 0:
+					return true
+			return false
+		"disinfo":
+			return mine.size() >= 2
+		"parade":
+			for pos in mine:
+				var n := 0
+				for other in mine:
+					if absi(other.x - pos.x) <= 1 and absi(other.y - pos.y) <= 1:
+						n += 1
+				if n >= 2:
+					return true
+			return false
+	# Tariff-backed (Trump's Diplomatic Visit destroys your best piece): needs one
+	return str(kit.get("ability_tariff", "")) != "" and not mine.is_empty()
 
 
 ## THE POWER HOOK (issue 92) — bespoke King Powers, dispatched through the same

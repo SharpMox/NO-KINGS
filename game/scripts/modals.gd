@@ -39,6 +39,8 @@ var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
+var _shop_dock: PanelContainer # the detail dock — refilled on a tile tap, so a
+	# tap no longer frees and rebuilds the whole ~80-node drawer (review pass 2)
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
@@ -469,16 +471,31 @@ func show_shop() -> void:
 	root.add_child(pieces_band)
 	root.add_child(lower)
 
-	var dock := PanelContainer.new()
-	dock.custom_minimum_size = Vector2(0, 92)
+	_shop_dock = PanelContainer.new()
+	_shop_dock.custom_minimum_size = Vector2(0, 92)
 	var dock_bg := StyleBoxFlat.new()
 	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
-	dock.add_theme_stylebox_override("panel", dock_bg)
+	_shop_dock.add_theme_stylebox_override("panel", dock_bg)
+	_fill_shop_dock()
+	root.add_child(_shop_dock)
+
+	g.hud.add_child(shop_panel)
+	shop_panel.move_to_front()
+
+
+## The dock's content for the current expanded tile (or the hint). Called
+## from show_shop and from every tile tap; the tiles themselves are untouched
+## by a tap, so nothing else needs rebuilding. free(), not queue_free(): the
+## tap comes from a TILE, never from a dock child, so nothing here is mid-signal,
+## and an immediately-freed dock can't be found by a same-frame probe.
+func _fill_shop_dock() -> void:
+	for c in _shop_dock.get_children():
+		c.free()
 	if shop_sell_mode and sell_expanded_index >= 0 \
 			and sell_expanded_index < _sell_entries(sell_expanded_kind).size():
-		dock.add_child(_sell_detail(sell_expanded_kind, sell_expanded_index))
+		_shop_dock.add_child(_sell_detail(sell_expanded_kind, sell_expanded_index))
 	elif not shop_sell_mode and shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
-		dock.add_child(_shop_detail(shop_expanded_index))
+		_shop_dock.add_child(_shop_detail(shop_expanded_index))
 	else:
 		var hint := Label.new()
 		hint.text = "Tap a tile for details"
@@ -487,11 +504,7 @@ func show_shop() -> void:
 		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		hint.modulate = Color(1, 1, 1, 0.5)
 		hint.add_theme_font_size_override("font_size", 13)
-		dock.add_child(hint)
-	root.add_child(dock)
-
-	g.hud.add_child(shop_panel)
-	shop_panel.move_to_front()
+		_shop_dock.add_child(hint)
 
 
 func _shop_zone_label(text: String) -> Label:
@@ -572,7 +585,7 @@ func _shop_tile(index: int) -> Button:
 	btn.add_child(price)
 	btn.pressed.connect(func() -> void:
 		shop_expanded_index = -1 if shop_expanded_index == index else index
-		show_shop())
+		_fill_shop_dock())
 	return btn
 
 
@@ -718,7 +731,7 @@ func _sell_tile(kind: String, index: int) -> Button:
 		else:
 			sell_expanded_kind = kind
 			sell_expanded_index = index
-		show_shop())
+		_fill_shop_dock())
 	return btn
 
 

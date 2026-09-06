@@ -1,5 +1,20 @@
 # PRD: GDD gap bridge
 
+> ## 🗄️ ARCHIVE — read, don't write (2026-09-06)
+>
+> **Live work moved to Linear**: workspace `no-kings`, team `NO`, ids `NO-<n>`.
+> **A slice lives in exactly one place** — Linear if it is open, here if it is closed.
+> Do not add a new `issues/NN-*.md`, and do not reopen one; file it in Linear instead.
+>
+> This directory keeps its full value as history: 106 slices, each with its `Status:`
+> line and an `## Outcome` recording what actually shipped, plus `FLAGS.md`,
+> `NOTION-QUESTIONS.md` and `MANUAL-STEPS.md`. Only the *live* items were migrated
+> (104, 105 and the findings open on 2026-09-06); the archive deliberately was not.
+>
+> The status line below is itself stale — it says 135/180 artefacts. The catalog closed
+> at **180/180** on 2026-08-30 (issue 56). Left as written, because an archive that gets
+> quietly edited stops being a record.
+
 Status: all 26 slices worked; 135/180 artefacts implemented
 
 > **Wrap-up 2026-08-28.** Every slice 01-26 has been worked and merged to `main`, which is

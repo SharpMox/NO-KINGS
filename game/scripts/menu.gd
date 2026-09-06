@@ -535,20 +535,30 @@ func _ready() -> void:
 	# issue 77: vertical only — a long scenario name must wrap or clip, never
 	# push the list sideways
 	test_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	test_scroll.offset_left = 60
-	test_scroll.offset_top = 30
-	test_scroll.offset_right = -60
-	test_scroll.offset_bottom = -30
+	# 2026-09-06 (user: "horrible to use, scrolls awkwardly, x overflows"). The
+	# list now runs nearly edge to edge; every row is a full-width button that
+	# CLIPS with an ellipsis instead of pushing past the right edge; rows drop
+	# their section's own prefix ("Artefact Common: " is the header already);
+	# ONE section is open at a time; opening one scrolls it to the top so the
+	# view never lands mid-list; and Back sits at the top, where it is
+	# reachable without scrolling past an open section.
+	test_scroll.offset_left = 12
+	test_scroll.offset_top = 24
+	test_scroll.offset_right = -12
+	test_scroll.offset_bottom = -24
 	test_scroll.visible = false
 	add_child(test_scroll)
 	var test_box := VBoxContainer.new()
 	test_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	test_box.add_theme_constant_override("separation", 6)
+	test_box.add_theme_constant_override("separation", 4)
 	test_scroll.add_child(test_box)
 	var head := Label.new()
-	head.text = "Test scenarios"
+	head.text = "Test scenarios — %d boards" % Scenarios.all().size()
 	head.add_theme_font_size_override("font_size", 22)
 	test_box.add_child(head)
+	_button(test_box, "← Back", 20, func() -> void:
+		test_scroll.visible = false
+		main_box.visible = true)
 	# issue 77: 53 scenarios in one flat column is unscannable. Sections are
 	# DERIVED from the names rather than stored, so scenarios.gd is untouched
 	# and anything added later groups itself by how it is named.
@@ -598,33 +608,69 @@ func _ready() -> void:
 	# whole catalog into nine headers on one screen, at the cost of one extra
 	# click to reach any entry. That trade is only worth it at this size, which
 	# is why 77 did not make it.
+	var sections: Array = [] # {rows, relabel} per section — the accordion
+	var row_style := StyleBoxFlat.new()
+	row_style.bg_color = Color(1, 1, 1, 0.06)
+	row_style.set_corner_radius_all(6)
+	row_style.content_margin_left = 10
+	row_style.content_margin_right = 10
+	var head_style := StyleBoxFlat.new()
+	head_style.bg_color = Color(0.22, 0.22, 0.28)
+	head_style.set_corner_radius_all(6)
+	head_style.content_margin_left = 10
+	head_style.content_margin_right = 10
 	for sec in ordered:
 		var rows: Array[Button] = []
 		var sec_head := Button.new()
-		sec_head.flat = true # a header that happens to be clickable, not a CTA
-		sec_head.add_theme_font_size_override("font_size", 11)
-		sec_head.modulate = Color(1, 1, 1, 0.55) # same dimmed-header idiom the
-			# inventory drawer's Activate section uses
+		sec_head.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		sec_head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sec_head.custom_minimum_size = Vector2(0, 44) # a thumb-sized row
+		sec_head.add_theme_font_size_override("font_size", 16)
+		sec_head.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
+		for style in ["normal", "hover", "pressed"]:
+			sec_head.add_theme_stylebox_override(style, head_style)
 		var relabel := func(open: bool) -> void:
 			sec_head.text = "%s  %s  (%d)" % ["▾" if open else "▸",
 				sec.to_upper(), groups[sec].size()]
 		relabel.call(false)
 		test_box.add_child(sec_head)
 		for s in groups[sec]:
-			var row := _button(test_box, s.name, 15, func() -> void:
+			var row := _button(test_box, _test_row_text(s.name, sec), 15, func() -> void:
 				GameScript.next_config = s.cfg
 				GameScript.is_scenario = true # scenarios never autosave
 				get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			row.clip_text = true # never wider than the list: ellipsis, not overflow
+			row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.custom_minimum_size = Vector2(0, 40)
+			row.tooltip_text = s.name
+			for style in ["normal", "hover", "pressed"]:
+				row.add_theme_stylebox_override(style, row_style)
 			row.visible = false
 			rows.append(row)
+		sections.append({"rows": rows, "relabel": relabel})
 		sec_head.pressed.connect(func() -> void:
 			var open := not rows[0].visible
-			for r in rows:
-				r.visible = open
-			relabel.call(open))
-	_button(test_box, "← Back", 20, func() -> void:
-		test_scroll.visible = false
-		main_box.visible = true)
+			for other in sections: # accordion: one section open at a time
+				for r in other.rows:
+					r.visible = false
+				other.relabel.call(false)
+			if open:
+				for r in rows:
+					r.visible = true
+				relabel.call(true)
+			# put the header at the top. Computed from the siblings above it
+			# (hidden rows count nothing) rather than read back after a frame:
+			# set_deferred lands after this frame's container sort, so the new
+			# content height is known and nothing else has moved the scroll.
+			var y := 0.0
+			for c in test_box.get_children():
+				if c == sec_head:
+					break
+				if c.visible:
+					y += c.size.y + 4.0
+			test_scroll.set_deferred("scroll_vertical", int(y)))
 
 	# army select: Play goes here; each army is a button + composition line.
 	# ScrollContainer, not CenterContainer (issue 68): 6 Armies' worth of
@@ -875,3 +921,15 @@ func _button(parent: Container, text: String, size: int, on_press: Callable) -> 
 	b.pressed.connect(on_press)
 	parent.add_child(b)
 	return b
+
+
+## A scenario row's text inside its section: the section prefix is the header
+## already, so "Artefact Common: Loch Ness Stool Sample" reads "Loch Ness Stool
+## Sample" under ARTEFACT COMMON. "Other" and "General" carry no shared prefix.
+func _test_row_text(name: String, sec: String) -> String:
+	if sec == "Other" or sec == "General" or not name.begins_with(sec):
+		return name
+	var rest := name.substr(sec.length()).strip_edges()
+	if rest.begins_with(":"):
+		rest = rest.substr(1).strip_edges()
+	return rest if rest != "" else name

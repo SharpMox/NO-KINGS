@@ -404,6 +404,51 @@ func _init() -> void:
 			% game.hud.army_ability_button.text)
 	check(kit.ability_name in game.hud.army_ability_button.text,
 		"and names the ability itself")
+
+	# ---- design C invariants (issue 106) ------------------------------------
+	# DECK ORDER. This broke silently once: bar.move_to_front(), left over from
+	# when the drawer opened OVER the button bar, made that bar the LAST child of
+	# the deck. The tree reported one order and the screen showed another, and it
+	# cost several rounds of screenshots to find. Order is load-bearing here —
+	# the whole design is "board, then status, then the thumb row lowest".
+	var deck: Node = game.hud.stock_strip.get_parent()
+	check(game.hud.stock_strip.get_index() == 0,
+		"deck order: the stock strip sits directly under the board")
+	check(game.hud.act_row.get_index() == deck.get_child_count() - 1,
+		"deck order: Ability and PASS are the LAST row, in the thumb arc")
+
+	# ONE ICON SIZE. Items were 30px, stock stacks 46, the strip 52 before this
+	# was pulled onto a single constant; nothing but a pin stops them drifting
+	# apart again, because each lives in a different rebuild function.
+	var odd_sizes: Array = []
+	for b in game.hud.stock_strip.find_children("*", "Button", true, false):
+		if (b as Button).custom_minimum_size.x != game.hud.ICON:
+			odd_sizes.append((b as Button).custom_minimum_size.x)
+	check(odd_sizes.is_empty(),
+		"every strip icon is exactly ICON (%d), found: %s" % [game.hud.ICON, str(odd_sizes)])
+
+	# THE ABILITY WEARS ITS STATE. Availability without opening a menu is the
+	# feature; "ready" was the only state ever exercised, and the other two are
+	# what a player actually hits mid-turn.
+	var was_used: bool = game.army_ability_used_this_wave
+	var was_actions: int = game.actions_left
+	game.army_ability_used_this_wave = true
+	game.hud.refresh()
+	check("next wave" in game.hud.army_ability_button.text
+			and game.hud.army_ability_button.disabled,
+		"spent: the Ability says when it returns, and refuses the press")
+	game.army_ability_used_this_wave = false
+	game.actions_left = 0
+	game.hud.refresh()
+	check("no Action" in game.hud.army_ability_button.text
+			and game.hud.army_ability_button.disabled,
+		"out of Actions: it says WHY, rather than greying out anonymously")
+	game.actions_left = was_actions
+	game.army_ability_used_this_wave = was_used
+	game.hud.refresh()
+	check("1 Action" in game.hud.army_ability_button.text
+			and not game.hud.army_ability_button.disabled,
+		"and it comes back ready once an Action exists again")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")

@@ -1,0 +1,31 @@
+result,reason,wave,score,turns,gold_left,tier,army,seed,shop_open,shop_buy,sell,convert,item_use,artefact_activate,army_ability,merge,deploy,buff_apply,capture,piece_lost
+WIN,FULL CLEAR — every King has fallen,150,1039150,4255,5606965,Tier 1,Crown,1,0,1151,0,16,230,0,136,978,825,15,738,675
+WIN,Wave-64 King checkmated,64,118700,1320,1040,Tier 1,Wild Hunt,1,0,136,0,127,46,0,58,49,253,130,230,205
+WIN,Wave-99 King checkmated,99,300560,2399,9306,Tier 1,Old Guard,1,0,372,0,326,89,0,92,171,605,124,458,489
+WIN,FULL CLEAR — every King has fallen,150,539150,2927,1092,Tier 1,Syndicate,1,0,475,0,335,58,0,56,150,830,1,712,705
+WIN,Wave-66 King checkmated,66,589500,1820,1030,Tier 1,Cult,1,0,630,0,28,189,0,66,126,377,74,232,318
+WIN,Wave-66 King checkmated,66,157110,1453,1000,Tier 1,Horde,1,0,208,0,110,54,0,62,123,397,1,273,337
+WIN,FULL CLEAR — every King has fallen,150,1039150,4255,5606965,Tier 2,Crown,1,0,1151,0,16,230,0,136,978,825,15,738,675
+WIN,Wave-64 King checkmated,64,118700,1320,1040,Tier 2,Wild Hunt,1,0,136,0,127,46,0,58,49,253,130,230,205
+WIN,Wave-99 King checkmated,99,300560,2399,9306,Tier 2,Old Guard,1,0,372,0,326,89,0,92,171,605,124,458,489
+WIN,FULL CLEAR — every King has fallen,150,539150,2927,1092,Tier 2,Syndicate,1,0,475,0,335,58,0,56,150,830,1,712,705
+WIN,Wave-66 King checkmated,66,589500,1820,1030,Tier 2,Cult,1,0,630,0,28,189,0,66,126,377,74,232,318
+WIN,Wave-66 King checkmated,66,157110,1453,1000,Tier 2,Horde,1,0,208,0,110,54,0,62,123,397,1,273,337
+WIN,FULL CLEAR — every King has fallen,150,370750,2867,950,Tier 3,Crown,1,0,447,0,161,118,0,127,425,699,8,614,555
+WIN,Wave-61 King checkmated,61,122200,1470,1000,Tier 3,Wild Hunt,1,0,142,0,153,35,0,60,42,284,211,245,227
+WIN,Wave-73 King checkmated,73,145940,1497,7283,Tier 3,Old Guard,1,0,178,0,232,50,0,71,81,384,89,300,300
+WIN,FULL CLEAR — every King has fallen,150,895850,3591,22965,Tier 3,Syndicate,1,0,758,0,290,108,0,142,459,1059,5,624,922
+WIN,Wave-90 King checkmated,90,559300,2138,1000,Tier 3,Cult,1,0,493,0,125,128,0,83,151,536,168,387,440
+WIN,Wave-51 King checkmated,51,103400,1095,1071,Tier 3,Horde,1,0,123,0,125,37,0,47,90,314,2,193,273
+WIN,FULL CLEAR — every King has fallen,150,491180,3527,1050,Tier 4,Crown,1,0,477,0,241,84,0,134,587,886,2,895,736
+LOSS,Back-row breach,27,18000,622,0,Tier 4,Wild Hunt,1,0,28,0,43,8,0,24,2,76,0,70,72
+WIN,Wave-95 King checkmated,95,205400,1979,10312,Tier 4,Old Guard,1,0,231,0,327,17,0,89,125,548,326,424,428
+LOSS,Back-row breach,18,4500,234,0,Tier 4,Syndicate,1,0,10,0,5,0,0,6,1,24,0,15,26
+LOSS,Resource starvation,51,157650,1360,0,Tier 4,Cult,1,0,172,0,104,82,0,47,90,265,52,185,245
+LOSS,Back-row breach,51,67600,1300,0,Tier 4,Horde,1,0,82,0,93,23,0,46,33,262,146,145,238
+LOSS,Back-row breach,10,2200,94,0,Tier 5,Crown,1,0,7,0,7,1,0,3,0,12,0,9,19
+LOSS,Resource starvation,12,1400,118,0,Tier 5,Wild Hunt,1,0,5,0,4,3,0,9,0,15,0,4,21
+LOSS,Resource starvation,13,4100,148,38,Tier 5,Old Guard,1,0,21,0,18,4,0,10,0,39,17,19,42
+LOSS,Resource starvation,7,1700,53,0,Tier 5,Syndicate,1,0,1,0,5,0,0,4,0,10,0,5,14
+LOSS,Back-row breach,18,10300,192,0,Tier 5,Cult,1,0,15,0,22,6,0,13,0,43,14,26,49
+LOSS,Resource starvation,9,1400,83,0,Tier 5,Horde,1,0,4,0,6,0,0,8,0,26,0,6,33

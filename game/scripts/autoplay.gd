@@ -40,6 +40,8 @@ static func step(g) -> void:
 		# they do not apply, and neither costs an Action (Shop purchases are
 		# free by issue 64; conversion is Gold-only), so this cannot starve the
 		# turn budget the way an extra board move would.
+		if try_sell(g): # before try_shop: sell to AFFORD, not as income
+			return
 		if try_shop(g):
 			return
 		if try_convert(g):
@@ -138,6 +140,16 @@ static func use_item(g) -> bool:
 ## grant, shop.gd), so buying one the bot never opens would burn Gold for
 ## nothing.
 const LOW_STOCK := 3 # below this, deployable material is the binding constraint
+
+## NO-15: below this the bot will liquidate a spare Captured piece. Low on
+## purpose — selling is meant to read as "short of Gold for something I want",
+## not as a routine income stream.
+const SELL_GOLD_FLOOR := 30
+
+## NO-15: how much Captured Stock counts as a SURPLUS worth liquidating. Held
+## above LOW_STOCK's reserve because Captured is conversion feedstock, not idle
+## inventory — see try_sell's own note for the sweep that established this.
+const SELL_CAPTURED_SURPLUS := 6
 
 
 static func try_shop(g) -> bool:
@@ -269,3 +281,49 @@ static func reinforce(g) -> void:
 		return int(g.defs[a].value) < int(g.defs[b].value))
 	for i in 4:
 		g.stock.append(ids[i % ids.size()])
+
+
+## NO-15: SELL. The bot could not sell AT ALL — `sell` fired in 0 of 60 runs,
+## and the cause was a missing capability, not a strategy choice: autoplay.gd
+## contained no sell path and the only occurrence of the word was prose. Every
+## balance number this project has produced therefore came from runs where held
+## goods could never be turned back into Gold — which is exactly the valve for
+## the resource starvation that dominates the death table.
+##
+## Deliberately conservative, and crude on purpose (the bot's numbers are a
+## floor, not a difficulty measurement — see docs/playtest-harness-audit.md):
+##
+##   * only when Gold is genuinely short, so a sale reads as "I need this to
+##     afford something", not as a routine income stream;
+##   * only from CAPTURED Stock, and only a spare. Captured pieces are the one
+##     safe thing to liquidate: they are not deployable without paying
+##     convert_price first, so selling one cannot cost board presence the way
+##     selling from Stock can;
+##   * Shop.can_sell's own starvation-softlock guard is the backstop, never the
+##     strategy — a bot that relied on it would be selling right up to the edge
+##     of a softlock every run and calling that a measurement.
+##
+## Sells through g._sell, the same entry point the Sell-mode panel calls, so
+## the tally and Insider Rates' payout bonus both apply exactly as they do for
+## a player. Costs no Action (issue 64), like the Shop and conversion beside it.
+static func try_sell(g) -> bool:
+	if g.gold >= SELL_GOLD_FLOOR:
+		return false
+	# MEASURED 2026-09-07, and it corrected the rule above. A first cut sold a
+	# spare Captured piece whenever Gold was short, on the reasoning that
+	# Captured Stock is not deployable and is therefore the safe thing to
+	# liquidate. Starvation deaths went 32% -> 90% in one sweep.
+	#
+	# The reasoning was wrong in a way only the sweep showed: `convert` fires in
+	# 100% of runs, so Captured Stock is not idle inventory — it IS the bot's
+	# deployable-material pipeline, one convert_price away from being Stock.
+	# Selling it competes with converting it, and the bot was liquidating its
+	# own supply line to buy things it then had no pieces to use.
+	#
+	# So: only with Stock already healthy, and only from a genuine surplus.
+	if g.stock.size() < LOW_STOCK or g.captured.size() < SELL_CAPTURED_SURPLUS:
+		return false
+	for entry in g.captured:
+		if Shop.can_sell(g, "captured", entry):
+			return g._sell("captured", entry)
+	return false

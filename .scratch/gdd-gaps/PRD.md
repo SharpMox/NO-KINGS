@@ -7,9 +7,16 @@
 > Do not add a new `issues/NN-*.md`, and do not reopen one; file it in Linear instead.
 >
 > This directory keeps its full value as history: 106 slices, each with its `Status:`
-> line and an `## Outcome` recording what actually shipped, plus `FLAGS.md`,
-> `NOTION-QUESTIONS.md` and `MANUAL-STEPS.md`. Only the *live* items were migrated
-> (104, 105 and the findings open on 2026-09-06); the archive deliberately was not.
+> line and an `## Outcome` recording what actually shipped, plus `NOTION-QUESTIONS.md`
+> and `MANUAL-STEPS.md`. Only the *live* items were migrated (104, 105 and the findings
+> open on 2026-09-06); the archive deliberately was not.
+>
+> **`FLAGS.md` was retired the same day** and split three ways, because it had become
+> three different things under one name: the actionable findings became Linear issues,
+> the doctrine and hard-won lessons moved into `CLAUDE.md` (which is loaded every session,
+> where a flags file is not), and the resolved entries were dropped — each already names
+> the slice that closed it, and git history keeps the rest. Older issue files below still
+> cite it; they are describing what was true when they were written.
 >
 > The status line below is itself stale — it says 135/180 artefacts. The catalog closed
 > at **180/180** on 2026-08-30 (issue 56). Left as written, because an archive that gets
@@ -134,9 +141,9 @@ list exactly which questions need answering.
 
 ## Open flags
 
-`FLAGS.md` holds the non-blocking findings that surfaced while working the slices — art
-gaps, unvalidated tuning, and the judgement calls made to ship that are cheap to reverse.
-They are not slices; they are decisions or small pieces of art away from closing.
+~~`FLAGS.md` holds the non-blocking findings that surfaced while working the slices.~~
+**Retired 2026-09-06.** Open findings live in Linear; the doctrine and the lessons live in
+`CLAUDE.md`. Nothing that was still true was lost — see the note at the top of this file.
 
 ## Out of scope
 

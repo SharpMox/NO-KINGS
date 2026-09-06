@@ -3,8 +3,9 @@
 # still the King's only token — the one piece on the monochrome-art fallback
 # path in game.gd's `mono_art`. Keep it until `king-light.png`/`king-dark.png`
 # land; at that point it generates nothing the game uses and can be deleted.
-# (Recorded because "mostly orphaned" sat in FLAGS.md as an open question about
-# whether to delete it — the answer is "not yet, and here is the trigger".)
+# (Recorded because "mostly orphaned" was once an open question about whether to
+# delete it — the answer is "not yet, and here is the trigger". The King art is
+# tracked in Linear as part of the art bundle.)
 #
 # Generates the 25 piece illustrations as SVG (Godot imports SVG natively via
 # ThorVG). Each piece = shared token frame (ivory disc + dark ring) + a

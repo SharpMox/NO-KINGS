@@ -55,6 +55,10 @@ func _init() -> void:
 		"skip_enemy_turns": 1, "tariffs_off": true,
 		"ecdysis_copy_key": "voynich-dictionary", # issue 55
 		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
+		"wave_start_lost_player": 3, # review pass 1: `clean` on wave clear compares
+			# lost_player against this; a resume that zeroed it denied every
+			# clean-wave Artefact for the wave in progress
+		"silk_road_active": true, # review pass 1: the coupon's -50% must survive a resume
 		"family_ability_used_this_wave": true, # issue 67 — note the SAVE KEY
 			# deliberately kept its old name in issue 76 while the in-memory
 			# symbol became army_*: renaming a persisted key is not additive and
@@ -91,6 +95,9 @@ func _init() -> void:
 		+ "run_capture_count/shop_lane_b_progress above, a field missing from the save is "
 		+ "absent from BOTH sides of the generic identity check and compares equal, so this "
 		+ "asserts the actual restored VALUE instead of trusting the identity check alone")
+	check(b.wave_start_lost_player == 3 and b.silk_road_active,
+		"review pass 1: the wave-in-progress snapshot (wave_start_lost_player) and Silk Road "
+		+ "Coupon's active discount survive a resume — same missing-from-both-sides trap as above")
 	check(b.shop_stock.size() == 2 and b.shop_stock[0].sold and not b.shop_stock[1].sold,
 		"shop slots and SOLD flags restored")
 	check(b.shop_stock[1].size == "big" and b.shop_stock[1].contents.size() == 1

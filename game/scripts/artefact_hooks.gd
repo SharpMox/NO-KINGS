@@ -1140,14 +1140,27 @@ const REGISTRY := {
 ## artefacts (g.artefacts) always before tariffs (g.tariffs_active, skipped
 ## entirely while g.tariffs_suppressed) — see the header for why a single
 ## merged sort would be wrong for the one hook (on_clock_refill) both groups use.
+## QUERY hooks answer a question ("what does this cost?", "is this merge
+## allowed?") and are dispatched from READ paths — Shop.price() on every tile
+## of every Shop redraw, the HUD's per-stack deploy/convert prices, autoplay's
+## can_buy scan. They are not events: the echo/meta layer (Bilderberg's "2+
+## Artefacts triggered", Mona Lisa's once-per-Turn echo, CERN, Déjà Vu…) and
+## the telemetry tally skip them. Before this, holding Bilderberg plus any two
+## on_price Artefacts paid +15 Gold per Shop tile per frame, and a Shop redraw
+## spent Mona Lisa's echo on a discount recompute (review pass 1, 2026-09-06).
+const QUERY_HOOKS := ["on_price", "on_sanction_check", "on_merge_check", "on_place_cost"]
+
+
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
+	var is_query: bool = QUERY_HOOKS.has(hook)
 	# issue 103: every hook event passes through here exactly once, so counting
 	# them here covers most of the leverage telemetry for one line — captures,
 	# deploys, merges, item uses, purchases and buff grants all become counters
 	# without touching their call sites. The four that are NOT hook events
 	# (opening the Shop, selling, converting Captured Stock, activating an
 	# Artefact or Army Ability) are tallied at their own sites instead.
-	g.tally("hook:" + hook)
+	if not is_query:
+		g.tally("hook:" + hook)
 	var held: Array = g.artefacts.duplicate()
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
 	var tariffs: Array = [] if g.tariffs_suppressed else g.tariffs_active.duplicate()
@@ -1199,7 +1212,8 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	# else and drifting from it. Kings are not in REGISTRY: only one Power is
 	# ever live, so there is nothing to key-sort for order independence.
 	Kings.power_hook(g, hook, ctx)
-	if g.artefact_echo_depth == 0: # re-entrancy guard, see header
+	if g.artefact_echo_depth == 0 and not is_query: # re-entrancy guard, see
+		# header; a query is a read, never an echo trigger (QUERY_HOOKS above)
 		g.artefact_echo_depth += 1
 		_run_meta_triggers(g, hook, ctx, fired, held)
 		g.artefact_echo_depth -= 1

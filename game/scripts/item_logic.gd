@@ -47,6 +47,8 @@ static func grant(g, item: Dictionary) -> bool:
 
 static func stage_targets(board: Dictionary, defs: Dictionary, key: String, a: Vector2i,
 		moved: Array[Vector2i] = [] as Array[Vector2i]) -> Array[Vector2i]:
+	if key == "rapid_deployment" and a.x >= 0: # stage B IS the Deploy tile set —
+		return Rules.placement_tiles(board)      # computed once, not per candidate tile
 	var out: Array[Vector2i] = []
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:

@@ -219,7 +219,12 @@ static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict 
 			if denied.has(to):
 				continue
 			if king.x >= 0 and (strict or pos == king):
-				var sim := board.duplicate(true)
+				# shallow: the sim only re-keys piece references, and is_attacked
+				# never mutates a piece. ponytail: the cost of this branch is the
+				# is_attacked move-gen itself (~5 ms for a 12-a-side board in
+				# check, measured 2026-09-06), not the copy — an attacker/pin
+				# pre-filter is the upgrade if King waves ever stutter
+				var sim := board.duplicate()
 				sim[to] = sim[pos]
 				sim.erase(pos)
 				var king_after := to if pos == king else king
@@ -407,7 +412,7 @@ static func _defend_king(board: Dictionary, moves: Array[Dictionary], king: Vect
 	var best := {}
 	var best_left := threats.size() + 1
 	for m in retreats:
-		var sim := board.duplicate(true)
+		var sim := board.duplicate() # shallow, same reasoning as legal_moves
 		sim[m.to] = sim[m.from]
 		sim.erase(m.from)
 		var left := _king_threats(sim, m.to, defs).size()

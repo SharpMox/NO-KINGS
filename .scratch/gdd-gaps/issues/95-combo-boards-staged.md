@@ -1,6 +1,8 @@
 # 95 — Combo boards that stage the interaction, and Item ↔ Item
 
-Status: (b) done (2026-09-02) — 14 staged boards. (a) still blocked, see below.
+Status: CLOSED (2026-09-06). (b) done 2026-09-02 — 14 staged boards. **(a) DROPPED by
+user ruling 2026-09-06** — not deferred, not blocked: dropped. See the closing note at
+the foot of this file.
 
 ## Parent
 
@@ -91,9 +93,20 @@ Shop-triggered boards sit at Wave 9, clear of 101's Wave-5 Shop lock.
 
 `run_all.sh` ALL GREEN, foreground, alone — `test_scenarios` boots and bot-plays all 365.
 
-## Part (a) — Item <-> Item — still blocked, and the blocker is real
+## Part (a) — Item <-> Item — DROPPED (user ruling 2026-09-06)
 
-Not built, and it should not be until the design question is answered: **nothing in the game
-dispatches TO an Item.** An Item's effect resolves immediately inside `_use_item`'s match, so
-"this Item listens for that one" is not a declaration that can be added — it needs a mechanism
-that does not exist. Writing a `listens` field today would describe nothing.
+**Not deferred. Dropped.** Do not reopen this, and do not carry it forward into the
+Linear backlog as a "someday" ticket — that is exactly what a dropped item stops being.
+
+The blocker was real and it is why this was the right call: **nothing in the game
+dispatches TO an Item.** An Item's effect resolves immediately inside `_use_item`'s
+match, so "this Item listens for that one" was never a declaration that could be added —
+it needed a hook-consumer mechanism that does not exist. `fires` was cheap because it
+describes what already happens; `listens` would have required building the thing it
+claims to describe.
+
+The value it would have added is also the part already covered: the 14 staged boards from
+(b) and the 34 generated ones from issue 94 demonstrate cross-effect interaction through
+Artefacts, which is where the dispatch layer actually lives.
+
+Part (b) shipped and stands. This file stays for its Outcome.

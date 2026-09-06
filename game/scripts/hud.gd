@@ -123,8 +123,8 @@ var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
 
-## Deck surface styling, one place. The colours are the prototype's tokens
-## (.scratch/ui-proto/index.html): pill, power badge, ability, PASS. Applying
+## Deck surface styling, one place. The colours are the design-C prototype's
+## tokens (issue 106): pill, power badge, ability, PASS. Applying
 ## them through a helper is what stops the four surfaces drifting into four
 ## slightly different greys the way the old bar did.
 static func _surface(bg: Color, border: Color, radius: int = 8, pad_x: int = 10,

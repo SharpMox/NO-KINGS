@@ -1,6 +1,23 @@
 # 01 — Rename money → Gold, trinket → Artefact
 
-Status: todo
+Status: done (verified 2026-09-06) — every acceptance criterion below was already
+met; the file had simply never been closed. Audited across `game/`, `data/`,
+`tools/` and the site: **zero** legacy identifiers, **zero** legacy save keys.
+`g.gold`, `g.artefacts`, `Items.ARTEFACT_EFFECTS` and `ArtefactHooks` are the
+live names; `TRINKET_EFFECTS` does not exist. The save keys are `"gold"` and
+`"artefacts"` in both directions — there was never a `"money"` or `"trinkets"`
+key to migrate.
+
+The 32 surviving occurrences of "trinket" and 45 of "money" are all
+non-load-bearing: prose in `CONTEXT.md` (a deliberate historical note), old PRD
+text under `.scratch/`, the `money-and-shop` **directory name** cited in ~20 code
+comments as design provenance, the Notion catalog key
+`money-printer-service-manual`, and the English phrase "money printer" in balance
+comments. None is a rename target.
+
+The one legacy-shaped save key that does survive is unrelated to this issue:
+`"family_ability_used_this_wave"` (issue 76), deliberately kept because renaming a
+persisted key is not additive.
 
 ## Parent
 

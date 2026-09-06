@@ -524,7 +524,7 @@ func _ready() -> void:
 			var t: Texture2D = load(mono)
 			textures[id] = {Rules.PLAYER: t, Rules.ENEMY: t}
 			mono_art[id] = true
-	for it in Items.ITEMS: # item glyphs (picked 2026-07-17, .scratch/item-icons)
+	for it in Items.ITEMS: # item glyphs (icon set picked 2026-07-17)
 		var path := "res://assets/items/%s.svg" % it.key
 		if ResourceLoader.exists(path):
 			item_icons[it.key] = load(path)

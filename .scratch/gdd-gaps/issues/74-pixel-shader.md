@@ -73,7 +73,7 @@ without it the blocks are smoothly interpolated and the effect looks like blur, 
 
 ### What it looks like
 
-Screenshots in `74-assets/`: `pixel-off.png`, `pixel-3x.png`, `pixel-5x.png`.
+(Screenshots deleted 2026-09-06 — the written findings below are the record.)
 
 At **3x** the pieces read well — the hand-drawn tokens take on a genuine pixel-art quality, and
 the board itself is unchanged (flat colours have nothing to quantise). **Text is where the
@@ -108,9 +108,8 @@ stylises. The filter shipped on menus at 3x, and was then rejected on sight.
 | Same at 2x | moderate effect, text legible | still a degraded letterform, not a designed one |
 | Same at 1x | crisp text, no distortion | **chosen** — see below |
 
-Screenshots for all of it in `74-assets/`: `pixel-off/3x/5x.png` (post-effect),
-`subviewport-true-3x.png` (SubViewport, AA on), `subviewport-noAA-3x.png`, `noAA-2x.png`,
-`noAA-1x.png`.
+(Screenshots for all of it were deleted 2026-09-06. The comparison table above is the
+record — it was always the part that carried the reasoning.)
 
 ### The diagnosis worth keeping
 
@@ -177,5 +176,7 @@ shared `_hardened()` helper. `test_settings.gd` gained two assertions that const
 Label and Button and check `get_theme_font("font")`. **Proven to catch the defect**: stubbing
 out the `theme.default_font` line makes both fail; with the fix they pass.
 
-Shipped result: `74-assets/shipped-crisp-menu.png` — this is the 1x look the user approved,
-now actually rendering.
+Shipped result: the 1x look the user approved, now actually rendering. (The screenshot that
+recorded it was deleted 2026-09-06 — the shipped build is the reference now, which is the
+better source anyway: a screenshot of an approved look goes stale the moment the UI moves,
+and the HUD was rebuilt by issue 106 two weeks later.)

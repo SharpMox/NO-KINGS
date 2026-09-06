@@ -35,21 +35,23 @@ Reviewed 2026-08-29.
 
 ## Tuning artifacts created by Score x10 (issue 57)
 
-- **The Wave-10 milestone bonus now EXACTLY equals the first Shop restock threshold.**
-  `MILESTONE_SCORE_BONUS` is 100, so x10 it pays **1000**; `Shop.threshold(0)` is
-  `SHOP_RESTOCK_BASE` = **1000**. They are equal to the point. So reaching Wave 10 banks the
-  first restock **by itself, regardless of how the run has gone** — before the slice a
-  100-point bonus was nowhere near the 1000 threshold, and the first restock had to be
-  earned by scoring.
+- ~~**The Wave-10 milestone bonus now EXACTLY equals the first Shop restock threshold.**~~
+  **RESOLVED, and this flag was describing dead code — struck 2026-09-06.** Both sides of the
+  coincidence are gone:
 
-  Verified by computing both sides, not inferred. The curve is
-  `threshold(n) = 1000(n+1) + 500·n(n+1)/2` -> 1000 / 2500 / 4500 / 7000, so only the first
-  threshold has this property; the milestone does not trivially cross later ones.
+  - The **threshold** side died with issue 64 (2026-08-30). `SHOP_RESTOCK_BASE`,
+    `SHOP_RESTOCK_STEP`, `Shop.threshold()` and `Shop.maybe_restock()` no longer exist; the
+    rising `1000 / 2500 / 4500 / 7000` curve was replaced outright by two lanes — Lane A
+    every 5 Waves (`SHOP_RESTOCK_WAVES`) and Lane B a flat 10,000-Score gauge
+    (`SHOP_LANE_B_SCORE`). This section survived that slice unedited and has been describing
+    a system that does not exist for a week.
+  - The **milestone** side dies with the 10-Wave reinforcement merge (2026-09-06):
+    `MILESTONE_SCORE_BONUS` is deleted, so the beat pays no Score at all.
 
-  Not a bug — the slice's whole purpose was to make thresholds reachable, and this is that
-  working. But an exact tie is a coincidence rather than a decision, and it puts the first
-  restock on rails. Adjusting either constant by any amount breaks the tie; worth a look in
-  the tuning pass.
+  Kept as a struck entry rather than deleted, because the lesson is the reusable part: an
+  exact tie between two independently-tuned constants is a coincidence, not a decision, and
+  this file did not notice when the constants underneath it were removed. **A flag that
+  outlives its code stops being a finding and becomes misinformation.**
 
 - **Rate coefficients were scaled as flat constants**, which is right but worth recording:
   Putin's Golden Toilet Brush (`5 * ctx.price` -> 50) and Rapture Insurance Policy
@@ -293,6 +295,20 @@ most of a day between them, and every one is the kind that comes back.
   make room, which softens it.
 
 ## Housekeeping
+
+- **`tools/verify-artefacts-gallery.js` DELETED 2026-09-06 — it could not run.** Its line 7 was
+  `require('/tmp/node_modules/playwright')`; that directory is now absent entirely, and
+  `CLAUDE.md` already recorded the install as broken (no `package.json`, so both `require` and
+  ESM import fail) and pointed at `agent-browser` instead. Nothing in the repo referenced the
+  script — not even `CLAUDE.md`. **A verifier that cannot execute is worse than none, because
+  its presence implies coverage that does not exist.** The checks it claimed are still
+  available: `CLAUDE.md`'s `agent-browser` recipe for the rendered page (zero console errors,
+  no horizontal overflow, light + dark), and the structural one-liner over `data/artefacts.js`
+  for malformed entries. If the browser check is wanted as a script again, write it against
+  `agent-browser`, which is on PATH and needs no project dependency.
+- **`game/tests/test_families.gd.uid` DELETED 2026-09-06** — orphaned since issue 76 renamed
+  `test_families.gd` to `test_armies.gd` and left the `.uid` behind. It was the repo's only
+  orphaned uid.
 
 - ~~**`tools/generate-piece-art.py` is mostly orphaned.**~~ Resolved 2026-08-31 by taking the
   second branch the flag itself offered: King art has **not** landed (only `king.svg` exists;

@@ -1042,16 +1042,23 @@ func _wait_while_backgrounded() -> void:
 
 func _run_enemy_actions() -> void:
 	var actions := Economy.enemy_actions(self)
-	# issue 91: the King Ability COSTS THE KING AN ACTION. Spending it here,
-	# out of the same budget the attacks come from, is what makes it a tradeoff
-	# the player can see and play around rather than a free extra effect. It
-	# fires only with an Action to spend, so an enemy turn zeroed by Y2K Patch
-	# Floppy Disk buys no Ability either.
-	if actions > 0 and Kings.fire_ability(self):
-		actions -= 1
 	for i in actions:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs, _enemy_denied_tiles())
+		# issue 91: the King Ability COSTS THE KING AN ACTION, out of the same
+		# budget the attacks come from — the tradeoff the player plays around.
+		# 2026-09-06: WHEN to spend it is an AI decision, not a turn-start
+		# reflex. Check resolution comes first (a King in check with one Action
+		# used to spend it on the Ability and never move), then a profitable
+		# capture, and only an Ability that would do something (Kings.
+		# ability_useful). A turn zeroed by Y2K Patch Floppy Disk never reaches
+		# this loop, so it still buys no Ability.
+		if Kings.ability_useful(self):
+			var king := Rules.find_king(board, Rules.ENEMY)
+			var in_check: bool = king.x >= 0 and Rules.is_attacked(board, king, Rules.PLAYER, defs)
+			var capturing: bool = not act.is_empty() and board.has(act.to)
+			if not in_check and not capturing and Kings.fire_ability(self):
+				continue # this Action went to the Ability; the next re-reads the board
 		if act.is_empty():
 			return
 		if not autoplay and animations_on:

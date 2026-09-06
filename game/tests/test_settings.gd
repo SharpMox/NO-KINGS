@@ -41,6 +41,18 @@ func _init() -> void:
 	check(reloaded2.difficulty == "hard",
 		"keys this module doesn't own still round-trip")
 
+	# CRT overlay (2026-09-06): the toggle drives the autoload, on by default.
+	# Autoloads join the root right AFTER this _init's first frame (a `-s`
+	# script's root is empty until then), so wait one, then read the real one.
+	await process_frame
+	var crt: Node = root.get_node_or_null("CrtOverlay")
+	check(crt != null, "the CRT overlay autoload is registered")
+	check(Settings.load_settings().get("crt_on", false) == true, "CRT defaults to on")
+	check(crt.enabled(), "the overlay boots on")
+	Settings.apply({"crt_on": false})
+	check(not crt.enabled(), "apply({crt_on: false}) hides the overlay")
+	Settings.apply({"crt_on": true})
+	check(crt.enabled(), "apply({crt_on: true}) shows it again")
 	Settings.apply({"sound_on": false})
 	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")),
 		"apply() mutes the Master bus when sound is off")
@@ -48,24 +60,22 @@ func _init() -> void:
 	check(not AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")),
 		"apply() unmutes the Master bus when sound is on")
 
-	# issue 74: hard-edged text. Assert what a LIVE CONTROL RESOLVES, never the
-	# property that was just written — the first version of this hardened
-	# ThemeDB.fallback_font only, which nothing reads while the default theme
-	# supplies a font of its own. It changed no pixels, and a property read-back
-	# would have called that a pass.
+	# issue 74's hard-edged text was removed 2026-09-06 (user: "remove the
+	# pixelated filter"): apply() must leave the fonts a live control resolves
+	# antialiased. Same assert-what-resolves shape as before, inverted.
 	Settings.apply({"sound_on": true})
 	var probe_label := Label.new()
 	root.add_child(probe_label)
 	var label_font := probe_label.get_theme_font("font")
 	check(label_font is FontFile and label_font.antialiasing
-			== TextServer.FONT_ANTIALIASING_NONE,
-		"a Label RESOLVES a font with antialiasing off")
+			!= TextServer.FONT_ANTIALIASING_NONE,
+		"a Label RESOLVES an antialiased font (no pixelated text)")
 	var probe_button := Button.new()
 	root.add_child(probe_button)
 	var button_font := probe_button.get_theme_font("font")
 	check(button_font is FontFile and button_font.antialiasing
-			== TextServer.FONT_ANTIALIASING_NONE,
-		"a Button RESOLVES a font with antialiasing off")
+			!= TextServer.FONT_ANTIALIASING_NONE,
+		"a Button RESOLVES an antialiased font (no pixelated text)")
 	probe_label.queue_free()
 	probe_button.queue_free()
 

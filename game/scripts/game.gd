@@ -483,12 +483,11 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	autoplay = args.has("--autoplay")
 	autoplay_exit = autoplay
-	# issue 74: no pixel filter here or anywhere. What shipped is hard-edged text
-	# (Settings._crisp_text, applied by the apply() above), which touches only
-	# glyph rasterisation — so the painted piece tokens are left exactly as
-	# drawn. That was the requirement any quantising filter kept failing: art
-	# has to dodge the effect, but a full-screen post-effect quantises
-	# everything composited below it, and the UI has to render above the board.
+	# issue 74: no pixel filter here or anywhere — a full-screen quantising
+	# post-effect would quantise everything composited below it, art included.
+	# The hard-edged text that shipped in its place was removed 2026-09-06 at
+	# the user's ask; the CRT overlay (scripts/crt_overlay.gd) is the one
+	# look-changer, and it only shades/warps the finished frame.
 	if args.has("--screenshot"):
 		screenshot_dir = args[args.find("--screenshot") + 1]
 		if not autoplay: # with --autoplay, the end screen is captured instead

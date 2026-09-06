@@ -18,10 +18,10 @@ const Settings := preload("res://scripts/settings.gd")
 const SHADER := """
 shader_type canvas_item;
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;
-uniform float curvature = 0.035;   // barrel: 0 = flat, 0.1 = a fishbowl
+uniform float curvature = 0.006;   // barrel: 0 = flat, 0.1 = a fishbowl (user: much milder)
 uniform float scanline = 0.28;     // how dark the gaps between lines get
 uniform float line_count = 400.0;  // lines down the screen (native height / 2)
-uniform float vignette = 0.32;     // corner darkening
+uniform float vignette = 0.10;     // corner darkening (user: much milder)
 uniform float fringe = 0.0012;     // red/blue split at the edges, in UV
 uniform float brightness = 1.06;   // lift, so the lines don't dim the picture
 

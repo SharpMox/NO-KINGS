@@ -30,12 +30,13 @@ static func save_settings(data: Dictionary) -> void:
 
 
 ## Mutes/unmutes the Master bus from a loaded settings Dictionary. Call once
-## at every boot (Menu and Game scenes) so a relaunch respects the choice.
-## Also applies the hard-edged text rendering (74) — not a user pref, it rides
-## here because this is already the "runs once at every boot, idempotent" hook.
+## at every boot (Menu and Game scenes) so a relaunch respects the choice, and
+## on every toggle. The hard-edged text of issue 74 (font antialiasing off,
+## project-wide) used to ride here too; removed 2026-09-06 at the user's ask
+## ("remove the pixelated filter") — text renders with Godot's default
+## antialiasing again, and the CRT overlay is the only look-changer left.
 static func apply(data: Dictionary) -> void:
 	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not data.get("sound_on", true))
-	_crisp_text()
 	_crt(data)
 
 
@@ -50,45 +51,6 @@ static func _crt(data: Dictionary) -> void:
 	var overlay: Node = (loop as SceneTree).root.get_node_or_null("CrtOverlay")
 	if overlay != null:
 		overlay.set_enabled(bool(data.get("crt_on", true)))
-
-
-## issue 74: turn OFF font antialiasing project-wide, so text renders as hard
-## pixels instead of soft grey edges and sits with the pixel-art tokens.
-##
-## This is what survived the pixel-filter spike. A full-screen pixelate shader
-## and a SubViewport downscale were both tried and both rejected by the user:
-## downscaling a vector font and upscaling it back reads as damage, not as
-## retro, and the smaller the render the worse the glyphs break (see
-## `.scratch/gdd-gaps/issues/74-assets/`). Antialiasing was the whole of the
-## blur; removing it is the entire effect, at native resolution, with no
-## shader, no viewport and no coordinate-space shift for the click probes.
-##
-## BOTH font slots have to be hardened, and this is the whole trap:
-## `ThemeDB.fallback_font` is only consulted when nothing else supplies a font,
-## and the DEFAULT THEME supplies one. Hardening the fallback alone therefore
-## sets a property nothing reads — the first version of this shipped exactly
-## that, changed no pixels, and every assertion about it still passed because
-## they read back the property that had just been written.
-##
-## `test_settings.gd` now asks a live Label and Button what they RESOLVE
-## (`get_theme_font("font")`) instead, which is the only form of this assertion
-## that can fail when the effect is absent.
-static func _crisp_text() -> void:
-	var theme := ThemeDB.get_default_theme()
-	theme.default_font = _hardened(theme.default_font)
-	ThemeDB.fallback_font = _hardened(ThemeDB.fallback_font)
-
-
-## A copy of `f` with antialiasing off — or `f` untouched when it is not a
-## FontFile or is already hard, so repeated boots do not re-duplicate.
-static func _hardened(f: Font) -> Font:
-	if not (f is FontFile) or f.antialiasing == TextServer.FONT_ANTIALIASING_NONE:
-		return f
-	var hard: FontFile = f.duplicate()
-	hard.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	hard.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-	hard.hinting = TextServer.HINTING_NONE
-	return hard
 
 
 ## Shared, full-rect, initially-hidden Settings panel built as a child of

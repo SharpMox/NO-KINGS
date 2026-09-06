@@ -415,7 +415,8 @@
 ## issue 21 (echo and meta-triggers, split out of 19 because it's one real
 ## system — a meta-layer over run() itself, not a scatter of one-offs) grew
 ## run()'s own contract: `fired` (built inline, not a new field on `g`) is
-## the subset of `held + tariffs` that actually dispatched this call — not
+## the subset of `held` (Artefacts only — never Tariffs, review pass 3
+## 2026-09-06) that actually dispatched this call — not
 ## just which keys are held, the distinction Bilderberg Hotel Slippers'
 ## effect text needs ("two or more of your Artefacts trigger", not "own").
 ## A dedicated pass, `_run_meta_triggers`, runs once after the normal
@@ -1202,10 +1203,15 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		# instead of falling back to the default (issue 28: a 5-Wave Milestone
 		# artefact echoed by Max Headroom Mask/Polybius Cartridge/etc. used to
 		# echo on the wrong beat for any copy not acquired on wave 1).
-	for t in held + tariffs:
+	for t in held:
 		if REGISTRY.get(t.key, []).has(hook):
 			_dispatch(g, t.key, hook, ctx, t.get("acquired_wave", 1))
 			fired.append(t)
+	for t in tariffs: # dispatched, but never in `fired`: a Tariff is not one of
+		# "your Artefacts" (review pass 3 — Bilderberg paid on Artefact+Tariff
+		# pairs and Mona Lisa echoed a live Inflation into a second -10%)
+		if REGISTRY.get(t.key, []).has(hook):
+			_dispatch(g, t.key, hook, ctx, t.get("acquired_wave", 1))
 	# issue 92: the active King's Power, through the SAME ctx contract and the
 	# same run() call as Artefacts and Tariffs — so a Power participates in the
 	# established ordering instead of being applied before or after everything

@@ -305,3 +305,28 @@ most of a day between them, and every one is the kind that comes back.
   `ARTEFACT_EFFECTS_CORE` (they pre-date the catalog and have no Notion equivalent), and
   everything else flows through the exporter. **`game/data/artefacts.json` is generated;
   never hand-edit it.**
+
+## Review passes 2026-09-06 (PRs #313, #314, #315) — what was NOT fixed
+
+- **Once-per-Wave activation flags are not persisted**, so quit-and-Continue re-arms them
+  mid-wave: `zapruder_used_this_wave`, `bovine_used_this_wave`, `jet_fuel_used_this_wave`,
+  `uap_used_this_wave`, `torpedo_used_this_wave`, `hoffa_used_this_wave`, `arks_bunkbed_used`,
+  `salvation_charged`, plus the run-long streaks `nibiru_wave_streak` / `club27_streak` /
+  `lottery_purchase_count`. game.gd's own comments call this an "accepted existing gap";
+  it is now also a save-scum path for six player-triggered Artefacts. Each is one additive
+  save field away from closed (`army_ability_used_this_wave` shows the shape). Decide whether
+  save-scumming is a problem before spending the fields.
+- **The check-resolution path costs ~5 ms** on a 12-a-side board with the enemy King in
+  check (`Rules.legal_moves(strict=true)`, measured headless). The cost is move generation
+  in `is_attacked`, not the board copy (a shallow copy changed nothing). Only reachable on
+  King waves and only when the King is actually attacked, so it is one frame at worst. If
+  King waves ever stutter, the upgrade is an attacker/pin pre-filter, not micro-optimising
+  `moves_for`.
+- **`hud.refresh()` rebuilds all four strips on every refresh** (~1.7 ms measured with a
+  10-piece Stock), including strips inside a hidden drawer. Gating them on drawer visibility
+  is blocked by suites that assert on `activate_box`/`item_box` child counts with the drawer
+  closed (`test_items_artefacts_4.gd`, `test_shop.gd`). Not worth the test churn at 1.7 ms.
+- **`Kings.power_hook` still runs on query hooks** (`on_price`, `on_place_cost`,
+  `on_merge_check`), which is correct — Qin Shi Huang's wall and Genghis Khan's no-merge are
+  legitimately modifiers — but it means a King Power is the one thing that can still add
+  state-dependent behaviour to a read path. Keep Powers pure on those three hooks.

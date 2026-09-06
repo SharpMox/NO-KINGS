@@ -298,6 +298,8 @@ var pool_drag_cap := false # the mid-drag stack is captured stock
 var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
 var merge_highlights := {} # ids that complete a merge with the current selection
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
+var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
+	# per-frame pulse never rebuilds the board's draw list (review pass 2)
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 var artefacts: Array = [] # run-long passive effects
@@ -502,6 +504,8 @@ func _ready() -> void:
 	if args.has("--seed"): # issue 75: reproduce a run exactly
 		next_seed = args[args.find("--seed") + 1]
 	_layout_board()
+	add_child(_pulse)
+	_pulse.draw.connect(_draw_pulse)
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
@@ -656,6 +660,7 @@ func _clear_selection() -> void:
 	legal_dests.clear()
 	legal_paths.clear()
 	queue_redraw()
+	_pulse.queue_redraw()
 
 
 func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
@@ -820,7 +825,7 @@ func _has_usable_item() -> bool:
 
 func _process(delta: float) -> void:
 	if (selected.x >= 0 or placing_id != "") and not autoplay:
-		queue_redraw() # the selection outline pulses every frame
+		_pulse.queue_redraw() # only the ring redraws every frame, not the board
 		hud.stock_armed.queue_redraw()
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
@@ -1036,7 +1041,9 @@ func _enemy_turn() -> void:
 ## flag-based seam as game_menu_open/win_open/shop_open() instead of a second
 ## pause mechanism.
 func _wait_while_backgrounded() -> void:
-	while backgrounded:
+	while backgrounded or game_menu_open: # review pass 2: "Paused" froze the
+		# clock and input but not this coroutine — enemy pieces kept resolving
+		# under the overlay
 		await get_tree().process_frame
 
 
@@ -2550,12 +2557,16 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 	var uncounted := _artefact_count("definitely-not-russia-patch") > 0 and dnr_patch_wave != wave
 	var ctx := ArtefactHooks.run(self, "on_piece_lost",
 		{"pos": pos, "id": board[pos].id, "reason": reason, "attacker_pos": attacker_pos,
-			"cancel": false, "destroy_attacker": false, "uncounted": uncounted})
+			"cancel": false, "destroy_attacker": false, "uncounted": uncounted,
+			"gold_bonus": 0.0}) # Total War's side-payment channel (Kings.power_hook)
 	if uncounted:
 		dnr_patch_wave = wave
 	if not ctx.cancel and not uncounted:
 		lost_player += 1
 		wave_lost_ids.append(board[pos].id)
+		if ctx.gold_bonus < 0.0: # review pass 2: applied exactly once, here —
+			# nothing consumed this channel before, so Total War was inert in play
+			Economy.spend_gold(self, -roundi(ctx.gold_bonus))
 		if BuffLogic.has(board[pos], "piece_bounty"): # Bounty (issue 48), ally
 			# half — queue it, see pending_bounty_boxes' own comment for why
 			# this can't open the choice pick here
@@ -3506,13 +3517,6 @@ func _draw() -> void:
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
 		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
-	if selected.x >= 0 and board.has(selected): # animated pulse on the selection
-		var t := Time.get_ticks_msec() / 1000.0
-		var pulse := 0.5 + 0.5 * sin(t * 5.0)
-		var pc := Color(COL_CAPTURE, 0.45 + 0.4 * pulse) if recon \
-				else Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse)
-		draw_arc(_tile_px(selected) + half, tile * (0.46 + 0.035 * pulse), 0, TAU, 40,
-			pc, 3.0 + 1.5 * pulse)
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
@@ -3552,6 +3556,21 @@ func _draw() -> void:
 		var arrow_cur := _tile_at(get_global_mouse_position())
 		if arrow_cur.x >= 0 and arrow_cur != arrow_from:
 			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW)
+
+
+## The animated ring around the selected piece — drawn by `_pulse`, a child
+## canvas item that is the only thing redrawn per frame while something is
+## selected (the board itself only redraws on state changes).
+func _draw_pulse() -> void:
+	if selected.x < 0 or not board.has(selected):
+		return
+	var recon: bool = board[selected].owner == Rules.ENEMY
+	var t := Time.get_ticks_msec() / 1000.0
+	var pulse := 0.5 + 0.5 * sin(t * 5.0)
+	var pc := Color(COL_CAPTURE, 0.45 + 0.4 * pulse) if recon \
+			else Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse)
+	_pulse.draw_arc(_tile_px(selected) + Vector2(tile, tile) / 2,
+		tile * (0.46 + 0.035 * pulse), 0, TAU, 40, pc, 3.0 + 1.5 * pulse)
 
 
 ## Token art for a piece; the player token unless a side is named.

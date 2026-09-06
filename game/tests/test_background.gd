@@ -74,6 +74,23 @@ func _init() -> void:
 	b.queue_free()
 	await process_frame
 
+	# --- review pass 2: the pause menu freezes the enemy turn too. "Paused"
+	# while enemy pieces kept resolving under the overlay was a lie: only the
+	# clock and input honoured game_menu_open, the coroutine did not.
+	var c := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 7]]})
+	await process_frame
+	c.hud.toggle_menu(true)
+	c._enemy_turn()
+	var before_c := JSON.stringify(c._to_config())
+	await create_timer(Tuning.ENEMY_TURN_PAUSE + 0.6).timeout
+	check(c.state == GameScript.State.ENEMY_TURN and JSON.stringify(c._to_config()) == before_c,
+		"review pass 2: no enemy action resolves while the pause menu is open")
+	c.hud.toggle_menu(false)
+	await create_timer(Tuning.ENEMY_TURN_PAUSE * 2 + 0.7).timeout
+	check(c.state == GameScript.State.PLAYER_TURN, "review pass 2: the enemy turn resumes after Resume")
+	c.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL BACKGROUND CHECKS OK")

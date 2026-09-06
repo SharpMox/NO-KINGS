@@ -152,7 +152,10 @@ static func spawn_pending(g) -> void:
 		var spot: Vector2i = open[g.rng.randi() % open.size()]
 		var entry: Dictionary = g.pending_spawn.pop_front()
 		if g.board.has(spot) and g.board[spot].owner == Rules.PLAYER:
-			g.lost_player += 1 # arrival captures a friendly blockading the row
+			# arrival captures a friendly blockading the row — through the loss
+			# choke point (review pass 2: a bare lost_player += 1 hid this loss
+			# from every on_piece_lost Artefact and from wave_lost_ids)
+			g._lose_player_piece(spot, "captured")
 		# an enemy displaced by a King arrival is simply absorbed: it is not a
 		# player capture, so it must not score, pay Gold or fire on_capture
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}

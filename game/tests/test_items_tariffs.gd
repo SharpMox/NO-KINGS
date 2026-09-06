@@ -348,6 +348,28 @@ func _init() -> void:
 	seti_tar.queue_free()
 	await process_frame
 
+	# --- review pass 3: the echo layer's `fired` counted TARIFFS as "your
+	# Artefacts". Bilderberg paid +15 on one Artefact + one Tariff firing
+	# together, and Mona Lisa's "first Artefact trigger each Turn" echoed a
+	# live Inflation into a second -10% (reachable in play via Trump's Power).
+	var bil := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4, "gold": 0,
+		"artefacts": ["bilderberg-hotel-slippers", "panama-papers-shredder"], "tariffs": ["inflation"]})
+	await process_frame
+	bil.gold = 0
+	Economy.gain(bil, 100)
+	check(bil.gold == 0,
+		"review pass 3: Bilderberg counts your Artefacts only — an Artefact + a Tariff firing together pays nothing")
+	bil.queue_free()
+	await process_frame
+
+	var mona := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4, "gold": 0,
+		"artefacts": ["100-genuine-original-mona-lisa"], "tariffs": ["inflation"]})
+	await process_frame
+	mona.mona_lisa_turn_done = false
+	check(Economy.gain(mona, 100) == 90,
+		"review pass 3: Mona Lisa never echoes a Tariff — Inflation applies once, not twice")
+	mona.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

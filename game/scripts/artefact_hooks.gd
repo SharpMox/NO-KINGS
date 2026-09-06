@@ -1403,7 +1403,8 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 
 ## "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, not the GLOBAL
 ## 10-wave beat (Tuning.MILESTONE_WAVES / on_clock_refill, wave_logic.gd's
-## clock refill + score chunk — untouched, a genuinely different cadence). Each held
+## Clock refill + reinforcement pick at the start of waves 11/21/31… —
+## untouched, a genuinely different cadence). Each held
 ## copy counts its own 5 waves from its own acquisition — ruled 2026-08-28,
 ## matching .scratch/shop-gdd-sync/PRD.md ("each Artefact counts its own 5
 ## waves from acquisition"). The acquisition wave itself counts as beat 1, so

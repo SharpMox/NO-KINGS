@@ -113,15 +113,23 @@ const TURN_END_CLOCK_BONUS_MS := 5 * 1000 # +5s for finishing a turn (2026-07-07
 # spawns → +N× these. Amounts are playtest assumptions on the ×10 economy.
 const EARLY_CLEAR_SCORE_PER_TURN := 10
 const EARLY_CLEAR_CLOCK_MS_PER_TURN := 2000
-const CLOCK_REFILL_MS := 30 * 1000      # every 10 waves; GDD example value
-const MILESTONE_WAVES := 10             # GDD Reward Economy
-const REINFORCE_WAVES := [10, 20, 30, 40]  # reinforcement shop opens when the
-                                        # next wave queues ("end of" these);
-                                        # prices = catalog piece values, the
-                                        # selection = the army's starter mix
-const MILESTONE_STOCK_DRIP := 2         # pieces from the army mix per milestone
-                                        # (balance 2026-07-06: starvation valve —
-                                        # income, not wave pressure, is what kills)
+## The 10-Wave beat (user ruling 2026-09-06): ONE event at the start of waves
+## 11/21/31…, forever — you clear 10 waves, the reinforcement pick greets you.
+## It carries the Clock refill and nothing else. The silent 2-piece Stock drip
+## and the Score chunk that used to fire a wave earlier are both gone: the pick
+## IS the reward, and a beat that pays three separate things a wave apart was
+## two mechanics wearing one name.
+##
+## Kept deliberately separate from KING_CLOCK_REFILL_MS even though they are
+## equal today — they are equal by coincidence, and aliasing them would make a
+## future King-refill tune silently move the reinforcement refill too.
+const CLOCK_REFILL_MS := 2 * 60 * 1000  # per beat (2026-09-06: was 30s)
+const MILESTONE_WAVES := 10             # the beat's period; fires at n where
+                                        # (n - 1) % MILESTONE_WAVES == 0.
+                                        # NOT the per-artefact "5-Wave
+                                        # Milestone" (artefact_hooks.gd's
+                                        # _milestone5_hit) — different cadence,
+                                        # counted per held copy, shares nothing.
 
 # x10 economy (2026-07-03): pawn = 10 points, queen = 90, amazon = 120
 const PLACEMENT_COST := 20         # placing mid-turn costs gold (GDD, amount TBD)
@@ -142,7 +150,6 @@ const PLACEMENT_COST := 20         # placing mid-turn costs gold (GDD, amount TB
 ##
 ## Composes with the `fuse_cost` Tariff charge; it does not replace it.
 const MERGE_COST := 15
-const MILESTONE_SCORE_BONUS := 100 # every 10 waves (GDD, amount TBD)
 const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
 const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)
 const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless

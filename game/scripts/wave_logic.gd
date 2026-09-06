@@ -46,8 +46,6 @@ static func queue(g, n: int) -> void:
 	g.king_extra_actions = 0 # Total Mobilisation (93) ends with its wave
 	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
-	if Tuning.REINFORCE_WAVES.has(n - 1): # that wave is done: shop at turn start
-		g.pending_reinforce = true
 	if n % Tuning.SHOP_RESTOCK_WAVES == 0: # issue 64 Lane A: guaranteed
 		Shop.lane_a_restock(g) # restock every 5 Waves, independent of Score
 		# issue 101: and the Shop opens ITSELF on a restock Wave (user ruling).
@@ -83,18 +81,26 @@ static func queue(g, n: int) -> void:
 			Economy.activate_tariff_by_key(g, "inflation") # T0, GDD: fires after wave 1
 		elif Tariffs.SCHEDULE.has(n):
 			Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
-	if n % Tuning.MILESTONE_WAVES == 0:
+	# The 10-Wave beat, now ONE event (user ruling 2026-09-06): the
+	# reinforcement pick and the Clock refill together, at the START of waves
+	# 11/21/31… A MODULO, not the old 4-entry REINFORCE_WAVES list, so it keeps
+	# firing through Endless — where the four King fights live and where
+	# nothing replenished anything before. `n > 1` because wave 1 satisfies the
+	# modulo but has cleared nothing.
+	#
+	# The refill lands HERE, at queue() time, not when the panel is dismissed.
+	# queue() -> _autosave() -> consume, so the Clock gain is already inside
+	# the turn-start snapshot, and apply() never replays queue() — one
+	# application, guaranteed by the grant not being gated on the flag that
+	# survives the save. Moving it to dismissal would key a grant to consuming
+	# a *persisted* flag, and the bot never emits reinforce_done_pressed at all
+	# (game.gd consumes it directly), so it would need writing twice.
+	if n > 1 and (n - 1) % Tuning.MILESTONE_WAVES == 0:
+		g.pending_reinforce = true # consumed at the next player-turn start
 		var ctx := ArtefactHooks.run(g, "on_clock_refill", {"refill": Tuning.CLOCK_REFILL_MS})
 		Economy.add_clock(g, ctx.refill, "milestone") # Recession (issue 13) halves
 			# ctx.refill via the same on_clock_refill hook, BEFORE this call — issue
 			# 35 routes the actual application through the Clock choke point
-		g.fx_at = Vector2(g.hud.wave_label.get_global_rect().get_center())
-		Economy.earn(g, Tuning.MILESTONE_SCORE_BONUS)
-		# reinforcement drip from the army's own mix (balance 2026-07-06:
-		# starvation was 100% of bot deaths — nothing replenished Stock)
-		var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
-		for i in Tuning.MILESTONE_STOCK_DRIP:
-			g.stock.append(mix[g.rng.randi() % mix.size()])
 	ArtefactHooks.run(g, "on_wave_spawn", {"wave": n})
 
 

@@ -159,7 +159,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.king_ability_used_this_wave = bool(cfg.get("king_ability_used_this_wave", false))
 	g.king_power_tariff = str(cfg.get("king_power_tariff", "")) # issue 91
 	g.king_power_id = str(cfg.get("king_power_id", "")) # issue 92
-	g.next_army = str(cfg.get("army", g.next_army)) # milestone drip draws from it
+	g.next_army = str(cfg.get("army", g.next_army)) # the reinforcement pick draws from it
 	# issue 76: the SAVE KEY stays "family_ability_used_this_wave" while the
 	# in-memory symbol became army_*. Renaming a persisted key is not additive
 	# and would need a migration; SAVE_VERSION 2's first entry was just spent

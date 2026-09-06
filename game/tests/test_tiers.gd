@@ -141,6 +141,36 @@ func _init() -> void:
 	check(c1.clock_ms < before_buff, "Tier 1: the Buff Box sub-pick never pauses the Clock")
 	c1.buff_pick_open = false
 
+	# --- a71f574 shipped Modals.pause_modal_open() with no tests at all. The
+	# three full-rect panels carry no *_open flag of their own — `visible` is
+	# their only state — so nothing pinned them. Assert BOTH directions: they
+	# pause at Tier 1 here, and at Tier 2+ below they do not, which is what
+	# keeps clock_never_pauses the only thing deciding it. Each case must
+	# close its panel: the issue-41 block below asserts the Clock KEEPS
+	# running, and a panel left visible turns that into a silent false fail. ---
+	c1._show_tariffs()
+	check(c1.tariff_panel != null and c1.tariff_panel.visible, "the tariff overlay opened")
+	var before_tar: float = c1.clock_ms
+	await create_timer(0.2).timeout
+	check(c1.clock_ms == before_tar, "Tier 1: the tariff overlay pauses the Clock")
+	c1.tariff_panel.visible = false
+	# ids only feed the confirm's label — this exercises the panel, not merge rules
+	c1.modals.show_merge_confirm("pawn", "pawn", "knight")
+	var before_merge: float = c1.clock_ms
+	await create_timer(0.2).timeout
+	check(c1.clock_ms == before_merge, "Tier 1: the merge confirm pauses the Clock")
+	c1.modals.merge_panel.visible = false
+	c1.modals.show_reinforce()
+	var before_reinf: float = c1.clock_ms
+	await create_timer(0.2).timeout
+	check(c1.clock_ms == before_reinf,
+		"Tier 1: the reinforcement pick pauses the Clock (the third instance of the same gap)")
+	c1.modals.reinforce_panel.visible = false
+	var before_none: float = c1.clock_ms
+	await create_timer(0.2).timeout
+	check(c1.clock_ms < before_none,
+		"...and the Clock runs again once they close — the pause was the panel, not a stuck flag")
+
 	# --- issue 41: the generic choice-modal seam, exercised directly — not
 	# through the Buff Box — proves it generalises: opening it blocks input
 	# on the shared flag (same guard sites), the Clock keeps ticking (Tier
@@ -191,6 +221,23 @@ func _init() -> void:
 	check(c2.clock_ms == before_bg, "Tier 2+: OS-backgrounding still pauses the Clock")
 	c2.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
 	c2.preview_open = false
+	# the same three panels, at Tier 2+: the lever must still bite through them
+	c2._show_tariffs()
+	var t2_tar: float = c2.clock_ms
+	await create_timer(0.2).timeout
+	check(c2.clock_ms < t2_tar, "Tier 2+: the tariff overlay no longer pauses the Clock")
+	c2.tariff_panel.visible = false
+	c2.modals.show_merge_confirm("pawn", "pawn", "knight")
+	var t2_merge: float = c2.clock_ms
+	await create_timer(0.2).timeout
+	check(c2.clock_ms < t2_merge, "Tier 2+: the merge confirm no longer pauses the Clock")
+	c2.modals.merge_panel.visible = false
+	c2.modals.show_reinforce()
+	var t2_reinf: float = c2.clock_ms
+	await create_timer(0.2).timeout
+	check(c2.clock_ms < t2_reinf,
+		"Tier 2+: the reinforcement pick no longer pauses it either — the lever still bites")
+	c2.modals.reinforce_panel.visible = false
 	c2.buff_pick_open = true # issue 41: the choice-pick seam, higher tier too
 	var before_c2_choice: float = c2.clock_ms
 	await create_timer(0.2).timeout

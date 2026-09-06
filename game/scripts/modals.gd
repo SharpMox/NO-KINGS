@@ -130,13 +130,17 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 
 
 ## Tier-1 pause parity (user ruling 2026-09-04: the gap was an oversight, not
-## a lever). Reading the tariff list or a merge confirm pauses the clock at
-## Tier 1 exactly like the menu, Shop, drawers and preview already do. Box
-## Pick stays deliberately excluded — GDD: "decisive picks rewarded,
-## indecision punished" — that one IS a difficulty lever.
+## a lever). Reading the tariff list, a merge confirm or the reinforcement pick
+## pauses the clock at Tier 1 exactly like the menu, Shop, drawers and preview
+## already do. The reinforcement pick was the third instance of the same
+## oversight — a full-rect panel whose only state is `visible`, so nothing
+## mirrored it into a `*_open` flag the way preview_open/box_open do. Box Pick
+## stays deliberately excluded — GDD: "decisive picks rewarded, indecision
+## punished" — that one IS a difficulty lever.
 func pause_modal_open() -> bool:
 	return (is_instance_valid(tariff_panel) and tariff_panel.visible) \
-		or (is_instance_valid(merge_panel) and merge_panel.visible)
+		or (is_instance_valid(merge_panel) and merge_panel.visible) \
+		or (is_instance_valid(reinforce_panel) and reinforce_panel.visible)
 
 
 ## Width-capped, wrapping, centered label — end/win screens must never

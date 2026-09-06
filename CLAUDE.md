@@ -129,8 +129,7 @@ scaffolding, and a 22-suite test harness.
 ### Where the work lives
 
 - **The backlog is `.scratch/gdd-gaps/`** — `PRD.md` (the map), `issues/NN-*.md` (one slice
-  each, with a `Status:` line and an `## Outcome` when done), `FLAGS.md` (non-blocking
-  findings and open design questions, so they don't rot in PR descriptions), and
+  each, with a `Status:` line and an `## Outcome` when done) and
   `NOTION-QUESTIONS.md` (the open GDD questions, each blocking at least one Artefact —
   **read it before implementing any Artefact**, so an already-known ambiguity isn't
   rediscovered or, worse, guessed at).
@@ -239,6 +238,71 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
+
+### Tests that pass for the wrong reason
+
+Four of these cost most of a day during the HUD redesign, and every one is the kind that
+comes back. Migrated from `FLAGS.md` when that file was retired (2026-09-06).
+
+- **A probe can pass because its click was CONSUMED.** A probe proved the choice modal
+  blocked board input by clicking tile (2,2). The board moved, that coordinate landed under
+  the modal's own buttons, so the click PICKED an option — and the assertion still passed,
+  because a consumed click leaves `selected` untouched either way. Click over the backdrop,
+  and additionally assert the modal survived.
+- **Hardcoded tile coordinates in drag tests are geometry assertions in disguise.** The
+  "drop inside the open drawer places nothing" guard silently stopped testing anything when
+  drawers moved. FIND a tile the drawer actually covers.
+- **`test_menu_clicks` leaves a Game instance in the tree while testing the Menu**, so the
+  game's HUD draws over the menu. Harmless until the deck grew tall enough to cover the
+  menu's Back button. Free the stray Game.
+- **A failure you can explain is not a failure you have diagnosed.** A suite SIGTERM was
+  read as window-focus contention — which was real, and self-inflicted — while a genuine
+  infinite loop sat underneath it.
+- **Assert the observable consequence, never the flag that was just written.** A crisp-text
+  change shipped as a complete no-op because it set a property nothing reads, and a
+  property read-back would have "passed".
+
+### Layout traps the device taught
+
+- **A control that measures itself before layout will cache nonsense.** The stock strip
+  sized rows from its own width, which arrives a frame or two after build; at 13px wide it
+  concluded one tile fitted and cached that forever — "Stock 21" with no pieces, on the
+  phone only. Wait for a sane width, retry bounded, and **never bind a rebuild to
+  `resized`** — that is a feedback loop when the rebuild changes its own children.
+- **Centring content in a span splits empty space into two gaps.** Flush to one edge puts
+  all the slack in one place where something can absorb it.
+
+### Standing rulings — read before triaging a "bug"
+
+- **Big interactions stay. At worst cap them, never remove them** (user, 2026-08-30). When
+  something looks exploitable the question is **"what bounds it?"**, not "how do we close
+  it?" — and if the answer is "nothing", the fix is a **cap**, not a deletion. Corollary:
+  never propose removing an Artefact because it combos well. Propose the bound.
+- **Rate coefficients are flat constants, not percentages.** Any effect converting Gold to
+  Score by a coefficient does not scale with an economy-wide multiplier and must be scaled
+  explicitly.
+
+Judgement calls made to ship, each cheap to reverse and none specced:
+
+- **Range is consumed by the capture, not by any move**, so repositioning does not waste it.
+- **Multicapture picks its extra victim automatically** (most valuable eligible neighbour),
+  so the trigger needs no second targeting step.
+- **Yalta Cocktail Napkin held twice, both acquired the same Wave**: the first copy wins the
+  modal and the second forfeits, rather than queueing a second one.
+- **New World Order Gerrymandering is a post-pass in `run()`, not a REGISTRY handler.** It
+  multiplies what the other handlers added, so it is only correct once every other handler
+  and the echo layer have run. A deliberate, called-out exception to the ORDERING rule —
+  **it must stay last in `run()`.**
+- **Buff Box resolves on use, not on acquisition**, like every other item.
+
+Accepted and deliberately not fixed: the check-resolution path costs ~5 ms on a King wave
+with the King actually in check (one frame at worst; if King waves ever stutter the upgrade
+is an attacker pre-filter, not micro-optimising move generation). `hud.refresh()` rebuilds
+all four strips every refresh (~1.7 ms), and gating them on drawer visibility is blocked by
+suites asserting child counts with the drawer closed. **`Kings.power_hook` runs on query
+hooks** (`on_price`, `on_place_cost`, `on_merge_check`) — correct, since a King Power is
+legitimately a modifier there, but it means a Power is the one thing that can add
+state-dependent behaviour to a read path. Keep Powers pure on those three.
 
 ### Piece art
 

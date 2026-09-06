@@ -364,6 +364,15 @@ func _init() -> void:
 	await process_frame
 
 
+	# --- review pass 1: Rapid Deployment's stage B is exactly the Deploy tile
+	# set (guard for computing it once instead of once per candidate tile)
+	var rd_board := {Vector2i(2, 1): {"id": "pawn", "owner": Rules.PLAYER},
+		Vector2i(5, 9): {"id": "rook", "owner": Rules.ENEMY}}
+	var rd_defs := Rules.load_pieces()
+	check(ItemLogic.stage_targets(rd_board, rd_defs, "rapid_deployment", Vector2i(2, 1))
+			== Rules.placement_tiles(rd_board),
+		"Rapid Deployment stage B is exactly the Deploy tile set")
+
 	print("---")
 	if fails == 0:
 		print("ALL ITEM CHECKS OK")

@@ -16,8 +16,6 @@ const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
-const INV_H_BASE := DRAWER_H * 2 + 70.0 # pre-issue-52 height: items + artefacts
-	# only — unreachable since issue 67, kept so nothing breaks reading it
 const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0 # +1 row while the Activate
 	# strip is up, +48 more for issue 100's Army Power line (two wrapped rows
 	# at 13px on a 480-wide portrait screen)

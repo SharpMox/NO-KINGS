@@ -133,7 +133,8 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 ## Pick stays deliberately excluded — GDD: "decisive picks rewarded,
 ## indecision punished" — that one IS a difficulty lever.
 func pause_modal_open() -> bool:
-	return (is_instance_valid(tariff_panel) and tariff_panel.visible) 		or (is_instance_valid(merge_panel) and merge_panel.visible)
+	return (is_instance_valid(tariff_panel) and tariff_panel.visible) \
+		or (is_instance_valid(merge_panel) and merge_panel.visible)
 
 
 ## Width-capped, wrapping, centered label — end/win screens must never

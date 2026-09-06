@@ -259,6 +259,21 @@ func _init() -> void:
 	check(mismatches == 0,
 		"move_paths flattens to moves_for for all %d pieces (%d mismatches)" % [defs.size(), mismatches])
 
+	# --- review pass 1: strict legality simulates moves on a copy of the board
+	# and must never touch the caller's board or its piece state (the copy is
+	# shallow now — piece Dictionaries are shared, so this is the guard).
+	var chk := {Vector2i(0, 11): piece("king", Rules.ENEMY),
+		Vector2i(1, 10): piece("pawn", Rules.ENEMY), Vector2i(0, 3): piece("rook", Rules.PLAYER)}
+	chk[Vector2i(1, 10)].buffs = [{"key": "shield"}]
+	var chk_before := chk.duplicate(true)
+	var strict := Rules.legal_moves(chk, Rules.ENEMY, defs, true)
+	check(chk == chk_before and not strict.is_empty(),
+		"strict legal_moves leaves the board and its piece state untouched")
+	var t0 := Time.get_ticks_usec()
+	for i in 20:
+		Rules.legal_moves(chk, Rules.ENEMY, defs, true)
+	print("perf: strict legal_moves x20 = %.1f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
+
 	print("---")
 	if fails == 0:
 		print("ALL TESTS PASSED")

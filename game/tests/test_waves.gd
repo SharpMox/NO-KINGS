@@ -96,22 +96,54 @@ func _init() -> void:
 	g.queue_free()
 	await process_frame
 
-	# --- reinforcement shop: queues after waves 10/20/30/40, bot buys in ---
+	# --- The 10-Wave beat (user ruling 2026-09-06): ONE event at the start of
+	# waves 11/21/31…, forever. The pick AND the Clock refill; no silent Stock
+	# drip and no Score chunk — those used to fire a wave earlier, so the beat
+	# was two mechanics wearing one name. Asserting the absences matters as
+	# much as the presences: a drip left in place would still leave the suite
+	# green if only "the bot restocked" were checked. ---
 	var r: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 10, "score": 300})
+		"wave": 10, "score": 300, "clock_s": 100.0})
 	await process_frame
 	await process_frame
-	r._queue_wave(11)
-	check(r.pending_reinforce, "clearing wave 10 pends the reinforcement shop")
-	r.autoplay = true # bot path: the panel is free, grab the cheapest offers
+	var clock_beat: float = r.clock_ms
 	var stock0: int = r.stock.size()
 	var score0: int = r.score
+	r._queue_wave(11)
+	check(r.pending_reinforce, "clearing wave 10 pends the reinforcement pick")
+	check(r.clock_ms == clock_beat + Tuning.CLOCK_REFILL_MS,
+		"...and the SAME event refills the Clock by 2 minutes")
+	check(r.stock.size() == stock0,
+		"...with no silent Stock drip: the pick is the only piece grant left")
+	check(r.score == score0,
+		"...and no Score chunk: the beat pays Clock and the pick, nothing else")
+	r.autoplay = true # bot path: the panel is free, grab the cheapest offers
 	r._begin_player_turn()
-	check(not r.pending_reinforce, "the bot consumes the pending shop")
+	check(not r.pending_reinforce, "the bot consumes the pending pick")
 	check(r.stock.size() == stock0 + 4 and r.score == score0,
 		"the bot restocked for free (stock +%d)" % (r.stock.size() - stock0))
+
+	# a non-beat wave grants neither half of the merged event
+	r.pending_reinforce = false
+	var clock12: float = r.clock_ms
 	r._queue_wave(12)
-	check(not r.pending_reinforce, "non-milestone waves pend no shop")
+	check(not r.pending_reinforce and r.clock_ms == clock12,
+		"a non-beat wave pends no pick and refills no Clock")
+
+	# `n > 1`: wave 1 satisfies the modulo but has cleared nothing
+	r._queue_wave(1)
+	check(not r.pending_reinforce, "wave 1 fires nothing — nothing has been cleared yet")
+
+	# the modulo, not the old 4-entry REINFORCE_WAVES list: it runs in Endless
+	var clock50: float = r.clock_ms
+	r._queue_wave(51)
+	check(r.pending_reinforce and r.clock_ms == clock50 + Tuning.CLOCK_REFILL_MS,
+		"wave 51 fires the same beat — past the end of the old REINFORCE_WAVES list")
+	r.pending_reinforce = false
+	var clock140: float = r.clock_ms
+	r._queue_wave(141)
+	check(r.pending_reinforce and r.clock_ms == clock140 + Tuning.CLOCK_REFILL_MS,
+		"and wave 141 too — every 10th wave, forever, deep in Endless")
 	r.queue_free()
 	await process_frame
 

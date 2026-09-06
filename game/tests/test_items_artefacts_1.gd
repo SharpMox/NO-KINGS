@@ -455,12 +455,12 @@ func _init() -> void:
 	# 10-wave beat) when the rest of this "5-Wave Milestone" batch moved to
 	# the per-artefact on_wave_clear + _milestone5_hit cadence — paid at half
 	# the intended rate. Acquired wave 2: fires clearing wave 6 (2+4, beat 1)
-	# and wave 11 (2+9, beat 2). Waves 8-10 are jumped directly (g.wave set,
+	# and wave 11 (2+9, beat 2). Waves 8-11 are jumped directly (g.wave set,
 	# not queued one by one) so the test never calls WaveLogic.queue with the
-	# GLOBAL milestone wave (10) itself — that fires its OWN clock refill +
-	# score/gold bonus (wave_logic.gd's `n % MILESTONE_WAVES == 0` block),
-	# unrelated to this artefact and just noise for this assertion; the
-	# separate control test below isolates that wave on purpose instead.
+	# GLOBAL beat wave (11 — `(n - 1) % MILESTONE_WAVES == 0`) itself, which
+	# fires its OWN Clock refill, unrelated to this artefact and pure noise for
+	# an assertion whose payout is int(clock_ms / 5000); the separate control
+	# test below isolates that wave on purpose instead.
 	var cw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 2, "artefacts": ["john-titor-s-crypto-wallet"], "gold": 0})
 	await process_frame
@@ -481,26 +481,26 @@ func _init() -> void:
 	# behaviour change. Its two listeners were the "timer" artefact and the
 	# Recession tariff; issue 69 removed "timer" (no catalog artefact has
 	# taken its place on this hook), so only the tariff remains to prove the
-	# hook still fires on the GLOBAL 10-Wave clock refill (Tuning.
-	# MILESTONE_WAVES), unrelated to the PER-ARTEFACT "5-Wave Milestone"
+	# hook still fires on the GLOBAL 10-Wave beat (Tuning.MILESTONE_WAVES —
+	# the start of wave 11), unrelated to the PER-ARTEFACT "5-Wave Milestone"
 	# cadence covered above (Crop Circle Plank/John Titor). The
 	# artefact-computed-first/tariff-halves-on-top ordering this block used to
 	# also prove is moot with no artefact left on the hook — the ordering
 	# guarantee itself is unchanged (see this file's own header note above),
 	# just currently unexercised by anything other than the tariff.
 	var refill := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 9, "clock_s": 0})
+		"wave": 10, "clock_s": 0})
 	await process_frame
-	WaveLogic.queue(refill, 10) # starting wave 10: the GLOBAL milestone fires
+	WaveLogic.queue(refill, 11) # starting wave 11: the GLOBAL beat fires
 	check(refill.clock_ms == Tuning.CLOCK_REFILL_MS,
 		"the renamed on_clock_refill hook still fires: base refill, no artefact left on the hook")
 	refill.queue_free()
 	await process_frame
 
 	var refill_recession := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 9, "clock_s": 0, "tariffs": ["recession"]})
+		"wave": 10, "clock_s": 0, "tariffs": ["recession"]})
 	await process_frame
-	WaveLogic.queue(refill_recession, 10)
+	WaveLogic.queue(refill_recession, 11)
 	check(refill_recession.clock_ms == Tuning.CLOCK_REFILL_MS * 0.5,
 		"the renamed on_clock_refill hook still fires Recession: halves the base refill")
 	refill_recession.queue_free()

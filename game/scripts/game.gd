@@ -696,8 +696,9 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 		placing_id = ""
 		placing_cap = false
 	else:
-		if cap and (state != State.PLAYER_TURN or actions_left <= 0):
-			return # captured only merges, and a merge needs a turn action
+		if cap and state != State.PLAYER_TURN:
+			return # captured arms to merge or convert; a merge's own Action
+				# gate is MergeLogic's, and converting costs none (issue 64)
 		if not cap and Economy.sanctioned(self, id):
 			return
 		if not cap and not (state == State.SETUP or actions_left > 0):
@@ -3612,6 +3613,11 @@ func _connect_hud() -> void:
 	hud.army_ability_pressed.connect(_activate_army_ability)
 	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
 		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
+	hud.convert_pressed.connect(func(entry: Variant) -> void:
+		if _convert_captured(entry): # same rules as the Shop's Convert button
+			placing_id = ""
+			placing_cap = false
+			_refresh())
 	hud.return_to_stock_pressed.connect(func() -> void:
 		if selected.x >= 0 and board.has(selected):
 			_setup_to_stock(selected))

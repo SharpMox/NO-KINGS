@@ -34,6 +34,7 @@ signal item_pressed(index: int)
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal promote_pressed(id: String, cap: bool)
+signal convert_pressed(entry: Variant) # the ⇄ badge on an armed Captured stack (2026-09-06)
 signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
@@ -597,7 +598,7 @@ func _add_captured_header() -> void:
 	sep.custom_minimum_size = Vector2(10, 0)
 	pool_box.add_child(sep)
 	var lbl := Label.new()
-	lbl.text = "CAPTURED\nno deploy"
+	lbl.text = "CAPTURED\nno deploy\ntap: convert" # the badge appears on the armed stack
 	lbl.add_theme_font_size_override("font_size", 10)
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8))
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -849,9 +850,16 @@ func _rebuild_pool_strip() -> void:
 		else:
 			btn.text = g.defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)
-		var show_promote: bool = g.placing_id == id and g.placing_cap == cap \
+		var armed: bool = g.placing_id == id and g.placing_cap == cap and g.armed_entry == st.entry
+		var show_promote: bool = armed \
 				and st.count >= 2 and MergeLogic.pair_ok(g, id, id) \
 				and g.state == g.State.PLAYER_TURN and g.actions_left > 0
+		# 2026-09-06: Captured -> Stock conversion on the stack itself. It lived
+		# only in the Shop's Sell mode — four taps deep, and unreachable before
+		# SHOP_UNLOCK_WAVE since issue 101 locks the panel — so early captures
+		# could not be converted at all. Same round-badge shape as ▲ promote,
+		# the price on it, greyed when unaffordable (Shop.can_convert).
+		var show_convert: bool = armed and cap and not show_promote
 		if st.count > 1:
 			# corner badge keeps the icon full-size (no inline text); it yields
 			# the top-right corner to the ▲ promote button when that shows
@@ -922,6 +930,26 @@ func _rebuild_pool_strip() -> void:
 			promote.offset_bottom = 9
 			promote.pressed.connect(func() -> void: promote_pressed.emit(id, cap))
 			btn.add_child(promote)
+		if show_convert:
+			var convert := Button.new()
+			convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
+			convert.add_theme_font_size_override("font_size", 11)
+			convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+			convert.disabled = not Shop.can_convert(g, st.entry)
+			var pill := StyleBoxFlat.new()
+			pill.bg_color = Color(0.3, 0.6, 1.0) # player blue, same as ▲
+			pill.set_corner_radius_all(9)
+			for style in ["normal", "hover", "pressed", "disabled"]:
+				convert.add_theme_stylebox_override(style, pill)
+			convert.tooltip_text = "Convert to Stock (deployable)"
+			convert.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			convert.offset_left = -26
+			convert.offset_right = 4
+			convert.offset_top = -9
+			convert.offset_bottom = 9
+			var entry: Variant = st.entry
+			convert.pressed.connect(func() -> void: convert_pressed.emit(entry))
+			btn.add_child(convert)
 		btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
 		if g.placing_id != "" and g.armed_entry == st.entry and g.placing_cap == cap:
 			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin

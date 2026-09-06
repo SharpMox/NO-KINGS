@@ -655,7 +655,7 @@ func _init() -> void:
 	# drawer's Sell mode instead, exercised earlier in this file)
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3, "captured": ["rook"],
+	GameScript.next_config = {"wave": 3, "captured": ["rook"], "gold": 100,
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -687,6 +687,35 @@ func _init() -> void:
 	await process_frame
 	check(not game.board.has(Vector2i(5, 0)) and game.captured == ["rook"] and game.placing_cap,
 		"tapping a Deploy tile no longer places a Captured stack — it stays armed, inert")
+	# 2026-09-06: a Convert control ON the armed Captured stack. Conversion lived
+	# only in the Shop's Sell mode, which issue 101 locks before Wave 5 — so at
+	# Wave 3 this rook could not be converted at all through the UI.
+	check(await _click_button_in(game.hud, "Stock 1"), "Stock drawer reopens")
+	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
+		# tap on the same stack inside it opens the piece preview, not the arm
+	cap_stack = game.pool_box.get_children().filter(func(b: Node) -> bool:
+		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
+	_click(cap_stack.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	var convert_badge: Button = null
+	for c in game.pool_box.get_children():
+		for sub_c in c.get_children():
+			if sub_c is Button and (sub_c as Button).text.begins_with("⇄"):
+				convert_badge = sub_c
+	var badge_cost: int = Shop.convert_price(game, "rook")
+	check(convert_badge != null and convert_badge.is_visible_in_tree()
+			and convert_badge.text == "⇄$%d" % badge_cost and not convert_badge.disabled,
+		"an armed Captured stack shows its Convert badge, priced and live at Wave 3")
+	var gold_before_convert: int = game.gold
+	_click(convert_badge.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(game.captured.is_empty() and game.stock.has("rook")
+			and game.gold == gold_before_convert - badge_cost and not game.placing_cap,
+		"tapping Convert moves the rook to Stock, debits the convert price and disarms the stack")
+	_click(game._tile_px(Vector2i(5, 6)) + Vector2(game.tile, game.tile) / 2) # close drawer
+	await process_frame
 	# still armed (nothing clears it on a rejected deploy, same as any other
 	# invalid tap on an armed stack) — deselect directly, same effect as
 	# tapping the same stack again (exercised on regular Stock earlier in

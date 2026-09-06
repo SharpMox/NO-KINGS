@@ -105,4 +105,27 @@ static func all() -> Array:
 			cfg["stock"] = stock
 		out.append({"name": "Piece %s: %s" % [fam, e.get("name", id)], "cfg": cfg})
 	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.name < b.name)
-	return out
+	return out + _every_piece_boards()
+
+
+## 2026-09-06 (user ask): every piece type on one board. Two boards: your
+## side only (a quiet study board — 38 types on rows 0-4, sorted by id, 8 to
+## a row), and both sides (the same 38 mirrored on rows 7-11 plus the King).
+## Generated from the catalog like the sandboxes above, so a new codex piece
+## appears here with no edit. No wave, so nothing spawns into it.
+static func _every_piece_boards() -> Array:
+	var ids: Array = catalog().keys().filter(func(id: String) -> bool: return id != "king")
+	ids.sort()
+	var mine: Array = []
+	for i in ids.size():
+		mine.append([ids[i], 0, i % 8, int(i / 8)]) # rows 0..4
+	var theirs: Array = []
+	for i in ids.size():
+		theirs.append([ids[i], 1, i % 8, 11 - int(i / 8)]) # rows 11..7
+	theirs.append(["king", 1, ids.size() % 8, 11 - int(ids.size() / 8)])
+	return [
+		{"name": "Piece board: every type, your side (%d)" % ids.size(), "cfg": {
+			"board": mine, "gold": 300, "score": 500, "seed": 80}},
+		{"name": "Piece board: every type, both sides (%d + King)" % ids.size(), "cfg": {
+			"board": mine + theirs, "gold": 300, "score": 500, "seed": 81}},
+	]

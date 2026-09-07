@@ -16,7 +16,7 @@ config/description="An explosive Chess riot"
 run/main_scene="res://scenes/Intro.tscn"
 config/features=PackedStringArray("4.7")
 config/icon="res://icon.png"
-application/config/quit_on_go_back=false
+config/quit_on_go_back=false
 
 [autoload]
 

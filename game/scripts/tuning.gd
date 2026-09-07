@@ -11,6 +11,12 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
 
+## Newest-first run log, capped so the file cannot grow forever. Lives here
+## rather than in economy.gd because leaderboard.gd needs it too and preloading
+## economy there drags in the whole gameplay chain -- which is why that file
+## carried a bare 50 with a comment apologising for it (NO-37).
+const HISTORY_CAP := 50
+
 const ITEM_CAP_BASE := 3          # issue 53 (user ruling): held Items were
                                    # unbounded before this — Area 51 Parking
                                    # Permit raises it, +3 per copy (item_logic.gd)

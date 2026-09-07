@@ -307,10 +307,12 @@ func _init() -> void:
 	var strict := Rules.legal_moves(chk, Rules.ENEMY, defs, true)
 	check(chk == chk_before and not strict.is_empty(),
 		"strict legal_moves leaves the board and its piece state untouched")
-	var t0 := Time.get_ticks_usec()
-	for i in 20:
-		Rules.legal_moves(chk, Rules.ENEMY, defs, true)
-	print("perf: strict legal_moves x20 = %.1f ms" % ((Time.get_ticks_usec() - t0) / 1000.0))
+	# NO-37: a timed x20 loop printed a number nothing asserted. Dropped rather
+	# than turned into a bound: a wall-clock assertion in this suite would be
+	# exactly the load-sensitive measurement CLAUDE.md records getting a PR
+	# blocked on a wrong conclusion, and the strict path already has a
+	# correctness assertion directly above. The accepted ~5 ms check-resolution
+	# cost is documented in CLAUDE.md, not pinned here.
 
 	print("---")
 	if fails == 0:

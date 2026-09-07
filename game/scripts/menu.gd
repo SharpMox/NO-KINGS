@@ -20,14 +20,24 @@ const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
 ## ONE sign-in flow, two bridges. The iOS bridge mirrors the Android one's
 ## static surface and signals exactly (issue 87 copied issue 86 on purpose),
 ## so the menu never branches on platform beyond these two pickers.
+## ONE platform predicate. OS.get_name() == "iOS" was written out at three
+## separate decision points here, so a fourth platform meant finding all three
+## (NO-37). cloud_save.gd's _default_backend keeps its own three-arm match on
+## OS.get_name(): it chooses between iOS, Android AND a desktop no-op, which is
+## a switch rather than this boolean, and folding it in here would make it less
+## clear, not more.
+static func _IS_IOS() -> bool:
+	return OS.get_name() == "iOS"
+
+
 static func _BRIDGE() -> GDScript:
-	return IosBridge if OS.get_name() == "iOS" else PlayBridge
+	return IosBridge if _IS_IOS() else PlayBridge
 
 
 ## The provider this platform can actually sign into: Game Center on iOS,
 ## Play Games elsewhere. The other button refuses with the honest message.
 static func _NATIVE_PROVIDER() -> String:
-	return Account.APPLE if OS.get_name() == "iOS" else Account.GOOGLE
+	return Account.APPLE if _IS_IOS() else Account.GOOGLE
 
 
 ## Where to send a player whose sign-in does not land. This is the one place
@@ -72,10 +82,7 @@ static func _SAVE_PATHS() -> Array:
 ## picking a side. See leaderboard.gd's header for why a board synced by
 ## pick-a-side silently deletes the other device's real entries.
 static func _MERGER(key: String) -> Callable:
-	match key:
-		"scores": return Leaderboard.merge
-		"history": return Leaderboard.merge_history
-	return Callable()
+	return Leaderboard.merger_for(key) # NO-37: the table lives beside the mergers
 
 
 static var window_sized := false # once per launch, not on every return to menu
@@ -431,7 +438,7 @@ func _ready() -> void:
 	# progress on a fresh device. Null off Android, where nothing fetches.
 	# (issue 86 / T4)
 	var bridge := get_node_or_null(
-		"/root/IosCloudBridge" if OS.get_name() == "iOS" else "/root/PlayGamesBridge")
+		"/root/IosCloudBridge" if _IS_IOS() else "/root/PlayGamesBridge")
 	if bridge != null:
 		bridge.snapshot_loaded.connect(_on_snapshot_loaded)
 		# Connected HERE, not inside the login button, and this distinction is

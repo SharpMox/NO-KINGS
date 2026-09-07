@@ -4,6 +4,15 @@
 ## the HUD layer so stacking (and the click probes) behave exactly as before.
 ## Signals up, calls down: buttons emit intents handled by game.gd; builders
 ## only read game state via `g`.
+##
+## ONE deliberate exception (NO-37, documented rather than routed): the in-game
+## menu's close path writes `g.game_menu_open = false` as well as hiding the
+## panel. The flag gates input handling and the clock-pause test in eight
+## places, so hiding the panel while leaving it true would leave the run
+## believing it is paused by a menu the player can no longer see. Routing it as
+## a signal game.gd handles would be the pure form; it is not worth a round trip
+## for a flag whose only correct value at that instant is false. Do not treat
+## this as licence for further writes -- everything else here still only reads.
 
 extends Node
 

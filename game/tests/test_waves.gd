@@ -164,6 +164,51 @@ func _init() -> void:
 	blk.queue_free()
 	await process_frame
 
+	# ---- NO-26: the WAVE banner never draws outside the board ---------------
+	# Reported from the iPad audit as "starts at the LEFT SCREEN EDGE, outside the
+	# board, and stops roughly 60 percent of the way across". The banner was never
+	# mis-SIZED: its width has always been the board width and its settled
+	# position has always been correct. It ENTERED from outside the board, with
+	# nothing clipping it -- invisible on a phone, where the board is nearly full
+	# width and the overflow falls off-screen, and plainly visible on a tablet,
+	# where the board is centred inside wide margins.
+	#
+	# Swept across the whole entrance rather than sampled at rest, because the
+	# defect only exists mid-animation and a t == 1 check would pass either way.
+	var bg := _boot({"wave": 1, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]})
+	await process_frame
+	var viewports := [[1032.0, 1376.0, "iPad Pro 13in portrait"],
+		[480.0, 800.0, "the 480x800 design viewport"],
+		[1179.0, 2556.0, "a 9:19.5 phone"]]
+	for vp in viewports:
+		# drive the layout the same way _layout_board does, so the numbers are the
+		# real ones rather than a second copy of the formula
+		var vw: float = vp[0]
+		var vh: float = vp[1]
+		bg.tile = int(minf((vw - 8.0) / Tuning.BOARD_W,
+			(vh - bg.HUD_DECK - bg.HUD_TOP) / Tuning.BOARD_H))
+		bg.board_px = Vector2(roundf((vw - bg.tile * Tuning.BOARD_W) / 2.0), bg.HUD_TOP)
+		var board_l: float = bg.board_px.x
+		var board_r: float = bg.board_px.x + Tuning.BOARD_W * bg.tile
+		var escaped: Array = []
+		var t := 0.0
+		while t <= 1.0001:
+			var br: Rect2 = bg._banner_rect(t, 0)
+			if br.size.x > 0.0 and (br.position.x < board_l - 0.5 or br.end.x > board_r + 0.5):
+				escaped.append([t, br.position.x, br.end.x])
+			t += 0.02
+		check(escaped.is_empty(),
+			"banner stays inside the board [%.0f, %.0f] for the whole entrance on %s, escaped at: %s"
+				% [board_l, board_r, vp[2], str(escaped.slice(0, 3))])
+		# and the settled banner still spans the board exactly — the clamp must not
+		# have quietly shrunk the thing it was bounding
+		var settled: Rect2 = bg._banner_rect(1.0, 0)
+		check(absf(settled.position.x - board_l) < 0.5 and absf(settled.end.x - board_r) < 0.5,
+			"and at rest it spans the board exactly on %s (%.0f..%.0f)"
+				% [vp[2], settled.position.x, settled.end.x])
+	bg.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL WAVE CHECKS OK")

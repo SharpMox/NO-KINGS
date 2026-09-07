@@ -132,6 +132,14 @@ function coreText(s) {
   if (s == null) return null;
   let core = String(s).split(/\r?\n\s*\r?\n/)[0]; // drop a trailing blank-line-separated ruling paragraph
   core = core.replace(/\s*\(issue \d+[^)]*\)\s*$/i, ""); // drop a trailing inline "(issue N ...)" note
+  // Smart quotes are NOT drift. Notion autocorrects a straight apostrophe to a
+  // curly one the moment anything is typed into a property, so every effect
+  // text edited through the UI comes back as "don’t" against the repo's
+  // "don't" — and reports as a mismatch forever. Two such false positives
+  // appeared on 2026-09-07 the instant a batch of edits was applied through
+  // the browser. normName() has always done this for names; text needs it for
+  // exactly the same reason.
+  core = core.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
   return core.replace(/\s+/g, " ").trim();
 }
 function normName(s) {

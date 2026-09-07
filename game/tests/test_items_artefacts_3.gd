@@ -1087,7 +1087,7 @@ func _init() -> void:
 	for opt in cic_piece.box_offer:
 		expect_piece += int(cic_piece.defs[opt.payload].value)
 	cic_piece._on_box_skipped()
-	check(cic_piece.gold == Tuning.box_skip_score("small") + expect_piece,
+	check(cic_piece.gold == Tuning.box_skip_gold("small") + expect_piece,
 		"Cicada Rejection Letter: declining a Piece Box pays g.defs[id].value per piece, on top of the Box-price consolation")
 	cic_piece.queue_free()
 	await process_frame
@@ -1100,7 +1100,7 @@ func _init() -> void:
 	for opt in cic_item.box_offer:
 		expect_item += int(Tuning.SHOP_ITEM_PRICE[opt.payload.tier])
 	cic_item._on_box_skipped()
-	check(cic_item.gold == Tuning.box_skip_score("small") + expect_item,
+	check(cic_item.gold == Tuning.box_skip_gold("small") + expect_item,
 		"Cicada Rejection Letter: declining an Item Box pays Tuning.SHOP_ITEM_PRICE[tier] per item")
 	cic_item.queue_free()
 	await process_frame
@@ -1117,7 +1117,7 @@ func _init() -> void:
 		var rarity: String = str(opt.payload.get("rarity", ""))
 		expect_artefact += int(Tuning.SHOP_ARTEFACT_PRICE.get(rarity, Tuning.SHOP_ARTEFACT_PRICE[""]))
 	cic_artefact._on_box_skipped()
-	check(cic_artefact.gold == Tuning.box_skip_score("huge") + expect_artefact,
+	check(cic_artefact.gold == Tuning.box_skip_gold("huge") + expect_artefact,
 		"Cicada Rejection Letter: declining a Huge Artefact Box pays Tuning.SHOP_ARTEFACT_PRICE[rarity] per artefact, scaled to all 7")
 	cic_artefact.queue_free()
 	await process_frame

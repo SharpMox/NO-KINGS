@@ -149,8 +149,12 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		# Says what actually happens, because the honest answer is reassuring:
 		# nothing is deleted here and nothing is lost.
+		# NO-31: this said "Log out of Apple?" on iOS, because capitalize() on the
+		# provider key spells the KEY, not the service. PR #301 ruled the provider
+		# is always shown as "Game Center" -- Account.label() is the one place that
+		# knows, and menu.gd reads it too.
 		warn.text = "Log out of %s?\nYour progress stays with this account and\ncomes back when you sign in again." \
-			% Account.provider().capitalize()
+			% Account.label(Account.provider())
 		confirm_box.add_child(warn)
 		var yes := Button.new()
 		yes.text = "Log out"

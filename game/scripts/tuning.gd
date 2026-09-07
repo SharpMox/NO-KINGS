@@ -233,7 +233,22 @@ const SHOP_RESTOCK_WAVES := 5
 ## ruling was made: the Shop is the only surface that shows Item and Artefact
 ## descriptions, so the first four Waves are now played without a reference.
 const SHOP_UNLOCK_WAVE := 5
-const SHOP_LANE_B_SCORE := 10000
+
+## Lane B: the bonus restock gauge. Score banked since the last Lane-A restock,
+## which ZEROES it (shop.gd's lane_a_restock) — user ruling 2026-09-07, keeping
+## Lane B a within-window sprint rather than a run-long accumulation.
+##
+## 10000 -> 5000 the same day, because the wipe makes the real bar "this much
+## between two Lane-A fires", not "this much cumulatively". Measured on the
+## 30-run sweep: median score 3900 over a median 25 waves, so a typical 5-Wave
+## window banks about 780. At 10000 that was a ~13x gap and Lane B effectively
+## never fired; only 9 of 30 runs reached 10000 even CUMULATIVELY. Same shape
+## as the pre-issue-57 flag about an unreachable first threshold.
+##
+## 5000 is still ~6x a typical window ON PURPOSE: Lane B is a reward for a
+## scoring burst, not a second guaranteed lane. If it should fire for ordinary
+## play, this number is the lever — not the wipe, which is now a ruling.
+const SHOP_LANE_B_SCORE := 5000
 
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
 # halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most

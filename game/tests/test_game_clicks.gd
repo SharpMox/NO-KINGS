@@ -907,10 +907,17 @@ func _init() -> void:
 		"the bar's range matches the Lane B threshold")
 	check(game.modals.shop_lane_b_bar.value == game.shop_lane_b_progress,
 		"the bar's value reflects g.shop_lane_b_progress on open (0, fresh run)")
-	game.shop_lane_b_progress = 6300
+	# Derived from the gate, not a literal: this was hardcoded 6300, which sat
+	# below the old 10,000 threshold but ABOVE the 5,000 it became on
+	# 2026-09-07 — so the ProgressBar clamped it to max_value and the assertion
+	# failed on a tuning change rather than a real regression. Two thirds of
+	# the gate is always mid-bar, and stays non-round so a clamp or a reset to
+	# zero still reads as a failure.
+	var probe_progress: int = Tuning.SHOP_LANE_B_SCORE * 2 / 3
+	game.shop_lane_b_progress = probe_progress
 	game.modals.show_shop() # rebuild, same as reopening after a Score gain
 	await process_frame
-	check(game.modals.shop_lane_b_bar.value == 6300,
+	check(game.modals.shop_lane_b_bar.value == probe_progress,
 		"the bar tracks g.shop_lane_b_progress after it changes and the drawer rebuilds")
 
 	var tile: Button = null # first affordable piece tile — every slot is visible, none scrolled

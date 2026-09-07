@@ -31,19 +31,47 @@ between them never manifests.
 Do not read a Tier 1 → Tier 2 difficulty step off this harness; there isn't one to read.
 Tier 2 needs a human or a bot taught to open panels.
 
-## 2. `sell` reads 0% because the bot cannot sell
+## 2. `sell` read 0% because the bot could not sell — fixed, and the fix was wrong twice
 
-`sell` has fired in **0 of 60 runs**. That is not the bot declining to sell — it is a
-capability gap. `autoplay.gd` contains no sell path at all; the single occurrence of the
-word is prose in a comment about the Shop.
+**Was:** `sell` fired in 0 of 60 runs. Not the bot declining — a capability gap.
+`autoplay.gd` contained no sell path at all; the only occurrence of the word was prose. So
+issue 60's mechanic was unexercised by every balance number produced before 2026-09-07.
 
-So the sell mechanic (issue 60) is **unexercised by every balance number this project
-has produced.** Anything the balance pass concludes about Gold scarcity, inventory
-pressure or the Item/Artefact caps is drawn from runs where the player could never
-convert held goods back into Gold.
+**Now:** `try_sell` fires in ~53% of runs. But *how* it was written mattered more than
+that it exists, and only the harness could show that:
 
-This one is worth fixing before the balance pass rather than annotating, because selling
-is precisely a pressure valve for the resource starvation that dominates the death table.
+| | no sell | naive sell | corrected |
+|---|---|---|---|
+| `sell` fires | 0% | 83% | 53% |
+| Starvation deaths | 32% | **90%** | **20%** |
+| `deploy` median | — | 16 | 36 |
+| `capture` median | — | 10 | 22 |
+
+The first cut sold a spare Captured piece whenever Gold was short, on the reasoning that
+Captured Stock is not deployable and is therefore the safe thing to liquidate.
+**Starvation deaths went to 90%.**
+
+The reasoning was wrong in a way only the sweep could show: `convert` fires in **100%** of
+runs, so Captured Stock is not idle inventory — it is the deployable-material *pipeline*,
+one `convert_price` away from being Stock. Selling it competes with converting it, and the
+bot was liquidating its own supply line to buy things it then had no pieces to use.
+
+Corrected to sell only with Stock already healthy and Captured genuinely in surplus. Kept
+here as a worked example of the harness doing its job: a plausible strategy, a
+measurement, and a reversal.
+
+**Caveat on those numbers**: the three columns are separate batches at different times,
+not interleaved — see §5. The direction is far outside noise; treat the magnitudes as
+indicative.
+
+## 2b. `artefact_activate` is the next 0%
+
+It reads **0% in both 2026-09-07 sweeps**, and 8.3% in the 60-run sweep before them — so
+it is reachable (`try_activate_artefact` exists and is tried up front at 25%, before the
+`actions_left` gate) but rare enough to vanish in a 30-run batch. That makes it the
+weakest lever in the table and the next one to check before the balance pass leans on
+anything about activated Artefacts. Not caused by the sell work, which sits inside the
+`actions_left` block that runs after it.
 
 ## 3. What is genuinely covered
 

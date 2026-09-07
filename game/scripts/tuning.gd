@@ -153,7 +153,30 @@ const MERGE_COST := 15
 const WIN_SCORE_BONUS := 1000      # every King checkmate (GDD, amount TBD)
 const KING_CLOCK_REFILL_MS := 2 * 60 * 1000     # recurring King (grilled 2026-07-03)
 const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless
-const BOX_SKIP_CONSOLATION := 20   # GDD: small consolation, amount TBD
+## Declining a Box pays the Box's own PRICE as Score (user ruling 2026-09-07),
+## not a flat number. A Huge Box is worth four times a Small one, so a flat
+## consolation made declining the expensive one read as a punishment for a
+## choice the game itself offered.
+##
+## Was `BOX_SKIP_CONSOLATION := 20`. Note that went through Economy.earn, which
+## applies SCORE_MULTIPLIER — so it actually paid 200, while the button said
+## "+20 score". The label under-reported by 10x for as long as it existed; it
+## now shows what the player receives.
+##
+## PAID THROUGH Economy.earn, which grants BOTH currencies — score * 10 AND
+## roughly `amount` in Gold (Reward Economy: Gold is earned 1:1 alongside every
+## Score gain). So this is not a Score-only knob, and raising it 20 -> 50/100/200
+## raises the Gold on decline by the same multiple.
+##
+## That is a real balance surface, called out rather than discovered later:
+## Boxes also arrive FREE from Bounty and from Artefacts, so a declined free
+## Huge Box now pays ~200 Gold where it paid ~20. Bounded by the fact that a
+## Box has to be opened at all — Bounty needs a carrying piece captured, and
+## the Artefact sources are once-per-cadence — so it is a rate, not a tap. The
+## standing ruling applies: bound it if it misbehaves, do not remove it.
+## Cicada Rejection Letter stacks ON TOP and stays the deliberate outlier.
+static func box_skip_score(size: String) -> int:
+	return SHOP_BOX_PRICE.get(size, SHOP_BOX_PRICE["small"])
 # Shop prices (money-and-shop PRD; playtest placeholders on the x10 economy —
 # income is thin, so they sit low; piece slots charge the catalog value)
 const SHOP_ITEM_PRICE := {"Tactical": 30, "Strategic": 60, "Decisive": 120}

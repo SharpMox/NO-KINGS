@@ -3922,7 +3922,11 @@ func _on_box_skipped() -> void:
 ## A Huge Box declining all 7 pays for all 7 — intended, not a bug (issue 49).
 ## Stacks additively per held copy, same convention as every other artefact.
 func _decline_box_pick() -> void:
-	Economy.earn(self, Tuning.BOX_SKIP_CONSOLATION)
+	# NO-23 (user ruling 2026-09-07): the consolation is the Box's own price,
+	# so declining a Huge Box is worth four times declining a Small one.
+	# box_size is pinned when the Box opens; the helper falls back to Small for
+	# a Box that somehow carries no size, which pays rather than paying nothing.
+	Economy.earn(self, Tuning.box_skip_score(box_size))
 	var n := _artefact_count("cicada-rejection-letter")
 	if n > 0:
 		var value := 0

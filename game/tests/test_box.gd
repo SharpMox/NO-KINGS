@@ -10,6 +10,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Box := preload("res://scripts/box.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Economy := preload("res://scripts/economy.gd") # SCORE_MULTIPLIER (NO-23)
 
 var fails := 0
 
@@ -159,6 +160,33 @@ func _init() -> void:
 
 	game.queue_free()
 	await process_frame
+
+	# --- NO-23 (user ruling 2026-09-07): declining a Box pays the Box's own
+	# PRICE, not a flat 20. The point is that it SCALES, so a Small and a Huge
+	# are asserted against each other rather than each against a literal — a
+	# test that hardcoded the numbers would break on the next price tune, which
+	# is exactly what happened to the Lane B assertions in NO-16.
+	#
+	# Economy.earn grants BOTH currencies, so both move. That is the balance
+	# surface this ruling opens and it is asserted, not assumed.
+	for size in ["small", "huge"]:
+		var d := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"wave": 3, "gold": 0, "score": 0})
+		await process_frame
+		d._open_box_pick({"kind": "box", "key": "piece", "size": size,
+			"contents": Box.roll_options(d, "piece", size), "sold": false})
+		d._on_box_skipped()
+		var want: int = Tuning.box_skip_score(size)
+		check(d.gold == want,
+			"NO-23: declining a %s Box pays its price in Gold (%d)" % [size, want])
+		check(d.score == want * Economy.SCORE_MULTIPLIER,
+			"NO-23: ...and its price x%d in Score" % Economy.SCORE_MULTIPLIER)
+		d.queue_free()
+		await process_frame
+	check(Tuning.box_skip_score("huge") == Tuning.box_skip_score("small") * 4,
+		"NO-23: a Huge Box is worth 4x a Small one to decline — the consolation SCALES")
+	check(Tuning.box_skip_score("nonsense") == Tuning.box_skip_score("small"),
+		"NO-23: an unknown size falls back to Small — a Box with no size still pays")
 
 	print("---")
 	if fails == 0:

@@ -388,12 +388,50 @@ listing and abandoning the install base.
 
 Two consequences, both non-negotiable:
 
-- **It never goes in the repo.** `game/export_presets.cfg` is tracked, so the
-  `keystore/release*` fields stay EMPTY in git. Point Godot at the file through the editor's
-  Android export settings or the `GODOT_ANDROID_KEYSTORE_RELEASE_*` environment variables at
-  export time — verify which your Godot build honours before relying on it.
+- **It never goes in the repo.** See "How the key reaches the build" below — this is the
+  part with a real, specific leak path, not a general caution.
 - **Back it up somewhere that is not this machine.** A password manager or an encrypted
-  archive. Not `~/Downloads`.
+  archive. The file, BOTH passwords and the alias — all four, or none of it works. Not
+  `~/Downloads`.
+
+### How the key reaches the build — environment variables, never the editor UI
+
+**Do not fill the keystore fields in Godot's export dialog.** Doing so writes
+`keystore/release`, `keystore/release_user` and `keystore/release_password` into
+`game/export_presets.cfg` **in plaintext** — and that file is TRACKED. One `git add -A`
+puts the signing password in the history, pushed to GitHub, permanently. Those three empty
+fields are sitting in the preset right now waiting for exactly that.
+
+Use the environment variables instead. Godot reads them at export time and persists
+nothing.
+
+**Verified 2026-09-07** against the installed binary rather than assumed —
+`strings /Applications/Godot.app/Contents/MacOS/Godot | grep GODOT_ANDROID_KEYSTORE`
+lists all three RELEASE variables (plus the DEBUG trio). This build honours them.
+
+Env vars have their own leak: `export FOO=secret` lands in `~/.zsh_history`, and anything
+in a dotfile is plaintext on disk. So take the password from the Keychain at invocation and
+prefix it onto the command, scoping it to that one process:
+
+```sh
+# once — prompts for the password, never echoes it
+security add-generic-password -a nokings -s nokings-keystore -U -w
+
+# every export
+GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$HOME/keystores/nokings-upload.keystore" \
+GODOT_ANDROID_KEYSTORE_RELEASE_USER=nokings \
+GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$(security find-generic-password -s nokings-keystore -w)" \
+godot --headless --path game --export-release "Android" build/nokings.aab
+```
+
+Prefixed, not exported: the password never reaches argv, shell history, or any file. Same
+pattern as the sharpunk SFTP password (see the global `CLAUDE.md`); broad Keychain searches
+get blocked by the permission classifier, so always look the service up by its exact `-s`
+name.
+
+**What this does NOT protect.** The keystore FILE still sits on disk at `~/keystores/`.
+Environment variables guard the password, not the file — which is why the backup point
+above is separate and independent.
 
 ### Play App Signing softens exactly one of those risks
 

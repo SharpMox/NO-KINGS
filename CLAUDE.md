@@ -128,13 +128,20 @@ scaffolding, and a 22-suite test harness.
 
 ### Where the work lives
 
-- **The backlog is Linear** (user ruling 2026-09-06): the PRD as a project, one issue per
+- **Live work lives in Linear** (user ruling 2026-09-06): the PRD as a project, one issue per
   slice (status, labels, an outcome comment on close), and non-blocking findings as issues
-  labelled `flag`. Commits and PRs carry `Refs: ENG-NN`. While the Linear MCP was absent the
-  backlog lived in `.scratch/gdd-gaps/` (`PRD.md`, `issues/NN-*.md` with a `Status:` line and
-  an `## Outcome`, `FLAGS.md`); those files are being migrated into Linear and stay readable
-  as history until then. If a session has no Linear MCP, say so rather than silently
-  falling back to the files.
+  labelled `flag`. Workspace `no-kings`, team `NO`, ids `NO-<n>` — commits and PRs carry a
+  `Refs: NO-NN` trailer.
+- **Linear is driven through the signed-in browser, not an MCP** — there has never been a
+  Linear MCP. See the global `~/.claude/CLAUDE.md` for the connect-mode recipe. If the
+  browser session is gone, say so and stop; never fall back silently.
+- **`.scratch/gdd-gaps/` is a READ-ONLY ARCHIVE** (2026-09-06) — `PRD.md` (the map) and
+  `issues/NN-*.md`, each with a `Status:` line and an `## Outcome`. 106 files holding the
+  history, worth reading, but no new slice goes here. **A slice lives in exactly one
+  place**: Linear if it is open, the archive if it is closed. Only the LIVE items were
+  migrated; the archive deliberately was not.
+  This file said *"There is no Linear; there never was"* until 2026-09-06 — true for the
+  whole history above it, and no longer true.
   `NOTION-QUESTIONS.md` stays in the repo: the open GDD questions, each blocking at least one
   Artefact — **read it before implementing any Artefact**, so an already-known ambiguity
   isn't rediscovered or, worse, guessed at.
@@ -297,9 +304,11 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   `game/data/items.gd`, `data/pieces-codex.js`, `game/data/tariffs.gd`) have drifted
   apart unnoticed before and been hand-fixed twice — the second fix still missed a
   row. `tools/check-notion-drift.mjs` diffs them and prints every disagreement; it
-  never writes to either side. It needs a Notion snapshot as input (a plain script
-  can't call the Notion MCP tools) — see the header of that file for the exact SQL
-  to run and the JSON shape to save, then:
+  never writes to either side. It needs a Notion snapshot as input — a plain `node`
+  script cannot reach Notion at all (there is no token in the repo, and the Notion MCP
+  was removed 2026-09-06 in favour of the signed-in browser). Gather the rows through
+  the browser; see the header of that file for the exact SQL and the JSON shape to save,
+  then:
   ```sh
   node tools/check-notion-drift.mjs <snapshot.json>
   ```
@@ -312,7 +321,8 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
 
 Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`. One commit per logical
 change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
-(e.g. `Refs: ENG-42`); reference-site changes don't need one.
+(e.g. `Refs: NO-16`); reference-site changes don't need one. The example here said
+`ENG-42` until 2026-09-06, from a team prefix that never existed.
 
 ## Agent tooling
 

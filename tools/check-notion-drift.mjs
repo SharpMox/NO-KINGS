@@ -76,6 +76,32 @@
 // every row has exactly as many values as there are headers. A run where those
 // two hold is measuring drift; one where they do not is measuring the viewport.
 //
+// THIRD TRAP, and it survives both checks above: TABLE CELLS FLATTEN NEWLINES.
+// A property whose real value is
+//     "On 5-Wave Milestone: ...+10%\n\nReconciled 2026-08-30 (issue 63): ..."
+// reads back from `.notion-table-view-cell` as ONE line with no newlines at
+// all. The blank line is still in Notion — open the row's own page and the
+// property has it — but the table view does not render it.
+//
+// That matters because coreText() strips a trailing ruling paragraph by
+// splitting on the first BLANK LINE. Flattened, there is no blank line to
+// split on, so the whole annotation is compared as if it were effect text and
+// every annotated row reports as drift. Ten rows did exactly that on
+// 2026-09-07 — all of them with byte-identical effect text.
+//
+// So a table-cell scrape is fine for short single-line properties (Name,
+// Rarity, STATUS, Tier) and WRONG for anything that may carry an appended
+// note. For those, read the property from the ROW PAGE instead:
+//
+//   // on app.notion.com/p/<row-block-id>
+//   const leaf = [...document.querySelectorAll('*')]
+//     .filter(e => /^<unique prefix>/.test((e.textContent||'').trim())).pop();
+//   const value = leaf.closest('[class*=x87ps6o]') || leaf.parentElement.parentElement;
+//   value.innerText   // newlines intact
+//
+// The same container, two levels up from the text leaf, is also what you must
+// CLICK to edit a property — clicking the leaf focuses the page title instead.
+//
 // Save as { "artefacts": [...], "items": [...], "pieces": [...], "tariffs": [...] }
 // keyed on the exact Notion column names. A partial snapshot is fine if you
 // only read that catalog's section — an omitted catalog reports every repo row

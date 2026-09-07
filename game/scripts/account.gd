@@ -189,6 +189,39 @@ static func logout(save_paths: Array) -> bool:
 	return _write({"owner": "", "provider": ""})
 
 
+## NO-11 (user ruling 2026-09-07): the device's Google account changed under a
+## signed-in install.
+##
+## Before this, NOTHING happened. `is_available()` simply went false because
+## owner() no longer matched the live player id, and sync stopped — silently,
+## with no notice, and no way back except switching the device account back.
+## menu.gd's sign_in call is guarded by `not Account.signed_in()`, so the
+## mismatch case fell through every branch there was.
+##
+## A switch is logout THEN sign_in, in that order, reusing exactly the machinery
+## LOGOUT already shipped: the outgoing owner's saves are parked under its id,
+## and the incoming account reclaims whatever it parked before. Each account
+## keeps its own progress, and switching back restores it. Nothing is deleted.
+##
+## REFUSED when the outgoing owner is a GUEST. That is not a switch — it is the
+## guest->Google conversion, which sign_in() handles by REBINDING so the guest's
+## progress follows them to the new id. Parking a guest's saves would orphan
+## them for good, because start_guest() mints a new id every call and the guest
+## could never reclaim them. Same reasoning logout() gives for refusing guests.
+##
+## Returns whether a switch actually happened, so a caller can tell "rebound the
+## saves" from "nothing to do".
+static func switch_to(new_provider: String, account_id: String,
+		save_paths: Array) -> bool:
+	if account_id == "" or account_id == owner():
+		return false # same account, or no id to switch to
+	if not signed_in() or provider() == GUEST:
+		return false # first bind or guest conversion — sign_in()'s own path
+	logout(save_paths)
+	sign_in(new_provider, account_id, save_paths)
+	return true
+
+
 static func _restamp(path: String, account_id: String) -> void:
 	if not FileAccess.file_exists(path):
 		return

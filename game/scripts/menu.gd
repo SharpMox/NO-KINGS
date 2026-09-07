@@ -30,14 +30,6 @@ static func _NATIVE_PROVIDER() -> String:
 	return Account.APPLE if OS.get_name() == "iOS" else Account.GOOGLE
 
 
-## What to CALL the provider on screen. "Apple" names Sign in with Apple — a
-## DIFFERENT Apple service; what we actually use is Game Center, and a player
-## who reads "Apple" goes looking for the wrong thing (observed on the
-## simulator, 2026-09-04: "is there supposed to be a Game Center app?").
-static func _LABEL(prov: String) -> String:
-	return "Game Center" if prov == Account.APPLE else "Google"
-
-
 ## Where to send a player whose sign-in does not land. This is the one place
 ## the two platforms genuinely differ, and it decides whether a failure is a
 ## retry or a dead end: Play Games presents its own sign-in, so retrying can
@@ -160,7 +152,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 		# resets the note to the tagline anyway.
 		if was_interactive:
 			login_note.text = "%s sign-in didn't complete.%s You can try again." \
-				% [_LABEL(_NATIVE_PROVIDER()), _RETRY_HINT(_NATIVE_PROVIDER())]
+				% [Account.label(_NATIVE_PROVIDER()), _RETRY_HINT(_NATIVE_PROVIDER())]
 		return
 	# ADOPT the local saves only when there is one history to adopt. account.gd
 	# states the premise the rebind rests on: "it never merges two histories,
@@ -174,11 +166,17 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# last-write-wins, taking B's outright. Silent, and it destroys the data of
 	# an account the player was not even playing.
 	#
-	# So a switch does NOTHING here: no rebind, no fetch. is_available() also
-	# reports false while the ids disagree, which keeps the rest of the session
-	# from pushing A's progress into B. Keeping the two accounts genuinely
-	# separate needs per-account local saves — a real feature, and a design call
-	# rather than something to guess at. See issue 86.
+	# That was why a switch originally did NOTHING here. NO-11 then replaced the
+	# no-op with switch_to, which resolves the danger above a different way: it
+	# PARKS account A's saves under A's id instead of restamping them as B's, so
+	# the two histories never meet and switching back restores A intact. NO-31
+	# adds the consent gate — the player is asked before the install re-homes.
+	#
+	# Declining keeps exactly the pre-NO-11 behaviour for the session: no rebind,
+	# no fetch, and is_available() stays false while the ids disagree, which keeps
+	# the rest of the session from pushing A's progress into B. Genuinely
+	# SIMULTANEOUS accounts would still need per-account local saves — a real
+	# feature and a design call, not something to guess at. See issue 86.
 	var id: String = CloudSave.backend.account_id()
 	# ONLY WHEN THE PLAYER ASKED. A verdict that arrives on its own must not
 	# convert a guest who deliberately chose "Play as Guest", and on a first run
@@ -195,8 +193,16 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# mismatch fell through every path and sync just went quiet. switch_to
 	# parks the outgoing owner's saves and reclaims the incoming account's, and
 	# refuses on its own when this is really a guest conversion or a first bind.
-	elif id != "" and Account.owner() != id:
-		Account.switch_to(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
+	#
+	# NO-31: ASK first. NO-11 called switch_to straight from here, on every
+	# verdict including the silent boot check, so a device whose Google account
+	# changed re-homed the install with nothing on screen saying so. Nothing was
+	# lost — parking is reversible — but the consent gate that binding has was
+	# missing. Now the mismatch raises a prompt and returns; the rebind happens
+	# in _on_switch_accepted, through the same switch_to.
+	elif id != "" and Account.owner() != id and not _switch_declined:
+		_ask_to_switch(id)
+		return
 	if Account.owner() == id:
 		if sync_button != null:
 			sync_button.visible = false
@@ -219,7 +225,7 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# word. Continue offline remains the exit.
 	if was_interactive and Account.signed_in():
 		login_note.text = "This device is signed in as a different %s account." \
-			% _LABEL(_NATIVE_PROVIDER())
+			% Account.label(_NATIVE_PROVIDER())
 
 
 ## Logging out returns to the LOGIN SCREEN, not to guest play: becoming a guest
@@ -250,6 +256,45 @@ func _on_logout() -> void:
 ## each of which hides main_box, and showing main_box unconditionally would
 ## surface the menu underneath whatever they opened. Signing in never moves the
 ## player.
+## NO-31: raise the switch prompt. Names BOTH accounts, because "an account
+## changed" without saying which is not something a player can answer.
+func _ask_to_switch(id: String) -> void:
+	_switch_pending_id = id
+	switch_prompt_label.text = ("This device is now signed in to %s as %s.\n" +
+		"This install's progress belongs to %s.\nSwitch to the new account?") \
+		% [Account.label(_NATIVE_PROVIDER()), id, Account.owner()]
+	switch_prompt.visible = true
+
+
+## Yes: rebind through the SAME switch_to NO-11 used, then do the post-bind work
+## the verdict path would have done had it not returned to ask.
+func _on_switch_accepted() -> void:
+	var id := _switch_pending_id
+	_switch_pending_id = ""
+	switch_prompt.visible = false
+	Account.switch_to(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
+	if Account.owner() != id:
+		return # switch_to refused (guest conversion / first bind); it owns that call
+	if sync_button != null:
+		sync_button.visible = false
+	_finish_login()
+	CloudSave.drain_queue()
+	for key: String in _SYNC_KEYS():
+		_BRIDGE().fetch(key)
+
+
+## No: the pre-NO-11 behaviour for the rest of the session. Say so on the login
+## note rather than going quiet — going quiet is the defect NO-11 set out to fix,
+## and declining must not reintroduce it.
+func _on_switch_declined() -> void:
+	_switch_declined = true
+	_switch_pending_id = ""
+	switch_prompt.visible = false
+	login_note.text = ("Playing as %s. This device is signed in to a different " +
+		"%s account, so sync is paused until you accept the switch.") \
+		% [Account.owner(), Account.label(_NATIVE_PROVIDER())]
+
+
 func _finish_login() -> void:
 	if not login_center.visible:
 		return
@@ -274,7 +319,7 @@ func _on_provider_pressed(prov: String) -> void:
 	# refuses the one this platform is not — Google on an iPhone, Apple on
 	# Android — where no amount of retrying could ever succeed.
 	if prov != _NATIVE_PROVIDER() or not _BRIDGE().supported():
-		login_note.text = "%s sign-in isn't available on this device yet." % _LABEL(prov)
+		login_note.text = "%s sign-in isn't available on this device yet." % Account.label(prov)
 		return
 	# Already authenticated silently — so there is a session, but this press is
 	# what makes it CONSENTED. Run the verdict path directly rather than calling
@@ -309,7 +354,7 @@ func _on_provider_pressed(prov: String) -> void:
 			return
 		_sign_in_gen = 0
 		login_note.text = "%s sign-in timed out.%s You can try again." \
-			% [_LABEL(prov), _RETRY_HINT(prov)]
+			% [Account.label(prov), _RETRY_HINT(prov)]
 		_set_providers_disabled(false))
 	_BRIDGE().begin_sign_in()
 
@@ -326,6 +371,18 @@ var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
 var login_note: Label # the login screen's status line
+## NO-31: the device's account changed under a signed-in install. Rebinding is
+## reversible -- switch_to parks the outgoing owner's saves and reclaims the
+## incoming account's -- but it is not invisible, and BINDING already asks: the
+## first-bind path below is gated on was_interactive, i.e. the player pressed
+## the button. A silent re-home was the one consent gate missing.
+var switch_prompt: VBoxContainer
+var switch_prompt_label: Label
+var _switch_pending_id := "" # the incoming account waiting on an answer
+## Answered "Not now" THIS SESSION. Deliberately not persisted: the prompt
+## re-appears on the next boot, not on every verdict (a verdict can arrive
+## several times a session, and re-asking each time is nagging, not consent).
+var _switch_declined := false
 var provider_buttons: Array[Button] = [] # Google/Apple; locked during a sign-in
 
 ## Which sign-in attempt is in flight, or 0 for none. A COUNTER not a bool, so
@@ -412,6 +469,19 @@ func _ready() -> void:
 	title.text = "NO KINGS"
 	title.add_theme_font_size_override("font_size", 48)
 	main_box.add_child(title)
+	# NO-31: the account-switch consent prompt. Inline on the main menu rather
+	# than a modal, matching the logout confirm in settings.gd — the verdict that
+	# raises it usually lands at boot, with the main menu already up.
+	switch_prompt = VBoxContainer.new()
+	switch_prompt.add_theme_constant_override("separation", 8)
+	switch_prompt.visible = false
+	main_box.add_child(switch_prompt)
+	switch_prompt_label = Label.new()
+	switch_prompt_label.add_theme_font_size_override("font_size", 13)
+	switch_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	switch_prompt.add_child(switch_prompt_label)
+	_button(switch_prompt, "Switch account", 20, _on_switch_accepted)
+	_button(switch_prompt, "Not now", 20, _on_switch_declined)
 	# Offered on whether the save can actually be READ, not on whether a file is
 	# there. The old check was file_exists alone, which fed JSON.parse_string
 	# straight into the run — so a corrupt file loaded `null`, and a save from a
@@ -494,7 +564,7 @@ func _ready() -> void:
 	login_box.add_child(login_note)
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(
-			_button(login_box, "Sign in with %s" % _LABEL(prov), 22,
+			_button(login_box, "Sign in with %s" % Account.label(prov), 22,
 				_on_provider_pressed.bind(prov)))
 	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
 	# exit, and the one control that must work when everything else has failed.

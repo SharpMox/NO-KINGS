@@ -8,6 +8,7 @@ extends SceneTree
 ##   godot --headless --path game -s tests/test_settings.gd
 
 const Settings := preload("res://scripts/settings.gd")
+const Account := preload("res://scripts/account.gd")
 
 var fails := 0
 
@@ -100,9 +101,49 @@ func _init() -> void:
 	probe_label.queue_free()
 	probe_button.queue_free()
 
+	# NO-31: the logout confirm asked "Log out of Apple?" on iOS. capitalize() on
+	# the provider KEY spells the key, and PR #301 ruled the provider is always
+	# shown as "Game Center" -- Apple names Sign in with Apple, a different
+	# service a player then goes looking for. Account.label() is the one place
+	# that knows, and menu.gd reads the same helper.
+	var acct_paths := ["user://t_no31_save.json"]
+	for prov_case in [[Account.APPLE, "Game Center", "Apple"],
+			[Account.GOOGLE, "Google", ""]]:
+		Account.logout(acct_paths)
+		Account._reset_cache()
+		Account.sign_in(prov_case[0], "id-" + str(prov_case[0]), acct_paths)
+		var layer := Control.new()
+		root.add_child(layer)
+		Settings.build(layer, func() -> void: pass, Callable(),
+			func() -> void: pass)
+		var warn_text := _find_logout_warn(layer)
+		check(prov_case[1] in warn_text,
+			"the logout confirm names %s for provider %s (%s)"
+				% [prov_case[1], prov_case[0], warn_text.split("\n")[0]])
+		if prov_case[2] != "":
+			check(not (prov_case[2] in warn_text),
+				"and never says \"%s\" -- that is a different Apple service" % prov_case[2])
+		layer.queue_free()
+		await process_frame
+	Account.logout(acct_paths)
+	DirAccess.remove_absolute(acct_paths[0])
+
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
 
 	print("---")
 	if fails == 0:
 		print("ALL SETTINGS CHECKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## The logout confirm's warning Label, found by content rather than by index:
+## the panel's child order is not this test's business and moves with the
+## settings rows.
+func _find_logout_warn(node: Node) -> String:
+	if node is Label and "Log out of" in (node as Label).text:
+		return (node as Label).text
+	for c in node.get_children():
+		var found := _find_logout_warn(c)
+		if found != "":
+			return found
+	return ""

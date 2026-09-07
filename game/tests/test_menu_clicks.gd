@@ -8,6 +8,8 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
+const MemoryBackend := preload("res://scripts/cloud/cloud_backend_memory.gd")
+const CloudSave := preload("res://scripts/cloud_save.gd")
 
 var fails := 0
 
@@ -319,6 +321,69 @@ func _init() -> void:
 	check(Account.needs_login(), "confirmed logout ends the session")
 	check(_find_button(out, "Play as Guest") != null,
 		"and lands on the login screen, with its guest exit relabelled for a device with nothing to continue")
+
+	# ---- NO-31: an account switch ASKS before it rebinds ---------------------
+	# NO-11 called Account.switch_to straight from the verdict handler, on every
+	# verdict including the silent boot check, so a device whose account changed
+	# re-homed the install with nothing on screen saying so. Drive a mismatched
+	# verdict and pin that the rebind waits for an answer.
+	#
+	# The memory backend reports a FIXED account_id ("memory-account"), so signing
+	# in as anything else and then handing the menu a successful verdict IS the
+	# mismatch, with no device involved (the pattern PR #338 established).
+	out.queue_free()
+	await process_frame
+	var prev_backend = CloudSave.backend
+	CloudSave.backend = MemoryBackend
+	Account._reset_cache()
+	Account.sign_in(Account.GOOGLE, "probe-owner-a", [])
+	var sw: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(sw)
+	await process_frame
+	await process_frame
+	sw._on_sign_in_finished(true)
+	await process_frame
+	check(Account.owner() == "probe-owner-a",
+		"a mismatched verdict does NOT rebind on its own — switch_to waits for consent")
+	check(_find_button(sw, "Switch account") != null
+			and _find_button(sw, "Not now") != null,
+		"it asks instead, offering both answers")
+	var prompt_text := _find_label(sw, "Switch to the new account?")
+	check(prompt_text != null and "probe-owner-a" in prompt_text.text
+			and "memory-account" in prompt_text.text,
+		"and the prompt NAMES BOTH accounts — \"an account changed\" is not answerable")
+
+	# Decline: pre-NO-11 behaviour for the session, but said out loud.
+	check(await _click_button(sw, "Not now"), "Not now clickable")
+	await process_frame
+	check(Account.owner() == "probe-owner-a", "declining does not rebind")
+	check(_find_button(sw, "Switch account") == null, "and the prompt closes")
+	sw._on_sign_in_finished(true)
+	await process_frame
+	check(_find_button(sw, "Switch account") == null,
+		"a later verdict in the SAME session does not re-ask — declining is not a nag loop")
+	check(Account.owner() == "probe-owner-a", "and still does not rebind")
+
+	# Accept, on a fresh menu — the prompt re-appears on the next boot.
+	sw.queue_free()
+	await process_frame
+	var sw2: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(sw2)
+	await process_frame
+	await process_frame
+	sw2._on_sign_in_finished(true)
+	await process_frame
+	check(_find_button(sw2, "Switch account") != null,
+		"the prompt DOES come back on the next boot")
+	check(await _click_button(sw2, "Switch account"), "Switch account clickable")
+	await process_frame
+	check(Account.owner() == "memory-account",
+		"accepting rebinds, through the same Account.switch_to")
+	sw2.queue_free()
+	await process_frame
+	CloudSave.backend = prev_backend
+	Account.logout([])
+	Account._reset_cache()
 
 	print("---")
 	if fails == 0:

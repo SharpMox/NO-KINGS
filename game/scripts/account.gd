@@ -211,6 +211,18 @@ static func logout(save_paths: Array) -> bool:
 ##
 ## Returns whether a switch actually happened, so a caller can tell "rebound the
 ## saves" from "nothing to do".
+## What to CALL a provider on screen. "Apple" names Sign in with Apple -- a
+## DIFFERENT Apple service; what we actually use is Game Center, and a player who
+## reads "Apple" goes looking for the wrong thing (observed on the simulator,
+## 2026-09-04: "is there supposed to be a Game Center app?").
+##
+## Lives here, not in menu.gd, because settings.gd needs it too: its logout
+## confirm built the name with provider().capitalize() and so asked "Log out of
+## Apple?" on iOS, contradicting the ruling in the paragraph above (NO-31).
+static func label(prov: String) -> String:
+	return "Game Center" if prov == APPLE else "Google"
+
+
 static func switch_to(new_provider: String, account_id: String,
 		save_paths: Array) -> bool:
 	if account_id == "" or account_id == owner():

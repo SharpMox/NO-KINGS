@@ -187,6 +187,32 @@ static func apply(g, cfg: Dictionary) -> void:
 	# only mean (nothing lost since the snapshot it never took).
 	g.wave_start_lost_player = int(cfg.get("wave_start_lost_player", g.lost_player))
 	g.silk_road_active = bool(cfg.get("silk_road_active", false))
+	# NO-20: the per-Artefact activation flags and run-long counters. Every one
+	# is ADDITIVE — read with a default that is exactly what a save written
+	# before the field existed meant — so no migration and no version bump.
+	#
+	# Unpersisted, these re-armed on quit-and-Continue, which is a save-scum
+	# path for six player-triggered Artefacts: spend the once-per-Wave effect,
+	# quit, Continue, spend it again. The run-long counters were worse than
+	# re-armed, they RESET, silently restarting a cadence mid-run the way issue
+	# 55's run_capture_count did before it was persisted.
+	#
+	# `salvation_charged` defaults TRUE, not false: it means "ready to veto the
+	# next Tariff", and its var declaration starts true. Defaulting it false
+	# would hand every pre-NO-20 save a spent Salvation Gift Card it never used.
+	g.zapruder_used_this_wave = bool(cfg.get("zapruder_used_this_wave", false))
+	g.bovine_used_this_wave = bool(cfg.get("bovine_used_this_wave", false))
+	g.jet_fuel_used_this_wave = bool(cfg.get("jet_fuel_used_this_wave", false))
+	g.uap_used_this_wave = bool(cfg.get("uap_used_this_wave", false))
+	g.torpedo_used_this_wave = bool(cfg.get("torpedo_used_this_wave", false))
+	g.hoffa_used_this_wave = bool(cfg.get("hoffa_used_this_wave", false))
+	g.doomsday_snooze_used_this_wave = bool(cfg.get("doomsday_snooze_used_this_wave", false))
+	g.arks_bunkbed_used = bool(cfg.get("arks_bunkbed_used", false))
+	g.salvation_charged = bool(cfg.get("salvation_charged", true))
+	g.nibiru_wave_streak = int(cfg.get("nibiru_wave_streak", 0))
+	g.club27_streak = int(cfg.get("club27_streak", 0))
+	g.lottery_purchase_count = int(cfg.get("lottery_purchase_count", 0))
+	g.pallet_purchase_count = int(cfg.get("pallet_purchase_count", 0))
 	g.pending_spawn = cfg.get("pending", []).duplicate(true)
 	for p in cfg.get("board", []):
 		var piece := {"id": p[0], "owner": int(p[1])}
@@ -295,6 +321,21 @@ static func to_config(g) -> Dictionary:
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
 		"wave_start_lost_player": g.wave_start_lost_player, # review pass 1
 		"silk_road_active": g.silk_road_active, # review pass 1
+		# NO-20 — see the matching block in apply() for why each default is
+		# what it is. Additive: no migration, no version bump.
+		"zapruder_used_this_wave": g.zapruder_used_this_wave,
+		"bovine_used_this_wave": g.bovine_used_this_wave,
+		"jet_fuel_used_this_wave": g.jet_fuel_used_this_wave,
+		"uap_used_this_wave": g.uap_used_this_wave,
+		"torpedo_used_this_wave": g.torpedo_used_this_wave,
+		"hoffa_used_this_wave": g.hoffa_used_this_wave,
+		"doomsday_snooze_used_this_wave": g.doomsday_snooze_used_this_wave,
+		"arks_bunkbed_used": g.arks_bunkbed_used,
+		"salvation_charged": g.salvation_charged,
+		"nibiru_wave_streak": g.nibiru_wave_streak,
+		"club27_streak": g.club27_streak,
+		"lottery_purchase_count": g.lottery_purchase_count,
+		"pallet_purchase_count": g.pallet_purchase_count,
 		"pending": g.pending_spawn.duplicate(true),
 		"score": g.score, "gold": g.gold, "score_gained_total": g.score_gained_total,
 		"run_capture_count": g.run_capture_count, # issue 55, Zeta Reticuli

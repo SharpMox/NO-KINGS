@@ -141,10 +141,12 @@ var turn_capture_count := 0 # captures this player turn, reset in _begin_player_
 var run_capture_count := 0 # issue 55: run-long, never resets (Zeta Reticuli
 	# Souvenir Map's "every 3rd Capture" of the whole run — the two indices
 	# above reset on their own wave/turn boundaries and would undercount).
-	# Not persisted across saves, same as the sibling per-artefact run-long
-	# counters below that already aren't (nibiru_wave_streak, club27_streak,
-	# lottery_purchase_count, pallet_purchase_count) — an accepted existing
-	# gap, not a new one.
+	# Persisted since issue 55. The sibling run-long counters below
+	# (nibiru_wave_streak, club27_streak, lottery_purchase_count,
+	# pallet_purchase_count) and the once-per-Wave activation flags joined it
+	# in NO-20; this comment claimed none of them were saved, which was already
+	# untrue of run_capture_count itself and is what made the gap read as
+	# accepted rather than open.
 var gold_spent_shop_this_wave := 0 # reset in WaveLogic.queue() (artefact hook 16)
 var silk_road_active := false # Silk Road Coupon's -50% Shop prices, reset in
 	# WaveLogic.queue() every wave (artefact hook 18)

@@ -59,6 +59,17 @@ func _init() -> void:
 			# lost_player against this; a resume that zeroed it denied every
 			# clean-wave Artefact for the wave in progress
 		"silk_road_active": true, # review pass 1: the coupon's -50% must survive a resume
+		# NO-20: the once-per-Wave activation flags and run-long counters.
+		# salvation_charged is deliberately set FALSE here — its default is
+		# true, so a fixture that left it true would pass even if the field
+		# were dropped entirely.
+		"zapruder_used_this_wave": true, "bovine_used_this_wave": true,
+		"jet_fuel_used_this_wave": true, "uap_used_this_wave": true,
+		"torpedo_used_this_wave": true, "hoffa_used_this_wave": true,
+		"doomsday_snooze_used_this_wave": true, "arks_bunkbed_used": true,
+		"salvation_charged": false,
+		"nibiru_wave_streak": 4, "club27_streak": 6,
+		"lottery_purchase_count": 3, "pallet_purchase_count": 2,
 		"family_ability_used_this_wave": true, # issue 67 — note the SAVE KEY
 			# deliberately kept its old name in issue 76 while the in-memory
 			# symbol became army_*: renaming a persisted key is not additive and
@@ -95,6 +106,23 @@ func _init() -> void:
 		+ "run_capture_count/shop_lane_b_progress above, a field missing from the save is "
 		+ "absent from BOTH sides of the generic identity check and compares equal, so this "
 		+ "asserts the actual restored VALUE instead of trusting the identity check alone")
+	# NO-20: same missing-from-both-sides trap as run_capture_count above, so
+	# these assert the restored VALUES rather than trusting the identity check.
+	# Unpersisted, every one of these re-armed on quit-and-Continue — a
+	# save-scum path for six player-triggered Artefacts.
+	check(b.zapruder_used_this_wave and b.bovine_used_this_wave
+			and b.jet_fuel_used_this_wave and b.uap_used_this_wave
+			and b.torpedo_used_this_wave and b.hoffa_used_this_wave
+			and b.doomsday_snooze_used_this_wave and b.arks_bunkbed_used,
+		"NO-20: the eight once-per-Wave activation flags survive a resume — "
+		+ "spend, quit, Continue must not re-arm them")
+	check(not b.salvation_charged,
+		"NO-20: a SPENT Salvation Gift Card stays spent — the field defaults to "
+		+ "true, so this is the direction that fails if the key were dropped")
+	check(b.nibiru_wave_streak == 4 and b.club27_streak == 6
+			and b.lottery_purchase_count == 3 and b.pallet_purchase_count == 2,
+		"NO-20: the four run-long counters survive — unpersisted they RESET, "
+		+ "silently restarting a cadence mid-run")
 	check(b.wave_start_lost_player == 3 and b.silk_road_active,
 		"review pass 1: the wave-in-progress snapshot (wave_start_lost_player) and Silk Road "
 		+ "Coupon's active discount survive a resume — same missing-from-both-sides trap as above")

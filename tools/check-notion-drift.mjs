@@ -11,34 +11,79 @@
 // 21 tariffs does not scale and fails silently.
 //
 // ---------------------------------------------------------------------------
-// THE MCP CONSTRAINT — read this before wiring it into anything
+// HOW TO PRODUCE THE SNAPSHOT (updated 2026-09-07 — the old recipe is dead)
 // ---------------------------------------------------------------------------
-// The Notion MCP tools (`mcp__notion__notion-query-data-sources`) are only
-// available inside an interactive agent session — a plain `node` script
-// cannot call them, and this repo has no Notion API token/CLI to shell out
-// to instead. So this tool takes Notion's data as an input file rather than
-// fetching it itself:
+// This tool takes Notion's data as an input file rather than fetching it:
 //
 //   node tools/check-notion-drift.mjs <snapshot.json>
 //
-// To produce that snapshot, run in an agent session with Notion MCP access
-// (SQL mode; this Notion plan only allows ONE data source per query, so run
-// these four separately, not as a batch):
+// The header used to say "run these SQL queries through the Notion MCP".
+// THE NOTION MCP WAS REMOVED on 2026-09-06 in favour of the signed-in browser,
+// so that recipe cannot be followed. Gather the rows through agent-browser
+// instead — see the global CLAUDE.md for the connect-mode launch.
 //
-//   SELECT Name, Rarity, STATUS, Notes FROM "collection://9130a407-248b-4c63-896b-759465ab2d46" -- Artefacts
-//   SELECT Name, Tier, Description FROM "collection://9cbe7699-3282-4419-b8f2-dabec907825f" -- Items
-//   SELECT "Codex ID", Name, Betza, Letter FROM "collection://1cb5b2b5-d805-4041-8de2-f7715ac16471" -- Pieces
-//   SELECT Name, Tier, Description FROM "collection://1328fb22-abaf-47ee-bd32-1eb3397f5a66" -- Tariffs
+// Database page URLs (NOT the collection:// ids the old recipe used — those
+// are data sources and 404 as pages):
 //
-// (Artefacts is 180 rows — SQL mode pages at 100, so run it twice with
-// `LIMIT 100 OFFSET 100` for the second page and concatenate.)
+//   Artefacts       app.notion.com/p/dcfc4879530547c785278f198b85f3cb   (180 rows)
+//   Items           app.notion.com/p/4bb01465387746e0beac20f382e7544c   (16)
+//   Pieces          app.notion.com/p/a0cc1983c47541b6a92922f0113dc627   (39)
+//   Tariffs Catalog app.notion.com/p/8906ed7b41da4b64a800f30af3494c8d   (21)
 //
-// Save the four result arrays into one JSON file shaped like:
-//   { "artefacts": [...], "items": [...], "pieces": [...], "tariffs": [...] }
-// using the exact Notion column names as object keys (as SQL returns them),
-// then run this tool against that file. There is no committed snapshot
-// fixture on purpose — a stale one would silently start lying, which is the
-// exact failure mode this tool exists to catch.
+// Extract CELL-ALIGNED, never by splitting a row's innerText: an empty cell
+// emits no line, so a split silently shifts every later column and manufactures
+// drift that isn't there.
+//
+//   const rows = [...document.querySelectorAll('.notion-collection-item')];
+//   const hdr  = [...document.querySelectorAll('.notion-table-view-header-cell')]
+//                  .map(e => e.innerText.trim());
+//   rows.map(r => {
+//     const cells = [...r.querySelectorAll('.notion-table-view-cell')]
+//                     .map(c => c.innerText.trim());
+//     return Object.fromEntries(hdr.map((h, i) => [h, cells[i] ?? '']));
+//   });
+//
+// Notion VIRTUALIZES BOTH AXES, and the column half is the nastier one.
+//
+// ROWS: a short viewport renders only ~20, so a naive read of the 180-row
+// Artefacts table returns a window and every missing row reports as "in Notion
+// only". Obvious once seen, because the count is visibly wrong.
+//
+// COLUMNS: a table wider than the viewport renders only the visible ones —
+// 4 of the Artefacts table's 8 at 1200px wide. This one is DANGEROUS, because
+// zipping headers against rendered cells by position still "works": it just
+// silently assigns 8 header names to 4 values, so every column past the fourth
+// reads as empty and reports as drift. That produced 383 fabricated findings
+// on 2026-09-07 before anyone noticed the shape (nearly all Notion="").
+//
+// Zooming the page does NOT help — the virtualization is Notion's own layout
+// maths, not CSS. Cells carry `data-row-index` and `data-col-index`; key on
+// those and accumulate over BOTH scroll axes:
+//
+//   const rows = {};
+//   const grab = () => {
+//     for (const r of document.querySelectorAll('.notion-collection-item')) {
+//       const cells = [...r.querySelectorAll('.notion-table-view-cell')];
+//       if (!cells.length) continue;
+//       const ri = cells[0].getAttribute('data-row-index');
+//       rows[ri] ??= {};
+//       for (const c of cells) rows[ri][c.getAttribute('data-col-index')] = c.innerText.trim();
+//     }
+//   };
+//   // then: for each horizontal scroll position, walk the vertical one, grab()
+//
+// VERIFY BEFORE TRUSTING A RUN: row count matches the table's own count, AND
+// every row has exactly as many values as there are headers. A run where those
+// two hold is measuring drift; one where they do not is measuring the viewport.
+//
+// Save as { "artefacts": [...], "items": [...], "pieces": [...], "tariffs": [...] }
+// keyed on the exact Notion column names. A partial snapshot is fine if you
+// only read that catalog's section — an omitted catalog reports every repo row
+// as "in repo only", which is noise, not a finding.
+//
+// There is no committed snapshot fixture on purpose — a stale one would
+// silently start lying, which is the exact failure mode this tool exists to
+// catch.
 //
 // ---------------------------------------------------------------------------
 // NORMALISATION — what counts as "different"

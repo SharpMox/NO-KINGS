@@ -43,10 +43,38 @@
 //     return Object.fromEntries(hdr.map((h, i) => [h, cells[i] ?? '']));
 //   });
 //
-// Notion VIRTUALIZES rows: a short viewport renders only ~20. Scroll the list
-// container and accumulate into a Set keyed on Name, or the 180-row Artefacts
-// table will quietly return a window and every missing row reports as
-// "in Notion only". Verify the count matches the table before trusting a run.
+// Notion VIRTUALIZES BOTH AXES, and the column half is the nastier one.
+//
+// ROWS: a short viewport renders only ~20, so a naive read of the 180-row
+// Artefacts table returns a window and every missing row reports as "in Notion
+// only". Obvious once seen, because the count is visibly wrong.
+//
+// COLUMNS: a table wider than the viewport renders only the visible ones —
+// 4 of the Artefacts table's 8 at 1200px wide. This one is DANGEROUS, because
+// zipping headers against rendered cells by position still "works": it just
+// silently assigns 8 header names to 4 values, so every column past the fourth
+// reads as empty and reports as drift. That produced 383 fabricated findings
+// on 2026-09-07 before anyone noticed the shape (nearly all Notion="").
+//
+// Zooming the page does NOT help — the virtualization is Notion's own layout
+// maths, not CSS. Cells carry `data-row-index` and `data-col-index`; key on
+// those and accumulate over BOTH scroll axes:
+//
+//   const rows = {};
+//   const grab = () => {
+//     for (const r of document.querySelectorAll('.notion-collection-item')) {
+//       const cells = [...r.querySelectorAll('.notion-table-view-cell')];
+//       if (!cells.length) continue;
+//       const ri = cells[0].getAttribute('data-row-index');
+//       rows[ri] ??= {};
+//       for (const c of cells) rows[ri][c.getAttribute('data-col-index')] = c.innerText.trim();
+//     }
+//   };
+//   // then: for each horizontal scroll position, walk the vertical one, grab()
+//
+// VERIFY BEFORE TRUSTING A RUN: row count matches the table's own count, AND
+// every row has exactly as many values as there are headers. A run where those
+// two hold is measuring drift; one where they do not is measuring the viewport.
 //
 // Save as { "artefacts": [...], "items": [...], "pieces": [...], "tariffs": [...] }
 // keyed on the exact Notion column names. A partial snapshot is fine if you

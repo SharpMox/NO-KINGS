@@ -436,12 +436,11 @@ func _init() -> void:
 	# ONE ICON SIZE. Items were 30px, stock stacks 46, the strip 52 before this
 	# was pulled onto a single constant; nothing but a pin stops them drifting
 	# apart again, because each lives in a different rebuild function.
-	var odd_sizes: Array = []
-	for b in game.hud.stock_strip.find_children("*", "Button", true, false):
-		if (b as Button).custom_minimum_size.x != game.hud.ICON:
-			odd_sizes.append((b as Button).custom_minimum_size.x)
-	check(odd_sizes.is_empty(),
-		"every strip icon is exactly ICON (%d), found: %s" % [game.hud.ICON, str(odd_sizes)])
+	# The ONE ICON SIZE pin used to sit here, walking game.hud.stock_strip only.
+	# It could not fail: this config carries no Stock, so the strip held ZERO
+	# buttons and the loop asserted nothing at all (measured, NO-36). It now has
+	# its own instance, with the content all three strips need — see below, after
+	# the Ability states.
 
 	# THE ABILITY WEARS ITS STATE. Availability without opening a menu is the
 	# feature; "ready" was the only state ever exercised, and the other two are
@@ -465,6 +464,104 @@ func _init() -> void:
 	check("1 Action" in game.hud.army_ability_button.text
 			and not game.hud.army_ability_button.disabled,
 		"and it comes back ready once an Action exists again")
+	await process_frame
+
+	# ---- ONE ICON SIZE, ACROSS ALL THREE STRIPS (NO-36) ---------------------
+	# Items were 30px, stock stacks 46, the strip 52 before these were pulled
+	# onto one constant. PR #312's pin named that drift but walked only
+	# stock_strip — and on a config with no Stock that container is empty, so the
+	# pin asserted nothing whatsoever. The two strips that ACTUALLY drifted, the
+	# item strip and the pool strip, were never inspected.
+	#
+	# So: a dedicated instance holding Stock AND items, both drawers visited, and
+	# every strip asserted NON-EMPTY first — a vacuous pass is the exact failure
+	# being fixed, and it must not be reachable again.
+	var icon_game: Node2D = game
+	game = null
+	icon_game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"items": ["buff_box"], "stock": ["pawn", "rook"]}
+	icon_game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(icon_game)
+	await process_frame
+	await process_frame
+	var ICON_PX: int = icon_game.hud.ICON
+
+	# 1. the stock strip under the board (rebuilt from _pool(), needs a sane width)
+	var stock_btns: Array = icon_game.hud.stock_strip.find_children("*", "Button", true, false)
+	check(not stock_btns.is_empty(), "(setup) the stock strip actually holds buttons to measure")
+	var odd_stock: Array = []
+	for b in stock_btns:
+		if (b as Button).custom_minimum_size != Vector2(ICON_PX, ICON_PX):
+			odd_stock.append((b as Button).custom_minimum_size)
+	check(odd_stock.is_empty(),
+		"stock strip: every icon is exactly ICON x ICON (%d), found: %s" % [ICON_PX, str(odd_stock)])
+
+	# 2. the item strip, in the Inventory drawer. KNOWN EXCEPTION, asserted
+	# rather than skipped: the button carries the item NAME beside the icon, so
+	# its width is free and the icon is clamped to ICON - 8 (hud.gd's comment at
+	# the icon_max_width override). Its HEIGHT is still a flat ICON.
+	check(await _click_button_in(icon_game.hud, "Inventory 1"),
+		"Inventory opens for the item strip")
+	await process_frame
+	var item_btns: Array = []
+	for c in icon_game.hud.item_box.get_children():
+		if c is Button:
+			item_btns.append(c)
+	check(not item_btns.is_empty(), "(setup) the item strip actually holds buttons to measure")
+	var odd_item: Array = []
+	for b in item_btns:
+		if (b as Button).custom_minimum_size.y != ICON_PX \
+				or (b as Button).get_theme_constant("icon_max_width") != ICON_PX - 8:
+			odd_item.append([(b as Button).custom_minimum_size.y,
+				(b as Button).get_theme_constant("icon_max_width")])
+	check(odd_item.is_empty(),
+		"item strip: height is ICON (%d) and the icon clamps to ICON-8 (%d), found: %s"
+			% [ICON_PX, ICON_PX - 8, str(odd_item)])
+
+	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
+	# while that drawer is closed ("stock drawer closed: no targets"), so the
+	# drawer has to be OPEN for this container to hold anything at all.
+	check(await _click_button_in(icon_game.hud, "Stock 2"), "Stock drawer opens for the pool strip")
+	await process_frame
+	var pool_btns: Array = []
+	for c in icon_game.hud.pool_box.get_children():
+		if c is Button:
+			pool_btns.append(c)
+	check(not pool_btns.is_empty(), "(setup) the pool strip actually holds buttons to measure")
+	var odd_pool: Array = []
+	for b in pool_btns:
+		if (b as Button).custom_minimum_size != Vector2(ICON_PX, ICON_PX):
+			odd_pool.append((b as Button).custom_minimum_size)
+	check(odd_pool.is_empty(),
+		"pool strip: every icon is exactly ICON x ICON (%d), found: %s" % [ICON_PX, str(odd_pool)])
+
+	# The pool strip grows a "+" take-back slot, but ONLY in SETUP with a board
+	# piece selected -- which is why it kept a hardcoded 46 long after every
+	# stack button beside it moved to ICON. Force that state rather than leave
+	# the one control the pin cannot otherwise reach untested.
+	icon_game.state = icon_game.State.SETUP
+	icon_game.selected = Vector2i(2, 2)
+	icon_game.hud.refresh()
+	await process_frame
+	var plus_slot: Button = null
+	for c in icon_game.hud.pool_box.get_children():
+		if c is Button and (c as Button).text == "+":
+			plus_slot = c
+	check(plus_slot != null, "(setup) the take-back \"+\" slot is present in SETUP with a selection")
+	check(plus_slot != null and plus_slot.custom_minimum_size == Vector2(ICON_PX, ICON_PX),
+		"pool strip: the \"+\" take-back slot is ICON too (%d), not the pre-ICON 46" % ICON_PX)
+
+	icon_game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens after the icon-size pin")
 	await process_frame
 	check(await _click_button_in(game.hud.item_box, "Buff Box"),
 		"Buff Box clickable in the drawer")

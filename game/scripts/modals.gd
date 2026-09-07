@@ -8,6 +8,8 @@
 extends Node
 
 const Tuning := preload("res://scripts/tuning.gd")
+const Economy := preload("res://scripts/economy.gd") # SCORE_MULTIPLIER, so the
+	# Skip button can show the score the player actually receives
 const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
@@ -1060,6 +1062,8 @@ func show_box(options: Array) -> void:
 		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
 		box.add_child(reroll)
 	var skip := Button.new()
-	skip.text = "Skip (+%d score)" % Tuning.BOX_SKIP_CONSOLATION
+	# The Box's price, and the number the player ACTUALLY receives: earn()
+	# applies SCORE_MULTIPLIER, so the old label's "+20 score" was really +200.
+	skip.text = "Skip (+%d score)" % (Tuning.box_skip_score(g.box_size) * Economy.SCORE_MULTIPLIER)
 	skip.pressed.connect(func() -> void: box_skipped.emit())
 	box.add_child(skip)

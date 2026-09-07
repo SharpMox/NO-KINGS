@@ -427,19 +427,16 @@ func build(game) -> void:
 	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
 	power_badge.add_child(army_power_label)
 	deck.add_child(power_badge)
-	# DECK ORDER (design C): status pills, drawers, the passive power, then the
-	# thumb row last. The rows are built in whatever order the rest of build()
-	# needs them, so the order that matters is asserted here rather than implied
-	# by construction sequence.
-	# ORDER (design C): stock strip under the board, then status, drawers, the
-	# passive power, and the thumb row last.
+	# DECK ORDER (design C): stock strip under the board, then status pills,
+	# drawers, the passive power, and the thumb row last. The rows are built in
+	# whatever order the rest of build() needs them, so the order that matters is
+	# asserted here rather than implied by construction sequence.
 	deck.move_child(stock_strip, 0)
 	deck.move_child(status, 1)
 	deck.move_child(nav_row, 2)
 	deck.move_child(power_badge, 3)
 	deck.move_child(act_row, 4)
-	# (the power label used to sit here; design C moved it onto the deck) — it is
-		# the standing rule the rest of the drawer operates under
+	# (the power label used to sit here; design C moved it onto the deck)
 	inv_box.add_child(item_box)
 	inv_box.add_child(activate_box)
 	inv_box.add_child(artefact_box)

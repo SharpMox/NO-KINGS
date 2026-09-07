@@ -4,6 +4,7 @@
 ## (difficulty picker) hang their own rows off — 05-menus-and-settings only
 ## ships the one real, wired toggle that exists today: Sound.
 
+const Account := preload("res://scripts/account.gd")
 const SETTINGS_PATH := "user://settings.json"
 const DEFAULTS := {"sound_on": true, "animations_on": true, "crt_on": true}
 
@@ -59,7 +60,6 @@ static func _crt(data: Dictionary) -> void:
 ## (optional) fires with the full settings Dictionary after every toggle, so a
 ## caller with a live session (the in-game menu) can apply it without a
 ## restart — the Main Menu has no running game to update, so it's unused there.
-const Account := preload("res://scripts/account.gd")
 
 
 ## `on_logout` is what makes the Log out row appear at all. Both entry points

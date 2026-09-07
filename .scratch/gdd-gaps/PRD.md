@@ -7,9 +7,13 @@
 > Do not add a new `issues/NN-*.md`, and do not reopen one; file it in Linear instead.
 >
 > This directory keeps its full value as history: 106 slices, each with its `Status:`
-> line and an `## Outcome` recording what actually shipped, plus `NOTION-QUESTIONS.md`
-> and `MANUAL-STEPS.md`. Only the *live* items were migrated (104, 105 and the findings
-> open on 2026-09-06); the archive deliberately was not.
+> line and an `## Outcome` recording what actually shipped, plus `NOTION-QUESTIONS.md`.
+> Only the *live* items were migrated (104, 105 and the findings open on 2026-09-06);
+> the archive deliberately was not.
+>
+> `MANUAL-STEPS.md` was listed here too until 2026-09-08, when it moved to
+> `docs/MANUAL-STEPS.md` — it is a LIVE checklist, still being edited after this
+> directory became read-only, so it did not belong in an archive (NO-34).
 >
 > **`FLAGS.md` was retired the same day** and split three ways, because it had become
 > three different things under one name: the actionable findings became Linear issues,

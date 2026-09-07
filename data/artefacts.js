@@ -609,7 +609,7 @@ var ARTEFACTS = [
   { name: "Elvish Hard Hat", rarity: "Rare", type: "Trigger", bonus: ["Action"], status: "KEEP",
     implemented: true,
     effect: "If your first Action of a Turn is an Item or ability: +1 Action",
-    conspiracy: "The Demolition Elves", url: "https://en.wikipedia.org/wiki/Elf",
+    conspiracy: "The Demolition Elves", url: "https://en.wikipedia.org/wiki/Huldufolk",
     summary: "From the deep catalog: the theory that small unseen crews quietly demolish and rearrange the world overnight — that's why nothing is where you left it. OSHA-compliant, size XXS. (Full dossier in the Conspiracies DB.)" },
   { name: "Majestic 12 Secret Handshake Diagram", rarity: "Rare", type: "Passive", bonus: ["Item"], status: "KEEP", implemented: true,
     effect: "Item Boxes only offer Strategic and Decisive Items",

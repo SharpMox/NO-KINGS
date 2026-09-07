@@ -200,6 +200,12 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   leave it `implemented: false` and write down why.
 - **Scope discipline.** No defensive code, speculative features, or backwards-compat
   shims. Out-of-scope discoveries open a follow-up Linear issue — don't expand the change.
+  **The one sanctioned exception is a first-launch failure path that would otherwise
+  leave a black screen**: `intro.gd`'s deadman timer advances past the intro after
+  `INTRO_MAX_SECONDS` if the video never decodes, and its own commit (e8c0f4b) calls it
+  "defensive rather than a fix for an observed fault". Ruled to KEEP, 2026-09-07 — a
+  player staring at nothing has no way to report what went wrong. Named here so the next
+  reviewer does not flag it again.
 - **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the
   headless sweeps: `godot --path game -s tests/test_menu_clicks.gd` and
   `-s tests/test_game_clicks.gd` (windowed — Godot headless still drops GUI picking, re-verified on 4.7).
@@ -384,8 +390,11 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
 <type>(<scope>): <description>
 ```
 
-Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`. One commit per logical
-change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
+Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `test`, `perf` (`test` and
+`perf` added 2026-09-07 — the preceding three days had already used both). A `wip` commit
+is **squashed before merge**, never landed: 8ad5681 reached `main` inside PR #308. The
+scope is **required** — nine commits on 2026-09-03 shipped without one. One commit per
+logical change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
 (e.g. `Refs: NO-16`); reference-site changes don't need one. The example here said
 `ENG-42` until 2026-09-06, from a team prefix that never existed.
 
@@ -408,5 +417,9 @@ directory to `SKILLS`.
 - `data/` — the canonical piece / promotion / fusion data for the reference site.
 - `CONTEXT.md` — domain glossary (Godot + GitNexus-fork terms, for the game).
 - `docs/adr/` — architecture decision records.
+- `docs/MANUAL-STEPS.md` — the live checklist of things only the user can do
+  (accounts, payments, keystore, device logins). Moved out of
+  `.scratch/gdd-gaps/` on 2026-09-08: it was still being edited three times
+  after that directory became a read-only archive, and nothing pointed at it.
 - `skills-lock.json` — installed external skills with content hashes.
 - Godot skills: `.agents/skills/godot-{best-practices,gdscript-patterns,ui,mcp}/SKILL.md`.

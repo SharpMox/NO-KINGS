@@ -190,6 +190,13 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# Game Center is issue 87 and needs its own path.
 	if id != "" and was_interactive and not Account.signed_in():
 		Account.sign_in(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
+	# NO-11: the device's account changed under a signed-in install. The branch
+	# above cannot catch it — it requires NOT signed in — so before this the
+	# mismatch fell through every path and sync just went quiet. switch_to
+	# parks the outgoing owner's saves and reclaims the incoming account's, and
+	# refuses on its own when this is really a guest conversion or a first bind.
+	elif id != "" and Account.owner() != id:
+		Account.switch_to(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
 	if Account.owner() == id:
 		if sync_button != null:
 			sync_button.visible = false

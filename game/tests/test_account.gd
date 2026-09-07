@@ -164,6 +164,49 @@ func _init() -> void:
 	check(not Account.logout(paths), "logout refuses a guest — a fresh id could never reclaim the saves")
 	check(not Account.needs_login(), "and leaves the guest account intact")
 
+	# --- NO-11: the device's Google account changes under a signed-in install.
+	# Before this the mismatch fell through every branch in menu.gd (its
+	# sign_in call requires NOT signed in), so sync silently went dead.
+	# switch_to composes logout+sign_in, so each account keeps its own progress.
+	_clean()
+	var sw_run := "user://t_run.json"
+	var sw_paths: Array = [sw_run]
+	Account.sign_in(Account.GOOGLE, "google-alice", sw_paths)
+	_write(sw_run, {"wave": 42, "owner": "google-alice"})
+
+	check(Account.switch_to(Account.GOOGLE, "google-bob", sw_paths),
+		"NO-11: a live owner mismatch is handled as a switch")
+	check(Account.owner() == "google-bob", "...the session is now the new account")
+	check(not FileAccess.file_exists(sw_run),
+		"...Bob does not inherit Alice's run")
+	check(FileAccess.file_exists(Account._parked(sw_run, "google-alice")),
+		"...Alice's run is PARKED under her id, never deleted")
+
+	# switching back restores it — the property that makes this safe to ship
+	# before a device can confirm it, since nothing is destroyed either way.
+	check(Account.switch_to(Account.GOOGLE, "google-alice", sw_paths),
+		"NO-11: switching back is the same operation")
+	check(FileAccess.file_exists(sw_run), "...and Alice gets her run returned")
+	var back: Variant = JSON.parse_string(FileAccess.get_file_as_string(sw_run))
+	check(back is Dictionary and int(back.get("wave", 0)) == 42,
+		"...with her progress intact, not just a file of the right name")
+
+	check(not Account.switch_to(Account.GOOGLE, "google-alice", sw_paths),
+		"NO-11: switching to the account already signed in is a no-op")
+	check(not Account.switch_to(Account.GOOGLE, "", sw_paths),
+		"NO-11: an empty id is refused rather than parking saves to nowhere")
+
+	# A GUEST hitting this path is the conversion case, not a switch: sign_in
+	# REBINDS so the guest's progress follows them. Parking it would orphan it,
+	# because start_guest mints a new id every call.
+	_clean()
+	Account.start_guest()
+	_write(sw_run, {"wave": 7})
+	check(not Account.switch_to(Account.GOOGLE, "google-alice", sw_paths),
+		"NO-11: a guest is refused — that is conversion, which sign_in rebinds")
+	check(FileAccess.file_exists(sw_run),
+		"...so the guest's run stays exactly where it is, unparked")
+
 	_clean()
 	print("---")
 	print("ALL ACCOUNT CHECKS OK" if fails == 0 else "ACCOUNT FAILURES: %d" % fails)

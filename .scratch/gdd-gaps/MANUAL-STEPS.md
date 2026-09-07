@@ -356,3 +356,65 @@ designed for exactly that split. If you do want it:
 4. Wire the leaderboard id from A7.
 5. Build, install to the device from B, and verify sign-in, a save round-trip and a
    leaderboard submit **on the device** — the only verification that counts here.
+
+---
+
+## D. The release keystore — NO-12, and the one secret in the whole build
+
+`gradle_build/export_format` is now **1 (AAB)**, which is what Google Play requires for a new
+app. Issue 86 measured the difference: **28.9 MB as an AAB against 78 MB as an APK**, because
+the native libs are stored compressed again.
+
+That leaves exactly one blocker, and it is the one thing an agent must not create for you.
+
+### What the key IS
+
+Not something you download. You **generate** it, once, with `keytool` from the JDK already
+installed for the Android build:
+
+```sh
+keytool -genkey -v -keystore ~/keystores/nokings-release.keystore \
+  -alias nokings -keyalg RSA -keysize 2048 -validity 10000
+```
+
+It asks for a keystore password, a key password and some identity fields. The file plus those
+two passwords and the alias are the whole credential.
+
+### Why it is handled differently from every other config
+
+**Losing it is unrecoverable in the ordinary case.** An Android app's identity IS its signing
+key: Play refuses an update signed by a different one, and the only remedy is shipping a new
+listing and abandoning the install base.
+
+Two consequences, both non-negotiable:
+
+- **It never goes in the repo.** `game/export_presets.cfg` is tracked, so the
+  `keystore/release*` fields stay EMPTY in git. Point Godot at the file through the editor's
+  Android export settings or the `GODOT_ANDROID_KEYSTORE_RELEASE_*` environment variables at
+  export time — verify which your Godot build honours before relying on it.
+- **Back it up somewhere that is not this machine.** A password manager or an encrypted
+  archive. Not `~/Downloads`.
+
+### Play App Signing softens exactly one of those risks
+
+Google's default for new apps: you upload an **upload key**, Google holds the actual app
+signing key. If the upload key is lost, support can reset it — the app survives. The app
+signing key never leaves Google, so it cannot be lost by you at all.
+
+**Opt in when creating the app entry.** It is the safer default and it is what the `keytool`
+key above becomes: an upload key rather than the final signing key.
+
+### What I can do once the key exists
+
+Everything else is already prepared. Build:
+
+```sh
+cd game && godot --headless --path . --export-release "Android" ../build/nokings.aab
+```
+
+The preset is otherwise complete — `arm64-v8a` only, `com.sharpunk.nokings`, launcher icons
+wired, Play Games app id `292256536070` set, `package/signed=true`.
+
+**Corrected 2026-09-07:** issue 86 recorded *"No project icon specified — a store build will
+want one."* That is stale. `project.godot` carries `config/icon="res://icon.png"` and the
+file exists. Nothing owed there.

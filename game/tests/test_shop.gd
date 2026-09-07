@@ -2,9 +2,11 @@ extends SceneTree
 ## The Shop: 22-slot randomized stock (6 typed boxes / 4 artefacts / 4 items /
 ## 8 distinct base pieces), priced in gold, no Action cost on any interaction
 ## (issue 64). Bought slots go SOLD. Restocks on two lanes (issue 64): every
-## 5 Waves (Lane A, guaranteed), or 10,000 Score since the last Lane-A
-## restock (Lane B, resets on every Lane-A restock) — the old cumulative-
-## score threshold curve (Shop.threshold) is gone entirely.
+## 5 Waves (Lane A, guaranteed), or Tuning.SHOP_LANE_B_SCORE Score since the
+## last Lane-A restock (Lane B, which every Lane-A restock resets) — the old
+## cumulative-score threshold curve (Shop.threshold) is gone entirely. The
+## gate is named, not spelled: it was written as "10,000" here and moved to
+## 5,000 on 2026-09-07 (NO-16), leaving this header describing the old game.
 ## Pure logic in scripts/shop.gd over the live game node.
 ## Run headless:  godot --headless --path game -s tests/test_shop.gd
 

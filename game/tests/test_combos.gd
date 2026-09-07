@@ -71,6 +71,37 @@ func _init() -> void:
 				% [p.hook, p.producer.key, Tuning.ARTEFACT_CAP_BASE, p.listeners.size()])
 	check(checked > 0, "the directed rule was actually exercised (%d pairs)" % checked)
 
+	# NO-21: the SAME directed rule for the suppresses half. Until this slice
+	# `suppresses` was read only to check its hook names were real, so a
+	# name-valid but factually wrong entry passed everything — and the failure
+	# it describes (an effect silently doing nothing) reports nothing by
+	# construction. These boards are what make a wrong entry openable.
+	var anti_checked := 0
+	for p in Combos.pairs("suppresses"):
+		check(p.producer.fires.has(p.hook),
+			"%s suppresses %s" % [p.producer.key, p.hook])
+		for key in p.listeners:
+			anti_checked += 1
+			check(listeners.get(p.hook, []).has(key),
+				"%s listens on the suppressed hook %s" % [key, p.hook])
+	check(anti_checked > 0,
+		"the anti-combo rule was actually exercised (%d pairs)" % anti_checked)
+	# An Artefact can never be a suppressor: artefact_fires.json is derived from
+	# _dispatch and has no suppresses counterpart, so a producer of kind
+	# "artefact" here would mean _producers() silently read the wrong field.
+	for p in Combos.pairs("suppresses"):
+		check(p.producer.kind != "artefact",
+			"anti-combo producers are Items/Buffs/Armies only, never Artefacts (%s)"
+				% p.producer.key)
+	var anti := Combos.anti_all()
+	check(not anti.is_empty(), "the suppresses declarations produce boards (%d)" % anti.size())
+	for b in anti:
+		check(b.name.begins_with("Anti-combo: "),
+			"%s lands in its own menu section, not among the Combo boards" % b.name)
+		check(b.cfg.artefacts.size() <= Tuning.ARTEFACT_CAP_BASE,
+			"%s holds at most %d Artefacts (%d)"
+				% [b.name, Tuning.ARTEFACT_CAP_BASE, b.cfg.artefacts.size()])
+
 	# and the boards those pairs turn into hold no more Artefacts than a real
 	# run can (the producer takes a slot too, when it is itself an Artefact)
 	for b in boards:

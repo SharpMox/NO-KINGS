@@ -13,8 +13,22 @@
 ## nothing at all, because no Item, Buff, Army or Artefact fires on_wave_clear.
 ## The wave does.
 ##
-## `suppresses` is declared alongside `fires` but generates NOTHING here (user
-## ruling): the anti-combo boards are a later slice. See FLAGS.
+## NO-21 adds the symmetric rule, and it is symmetric on purpose:
+##
+##     anticombo(X, Y)  iff  suppresses(X) ∩ listens(Y) ≠ ∅
+##
+## Why it had to exist: `fires` is self-checking, because a wrong line makes a
+## board where nothing happens and you notice on opening it. `suppresses` is
+## NOT symmetric that way — a wrong entry describes an effect silently doing
+## nothing, and the whole point of the relation is that nothing happens and
+## nothing reports it. Before this, `suppresses` was read only by test_combos,
+## and only to check the hook NAMES were real; a name-valid but factually wrong
+## entry passed every check in the repo. Now each declaration is a board you can
+## open, which is what makes it falsifiable at all.
+##
+## Artefacts contribute producers but never suppressors: `artefact_fires.json`
+## is derived from `_dispatch`'s match arms and has no suppresses counterpart.
+## The 42 hand-written declarations live on Items, Piece Buffs and Armies.
 
 const Items := preload("res://data/items.gd")
 const Armies := preload("res://scripts/armies.gd")
@@ -60,23 +74,27 @@ static func artefact_fires() -> Dictionary:
 ## Every producer, as {key, name, kind, fires}. kind drives how the board holds
 ## it: an Item goes in `items`, a Buff rides a board piece, an Army is the run's
 ## own Army, an Artefact takes one of the five Artefact slots.
-static func _producers() -> Array:
+## `relation` is "fires" or "suppresses" — the two halves of the producer
+## declaration, read through one path so the anti-combo graph cannot drift from
+## the combo graph. Armies spell it per-slot (power_fires / power_suppresses).
+static func _producers(relation: String = "fires") -> Array:
 	var out: Array = []
 	for it in Items.ITEMS:
 		out.append({"key": it.key, "name": it.name, "kind": "item",
-			"fires": it.get("fires", [])})
+			"fires": it.get(relation, [])})
 	for b in Items.PIECE_BUFFS:
 		out.append({"key": b.key, "name": b.name, "kind": "buff",
-			"fires": b.get("fires", [])})
+			"fires": b.get(relation, [])})
 	for id in Armies.CATALOG:
 		var a: Dictionary = Armies.CATALOG[id]
 		out.append({"key": id, "name": a.power_name, "kind": "army",
-			"fires": a.get("power_fires", [])})
+			"fires": a.get("power_" + relation, [])})
 		out.append({"key": id, "name": a.ability_name, "kind": "army",
-			"fires": a.get("ability_fires", [])})
-	for key in artefact_fires():
-		out.append({"key": key, "name": _titled(key), "kind": "artefact",
-			"fires": artefact_fires()[key]})
+			"fires": a.get("ability_" + relation, [])})
+	if relation == "fires": # no suppresses counterpart is derived for Artefacts
+		for key in artefact_fires():
+			out.append({"key": key, "name": _titled(key), "kind": "artefact",
+				"fires": artefact_fires()[key]})
 	out.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.key < y.key)
 	return out
 
@@ -113,11 +131,11 @@ static func _listeners() -> Dictionary:
 ## parser over a string this same file just wrote, which breaks the moment a
 ## producer is named something containing the separator. Emitting the structure
 ## is both shorter and honest.
-static func pairs() -> Array:
+static func pairs(relation: String = "fires") -> Array:
 	_dropped = []
 	var listeners := _listeners()
 	var by_hook := {}
-	for p in _producers():
+	for p in _producers(relation):
 		for hook in p.fires:
 			if not listeners.has(hook):
 				continue # a hook nothing listens on produces no board
@@ -157,7 +175,18 @@ static func all() -> Array:
 	return out
 
 
-static func _board(p: Dictionary) -> Dictionary:
+## NO-21: the anti-combo half. Same graph machinery, `suppresses` instead of
+## `fires`, and its own menu section so the two are never read as one list —
+## a Combo board asks "do these reach each other?", an Anti-combo board asks
+## "does this one still fire while that one denies the hook?"
+static func anti_all() -> Array:
+	var out: Array = []
+	for p in pairs("suppresses"):
+		out.append(_board(p, "Anti-combo"))
+	return out
+
+
+static func _board(p: Dictionary, section: String = "Combo") -> Dictionary:
 	var hook: String = p.hook
 	var lead: Dictionary = p.producer
 	var chunk: Array = p.listeners
@@ -185,8 +214,13 @@ static func _board(p: Dictionary) -> Dictionary:
 		"artefact":
 			cfg["artefacts"] = [lead.key] + chunk
 	var suffix := "" if total <= 1 else " (%d/%d)" % [index + 1, total]
-	# menu.gd cuts at the first ":", so these join 81's hand-built "Combo"
-	# section rather than starting one of their own (user ruling).
+	# menu.gd cuts at the first ":", so Combo boards join 81's hand-built
+	# "Combo" section rather than starting one of their own (user ruling).
+	# Anti-combo boards get their own section on purpose: they ask the opposite
+	# question, and "via" would read as cooperation where it is denial.
+	if section == "Anti-combo":
+		return {"name": "Anti-combo: %s suppressed by %s%s" % [hook, lead.name, suffix],
+			"cfg": cfg}
 	return {"name": "Combo: %s via %s%s" % [hook, lead.name, suffix], "cfg": cfg}
 
 

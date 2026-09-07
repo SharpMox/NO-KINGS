@@ -42,7 +42,8 @@ static func _chain(title: String, base: String, mid: String) -> Dictionary:
 
 static func all() -> Array:
 	return _hand_written() + Generated.all() + GeneratedPieces.all() \
-		+ GeneratedKings.all() + GeneratedCombos.all() + StagedCombos.all()
+		+ GeneratedKings.all() + GeneratedCombos.all() + GeneratedCombos.anti_all() \
+		+ StagedCombos.all()
 
 
 static func _hand_written() -> Array:

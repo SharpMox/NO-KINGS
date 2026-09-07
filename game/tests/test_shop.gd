@@ -285,28 +285,39 @@ func _init() -> void:
 	check(JSON.stringify(game.shop_stock) != before, "Wave 10 fires the next Lane-A restock")
 	check(game.shop_restocks == 2, "the restock counter keeps counting Lane-A restocks")
 
-	# Lane B: 10,000 Score since the last Lane-A restock — keeps accumulating
-	# (not resetting) after firing on its own; only Lane A resets it.
+	# Lane B: Tuning.SHOP_LANE_B_SCORE Score since the last Lane-A restock —
+	# keeps accumulating (not resetting) after firing on its own; only Lane A
+	# resets it.
+	#
+	# Written against the CONSTANT, never the literal. These five assertions
+	# hardcoded 10,000 and all broke when the gate moved to 5,000 on
+	# 2026-09-07 — a test coupled to a tuning value rather than to the
+	# contract. The contract is "one gate crossed = one restock, remainder
+	# kept", and that is what should survive the next tune.
+	var gate: int = Tuning.SHOP_LANE_B_SCORE
+	var step: int = Economy.SCORE_MULTIPLIER # earn(n) banks n * step
 	before = JSON.stringify(game.shop_stock)
 	game.score = 0
 	game.shop_restocks = 0
 	game.shop_lane_b_progress = 0
-	Economy.earn(game, 999) # x10'd by SCORE_MULTIPLIER -> 9990, still short of 10,000
+	Economy.earn(game, gate / step - 1) # one step short of the gate
 	check(JSON.stringify(game.shop_stock) == before and game.shop_restocks == 0,
-		"progress below 10,000 leaves the stock alone")
-	check(game.shop_lane_b_progress == 9990, "Lane B progress tracks Score earned so far")
-	Economy.earn(game, 1) # +10 Score -> exactly 10,000
-	check(JSON.stringify(game.shop_stock) != before, "crossing 10,000 Score restocks (Lane B)")
+		"progress one step below the gate leaves the stock alone")
+	check(game.shop_lane_b_progress == gate - step,
+		"Lane B progress tracks Score earned so far")
+	Economy.earn(game, 1) # exactly onto the gate
+	check(JSON.stringify(game.shop_stock) != before, "crossing the gate restocks (Lane B)")
 	check(game.shop_restocks == 1, "the restock counter advances")
-	check(game.shop_lane_b_progress == 0, "the crossed 10,000 is consumed, no remainder left")
+	check(game.shop_lane_b_progress == 0, "the crossed gate is consumed, no remainder left")
 
-	# one gain crossing several 10,000 multiples banks them all but rolls
-	# once (issue 57's "leap crosses several thresholds" contract, preserved)
+	# one gain crossing several gate multiples banks them all but rolls once
+	# (issue 57's "leap crosses several thresholds" contract, preserved)
 	game.shop_restocks = 0
 	game.shop_lane_b_progress = 0
-	Economy.earn(game, 2500) # x10'd to 25,000 Score by SCORE_MULTIPLIER -> crosses 10,000 twice
-	check(game.shop_restocks == 2, "a single huge gain banks every 10,000 multiple it crossed")
-	check(game.shop_lane_b_progress == 5000, "the remainder past the last crossed multiple is kept")
+	Economy.earn(game, (gate / step) * 2 + (gate / step) / 2) # 2.5 gates
+	check(game.shop_restocks == 2, "a single huge gain banks every gate multiple it crossed")
+	check(game.shop_lane_b_progress == gate / 2,
+		"the remainder past the last crossed multiple is kept")
 
 	# openable in any STATE once unlocked (issue 101 gates it by WAVE, not by
 	# state), and it pauses the run clock (GDD Shop page). Buying stays

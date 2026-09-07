@@ -1062,8 +1062,8 @@ func show_box(options: Array) -> void:
 		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
 		box.add_child(reroll)
 	var skip := Button.new()
-	# The Box's price, and the number the player ACTUALLY receives: earn()
-	# applies SCORE_MULTIPLIER, so the old label's "+20 score" was really +200.
-	skip.text = "Skip (+%d score)" % (Tuning.box_skip_score(g.box_size) * Economy.SCORE_MULTIPLIER)
+	# The Box's price, in Gold. The old label said "+20 score" while earn() paid
+	# ~20 Gold AND 200 Score — wrong currency and wrong by 10x at once.
+	skip.text = "Skip (+%d gold)" % Tuning.box_skip_gold(g.box_size)
 	skip.pressed.connect(func() -> void: box_skipped.emit())
 	box.add_child(skip)

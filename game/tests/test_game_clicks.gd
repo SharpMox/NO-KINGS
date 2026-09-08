@@ -53,6 +53,17 @@ func _click_button_in(node: Node, text: String) -> bool:
 	return false
 
 
+## NO-32: the Army Ability lives on the DECK button alone now, not in a drawer
+## chip, so reaching it needs no Inventory step. Every Ability press below goes
+## through here, which is also the pin that the deck button is the one home.
+func _click_ability(game: Node) -> bool:
+	var btn: Button = game.hud.army_ability_button
+	if not btn.is_visible_in_tree():
+		return false
+	_click(btn.get_global_rect().get_center())
+	return true
+
+
 func _click(at: Vector2) -> void:
 	for pressed in [true, false]:
 		var ev := InputEventMouseButton.new()
@@ -404,6 +415,11 @@ func _init() -> void:
 			% game.hud.army_ability_button.text)
 	check(kit.ability_name in game.hud.army_ability_button.text,
 		"and names the ability itself")
+	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived.
+	# It moved to the deck button's tooltip, so pin it here or the next refactor
+	# drops the description entirely and nothing notices.
+	check(kit.ability_desc in game.hud.army_ability_button.tooltip_text,
+		"the deck button's tooltip carries the Ability description the chip used to hold")
 
 	# ---- design C invariants (issue 106) ------------------------------------
 	# DECK ORDER. This broke silently once: bar.move_to_front(), left over from
@@ -1324,10 +1340,17 @@ func _init() -> void:
 	# headless can't verify — Godot headless drops GUI picking)
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
-	check(game.hud.activate_box.get_child_count() == 2,
-		"the drawer shows two Activate chips: the Artefact's and the Army " +
-		"Ability's (issue 67 — every run has a Army, so the section is never " +
-		"Artefact-only)")
+	# NO-32: issue 67 put an Army Ability chip in this row too, so the Ability
+	# was reachable from two places and the count here was 2. The chip is gone;
+	# the row is Artefact-only again.
+	check(game.hud.activate_box.get_child_count() == 1,
+		"the drawer shows ONE Activate chip: the Artefact's, and no Army Ability chip")
+	var star_chips := 0
+	for c in game.hud.activate_box.get_children():
+		if c is Button and (c as Button).text.begins_with("★"):
+			star_chips += 1
+	check(star_chips == 0,
+		"no ★ chip survives in the Activate row — the Ability has exactly one home")
 	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
 		"the Activate chip is clickable")
 	await process_frame
@@ -1409,10 +1432,8 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for the Army Ability chip")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Shield Wall"),
-		"the Army Ability chip is clickable — visually distinct glyph (★, not ⚡)")
+	check(_click_ability(game),
+		"the Army Ability is clickable on the deck — no drawer to open (NO-32)")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
 		"clicking an untargeted Army Ability opens the confirm modal, same as an untargeted Artefact")
@@ -1421,8 +1442,8 @@ func _init() -> void:
 	check(not game.buff_pick_open and game.actions_left == Tuning.ACTIONS_PER_TURN \
 			and not game.army_ability_used_this_wave,
 		"cancelling the confirm costs nothing — no Action spent, Wave flag untouched")
-	check(await _click_button_in(game.hud.activate_box, "★Shield Wall"),
-		"the chip is clickable again after a cancel, drawer untouched")
+	check(_click_ability(game),
+		"the deck button is clickable again after a cancel")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
@@ -1440,26 +1461,20 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for Call the Banners")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
-		"the Call the Banners chip is clickable")
+	check(_click_ability(game), "Call the Banners is clickable on the deck")
 	await process_frame
 	check(not game.buff_pick_open and game.army_targeting and game.hud.drawer_open == "stock",
 		"clicking Call the Banners stages targeting and switches straight to the Stock drawer — no confirm modal")
-	# Targeting switched the drawer to Stock (that IS its targeting surface),
-	# so the chip is out of reach until Inventory is reopened — the same
-	# reach-the-chip step Bovine's board-targeting needs above.
-	check(await _click_button_in(game.hud, "Inventory 0"),
-		"Inventory reopens to reach the chip mid-targeting")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
-		"tapping the chip again mid-targeting cancels (slice 52's rule)")
+	# Targeting switched the drawer to Stock (that IS its targeting surface).
+	# The chip used to go out of reach here, needing an Inventory reopen; the
+	# deck button never does, which is the point of NO-32.
+	check(_click_ability(game),
+		"tapping the deck button again mid-targeting cancels (slice 52's rule), with no drawer step")
 	await process_frame
 	check(not game.army_targeting and game.stock.size() == 1 and not game.army_ability_used_this_wave,
 		"cancelling FROM TARGETING costs nothing — no duplicate, no charge")
-	check(await _click_button_in(game.hud.activate_box, "★Call the Banners"),
-		"the chip is clickable again after a targeting cancel")
+	check(_click_ability(game),
+		"the deck button is clickable again after a targeting cancel")
 	await process_frame
 	check(game.pool_box.get_child_count() == 1, "(setup) the Stock strip shows the one pawn stack")
 	var pawn_stack: Button = _first_pool_stack(game)
@@ -1481,24 +1496,18 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for Hostile Takeover")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
-		"the Hostile Takeover chip is clickable")
+	check(_click_ability(game), "Hostile Takeover is clickable on the deck")
 	await process_frame
 	check(not game.buff_pick_open and game.army_board_targeting and game.hud.drawer_open == "",
 		"clicking Hostile Takeover stages targeting and hands the board back — no confirm modal (it has a target instead)")
-	check(await _click_button_in(game.hud, "Inventory 0"),
-		"Inventory reopens to reach the chip mid-targeting")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
-		"the chip stays clickable mid-targeting (to cancel)")
+	check(_click_ability(game),
+		"the deck button stays clickable mid-targeting (to cancel), with no drawer step")
 	await process_frame
 	check(not game.army_board_targeting and game.board.has(Vector2i(7, 10)) \
 			and not game.army_ability_used_this_wave and game.gold == 1000,
 		"tapping the chip again CANCELS FROM TARGETING — no purchase, no charge, board untouched")
-	check(await _click_button_in(game.hud.activate_box, "★Hostile Takeover"),
-		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
+	check(_click_ability(game),
+		"the deck button is clickable again after a targeting cancel")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # the enemy Rook: commit
 	await process_frame
@@ -1516,10 +1525,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 0"), "Inventory opens for Conscription")
-	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "★Conscription"),
-		"the Conscription chip is clickable")
+	check(_click_ability(game), "Conscription is clickable on the deck")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
 		"clicking untargeted Conscription opens the confirm modal, same as an untargeted Artefact")
@@ -1527,8 +1533,8 @@ func _init() -> void:
 	await process_frame
 	check(not game.buff_pick_open and game.stock.is_empty() and not game.army_ability_used_this_wave,
 		"cancelling the confirm costs nothing — no pawns added, Wave flag untouched")
-	check(await _click_button_in(game.hud.activate_box, "★Conscription"),
-		"the chip is clickable again after a cancel, drawer untouched")
+	check(_click_ability(game),
+		"the deck button is clickable again after a cancel")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame

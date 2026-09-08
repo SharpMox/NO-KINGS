@@ -16,12 +16,14 @@ const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
-const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0 # +1 row while the Activate
-	# strip is up, +48 more for issue 100's Army Power line (two wrapped rows
-	# at 13px on a 480-wide portrait screen)
-	# section has content (issue 52). Issue 67: the Army Ability chip is
-	# now unconditionally in that section (every run holds a Army), so this
-	# is the drawer's permanent height going forward, not a conditional one
+## +1 row while the Activate strip is up, +48 more for issue 100's Army Power
+## line (two wrapped rows at 13px on a 480-wide portrait screen). Issue 67 made
+## this height unconditional because the Army Ability chip was always in the
+## Activate section; NO-32 removed that chip, so the section can be empty again
+## and the height is now a flat choice rather than a consequence. Left flat
+## deliberately: a drawer that changes height as Artefacts come and go is a
+## worse trade than one empty row.
+const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0
 
 signal pass_pressed
 signal tariff_pressed
@@ -88,11 +90,15 @@ var stock_armed := Control.new() # draws the armed piece on the Stock button
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
-var activate_box := HBoxContainer.new() # issue 52: pressable Activate chips
+## issue 52: pressable Activate chips, for activatable Artefacts. NO-32 removed
+## the Army Ability chip that issue 67 added here — the Ability lives on the
+## deck button alone now, so this row can legitimately be empty again.
+var activate_box := HBoxContainer.new()
 ## issue 100: the Army POWER, written out in the drawer. It was previously
-## readable in exactly two places — the tooltip of the Ability chip, and the
-## army-select screen before the run — and this is a portrait TOUCH game, so
-## once a run starts a hover tooltip is unreachable. Several Powers change what
+## readable in exactly two places — the tooltip of the Ability chip (deleted by
+## NO-32; the deck button carries that tooltip now), and the army-select screen
+## before the run — and this is a portrait TOUCH game, so once a run starts a
+## hover tooltip is unreachable. Several Powers change what
 ## is LEGAL (Close Ranks makes merges free, Endless Ranks makes pawn deploys
 ## free), so a player who has forgotten theirs is misreading their own rules.
 var army_power_label := Label.new()
@@ -116,8 +122,7 @@ var _strip_retry := 0 # bounded waits for layout; see _rebuild_stock_strip
 ## One size for every menu icon, deliberately just under a board tile so the
 ## deck reads as smaller than the board without looking like a different game.
 const ICON := 52
-	# for activatable Artefacts; issue 67 added the Army Ability chip here
-	# too (always present, unlike the Artefact ones — every run holds one)
+
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
 	# moved the 6 activatable keys out into activate_box above)
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
@@ -557,6 +562,12 @@ func refresh() -> void:
 	# or ready. Saying which one it is beats greying the button out and leaving
 	# them to guess.
 	army_ability_button.text = "★ %s" % kit.ability_name
+	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived
+	# (its tooltip). The chip is gone, so the deck button inherits that tooltip
+	# verbatim — the button's own text carries the name and the cost, the tooltip
+	# carries what the Ability actually does.
+	army_ability_button.tooltip_text = "%s (1 Action)\n%s" % [
+		kit.power_name + " — always on. " + kit.ability_name, kit.ability_desc]
 	if g.army_ability_used_this_wave:
 		army_ability_button.text += "  ·  next wave"
 		army_ability_button.disabled = true
@@ -571,8 +582,10 @@ func refresh() -> void:
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
 	_rebuild_activate_strip()
 	_rebuild_artefact_strip()
-	# issue 52 grew the drawer only when the Activate row had content; issue
-	# 67 made that permanent — the Army Ability chip means it always does.
+	# issue 52 grew the drawer only when the Activate row had content; issue 67
+	# made that permanent because the Army Ability chip always filled it. NO-32
+	# deleted that chip, so the row can be empty — the height stays flat by
+	# choice (see INV_H_ACTIVATE), not because something is always in there.
 	var inv_panel: PanelContainer = drawers["inventory"]
 	var inv_h := INV_H_ACTIVATE
 	if inv_panel.custom_minimum_size.y != inv_h:
@@ -679,7 +692,8 @@ func _rebuild_artefact_strip() -> void:
 ## widget here, since this codebase's single Inventory drawer already holds
 ## both Items and Artefacts (there is no second menu to put a distinct copy
 ## in). Empty (no activatable Artefact held) leaves activate_box with zero
-## children — refresh() reads that to keep the drawer at today's height.
+## children again, now NO-32 has removed the Army Ability chip that made the
+## row permanently occupied; the drawer height is flat regardless.
 func _rebuild_activate_strip() -> void:
 	for c in activate_box.get_children():
 		c.queue_free()
@@ -696,32 +710,6 @@ func _rebuild_activate_strip() -> void:
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		btn.pressed.connect(func() -> void: artefact_activate_pressed.emit(key))
 		activate_box.add_child(btn)
-	_add_army_ability_chip()
-
-
-## issue 67: the Army Ability chip — same activate_box row as the Artefact
-## chips above, but every run always holds exactly one (a Army replaces
-## the Army pick), so this is unconditional, not gated on "is one held" the
-## way the Artefact loop above is. "Visually distinct from Artefact chips"
-## (acceptance): a ★ glyph instead of ⚡ and a warm gold tint at rest,
-## instead of the Artefact chips' plain default button styling.
-func _add_army_ability_chip() -> void:
-	var kit: Dictionary = Armies.entry(g.next_army)
-	var btn := Button.new()
-	btn.text = "★%s" % kit.ability_name
-	var targeting: bool = g.army_targeting or g.army_board_targeting # issue
-		# 68: Hostile Takeover/Ritual's board-targeting flavor gets the same tint
-	btn.disabled = not (g._army_ability_available() or targeting)
-	btn.tooltip_text = "%s (1 Action)\n%s" % [kit.power_name + " — always on. " \
-		+ kit.ability_name, kit.ability_desc]
-	if targeting:
-		btn.modulate = Color(0.5, 1.3, 1.3) # mid-targeting: same tint as an
-			# Artefact/Item mid-target, tap again to cancel
-	else:
-		btn.modulate = Color(1.35, 1.2, 0.75) # at-rest: warm gold, distinct
-			# from an Artefact chip's plain default tint
-	btn.pressed.connect(func() -> void: army_ability_pressed.emit())
-	activate_box.add_child(btn)
 
 
 ## Fill the strip with COMPLETE rows only. A half-cut row of pieces reads as a

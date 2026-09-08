@@ -148,12 +148,12 @@ func _init() -> void:
 	# keeps clock_never_pauses the only thing deciding it. Each case must
 	# close its panel: the issue-41 block below asserts the Clock KEEPS
 	# running, and a panel left visible turns that into a silent false fail. ---
-	c1._show_tariffs()
-	check(c1.tariff_panel != null and c1.tariff_panel.visible, "the tariff overlay opened")
+	c1._show_king_abilities()
+	check(c1.king_ability_panel != null and c1.king_ability_panel.visible, "the tariff overlay opened")
 	var before_tar: float = c1.clock_ms
 	await create_timer(0.2).timeout
 	check(c1.clock_ms == before_tar, "Tier 1: the tariff overlay pauses the Clock")
-	c1.tariff_panel.visible = false
+	c1.king_ability_panel.visible = false
 	# ids only feed the confirm's label — this exercises the panel, not merge rules
 	c1.modals.show_merge_confirm("pawn", "pawn", "knight")
 	var before_merge: float = c1.clock_ms
@@ -222,11 +222,11 @@ func _init() -> void:
 	c2.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
 	c2.preview_open = false
 	# the same three panels, at Tier 2+: the lever must still bite through them
-	c2._show_tariffs()
+	c2._show_king_abilities()
 	var t2_tar: float = c2.clock_ms
 	await create_timer(0.2).timeout
 	check(c2.clock_ms < t2_tar, "Tier 2+: the tariff overlay no longer pauses the Clock")
-	c2.tariff_panel.visible = false
+	c2.king_ability_panel.visible = false
 	c2.modals.show_merge_confirm("pawn", "pawn", "knight")
 	var t2_merge: float = c2.clock_ms
 	await create_timer(0.2).timeout
@@ -253,8 +253,8 @@ func _init() -> void:
 	var t1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	t1.rng.seed = 99
-	Economy.activate_tariff(t1, "Mild")
-	var drawn_1: String = t1.tariffs_seen[0] if not t1.tariffs_seen.is_empty() else ""
+	Economy.activate_king_ability(t1, "Mild")
+	var drawn_1: String = t1.king_abilities_seen[0] if not t1.king_abilities_seen.is_empty() else ""
 	t1.queue_free()
 	await process_frame
 
@@ -262,8 +262,8 @@ func _init() -> void:
 	var t5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	t5.rng.seed = 99
-	Economy.activate_tariff(t5, "Mild")
-	var drawn_5: String = t5.tariffs_seen[0] if not t5.tariffs_seen.is_empty() else ""
+	Economy.activate_king_ability(t5, "Mild")
+	var drawn_5: String = t5.king_abilities_seen[0] if not t5.king_abilities_seen.is_empty() else ""
 	t5.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER

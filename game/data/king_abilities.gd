@@ -11,13 +11,13 @@
 ## Renamed: the file (data/tariffs.gd -> data/king_abilities.gd), its preload
 ## const (Tariffs -> KingAbilities) and this catalog (TARIFFS -> ABILITIES).
 ##
-## NOT renamed, deliberately: the RUNTIME and SAVE identifiers — g.tariffs_active,
-## g.king_power_tariff, Economy.activate_tariff, entry "key" values, and
-## Tuning.TARIFFS_SCHEDULED. Those are game state that save_config.gd persists,
+## NOT renamed, deliberately: the RUNTIME and SAVE identifiers — g.king_abilities_active,
+## g.king_power_ability, Economy.activate_king_ability, entry "key" values, and
+## Tuning.KING_ABILITIES_SCHEDULED. Those are game state that save_config.gd persists,
 ## and a reshaped save field read with a default is a silent corruption rather
 ## than a rename (see save_config.gd's header). They move with the rework, which
-## has NOT landed: TARIFFS_SCHEDULED is still false and exactly one King draws
-## on this catalog (kings.gd — Donald Trump's power_tariff/ability_tariff).
+## has NOT landed: KING_ABILITIES_SCHEDULED is still false and exactly one King draws
+## on this catalog (kings.gd — Donald Trump's power_catalog_key/ability_catalog_key).
 ##
 ## Tariffs Catalog, from the Notion GDD (fetched 2026-07-02). Penalties on the
 ## player, activated on every 10th wave per the Wave Catalog schedule.
@@ -27,11 +27,11 @@
 ## it is denominated in SCORE while this file charges GOLD; it is a three-step
 ## ladder (200/500/1000) while tuning.gd has a single flat per-action constant;
 ## and the ratio is ~/20, NOT the ~/100 this header claimed for months
-## (TARIFF_ACTION_COST = 10 against an upstream 200, after the 2026-07-06
+## (KING_ABILITY_ACTION_COST = 10 against an upstream 200, after the 2026-07-06
 ## halving). Issue 57's Score x10 did not move that target — it scales Score at
 ## the point of scoring and leaves Gold untouched. Not reconciled on purpose:
 ## picking a currency or a ladder belongs to the coming Tariff rework, and
-## Tariffs are switched off (Tuning.TARIFFS_SCHEDULED) until it lands.
+## Tariffs are switched off (Tuning.KING_ABILITIES_SCHEDULED) until it lands.
 ##
 ## kind: "action" (gold cost when the action happens) · "persistent" (rule
 ## modifier for the rest of the run) · "oneoff" (applies instantly).
@@ -93,6 +93,6 @@ const SCHEDULE := {
 }
 
 ## Severity order the SCHEDULE draws from. Identical at every difficulty
-## tier (07-difficulty-ranks rework) — Economy.activate_tariff() no longer
+## tier (07-difficulty-ranks rework) — Economy.activate_king_ability() no longer
 ## shifts it.
 const TIER_ORDER := ["Mild", "Moderate", "Severe"]

@@ -186,7 +186,7 @@ static func _hand_written() -> Array:
 				"witness-protection-mustache", "cia-heart-attack-gun",
 				"dyatlov-geiger-counter", "merchants-of-death-sample-case",
 				"tunguska-toothpicks"],
-			"tariffs": ["move_cost"], "gold": 100, "wave": 4, "stock": ["pawn"]}},
+			"king_abilities": ["move_cost"], "gold": 100, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Artefacts: issue 25 (per-piece capture ledger)", "cfg": {
 			"board": [["queen", 0, 2, 1, {"captures": 2, "wave_captures": 1}],
 				["pawn", 0, 3, 1], ["pawn", 1, 2, 5], ["pawn", 1, 3, 5, {"captures": 1}],
@@ -197,7 +197,7 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
 			"artefacts": ["panama-papers-shredder", "amber-room-bubble-wrap",
 				"ark-grounding-cable", "salvation-gift-card"],
-			"tariffs": ["move_cost", "inflation", "deploy_cost"],
+			"king_abilities": ["move_cost", "inflation", "deploy_cost"],
 			"gold": 200, "wave": 4, "stock": ["pawn"]}},
 		{"name": "Artefacts: economy & Box batch (issue 26)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
@@ -283,17 +283,17 @@ static func _hand_written() -> Array:
 			"items": ["drone_strike"], "wave": 5, "stock": ["pawn"]}},
 		{"name": "Counter-Intel (suppress live tariffs)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
-			"items": ["counter_intel"], "tariffs": ["move_cost", "inflation"],
+			"items": ["counter_intel"], "king_abilities": ["move_cost", "inflation"],
 			"gold": 100, "wave": 11, "stock": ["pawn"]}},
 		# --- tariffs ---
 		{"name": "Tariffs: all action costs", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1], ["pawn", 1, 2, 5], ["bishop", 1, 4, 5]],
-			"tariffs": ["move_cost", "capture_cost", "deploy_cost", "pass_cost",
+			"king_abilities": ["move_cost", "capture_cost", "deploy_cost", "pass_cost",
 				"long_range_cost", "ability_cost", "fuse_cost"],
 			"gold": 500, "items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
 		{"name": "Tariffs: all persistent", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],
-			"tariffs": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],
+			"king_abilities": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],
 			"stock": ["pawn", "pawn", "rook"], "captured": ["pawn", "pawn"], "wave": 8, "score": 1000}},
 		{"name": "One-off: Forced Audit", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "queen", "pawn"], "oneoffs": ["forced_audit"]}},

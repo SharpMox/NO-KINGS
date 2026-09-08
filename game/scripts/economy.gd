@@ -1,7 +1,7 @@
 ## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
 ## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
-## (data/kings.gd). Code identifiers below (tariff_on, apply_tariff,
-## resolve_tariff, etc.) are deliberately left as "tariff"; the rename lands
+## (data/kings.gd). Code identifiers below (tariff_on, apply_king_ability,
+## resolve_king_ability, etc.) are deliberately left as "tariff"; the rename lands
 ## with the coming Kings + Tariffs rework, which restructures this code
 ## rather than just renaming it.
 ##
@@ -31,7 +31,7 @@ const Armies := preload("res://scripts/armies.gd")
 ## same gain stays untouched: gain() below derives Gold from the raw
 ## `amount`, never the x10'd Score. Handlers that write g.score directly,
 ## bypassing earn() (a handful of on_wave_clear/on_purchase/on_game_over/
-## on_item_consume/on_tariff_charge/on_piece_lost/on_destroy effects in
+## on_item_consume/on_king_ability_charge/on_piece_lost/on_destroy effects in
 ## artefact_hooks.gd), are x10'd individually at their own literal instead.
 const SCORE_MULTIPLIER := 10
 
@@ -40,18 +40,18 @@ const SCORE_MULTIPLIER := 10
 ## (issue 13) with ctx.key set to the specific tariff being charged; the
 ## matching held tariff (if any, and only Counter-Intel's suppression is
 ## checked centrally by ArtefactHooks.run) sets ctx.charged. When it does,
-## on_tariff_charge (issue 19) fires right after — "whenever a Tariff charges
+## on_king_ability_charge (issue 19) fires right after — "whenever a Tariff charges
 ## you" — a single choke point since every call site already funnels through
 ## here. `base`/`amount` (issue 22) let Ark Grounding Cable scale the amount
 ## before it's deducted — same immutable-base/additive-amount contract as
 ## on_score_change, off ctx.base, never the running ctx.amount.
-static func charge(g, key: String, amount: int = Tuning.TARIFF_ACTION_COST) -> void:
+static func charge(g, key: String, amount: int = Tuning.KING_ABILITY_ACTION_COST) -> void:
 	var ctx := ArtefactHooks.run(g, "on_charge",
 		{"key": key, "charged": false, "base": float(amount), "amount": float(amount)})
 	if ctx.charged:
 		var charged_amount := roundi(ctx.amount) # issue 22: Ark Grounding Cable scales this
 		spend_gold(g, charged_amount) # issue 26: floor + on_gold_zero (Zero-Point Energy Drink)
-		ArtefactHooks.run(g, "on_tariff_charge", {"key": key, "amount": charged_amount})
+		ArtefactHooks.run(g, "on_king_ability_charge", {"key": key, "amount": charged_amount})
 
 
 ## Debit gold, floored at `floor_at` (0 for every call site here; Shop.buy
@@ -291,7 +291,7 @@ static func record_history(g, won: bool) -> void:
 	var history: Array = g.load_history()
 	history.push_front({
 		"score": g.score, "wave": g.wave, "kings": g.kings_defeated,
-		"tariffs": g.tariffs_seen.size(), "lost": g.lost_player, "won": won,
+		"king_abilities": g.king_abilities_seen.size(), "lost": g.lost_player, "won": won,
 	})
 	var f := FileAccess.open(g.HISTORY_PATH, FileAccess.WRITE)
 	if f == null:
@@ -306,23 +306,23 @@ static func record_history(g, won: bool) -> void:
 
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
 
-static func activate_tariff(g, tier: String) -> void:
+static func activate_king_ability(g, tier: String) -> void:
 	# Tariffs behave identically at every difficulty tier (07-difficulty-ranks
 	# rework — the severity-shift lever was rejected as illegible).
 	var pool := KingAbilities.ABILITIES.filter(func(t: Dictionary) -> bool:
 		if t.tier != tier:
 			return false
 		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
-		return tier == "Mild" or not g.tariffs_seen.has(t.name))
+		return tier == "Mild" or not g.king_abilities_seen.has(t.name))
 	if pool.is_empty():
 		return
-	apply_tariff(g, pool[g.rng.randi() % pool.size()])
+	apply_king_ability(g, pool[g.rng.randi() % pool.size()])
 
 
-static func activate_tariff_by_key(g, key: String) -> void:
+static func activate_king_ability_by_key(g, key: String) -> void:
 	for t in KingAbilities.ABILITIES:
 		if t.key == key:
-			return apply_tariff(g, t)
+			return apply_king_ability(g, t)
 
 
 ## Single choke point for every Tariff taking effect (oneoff or persistent) —
@@ -334,27 +334,27 @@ static func activate_tariff_by_key(g, key: String) -> void:
 ## key-sort order, the same precedent as on_piece_lost's Fireproof Pajamas
 ## (artefact hook 24) rather than reordering the dispatch to favor one
 ## handler over another. `choice` (issue 22/54) is Exhibit 399's — the actual
-## effect (resolve_tariff below) is deferred to game.gd's choice-pick
+## effect (resolve_king_ability below) is deferred to game.gd's choice-pick
 ## callback instead of running here; Salvation's automatic cancel still wins
 ## outright if both are somehow held (ctx.cancel is checked first).
-static func apply_tariff(g, t: Dictionary) -> void:
-	g.tariffs_seen.append(t.name)
+static func apply_king_ability(g, t: Dictionary) -> void:
+	g.king_abilities_seen.append(t.name)
 	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
-	var ctx := ArtefactHooks.run(g, "on_tariff_apply",
+	var ctx := ArtefactHooks.run(g, "on_king_ability_apply",
 		{"key": t.key, "tier": t.get("tier", ""), "cancel": false, "choice": false})
 	if ctx.cancel:
 		return
 	if ctx.choice:
 		return g._open_exhibit_choice(t)
-	resolve_tariff(g, t)
+	resolve_king_ability(g, t)
 
 
-## The Tariff's actual effect — split out of apply_tariff (issue 54) so
+## The Tariff's actual effect — split out of apply_king_ability (issue 54) so
 ## Exhibit 399 can defer this half behind a player choice while the banner
-## and the on_tariff_apply dispatch above still fire immediately, exactly as
+## and the on_king_ability_apply dispatch above still fire immediately, exactly as
 ## they always did (Merchants of Death Sample Case's own reward doesn't wait
 ## on the pick either).
-static func resolve_tariff(g, t: Dictionary) -> void:
+static func resolve_king_ability(g, t: Dictionary) -> void:
 	if t.kind == "oneoff":
 		match t.key:
 			"forced_audit":
@@ -375,7 +375,7 @@ static func resolve_tariff(g, t: Dictionary) -> void:
 				if best.x >= 0:
 					g._destroy(best)
 		return
-	g.tariffs_active.append(t)
+	g.king_abilities_active.append(t)
 	if t.key == "sanctions": # fix the barred type at trigger time
 		var types := {}
 		for e in g.stock + g.captured:

@@ -63,7 +63,7 @@ func _init() -> void:
 
 	# --- review bug 2: Trade War's +1 piece must never duplicate the King ---
 	var tw := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 99,
-		"tariffs": ["trade_war"]})
+		"king_abilities": ["trade_war"]})
 	await process_frame
 	var double_king := false
 	for i in 200:

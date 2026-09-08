@@ -1,6 +1,6 @@
 ## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
 ## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
-## (data/kings.gd). Code identifiers below (on_tariff_apply, tariff_on,
+## (data/kings.gd). Code identifiers below (on_king_ability_apply, tariff_on,
 ## Tariffs, etc.) are deliberately left as "tariff"; the rename lands with the
 ## coming Kings + Tariffs rework, which restructures this dispatch rather than
 ## just renaming it.
@@ -122,7 +122,7 @@
 ##
 ## issue 13 (hook architecture, reduced scope) migrated the tariff system
 ## (data/tariffs.gd) onto this same registry, so g.artefacts and
-## g.tariffs_active are just two flavours of "held modifier" run() dispatches
+## g.king_abilities_active are just two flavours of "held modifier" run() dispatches
 ## identically — the ad hoc `if Economy.tariff_on(g, "...")` branches that
 ## used to sit inline in game.gd/wave_logic.gd/merge_logic.gd/hud.gd are now
 ## REGISTRY entries + _dispatch cases like any artefact. `tariff_on` is gone;
@@ -134,8 +134,8 @@
 ## diff against the concurrent artefacts/shop/buff branch for no behavioural
 ## gain.
 ##
-## g.tariffs_suppressed (Counter-Intel) pauses every held tariff at once —
-## enforced centrally in run() by leaving tariffs_active out of `held`
+## g.king_abilities_suppressed (Counter-Intel) pauses every held tariff at once —
+## enforced centrally in run() by leaving king_abilities_active out of `held`
 ## entirely while suppressed, rather than each handler re-checking it (that
 ## was the one thing `tariff_on` did that a plain REGISTRY lookup didn't).
 ##
@@ -165,7 +165,7 @@
 ## that ordering for any key sorting before "timer".
 ##
 ## Oneoff tariffs (forced_audit, hostile_takeover, asset_seizure, jd_vance,
-## asset_freeze) stay on Economy.apply_tariff's own `match t.key` — that's
+## asset_freeze) stay on Economy.apply_king_ability's own `match t.key` — that's
 ## already a single non-scattered dispatch point (fires once, at activation),
 ## not an ad hoc branch repeated at multiple call sites, so folding it into
 ## REGISTRY/_dispatch too would add a hook with no behavioural or
@@ -197,8 +197,8 @@
 ##   landed in Stock, not the board (a pool-only merge) — Holy Grail Coaster
 ##   branches on that to convert the bare Stock id into a buff-carrying
 ##   Dictionary, Sleeper Agent Pillow's same pattern (issue 18).
-## - on_tariff_apply (economy.gd apply_tariff, ctx = {key, tier}) and
-##   on_tariff_charge (economy.gd charge, fired right after on_charge leaves
+## - on_king_ability_apply (economy.gd apply_king_ability, ctx = {key, tier}) and
+##   on_king_ability_charge (economy.gd charge, fired right after on_charge leaves
 ##   ctx.charged true — issue 13 landed on_charge concurrently, so this rides
 ##   its gate rather than querying tariff state itself; ctx = {key, amount})
 ##   — both were already single choke points, so no call sites moved; issue
@@ -492,7 +492,7 @@
 ## handlers an on_wave_spawn ctx missing `gold_spent`/`gold_base`/`captures`
 ## — most of them would silently pay out on zeroed fields).
 
-## issue 22 (split out of 19: "the reactive on_tariff_apply/on_tariff_charge
+## issue 22 (split out of 19: "the reactive on_king_ability_apply/on_king_ability_charge
 ## hooks can't express changing whether/how a Tariff applies") added the
 ## filter/scale/cancel shapes those two hooks were missing:
 ## - Panama Papers Shredder ("Mild Tariffs don't affect you") and Amber Room
@@ -503,11 +503,11 @@
 ##   (split from the 2 Moderate keys, deploy_cost/fuse_cost, which don't);
 ##   `on_gold_gain`'s Inflation checks `ctx.gain_immune`, set by either
 ##   artefact (a boolean gate, not a percentage — no compounding to reason
-##   about). Neither artefact touches on_tariff_apply/on_tariff_charge
+##   about). Neither artefact touches on_king_ability_apply/on_king_ability_charge
 ##   themselves (issue 19's "a Tariff was applied/charged" meta-notifications
 ##   fire regardless — Merchants of Death Sample Case still pays out on a
 ##   Mild Tariff even though Panama Papers Shredder just neutralized its
-##   effect); on_tariff_charge additionally just can't fire for a blocked
+##   effect); on_king_ability_charge additionally just can't fire for a blocked
 ##   charge, since Economy.charge only dispatches it inside `if ctx.charged`.
 ## - Ark Grounding Cable ("Tariff penalties reduced by 50%") is the
 ##   percentage-scale twin — economy.gd's charge() grew `base`/`amount` ctx
@@ -515,8 +515,8 @@
 ##   shrink the actual gold deducted, off the immutable base like every other
 ##   percentage handler.
 ## - Salvation Gift Card ("cancelled; recharges at each 5-Wave Milestone") is
-##   the veto — economy.gd's apply_tariff() grew `ctx.cancel`, read right
-##   after the on_tariff_apply dispatch, same shape as on_item_consume's
+##   the veto — economy.gd's apply_king_ability() grew `ctx.cancel`, read right
+##   after the on_king_ability_apply dispatch, same shape as on_item_consume's
 ##   cancel. Recharge state (`g.salvation_charged`, starts true) is consumed
 ##   on a successful veto and restored on_wave_clear at wave%5==0, the same
 ##   cadence Silk Road Coupon already established (issue 18).
@@ -652,13 +652,13 @@
 ##   grant exactly one free move per eligible piece, same non-stacking
 ##   precedent as Y2K Patch Floppy Disk above.
 ## - Exhibit 399 ("you choose between 2 options") is wired but genuinely
-##   dormant: Tuning.TARIFFS_SCHEDULED is false (2026-08-29 ruling), so
+##   dormant: Tuning.KING_ABILITIES_SCHEDULED is false (2026-08-29 ruling), so
 ##   Tariffs never activate in a live run and this can only be exercised by
-##   calling economy.gd's `apply_tariff`/`activate_tariff_by_key` directly —
-##   done in game/tests/test_items_tariffs.gd. Its on_tariff_apply handler
+##   calling economy.gd's `apply_king_ability`/`activate_king_ability_by_key` directly —
+##   done in game/tests/test_items_king_abilities.gd. Its on_king_ability_apply handler
 ##   sets a new `ctx.choice` output flag (mirrors `ctx.cancel`'s shape);
-##   apply_tariff defers the Tariff's actual effect (now split out as
-##   `resolve_tariff`) to game.gd's `_open_exhibit_choice`, which reframes
+##   apply_king_ability defers the Tariff's actual effect (now split out as
+##   `resolve_king_ability`) to game.gd's `_open_exhibit_choice`, which reframes
 ##   "2 options" as the existing tariff-cancel mechanism (Salvation Gift
 ##   Card's own veto) handed to the player as a real choice via the issue-41
 ##   choice-pick seam, instead of firing automatically and with no recharge
@@ -755,13 +755,13 @@
 ##   remove a random active Tariff and open a Big Artefact Box." An ordinary
 ##   self-referential on_purchase handler (REGISTRY/_dispatch below) — the
 ##   one thing that matters is that the Box opens UNCONDITIONALLY, not only
-##   when a Tariff happened to be removed: Tuning.TARIFFS_SCHEDULED is false,
+##   when a Tariff happened to be removed: Tuning.KING_ABILITIES_SCHEDULED is false,
 ##   so no Tariff is ever active in a live run today, and a Box gated on the
 ##   removal would leave this Artefact dead on arrival all over again, the
 ##   exact defect the redesign exists to fix. Big (5 choices, 1 pick, user
 ##   ruling). Covered by test_items_artefacts_4.gd (no Tariff active — the
-##   live-run case) and test_items_tariffs.gd (a Tariff removed, driven
-##   directly via Economy.activate_tariff_by_key since it can't happen live).
+##   live-run case) and test_items_king_abilities.gd (a Tariff removed, driven
+##   directly via Economy.activate_king_ability_by_key since it can't happen live).
 ## - Zapruder's Director's Cut ("repeat your previous Action") shipped in
 ##   issue 52 scoped to move/capture only, since _log_action (issue 30) only
 ##   ever recorded {kind} — an Item use, Deploy or Merge had nothing to
@@ -810,7 +810,7 @@ const HOOKS := [
 	"on_wave_clear", "on_wave_spawn", "on_clock_refill",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
 	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
-	"on_item_consume", "on_rank_up", "on_tariff_apply", "on_tariff_charge",
+	"on_item_consume", "on_rank_up", "on_king_ability_apply", "on_king_ability_charge",
 	# --- issue 13: tariff-only trigger points (see header) ---
 	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
@@ -961,9 +961,9 @@ const REGISTRY := {
 	"2012-doomsday-party-hat": ["on_gold_change"],
 	"fort-knox-iou": ["on_score_change", "on_wave_clear"],
 
-	# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd apply_tariff/charge) ---
-	"merchants-of-death-sample-case": ["on_tariff_apply"],
-	"tunguska-toothpicks": ["on_tariff_charge"],
+	# --- issue 19: on_king_ability_apply / on_king_ability_charge (economy.gd apply_king_ability/charge) ---
+	"merchants-of-death-sample-case": ["on_king_ability_apply"],
+	"tunguska-toothpicks": ["on_king_ability_charge"],
 
 	# --- issue 19: capture conversion, the cheap wave-clear half (economy.gd
 	# capture_score's ctx isn't exposed to game.gd's _move_player caller, so
@@ -999,7 +999,7 @@ const REGISTRY := {
 	"panama-papers-shredder": ["on_charge", "on_gold_gain"],
 	"amber-room-bubble-wrap": ["on_gold_gain"],
 	"ark-grounding-cable": ["on_charge"],
-	"salvation-gift-card": ["on_tariff_apply", "on_wave_clear"],
+	"salvation-gift-card": ["on_king_ability_apply", "on_wave_clear"],
 
 	# --- issue 26: spawn roster modifiers (WaveLogic.queue's existing
 	# on_wave_roster dispatch — trade_war's own prerequisite, not a new one) ---
@@ -1111,7 +1111,7 @@ const REGISTRY := {
 	"inflatable-vietcong-torpedo": ["on_wave_clear"],
 	"hellfire-club-discord-invite": ["on_turn_start"],
 	"pegasus-free-trial": ["on_turn_start"],
-	"exhibit-399": ["on_tariff_apply"],
+	"exhibit-399": ["on_king_ability_apply"],
 
 	# --- issue 55: meta-dispatch and capture conversion (the last 3). Troll
 	# Farm Employee of the Month and Ecdysis Sheddings deliberately have NO
@@ -1138,8 +1138,8 @@ const REGISTRY := {
 ## exactly what the pre-migration call sites did inline.
 ##
 ## Two held sources, dispatched as two separately key-sorted groups —
-## artefacts (g.artefacts) always before tariffs (g.tariffs_active, skipped
-## entirely while g.tariffs_suppressed) — see the header for why a single
+## artefacts (g.artefacts) always before tariffs (g.king_abilities_active, skipped
+## entirely while g.king_abilities_suppressed) — see the header for why a single
 ## merged sort would be wrong for the one hook (on_clock_refill) both groups use.
 ## QUERY hooks answer a question ("what does this cost?", "is this merge
 ## allowed?") and are dispatched from READ paths — Shop.price() on every tile
@@ -1164,7 +1164,7 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 		g.tally("hook:" + hook)
 	var held: Array = g.artefacts.duplicate()
 	held.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
-	var tariffs: Array = [] if g.tariffs_suppressed else g.tariffs_active.duplicate()
+	var tariffs: Array = [] if g.king_abilities_suppressed else g.king_abilities_active.duplicate()
 	tariffs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.key < b.key)
 	# issue 21: "a Turn just began" is the only reset these two echo flags
 	# need, and both of the choke points that mean that already dispatch
@@ -2155,10 +2155,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g._open_box_pick({"kind": "box", "key": "item", "size": "small",
 					"sold": false, "contents": Box.roll_options(g, "item", "small")})
 
-		# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd) ---
-		["merchants-of-death-sample-case", "on_tariff_apply"]:
+		# --- issue 19: on_king_ability_apply / on_king_ability_charge (economy.gd) ---
+		["merchants-of-death-sample-case", "on_king_ability_apply"]:
 			g.gold += 100
-		["tunguska-toothpicks", "on_tariff_charge"]:
+		["tunguska-toothpicks", "on_king_ability_charge"]:
 			g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 			Economy.add_clock(g, 5000, "tunguska-toothpicks")
 
@@ -2279,7 +2279,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				# gold-reducing Tariffs" is the same gate regardless of tier
 		["ark-grounding-cable", "on_charge"]:
 			ctx.amount -= ctx.base * 0.5 # off the immutable base, additive per copy
-		["salvation-gift-card", "on_tariff_apply"]:
+		["salvation-gift-card", "on_king_ability_apply"]:
 			if g.salvation_charged:
 				g.salvation_charged = false
 				ctx.cancel = true
@@ -2607,7 +2607,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				if g.board[pos].owner == Rules.PLAYER and g.board[pos].id != "king" \
 						and g.defs[g.board[pos].id].next == null:
 					g.board[pos].blitz_free_move = true
-		["exhibit-399", "on_tariff_apply"]:
+		["exhibit-399", "on_king_ability_apply"]:
 			ctx.choice = true
 
 		# --- issue 55: meta-dispatch and capture conversion (see this file's
@@ -2625,12 +2625,12 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# the bought copy to g.artefacts BEFORE calling run() (see there),
 			# so ctx.key == this key on the very dispatch for buying it. BOTH
 			# halves always run — the Box opening unconditionally is the whole
-			# point of the redesign (TARIFFS_SCHEDULED is false today, so the
+			# point of the redesign (KING_ABILITIES_SCHEDULED is false today, so the
 			# Tariff-removal half never actually fires in a live run, only in
-			# test_items_tariffs.gd driving g.tariffs_active directly).
+			# test_items_king_abilities.gd driving g.king_abilities_active directly).
 			if ctx.kind == "artefact" and ctx.key == "seti-s-red-marker":
-				if not g.tariffs_active.is_empty():
-					g.tariffs_active.remove_at(g.rng.randi() % g.tariffs_active.size())
+				if not g.king_abilities_active.is_empty():
+					g.king_abilities_active.remove_at(g.rng.randi() % g.king_abilities_active.size())
 				if not g.box_open: # mirrors Trojan Horse Assembly Manual/Loch Ness
 					# Stool Sample's own guard above — two held SETI copies both
 					# dispatching on the SAME purchase (stacks per held copy,

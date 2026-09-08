@@ -42,7 +42,7 @@ func _init() -> void:
 		# issue 69 repointed "greed"/"move" (removed game-native keys) to
 		# surviving catalog Artefacts of the same held-copy shape.
 		"artefacts": ["voynich-dictionary", "voynich-dictionary", "cia-exploding-cigar"],
-		"tariffs": ["inflation", "inflation", "austerity"],
+		"king_abilities": ["inflation", "inflation", "austerity"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn"}],
@@ -52,7 +52,7 @@ func _init() -> void:
 			{"kind": "box", "key": "item", "size": "big", "sold": false,
 				"contents": [{"kind": "item", "name": "Blitz", "tier": "Tactical",
 					"description": "d", "payload": {"key": "blitz"}}]}],
-		"skip_enemy_turns": 1, "tariffs_off": true,
+		"skip_enemy_turns": 1, "king_abilities_off": true,
 		"ecdysis_copy_key": "voynich-dictionary", # issue 55
 		"run_capture_count": 7, # issue 55, Zeta Reticuli Souvenir Map
 		"wave_start_lost_player": 3, # review pass 1: `clean` on wave clear compares
@@ -142,11 +142,11 @@ func _init() -> void:
 	check(b.kings_defeated == 1, "kings defeated restored")
 	check(b.lost_player == 5 and b.lost_enemy == 9, "loss counters restored")
 	check(b.artefacts.size() == 3, "artefact stacks restored")
-	check(b.tariffs_active.size() == 3, "tariff stacks restored")
+	check(b.king_abilities_active.size() == 3, "tariff stacks restored")
 	check(b.pending_spawn.is_empty(), "pending wave spawned on resume")
 	check(b.board.size() >= 5, "pending pieces landed on the board")
 	check(b.skip_enemy_turns == 1, "item counters restored")
-	check(b.tariffs_suppressed, "counter-intel suppression restored")
+	check(b.king_abilities_suppressed, "counter-intel suppression restored")
 	check(b.stock.has({"id": "ferz", "buff": true}) and b.stock.has("pawn"),
 		"mixed String/Dictionary stock survives the JSON round-trip (ADR-0002)")
 	var buffed := 0

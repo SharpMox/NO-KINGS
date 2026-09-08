@@ -3,7 +3,7 @@ extends SceneTree
 ## merge-selection survives item removal, and the core item abilities
 ## (promote/invert/rapid-deployment/radar-jamming/drone-strike/extraction/
 ## merge/demote). Split from the former monolithic test_items.gd (issue 37) —
-## tariff-flavored item behavior lives in test_items_tariffs.gd, Piece Buffs
+## tariff-flavored item behavior lives in test_items_king_abilities.gd, Piece Buffs
 ## in test_items_buffs.gd, artefacts in test_items_artefacts_*.gd.
 ## Run headless:  godot --headless --path game -s tests/test_items.gd
 

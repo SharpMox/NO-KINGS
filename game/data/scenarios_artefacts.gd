@@ -30,7 +30,7 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 ## incidentally alongside a more interesting trigger.
 const FAMILIES := [
 	["Capture", ["on_capture", "on_destroy"]],
-	["Losses", ["on_piece_lost", "on_charge", "on_tariff_charge", "on_demote",
+	["Losses", ["on_piece_lost", "on_charge", "on_king_ability_charge", "on_demote",
 		"on_piece_demoted"]],
 	["Shop", ["on_purchase", "on_price", "on_shop_restock"]],
 	["Items", ["on_item_consume"]],
@@ -40,7 +40,7 @@ const FAMILIES := [
 		"on_clock_refill"]],
 	["Turn", ["on_turn_start", "on_turn_end", "on_enemy_turn_start", "on_deploy",
 		"on_merge_check", "on_place_cost", "on_sanction_check", "on_rank_up",
-		"on_tariff_apply", "on_game_over"]],
+		"on_king_ability_apply", "on_game_over"]],
 	["Economy", ["on_score_change", "on_gold_change", "on_gold_gain", "on_gold_zero"]],
 ]
 

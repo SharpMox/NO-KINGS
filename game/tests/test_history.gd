@@ -44,7 +44,7 @@ func _init() -> void:
 	game.score = 300
 	game.wave = 5
 	game.kings_defeated = 1
-	game.tariffs_seen = ["Inflation"]
+	game.king_abilities_seen = ["Inflation"]
 	game.lost_player = 2
 	game._record_history(false)
 
@@ -52,7 +52,7 @@ func _init() -> void:
 	check(history.size() == 1, "a run appends one entry")
 	var e: Dictionary = history[0]
 	check(int(e.score) == 300 and int(e.wave) == 5 and int(e.kings) == 1
-		and int(e.tariffs) == 1 and int(e.lost) == 2 and e.won == false,
+		and int(e.king_abilities) == 1 and int(e.lost) == 2 and e.won == false,
 		"the entry carries the full run summary")
 
 	game.score = 900

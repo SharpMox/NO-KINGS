@@ -67,9 +67,9 @@ const CONVERT_RATE := 0.75
 ## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and
 ## testable: the catalog, the hooks slice 13 migrated onto ArtefactHooks, the
 ## tariff-intercepting artefacts, and direct activation via a scenario/save
-## config or Economy.activate_tariff all behave exactly as before. Flip this
+## config or Economy.activate_king_ability all behave exactly as before. Flip this
 ## back to true to restore the cadence — nothing else needs touching.
-const TARIFFS_SCHEDULED := false
+const KING_ABILITIES_SCHEDULED := false
 
 const STUN_MISSES := 2            # Stun: turns the attacker loses, its own
                                    # side's turns (user call 2026-08-28)
@@ -275,7 +275,7 @@ const SHOP_LANE_B_SCORE := 5000
 # Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
 # halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most
 # captures earn (fleet data: Crown median score 30 at run end)
-const TARIFF_ACTION_COST := 10     # per tariffed action
+const KING_ABILITY_ACTION_COST := 10     # per tariffed action
 const TARIFF_LR_PER_SQUARE := 5    # Tariff on Long-Range, per square moved
 
 # Armies (grilled 2026-07-03; slimmed 2026-07-08 — "too many pieces"): three

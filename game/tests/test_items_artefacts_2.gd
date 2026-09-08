@@ -2,7 +2,7 @@ extends SceneTree
 ## Artefacts, part 2: grant-on-capture (Obedience-Flavored Tap Water etc.),
 ## issue 19's remaining hooks (on_piece_lost, on_item_consume, on_rank_up,
 ## chain-lookup, board-half reads, enemy auto-debuff, cheap follow-ups,
-## capture conversion — its tariff hooks moved to test_items_tariffs.gd),
+## capture conversion — its tariff hooks moved to test_items_king_abilities.gd),
 ## and combat & positioning (issue 24). Split out of test_items.gd (issue 37).
 ## Run headless:  godot --headless --path game -s tests/test_items_artefacts_2.gd
 

@@ -157,7 +157,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	# unwinnable rather than merely different.
 	g.pending_king = cfg.get("pending_king", {}).duplicate()
 	g.king_ability_used_this_wave = bool(cfg.get("king_ability_used_this_wave", false))
-	g.king_power_tariff = str(cfg.get("king_power_tariff", "")) # issue 91
+	g.king_power_ability = str(cfg.get("king_power_ability", "")) # issue 91
 	g.king_power_id = str(cfg.get("king_power_id", "")) # issue 92
 	g.next_army = str(cfg.get("army", g.next_army)) # the reinforcement pick draws from it
 	# issue 76: the SAVE KEY stays "family_ability_used_this_wave" while the
@@ -252,13 +252,13 @@ static func apply(g, cfg: Dictionary) -> void:
 				inst.acquired_wave = acquired
 				inst.rarity = rarity
 				g.artefacts.append(inst)
-	for key in cfg.get("tariffs", []) + cfg.get("oneoffs", []):
-		Economy.activate_tariff_by_key(g, key)
+	for key in cfg.get("king_abilities", []) + cfg.get("oneoffs", []):
+		Economy.activate_king_ability_by_key(g, key)
 	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
 		g.sanctioned_id = cfg.sanctioned_id
-	if cfg.has("tariffs_seen"): # activation above re-logged; restore the truth
-		g.tariffs_seen = cfg.tariffs_seen.duplicate()
-	g.tariffs_suppressed = cfg.get("tariffs_off", false)
+	if cfg.has("king_abilities_seen"): # activation above re-logged; restore the truth
+		g.king_abilities_seen = cfg.king_abilities_seen.duplicate()
+	g.king_abilities_suppressed = cfg.get("king_abilities_off", false)
 	g._begin_player_turn()
 	# item-effect counters restore AFTER the turn reset (a save is always taken
 	# at a turn start, so move/place/merge budgets are simply fresh)
@@ -299,7 +299,7 @@ static func to_config(g) -> Dictionary:
 		"save_version": SAVE_VERSION,
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,
-		"tariffs": keys_of.call(g.tariffs_active), "tariffs_seen": g.tariffs_seen.duplicate(),
+		"king_abilities": keys_of.call(g.king_abilities_active), "king_abilities_seen": g.king_abilities_seen.duplicate(),
 		"wave": g.wave, "turns_since_wave": g.turns_since_wave, "turn_number": g.turn_number,
 		"early_clear_awarded": g.early_clear_awarded,
 		"pending_reinforce": g.pending_reinforce,
@@ -314,7 +314,7 @@ static func to_config(g) -> Dictionary:
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
 		"pending_king": g.pending_king.duplicate(), # issue 90
 		"king_ability_used_this_wave": g.king_ability_used_this_wave, # issue 91
-		"king_power_tariff": g.king_power_tariff,
+		"king_power_ability": g.king_power_ability,
 		"king_power_id": g.king_power_id, # issue 92
 		"army": g.next_army, "rank": g.next_tier,
 		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load
@@ -347,7 +347,7 @@ static func to_config(g) -> Dictionary:
 			# restarts at 0 (issue 55's shipped bug, same class)
 		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
-		"tariffs_off": g.tariffs_suppressed,
+		"king_abilities_off": g.king_abilities_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
 		"ecdysis_copy_key": g.ecdysis_copy_key,
 	})

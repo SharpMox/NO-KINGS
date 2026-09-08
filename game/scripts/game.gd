@@ -124,7 +124,7 @@ var pending_king: Dictionary = {}
 var king_ability_used_this_wave := false
 ## issue 91: the Tariff key a King's Power put in force, so it can be taken
 ## back out when the wave ends. "" when no Power is live.
-var king_power_tariff := ""
+var king_power_ability := ""
 ## issue 92: the King whose Power is in force, or "". Distinct from the board
 ## King: the Power is live through segment 1, before the King has arrived.
 var king_power_id := ""
@@ -159,9 +159,9 @@ var uap_used_this_wave := false # UAP Breath Mint: once per Wave, reset
 var torpedo_used_this_wave := false # Inflatable Vietcong Torpedo: once per
 	# Wave, reset on_wave_clear (artefact_hooks.gd, issue 54)
 var exhibit_399_tariff: Dictionary = {} # Exhibit 399 (issue 54, dormant —
-	# TARIFFS_SCHEDULED is false): the Tariff whose apply is paused behind the
+	# KING_ABILITIES_SCHEDULED is false): the Tariff whose apply is paused behind the
 	# choice pick, stashed here so the callback (_exhibit_399_chosen) can
-	# still resolve it after economy.gd's apply_tariff has already returned
+	# still resolve it after economy.gd's apply_king_ability has already returned
 var salvation_charged := true # Salvation Gift Card: ready to veto the next
 	# Tariff applied; consumed on use, restored on_wave_clear at wave%5==0
 	# (artefact hook 22)
@@ -414,9 +414,9 @@ var hounds_free_turn := false # Wild Hunt's Loose the Hounds: "this Turn"
 	# per-turn scratch flag needs no save round-trip (SaveConfig.apply's own
 	# header: "a save is always taken at a turn start")
 
-var tariffs_active: Array = [] # action + persistent tariffs, run-long
-var tariffs_suppressed := false # Counter-Intel: off for the rest of the wave
-var tariffs_seen: Array = [] # every activation, for the end screens
+var king_abilities_active: Array = [] # action + persistent tariffs, run-long
+var king_abilities_suppressed := false # Counter-Intel: off for the rest of the wave
+var king_abilities_seen: Array = [] # every activation, for the end screens
 var sanctioned_id := "" # Sanctions: piece type barred from placement
 var rng := RandomNumberGenerator.new()
 
@@ -467,8 +467,8 @@ var preview_panel: PanelContainer:
 	get: return modals.preview_panel
 var reinforce_panel: PanelContainer:
 	get: return modals.reinforce_panel
-var tariff_panel: PanelContainer:
-	get: return modals.tariff_panel
+var king_ability_panel: PanelContainer:
+	get: return modals.king_ability_panel
 var pending_merge: Array = [] # the two sources awaiting confirmation
 var game_menu_open := false
 var animations_on := true # Settings toggle (06); false short-circuits the
@@ -2400,13 +2400,13 @@ func _yalta_pick_cancelled() -> void:
 	pass
 
 
-## Exhibit 399 (issue 54, dormant — Tuning.TARIFFS_SCHEDULED is false, so this
-## can only be reached by driving economy.gd's apply_tariff directly, in
+## Exhibit 399 (issue 54, dormant — Tuning.KING_ABILITIES_SCHEDULED is false, so this
+## can only be reached by driving economy.gd's apply_king_ability directly, in
 ## tests): "you choose between 2 options" reframed as the tariff-cancel
-## mechanism Salvation Gift Card already has (economy.gd's resolve_tariff),
+## mechanism Salvation Gift Card already has (economy.gd's resolve_king_ability),
 ## just handed to the player as a real choice instead of firing
 ## automatically and with no recharge limit. `t` is stashed because
-## apply_tariff's on_tariff_apply dispatch has already returned by the time
+## apply_king_ability's on_king_ability_apply dispatch has already returned by the time
 ## this opens — the mutation itself waits for the pick, same shape as every
 ## other choice-modal consumer here (Yalta/Bounty above).
 func _open_exhibit_choice(t: Dictionary) -> void:
@@ -2419,7 +2419,7 @@ func _open_exhibit_choice(t: Dictionary) -> void:
 
 
 func _exhibit_399_chosen(_value: bool) -> void:
-	Economy.resolve_tariff(self, exhibit_399_tariff)
+	Economy.resolve_king_ability(self, exhibit_399_tariff)
 	exhibit_399_tariff = {}
 	_refresh()
 
@@ -2496,7 +2496,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"surprise_attack":
 			skip_enemy_turns += 1
 		"counter_intel":
-			tariffs_suppressed = true
+			king_abilities_suppressed = true
 		"extraction": # selection -> Stock at current id; board-only fields
 			# stripped, any remaining piece state rides along (ADR-0002)
 			for pos in _extract_sel:
@@ -3700,7 +3700,7 @@ func _record_history(won: bool) -> void:
 
 func _connect_hud() -> void:
 	hud.pass_pressed.connect(_on_pass)
-	hud.tariff_pressed.connect(_show_tariffs)
+	hud.king_ability_pressed.connect(_show_king_abilities)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.multi_confirm_pressed.connect(_item_confirm_multi)
@@ -3959,7 +3959,7 @@ func _show_preview(id: String) -> void:
 
 
 ## Opening the tariff overlay deselects, like menus and drawers.
-func _show_tariffs() -> void:
+func _show_king_abilities() -> void:
 	# The only modal opener with no guard at all. It is unreachable over another
 	# modal today only because every other panel happens to cover the top bar
 	# button — the same accident that made the pause menu safe over a finished
@@ -3972,7 +3972,7 @@ func _show_tariffs() -> void:
 	placing_id = ""
 	placing_cap = false
 	_clear_selection()
-	modals.show_tariffs()
+	modals.show_king_abilities()
 
 
 func _on_box_skipped() -> void:

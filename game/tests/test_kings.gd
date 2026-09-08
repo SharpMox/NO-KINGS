@@ -188,21 +188,21 @@ func _init() -> void:
 	await process_frame
 	t.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
 	t._queue_wave(50)
-	check(t.king_power_tariff != "", "the King's Power is in force during segment 1")
+	check(t.king_power_ability != "", "the King's Power is in force during segment 1")
 	check(Kings.active_id(t) == "donald_trump",
 		"and the active King is resolved from the HELD King, not the board")
 	var live := false
-	for a in t.tariffs_active:
-		if a.get("key", "") == t.king_power_tariff:
+	for a in t.king_abilities_active:
+		if a.get("key", "") == t.king_power_ability:
 			live = true
 	check(live, "the Power's Tariff is actually active, not just recorded")
 
 	# ...and it does NOT outlive its wave. A Power that leaked into wave 51
 	# would be a permanent difficulty increase nobody chose.
 	t._queue_wave(51)
-	check(t.king_power_tariff == "", "the Power is cleared when the wave ends")
+	check(t.king_power_ability == "", "the Power is cleared when the wave ends")
 	var leaked := false
-	for a in t.tariffs_active:
+	for a in t.king_abilities_active:
 		if a.get("key", "") == "inflation":
 			leaked = true
 	check(not leaked, "and its Tariff is removed, not left running")
@@ -336,8 +336,8 @@ func _init() -> void:
 			if kit.is_empty():
 				continue
 			kitted += 1
-			var pk: String = str(kit.get("power_key", kit.get("power_tariff", "")))
-			var ak: String = str(kit.get("ability_key", kit.get("ability_tariff", "")))
+			var pk: String = str(kit.get("power_key", kit.get("power_catalog_key", "")))
+			var ak: String = str(kit.get("ability_key", kit.get("ability_catalog_key", "")))
 			check(not seen_power.has(pk), "%s's Power is its own (%s)" % [entry.name, pk])
 			check(not seen_ability.has(ak), "%s's Ability is its own (%s)" % [entry.name, ak])
 			seen_power[pk] = true

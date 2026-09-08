@@ -43,19 +43,21 @@ run() {
 	outfile=$(mktemp)
 	"$GODOT" --path . "$@" >"$outfile" 2>&1 &
 	pid=$!
-	( sleep "$TIMEOUT"; kill "$pid" 2>/dev/null ) &
+	# </dev/null >/dev/null: the orphaned sleep must not inherit our stdout, or a
+	# caller reading us through a pipe blocks until it expires (up to TIMEOUT).
+	( sleep "$TIMEOUT"; kill "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
 	watchdog=$!
 	wait "$pid"
 	code=$?
 	kill "$watchdog" 2>/dev/null
 	wait "$watchdog" 2>/dev/null
-	out=$(cat "$outfile"); rm -f "$outfile"
+	out=$(cat "$outfile")
 	if [ "$code" -ne 0 ] || printf '%s' "$out" | grep -q "SCRIPT ERROR"; then
 		fails="$fails $name"
-		echo "FAIL: $name (exit $code)"
+		echo "FAIL: $name (exit $code) — full log kept at $outfile"
 		printf '%s\n' "$out" | grep -i "FAIL\|ERROR" | head -6
 	else
-		echo "ok: $name"
+		echo "ok: $name"; rm -f "$outfile"
 	fi
 }
 

@@ -406,14 +406,33 @@ var _sign_in_gen := 0
 var sync_button: Button
 
 
+## Did the launch ask for a specific window size? `--resolution` cannot be
+## detected as a FLAG — Godot consumes it and strips it from both
+## OS.get_cmdline_args() and get_cmdline_user_args() (verified 2026-09-08: a
+## `--resolution 600x800` boot reports an arg list of just ["-s", "<script>"]).
+## It has already been APPLIED by the time this runs, though, so the window
+## differing from the project default IS the request.
+static func _window_size_requested() -> bool:
+	var want := Vector2i(
+		int(ProjectSettings.get_setting("display/window/size/viewport_width", 480)),
+		int(ProjectSettings.get_setting("display/window/size/viewport_height", 800)))
+	return DisplayServer.window_get_size() != want
+
+
 func _ready() -> void:
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
 	# Carries issue 74's hard-edged text as well as the sound setting.
 	Settings.apply(Settings.load_settings())
 	# real boots only — the click probes instantiate the menu by hand and inject
-	# clicks at 480×800 coords, which a mid-probe resize would break
+	# clicks at 480×800 coords, which a mid-probe resize would break.
+	# NO-33 slice 3: and never when the launch asked for a window size. This
+	# resize is unconditional-once-per-launch, so it silently OVERWROTE
+	# --resolution — three tablet captures for the NO-25 audit came back
+	# byte-identical before anyone spotted why, and the design-C format work was
+	# done in HTML rather than in-engine for the same reason.
 	if not window_sized and DisplayServer.get_name() != "headless" \
+			and not _window_size_requested() \
 			and get_tree().current_scene == self:
 		window_sized = true
 		var usable := DisplayServer.screen_get_usable_rect()

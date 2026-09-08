@@ -39,7 +39,7 @@
 const ABILITIES: Array = [
 	{"key": "move_cost", "name": "Tariff on Move", "tier": "Mild", "kind": "action",
 		"description": "Each piece move costs extra gold."},
-	{"key": "ability_cost", "name": "Tariff on Ability", "tier": "Mild", "kind": "action",
+	{"key": "ability_cost", "name": "Tariff on Item", "tier": "Mild", "kind": "action",
 		"description": "Activating an Item costs extra gold."},
 	{"key": "capture_cost", "name": "Tariff on Capture", "tier": "Mild", "kind": "action",
 		"description": "Each capture costs extra gold."},

@@ -346,6 +346,9 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
 			"artefacts": ["denver-bunker-timeshare"],
 			"items": ["blitz", "shield", "promote"], "wave": 9, "gold": 300, "score": 1000}},
+		{"name": "Combo: NO-38 — sell from inside an Item Box at a full inventory", "cfg": {
+			"board": [["queen", 0, 3, 3], ["knight", 0, 1, 3]],
+			"items": ["blitz", "sniper", "promote"], "wave": 3, "gold": 2000}},
 		{"name": "Combo: Tape Eraser Magnet — selling is not using, so it must not fire", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
 			"artefacts": ["tape-eraser-magnet"], "items": ["blitz"],

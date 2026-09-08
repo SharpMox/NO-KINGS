@@ -20,6 +20,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -33,6 +34,7 @@ signal shop_buy_pressed(index: int)
 signal shop_closed
 signal shop_restock_pressed # issue 52: Jet Fuel Vial's Restock button
 signal shop_sell_pressed(kind: String, entry: Variant) # issue 60
+signal box_sell_pressed(entry: Dictionary) # NO-38: sell a held Item from inside an Item Box
 signal shop_convert_pressed(entry: Variant) # issue 60: Captured -> Stock
 signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
@@ -960,6 +962,8 @@ func show_tariffs() -> void:
 
 func _box_clear() -> void:
 	for c in box_panel.get_children():
+		box_panel.remove_child(c) # gone NOW, not at frame end: a re-render mid-frame
+			# (NO-38's sell row) must not leave a freed button clickable
 		c.queue_free()
 
 
@@ -1062,6 +1066,22 @@ func show_box(options: Array) -> void:
 		b.custom_minimum_size = Vector2(420, 0)
 		b.pressed.connect(func() -> void: box_chosen.emit(opt))
 		box.add_child(b)
+	if g.box_only_kind == "item" and not ItemLogic.has_room(g):
+		# NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
+		# Box. The Shop cannot open under it (one modal at a time), and issue
+		# 53's refusal would otherwise spend the pick for nothing. Selling goes
+		# through game._sell like any sale, then the Box re-renders without this row.
+		var full := Label.new()
+		full.text = "Items full (%d/%d) — sell one to make room:" % [g.items.size(), ItemLogic.cap(g)]
+		full.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(full)
+		for it in g.items:
+			var sell := Button.new()
+			sell.text = "Sell %s (+%d gold)" % [it.name, Shop.sell_payout(g, "item", it)]
+			sell.add_theme_font_size_override("font_size", 16)
+			sell.custom_minimum_size = Vector2(420, 0)
+			sell.pressed.connect(func() -> void: box_sell_pressed.emit(it))
+			box.add_child(sell)
 	if g.box_rerolls_left > 0: # Bible Gag Reel Scroll / Snowden's Rubik's
 		# Cube (issue 46) — only while the per-Box budget is above zero
 		var reroll := Button.new()

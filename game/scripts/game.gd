@@ -3372,6 +3372,8 @@ func _open_box_pick(slot: Dictionary) -> void:
 	if autoplay: # bot: random pick (or skip), and exercise the reroll branch
 		# too — every new path must stay inside this branch or the bot deadlocks
 		# on a modal nobody is there to click (issue 46)
+		if box_only_kind == "item" and not ItemLogic.has_room(self) and rng.randf() < 0.5:
+			_sell("item", items[0]) # NO-38: the bot walks the sell path too
 		if rng.randf() < 0.1:
 			_decline_box_pick()
 			return _box_close()
@@ -3451,6 +3453,15 @@ func _box_reroll() -> void:
 	box_rerolls_left -= 1
 	box_offer = _box_options(box_only_kind, box_size)
 	modals.show_box(box_offer)
+
+
+## NO-38 (user ruling 2026-09-08): sell a held Item from inside an open Item
+## Box, then re-render the Box so its sell row reflects the room just made.
+## Routes through _sell, so Insider Rates, Denver Bunker and the sell tally all
+## see it as the sale it is; the Box itself stays open and untouched.
+func _box_sell(entry: Dictionary) -> void:
+	if _sell("item", entry):
+		modals.show_box(box_offer)
 
 
 func _box_close() -> void:
@@ -3729,6 +3740,7 @@ func _connect_modals() -> void:
 	modals.box_chosen.connect(_box_choose)
 	modals.box_skipped.connect(_on_box_skipped)
 	modals.box_reroll_pressed.connect(_box_reroll)
+	modals.box_sell_pressed.connect(_box_sell)
 	modals.win_continue_pressed.connect(_on_win_continue)
 	modals.win_end_pressed.connect(func() -> void:
 		win_open = false

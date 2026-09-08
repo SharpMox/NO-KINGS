@@ -290,6 +290,12 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 	return false
 
 
+## Taunt: if a taunting piece can be taken, it is the target, whatever the
+## trade. Declared here rather than immediately above ai_action, where it sat
+## between that function and its own docstring.
+const TAUNT_PRIORITY := 1000
+
+
 ## One enemy action. Priority (GDD Enemy AI Behaviors + grilled advance
 ## rule): resolve check > protect the King (capture a piece threatening it,
 ## else retreat it to safety) > a capture worth taking > advance toward the
@@ -315,10 +321,6 @@ static func _touches_player(board: Dictionary, pos: Vector2i) -> bool:
 ## ai_action calls the same legal_moves the player's own moves come from,
 ## so this one parameter binds the AI too; there is no second move
 ## generator to keep in sync.
-const TAUNT_PRIORITY := 1000 # Taunt: if a taunting piece can be taken, it is
-	# the target, whatever the trade
-
-
 static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = []) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)

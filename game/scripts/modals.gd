@@ -17,8 +17,6 @@
 extends Node
 
 const Tuning := preload("res://scripts/tuning.gd")
-const Economy := preload("res://scripts/economy.gd") # SCORE_MULTIPLIER, so the
-	# Skip button can show the score the player actually receives
 const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")

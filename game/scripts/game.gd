@@ -953,8 +953,13 @@ func _begin_player_turn() -> void:
 		_open_bounty_pick()
 
 
-## Write the run to disk and mirror it. Called at every turn start, and again
-## when the app is backgrounded — the point at which Android may kill us.
+## Write the run to disk and mirror it. Called at TURN START, and only there.
+##
+## PR #294 tried calling it on backgrounding too — the point at which Android
+## may kill us — and reverted it (commit 8ee93ab): writing mid-turn violates the
+## save schema's turn-start invariant, so a resumed run came back inconsistent.
+## Backgrounding is therefore NOT a save point, and the guard below still reads
+## as if it were because a result screen is a common place to switch away.
 ##
 ## The comment at the old call site referred to a `_save_run` that never
 ## existed; this is that function, finally.
@@ -962,9 +967,10 @@ func _autosave() -> void:
 	if autoplay or is_scenario:
 		return # bot runs and scenarios are not resumable, by design
 	# NOT after the run has ended. _game_over deletes SAVE_PATH and tombstones
-	# the cloud copy precisely so a finished run cannot be resumed — and this
-	# function is now also called on backgrounding, which is exactly what a
-	# player does on the result screen. Without this guard, switching away from
+	# the cloud copy precisely so a finished run cannot be resumed. The guard
+	# predates the reverted backgrounding autosave (see the docstring) and is kept
+	# on its own merits: a turn-start write after _game_over would resurrect a
+	# finished run. Without this guard, switching away from
 	# GAME OVER rewrote the save and resurrected the finished run at the next
 	# launch: the same defect the tombstone was added to kill, reintroduced
 	# through a new door.
@@ -1512,7 +1518,7 @@ func _notification(what: int) -> void:
 		backgrounded = false
 	# Android's hardware Back. Godot quits the app on it by default, and mid-run
 	# that is the worst possible response: the autosave is only written at turn
-	# start (see _save_run), so a stray Back discarded the turn in progress and
+	# start (see _autosave), so a stray Back discarded the turn in progress and
 	# looked like a crash. quit_on_go_back is off in project.godot, so this is
 	# now the only handler.
 	#
@@ -3913,7 +3919,8 @@ func _on_box_skipped() -> void:
 
 
 ## Both decline paths (the interactive Skip button above, and autoplay's own
-## inline decline in _open_box_pick) pay the same flat consolation plus
+## inline decline in _open_box_pick) pay the Box's OWN price in Gold and no
+## Score (Tuning.box_skip_gold — PRs #343 and #345 replaced the flat rate), plus
 ## Cicada Rejection Letter's Gold (issue 49): "+Gold equal to the Shop value
 ## of the offered pieces" re-texted to "the Box's contents, whatever kind" —
 ## valued off whatever is STILL in box_offer at the moment of decline (the

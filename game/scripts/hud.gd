@@ -121,7 +121,11 @@ var _strip_sig := "" # last built content, so refresh does not rebuild every fra
 var _strip_retry := 0 # bounded waits for layout; see _rebuild_stock_strip
 ## One size for every menu icon, deliberately just under a board tile so the
 ## deck reads as smaller than the board without looking like a different game.
-const ICON := 52
+## NO-33 / ADR-0004: derived from the tile rather than fixed at 52. As a literal
+## it only held that relationship on tall phones — on any shape wider than 3:5
+## the tile is ~40 and the deck icons were LARGER than the board pieces, which is
+## backwards. Set once in build(), before anything reads it.
+var ICON: int = 52
 
 var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
 	# moved the 6 activatable keys out into activate_box above)
@@ -156,6 +160,9 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 func build(game) -> void:
 	g = game
 	var vp: Vector2 = g.get_viewport_rect().size
+	# NO-33 / ADR-0004: one-way. _layout_board has already solved the tile for
+	# this viewport, so ICON reads it rather than anything measuring itself.
+	ICON = maxi(1, g.tile - g.ICON_GAP)
 	# condensed top bar: clock · score · gold · wave, menu at the right corner
 	clock_label.add_theme_font_size_override("font_size", 17)
 	score_label.add_theme_font_size_override("font_size", 18)
@@ -222,18 +229,18 @@ func build(game) -> void:
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
 
-	# THE STOCK STRIP (design C). Sits directly under the board, shows the pieces
-	# you actually hold at the same size they appear on the board, and is the
-	# element that ABSORBS leftover height: whatever the board does not use, this
-	# takes, which is what makes a dead band impossible rather than merely absent.
+	# THE STOCK STRIP (design C). Sits directly under the board and shows the
+	# pieces you actually hold at the same size they appear on the board.
+	# NO-33 / ADR-0004: it no longer absorbs leftover height. It spent absorbed
+	# height in whole icon rows, so any remainder under a row was empty by
+	# construction — the board absorbs now, and this is exactly one row.
 	stock_strip = PanelContainer.new()
 	stock_strip.add_theme_stylebox_override("panel",
 		_surface(Color(0, 0, 0, 0.19), Color(0, 0, 0, 0), 8, 6, 5))
-	stock_strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	# one full row of pieces plus its header, always. Without a floor here the
 	# strip measures itself before layout has given it any height, decides no row
 	# fits, hides, and then never comes back because a hidden node stays 0 tall.
-	stock_strip.custom_minimum_size = Vector2(0, ICON + 22)
+	stock_strip.custom_minimum_size = Vector2(0, ICON + g.STRIP_CHROME)
 	stock_strip.gui_input.connect(func(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.pressed:
 			set_drawer("stock")
@@ -751,9 +758,9 @@ func _rebuild_stock_strip() -> void:
 	var shown: int = mini(pool.size(), room - 1 if pool.size() > room else room)
 	# rebuilt only when the visible content actually changed: this runs on every
 	# refresh, and freeing/adding ~10 nodes per frame is a real cost for nothing
-	# the ROOM is part of the signature, not just the content: the strip is
-	# resizable (it absorbs whatever the board leaves), so the same 21 pieces
-	# legitimately draw differently at different heights
+	# the ROOM is part of the signature, not just the content: room varies with
+	# the strip's WIDTH (and, across devices, with ICON), so the same 21 pieces
+	# legitimately draw differently at different sizes
 	var sig := "%d/%d/%d" % [pool.size(), shown, room]
 	if sig == _strip_sig:
 		return

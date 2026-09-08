@@ -462,6 +462,40 @@ func _init() -> void:
 	check(game.hud.act_row.get_index() == deck.get_child_count() - 1,
 		"deck order: Ability and PASS are the LAST row, in the thumb arc")
 
+	# ---- NO-33 / ADR-0004: the BOARD absorbs slack, the deck is a SUM -------
+	# Design C made the strip the absorber. A strip built from fixed icon rows
+	# spends a continuous quantity in discrete steps, so the remainder is dead by
+	# construction — and a wider strip needs fewer rows and wastes MORE, which is
+	# why NO-25 read it as a tablet bug. The board absorbs now.
+	check(game.hud.stock_strip.size_flags_vertical != Control.SIZE_EXPAND_FILL,
+		"NO-33: the stock strip no longer absorbs leftover height")
+	# THE GUARD. The deck's height is a sum of constants, never a runtime
+	# measurement (measuring needs a second layout pass, and a control that
+	# measures itself before layout caches nonsense — CLAUDE.md, layout traps).
+	# A sum can drift from the thing it describes, so this is what fails the
+	# moment a deck row is added or a font moves under one.
+	var rest := 0.0
+	for c in deck.get_children():
+		if c != game.hud.stock_strip:
+			rest += (c as Control).get_combined_minimum_size().y
+	rest += deck.get_theme_constant("separation") * (deck.get_child_count() - 1)
+	check(is_equal_approx(rest, GameScript.DECK_BELOW_STRIP),
+		"NO-33: DECK_BELOW_STRIP (%s) still matches the built deck (%s)"
+			% [GameScript.DECK_BELOW_STRIP, rest])
+	check(is_equal_approx(game.hud.stock_strip.get_combined_minimum_size().y,
+			game.hud.ICON + GameScript.STRIP_CHROME),
+		"NO-33: STRIP_CHROME still matches the strip's real one-row height (%s vs %s)"
+			% [game.hud.stock_strip.get_combined_minimum_size().y,
+				game.hud.ICON + GameScript.STRIP_CHROME])
+	# The closed form reproduces the numbers design C was tuned against: on a
+	# 9:20 phone the WIDTH term wins at tile 59, which is exactly where ICON's
+	# literal 52 came from. If this pair ever stops agreeing, the -7 relationship
+	# was refitted rather than derived, and ADR-0004 wants re-reading.
+	check(GameScript.board_tile_for(Vector2(480.0, 1066.0)) == 59,
+		"NO-33: a 9:20 phone still solves to tile 59, as design C shipped it")
+	check(GameScript.board_tile_for(Vector2(480.0, 1066.0)) - GameScript.ICON_GAP == 52,
+		"NO-33: ...and ICON on that phone is still 52, the constant it replaced")
+
 	# ONE ICON SIZE. Items were 30px, stock stacks 46, the strip 52 before this
 	# was pulled onto a single constant; nothing but a pin stops them drifting
 	# apart again, because each lives in a different rebuild function.
@@ -603,7 +637,28 @@ func _init() -> void:
 	# picking it, and closing the modal — while the assertion below still passed,
 	# because a consumed click leaves `selected` untouched either way. A corner
 	# tile is over the modal's backdrop, which is what the check is about.
-	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	# FIND a tile the modal does not cover, rather than naming one. The old
+	# hardcoded corner (0,0) is the BOTTOM-left tile, which sits inside the
+	# modal's own button column — it passed only because it happened to land in
+	# the 12px separation between the last option and Cancel, and NO-33's taller
+	# board slid it 23px down onto Cancel, closing the very modal this check is
+	# about. Same lesson as the drag probes: a hardcoded tile is a geometry
+	# assertion in disguise (CLAUDE.md, tests that pass for the wrong reason).
+	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
+	var box_rect: Rect2 = modal_box.get_global_rect()
+	var backdrop := Vector2(-1, -1)
+	for by in Tuning.BOARD_H:
+		for bx in Tuning.BOARD_W:
+			var c: Vector2 = game._tile_px(Vector2i(bx, by)) \
+				+ Vector2(game.tile, game.tile) / 2
+			if not box_rect.has_point(c):
+				backdrop = c
+				break
+		if backdrop.x >= 0.0:
+			break
+	check(backdrop.x >= 0.0,
+		"(setup) a board tile exists over the modal's backdrop rather than its buttons")
+	_click(backdrop)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
 	check(game.modals.buff_panel != null and game.modals.buff_panel.visible,
@@ -1343,7 +1398,38 @@ func _init() -> void:
 	# would be gone, and "selected nothing" would have been true for the wrong
 	# reason.
 	game.selected = Vector2i(-1, -1)
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	# NO-33: FIND the tile rather than naming it, for the reason the paragraph
+	# above already gives — the tap has to hold a PLAYER piece (so a leak selects
+	# it and fails loudly) AND sit off the overlay's own buttons (so a consumed
+	# click cannot masquerade as a blocked one). Hardcoding (2,2) satisfied both
+	# only at the board geometry of the day; a taller board moved it onto Close.
+	var tap := Vector2(-1, -1)
+	var overlay_btns: Array = game.tariff_panel.find_children("*", "Button", true, false)
+	for pos in game.board:
+		if int(game.board[pos].owner) != 0:
+			continue
+		var o: Vector2 = game._tile_px(pos)
+		var t: float = float(game.tile)
+		# ANY point inside the tile selects the piece if the tap leaks, so sample
+		# a few rather than only the centre: the overlay's Close button covers
+		# the middle of this tile and used to clear it by 12px, which is the
+		# whole reason the hardcoded version broke when the board grew.
+		for f in [Vector2(0.5, 0.5), Vector2(0.5, 0.12), Vector2(0.5, 0.88),
+				Vector2(0.12, 0.5), Vector2(0.88, 0.5)]:
+			var c := o + Vector2(t * f.x, t * f.y)
+			var on_button := false
+			for b in overlay_btns:
+				if (b as Button).get_global_rect().has_point(c):
+					on_button = true
+					break
+			if not on_button:
+				tap = c
+				break
+		if tap.x >= 0.0:
+			break
+	check(tap.x >= 0.0,
+		"(setup) a point on a player-held tile sits clear of the overlay's buttons")
+	_click(tap)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1),
 		"NO-5: a board tap under the open tariff overlay selects nothing")

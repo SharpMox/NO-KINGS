@@ -185,8 +185,10 @@ func _init() -> void:
 		# real ones rather than a second copy of the formula
 		var vw: float = vp[0]
 		var vh: float = vp[1]
-		bg.tile = int(minf((vw - 8.0) / Tuning.BOARD_W,
-			(vh - bg.HUD_DECK - bg.HUD_TOP) / Tuning.BOARD_H))
+		# NO-33: call the game's own solver rather than keeping a second copy of
+		# the formula here — this copy silently disagreed the moment ADR-0004
+		# coupled the tile to ICON.
+		bg.tile = bg.board_tile_for(Vector2(vw, vh))
 		bg.board_px = Vector2(roundf((vw - bg.tile * Tuning.BOARD_W) / 2.0), bg.HUD_TOP)
 		var board_l: float = bg.board_px.x
 		var board_r: float = bg.board_px.x + Tuning.BOARD_W * bg.tile

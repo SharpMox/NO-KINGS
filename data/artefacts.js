@@ -170,7 +170,7 @@ var ARTEFACTS = [
     conspiracy: "Area 51", url: "https://en.wikipedia.org/wiki/Area_51",
     summary: "The Nevada test site whose existence the US denied until 2013. Lore says crashed saucers are stored and reverse-engineered there. The badge is the access nobody is supposed to have." },
   { name: "Fort Knox IOU", rarity: "Common", type: "Passive", bonus: ["Score", "Item"], status: "KEEP", implemented: true,
-    effect: "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item",
+    effect: "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: open a Small Item Box",
     conspiracy: "Fort Knox's missing gold", url: "https://en.wikipedia.org/wiki/United_States_Bullion_Depository",
     summary: "The claim: the US gold reserve is gone and the audits are theater. The last full audit was 1953; the 1974 press tour meant to kill the rumor only fed it — you saw one room, said the theorists." },
   { name: "FEMA Summer Camp Flyer", rarity: "Common", type: "Trigger", bonus: ["Gold"], status: "KEEP", implemented: true,

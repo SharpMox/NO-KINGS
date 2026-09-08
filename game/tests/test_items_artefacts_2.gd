@@ -15,6 +15,7 @@ const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const Box := preload("res://scripts/box.gd")
 
 var fails := 0
 
@@ -501,6 +502,44 @@ func _init() -> void:
 	Economy.earn(cheap, 100)
 	check(cheap.score == s0 + 1500, "Fort Knox IOU: +50% Score gain while holding under 10 Gold") # issue 57: x10
 	cheap.queue_free()
+	await process_frame
+
+	# --- NO-23 (user ruling 2026-09-08): the wave-clear half opens a Small Item
+	# Box instead of granting an Item outright. A direct grant is refused at the
+	# base cap of 3 (issue 53) and was silently dropped; the Manna Vending
+	# Machine took the same treatment in issue 58, and NO-38's sell row is what
+	# makes a full inventory a choice rather than a wasted pick.
+	var knox := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 5, "artefacts": ["fort-knox-iou"]})
+	await process_frame
+	WaveLogic.queue(knox, 5)
+	check(knox.box_open and knox.box_only_kind == "item" and knox.box_size == "small",
+		"NO-23: Fort Knox IOU opens a Small Item Box on Wave clear under 10 Gold")
+	knox.queue_free()
+	await process_frame
+
+	# the under-10 condition still gates it — this is the same read as the
+	# on_score_change half, and a Box is the grant, so no Gold means no Box
+	var knox_rich := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 10, "artefacts": ["fort-knox-iou"]})
+	await process_frame
+	WaveLogic.queue(knox_rich, 5)
+	check(not knox_rich.box_open, "NO-23: at 10 Gold the Wave-clear Box does not open")
+	knox_rich.queue_free()
+	await process_frame
+
+	# the `not g.box_open` guard the other four Box-opening hooks use: a Box
+	# already open is a Box being picked from, and _open_box_pick rewrites every
+	# field wholesale
+	var knox_busy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 5, "artefacts": ["fort-knox-iou"]})
+	await process_frame
+	knox_busy._open_box_pick({"kind": "box", "key": "piece", "size": "huge", "sold": false,
+		"contents": Box.roll_options(knox_busy, "piece", "huge")})
+	WaveLogic.queue(knox_busy, 5)
+	check(knox_busy.box_open and knox_busy.box_only_kind == "piece" and knox_busy.box_size == "huge",
+		"NO-23: an already-open Box is not clobbered by the Wave-clear Box")
+	knox_busy.queue_free()
 	await process_frame
 
 	# --- issue 19: capture conversion, the cheap wave-clear half (Stockholm

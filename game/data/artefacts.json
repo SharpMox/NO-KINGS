@@ -44,7 +44,7 @@
    "Score",
    "Item"
   ],
-  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: +1 Tactical Item",
+  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: open a Small Item Box",
   "conspiracy": "Fort Knox's missing gold",
   "implemented": true
  },

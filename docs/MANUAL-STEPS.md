@@ -1,4 +1,4 @@
-# Manual steps only you can do — the blockers on 86 / 87
+# Manual steps only you can do — the blockers on NO-10, NO-12 and NO-13 (archive issues 86 / 87)
 
 Everything in this file needs an account, a payment, a device or a GUI login. Nothing here can
 be done from the dev loop, which is why these two slices are stalled while the rest of the
@@ -359,7 +359,7 @@ designed for exactly that split. If you do want it:
 
 ---
 
-## D. The release keystore — NO-12, and the one secret in the whole build
+## E. The release keystore — NO-12, and the one secret in the whole build
 
 `gradle_build/export_format` is now **1 (AAB)**, which is what Google Play requires for a new
 app. Issue 86 measured the difference: **28.9 MB as an AAB against 78 MB as an APK**, because

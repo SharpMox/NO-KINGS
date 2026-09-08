@@ -110,11 +110,8 @@ nothing and read it at load time. Two exporters carry the same data to the Godot
   agent-browser screenshot /path/out.png
   ```
 
-  **Not Playwright.** This file used to say Playwright was installed under
-  `/tmp/node_modules`; that install is broken (the `playwright` package there has no
-  `package.json`, so both `require` and ESM import fail) and it is a temp directory that
-  will not survive. `agent-browser` is on PATH, needs no project dependency, and drove the
-  whole check first time. Verified 2026-09-02 while adding privacy.html/terms.html.
+  **Not Playwright.** The old `/tmp/node_modules` install is broken and will not
+  survive; `agent-browser` is on PATH and needs no project dependency.
 - **Match the surrounding page.** Styles/scripts are inline per page — keep edits in the
   same idiom and density as the file you're touching.
 
@@ -140,8 +137,6 @@ scaffolding, and a 22-suite test harness.
   history, worth reading, but no new slice goes here. **A slice lives in exactly one
   place**: Linear if it is open, the archive if it is closed. Only the LIVE items were
   migrated; the archive deliberately was not.
-  This file said *"There is no Linear; there never was"* until 2026-09-06 — true for the
-  whole history above it, and no longer true.
   `NOTION-QUESTIONS.md` stays in the repo: the open GDD questions, each blocking at least one
   Artefact — **read it before implementing any Artefact**, so an already-known ambiguity
   isn't rediscovered or, worse, guessed at.
@@ -224,18 +219,15 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
 - **A/B a suspected flake by INTERLEAVING runs, not by batching them.** Running 15 on a
   branch, then 20 on `main`, and comparing the rates is invalid when the flake is
   load-sensitive: the two batches ran under different machine load, so the comparison
-  measures the load, not the branch. This produced a confident and **wrong** conclusion on
-  2026-08-29 — 3/15 on a branch against 0/20 on `main` "proved" the branch broke it, the PR
-  was blocked, and an interleaved 20-and-20 in the same window then came back 0 and 0.
-  Alternate the two in a single loop so both see identical conditions, using a second
+  measures the load, not the branch. A batched comparison once blocked a PR on 3/15 against
+  0/20; the interleaved re-run came back 0 and 0. Alternate the two in a single loop so both see identical conditions, using a second
   `git worktree` rather than checking branches out back and forth. And weigh a
   *reachability* argument ("that code cannot execute at the failure site") above a rate
   comparison — it is the stronger evidence.
 - **Never run two suites at once.** The click probes are *windowed* — they open a real
   Godot window and drive real input. Two concurrent runs fight over window focus and the
-  probes fail for no reason in the code. This has already produced one false failure
-  (2026-08-29: three `game-clicks` cases failed while four suites ran in parallel across
-  worktrees; all three passed on every one of three sequential re-runs). It matters most
+  probes fail for no reason in the code. It has already produced a false failure that
+  vanished on every sequential re-run. It matters most
   with parallel agents, where each worktree is a separate checkout but they all share one
   display: **serialise the suite runs**, don't parallelise them. A probe failure during a
   concurrent run is not evidence of a bug, and — just as important — a *pass* during one
@@ -249,7 +241,7 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
 ### Tests that pass for the wrong reason
 
 Four of these cost most of a day during the HUD redesign, and every one is the kind that
-comes back. Migrated from `FLAGS.md` when that file was retired (2026-09-06).
+comes back.
 
 - **A probe can pass because its click was CONSUMED.** A probe proved the choice modal
   blocked board input by clicking tile (2,2). The board moved, that coordinate landed under
@@ -376,8 +368,8 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   apart unnoticed before and been hand-fixed twice — the second fix still missed a
   row. `tools/check-notion-drift.mjs` diffs them and prints every disagreement; it
   never writes to either side. It needs a Notion snapshot as input — a plain `node`
-  script cannot reach Notion at all (there is no token in the repo, and the Notion MCP
-  was removed 2026-09-06 in favour of the signed-in browser). Gather the rows through
+  script cannot reach Notion at all (there is no token in the repo; Notion is reached
+  through the signed-in browser). Gather the rows through
   the browser; see the header of that file for the exact SQL and the JSON shape to save,
   then:
   ```sh
@@ -390,13 +382,10 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
 <type>(<scope>): <description>
 ```
 
-Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `test`, `perf` (`test` and
-`perf` added 2026-09-07 — the preceding three days had already used both). A `wip` commit
-is **squashed before merge**, never landed: 8ad5681 reached `main` inside PR #308. The
-scope is **required** — nine commits on 2026-09-03 shipped without one. One commit per
-logical change. When a Linear issue drives the work (the game), add a `Refs: <issue-id>` trailer
-(e.g. `Refs: NO-16`); reference-site changes don't need one. The example here said
-`ENG-42` until 2026-09-06, from a team prefix that never existed.
+Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `test`, `perf`. A `wip`
+commit is **squashed before merge**, never landed. The scope is **required**. One commit
+per logical change. When a Linear issue drives the work (the game), add a
+`Refs: <issue-id>` trailer (e.g. `Refs: NO-16`); reference-site changes don't need one.
 
 ## Agent tooling
 
@@ -418,8 +407,6 @@ directory to `SKILLS`.
 - `CONTEXT.md` — domain glossary (Godot + GitNexus-fork terms, for the game).
 - `docs/adr/` — architecture decision records.
 - `docs/MANUAL-STEPS.md` — the live checklist of things only the user can do
-  (accounts, payments, keystore, device logins). Moved out of
-  `.scratch/gdd-gaps/` on 2026-09-08: it was still being edited three times
-  after that directory became a read-only archive, and nothing pointed at it.
+  (accounts, payments, keystore, device logins).
 - `skills-lock.json` — installed external skills with content hashes.
 - Godot skills: `.agents/skills/godot-{best-practices,gdscript-patterns,ui,mcp}/SKILL.md`.

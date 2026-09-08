@@ -9,6 +9,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Settings := preload("res://scripts/settings.gd")
 const ShopScript := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
+const Items := preload("res://data/items.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Armies := preload("res://scripts/armies.gd") # issue 100
 const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
@@ -328,6 +329,34 @@ func _init() -> void:
 	check(not game.box_open, "picking every offered option closes the box")
 	check(game.items.size() + game.artefacts.size() + game.stock.size() > loot_before,
 		"the picked reward is applied")
+
+	# NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
+	# Item Box — the row is only there at capacity, one click sells one Item and
+	# pays, the Box survives it, and the pick then lands.
+	game.items.clear()
+	for key in ["blitz", "sniper", "promote"]:
+		for it in Items.ITEMS:
+			if it.key == key:
+				game.items.append(it)
+	game._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
+		"contents": Box.roll_options(game, "item", "small")})
+	await process_frame
+	var sell_btn := _sell_button(game.box_panel)
+	check(game.box_open and sell_btn != null,
+		"NO-38: an Item Box at a full inventory shows a Sell row")
+	var items_before: int = game.items.size()
+	var gold_before_sale: int = game.gold
+	_click(sell_btn.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(game.items.size() == items_before - 1 and game.gold > gold_before_sale,
+		"NO-38: clicking Sell frees one slot and pays the sell price")
+	check(game.box_open and _sell_button(game.box_panel) == null,
+		"NO-38: the Box survives the sale and the Sell row is gone")
+	_click(_first_option_button(game.box_panel).get_global_rect().get_center())
+	await process_frame
+	check(not game.box_open and game.items.size() == items_before,
+		"NO-38: the pick then lands and closes the Box")
 
 	# Nostradamus Mad Libs (issue 46/47): the extra pick reopens the box
 	# modal with what's left of the offer instead of closing it — stacks on
@@ -1646,6 +1675,17 @@ func _init() -> void:
 
 
 ## First reward button in the box panel (options precede the Skip button).
+## NO-38: the Box's own sell row — the first Button whose text starts "Sell ".
+func _sell_button(node: Node) -> Button:
+	if node is Button and node.text.begins_with("Sell "):
+		return node
+	for c in node.get_children():
+		var hit := _sell_button(c)
+		if hit:
+			return hit
+	return null
+
+
 func _first_option_button(node: Node) -> Button:
 	if node is Button and not node.text.begins_with("Skip"):
 		return node

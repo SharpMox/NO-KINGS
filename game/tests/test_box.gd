@@ -11,6 +11,7 @@ const Box := preload("res://scripts/box.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
 
 var fails := 0
 
@@ -27,6 +28,16 @@ func check(cond: bool, label: String) -> void:
 ## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
 ## out — only for a test that genuinely wants variance.
 const DEFAULT_SEED := 1
+
+
+## NO-38: the Box's own sell row — every Button whose text starts "Sell ".
+func _sell_buttons(node: Node) -> Array:
+	var out: Array = []
+	if node is Button and node.text.begins_with("Sell "):
+		out.append(node)
+	for c in node.get_children():
+		out.append_array(_sell_buttons(c))
+	return out
 
 
 func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
@@ -89,6 +100,8 @@ func _init() -> void:
 	var item_opt: Dictionary = Box.roll_options(game, "item", "small")[0]
 	game._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
 		"contents": [item_opt]})
+	check(_sell_buttons(game.box_panel).is_empty(),
+		"NO-38: an Item Box shows no sell row while there is room")
 	game._box_choose(game.box_offer[0])
 	check(game.items.size() == 1, "picking an Item Box option adds it to the held items")
 
@@ -189,6 +202,29 @@ func _init() -> void:
 		"NO-23: a Huge Box is worth 4x a Small one to decline — the consolation SCALES")
 	check(Tuning.box_skip_gold("nonsense") == Tuning.box_skip_gold("small"),
 		"NO-23: an unknown size falls back to Small — a Box with no size still pays")
+
+	# --- NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
+	# Box, so an Item pick is never spent for nothing ---
+	var full: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"items": ["blitz", "sniper", "promote"], "gold": 100})
+	await process_frame
+	check(full.items.size() == ItemLogic.cap(full), "(setup) held Items at the base cap of 3")
+	full._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
+		"contents": Box.roll_options(full, "item", "small")})
+	check(full.box_open and _sell_buttons(full.box_panel).size() == 3,
+		"NO-38: an Item Box at a full inventory lists every held Item with a Sell button")
+	var gold_before: int = full.gold
+	var want_gold: int = Shop.sell_payout(full, "item", full.items[0])
+	full._box_sell(full.items[0])
+	check(full.items.size() == 2 and full.gold == gold_before + want_gold,
+		"NO-38: selling from the Box frees the slot and pays the sell price")
+	check(full.box_open and _sell_buttons(full.box_panel).is_empty(),
+		"NO-38: the Box stays open and the sell row is gone once there is room")
+	full._box_choose(full.box_offer[0])
+	check(full.items.size() == 3 and not full.box_open,
+		"NO-38: the pick then lands and the Box closes")
+	full.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

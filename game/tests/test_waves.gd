@@ -4,7 +4,7 @@ extends SceneTree
 ## Run headless:  godot --headless --path game -s tests/test_waves.gd
 
 const Waves := preload("res://data/waves.gd")
-const Tariffs := preload("res://data/tariffs.gd")
+const KingAbilities := preload("res://data/king_abilities.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
@@ -67,9 +67,9 @@ func _init() -> void:
 		60: "Mild", 70: "Mild", 80: "Moderate", 90: "Moderate", 100: "Severe",
 		110: "Mild", 120: "Moderate", 130: "Moderate", 140: "Severe", 150: "Severe",
 	}
-	check(Tariffs.SCHEDULE.size() == 15, "15 tariff waves")
+	check(KingAbilities.SCHEDULE.size() == 15, "15 tariff waves")
 	for n in tiers:
-		check(Tariffs.SCHEDULE.get(n) == tiers[n], "wave %d tariff is %s" % [n, tiers[n]])
+		check(KingAbilities.SCHEDULE.get(n) == tiers[n], "wave %d tariff is %s" % [n, tiers[n]])
 
 	# --- early-clear bonus: emptying the board before the next wave pays out
 	# score + clock scaled by the turns to spare, once per wave (2026-07-07) ---

@@ -4,7 +4,7 @@
 const Rules := preload("res://scripts/rules.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Waves := preload("res://data/waves.gd")
-const Tariffs := preload("res://data/tariffs.gd")
+const KingAbilities := preload("res://data/king_abilities.gd")
 const Kings := preload("res://data/kings.gd")
 const Economy := preload("res://scripts/economy.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
@@ -79,8 +79,8 @@ static func queue(g, n: int) -> void:
 	if Tuning.TARIFFS_SCHEDULED: # off for now — see Tuning.TARIFFS_SCHEDULED
 		if n == 2:
 			Economy.activate_tariff_by_key(g, "inflation") # T0, GDD: fires after wave 1
-		elif Tariffs.SCHEDULE.has(n):
-			Economy.activate_tariff(g, Tariffs.SCHEDULE[n])
+		elif KingAbilities.SCHEDULE.has(n):
+			Economy.activate_tariff(g, KingAbilities.SCHEDULE[n])
 	# The 10-Wave beat, now ONE event (user ruling 2026-09-06): the
 	# reinforcement pick and the Clock refill together, at the START of waves
 	# 11/21/31… A MODULO, not the old 4-entry REINFORCE_WAVES list, so it keeps

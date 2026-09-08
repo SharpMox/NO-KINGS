@@ -1,11 +1,23 @@
-## NOTE (issue 66, 2026-08-30): the design-facing name for this mechanic is
-## now "King Ability" — "Tariff" survives only as Donald Trump's King Power
-## (data/kings.gd). Code identifiers here (TARIFFS, tariffs_active, key/name
-## fields, etc.) are deliberately left as "tariff" — the coming Kings +
-## Tariffs rework restructures this catalog (entries become the per-King
-## Ability design pool) rather than just renaming it, so renaming twice would
-## be wasted work. Do not read "Tariff" in this file as a stale rename; it is
-## the pre-rework code shape on purpose.
+## King Abilities — the catalog issue 66 renamed from "Tariff" (2026-08-30).
+##
+## RENAMED 2026-09-09 (user ruling), superseding this header's own instruction
+## to wait. It used to say identifiers were deliberately left as "tariff"
+## because the coming Kings + Tariffs rework would restructure the catalog and
+## renaming twice would be wasted work. The user ruled the naming rename should
+## reach the file now: issue 66 retired the name in the code and NO-24 fixed it
+## in Notion, so the file was the last place still calling it a Tariff — and
+## reading this file cost every newcomer the same explanation.
+##
+## Renamed: the file (data/tariffs.gd -> data/king_abilities.gd), its preload
+## const (Tariffs -> KingAbilities) and this catalog (TARIFFS -> ABILITIES).
+##
+## NOT renamed, deliberately: the RUNTIME and SAVE identifiers — g.tariffs_active,
+## g.king_power_tariff, Economy.activate_tariff, entry "key" values, and
+## Tuning.TARIFFS_SCHEDULED. Those are game state that save_config.gd persists,
+## and a reshaped save field read with a default is a silent corruption rather
+## than a rename (see save_config.gd's header). They move with the rework, which
+## has NOT landed: TARIFFS_SCHEDULED is still false and exactly one King draws
+## on this catalog (kings.gd — Donald Trump's power_tariff/ability_tariff).
 ##
 ## Tariffs Catalog, from the Notion GDD (fetched 2026-07-02). Penalties on the
 ## player, activated on every 10th wave per the Wave Catalog schedule.
@@ -24,7 +36,7 @@
 ## kind: "action" (gold cost when the action happens) · "persistent" (rule
 ## modifier for the rest of the run) · "oneoff" (applies instantly).
 
-const TARIFFS: Array = [
+const ABILITIES: Array = [
 	{"key": "move_cost", "name": "Tariff on Move", "tier": "Mild", "kind": "action",
 		"description": "Each piece move costs extra gold."},
 	{"key": "ability_cost", "name": "Tariff on Ability", "tier": "Mild", "kind": "action",
@@ -65,8 +77,11 @@ const TARIFFS: Array = [
 		"description": "Lose half your current gold."},
 ]
 
-## Excluded: Tariff on Promotion (last-rank promotion is cut from MVP — merges
-## are covered by Tariff on Fuse).
+## Tariff on Promotion was the one catalog entry with no code here. It was
+## excluded for the MVP (last-rank promotion is cut; merges are covered by
+## Tariff on Fuse) and then held pending the rework. Ruled OBSOLETE and deleted
+## from the Notion catalog 2026-09-09, so the two sides now hold the same 19
+## entries and the drift checker has nothing to report here.
 
 ## Tariff slots for waves 1-150 (GDD Wave Catalog cycles 1-3, escalating). T0
 ## fires when wave 2 arrives and is always Inflation. Mild slots may repeat a

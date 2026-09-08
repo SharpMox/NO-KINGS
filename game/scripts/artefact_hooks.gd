@@ -2142,8 +2142,18 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if g.gold < 10:
 				ctx.amount += ctx.base * 0.5
 		["fort-knox-iou", "on_wave_clear"]:
-			if g.gold < 10:
-				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
+			# NO-23 (user ruling 2026-09-08): a Small Item Box, not a direct
+			# grant. Issue 53 makes capacity REFUSE an acquisition, so at the
+			# base cap of 3 this grant was silently dropped — the same exposure
+			# Manna Vending Machine had, and took the same treatment for in
+			# issue 58. NO-38's sell-from-inside-the-Box row is what turns a
+			# full inventory into a choice rather than a wasted pick.
+			# `not g.box_open` mirrors the other four Box-opening hooks: a Box
+			# already open is a Box being picked from, and _open_box_pick
+			# rewrites every field wholesale.
+			if g.gold < 10 and not g.box_open:
+				g._open_box_pick({"kind": "box", "key": "item", "size": "small",
+					"sold": false, "contents": Box.roll_options(g, "item", "small")})
 
 		# --- issue 19: on_tariff_apply / on_tariff_charge (economy.gd) ---
 		["merchants-of-death-sample-case", "on_tariff_apply"]:

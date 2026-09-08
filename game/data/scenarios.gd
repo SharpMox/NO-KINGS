@@ -120,6 +120,14 @@ static func _hand_written() -> Array:
 				"decoy_swap", "asset_recovery", "radar_jamming", "counter_intel",
 				"drone_strike", "extraction"],
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
+		# NO-23: capture the rook to clear the wave. Under 10 Gold, Fort Knox
+		# IOU opens a Small Item Box; the inventory is already at the base cap
+		# of 3, so NO-38's sell row is what makes the pick land — sell one,
+		# then pick one. Before NO-23 this grant was silently dropped.
+		{"name": "NO-23: Fort Knox IOU opens a Small Item Box at a full inventory", "cfg": {
+			"board": [["queen", 0, 2, 2], ["rook", 1, 2, 6]],
+			"items": ["blitz", "sniper", "promote"], "gold": 5,
+			"artefacts": ["fort-knox-iou"], "wave": 3}},
 		{"name": "Piece Buffs (Buff Box: pick, target, Shield/Critical)", "cfg": {
 			"board": [["queen", 0, 2, 1, {"buffs": [{"key": "critical"}]}],
 				["pawn", 0, 3, 1], ["rook", 1, 2, 6, {"buffs": [{"key": "shield"}]}],

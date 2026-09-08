@@ -209,8 +209,11 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
 - **Run the suite in the foreground WITH AN EXPLICIT TIMEOUT: `timeout: 600000`.** This is
   the single most-repeated mistake in this repo — **four** agents have now lost their turn
   to it, with work uncommitted and unpushed. The mechanism is not carelessness: `run_all.sh`
-  takes several minutes, the Bash tool's default timeout is **120s**, and on hitting that
-  the harness *auto-backgrounds* the command. So "run it in the foreground" is not
+  takes **~190 s** (192/193/193 s over three full runs on 2026-09-08, 183 s `--headless`),
+  the Bash tool's default timeout is **120s**, and on hitting that the harness
+  *auto-backgrounds* the command. Until PR #355 it was worse still: the watchdog's orphaned
+  `sleep` held stdout open for up to 300 s AFTER the verdict printed, so a run could look
+  unfinished five minutes after it was. So "run it in the foreground" is not
   achievable by intent alone — without the explicit timeout it gets backgrounded no matter
   what you meant, and then the agent sits waiting on a task that has already ended.
   Pass `timeout: 600000` (10 minutes, the maximum) and let it block until it prints its

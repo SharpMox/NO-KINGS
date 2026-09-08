@@ -966,7 +966,10 @@ func _rebuild_pool_strip() -> void:
 		# the selected board piece back into stock
 		var slot := Button.new()
 		slot.text = "+"
-		slot.custom_minimum_size = Vector2(46, 46)
+		# NO-36: this still read a hardcoded 46 -- the exact pre-ICON stock-stack
+		# size -- while every stack button beside it in this same container is
+		# ICON. Found by extending the one-icon-size pin past stock_strip.
+		slot.custom_minimum_size = Vector2(ICON, ICON)
 		slot.add_theme_font_size_override("font_size", 22)
 		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
 		slot.tooltip_text = "Put the piece back into stock"

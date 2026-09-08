@@ -43,7 +43,7 @@ build/
 #   godot --headless --path game --install-android-build-template --export-debug "Android" build/nokings.apk
 game/android/
 
-# Signing keys, belt to MANUAL-STEPS §D's brace. The keystore is meant to live
+# Signing keys, belt to MANUAL-STEPS §E's brace. The keystore is meant to live
 # outside the repo entirely (~/keystores/), so nothing here should ever match —
 # these patterns exist for the day someone drops one in "just to test the
 # export". An Android app's identity IS its signing key: committing it is not a

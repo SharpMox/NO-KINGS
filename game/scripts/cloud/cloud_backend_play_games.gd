@@ -1,15 +1,12 @@
 ## Android cloud backend (issue 12 — accounts & cloud saves): Play Games
 ## Saved Games mirror.
 ##
-## STATUS: UNIMPLEMENTED STUB. This checkout is desktop-only with no Android
-## export configured and no native plugin available to verify against, so
-## push/pull are no-ops and is_available() stays false — no caller in
-## cloud_save.gd ever depends on cloud data that doesn't exist yet.
-##
-## Making this real is a drop-in, not a rewrite: add the Play Games
-## Services native plugin (Saved Games API), then fill in the three TODOs
-## below with calls into it. Nothing in cloud_save.gd or its callers needs
-## to change.
+## Live: push/pull/is_available/account_id all go through play_games_bridge.gd,
+## which owns the native plugin's client Nodes and the snapshot cache. On a
+## desktop checkout the bridge reports unsupported, so is_available() stays
+## false and cloud_save.gd falls back to local saves — the same contract iOS
+## implements in cloud_backend_ios.gd. Device-verified on the Nothing
+## Phone 2a; the three paths still owed on hardware are listed in NO-10.
 
 
 ## --- Play Games identifiers, issued by the Play Console (issue 86) ----------

@@ -120,8 +120,8 @@ nothing and read it at load time. Two exporters carry the same data to the Godot
 ## The game (Godot 4.7 — built, and the larger half of this repo)
 
 Portrait 480×800, desktop-first. The MVP shipped and then some: ~30 merged slices, a
-5-tier difficulty system, 12 Piece Buffs, a 16-King cast, 141 of 180 Artefacts, cloud-save
-scaffolding, and a 22-suite test harness.
+5-tier difficulty system, 12 Piece Buffs, a 16-King cast, all 180 Artefacts, cloud saves
+through Play Games and iCloud, and a 33-suite test harness plus a full autoplay run.
 
 ### Where the work lives
 
@@ -137,9 +137,8 @@ scaffolding, and a 22-suite test harness.
   history, worth reading, but no new slice goes here. **A slice lives in exactly one
   place**: Linear if it is open, the archive if it is closed. Only the LIVE items were
   migrated; the archive deliberately was not.
-  `NOTION-QUESTIONS.md` stays in the repo: the open GDD questions, each blocking at least one
-  Artefact — **read it before implementing any Artefact**, so an already-known ambiguity
-  isn't rediscovered or, worse, guessed at.
+  `NOTION-QUESTIONS.md` there holds the ten GDD questions and the user's answers (all
+  resolved by 2026-08-30); check it before changing an Artefact's effect.
 - One slice → one branch → one PR, rebased on `main` before pushing, same as the reference site.
 - **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,
   Artefacts, Tariffs, Piece Buffs). When Notion and the code disagree, that is a finding —

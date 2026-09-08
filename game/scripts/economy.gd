@@ -275,11 +275,14 @@ static func record_score(g) -> int:
 		return rank
 	f.store_string(JSON.stringify(scores.slice(0, 10)))
 	f = null # close before the mirror reads the file back through its own handle
-	CloudSave.sync_file("scores", g.SCORES_PATH, Leaderboard.merge) # union, never pick-a-side
+	CloudSave.sync_file("scores", g.SCORES_PATH,
+		Leaderboard.merger_for("scores")) # union, never pick-a-side
 	return rank
 
 
-const HISTORY_CAP := 50 # newest-first log; capped so the file can't grow forever
+## Re-exported from Tuning so Economy.HISTORY_CAP keeps working for its existing
+## readers; Tuning is the single definition (NO-37).
+const HISTORY_CAP := Tuning.HISTORY_CAP
 
 
 ## Games History: every real run's end-screen summary (05-menus-and-settings)
@@ -297,7 +300,8 @@ static func record_history(g, won: bool) -> void:
 		return
 	f.store_string(JSON.stringify(history.slice(0, HISTORY_CAP)))
 	f = null # close before the mirror reads it back
-	CloudSave.sync_file("history", g.HISTORY_PATH, Leaderboard.merge_history) # union
+	CloudSave.sync_file("history", g.HISTORY_PATH,
+		Leaderboard.merger_for("history")) # union
 
 
 # --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---

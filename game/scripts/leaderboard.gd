@@ -16,6 +16,7 @@
 ## because the issue's "reuse the rule" instruction is the tempting wrong answer.
 
 const CloudSave := preload("res://scripts/cloud_save.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 const KEY := "scores"
 const CAP := 10
@@ -23,6 +24,19 @@ const CAP := 10
 
 ## Union of two boards, best first, capped. Order-independent and idempotent:
 ## merge(a, b) == merge(b, a), and merging a board with itself changes nothing.
+## The one key -> merger table (NO-37). This mapping used to live twice: as a
+## match in menu.gd's _MERGER, and as two direct Leaderboard.merge /
+## merge_history arguments in economy.gd. It belongs here, next to the two
+## functions it names, so a third synced key cannot be added to one copy only.
+##
+## Callable() for an unknown key, which is what sync_file treats as "no merger".
+static func merger_for(key: String) -> Callable:
+	match key:
+		"scores": return merge
+		"history": return merge_history
+	return Callable()
+
+
 static func merge(a: Array, b: Array) -> Array:
 	var seen := {}
 	var out: Array = []
@@ -62,10 +76,11 @@ static func merge_history(a: Array, b: Array) -> Array:
 		seen[id] = seen.get(id, 0) + 1
 		if seen[id] > have.get(id, 0):
 			out.append(e)
-	# 50 = Economy.HISTORY_CAP, not preloaded here (economy drags in the whole
-	# gameplay chain). Writers re-cap on every record, so drift in this literal
-	# only ever affects the size of one synced file, never what is kept.
-	return out.slice(0, 50)
+	# NO-37: this was a bare 50 with a comment naming Economy.HISTORY_CAP as the
+	# value it meant but could not reach (preloading economy here drags in the
+	# whole gameplay chain). The constant moved to Tuning, which is dependency
+	# free, so the literal is gone and there is one definition again.
+	return out.slice(0, Tuning.HISTORY_CAP)
 
 
 ## The cloud board, or [] when there is no cloud to reach. An unreachable

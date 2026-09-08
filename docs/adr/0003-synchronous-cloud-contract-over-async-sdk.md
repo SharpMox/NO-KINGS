@@ -82,3 +82,17 @@ and any in-flight sign-in with it.
   `PlayGamesSnapshot.content` is bytes and a wrong round-trip corrupts every
   save silently. A fake plugin double was rejected as infrastructure that
   mostly watches our own mocks agree.
+
+## Addendum (2026-09-08, NO-37)
+
+"No fake plugin double" rejects a double that **simulates the SDK** — one that
+pretends to be Play Games or GameKit, and whose behaviour is a guess about
+someone else's software that no test can validate.
+
+It does **not** reject a stub that pins **our own contract rules**.
+`test_cloud_save.gd` builds GDScript stub clients (lines ~146 and ~167) to assert
+write-through and the size guard: both are rules this repo defines and owns, and
+the stub exists only to observe them. Those are in scope.
+
+The line is what the double is a model OF. A model of the vendor's SDK is out;
+a model of our own seam is in.

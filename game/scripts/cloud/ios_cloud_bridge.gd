@@ -73,6 +73,16 @@ func _ready() -> void:
 ## --- the static API the backend and menu call (same names as Android) -------
 
 
+## Same name, role and STATICNESS as Android's fetch(): kick a sync and queue
+## the announcement. The poll below emits it within half a second — a static
+## function cannot emit an instance signal, and the tiny delay also mirrors the
+## arrival cadence menu.gd was built against on Android.
+static var _announce: Array = []
+
+## Set once authenticate() has been ACCEPTED (returned OK). Before that the
+## poll keeps re-asking — see _ready for why the first asks can fail.
+static var _auth_started := false
+
 static func supported() -> bool:
 	# BOTH, and the identity half is not optional. Saves are what matters, but
 	# a save with no account_id() can never be bound or fetched — so with GC
@@ -121,16 +131,6 @@ static func erase(key: String) -> void:
 	if _ic != null:
 		_ic.remove_key(key)
 
-
-## Same name, role and STATICNESS as Android's fetch(): kick a sync and queue
-## the announcement. The poll below emits it within half a second — a static
-## function cannot emit an instance signal, and the tiny delay also mirrors the
-## arrival cadence menu.gd was built against on Android.
-static var _announce: Array = []
-
-## Set once authenticate() has been ACCEPTED (returned OK). Before that the
-## poll keeps re-asking — see _ready for why the first asks can fail.
-static var _auth_started := false
 
 static func fetch(key: String) -> void:
 	if _ic == null:

@@ -12,7 +12,7 @@
 const Rules := preload("res://scripts/rules.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Tuning := preload("res://scripts/tuning.gd")
-const Tariffs := preload("res://data/tariffs.gd")
+const KingAbilities := preload("res://data/king_abilities.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd") # set-union sync
@@ -309,7 +309,7 @@ static func record_history(g, won: bool) -> void:
 static func activate_tariff(g, tier: String) -> void:
 	# Tariffs behave identically at every difficulty tier (07-difficulty-ranks
 	# rework — the severity-shift lever was rejected as illegible).
-	var pool := Tariffs.TARIFFS.filter(func(t: Dictionary) -> bool:
+	var pool := KingAbilities.ABILITIES.filter(func(t: Dictionary) -> bool:
 		if t.tier != tier:
 			return false
 		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
@@ -320,7 +320,7 @@ static func activate_tariff(g, tier: String) -> void:
 
 
 static func activate_tariff_by_key(g, key: String) -> void:
-	for t in Tariffs.TARIFFS:
+	for t in KingAbilities.ABILITIES:
 		if t.key == key:
 			return apply_tariff(g, t)
 

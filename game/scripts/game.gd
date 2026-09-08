@@ -888,7 +888,31 @@ func _process(delta: float) -> void:
 
 # --- turn flow ---
 
-## Turn/wave transition feedback: board-outline glow + a sliding banner
+## The wave/turn banner's on-screen rect at animation time `t`, for stack `slot`.
+##
+## Extracted from _draw so the geometry is testable, and CLAMPED to the board
+## (NO-26). It used to be drawn at `board_px.x - (1 - slide) * board_width` with
+## a full board width, i.e. entering from OUTSIDE the board with nothing
+## clipping it. On a phone the board is nearly the full screen width, so the
+## overflow ran off-screen and read as a slide; on a tablet the board is
+## centred with wide margins, so the same draw visibly started at the LEFT
+## SCREEN EDGE and stopped short of the board's right edge, with its text
+## off-centre. The banner was never mis-SIZED -- bw has always been the board
+## width and the settled position has always been correct. What was missing was
+## any bound keeping the entrance inside the board.
+##
+## It now emerges from the board's own left edge: the right edge sweeps across
+## while the left stays pinned, so nothing is ever drawn outside the board. The
+## settled state (slide == 1) is byte-identical to before.
+func _banner_rect(t: float, slot: int) -> Rect2:
+	var bw: float = Tuning.BOARD_W * tile
+	var by: float = board_px.y + tile * 3.0 + slot * 52.0
+	var slide: float = ease(minf(t * 4.0, 1.0), 0.3)
+	var right: float = board_px.x + slide * bw
+	return Rect2(Vector2(board_px.x, by), Vector2(maxf(0.0, right - board_px.x), 44))
+
+
+## Turn/wave transition feedback: board-outline glow + a wiping banner
 ## (game-feel pass 2026-07-06). Stacked banners offset so they never overlap.
 func _add_turn_fx(text: String, color: Color) -> void:
 	if autoplay or not animations_on:
@@ -3547,16 +3571,14 @@ func _draw() -> void:
 			draw_rect(Rect2(board_px - Vector2(grow, grow),
 				Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile + Vector2(grow, grow) * 2),
 				Color(a.color, 1.0 - a.t), false, 5.0)
-		elif a.kind == "banner": # turn/wave strip: slides in, holds, fades out
-			var bw: float = Tuning.BOARD_W * tile
-			var by: float = board_px.y + tile * 3.0 + a.get("slot", 0) * 52.0
+		elif a.kind == "banner": # turn/wave strip: wipes in, holds, fades out
+			var br := _banner_rect(a.t, a.get("slot", 0))
+			if br.size.x <= 0.0:
+				continue # not emerged yet
 			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
-			var slide: float = ease(minf(a.t * 4.0, 1.0), 0.3)
-			var bx: float = board_px.x - (1.0 - slide) * bw
-			draw_rect(Rect2(Vector2(bx, by), Vector2(bw, 44)),
-				Color(0.06, 0.06, 0.09, 0.78 * alpha))
-			draw_string(font, Vector2(bx, by + 31), a.text,
-				HORIZONTAL_ALIGNMENT_CENTER, bw, 26, Color(a.color, alpha))
+			draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
+			draw_string(font, Vector2(br.position.x, br.position.y + 31), a.text,
+				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))

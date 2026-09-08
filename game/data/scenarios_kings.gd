@@ -61,13 +61,13 @@ static func all() -> Array:
 			# `inflation`, slice 66); the other 15 are bespoke keys that
 			# king_power_id alone switches on. Listing the tariff in the config
 			# activates it exactly as apply_power() would.
-			# ponytail: this leaves g.king_power_tariff unset, so the tariff
+			# ponytail: this leaves g.king_power_ability unset, so the tariff
 			# would outlive its wave — unreachable here (a sandbox turns no
 			# wave over). Call Kings.apply_power() from save_config if a
 			# scenario ever needs to advance past its King.
-			var power_tariff: String = str(kit.get("power_tariff", ""))
-			if power_tariff != "":
-				cfg["tariffs"] = [power_tariff]
+			var power_catalog_key: String = str(kit.get("power_catalog_key", ""))
+			if power_catalog_key != "":
+				cfg["king_abilities"] = [power_catalog_key]
 			# Named for the Power, which is the thing that is live on arrival —
 			# the Ability announces itself in the turn feed when it fires.
 			# menu.gd cuts at the first ":", so all 16 land in one "King"

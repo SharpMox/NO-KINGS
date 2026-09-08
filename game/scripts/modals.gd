@@ -62,7 +62,7 @@ var sell_expanded_index := -1 # index into the matching g.stock/g.captured/
 	# g.items/g.artefacts array — a SEPARATE counter from shop_expanded_index
 	# since Sell mode indexes held entries, not g.shop_stock slots
 const SHOP_TILE := 46.0 # matches the pool-strip icon size (hud.gd) for visual rhythm
-var tariff_panel: PanelContainer # tariff detail overlay
+var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
 	# just the panel field, not a Buff-specific behaviour
@@ -149,7 +149,7 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 ## stays deliberately excluded — GDD: "decisive picks rewarded, indecision
 ## punished" — that one IS a difficulty lever.
 func pause_modal_open() -> bool:
-	return (is_instance_valid(tariff_panel) and tariff_panel.visible) \
+	return (is_instance_valid(king_ability_panel) and king_ability_panel.visible) \
 		or (is_instance_valid(merge_panel) and merge_panel.visible) \
 		or (is_instance_valid(reinforce_panel) and reinforce_panel.visible)
 
@@ -179,7 +179,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", 32))
 	box.add_child(_overlay_label(reason, 18))
 	var stats := "Score %d · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, g.wave, g.kings_defeated, g.tariffs_seen.size(), g.lost_player, g.lost_enemy]
+		% [g.score, g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	if not g.king_ids_defeated.is_empty():
 		var names: Array = g.king_ids_defeated.map(func(id: String) -> String: return Kings.name_of(id))
 		stats += "\nDefeated: %s" % ", ".join(names)
@@ -255,7 +255,7 @@ func show_win_screen() -> void:
 			preview += 1
 	box.add_child(_overlay_label(
 		"Score %d · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, preview, g.wave, g.tariffs_seen.size(), g.lost_player, g.lost_enemy], 19))
+		% [g.score, preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy], 19))
 	box.add_child(_overlay_label("Continue into endless waves?", 20))
 	var cont := Button.new()
 	cont.text = "Continue"
@@ -912,16 +912,16 @@ func show_reinforce() -> void:
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the
 ## top-bar warning button; purely informational, Close dismisses.
-func show_tariffs() -> void:
-	if tariff_panel:
-		tariff_panel.queue_free()
-	tariff_panel = PanelContainer.new()
-	tariff_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+func show_king_abilities() -> void:
+	if king_ability_panel:
+		king_ability_panel.queue_free()
+	king_ability_panel = PanelContainer.new()
+	king_ability_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg := StyleBoxFlat.new()
 	bg.bg_color = Color(0.08, 0.08, 0.1, 0.94)
-	tariff_panel.add_theme_stylebox_override("panel", bg)
+	king_ability_panel.add_theme_stylebox_override("panel", bg)
 	var center := CenterContainer.new()
-	tariff_panel.add_child(center)
+	king_ability_panel.add_child(center)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	center.add_child(box)
@@ -930,13 +930,13 @@ func show_tariffs() -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	if g.tariffs_active.is_empty():
+	if g.king_abilities_active.is_empty():
 		var none := Label.new()
 		none.text = "none yet — they land every 10th wave"
 		none.modulate = Color(1, 1, 1, 0.6)
 		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(none)
-	for t in g.tariffs_active:
+	for t in g.king_abilities_active:
 		var name := Label.new()
 		name.text = "%s  (%s)" % [t.name, t.tier]
 		name.add_theme_font_size_override("font_size", 17)
@@ -952,10 +952,10 @@ func show_tariffs() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void: tariff_panel.visible = false)
+	close.pressed.connect(func() -> void: king_ability_panel.visible = false)
 	box.add_child(close)
-	g.hud.add_child(tariff_panel)
-	tariff_panel.move_to_front()
+	g.hud.add_child(king_ability_panel)
+	king_ability_panel.move_to_front()
 
 
 # --- box pick ---

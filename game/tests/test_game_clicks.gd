@@ -933,7 +933,7 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"tariffs": ["move_cost"]}
+		"king_abilities": ["move_cost"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1357,7 +1357,7 @@ func _init() -> void:
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 11, "score": 100, "pending_reinforce": true,
-		"tariffs": ["move_cost"]} # the tariff section below reuses this boot
+		"king_abilities": ["move_cost"]} # the tariff section below reuses this boot
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1386,7 +1386,7 @@ func _init() -> void:
 	# tariff button in the top row opens the detail overlay
 	check(await _click_button_in(game.hud, "⚠1"), "tariff button clickable")
 	await process_frame
-	check(game.tariff_panel != null and game.tariff_panel.visible, "tariff overlay opens")
+	check(game.king_ability_panel != null and game.king_ability_panel.visible, "tariff overlay opens")
 
 	# NO-5: the three ad-hoc panels are PanelContainers on a CanvasLayer, and
 	# Container defaults to MOUSE_FILTER_PASS with no MOUSE_FILTER_STOP
@@ -1404,7 +1404,7 @@ func _init() -> void:
 	# click cannot masquerade as a blocked one). Hardcoding (2,2) satisfied both
 	# only at the board geometry of the day; a taller board moved it onto Close.
 	var tap := Vector2(-1, -1)
-	var overlay_btns: Array = game.tariff_panel.find_children("*", "Button", true, false)
+	var overlay_btns: Array = game.king_ability_panel.find_children("*", "Button", true, false)
 	for pos in game.board:
 		if int(game.board[pos].owner) != 0:
 			continue
@@ -1433,12 +1433,12 @@ func _init() -> void:
 	await process_frame
 	check(game.selected == Vector2i(-1, -1),
 		"NO-5: a board tap under the open tariff overlay selects nothing")
-	check(game.tariff_panel.visible,
+	check(game.king_ability_panel.visible,
 		"...and the overlay is still open — the tap was blocked, not consumed by Close")
 
-	check(await _click_button_in(game.tariff_panel, "Close"), "tariff Close clickable")
+	check(await _click_button_in(game.king_ability_panel, "Close"), "tariff Close clickable")
 	await process_frame
-	check(not game.tariff_panel.visible, "tariff overlay closes")
+	check(not game.king_ability_panel.visible, "tariff overlay closes")
 
 	# CONTROL for the NO-5 assertion above: the very same click, with no panel
 	# up, MUST select the queen. Without this the "selects nothing" assertion is

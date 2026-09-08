@@ -215,7 +215,7 @@ func _init() -> void:
 	# Games History: per-run log, distinct from the top-10 Highscores above
 	var hf := FileAccess.open(GameScript.HISTORY_PATH, FileAccess.WRITE)
 	hf.store_string(JSON.stringify(
-		[{"score": 77, "wave": 4, "kings": 0, "tariffs": 1, "lost": 2, "won": false}]))
+		[{"score": 77, "wave": 4, "kings": 0, "king_abilities": 1, "lost": 2, "won": false}]))
 	hf = null
 	check(await _click_button(menu, "Games History"), "Games History button clickable")
 	await process_frame

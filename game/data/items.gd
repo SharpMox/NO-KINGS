@@ -71,7 +71,7 @@ const ITEMS: Array = [
 		"fires": ["on_item_consume"],
 		"description": "Swap the positions of any two pieces on the board (ally or enemy, in any combination)."},
 	{"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic", "target": "",
-		"fires": ["on_item_consume"], "suppresses": ["on_tariff_apply", "on_tariff_charge", "on_charge"],
+		"fires": ["on_item_consume"], "suppresses": ["on_king_ability_apply", "on_king_ability_charge", "on_charge"],
 		"description": "Disable all King Abilities until the next Wave."},
 	{"key": "drone_strike", "name": "Drone Strike", "tier": "Decisive", "target": "area",
 		"fires": ["on_item_consume", "on_destroy", "on_piece_lost"],

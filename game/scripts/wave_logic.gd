@@ -44,7 +44,7 @@ static func queue(g, n: int) -> void:
 	g.army_ability_used_this_wave = false # the Army Ability (67), same idiom
 	g.king_ability_used_this_wave = false # the King Ability (91), same idiom again
 	g.king_extra_actions = 0 # Total Mobilisation (93) ends with its wave
-	g.tariffs_suppressed = false # Counter-Intel ends when the next wave arrives
+	g.king_abilities_suppressed = false # Counter-Intel ends when the next wave arrives
 	g.early_clear_awarded = false # the new wave can earn its own clear bonus
 	if n % Tuning.SHOP_RESTOCK_WAVES == 0: # issue 64 Lane A: guaranteed
 		Shop.lane_a_restock(g) # restock every 5 Waves, independent of Score
@@ -76,11 +76,11 @@ static func queue(g, n: int) -> void:
 			g.pending_king = entry
 			continue
 		g.pending_spawn.append(entry)
-	if Tuning.TARIFFS_SCHEDULED: # off for now — see Tuning.TARIFFS_SCHEDULED
+	if Tuning.KING_ABILITIES_SCHEDULED: # off for now — see Tuning.KING_ABILITIES_SCHEDULED
 		if n == 2:
-			Economy.activate_tariff_by_key(g, "inflation") # T0, GDD: fires after wave 1
+			Economy.activate_king_ability_by_key(g, "inflation") # T0, GDD: fires after wave 1
 		elif KingAbilities.SCHEDULE.has(n):
-			Economy.activate_tariff(g, KingAbilities.SCHEDULE[n])
+			Economy.activate_king_ability(g, KingAbilities.SCHEDULE[n])
 	# The 10-Wave beat, now ONE event (user ruling 2026-09-06): the
 	# reinforcement pick and the Clock refill together, at the START of waves
 	# 11/21/31… A MODULO, not the old 4-entry REINFORCE_WAVES list, so it keeps

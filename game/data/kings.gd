@@ -258,10 +258,10 @@ const KITS := {
 	"donald_trump": {
 		"power_name": "Tariff",
 		"power_desc": "Tariffs are in force for the whole of this King's wave.",
-		"power_tariff": "inflation",
+		"power_catalog_key": "inflation",
 		"ability_name": "Diplomatic Visit – JD Vance",
 		"ability_desc": "Destroys your highest-value piece on the board.",
-		"ability_tariff": "jd_vance",
+		"ability_catalog_key": "jd_vance",
 	},
 	"benjamin_netanyahu": {
 		"power_name": "Iron Dome",
@@ -317,20 +317,20 @@ static func active_id(g) -> String:
 ## 51 would be a permanent difficulty increase nobody chose.
 static func apply_power(g, king_id: String) -> void:
 	g.king_power_id = ""
-	if g.king_power_tariff != "":
-		for i in range(g.tariffs_active.size() - 1, -1, -1):
-			if g.tariffs_active[i].get("key", "") == g.king_power_tariff:
-				g.tariffs_active.remove_at(i)
-		g.king_power_tariff = ""
+	if g.king_power_ability != "":
+		for i in range(g.king_abilities_active.size() - 1, -1, -1):
+			if g.king_abilities_active[i].get("key", "") == g.king_power_ability:
+				g.king_abilities_active.remove_at(i)
+		g.king_power_ability = ""
 	if king_id == "":
 		return
 	var kit := kit_of(king_id)
 	if kit.is_empty():
 		return # a King with no kit yet — the engine no-ops
-	var key: String = str(kit.get("power_tariff", ""))
+	var key: String = str(kit.get("power_catalog_key", ""))
 	if key != "":
-		_economy().activate_tariff_by_key(g, key)
-		g.king_power_tariff = key
+		_economy().activate_king_ability_by_key(g, key)
+		g.king_power_ability = key
 	g.king_power_id = king_id
 	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], Color(1.0, 0.55, 0.4))
 
@@ -349,7 +349,7 @@ static func fire_ability(g) -> bool:
 		return false
 	var kit := kit_of(id)
 	var bespoke: String = str(kit.get("ability_key", ""))
-	var tariff: String = str(kit.get("ability_tariff", ""))
+	var tariff: String = str(kit.get("ability_catalog_key", ""))
 	if bespoke == "" and tariff == "":
 		return false # no kit yet: no Ability, and no Action charged for one
 	g.king_ability_used_this_wave = true
@@ -357,7 +357,7 @@ static func fire_ability(g) -> bool:
 	if bespoke != "":
 		_bespoke_ability(g, bespoke)
 	else:
-		_economy().activate_tariff_by_key(g, tariff)
+		_economy().activate_king_ability_by_key(g, tariff)
 	return true
 
 
@@ -436,7 +436,7 @@ static func ability_useful(g) -> bool:
 					return true
 			return false
 	# Tariff-backed (Trump's Diplomatic Visit destroys your best piece): needs one
-	return str(kit.get("ability_tariff", "")) != "" and not mine.is_empty()
+	return str(kit.get("ability_catalog_key", "")) != "" and not mine.is_empty()
 
 
 ## THE POWER HOOK (issue 92) — bespoke King Powers, dispatched through the same

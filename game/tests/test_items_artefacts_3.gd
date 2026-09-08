@@ -1,7 +1,7 @@
 extends SceneTree
 ## Artefacts, part 3: Piece Buff lifecycle hooks (issue 23), the per-piece
 ## capture ledger (issue 25, its tariff-interception subsection moved to
-## test_items_tariffs.gd), the economy/Shop/Box batch (issue 26), and the
+## test_items_king_abilities.gd), the economy/Shop/Box batch (issue 26), and the
 ## Box Pick flow Artefacts — extra pick + reroll (issue 46).
 ## Split out of test_items.gd (issue 37).
 ## Run headless:  godot --headless --path game -s tests/test_items_artefacts_3.gd
@@ -666,7 +666,7 @@ func _init() -> void:
 	# --- issue 26: Gold reaching exactly 0 (Zero-Point Energy Drink) ---
 	var zpe := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 9, "gold": 20, "artefacts": ["zero-point-energy-drink"],
-		"tariffs": ["move_cost"]})
+		"king_abilities": ["move_cost"]})
 	await process_frame
 	zpe.actions_left = 3
 	var zpe_actions_before: int = zpe.actions_left
@@ -911,7 +911,7 @@ func _init() -> void:
 	# Mild-tier tariff held at once.
 	var rr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 100,
-		"tariffs": ["move_cost", "ability_cost", "capture_cost", "pass_cost",
+		"king_abilities": ["move_cost", "ability_cost", "capture_cost", "pass_cost",
 			"long_range_cost", "inflation"],
 		"artefacts": ["snowden-s-rubik-s-cube", "snowden-s-rubik-s-cube"]})
 	await process_frame

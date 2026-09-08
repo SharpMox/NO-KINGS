@@ -26,7 +26,7 @@ const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0
 
 signal pass_pressed
-signal tariff_pressed
+signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
 signal multi_confirm_pressed # the floating Extract button
@@ -80,7 +80,7 @@ var pass_button := Button.new()
 var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
-var tariff_button := Button.new() # top-row tariff count; opens the overlay
+var king_ability_button := Button.new() # top-row tariff count; opens the overlay
 var arrow_button := Button.new() # Arrow Planning: toggles decorative drawing mode
 var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
@@ -181,9 +181,9 @@ func build(game) -> void:
 	for l in [clock_label, score_label, gold_label]:
 		top.add_child(l)
 	add_child(top)
-	tariff_button.add_theme_font_size_override("font_size", 13)
-	tariff_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-	tariff_button.pressed.connect(func() -> void: tariff_pressed.emit())
+	king_ability_button.add_theme_font_size_override("font_size", 13)
+	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
+	king_ability_button.pressed.connect(func() -> void: king_ability_pressed.emit())
 	arrow_button.text = "Arrows"
 	arrow_button.add_theme_font_size_override("font_size", 13)
 	arrow_button.pressed.connect(func() -> void: arrow_toggle_pressed.emit())
@@ -194,7 +194,7 @@ func build(game) -> void:
 	menu_btn.position = Vector2(vp.x - 34, 3)
 	# both top-row buttons get flat compact styling so they fit inside the
 	# top strip without overflowing onto the board (2026-07-08)
-	for b: Button in [tariff_button, arrow_button, menu_btn]:
+	for b: Button in [king_ability_button, arrow_button, menu_btn]:
 		var compact := StyleBoxFlat.new()
 		compact.bg_color = Color(0.22, 0.22, 0.26)
 		compact.set_corner_radius_all(4)
@@ -268,9 +268,9 @@ func build(game) -> void:
 		_surface(Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3))
 	wave_pill.add_child(wave_label)
 	status.add_child(wave_pill)
-	_style_button(tariff_button, Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3)
+	_style_button(king_ability_button, Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3)
 	_style_button(arrow_button, Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 14, 10, 3)
-	status.add_child(tariff_button)
+	status.add_child(king_ability_button)
 	status.add_child(arrow_button)
 	status.size_flags_vertical = Control.SIZE_SHRINK_CENTER # a status line, not a band
 	# the drawers get their own line. Sharing one with the status pills clipped
@@ -545,8 +545,8 @@ func refresh() -> void:
 	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
-	tariff_button.text = "⚠%d" % g.tariffs_active.size() \
-		+ ("·off" if g.tariffs_suppressed else "")
+	king_ability_button.text = "⚠%d" % g.king_abilities_active.size() \
+		+ ("·off" if g.king_abilities_suppressed else "")
 	# armed-placement tint (2026-07-07 palette) marks the toggle as active
 	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
 	arrow_clear_button.visible = g.arrow_mode

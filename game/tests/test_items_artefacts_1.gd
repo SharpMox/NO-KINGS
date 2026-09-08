@@ -498,7 +498,7 @@ func _init() -> void:
 	await process_frame
 
 	var refill_recession := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 10, "clock_s": 0, "tariffs": ["recession"]})
+		"wave": 10, "clock_s": 0, "king_abilities": ["recession"]})
 	await process_frame
 	WaveLogic.queue(refill_recession, 11)
 	check(refill_recession.clock_ms == Tuning.CLOCK_REFILL_MS * 0.5,

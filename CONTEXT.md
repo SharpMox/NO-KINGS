@@ -20,7 +20,7 @@ Checkmating the wave-150 King. Ends the run immediately with a win-flavored end 
 
 **Army**:
 One of six preset starting kits chosen on the army-select screen before a run: **The Muster** (classic, signature rook), **Wild Hunt** (leapers, signature kirin), **Old Guard** (walkers, signature ferz/wazir), **The Syndicate**, **The Cult**, **The Horde**. An Army sets Starting Stock, Starting Gold and Starting Items, plus a static **Power** (always on) and a once-per-Wave **Ability** costing 1 Action — a deliberate contrast with Artefact activation and the Shop, both 0 (issues 67, 68). Called "Family" before issue 76.
-_Avoid_: "team", "deck", "loadout", "family"
+_Avoid_: "team", "loadout", "family" — and never "deck" for a starting kit, which is the in-run **Deck** below the board.
 _Note_: ids stay the original keys (`Crown`/`Wild Hunt`/`Old Guard`) — load-bearing in the save's `army` field, so display name ≠ id.
 
 **Family**:
@@ -56,6 +56,20 @@ _Avoid_: "synergy", "interaction" (too broad — those cover the undirected case
 **Anti-combo**:
 The inverse relation: X **suppresses** a hook Y listens on, so holding both makes Y silently do nothing. Shield stopping a capture attempt is the reference case — it denies `on_capture` to the 22 Artefacts listening there. Named separately because the failure is invisible by construction: nothing happens, and nothing reports that nothing happened.
 _Avoid_: "conflict", "negative synergy".
+
+### In-run HUD
+
+**Deck**:
+The single column of controls between the board's bottom edge and the bottom of the screen, in fixed order (design C, issue 106): Stock strip, status pills, Drawer buttons, Power badge, and the Ability/PASS row last, inside the thumb arc. One Deck, always present during a run.
+_Avoid_: "HUD" (that is the whole in-run overlay, top strip included), "toolbar", "tray" — and see **Army** for the starting-kit sense this word does not have.
+
+**Stock strip**:
+The preview at the top of the Deck showing the piece types currently in Stock, plus their count. Exactly one icon row tall (ADR-0004). It is a single control, not a rack of them: every icon and the panel behind them open the Stock Drawer, and nothing in it is draggable.
+_Avoid_: "stock bar", "piece tray", "hand" — and do not call it a route to Stock distinct from the Drawer button; both open the same Drawer.
+
+**Drawer**:
+A panel that opens upward over the Deck to hold what does not fit on the main view — Stock and Inventory. Placement happens by dragging a piece out of the open Stock Drawer, which is what makes the Drawer the place Stock is *operated* while the Stock strip only reports it.
+_Avoid_: "modal", "panel", "menu" — a Box or the Shop is a different thing.
 
 ### Godot domain
 

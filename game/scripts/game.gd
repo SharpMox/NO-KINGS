@@ -612,20 +612,49 @@ func _ready() -> void:
 
 
 ## The two bands the board sits between. HUD_TOP is the condensed strip that now
-## carries only clock, score, gold and the menu; HUD_DECK is the smallest the
-## control deck under the board can be (design C, user pick 2026-09-05).
+## carries only clock, score, gold and the menu (design C, user pick 2026-09-05).
 const HUD_TOP := 44.0
-## Raised from 190 when the stock strip joined the deck: the board must leave
-## room for a full row of it, or the strip sizes itself from a height it has not
-## been given yet and collapses on the first frame.
-const HUD_DECK := 268.0
+
+## NO-33 / ADR-0004. HUD_DECK used to be a flat 268.0 reservation, and the stock
+## strip was the element that absorbed whatever the board left over. That makes a
+## dead band inevitable rather than impossible: the strip spends absorbed height
+## in whole icon rows, so any remainder smaller than a row is empty by
+## construction — and a WIDER strip fits more icons per row, needs fewer rows,
+## and wastes more. NO-25 measured ~100px of it on a 3:4 tablet.
+##
+## Now the BOARD absorbs, and the deck is the sum of the rows it is built from.
+## Measured once (probe, 2026-09-08) and pinned here; test_game_clicks asserts
+## the built deck still agrees and fails the moment a row is added or a font
+## moves under one. It is a sum rather than a measurement on purpose: measuring
+## needs a second layout pass, and a control that measures itself before layout
+## caches nonsense (CLAUDE.md, layout traps).
+const DECK_BELOW_STRIP := 172.0 ## status 28 + drawers 32 + power 28 + act 60 + 4 gaps x 6
+const STRIP_CHROME := 31.0 ## the strip around its one icon row: padding 10 + header 17 + gap 4
+const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
+## ICON sits this far under the board tile, so the deck always reads as smaller
+## than the board. Design C picked 52 against a 59px tile; this is that gap, kept
+## as the relationship rather than the pair of numbers it produced on one screen.
+const ICON_GAP := 7
+
+
+## The one-way, closed-form solve (ADR-0004). The deck's height depends on ICON,
+## ICON depends on the tile, and the tile depends on the deck — but the loop is
+## linear, so it resolves in a single division instead of a second layout pass:
+##
+##   vp.y = HUD_TOP + BOARD_H*tile + DECK_MARGINS + (ICON + STRIP_CHROME) + DECK_BELOW_STRIP
+##   ICON = tile - ICON_GAP
+##
+## which is BOARD_H + 1 rows of tile — the board's 12 plus the strip's one.
+static func board_tile_for(vp: Vector2) -> int:
+	var below: float = DECK_MARGINS + STRIP_CHROME - ICON_GAP + DECK_BELOW_STRIP
+	return int(minf((vp.x - 8.0) / Tuning.BOARD_W,
+		(vp.y - HUD_TOP - below) / (Tuning.BOARD_H + 1)))
 
 
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
 	var top := HUD_TOP
-	var bottom: float = vp.y - HUD_DECK
-	tile = int(minf((vp.x - 8.0) / Tuning.BOARD_W, (bottom - top) / Tuning.BOARD_H))
+	tile = board_tile_for(vp)
 	# PULLED UP under the top strip rather than centred in the span (user ruling,
 	# 2026-09-05). Centring split the leftover height into a gap above AND below
 	# the board, and on a 9:20 phone that was ~130px of nothing in two places.

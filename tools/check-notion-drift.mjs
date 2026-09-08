@@ -28,7 +28,15 @@
 //   Artefacts       app.notion.com/p/dcfc4879530547c785278f198b85f3cb   (180 rows)
 //   Items           app.notion.com/p/4bb01465387746e0beac20f382e7544c   (16)
 //   Pieces          app.notion.com/p/a0cc1983c47541b6a92922f0113dc627   (39)
-//   Tariffs Catalog app.notion.com/p/8906ed7b41da4b64a800f30af3494c8d   (21)
+//   Tariffs Catalog app.notion.com/p/8906ed7b41da4b64a800f30af3494c8d   (20)
+//
+// Tariffs went 21 -> 20 on 2026-09-09: one row was completely blank (no Name,
+// Tier, Cost, Description or Type; created 2026-05-29) and reported forever as
+// an unnamed "in Notion only" finding. Moved to Trash on the user's call. The
+// remaining 20 are the 19 in tariffs.gd plus Tariff on Promotion, which is
+// EXCLUDED on purpose (tariffs.gd:68 — last-rank promotion is cut from MVP,
+// merges are covered by Tariff on Fuse) and is meant to keep reporting until
+// the Tariff rework resolves it. Do not "fix" that one by deleting the row.
 //
 // Extract CELL-ALIGNED, never by splitting a row's innerText: an empty cell
 // emits no line, so a split silently shifts every later column and manufactures

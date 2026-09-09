@@ -296,15 +296,29 @@
   }
   .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:#141024}
 
-  .r-open{padding:2px 16px 18px 34px;display:grid;grid-template-columns:1.1fr 1fr;gap:24px}
-  /* Art is a LEADING column and only on the 38 rows that have a file. The
-     other 142 keep the two-column layout exactly as it was — this is why the
-     class is on the row rather than a rule that reserves an empty gutter. */
-  .row.has-art .r-open{grid-template-columns:128px 1.1fr 1fr}
+  .r-open{padding:2px 16px 18px 34px;display:grid;gap:24px}
+  /* Art is a LEADING column on EVERY row: the 38 painted artefacts show their
+     own file, the other 142 show the placeholder, so the detail layout is the
+     same shape either way and rows do not jump width as you open them. */
+  .r-open{grid-template-columns:128px 1.1fr 1fr}
   .r-art{
     width:100%;height:auto;aspect-ratio:1;border-radius:var(--rad-sm);display:block;
     background:var(--surface-2);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);
   }
+  /* The placeholder is the GAME's asset (game/assets/ui/art_placeholder.svg),
+     painted for the game's dark-only UI. Light is this page's BASE theme, and
+     unmodified it lands as a near-black slab on cream — on 142 of 180 rows,
+     reading as a hole rather than as "pending". Its greys are pure neutrals,
+     so an invert is a clean lightness flip with no hue shift. Dark, which is
+     what it was drawn for, keeps it untouched. One asset, same as the game,
+     rather than a second file to keep in sync. Painted art is never filtered. */
+  .r-art.is-ph{
+    /* No CSS frame: the placeholder draws its own rounded rect and stroke, and
+       `filter` applies to the element's OWN background and border too — an
+       inverted light surface came back as a black ring around the tile. */
+    background:none;border-color:transparent;filter:invert(1);
+  }
+  [data-theme="dark"] .r-art.is-ph{filter:none}
   .r-open h4{margin:0 0 6px;font:700 9.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim)}
   .r-open h4.mt{margin-top:15px}
   .r-open p{margin:0}
@@ -401,7 +415,7 @@
     .legend{display:none}
     .threads path{stroke-width:.75;opacity:.42}
 
-    .r-open,.row.has-art .r-open{grid-template-columns:1fr;gap:14px;padding:2px 10px 16px 24px}
+    .r-open{grid-template-columns:1fr;gap:14px;padding:2px 10px 16px 24px}
     .r-art{max-width:168px} /* full-bleed art would push the text off the fold */
     .r-eff,.r-type{display:none}
     .r-name{flex:1 1 auto;font-size:13px}
@@ -547,10 +561,13 @@ function buildRail(view) {
 function render(idx) {
   ledger.innerHTML = idx.length ? idx.map(i => {
     const a = ARTEFACTS[i];
-    // Only artefacts present in the generated manifest get an <img>; the rest
-    // get no element at all, so a missing file can never become a 404.
-    const art = ARTEFACT_ART[a.name];
-    return `<details class="row${art ? ' has-art' : ''}" data-row="${i}" data-r="${esc(a.rarity)}">
+    // Painted-or-placeholder, resolved from the generated manifest — the same
+    // shape as the game's artefact_tex(), which is
+    // `artefact_icons.get(key, art_placeholder)`. Both branches name a file
+    // that exists, so no <img> ever has to discover its source is missing.
+    const painted = ARTEFACT_ART[a.name];
+    const art = painted || ARTEFACT_ART_PLACEHOLDER;
+    return `<details class="row" data-row="${i}" data-r="${esc(a.rarity)}">
       <summary>
         <span class="r-dot"></span>
         <span class="r-no">#${i + 1}</span>
@@ -560,12 +577,13 @@ function render(idx) {
         <span class="r-caret">&#9660;</span>
       </summary>
       <div class="r-open">
-        ${art ? `<img class="r-art" src="${esc(art)}" alt="" width="360" height="360"
-             loading="lazy" decoding="async">` : ''}
+        <img class="r-art${painted ? '' : ' is-ph'}" src="${esc(art)}" alt="" width="360" height="360"
+             loading="lazy" decoding="async">
         <!-- alt="" on purpose: the artefact's name is the row's own <h3> right
              above, so a description here would just repeat it to a screen
-             reader. loading="lazy" keeps the 38 files unfetched until a row is
-             actually opened. -->
+             reader. loading="lazy" keeps every file unfetched until a row is
+             actually opened; the 142 placeholders are all one 833-byte SVG, so
+             they cost a single request between them. -->
         <div>
           <h4>Effect</h4><p class="fe">${effectHtml(a.effect)}</p>
           <h4 class="mt">Bonuses</h4>

@@ -12,6 +12,7 @@ const Armies := preload("res://scripts/armies.gd")
 const Account := preload("res://scripts/account.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
+const GlobalBoard := preload("res://scripts/global_board.gd")
 
 const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
 const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
@@ -928,6 +929,18 @@ func _show_scores() -> void:
 	else:
 		status.text = "Local scores — sign in to compare."
 	box.add_child(status)
+	# NO-8: the door OUT to the global board. The personal list below is
+	# untouched — this adds a way to ask "how do I rank?" beside the existing
+	# "am I improving?", and opens the PLATFORM's own screen rather than a
+	# second list for us to maintain. Hidden rather than disabled when there is
+	# no platform behind it: a permanently greyed button on desktop would be
+	# chrome advertising something that cannot exist there.
+	if GlobalBoard.available():
+		var global_btn := Button.new()
+		global_btn.text = "Global ranking"
+		global_btn.pressed.connect(func() -> void:
+			GlobalBoard.show_board(GlobalBoard.HIGH_SCORE))
+		box.add_child(global_btn)
 	if scores.is_empty():
 		var none := Label.new()
 		none.text = "No runs yet"

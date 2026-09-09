@@ -552,9 +552,10 @@ func _shop_sub_zone(title_text: String, indices: Array) -> VBoxContainer:
 	return wrap
 
 
-## Icon or price-badge glyph for a slot — a Texture2D when painted art exists,
-## otherwise a fallback character (mirrors hud.gd's pool-strip glyph fallback
-## and show_box's per-kind glyphs, so the vocabulary matches across the app).
+## Icon for a slot. Artefacts and Boxes always resolve to a Texture2D now
+## (NO-17: real art or the shared placeholder); pieces and items still fall back
+## to a glyph character when unpainted, which mirrors hud.gd's pool-strip
+## fallback so the vocabulary matches across the app.
 func _shop_icon(slot: Dictionary) -> Variant:
 	match slot.kind:
 		"piece":
@@ -562,9 +563,15 @@ func _shop_icon(slot: Dictionary) -> Variant:
 		"item":
 			return g.item_icons[slot.key] if g.item_icons.has(slot.key) else "✦"
 		"artefact":
-			return "◈"
-		_: # box — glyph by the box's theme (issue 47: piece/artefact/item)
-			return {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "📦")
+			# NO-17: painted art where it exists, the shared placeholder where it
+			# does not. artefact_tex never returns null, so an artefact tile is
+			# the same size whether or not its art has landed — which is the
+			# whole point of the placeholder: the Shop must not reflow as art
+			# arrives one file at a time.
+			return g.artefact_tex(slot.key)
+		_: # box — no painted art for any of the 9 yet
+			return g.art_placeholder if g.art_placeholder != null \
+				else {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "📦")
 
 
 ## One icon tile with a price badge; sold tiles grey out but keep their slot

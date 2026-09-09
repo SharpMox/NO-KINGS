@@ -127,7 +127,11 @@ var _strip_retry := 0 # bounded waits for layout; see _rebuild_stock_strip
 ## backwards. Set once in build(), before anything reads it.
 var ICON: int = 52
 
-var artefact_box := HBoxContainer.new() # passive Artefacts only (issue 52
+## HFlow, not HBox (NO-17): with art beside each name the row measured 1495px
+## against a 533px viewport and simply ran off the screen — it already clipped
+## the last entry when it was text-only, and art made that worse rather than
+## causing it. Wrapping is what makes the art visible at all.
+var artefact_box := HFlowContainer.new() # passive Artefacts only (issue 52
 	# moved the 6 activatable keys out into activate_box above)
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
@@ -687,11 +691,35 @@ func _rebuild_artefact_strip() -> void:
 		if seen.has(t.key) or g.ACTIVATABLE_ARTEFACT_KEYS.has(t.key):
 			continue
 		seen[t.key] = true
+		# NO-17: art where it exists, the shared placeholder where it does not,
+		# so the row is the same height for every artefact. A Button rather than
+		# a Label purely because Button carries an icon slot next to its text;
+		# it is not pressable (a passive artefact has nothing to press) and says
+		# so via disabled, with the font colour restored so it does not read as
+		# unavailable.
+		# A TextureRect beside a Label, NOT a disabled Button with an icon slot.
+		# The Button route looked shorter and cost two rounds: a disabled Button
+		# tints its icon with icon_disabled_color, so the art loaded, resolved
+		# and drew at zero alpha — every texture-level assert passed while the
+		# row rendered as bare text, and only a screenshot caught it. A passive
+		# artefact is not a button anyway; this says so.
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		row.tooltip_text = t.description
+		row.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
+		var art := TextureRect.new()
+		art.texture = g.artefact_tex(t.key)
+		art.custom_minimum_size = Vector2(ICON, ICON)
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(art)
 		var l := Label.new()
-		l.text = "◈%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
-		l.tooltip_text = t.description
-		l.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
-		artefact_box.add_child(l)
+		l.text = "%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(l)
+		artefact_box.add_child(row)
 
 
 ## issue 52: the Activate section — entry point 1 ("click the Artefact in
@@ -708,7 +736,18 @@ func _rebuild_activate_strip() -> void:
 		var entry: Dictionary = g._artefact_entry(key)
 		var count: int = g._artefact_count(key)
 		var btn := Button.new()
+		# NO-17: the ⚡ stays. It is not decoration here — it marks the chip as
+		# ACTIVATABLE, which is the one thing separating this strip from the
+		# passive artefacts below it, and the art cannot carry that distinction.
 		btn.text = "⚡%s%s" % [entry.name, " ×%d" % count if count > 1 else ""]
+		btn.icon = g.artefact_tex(key)
+		btn.expand_icon = true
+		btn.add_theme_constant_override("icon_max_width", ICON - 8)
+		btn.custom_minimum_size = Vector2(0, ICON)
+		# these ARE buttons and go disabled when the activation is unavailable,
+		# so the same icon_disabled_color trap applies — without this the art
+		# vanishes exactly when the chip is greyed, which is most of the time.
+		btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
 		var targeting: bool = g.artefact_targeting_key == key
 		btn.disabled = not (g._artefact_activation_available(key) or targeting)
 		btn.tooltip_text = entry.description

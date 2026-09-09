@@ -306,6 +306,14 @@ var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
 	# per-frame pulse never rebuilds the board's draw list (review pass 2)
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
+## NO-17: artefact key -> Texture2D. Only the painted ones are in here; read it
+## through artefact_tex() rather than directly, so an unpainted artefact gets the
+## placeholder instead of nothing. 38 of 180 are painted today.
+var artefact_icons := {}
+## The stand-in for any catalog art that does not exist yet — artefacts, Boxes,
+## anything the Shop can stock. One texture at the same size as the real art, so
+## a tile is the same size whether or not its art has landed.
+var art_placeholder: Texture2D
 var artefacts: Array = [] # run-long passive effects
 var box_open := false # box-pick modal showing; blocks all other input
 var buff_pick_open := false # generic "choose 1 of N, then continue" modal
@@ -531,6 +539,16 @@ func _ready() -> void:
 		var path := "res://assets/items/%s.svg" % it.key
 		if ResourceLoader.exists(path):
 			item_icons[it.key] = load(path)
+	# NO-17: painted artefact art, same guarded shape as the items above — the
+	# catalog is 180 entries and 38 are painted, so the miss is the normal case
+	# here rather than the exception.
+	for a in Items.ARTEFACT_CATALOG:
+		var art := "res://assets/artefacts/%s.png" % str(a.get("key", ""))
+		if ResourceLoader.exists(art):
+			artefact_icons[a.key] = load(art)
+	var ph := "res://assets/ui/art_placeholder.svg"
+	if ResourceLoader.exists(ph):
+		art_placeholder = load(ph)
 	# GDD Game Flow — Run: one seed per run, captured so a save resumes the same
 	# stream. SaveConfig.apply below overrides both when restoring a save, and a
 	# scenario may pin "seed" to replay a bug exactly.
@@ -650,6 +668,13 @@ static func board_tile_for(vp: Vector2) -> int:
 	var below: float = DECK_MARGINS + STRIP_CHROME - ICON_GAP + DECK_BELOW_STRIP
 	return int(minf((vp.x - 8.0) / Tuning.BOARD_W,
 		(vp.y - HUD_TOP - below) / (Tuning.BOARD_H + 1)))
+
+
+## Art for an artefact, or the placeholder when it has none. Never returns null,
+## which is the point: every artefact draws at the same size whether or not it is
+## painted, so the Shop and the drawers do not reflow as art lands.
+func artefact_tex(key: String) -> Texture2D:
+	return artefact_icons.get(key, art_placeholder)
 
 
 func _layout_board() -> void:

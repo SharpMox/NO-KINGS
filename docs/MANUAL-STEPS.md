@@ -307,9 +307,58 @@ social**. If Sharpunk is registered at a home address, an Organisation account d
 ## B. An Android device — unblocks *verifying* slice 86
 
 A phone with **Developer options -> USB debugging** on, plugged in. Then `adb devices` should
-list it (`adb` is at `/opt/homebrew/share/android-commandlinetools/platform-tools/adb`).
+list it (`adb` is at `/opt/homebrew/share/android-commandlinetools/platform-tools/adb`, not
+on PATH). Wireless debugging works too and needs no cable once the phone is paired.
 
 An emulator with **Google Play services** also works, but a real device is less trouble.
+
+### `ADB_LIBUSB=1` is REQUIRED, or adb hangs forever
+
+```sh
+export ADB_LIBUSB=1
+```
+
+Without it every adb command hangs. The symptom is a lie: `adb devices` prints
+`* daemon not running; starting now at tcp:5037` and never returns, and a server process
+exists while **nothing is listening on 5037**, so every client waits forever.
+
+`sample` on the stuck process says exactly why (2026-09-09):
+
+```
+adb_server_main() -> usb_init() -> std::this_thread::sleep_for()   2332 of 2359 samples
+```
+
+It hangs inside USB init and never reaches the TCP bind. Tested back to back in one shell:
+`ADB_LIBUSB=0` -> refused, `ADB_LIBUSB=1` -> LISTENING.
+
+**Three wrong diagnoses, all checked and all false** — written down because each one costs an
+hour and the next reader will reach for them in this order:
+
+- **Not mDNS.** `ADB_MDNS=0` changes nothing. The mDNS sockets you see in `lsof` are opened
+  before the hang, not the cause of it.
+- **Not Gatekeeper or quarantine.** The binary is Developer-ID signed by Google LLC with no
+  `com.apple.quarantine` xattr. `spctl` says "rejected … does not seem to be an app", which
+  is normal for any CLI binary and is not a block.
+- **NOT "it needs an interactive shell"** — the most tempting one, because running it by hand
+  appears to fix it. It does not; the environment differs, not the interactivity.
+
+### Getting a build onto the device
+
+The export preset has been **AAB-only since PR #342**, so `--export-debug ...apk` is refused
+outright ("Android App Bundle requires the *.aab extension"). The path that works:
+
+```sh
+export ADB_LIBUSB=1
+godot --headless --path game --export-debug "Android" ../build/nokings-debug.aab
+bundletool build-apks --bundle=build/nokings-debug.aab --output=build/nokings.apks \
+  --connected-device --adb="$(which adb)" \
+  --ks="$HOME/Library/Application Support/Godot/keystores/debug.keystore" \
+  --ks-pass=pass:android --ks-key-alias=androiddebugkey --key-pass=pass:android
+bundletool install-apks --apks=build/nokings.apks --adb="$(which adb)"
+```
+
+**Pass the keystore.** Without `--ks` the APKs build fine, bundletool only *warns*, and the
+install then fails — a silent trap, because the build looked successful.
 
 This is what turns 86 from "written" into "verified" — and issue 86 is explicit that
 `run_all.sh` ALL GREEN does **not** verify this slice.

@@ -40,11 +40,27 @@ const HIGH_SCORE := "high_score"
 static var submits := 0
 
 
-## Is there a platform board to talk to? False on desktop, and false on a device
-## until the player is actually signed in — the same question CloudSave asks,
-## because a board with no account behind it has nothing to post to.
+## Per platform, the same shape cloud_save.gd's _default_backend() uses.
+##
+## iOS deliberately has NO board backend yet: Game Center's leaderboard needs an
+## App Store Connect entry, gated on the paid Apple account (NO-14). Returning
+## null here rather than letting iOS fall through to Play Games is the
+## difference between "no board on iOS" and "silently asking Google about an
+## iOS player" — the second is the kind of wrong that looks fine in every test
+## and only shows up as an empty board on a real device.
+static func _backend():
+	match OS.get_name():
+		"Android":
+			return PlayGames
+	return null
+
+
+## Is there a platform board to talk to? False on desktop, false on iOS until
+## Game Center's board exists, and false on Android until the player is signed
+## in — a board with no account behind it has nothing to post to.
 static func available() -> bool:
-	return PlayGames.board_available()
+	var b = _backend()
+	return b != null and b.board_available()
 
 
 ## Fire-and-forget. Safe to call when unavailable; it simply does nothing.
@@ -52,7 +68,7 @@ static func submit(board: String, value: int) -> void:
 	submits += 1
 	if not available():
 		return
-	PlayGames.board_submit(board, value)
+	_backend().board_submit(board, value)
 
 
 ## Open the PLATFORM's own leaderboard screen. Returns false when there is none
@@ -65,4 +81,4 @@ static func submit(board: String, value: int) -> void:
 static func show_board(board: String) -> bool:
 	if not available():
 		return false
-	return PlayGames.board_show(board)
+	return _backend().board_show(board)

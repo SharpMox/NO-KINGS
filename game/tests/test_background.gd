@@ -53,9 +53,40 @@ func _init() -> void:
 
 	a.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
 	check(not a.backgrounded, "FOCUS_IN clears backgrounded")
+	# Returning to the foreground now RAISES THE PAUSE MENU rather than dropping
+	# the player straight back into a live clock. They have been away for an
+	# unknown length of time, so the clock must stay stopped until they say they
+	# are ready — one deliberate tap. The old expectation here was that focus
+	# alone resumed the clock; that is the behaviour this change deliberately
+	# replaces, so the assertion moved rather than being relaxed.
+	# The RESUME MENU is mobile-only (GameScript.pauses_on_resume). On a phone,
+	# backgrounding means the player left and Android may have been about to kill
+	# the process, so they come back to a paused game. On desktop a focus change
+	# is routine — alt-tab, a notification — and a modal on each one would be its
+	# own bug, so behaviour here is unchanged and the clock simply resumes.
+	check(not GameScript.pauses_on_resume(),
+		"desktop does not raise the resume menu (this suite runs on desktop)")
+	check(not a.game_menu_open, "...so returning to focus does not pop a menu here")
 	await create_timer(0.2).timeout
 	check(a.clock_ms < frozen, "clock resumes ticking after returning to the foreground")
 	a.queue_free()
+	await process_frame
+
+	# --- backgrounding SAVES now (it deliberately did not before) ------------
+	# The old format could not represent a mid-turn snapshot, so FOCUS_OUT threw
+	# the turn away rather than resume it wrong. save_config.gd carries the turn
+	# now, so the snapshot is honest and this is the whole point of the change.
+	var sv := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 7]], "wave": 3})
+	await process_frame
+	await process_frame
+	sv.is_scenario = false # _autosave refuses scenario runs, by design
+	sv.actions_left = 1 # a turn visibly in progress
+	sv.notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
+	await process_frame
+	var written: Dictionary = sv._to_config()
+	check(written.has("state") and int(written.actions_left) == 1,
+		"a backgrounded save carries the turn in progress, not a fresh turn")
+	sv.queue_free()
 	await process_frame
 
 	# --- no enemy turn resolves while backgrounded; it resumes after ---
@@ -69,7 +100,7 @@ func _init() -> void:
 	check(JSON.stringify(b._to_config()) == before, "no enemy action resolves while backgrounded")
 
 	b.notification(NOTIFICATION_APPLICATION_FOCUS_IN)
-	await create_timer(Tuning.ENEMY_TURN_PAUSE * 2 + 0.7).timeout # enough for the turn to finish
+	await create_timer(Tuning.ENEMY_TURN_PAUSE * 2 + 0.7).timeout
 	check(b.state == GameScript.State.PLAYER_TURN, "enemy turn resumes and completes after returning")
 	b.queue_free()
 	await process_frame

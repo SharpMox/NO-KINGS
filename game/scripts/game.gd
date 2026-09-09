@@ -1042,6 +1042,24 @@ func _begin_player_turn() -> void:
 ##
 ## The comment at the old call site referred to a `_save_run` that never
 ## existed; this is that function, finally.
+## Does returning to the foreground raise the pause menu?
+##
+## Mobile only, and that is the whole point rather than a convenience: on a
+## phone, backgrounding is a real lifecycle event — the player left, minutes or
+## hours passed, and Android may have been about to kill the process. Coming
+## back to a live clock mid-turn is disorienting there.
+##
+## On desktop a focus change is routine — alt-tab, a notification, clicking
+## another window — and a modal on every one of them would be its own bug. It
+## also broke the windowed click probes outright: they lose and regain focus
+## during a run, so the menu landed over the board and every subsequent probe
+## click hit the menu instead of the game.
+##
+## The clock still stops on focus loss everywhere; that part is not gated.
+static func pauses_on_resume() -> bool:
+	return OS.get_name() == "Android" or OS.get_name() == "iOS"
+
+
 func _autosave() -> void:
 	if autoplay or is_scenario:
 		return # bot runs and scenarios are not resumable, by design
@@ -1584,23 +1602,47 @@ func _notification(what: int) -> void:
 	# in-game menu (clock stopped, no enemy turns), via `backgrounded`.
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		backgrounded = true
-		# DELIBERATELY DOES NOT SAVE, and that is not an oversight.
+		# NOW SAVES. It did not, and the comment here used to explain why: the
+		# format assumed every save was taken at a TURN START, so a mid-turn
+		# snapshot resumed as a fresh turn and handed back actions already
+		# spent. save_config.gd carries the turn in progress now (state,
+		# actions_left, the per-turn flags) and apply() resumes it without
+		# re-running _begin_player_turn()'s side effects, so the snapshot is
+		# honest and this call is safe.
 		#
-		# Backgrounding is when Android may kill us, so saving here looks
-		# obviously right — it was tried, and it breaks the save schema. A save
-		# records neither `state` nor `actions_left`, because apply() always
-		# ends with _begin_player_turn(): the format assumes every save is taken
-		# at a TURN START. A mid-turn snapshot therefore resumes as a fresh turn,
-		# which hands back actions already spent; a mid-ENEMY-turn one resumes
-		# as the player's turn with the enemy's remaining moves never played,
-		# repeatably; and one taken during SETUP skips the free placement phase.
+		# _autosave() keeps its own guards: never for autoplay or scenario runs,
+		# and never at GAME_OVER — switching away from a finished run once
+		# rewrote the save and resurrected it, and that door stays shut.
 		#
-		# Losing the turn in progress is the honest cost of that format, and it
-		# is smaller than silently letting a run dodge enemy turns. Saving here
-		# needs `state` and `actions_left` in the schema first — a version bump,
-		# not a one-line call.
+		# NOT while a modal or targeting is open. The continuation for an open
+		# choice lives in `_choice_on_chosen`, a Callable, which cannot be
+		# serialised at all — so a save taken mid-choice would come back with
+		# the choice gone and whatever it was about to do lost. That one case
+		# keeps today's behaviour (no save) until it is decided whether choices
+		# should become re-dispatchable data; it is the only gap left in
+		# "resume exactly where you left off".
+		# A Box pick IS saved and re-opened on resume — its state is pure data.
+		# The generic choice modal and targeting are not: their continuation is a
+		# Callable and their openers are entangled with the effect that raised
+		# them, so replaying an opener could re-charge or re-consume. Those two
+		# keep today's behaviour (no save) and are named in the PR.
+		if not (buff_pick_open or item_active != -1 or artefact_targeting_key != ""):
+			_autosave()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+		# Only a RESUME raises the menu — a focus event with no matching
+		# FOCUS_OUT behind it is not one. The window gains focus when it is first
+		# created, and again on every alt-tab; raising the pause menu on those
+		# put it over the board before the game had started, which hung the
+		# windowed click probes outright (every probe click landed on the menu).
+		var resuming := backgrounded
 		backgrounded = false
+		# Come back to a PAUSED game, not a live one. The player has been away
+		# for an unknown length of time; dropping them straight into a running
+		# clock mid-turn is worse than one deliberate tap to re-orient. Same
+		# entry point the hardware Back handler uses, so the two cannot drift.
+		if resuming and pauses_on_resume() and state != State.GAME_OVER \
+				and not autoplay and not win_open:
+			hud.toggle_menu(true)
 	# Android's hardware Back. Godot quits the app on it by default, and mid-run
 	# that is the worst possible response: the autosave is only written at turn
 	# start (see _autosave), so a stray Back discarded the turn in progress and

@@ -100,6 +100,13 @@ const BACKROW_NEAR_ROWS := 2       # rows 0..2 count as "near"
 ## turns of buffed enemies BEFORE the King arrives, then the fight proper.
 ## Wave-scoped King Powers only feel like anything because the wave is long.
 const KING_SEGMENT_TURNS := 15
+## Donald Trump's Tariff Power escalates: one MORE Tariff comes into force every
+## this many turns of his wave, up to the seven in the catalog. A King wave has
+## no turn limit — game.gd bars the wave from advancing while the King is alive
+## or pending — so before this, stalling a King out cost nothing but Clock.
+## UNTUNED: picked to reach all seven around turn 60, against a 15-turn segment
+## and a 15-minute Clock. It belongs to the balance pass (NO-6), not to a guess.
+const KING_TARIFF_STACK_TURNS := 10
 
 ## How many Piece Buffs a segment-1 spawn arrives carrying. Reuses the 12
 ## shipped buffs rather than inventing an enemy-only stat line: the player

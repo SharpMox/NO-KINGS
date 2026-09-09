@@ -188,19 +188,59 @@ func _init() -> void:
 	await process_frame
 	t.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
 	t._queue_wave(50)
-	check(t.king_power_ability != "", "the King's Power is in force during segment 1")
+	check(not t.king_power_abilities.is_empty(), "the King's Power is in force during segment 1")
 	check(Kings.active_id(t) == "donald_trump",
 		"and the active King is resolved from the HELD King, not the board")
 	var live := false
 	for a in t.king_abilities_active:
-		if a.get("key", "") == t.king_power_ability:
+		if t.king_power_abilities.has(a.get("key", "")):
 			live = true
 	check(live, "the Power's Tariff is actually active, not just recorded")
+
+
+	# --- the Tariff Power ESCALATES (design 2026-09-09) ----------------------
+	# A King wave has NO turn limit: game.gd bars the wave from advancing while
+	# the King is alive or pending, so it ends on checkmate rather than a count.
+	# Stalling one out therefore used to cost nothing but Clock. Donald Trump's
+	# Power now brings one more Tariff into force every KING_TARIFF_STACK_TURNS
+	# turns, which is what makes the plural in his description true.
+	var esc: Node2D = _boot({"board": [], "wave": 49})
+	await process_frame
+	await process_frame
+	esc.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
+	esc._queue_wave(50)
+	check(esc.king_power_abilities.size() == 1,
+		"one Tariff is in force the moment the wave starts")
+	esc.turns_since_wave = Tuning.KING_TARIFF_STACK_TURNS
+	Kings.stack_power_if_due(esc)
+	check(esc.king_power_abilities.size() == 2,
+		"a second Tariff comes into force after %d turns" % Tuning.KING_TARIFF_STACK_TURNS)
+	# recorded is not the same as in force — assert the observable consequence
+	var all_live := true
+	for stacked in esc.king_power_abilities:
+		var found := false
+		for a in esc.king_abilities_active:
+			if a.get("key", "") == stacked:
+				found = true
+		all_live = all_live and found
+	check(all_live, "...and every stacked Tariff is actually active, not just recorded")
+	# escalation stops at the end of the list rather than running off it
+	esc.turns_since_wave = Tuning.KING_TARIFF_STACK_TURNS * 50
+	Kings.stack_power_if_due(esc)
+	var dt_kit: Dictionary = Kings.kit_of("donald_trump")
+	check(esc.king_power_abilities.size() == dt_kit.power_catalog_escalation.size(),
+		"the escalation caps at the %d Tariffs in the list" % dt_kit.power_catalog_escalation.size())
+	# and the WHOLE stack clears with the wave, exactly as the single Power did
+	esc._queue_wave(51)
+	check(esc.king_power_abilities.is_empty(),
+		"the whole stack clears when the wave ends, not just the first Tariff")
+	esc.queue_free()
+	await process_frame
 
 	# ...and it does NOT outlive its wave. A Power that leaked into wave 51
 	# would be a permanent difficulty increase nobody chose.
 	t._queue_wave(51)
-	check(t.king_power_ability == "", "the Power is cleared when the wave ends")
+	check(t.king_power_abilities.is_empty(), "the Power is cleared when the wave ends")
 	var leaked := false
 	for a in t.king_abilities_active:
 		if a.get("key", "") == "inflation":

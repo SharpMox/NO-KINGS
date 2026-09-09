@@ -57,15 +57,22 @@ static func all() -> Array:
 				"king_power_id": k.id,
 				"seed": abs(hash(k.id)),
 			}
-			# Donald Trump's Power is the ONLY tariff-backed one (Tariff ->
-			# `inflation`, slice 66); the other 15 are bespoke keys that
+			# Donald Trump's Power is the ONLY tariff-backed one (slice 66);
+			# the other 15 are bespoke keys that
 			# king_power_id alone switches on. Listing the tariff in the config
 			# activates it exactly as apply_power() would.
-			# ponytail: this leaves g.king_power_ability unset, so the tariff
+			# ponytail: this leaves g.king_power_abilities unset, so the tariff
 			# would outlive its wave — unreachable here (a sandbox turns no
 			# wave over). Call Kings.apply_power() from save_config if a
 			# scenario ever needs to advance past its King.
-			var power_catalog_key: String = str(kit.get("power_catalog_key", ""))
+			# Trump's Power ESCALATES (2026-09-09), so it is a list now. The
+			# sandbox seeds only the FIRST Tariff: that is what is in force on
+			# arrival, and a sandbox turns no wave over, so nothing here would
+			# ever stack the rest. Drive Kings.stack_power_if_due() by hand to
+			# see the escalation.
+			var esc: Array = kit.get("power_catalog_escalation", [])
+			var power_catalog_key: String = str(esc[0]) if not esc.is_empty() \
+				else str(kit.get("power_catalog_key", ""))
 			if power_catalog_key != "":
 				cfg["king_abilities"] = [power_catalog_key]
 			# Named for the Power, which is the thing that is live on arrival —

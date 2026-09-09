@@ -157,7 +157,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	# unwinnable rather than merely different.
 	g.pending_king = cfg.get("pending_king", {}).duplicate()
 	g.king_ability_used_this_wave = bool(cfg.get("king_ability_used_this_wave", false))
-	g.king_power_ability = str(cfg.get("king_power_ability", "")) # issue 91
+	g.king_power_abilities = (cfg.get("king_power_abilities", []) as Array).duplicate() # issue 91
 	g.king_power_id = str(cfg.get("king_power_id", "")) # issue 92
 	g.next_army = str(cfg.get("army", g.next_army)) # the reinforcement pick draws from it
 	# issue 76: the SAVE KEY stays "family_ability_used_this_wave" while the
@@ -314,7 +314,7 @@ static func to_config(g) -> Dictionary:
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
 		"pending_king": g.pending_king.duplicate(), # issue 90
 		"king_ability_used_this_wave": g.king_ability_used_this_wave, # issue 91
-		"king_power_ability": g.king_power_ability,
+		"king_power_abilities": g.king_power_abilities.duplicate(),
 		"king_power_id": g.king_power_id, # issue 92
 		"army": g.next_army, "rank": g.next_tier,
 		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load

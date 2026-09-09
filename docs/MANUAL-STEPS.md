@@ -373,7 +373,7 @@ Not something you download. You **generate** it, once, with `keytool` from the J
 installed for the Android build:
 
 ```sh
-keytool -genkey -v -keystore ~/keystores/nokings-release.keystore \
+keytool -genkey -v -keystore ~/keystores/nokings-upload.keystore \
   -alias nokings -keyalg RSA -keysize 2048 -validity 10000
 ```
 
@@ -439,8 +439,17 @@ Google's default for new apps: you upload an **upload key**, Google holds the ac
 signing key. If the upload key is lost, support can reset it — the app survives. The app
 signing key never leaves Google, so it cannot be lost by you at all.
 
-**Opt in when creating the app entry.** It is the safer default and it is what the `keytool`
-key above becomes: an upload key rather than the final signing key.
+**It is automatic for new apps now** (verified against Google's own docs 2026-09-09, which
+say new apps are "automatically enrolled in quantum-ready, hybrid signing with Google-generated
+keys"). There is no opt-in step to remember at app-entry creation — this page used to say there
+was. What it means for the key above is unchanged: it is an **upload** key, not the final
+signing key.
+
+Google does NOT generate the upload key for you. You still run the `keytool` command above:
+Play needs your first AAB signed with something, and registers that as your upload key. What
+enrolment buys is recovery — a lost upload key is reset by generating a new one, exporting its
+certificate to PEM, and submitting a reset request in the Play Console. A lost key on an app
+that was NOT enrolled is terminal.
 
 ### What I can do once the key exists
 

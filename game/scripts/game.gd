@@ -269,6 +269,12 @@ var pending_reinforce := false # shop due at the next player-turn start
 ## (a Wave clear can raise a Box pick), and _open_shop refuses over one. Held
 ## as a flag so the open QUEUES rather than being dropped.
 var pending_shop_open := false
+var pending_yalta_picks := 0 # Yalta Cocktail Napkin picks owed to the player.
+	# Exists for ONE reason: backgrounding. Yalta's trigger is the 5-Wave
+	# Milestone, which has already fired by the time the modal is up and will
+	# not fire again, so rolling the modal back with its own Cancel (forfeit,
+	# no refund) would charge a phone call the whole reward. Queued instead,
+	# drained at turn start exactly like pending_bounty_boxes below.
 var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 	# many Box choices are queued. _lose_player_piece is synchronous — called
 	# mid enemy-move loop among other sites — so it cannot itself open a modal
@@ -1026,6 +1032,9 @@ func _begin_player_turn() -> void:
 		if not autoplay: # the bot buys through Shop.buy and never opens the
 			_open_shop() # panel (autoplay.gd try_shop) — opening it here would
 				# only stall a run that has no way to close it
+	if pending_yalta_picks > 0: # deferred at background — see the field's own
+		pending_yalta_picks -= 1 # comment. Drained BEFORE Bounty on purpose:
+		_open_yalta_pick() # if this opens, _open_bounty_pick re-queues itself.
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -1614,20 +1623,16 @@ func _notification(what: int) -> void:
 		# and never at GAME_OVER — switching away from a finished run once
 		# rewrote the save and resurrected it, and that door stays shut.
 		#
-		# NOT while a modal or targeting is open. The continuation for an open
-		# choice lives in `_choice_on_chosen`, a Callable, which cannot be
-		# serialised at all — so a save taken mid-choice would come back with
-		# the choice gone and whatever it was about to do lost. That one case
-		# keeps today's behaviour (no save) until it is decided whether choices
-		# should become re-dispatchable data; it is the only gap left in
-		# "resume exactly where you left off".
-		# A Box pick IS saved and re-opened on resume — its state is pure data.
-		# The generic choice modal and targeting are not: their continuation is a
-		# Callable and their openers are entangled with the effect that raised
-		# them, so replaying an opener could re-charge or re-consume. Those two
-		# keep today's behaviour (no save) and are named in the PR.
-		if not (buff_pick_open or item_active != -1 or artefact_targeting_key != ""):
-			_autosave()
+		# A modal or targeting no longer blocks the save. It used to: the
+		# continuation for an open choice lives in `_choice_on_chosen`, a
+		# Callable, which cannot be serialised — so the first cut refused to
+		# save at all and the player lost the turn for answering the phone.
+		# _rollback_for_save() takes the run back to where that modal's own
+		# Cancel lands, which IS representable, and saves there. See its header.
+		# A Box pick is the one that needs no rollback: its state is pure data,
+		# so it is saved as-is and re-opened on resume.
+		_rollback_for_save()
+		_autosave()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
 		# Only a RESUME raises the menu — a focus event with no matching
 		# FOCUS_OUT behind it is not one. The window gains focus when it is first
@@ -2356,6 +2361,45 @@ func _item_reset() -> void:
 	pending_buff = ""
 
 
+## Return the run to the last state the save schema can represent, so
+## backgrounding can snapshot it instead of refusing to.
+##
+## The first cut of mid-turn resume refused to save while a choice modal or
+## targeting was open, on the grounds that the continuation is a Callable and
+## cannot be serialised. True, and beside the point (user, 2026-09-08): the
+## continuation never needed serialising, because every one of these already
+## has a written-down state one step EARLIER — where its own Cancel lands.
+## That state is one normal play reaches and saves every day, so rolling back
+## to it and saving THERE costs the player one redone decision instead of the
+## whole turn. Nothing is replayed forward, so nothing can double-charge.
+##
+## Rolling back is safe for five of the seven choice callers because nothing is
+## paid, consumed or charged when the modal opens — the effect body lives
+## entirely in the on_chosen handler (see the Callable() cancels at
+## _activate_artefact, _activate_army_ability and _jet_fuel_restock_pressed, and
+## _item_reset() for the Buff Box). The two exceptions are the ones whose CALLER
+## spent the trigger before opening, so their Cancel would take payment and give
+## nothing: those are queued onto the deferral counters instead.
+func _rollback_for_save() -> void:
+	if buff_pick_open:
+		match _choice_on_chosen.get_method():
+			"_open_box_pick": # Bounty: its caller already consumed the
+				pending_bounty_boxes += 1 # piece_bounty Buff / decremented
+					# the counter, and this is the queue that exists for it
+			"_yalta_chosen": # the 5-Wave Milestone cannot fire twice
+				pending_yalta_picks += 1
+		_choice_pick_cancelled()
+	if item_active != -1:
+		_item_reset() # nothing is consumed at _begin targeting: _consume_item
+			# runs on the instant-item branch or on confirm, never here
+	if artefact_targeting_key != "":
+		_artefact_targeting_reset()
+	if army_targeting:
+		_army_targeting_reset()
+	if army_board_targeting:
+		_army_board_targeting_reset()
+
+
 ## Generic "choose 1 of N, then continue" modal seam (issue 41). `offers` are
 ## Dictionaries with `label` (button text) and `value` (handed back verbatim
 ## to `on_chosen`) — the modal and this seam don't know what a caller does
@@ -2446,6 +2490,10 @@ func _buff_pick_cancelled() -> void:
 ## same pattern as _open_buff_pick / _open_box_pick — so the bot never
 ## deadlocks on a panel nobody is there to click.
 func _open_yalta_pick() -> void:
+	if box_open or buff_pick_open: # DEFER rather than drop, for the reason
+		pending_yalta_picks += 1 # _open_bounty_pick spells out: a hook on the
+		return # same wave clear can already have a modal up, and rendering
+			# this on top means the player picks and the pick goes nowhere.
 	var offers := [
 		{"label": "+100 Gold", "value": "gold"},
 		{"label": "+1 Item", "value": "item"},

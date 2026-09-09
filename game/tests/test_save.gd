@@ -441,6 +441,77 @@ func _init() -> void:
 	GameScript.next_config = {}
 	GameScript.next_seed = ""
 
+	# --- BACKGROUNDING MID-CHOICE (NO-?? review): roll back, don't refuse ----
+	# The first cut refused to save while a choice modal or targeting was open,
+	# because the continuation is a Callable and cannot be serialised. That
+	# threw away the whole turn for a phone call.
+	#
+	# The continuation never needed serialising. Every choice modal already has
+	# a written-down state one step earlier: where its own Cancel lands. That is
+	# a state normal play reaches and saves every day, so rolling back to it and
+	# saving THERE costs the player one redone decision instead of a turn.
+	var rb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	var actions_before: int = rb.actions_left
+	rb._open_yalta_pick()
+	check(rb.buff_pick_open, "(setup) a choice modal is open")
+	rb._rollback_for_save()
+	check(not rb.buff_pick_open,
+		"backgrounding mid-choice closes the modal instead of refusing to save")
+	check(rb.actions_left == actions_before,
+		"...and does NOT cost the turn: the actions already spent are still spent, no more")
+
+	# Yalta's trigger — the 5-Wave Milestone — has already fired and will not
+	# fire again, so its own Cancel (forfeit, no refund) would take the reward
+	# away for backgrounding. Queue it like Bounty instead.
+	check(rb.pending_yalta_picks == 1,
+		"a Yalta pick open at background is QUEUED, not forfeited — its milestone cannot re-fire")
+	var rb_saved := _round_trip(rb)
+	rb.queue_free()
+	await process_frame
+	var rb_r := _boot(rb_saved)
+	await process_frame
+	check(rb_r.pending_yalta_picks == 1,
+		"...and the queued pick survives the save, so the resumed run still owes it")
+	rb_r.queue_free()
+	await process_frame
+
+	# Bounty is the other one whose caller spends the trigger before opening
+	# (the capture path consumes the piece_bounty Buff). It already had the
+	# queue for exactly this — _open_bounty_pick defers onto it when a Box is
+	# in the way — so backgrounding reuses that rather than inventing a second.
+	var bq := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	bq._open_bounty_pick()
+	check(bq.buff_pick_open, "(setup) a Bounty pick is open")
+	bq._rollback_for_save()
+	check(bq.pending_bounty_boxes == 1 and not bq.buff_pick_open,
+		"a Bounty pick open at background goes back on pending_bounty_boxes, not forfeited")
+	bq.queue_free()
+	await process_frame
+
+	# Targeting rolls back the same way, and for the plainest reason: nothing is
+	# consumed when it opens. _item_reset() IS the pre-targeting state.
+	var tg := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	tg.artefact_targeting_key = "bovine-tractor-beam"
+	tg.army_targeting = true
+	tg.army_board_targeting = true
+	tg.item_active = 0
+	tg._rollback_for_save()
+	check(tg.artefact_targeting_key == "" and not tg.army_targeting
+			and not tg.army_board_targeting and tg.item_active == -1,
+		"every targeting flavour rolls back at background — including the two ARMY ones, "
+		+ "which the first cut's guard did not even name")
+	tg.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL SAVE CHECKS OK")

@@ -12,6 +12,7 @@ const ItemLogic := preload("res://scripts/item_logic.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Economy := preload("res://scripts/economy.gd")
+const GlobalBoard := preload("res://scripts/global_board.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
@@ -1476,6 +1477,11 @@ func _game_over(won: bool, reason: String) -> void:
 	if not is_scenario and not autoplay:
 		rank = Economy.record_score(self)
 		_record_history(won) # Games History: every real run, win or loss
+		# NO-8: and the GLOBAL board, inside this same guard rather than a
+		# second one. The harness plays hundreds of bot runs; a submit outside
+		# here posts every single one to a real, public leaderboard. Reusing the
+		# guard is what makes that impossible rather than merely unlikely.
+		GlobalBoard.submit(GlobalBoard.HIGH_SCORE, score)
 	modals.show_overlay(won, reason, rank)
 	_refresh()
 	if autoplay_exit:

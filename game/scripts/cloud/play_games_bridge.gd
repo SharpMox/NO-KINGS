@@ -83,10 +83,14 @@ static var snapshots := {}
 static var _sign_in: Node
 static var _snapshots: Node
 static var _players: Node
+## NO-8: the global leaderboard client. Same ownership rules as the three
+## above, and null off Android for the same reason.
+static var _leaderboards: Node
 
 const _SIGN_IN_SCRIPT := "res://addons/GodotPlayGameServices/scripts/sign_in/sign_in_client.gd"
 const _SNAPSHOTS_SCRIPT := "res://addons/GodotPlayGameServices/scripts/snapshots/snapshots_client.gd"
 const _PLAYERS_SCRIPT := "res://addons/GodotPlayGameServices/scripts/players/players_client.gd"
+const _LEADERBOARDS_SCRIPT := "res://addons/GodotPlayGameServices/scripts/leaderboards/leaderboards_client.gd"
 
 
 func _ready() -> void:
@@ -112,6 +116,7 @@ func _ready() -> void:
 	_sign_in = (load(_SIGN_IN_SCRIPT) as GDScript).new()
 	_snapshots = (load(_SNAPSHOTS_SCRIPT) as GDScript).new()
 	_players = (load(_PLAYERS_SCRIPT) as GDScript).new()
+	_leaderboards = (load(_LEADERBOARDS_SCRIPT) as GDScript).new()
 	# CONNECTED BEFORE add_child, deliberately. Each client wires itself to the
 	# native plugin in its own _ready(), which fires DURING add_child — so
 	# connecting afterwards leaves a window in which the plugin's startup
@@ -124,6 +129,11 @@ func _ready() -> void:
 	add_child(_sign_in)
 	add_child(_snapshots)
 	add_child(_players)
+	# No signal connected: submit_score is fire-and-forget by design (NO-8), and
+	# show_leaderboard hands off to the platform's own screen. The client's
+	# score_submitted signal reports a queue result we have nothing to do with —
+	# the SDK retries offline submissions itself.
+	add_child(_leaderboards)
 	# ASK, because the plugin does not tell. Its doc comment says it "does a
 	# check at startup" — DEVICE-VERIFIED FALSE (Nothing Phone 2a, 2026-09-04):
 	# nothing ever arrives in GDScript unprompted, so on every launch after the
@@ -348,3 +358,19 @@ func _on_conflict(conflict: Variant) -> void:
 	var settled := {"ts": Time.get_unix_time_from_system(), "data": winner}
 	snapshots[key] = settled
 	save(key, settled)
+
+
+## NO-8: the global leaderboard entry points. Null-safe like every other static
+## entry here — off Android the client stays null and both calls no-op, which is
+## the correct desktop answer rather than a degraded one.
+static func submit_score(board_id: String, value: int) -> void:
+	if _leaderboards == null:
+		return
+	_leaderboards.submit_score(board_id, value)
+
+
+static func show_leaderboard(board_id: String) -> bool:
+	if _leaderboards == null:
+		return false
+	_leaderboards.show_leaderboard(board_id)
+	return true

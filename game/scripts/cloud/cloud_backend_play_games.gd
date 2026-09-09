@@ -30,6 +30,32 @@ const APP_ID := "292256536070"
 const LEADERBOARD_HIGH_SCORE := "CgkIhqzj3sAIEAIQAQ"
 
 
+## NO-8: the global-board half of this backend. Kept here rather than in
+## global_board.gd because a Play Games id means nothing to Game Center — the
+## mapping belongs beside the platform that issued it.
+static func board_id(board: String) -> String:
+	match board:
+		"high_score": return LEADERBOARD_HIGH_SCORE
+	return "" # an unknown board is not an error, it is simply not wired yet
+
+
+## Signed in AND on a platform that has a board. is_available() already means
+## "is there an account to talk to", which is the same question here.
+static func board_available() -> bool:
+	return is_available()
+
+
+static func board_submit(board: String, value: int) -> void:
+	var id := board_id(board)
+	if id != "":
+		Bridge.submit_score(id, value)
+
+
+static func board_show(board: String) -> bool:
+	var id := board_id(board)
+	return Bridge.show_leaderboard(id) if id != "" else false
+
+
 ## The bridge owns the plugin's client Nodes and the cache this file reads.
 ## The dependency runs ONE WAY — backend -> bridge — which is why the snapshot
 ## codec lives over there rather than here: the bridge needs it too (to decode

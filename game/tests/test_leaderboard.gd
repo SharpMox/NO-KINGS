@@ -4,6 +4,8 @@ extends SceneTree
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Memory := preload("res://scripts/cloud/cloud_backend_memory.gd")
+const GlobalBoard := preload("res://scripts/global_board.gd")
+const GameScript := preload("res://scripts/game.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 
 var fails := 0
@@ -21,7 +23,63 @@ func _e(score: int, wave: int) -> Dictionary:
 	return {"score": score, "wave": wave, "kings": 0}
 
 
+func _boot(cfg: Dictionary) -> Node2D:
+	if not cfg.has("seed"):
+		cfg = cfg.duplicate()
+		cfg.seed = 1
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	return game
+
+
 func _init() -> void:
+	# --- NO-8: the GLOBAL board (was issue 104) -----------------------------
+	# A different question from the personal board above: "how do I rank?"
+	# rather than "am I improving?". Desktop has no platform behind it.
+	check(not GlobalBoard.available(),
+		"no global board on desktop — so no door to one on the Scores screen")
+
+	# THE ONE THAT SILENTLY CORRUPTS A REAL LEADERBOARD IF IT REGRESSES.
+	# tools/playtest.sh plays hundreds of bot runs. If the submit ever escapes
+	# game.gd's `not is_scenario and not autoplay` guard, every one of them
+	# posts to a public board — and it would look fine here, because desktop
+	# submits nothing either way. So this counts ATTEMPTS, not sends.
+	var sc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	GlobalBoard.submits = 0
+	sc._game_over(false, "test")
+	check(GlobalBoard.submits == 0,
+		"a scenario run submits NOTHING to the global board (attempts: %d)"
+			% GlobalBoard.submits)
+	sc.queue_free()
+	await process_frame
+
+	var bot := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bot.is_scenario = false
+	bot.autoplay = true # the harness's own shape: a real config, driven by the bot
+	GlobalBoard.submits = 0
+	bot._game_over(false, "test")
+	check(GlobalBoard.submits == 0,
+		"an autoplay run submits NOTHING either (attempts: %d)" % GlobalBoard.submits)
+	bot.queue_free()
+	await process_frame
+
+	# ...and the guard is not simply always-false: a real run DOES reach the
+	# submit. Without this, both checks above would pass on a deleted call.
+	var real := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	real.is_scenario = false
+	real.autoplay = false
+	GlobalBoard.submits = 0
+	real._game_over(false, "test")
+	check(GlobalBoard.submits == 1,
+		"a REAL run does reach the submit — the guard gates it, it is not dead code")
+	real.queue_free()
+	await process_frame
+
 	Memory.reset()
 	CloudSave.backend = Noop
 

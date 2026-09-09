@@ -26,12 +26,66 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## The CONTINUE button, found by text rather than by index so a future sibling
+## node cannot silently make this assert about the wrong control.
+func _continue_button(root_node: Node) -> Button:
+	for c in root_node.get_children():
+		if c is Button and (c as Button).text == "CONTINUE":
+			return c
+	return null
+
+
+func _count_continue(root_node: Node) -> int:
+	var n := 0
+	for c in root_node.get_children():
+		if c is Button and (c as Button).text == "CONTINUE":
+			n += 1
+	return n
+
+
 func _init() -> void:
 	check(Intro.should_bypass(["--autoplay"]), "bypasses on --autoplay")
 	check(Intro.should_bypass(["--scenario", "0"]), "bypasses on --scenario")
 	check(Intro.should_bypass(["--screenshot", "/tmp"]), "bypasses on --screenshot")
 	check(not Intro.should_bypass([]), "plays for a real launch (no bypass args)")
 	check(not Intro.should_bypass(["--army", "Cult"]), "an unrelated flag doesn't bypass it")
+
+	# --- the loop + CONTINUE gate (2026-09-09) ------------------------------
+	# The intro no longer walks straight into the menu. It hands over to a short
+	# looping clip under a CONTINUE button, so entering the game (and the sign-in
+	# behind it) is a deliberate press. Three different things can end the intro
+	# — the `finished` signal, the deadman timer and a tap — and all three must
+	# land in the SAME loop state exactly once.
+	var gate: Control = Intro.new()
+	root.add_child(gate)
+	await process_frame
+	await process_frame
+	check(not gate._looping, "the intro starts in its first clip, not the loop")
+	check(_continue_button(gate) == null,
+		"...and CONTINUE is not offered while the intro is still playing")
+	gate._begin_loop()
+	gate._begin_loop() # a tap racing the deadman racing `finished`
+	await process_frame
+	var btn := _continue_button(gate)
+	check(gate._looping and btn != null,
+		"ending the intro raises the loop with a CONTINUE button")
+	check(_count_continue(gate) == 1,
+		"...exactly one, however many things ended the intro (found %d)"
+			% _count_continue(gate))
+	# THE POINT OF THE GATE: reaching the loop must not reach the menu. If this
+	# regresses, the sign-in screen appears on its own again and the button is
+	# decoration.
+	check(current_scene == null
+		or current_scene.scene_file_path != "res://scenes/Menu.tscn",
+		"reaching the loop does NOT enter the menu on its own")
+	btn.pressed.emit()
+	await process_frame
+	await process_frame
+	check(current_scene != null
+		and current_scene.scene_file_path == "res://scenes/Menu.tscn",
+		"pressing CONTINUE is what enters the menu")
+	gate.queue_free()
+	await process_frame
 
 	var intro: Control = Intro.new()
 	root.add_child(intro)

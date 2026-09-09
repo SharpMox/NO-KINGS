@@ -373,9 +373,18 @@ Not something you download. You **generate** it, once, with `keytool` from the J
 installed for the Android build:
 
 ```sh
-keytool -genkey -v -keystore ~/keystores/nokings-upload.keystore \
+mkdir -p ~/keystores
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+"$JAVA_HOME/bin/keytool" -genkey -v -keystore ~/keystores/nokings-upload.keystore \
   -alias nokings -keyalg RSA -keysize 2048 -validity 10000
 ```
+
+**Call keytool through `$JAVA_HOME`, not by bare name.** macOS ships a stub at
+`/usr/bin/keytool` that is first on `PATH` and is not a real tool — it answers every
+invocation with *"The operation couldn't be completed. Unable to locate a Java Runtime."*
+`which keytool` finds the stub and tells you nothing, which is how this was hit for real on
+2026-09-09. The JDK installed for the Android build is the working one, same as the debug
+fingerprint command further up already assumes.
 
 It asks for a keystore password, a key password and some identity fields. The file plus those
 two passwords and the alias are the whole credential.

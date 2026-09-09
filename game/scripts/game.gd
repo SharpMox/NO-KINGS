@@ -124,7 +124,7 @@ var pending_king: Dictionary = {}
 var king_ability_used_this_wave := false
 ## issue 91: the Tariff key a King's Power put in force, so it can be taken
 ## back out when the wave ends. "" when no Power is live.
-var king_power_ability := ""
+var king_power_abilities: Array = [] # keys in force from the King's Power (escalates)
 ## issue 92: the King whose Power is in force, or "". Distinct from the board
 ## King: the Power is live through segment 1, before the King has arrived.
 var king_power_id := ""
@@ -1076,6 +1076,7 @@ func _enemy_turn() -> void:
 				_add_turn_fx("Annexed", Color(1.0, 0.5, 0.4))
 	turns_since_wave += 1
 	WaveLogic.release_king_if_due(self) # issue 90: segment 1 -> segment 2
+	Kings.stack_power_if_due(self) # an escalating Power gains its next Tariff
 	# `pending_king.is_empty()` is load-bearing, not defensive. Through segment
 	# 1 there is no King on the board, so `_king_alive()` is false — without
 	# this the cadence would queue the NEXT wave and walk straight past a King

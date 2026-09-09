@@ -25,6 +25,7 @@
 const Waves := preload("res://data/waves.gd")
 const Rules := preload("res://scripts/rules.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 ## Economy is loaded lazily, NOT preloaded: artefact_hooks.gd preloads this
 ## file (issue 92 dispatches King Powers through its run()), and economy.gd
@@ -257,8 +258,13 @@ const KITS := {
 	# ---- SUIT (ruled in slice 66 + the design session) ----------------------
 	"donald_trump": {
 		"power_name": "Tariff",
-		"power_desc": "Tariffs are in force for the whole of this King's wave.",
-		"power_catalog_key": "inflation",
+		"power_desc": "A new Tariff comes into force every few turns, for the whole of this King's wave.",
+		# ESCALATING (design 2026-09-09). Ordered by tier so the wave tightens
+		# rather than opening at full strength: the five Mild Tariffs first,
+		# then the two Moderate ones. Trump is the only King whose Power is a
+		# catalog entry at all, so this field is his alone.
+		"power_catalog_escalation": ["move_cost", "capture_cost", "pass_cost",
+			"long_range_cost", "ability_cost", "deploy_cost", "fuse_cost"],
 		"ability_name": "Diplomatic Visit – JD Vance",
 		"ability_desc": "Destroys your highest-value piece on the board.",
 		"ability_catalog_key": "jd_vance",
@@ -317,11 +323,11 @@ static func active_id(g) -> String:
 ## 51 would be a permanent difficulty increase nobody chose.
 static func apply_power(g, king_id: String) -> void:
 	g.king_power_id = ""
-	if g.king_power_ability != "":
+	for held in g.king_power_abilities:
 		for i in range(g.king_abilities_active.size() - 1, -1, -1):
-			if g.king_abilities_active[i].get("key", "") == g.king_power_ability:
+			if g.king_abilities_active[i].get("key", "") == held:
 				g.king_abilities_active.remove_at(i)
-		g.king_power_ability = ""
+	g.king_power_abilities = []
 	if king_id == "":
 		return
 	var kit := kit_of(king_id)
@@ -330,9 +336,37 @@ static func apply_power(g, king_id: String) -> void:
 	var key: String = str(kit.get("power_catalog_key", ""))
 	if key != "":
 		_economy().activate_king_ability_by_key(g, key)
-		g.king_power_ability = key
+		g.king_power_abilities = [key]
 	g.king_power_id = king_id
+	# an escalating Power seeds its first Tariff through the same path that
+	# stacks the rest, so "what is in force at turn 0" has one definition
+	stack_power_if_due(g)
 	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], Color(1.0, 0.55, 0.4))
+
+
+## Bring the next Tariff of an escalating Power into force, if enough turns have
+## passed. Called every turn from game.gd beside release_king_if_due.
+##
+## A King wave has NO turn limit — game.gd bars the wave from advancing while
+## the King is alive or pending, so it ends on checkmate, not a count. Stalling
+## one out therefore cost nothing but Clock. This is what makes waiting expensive.
+##
+## Derived from turns_since_wave rather than counted, so it is idempotent: call
+## it twice on the same turn and nothing stacks twice, and a save restored
+## mid-wave lands on the same stack it left.
+static func stack_power_if_due(g) -> void:
+	if g.king_power_id == "":
+		return
+	var esc: Array = kit_of(g.king_power_id).get("power_catalog_escalation", [])
+	if esc.is_empty():
+		return # an ordinary Power: one Tariff, or a bespoke key
+	var want: int = mini(esc.size(),
+		1 + int(g.turns_since_wave / float(Tuning.KING_TARIFF_STACK_TURNS)))
+	while g.king_power_abilities.size() < want:
+		var key: String = str(esc[g.king_power_abilities.size()])
+		_economy().activate_king_ability_by_key(g, key)
+		g.king_power_abilities.append(key)
+		g._add_turn_fx("TARIFF: %s" % key.replace("_", " "), Color(1.0, 0.55, 0.4))
 
 
 ## Spend the King's once-per-Wave Ability. Returns true when it fired, so the

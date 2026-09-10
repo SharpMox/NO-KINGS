@@ -200,6 +200,27 @@ also once per batch and is therefore irrelevant to throughput — lowering it
 burns battery and frames to shave a cost nobody pays. One command per file is
 the slow way to use this.
 
+**A `tap_text` target can be off-screen, and the driver now says so.** A control
+inside a `ScrollContainer` can be scrolled below the fold; its centre is then a
+point no finger reaches. The verb used to report `ok` for that, which is the
+"a click that does nothing proves nothing" trap inside the harness — it cost a
+wrong conclusion about the Guide's Back button before being fixed. It now fails
+with the point and the viewport size. **If you see that failure, the fix is a
+`drag` to scroll first, not a bigger timeout.**
+
+**`wait_text` matches SUBSTRINGS, so a marker must be unique to its screen.**
+`wait_text Play` passes on the sign-in screen by matching **"Play as Guest"**,
+then the next command runs against a screen that has no menu on it. Use
+`Games History` as the main-menu marker; `Play` is not safe.
+
+**Desktop and the device take different paths after the intro.** A device with a
+bound account goes straight to the menu (with the account-switch prompt);
+desktop with no account shows a sign-in screen — *Sign in with Google*, *Sign in
+with Game Center*, *Play as Guest* — first. A batch meant to run on both needs
+that step. Worth the trouble: **most layout questions are identical on both**, so
+the driver on desktop answers them in ~20 seconds with no phone at all. The
+Guide's geometry cross-checked exactly, 1179 against a 1038 and an 800 viewport.
+
 **Prefer `wait_text` over `wait_settled`.** `wait_settled` md5s the framebuffer
 each iteration, which is ~5.9MB per pass at 828x1792. And keep timeouts tight:
 in one 42-command tour, four 6000ms `wait_text` timeouts were 24 of the 26

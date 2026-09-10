@@ -99,18 +99,19 @@
 // every annotated row reports as drift. Ten rows did exactly that on
 // 2026-09-07 — all of them with byte-identical effect text.
 //
-// So a table-cell scrape is fine for short single-line properties (Name,
-// Rarity, STATUS, Tier) and WRONG for anything that may carry an appended
-// note. For those, read the property from the ROW PAGE instead:
+// RESOLVED 2026-09-09 — the per-row workaround below is no longer needed. The
+// table-view read path was fixed (notion-web's scripts/collect-cells.js keys on
+// data-row-index/data-col-index instead of splitting a row's innerText), and
+// with it the Artefacts section went from 11 findings to 0. Read the whole
+// table in one pass; do NOT open 180 row pages.
 //
-//   // on app.notion.com/p/<row-block-id>
+// Kept because the DOM fact is still true and still useful for WRITES: the
+// container two levels up from a text leaf is what you must CLICK to edit a
+// property — clicking the leaf focuses the page title instead.
+//
 //   const leaf = [...document.querySelectorAll('*')]
 //     .filter(e => /^<unique prefix>/.test((e.textContent||'').trim())).pop();
 //   const value = leaf.closest('[class*=x87ps6o]') || leaf.parentElement.parentElement;
-//   value.innerText   // newlines intact
-//
-// The same container, two levels up from the text leaf, is also what you must
-// CLICK to edit a property — clicking the leaf focuses the page title instead.
 //
 // Save as { "artefacts": [...], "items": [...], "pieces": [...], "tariffs": [...] }
 // keyed on the exact Notion column names. A partial snapshot is fine if you

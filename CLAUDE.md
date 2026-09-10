@@ -200,6 +200,14 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   "defensive rather than a fix for an observed fault". Ruled to KEEP, 2026-09-07 — a
   player staring at nothing has no way to report what went wrong. Named here so the next
   reviewer does not flag it again.
+- **DEVICE-TEST ON A SCENARIO BUILD, NEVER ON MAX'S LIVE SAVE.** On 2026-09-09 a device run
+  restored his real cloud-synced game (wave 8/150, score 6900) because that is what the app
+  does on launch, and a stray tap aimed at the Stock drawer landed on the board instead: a
+  piece deployed, Stock 22 -> 21, $435 -> $415, three turns elapsed. A legal move, but not his,
+  and it synced before anyone noticed. **It could not be reverted.** Drive device checks from
+  `--scenario` instead: `game.gd` guards the save path on `is_scenario`, so scenario runs do
+  not autosave and cannot touch a real run. Verify that guard held afterwards rather than
+  assuming it.
 - **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the
   headless sweeps: `godot --path game -s tests/test_menu_clicks.gd` and
   `-s tests/test_game_clicks.gd` (windowed — Godot headless still drops GUI picking, re-verified on 4.7).

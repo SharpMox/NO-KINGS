@@ -1,6 +1,6 @@
 extends SceneTree
 ## Endless-mode King branching: wave-50 win screen with Continue, wave-100
-## recurring King (bonus + refill, run continues), wave-150 full clear.
+## recurring King (bonus + refill, run continues), wave-200 full clear.
 ## Run headless:  godot --headless --path game -s tests/test_endless.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -103,12 +103,26 @@ func _init() -> void:
 	c.queue_free()
 	await process_frame
 
-	# --- wave-150 last King: full clear ends the run ---
-	var d := _boot(_king_cfg(150, 2))
+	# --- wave-200 last King: full clear ends the run ---
+	# Was wave 150 until the table grew to 200 (NO-7 slice 1). The FULL CLEAR
+	# branch keys off `wave >= Waves.WAVES.size()`, so it MOVES with the table
+	# rather than sitting on a literal — and the wave-150 King now behaves like
+	# any other recurring King, which is the point of the fourth King wave.
+	var d := _boot(_king_cfg(200, 3))
 	await process_frame
 	d._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(d.state == GameScript.State.GAME_OVER, "full clear: run over")
-	check(d.kings_defeated == 3, "full clear: three Kings defeated")
+	check(d.kings_defeated == 4, "full clear: four Kings defeated")
+
+	# ...and the wave-150 King no longer ends the run, which is the regression
+	# this slice could most plausibly have caused.
+	var e := _boot(_king_cfg(150, 2))
+	await process_frame
+	e._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(e.state == GameScript.State.PLAYER_TURN,
+		"wave-150 King no longer full-clears: the run continues to the 4th King")
+	e.queue_free()
+	await process_frame
 	d.queue_free()
 	await process_frame
 

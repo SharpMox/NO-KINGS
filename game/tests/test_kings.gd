@@ -107,6 +107,19 @@ func _init() -> void:
 	check(Kings.for_ordinal(line_up.order, 9) == "",
 		"past the line-up there is no King (wave 201 is Larry, parked)")
 
+	# NO-7 slice 1: the FOURTH King is reachable in real play at last. `order`
+	# has always been four long, but `_ordinal` counts King rosters in the wave
+	# table and the table had only three — so order[3] was never read and every
+	# run rolled, and SAVED, a fourth King it could not meet. This asserts
+	# through the public path (select at the wave) rather than the ordinal, so
+	# it fails if the wave-200 entry is ever dropped from the table.
+	var seeded := RandomNumberGenerator.new()
+	seeded.seed = 7
+	var lu: Dictionary = Kings.roll_run(seeded)
+	for pair in [[50, 0], [100, 1], [150, 2], [200, 3]]:
+		check(Kings.select(seeded, pair[0], lu.order).id == str(lu.order[pair[1]]),
+			"wave %d fights King %d of the line-up" % [pair[0], pair[1] + 1])
+
 	check(Kings.name_of("nero") == "Nero", "name_of resolves a known id")
 	check(Kings.name_of("") == "King", "name_of falls back on an unset id")
 	check(Kings.name_of("nonexistent") == "King", "name_of falls back on an unknown id")

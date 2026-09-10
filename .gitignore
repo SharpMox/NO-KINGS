@@ -50,3 +50,6 @@ game/android/
 # leak you rotate, it is a leak that hands over the ability to ship as you.
 *.keystore
 *.jks
+
+# written and removed by game/tests/run_all.sh around the touch-scroll probe
+game/override.cfg

@@ -64,6 +64,15 @@ run() {
 if [ "${1:-}" != "--headless" ]; then
 	run menu-clicks -s tests/test_menu_clicks.gd
 	run game-clicks -s tests/test_game_clicks.gd
+	# Touch-drag probe. ScrollContainer only drag-scrolls when the DisplayServer
+	# reports a touchscreen, which a desktop does only under this project
+	# setting — and Input has no runtime setter for it, so it goes through
+	# override.cfg for exactly this one run. The trap removes the file however
+	# the run ends: left behind, every later mouse click would also be a touch.
+	printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > override.cfg
+	trap 'rm -f override.cfg' EXIT
+	run touch-scroll -s tests/test_touch_scroll.gd
+	rm -f override.cfg
 else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
 fi

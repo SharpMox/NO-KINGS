@@ -66,13 +66,39 @@ func _click_ability(game: Node) -> bool:
 
 
 func _click(at: Vector2) -> void:
-	for pressed in [true, false]:
-		var ev := InputEventMouseButton.new()
-		ev.button_index = MOUSE_BUTTON_LEFT
-		ev.pressed = pressed
-		ev.position = at
-		ev.global_position = at
-		root.push_input(ev)
+	_press(at)
+	_release(at)
+
+
+## A press with NO release. A press-drag starts on button_down, so _click's
+## release would begin and end it inside one call and leave nothing to inspect.
+func _press(at: Vector2) -> void:
+	_mouse_button(at, true)
+
+
+func _release(at: Vector2) -> void:
+	_mouse_button(at, false)
+
+
+func _mouse_button(at: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = at
+	ev.global_position = at
+	root.push_input(ev)
+
+
+## The pool-strip rows of ONE section, in on-screen order: Stock (cap false) or
+## Captured (cap true). Re-read it after every refresh — the strip frees and
+## rebuilds its buttons, so a row held across one is a freed node.
+func _pool_rows(game: Node2D, cap: bool) -> Array:
+	var out := []
+	for c in game.pool_box.get_children():
+		if c is Button and not c.is_queued_for_deletion() \
+				and c.has_meta("cap") and bool(c.get_meta("cap")) == cap:
+			out.append(c)
+	return out
 
 
 ## Poll until the enemy turn hands control back (animations + ENEMY_TURN_PAUSE
@@ -107,7 +133,8 @@ func _init() -> void:
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
-		"captured": ["pawn", "pawn"],
+		"stock": ["pawn", "pawn"],   # the merge pair: Captured Stock cannot
+		"captured": ["pawn", "pawn"], # merge since 2026-09-10, Stock still can
 		"gold": 300, # issue 98: merging costs Gold, and this probe merges
 	}
 	# Hygiene fix, not the flake's cause (see _await_player_turn): every other
@@ -173,44 +200,85 @@ func _init() -> void:
 	check(game.board.has(Vector2i(2, 4)) and not game.board.has(recon_dest),
 		"an enemy recon selection can never be moved")
 
-	# Buttonless merging: dragging the captured pawn stack onto itself promotes
-	# the pair (same-stack pairs merge by drag; tap-again means deselect)
-	check(await _click_button_in(game.hud, "Stock 2"), "Stock button opens the drawer")
+	# CAPTURED STOCK is convert-and-sell only (user ruling 2026-09-10). Three of
+	# the reported problems are asserted here through real clicks: captured
+	# pieces are listed ONE PER PIECE rather than stacked; a captured entry
+	# carries no merge control and never lights up as a merge partner, even
+	# though the armed Stock stack below holds the very same piece id; and
+	# press-dragging one paints NO deploy targets on a board it can never be
+	# placed on. Deployable Stock is untouched, which the ▲ merge at the end
+	# of the block is here to prove.
+	check(await _click_button_in(game.hud, "Stock 4"), "Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock" and game.pool_box.is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
-	# issue 96 added a VSeparator + label before the Captured section, so the
-	# strip is no longer buttons-only — count the STACKS, not the children.
-	var pool_stacks: Array = game.pool_box.get_children().filter(
-		func(n: Node) -> bool: return n is Button)
-	check(pool_stacks.size() == 1, "2 captured pawns show as one stack")
-	var stack: Button = _first_pool_stack(game)
-	_click(stack.get_global_rect().get_center())
+	check(_pool_rows(game, false).size() == 1,
+		"2 Stock pawns still show as ONE stack — Stock stacking is unchanged")
+	var cap_rows: Array = _pool_rows(game, true)
+	check(cap_rows.size() == 2, "2 captured pawns are listed individually, NOT stacked")
+	# One control per captured entry and it is the ⇄ Convert badge: no ▲ merge,
+	# and no arming step to reveal it. Holding two of a piece used to hand that
+	# corner to ▲ and merge instead of converting (the user's report).
+	var cap_cost: int = Shop.convert_price(game, "pawn")
+	var cap_controls_ok := true
+	var cap_controls_seen := ""
+	for row in cap_rows:
+		var controls: Array = (row as Button).get_children().filter(
+			func(n: Node) -> bool: return n is Button)
+		for c in controls:
+			cap_controls_seen += (c as Button).text
+		if controls.size() != 1 or (controls[0] as Button).text != "⇄$%d" % cap_cost \
+				or (controls[0] as Button).disabled:
+			cap_controls_ok = false
+	check(cap_controls_ok,
+		"each captured entry carries exactly ONE live control, its priced ⇄ Convert badge (%s)"
+			% cap_controls_seen)
+	# BUG (user 2026-09-10): press-dragging a captured piece lit up every legal
+	# deploy tile. Assert the tile set _draw circles — the highlight the player
+	# actually sees — not the flag behind it.
+	var cap_at: Vector2 = (cap_rows[0] as Button).get_global_rect().get_center()
+	_press(cap_at)
+	await process_frame
+	check(game._deploy_highlight_tiles().is_empty(),
+		"press-dragging a captured entry paints NO deploy targets on the board")
+	_release(cap_at)
 	await process_frame
 	await process_frame
-	check(game.placing_id == "pawn" and game.placing_cap,
-		"tapping the stack arms it (no merge on tap — 2026-07-07)")
+	# CONTROL for the check above: arming the STOCK stack DOES paint them, in
+	# this same game state, so an empty highlight set means something.
+	var stock_stack: Button = _pool_rows(game, false)[0]
+	_click(stock_stack.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(not game._deploy_highlight_tiles().is_empty(),
+		"(control) arming the STOCK stack DOES paint them — the check above is not vacuous")
+	check(game.merge_highlights.has("pawn"),
+		"(control) 'pawn' is a highlighted merge-partner id while that stack is armed")
+	var cap_tint_ok := true
+	for row in _pool_rows(game, true):
+		if not (row as Button).modulate.is_equal_approx(Color(1.0, 0.8, 0.8)):
+			cap_tint_ok = false
+	check(cap_tint_ok,
+		"and a captured pawn keeps its warm tint — never gold, never a merge partner")
 	var badges: Array = []
-	for b in game.pool_box.get_children():
-		if b.is_queued_for_deletion():
-			continue
-		for c in b.get_children():
-			if c is Button and c.text.begins_with("▲"):
+	for row in _pool_rows(game, false):
+		for c in (row as Button).get_children():
+			if c is Button and (c as Button).text.begins_with("▲"):
 				badges.append(c)
-	check(not badges.is_empty(), "an armed promotable stack shows the ▲ button")
+	check(badges.size() == 1, "the armed STOCK stack shows the ▲ promote button")
 	# issue 97/98: the badge carries the merge's PRICE, on the control that
 	# starts the merge. Close Ranks does not make it free — that Power waives
 	# the Action only (merge_logic.can_afford_merge), so the Gold always shows.
-	check(badges[0].text == "▲$%d" % Tuning.MERGE_COST,
-		"and the ▲ badge shows what the merge costs (%s)" % badges[0].text)
+	check((badges[0] as Button).text == "▲$%d" % Tuning.MERGE_COST,
+		"and the ▲ badge shows what the merge costs (%s)" % (badges[0] as Button).text)
 	_click((badges[0] as Button).get_global_rect().get_center())
 	await process_frame
 	check(game.pending_merge.size() == 2, "the ▲ badge asks for merge confirmation")
-	check(game.captured.size() == 2, "nothing merges before confirmation")
+	check(game.stock.size() == 2, "nothing merges before confirmation")
 	check(await _click_button_in(game.hud, "Merge"), "confirm button clickable")
 	await process_frame
-	check(game.stock == ["sergeant"] and game.captured.is_empty(),
-		"confirming promotes the pawn pair into stock")
+	check(game.stock == ["sergeant"] and game.captured == ["pawn", "pawn"],
+		"confirming promotes the STOCK pawn pair and leaves Captured Stock untouched")
 
 	# PASS hands the turn over, banks the +5s turn bonus, and comes back
 	var clock_before: float = game.clock_ms
@@ -846,81 +914,87 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
 
-	# clearing the last enemy auto-passes the turn; first, confirm a captured
-	# stack arms (for a merge) but a Deploy-tile tap does NOT place it (issue
-	# 60 removed direct Captured Stock deploy — convert/sell live in the Shop
-	# drawer's Sell mode instead, exercised earlier in this file)
+	# clearing the last enemy auto-passes the turn; first, the two properties
+	# that need MORE THAN ONE captured piece to mean anything (user 2026-09-10):
+	# the section lists one row per piece with the MOST RECENT CAPTURE FIRST,
+	# and Convert works WITH A DUPLICATE HELD — the case that used to hand the
+	# badge's corner to ▲ and merge instead of converting.
 	game.queue_free()
 	await process_frame
-	GameScript.next_config = {"wave": 3, "captured": ["rook"], "gold": 100,
+	GameScript.next_config = {"wave": 3, "gold": 100,
+		"captured": ["rook", "bishop", "bishop"], # captured oldest -> newest
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Stock 1"), "Stock drawer opens")
+	check(await _click_button_in(game.hud, "Stock 3"), "Stock drawer opens")
 	await process_frame
 	# issue 96: Captured Stock is its own LABELLED section, not a tinted tail.
 	# The two pools obey different rules (a Captured entry can never be
-	# deployed, issue 60) and the only signals were a tint and a tooltip — and
-	# a tooltip does not exist on a phone, which is the target platform.
+	# deployed, issue 60, nor merged since 2026-09-10) and the only signals
+	# were a tint and a tooltip — and a tooltip does not exist on a phone,
+	# which is the target platform.
 	var pool_labels := ""
 	for c in game.hud.pool_box.get_children():
 		if c is Label:
 			pool_labels += c.text
 	check("CAPTURED" in pool_labels,
 		"the Captured section is labelled in the pool strip")
-	check("no deploy" in pool_labels,
-		"and the label carries the rule, not just the name")
-	var cap_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
-		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
-	_click(cap_stack.get_global_rect().get_center())
+	check("no deploy" in pool_labels and "⇄" in pool_labels,
+		"and the label carries the rule and the control, not just the name")
+	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST: the bishops were captured after
+	# the rook, so they sit above it — the reverse of g.captured's own order.
+	check(game.captured == ["rook", "bishop", "bishop"],
+		"(sanity) the run captured a rook, then two bishops, in that order")
+	var cap_order: Array = []
+	for row in _pool_rows(game, true):
+		cap_order.append(str((row as Button).get_meta("id")))
+	check(cap_order == ["bishop", "bishop", "rook"],
+		"the Captured section lists one row per piece, most recent first (%s)" % str(cap_order))
+	# tapping the entry arms nothing, so the board stays unlit and a following
+	# Deploy-tile tap has nothing to place
+	var cap_row: Button = _pool_rows(game, true)[0]
+	_click(cap_row.get_global_rect().get_center())
 	await process_frame
 	await process_frame
-	check(game.placing_id == "rook" and game.placing_cap, "captured stack arms placement")
+	check(game._deploy_highlight_tiles().is_empty(),
+		"tapping a captured entry paints no deploy targets")
 	_click(game._tile_px(Vector2i(5, 6)) + Vector2(game.tile, game.tile) / 2) # close drawer
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	check(not game.board.has(Vector2i(5, 0)) and game.captured == ["rook"] and game.placing_cap,
-		"tapping a Deploy tile no longer places a Captured stack — it stays armed, inert")
-	# 2026-09-06: a Convert control ON the armed Captured stack. Conversion lived
-	# only in the Shop's Sell mode, which issue 101 locks before Wave 5 — so at
-	# Wave 3 this rook could not be converted at all through the UI.
-	check(await _click_button_in(game.hud, "Stock 1"), "Stock drawer reopens")
+	check(not game.board.has(Vector2i(5, 0))
+			and game.captured == ["rook", "bishop", "bishop"],
+		"and a Deploy-tile tap after it places nothing — Captured Stock never deploys")
+	# 2026-09-06: a Convert control ON the captured entry. Conversion lived only
+	# in the Shop's Sell mode, which issue 101 locks before Wave 5 — so at Wave
+	# 3 these pieces could not be converted at all through the UI. 2026-09-10:
+	# it is on EVERY captured entry now, with no arming step and no ▲ merge to
+	# lose the corner to when a duplicate is held.
+	if game.drawer_open != "stock":
+		check(await _click_button_in(game.hud, "Stock 3"), "Stock drawer reopens")
+		await process_frame
 	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
-		# tap on the same stack inside it opens the piece preview, not the arm
-	cap_stack = game.pool_box.get_children().filter(func(b: Node) -> bool:
-		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
-	_click(cap_stack.get_global_rect().get_center())
-	await process_frame
-	await process_frame
+		# tap on the same entry inside it opens the piece preview instead
+	cap_row = _pool_rows(game, true)[0]
 	var convert_badge: Button = null
-	for c in game.pool_box.get_children():
-		for sub_c in c.get_children():
-			if sub_c is Button and (sub_c as Button).text.begins_with("⇄"):
-				convert_badge = sub_c
-	var badge_cost: int = Shop.convert_price(game, "rook")
+	for c in cap_row.get_children():
+		if c is Button and (c as Button).text.begins_with("⇄"):
+			convert_badge = c
+	var badge_cost: int = Shop.convert_price(game, "bishop")
 	check(convert_badge != null and convert_badge.is_visible_in_tree()
 			and convert_badge.text == "⇄$%d" % badge_cost and not convert_badge.disabled,
-		"an armed Captured stack shows its Convert badge, priced and live at Wave 3")
+		"a captured entry shows its Convert badge with no arming step, priced and live at Wave 3")
 	var gold_before_convert: int = game.gold
 	_click(convert_badge.get_global_rect().get_center())
 	await process_frame
 	await process_frame
-	check(game.captured.is_empty() and game.stock.has("rook")
-			and game.gold == gold_before_convert - badge_cost and not game.placing_cap,
-		"tapping Convert moves the rook to Stock, debits the convert price and disarms the stack")
+	check(game.captured == ["rook", "bishop"] and game.stock == ["bishop"]
+			and game.gold == gold_before_convert - badge_cost,
+		"Convert works with a DUPLICATE held: one bishop moves to Stock, priced, nothing merges")
 	_click(game._tile_px(Vector2i(5, 6)) + Vector2(game.tile, game.tile) / 2) # close drawer
 	await process_frame
-	# still armed (nothing clears it on a rejected deploy, same as any other
-	# invalid tap on an armed stack) — deselect directly, same effect as
-	# tapping the same stack again (exercised on regular Stock earlier in
-	# this file), before the wave-clear check below
-	game.placing_id = ""
-	game.placing_cap = false
-	game._clear_selection()
-	game._refresh()
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
@@ -1234,10 +1308,14 @@ func _init() -> void:
 	await process_frame
 	check(not game.modals.shop_sell_mode, "the Shop drawer is back in Buy mode")
 
-	# Direct deploy is gone (issue 60): arm the drawer's Captured stack (the
-	# same tap that used to arm a deploy) and confirm tapping a Deploy tile
-	# does nothing — only merge/convert/sell remain.
+	# Direct deploy is gone (issue 60) and so is the merge (2026-09-10): the tap
+	# that used to arm a Captured stack arms nothing now, so a following
+	# Deploy-tile tap has nothing to place. Driven through the REAL tap rather
+	# than by setting the armed flags — there are none left to set — and paired
+	# with the Stock control, because "nothing was placed" is also what a tap
+	# swallowed by the open Shop panel would look like.
 	game.stock.append("pawn") # a fresh Stock piece so the drawer has both
+	game.captured.append("pawn") # the Convert above emptied Captured Stock
 	game._refresh()
 	var deploy_target := Vector2i(-1, -1)
 	for t in game._deploy_tiles():
@@ -1245,14 +1323,18 @@ func _init() -> void:
 			deploy_target = t
 			break
 	check(deploy_target.x >= 0, "(sanity) an open Deploy tile exists")
-	game.placing_id = "pawn"
-	game.placing_cap = true
-	game.armed_entry = "pawn"
+	game._on_stack_pressed("pawn", true, 1)
+	check(game._deploy_highlight_tiles().is_empty(),
+		"tapping a Captured entry paints no deploy targets")
 	game._on_tile_clicked(deploy_target)
-	check(not game.board.has(deploy_target),
-		"tapping a Deploy tile with a Captured stack armed no longer deploys it")
-	game.placing_id = ""
-	game.placing_cap = false
+	check(not game.board.has(deploy_target) and game.captured == ["pawn"],
+		"and a Deploy-tile tap after it deploys nothing")
+	game._on_stack_pressed("pawn", false, 1) # the Stock pawn, same two calls
+	check(not game._deploy_highlight_tiles().is_empty(),
+		"(control) the Stock entry DOES arm and light the board")
+	game._on_tile_clicked(deploy_target)
+	check(game.board.has(deploy_target) and game.board[deploy_target].id == "pawn",
+		"(control) and the very same Deploy-tile tap deploys a STOCK piece")
 
 	# Jet Fuel Vial (issue 52): a Shop-only control, restock button appears
 	# only while it's held — confirm-gated, same as every untargeted

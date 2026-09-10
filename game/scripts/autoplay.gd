@@ -180,10 +180,11 @@ static func try_shop(g) -> bool:
 	return false
 
 
-## issue 103: Captured Stock -> Stock. Captured pieces can merge but never
-## deploy (issue 60), so a bot with an empty Stock and a full Captured Stock is
-## out of deployable material while holding the cure. Costs Gold, which is
-## exactly the point — it is the other half of the same starvation.
+## issue 103: Captured Stock -> Stock. Captured pieces can neither deploy
+## (issue 60) nor merge (2026-09-10), so a bot with an empty Stock and a full
+## Captured Stock is out of deployable material while holding the cure. Costs
+## Gold, which is exactly the point — it is the other half of the same
+## starvation, and converting is now the ONLY way out of it.
 static func try_convert(g) -> bool:
 	if not g.stock.is_empty() or g.captured.is_empty():
 		return false
@@ -253,11 +254,10 @@ static func try_activate_army_ability(g) -> bool:
 
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.
 static func try_merge(g) -> bool:
+	# Stock only: Captured Stock cannot merge (2026-09-10), it converts or sells
 	var units := []
 	for e in g.stock:
-		units.append({"id": (e if e is String else e.id), "cap": false, "entry": e})
-	for id in g.captured:
-		units.append({"id": id, "cap": true, "entry": id})
+		units.append({"id": (e if e is String else e.id), "entry": e})
 	for i in units.size():
 		for j in range(i + 1, units.size()):
 			if MergeLogic.pair_ok(g, units[i].id, units[j].id):

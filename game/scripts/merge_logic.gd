@@ -9,9 +9,9 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
 
 
-## The piece the current selection would merge FROM: an armed pool stack
-## (placing_id, stock or captured), a mid-drag stack, or the selected board
-## piece. "" when nothing is selected.
+## The piece the current selection would merge FROM: an armed Stock stack
+## (placing_id), a mid-drag Stock stack, or the selected board piece. "" when
+## nothing is selected. Captured Stock is never any of them (2026-09-10).
 static func origin_id(g) -> String:
 	if g.pool_drag_id != "":
 		return g.pool_drag_id
@@ -54,7 +54,9 @@ static func partner_ids(g) -> Dictionary:
 			or (g.actions_left <= 0 and not Armies.merge_free(g)) \
 			or not can_afford_merge(g): # Close Ranks (67)
 		return out
-	var all: Array = g._pool()
+	# STOCK ONLY, never g._pool(): a captured piece cannot merge (2026-09-10),
+	# so highlighting it as a partner would offer an action that is refused.
+	var all: Array = g.stock.duplicate()
 	for pos in g._player_pieces():
 		all.append(g.board[pos].id)
 	var counts := {}
@@ -111,12 +113,13 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 			state.erase("owner")
 			consumed_states.append(state.id if state.size() == 1 else state)
 			g.board.erase(ref)
-		else: # a unit from a stack: remove one copy by value — the exact entry,
-			# so a stateful copy is consumed and its state discarded (ADR-0002).
-			# `ref.entry` (or the bare id, same fallback the erase below uses)
-			# is already Stock-shaped — no owner field to strip.
+		else: # a unit from a Stock stack: remove one copy by value — the exact
+			# entry, so a stateful copy is consumed and its state discarded
+			# (ADR-0002). `ref.entry` (or the bare id, same fallback the erase
+			# below uses) is already Stock-shaped — no owner field to strip.
+			# Stock is the only pool a unit can come from since 2026-09-10.
 			consumed_states.append(ref.get("entry", ref.id))
-			(g.captured if ref.cap else g.stock).erase(ref.get("entry", ref.id))
+			g.stock.erase(ref.get("entry", ref.id))
 	if not Armies.merge_free(g): # Close Ranks (The Muster, issue 67)
 		g.actions_left -= 1
 	Economy.spend_gold(g, Tuning.MERGE_COST) # issue 98: Close Ranks waives the
@@ -146,7 +149,6 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	ArtefactHooks.run(g, "on_fuse", {"a_id": ids[0], "b_id": ids[1]})
 	Economy.charge(g, "fuse_cost")
 	g.placing_id = ""
-	g.placing_cap = false
 	g._clear_selection()
 	if (g.actions_left == 0 and not Armies.merge_free(g)) or g._board_cleared():
 		# last action spent on the merge — Close Ranks (67) never spends one,

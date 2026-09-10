@@ -639,6 +639,19 @@ func _ready() -> void:
 	# issue 77: vertical only — a long scenario name must wrap or clip, never
 	# push the list sideways
 	test_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# 2026-09-10 (Max, on the phone: "I can't scroll the test menu list ...
+	# using touchscreen"). Every row here is a Button, and a Button's default
+	# mouse_filter is STOP: Viewport::_gui_call_input marks a pointer press
+	# handled at a STOP control and stops climbing, so the press never reached
+	# this ScrollContainer and its touch-drag never started (Godot 4.7,
+	# scroll_container.cpp: drag_touching is set in the press branch, motion is
+	# ignored without it). The Guide panel drags fine because its body is a
+	# Label. So the buttons below PASS instead, and this deadzone keeps a
+	# slightly-moving tap a tap: past it the container fires
+	# NOTIFICATION_SCROLL_BEGIN and BaseButton drops its press attempt, which is
+	# how a drag that starts on a row scrolls instead of launching a scenario.
+	# Regression probe: tests/test_touch_scroll.gd. UNVERIFIED ON DEVICE.
+	test_scroll.scroll_deadzone = 24
 	# 2026-09-06 (user: "horrible to use, scrolls awkwardly, x overflows"). The
 	# list now runs nearly edge to edge; every row is a full-width button that
 	# CLIPS with an ellipsis instead of pushing past the right edge; rows drop
@@ -660,9 +673,10 @@ func _ready() -> void:
 	head.text = "Test scenarios — %d boards" % Scenarios.all().size()
 	head.add_theme_font_size_override("font_size", 22)
 	test_box.add_child(head)
-	_button(test_box, "← Back", 20, func() -> void:
+	var back := _button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
+	back.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 	# issue 77: 53 scenarios in one flat column is unscannable. Sections are
 	# DERIVED from the names rather than stored, so scenarios.gd is untouched
 	# and anything added later groups itself by how it is named.
@@ -729,6 +743,7 @@ func _ready() -> void:
 		sec_head.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		sec_head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sec_head.custom_minimum_size = Vector2(0, 44) # a thumb-sized row
+		sec_head.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 		sec_head.add_theme_font_size_override("font_size", 16)
 		sec_head.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
 		for style in ["normal", "hover", "pressed"]:
@@ -748,6 +763,7 @@ func _ready() -> void:
 			row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.custom_minimum_size = Vector2(0, 40)
+			row.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 			row.tooltip_text = s.name
 			for style in ["normal", "hover", "pressed"]:
 				row.add_theme_stylebox_override(style, row_style)

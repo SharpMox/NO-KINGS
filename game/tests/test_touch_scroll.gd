@@ -1,0 +1,160 @@
+extends SceneTree
+## Touch-drag probe for the TEST menu's scenario list. Needs a window AND
+## touch emulation — run it through run_all.sh, or by hand with:
+##   printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > game/override.cfg
+##   godot --path game -s tests/test_touch_scroll.gd; rm game/override.cfg
+##
+## Why the override: ScrollContainer::gui_input (Godot 4.7) returns before its
+## drag branch unless DisplayServer.is_touchscreen_available(), which on a desktop
+## is only true while emulate_touch_from_mouse is on, and Input exposes no setter
+## for it. Without the override this probe cannot go red, so it refuses to run
+## rather than pass vacuously.
+##
+## The bug (2026-09-10, Max on the Nothing Phone 2a): dragging the list did
+## nothing at all, no snap-back, while a tap on the scrollbar groove paged. The
+## rows are Buttons, whose default mouse_filter is STOP; Viewport::_gui_call_input
+## marks a pointer press handled at a STOP control, so the press never reached
+## the ScrollContainer and drag_touching never started. The assertion below is
+## the observable consequence — the scroll offset moved — never a flag.
+
+const Settings := preload("res://scripts/settings.gd")
+const Account := preload("res://scripts/account.gd")
+
+var fails := 0
+# A member, not a local: a GDScript lambda captures locals BY VALUE, so a
+# `fired = true` inside one never reaches the probe — the first cut of this
+# file passed "a drag does not press the row" vacuously that way.
+var fired := false
+
+
+func _on_row_pressed() -> void:
+	fired = true
+
+
+func check(cond: bool, label: String) -> void:
+	if not cond:
+		push_error("FAIL: " + label)
+		fails += 1
+	else:
+		print("ok: " + label)
+
+
+func _find_button(node: Node, text: String) -> Button:
+	if node is Button and node.text == text and node.is_visible_in_tree():
+		return node
+	for c in node.get_children():
+		var hit := _find_button(c, text)
+		if hit:
+			return hit
+	return null
+
+
+func _mouse(pressed: bool, at: Vector2) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = at
+	ev.global_position = at
+	root.push_input(ev)
+
+
+## A finger drag: press, several motion steps with the button held, release.
+func _drag(from: Vector2, step: Vector2, steps: int) -> void:
+	_mouse(true, from)
+	await process_frame
+	var at := from
+	for i in steps:
+		at += step
+		var mm := InputEventMouseMotion.new()
+		mm.position = at
+		mm.global_position = at
+		mm.relative = step
+		mm.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(mm)
+		await process_frame
+	_mouse(false, at)
+	await process_frame
+
+
+func _init() -> void:
+	create_timer(60.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: probe still running after 60s — force quit")
+		quit(1))
+	if not DisplayServer.is_touchscreen_available():
+		push_error("FAIL: touch emulation is off — this probe needs game/override.cfg (see header)")
+		quit(1)
+		return
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
+	Account._reset_cache()
+	Account.start_guest()
+	var menu: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+
+	var test_btn := _find_button(menu, "TEST")
+	check(test_btn != null, "TEST button visible")
+	_mouse(true, test_btn.get_global_rect().get_center())
+	_mouse(false, test_btn.get_global_rect().get_center())
+	await process_frame
+	var scroll: ScrollContainer = menu.test_scroll
+	check(scroll.visible, "TEST opens the scenario list")
+
+	# Open the LAST section so the list overflows the viewport, then drag on a
+	# visible scenario ROW — a real finger lands on rows, not on gaps.
+	var headers: Array[Button] = []
+	for c in scroll.get_child(0).get_children():
+		if c is Button and c.text.begins_with("▸"):
+			headers.append(c)
+	var last_head: Button = headers[headers.size() - 1]
+	_mouse(true, last_head.get_global_rect().get_center())
+	_mouse(false, last_head.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(scroll.get_v_scroll_bar().max_value > scroll.size.y,
+		"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
+	var row: Button = null
+	for c in scroll.get_child(0).get_children():
+		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back":
+			var r: Rect2 = c.get_global_rect()
+			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
+				row = c
+				break
+	check(row != null, "a scenario row is on screen to drag on")
+	fired = false
+	row.pressed.connect(_on_row_pressed)
+
+	var before: float = scroll.scroll_vertical
+	await _drag(row.get_global_rect().get_center(), Vector2(0, -30), 6)
+	check(scroll.scroll_vertical > before,
+		"dragging up on a row scrolls the list (offset %d -> %d)" % [before, scroll.scroll_vertical])
+	check(not fired, "a drag does not press the row it started on")
+
+	# A plain tap must still press the row (the deadzone keeps taps as taps).
+	# The list is still decelerating after the drag; wait for it to stop, then
+	# re-find a row that is on screen now.
+	var last_off := -1.0
+	for i in 120:
+		if scroll.scroll_vertical == last_off:
+			break
+		last_off = scroll.scroll_vertical
+		await process_frame
+	fired = false
+	row = null
+	for c in scroll.get_child(0).get_children():
+		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back":
+			var r: Rect2 = c.get_global_rect()
+			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
+				row = c
+				break
+	check(row != null, "a scenario row is on screen to tap")
+	row.pressed.connect(_on_row_pressed)
+	_mouse(true, row.get_global_rect().get_center())
+	await process_frame
+	_mouse(false, row.get_global_rect().get_center())
+	await process_frame
+	check(fired, "a tap still presses the row")
+
+	if fails == 0:
+		print("ALL GREEN (touch-scroll probe)")
+	quit(0 if fails == 0 else 1)

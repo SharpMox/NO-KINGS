@@ -21,6 +21,7 @@
 ## by Play Games means nothing to Game Center and vice versa.
 
 const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
+const IOS := preload("res://scripts/cloud/cloud_backend_ios.gd")
 
 ## Logical board names. The platform backends map these to their own ids.
 ## One board today; the other two candidates (Deepest Wave, Kings Defeated) are
@@ -42,22 +43,28 @@ static var submits := 0
 
 ## Per platform, the same shape cloud_save.gd's _default_backend() uses.
 ##
-## iOS deliberately has NO board backend yet: Game Center's leaderboard needs an
-## App Store Connect entry, gated on the paid Apple account (NO-14). Returning
-## null here rather than letting iOS fall through to Play Games is the
-## difference between "no board on iOS" and "silently asking Google about an
-## iOS player" — the second is the kind of wrong that looks fine in every test
-## and only shows up as an empty board on a real device.
+## iOS is wired here as of 2026-09-10, and it still reports no board — because
+## its LEADERBOARD_HIGH_SCORE is empty until Apple issues the id, and its
+## board_available() says so. That is deliberately a different mechanism from
+## the `return null` this used to do: null meant "this platform has no backend",
+## which stopped being true once the Game Center one existed, and it would have
+## made the id landing a two-file change. The property that mattered about the
+## null is kept either way — iOS never falls through to Play Games, so we never
+## silently ask Google about an iOS player, the kind of wrong that looks fine in
+## every test and shows up as an empty board on a real device.
 static func _backend():
 	match OS.get_name():
 		"Android":
 			return PlayGames
+		"iOS":
+			return IOS
 	return null
 
 
-## Is there a platform board to talk to? False on desktop, false on iOS until
-## Game Center's board exists, and false on Android until the player is signed
-## in — a board with no account behind it has nothing to post to.
+## Is there a platform board to talk to? False on desktop (no backend), false
+## on iOS until Game Center's board id exists, and false on either platform
+## until the player is signed in — a board with no account behind it has nothing
+## to post to.
 static func available() -> bool:
 	var b = _backend()
 	return b != null and b.board_available()

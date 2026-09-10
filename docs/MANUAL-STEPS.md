@@ -425,12 +425,38 @@ rewrite** (2026-09-10):
 **Membership: enrolled.** Team ID `DGT6GH7583`, **Organization**. The Team ID is public and is
 already in `game/export_presets.cfg` — no placeholder left.
 
+### The exact values you will be asked for
+
+Same shape as section A's Android table. **All four are PUBLIC identifiers** — they belong in
+the repo. The secrets in this area are the Apple ID password, 2FA codes, an App Store Connect
+API key's `.p8` and any exported `.p12`; none of those go in a file.
+
+| Field | Value | Where it came from |
+| --- | --- | --- |
+| Bundle identifier | `com.sharpunk.nokings` | user ruling 2026-09-02: match Android |
+| Team ID | `DGT6GH7583` | Apple Developer -> Membership details |
+| Enrolment type | **Organization** (Sharpunk) | decides that a D-U-N-S applies — see A-bis |
+| **App Store listing name** | **`NO KINGS: Chess Riot`** | App Store Connect app record |
+| **ASC app Apple ID** | **`6810748568`** | App Store Connect, after the record propagated |
+
+> **The App Store listing name is NOT the in-game title.** The game is `NO KINGS`; the store
+> listing had to be `NO KINGS: Chess Riot` because `NO KINGS` alone was already taken by
+> another app. Expect them to differ, and do not "fix" one to match the other.
+
+The ASC app Apple ID is the number App Store Connect issues for the app record itself — needed
+for uploads and for ASC URLs. It is **not** the Game Center Leaderboard ID (still outstanding,
+D1 step 3) and **not** the bundle id.
+
 ### D1. Records only you can create (App Store Connect / developer.apple.com, GUI)
 
-1. **The app record.** App Store Connect -> create the app. Name `No Kings`, platform iOS,
-   bundle id **`com.sharpunk.nokings`** (user ruling 2026-09-02: match Android — bundle ids are
-   as permanent as Android's), SKU anything, primary language. Then send the app's **Apple ID
-   number** (public).
+1. ~~**The app record.**~~ **DONE 2026-09-10.** `NO KINGS: Chess Riot`, iOS 1.0, status
+   *Prepare for Submission*, Apple ID `6810748568` — in the table above.
+   Worth keeping the one lesson: **the record did not appear for ~90 minutes.** App Store
+   Connect's Apps page rendered blank, the bundle id vanished from the New App dropdown, and
+   `/iris/v1/apps` returned an authenticated `200` with **zero** records — which was the truth,
+   not a false negative. It propagated on its own with no Support ticket (NO-51). So if a
+   freshly created record is missing: **trust the API and wait**, do not distrust the
+   instrument.
 2. **Capabilities on the identifier.** developer.apple.com -> Identifiers -> that bundle id ->
    enable **Game Center** and **iCloud (Key-Value storage)**. KV needs no container; the
    entitlement is `com.apple.developer.ubiquitous-key-value-store`.

@@ -174,6 +174,9 @@ func _run(line: String) -> void:
 			if c == null:
 				return _fail(verb, "no visible control with text '%s'" % s)
 			var at := c.get_global_rect().get_center()
+			var why := _unreachable(at)
+			if why != "":
+				return _fail(verb, "'%s' %s" % [s, why])
 			_touch(at, true)
 			await _frames(2)
 			_touch(at, false)
@@ -192,6 +195,9 @@ func _run(line: String) -> void:
 			if c == null:
 				return _fail(verb, "no visible control with text '%s'" % parts[0])
 			var from := c.get_global_rect().get_center()
+			var why_from := _unreachable(from)
+			if why_from != "":
+				return _fail(verb, "'%s' %s" % [parts[0], why_from])
 			var to := from + Vector2(float(parts[1]), float(parts[2]))
 			await _drag(from, to)
 			_ok(verb, "'%s' %d,%d -> %d,%d" % [parts[0], from.x, from.y, to.x, to.y])
@@ -313,6 +319,25 @@ func _to_window(at: Vector2) -> Vector2:
 		return at
 	var win := Vector2(DisplayServer.window_get_size())
 	return at * (win / vp)
+
+
+## A control found BY TEXT can be scrolled out of view, and its centre is then a
+## point no finger could reach. Injecting there and reporting `ok` is this repo's
+## "a click that does nothing proves nothing" trap living inside the harness, so
+## the verbs that compute their own target refuse instead and say where it was.
+##
+## Measured 2026-09-10 on both platforms: the Guide's "← Back" is the last child
+## of a ScrollContainer, so unscrolled it sits at y=1179 while the viewport ends
+## at 1038 (iPhone 11) or 800 (desktop). `tap_text "← Back"` reported
+## `ok … at 239,1179`, nothing happened, and the screen never changed — which I
+## first read as the button being broken rather than as never having been hit.
+## Returns "" when the point is fine, else the reason to fail with.
+func _unreachable(at: Vector2) -> String:
+	var vp := get_viewport().get_visible_rect()
+	if vp.has_point(at):
+		return ""
+	return "centre %d,%d is outside the %dx%d viewport, so the event cannot land — scroll it into view first" % [
+		at.x, at.y, vp.size.x, vp.size.y]
 
 
 ## ScreenTouch, not a mouse event: the questions this exists for are about TOUCH

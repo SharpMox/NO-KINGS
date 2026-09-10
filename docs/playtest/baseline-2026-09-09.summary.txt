@@ -1,0 +1,44 @@
+90 runs from docs/playtest/baseline-2026-09-09.csv  (2 outlived the step cap — unresolved, not losses)
+
+LEVERAGE USE  (runs that used it at all / total, and the median when used)
+  shop_open            0.0%  median      0   (UI counter — bot buys via Shop.buy, not the panel)
+  shop_buy            93.3%  median     11
+  sell                48.9%  median      6
+  convert             97.8%  median     11
+  item_use            81.1%  median      3
+  artefact_activate    6.7%  median      1
+  army_ability       100.0%  median      9
+  merge               45.6%  median      4
+  deploy              98.9%  median     30
+  buff_apply          34.4%  median     33
+  capture             98.9%  median     20
+
+  26 runs died of resource starvation, holding a median of 0 Gold
+  median Gold unspent at run end, all runs: 0
+
+BY TIER
+  tier         runs    wins median wave median score
+  Tier 1         18       2        19.5        4150
+  Tier 2         18       2        19.5        4150
+  Tier 3         18       4        29.5        8080
+  Tier 4         18    2+2c        24.0        3450
+  Tier 5         18       0         8.0         600
+
+BY ARMY
+  army         runs    wins median wave median score
+  Crown          15       0        17.0        3200
+  Cult           15       1        18.0        3600
+  Horde          15    1+1c        28.0        4000
+  Old Guard      15    8+1c        51.0       67900
+  Syndicate      15       0        16.0        1300
+  Wild Hunt      15       0        20.0        3000
+
+HOW RUNS END
+  LOSS  Back-row breach                  52
+  LOSS  Resource starvation              26
+  WIN   Wave-51 King checkmated          4
+  WIN   Wave-52 King checkmated          2
+  WIN   Wave-58 King checkmated          2
+  CAP   Outlived the step cap            2
+  WIN   Wave-53 King checkmated          1
+  WIN   Wave-56 King checkmated          1

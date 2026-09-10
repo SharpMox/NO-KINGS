@@ -1,6 +1,6 @@
 extends SceneTree
 ## Endless-mode King branching: wave-50 win screen with Continue, wave-100
-## recurring King (bonus + refill, run continues), wave-200 full clear.
+## recurring King (bonus + refill, run continues), Larry's wave-201 full clear.
 ## Run headless:  godot --headless --path game -s tests/test_endless.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -103,26 +103,28 @@ func _init() -> void:
 	c.queue_free()
 	await process_frame
 
-	# --- wave-200 last King: full clear ends the run ---
-	# Was wave 150 until the table grew to 200 (NO-7 slice 1). The FULL CLEAR
-	# branch keys off `wave >= Waves.WAVES.size()`, so it MOVES with the table
-	# rather than sitting on a literal — and the wave-150 King now behaves like
-	# any other recurring King, which is the point of the fourth King wave.
-	var d := _boot(_king_cfg(200, 3))
+	# --- LARRY at 201: beating him is the full clear ---
+	# The FULL CLEAR branch keys off `wave >= Waves.WAVES.size()`, so it MOVES
+	# with the table instead of sitting on a literal. Larry being the LAST entry
+	# is therefore the whole implementation of "Larry owns the ending" — game.gd
+	# is untouched. It was wave 150 before slice 1 and wave 200 between them.
+	var d := _boot(_king_cfg(201, 4))
 	await process_frame
 	d._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(d.state == GameScript.State.GAME_OVER, "full clear: run over")
-	check(d.kings_defeated == 4, "full clear: four Kings defeated")
+	check(d.kings_defeated == 5, "full clear: four Kings and Larry")
 
-	# ...and the wave-150 King no longer ends the run, which is the regression
-	# this slice could most plausibly have caused.
-	var e := _boot(_king_cfg(150, 2))
-	await process_frame
-	e._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(e.state == GameScript.State.PLAYER_TURN,
-		"wave-150 King no longer full-clears: the run continues to the 4th King")
-	e.queue_free()
-	await process_frame
+	# ...and neither earlier King ends the run any more. These are the two
+	# regressions this pair of slices could most plausibly have caused, so both
+	# are asserted rather than reasoned about.
+	for pair in [[150, 2], [200, 3]]:
+		var e := _boot(_king_cfg(pair[0], pair[1]))
+		await process_frame
+		e._move_player(Vector2i(2, 2), Vector2i(2, 3))
+		check(e.state == GameScript.State.PLAYER_TURN,
+			"the wave-%d King no longer full-clears: the run continues" % pair[0])
+		e.queue_free()
+		await process_frame
 	d.queue_free()
 	await process_frame
 

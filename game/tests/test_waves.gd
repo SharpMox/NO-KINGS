@@ -39,16 +39,20 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 
 
 func _init() -> void:
-	check(Waves.WAVES.size() == 200, "150 designed waves + the generated tail to 200")
+	check(Waves.WAVES.size() == 201, "150 designed waves + the generated tail through Larry at 201")
 
-	# Kings at 50/100/150/200, with the catalog escorts. The loop below keys on
-	# `n % 50 == 0`, so the fourth King wave satisfies it without a special case.
+	# Kings at 50/100/150/200, plus LARRY at 201 — the one King wave that is not
+	# a multiple of 50, because he sits outside the 4x4 cast (NO-7).
 	for n in range(1, Waves.WAVES.size() + 1):
 		var has_king: bool = Waves.WAVES[n - 1].has("king")
-		if n % 50 == 0:
+		if n % 50 == 0 or Waves.is_larry_wave(n):
 			check(has_king, "wave %d is a King wave" % n)
 		elif has_king:
 			check(false, "unexpected king in wave %d" % n)
+	check(Waves.is_larry_wave(Waves.WAVES.size()),
+		"Larry is the LAST wave — that is what hands FULL CLEAR to him, via " \
+		+ "`wave >= WAVES.size()`, with no change to game.gd")
+	check(Waves.WAVES[Waves.LARRY_WAVE - 1].size() == 6, "wave 201: Larry + 5 escorts")
 	check(Waves.WAVES[49].size() == 5, "wave 50: King + 4 escorts")
 	check(Waves.WAVES[99].size() == 5, "wave 100: King + 4 escorts")
 	check(Waves.WAVES[149].size() == 6, "wave 150: King + 5 escorts")
@@ -82,7 +86,7 @@ func _init() -> void:
 
 	var counts_ok := true
 	var repeats_ok := true
-	for n in range(151, 200):
+	for n in range(151, 200): # 200 and 201 are King waves, checked above
 		var roster: Array = Waves.WAVES[n - 1]
 		counts_ok = counts_ok and roster.size() >= 3 and roster.size() <= 8
 		for id in roster: # BOARD_W is 8; a wider wave only spills to next turn

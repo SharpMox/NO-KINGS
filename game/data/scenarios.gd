@@ -76,23 +76,30 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 1, 4, 4], ["rook", 1, 5, 6]],
 			"items": ["blitz"], "artefacts": ["stargate-divination-crystal"], "score": 200, "wave": 3}},
 		# win-screen tests: King one queen-move away, capture it to trigger the
-		# screen — wave 50 = Continue/End Run, wave >= 200 = FULL CLEAR game over.
+		# screen — wave 50 = Continue/End Run, wave >= 201 = FULL CLEAR game over.
 		#
-		# The "@ wave 200" below was NOT reachable until NO-7 slice 1. The table
-		# stopped at 150, so `wave: 200` satisfied `wave >= WAVES.size()` and the
-		# scenario exercised the FULL CLEAR branch at a wave real play could never
-		# arrive at — passing, but for the wrong reason. The comment above tracked
-		# the truncation ("wave >= 150") and the scenario NAME did not, which is
-		# how the two drifted apart unnoticed. It is honest now.
+		# The full-clear entry below was named "@ wave 200" and set `wave: 200`
+		# against a table that stopped at 150. That satisfied
+		# `wave >= WAVES.size()`, so it exercised the FULL CLEAR branch at a wave
+		# real play could never arrive at — passing, but for the wrong reason.
+		# The comment above tracked the truncation ("wave >= 150") and the
+		# scenario NAME did not, which is how the two drifted apart unnoticed.
+		# The lesson generalises: a name that drifts from what a test actually
+		# exercises hides a test that has stopped testing anything. It names
+		# Larry's wave now, and that wave exists.
 		{"name": "Win screen: wave 50 (capture King)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
 			"wave": 50, "score": 1000}},
 		{"name": "Win screen: named King (identity, issue 09)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10, {"king_id": "nero"}]],
 			"wave": 50, "score": 1000}},
-		{"name": "Win screen: full clear @ wave 200 (capture King)", "cfg": {
+		{"name": "Win screen: full clear @ wave 201 (capture Larry)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
-			"wave": 200, "score": 5000}},
+			"wave": 201, "score": 5000}},
+		{"name": "Larry: wave 201, the 17th boss and the full clear", "cfg": {
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10, {"king_id": "larry"}],
+				["godzilla", 1, 2, 10], ["amazon", 1, 4, 10]],
+			"wave": 201, "kings_defeated": 4, "score": 9000}},
 		{"name": "King wave 200 (the 4th King — order[3], reachable at last)", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1],
 				["king", 1, 3, 10], ["godzilla", 1, 2, 10], ["raven", 1, 4, 10]],

@@ -38,9 +38,18 @@ lipo -create libgodot.ios.debug.xcframework/ios-arm64_x86_64-simulator/libgodot.
 zip -q "$T/ios.zip" "libgodot.ios.debug.xcframework/ios-arm64_x86_64-simulator/libgodot.a"
 ```
 
-Repeat with `target=template_release` against the release xcframework when a
-release simulator build is ever needed (device builds are unaffected — the
-device slices were always correct).
+DONE FOR RELEASE TOO (2026-09-10). Confirmed the defect rather than trusting
+this note: the installed 4.7.stable `libgodot.ios.release.xcframework/
+ios-arm64_x86_64-simulator/libgodot.a` was `lipo -archs` **x86_64 only**, same
+mislabelling as the debug slice. Built `target=template_release arch=arm64
+ios_simulator=yes` (3m50s) and fattened it; both slices now read
+`x86_64 arm64`, re-read out of the installed zip. Device builds were never
+affected — the device slices were always correct.
+
+**Do NOT re-run the `cp "$T/ios.zip" "$T/ios.zip.orig"` line above.**
+`ios.zip.orig` already holds the PRISTINE upstream zip from before the debug
+patch. The live `ios.zip` is patched, so copying it over the backup destroys
+the only way back to an unmodified template.
 
 ## Simulator builds (no paid account needed)
 
@@ -57,7 +66,47 @@ xcodebuild -project nokings.xcodeproj -scheme nokings -sdk iphonesimulator \
 with an entitlements plist carrying `com.apple.developer.ubiquity-kvstore-identifier`
 (= the bundle id) and `com.apple.developer.game-center`. Verified on the
 simulator 2026-09-04: the iCloud store registers, syncs with a signed-in
-iCloud account, and values survive relaunches. **Game Center is the one thing
-the simulator cannot test**: GameKit refuses to load its services without a
-real provisioning profile — that wall is exactly where the paid developer
-account starts being necessary.
+iCloud account, and values survive relaunches.
+
+**GAME CENTER WORKS HERE TOO** — and the sentence that used to sit in this spot
+saying it could not, "GameKit refuses to load its services without a real
+provisioning profile, that wall is exactly where the paid developer account
+starts being necessary", is RETRACTED. Archive issue 87 retracted it on
+2026-09-04 and this file was never updated (found 2026-09-10). It came from a
+log line — *"Could not load services... missing the
+com.apple.developer.game-center entitlement"* — captured BEFORE that
+entitlement was added and never re-tested after; the message named its own fix
+and was read as a verdict. With the entitlement present (ad-hoc simulator
+signing carries it, which is the whole reason the two `CODE_SIGN_*` flags above
+are set the way they are) `authenticate()` returns `result: "ok"` with a real
+player id and an alias, on the free simulator, with no paid account.
+
+What the paid membership actually buys is a **signed build on a physical device
+and the store** — not a first login. What the simulator still cannot do is
+device provisioning itself, which is the point of the remaining iOS gates
+(docs/MANUAL-STEPS.md section D3).
+
+### The exporter writes the entitlements file EMPTY (found 2026-09-10)
+
+`export_project_only` produces `nokings/nokings.entitlements` containing an
+**empty dict**, even with `plugins/GameCenter=true` and `plugins/iCloud=true` in
+the preset — the Godot 4.7 iOS exporter emits neither
+`com.apple.developer.game-center` nor
+`com.apple.developer.ubiquitous-key-value-store`. The generated project
+hardcodes `CODE_SIGN_ENTITLEMENTS = "nokings/nokings.entitlements"` in both
+configurations, which is why the entitlements plist above has to be supplied by
+hand at all. Worth knowing before concluding anything from a run: an app signed
+with empty entitlements produces exactly the *"Could not load services...
+missing the com.apple.developer.game-center entitlement"* log line that the
+retraction above is about, so a careless re-test re-derives the wrong answer.
+
+**Unresolved for RELEASE simulator builds, flagged not fixed.** Two ways of
+supplying them left the SIGNED app's embedded entitlements still `{}`
+(`codesign -d --entitlements`): passing
+`CODE_SIGN_ENTITLEMENTS=<abs path>` to `xcodebuild` — which
+`-showBuildSettings` confirmed resolved to that path — and writing the two keys
+into the exported `nokings/nokings.entitlements` before building. No cause
+established, so none is claimed here. The 2026-09-04 verification that DOES
+stand was a **Debug** build via the recipe above, and nothing here contradicts
+it; only the Release simulator path is unproven. Do not read this note as
+"entitlements are broken".

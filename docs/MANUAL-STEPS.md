@@ -280,17 +280,43 @@ address logs in does not convert anything.
 > plus everything built in section A would be stranded on the old one. The conversion path
 > keeps developer ID `5660342400699971142` and everything attached to it.
 
-### Do it in parallel, not first
+### The D-U-N-S is ALREADY IN HAND — Apple's enrolment proves it (2026-09-10)
 
-**D-U-N-S is the long pole (up to 30 days) and nothing else waits on it.** So:
+**The long pole is already spent.** The Apple Developer Program enrolment is type
+**Organization**, and Apple's own requirement is that *"Companies and educational institutions
+must provide a D‑U‑N‑S Number registered to their legal entity"*
+(developer.apple.com/help/account/membership/D-U-N-S/). An Organization enrolment cannot
+complete without one, so Sharpunk holds one.
 
-1. **Request the D-U-N-S now** — dnb.com, free. A registered French company is already in the
-   Sirene registry and often already has a D&B record, so this can come back far faster than
-   the 30-day worst case. You will need the SIREN/SIRET and the registered address.
-2. **Meanwhile continue section A on the existing Personal account.** Sign-in, Saved Games,
-   leaderboards and device testing do not care about account type.
-3. **Convert when the D-U-N-S arrives**: new payments profile of the organisation type ->
-   verify -> link to the existing developer account.
+**It is the same number.** A D-U-N-S is issued and maintained by **Dun & Bradstreet** and
+belongs to the legal entity — neither Apple nor Google issues one, and neither has a
+vendor-specific variant. Play's own Help page says so from the other side: *"Many organizations
+already have a D-U-N-S number as part of doing business. You should check whether your
+organization has one before applying for a new one."* So the number that satisfied Apple is
+the number Play Console asks for, and step 1 below is done rather than pending.
+
+Two conditions on that, and both are worth checking rather than assuming:
+
+- **Same legal entity.** This holds only if the Apple enrolment was completed under the entity
+  Play would show — Sharpunk, the registered French company. A different entity means a
+  different number. Play warns about exactly this: *"Large organizations may have multiple
+  D-U-N-S numbers for the different entities... you must make sure that the one that you use to
+  create your developer account contains the organization details that you'd like to be
+  associated with your developer account."*
+- **Having the number is not the same as passing Play's verification**, which matches the D&B
+  record's name and address against the documents supplied. That is a verification step, not a
+  30-day wait for an identifier.
+
+So the revised order:
+
+1. ~~Request the D-U-N-S~~ — **done, via Apple.** Read it off the Apple Developer account
+   (Membership details) or the D&B record; it is the same nine digits either way.
+2. **Continue section A on the existing Personal account** whenever you like. Sign-in, Saved
+   Games, leaderboards and device testing do not care about account type.
+3. **Convert whenever you want to**: new payments profile of the organisation type -> verify
+   -> link to the existing developer account. What is still needed for that, and none of it is
+   a wait: the official organisation documents, an identity document for the account owner,
+   sharpunk.com verified in Search Console (the domain is already owned), and no second $25.
 
 The developer account **ID stays the same** through that conversion (`5660342400699971142`),
 so the PGS project, the OAuth credential and the leaderboard ids created in section A are
@@ -375,24 +401,73 @@ This is what turns 86 from "written" into "verified" — and issue 86 is explici
 
 ---
 
-## D. iOS — do this last, or not at all for now
+## D. iOS — the account half is bought; what is left is records and a device
 
-Recommendation from issue 87: **ship Android first and leave iOS stubbed.** The seam is
-designed for exactly that split. If you do want it:
+**Two things this section used to say are wrong, and both were verified wrong before this
+rewrite** (2026-09-10):
 
-1. **Install Xcode** (not just Command Line Tools — `xcodebuild` currently reports the CLT
-   instance, so no iOS build can be produced here at all).
-2. **Apple Developer Program — $99/year.** Needed for the iCloud entitlement *and* for device
-   installs.
-3. App Store Connect -> create the app with bundle id **`com.sharpunk.nokings`** (user
-   ruling 2026-09-02: match Android). Bundle ids are as permanent as Android's.
-4. Enable the **iCloud key-value store** capability, entitlement
-   `com.apple.developer.ubiquitous-key-value-store`.
-5. Create the leaderboard in App Store Connect and copy its id back to me.
-6. A real iPhone — Game Center does not fully work in the simulator.
-7. **Build the plugins from source.** `godotengine/godot-ios-plugins` has no Godot 4 release —
-   every published artifact is Godot 3 — so `gamecenter` and `icloud` must be compiled from
-   master with Xcode.
+- **Xcode IS installed** — `xcodebuild -version` = Xcode 26.6 (17F113). The old step 1 said
+  only Command Line Tools were present. Both plugins were compiled against 4.7-stable on
+  2026-09-04 and are vendored under `game/ios/plugins`, so the old step 7 is done too.
+- **The $99 membership was never the wall it was described as.** The simulator proved BOTH
+  halves without any paid account: the iCloud KV round-trip (write, synchronous read, real
+  sync, survives relaunch) *and* a Game Center sign-in returning `result: "ok"` with a real
+  player id. The earlier claim came from a log line captured *before* the
+  `com.apple.developer.game-center` entitlement was added and never re-tested after; ad-hoc
+  simulator signing carries entitlements, which is what makes it work. See archive issue 87's
+  own CORRECTION note. The membership buys a **device and the store**, not a first login.
+
+**Membership: enrolled.** Team ID `DGT6GH7583`, **Organization**. The Team ID is public and is
+already in `game/export_presets.cfg` — no placeholder left.
+
+### D1. Records only you can create (App Store Connect / developer.apple.com, GUI)
+
+1. **The app record.** App Store Connect -> create the app. Name `No Kings`, platform iOS,
+   bundle id **`com.sharpunk.nokings`** (user ruling 2026-09-02: match Android — bundle ids are
+   as permanent as Android's), SKU anything, primary language. Then send the app's **Apple ID
+   number** (public).
+2. **Capabilities on the identifier.** developer.apple.com -> Identifiers -> that bundle id ->
+   enable **Game Center** and **iCloud (Key-Value storage)**. KV needs no container; the
+   entitlement is `com.apple.developer.ubiquitous-key-value-store`.
+3. **The leaderboard.** App Store Connect -> the app -> Game Center -> a leaderboard named
+   **High Score**, classic, integer, best score, high to low. Send its **Leaderboard ID**
+   (public). It drops into `LEADERBOARD_HIGH_SCORE` in
+   `game/scripts/cloud/cloud_backend_ios.gd` — one string, no other change: the bridge calls,
+   the backend methods and the `global_board.gd` seam are all already wired and tested against
+   the empty id.
+4. **The Program License Agreement**, if App Store Connect prompts. It blocks builds silently
+   until accepted. The Paid Apps agreement is not needed; the game is free.
+
+### D2. Signing — your choice of two, one is a SECRET
+
+5. Either:
+   - **a.** Xcode -> Settings -> Accounts -> sign in with the Apple ID, once, at this Mac.
+     Certificates and profiles then handle themselves. Nothing to hand over.
+   - **b.** An **App Store Connect API key** (Users and Access -> Integrations): the `.p8`
+     file, its **Key ID** and the **Issuer ID**. **The .p8 is a secret.** Never paste it in
+     chat and never commit it: drop the file in `~/keystores/` (same home as the Android
+     keystore, outside the repo) and put the two ids in the macOS Keychain — then tell me the
+     Keychain service name only. A leaked ASC key signs and uploads as you.
+
+### D3. The device gate — the only genuinely blocked thing left
+
+6. **An iPhone.** The earlier one was borrowed and left on 2026-09-04. Needed for: the first
+   signed build reaching a device, and the device script (sign-in consent, account binding,
+   relaunch reconnect, tombstone, wipe-and-restore). Say **which model and iOS**, and whether
+   it is yours to keep or borrowed — the verification plan differs. If a specific device must
+   be registered, its **UDID** (Settings -> General -> About, or Xcode). UDID is public but
+   keep it out of the repo.
+
+Not needed from you: the Apple ID password or 2FA codes, ever.
+
+### What is already done and needs nothing
+
+- iOS export preset: bundle id, both plugins, `export_project_only`, and the Team ID.
+- Both plugin xcframeworks, debug and release, vendored with a rebuild recipe.
+- The vendored window patch without which `authenticate()` and `show_game_center()` return nil
+  forever on Godot 4.7.
+- Both simulator slices of the installed export template fattened to arm64 (debug 2026-09-04,
+  release 2026-09-10) — see `game/ios/plugins/README.md`.
 
 ---
 

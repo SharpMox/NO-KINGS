@@ -139,6 +139,34 @@ static func fetch(key: String) -> void:
 	_announce.append(key)
 
 
+## NO-8: the global leaderboard client. Same two names, same null-safe shape and
+## same return types as play_games_bridge.gd's pair, so global_board.gd's seam
+## sees ONE surface on both platforms and needs no per-platform branch.
+##
+## The Dictionary keys are READ FROM THE PLUGIN'S OWN SOURCE, not guessed —
+## plugins/gamecenter/game_center.mm, the same place the T4 probe read the rest
+## of this API from:
+##   * post_score() ERR_FAILs without both "score" and "category", takes score
+##     as a float, and `category` IS the GKLeaderboard identifier (it predates
+##     Apple's rename; there is no separate category concept here).
+##   * show_game_center() switches on "view" ("default"/"leaderboards"/
+##     "achievements"/"challenges", anything else is ERR_INVALID_PARAMETER) and
+##     only reads "leaderboard_name" in the leaderboards state.
+## Both go through the same nk_root_controller() our vendored window patch
+## fixed, so neither could have worked on 4.7 before that patch.
+static func submit_score(board_id: String, value: int) -> void:
+	if _gc == null:
+		return
+	_gc.post_score({"score": float(value), "category": board_id})
+
+
+static func show_leaderboard(board_id: String) -> bool:
+	if _gc == null:
+		return false
+	return _gc.show_game_center({
+		"view": "leaderboards", "leaderboard_name": board_id}) == OK
+
+
 ## --- the polled event queue (issue 87 / T4) ----------------------------------
 ## Both plugins answer through pending-event queues rather than signals. One
 ## poll drains both; every event is read as a Variant with lenient .get()s,

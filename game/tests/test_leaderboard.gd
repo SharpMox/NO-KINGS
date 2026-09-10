@@ -5,6 +5,10 @@ const Leaderboard := preload("res://scripts/leaderboard.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Memory := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const GlobalBoard := preload("res://scripts/global_board.gd")
+const PlayGames := preload("res://scripts/cloud/cloud_backend_play_games.gd")
+const IosBackend := preload("res://scripts/cloud/cloud_backend_ios.gd")
+const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
+const Account := preload("res://scripts/account.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")
 
@@ -79,6 +83,41 @@ func _init() -> void:
 		"a REAL run does reach the submit — the guard gates it, it is not dead code")
 	real.queue_free()
 	await process_frame
+
+	# --- NO-8, the iOS half: the board id is EMPTY until Apple issues it -----
+	# The whole point of this block is that "unavailable" must be caused by the
+	# EMPTY ID and nothing else. Desktop is not signed in, so a bare
+	# `not board_available()` would pass for the wrong reason forever and keep
+	# passing after the id lands — so sign-in is FAKED first (the same
+	# account.json + bridge-statics idiom test_cloud_save.gd uses for the
+	# Android ownership gate), making is_available() genuinely true.
+	check(PlayGames.board_id(GlobalBoard.HIGH_SCORE) != "",
+		"(control) the ANDROID board id is wired, so an empty id is a real difference")
+	check(IosBackend.board_id(GlobalBoard.HIGH_SCORE) == "",
+		"the iOS board id is empty — Apple has not issued it yet (MANUAL-STEPS D)")
+	check(IosBackend.board_id("no-such-board") == "",
+		"and an unknown board name is empty too, not an error")
+	var gc_acc := FileAccess.open(Account.ACCOUNT_PATH, FileAccess.WRITE)
+	gc_acc.store_string(JSON.stringify({"owner": "gc-player-1", "provider": "apple"}))
+	gc_acc = null
+	Account._reset_cache()
+	IosBridge.signed_in = true
+	IosBridge.player_id = "gc-player-1"
+	check(IosBackend.is_available(),
+		"(control) signed in as the owner: the iOS cloud backend itself IS live")
+	check(not IosBackend.board_available(),
+		"...and the board is STILL unavailable — the empty id is the only thing stopping it")
+	# so the two calls a live board would make are no-ops rather than sends into
+	# an identifier Apple never issued (GKScore accepts any string, so that
+	# failure would be a score that silently goes nowhere)
+	IosBackend.board_submit(GlobalBoard.HIGH_SCORE, 12345)
+	check(not IosBackend.board_show(GlobalBoard.HIGH_SCORE),
+		"board_show refuses while the id is empty, so a caller can disable its button")
+	# restore: statics survive the process, and later checks assume defaults
+	IosBridge.signed_in = false
+	IosBridge.player_id = ""
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Account.ACCOUNT_PATH))
+	Account._reset_cache()
 
 	Memory.reset()
 	CloudSave.backend = Noop

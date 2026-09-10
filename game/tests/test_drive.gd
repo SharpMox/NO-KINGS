@@ -94,7 +94,8 @@ func _init() -> void:
 
 	# FAILURES FIRST, because they are the assertions that matter most
 	var ack := await _send(d, 1, ["tap_text NO SUCH CONTROL"])
-	check(ack.size() >= 2 and ack[0] == "seq 1", "the ack echoes the sequence number")
+	check(ack.size() >= 2 and ack[0].begins_with("seq 1 ms "),
+		"the ack echoes the sequence number AND the batch's elapsed ms (%s)" % ack[0])
 	check(ack.size() >= 2 and ack[1].begins_with("fail tap_text"),
 		"tap_text on a missing control FAILS rather than silently doing nothing")
 	check(ack.size() >= 2 and "NO SUCH CONTROL" in ack[1],
@@ -160,6 +161,37 @@ func _init() -> void:
 	await _send(d, 9, ["probe"])
 	check(FileAccess.get_file_as_string(_dir().path_join("ack.txt")) == before,
 		"a repeated sequence number is ignored — no replay of consumed commands")
+
+	# A control that EXISTS but sits outside the viewport. The real case is the
+	# Guide's "← Back": last child of a ScrollContainer, so unscrolled it sits at
+	# y=1179 while the viewport ends at 800 on desktop and 1038 on an iPhone 11.
+	# Injecting there does nothing, so an `ok` would be this harness committing
+	# the repo's own "a click that does nothing proves nothing" — which it did,
+	# on both platforms, and it cost a wrong conclusion before being caught.
+	# Numbered above every seq used earlier: a lower one is correctly ignored.
+	var away := Button.new()
+	away.text = "SCROLLED AWAY"
+	away.position = Vector2(20, 5000)
+	away.size = Vector2(160, 40)
+	root.add_child(away)
+	await process_frame
+	await process_frame
+	ack = await _send(d, 20, ["tap_text SCROLLED AWAY"])
+	check(ack.size() >= 2 and ack[1].begins_with("fail tap_text"),
+		"tap_text on an OFF-SCREEN control fails rather than reporting a tap that cannot land")
+	check(ack.size() >= 2 and "outside" in ack[1] and "5020" in ack[1],
+		"...and the reason names the point and the viewport (%s)" % (ack[1] if ack.size() > 1 else "-"))
+
+	ack = await _send(d, 21, ["drag_text SCROLLED AWAY 0 -100"])
+	check(ack.size() >= 2 and ack[1].begins_with("fail drag_text"),
+		"drag_text refuses the same unreachable start point (%s)" % (ack[1] if ack.size() > 1 else "-"))
+
+	# the control: the guard must not be refusing everything
+	ack = await _send(d, 22, ["tap_text DRIVE TARGET"])
+	check(ack.size() >= 2 and ack[1].begins_with("ok tap_text"),
+		"(control) a control INSIDE the viewport is still tapped (%s)" % (ack[1] if ack.size() > 1 else "-"))
+	away.queue_free()
+	await process_frame
 
 	d.queue_free()
 	btn.queue_free()

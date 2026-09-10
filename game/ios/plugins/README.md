@@ -19,6 +19,30 @@ done; done
 cp -R bin/{gamecenter,icloud}.{debug,release}.xcframework <this dir>/
 ```
 
+## APPLY THE PATCHES IN THIS DIRECTORY BEFORE BUILDING
+
+The vendored binaries are **not** pristine upstream. Three patches, applied
+with `patch -p1` from `~/godot-ios-plugins`, in any order — they touch
+different lines of `plugins/gamecenter/game_center.mm`:
+
+| Patch | What it fixes |
+|---|---|
+| `gamecenter-godot47-window.patch` | Godot 4.7 leaves the app delegate's `window` nil, so `authenticate()` could never present its view controller. |
+| `gamecenter-utf8-strings.patch` | The plugin handed Godot a UTF-8 `const char *`, whose `String` constructor parses **Latin-1** (`core/string/ustring.h`), mangling every non-Latin player name (NO-52). |
+| `gamecenter-scoped-ids.patch` | Reports `scopedIDsArePersistent`, Apple's documented way to tell whether `teamPlayerID` is stable or unique per app launch (NO-53). |
+
+**A rebuild that skips them silently reintroduces all three**, and two of the
+three are invisible on an English-language account with a persistent id. Verify
+after applying:
+
+```sh
+grep -c 'String::utf8(\[player' plugins/gamecenter/game_center.mm   # expect 2
+grep -c 'scopedIDsArePersistent'  plugins/gamecenter/game_center.mm   # expect 2
+grep -c 'nk_root_controller'      plugins/gamecenter/game_center.mm   # expect 3
+```
+
+All three are candidates for upstream PRs; none is specific to this project.
+
 ## The trap this recipe also fixes
 
 The OFFICIAL Godot iOS export template ships its simulator library x86_64-only

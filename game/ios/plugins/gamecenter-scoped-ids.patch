@@ -1,0 +1,20 @@
+diff --git a/plugins/gamecenter/game_center.mm b/plugins/gamecenter/game_center.mm
+--- a/plugins/gamecenter/game_center.mm
++++ b/plugins/gamecenter/game_center.mm
+@@ -137,6 +137,16 @@
+ 
+ 				if (@available(iOS 13, *)) {
+ 					ret["player_id"] = [player.teamPlayerID UTF8String];
++					// LOCAL PATCH (NO KINGS, 2026-09-10): Apple's own header says
++					// the scoped ids are persistent OR "unique for the
++					// instantiation of this app", and this is the documented way
++					// to tell which. Reported so the caller can stop assuming.
++					// NSLog as well as the event, because Godot's print/printerr
++					// do not reach the device console without Xcode; the boolean
++					// only, never the identifier.
++					BOOL persistent = [player scopedIDsArePersistent];
++					ret["scoped_ids_persistent"] = (bool)persistent;
++					NSLog(@"[gc] scopedIDsArePersistent=%d", (int)persistent);
+ 				} else {
+ 					ret["player_id"] = [player.playerID UTF8String];
+ 				}

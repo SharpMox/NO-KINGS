@@ -30,6 +30,26 @@ extends Node
 ## The sequence number is what makes a rewrite detectable — mtime is not
 ## trustworthy across a `copy to`, which preserves the source's timestamp.
 ##
+## ############ iOS: THIS DRIVES INPUT ON DESKTOP ONLY. ############
+##
+## On a physical iPhone (measured 2026-09-10, iPhone 11 / iOS 26.6.1) the FILE
+## LOOP, `probe` and `shot` all work with no human — but SYNTHESISED INPUT
+## ACTUATES NOTHING. `tap_text` reported `ok tap_text 'CONTINUE' at 240,885`,
+## which is the exact centre of the rect `probe` itself had just returned, and
+## the intro did not advance. Retried with an `InputEventMouseButton` pushed at
+## the viewport (the form this repo's click probes use, proven to drive Controls
+## on desktop): identical result. No cause established, so none is claimed.
+##
+## SO ON iOS THIS IS AN OBSERVER, NOT A DRIVER. `probe` and `shot` answer "what
+## is on screen" and "what does that label measure" — which is most of what
+## needed a human's eyes — while taps and drags still need fingers.
+##
+## AND IT CANNOT ANSWER A TOUCH QUESTION ON iOS AT ALL. NO-45 and #379 are about
+## a press being swallowed before a ScrollContainer's touch branch runs; a driver
+## whose input does not arrive cannot test that. NO-45 was answered on DESKTOP
+## (tests/repro_no45.gd) where touch synthesis does work. Do not "verify" a touch
+## fix on a phone with this — you would be verifying nothing.
+##
 ## EVERY COMMAND REPORTS ok OR fail WITH A REASON. A driver whose failures are
 ## indistinguishable from successes is worse than no driver: `tap_text "Play"`
 ## with no such control on screen must say so, naming what it looked for, rather
@@ -260,10 +280,15 @@ func _find_text(s: String) -> Control:
 	return loose
 
 
+## ScreenTouch, not a mouse event: the questions this exists for are about TOUCH
+## handling (NO-45's ScrollContainer drag), Godot converts touch to mouse for
+## Controls on desktop, and this is the strictly more faithful input.
+##
+## MEASURED 2026-09-10, and see the "iOS" note in the file header: on a physical
+## iPhone NEITHER this nor an `InputEventMouseButton` pushed at the viewport
+## actuates a Control. A mouse variant was written, built, installed and tried;
+## it changed nothing, so it was removed rather than kept as decoration.
 func _touch(at: Vector2, pressed: bool) -> void:
-	# ScreenTouch, not a mouse event: the questions this exists for are about
-	# TOUCH handling (NO-45's ScrollContainer drag), and Godot converts touch to
-	# mouse for Controls anyway, so this is the strictly more faithful input.
 	var e := InputEventScreenTouch.new()
 	e.index = 0
 	e.position = at

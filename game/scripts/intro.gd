@@ -17,6 +17,8 @@ const MENU_SCENE := "res://scenes/Menu.tscn"
 ## short loop that runs under a CONTINUE button, so the player enters the menu
 ## — and the sign-in behind it — by choosing to, rather than by being dropped
 ## there when a video happens to end.
+const Drive := preload("res://scripts/drive.gd")
+
 const VIDEO := preload("res://assets/video/nokings_intro.ogv")
 const LOOP_VIDEO := preload("res://assets/video/nokings_intro_endloop.ogv")
 const NATIVE_SIZE := Vector2(128, 228)
@@ -56,7 +58,30 @@ static func should_bypass(args: PackedStringArray) -> bool:
 	return args.has("--autoplay") or args.has("--scenario") or args.has("--screenshot")
 
 
+## NO `--drive` IN should_bypass ABOVE, deliberately: the driver has to be able
+## to test the intro itself, so the intro plays normally under it and the host
+## taps CONTINUE like a player would. The driver is created either way.
+##
+## Parented to the scene tree ROOT rather than to this scene, so it survives
+## every change_scene_to_file — the harness has to outlive the Intro that
+## started it, and an autoload would mean a project.godot change for something
+## that must not exist in a normal run.
+## Takes the root NODE rather than the SceneTree, because that is all it uses —
+## and because in a `SceneTree`-extending test script `root` IS the root Window,
+## so a SceneTree parameter cannot be passed from the place that tests this.
+static func _start_driver(args: PackedStringArray, tree_root: Node) -> Node:
+	var dir := Drive.drive_dir(args)
+	if dir == "":
+		return null # no flag, no node — tests/test_drive.gd asserts exactly this
+	var d: Node = Drive.new()
+	d.name = "Drive"
+	d.dir = dir
+	tree_root.add_child.call_deferred(d)
+	return d
+
+
 func _ready() -> void:
+	_start_driver(OS.get_cmdline_user_args(), get_tree().root)
 	if should_bypass(OS.get_cmdline_user_args()):
 		_advance()
 		return

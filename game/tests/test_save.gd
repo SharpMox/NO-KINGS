@@ -4,6 +4,7 @@ extends SceneTree
 ## Run headless:  godot --headless --path game -s tests/test_save.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const Box := preload("res://scripts/box.gd")
 
 var fails := 0
 
@@ -33,7 +34,124 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 	return game
 
 
+## Round-trip a live game through JSON exactly as the real save file does.
+func _round_trip(g) -> Dictionary:
+	return JSON.parse_string(JSON.stringify(g._to_config()))
+
+
 func _init() -> void:
+	# --- RESUME MID-TURN (NO-?? / backgrounding) -----------------------------
+	# The save format used to assume every save was taken at a TURN START:
+	# apply() ended with _begin_player_turn(), so a mid-turn snapshot came back
+	# as a fresh turn. These three cases ARE that bug. Each asserts the resumed
+	# game is in the state it was SAVED in, not the state a new turn would be —
+	# a test that cannot tell those apart is not testing this.
+	var mt := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	await process_frame
+	mt.actions_left = 1 # two of three spent this turn
+	mt.turn_action_count = 2
+	var mt_actions: int = mt.actions_left
+	var mt_saved := _round_trip(mt)
+	mt.queue_free()
+	await process_frame
+	var mt_r := _boot(mt_saved)
+	await process_frame
+	check(mt_r.actions_left == mt_actions,
+		"mid-turn resume keeps the actions already spent (%d, got %d)"
+			% [mt_actions, mt_r.actions_left])
+	check(mt_r.state == GameScript.State.PLAYER_TURN,
+		"...and is still the player's turn")
+	mt_r.queue_free()
+	await process_frame
+
+	# THE SIDE EFFECTS MUST NOT RE-RUN. _begin_player_turn() is not a reset: it
+	# dispatches on_turn_start, ages every timed buff, and can spawn a wave.
+	# Resuming through it would do all three a second time, and all three favour
+	# the player — so a test that only checks "it resumed" passes while the run
+	# silently drifts. A timed buff is the clearest independent signal: nothing
+	# else in this file would notice it ageing twice.
+	var bf := _boot({"board": [["queen", 0, 2, 2, {"buffs": [{"key": "aura", "turns": 2}]}],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	await process_frame
+	var turns_before: int = 0
+	for e in bf.board[Vector2i(2, 2)].get("buffs", []):
+		if e.key == "aura":
+			turns_before = int(e.turns)
+	check(turns_before > 0, "(setup) the aura buff is on the board with turns left")
+	var bf_saved := _round_trip(bf)
+	bf.queue_free()
+	await process_frame
+	var bf_r := _boot(bf_saved)
+	await process_frame
+	var turns_after: int = -1
+	for e in bf_r.board[Vector2i(2, 2)].get("buffs", []):
+		if e.key == "aura":
+			turns_after = int(e.turns)
+	check(turns_after == turns_before,
+		"a timed buff does NOT age on resume — %d turns saved, %d restored"
+			% [turns_before, turns_after])
+	bf_r.queue_free()
+	await process_frame
+
+	# MID-CHOICE: come back to the SAME open Box with the SAME options (user
+	# ruling 2026-09-09). The offer is persisted, not regenerated — regenerating
+	# could hand back a different set after any RNG change, which would be a
+	# quieter bug than losing the Box altogether.
+	var bx := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	bx._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
+		"contents": Box.roll_options(bx, "item", "small")})
+	check(bx.box_open, "(setup) a Box pick is open")
+	var offer_before := JSON.stringify(bx.box_offer)
+	var bx_saved := _round_trip(bx)
+	bx.queue_free()
+	await process_frame
+	var bx_r := _boot(bx_saved)
+	await process_frame
+	check(bx_r.box_open, "a run backgrounded mid-Box resumes with the Box still open")
+	check(JSON.stringify(bx_r.box_offer) == offer_before,
+		"...showing the SAME offer, not a re-roll (%s vs %s)"
+			% [JSON.stringify(bx_r.box_offer), offer_before])
+	bx_r.queue_free()
+	await process_frame
+
+	# mid-ENEMY-turn: the old format resumed as the PLAYER's turn, so the
+	# enemy's remaining moves were never played — repeatably, every background.
+	var et := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	await process_frame
+	et.state = et.State.ENEMY_TURN
+	var et_saved := _round_trip(et)
+	et.queue_free()
+	await process_frame
+	var et_r := _boot(et_saved)
+	await process_frame
+	check(et_r.state == GameScript.State.ENEMY_TURN,
+		"a save taken mid-ENEMY-turn resumes in ENEMY_TURN, not as a free player turn")
+	et_r.queue_free()
+	await process_frame
+
+	# mid-SETUP: the old format resumed at a turn start, skipping the free
+	# placement phase entirely.
+	var st := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 1})
+	await process_frame
+	await process_frame
+	st.state = st.State.SETUP
+	var st_saved := _round_trip(st)
+	st.queue_free()
+	await process_frame
+	var st_r := _boot(st_saved)
+	await process_frame
+	check(st_r.state == GameScript.State.SETUP,
+		"a save taken during SETUP resumes in SETUP, not past the free placement")
+	st_r.queue_free()
+	await process_frame
+
+
 	var rich := {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1, "buff"], ["rook", 1, 4, 10]],
 		"stock": ["pawn", {"id": "ferz", "buff": true}],
@@ -322,6 +440,77 @@ func _init() -> void:
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 	GameScript.next_config = {}
 	GameScript.next_seed = ""
+
+	# --- BACKGROUNDING MID-CHOICE (NO-?? review): roll back, don't refuse ----
+	# The first cut refused to save while a choice modal or targeting was open,
+	# because the continuation is a Callable and cannot be serialised. That
+	# threw away the whole turn for a phone call.
+	#
+	# The continuation never needed serialising. Every choice modal already has
+	# a written-down state one step earlier: where its own Cancel lands. That is
+	# a state normal play reaches and saves every day, so rolling back to it and
+	# saving THERE costs the player one redone decision instead of a turn.
+	var rb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	var actions_before: int = rb.actions_left
+	rb._open_yalta_pick()
+	check(rb.buff_pick_open, "(setup) a choice modal is open")
+	rb._rollback_for_save()
+	check(not rb.buff_pick_open,
+		"backgrounding mid-choice closes the modal instead of refusing to save")
+	check(rb.actions_left == actions_before,
+		"...and does NOT cost the turn: the actions already spent are still spent, no more")
+
+	# Yalta's trigger — the 5-Wave Milestone — has already fired and will not
+	# fire again, so its own Cancel (forfeit, no refund) would take the reward
+	# away for backgrounding. Queue it like Bounty instead.
+	check(rb.pending_yalta_picks == 1,
+		"a Yalta pick open at background is QUEUED, not forfeited — its milestone cannot re-fire")
+	var rb_saved := _round_trip(rb)
+	rb.queue_free()
+	await process_frame
+	var rb_r := _boot(rb_saved)
+	await process_frame
+	check(rb_r.pending_yalta_picks == 1,
+		"...and the queued pick survives the save, so the resumed run still owes it")
+	rb_r.queue_free()
+	await process_frame
+
+	# Bounty is the other one whose caller spends the trigger before opening
+	# (the capture path consumes the piece_bounty Buff). It already had the
+	# queue for exactly this — _open_bounty_pick defers onto it when a Box is
+	# in the way — so backgrounding reuses that rather than inventing a second.
+	var bq := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	bq._open_bounty_pick()
+	check(bq.buff_pick_open, "(setup) a Bounty pick is open")
+	bq._rollback_for_save()
+	check(bq.pending_bounty_boxes == 1 and not bq.buff_pick_open,
+		"a Bounty pick open at background goes back on pending_bounty_boxes, not forfeited")
+	bq.queue_free()
+	await process_frame
+
+	# Targeting rolls back the same way, and for the plainest reason: nothing is
+	# consumed when it opens. _item_reset() IS the pre-targeting state.
+	var tg := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"gold": 500})
+	await process_frame
+	await process_frame
+	tg.artefact_targeting_key = "bovine-tractor-beam"
+	tg.army_targeting = true
+	tg.army_board_targeting = true
+	tg.item_active = 0
+	tg._rollback_for_save()
+	check(tg.artefact_targeting_key == "" and not tg.army_targeting
+			and not tg.army_board_targeting and tg.item_active == -1,
+		"every targeting flavour rolls back at background — including the two ARMY ones, "
+		+ "which the first cut's guard did not even name")
+	tg.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

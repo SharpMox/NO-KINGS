@@ -141,6 +141,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	g.early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
 	g.pending_bounty_boxes = int(cfg.get("pending_bounty_boxes", 0))
+	g.pending_yalta_picks = int(cfg.get("pending_yalta_picks", 0))
 	g.pending_reinforce = bool(cfg.get("pending_reinforce", false))
 	g.pending_shop_open = bool(cfg.get("pending_shop_open", false)) # issue 101:
 		# additive — a save from before this field existed had no queued Shop
@@ -259,7 +260,20 @@ static func apply(g, cfg: Dictionary) -> void:
 	if cfg.has("king_abilities_seen"): # activation above re-logged; restore the truth
 		g.king_abilities_seen = cfg.king_abilities_seen.duplicate()
 	g.king_abilities_suppressed = cfg.get("king_abilities_off", false)
-	g._begin_player_turn()
+	# A save carrying `state` was taken MID-TURN and must not be resumed through
+	# _begin_player_turn(). That function is not a reset — it dispatches
+	# on_turn_start (every turn-start Artefact fires AGAIN, granting its actions,
+	# Gold and Clock a second time), ticks every timed buff one more turn (Slow,
+	# Aura, Smog), can queue and spawn a wave that already spawned, and
+	# autosaves the result. Three of those four favour the player, which is the
+	# shape of bug nobody reports.
+	#
+	# Saves written before this field have no `state` and take the old path,
+	# which is correct for them: they WERE taken at a turn start.
+	if cfg.has("state"):
+		_resume_turn(g, cfg)
+	else:
+		g._begin_player_turn()
 	# item-effect counters restore AFTER the turn reset (a save is always taken
 	# at a turn start, so move/place/merge budgets are simply fresh)
 	g.skip_enemy_turns = int(cfg.get("skip_enemy_turns", 0))
@@ -270,6 +284,50 @@ static func apply(g, cfg: Dictionary) -> void:
 	# double-count the Turn it was saved on.
 	g.turn_number = int(cfg.get("turn_number", g.turn_number))
 	g.ecdysis_copy_key = str(cfg.get("ecdysis_copy_key", "")) # issue 55, additive
+
+
+## Restore a turn already in progress, doing ONLY what _begin_player_turn() does
+## that a resume still needs — draw the HUD, and reopen a modal the save was
+## waiting on. Everything else in that function is a per-turn side effect that
+## must not run twice; see the call site.
+static func _resume_turn(g, cfg: Dictionary) -> void:
+	g.state = int(cfg.get("state", g.State.PLAYER_TURN))
+	g.actions_left = int(cfg.get("actions_left", 0))
+	g.actions_max = int(cfg.get("actions_max", g.actions_left))
+	g.turn_action_count = int(cfg.get("turn_action_count", 0))
+	g.turn_capture_count = int(cfg.get("turn_capture_count", 0))
+	# appended, not assigned: action_log is Array[Dictionary] and a plain Array
+	# will not assign to a typed one
+	g.action_log.clear()
+	for e in cfg.get("action_log", []):
+		g.action_log.append(e)
+	g.moved_this_turn.clear()
+	for t in cfg.get("moved_this_turn", []):
+		g.moved_this_turn.append(Vector2i(int(t[0]), int(t[1])))
+	g.oak_island_used_this_turn = bool(cfg.get("oak_island_used_this_turn", false))
+	g.moscovium_active = bool(cfg.get("moscovium_active", false))
+	g.hounds_free_turn = bool(cfg.get("hounds_free_turn", false))
+	# A selection is deliberately NOT restored: it is a pointer into a board the
+	# player has not looked at for however long they were away, and re-arming it
+	# silently is worse than making them tap again.
+	g._clear_selection()
+	g._refresh()
+	# Re-open a Box the player was mid-pick on. Restores the offer verbatim and
+	# re-renders it; the opener's side effects are NOT replayed.
+	if bool(cfg.get("box_open", false)) and not g.autoplay:
+		g.box_open = true
+		g.box_offer = (cfg.get("box_offer", []) as Array).duplicate(true)
+		g.box_only_kind = str(cfg.get("box_only_kind", ""))
+		g.box_size = str(cfg.get("box_size", "small"))
+		g.box_picks_left = int(cfg.get("box_picks_left", 0))
+		g.box_rerolls_left = int(cfg.get("box_rerolls_left", 0))
+		g.box_black_book_pending = bool(cfg.get("box_black_book_pending", false))
+		g.modals.show_box(g.box_offer)
+	if g.pending_reinforce and not g.autoplay:
+		g.modals.show_reinforce()
+	if g.pending_shop_open and not g.autoplay:
+		g.pending_shop_open = false
+		g._open_shop()
 
 
 ## The inverse of apply(): the live run as a JSON-safe config Dictionary.
@@ -295,8 +353,32 @@ static func to_config(g) -> Dictionary:
 			# reloaded save keeps each held copy's own "5-Wave Milestone" cadence
 			# and rarity (issue 29) — the catalog fallback covers an in-memory
 			# entry that predates the stamp, same as apply()'s own fallback
+	var moved_out := []
+	for t in g.moved_this_turn: # Array[Vector2i] is not JSON-safe
+		moved_out.append([t.x, t.y])
 	return Account.stamp({
 		"save_version": SAVE_VERSION,
+		# --- the TURN IN PROGRESS. All additive: a save written before this
+		# carries none of it, apply() sees no `state` and takes the old
+		# turn-start path, which is exactly right for a save that WAS taken at a
+		# turn start. No migration needed, and none is registered.
+		"state": int(g.state), "actions_left": g.actions_left,
+		"actions_max": g.actions_max, "turn_action_count": g.turn_action_count,
+		"turn_capture_count": g.turn_capture_count,
+		"action_log": g.action_log.duplicate(true), "moved_this_turn": moved_out,
+		# An open BOX PICK, re-opened on resume (user ruling 2026-09-09: come back
+		# to the same choice). The offer is persisted rather than regenerated —
+		# it was rolled once at Shop-stock time, and re-rolling it could hand back
+		# a different set after any RNG change. Re-showing is idempotent: nothing
+		# here charges Gold, consumes an item or fires a hook; _open_box_pick's
+		# side effects all happened when the Box was first opened.
+		"box_open": g.box_open, "box_offer": g.box_offer.duplicate(true),
+		"box_only_kind": g.box_only_kind, "box_size": g.box_size,
+		"box_picks_left": g.box_picks_left, "box_rerolls_left": g.box_rerolls_left,
+		"box_black_book_pending": g.box_black_book_pending,
+		"oak_island_used_this_turn": g.oak_island_used_this_turn,
+		"moscovium_active": g.moscovium_active,
+		"hounds_free_turn": g.hounds_free_turn,
 		"board": b, "stock": g.stock.duplicate(), "captured": g.captured.duplicate(),
 		"items": keys_of.call(g.items), "artefacts": artefacts_out,
 		"king_abilities": keys_of.call(g.king_abilities_active), "king_abilities_seen": g.king_abilities_seen.duplicate(),
@@ -310,6 +392,7 @@ static func to_config(g) -> Dictionary:
 		# destroyed every queued Box. Additive with a 0 default, so old saves
 		# read back exactly as they did before.
 		"pending_bounty_boxes": g.pending_bounty_boxes,
+		"pending_yalta_picks": g.pending_yalta_picks,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
 		"pending_king": g.pending_king.duplicate(), # issue 90

@@ -269,6 +269,12 @@ var pending_reinforce := false # shop due at the next player-turn start
 ## (a Wave clear can raise a Box pick), and _open_shop refuses over one. Held
 ## as a flag so the open QUEUES rather than being dropped.
 var pending_shop_open := false
+var pending_yalta_picks := 0 # Yalta Cocktail Napkin picks owed to the player.
+	# Exists for ONE reason: backgrounding. Yalta's trigger is the 5-Wave
+	# Milestone, which has already fired by the time the modal is up and will
+	# not fire again, so rolling the modal back with its own Cancel (forfeit,
+	# no refund) would charge a phone call the whole reward. Queued instead,
+	# drained at turn start exactly like pending_bounty_boxes below.
 var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 	# many Box choices are queued. _lose_player_piece is synchronous — called
 	# mid enemy-move loop among other sites — so it cannot itself open a modal
@@ -1026,6 +1032,9 @@ func _begin_player_turn() -> void:
 		if not autoplay: # the bot buys through Shop.buy and never opens the
 			_open_shop() # panel (autoplay.gd try_shop) — opening it here would
 				# only stall a run that has no way to close it
+	if pending_yalta_picks > 0: # deferred at background — see the field's own
+		pending_yalta_picks -= 1 # comment. Drained BEFORE Bounty on purpose:
+		_open_yalta_pick() # if this opens, _open_bounty_pick re-queues itself.
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -1042,6 +1051,24 @@ func _begin_player_turn() -> void:
 ##
 ## The comment at the old call site referred to a `_save_run` that never
 ## existed; this is that function, finally.
+## Does returning to the foreground raise the pause menu?
+##
+## Mobile only, and that is the whole point rather than a convenience: on a
+## phone, backgrounding is a real lifecycle event — the player left, minutes or
+## hours passed, and Android may have been about to kill the process. Coming
+## back to a live clock mid-turn is disorienting there.
+##
+## On desktop a focus change is routine — alt-tab, a notification, clicking
+## another window — and a modal on every one of them would be its own bug. It
+## also broke the windowed click probes outright: they lose and regain focus
+## during a run, so the menu landed over the board and every subsequent probe
+## click hit the menu instead of the game.
+##
+## The clock still stops on focus loss everywhere; that part is not gated.
+static func pauses_on_resume() -> bool:
+	return OS.get_name() == "Android" or OS.get_name() == "iOS"
+
+
 func _autosave() -> void:
 	if autoplay or is_scenario:
 		return # bot runs and scenarios are not resumable, by design
@@ -1584,23 +1611,43 @@ func _notification(what: int) -> void:
 	# in-game menu (clock stopped, no enemy turns), via `backgrounded`.
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		backgrounded = true
-		# DELIBERATELY DOES NOT SAVE, and that is not an oversight.
+		# NOW SAVES. It did not, and the comment here used to explain why: the
+		# format assumed every save was taken at a TURN START, so a mid-turn
+		# snapshot resumed as a fresh turn and handed back actions already
+		# spent. save_config.gd carries the turn in progress now (state,
+		# actions_left, the per-turn flags) and apply() resumes it without
+		# re-running _begin_player_turn()'s side effects, so the snapshot is
+		# honest and this call is safe.
 		#
-		# Backgrounding is when Android may kill us, so saving here looks
-		# obviously right — it was tried, and it breaks the save schema. A save
-		# records neither `state` nor `actions_left`, because apply() always
-		# ends with _begin_player_turn(): the format assumes every save is taken
-		# at a TURN START. A mid-turn snapshot therefore resumes as a fresh turn,
-		# which hands back actions already spent; a mid-ENEMY-turn one resumes
-		# as the player's turn with the enemy's remaining moves never played,
-		# repeatably; and one taken during SETUP skips the free placement phase.
+		# _autosave() keeps its own guards: never for autoplay or scenario runs,
+		# and never at GAME_OVER — switching away from a finished run once
+		# rewrote the save and resurrected it, and that door stays shut.
 		#
-		# Losing the turn in progress is the honest cost of that format, and it
-		# is smaller than silently letting a run dodge enemy turns. Saving here
-		# needs `state` and `actions_left` in the schema first — a version bump,
-		# not a one-line call.
+		# A modal or targeting no longer blocks the save. It used to: the
+		# continuation for an open choice lives in `_choice_on_chosen`, a
+		# Callable, which cannot be serialised — so the first cut refused to
+		# save at all and the player lost the turn for answering the phone.
+		# _rollback_for_save() takes the run back to where that modal's own
+		# Cancel lands, which IS representable, and saves there. See its header.
+		# A Box pick is the one that needs no rollback: its state is pure data,
+		# so it is saved as-is and re-opened on resume.
+		_rollback_for_save()
+		_autosave()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN or what == NOTIFICATION_WM_WINDOW_FOCUS_IN:
+		# Only a RESUME raises the menu — a focus event with no matching
+		# FOCUS_OUT behind it is not one. The window gains focus when it is first
+		# created, and again on every alt-tab; raising the pause menu on those
+		# put it over the board before the game had started, which hung the
+		# windowed click probes outright (every probe click landed on the menu).
+		var resuming := backgrounded
 		backgrounded = false
+		# Come back to a PAUSED game, not a live one. The player has been away
+		# for an unknown length of time; dropping them straight into a running
+		# clock mid-turn is worse than one deliberate tap to re-orient. Same
+		# entry point the hardware Back handler uses, so the two cannot drift.
+		if resuming and pauses_on_resume() and state != State.GAME_OVER \
+				and not autoplay and not win_open:
+			hud.toggle_menu(true)
 	# Android's hardware Back. Godot quits the app on it by default, and mid-run
 	# that is the worst possible response: the autosave is only written at turn
 	# start (see _autosave), so a stray Back discarded the turn in progress and
@@ -2314,6 +2361,45 @@ func _item_reset() -> void:
 	pending_buff = ""
 
 
+## Return the run to the last state the save schema can represent, so
+## backgrounding can snapshot it instead of refusing to.
+##
+## The first cut of mid-turn resume refused to save while a choice modal or
+## targeting was open, on the grounds that the continuation is a Callable and
+## cannot be serialised. True, and beside the point (user, 2026-09-08): the
+## continuation never needed serialising, because every one of these already
+## has a written-down state one step EARLIER — where its own Cancel lands.
+## That state is one normal play reaches and saves every day, so rolling back
+## to it and saving THERE costs the player one redone decision instead of the
+## whole turn. Nothing is replayed forward, so nothing can double-charge.
+##
+## Rolling back is safe for five of the seven choice callers because nothing is
+## paid, consumed or charged when the modal opens — the effect body lives
+## entirely in the on_chosen handler (see the Callable() cancels at
+## _activate_artefact, _activate_army_ability and _jet_fuel_restock_pressed, and
+## _item_reset() for the Buff Box). The two exceptions are the ones whose CALLER
+## spent the trigger before opening, so their Cancel would take payment and give
+## nothing: those are queued onto the deferral counters instead.
+func _rollback_for_save() -> void:
+	if buff_pick_open:
+		match _choice_on_chosen.get_method():
+			"_open_box_pick": # Bounty: its caller already consumed the
+				pending_bounty_boxes += 1 # piece_bounty Buff / decremented
+					# the counter, and this is the queue that exists for it
+			"_yalta_chosen": # the 5-Wave Milestone cannot fire twice
+				pending_yalta_picks += 1
+		_choice_pick_cancelled()
+	if item_active != -1:
+		_item_reset() # nothing is consumed at _begin targeting: _consume_item
+			# runs on the instant-item branch or on confirm, never here
+	if artefact_targeting_key != "":
+		_artefact_targeting_reset()
+	if army_targeting:
+		_army_targeting_reset()
+	if army_board_targeting:
+		_army_board_targeting_reset()
+
+
 ## Generic "choose 1 of N, then continue" modal seam (issue 41). `offers` are
 ## Dictionaries with `label` (button text) and `value` (handed back verbatim
 ## to `on_chosen`) — the modal and this seam don't know what a caller does
@@ -2404,6 +2490,10 @@ func _buff_pick_cancelled() -> void:
 ## same pattern as _open_buff_pick / _open_box_pick — so the bot never
 ## deadlocks on a panel nobody is there to click.
 func _open_yalta_pick() -> void:
+	if box_open or buff_pick_open: # DEFER rather than drop, for the reason
+		pending_yalta_picks += 1 # _open_bounty_pick spells out: a hook on the
+		return # same wave clear can already have a modal up, and rendering
+			# this on top means the player picks and the pick goes nowhere.
 	var offers := [
 		{"label": "+100 Gold", "value": "gold"},
 		{"label": "+1 Item", "value": "item"},

@@ -924,7 +924,10 @@ func _process(delta: float) -> void:
 			# discrete gain, and hooking it would fire on_clock_change every
 			# single frame. Direct mutation stays, on purpose; don't "finish
 			# the job" by wiring this one up too.
-			clock_ms -= delta * 1000.0
+			# Kings.clock_drain_mult is 1.0 for everyone but Larry, whose
+			# Borrowed Time doubles it for his wave (NO-7). A multiplier on the
+			# RATE, deliberately not a second clock source — see that function.
+			clock_ms -= delta * 1000.0 * Kings.clock_drain_mult(self)
 		# Doomsday Clock Snooze Button (issue 26): the THRESHOLD CROSS is
 		# watched here every frame (no discrete hook fires on one), but the
 		# actual grant below is a one-time-per-wave GAIN, guarded by

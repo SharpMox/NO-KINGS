@@ -35,6 +35,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 const FIRST = 151;
 const KING_WAVE = 200;          // the 4th King wave — also what makes order[3]
                                 // reachable at last (Kings._ordinal returns 3)
+const LARRY_WAVE = 201;         // the 17th boss (NO-7). Deliberately the LAST
+                                // entry: the FULL CLEAR branch keys off
+                                // `wave >= WAVES.size()`, so being last is what
+                                // hands the ending to Larry — no code change.
 const BUDGET_START = 240;       // wave 150's own ceiling, so 151 has no seam
 const BUDGET_STEP = 9;          // per wave; 240 -> 672 by wave 199
 const COUNT_MIN = 3;
@@ -128,11 +132,15 @@ for (let n = FIRST; n < KING_WAVE; n++) rows.push({ n, ids: wave(n) });
 // the other three King waves use. Budgeted like a normal wave so it does not
 // dip below its neighbours, then trimmed to leave room for the King itself.
 rows.push({ n: KING_WAVE, ids: ["king", ...wave(KING_WAVE).slice(0, 5)] });
+// Larry's wave. Same King-plus-five shape as the other four; the escort is the
+// top of the curve because there is nothing after it to escalate into.
+rows.push({ n: LARRY_WAVE, ids: ["king", ...wave(LARRY_WAVE).slice(0, 5)] });
 
 const width = Math.max(...rows.map(r => r.ids.map(i => `"${i}"`).join(", ").length));
 const body = rows.map(r => {
   const list = r.ids.map(i => `"${i}"`).join(", ");
-  const note = r.n === KING_WAVE ? ` — King wave (the 4th)` : "";
+  const note = r.n === KING_WAVE ? ` — King wave (the 4th)`
+    : r.n === LARRY_WAVE ? ` — LARRY, the 17th boss` : "";
   return `\t[${list}],${" ".repeat(width - list.length)} # ${r.n}${note}`;
 }).join("\n");
 
@@ -147,8 +155,8 @@ const next = i === -1
 writeFileSync("game/data/waves.gd", next);
 
 const vals = Object.fromEntries(palette.map(p => [p.id, p.value]));
-const b = rows.filter(r => r.n !== KING_WAVE);
-console.log(`waves ${FIRST}-${KING_WAVE} written (${rows.length} entries)`);
+const b = rows.filter(r => r.n !== KING_WAVE && r.n !== LARRY_WAVE);
+console.log(`waves ${FIRST}-${LARRY_WAVE} written (${rows.length} entries)`);
 console.log(`  value  ${b[0].ids.reduce((s,i)=>s+vals[i],0)} -> ${b[b.length-1].ids.reduce((s,i)=>s+vals[i],0)}`);
 console.log(`  count  min ${Math.min(...b.map(r=>r.ids.length))}, max ${Math.max(...b.map(r=>r.ids.length))}`);
 console.log(`  distinct pieces used: ${new Set(rows.flatMap(r=>r.ids)).size}`);

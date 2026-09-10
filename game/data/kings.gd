@@ -41,6 +41,16 @@ const SUIT := "suit"
 
 const TIER_ORDER := [LAUREL, HAT, UNIFORM, SUIT]
 
+## LARRY — the 17th boss, at wave 201 (NO-7). DELIBERATELY OUTSIDE `ROSTER`.
+##
+## ROSTER is keyed by costume tier and `roll_run` shuffles all four entries of
+## the tier it draws, so a Larry inside it would join that shuffle and could
+## turn up at wave 50. He is not one of the 4x4 cast — he is what waits past it
+## — so he is selected BY WAVE NUMBER and never by the tier draw. That also
+## keeps the seed guarantee intact: the line-up is still a permutation of one
+## tier's four, unchanged by his existence (issue 75, issue 85).
+const LARRY := {"id": "larry", "name": "Larry"}
+
 const ROSTER := {
 	LAUREL: [
 		{"id": "nebuchadnezzar_ii", "name": "Nebuchadnezzar II"},
@@ -115,6 +125,8 @@ static func _ordinal(n: int) -> int:
 ## scenarios and pre-89 saves both reach here without one, and a King wave with
 ## no King would be a softlock rather than a missing cosmetic.
 static func select(rng: RandomNumberGenerator, n: int, order: Array = []) -> Dictionary:
+	if Waves.is_larry_wave(n): # the 17th boss is not IN the line-up — he is what
+		return {"id": LARRY.id, "name": LARRY.name} # waits past the end of it
 	var line_up: Array = order if not order.is_empty() else roll_run(rng).order
 	var id := for_ordinal(line_up, _ordinal(n))
 	if id == "":
@@ -125,6 +137,8 @@ static func select(rng: RandomNumberGenerator, n: int, order: Array = []) -> Dic
 ## Display name for a King id, or "King" if unset/unrecognized (bare "king"
 ## board entries with no king_id — e.g. hand-written test scenarios).
 static func name_of(id: String) -> String:
+	if id == LARRY.id:
+		return LARRY.name
 	for tier in ROSTER:
 		for k in ROSTER[tier]:
 			if k.id == id:
@@ -292,6 +306,17 @@ const KITS := {
 		"ability_name": "The Parade",
 		"ability_desc": "Destroys every piece you have in a three-by-three block.",
 		"ability_key": "parade",
+	},
+	# ---- LARRY, the 17th boss at wave 201 (NO-7) ----------------------------
+	# Outside the 4x4 cast and outside ROSTER, but the KIT contract is the same
+	# one Power, one Ability — the symmetry every other King is read by.
+	"larry": {
+		"power_name": "Borrowed Time",
+		"power_desc": "Your Clock drains twice as fast this wave.",
+		"power_key": "borrowedtime",
+		"ability_name": "The Bill Comes Due",
+		"ability_desc": "Destroys your most valuable piece, once for every King you have already defeated.",
+		"ability_key": "bill",
 	},
 }
 
@@ -528,6 +553,25 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 ## Branch-style Powers: read at the site rather than dispatched, because each
 ## one answers "is this action allowed / different" rather than "what is this
 ## value". Forcing them through ctx would mean a suppression flag per effect.
+## The most pieces The Bill Comes Due may take: one per King wave standing
+## before Larry's. Named rather than derived from the wave table on purpose —
+## it is a DESIGN bound, not an incidental count, so a fifth King wave must not
+## silently make Larry's Ability harsher. Someone has to come and change this.
+const BILL_MAX := 4
+
+
+## Larry's Borrowed Time: the Clock runs at double speed for his whole wave.
+##
+## A RATE read at the drain site, not a hook. game.gd's drain is deliberately
+## unhooked (issue 35: it is a continuous per-frame drain, not a discrete gain,
+## and hooking it would fire on_clock_change every frame), so a Power that
+## changes how FAST it runs belongs there as a multiplier rather than as a
+## second source of clock change. 1.0 for every other King, so the multiply is
+## a no-op unless Larry is the one on the board.
+static func clock_drain_mult(g) -> float:
+	return 2.0 if power_is(g, "borrowedtime") else 1.0
+
+
 static func power_is(g, key: String) -> bool:
 	return str(kit_of(g.king_power_id).get("power_key", "")) == key
 
@@ -596,6 +640,23 @@ static func _bespoke_ability(g, key: String) -> bool:
 				return g.defs[g.board[a].id].value < g.defs[g.board[b].id].value)
 			for i in mini(2, mine.size()):
 				g._destroy(mine[i])
+			return true
+		"bill":
+			# Larry: you toppled four Kings to reach him, and he takes one of
+			# your best for each. The exact mirror of Tamerlane's Pyramid of
+			# Skulls directly above — that takes the two WEAKEST, this takes the
+			# STRONGEST, once per King already defeated.
+			#
+			# Bounded twice over: by BILL_MAX, so it cannot grow if the wave
+			# table ever gains a fifth King wave, and by the board, so it is a
+			# hard hit rather than a wipe. It also costs Larry the Action it
+			# fires on — the turn he spends collecting is a turn he does not
+			# spend attacking, which is the opening the player plays for.
+			var best: Array = g._player_pieces()
+			best.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+				return g.defs[g.board[a].id].value > g.defs[g.board[b].id].value)
+			for i in mini(mini(g.kings_defeated, BILL_MAX), best.size()):
+				g._destroy(best[i])
 			return true
 		"turncoat":
 			# Ivan: he killed his own son. Ownership, not destruction — the

@@ -3,6 +3,20 @@
 ## The catalog's procedural extension past 150 is not implemented — the run
 ## ends at the wave-150 full clear (grilled 2026-07-03).
 
+## Larry's wave — the 17th boss, past the 4x4 cast (NO-7). Named here rather
+## than derived, so "which wave is Larry's" has exactly one answer and cannot
+## drift from the table. It is the LAST entry on purpose: the FULL CLEAR branch
+## keys off `wave >= WAVES.size()`, so being last is what hands the run's ending
+## to Larry — no change to game.gd at all.
+const LARRY_WAVE := 201
+
+
+## True when wave `n` is Larry's. Kings.select() asks this BEFORE consulting the
+## run's line-up, because Larry is not in it.
+static func is_larry_wave(n: int) -> bool:
+	return n == LARRY_WAVE
+
+
 const WAVES: Array = [
 	# waves 1-19 softened 2026-07-06: the old run of all-bishop walls (8/12/14)
 	# killed the walker armies before their merge economy could start —
@@ -212,5 +226,6 @@ const WAVES: Array = [
 	["amazonrider", "amazon", "amazonrider", "queen", "godzilla", "manticore"],                                  # 198
 	["amazonrider", "godzilla", "godzilla", "banshee", "amazonrider", "raven"],                                  # 199
 	["king", "godzilla", "raven", "queen", "amazonrider", "raven"],                                              # 200 — King wave (the 4th)
+	["king", "amazon", "raven", "godzilla", "amazon", "godzilla"],                                               # 201 — LARRY, the 17th boss
 	# ---- end generated ----
 ]

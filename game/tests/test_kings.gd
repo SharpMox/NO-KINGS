@@ -1,9 +1,11 @@
 extends SceneTree
-## The 16-King cast (issue 09): roster shape, the tier-by-depth selection
-## rule, and that a spawned King carries its identity onto the board.
+## The 16-King cast (issue 09) plus Larry, the 17th (NO-7): roster shape, the
+## one-tier-per-run selection rule, and that a spawned King carries its
+## identity onto the board.
 ## Run headless:  godot --headless --path game -s tests/test_kings.gd
 
 const Kings := preload("res://data/kings.gd")
+const Waves := preload("res://data/waves.gd")
 const Rules := preload("res://scripts/rules.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const GameScript := preload("res://scripts/game.gd")
@@ -105,7 +107,8 @@ func _init() -> void:
 	check(Kings.for_ordinal(line_up.order, 3) == line_up.order[3],
 		"the fourth King wave takes the fourth")
 	check(Kings.for_ordinal(line_up.order, 9) == "",
-		"past the line-up there is no King (wave 201 is Larry, parked)")
+		"past the line-up the ORDER runs out — Larry is not in it, he is keyed " \
+		+ "off the wave instead (see the Larry block below)")
 
 	# NO-7 slice 1: the FOURTH King is reachable in real play at last. `order`
 	# has always been four long, but `_ordinal` counts King rosters in the wave
@@ -119,6 +122,22 @@ func _init() -> void:
 	for pair in [[50, 0], [100, 1], [150, 2], [200, 3]]:
 		check(Kings.select(seeded, pair[0], lu.order).id == str(lu.order[pair[1]]),
 			"wave %d fights King %d of the line-up" % [pair[0], pair[1] + 1])
+
+	# --- LARRY, the 17th boss at wave 201 (NO-7) ----------------------------
+	# He is selected BY WAVE, never from the line-up. The assertions below are
+	# the ones that would catch him leaking into the 4x4 cast, which is the
+	# failure that would matter: a Larry inside ROSTER joins the tier shuffle
+	# and can turn up at wave 50.
+	check(Kings.select(seeded, Waves.LARRY_WAVE, lu.order).id == "larry",
+		"wave 201 is Larry, whatever line-up the run rolled")
+	check(not lu.order.has("larry"), "Larry is never IN a run's line-up")
+	var tiers_clean := true
+	for tier in Kings.ROSTER:
+		for k in Kings.ROSTER[tier]:
+			if k.id == "larry":
+				tiers_clean = false
+	check(tiers_clean, "Larry is outside ROSTER, so he cannot be drawn at wave 50")
+	check(Kings.name_of("larry") == "Larry", "name_of resolves Larry")
 
 	check(Kings.name_of("nero") == "Nero", "name_of resolves a known id")
 	check(Kings.name_of("") == "King", "name_of falls back on an unset id")
@@ -191,8 +210,68 @@ func _init() -> void:
 	# --- issue 91: the Power/Ability engine ---------------------------------
 	# Trump is the only King whose kit is ruled; the other 15 no-op by design.
 	check(Kings.kit_of("donald_trump").has("power_name"), "Trump has a kit")
-	check(Kings.kit_of("larry").is_empty(),
-		"an id with no kit returns {} — Larry is parked (ruling 9)")
+	check(Kings.kit_of("nobody_at_all").is_empty(),
+		"an id with no kit returns {}")
+	check(Kings.kit_of("larry").has("power_name"), "Larry has a kit (NO-7)")
+
+	# --- Larry's kit: Borrowed Time + The Bill Comes Due --------------------
+	# Borrowed Time is a RATE, read at game.gd's drain site rather than hooked,
+	# so the assertion is on the multiplier itself: 1.0 for every other King,
+	# which is what keeps the multiply a no-op for the whole rest of the cast.
+	var bt: Node2D = _boot({"board": [], "wave": 201})
+	await process_frame
+	check(is_equal_approx(Kings.clock_drain_mult(bt), 1.0),
+		"no King on the board: the Clock drains at normal speed")
+	bt.king_power_id = "nero"
+	check(is_equal_approx(Kings.clock_drain_mult(bt), 1.0),
+		"another King's Power does not touch the drain rate")
+	bt.king_power_id = "larry"
+	check(is_equal_approx(Kings.clock_drain_mult(bt), 2.0),
+		"Borrowed Time: Larry's wave drains the Clock twice as fast")
+	bt.queue_free()
+	await process_frame
+
+	# The Bill Comes Due takes the STRONGEST, once per King already defeated —
+	# the mirror of Tamerlane's Pyramid of Skulls, which takes the two weakest.
+	var bill: Node2D = _boot({"board": [
+		["pawn", 0, 0, 1], ["queen", 0, 1, 1], ["rook", 0, 2, 1],
+		["bishop", 0, 3, 1], ["godzilla", 0, 4, 1], ["knight", 0, 5, 1],
+		["king", 1, 3, 10, {"king_id": "larry"}]],
+		"wave": 201, "kings_defeated": 4}, false)
+	await process_frame
+	await process_frame
+	bill.king_ability_used_this_wave = false
+	check(Kings.fire_ability(bill), "Larry fires The Bill Comes Due")
+	var left: Array = []
+	for pos in bill.board:
+		if bill.board[pos].owner == Rules.PLAYER:
+			left.append(str(bill.board[pos].id))
+	left.sort()
+	check(left == ["knight", "pawn"],
+		"four Kings defeated: the four most valuable go, the cheap ones remain (got %s)"
+			% str(left))
+	check(not left.is_empty(),
+		"...and it never clears the board — near-impossible was the ruling, not impossible")
+	bill.queue_free()
+	await process_frame
+
+	# It scales with the run, and is bounded so a longer run cannot make it
+	# worse: BILL_MAX is the design bound, not an incidental count.
+	var one: Node2D = _boot({"board": [
+		["pawn", 0, 0, 1], ["queen", 0, 1, 1], ["rook", 0, 2, 1],
+		["king", 1, 3, 10, {"king_id": "larry"}]],
+		"wave": 201, "kings_defeated": 1}, false)
+	await process_frame
+	await process_frame
+	one.king_ability_used_this_wave = false
+	Kings.fire_ability(one)
+	var n := 0
+	for pos in one.board:
+		if one.board[pos].owner == Rules.PLAYER:
+			n += 1
+	check(n == 2, "one King defeated: it takes exactly one piece, not four (got %d left)" % n)
+	one.queue_free()
+	await process_frame
 
 	# the Power comes on with the WAVE, and is live through segment 1 — before
 	# the King is on the board at all (ruling 6)
@@ -279,11 +358,14 @@ func _init() -> void:
 		"JD Vance destroyed a player piece (%d -> %d)" % [before, t._player_pieces().size()])
 	check(not Kings.fire_ability(t), "ONCE per Wave — a second attempt does nothing")
 
-	# a King with no kit must not consume an Action for an Ability it lacks
+	# a King with no kit must not consume an Action for an Ability it lacks.
+	# This used "larry" as the kitless example until NO-7 gave him one; a real
+	# nonexistent id keeps the assertion about the kitless PATH rather than
+	# about whichever King happens to be unfinished this month.
 	t.king_ability_used_this_wave = false
 	for pos in t.board:
 		if t.board[pos].get("id", "") == "king":
-			t.board[pos].king_id = "larry"
+			t.board[pos].king_id = "no_such_king"
 	check(not Kings.fire_ability(t), "a kitless id fires nothing")
 	check(not t.king_ability_used_this_wave, "and is charged no Action for it")
 	t.queue_free()

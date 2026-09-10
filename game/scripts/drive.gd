@@ -30,25 +30,30 @@ extends Node
 ## The sequence number is what makes a rewrite detectable — mtime is not
 ## trustworthy across a `copy to`, which preserves the source's timestamp.
 ##
-## ############ iOS: THIS DRIVES INPUT ON DESKTOP ONLY. ############
+## COORDINATES ARE WINDOW PIXELS, NOT CANVAS PIXELS. This cost two device
+## sessions, so it is the first thing the file says.
 ##
-## On a physical iPhone (measured 2026-09-10, iPhone 11 / iOS 26.6.1) the FILE
-## LOOP, `probe` and `shot` all work with no human — but SYNTHESISED INPUT
-## ACTUATES NOTHING. `tap_text` reported `ok tap_text 'CONTINUE' at 240,885`,
-## which is the exact centre of the rect `probe` itself had just returned, and
-## the intro did not advance. Retried with an `InputEventMouseButton` pushed at
-## the viewport (the form this repo's click probes use, proven to drive Controls
-## on desktop): identical result. No cause established, so none is claimed.
+## `Input.parse_input_event` delivers through `Window::_window_input` with
+## `p_local_coords=false` (scene/main/window.cpp), and `Viewport::push_input`
+## then applies `_make_input_local` — `(stretch_transform *
+## global_canvas_transform).affine_inverse()` (scene/main/viewport.cpp). So the
+## `position` you hand it is read as WINDOW pixels and transformed INTO canvas
+## space. On desktop the window is 480x800, the same as the canvas, the
+## transform is identity, and none of this is visible. On an iPhone 11 the
+## window is 828x1792 against a ~480 canvas: ratio 1.725, so a canvas-space
+## coordinate lands about 370 canvas px off target and actuates nothing.
 ##
-## SO ON iOS THIS IS AN OBSERVER, NOT A DRIVER. `probe` and `shot` answer "what
-## is on screen" and "what does that label measure" — which is most of what
-## needed a human's eyes — while taps and drags still need fingers.
+## Measured 2026-09-10: `tap_text CONTINUE` reported `ok … at 240,885` — the
+## exact centre of the rect `probe` had just returned — and the intro did not
+## advance. The same point in window pixels, `tap 413 1527`, advanced it
+## immediately. So `_touch` and `_drag` SCALE canvas -> window below, and
+## `probe` reports BOTH sizes, because had it done so from the start this would
+## have been obvious rather than invisible.
 ##
-## AND IT CANNOT ANSWER A TOUCH QUESTION ON iOS AT ALL. NO-45 and #379 are about
-## a press being swallowed before a ScrollContainer's touch branch runs; a driver
-## whose input does not arrive cannot test that. NO-45 was answered on DESKTOP
-## (tests/repro_no45.gd) where touch synthesis does work. Do not "verify" a touch
-## fix on a phone with this — you would be verifying nothing.
+## Do NOT "fix" this by calling `get_tree().root.push_input(e, true)` to pass
+## local coordinates: that bypasses `Input`, which skips touch-to-mouse
+## emulation and `Input.is_action_pressed` state, so it would stop exercising
+## the path a real finger takes — which is the entire point of the driver.
 ##
 ## EVERY COMMAND REPORTS ok OR fail WITH A REASON. A driver whose failures are
 ## indistinguishable from successes is worse than no driver: `tap_text "Play"`
@@ -220,8 +225,12 @@ func _run(line: String) -> void:
 ## a number instead of a judgement about a screenshot.
 func _probe() -> String:
 	var vp := get_viewport().get_visible_rect().size
+	var win := Vector2(DisplayServer.window_get_size())
 	var out := PackedStringArray()
-	out.append("viewport=%dx%d" % [vp.x, vp.y])
+	# BOTH sizes, always. Every rect below is in canvas space; the window size is
+	# what the injected events are scaled into. Reporting only the viewport hid a
+	# coordinate-space bug through two whole device sessions.
+	out.append("viewport=%dx%d window=%dx%d" % [vp.x, vp.y, win.x, win.y])
 	for c in _controls():
 		var t := _text_of(c)
 		if t == "":
@@ -280,18 +289,32 @@ func _find_text(s: String) -> Control:
 	return loose
 
 
+## Canvas -> window, the conversion the header explains. Every verb works in
+## CANVAS coordinates, because that is what `probe` reports and what a control's
+## `get_global_rect()` returns; only the injected event needs window pixels.
+##
+## Identity on desktop, 1.725x on an iPhone 11 — which is why the bug was
+## invisible until real hardware.
+func _to_window(at: Vector2) -> Vector2:
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x <= 0.0 or vp.y <= 0.0:
+		return at
+	var win := Vector2(DisplayServer.window_get_size())
+	return at * (win / vp)
+
+
 ## ScreenTouch, not a mouse event: the questions this exists for are about TOUCH
 ## handling (NO-45's ScrollContainer drag), Godot converts touch to mouse for
-## Controls on desktop, and this is the strictly more faithful input.
+## Controls (4.7 default `emulate_mouse_from_touch=true`, and project.godot sets
+## neither pointing key), and this is the strictly more faithful input.
 ##
-## MEASURED 2026-09-10, and see the "iOS" note in the file header: on a physical
-## iPhone NEITHER this nor an `InputEventMouseButton` pushed at the viewport
-## actuates a Control. A mouse variant was written, built, installed and tried;
-## it changed nothing, so it was removed rather than kept as decoration.
+## A mouse variant was written, built and tried on the device while the
+## coordinate bug was still unknown; it failed identically, for the same reason,
+## and was removed. The event TYPE was never the problem.
 func _touch(at: Vector2, pressed: bool) -> void:
 	var e := InputEventScreenTouch.new()
 	e.index = 0
-	e.position = at
+	e.position = _to_window(at)
 	e.pressed = pressed
 	Input.parse_input_event(e)
 
@@ -307,8 +330,11 @@ func _drag(from: Vector2, to: Vector2, steps: int = 8) -> void:
 		var at := from.lerp(to, float(i) / float(steps))
 		var e := InputEventScreenDrag.new()
 		e.index = 0
-		e.position = at
-		e.relative = at - prev
+		e.position = _to_window(at)
+		# relative is a DELTA in the same space, so it scales too — a drag whose
+		# position was converted but whose relative was not would move the finger
+		# to the right place and tell the ScrollContainer the wrong distance.
+		e.relative = _to_window(at) - _to_window(prev)
 		Input.parse_input_event(e)
 		prev = at
 		await _frames(1)

@@ -133,8 +133,11 @@ func _init() -> void:
 
 	ack = await _send(d, 7, ["probe"])
 	check(ack.size() >= 2 and ack[1].begins_with("ok probe"), "probe reports ok")
-	check(ack.size() >= 2 and "viewport=" in ack[1] and "DRIVE TARGET" in ack[1],
-		"...and its dump carries the viewport size and the on-screen text")
+	check(ack.size() >= 2 and "viewport=" in ack[1] and "window=" in ack[1]
+			and "DRIVE TARGET" in ack[1],
+		"...and its dump carries BOTH sizes and the on-screen text — the window size"
+		+ " is what injected events are scaled into, and omitting it hid a"
+		+ " coordinate-space bug for two device sessions")
 
 	# `shot` cannot work here and says so: RenderingServer.frame_post_draw never
 	# resolves under --headless, so capturing has to REFUSE rather than await a

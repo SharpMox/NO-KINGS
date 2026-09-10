@@ -133,6 +133,29 @@ static func _hand_written() -> Array:
 		# --- reward economy ---
 		{"name": "Boxes (Shop, issue 47: 9 typed Boxes)", "cfg": {
 			"board": [["queen", 0, 3, 3], ["knight", 0, 1, 3]], "wave": 3, "gold": 2000}},
+		# NO-45 needs a drag that STARTS ON an artefact row, and until now no
+		# scenario held more than ONE artefact — the generated per-artefact ones
+		# hold exactly one each — so the drawer never had enough rows to scroll
+		# and the question could not be answered on any device. EIGHT rows was
+		# not enough: measured, they overflow the drawer by 2px, leaving 2px of
+		# scrollable range and an assertion that could barely fail. Sixteen
+		# leaves real room, and the probe asserts the margin rather than a bare
+		# inequality so this cannot go vacuous unnoticed.
+		# Deliberately all PASSIVE keys: an activatable artefact is moved out of
+		# artefact_box into activate_box (hud.gd's _rebuild_artefact_strip skips
+		# ACTIVATABLE_ARTEFACT_KEYS), which would silently shorten the list this
+		# scenario exists to lengthen.
+		{"name": "Artefacts: sixteen held, so the drawer list actually scrolls", "cfg": {
+			"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+			"artefacts": ["27-club-punch-card", "tinfoil-hat",
+				"area-51-parking-permit", "fort-knox-iou",
+				"fema-summer-camp-flyer", "zurich-gnome-figurine",
+				"nero-s-marshmallow-stick", "pre-scratched-lottery-ticket",
+				"tungsten-filled-gold-bar", "crop-circle-plank",
+				"mar-a-lago-toilet-papers", "suspiciously-large-femur",
+				"daylight-savings-jar", "phantom-punch-glove",
+				"naruto-run-manual", "social-credit-report-card"],
+			"wave": 3, "gold": 200}},
 		{"name": "Items: full inventory", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 0, 1, 1],
 				["pawn", 1, 2, 6], ["bishop", 1, 4, 6], ["rook", 1, 1, 8], ["knight", 1, 3, 8]],

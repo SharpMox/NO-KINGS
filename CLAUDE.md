@@ -436,5 +436,8 @@ directory to `SKILLS`.
 - `docs/adr/` — architecture decision records.
 - `docs/MANUAL-STEPS.md` — the live checklist of things only the user can do
   (accounts, payments, keystore, device logins).
+- `docs/device-verification.md` — what has actually been confirmed on real
+  hardware, and what has not; newest build first. Read it before repeating a
+  device test.
 - `skills-lock.json` — installed external skills with content hashes.
 - Godot skills: `.agents/skills/godot-{best-practices,gdscript-patterns,ui,mcp}/SKILL.md`.

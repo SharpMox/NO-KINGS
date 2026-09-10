@@ -389,6 +389,11 @@ install then fails — a silent trap, because the build looked successful.
 This is what turns 86 from "written" into "verified" — and issue 86 is explicit that
 `run_all.sh` ALL GREEN does **not** verify this slice.
 
+**What has actually been verified on a device, and what has not, is recorded in
+`docs/device-verification.md`** — newest build first. This file is the STEPS; that one is
+the RECORD. Check it before re-doing a device test, and add to it after doing one: a PR body
+saying "UNVERIFIED ON DEVICE" cannot update itself once merged.
+
 ---
 
 ## C. Only when you actually publish — not needed for any of the above

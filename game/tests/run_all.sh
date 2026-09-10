@@ -77,9 +77,12 @@ else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
 fi
 
+# NOTE: tests/repro_no45.gd is deliberately NOT here. It reproduces a live bug
+# (NO-45) and is meant to fail; a suite entry that is expected to be red teaches
+# everyone to ignore red. Run it by hand — its header says how.
 for t in rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
 	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
-	box combos scenarios background tiers intro seed account sync leaderboard; do
+	box combos scenarios background tiers intro seed account sync leaderboard drive; do
 	run "test_$t" --headless -s "tests/test_$t.gd"
 done
 

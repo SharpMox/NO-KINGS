@@ -19,6 +19,7 @@ extends SceneTree
 
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
+const Drive := preload("res://scripts/drive.gd")
 
 var fails := 0
 # A member, not a local: a GDScript lambda captures locals BY VALUE, so a
@@ -74,6 +75,19 @@ func _drag(from: Vector2, step: Vector2, steps: int) -> void:
 		await process_frame
 	_mouse(false, at)
 	await process_frame
+
+
+## Drive one command batch and return the ack lines. Writes cmd.txt and pumps
+## the driver's own poll rather than waiting on its Timer, so the probe stays
+## deterministic — this repo's rule against fixed sleeps applies to probes too.
+func _drive(d: Node, dir: String, seq: int, cmds: Array) -> PackedStringArray:
+	var f := FileAccess.open(dir.path_join("cmd.txt"), FileAccess.WRITE)
+	f.store_line("seq %d" % seq)
+	for c in cmds:
+		f.store_line(c)
+	f = null
+	await d._poll()
+	return FileAccess.get_file_as_string(dir.path_join("ack.txt")).split("\n", false)
 
 
 func _init() -> void:
@@ -154,6 +168,44 @@ func _init() -> void:
 	_mouse(false, row.get_global_rect().get_center())
 	await process_frame
 	check(fired, "a tap still presses the row")
+
+	# --- the host-driven input harness (scripts/drive.gd) --------------------
+	# TWO THINGS ONLY A WINDOW CAN ASSERT, which is why they are here and not in
+	# tests/test_drive.gd: headless drops GUI picking (CLAUDE.md, re-verified on
+	# 4.7), so a synthesised tap reports `ok` there while pressing nothing. The
+	# headless test covers the protocol and the failure reasons; this covers that
+	# the input actually LANDS.
+	var dd := "user://t_drive_probe"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dd))
+	var drv := Drive.new()
+	drv.dir = dd
+	root.add_child(drv)
+	await process_frame
+
+	# 1. a driven tap really presses a control
+	var target := Button.new()
+	target.text = "DRIVEN TAP TARGET"
+	target.position = Vector2(30, 30)
+	target.size = Vector2(220, 44)
+	target.pressed.connect(_on_row_pressed)
+	root.add_child(target)
+	await process_frame
+	await process_frame
+	fired = false
+	await _drive(drv, dd, 1, ["tap_text DRIVEN TAP TARGET"])
+	check(fired, "a driven tap_text ACTUALLY PRESSES the control — observable, not the ack")
+	target.queue_free()
+	await process_frame
+	# The other thing the driver was built for — NO-45's "does a drag starting ON
+	# an artefact row scroll the drawer" — lives in tests/repro_no45.gd instead,
+	# because it REPRODUCES a live bug and would therefore be permanently red
+	# here. A suite test that is expected to fail teaches the reader to ignore
+	# red, which is worse than not having it.
+
+	drv.queue_free()
+	await process_frame
+	for f in ["cmd.txt", "ack.txt"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(dd.path_join(f)))
 
 	if fails == 0:
 		print("ALL GREEN (touch-scroll probe)")

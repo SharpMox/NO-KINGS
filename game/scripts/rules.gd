@@ -257,16 +257,6 @@ static func merge_result(ids: Array, defs: Dictionary, fusions: Dictionary) -> S
 	return fusions.get("+".join(pair), "")
 
 
-## Any valid merge available in the pool? (Part of the resource-starvation
-## loss check.)
-static func has_merge(pool: Array, defs: Dictionary, fusions: Dictionary) -> bool:
-	for i in pool.size():
-		for j in range(i + 1, pool.size()):
-			if merge_result([pool[i], pool[j]], defs, fusions) != "":
-				return true
-	return false
-
-
 ## Empty tiles where the player may place: bottom zone rows, or adjacent
 ## (8-neighborhood) to a friendly piece.
 static func placement_tiles(board: Dictionary) -> Array[Vector2i]:

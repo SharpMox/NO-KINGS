@@ -17,6 +17,7 @@ const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const Rules := preload("res://scripts/rules.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 var fails := 0
 
@@ -453,35 +454,44 @@ func _init() -> void:
 
 	# --- issue 60: the softlock guard — mirrors _begin_player_turn()'s own
 	# "Resource starvation" game-over check. An empty board + the LAST Stock
-	# piece + no merge partner in the pool must refuse the sale that would
-	# create that exact state; the same sale is fine with a board piece
-	# still up, or with a merge partner still in the pool.
+	# piece + nothing captured left must refuse the sale that would create that
+	# exact state; the same sale is fine with a board piece still up, another
+	# Stock piece left, or a captured piece left to convert. (That third clause
+	# read "a merge partner in the pool" until 2026-09-10 — Captured Stock
+	# cannot merge any more, so conversion is what makes it a path forward.)
 	var lock := _boot({"board": [], "stock": ["pawn"], "wave": 3, "gold": 0})
 	await process_frame
 	lock.state = lock.State.PLAYER_TURN
 	lock.actions_left = 5
 	check(Shop.sell_softlocks(lock, "piece", "pawn"),
-		"selling the last Stock piece off an empty board with no merge partner triggers the guard")
+		"selling the last Stock piece off an empty board, nothing else held, trips the guard")
 	check(not lock._sell("piece", "pawn"), "the sale is refused outright")
 	check(lock.stock == ["pawn"], "the piece stays put — refused, not silently dropped")
-	lock.stock.append("pawn") # a second pawn IS a merge partner
-	check(not Shop.sell_softlocks(lock, "piece", lock.stock[0]),
-		"a merge partner left in the pool means the sale is safe (a merge is still a path forward)")
-	check(lock._sell("piece", lock.stock[0]), "so the sale is allowed")
-	lock.board[Vector2i(0, 0)] = {"id": "pawn", "owner": Rules.PLAYER}
-	lock.stock = ["pawn"] # back to the last piece, no partner — but the
-		# board is no longer empty, so starvation can't trigger at all
+	lock.captured.append("rook") # one convert away from being Stock again
 	check(not Shop.sell_softlocks(lock, "piece", "pawn"),
+		"a captured piece left to convert means the sale is safe (conversion is a path forward)")
+	check(lock._sell("piece", "pawn"), "so the sale is allowed")
+	check(Shop.sell_softlocks(lock, "captured", "rook"),
+		"and selling THAT captured piece is now the sale that would strand the run")
+	lock.captured.append("rook")
+	check(not Shop.sell_softlocks(lock, "captured", "rook"),
+		"with a second captured piece behind it, the same sale is safe again")
+	lock.board[Vector2i(0, 0)] = {"id": "pawn", "owner": Rules.PLAYER}
+	lock.captured = ["rook"] # back to the last piece — but the board is no
+		# longer empty, so starvation can't trigger at all
+	check(not Shop.sell_softlocks(lock, "captured", "rook"),
 		"a board piece still up means the sale can never trigger the starvation shape")
 	lock.queue_free()
 	await process_frame
 
-	# --- issue 60: Captured Stock's only exits are merge, convert, and sell —
-	# direct deployment is REMOVED (game.gd:1393 used to call _place for it).
-	# Both interaction paths that used to reach it (tap-to-place and
-	# drag-to-drop) are checked directly, headless.
+	# --- Captured Stock's only exits are CONVERT and SELL (user 2026-09-10;
+	# issue 60 had already removed the direct deploy). Both interaction paths
+	# that used to reach a deploy go through their REAL entry points here
+	# rather than by poking the armed flags: those flags are gone, because a
+	# captured entry no longer arms and no longer drags at all — which is what
+	# stops the board lighting up deploy targets for a piece it cannot take.
 	var cap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 1000})
+		"wave": 3, "gold": 1000, "stock": ["pawn"]})
 	await process_frame
 	cap.state = cap.State.PLAYER_TURN
 	cap.actions_left = 5
@@ -492,26 +502,58 @@ func _init() -> void:
 			target = t
 			break
 	check(target.x >= 0, "(sanity) an open, EMPTY Deploy tile exists")
-	# tap path: arm the captured stack, then tap an empty Deploy tile
-	cap.placing_id = "pawn"
-	cap.placing_cap = true
-	cap.armed_entry = "pawn"
+	# tap path: the tap itself must arm nothing and light nothing
+	cap._on_stack_pressed("pawn", true, 1)
+	check(cap._deploy_highlight_tiles().is_empty(),
+		"tapping a captured entry paints no deploy targets on the board")
 	cap._on_tile_clicked(target)
 	check(not cap.board.has(target) and cap.captured == ["pawn"],
-		"tapping a Deploy tile with a Captured stack armed does nothing — no direct deploy")
-	cap.placing_id = ""
-	cap.placing_cap = false
-	# drag path: release a captured drag over an empty Deploy tile
-	cap.pool_drag_id = "pawn"
-	cap.pool_drag_cap = true
-	cap.armed_entry = "pawn"
+		"and a following Deploy-tile tap places nothing — no direct deploy")
+	# drag path: the press-drag never starts, so nothing lights and nothing drops
+	cap._on_stack_drag_start("pawn", true)
+	check(cap._deploy_highlight_tiles().is_empty(),
+		"press-dragging a captured entry paints no deploy targets either")
 	var release := InputEventMouseButton.new()
 	release.button_index = MOUSE_BUTTON_LEFT
 	release.pressed = false
 	release.position = cap._tile_px(target) + Vector2(cap.tile, cap.tile) / 2
 	cap._input(release)
 	check(not cap.board.has(target) and cap.captured == ["pawn"],
-		"dropping a Captured drag on a Deploy tile does nothing — no direct deploy")
+		"and releasing over a Deploy tile places nothing")
+	# CONTROL: the SAME two calls on the Stock pawn DO light the board, so the
+	# two empty-highlight checks above are not passing vacuously.
+	cap._on_stack_pressed("pawn", false, 1)
+	check(not cap._deploy_highlight_tiles().is_empty(),
+		"(control) arming a STOCK entry does light the deploy targets")
+	cap.placing_id = ""
+	cap._on_stack_drag_start("pawn", false)
+	check(not cap._deploy_highlight_tiles().is_empty(),
+		"(control) press-dragging a STOCK entry lights them too")
+	cap.pool_drag_id = ""
+	# NO MERGE from Captured Stock: a captured piece is never offered as a
+	# partner, and tapping one while a real partner is armed does nothing —
+	# that tap is exactly what used to merge instead of converting.
+	cap.stock.append("pawn") # two Stock pawns: a genuine, affordable pair
+	cap.captured.append("pawn") # ... and two captured pawns beside them
+	check(MergeLogic.pair_ok(cap, "pawn", "pawn"),
+		"(control) pawn+pawn IS a legal pair, so the refusals below are about the POOL")
+	cap.placing_id = "pawn"
+	cap.armed_entry = cap.stock[0]
+	cap._refresh()
+	check(cap.merge_highlights.has("pawn"),
+		"(control) the armed Stock pawn has a Stock partner, so 'pawn' IS a highlighted id")
+	cap.pool_click_key = "" # clear of the double-tap window: this is a first tap
+	cap._on_stack_pressed("pawn", true, 2)
+	check(cap.pending_merge.is_empty() and cap.captured == ["pawn", "pawn"]
+			and cap.stock == ["pawn", "pawn"],
+		"tapping a captured entry with a partner armed merges nothing — no confirm, no consumption")
+	cap.stock.clear()
+	cap.stock.append("pawn") # ONE Stock pawn, two captured ones
+	cap.placing_id = "pawn"
+	cap.armed_entry = "pawn"
+	check(not MergeLogic.partner_ids(cap).has("pawn"),
+		"and two captured pawns do not make 'pawn' a partner for the single Stock pawn")
+	cap.placing_id = ""
 	cap.queue_free()
 	await process_frame
 

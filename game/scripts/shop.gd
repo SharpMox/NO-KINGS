@@ -10,7 +10,6 @@ const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
-const Rules := preload("res://scripts/rules.gd")
 const Armies := preload("res://scripts/armies.gd")
 
 ## Base slot counts (money-and-shop/04). Issue 18 adds the "base + modifiers"
@@ -406,11 +405,13 @@ static func held_entries(g, kind: String) -> Array:
 
 ## Softlock guard: mirrors game.gd's own _begin_player_turn() "Resource
 ## starvation" game-over check exactly (no player board pieces, empty Stock,
-## no merge left in the pool) rather than inventing a new threshold — that
-## check runs at the START of the NEXT turn with no regard for Gold, so
-## simulating the SAME condition here and refusing the sale that would
-## trigger it is the correct mirror. Only a Stock or Captured sale can ever
-## reach it; an Item/Artefact sale never touches board or Stock.
+## nothing captured left to convert into Stock) rather than inventing a new
+## threshold — that check runs at the START of the NEXT turn with no regard for
+## Gold, so simulating the SAME condition here and refusing the sale that would
+## trigger it is the correct mirror. The third clause was "no merge left in the
+## pool" until 2026-09-10, when Captured Stock lost its merge: convert is the
+## escape hatch now, and any captured piece is one. Only a Stock or Captured
+## sale can ever reach it; an Item/Artefact sale never touches board or Stock.
 static func sell_softlocks(g, kind: String, entry) -> bool:
 	if kind != "piece" and kind != "captured":
 		return false
@@ -419,8 +420,7 @@ static func sell_softlocks(g, kind: String, entry) -> bool:
 	var stock_after: Array = g.stock.duplicate()
 	var captured_after: Array = g.captured.duplicate()
 	(stock_after if kind == "piece" else captured_after).erase(entry)
-	return stock_after.is_empty() \
-			and not Rules.has_merge(stock_after + captured_after, g.defs, g.fusions)
+	return stock_after.is_empty() and captured_after.is_empty()
 
 
 ## Sellable right now: actually held (never sell/pay out for something not

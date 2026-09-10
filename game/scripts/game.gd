@@ -303,8 +303,6 @@ var armed_entry: Variant = "" # the exact Stock entry behind placing_id /
 	# Only read while one of those is armed, so no reset bookkeeping.
 var preview_open := false
 var placing_id := ""  # stock piece id being placed, "" = none
-var placing_cap := false # the armed stack is captured stock (merge-only origin)
-var pool_drag_cap := false # the mid-drag stack is captured stock
 var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
 var merge_highlights := {} # ids that complete a merge with the current selection
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
@@ -702,6 +700,17 @@ func _pool() -> Array:
 	return stock + captured
 
 
+## The tiles _draw circles as deploy targets — its ONLY source for those dots,
+## so a probe can assert the highlight the player actually sees rather than the
+## flag behind it. Empty unless a STOCK entry is armed or mid-drag: Captured
+## Stock neither arms nor drags (2026-09-10), which is why dragging a captured
+## piece no longer lights up a board it can never be placed on.
+func _deploy_highlight_tiles() -> Array:
+	if placing_id == "" and pool_drag_id == "":
+		return []
+	return _setup_open_tiles() if state == State.SETUP else _deploy_tiles()
+
+
 
 
 func _clock_text() -> String:
@@ -747,32 +756,35 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 		return _show_preview(id)
 	pool_click_key = key
 	pool_click_ms = now
+	# CAPTURED STOCK ARMS NOTHING (user ruling 2026-09-10). Its only two exits
+	# are Convert (the badge that now sits on every captured entry) and Sell
+	# (the Shop drawer) — issue 60 had already taken its deploy, and this slice
+	# takes its merge, which leaves the armed state with nothing left to do.
+	# Bailing here is also what stops the board painting deploy targets for a
+	# piece that cannot be deployed: those dots come from placing_id /
+	# pool_drag_id (see _deploy_highlight_tiles), and neither can ever hold a
+	# captured entry now.
+	if cap:
+		return
 	# tapping a partner of the current selection completes the merge; a
 	# same-stack pair goes through drag instead (tap-again means deselect)
-	var same_stack: bool = placing_id != "" and armed_entry == entry and placing_cap == cap
+	var same_stack: bool = placing_id != "" and armed_entry == entry
 	if not same_stack and merge_highlights.has(id):
-		var unit := {"id": id, "cap": cap, "entry": entry}
+		var unit := {"id": id, "entry": entry}
 		if placing_id != "":
 			return MergeLogic.do_merge(self,
-				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, unit)
+				{"id": placing_id, "entry": armed_entry}, unit)
 		if selected.x >= 0:
 			return MergeLogic.do_merge(self, selected, unit)
-	# select / deselect the stack: arms merging (and Stock placement — issue
-	# 60 removed Captured Stock's own deploy, so an armed captured stack can
-	# now only complete a merge; convert/sell live in the Shop drawer instead)
+	# select / deselect the stack: arms merging and Stock placement
 	if same_stack:
 		placing_id = ""
-		placing_cap = false
 	else:
-		if cap and state != State.PLAYER_TURN:
-			return # captured arms to merge or convert; a merge's own Action
-				# gate is MergeLogic's, and converting costs none (issue 64)
-		if not cap and Economy.sanctioned(self, id):
+		if Economy.sanctioned(self, id):
 			return
-		if not cap and not (state == State.SETUP or actions_left > 0):
+		if not (state == State.SETUP or actions_left > 0):
 			return
 		placing_id = id
-		placing_cap = cap
 		armed_entry = entry
 	_clear_selection()
 	_refresh()
@@ -794,7 +806,6 @@ func _on_arrow_toggle() -> void:
 	arrow_from = Vector2i(-1, -1)
 	if arrow_mode: # entering the mode drops any selection/armed placement —
 		placing_id = ""    # the board stops selecting pieces while it's on
-		placing_cap = false
 		_clear_selection()
 	_refresh()
 
@@ -1017,7 +1028,13 @@ func _begin_player_turn() -> void:
 	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
 		WaveLogic.queue(self, wave + 1)
 	WaveLogic.spawn_pending(self)
-	if _player_pieces().is_empty() and stock.is_empty() and not Rules.has_merge(_pool(), defs, fusions):
+	# Nothing on the board, nothing in Stock, and nothing captured to convert
+	# INTO Stock. The third clause used to be "and Captured Stock holds no
+	# legal merge"; captured pieces cannot merge since 2026-09-10, so the
+	# escape hatch is conversion instead, and ANY captured piece is one. Like
+	# the merge test it replaces, it ignores Gold (a merge cost Gold too), so
+	# it stays exactly as forgiving as it was and never ends a run early.
+	if _player_pieces().is_empty() and stock.is_empty() and captured.is_empty():
 		return _game_over(false, "Resource starvation")
 	_autosave() # at every turn start
 	_refresh()
@@ -1104,9 +1121,7 @@ func _enemy_turn() -> void:
 		_set_drawer("")
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	pool_drag_id = ""
-	pool_drag_cap = false
 	_item_reset()
 	_artefact_targeting_reset() # Bovine Tractor Beam (52): never carries into the enemy turn
 	_army_board_targeting_reset() # issue 68: Hostile Takeover/Ritual, same reasoning
@@ -1575,15 +1590,17 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	var id: String = entry if entry is String else entry.id
 	if box_open or buff_pick_open or win_open or game_menu_open or preview_open:
 		return
-	if not cap and Economy.sanctioned(self, id):
+	if cap:
+		return # Captured Stock is not draggable: there is nothing to drag it
+			# TO. It has no deploy (issue 60) and, since 2026-09-10, no merge
+			# either — and starting the drag is what used to light up every
+			# deploy tile for a piece that could not be placed on any of them.
+	if Economy.sanctioned(self, id):
 		return
-	if cap and (state != State.PLAYER_TURN or actions_left <= 0):
-		return # captured drags only merge, and a merge needs a turn action
 	if state != State.SETUP and (state != State.PLAYER_TURN or actions_left <= 0):
 		return
 	_clear_selection()
 	pool_drag_id = id
-	pool_drag_cap = cap
 	armed_entry = entry
 	drawer_autoclosed = ""
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
@@ -1602,7 +1619,6 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_MOUSE_EXIT and pool_drag_id != "":
 		# the cursor left the window mid-drag: cancel and restore the drawer
 		pool_drag_id = ""
-		pool_drag_cap = false
 		if drawer_autoclosed != "":
 			_set_drawer.call_deferred(drawer_autoclosed)
 			drawer_autoclosed = ""
@@ -1684,10 +1700,8 @@ func _input(event: InputEvent) -> void:
 			and not event.pressed:
 		var t := _tile_at(event.position)
 		var id := pool_drag_id
-		var cap := pool_drag_cap
 		var entry: Variant = armed_entry
 		pool_drag_id = ""
-		pool_drag_cap = false
 		# a release inside the open drawer must never hit the board tiles
 		# hidden beneath it — that reads as a misinput (2026-07-08). Dragging
 		# out closes the drawer, so real board drops arrive uncovered.
@@ -1698,22 +1712,23 @@ func _input(event: InputEvent) -> void:
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
 			get_viewport().set_input_as_handled()
 			drawer_autoclosed = ""
-			return MergeLogic.do_merge(self, {"id": id, "cap": cap, "entry": entry}, t)
-		# drop on a DIFFERENT partner stack in the strip: pool merge. Dropping
-		# back on the same stack is a plain tap (arms placement) — same-stack
-		# promotion goes through the ▲ badge instead (2026-07-07)
+			return MergeLogic.do_merge(self, {"id": id, "entry": entry}, t)
+		# drop on a DIFFERENT partner Stock stack in the strip: pool merge.
+		# Dropping back on the same stack is a plain tap (arms placement) —
+		# same-stack promotion goes through the ▲ badge instead (2026-07-07).
+		# A CAPTURED stack is never a drop target (2026-09-10): merging into one
+		# would consume it, and its only exits now are convert and sell.
 		var target := hud.stack_button_at(event.position)
 		if state == State.PLAYER_TURN and target != null \
+				and not target.get_meta("cap") \
 				and merge_highlights.has(target.get_meta("id")) \
-				and not (target.get_meta("id") == id and target.get_meta("cap") == cap):
+				and target.get_meta("id") != id:
 			get_viewport().set_input_as_handled()
-			return MergeLogic.do_merge(self, {"id": id, "cap": cap, "entry": entry},
-				{"id": target.get_meta("id"), "cap": target.get_meta("cap"),
-					"entry": target.get_meta("entry")})
-		var placeable: bool = not cap and not covered and t.x >= 0 and not board.has(t) \
+			return MergeLogic.do_merge(self, {"id": id, "entry": entry},
+				{"id": target.get_meta("id"), "entry": target.get_meta("entry")})
+		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
 			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
-				else _deploy_tiles().has(t)) # issue 60: Captured Stock (cap) no
-			# longer deploys — convert to Stock, merge (above), or sell instead
+				else _deploy_tiles().has(t))
 		if placeable and (state == State.SETUP
 				or (state == State.PLAYER_TURN and actions_left > 0)):
 			drawer_autoclosed = ""
@@ -1752,7 +1767,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			if at.x < 0: # dead UI space: a no-interaction press drops selection
 				if selected.x >= 0 or placing_id != "":
 					placing_id = ""
-					placing_cap = false
 					_clear_selection()
 					_refresh()
 			if event.double_click and at.x >= 0 and board.has(at):
@@ -1877,9 +1891,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 		if board.has(tile) and board[tile].owner == Rules.PLAYER \
 				and merge_highlights.has(board[tile].id):
 			return MergeLogic.do_merge(self,
-				{"id": placing_id, "cap": placing_cap, "entry": armed_entry}, tile)
-		if placing_cap: # issue 60: Captured Stock no longer deploys directly —
-			return       # convert to Stock, merge (above), or sell instead
+				{"id": placing_id, "entry": armed_entry}, tile)
 		var ok := tile.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP else _deploy_tiles().has(tile)
 		if ok and not board.has(tile):
 			_place(armed_entry, tile)
@@ -1926,9 +1938,9 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 
 
 ## `entry` is a Stock entry: a bare id String or {id + state} (ADR-0002).
-## Stock only, since issue 60: Captured Stock no longer deploys directly (it
-## converts to Stock, merges, or sells instead) — every call site already
-## guards `cap`/`placing_cap`/`pool_drag_cap` before reaching here, so this
+## Stock only, since issue 60: Captured Stock no longer deploys (it converts to
+## Stock or sells instead). Nothing captured can reach here — placing_id and
+## pool_drag_id are only ever set from a Stock entry (2026-09-10) — so this
 ## dropped its own `cap` param rather than carry a dead branch.
 func _place(entry: Variant, tile: Vector2i) -> void:
 	# Mao Zedong: Backyard Furnaces — what you deploy arrives worthless.
@@ -1947,7 +1959,6 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 	if entry is Dictionary: # restore the piece state it left the board with
 		board[tile].merge(entry)
 	placing_id = ""
-	placing_cap = false
 	if state == State.PLAYER_TURN:
 		# MK-Ultra Sugar Cube (18); skip_action: Hitler's Argentinian Passport (26)
 		var deploy_ctx := ArtefactHooks.run(self, "on_deploy", {"pos": tile, "skip_action": false})
@@ -2349,7 +2360,6 @@ func _use_item(index: int) -> void:
 	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	_refresh()
 
 
@@ -2472,7 +2482,6 @@ func _buff_chosen(key: String) -> void:
 	item_targets = _item_stage_targets(it, Vector2i(-1, -1))
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	_refresh()
 
 
@@ -3187,7 +3196,6 @@ func _begin_artefact_targeting(key: String) -> void:
 	artefact_targets = _artefact_stage_targets(key, Vector2i(-1, -1))
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	_refresh()
 
 
@@ -3332,7 +3340,6 @@ func _begin_army_targeting() -> void:
 	army_targeting = true
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	_refresh()
 
 
@@ -3391,7 +3398,6 @@ func _begin_army_board_targeting() -> void:
 	army_board_targets = _army_board_target_tiles()
 	_clear_selection()
 	placing_id = ""
-	placing_cap = false
 	_refresh()
 
 
@@ -3699,10 +3705,8 @@ func _draw() -> void:
 							_tile_px(p.line[-1]) + half, col)
 				"bent":
 					_draw_linked_dots(_tile_px(selected) + half, p.line, col)
-	if placing_id != "" or pool_drag_id != "":
-		var tiles := _setup_open_tiles() if state == State.SETUP else _deploy_tiles()
-		for t in tiles:
-			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
+	for t in _deploy_highlight_tiles():
+		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
 		if a.kind == "move":
@@ -3829,12 +3833,10 @@ func _connect_hud() -> void:
 	hud.item_pressed.connect(_use_item)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)
-	hud.promote_pressed.connect(func(id: String, cap: bool) -> void:
-		MergeLogic.do_merge(self, {"id": id, "cap": cap}, {"id": id, "cap": cap}))
+	hud.promote_pressed.connect(func(id: String) -> void:
+		MergeLogic.do_merge(self, {"id": id}, {"id": id}))
 	hud.convert_pressed.connect(func(entry: Variant) -> void:
 		if _convert_captured(entry): # same rules as the Shop's Convert button
-			placing_id = ""
-			placing_cap = false
 			_refresh())
 	hud.return_to_stock_pressed.connect(func() -> void:
 		if selected.x >= 0 and board.has(selected):
@@ -3847,7 +3849,6 @@ func _connect_hud() -> void:
 		game_menu_open = open
 		if open:
 			placing_id = ""
-			placing_cap = false
 			_clear_selection())
 	hud.settings_changed.connect(func(data: Dictionary) -> void:
 		animations_on = data.get("animations_on", true)) # live — no restart needed
@@ -3862,7 +3863,6 @@ func _set_drawer(which: String) -> void:
 func _after_drawer_change() -> void:
 	if hud.drawer_open != "": # opening a drawer drops any selection (2026-07-08);
 		placing_id = ""       # closing keeps it (outside-tap flow places next tap)
-		placing_cap = false
 		_clear_selection()
 	_layout_board()
 	_refresh()
@@ -4092,7 +4092,6 @@ func _show_king_abilities() -> void:
 			or win_open or state == State.GAME_OVER:
 		return
 	placing_id = ""
-	placing_cap = false
 	_clear_selection()
 	modals.show_king_abilities()
 

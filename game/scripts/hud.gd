@@ -33,8 +33,8 @@ signal multi_confirm_pressed # the floating Extract button
 signal item_pressed(index: int)
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
-signal promote_pressed(id: String, cap: bool)
-signal convert_pressed(entry: Variant) # the ⇄ badge on an armed Captured stack (2026-09-06)
+signal promote_pressed(id: String)
+signal convert_pressed(entry: Variant) # the ⇄ badge on a Captured entry (2026-09-06)
 signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
@@ -621,7 +621,14 @@ func _add_captured_header() -> void:
 	sep.custom_minimum_size = Vector2(10, 0)
 	pool_box.add_child(sep)
 	var lbl := Label.new()
-	lbl.text = "CAPTURED\nno deploy\ntap: convert" # the badge appears on the armed stack
+	# 2026-09-10: the ⇄ badge sits on EVERY captured entry now, not just an
+	# armed one, so the hint names the control instead of the gesture that used
+	# to arm one ("tap: convert", which never converted anything). "no merge"
+	# joins "no deploy" for the reason the rule was put here in the first
+	# place: it is the constraint that makes the section exist, and a phone has
+	# no tooltip to discover it in. Lines stay short — this label sits INSIDE
+	# the horizontal strip, so its width is width the pieces do not get.
+	lbl.text = "CAPTURED\nno deploy/merge\n⇄ = convert"
 	lbl.add_theme_font_size_override("font_size", 10)
 	lbl.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8))
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -655,17 +662,26 @@ func _draw_stock_armed() -> void:
 
 
 func _stacks() -> Array:
-	# pool grouped for display/selection: stock stacks first, then captured.
-	# Grouping is by WHOLE entry (ADR-0002), so a piece carrying state stacks
-	# apart from plain copies of the same id.
+	# pool grouped for display/selection: Stock stacks first, then Captured.
+	# Stock grouping is by WHOLE entry (ADR-0002), so a piece carrying state
+	# stacks apart from plain copies of the same id.
+	#
+	# CAPTURED NEVER STACKS (user ruling 2026-09-10): one row per captured
+	# piece, MOST RECENT CAPTURE FIRST. g.captured is append-ordered, so newest
+	# first is simply its reverse. A stack made sense while a captured pair
+	# could merge; with convert and sell the only exits, every action is on ONE
+	# piece, so a row is one piece and the count badge has nothing to count.
 	var out := []
-	for cap in [false, true]:
-		var counts := {}
-		for e in (g.captured if cap else g.stock):
-			counts[e] = counts.get(e, 0) + 1
-		for e in counts:
-			out.append({"entry": e, "id": (e if e is String else e.id),
-				"cap": cap, "count": counts[e]})
+	var counts := {}
+	for e in g.stock:
+		counts[e] = counts.get(e, 0) + 1
+	for e in counts:
+		out.append({"entry": e, "id": (e if e is String else e.id),
+			"cap": false, "count": counts[e]})
+	for i in range(g.captured.size() - 1, -1, -1):
+		var e: Variant = g.captured[i]
+		out.append({"entry": e, "id": (e if e is String else e.id),
+			"cap": true, "count": 1})
 	return out
 
 
@@ -883,16 +899,25 @@ func _rebuild_pool_strip() -> void:
 		else:
 			btn.text = g.defs[id].glyph
 			btn.add_theme_font_size_override("font_size", 22)
-		var armed: bool = g.placing_id == id and g.placing_cap == cap and g.armed_entry == st.entry
+		# `not cap` is load-bearing, not decoration: placing_id is only ever a
+		# STOCK id now (game.gd), so without it a captured row holding the same
+		# piece id as the armed Stock stack would light up armed too.
+		var armed: bool = not cap and g.placing_id == id and g.armed_entry == st.entry
 		var show_promote: bool = armed \
 				and st.count >= 2 and MergeLogic.pair_ok(g, id, id) \
 				and g.state == g.State.PLAYER_TURN and g.actions_left > 0
-		# 2026-09-06: Captured -> Stock conversion on the stack itself. It lived
+		# 2026-09-06: Captured -> Stock conversion on the entry itself. It lived
 		# only in the Shop's Sell mode — four taps deep, and unreachable before
 		# SHOP_UNLOCK_WAVE since issue 101 locks the panel — so early captures
-		# could not be converted at all. Same round-badge shape as ▲ promote,
-		# the price on it, greyed when unaffordable (Shop.can_convert).
-		var show_convert: bool = armed and cap and not show_promote
+		# could not be converted at all.
+		#
+		# 2026-09-10: ALWAYS SHOWN, on every captured entry. It used to appear
+		# only on an armed stack and only when ▲ promote did not claim the
+		# corner first — so holding two of a piece hid Convert behind the merge
+		# it lost the corner to, which is exactly the "tap to convert tries to
+		# merge instead" the user reported. Merge is gone from Captured Stock
+		# and arming it does nothing, so the badge has no reason to hide.
+		var show_convert: bool = cap
 		if st.count > 1:
 			# corner badge keeps the icon full-size (no inline text); it yields
 			# the top-right corner to the ▲ promote button when that shows
@@ -961,7 +986,7 @@ func _rebuild_pool_strip() -> void:
 			promote.offset_right = 4
 			promote.offset_top = -9
 			promote.offset_bottom = 9
-			promote.pressed.connect(func() -> void: promote_pressed.emit(id, cap))
+			promote.pressed.connect(func() -> void: promote_pressed.emit(id))
 			btn.add_child(promote)
 		if show_convert:
 			var convert := Button.new()
@@ -984,9 +1009,9 @@ func _rebuild_pool_strip() -> void:
 			convert.pressed.connect(func() -> void: convert_pressed.emit(entry))
 			btn.add_child(convert)
 		btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
-		if g.placing_id != "" and g.armed_entry == st.entry and g.placing_cap == cap:
+		if armed:
 			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-		elif g.merge_highlights.has(id):
+		elif not cap and g.merge_highlights.has(id):
 			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
 		elif not cap and Economy.sanctioned(g, id):
 			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable

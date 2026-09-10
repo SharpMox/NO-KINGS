@@ -107,10 +107,6 @@ func _init() -> void:
 		"non-fusion pair does not merge")
 	check(Rules.merge_result(["pawn", "pawn", "pawn"], defs, fus) == "",
 		"3-piece selections are invalid")
-	check(Rules.has_merge(["pawn", "pawn"], defs, fus), "has_merge: promotion pair")
-	check(Rules.has_merge(["bishop", "rook"], defs, fus), "has_merge: fusion pair")
-	check(not Rules.has_merge(["pawn", "rook"], defs, fus), "has_merge: dead pair")
-	check(not Rules.has_merge(["queen", "queen"], defs, fus), "has_merge: chain end is dead")
 
 	# --- placement tiles ---
 	b = {Vector2i(3, 3): piece("rook", Rules.PLAYER), Vector2i(0, 5): piece("rook", Rules.ENEMY)}

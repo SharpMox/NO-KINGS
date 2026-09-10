@@ -61,6 +61,13 @@ extends Node
 ## than silently doing nothing. That is the same rule as this repo's "assert the
 ## observable consequence" — a harness has to be falsifiable too.
 
+## 0.25s, and measured 2026-09-10 on an iPhone 11 to be IRRELEVANT to
+## throughput — not because it is small, but because it is paid ONCE PER BATCH.
+## A host round trip (one `devicectl copy to` plus one `copy from`) is 0.43s,
+## and a 42-command batch cost 0.73s of host overhead in total. So the way to go
+## faster is MANY COMMANDS PER FILE — which the protocol already supports, one
+## ack line each — not a tighter poll, which would burn battery and frames to
+## shave at most 0.25s off a whole batch.
 const POLL_SECONDS := 0.25
 
 ## Bounds every wait. A host that asked for something that never arrives gets a
@@ -114,21 +121,26 @@ func _poll() -> void:
 	_seq = seq
 	_busy = true
 	_results.clear()
+	var began := Time.get_ticks_msec()
 	for i in range(1, lines.size()):
 		var line := lines[i].strip_edges()
 		if line == "" or line.begins_with("#"):
 			continue
 		await _run(line)
-	_write_ack()
+	_write_ack(Time.get_ticks_msec() - began)
 	_busy = false
 
 
-func _write_ack() -> void:
+## The header carries the batch's ELAPSED MILLISECONDS as well as its sequence
+## number. It is the only part of the round trip the app can measure, and
+## subtracting it from the host's wall clock leaves devicectl's cost — which is
+## what decides whether the poll interval is worth lowering or is irrelevant.
+func _write_ack(elapsed_ms: int) -> void:
 	var f := FileAccess.open(dir.path_join("ack.txt"), FileAccess.WRITE)
 	if f == null:
 		push_error("drive: cannot write ack.txt in " + dir)
 		return
-	f.store_line("seq %d" % _seq)
+	f.store_line("seq %d ms %d" % [_seq, elapsed_ms])
 	for r in _results:
 		f.store_line(r)
 

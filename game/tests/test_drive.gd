@@ -94,7 +94,8 @@ func _init() -> void:
 
 	# FAILURES FIRST, because they are the assertions that matter most
 	var ack := await _send(d, 1, ["tap_text NO SUCH CONTROL"])
-	check(ack.size() >= 2 and ack[0] == "seq 1", "the ack echoes the sequence number")
+	check(ack.size() >= 2 and ack[0].begins_with("seq 1 ms "),
+		"the ack echoes the sequence number AND the batch's elapsed ms (%s)" % ack[0])
 	check(ack.size() >= 2 and ack[1].begins_with("fail tap_text"),
 		"tap_text on a missing control FAILS rather than silently doing nothing")
 	check(ack.size() >= 2 and "NO SUCH CONTROL" in ack[1],

@@ -384,7 +384,36 @@ bundletool install-apks --apks=build/nokings.apks --adb="$(which adb)"
 ```
 
 **Pass the keystore.** Without `--ks` the APKs build fine, bundletool only *warns*, and the
-install then fails — a silent trap, because the build looked successful.
+install then fails — a silent trap, because the build looked successful. Re-confirmed
+2026-09-11 by following this recipe.
+
+**`--mode=universal` instead of `--connected-device` when there is no phone yet.** The two
+differ only in whether bundletool asks a device what splits it needs, so the universal set is
+larger (80.8 MB against the AAB's 31.3 MB) and installs anywhere. That matters because it
+decouples the BUILD from the device: a build made while the phone is unreachable is ready the
+moment it appears, and the install is then one command. Use `--connected-device` only when
+the phone is already there and the smaller set is worth having.
+
+### The build template does not exist in a git worktree — COPY it, do not wait
+
+`game/android/build` is 1.2 GB of generated scaffolding and `.gitignore` excludes all of
+`game/android/`, so a fresh `git worktree` has none of it and the export refuses outright:
+
+```
+ERROR: Cannot export project with preset "Android" due to configuration errors:
+Android build template not installed in the project. Install it from the Project menu.
+```
+
+**`godot --headless --path game --install-android-build-template` produced NOTHING here**
+(2026-09-11): it ran past 600 s with no output and without creating the directory. Do not
+wait on it. Copy the template from a checkout that already has one — seconds, and it leaves
+that checkout untouched:
+
+```sh
+mkdir -p <worktree>/game/android
+cp -a <primary-checkout>/game/android/build <worktree>/game/android/build
+cp -a <primary-checkout>/game/android/.build_version <worktree>/game/android/
+```
 
 This is what turns 86 from "written" into "verified" — and issue 86 is explicit that
 `run_all.sh` ALL GREEN does **not** verify this slice.

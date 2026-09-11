@@ -1,6 +1,7 @@
 extends SceneTree
-## Touch-drag probe for the TEST menu's scenario list. Needs a window AND
-## touch emulation — run it through run_all.sh, or by hand with:
+## Touch-drag probe for every scrolling list a finger lands on: the TEST menu's
+## scenario list (PR #379) and the in-game HUD drawers (NO-45). Needs a window
+## AND touch emulation — run it through run_all.sh, or by hand with:
 ##   printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > game/override.cfg
 ##   godot --path game -s tests/test_touch_scroll.gd; rm game/override.cfg
 ##
@@ -20,6 +21,7 @@ extends SceneTree
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
 const Drive := preload("res://scripts/drive.gd")
+const GameScript := preload("res://scripts/game.gd")
 
 var fails := 0
 # A member, not a local: a GDScript lambda captures locals BY VALUE, so a
@@ -196,16 +198,138 @@ func _init() -> void:
 	check(fired, "a driven tap_text ACTUALLY PRESSES the control — observable, not the ack")
 	target.queue_free()
 	await process_frame
-	# The other thing the driver was built for — NO-45's "does a drag starting ON
-	# an artefact row scroll the drawer" — lives in tests/repro_no45.gd instead,
-	# because it REPRODUCES a live bug and would therefore be permanently red
-	# here. A suite test that is expected to fail teaches the reader to ignore
-	# red, which is worse than not having it.
-
 	drv.queue_free()
 	await process_frame
 	for f in ["cmd.txt", "ack.txt"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(dd.path_join(f)))
+
+	# ---- NO-45: the HUD drawers, which is the same mechanism in the game ----
+	# This block replaces tests/repro_no45.gd, which was deliberately red while
+	# the bug was live and is deleted now that it is green — its own header said
+	# a suite test expected to fail teaches the reader to ignore red. It lands
+	# HERE rather than in a file of its own because this is the one suite
+	# run_all.sh already wraps in the touch-emulation override, and the
+	# precondition is the whole reason a separate file would exist.
+	#
+	# The fix is rows -> MOUSE_FILTER_PASS plus a deadzone on the container, so
+	# there are two things to pin and the second is the one that bites: a drag
+	# must SCROLL, and a tap must still PRESS. PASS delivers the press to the row
+	# either way, so "the button still works" is not free — it is what the
+	# deadzone buys.
+	menu.queue_free()
+	await process_frame
+	GameScript.next_config = {
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		# NO ITEMS HERE, deliberately. Adding six put the inventory drawer's
+		# scroll range down from 314px to 37px — the item strip changes the
+		# drawer's height — and an assertion with 37px of room and a 24px
+		# deadzone is one layout tweak away from being unable to fail. The tap
+		# assertions below get their own scenario instead.
+		"artefacts": ["27-club-punch-card", "tinfoil-hat",
+			"area-51-parking-permit", "fort-knox-iou",
+			"fema-summer-camp-flyer", "zurich-gnome-figurine",
+			"nero-s-marshmallow-stick", "pre-scratched-lottery-ticket",
+			"tungsten-filled-gold-bar", "crop-circle-plank",
+			"mar-a-lago-toilet-papers", "suspiciously-large-femur",
+			"daylight-savings-jar", "phantom-punch-glove",
+			"naruto-run-manual", "social-credit-report-card"],
+		"wave": 3, "gold": 200, "seed": 1}
+	GameScript.is_scenario = true
+	var game: Node = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game._set_drawer("inventory")
+	await process_frame
+	await process_frame
+
+	var inv_sc: ScrollContainer = null # reused by the second scenario below
+	for c in (game.hud.drawers["inventory"] as Control).get_children():
+		if c is ScrollContainer:
+			inv_sc = c
+	check(inv_sc != null, "the inventory drawer has a ScrollContainer")
+	check(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y > 100.0,
+		"...with real scroll range (%dpx) — a drawer that cannot scroll proves nothing"
+			% int(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y))
+	# START THE DRAG ON AN ARTEFACT ROW. That is the whole point: those rows are
+	# the ones that carried MOUSE_FILTER_STOP "so the tooltip shows", and a drag
+	# that began on blank drawer space would have scrolled even with the bug —
+	# which is exactly how a device test on 2026-09-10 reported "the drawer
+	# scrolls fine" against a scenario holding no artefacts at all.
+	var art_row: Control = game.hud.artefact_box.get_child(0)
+	var inv_before: int = inv_sc.scroll_vertical
+	await _drag(art_row.get_global_rect().get_center(), Vector2(0, -30), 6)
+	check(inv_sc.scroll_vertical != inv_before,
+		"a drag STARTING ON an artefact row scrolls the inventory drawer (%d -> %d)"
+			% [inv_before, inv_sc.scroll_vertical])
+
+	# ...and the strips that share the drawer still take a tap. item_box and
+	# activate_box build their rows as Buttons, whose default filter was also
+	# STOP, so they were changed too — and a Button set to PASS that stopped
+	# firing would be a silent, much worse regression than the one being fixed.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {
+		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
+		"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert"],
+		"stock": ["pawn", "pawn", "knight"], "wave": 1, "gold": 200, "seed": 1}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game._set_drawer("inventory")
+	await process_frame
+	await process_frame
+	inv_sc = null
+	for c in (game.hud.drawers["inventory"] as Control).get_children():
+		if c is ScrollContainer:
+			inv_sc = c
+	var item_btn: Button = null
+	for c in game.hud.item_box.get_children():
+		if c is Button:
+			item_btn = c
+			break
+	check(item_btn != null, "the inventory drawer has an item button to tap")
+	if item_btn != null:
+		var item_fired := [false]
+		game.hud.item_pressed.connect(func(_i: int) -> void: item_fired[0] = true)
+		inv_sc.ensure_control_visible(item_btn)
+		await process_frame
+		await process_frame
+		var p := item_btn.get_global_rect().get_center()
+		_mouse(true, p)
+		await process_frame
+		_mouse(false, p)
+		await process_frame
+		check(item_fired[0], "a TAP on an item row still presses it — PASS did not cost the press")
+
+	# The Stock drawer is the fourth strip, and the one where PASS is a
+	# judgement call: its buttons are drag SOURCES for deploying a piece. Pin
+	# that arming a deploy still works, because that is what a careless PASS
+	# would break and no artefact assertion would notice.
+	game._set_drawer("stock")
+	await process_frame
+	await process_frame
+	var stack_btn: Button = null
+	for c in game.hud.pool_box.get_children():
+		if c is Button and c.has_meta("id"):
+			stack_btn = c
+			break
+	check(stack_btn != null, "the stock drawer has a stack button")
+	if stack_btn != null:
+		var drag_started := [false]
+		game.hud.stack_drag_started.connect(func(_e: Variant, _c: bool) -> void:
+			drag_started[0] = true)
+		var sp := stack_btn.get_global_rect().get_center()
+		_mouse(true, sp)
+		await process_frame
+		_mouse(false, sp)
+		await process_frame
+		check(drag_started[0],
+			"pressing a Stock stack still arms a deploy — PASS did not cost the drag source")
+	game.queue_free()
+	await process_frame
 
 	if fails == 0:
 		print("ALL GREEN (touch-scroll probe)")

@@ -77,9 +77,11 @@ else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
 fi
 
-# NOTE: tests/repro_no45.gd is deliberately NOT here. It reproduces a live bug
-# (NO-45) and is meant to fail; a suite entry that is expected to be red teaches
-# everyone to ignore red. Run it by hand — its header says how.
+# NOTE: tests/repro_no45.gd is GONE (NO-45 is fixed). It was deliberately red
+# while the bug was live and kept out of this list for that reason — a suite
+# entry expected to be red teaches everyone to ignore red. Now that it is green
+# the same checks live in tests/test_touch_scroll.gd above, which is the one
+# suite this script already wraps in the touch-emulation override.
 for t in rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
 	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
 	box combos scenarios background tiers intro seed account sync leaderboard drive; do

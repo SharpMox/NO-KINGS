@@ -6,6 +6,7 @@ extends SceneTree
 ##   godot --path game -s tests/test_menu_clicks.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const MenuScript := preload("res://scripts/menu.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
 const MemoryBackend := preload("res://scripts/cloud/cloud_backend_memory.gd")
@@ -75,6 +76,16 @@ func _init() -> void:
 	root.add_child(menu)
 	await process_frame
 	await process_frame
+
+	# NO-56: Quit is offered on every platform that can honour it and on no
+	# platform that cannot. Written as the invariant rather than as "Quit
+	# exists", because the rule is the gate: iOS cannot self-terminate, so a
+	# Quit button there is a dead control. The suite only ever runs off-iOS, so
+	# what this actually guards is the other half — that gating it did not
+	# delete it from desktop and Android, which is what NO-56 explicitly rules
+	# against. The iOS half is unobservable from here and is not claimed.
+	check((_find_button(menu, "Quit") != null) == (not MenuScript._IS_IOS()),
+		"Quit is offered exactly on the platforms that can quit")
 
 	# TEST opens the scenario list (this click is what PR #20 shipped broken:
 	# the hidden submenu's ScrollContainer swallowed every mouse event)

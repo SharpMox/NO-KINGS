@@ -43,10 +43,11 @@ static var submits := 0
 
 ## Per platform, the same shape cloud_save.gd's _default_backend() uses.
 ##
-## iOS is wired here as of 2026-09-10, and it still reports no board — because
-## its LEADERBOARD_HIGH_SCORE is empty until Apple issues the id, and its
-## board_available() says so. That is deliberately a different mechanism from
-## the `return null` this used to do: null meant "this platform has no backend",
+## iOS was wired here on 2026-09-10 while still reporting no board, because its
+## LEADERBOARD_HIGH_SCORE was empty until Apple issued the id. That id landed on
+## 2026-09-11, so both platforms now answer for real. The seam is unchanged:
+## board_available() is still what decides, and that is deliberately a different
+## mechanism from the `return null` this used to do: null meant "this platform has no backend",
 ## which stopped being true once the Game Center one existed, and it would have
 ## made the id landing a two-file change. The property that mattered about the
 ## null is kept either way — iOS never falls through to Play Games, so we never

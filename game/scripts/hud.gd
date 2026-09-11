@@ -36,6 +36,13 @@ const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 ## descriptions on desktop by tap is a separate, filed piece of work — it is a
 ## small feature (Godot's tooltips are hover-only), not a side-effect of this.
 const DRAWER_SCROLL_DEADZONE := 24
+
+## NO-59: the description popup. Preferred wrap width, and the gutter it keeps
+## from every screen edge. Both are only PREFERENCES — _show_tip clamps the
+## panel into the viewport whatever they are, because an item at the right edge
+## of a 480-wide screen is where a popup anchored to its row goes off screen.
+const TIP_W := 240.0
+const TIP_MARGIN := 8.0
 ## +1 row while the Activate strip is up, +48 more for issue 100's Army Power
 ## line (two wrapped rows at 13px on a 480-wide portrait screen). Issue 67 made
 ## this height unconditional because the Army Ability chip was always in the
@@ -108,6 +115,14 @@ var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
 var stock_armed := Control.new() # draws the armed piece on the Stock button
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
+## NO-59: the description popup and its text. Built once in build(), owned by
+## the HUD rather than by any row — hud.refresh() frees every strip child, so a
+## panel parented to a row would not survive the next state change.
+var tip_panel: PanelContainer
+var tip_label: Label
+## Which artefact row the popup is currently describing, so tapping the same row
+## again closes it. Empty when nothing is shown.
+var tip_key := ""
 var pool_box := HBoxContainer.new()
 var item_box := HBoxContainer.new() # held-items strip
 ## issue 52: pressable Activate chips, for activatable Artefacts. NO-32 removed
@@ -496,6 +511,29 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
+	# NO-59: the description popup. ONE instance, owned by the HUD rather than by
+	# a row, because hud.refresh() frees and rebuilds every strip child — a panel
+	# parented to a row would be destroyed by the next refresh, which happens on
+	# essentially every state change.
+	#
+	# MOUSE_FILTER_IGNORE on both: it must not eat the press that dismisses it,
+	# and it must never sit between a finger and a control underneath.
+	tip_panel = PanelContainer.new()
+	tip_panel.add_theme_stylebox_override("panel",
+		_surface(Color(0.08, 0.08, 0.11, 0.97), Color(0.45, 0.45, 0.55), 8, 10, 8))
+	tip_panel.visible = false
+	tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_label = Label.new()
+	tip_label.add_theme_font_size_override("font_size", 13)
+	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A fixed wrap width rather than a free one: without it a long description is
+	# laid out as a single line whose minimum width is the whole string, and the
+	# clamp below would then have nothing it could fit on screen. Same failure
+	# NO-55 was, arriving through a different control.
+	tip_label.custom_minimum_size = Vector2(minf(TIP_W, vp.x - TIP_MARGIN * 2), 0)
+	tip_panel.add_child(tip_label)
+	add_child(tip_panel)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
 	# the button bar and the bar had to be raised above it; design C opens the
 	# drawers above the deck instead, so there is nothing to out-rank. Worse, the
@@ -511,6 +549,92 @@ func set_drawer(which: String) -> void:
 	drawer_open = "" if drawer_open == which else which
 	for name in drawers:
 		drawers[name].visible = drawer_open == name
+	hide_tip() # NO-59: a description outlives neither its drawer nor its row
+
+
+## NO-59: the tap-to-describe popup.
+##
+## WHY IT EXISTS. NO-45 set the drawer rows to MOUSE_FILTER_PASS so the lists
+## drag-scroll on touch, which gave up the hover tooltip STOP was there for. But
+## the bigger half is that a hover tooltip NEVER worked on a phone, so these
+## descriptions have not been readable during a run on the platform this game
+## ships to. hud.gd already argues this for a different control: the CAPTURED
+## header exists because "this is a portrait TOUCH game: the tooltip does not
+## exist on a phone".
+##
+## `anchor` is the row's global rect; the panel is placed BESIDE it (user ruling
+## 2026-09-11: a small popup beside the item, not a line inside the drawer) and
+## then clamped into the viewport.
+func show_tip(key: String, text: String, anchor: Rect2) -> void:
+	if key == tip_key: # tapping the same row again closes it
+		hide_tip()
+		return
+	tip_key = key
+	tip_label.text = text
+	tip_panel.visible = true
+	# The panel's size is not known until the container has sorted its children,
+	# and a position computed from a stale size is the whole bug this clamp
+	# exists to avoid. reset_size() forces it to its minimum NOW rather than
+	# next frame, so the arithmetic below runs on the real box.
+	tip_panel.reset_size()
+	var vp: Vector2 = g.get_viewport_rect().size
+	var box: Vector2 = tip_panel.size
+	# BESIDE THE ROW MEANS UNDER IT, not to its right, and that is a measurement
+	# rather than a preference: an artefact row is ~245px wide in a 480px
+	# viewport and the panel is 260, so there is never room to its right, and
+	# flipping it to the left landed it exactly on top of the row it describes —
+	# covering the thing the player just tapped. Directly under the row, aligned
+	# to its left edge, is adjacent and never hides it. Above instead when the
+	# row is near the bottom.
+	var y := anchor.end.y + 2.0
+	if y + box.y > vp.y - TIP_MARGIN:
+		y = anchor.position.y - 2.0 - box.y
+	# THE CLAMP IS THE POINT. A popup anchored to a row near an edge of a
+	# 480-wide portrait screen is exactly the failure NO-55 was — a control
+	# placed without reference to the viewport. maxf before minf so a panel
+	# TALLER OR WIDER than the screen still lands at the margin rather than at a
+	# negative offset, which is the case a bare clamp() gets wrong.
+	tip_panel.position = Vector2(
+		maxf(TIP_MARGIN, minf(anchor.position.x, vp.x - box.x - TIP_MARGIN)),
+		maxf(TIP_MARGIN, minf(y, vp.y - box.y - TIP_MARGIN)))
+
+
+func hide_tip() -> void:
+	tip_key = ""
+	if tip_panel != null:
+		tip_panel.visible = false
+
+
+## NO-59: a TAP on an artefact row, and specifically NOT a drag.
+##
+## An artefact row is an HBoxContainer, not a Button, so there is no `pressed`
+## signal that Godot has already taught to cancel when a ScrollContainer takes
+## the gesture over. This is that distinction, written out: remember where the
+## press landed, and act on the release only if the finger barely moved.
+##
+## The threshold is DRAWER_SCROLL_DEADZONE deliberately — the same number the
+## container uses to decide a drag IS a scroll. One constant means the two
+## answers can never disagree, and "it did not become a scroll" is exactly what
+## "it was a tap" has to mean here, because NO-45 made this row pass its press
+## through to the scroller.
+func _tip_input(row: Control, key: String, desc: String, e: InputEvent) -> void:
+	if not (e is InputEventMouseButton) or e.button_index != MOUSE_BUTTON_LEFT:
+		return
+	# GLOBAL position, not the local one gui_input hands out, and this is not a
+	# detail — it is the difference between working and silently never firing the
+	# guard. A gui_input `position` is relative to the ROW, and during a scroll
+	# the row travels with the content: a finger moving 180px up while its row
+	# moves 180px up reads as a local delta of ZERO, so every drag looked like a
+	# tap. Caught by the assertion below, not by reading the code.
+	if e.pressed:
+		row.set_meta("tip_press_at", e.global_position)
+		return
+	if not row.has_meta("tip_press_at"):
+		return
+	var from: Vector2 = row.get_meta("tip_press_at")
+	row.remove_meta("tip_press_at")
+	if e.global_position.distance_to(from) <= DRAWER_SCROLL_DEADZONE:
+		show_tip(key, desc, row.get_global_rect())
 
 
 func refresh() -> void:
@@ -719,6 +843,7 @@ func _rebuild_artefact_strip() -> void:
 		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
 		artefact_box.add_child(none)
+		hide_tip() # NO-59: nothing left to describe
 		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
@@ -749,6 +874,14 @@ func _rebuild_artefact_strip() -> void:
 		# desktop and on a physical iPhone 11. PASS still delivers the press to
 		# this row, which is what a tooltip needs; see DRAWER_SCROLL_DEADZONE.
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
+		# NO-59: tap the row to read its description. Passive artefacts are the
+		# only drawer rows where a plain tap is FREE — every other row in both
+		# drawers already spends a tap (an item arms, a chip activates, a Stock
+		# stack arms a deploy), so attaching a reveal to the same gesture there
+		# would change what those controls do.
+		var key: String = t.key
+		var desc: String = t.description
+		row.gui_input.connect(func(e: InputEvent) -> void: _tip_input(row, key, desc, e))
 		var art := TextureRect.new()
 		art.texture = g.artefact_tex(t.key)
 		art.custom_minimum_size = Vector2(ICON, ICON)
@@ -762,6 +895,11 @@ func _rebuild_artefact_strip() -> void:
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(l)
 		artefact_box.add_child(row)
+	# NO-59: the rows the popup was anchored to have just been freed. Keep it up
+	# only while the artefact it describes is still held — otherwise a consumed
+	# artefact leaves a description of something the player no longer has.
+	if tip_key != "" and not seen.has(tip_key):
+		hide_tip()
 
 
 ## issue 52: the Activate section — entry point 1 ("click the Artefact in

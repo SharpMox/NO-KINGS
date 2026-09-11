@@ -262,6 +262,76 @@ func _init() -> void:
 	check(inv_sc.scroll_vertical != inv_before,
 		"a drag STARTING ON an artefact row scrolls the inventory drawer (%d -> %d)"
 			% [inv_before, inv_sc.scroll_vertical])
+	# NO-59 LIVES OR DIES HERE: that drag must NOT also have popped a
+	# description. The rows pass their press through to the scroller now, so
+	# "tap" and "the start of a drag" are the same first event, and telling them
+	# apart is the whole risk of putting a reveal on this gesture.
+	check(not game.hud.tip_panel.visible,
+		"...and the drag does NOT pop a description — a scroll is not a tap")
+
+	# --- NO-59: tap an artefact row to read it, and stay on screen -----------
+	# Three positions, not the comfortable middle one: the popup is anchored to
+	# a row, and a row near an edge of a 480-wide portrait screen is exactly
+	# where an anchored panel goes off it. That is the failure NO-55 was.
+	var vpr: Vector2 = root.get_visible_rect().size
+	var rows: Array[Control] = []
+	for c in game.hud.artefact_box.get_children():
+		if c is Control:
+			rows.append(c)
+	check(rows.size() >= 3, "enough artefact rows to test edges (%d)" % rows.size())
+	# leftmost, rightmost and lowest row actually on screen in the drawer
+	var probes := {}
+	for r in rows:
+		var gr: Rect2 = r.get_global_rect()
+		if gr.position.y < inv_sc.global_position.y \
+				or gr.end.y > inv_sc.global_position.y + inv_sc.size.y:
+			continue # scrolled out of the drawer: its rect is not where a finger lands
+		if not probes.has("left") or gr.position.x < probes["left"].get_global_rect().position.x:
+			probes["left"] = r
+		if not probes.has("right") or gr.end.x > probes["right"].get_global_rect().end.x:
+			probes["right"] = r
+		if not probes.has("low") or gr.end.y > probes["low"].get_global_rect().end.y:
+			probes["low"] = r
+	check(probes.size() == 3, "found a left, right and bottom row to tap")
+	for where in ["left", "right", "low"]:
+		var r: Control = probes[where]
+		game.hud.hide_tip()
+		var p: Vector2 = r.get_global_rect().get_center()
+		_mouse(true, p)
+		await process_frame
+		_mouse(false, p)
+		await process_frame
+		check(game.hud.tip_panel.visible, "tapping the %s artefact row shows its description" % where)
+		# THE ASSERTION THAT MATTERS: fully inside the viewport, all four edges.
+		var tr: Rect2 = game.hud.tip_panel.get_global_rect()
+		check(tr.position.x >= 0.0 and tr.position.y >= 0.0
+				and tr.end.x <= vpr.x and tr.end.y <= vpr.y,
+			"...and the popup is fully on screen at the %s edge (%s in %s)"
+				% [where, tr, vpr])
+		check(game.hud.tip_label.text != "",
+			"...and it actually says something")
+	# Tapping the same row again closes it; so does closing the drawer.
+	var same: Control = probes["low"]
+	var same_at: Vector2 = same.get_global_rect().get_center()
+	game.hud.hide_tip()
+	_mouse(true, same_at)
+	await process_frame
+	_mouse(false, same_at)
+	await process_frame
+	check(game.hud.tip_panel.visible, "precondition: the description is up")
+	_mouse(true, same_at)
+	await process_frame
+	_mouse(false, same_at)
+	await process_frame
+	check(not game.hud.tip_panel.visible, "tapping the same row again closes it")
+	_mouse(true, same_at)
+	await process_frame
+	_mouse(false, same_at)
+	await process_frame
+	game._set_drawer("inventory") # closes it — set_drawer toggles
+	await process_frame
+	check(not game.hud.tip_panel.visible,
+		"closing the drawer takes the description with it")
 
 	# ...and the strips that share the drawer still take a tap. item_box and
 	# activate_box build their rows as Buttons, whose default filter was also

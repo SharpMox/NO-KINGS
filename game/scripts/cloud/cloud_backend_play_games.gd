@@ -115,3 +115,10 @@ static func pull(key: String) -> Variant:
 ## loaded", and T3 deliberately waits for the id before binding an account.
 static func account_id() -> String:
 	return Bridge.player_id
+
+
+## NO-54: the signed-in player's display name, or "" when there is none.
+## Same hop, same cache, same emptiness rule as account_id above — a caller
+## that gets "" falls back to the id rather than showing a blank.
+static func account_name() -> String:
+	return Account.clean_name(Bridge.display_name) # untrusted: see clean_name

@@ -97,3 +97,10 @@ static func pull(key: String) -> Variant:
 ## no id, no completed sign-in.
 static func account_id() -> String:
 	return Bridge.player_id
+
+
+## NO-54: the signed-in player's display name, or "" when there is none.
+## Arrives in the SAME authentication event as the id, so it can never
+## describe a different player than account_id() does.
+static func account_name() -> String:
+	return Account.clean_name(Bridge.display_name) # untrusted: see clean_name

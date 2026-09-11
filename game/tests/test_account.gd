@@ -207,6 +207,64 @@ func _init() -> void:
 	check(FileAccess.file_exists(sw_run),
 		"...so the guest's run stays exactly where it is, unparked")
 
+	# ---- NO-54: the display name is UNTRUSTED INPUT --------------------------
+	# A display name is chosen by the account holder, arrives from a platform
+	# service, and we render it and write it to disk. Each case below is a thing
+	# that string can be.
+	_clean()
+	check(Account.clean_name("Max\nQuit the game") == "MaxQuit the game",
+		"a newline is stripped — a name cannot add lines to the prompt")
+	# Built with char() rather than written literally: an invisible control
+	# character sitting in a source file is the very hazard under test here, and
+	# Godot's own parser refuses to compile one.
+	check(Account.clean_name("ab" + char(0x202E) + "cd") == "abcd",
+		"a bidi OVERRIDE is stripped — displayed text cannot be made to lie")
+	check(Account.clean_name(char(0x2066) + "a" + char(0x2069) + "b") == "ab",
+		"...and so are the isolates, which do the same job")
+	check(Account.clean_name("a" + char(0x200B) + "b" + char(0xFEFF) + "c") == "abc",
+		"zero-width padding is stripped — two accounts cannot render identically")
+	check(Account.clean_name("\t" + char(0x07) + "x" + char(0x9F) + "y") == "xy",
+		"C0 and C1 controls are stripped")
+	var huge := "A".repeat(10000)
+	check(Account.clean_name(huge).length() == Account.NAME_MAX_CHARS,
+		"a 10,000-character name is capped at %d, before anything measures it"
+			% Account.NAME_MAX_CHARS)
+	# THE CASE THAT MAKES THE REST MEANINGFUL. A sanitizer that mangles a real
+	# name is worse than none, and this project has already shipped one string
+	# defect (NO-52) that only a non-Latin account revealed.
+	for legit in ["Максим", "山田太郎", "Zoë O'Brien-Smith", "مُحَمَّد", "🎲 Dice"]:
+		check(Account.clean_name(legit) == legit,
+			"a legitimate name survives UNCHANGED: %s" % legit)
+
+	# ---- NO-54: the save field is ADDITIVE, which is why it is safe ----------
+	# save_config.gd's header draws the line this asserts: a field ADDED and read
+	# with a default is safe forever; a field RESHAPED and read with a default is
+	# a silent corruption. Both halves are pinned — an old file still loads, and
+	# the field appears once something writes it.
+	_clean()
+	_write(Account.ACCOUNT_PATH, {"owner": "google-old", "provider": Account.GOOGLE})
+	Account._reset_cache()
+	check(Account.owner() == "google-old" and Account.provider() == Account.GOOGLE,
+		"a save written BEFORE the name field still loads")
+	check(Account.owner_name() == "",
+		"...and reads an empty name rather than failing")
+	Account.sign_in(Account.GOOGLE, "google-named", [], "Renée")
+	check(Account.owner_name() == "Renée",
+		"a rebind writes the name, so it is populated the next time the file is written")
+	var on_disk: Variant = _read(Account.ACCOUNT_PATH)
+	check(on_disk is Dictionary and str(on_disk.get("name", "")) == "Renée",
+		"...and it really is on disk, not only in the cache")
+	Account.sign_in(Account.GOOGLE, "google-nameless", [])
+	check(Account.owner_name() == "",
+		"a provider that gives no name lands on empty, which callers read as \"use the id\"")
+	# The file is a plain file on the player's device. A clean write is not a
+	# guarantee of a clean read, so the read sanitizes too.
+	_write(Account.ACCOUNT_PATH, {"owner": "google-tampered",
+		"provider": Account.GOOGLE, "name": "good" + char(0x202E) + "reversed\nbad"})
+	Account._reset_cache()
+	check(Account.owner_name() == "goodreversedbad",
+		"a HAND-EDITED account.json cannot inject through the name either")
+
 	_clean()
 	print("---")
 	print("ALL ACCOUNT CHECKS OK" if fails == 0 else "ACCOUNT FAILURES: %d" % fails)

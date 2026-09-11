@@ -12,6 +12,14 @@ const Account := preload("res://scripts/account.gd")
 const MemoryBackend := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 
+## NO-55: the owner id this probe binds is a REAL 64-character Game Center id,
+## not a short label, because the defect is about WIDTH. The earlier
+## "probe-owner-a" was 13 characters and fitted comfortably in a 480px viewport,
+## so a layout assertion written against it would have passed with the bug still
+## in place — verified by disabling the fix and watching it stay green. The
+## measured device failure was 792-797px of content in that viewport.
+const OWNER_64 := "A26B4668036156E12DCCA5EE5856704F3F55F827CEE5720427156111D3F55F82"
+
 var fails := 0
 
 
@@ -347,33 +355,90 @@ func _init() -> void:
 	var prev_backend = CloudSave.backend
 	CloudSave.backend = MemoryBackend
 	Account._reset_cache()
-	Account.sign_in(Account.GOOGLE, "probe-owner-a", [])
+	Account.sign_in(Account.GOOGLE, OWNER_64, [])
 	var sw: Node = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(sw)
 	await process_frame
 	await process_frame
 	sw._on_sign_in_finished(true)
 	await process_frame
-	check(Account.owner() == "probe-owner-a",
+	check(Account.owner() == OWNER_64,
 		"a mismatched verdict does NOT rebind on its own — switch_to waits for consent")
 	check(_find_button(sw, "Switch account") != null
 			and _find_button(sw, "Not now") != null,
 		"it asks instead, offering both answers")
 	var prompt_text := _find_label(sw, "Switch to the new account?")
-	check(prompt_text != null and "probe-owner-a" in prompt_text.text
-			and "memory-account" in prompt_text.text,
+	# A PREFIX of the owner id, not the whole thing: it has no recorded name, so
+	# it falls back to its id — and NO-54 then shortens that id to what fits.
+	check(prompt_text != null and OWNER_64.substr(0, 20) in prompt_text.text
+			and "Memory Player" in prompt_text.text,
 		"and the prompt NAMES BOTH accounts — \"an account changed\" is not answerable")
+	# NO-54: and it names them by DISPLAY NAME, not by id. Both halves of the
+	# rule are in that one assertion: the live account shows the backend's name
+	# ("Memory Player", not its id "memory-account"), and the owner — bound
+	# above with no name recorded — falls back to its id. This line pins the
+	# fallback explicitly, because the useful failure is showing a BLANK where a
+	# nameless account should show its id.
+	check(prompt_text != null and not ("memory-account" in prompt_text.text),
+		"the live account is named, not identified — no raw id where a name exists")
+
+	# NO-55: the layout consequence, which is what actually reached the player.
+	# A Label with AUTOWRAP_OFF reports its full text width as its MINIMUM, a
+	# VBox takes the max of its children and CenterContainer does not clamp — so
+	# a long line pushed the whole menu sideways, measured at 792-797px in a 480
+	# viewport, with "NO KINGS" clipped off the left edge.
+	#
+	# Asserted on the RENDERED RECTS of the menu's own controls rather than on
+	# any property of the label: the property is the mechanism, the rects are
+	# what a player sees. Checked while the prompt is UP — hidden children
+	# contribute no minimum size, so a check with it closed proves nothing.
+	var vp_w: float = root.get_visible_rect().size.x
+	var widest := 0.0
+	var leftmost := vp_w
+	for ctrl in _controls(sw):
+		var r := ctrl.get_global_rect()
+		widest = maxf(widest, r.size.x)
+		leftmost = minf(leftmost, r.position.x)
+	# VERIFIED TO HAVE BITE: with _wrap_account_text disabled this reads 643,
+	# and with the value-level truncation disabled too it reads 693.
+	check(widest <= vp_w,
+		"no menu control is wider than the screen with the prompt up (%.0f <= %.0f)"
+			% [widest, vp_w])
+	# The left edge is the symptom Max actually reported ("NO KINGS" clipped, the
+	# N cut by the screen edge). Kept as a guard, but SAY WHAT IT IS: it did NOT
+	# fail in either negative control above — with the fix removed this fixture's
+	# overflow all went right, leftmost stayed 0 — so the width assertion is the
+	# one carrying the weight here and this one is insurance, not evidence.
+	check(leftmost >= 0.0,
+		"and nothing is pushed off the left edge — the title is not clipped (x=%.0f)" % leftmost)
+	# NO-54, the value half of the ruling ("shortened if long"). Asserted on the
+	# function rather than through the UI because the memory backend's name is
+	# fixed: what needs pinning is that a pathological name is cut, and cut on
+	# MEASURED WIDTH — the string below is 300 CJK characters, which no
+	# character-count cap tuned for Latin text would size correctly.
+	var monster: String = "山".repeat(300)
+	var fitted: String = sw._who(sw.switch_prompt_label, monster, "")
+	check(fitted.length() < monster.length() and fitted.ends_with("…"),
+		"a pathological display name is truncated, with an ellipsis (%d -> %d chars)"
+			% [monster.length(), fitted.length()])
+	var fitted_font: Font = sw.switch_prompt_label.get_theme_font("font")
+	var fitted_w: float = fitted_font.get_string_size(fitted, HORIZONTAL_ALIGNMENT_LEFT,
+		-1, sw.switch_prompt_label.get_theme_font_size("font_size")).x
+	check(fitted_w <= vp_w,
+		"...and what is left actually FITS the screen (%.0f <= %.0f)" % [fitted_w, vp_w])
+	check(sw._who(sw.switch_prompt_label, "", "short-id") == "short-id",
+		"an account with no recorded name falls back to its id, never to a blank")
 
 	# Decline: pre-NO-11 behaviour for the session, but said out loud.
 	check(await _click_button(sw, "Not now"), "Not now clickable")
 	await process_frame
-	check(Account.owner() == "probe-owner-a", "declining does not rebind")
+	check(Account.owner() == OWNER_64, "declining does not rebind")
 	check(_find_button(sw, "Switch account") == null, "and the prompt closes")
 	sw._on_sign_in_finished(true)
 	await process_frame
 	check(_find_button(sw, "Switch account") == null,
 		"a later verdict in the SAME session does not re-ask — declining is not a nag loop")
-	check(Account.owner() == "probe-owner-a", "and still does not rebind")
+	check(Account.owner() == OWNER_64, "and still does not rebind")
 
 	# Accept, on a fresh menu — the prompt re-appears on the next boot.
 	sw.queue_free()
@@ -400,6 +465,16 @@ func _init() -> void:
 	if fails == 0:
 		print("ALL MENU CLICKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## Every visible Control under `node`. Used by the NO-55 layout assertions,
+## which are about what is on screen rather than about any one widget.
+func _controls(node: Node, out: Array[Control] = []) -> Array[Control]:
+	if node is Control and node.is_visible_in_tree():
+		out.append(node)
+	for c in node.get_children():
+		_controls(c, out)
+	return out
 
 
 ## First visible Label whose text contains `needle`.

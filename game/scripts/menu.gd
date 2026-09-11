@@ -384,6 +384,16 @@ func _on_provider_pressed(prov: String) -> void:
 var main_box: VBoxContainer
 var guest_button: Button # relabelled by _on_logout; see there
 var test_scroll: ScrollContainer
+## NO-58: the TEST list's search box, and the state _apply_test_filter needs.
+##
+## `_test_open` is an INDEX rather than the old "is rows[0] visible" test. That
+## test read visibility back to decide what to do to visibility, which works
+## only while the accordion is the sole writer of it — and a filter is a second
+## writer. One place decides, from state it owns.
+var test_filter: LineEdit
+var test_head: Label
+var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
+var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
 var army_center: ScrollContainer
 var rank_center: CenterContainer
 var seed_field: LineEdit # issue 75
@@ -698,10 +708,31 @@ func _ready() -> void:
 	test_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	test_box.add_theme_constant_override("separation", 4)
 	test_scroll.add_child(test_box)
-	var head := Label.new()
-	head.text = "Test scenarios — %d boards" % Scenarios.all().size()
-	head.add_theme_font_size_override("font_size", 22)
-	test_box.add_child(head)
+	test_head = Label.new()
+	test_head.text = "Test scenarios — %d boards" % Scenarios.all().size()
+	test_head.add_theme_font_size_override("font_size", 22)
+	test_box.add_child(test_head)
+	# NO-58 (user ruling 2026-09-11: "Add a search box"). 385 scenarios in 50
+	# sections, and the 16 sections with a single member fold into "Other" — all
+	# 16 of which are HAND-WRITTEN, because a hand-written scenario is named
+	# distinctively and that is exactly what makes it a section of one. The
+	# grouping rule buries the entries that exist for hand-testing; a search is
+	# what makes them reachable without scrolling past 380 generated boards.
+	#
+	# It COMPLEMENTS the accordion rather than replacing it — with the box empty
+	# the list behaves exactly as before.
+	test_filter = LineEdit.new()
+	test_filter.placeholder_text = "search scenarios"
+	test_filter.clear_button_enabled = true
+	test_filter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# MUST NOT TAKE FOCUS ON SHOW, and this is the same load-bearing line the
+	# seed field carries for the same reason: tests/test_menu_clicks.gd drives
+	# THIS list with synthesised input, and a focused text field swallows the
+	# probe's keystrokes. FOCUS_CLICK means it is focused by being clicked and
+	# never by appearing.
+	test_filter.focus_mode = Control.FOCUS_CLICK
+	test_filter.text_changed.connect(func(_t: String) -> void: _apply_test_filter())
+	test_box.add_child(test_filter)
 	var back := _button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
@@ -755,7 +786,8 @@ func _ready() -> void:
 	# whole catalog into nine headers on one screen, at the cost of one extra
 	# click to reach any entry. That trade is only worth it at this size, which
 	# is why 77 did not make it.
-	var sections: Array = [] # {rows, relabel} per section — the accordion
+	_test_sections = [] # {rows, head, relabel} per section — the accordion
+	_test_open = -1
 	var row_style := StyleBoxFlat.new()
 	row_style.bg_color = Color(1, 1, 1, 0.06)
 	row_style.set_corner_radius_all(6)
@@ -777,10 +809,13 @@ func _ready() -> void:
 		sec_head.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
 		for style in ["normal", "hover", "pressed"]:
 			sec_head.add_theme_stylebox_override(style, head_style)
-		var relabel := func(open: bool) -> void:
+		# NO-58: the count is now a PARAMETER. While a search is running the
+		# header must say how many of its entries MATCH, not how many it holds —
+		# "PIECE BUFFS (12)" above two visible rows is a header that lies.
+		var relabel := func(open: bool, shown: int) -> void:
 			sec_head.text = "%s  %s  (%d)" % ["▾" if open else "▸",
-				sec.to_upper(), groups[sec].size()]
-		relabel.call(false)
+				sec.to_upper(), shown]
+		relabel.call(false, groups[sec].size())
 		test_box.add_child(sec_head)
 		for s in groups[sec]:
 			var row := _button(test_box, _test_row_text(s.name, sec), 15, func() -> void:
@@ -794,21 +829,25 @@ func _ready() -> void:
 			row.custom_minimum_size = Vector2(0, 40)
 			row.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 			row.tooltip_text = s.name
+			# NO-58: the FULL name, kept on the row, because that is what a search
+			# has to match. The row's own text is _test_row_text(), which strips
+			# the section prefix — "Artefacts: Tinfoil Hat" renders as "Tinfoil
+			# Hat" — so matching row.text would silently never find anything by
+			# its section name. set_meta rather than reusing tooltip_text: a
+			# tooltip is display and could be changed for display reasons.
+			row.set_meta("scenario_name", s.name)
 			for style in ["normal", "hover", "pressed"]:
 				row.add_theme_stylebox_override(style, row_style)
 			row.visible = false
 			rows.append(row)
-		sections.append({"rows": rows, "relabel": relabel})
+		var my_index := _test_sections.size()
+		_test_sections.append({"rows": rows, "head": sec_head, "relabel": relabel})
 		sec_head.pressed.connect(func() -> void:
-			var open := not rows[0].visible
-			for other in sections: # accordion: one section open at a time
-				for r in other.rows:
-					r.visible = false
-				other.relabel.call(false)
-			if open:
-				for r in rows:
-					r.visible = true
-				relabel.call(true)
+			# The accordion no longer writes visibility itself — it records WHICH
+			# section is open and lets _apply_test_filter decide what that means.
+			# One writer, so the filter and the accordion cannot disagree.
+			_test_open = -1 if _test_open == my_index else my_index
+			_apply_test_filter()
 			# put the header at the top. Computed from the siblings above it
 			# (hidden rows count nothing) rather than read back after a frame:
 			# set_deferred lands after this frame's container sort, so the new
@@ -1149,6 +1188,45 @@ func _button(parent: Container, text: String, size: int, on_press: Callable) -> 
 ## A scenario row's text inside its section: the section prefix is the header
 ## already, so "Artefact Common: Loch Ness Stool Sample" reads "Loch Ness Stool
 ## Sample" under ARTEFACT COMMON. "Other" and "General" carry no shared prefix.
+## NO-58: THE ONE PLACE THAT DECIDES WHAT IS VISIBLE IN THE TEST LIST.
+##
+## Both the accordion and the search box want to hide and show rows, and before
+## this the accordion owned `visible` outright — it even read it back to decide
+## which way to toggle. Two writers of one property is how a filter and an
+## accordion end up undoing each other, so neither writes it now: the accordion
+## records which section is open, the box holds the query, and this computes the
+## answer from both.
+##
+## WITH AN EMPTY QUERY THE LIST BEHAVES EXACTLY AS IT DID — one section open at a
+## time, every header showing its own size. That is the property to preserve;
+## the search is an addition, not a replacement.
+##
+## While a query IS running, every section opens itself: a match hidden inside a
+## collapsed section is this issue's original complaint arriving by a new route.
+## Sections with no match hide their header too, so what is left on screen is
+## the result rather than fifty empty headings.
+func _apply_test_filter() -> void:
+	if test_filter == null:
+		return
+	var q := test_filter.text.strip_edges().to_lower()
+	var searching := q != ""
+	var hits := 0
+	for i in _test_sections.size():
+		var sec: Dictionary = _test_sections[i]
+		var open: bool = searching or i == _test_open
+		var shown := 0
+		for r: Button in sec.rows:
+			var hit: bool = not searching or q in str(r.get_meta("scenario_name")).to_lower()
+			r.visible = open and hit
+			if hit:
+				shown += 1
+		hits += shown
+		sec.head.visible = not searching or shown > 0
+		sec.relabel.call(open, shown)
+	test_head.text = "Test scenarios — %d of %d" % [hits, Scenarios.all().size()] \
+		if searching else "Test scenarios — %d boards" % Scenarios.all().size()
+
+
 func _test_row_text(name: String, sec: String) -> String:
 	if sec == "Other" or sec == "General" or not name.begins_with(sec):
 		return name

@@ -139,6 +139,86 @@ func _init() -> void:
 	check(_find_button(menu, deepest) != null,
 		"the LAST scenario of the LAST section is reachable, not clipped (%s)" % deepest)
 
+	# ---- NO-58: the search box -----------------------------------------------
+	# The complaint: the hand-written scenarios — the ones that exist FOR hand
+	# testing — are named distinctively, so each is usually a section of one, so
+	# all of them fold into "Other" at the very bottom behind fifty sections.
+	# Measured: 385 scenarios, 50 sections, 16 singletons, and all 16 are
+	# hand-written. A search is what makes them reachable.
+	check(menu.test_filter != null, "the TEST list has a search box")
+	# The trap this guards: a text field that focuses itself on show swallows
+	# every keystroke this probe sends, which is why the seed field carries the
+	# same focus_mode line. SAY WHAT IT IS WORTH: removing focus_mode =
+	# FOCUS_CLICK does NOT make this fail — a LineEdit does not grab focus just
+	# by being added to the tree — so this is insurance against a future
+	# grab_focus(), not evidence that the current line is doing anything. The
+	# line stays because FOCUS_ALL also puts the field in the Tab order.
+	check(not menu.test_filter.has_focus(),
+		"...and it does NOT take focus on show — a focused field eats the probe's input")
+
+	# Pick a target the way a person would be stuck: a row in a COLLAPSED
+	# section, found by its full name rather than by opening anything. Chosen
+	# from the data rather than hardcoded, so renaming a scenario cannot rot it.
+	var buried: Button = null
+	for sec_dict in menu._test_sections:
+		if sec_dict.head.text.begins_with("▾"):
+			continue # this one is open; the point is to reach a closed one
+		for r: Button in sec_dict.rows:
+			if not r.visible:
+				buried = r
+				break
+		if buried != null:
+			break
+	check(buried != null, "found a scenario inside a collapsed section")
+	var buried_name: String = str(buried.get_meta("scenario_name"))
+	menu.test_filter.text = buried_name
+	menu._apply_test_filter()
+	await process_frame
+	check(buried.visible,
+		"typing its name reveals a scenario WITHOUT opening its section (%s)" % buried_name)
+	# ...and the rest of the list is gone, which is what makes it findable.
+	var still_up := 0
+	for sec_dict in menu._test_sections:
+		for r: Button in sec_dict.rows:
+			if r.visible:
+				still_up += 1
+	check(still_up < 20, "and the other 380-odd are filtered out (%d left)" % still_up)
+	check("of" in menu.test_head.text,
+		"the heading counts the matches rather than the catalog (%s)" % menu.test_head.text)
+
+	# MATCH THE FULL NAME, NOT THE ROW LABEL. _test_row_text strips the section
+	# prefix, so "Artefacts: Tinfoil Hat" renders as "Tinfoil Hat" — searching
+	# the label would never find anything by its section. Only assert this where
+	# a stripped row actually exists.
+	var stripped: Button = null
+	for sec_dict in menu._test_sections:
+		for r: Button in sec_dict.rows:
+			var full: String = str(r.get_meta("scenario_name"))
+			if full != r.text and full.length() > r.text.length():
+				stripped = r
+				break
+		if stripped != null:
+			break
+	if stripped != null:
+		var prefix: String = str(stripped.get_meta("scenario_name")) \
+			.substr(0, str(stripped.get_meta("scenario_name")).length() - stripped.text.length())
+		prefix = prefix.strip_edges().trim_suffix(":").strip_edges()
+		menu.test_filter.text = prefix
+		menu._apply_test_filter()
+		await process_frame
+		check(stripped.visible,
+			"searching the SECTION half of a name finds it, though the row does not show it (%s)"
+				% prefix)
+
+	# Clearing restores exactly the previous behaviour — the search is an
+	# addition, not a replacement.
+	menu.test_filter.text = ""
+	menu._apply_test_filter()
+	await process_frame
+	check(not buried.visible, "clearing the box collapses the list again")
+	check(_find_button(menu, deepest) != null,
+		"...and the section that was open before the search is still open")
+
 	# Back returns to the main menu
 	check(await _click_button(menu, "← Back"), "Back button clickable")
 	await process_frame

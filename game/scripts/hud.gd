@@ -16,6 +16,26 @@ const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
+
+## NO-45: how far a finger must travel inside a drawer before the drag becomes a
+## SCROLL rather than a tap. 24px, the same value menu.gd:654 settled on for the
+## TEST list in PR #379 — one number for one gesture, and that one is device-
+## verified on a Nothing Phone 2a.
+##
+## THE ROWS IN BOTH DRAWERS ARE MOUSE_FILTER_PASS FOR THE SAME REASON, and the
+## pair is what makes it work. Viewport::_gui_call_input marks a pointer press
+## handled at a MOUSE_FILTER_STOP control and stops climbing, so with STOP rows
+## the press never reached the ScrollContainer and its touch drag — which only
+## starts in that press branch — never began. PASS still delivers the press to
+## the row, so taps and tooltips keep working; the deadzone is what stops a tap
+## being read as a scroll.
+##
+## WHAT THIS COSTS, accepted by user ruling 2026-09-11 ("take the trade"): on
+## DESKTOP the hover tooltip a row had under STOP is given up. Phones never had
+## tooltips, so nothing is lost where the defect actually lives. Restoring the
+## descriptions on desktop by tap is a separate, filed piece of work — it is a
+## small feature (Godot's tooltips are hover-only), not a side-effect of this.
+const DRAWER_SCROLL_DEADZONE := 24
 ## +1 row while the Activate strip is up, +48 more for issue 100's Army Power
 ## line (two wrapped rows at 13px on a 480-wide portrait screen). Issue 67 made
 ## this height unconditional because the Army Ability chip was always in the
@@ -469,6 +489,7 @@ func build(game) -> void:
 		panel.custom_minimum_size = Vector2(spec[3], spec[4])
 		panel.visible = false
 		var sc := ScrollContainer.new()
+		sc.scroll_deadzone = DRAWER_SCROLL_DEADZONE # NO-45
 		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
 		sc.clip_contents = false # the ▲ promote badge overhangs the drawer top
 		sc.add_child(spec[1])
@@ -722,7 +743,12 @@ func _rebuild_artefact_strip() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 		row.tooltip_text = t.description
-		row.mouse_filter = Control.MOUSE_FILTER_STOP # so the tooltip shows
+		# NO-45: PASS, not STOP. STOP was set here "so the tooltip shows" and it
+		# also stopped the press reaching the drawer's ScrollContainer, so the
+		# artefact list could not be drag-scrolled on a phone — reproduced on
+		# desktop and on a physical iPhone 11. PASS still delivers the press to
+		# this row, which is what a tooltip needs; see DRAWER_SCROLL_DEADZONE.
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		var art := TextureRect.new()
 		art.texture = g.artefact_tex(t.key)
 		art.custom_minimum_size = Vector2(ICON, ICON)
@@ -771,6 +797,7 @@ func _rebuild_activate_strip() -> void:
 			# again to cancel — same shape _rebuild_item_strip already uses
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		btn.pressed.connect(func() -> void: artefact_activate_pressed.emit(key))
+		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		activate_box.add_child(btn)
 
 
@@ -868,6 +895,7 @@ func _rebuild_item_strip() -> void:
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		btn.pressed.connect(func() -> void: item_pressed.emit(i))
+		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		item_box.add_child(btn)
 
 
@@ -1031,6 +1059,17 @@ func _rebuild_pool_strip() -> void:
 		btn.set_meta("entry", st.entry)
 		btn.pressed.connect(func() -> void: stack_pressed.emit(st.entry, cap, st.count))
 		btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
+		# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
+		# rather than a straight win. These buttons are drag SOURCES — button_down
+		# arms a deploy — so a press now also reaches the ScrollContainer and can
+		# start a scroll. The conflict is small in practice and the deadzone
+		# bounds it: this strip is horizontal, a deploy drag goes UP to the board,
+		# and a mostly-vertical drag moves a horizontal scroll barely at all.
+		# Against that, a full Stock (22 stacks was a real save) cannot currently
+		# be drag-scrolled at all — the one complaint Max has already made about
+		# this drawer. Flagged rather than assumed: if deploying from a long Stock
+		# ever feels like it drifts, this line is the suspect.
+		btn.mouse_filter = Control.MOUSE_FILTER_PASS
 		pool_box.add_child(btn)
 	if g.state == g.State.SETUP and g.selected.x >= 0:
 		# empty slot: tap it (or drop the dragged piece on the strip) to take
@@ -1045,4 +1084,5 @@ func _rebuild_pool_strip() -> void:
 		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
 		slot.tooltip_text = "Put the piece back into stock"
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		pool_box.add_child(slot)

@@ -45,6 +45,7 @@ func _init() -> void:
 	check(not GlobalBoard.available(),
 		"no global board on desktop — so no door to one on the Scores screen")
 
+
 	# THE ONE THAT SILENTLY CORRUPTS A REAL LEADERBOARD IF IT REGRESSES.
 	# tools/playtest.sh plays hundreds of bot runs. If the submit ever escapes
 	# game.gd's `not is_scenario and not autoplay` guard, every one of them
@@ -84,19 +85,27 @@ func _init() -> void:
 	real.queue_free()
 	await process_frame
 
-	# --- NO-8, the iOS half: the board id is EMPTY until Apple issues it -----
-	# The whole point of this block is that "unavailable" must be caused by the
-	# EMPTY ID and nothing else. Desktop is not signed in, so a bare
-	# `not board_available()` would pass for the wrong reason forever and keep
-	# passing after the id lands — so sign-in is FAKED first (the same
-	# account.json + bridge-statics idiom test_cloud_save.gd uses for the
-	# Android ownership gate), making is_available() genuinely true.
+	# --- NO-8, the iOS half: the board id LANDED on 2026-09-11 ---------------
+	# This block used to assert the opposite — that the board was unavailable
+	# and that the EMPTY ID was the only thing stopping it. That was true from
+	# 2026-09-10, and it stayed true for a day after the leaderboard actually
+	# existed in App Store Connect, because nobody came back to fill the
+	# constant in. Nothing ever reached GKScore on iOS in that window and there
+	# was no symptom anywhere: "no board" and "a board that is never asked" look
+	# identical from outside.
+	#
+	# The structure that made this block worth having is KEPT. Desktop is not
+	# signed in, so a bare board_available() check would answer for the wrong
+	# reason; sign-in is FAKED first (the same account.json + bridge-statics
+	# idiom test_cloud_save.gd uses for the Android ownership gate) so
+	# is_available() is genuinely true and the board id is the only variable.
+	check(IosBackend.board_id(GlobalBoard.HIGH_SCORE) != "",
+		"the iOS board id is wired — the game's own board name resolves to a real one")
 	check(PlayGames.board_id(GlobalBoard.HIGH_SCORE) != "",
-		"(control) the ANDROID board id is wired, so an empty id is a real difference")
-	check(IosBackend.board_id(GlobalBoard.HIGH_SCORE) == "",
-		"the iOS board id is empty — Apple has not issued it yet (MANUAL-STEPS D)")
-	check(IosBackend.board_id("no-such-board") == "",
-		"and an unknown board name is empty too, not an error")
+		"(control) and so does Android's, through its own id")
+	check(IosBackend.board_id("no-such-board") == ""
+			and PlayGames.board_id("no-such-board") == "",
+		"an unknown board name is still \"not wired yet\" on both, never an error")
 	var gc_acc := FileAccess.open(Account.ACCOUNT_PATH, FileAccess.WRITE)
 	gc_acc.store_string(JSON.stringify({"owner": "gc-player-1", "provider": "apple"}))
 	gc_acc = null
@@ -105,14 +114,16 @@ func _init() -> void:
 	IosBridge.player_id = "gc-player-1"
 	check(IosBackend.is_available(),
 		"(control) signed in as the owner: the iOS cloud backend itself IS live")
-	check(not IosBackend.board_available(),
-		"...and the board is STILL unavailable — the empty id is the only thing stopping it")
-	# so the two calls a live board would make are no-ops rather than sends into
-	# an identifier Apple never issued (GKScore accepts any string, so that
-	# failure would be a score that silently goes nowhere)
-	IosBackend.board_submit(GlobalBoard.HIGH_SCORE, 12345)
-	check(not IosBackend.board_show(GlobalBoard.HIGH_SCORE),
-		"board_show refuses while the id is empty, so a caller can disable its button")
+	# THE OBSERVABLE CONSEQUENCE OF THE ID LANDING, and the assertion that would
+	# have caught the day the constant sat empty behind a real leaderboard.
+	check(IosBackend.board_available(),
+		"...and the board is AVAILABLE — a signed-in iOS player can now be submitted for")
+	# The empty-id guard itself has not gone anywhere; it is just no longer the
+	# high-score board that exercises it. A board nobody has wired still refuses
+	# rather than sending into an identifier Apple never issued — GKScore accepts
+	# any string, so that failure would be a score that silently goes nowhere.
+	check(not IosBackend.board_show("no-such-board"),
+		"board_show still refuses an unwired board, so a caller can disable its button")
 	# restore: statics survive the process, and later checks assume defaults
 	IosBridge.signed_in = false
 	IosBridge.player_id = ""

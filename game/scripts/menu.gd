@@ -559,7 +559,15 @@ func _ready() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
 	_button(main_box, "TEST", 24, _show_tests)
-	_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
+	# NO-56: iOS has no sanctioned self-termination, so get_tree().quit() is a
+	# no-op there and the button is a visibly dead control — the same defect the
+	# hardware-Back handler above exists to avoid ("a gesture that silently does
+	# nothing reads as a frozen app"). Apple's HIG says not to offer Quit at all.
+	# GATED, NOT DELETED: Quit is legitimate on Android and desktop. The
+	# fall-through to quit() at the end of _back() stays — on iOS there is no
+	# hardware back, so it is unreachable rather than wrong.
+	if not _IS_IOS():
+		_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart

@@ -85,6 +85,90 @@ static func provider() -> String:
 	return str(_read().get("provider", ""))
 
 
+## NO-54: the hard cap on a display name, in characters, applied BEFORE any
+## width measurement. The measured-width trim in menu.gd is what decides how
+## much actually fits on a line; this exists so a pathological string can never
+## reach that measurement in the first place.
+const NAME_MAX_CHARS := 64
+
+## NO-54 (user ruling 2026-09-11: "sanitize the name to avoid any weird
+## intentional injection attack or mishap"): a display name is UNTRUSTED INPUT.
+## The account holder chooses it, a platform service hands it to us, and we then
+## render it and write it to disk. Treat it as hostile text, not as text.
+##
+## APPLIED AT THE BOUNDARIES, NOT AT THE DISPLAY SITES — three display sites
+## each remembering to sanitize is three chances to miss one. The three
+## boundaries are: the platform (each backend's account_name()), the write
+## (sign_in, so what lands in account.json is already clean) and the READ
+## (owner_name, because account.json is a plain file on the player's device and
+## can be hand-edited — a clean write is no guarantee of a clean read).
+##
+## WHAT IS REMOVED, and why each one:
+##   * C0/C1 CONTROLS AND NEWLINES. A "\n" in a name adds a line to the prompt
+##     and can push the rest off screen; the others do stranger things.
+##   * BIDI OVERRIDES (U+202A-202E, U+2066-2069) and the directional marks
+##     U+200E/200F. These REORDER the text that follows them, which is the
+##     classic way to make displayed text lie about what it says. This is the
+##     one with real spoofing potential and the one most likely to be missed.
+##   * ZERO-WIDTH AND BOM (U+200B-200D, U+FEFF). Invisible padding: it makes two
+##     different accounts render identically, and pads a name past a cap without
+##     showing anything.
+##
+## WHAT SURVIVES UNCHANGED, and this is the half that matters: every printable
+## character in every script. A Cyrillic, Japanese, Arabic or emoji name comes
+## through byte-for-byte. This project has already shipped one string defect that
+## only a non-Latin account revealed (NO-52), and a sanitizer that mangles a
+## legitimate Japanese name would be worse than no sanitizer at all.
+##
+## ONE JUDGEMENT CALL, stated so it can be reversed: U+200C/U+200D (ZWNJ/ZWJ)
+## are NOT purely decorative — they are meaningful in Persian and Indic scripts
+## and they join emoji sequences. Stripping them can make such a name render
+## slightly wrong (a split emoji, a missed joining form) while never making it
+## unreadable. That cost is taken deliberately in exchange for closing the
+## invisible-padding vector; if a real name is ever reported as mangled, these
+## two are the first thing to allow back.
+##
+## NOT ESCAPED: BBCode. Both labels that render this are plain Labels, not
+## RichTextLabels, so markup in a name is inert — and escaping it would corrupt
+## legitimate names containing brackets. If either label ever becomes a
+## RichTextLabel, that changes and this is the note that says so.
+static func clean_name(raw: String) -> String:
+	# Cap the WORK first: slice generously (a legal name is at most NAME_MAX_CHARS
+	# printable characters, but the strippable ones do not count toward it) before
+	# walking a string that may be arbitrarily long.
+	var out := ""
+	for c in raw.substr(0, NAME_MAX_CHARS * 8):
+		var u := c.unicode_at(0)
+		if u < 0x20 or u == 0x7F or (u >= 0x80 and u <= 0x9F):
+			continue # C0 controls, DEL, C1 controls — includes \n, \r and \t
+		if u == 0x200E or u == 0x200F or (u >= 0x202A and u <= 0x202E) \
+				or (u >= 0x2066 and u <= 0x2069):
+			continue # directional marks, embeddings, overrides and isolates
+		if (u >= 0x200B and u <= 0x200D) or u == 0xFEFF:
+			continue # zero-width space / non-joiner / joiner, and the BOM
+		out += c
+		if out.length() >= NAME_MAX_CHARS:
+			break
+	return out.strip_edges()
+
+
+## NO-54: the display name of the account that owns this install, or "" when
+## none was recorded. Written at BIND time because there is nowhere else to get
+## it from — the switch prompt names the OUTGOING account, which by then is not
+## the account the device is signed in to, so no live call can answer for it.
+## Callers fall back to owner() when this is empty.
+##
+## ADDITIVE, which is the only reason it is safe to add now. save_config.gd's
+## header draws the line: a field ADDED and read with a default is safe forever,
+## a field RESHAPED and read with a default is a silent corruption. Every
+## account.json written before this simply has no "name", reads "", and falls
+## back to the id exactly as it does today.
+## Sanitized on READ as well as on write: account.json is a plain file on the
+## player's device, so a clean write is no guarantee of a clean read.
+static func owner_name() -> String:
+	return clean_name(str(_read().get("name", "")))
+
+
 static func signed_in() -> bool:
 	return provider() != "" and provider() != GUEST
 
@@ -103,8 +187,11 @@ static func start_guest() -> String:
 ##
 ## `save_paths` are the local save files to restamp; the caller passes them so
 ## this stays a pure account module with no opinion about what a save is.
+## `account_name` is optional and defaults to "": a provider that gives no name,
+## and every call written before NO-54, land on the same empty value that
+## owner_name() already treats as "fall back to the id".
 static func sign_in(new_provider: String, account_id: String,
-		save_paths: Array) -> void:
+		save_paths: Array, account_name: String = "") -> void:
 	# Anything queued was queued by the PREVIOUS owner, and the queue stamps no
 	# owner of its own — so draining it after a rebind would deliver the old
 	# account's payload to the new account's cloud. A run tombstone crossing that
@@ -116,7 +203,10 @@ static func sign_in(new_provider: String, account_id: String,
 	# an account whose cloud the tombstone was never going to reach anyway, so
 	# delivering it could only ever damage a cloud it did not describe.
 	SyncQueue.clear()
-	_write({"owner": account_id, "provider": new_provider})
+	# Sanitized before it is persisted, so a later reader inherits a clean value
+	# rather than a promise of one (clean_name's header explains the rest).
+	_write({"owner": account_id, "provider": new_provider,
+		"name": clean_name(account_name)})
 	for path in save_paths:
 		# A returning account reclaims what logout parked under ITS id. Another
 		# account's parked saves are named for that account and stay untouched,
@@ -224,13 +314,13 @@ static func label(prov: String) -> String:
 
 
 static func switch_to(new_provider: String, account_id: String,
-		save_paths: Array) -> bool:
+		save_paths: Array, account_name: String = "") -> bool:
 	if account_id == "" or account_id == owner():
 		return false # same account, or no id to switch to
 	if not signed_in() or provider() == GUEST:
 		return false # first bind or guest conversion — sign_in()'s own path
 	logout(save_paths)
-	sign_in(new_provider, account_id, save_paths)
+	sign_in(new_provider, account_id, save_paths, account_name)
 	return true
 
 

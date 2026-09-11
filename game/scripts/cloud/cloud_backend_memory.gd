@@ -30,3 +30,9 @@ static func reset() -> void:
 ## Part of the backend contract alongside is_available/push/pull.
 static func account_id() -> String:
 	return "memory-account"
+
+
+## NO-54: a fixed name to match the fixed id, so tests can tell "showed the
+## name" from "showed the id" without a platform.
+static func account_name() -> String:
+	return "Memory Player"

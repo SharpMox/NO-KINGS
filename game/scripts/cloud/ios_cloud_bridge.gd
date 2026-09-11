@@ -31,6 +31,17 @@ static var signed_in := false
 static var sign_in_attempted := false
 static var player_id := ""
 
+## NO-54: the human-readable half of the SAME authentication event the id
+## arrives in, so it costs no extra call and cannot disagree with player_id.
+## Empty when Game Center gave no name — which the menu treats as "fall back to
+## the id", never as an error.
+##
+## Trustworthy only since NO-52 (PR #386): until then the plugin decoded these
+## bytes as Latin-1, so every non-Latin name arrived mangled. That is why this
+## was never plumbed through before — displaying it would have shipped garbage
+## to exactly the players it is meant to help.
+static var display_name := ""
+
 ## The plugin singletons, fetched at _ready. Objects, not Nodes — the plugin
 ## registers them with the Engine directly. Null off iOS, and every static
 ## entry point treats null as "no cloud", exactly like desktop.
@@ -197,15 +208,22 @@ func _on_gc_event(e: Variant) -> void:
 		var id := str(e.get("player_id", ""))
 		if id == "":
 			signed_in = false
+			display_name = ""
 			sign_in_attempted = true
 			sign_in_finished.emit(false)
 			return
 		player_id = id
+		# displayName first, alias second: GKPlayer.displayName is what Game
+		# Center itself shows, and falls back to the alias when the player has
+		# no separate display name. Either may be absent; "" then means "no
+		# name", which the menu resolves to the id rather than to a blank.
+		display_name = str(e.get("displayName", e.get("alias", "")))
 		signed_in = true
 		sign_in_attempted = true
 		sign_in_finished.emit(true)
 	else:
 		signed_in = false
+		display_name = ""
 		sign_in_attempted = true
 		sign_in_finished.emit(false)
 

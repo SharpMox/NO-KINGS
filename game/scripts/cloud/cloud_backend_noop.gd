@@ -25,3 +25,8 @@ static func pull(_key: String) -> Variant:
 ## Part of the backend contract alongside is_available/push/pull.
 static func account_id() -> String:
 	return ""
+
+
+## NO-54: no cloud, so no account and no name.
+static func account_name() -> String:
+	return ""

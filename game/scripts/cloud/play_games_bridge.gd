@@ -59,6 +59,14 @@ static var sign_in_attempted := false
 ## on user_authenticated alone would stamp an empty owner id into account.json.
 static var player_id := ""
 
+## NO-54: the display name from the same current_player_loaded hop the id comes
+## from. PlayGamesPlayer has carried this field all along
+## (addons/GodotPlayGameServices/scripts/players/player.gd) — it was simply
+## never read. Empty until the player loads, and empty is "fall back to the id",
+## not an error: an Android id is ~21 characters and fits, which is why this
+## defect surfaced on iOS first even though it was never iOS-only.
+static var display_name := ""
+
 ## key -> envelope Dictionary, the last snapshot seen for each save key.
 ## pull() answers from here so it can stay synchronous; a stale or missing
 ## entry is safe because resolve() is highest-wave-wins then last-write-wins,
@@ -286,10 +294,12 @@ func _on_player_loaded(player: Variant) -> void:
 	print("[pgs] player loaded: ", "null" if player == null else str(player.player_id))
 	if player == null:
 		signed_in = false
+		display_name = ""
 		sign_in_attempted = true
 		sign_in_finished.emit(false)
 		return
 	player_id = str(player.player_id)
+	display_name = str(player.display_name) # NO-54
 	signed_in = true
 	sign_in_attempted = true
 	sign_in_finished.emit(true)

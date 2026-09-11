@@ -195,7 +195,11 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# GOOGLE because Play Games is the only provider that reaches this signal;
 	# Game Center is issue 87 and needs its own path.
 	if id != "" and was_interactive and not Account.signed_in():
-		Account.sign_in(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
+		# NO-54: the name is recorded WITH the bind, because this is the only
+		# moment it is knowable — once another account signs in, nothing can say
+		# what this one was called.
+		Account.sign_in(_NATIVE_PROVIDER(), id, _SAVE_PATHS(),
+			CloudSave.backend.account_name())
 	# NO-11: the device's account changed under a signed-in install. The branch
 	# above cannot catch it — it requires NOT signed in — so before this the
 	# mismatch fell through every path and sync just went quiet. switch_to
@@ -268,9 +272,15 @@ func _on_logout() -> void:
 ## changed" without saying which is not something a player can answer.
 func _ask_to_switch(id: String) -> void:
 	_switch_pending_id = id
+	# NO-54: NAMES, not ids. Both halves: the live account through the backend,
+	# the outgoing one from what was stored when it was bound. _who falls back to
+	# the id per side, so a provider that gives no name degrades to today's
+	# behaviour on that line alone rather than blanking it.
 	switch_prompt_label.text = ("This device is now signed in to %s as %s.\n" +
 		"This install's progress belongs to %s.\nSwitch to the new account?") \
-		% [Account.label(_NATIVE_PROVIDER()), id, Account.owner()]
+		% [Account.label(_NATIVE_PROVIDER()),
+			_who(switch_prompt_label, CloudSave.backend.account_name(), id),
+			_who(switch_prompt_label, Account.owner_name(), Account.owner())]
 	switch_prompt.visible = true
 
 
@@ -280,7 +290,8 @@ func _on_switch_accepted() -> void:
 	var id := _switch_pending_id
 	_switch_pending_id = ""
 	switch_prompt.visible = false
-	Account.switch_to(_NATIVE_PROVIDER(), id, _SAVE_PATHS())
+	Account.switch_to(_NATIVE_PROVIDER(), id, _SAVE_PATHS(),
+		CloudSave.backend.account_name()) # NO-54
 	if Account.owner() != id:
 		return # switch_to refused (guest conversion / first bind); it owns that call
 	if sync_button != null:
@@ -298,9 +309,13 @@ func _on_switch_declined() -> void:
 	_switch_declined = true
 	_switch_pending_id = ""
 	switch_prompt.visible = false
+	# NO-54: the second site, and the one a fix scoped to the prompt misses —
+	# this line carries a raw id too, on the screen the player is left looking at
+	# after declining.
 	login_note.text = ("Playing as %s. This device is signed in to a different " +
 		"%s account, so sync is paused until you accept the switch.") \
-		% [Account.owner(), Account.label(_NATIVE_PROVIDER())]
+		% [_who(login_note, Account.owner_name(), Account.owner()),
+			Account.label(_NATIVE_PROVIDER())]
 
 
 func _finish_login() -> void:
@@ -507,6 +522,7 @@ func _ready() -> void:
 	switch_prompt_label.add_theme_font_size_override("font_size", 13)
 	switch_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	switch_prompt.add_child(switch_prompt_label)
+	_wrap_account_text(switch_prompt_label) # NO-55 — after add_child: it reads the theme font
 	_button(switch_prompt, "Switch account", 20, _on_switch_accepted)
 	_button(switch_prompt, "Not now", 20, _on_switch_declined)
 	# Offered on whether the save can actually be READ, not on whether a file is
@@ -589,6 +605,11 @@ func _ready() -> void:
 	login_note.modulate = Color(1, 1, 1, 0.6)
 	login_note.text = LOGIN_TAGLINE
 	login_box.add_child(login_note)
+	# NO-55: the same treatment, because _on_switch_declined puts an account
+	# label in here too — and this label sits in the login screen's own centred
+	# box, which overflows exactly the same way.
+	login_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wrap_account_text(login_note)
 	for prov in [Account.GOOGLE, Account.APPLE]:
 		provider_buttons.append(
 			_button(login_box, "Sign in with %s" % Account.label(prov), 22,
@@ -1044,6 +1065,68 @@ func _army_summary(army: Array) -> String:
 	for id in counts:
 		parts.append(("%d× %s" % [counts[id], id]) if counts[id] > 1 else id)
 	return " · ".join(parts)
+
+
+## NO-55: how wide an account label may be. One number, read from the viewport
+## rather than hardcoded, so it is right on any canvas this game is stretched to;
+## the inset leaves the wrapped text clear of both screen edges.
+const TEXT_INSET := 40.0
+
+func _text_width() -> float:
+	return maxf(120.0, get_viewport_rect().size.x - TEXT_INSET)
+
+
+## NO-55: make a Label that carries arbitrary account text safe to put in a
+## container.
+##
+## A Label with AUTOWRAP_OFF reports a MINIMUM WIDTH equal to its full text
+## width. A VBoxContainer's minimum is the max of its children's, and
+## CenterContainer centres its child at that minimum WITHOUT clamping to its own
+## rect — the offset just goes negative — so one long line pushed the whole main
+## menu sideways: "NO KINGS" clipped off the left edge, every button shoved
+## right, measured at 792-797px inside a 480px viewport.
+##
+## WORD_SMART, not plain WORD (user ruling: wrap, do not clip). Plain WORD cannot
+## break an unbroken token, and an account id — or a name with no spaces — is
+## exactly that, so plain WORD would have left the minimum width unchanged and
+## fixed nothing.
+##
+## The explicit minimum is what makes wrapping USEFUL rather than merely safe:
+## with autowrap on, the label's own minimum collapses toward zero and the
+## container would size to its widest BUTTON instead, wrapping the prompt into a
+## narrow column. Stating the width puts it back under the player's screen.
+func _wrap_account_text(l: Label) -> void:
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = _text_width()
+
+
+## NO-54: what to CALL an account on screen — its display name, or the id when
+## no name was recorded. Truncated so a name can never be absurdly long, which
+## is the value half of the user's ruling ("your display name, shortened if
+## long"); _wrap_account_text is the layout half, and neither substitutes for
+## the other.
+##
+## TRUNCATED ON MEASURED WIDTH, NOT CHARACTER COUNT, and that is the whole
+## reason this is not a substr(): a display name is arbitrary user text, and CJK
+## is short by character count and wide in pixels — four Japanese characters
+## outrun twenty Latin ones. Character counting would trim the wrong names.
+##
+## ponytail: trims one character at a time. The ceiling is the length of a
+## display name, measured once per prompt; a binary search if that ever shows up
+## in a profile.
+func _who(l: Label, name: String, id: String) -> String:
+	var text := name if name != "" else id
+	var font := l.get_theme_font("font")
+	if font == null:
+		return text
+	var size := l.get_theme_font_size("font_size")
+	var limit := _text_width()
+	if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= limit:
+		return text
+	while text.length() > 1 and font.get_string_size(
+			text + "…", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > limit:
+		text = text.substr(0, text.length() - 1)
+	return text + "…"
 
 
 func _button(parent: Container, text: String, size: int, on_press: Callable) -> Button:

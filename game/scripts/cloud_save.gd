@@ -20,6 +20,7 @@
 ##   push(key: String, envelope: Dictionary) -> bool
 ##   pull(key: String) -> Variant   # envelope Dictionary, or null
 ##   account_id() -> String         # issue 83: stable account id, "" if none
+##   account_name() -> String       # NO-54: display name, "" if none
 
 const SyncQueue := preload("res://scripts/sync_queue.gd")
 const Noop := preload("res://scripts/cloud/cloud_backend_noop.gd")

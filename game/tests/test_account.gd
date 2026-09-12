@@ -207,6 +207,88 @@ func _init() -> void:
 	check(FileAccess.file_exists(sw_run),
 		"...so the guest's run stays exactly where it is, unparked")
 
+	# ---- NO-63: logout must not leave the run behind -------------------------
+	# The defect, measured on Max's phone 2026-09-12: a stale parked file from an
+	# earlier cycle made every move in logout() fail silently, logout still
+	# returned true, and the outgoing account's run stayed live for the next
+	# account to inherit. save.json and save.json.parked.<google-id> held the
+	# SAME run — wave 8, score 6900, gold 364 — under two different owners.
+	_clean()
+	var n63_paths: Array = [RUN, SCORES]
+	Account.sign_in(Account.GOOGLE, "google-alice", n63_paths)
+	_write(RUN, {"wave": 1, "owner": "google-alice"})
+	check(Account.logout(n63_paths), "precondition: a first logout parks normally")
+	check(FileAccess.file_exists(Account._parked(RUN, "google-alice")),
+		"...and the parked copy exists")
+
+	# Alice comes back, plays further, and logs out AGAIN. The second logout is
+	# the one that used to fail: its destination already exists.
+	Account.sign_in(Account.GOOGLE, "google-alice", n63_paths)
+	_write(RUN, {"wave": 42, "owner": "google-alice"})
+	check(Account.logout(n63_paths),
+		"a SECOND logout succeeds even though a parked copy already exists")
+	check(not FileAccess.file_exists(RUN),
+		"...and THE RUN IS GONE from where the game reads it — the whole defect")
+	var n63_back: Variant = _read(Account._parked(RUN, "google-alice"))
+	check(n63_back is Dictionary and int(n63_back.get("wave", 0)) == 42,
+		"...and the parked copy is the LATEST run, not the stale one (user ruling: overwrite)")
+
+	# And the consequence that made it an account-correctness bug rather than a
+	# housekeeping one: the next account must not find the previous one's run.
+	Account.sign_in(Account.GOOGLE, "google-bob", n63_paths)
+	check(not FileAccess.file_exists(RUN),
+		"a different account signing in after that logout inherits NOTHING")
+
+	# A logout that CANNOT park must not report success, and must not unbind —
+	# clearing the owner while the run is still live is exactly what hands it to
+	# the next account. Forced by making the destination undeletable: a
+	# DIRECTORY where the parked file would go cannot be removed or renamed over.
+	_clean()
+	Account.sign_in(Account.GOOGLE, "google-solo", n63_paths)
+	_write(RUN, {"wave": 7, "owner": "google-solo"})
+	DirAccess.make_dir_recursive_absolute(
+		ProjectSettings.globalize_path(Account._parked(RUN, "google-solo")))
+	check(not Account.logout(n63_paths),
+		"a logout whose move FAILS reports failure rather than succeeding quietly")
+	check(Account.owner() == "google-solo",
+		"...and leaves the account BOUND, so the run is not handed to the next signer")
+	check(FileAccess.file_exists(RUN), "...with the run still where its owner can reach it")
+	DirAccess.remove_absolute(
+		ProjectSettings.globalize_path(Account._parked(RUN, "google-solo")))
+
+	# A SWITCH inherits the same guarantee. switch_to is logout-then-sign_in, so
+	# a switch whose logout cannot park must not go on to bind the incoming
+	# account — that is the same handover by another route.
+	_clean()
+	Account.sign_in(Account.GOOGLE, "google-solo", n63_paths)
+	_write(RUN, {"wave": 3, "owner": "google-solo"})
+	DirAccess.make_dir_recursive_absolute(
+		ProjectSettings.globalize_path(Account._parked(RUN, "google-solo")))
+	check(not Account.switch_to(Account.GOOGLE, "google-bob", n63_paths),
+		"a switch whose logout cannot park REFUSES rather than binding the new account")
+	check(Account.owner() == "google-solo",
+		"...and the outgoing account still owns the install")
+	DirAccess.remove_absolute(
+		ProjectSettings.globalize_path(Account._parked(RUN, "google-solo")))
+
+	# The reclaim is the OPPOSITE rule, deliberately: a live save at sign-in time
+	# is a guest conversion, and the guest's run must follow them rather than be
+	# overwritten by an older parked copy of the account they are converting to.
+	_clean()
+	Account.sign_in(Account.GOOGLE, "google-alice", n63_paths)
+	_write(RUN, {"wave": 5, "owner": "google-alice"})
+	Account.logout(n63_paths)                      # park Alice's wave-5 run
+	Account.start_guest()
+	_write(RUN, {"wave": 99, "owner": "a-guest"})  # the guest plays
+	Account.sign_in(Account.GOOGLE, "google-alice", n63_paths) # conversion
+	var n63_conv: Variant = _read(RUN)
+	check(n63_conv is Dictionary and int(n63_conv.get("wave", 0)) == 99,
+		"a guest converting KEEPS their own run — the reclaim does not overwrite it")
+	check(str(n63_conv.get("owner", "")) == "google-alice",
+		"...and it is restamped to the account they converted to")
+	check(FileAccess.file_exists(Account._parked(RUN, "google-alice")),
+		"...and the older parked run is left alone rather than deleted")
+
 	# ---- NO-54: the display name is UNTRUSTED INPUT --------------------------
 	# A display name is chosen by the account holder, arrives from a platform
 	# service, and we render it and write it to disk. Each case below is a thing

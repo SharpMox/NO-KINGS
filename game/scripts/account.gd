@@ -211,7 +211,20 @@ static func sign_in(new_provider: String, account_id: String,
 		# A returning account reclaims what logout parked under ITS id. Another
 		# account's parked saves are named for that account and stay untouched,
 		# which is what keeps progress tied to whoever earned it.
-		_move(_parked(str(path), account_id), str(path))
+		#
+		# NO-63: THE RECLAIM DELIBERATELY DOES NOT OVERWRITE, and that is the
+		# opposite of logout's rule on purpose. A live save sitting here means a
+		# GUEST CONVERSION is in progress — the guest's run must follow them to
+		# the new id, which is this function's founding ruling — so overwriting
+		# it with an older parked copy would destroy the run they just played.
+		# Same principle as logout's overwrite, applied to the same question:
+		# the latest progress wins. The parked copy is then left alone rather
+		# than deleted; it is an older run of this account's, not an orphan.
+		#
+		# The refusal used to be incidental — a side effect of _move's guard
+		# with its answer discarded. It is now intentional and stated.
+		if not FileAccess.file_exists(str(path)):
+			_move(_parked(str(path), account_id), str(path))
 		_restamp(str(path), account_id)
 
 
@@ -233,11 +246,26 @@ static func _parked(path: String, account_id: String) -> String:
 	return "%s%s%s" % [path, PARKED, account_id]
 
 
-## Move a save aside or back. Refuses to clobber an existing destination: the
-## file being overwritten would be someone's only copy.
-static func _move(from: String, to: String) -> bool:
-	if not FileAccess.file_exists(from) or FileAccess.file_exists(to):
+## Move a save aside or back. Returns whether the file is now AT `to`.
+##
+## Refuses to clobber an existing destination unless `overwrite` is asked for:
+## the file being overwritten would otherwise be someone's only copy.
+##
+## NO-63: THE RETURN VALUE IS NOT ADVISORY. Both callers discarded it, and that
+## is the bug — not the clobber policy, which is only what made it visible. A
+## refusal is indistinguishable from a success to a caller that does not look,
+## so logout reported success while leaving one account's entire run sitting in
+## place for the next account to inherit. Measured on Max's phone 2026-09-12:
+## save.json and save.json.parked.<google-id> held the SAME run — wave 8, score
+## 6900, gold 364 — under two different owners, and the parked copy's timestamp
+## was two days stale because that logout's move had silently failed.
+static func _move(from: String, to: String, overwrite: bool = false) -> bool:
+	if not FileAccess.file_exists(from):
 		return false
+	if FileAccess.file_exists(to):
+		if not overwrite:
+			return false
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(to))
 	var err := DirAccess.rename_absolute(ProjectSettings.globalize_path(from),
 		ProjectSettings.globalize_path(to))
 	if err != OK:
@@ -272,8 +300,27 @@ static func logout(save_paths: Array) -> bool:
 	# anything still in it belongs to the account being logged out and must not
 	# be delivered to whoever signs in next.
 	SyncQueue.clear()
+	# NO-63: OVERWRITE a parked copy this account already has (user ruling
+	# 2026-09-12: "the run just played replaces the older parked copy" — the
+	# latest progress is what a player wants back), and DO NOT DISCARD THE
+	# ANSWER. Before this, a stale parked file from an earlier cycle made every
+	# move fail silently while logout still returned true, so the outgoing
+	# account's run stayed live and the next account inherited it.
+	#
+	# A path with NO file is not a failure — a player who has never finished a
+	# run has no save to park — so only an existing file that will not move
+	# counts against us.
+	var parked_all := true
 	for path in save_paths:
-		_move(str(path), _parked(str(path), id))
+		if FileAccess.file_exists(str(path)) \
+				and not _move(str(path), _parked(str(path), id), true):
+			parked_all = false
+	if not parked_all:
+		# Leave the account BOUND. A logout that could not park is worse than no
+		# logout: clearing the owner here is precisely what hands the run to
+		# whoever signs in next, which is the defect this guard exists to stop.
+		push_error("account: logout aborted — could not park every save for %s" % id)
+		return false
 	# An EMPTY owner is the recoverable no-account state needs_login() documents:
 	# the login screen shows, and the next sign_in() rebinds normally.
 	return _write({"owner": "", "provider": ""})
@@ -319,7 +366,12 @@ static func switch_to(new_provider: String, account_id: String,
 		return false # same account, or no id to switch to
 	if not signed_in() or provider() == GUEST:
 		return false # first bind or guest conversion — sign_in()'s own path
-	logout(save_paths)
+	# NO-63: a switch that cannot park the outgoing account's saves must NOT go
+	# on to bind the incoming one — that is precisely how the outgoing run gets
+	# handed over. logout() answers honestly now, so this can refuse.
+	if not logout(save_paths):
+		push_error("account: switch aborted — logout could not park %s's saves" % owner())
+		return false
 	sign_in(new_provider, account_id, save_paths, account_name)
 	return true
 

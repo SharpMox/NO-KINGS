@@ -25,6 +25,109 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `e5e2896` — 2026-09-11/12, Android — the seven fixes, and a Back defect
+
+**Nothing Phone (2a)** (`A142`, `Pacman`), 1084x2412 @ 420 dpi, over wireless
+debugging. Built, installed and driven by me from the Mac with `adb shell input`;
+Max did not tap anything. Artefacts and every screenshot referenced below:
+`~/Documents/nokings-builds/e5e2896-2026-09-11/`.
+
+Seven fixes shipped that day and **not one had been run on hardware**. This is
+that pass. It is incomplete, and the incomplete half is recorded as carefully as
+the verified half.
+
+### Confirmed on hardware
+
+| Fix | What was observed |
+| --- | --- |
+| **NO-56** | Quit is **present** on the Android main menu. The probe can only assert the half that is observable off-iOS; this is that half, and gating it did not delete it. |
+| **NO-58** | Typed `knight`: heading became "Test scenarios — 8 of 385", six sections shown, each header carrying its own match count. Then used it for real — searched `sixteen` and reached the sixteen-artefact scenario in two taps instead of scrolling fifty sections, which is the complaint the issue was filed about. |
+| **NO-58, the keyboard** | The OS keyboard covers the bottom ~40%, and it does **not** matter: the heading, the field, Back and the first eight results stay visible, because filtering cuts the list to eight. Better in practice than the issue feared. |
+| **NO-45** | A swipe **starting on an artefact row** scrolled the inventory drawer — list moved ~6 rows, scrollbar thumb travelled. This is the defect that was device-confirmed broken on iOS, now confirmed fixed on a real finger path. |
+| **NO-59** | Tapping "Fort Knox IOU" popped its description directly under the row, fully on screen, wrapped to three lines. |
+| **NO-59, the hard case** | That same drag scrolled and did **not** pop a description. This is the case the desktop test caught a real bug in (row-local coordinates read a scroll as a tap); it holds on hardware. |
+| **NO-55** | Main menu correctly centred, "NO KINGS" fully visible, nothing clipped. |
+| **Back on the intro** | Skips the intro to the main menu, app alive. |
+| **The AAB path** | `--mode=universal` APKS, debug-signed, installed and booted through bundletool. |
+
+### Not observable, and why
+
+- **NO-54** (the prompt shows a display name) and **NO-55's prompt case**: the
+  account-switch prompt only appears when the device's Play Games account differs
+  from the one bound in `account.json`. Forcing that means **rebinding Max's
+  account** — an account action, not a test. Held.
+- **NO-8 / the leaderboard id**: iOS only. Nothing to see on this build.
+
+### THE BACK BUTTON IS BROKEN ON ANDROID — filed as NO-61
+
+Found on 2026-09-11, RETRACTED the same evening, then CONFIRMED on 2026-09-12.
+The retraction is recorded because the reason for it matters: Max turned out to
+be using the phone during the first observation, which made "process killed by
+signal 9" equally consistent with him swiping the app away. The confirming runs
+were done on a device that was exclusively mine.
+
+| where Back is pressed | what happens | what should happen |
+| --- | --- | --- |
+| on the intro | skips to the main menu, app alive | skip — CORRECT |
+| main menu, no panel open | app quits | quits — CORRECT, documented |
+| main menu, **TEST panel open** | **APP QUITS** | close the panel |
+| main menu, **Settings panel open** | **APP QUITS** | close the panel |
+| **in a run** | **nothing at all**, app alive | open the pause menu |
+
+The TEST case ran twice end to end from a fresh launch, identical both times,
+each with a screenshot proving the panel was on screen and a `pidof` before and
+after. Full reasoning, the reproduction recipe and the contradiction worth
+starting from are in NO-61; the short version is that `menu.gd`'s handler should
+hide a visible panel and RETURN before reaching `get_tree().quit()`, and two
+plainly visible panels did not match its loop.
+
+This is what PR #294 exists to prevent, and NO-10 records that PR as one whose
+Back handling "was never tried on a phone". It has now been tried.
+
+### Also confirmed on 2026-09-12, clean device
+
+| | |
+| --- | --- |
+| **Army select on a tall screen** | all six armies and the trailing "← Back" reachable, nothing clipped (PR #310) |
+| **CRT opt-out works** | `CRT: Off` removes the scanlines, the colour fringing and the vignette outright — the observable consequence, not the flag. Whether the "on" look is right is Max's call and the screenshots went to him. Toggled back to On afterwards and `settings.json` re-read to confirm `crt_on: true`, so nothing was left changed. |
+| **Back on the intro** | skips it, app alive |
+
+### Seen and deliberately NOT acted on
+
+- **The inventory drawer's list is not clipped to its panel** and draws over the
+  deck — the wave row, the Stock/Inventory/Shop buttons, the Army Power badge and
+  PASS all have artefact rows on top of them. Cause is `hud.gd`'s
+  `sc.clip_contents = false`, set deliberately so the ▲ promote badge can overhang
+  the drawer top. Predates every fix in this block and is visible on desktop too,
+  but far worse on a tall phone. The obvious fix re-breaks the badge overhang, and
+  it sits in the HUD the redesign will rework.
+- **The top bar sits at y≈48 device px**, in the status-bar region — NO-57's
+  Android face. Max pilots that redesign.
+- **The burger menu opened first time** from a centred synthetic tap. NO-60 says
+  it is "almost unclickable" for him. Either a centred tap hits what a thumb
+  misses — which points at hit area or the rounded corner rather than a dead
+  control — or his workaround had already put it in the good state. Recorded, not
+  investigated.
+
+### Still unverified on Android after this pass
+
+- The CRT overlay's APPEARANCE — the opt-out is confirmed, whether it looks
+  right is a judgement only Max can make.
+- Every account path: guest→Google conversion, logout-and-restore, the
+  account-switch prompt, airplane-mode sign-in. All four are **account actions on
+  his real phone**, not tests, and stay his.
+- Two-device board union. Needs a **second Android phone with a different Google
+  account** — the union is only observable where two accounts' entries meet. No
+  amount of time with one phone answers it.
+- **The score submit.** It cannot be answered from a TEST scenario at all:
+  `game.gd:1547` guards `GlobalBoard.submit` behind `not is_scenario and not
+  autoplay`, on purpose, so bot runs cannot post to a real public board. Proving
+  the PATH needs a **real run**, which is Max's to play. NO-48 itself needs more
+  than that — it is about the deprecated GKScore call, which is iOS-only, so an
+  Android run does not close it.
+
+---
+
 ## `8657977` — 2026-09-10, iOS — FIRST EVER RUN ON iOS HARDWARE
 
 **iPhone 11 (iPhone12,1), iOS 26.6.1 (23G83)**, UDID `00008030-001160D01486402E`,

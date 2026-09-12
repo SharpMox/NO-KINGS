@@ -165,9 +165,19 @@ func _init() -> void:
 				break
 	check(row != null, "a scenario row is on screen to tap")
 	row.pressed.connect(_on_row_pressed)
-	_mouse(true, row.get_global_rect().get_center())
+	var tap_at := row.get_global_rect().get_center()
+	_mouse(true, tap_at)
 	await process_frame
-	_mouse(false, row.get_global_rect().get_center())
+	# NO-71: same race as the item tap further down, which carries the full
+	# explanation — a real desktop-cursor motion landing in this frame cancels
+	# the Button's press. Re-assert the finger's position, back to back with the
+	# release.
+	var tap_back := InputEventMouseMotion.new()
+	tap_back.position = tap_at
+	tap_back.global_position = tap_at
+	tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(tap_back)
+	_mouse(false, tap_at)
 	await process_frame
 	check(fired, "a tap still presses the row")
 
@@ -370,6 +380,21 @@ func _init() -> void:
 		var p := item_btn.get_global_rect().get_center()
 		_mouse(true, p)
 		await process_frame
+		# NO-71: put the pointer back on the button before releasing. A Button
+		# emits `pressed` on release only if the last pointer motion it saw while
+		# held was inside it, and this probe's window also receives the REAL
+		# desktop cursor's motion. One of those landing in the frame between press
+		# and release cancelled the press: 1 in ~7 runs, every failure with real
+		# motion in the gap and none without; injecting an off-button motion there
+		# failed 20/20. A finger stays where it landed and a phone has no second
+		# pointer, so re-asserting the position is the tap, not a longer wait. The
+		# motion and release are pushed back to back, with nothing between for the
+		# OS to interleave.
+		var back := InputEventMouseMotion.new()
+		back.position = p
+		back.global_position = p
+		back.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(back)
 		_mouse(false, p)
 		await process_frame
 		check(item_fired[0], "a TAP on an item row still presses it — PASS did not cost the press")

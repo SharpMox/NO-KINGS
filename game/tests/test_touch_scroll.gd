@@ -370,6 +370,21 @@ func _init() -> void:
 		var p := item_btn.get_global_rect().get_center()
 		_mouse(true, p)
 		await process_frame
+		# NO-71: put the pointer back on the button before releasing. A Button
+		# emits `pressed` on release only if the last pointer motion it saw while
+		# held was inside it, and this probe's window also receives the REAL
+		# desktop cursor's motion. One of those landing in the frame between press
+		# and release cancelled the press: 1 in ~7 runs, every failure with real
+		# motion in the gap and none without; injecting an off-button motion there
+		# failed 20/20. A finger stays where it landed and a phone has no second
+		# pointer, so re-asserting the position is the tap, not a longer wait. The
+		# motion and release are pushed back to back, with nothing between for the
+		# OS to interleave.
+		var back := InputEventMouseMotion.new()
+		back.position = p
+		back.global_position = p
+		back.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(back)
 		_mouse(false, p)
 		await process_frame
 		check(item_fired[0], "a TAP on an item row still presses it — PASS did not cost the press")

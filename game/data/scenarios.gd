@@ -60,7 +60,7 @@ static func _hand_written() -> Array:
 				["pawn", 0, 0, 11], ["pawn", 0, 1, 11], ["pawn", 0, 2, 11], ["pawn", 0, 3, 11],
 				["pawn", 0, 4, 11], ["pawn", 0, 5, 11], ["pawn", 0, 6, 11], ["pawn", 0, 7, 11]],
 			"wave": 1, "score": 500}},
-		{"name": "Captured stock: deploy (gold cost) & merge", "cfg": {
+		{"name": "Captured stock: convert & sell", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "rook", "knight", "pawn"],
 			"stock": ["pawn"], "score": 500, "wave": 5}},
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {

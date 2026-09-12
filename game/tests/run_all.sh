@@ -72,6 +72,7 @@ if [ "${1:-}" != "--headless" ]; then
 	printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > override.cfg
 	trap 'rm -f override.cfg' EXIT
 	run touch-scroll -s tests/test_touch_scroll.gd
+	run long-press -s tests/test_long_press.gd # NO-72: same override, same reason
 	rm -f override.cfg
 else
 	echo "skipped: click probes (--headless) — run them before merging UI work"

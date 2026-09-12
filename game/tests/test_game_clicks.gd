@@ -801,6 +801,18 @@ func _init() -> void:
 	d_release.pressed = false
 	d_release.position = zone_px
 	d_release.global_position = zone_px
+	# game.gd:1699 closes the drawer on ANY mouse motion outside its rect while
+	# pool_drag_id is set, and _input sees REAL OS pointer motion as well as the
+	# synthetic events pushed here. So a cursor crossing the Godot window during
+	# the frame between the press and this release hands the drawer back, the
+	# release is no longer covered, and the piece places LEGITIMATELY — the
+	# check below then fails for a reason that is not in the code. It happened
+	# on 2026-09-12 with another agent working on the same display. This
+	# assertion makes that failure name itself instead of reading as a
+	# behaviour regression; the motion pushed above is deliberately INSIDE the
+	# drawer rect, so nothing this probe does can trip the auto-close.
+	check(game.hud.drawer_open == "stock",
+		"drawer still open at release (else a stray cursor closed it — see above)")
 	root.push_input(d_release)
 	await process_frame
 	check(not game.board.has(zone) and game.stock.size() == stock_before,

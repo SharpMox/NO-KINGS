@@ -415,6 +415,38 @@ cp -a <primary-checkout>/game/android/build <worktree>/game/android/build
 cp -a <primary-checkout>/game/android/.build_version <worktree>/game/android/
 ```
 
+### Launching it: the activity is `GodotAppLauncher`, and `monkey` is better anyway
+
+`am start -n com.sharpunk.nokings/com.godot.game.GodotApp` **fails** — a Binder exception,
+no app. Measured on the device 2026-09-11:
+
+```sh
+adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER com.sharpunk.nokings
+# -> com.sharpunk.nokings/com.godot.game.GodotAppLauncher
+```
+
+`GodotApp` is the activity name every recipe reaches for and it is the wrong one. Use the
+form that needs no activity name at all, which is also immune to Godot renaming it on the
+next template bump:
+
+```sh
+adb shell monkey -p com.sharpunk.nokings -c android.intent.category.LAUNCHER 1
+```
+
+**`scripts/drive.gd` has never run on Android**, and this is why it was not tried further:
+passing `--drive <dir>` needs `OS.get_cmdline_user_args()` to be populated at launch, and
+`--esa command_line_args` on top of the already-wrong activity produced nothing. It is not
+needed here — **Android has `adb shell input`**, which iOS does not, and that absence is the
+entire reason `drive.gd` exists. `input tap`, `input swipe`, `input keyevent 4` for Back,
+`input text` for typing (the driver has no typing verb at all) and `exec-out screencap -p`
+cover the whole verification surface.
+
+**Coordinates for `input tap` are DEVICE pixels.** `project.godot` is 480x800 with
+`stretch/aspect = expand`, which scales by `min(screen.x/480, screen.y/800)` and never
+letterboxes. On a 1084x2412 screen that is `2.258`, so `device_px = canvas_px x 2.258` and
+the canvas is 480 x ~1068 logical. This is the same trap that cost two iOS sessions,
+arriving on the other platform.
+
 This is what turns 86 from "written" into "verified" — and issue 86 is explicit that
 `run_all.sh` ALL GREEN does **not** verify this slice.
 

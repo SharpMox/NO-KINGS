@@ -165,9 +165,19 @@ func _init() -> void:
 				break
 	check(row != null, "a scenario row is on screen to tap")
 	row.pressed.connect(_on_row_pressed)
-	_mouse(true, row.get_global_rect().get_center())
+	var tap_at := row.get_global_rect().get_center()
+	_mouse(true, tap_at)
 	await process_frame
-	_mouse(false, row.get_global_rect().get_center())
+	# NO-71: same race as the item tap further down, which carries the full
+	# explanation — a real desktop-cursor motion landing in this frame cancels
+	# the Button's press. Re-assert the finger's position, back to back with the
+	# release.
+	var tap_back := InputEventMouseMotion.new()
+	tap_back.position = tap_at
+	tap_back.global_position = tap_at
+	tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(tap_back)
+	_mouse(false, tap_at)
 	await process_frame
 	check(fired, "a tap still presses the row")
 

@@ -7,6 +7,7 @@ extends Node2D
 ## (child UI layers — signals up, calls down) · autoplay.gd (headless bot).
 
 const Rules := preload("res://scripts/rules.gd")
+const BackGuard := preload("res://scripts/back_guard.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
@@ -1679,6 +1680,8 @@ func _notification(what: int) -> void:
 	# screen and has its own buttons, so Back is ignored rather than resurrecting
 	# a menu on top of it.
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if BackGuard.is_duplicate():
+			return # NO-61: Android raises this TWICE per press. See back_guard.gd.
 		if state == State.GAME_OVER:
 			# Leaves, rather than doing nothing. "A gesture that silently does
 			# nothing reads as a frozen app" is the reason this handler exists

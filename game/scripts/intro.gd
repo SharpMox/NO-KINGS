@@ -18,6 +18,7 @@ const MENU_SCENE := "res://scenes/Menu.tscn"
 ## — and the sign-in behind it — by choosing to, rather than by being dropped
 ## there when a video happens to end.
 const Drive := preload("res://scripts/drive.gd")
+const BackGuard := preload("res://scripts/back_guard.gd")
 
 const VIDEO := preload("res://assets/video/nokings_intro.ogv")
 const LOOP_VIDEO := preload("res://assets/video/nokings_intro_endloop.ogv")
@@ -139,6 +140,8 @@ func _gui_input(event: InputEvent) -> void:
 ## as a frozen app — the reason this handler exists at all.
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if BackGuard.is_duplicate():
+			return # NO-61: Android raises this TWICE per press. See back_guard.gd.
 		if _looping:
 			_advance()
 		else:

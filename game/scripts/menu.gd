@@ -3,6 +3,7 @@ extends Control
 ## `--scenario N` skip the menu; `--screenshot <dir>` captures menu.png first.
 
 const GameScript := preload("res://scripts/game.gd")
+const BackGuard := preload("res://scripts/back_guard.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
@@ -104,6 +105,8 @@ static var window_sized := false # once per launch, not on every return to menu
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
 		return
+	if BackGuard.is_duplicate():
+		return # NO-61: Android raises this TWICE per press. See back_guard.gd.
 	if login_center != null and login_center.visible:
 		return
 	# The tier picker goes back to the army picker, not to the main menu, so the

@@ -84,7 +84,7 @@ fi
 # suite this script already wraps in the touch-emulation override.
 for t in rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
 	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
-	box combos scenarios background tiers intro seed account sync leaderboard drive; do
+	box combos scenarios background tiers intro seed account sync leaderboard drive back_button; do
 	run "test_$t" --headless -s "tests/test_$t.gd"
 done
 

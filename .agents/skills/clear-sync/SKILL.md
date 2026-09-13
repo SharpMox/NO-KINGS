@@ -85,7 +85,6 @@ a PR, an issue id, the incident; the story is in git.
 - **Free homes**: write now.
 - **Ask-first homes**: batch every `CLAUDE.md` and `MANUAL-STEPS.md` candidate into ONE
   consolidated ask with, for each, the target section and the proposed exact wording.
-  User ruling (restated 2026-09-13): one consolidated ask at a time, never a trickle.
   Nothing lands before the answer; an ask still open at the close goes into the handoff
   verbatim, under open threads.
 

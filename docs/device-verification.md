@@ -25,6 +25,59 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `e8160ab` — 2026-09-13, iOS — second iPhone pass: the Game Center id holds
+
+**The same borrowed iPhone 11 (iPhone12,1)**, now iOS 26.6.2, still signed into its
+owner's Apple ID and Game Center with a Cyrillic account name, over cable. The owner
+re-approved Game Center and iCloud testing for this session (Max: "Same owner, test
+everything"). Debug build from `main` `e8160ab`, exported and signed headlessly on
+the 2026-09-10 provisioning profile (valid to 2027), no Xcode GUI step; entitlements
+written in by hand after export per NO-47, and `codesign` shows game-center and
+ubiquity-kvstore on the signed binary. Driven from the Mac with `drive.gd`, plus
+Max's hands for the steps the host cannot do. Evidence, 14 screenshots, `launch1.log`,
+`launch2.log` and `ack_4020.txt`: `~/Documents/nokings-builds/e8160ab-2026-09-13-ios/`.
+
+### Confirmed on hardware
+
+| What | On iOS | Evidence |
+| --- | --- | --- |
+| **NO-53** Game Center id stable | `[gc] scopedIDsArePersistent=1` on two consecutive launches. After the account switch, `account.json`'s owner id was unchanged across two further relaunches (compared by SHA-256 prefix, never printed) and no switch prompt appeared either time. This reverses the 2026-09-10 headline (five ids in five launches). Cause per ece5346: the leaderboard now exists, so Game Center treats the app as fully configured. | `launch1.log`, `launch2.log` (NSLog via `devicectl --console`) |
+| **NO-52** non-Latin names | The switch prompt rendered the account name as clean Cyrillic (`Игрок_3890543466`, then `ГромкийКолокол75` after a native Game Center sheet renamed it). No Latin-1 mojibake. Fixed by the vendored `gamecenter-utf8-strings.patch`. | prompt screenshots |
+| **Account switch prompt** (NO-31, NO-54) | Appeared because the stored owner was a 2026-09-10 placeholder id. Accepted by hand: the Claude Code auto-mode permission classifier refused the driver's tap as a "Real-World Transaction", twice. Afterwards `Continue` was gone from the menu, so the 2026-09-10 run is parked under the old binding, not deleted. | Max |
+| **NO-8** leaderboard id `high_score` | After a real run ended in game over, Scores → Global ranking showed his score on the Game Center leaderboard. This is the first-hand check ece5346 said was still missing ("It becomes verified the first time a score lands on a real device"). | Max |
+| Cloud availability | After the switch the Scores screen reads "Cloud scores included." with the `Global ranking` button. Before it: "Local scores — signed in as a different account.", no board button. | `p10_scores.png`, `p5_scores.png` |
+| **NO-64** on iOS, first run of the Connectivity plugin on an iPhone | On the Scores screen with airplane mode on, `Global ranking` greyed with "No internet connection" under it, and back to normal once airplane mode went off, no relaunch. The main menu shows no notice offline, correctly: a bound player's menu has no network-only control (`menu.gd:357-369`). | Max, by eye; `ack_4020.txt` records the driver's 120 s wait timing out on the menu |
+| **4b18849** Quit hidden on iOS | Main-menu probe buttons: TEST, Settings, About, Guide, Games History, Scores, Play, Continue. No Quit. | probe ack |
+| **NO-45** drawer drag-scroll | Scenario 29 ("Artefacts: sixteen held…"): one drag moved every row by 586 px. | `p6_drawer_top.png` → `p6_drawer_scrolled.png` |
+| **1aeaa4a** tap an artefact for its description | `Crop Circle Plank` showed its effect text. | `p6_desc.png` |
+| **NO-72** long press | Scenario 30 ("Items: full inventory"): a long press on an item showed its description and did not arm it. | Max |
+
+### Not observable, still unverified on iOS
+
+- **The iCloud KV round trip** (write → wipe or reinstall → restore). Only
+  availability was shown. Nothing here proves a byte reached iCloud.
+- **The safe-area defect from 2026-09-10** is unchanged: still no
+  `get_display_safe_area` call anywhere, so there was nothing to verify.
+- **NO-61** (Back) is Android-only. N/A.
+- **Game Center nickname display** anywhere other than the switch prompt.
+
+Also seen: one driver launch's intro took over 8 s to show CONTINUE; the other
+launches were under 8 s. One occurrence, no cause claimed.
+
+### Defects
+
+- **NO-65, filed 2026-09-12, now reproduced on iOS.** The Inventory drawer list is
+  not clipped and paints over the deck and the board (`p6_drawer_top.png`).
+  `hud.gd:514` sets `clip_contents = false`.
+- **NO-76, new.** The switch prompt showed the raw 64-hex owner id plus a lone "."
+  line (`p_final_menu.png`). The 2026-09-10 binding predates NO-54 storing a name,
+  so `menu.gd:1242` `_who()` falls back to the id.
+- **NO-77, new.** After a `-- --scenario 30` launch, pause → Main Menu bounces
+  straight back into a fresh copy of the scenario. The args last for the whole
+  process and `menu.gd:528-531` re-forwards on every Menu load. Test-harness only.
+
+---
+
 ## `feat/no-64-offline-controls` (PR #402) — 2026-09-13, Android — offline controls
 
 **Nothing Phone (2a)** (`A142`, serial `00064141N000650`), over **USB**. Debug

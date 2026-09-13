@@ -43,6 +43,11 @@ const DRAWER_SCROLL_DEADZONE := 24
 ## of a 480-wide screen is where a popup anchored to its row goes off screen.
 const TIP_W := 240.0
 const TIP_MARGIN := 8.0
+## NO-72: how long an item or Activate chip must be held to show its description
+## instead of firing. Android's own long-press timeout
+## (ViewConfiguration.getLongPressTimeout), so it feels like every other long
+## press on the device rather than a number picked here.
+const LONG_PRESS_MS := 500
 ## +1 row while the Activate strip is up, +48 more for issue 100's Army Power
 ## line (two wrapped rows at 13px on a 480-wide portrait screen). Issue 67 made
 ## this height unconditional because the Army Ability chip was always in the
@@ -617,6 +622,38 @@ func hide_tip() -> void:
 ## answers can never disagree, and "it did not become a scroll" is exactly what
 ## "it was a tap" has to mean here, because NO-45 made this row pass its press
 ## through to the scroller.
+## NO-72: a LONG PRESS on an item or Activate chip shows its description. A tap
+## on these already does something (an item arms, a chip activates), so unlike
+## an artefact row (_tip_input below) the gesture has to be a hold.
+##
+## Cancelled by moving past DRAWER_SCROLL_DEADZONE, the number the scroller uses
+## to call a drag a scroll, so a scroll can never also be a long press. GLOBAL
+## positions for the reason _tip_input gives. Each press gets its own token, so
+## a timer left over from a quick earlier press cannot fire into this one — and
+## show_tip toggles on a repeated key, so a double fire would open and then shut.
+##
+## When it fires, `lp_fired` makes the Button's own `pressed` handler swallow the
+## release that ends the hold. The next PRESS clears it, so a hold released off
+## the button cannot leak into a later tap.
+func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
+		if not e.pressed:
+			btn.remove_meta("lp_token")
+			return
+		btn.remove_meta("lp_fired")
+		var token := Time.get_ticks_usec()
+		btn.set_meta("lp_token", token)
+		btn.set_meta("lp_from", e.global_position)
+		get_tree().create_timer(LONG_PRESS_MS / 1000.0).timeout.connect(func() -> void:
+			if is_instance_valid(btn) and btn.get_meta("lp_token", 0) == token:
+				btn.remove_meta("lp_token")
+				btn.set_meta("lp_fired", true)
+				show_tip(key, desc, btn.get_global_rect()))
+	elif e is InputEventMouseMotion and btn.has_meta("lp_token") \
+			and e.global_position.distance_to(btn.get_meta("lp_from")) > DRAWER_SCROLL_DEADZONE:
+		btn.remove_meta("lp_token")
+
+
 func _tip_input(row: Control, key: String, desc: String, e: InputEvent) -> void:
 	if not (e is InputEventMouseButton) or e.button_index != MOUSE_BUTTON_LEFT:
 		return
@@ -934,7 +971,15 @@ func _rebuild_activate_strip() -> void:
 		if targeting: # mid-targeting (Bovine): tint like an active Item, tap
 			# again to cancel — same shape _rebuild_item_strip already uses
 			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(func() -> void: artefact_activate_pressed.emit(key))
+		btn.pressed.connect(func() -> void:
+			if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
+				btn.remove_meta("lp_fired")
+				return
+			artefact_activate_pressed.emit(key))
+		# gui_input still arrives on a DISABLED chip, which is most of the time —
+		# and "why can't I use this?" is exactly when the description is wanted.
+		btn.gui_input.connect(func(e: InputEvent) -> void:
+			_long_press_input(btn, key, entry.description, e))
 		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		activate_box.add_child(btn)
 
@@ -1032,7 +1077,13 @@ func _rebuild_item_strip() -> void:
 		btn.tooltip_text = "%s (%s)\n%s" % [g.items[i].name, g.items[i].tier, g.items[i].description]
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(func() -> void: item_pressed.emit(i))
+		btn.pressed.connect(func() -> void:
+			if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
+				btn.remove_meta("lp_fired")
+				return
+			item_pressed.emit(i))
+		btn.gui_input.connect(func(e: InputEvent) -> void:
+			_long_press_input(btn, "item:%d" % i, g.items[i].description, e))
 		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		item_box.add_child(btn)
 

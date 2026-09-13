@@ -393,7 +393,9 @@ at its first line). Its restore never ran, and Max found his phone still offline
 a watchdog started the same way dies the same way, so neither fixes it. Android also switched
 Wireless debugging itself off, so nothing could reconnect until he re-enabled it. For an
 offline test, use a **USB cable** (adb survives airplane mode, so the Mac toggles, reads back
-and restores) or have **Max flip it himself**.
+and restores) or have **Max flip it himself**. Or use an emulator: adb reaches it over host
+loopback, not the emulated network, so airplane mode inside it leaves adb connected. Verified
+2026-09-13 for NO-64 (AVD `nokings_api35`, arm64). It checks app logic, not Max's hardware.
 
 **4. Before guessing who changed a setting, read the phone's own record.** Rotation changes
 are logged with their caller:

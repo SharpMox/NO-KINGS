@@ -14,21 +14,30 @@
 ##   14:27:46.904  GO_BACK  history_scroll=true   main_box=false  -> hid the panel
 ##   14:27:46.905  GO_BACK  history_scroll=false  main_box=true   -> quit()
 ##
-## IT IS AN UPSTREAM GODOT REGRESSION, not our bug and not a misconfiguration.
-## Two independent paths both raise GO_BACK on 4.7:
+## IT IS UPSTREAM, not our bug and not a misconfiguration. Two independent paths
+## both raise GO_BACK on 4.7:
 ##   A. the KEY EVENT — KEYCODE_BACK ACTION_DOWN reaches the view tree and
-##      android_input_handler.cpp turns it into a DEFERRED GO_BACK.
+##      android_input_handler.cpp:135 turns it into a DEFERRED GO_BACK.
 ##   B. the CALLBACK — GodotActivity registers onBackPressedDispatcher, which
 ##      calls GodotLib.back() and raises GO_BACK immediately.
-## Path B was added by godotengine/godot#117653 ("[Android] Fix handling of back
-## navigation when targeting API level 36", merged 2026-04-07, present in
-## 4.7-stable). At targetSdk 36 — ours, game/android/build/config.gradle — the
-## OnBackInvoked dispatcher is mandatory, and AOSP's ViewRootImpl forwards the
-## ACTION_DOWN to the view tree AND invokes the callback on ACTION_UP. Before
-## #117653 the callback only ran if the view hierarchy declined the key, which
-## Godot never does. An earlier press+release double was #101457, fixed in 4.4;
-## this is a different one, re-introduced, and unreported upstream as of
-## 2026-09-09.
+## It takes BOTH halves, and only one is Godot's:
+##   - Path B was added by godotengine/godot#117653 ("[Android] Fix handling of
+##     back navigation when targeting API level 36", merged 2026-04-07, present
+##     in 4.7-stable). At targetSdk 36 (ours, game/android/build/config.gradle)
+##     the OnBackInvoked dispatcher is mandatory.
+##   - Path A reaching the view tree is ANDROID 16's change: AOSP's
+##     ViewRootImpl.doOnBackKeyEvent returns FORWARD on Android 16, where 13, 14
+##     and 15 returned FINISH_NOT_HANDLED. So the ACTION_DOWN is forwarded AND the
+##     callback runs.
+## Consequence: the double should NOT appear on Android 15 or earlier, even at
+## targetSdk 36. That follows from the AOSP source; it was not measured, and
+## neither was targetSdk 35 or a second device. An earlier press+release double
+## was #101457, fixed in 4.4; this is a different one.
+##
+## REPORTED UPSTREAM as godotengine/godot#123454, and CLOSED as not planned by a
+## member who could not reproduce it: no duplicate, no fix, no reasoning given.
+## The double is still real here (three runs, two engine versions), so the guard
+## stays.
 ##
 ## WHY MILLISECONDS AND NOT A FRAME COUNTER: path A is DEFERRED and path B is
 ## not, so the two deliveries can straddle a frame boundary. The 1 ms gap
@@ -41,7 +50,7 @@
 ##
 ## DELETE THIS FILE WHEN GODOT FIXES IT. That is the real fix; this is a
 ## defence. Test by rebuilding against a Godot without the duplicate dispatch,
-## or at targetSdk 35, where the double vanishes.
+## on an Android 16 device, since an older one would pass without proving anything.
 
 ## Long enough to cover two deliveries that straddle a frame, short enough that a
 ## human double-press is not swallowed — a deliberate double tap is 150-300 ms.

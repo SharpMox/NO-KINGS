@@ -338,6 +338,75 @@ on PATH). Wireless debugging works too and needs no cable once the phone is pair
 
 An emulator with **Google Play services** also works, but a real device is less trouble.
 
+### Getting a USB connection at all — three traps that cost time on 2026-09-13
+
+- **USB debugging and Wireless debugging are SEPARATE switches** in Developer options. The
+  phone had only Wireless debugging on, so over the cable it offered nothing but file
+  transfer: `ioreg -r -c IOUSBHostInterface -l` showed a lone "MTP" interface (class 6) and
+  no adb interface (class 0xff / subclass 0x42). With no adb interface, `adb devices` does
+  not list the phone at all, not even as `unauthorized`, and the "Allow USB debugging?"
+  prompt cannot appear. Turn on **USB debugging**, then Allow, ticking "Always allow from
+  this computer".
+- **Plug into a Mac port directly.** The first attempt went through the USB3.1 hub that
+  carries the Ethernet adapter, and the phone never appeared on the USB bus. It came up at
+  once on a direct port. The cable was swapped at the same moment, so which of the two was
+  at fault is not established. Check the bus before blaming adb: `ioreg -p IOUSB -w0` should
+  show `A142`. `system_profiler SPUSBDataType` prints nothing at all on this macOS, so an
+  empty answer from it proves nothing; use `SPUSBHostDataType` or `ioreg`.
+- **The adb server is SHARED by every session on this Mac.** One bare `adb` without
+  `ADB_LIBUSB=1` starts the server in the mode that cannot see USB, for everyone. And
+  `adb kill-server` pulls the transport out from under any other session mid-run: an
+  emulator agent's connection dropped at 12:21 when this was done to fix the first
+  problem. Export `ADB_LIBUSB=1` in every shell that runs adb, pass `-s <serial>` on every
+  command once more than one device is attached, and say so before restarting the server.
+
+### RULES for driving Max's phone — read before any adb input or settings change
+
+The test phone is Max's own phone. These rules come from things our automation did to it.
+
+**1. Never inject input into an app he is using. Check before EVERY batch.**
+
+```sh
+adb shell dumpsys activity activities | grep -m1 ResumedActivity
+```
+
+- **Taps, swipes, keyevents:** only while this names `com.sharpunk.nokings`. Check before
+  each batch, not once at the start: he picks the phone up mid-run. That is how both
+  2026-09-12 incidents happened. Synthetic taps landed in **Instagram** once, and once on his
+  **home screen**, where the app had gone away under a fixed-coordinate tap.
+- **Launching our app** (an intent, not a tap): fine when our app, the **launcher**, or a dark
+  screen is in front. **Abort** when any other app of his is in front (Spotify, a browser, a
+  messenger). Awake, unlocked and another app resumed means the phone is in his hand.
+- **A run he was touching is not a result.** One contaminated run delivered eight GO_BACKs
+  for a single keypress. It was thrown away, not reported.
+
+**2. Every setting a test changes, the test restores AND READS BACK.** Before the run, say
+which settings it touches and record each (`adb shell settings get ...`). After the run, put
+each back and `settings get` it again. The run is not finished until the values match. A
+restore nobody read back is only a claim, and on 2026-09-13 that claim was false.
+
+**3. Never script a connectivity toggle over WIRELESS adb, not even from a script on the
+phone.** Airplane mode drops Wi-Fi, wireless adb goes down with it, and every process that
+adb session started dies too, **`setsid` included**. NO-64's on-phone script turned airplane
+mode on, entered `sleep 3`, and never logged again (`/data/local/tmp/no64-menu/log.txt` ends
+at its first line). Its restore never ran, and Max found his phone still offline. A `trap` or
+a watchdog started the same way dies the same way, so neither fixes it. Android also switched
+Wireless debugging itself off, so nothing could reconnect until he re-enabled it. For an
+offline test, use a **USB cable** (adb survives airplane mode, so the Mac toggles, reads back
+and restores) or have **Max flip it himself**.
+
+**4. Before guessing who changed a setting, read the phone's own record.** Rotation changes
+are logged with their caller:
+
+```sh
+adb shell dumpsys window | grep -A12 RotationLockHistory
+```
+
+`RotationLockTile#handleClick` is the Quick Settings tile. `MonkeyRotationEven#injectEvent` is
+`adb shell monkey`, which is why the launch recipe below no longer uses it. On 2026-09-13
+this separated "auto-rotate keeps turning itself off" (two tile taps) from anything our
+tooling did.
+
 ### `ADB_LIBUSB=1` is REQUIRED, or adb hangs forever
 
 ```sh
@@ -415,7 +484,7 @@ cp -a <primary-checkout>/game/android/build <worktree>/game/android/build
 cp -a <primary-checkout>/game/android/.build_version <worktree>/game/android/
 ```
 
-### Launching it: the activity is `GodotAppLauncher`, and `monkey` is better anyway
+### Launching it: `am start` on `GodotAppLauncher`, NOT `monkey`
 
 `am start -n com.sharpunk.nokings/com.godot.game.GodotApp` **fails** — a Binder exception,
 no app. Measured on the device 2026-09-11:
@@ -425,13 +494,20 @@ adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCH
 # -> com.sharpunk.nokings/com.godot.game.GodotAppLauncher
 ```
 
-`GodotApp` is the activity name every recipe reaches for and it is the wrong one. Use the
-form that needs no activity name at all, which is also immune to Godot renaming it on the
-next template bump:
+`GodotApp` is the activity name every recipe reaches for and it is the wrong one. Launch the
+resolved one:
 
 ```sh
-adb shell monkey -p com.sharpunk.nokings -c android.intent.category.LAUNCHER 1
+adb shell am start -n com.sharpunk.nokings/com.godot.game.GodotAppLauncher
 ```
+
+**This recipe used to be `monkey -p com.sharpunk.nokings -c android.intent.category.LAUNCHER 1`,
+and `monkey` changes a setting on the phone.** Along with the launch it injects a rotation
+event, which `dumpsys window` → `RotationLockHistory` records as a LOCK then a FREE ~20 ms
+apart (`caller=MonkeyRotationEven#injectEvent`, 2026-09-12 22:49 and 22:50, 2026-09-13
+12:03). With auto-rotate on, nothing visible happens. With auto-rotate OFF, launching our app
+silently turns it ON. If Godot renames the activity on a template bump, re-run the
+`resolve-activity` line above rather than falling back to `monkey`.
 
 **`scripts/drive.gd` has never run on Android**, and this is why it was not tried further:
 passing `--drive <dir>` needs `OS.get_cmdline_user_args()` to be populated at launch, and

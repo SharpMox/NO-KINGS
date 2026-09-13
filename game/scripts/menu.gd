@@ -14,6 +14,7 @@ const Account := preload("res://scripts/account.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const GlobalBoard := preload("res://scripts/global_board.gd")
+const Connectivity := preload("res://scripts/connectivity.gd")
 
 const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
 const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
@@ -63,6 +64,10 @@ const SIGN_IN_TIMEOUT := 30.0
 ## show it — first build, and every re-open — cannot drift.
 const LOGIN_TAGLINE := "Your progress follows your account."
 
+## NO-64: the reason shown beside a control that needs the network while there
+## is none. Plain on purpose — presentation is Max's to rule on.
+const OFFLINE_REASON := "No internet connection"
+
 ## Every mirrored save, as cloud key -> local file. The single place that
 ## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
 static func _SYNC_KEYS() -> Dictionary:
@@ -103,6 +108,13 @@ static var window_sized := false # once per launch, not on every return to menu
 ## always live. Quitting on Back would make a stray gesture look like a crash on
 ## the very first screen anyone sees.
 func _notification(what: int) -> void:
+	# NO-64: turning airplane mode off means pulling down Control Center or the
+	# notification shade, which takes focus from the app — so the return of focus
+	# is exactly when a greyed control may need to come back. The poll covers the
+	# rest.
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		_apply_connectivity()
+		return
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
 		return
 	if BackGuard.is_duplicate():
@@ -328,9 +340,46 @@ func _finish_login() -> void:
 	main_box.visible = true
 
 
+## `locked` is the in-flight sign-in lock; being offline disables them too, so
+## every caller releasing the lock cannot re-enable a button with no network.
 func _set_providers_disabled(locked: bool) -> void:
 	for b in provider_buttons:
-		b.disabled = locked
+		b.disabled = locked or not _online
+
+
+## NO-64: disable, with a reason, every control that needs the network — never
+## hide it (a hidden button reads as "this game has no sign-in", a greyed one as
+## "not now": the Shop's precedent, issue 101). Continue offline / Play as Guest
+## are deliberately untouched: they are the way out.
+##
+## Re-run by a 1 s poll and on regaining focus, so a control greyed by airplane
+## mode comes back when the player turns it off. See connectivity.gd.
+func _apply_connectivity() -> void:
+	# Not built yet: _ready is still assembling, or a CLI bypass returned early.
+	if provider_offline_note == null:
+		return
+	_online = Connectivity.online()
+	_set_providers_disabled(_sign_in_gen != 0)
+	provider_offline_note.visible = not _online
+	if sync_button != null:
+		sync_button.disabled = not _online
+		sync_offline_note.visible = not _online and sync_button.visible
+	if is_instance_valid(global_btn):
+		global_btn.disabled = not _online
+		global_offline_note.visible = not _online
+
+
+## The plain one-line reason under a disabled control. Same size and fade as the
+## Scores screen's existing status line, so it introduces no new styling.
+func _offline_note(parent: Container) -> Label:
+	var l := Label.new()
+	l.text = OFFLINE_REASON
+	l.add_theme_font_size_override("font_size", 12)
+	l.modulate = Color(1, 1, 1, 0.55)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.visible = false
+	parent.add_child(l)
+	return l
 
 
 ## Start an interactive sign-in. Everything that happens AFTER this — binding,
@@ -433,6 +482,14 @@ var _sign_in_gen := 0
 ## button being pressed — the plugin signs in silently at boot — and a local
 ## would leave it advertising sign-in to an account that just signed in.
 var sync_button: Button
+
+## NO-64: whether the phone last said there is a connection, and the reason
+## labels shown under each network-only control while it says there is not.
+var _online := true
+var sync_offline_note: Label
+var provider_offline_note: Label
+var global_btn: Button # the Scores screen's door; rebuilt with that screen
+var global_offline_note: Label
 
 
 ## Did the launch ask for a specific window size? `--resolution` cannot be
@@ -584,6 +641,9 @@ func _ready() -> void:
 			main_box.visible = false
 			login_center.visible = true)
 		sync_button.visible = Account.provider() == Account.GUEST
+		sync_offline_note = _offline_note(main_box)
+		# its visibility is flipped from several places; the note follows it
+		sync_button.visibility_changed.connect(_apply_connectivity)
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
@@ -635,6 +695,7 @@ func _ready() -> void:
 		provider_buttons.append(
 			_button(login_box, "Sign in with %s" % Account.label(prov), 22,
 				_on_provider_pressed.bind(prov)))
+	provider_offline_note = _offline_note(login_box)
 	# ALWAYS VISIBLE, AND NEVER DISABLED — this is the screen's only guaranteed
 	# exit, and the one control that must work when everything else has failed.
 	#
@@ -966,6 +1027,14 @@ func _ready() -> void:
 		rank_center.visible = false
 		army_center.visible = true)
 
+	# NO-64: keep asking the phone while the menu is up. See _apply_connectivity.
+	var poll := Timer.new()
+	poll.wait_time = 1.0
+	poll.autostart = true
+	poll.timeout.connect(_apply_connectivity)
+	add_child(poll)
+	_apply_connectivity()
+
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]
 		await RenderingServer.frame_post_draw
@@ -1022,12 +1091,17 @@ func _show_scores() -> void:
 	# second list for us to maintain. Hidden rather than disabled when there is
 	# no platform behind it: a permanently greyed button on desktop would be
 	# chrome advertising something that cannot exist there.
+	#
+	# NO-64: OFFLINE is the opposite case — the platform exists, the network does
+	# not, so "not now" is the true message and the door is disabled, not hidden.
 	if GlobalBoard.available():
-		var global_btn := Button.new()
+		global_btn = Button.new()
 		global_btn.text = "Global ranking"
 		global_btn.pressed.connect(func() -> void:
 			GlobalBoard.show_board(GlobalBoard.HIGH_SCORE))
 		box.add_child(global_btn)
+		global_offline_note = _offline_note(box)
+		_apply_connectivity()
 	if scores.is_empty():
 		var none := Label.new()
 		none.text = "No runs yet"

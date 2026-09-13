@@ -25,6 +25,49 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `feat/no-64-offline-controls` (PR #402) — 2026-09-13, Android — offline controls
+
+**Nothing Phone (2a)** (`A142`, serial `00064141N000650`), over **USB**. Debug
+build installed over Max's own install with data kept, and run there with his
+explicit approval: main menu and login screen only, never Continue, Play or a board
+tile. A scenario build cannot show the menu. Driven from the Mac, every tap behind
+the foreground guard. Screenshots and `run.log`:
+`~/Documents/nokings-builds/no-64-2026-09-13/usb/`.
+
+### Confirmed on hardware
+
+| What | Observed |
+| --- | --- |
+| Permission | `dumpsys package`: `android.permission.ACCESS_NETWORK_STATE: granted=true`. Without it the detection fails open and every screenshot taken online would look identical. |
+| Offline, login screen | Airplane mode on (read back `airplane_mode_on=1`, no default network, ping fails): "Sign in with Google" and "Sign in with Game Center" greyed, "No internet connection" under them, "Continue offline" live and working. |
+| Offline, main menu | "Sign in to sync" greyed with "No internet connection". |
+| **Recovery without restart** | Airplane mode off, network back in 2 s: "Sign in to sync" live again and the reason gone 3 s later. App pid 13893 before and after, so no restart. |
+| logcat | No errors or exceptions from the app across the transition. |
+| Phone restored | Read back `airplane_mode_on=0 wifi_on=1 mobile_data=1 accelerometer_rotation=0`, matching the values recorded before the run. |
+
+### Not observable, and why
+
+- **Recovery on regaining focus.** Airplane mode was toggled from the Mac, not
+  from the notification shade, so the app never lost focus and
+  `NOTIFICATION_APPLICATION_FOCUS_IN` never fired. The recovery above is the 1 s
+  poll alone. The focus path, which is the one a player pulling down the shade
+  takes, is covered by the desktop probe only. An independent emulator run the
+  same day agreed on every observation and toggled from the host too, so it did
+  not exercise the focus path either.
+- **The Global ranking door.** This install is bound to a guest while Play Games
+  is signed in as another account, so the door is not built. Desktop probe only.
+- **iOS.** No iPhone. The `Connectivity` plugin compiles for device and simulator
+  and has never run.
+
+### The first attempt left the phone in airplane mode
+
+Over **wireless** adb, an on-phone script turned airplane mode on and was killed
+within 3 s: every process the adb session started dies with it, `setsid` included.
+Its restore never ran and Max fixed the phone by hand. The rules that came out of
+it are in `docs/MANUAL-STEPS.md` section B (PR #403).
+
+---
+
 ## `e5e2896` — 2026-09-11/12, Android — the seven fixes, and a Back defect
 
 **Nothing Phone (2a)** (`A142`, `Pacman`), 1084x2412 @ 420 dpi, over wireless

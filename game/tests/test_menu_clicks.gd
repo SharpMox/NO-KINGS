@@ -11,6 +11,18 @@ const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
 const MemoryBackend := preload("res://scripts/cloud/cloud_backend_memory.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
+const Connectivity := preload("res://scripts/connectivity.gd")
+const GlobalBoard := preload("res://scripts/global_board.gd")
+const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
+
+
+## NO-64: a platform board that exists, so the Scores door is built on desktop.
+class FakeBoard:
+	static func board_available() -> bool:
+		return true
+
+	static func board_show(_board: String) -> bool:
+		return true
 
 ## NO-55: the owner id this probe binds is a REAL 64-character Game Center id,
 ## not a short label, because the defect is about WIDTH. The earlier
@@ -538,6 +550,90 @@ func _init() -> void:
 	sw2.queue_free()
 	await process_frame
 	CloudSave.backend = prev_backend
+	Account.logout([])
+	Account._reset_cache()
+
+	# ---- NO-64: offline DISABLES network controls, with a reason -------------
+	# Detection asks the phone and cannot run here; its CONSEQUENCE can. The
+	# state is faked at the seam (Connectivity.override), and the rest is the
+	# real menu driven by real clicks.
+	#
+	# Desktop builds no "Sign in to sync" — PlayBridge.supported() is false with
+	# no plugin — so give the bridge a stand-in handle for the duration. Nothing
+	# here reaches a call on it: the button is disabled, which is the point.
+	Account.start_guest()
+	var prev_snapshots = PlayBridge._snapshots
+	PlayBridge._snapshots = Node.new()
+	GlobalBoard.backend_override = FakeBoard
+	Connectivity.override = false
+	var off: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(off)
+	await process_frame
+	await process_frame
+	var sync := _find_button(off, "Sign in to sync")
+	check(sync != null and sync.disabled,
+		"offline: Sign in to sync is still SHOWN, but disabled — not hidden")
+	check(_find_label(off, MenuScript.OFFLINE_REASON) != null, "...with the reason on screen")
+	await _click_button(off, "Sign in to sync")
+	await process_frame
+	check(_find_button(off, "Play") != null and not off.login_center.visible,
+		"...and pressing it does nothing")
+
+	# The login screen, reached the way a lapsed session would see it.
+	off.main_box.visible = false
+	off.login_center.visible = true
+	await process_frame
+	for prov_text in ["Sign in with Google", "Sign in with Game Center"]:
+		var pb := _find_button(off, prov_text)
+		check(pb != null and pb.disabled, "offline: %s is disabled" % prov_text)
+	check(_find_label(off, MenuScript.OFFLINE_REASON) != null, "...with the reason on screen")
+	await _click_button(off, "Sign in with Google")
+	await process_frame
+	check(off.login_note.text == MenuScript.LOGIN_TAGLINE,
+		"...and a press starts no sign-in (the note still reads the tagline)")
+	# The lock release every verdict path calls must not re-enable them offline.
+	off._set_providers_disabled(false)
+	check(_find_button(off, "Sign in with Google").disabled,
+		"releasing the in-flight sign-in lock does not re-enable a provider offline")
+	var way_out := _find_button(off, "Continue offline")
+	check(way_out != null and not way_out.disabled, "the way out stays LIVE offline")
+	check(await _click_button(off, "Continue offline"), "Continue offline clickable")
+	await process_frame
+	check(_find_button(off, "Play") != null, "...and it still leaves the login screen")
+
+	# The Scores screen's door to the global board.
+	check(await _click_button(off, "Scores"), "Scores opens offline")
+	await process_frame
+	var door := _find_button(off, "Global ranking")
+	check(door != null and door.disabled,
+		"offline: Global ranking is shown but disabled (a board exists, the network does not)")
+	check(_find_label(off, MenuScript.OFFLINE_REASON) != null, "...with the reason on screen")
+
+	# THE ONE THAT MATTERS MOST: connectivity returns mid-session and the control
+	# comes back ON ITS OWN, through the poll — no reopen, no restart. A greyed
+	# button that never ungreys is worse than the old behaviour.
+	Connectivity.override = true
+	await create_timer(1.5).timeout
+	check(not door.disabled, "back online: the door re-enables by itself, via the poll")
+	check(_find_label(off, MenuScript.OFFLINE_REASON) == null, "...and the reason goes away")
+	check(await _click_button(off, "← Back"), "scores Back clickable")
+	await process_frame
+	check(not _find_button(off, "Sign in to sync").disabled,
+		"...and Sign in to sync is live again too")
+
+	# Regaining focus re-asks at once (pulling down Control Center or the shade to
+	# toggle airplane mode takes focus from the app), without waiting for a tick.
+	Connectivity.override = false
+	off.notification(Node.NOTIFICATION_APPLICATION_FOCUS_IN)
+	check(_find_button(off, "Sign in to sync").disabled,
+		"regaining focus re-checks immediately")
+
+	off.queue_free()
+	await process_frame
+	Connectivity.override = null
+	GlobalBoard.backend_override = null
+	PlayBridge._snapshots.free()
+	PlayBridge._snapshots = prev_snapshots
 	Account.logout([])
 	Account._reset_cache()
 

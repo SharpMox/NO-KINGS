@@ -146,6 +146,18 @@ func _on_snapshot_loaded(key: String) -> void:
 	var paths := _SYNC_KEYS()
 	if paths.has(key):
 		CloudSave.sync_file(key, paths[key], _MERGER(key))
+	if key == "run":
+		_refresh_continue() # NO-88: the restore just landed; offer it now, not next launch
+
+
+## Show Continue exactly when the save on disk can be READ (see the comment at
+## the button's build), and stage that save for the press. Re-run whenever the
+## run file may have changed under a built menu.
+func _refresh_continue() -> void:
+	_continue_save = null
+	if FileAccess.file_exists(GameScript.SAVE_PATH):
+		_continue_save = JSON.parse_string(FileAccess.get_file_as_string(GameScript.SAVE_PATH))
+	continue_button.visible = SaveConfig.is_loadable(_continue_save)
 
 
 ## THE ONE PLACE A SIGN-IN VERDICT IS HANDLED — binding, cloud fetch and UI.
@@ -434,6 +446,8 @@ func _on_provider_pressed(prov: String) -> void:
 	_BRIDGE().begin_sign_in()
 
 var main_box: VBoxContainer
+var continue_button: Button # NO-88: shown/hidden by _refresh_continue
+var _continue_save: Variant = null # the readable save Continue will load, or null
 var guest_button: Button # relabelled by _on_logout; see there
 var test_scroll: ScrollContainer
 ## NO-58: the TEST list's search box, and the state _apply_test_filter needs.
@@ -606,14 +620,17 @@ func _ready() -> void:
 	# Continue would break every time it was pressed, forever, with no way to
 	# clear it from the menu. Hiding the button leaves Play working and the other
 	# build's save intact. (issue 86)
-	var saved: Variant = null
-	if FileAccess.file_exists(GameScript.SAVE_PATH):
-		saved = JSON.parse_string(FileAccess.get_file_as_string(GameScript.SAVE_PATH))
-	if SaveConfig.is_loadable(saved):
-		_button(main_box, "Continue", 32, func() -> void:
-			GameScript.next_config = saved
-			GameScript.is_scenario = false
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+	#
+	# NO-88: built ALWAYS and shown by _refresh_continue, because the save it
+	# offers can arrive after this menu exists — on a fresh install the player
+	# signs in FROM this menu, and the cloud run lands later, on
+	# _on_snapshot_loaded. Building it only here left that restore invisible
+	# until a relaunch.
+	continue_button = _button(main_box, "Continue", 32, func() -> void:
+		GameScript.next_config = _continue_save
+		GameScript.is_scenario = false
+		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+	_refresh_continue()
 	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "Scores", 24, _show_scores)
 	_button(main_box, "Games History", 24, _show_history)

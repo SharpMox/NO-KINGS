@@ -25,6 +25,43 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `e8160ab` — 2026-09-13, iOS — same evening, the iCloud round trip and two menu bugs
+
+**Same borrowed iPhone 11, later the same evening**, continuing past the pass
+recorded below (PR #405 covered only that earlier part of the session).
+Uninstalled and reinstalled the `main` `e8160ab` build, signed back into Game
+Center on the fresh install, and let the cloud save resolve. Evidence:
+`~/Documents/nokings-builds/e8160ab-2026-09-13-ios/icloud-roundtrip/` and the
+two bug drafts alongside it.
+
+### Confirmed on hardware
+
+| What | On iOS | Evidence |
+| --- | --- | --- |
+| **iCloud KV round trip** | A run at wave 2 / score 500 / gold 50 (plus a completed game at wave 15 / score 900) survived uninstall, reinstall and sign-in: `save.json`, `history.json` and `scores.json` all came back with the same values (numbers round-trip as JSON floats instead of ints, otherwise identical). Reverses the "still unverified" line in the entry below. | `icloud-roundtrip/before-uninstall/` vs `icloud-roundtrip/after-restore/` |
+
+### Defects (filed separately)
+
+- **Continue hidden after a cloud restore.** The restored save reached disk
+  correctly, but Continue is only built when the main menu itself is built
+  (`menu.gd:608-616`); the async cloud write that lands after sign-in
+  (`menu.gd:145-148`) never re-evaluates or rebuilds it. Continue stayed
+  missing until the app was killed and relaunched, then showed correctly.
+- **Game Center "switch account" prompt on a first bind.** A fresh install
+  with no account bound is treated as a switch between two accounts rather
+  than a first sign-in: the owner check compares against an empty owner
+  (`menu.gd:233-235`), and the first-bind branch that would otherwise apply
+  requires `was_interactive`, which native auto-login never sets
+  (`menu.gd:162`, `menu.gd:212`, `menu.gd:570-571`). Neither prompt button
+  binds the account. The install did end up bound to the right Game Center id
+  and the cloud save restored regardless, but which code path did the bind was
+  not established.
+
+Both filed as Linear issues labelled `flag`, being created separately from
+this PR.
+
+---
+
 ## `e8160ab` — 2026-09-13, iOS — second iPhone pass: the Game Center id holds
 
 **The same borrowed iPhone 11 (iPhone12,1)**, now iOS 26.6.2, still signed into its

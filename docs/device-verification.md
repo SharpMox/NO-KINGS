@@ -25,6 +25,29 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `e8160ab` — 2026-09-13, iOS — tombstone and the safe-area measurement
+
+**Same session as the entries below**, not filed in `docs/device-verification.md` at
+the time. No dedicated screenshot or log for either check turned up in
+`~/Documents/nokings-builds/e8160ab-2026-09-13-ios/` (only the iCloud round-trip and
+the two menu bugs are evidenced there). Source for both facts: the handoff note the
+session wrote on close, `~/Documents/handoff-nokings-2026-09-13-evening.md`, "Open, in
+order" item 2 — its author ran the checks.
+
+### Confirmed on hardware
+
+| What | On iOS | Evidence |
+| --- | --- | --- |
+| **Tombstone** | After a game over, two boots and 20 s waits each showed no Continue, no `save.json`, owner unchanged. | handoff note |
+
+### Measured on hardware
+
+| What | On iOS | Evidence |
+| --- | --- | --- |
+| **Safe area, iPhone 11** | `safe=[P: (0, 96), S: (828, 1628)]`, window 828×1792, scale 2 — top inset 48 pt / 56 canvas px, bottom 34 pt / 39 canvas px. Measured with a throwaway build, never committed. A measurement, not a fix: the defect in the entry below (no `get_display_safe_area` call, NO-57) still stands; these are the insets a fix has to respect. | handoff note |
+
+---
+
 ## `e8160ab` — 2026-09-13, iOS — same evening, the iCloud round trip and two menu bugs
 
 **Same borrowed iPhone 11, later the same evening**, continuing past the pass

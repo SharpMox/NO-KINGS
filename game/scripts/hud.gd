@@ -57,6 +57,31 @@ const LONG_PRESS_MS := 500
 ## worse trade than one empty row.
 const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0
 
+## ---- HEADER TUNING (NO-83) -------------------------------------------------
+## Every spacing number in the Header lives in THIS block, so tuning it on the
+## phone means editing one place. Canvas px on the 480-wide viewport. Nothing
+## here is measured at runtime: game.gd's board solve reads HEADER_H, and the
+## notch inset (g.safe_top) is ADDED above it, never taken out of it.
+const HEADER_H := 110.0 ## 2.5 x the 44px strip it replaces (NO-82)
+const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
+const HEADER_PAD_Y := 4.0 ## gap under the inset and above the bottom edge
+const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
+const CLOCK_FONT := 36 ## glyph size inside the Clock line, which is HEADER_H / 2 tall
+const SCORE_FONT := 17 ## a 17px Label is 25px tall: 4 + 55 + 25 + 25 fits the 110
+const GOLD_FONT := 17
+const COUNTER_FONT := 15 ## the ⚑ Wave and ⏳ turn counters
+const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
+const MENU_FONT := 15
+const MENU_W := 34.0 ## the ☰ button's footprint in the corner
+const STOCK_ICON := 44 ## the piece icon on the Stock button
+const STOCK_BADGE_FONT := 13
+const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the icon's centre
+const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
+## ----------------------------------------------------------------------------
+## The first King's wave (data/kings.gd: "wave 50 -> king 1"; data/waves.gd row
+## 50). The ⚑ Wave counter's denominator until that King falls (NO-82).
+const WIN_WAVE := 50
+
 signal pass_pressed
 signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
@@ -119,6 +144,8 @@ var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
 var stock_armed := Control.new() # draws the armed piece on the Stock button
+var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
+var menu_button := Button.new() # ☰, the Header's top-right corner
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
@@ -153,12 +180,9 @@ var deck_h := 0.0
 ## The bottom row: Ability beside PASS. Held as a member because build() places
 ## it before the power label exists and the final order is set afterwards.
 var act_row: HBoxContainer
-## The stock strip: a live row of the pieces you hold, at board-piece size.
-var stock_strip: PanelContainer
-var stock_strip_head := Label.new()
-var stock_strip_flow := HFlowContainer.new()
-var _strip_sig := "" # last built content, so refresh does not rebuild every frame
-var _strip_retry := 0 # bounded waits for layout; see _rebuild_stock_strip
+## The drawers row: Inventory and Shop, equal halves (NO-83 retired the Deck's
+## Stock button — Stock opens from the Header).
+var nav_row: HBoxContainer
 ## One size for every menu icon, deliberately just under a board tile so the
 ## deck reads as smaller than the board without looking like a different game.
 ## NO-33 / ADR-0004: derived from the tile rather than fixed at 52. As a literal
@@ -207,38 +231,65 @@ func build(game) -> void:
 	# NO-33 / ADR-0004: one-way. _layout_board has already solved the tile for
 	# this viewport, so ICON reads it rather than anything measuring itself.
 	ICON = maxi(1, g.tile - g.ICON_GAP)
-	# condensed top bar: clock · score · gold · wave, menu at the right corner
-	clock_label.add_theme_font_size_override("font_size", 17)
-	score_label.add_theme_font_size_override("font_size", 18)
+	# ---- THE HEADER (NO-82/NO-83) -------------------------------------------
+	# The band above the board: g.hud_top tall, of which the top g.safe_top is
+	# the platform's notch inset. The background is painted from y = 0 so it runs
+	# up behind the notch; every control starts at `y0`, below it.
+	var y0: float = g.safe_top
+	var header_bg := ColorRect.new()
+	header_bg.color = HEADER_BG
+	header_bg.position = Vector2.ZERO
+	header_bg.size = Vector2(vp.x, g.hud_top)
+	header_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(header_bg)
+	# LEFT: Clock, half the Header tall, then Score, then Gold — a fixed reading
+	# order (NO-82 stories 4-5).
+	clock_label.add_theme_font_size_override("font_size", CLOCK_FONT)
+	clock_label.custom_minimum_size = Vector2(0, HEADER_H / 2.0)
+	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	gold_label.add_theme_font_size_override("font_size", 18)
+	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
-	wave_label.add_theme_font_size_override("font_size", 15)
-	wave_label.modulate = Color(1, 1, 1, 0.85)
-	var top := HBoxContainer.new()
-	top.position = Vector2(10, 4)
-	top.custom_minimum_size = Vector2(vp.x - 56, 0)
-	top.add_theme_constant_override("separation", 14)
-	# ONLY the three numbers, plus the menu button at the corner (user ruling,
-	# 2026-09-05). Wave, tariffs and Arrows moved into the deck under the board:
-	# they are status and controls, and the top strip is for what you glance at.
+	var left := VBoxContainer.new()
+	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
+	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
+	left.add_theme_constant_override("separation", 0)
 	for l in [clock_label, score_label, gold_label]:
-		top.add_child(l)
-	add_child(top)
+		left.add_child(l)
+	add_child(left)
+	# CENTRE, flush to the bottom: ⚑ Wave over ⏳ turns. The column has a fixed
+	# width so a long King name is cut with an ellipsis rather than pushing into
+	# the Stock button (story 20).
+	var mid := VBoxContainer.new()
+	mid.position = Vector2((vp.x - COUNTER_W) / 2.0, y0)
+	mid.custom_minimum_size = Vector2(COUNTER_W, HEADER_H - HEADER_PAD_Y)
+	mid.alignment = BoxContainer.ALIGNMENT_END
+	mid.add_theme_constant_override("separation", 0)
+	for l: Label in [wave_label, turn_label]:
+		l.add_theme_font_size_override("font_size", COUNTER_FONT)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		mid.add_child(l)
+	wave_label.modulate = Color(1, 1, 1, 0.85)
+	add_child(mid)
+	# RIGHT: the menu in the corner, the Stock button just left of it.
 	king_ability_button.add_theme_font_size_override("font_size", 13)
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	king_ability_button.pressed.connect(func() -> void: king_ability_pressed.emit())
 	arrow_button.text = "Arrows"
 	arrow_button.add_theme_font_size_override("font_size", 13)
 	arrow_button.pressed.connect(func() -> void: arrow_toggle_pressed.emit())
+	# NO-83: the ⚠ and Arrows buttons are NOT on screen. Their state, signals
+	# and handlers stay (refresh still writes their text) so nothing behind
+	# them is lost; they get a home again when the Deck is redesigned (NO-84+).
 
-	var menu_btn := Button.new()
-	menu_btn.text = "☰"
-	menu_btn.add_theme_font_size_override("font_size", 15)
-	menu_btn.position = Vector2(vp.x - 34, 3)
-	# both top-row buttons get flat compact styling so they fit inside the
-	# top strip without overflowing onto the board (2026-07-08)
-	for b: Button in [king_ability_button, arrow_button, menu_btn]:
+	menu_button.text = "☰"
+	menu_button.add_theme_font_size_override("font_size", MENU_FONT)
+	menu_button.position = Vector2(vp.x - HEADER_PAD_X - MENU_W, y0 + HEADER_PAD_Y)
+	menu_button.custom_minimum_size = Vector2(MENU_W, 0)
+	# flat compact styling (2026-07-08); the two off-screen buttons keep theirs
+	for b: Button in [king_ability_button, arrow_button, menu_button]:
 		var compact := StyleBoxFlat.new()
 		compact.bg_color = Color(0.22, 0.22, 0.26)
 		compact.set_corner_radius_all(4)
@@ -248,18 +299,45 @@ func build(game) -> void:
 		compact.content_margin_bottom = 1
 		for style in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(style, compact)
-	menu_btn.pressed.connect(func() -> void: toggle_menu(true))
-	add_child(menu_btn)
-
-	# bottom: action count above the button row (Stock / Inventory / Shop / PASS)
-	turn_label.position = Vector2(0, vp.y - 70)
-	turn_label.custom_minimum_size = Vector2(vp.x, 0)
-	turn_label.add_theme_font_size_override("font_size", 14)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	# it floats over the board's bottom edge now — outline for readability
-	turn_label.add_theme_color_override("font_outline_color", Color(0.08, 0.08, 0.1))
-	turn_label.add_theme_constant_override("outline_size", 6)
-	add_child(turn_label)
+	menu_button.pressed.connect(func() -> void: toggle_menu(true))
+	add_child(menu_button)
+	# THE STOCK BUTTON (stories 7-12). Its tap area is the Header's full height
+	# and runs from the counters column to the menu button — and no further:
+	# the bottom edge IS g.hud_top, where the board starts, and the right edge
+	# stops HEADER_GAP short of the menu, so neither can be hit by accident.
+	var stock_btn := Button.new()
+	var stock_x: float = (vp.x + COUNTER_W) / 2.0 + HEADER_GAP
+	stock_btn.position = Vector2(stock_x, y0)
+	stock_btn.custom_minimum_size = Vector2(menu_button.position.x - HEADER_GAP - stock_x, HEADER_H)
+	if g.textures.has("pawn"):
+		stock_btn.icon = g.piece_tex("pawn") # Stock is always yours: the player token
+		stock_btn.expand_icon = true
+		stock_btn.add_theme_constant_override("icon_max_width", STOCK_ICON)
+	else:
+		stock_btn.text = "♟"
+	_style_button(stock_btn, Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 8, 4, 4)
+	stock_btn.pressed.connect(func() -> void:
+		set_drawer("stock")
+		drawer_changed.emit())
+	# the count badge, same idiom as a pool stack's: a corner label over the icon
+	stock_badge.add_theme_font_size_override("font_size", STOCK_BADGE_FONT)
+	stock_badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+	stock_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+	stock_badge.add_theme_constant_override("outline_size", 4)
+	stock_badge.set_anchors_preset(Control.PRESET_CENTER)
+	stock_badge.offset_left = STOCK_BADGE_OFFSET.x
+	stock_badge.offset_top = STOCK_BADGE_OFFSET.y
+	stock_badge.offset_right = STOCK_BADGE_OFFSET.x + 24.0
+	stock_badge.offset_bottom = STOCK_BADGE_OFFSET.y + 16.0
+	stock_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stock_btn.add_child(stock_badge)
+	# the armed stack rides on the Stock button, styled like a selection
+	stock_armed.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stock_armed.draw.connect(_draw_stock_armed)
+	stock_btn.add_child(stock_armed)
+	drawer_buttons["stock"] = stock_btn
+	add_child(stock_btn)
 	# ---- THE CONTROL DECK (design C, user pick 2026-09-05) ------------------
 	# Everything under the board lives in one column that starts where the board
 	# ends and runs to the bottom edge. That is what removes the dead band: the
@@ -273,73 +351,25 @@ func build(game) -> void:
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
 
-	# THE STOCK STRIP (design C). Sits directly under the board and shows the
-	# pieces you actually hold at the same size they appear on the board.
-	# NO-33 / ADR-0004: it no longer absorbs leftover height. It spent absorbed
-	# height in whole icon rows, so any remainder under a row was empty by
-	# construction — the board absorbs now, and this is exactly one row.
-	stock_strip = PanelContainer.new()
-	stock_strip.add_theme_stylebox_override("panel",
-		_surface(Color(0, 0, 0, 0.19), Color(0, 0, 0, 0), 8, 6, 5))
-	# one full row of pieces plus its header, always. Without a floor here the
-	# strip measures itself before layout has given it any height, decides no row
-	# fits, hides, and then never comes back because a hidden node stays 0 tall.
-	stock_strip.custom_minimum_size = Vector2(0, ICON + g.STRIP_CHROME)
-	stock_strip.gui_input.connect(func(e: InputEvent) -> void:
-		if e is InputEventMouseButton and e.pressed:
-			set_drawer("stock")
-			drawer_changed.emit())
-	var strip_box := VBoxContainer.new()
-	strip_box.add_theme_constant_override("separation", 4)
-	stock_strip.add_child(strip_box)
-	stock_strip_head.add_theme_font_size_override("font_size", 12)
-	stock_strip_head.modulate = Color(1, 1, 1, 0.65)
-	strip_box.add_child(stock_strip_head)
-	stock_strip_flow.add_theme_constant_override("h_separation", 5)
-	stock_strip_flow.add_theme_constant_override("v_separation", 5)
-	strip_box.add_child(stock_strip_flow)
-	deck.add_child(stock_strip)
-
-	# status and navigation share one line: wave, tariffs and Arrows on the left,
-	# the drawers on the right
-	var status := HBoxContainer.new()
-	status.add_theme_constant_override("separation", 5)
-	status.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	deck.add_child(status)
-	# pills, not buttons-that-look-like-chrome: these are status first
-	var wave_pill := PanelContainer.new()
-	wave_pill.add_theme_stylebox_override("panel",
-		_surface(Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3))
-	wave_pill.add_child(wave_label)
-	status.add_child(wave_pill)
-	_style_button(king_ability_button, Color(0, 0, 0, 0.22), Color(0, 0, 0, 0), 14, 10, 3)
-	_style_button(arrow_button, Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 14, 10, 3)
-	status.add_child(king_ability_button)
-	status.add_child(arrow_button)
-	status.size_flags_vertical = Control.SIZE_SHRINK_CENTER # a status line, not a band
-	# the drawers get their own line. Sharing one with the status pills clipped
-	# Shop off the right edge at 480 wide.
-	var nav_row := HBoxContainer.new()
+	# NO-83: the stock strip and the status line are gone from the Deck. The
+	# strip's job (which pieces you hold, without opening anything) moves to
+	# the Header's Stock badge; wave and turn moved up with it. The Deck is now
+	# the drawers row, the Power badge and the thumb row.
+	nav_row = HBoxContainer.new()
 	nav_row.add_theme_constant_override("separation", 5)
 	nav_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	deck.add_child(nav_row)
 
 	var bar := nav_row
-	for name in ["stock", "inventory"]:
-		var b := Button.new()
-		b.text = name.capitalize()
-		b.add_theme_font_size_override("font_size", 17)
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func() -> void:
-			set_drawer(name)
-			drawer_changed.emit())
-		drawer_buttons[name] = b
-		bar.add_child(b)
-	# the armed stack rides on the Stock button, styled like a selection
-	stock_armed.set_anchors_preset(Control.PRESET_FULL_RECT)
-	stock_armed.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stock_armed.draw.connect(_draw_stock_armed)
-	drawer_buttons["stock"].add_child(stock_armed)
+	var inv := Button.new()
+	inv.text = "Inventory"
+	inv.add_theme_font_size_override("font_size", 17)
+	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inv.pressed.connect(func() -> void:
+		set_drawer("inventory")
+		drawer_changed.emit())
+	drawer_buttons["inventory"] = inv
+	bar.add_child(inv)
 	shop_button.text = "Shop"
 	shop_button.add_theme_font_size_override("font_size", 17)
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -483,15 +513,13 @@ func build(game) -> void:
 	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
 	power_badge.add_child(army_power_label)
 	deck.add_child(power_badge)
-	# DECK ORDER (design C): stock strip under the board, then status pills,
-	# drawers, the passive power, and the thumb row last. The rows are built in
-	# whatever order the rest of build() needs them, so the order that matters is
-	# asserted here rather than implied by construction sequence.
-	deck.move_child(stock_strip, 0)
-	deck.move_child(status, 1)
-	deck.move_child(nav_row, 2)
-	deck.move_child(power_badge, 3)
-	deck.move_child(act_row, 4)
+	# DECK ORDER (design C, cut down by NO-83): drawers under the board, the
+	# passive power, and the thumb row last. The rows are built in whatever order
+	# the rest of build() needs them, so the order that matters is asserted here
+	# rather than implied by construction sequence.
+	deck.move_child(nav_row, 0)
+	deck.move_child(power_badge, 1)
+	deck.move_child(act_row, 2)
 	# (the power label used to sit here; design C moved it onto the deck)
 	inv_box.add_child(item_box)
 	inv_box.add_child(activate_box)
@@ -687,16 +715,20 @@ func refresh() -> void:
 	clock_label.text = g._clock_text()
 	score_label.text = "★%d" % g.score
 	gold_label.text = "$%d" % g.gold
-	var next_in: int = g._cadence() - g.turns_since_wave
-	var wave_txt := ("King: %s" % g._king_name()) if g._king_alive() \
-		else ("in %d" % maxi(next_in, 0)) if g.wave < Waves.WAVES.size() else "done"
-	wave_label.text = "wave %d/%d · %s" % [g.wave, Waves.WAVES.size(), wave_txt]
-	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
-		# the "Place your army (N left), then START" reminder used to live here.
-		# Removed 2026-09-06 (user): turn_label sits at vp.y - 70, under the whole
-		# deck in design C, so nobody could read it. Bring it back with the Stock
-		# UI move, where it can sit next to the strip it talks about.
+	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
+	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
+	wave_label.text = "⚑ %d/%d" % [g.wave,
+		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
+	# ⏳ TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
+	# The King's name instead while he is alive OR pending (no Wave arrives
+	# until he is checkmated); blank after the last Wave, when no Wave is coming.
+	if g._king_alive() or not g.pending_king.is_empty():
+		turn_label.text = "⏳ %s" % g._king_name()
+	elif g.wave >= Waves.WAVES.size():
 		turn_label.text = ""
+	else:
+		turn_label.text = "⏳ %d/%d" % [g.turns_since_wave, g._cadence()]
+	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""
@@ -715,9 +747,7 @@ func refresh() -> void:
 		pass_button.self_modulate = Color(0.5, 0.5, 0.5) if pass_blocked else Color(1, 0.5, 0.5)
 		pass_count.text = "%d/%d" % [g.actions_left, g.actions_max]
 		pass_label.text = "MUST ACT" if pass_blocked else "PASS"
-		turn_label.text = ""
 	elif g.state == g.State.ENEMY_TURN:
-		turn_label.text = "enemy turn…"
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""
 		pass_count.text = ""
@@ -725,10 +755,8 @@ func refresh() -> void:
 	elif g.state == g.State.GAME_OVER:
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""
-		turn_label.text = ""
 		pass_count.text = ""
-	_rebuild_stock_strip()
-	drawer_buttons["stock"].text = "Stock %d" % g._pool().size()
+	stock_badge.text = str(g._pool().size())
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
 	king_ability_button.text = "⚠%d" % g.king_abilities_active.size() \
@@ -834,12 +862,15 @@ func _draw_stock_armed() -> void:
 	# only while the drawer is closed — open, the armed stack itself is visible
 	if g.placing_id == "" or drawer_open == "stock" or not g.textures.has(g.placing_id):
 		return
-	var c := Vector2(19.0, stock_armed.size.y / 2.0)
+	# over the Header button's icon (NO-83): the armed piece replaces the
+	# generic token, with the same pulsing ring a selected board piece wears
+	var c := stock_armed.size / 2.0
+	var half := STOCK_ICON / 2.0
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	stock_armed.draw_texture_rect(g.piece_tex(g.placing_id),
-		Rect2(c - Vector2(13, 13), Vector2(26, 26)), false)
-	stock_armed.draw_arc(c, 14.0 + 2.0 * pulse, 0, TAU, 24,
+		Rect2(c - Vector2(half, half), Vector2(STOCK_ICON, STOCK_ICON)), false)
+	stock_armed.draw_arc(c, half + 2.0 + 2.0 * pulse, 0, TAU, 24,
 		Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse), 2.0 + pulse)
 
 
@@ -982,79 +1013,6 @@ func _rebuild_activate_strip() -> void:
 			_long_press_input(btn, key, entry.description, e))
 		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		activate_box.add_child(btn)
-
-
-## Fill the strip with COMPLETE rows only. A half-cut row of pieces reads as a
-## rendering fault rather than as "there is more below", so the surplus is
-## stated as a +N tile instead (the prototype made the same call).
-func _rebuild_stock_strip() -> void:
-	if stock_strip == null:
-		return
-	var pool: Array = g._pool()
-	# an empty strip says why it is empty rather than sitting there blank
-	stock_strip_head.text = "Stock %d" % pool.size() if pool.size() > 0 \
-		else "Stock 0 — captured and extracted pieces land here"
-	# NOTHING to measure before layout has run, and measuring anyway is worse
-	# than waiting: the signature below would cache the answer derived from a
-	# zero width and never recompute. Observed on device — "Stock 21" with a
-	# "+21" chip and not one piece drawn, permanently.
-	if stock_strip.size.x < ICON + 14.0:
-		# Layout has not settled: the width arrives a frame or two after build,
-		# and on the phone no game refresh happened to follow, so an early
-		# measurement got cached and the strip showed "Stock 21" with a "+21"
-		# chip and no pieces, permanently.
-		#
-		# Retry on the next frame rather than binding to `resized`. That signal
-		# is a feedback loop here — rebuilding changes the children, which
-		# changes the size, which fires resized, which rebuilds — and it cost a
-		# scenario run 2.7 million error lines before test_scenarios caught it.
-		# The counter bounds the retry so a strip that is legitimately narrow
-		# gives up instead of deferring forever.
-		if _strip_retry < 10:
-			_strip_retry += 1
-			_rebuild_stock_strip.call_deferred()
-		return
-	_strip_retry = 0
-	var per_row: int = maxi(1, int((stock_strip.size.x - 12.0 + 5.0) / (ICON + 5)))
-	var body_h: float = stock_strip.size.y - stock_strip_head.size.y - 15.0
-	# at least one row: the strip has a minimum height reserved for exactly that
-	var rows: int = maxi(1, int((body_h + 5.0) / (ICON + 5)))
-	var room: int = rows * per_row
-	var shown: int = mini(pool.size(), room - 1 if pool.size() > room else room)
-	# rebuilt only when the visible content actually changed: this runs on every
-	# refresh, and freeing/adding ~10 nodes per frame is a real cost for nothing
-	# the ROOM is part of the signature, not just the content: room varies with
-	# the strip's WIDTH (and, across devices, with ICON), so the same 21 pieces
-	# legitimately draw differently at different sizes
-	var sig := "%d/%d/%d" % [pool.size(), shown, room]
-	if sig == _strip_sig:
-		return
-	_strip_sig = sig
-	for c in stock_strip_flow.get_children():
-		c.queue_free()
-	for i in shown:
-		var e: Variant = pool[i]
-		var id: String = str(e) if e is String else str((e as Dictionary).get("id", ""))
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(ICON, ICON)
-		b.expand_icon = true
-		if g.textures.has(id):
-			b.icon = g.piece_tex(id)
-		else:
-			b.text = id.substr(0, 2)
-		_style_button(b, Color(0.169, 0.169, 0.169), Color(0, 0, 0, 0), 8, 2, 2)
-		b.pressed.connect(func() -> void:
-			set_drawer("stock")
-			drawer_changed.emit())
-		stock_strip_flow.add_child(b)
-	if pool.size() > shown:
-		var more := Label.new()
-		more.custom_minimum_size = Vector2(ICON, ICON)
-		more.text = "+%d" % (pool.size() - shown)
-		more.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		more.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		more.modulate = Color(1, 1, 1, 0.6)
-		stock_strip_flow.add_child(more)
 
 
 func _rebuild_item_strip() -> void:

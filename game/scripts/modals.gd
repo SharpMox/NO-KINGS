@@ -269,7 +269,10 @@ func show_win_screen() -> void:
 	overlay.visible = true
 
 
-func show_preview(id: String) -> void:
+## `king_id` (NO-83): a King whose Power draws on the King Ability catalogue —
+## only Donald Trump does (kings.gd) — lists the Abilities in force under his
+## diagram, the same rows the ⚠ overlay shows.
+func show_preview(id: String, king_id := "") -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
 	# Raised for the same reason every other panel is. preview_panel and
@@ -322,6 +325,15 @@ func show_preview(id: String) -> void:
 				tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
 			row.add_child(tr)
 		box.add_child(row)
+
+	var kit: Dictionary = Kings.kit_of(king_id)
+	if kit.has("power_catalog_key") or kit.has("power_catalog_escalation"):
+		var head := Label.new()
+		head.text = "%s — King Abilities in force" % str(kit.get("power_name", ""))
+		head.add_theme_font_size_override("font_size", 15)
+		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(head)
+		_add_king_ability_rows(box, 14, 12)
 
 	var close := Button.new()
 	close.text = "Close"
@@ -937,6 +949,20 @@ func show_king_abilities() -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
+	_add_king_ability_rows(box, 17, 13)
+	var close := Button.new()
+	close.text = "Close"
+	close.add_theme_font_size_override("font_size", 20)
+	close.pressed.connect(func() -> void: king_ability_panel.visible = false)
+	box.add_child(close)
+	g.hud.add_child(king_ability_panel)
+	king_ability_panel.move_to_front()
+
+
+## One name + description pair per active King Ability, or a "none yet" line.
+## Shared by the ⚠ overlay and a King's info panel (NO-83), so the two can
+## never list different things.
+func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) -> void:
 	if g.king_abilities_active.is_empty():
 		var none := Label.new()
 		none.text = "none yet — they land every 10th wave"
@@ -946,23 +972,16 @@ func show_king_abilities() -> void:
 	for t in g.king_abilities_active:
 		var name := Label.new()
 		name.text = "%s  (%s)" % [t.name, t.tier]
-		name.add_theme_font_size_override("font_size", 17)
+		name.add_theme_font_size_override("font_size", name_size)
 		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 		box.add_child(name)
 		var desc := Label.new()
 		desc.text = t.description
-		desc.add_theme_font_size_override("font_size", 13)
+		desc.add_theme_font_size_override("font_size", desc_size)
 		desc.modulate = Color(1, 1, 1, 0.75)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
 		box.add_child(desc)
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void: king_ability_panel.visible = false)
-	box.add_child(close)
-	g.hud.add_child(king_ability_panel)
-	king_ability_panel.move_to_front()
 
 
 # --- box pick ---

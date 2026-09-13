@@ -114,6 +114,22 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
 				["king", 1, 3, 10], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],
 			"wave": 50, "score": 1000}},
+		# --- NO-83: the Header ---
+		# Donald Trump with THREE Tariffs already in force (his Power escalates
+		# every KING_TARIFF_STACK_TURNS turns; turns_since_wave 20 is what
+		# stack_power_if_due would have reached by itself). ⏳ reads his name;
+		# double-tap the King to read the three in his info panel.
+		{"name": "Header: King Wave — Donald Trump, Tariffs in force", "cfg": {
+			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
+				["king", 1, 3, 10, {"king_id": "donald_trump"}], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],
+			"wave": 50, "score": 1000, "gold": 300, "turns_since_wave": 20,
+			"king_power_id": "donald_trump",
+			"king_abilities": ["move_cost", "capture_cost", "pass_cost"],
+			"king_power_abilities": ["move_cost", "capture_cost", "pass_cost"]}},
+		# Wave 51 after the win: ⚑ reads 51/201, ⏳ counts toward Wave 52.
+		{"name": "Header: Wave 51 after the win", "cfg": {
+			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
+			"wave": 51, "kings_defeated": 1, "score": 2000, "stock": ["pawn"]}},
 		# --- merging ---
 		{"name": "Merge: promotion pair (pool)", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"], "gold": 300}},

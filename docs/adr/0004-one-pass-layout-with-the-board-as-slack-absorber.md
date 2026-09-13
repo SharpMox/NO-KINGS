@@ -1,5 +1,12 @@
 # One-pass layout: the board absorbs slack, and the whole stack solves in closed form
 
+> **Amended 2026-09-13 (NO-83).** The stock strip is retired, so the deck no longer
+> depends on `ICON` and the solve loses its `+1` row:
+> `tile = min((vp.x - 8) / BOARD_W, (vp.y - top - DECK_MARGINS - DECK_ROWS) / BOARD_H)`,
+> where `top` is the Header — the notch inset plus `HudScript.HEADER_H` — rather than
+> the fixed 44. The board stays the slack absorber, so a notched phone gets a smaller
+> tile. `ICON = tile - 7` and the rest below still hold.
+
 Design C (issue 106) made the stock strip the slack absorber — `SIZE_EXPAND_FILL`
 under a board pinned flush to the top — so that leftover height would land in one
 place rather than splitting into two gaps. That worked on the three phone formats

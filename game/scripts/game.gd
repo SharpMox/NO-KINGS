@@ -28,6 +28,7 @@ const Settings := preload("res://scripts/settings.gd")
 const Kings := preload("res://data/kings.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
+const HudScript := preload("res://scripts/hud.gd") # HEADER_H feeds the board solve (NO-83)
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -462,7 +463,7 @@ func tally(key: String, n: int = 1) -> void:
 var screenshot_dir := "" # debug: save PNGs for agent visual verification
 
 # HUD nodes
-var hud := preload("res://scripts/hud.gd").new()
+var hud := HudScript.new()
 # HUD state forwarded read-only for the click probes and saves
 # (the widgets themselves live in scripts/hud.gd)
 var drawer_open: String:
@@ -643,9 +644,12 @@ func _ready() -> void:
 	_refresh()
 
 
-## The two bands the board sits between. HUD_TOP is the condensed strip that now
-## carries only clock, score, gold and the menu (design C, user pick 2026-09-05).
-const HUD_TOP := 44.0
+## The two bands the board sits between. The top one is the HEADER (NO-82/83):
+## the platform's notch inset plus HudScript.HEADER_H, solved in _layout_board
+## into `hud_top`. Every Header spacing constant lives in hud.gd's HEADER
+## TUNING block; this file only adds the inset on top.
+var safe_top := 0.0 ## the notch inset in canvas px (0 on desktop and un-notched phones)
+var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 
 ## NO-33 / ADR-0004. HUD_DECK used to be a flat 268.0 reservation, and the stock
 ## strip was the element that absorbed whatever the board left over. That makes a
@@ -660,8 +664,8 @@ const HUD_TOP := 44.0
 ## moves under one. It is a sum rather than a measurement on purpose: measuring
 ## needs a second layout pass, and a control that measures itself before layout
 ## caches nonsense (CLAUDE.md, layout traps).
-const DECK_BELOW_STRIP := 172.0 ## status 28 + drawers 32 + power 28 + act 60 + 4 gaps x 6
-const STRIP_CHROME := 31.0 ## the strip around its one icon row: padding 10 + header 17 + gap 4
+## NO-83 retired the stock strip and the status line, so the sum is three rows.
+const DECK_ROWS := 132.0 ## drawers 32 + power 28 + act 60 + 2 gaps x 6
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept
@@ -669,18 +673,37 @@ const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 const ICON_GAP := 7
 
 
-## The one-way, closed-form solve (ADR-0004). The deck's height depends on ICON,
-## ICON depends on the tile, and the tile depends on the deck — but the loop is
-## linear, so it resolves in a single division instead of a second layout pass:
+## The one-way, closed-form solve (ADR-0004, amended by NO-83). With the strip
+## gone the deck no longer depends on ICON, so the solve is one division:
 ##
-##   vp.y = HUD_TOP + BOARD_H*tile + DECK_MARGINS + (ICON + STRIP_CHROME) + DECK_BELOW_STRIP
-##   ICON = tile - ICON_GAP
+##   vp.y = top + BOARD_H*tile + DECK_MARGINS + DECK_ROWS
 ##
-## which is BOARD_H + 1 rows of tile — the board's 12 plus the strip's one.
-static func board_tile_for(vp: Vector2) -> int:
-	var below: float = DECK_MARGINS + STRIP_CHROME - ICON_GAP + DECK_BELOW_STRIP
+## `top` is the Header's full height including the notch inset, so a notched
+## phone gets a slightly smaller tile — the board stays the slack absorber.
+static func board_tile_for(vp: Vector2, top: float = HudScript.HEADER_H) -> int:
 	return int(minf((vp.x - 8.0) / Tuning.BOARD_W,
-		(vp.y - HUD_TOP - below) / (Tuning.BOARD_H + 1)))
+		(vp.y - top - DECK_MARGINS - DECK_ROWS) / Tuning.BOARD_H))
+
+
+## The notch inset in CANVAS px. The platform reports it in screen px; the
+## viewport is 480 canvas px wide whatever the screen (project.godot: stretch
+## canvas_items/expand), so the ratio of the two widths converts it. Measured
+## on an iPhone 11 (NO-82): 48pt at the top -> 56 canvas px.
+##
+## `--safe-top N` (a user arg, after `--`) overrides it for desktop runs, so
+## the notch layout can be probed and screenshotted without a phone. Desktop
+## otherwise reports 0: DisplayServer.get_display_safe_area() would return the
+## macOS menu bar as an inset there, which is not a notch.
+static func safe_top_px(vp: Vector2) -> float:
+	var args := OS.get_cmdline_user_args()
+	if args.has("--safe-top"):
+		return float(args[args.find("--safe-top") + 1])
+	if not OS.has_feature("mobile"):
+		return 0.0
+	var win: Vector2i = DisplayServer.window_get_size()
+	if win.x <= 0:
+		return 0.0
+	return roundf(DisplayServer.get_display_safe_area().position.y * vp.x / win.x)
 
 
 ## Art for an artefact, or the placeholder when it has none. Never returns null,
@@ -692,8 +715,10 @@ func artefact_tex(key: String) -> Texture2D:
 
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
-	var top := HUD_TOP
-	tile = board_tile_for(vp)
+	safe_top = safe_top_px(vp)
+	hud_top = safe_top + HudScript.HEADER_H
+	var top := hud_top
+	tile = board_tile_for(vp, top)
 	# PULLED UP under the top strip rather than centred in the span (user ruling,
 	# 2026-09-05). Centring split the leftover height into a gap above AND below
 	# the board, and on a 9:20 phone that was ~130px of nothing in two places.
@@ -1405,12 +1430,14 @@ func _king_alive() -> bool:
 	return Rules.find_king(board, Rules.ENEMY).x >= 0
 
 
-## Display name of the King currently on the board, or "King" if there is
-## none / it wasn't spawned with an identity (hand-written test scenarios).
+## Display name of the King currently on the board — or, before he lands, of
+## the one pending (NO-83: the ⏳ counter names him through segment 1 too) — or
+## "King" if there is none / it wasn't spawned with an identity (hand-written
+## test scenarios).
 func _king_name() -> String:
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x < 0:
-		return "King"
+		return Kings.name_of(pending_king.get("king_id", "")) if not pending_king.is_empty() else "King"
 	return Kings.name_of(board[k].get("king_id", ""))
 
 
@@ -1785,7 +1812,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh()
 			if event.double_click and at.x >= 0 and board.has(at):
 				drag_from = Vector2i(-1, -1)
-				return _show_preview(board[at].id) # double-tap: piece info
+				# double-tap: piece info (a King's carries his active Abilities)
+				return _show_preview(board[at].id, board[at].get("king_id", ""))
 			var was_selected := at.x >= 0 and at == selected
 			if at.x >= 0:
 				_on_tile_clicked(at)
@@ -4094,9 +4122,9 @@ func _show_win_screen() -> void:
 	modals.show_win_screen()
 
 
-func _show_preview(id: String) -> void:
+func _show_preview(id: String, king_id := "") -> void:
 	preview_open = true
-	modals.show_preview(id)
+	modals.show_preview(id, king_id)
 
 
 ## Opening the tariff overlay deselects, like menus and drawers.

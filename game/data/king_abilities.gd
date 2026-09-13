@@ -56,7 +56,7 @@ const ABILITIES: Array = [
 	{"key": "sanctions", "name": "Sanctions", "tier": "Moderate", "kind": "persistent",
 		"description": "One random piece type can no longer be placed."},
 	{"key": "regulation", "name": "Regulation", "tier": "Moderate", "kind": "persistent",
-		"description": "Pawns can no longer be merged."},
+		"description": "Pawns can no longer be merged or promoted."},
 	{"key": "austerity", "name": "Austerity", "tier": "Moderate", "kind": "persistent",
 		"description": "Placing pieces costs double gold."},
 	{"key": "recession", "name": "Recession", "tier": "Moderate", "kind": "persistent",

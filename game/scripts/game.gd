@@ -2568,7 +2568,12 @@ func _exhibit_399_blocked() -> void:
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.
 ## `a` = first pick for "pair" items, or (-1,-1).
 func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
-	return ItemLogic.stage_targets(board, defs, it.key, a, moved_this_turn)
+	var out := ItemLogic.stage_targets(board, defs, it.key, a, moved_this_turn)
+	if it.key == "promote": # NO-70: Regulation. Gated here, the one funnel every
+		# Item targeting read goes through, because ItemLogic is g-free and the
+		# block is a Tariff's, not the board's.
+		out = out.filter(func(p: Vector2i) -> bool: return Economy.promote_ok(self, board[p].id))
+	return out
 
 
 func _item_click(tile: Vector2i) -> void:

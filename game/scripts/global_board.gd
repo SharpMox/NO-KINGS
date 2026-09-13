@@ -40,6 +40,10 @@ const HIGH_SCORE := "high_score"
 ## without a device.
 static var submits := 0
 
+## Tests only: a stand-in backend, so the Scores screen's door can be driven on
+## desktop, where _backend() is null. Same idea as CloudSave.backend.
+static var backend_override: Variant = null
+
 
 ## Per platform, the same shape cloud_save.gd's _default_backend() uses.
 ##
@@ -54,6 +58,8 @@ static var submits := 0
 ## silently ask Google about an iOS player, the kind of wrong that looks fine in
 ## every test and shows up as an empty board on a real device.
 static func _backend():
+	if backend_override != null:
+		return backend_override
 	match OS.get_name():
 		"Android":
 			return PlayGames

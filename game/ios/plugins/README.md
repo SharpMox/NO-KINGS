@@ -43,6 +43,24 @@ grep -c 'nk_root_controller'      plugins/gamecenter/game_center.mm   # expect 3
 
 All three are candidates for upstream PRs; none is specific to this project.
 
+## `connectivity` — OUR plugin, not upstream's (NO-64)
+
+Asks iOS whether there is a network path (NWPathMonitor) so the menu can disable
+sign-in, sync and the global board while offline. Source lives HERE, in
+`src/connectivity/`, because upstream has no such plugin. Build it inside the
+same clone, after the engine headers exist:
+
+```sh
+cd ~/godot-ios-plugins
+patch -p1 < <this dir>/sconstruct-connectivity.patch   # adds 'connectivity' to SConstruct's plugin list
+mkdir -p plugins/connectivity && cp <this dir>/src/connectivity/* plugins/connectivity/
+for t in debug release; do ./scripts/generate_xcframework.sh connectivity $t 4.0; done
+cp -R bin/connectivity.{debug,release}.xcframework <this dir>/
+```
+
+**Written but NOT verified on a device** — there was no iPhone when it landed.
+Android needs no plugin at all; see `scripts/connectivity.gd`.
+
 ## The trap this recipe also fixes
 
 The OFFICIAL Godot iOS export template ships its simulator library x86_64-only

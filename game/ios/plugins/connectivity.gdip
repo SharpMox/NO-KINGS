@@ -1,0 +1,17 @@
+[config]
+name="Connectivity"
+binary="connectivity.xcframework"
+
+initialization="register_connectivity_types"
+deinitialization="unregister_connectivity_types"
+
+[dependencies]
+linked=[]
+embedded=[]
+system=["Network.framework"]
+
+capabilities=[]
+
+files=[]
+
+[plist]

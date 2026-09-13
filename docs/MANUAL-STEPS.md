@@ -338,6 +338,28 @@ on PATH). Wireless debugging works too and needs no cable once the phone is pair
 
 An emulator with **Google Play services** also works, but a real device is less trouble.
 
+### Getting a USB connection at all — three traps that cost time on 2026-09-13
+
+- **USB debugging and Wireless debugging are SEPARATE switches** in Developer options. The
+  phone had only Wireless debugging on, so over the cable it offered nothing but file
+  transfer: `ioreg -r -c IOUSBHostInterface -l` showed a lone "MTP" interface (class 6) and
+  no adb interface (class 0xff / subclass 0x42). With no adb interface, `adb devices` does
+  not list the phone at all, not even as `unauthorized`, and the "Allow USB debugging?"
+  prompt cannot appear. Turn on **USB debugging**, then Allow, ticking "Always allow from
+  this computer".
+- **Plug into a Mac port directly.** The first attempt went through the USB3.1 hub that
+  carries the Ethernet adapter, and the phone never appeared on the USB bus. It came up at
+  once on a direct port. The cable was swapped at the same moment, so which of the two was
+  at fault is not established. Check the bus before blaming adb: `ioreg -p IOUSB -w0` should
+  show `A142`. `system_profiler SPUSBDataType` prints nothing at all on this macOS, so an
+  empty answer from it proves nothing; use `SPUSBHostDataType` or `ioreg`.
+- **The adb server is SHARED by every session on this Mac.** One bare `adb` without
+  `ADB_LIBUSB=1` starts the server in the mode that cannot see USB, for everyone. And
+  `adb kill-server` pulls the transport out from under any other session mid-run: an
+  emulator agent's connection dropped at 12:21 when this was done to fix the first
+  problem. Export `ADB_LIBUSB=1` in every shell that runs adb, pass `-s <serial>` on every
+  command once more than one device is attached, and say so before restarting the server.
+
 ### RULES for driving Max's phone — read before any adb input or settings change
 
 The test phone is Max's own phone. These rules come from things our automation did to it.

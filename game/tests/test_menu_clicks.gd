@@ -553,6 +553,45 @@ func _init() -> void:
 	Account.logout([])
 	Account._reset_cache()
 
+	# ---- NO-88: a cloud restore landing AFTER the menu is built ------------
+	# The fresh-install case: the menu exists before the player can sign in, so
+	# the run snapshot always arrives on an already-built menu. Continue must
+	# not only appear (tests/test_menu_continue.gd pins that headlessly) but take
+	# a real CLICK — a late-added control is exactly the kind that can land
+	# under something else. Driven through the bridge's own signal.
+	Account._reset_cache()
+	Account.start_guest()
+	DirAccess.remove_absolute(GameScript.SAVE_PATH)
+	CloudSave.backend = MemoryBackend
+	MemoryBackend.reset()
+	var late: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(late)
+	await process_frame
+	await process_frame
+	check(_find_button(late, "Continue") == null, "precondition: no save, no Continue")
+	MemoryBackend.push("run", {"ts": 1, "data": {
+		"save_version": 2, "wave": 2, "gold": 50, "seed": 1,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}})
+	root.get_node("PlayGamesBridge").snapshot_loaded.emit("run")
+	await process_frame
+	GameScript.next_config = {}
+	check(await _click_button(late, "Continue"),
+		"NO-88: Continue that appeared after the restore landed is clickable")
+	await process_frame
+	check(int(GameScript.next_config.get("wave", 0)) == 2,
+		"...and the click stages the restored run")
+	late.queue_free()
+	if current_scene and current_scene != late:
+		current_scene.queue_free() # the Game that click booted (deferred change_scene)
+		current_scene = null
+	await process_frame
+	DirAccess.remove_absolute(GameScript.SAVE_PATH)
+	GameScript.next_config = {}
+	MemoryBackend.reset()
+	CloudSave.backend = prev_backend
+	Account.logout([])
+	Account._reset_cache()
+
 	# ---- NO-64: offline DISABLES network controls, with a reason -------------
 	# Detection asks the phone and cannot run here; its CONSEQUENCE can. The
 	# state is faked at the seam (Connectivity.override), and the rest is the

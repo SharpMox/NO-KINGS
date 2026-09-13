@@ -239,7 +239,17 @@ func _on_sign_in_finished(ok: bool) -> void:
 	# lost — parking is reversible — but the consent gate that binding has was
 	# missing. Now the mismatch raises a prompt and returns; the rebind happens
 	# in _on_switch_accepted, through the same switch_to.
-	elif id != "" and Account.owner() != id and not _switch_declined:
+	#
+	# NO-86: ONLY when a real account owns the install — the same test switch_to
+	# applies before it will act. An empty owner (fresh install, or after a
+	# logout) and a guest both differ from `id` too, and were asked to "switch"
+	# to a button that refused: on the iPhone the silent boot verdict raised
+	# this inside the hidden main_box, the player's press then bound through
+	# the branch above, and the menu came up wearing the stale prompt. Those
+	# two fall through to the tail instead, where the login screen (or the
+	# guest's sync button) is left up for the press that binds.
+	elif id != "" and Account.signed_in() and Account.owner() != id \
+			and not _switch_declined:
 		_ask_to_switch(id)
 		return
 	if Account.owner() == id:

@@ -154,6 +154,31 @@ column is a CoreDevice UUID and is what `--device` wants; the UDID
 `build/ios/nokings.xcodeproj` on every export, so anything added there is
 destroyed by the next build. Nothing device-side belongs in that project.
 
+**AIRPLANE MODE DROPS THE HOST LINK, EVEN WIRED.** `devicectl` reported
+`transportType: wired`, and the iPhone still went `unavailable` (CoreDeviceError
+1011) the moment airplane mode went on (2026-09-13). A batch pushed before the
+drop still runs on the device; collect its ack after reconnecting. So an offline
+check needs a human's eyes, or a batch pushed in advance. And test it on a screen
+that has a network-only control (Scores → Global ranking): the main menu of a
+bound player shows no offline notice, by design (`menu.gd:357-369`).
+
+**A `--scenario` / `--autoplay` launch owns the whole process.** The args
+persist, so every Main Menu load bounces back into the game (NO-77). To hand the
+phone to a human for a normal run, kill the app and reopen it from the
+home-screen icon.
+
+**The Claude Code permission classifier refuses a driver tap on the
+account-switch prompt** as a real-world transaction (twice, 2026-09-13). Plan for
+a human to tap Switch account. Pull a `Documents` backup first.
+
+**A stale `cmd.txt` left on the device is re-read by the next `--drive` launch.**
+Push a harmless `probe` batch with a fresh, higher seq immediately after
+launching.
+
+**The first `xcodebuild` after a reconnect can fail with "Device is busy
+(Preparing iPhone …)".** Wait about 20 s (poll `-showdestinations`) and retry. It
+is not a signing problem.
+
 ---
 
 ## Input injection — BUILT

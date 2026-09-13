@@ -31,7 +31,7 @@ _Avoid_: using it for the starting kit — that is an Army.
 The piece (and its Family) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
 
 **Tariff**:
-A player penalty activated on every 10th wave per the Wave Catalog. Three kinds: **action** (Gold surcharge when the taxed action happens), **persistent** (rule modifier for the rest of the run, e.g. Inflation), **oneoff** (applies instantly on activation).
+Donald Trump's King Power: a King Ability from the catalogue (`game/data/king_abilities.gd`) that comes into force during his Wave and escalates every few turns, active only while his Wave lasts (`Kings.apply_power` clears it when the next Wave spawns). Three kinds: **action** (Gold surcharge when the taxed action happens), **persistent** (rule modifier, e.g. Inflation), **oneoff** (applies instantly on activation). The every-10th-wave schedule this entry used to describe is switched off (`Tuning.KING_ABILITIES_SCHEDULED`); corrected by NO-83.
 _Avoid_: "debuff", "curse"
 
 **Tariff suppression**:
@@ -59,16 +59,20 @@ _Avoid_: "conflict", "negative synergy".
 
 ### In-run HUD
 
-**Deck**:
-The single column of controls between the board's bottom edge and the bottom of the screen, in fixed order (design C, issue 106): Stock strip, status pills, Drawer buttons, Power badge, and the Ability/PASS row last, inside the thumb arc. One Deck, always present during a run.
-_Avoid_: "HUD" (that is the whole in-run overlay, top strip included), "toolbar", "tray" — and see **Army** for the starting-kit sense this word does not have.
+**Header**:
+The band above the board (NO-82/83): the platform's notch inset plus 2.5× the strip it replaced, its background running up behind the notch. Left: Clock (half the Header tall), Score, Gold. Bottom centre: the ⚑ Wave counter over the ⏳ turn counter. Right: the menu button in the corner and the Stock button just left of it (piece icon, count badge, armed marker; tap area the Header's full height, never over the board or the menu). Dragging a board piece onto its Stock button returns it to Stock. Spacing lives in one block in `hud.gd` (HEADER TUNING).
+_Avoid_: "top bar", "top strip"
 
-**Stock strip**:
-The preview at the top of the Deck showing the piece types currently in Stock, plus their count. Exactly one icon row tall (ADR-0004). It is a single control, not a rack of them: every icon and the panel behind them open the Stock Drawer, and nothing in it is draggable.
-_Avoid_: "stock bar", "piece tray", "hand" — and do not call it a route to Stock distinct from the Drawer button; both open the same Drawer.
+**Deck**:
+The single column of controls between the board's bottom edge and the bottom of the screen, in fixed order (design C, issue 106, cut down by NO-83): Drawer buttons (Inventory and Shop, equal halves), Power badge, and the Ability/PASS row last, inside the thumb arc. One Deck, always present during a run. Stock is not opened from here — that is the Header's Stock button.
+_Avoid_: "HUD" (that is the whole in-run overlay, Header included), "toolbar", "tray" — and see **Army** for the starting-kit sense this word does not have.
+
+**Stock strip** (retired):
+Was the preview at the top of the Deck showing the piece types in Stock, one icon row tall (ADR-0004). Removed by NO-83; the Header's Stock badge carries the count now. Kept here so old issues and commits still read.
+_Avoid_: using it for anything on screen today.
 
 **Drawer**:
-A panel that opens upward over the Deck to hold what does not fit on the main view — Stock and Inventory. Placement happens by dragging a piece out of the open Stock Drawer, which is what makes the Drawer the place Stock is *operated* while the Stock strip only reports it.
+A panel that opens upward over the Deck to hold what does not fit on the main view — Stock and Inventory. Placement happens by dragging a piece out of the open Stock Drawer, which is what makes the Drawer the place Stock is *operated* while the Header's Stock button only reports it.
 _Avoid_: "modal", "panel", "menu" — a Box or the Shop is a different thing.
 
 ### Godot domain

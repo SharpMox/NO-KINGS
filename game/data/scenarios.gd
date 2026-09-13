@@ -339,6 +339,10 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],
 			"king_abilities": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],
 			"stock": ["pawn", "pawn", "rook"], "captured": ["pawn", "pawn"], "wave": 8, "score": 1000}},
+		{"name": "Regulation: pawn promotion blocked (NO-70)", "cfg": {
+			"board": [["pawn", 0, 2, 1], ["sergeant", 0, 3, 1], ["pawn", 1, 3, 6]],
+			"king_abilities": ["regulation"], "items": ["promote"], "stock": ["pawn", "pawn"],
+			"gold": 200, "wave": 8}},
 		{"name": "One-off: Forced Audit", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "queen", "pawn"], "oneoffs": ["forced_audit"]}},
 		{"name": "One-off: Asset Seizure", "cfg": {

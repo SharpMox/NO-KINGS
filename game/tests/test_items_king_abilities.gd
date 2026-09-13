@@ -10,6 +10,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Shop := preload("res://scripts/shop.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 var fails := 0
 
@@ -369,6 +370,30 @@ func _init() -> void:
 	check(Economy.gain(mona, 100) == 90,
 		"review pass 3: Mona Lisa never echoes a Tariff — Inflation applies once, not twice")
 	mona.queue_free()
+	await process_frame
+
+	# --- NO-70: Regulation blocks pawn PROMOTION as well as merging (Notion:
+	# "Pawns can no longer be merged or promoted"). The ▲ badge is a same-id
+	# merge (game.gd promote_pressed -> MergeLogic.do_merge), the Promote Item
+	# is the other entry point. The unregulated control is test_items.gd's
+	# "promote advances a pawn to its next tier".
+	var reg := _boot({"board": [["pawn", 0, 2, 2], ["sergeant", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "stock": ["pawn", "pawn"], "king_abilities": ["regulation"]})
+	await process_frame
+	MergeLogic.do_merge(reg, {"id": "pawn"}, {"id": "pawn"}) # what the ▲ badge presses
+	check(reg.stock.count("pawn") == 2 and reg.pending_merge.is_empty(),
+		"Regulation: the ▲ badge's same-id pawn merge is refused")
+	check(not MergeLogic.pair_ok(reg, "pawn", "pawn"),
+		"Regulation: the ▲ badge stays hidden on a pawn stack (hud.gd reads pair_ok)")
+	reg.items.append(_item("promote", "tile"))
+	reg._use_item(0)
+	reg._item_click(Vector2i(2, 2))
+	check(reg.board[Vector2i(2, 2)].id == "pawn" and reg.items.size() == 1,
+		"Regulation: the Promote Item refuses a pawn — id unchanged, Item unspent")
+	reg._item_click(Vector2i(3, 2)) # the Item is still armed: a non-pawn target
+	check(reg.board[Vector2i(3, 2)].id == "arrow-pawn" and reg.items.is_empty(),
+		"Regulation: a non-pawn still promotes with the Item")
+	reg.queue_free()
 	await process_frame
 
 	print("---")

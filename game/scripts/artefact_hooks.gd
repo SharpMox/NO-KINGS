@@ -814,6 +814,8 @@ const HOOKS := [
 	# --- issue 13: tariff-only trigger points (see header) ---
 	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
+	# --- NO-70: may this piece rank up via the Promote Item? (Economy.promote_ok) ---
+	"on_promote_check",
 	# --- issue 23: Piece Buff lifecycle choke points (see header) ---
 	"on_buff_apply", "on_buff_consume", "on_demote", "on_piece_demoted", "on_buff_removal",
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
@@ -909,7 +911,7 @@ const REGISTRY := {
 	"fuse_cost": ["on_charge"],
 	"inflation": ["on_gold_gain"],
 	"sanctions": ["on_sanction_check"],
-	"regulation": ["on_merge_check"],
+	"regulation": ["on_merge_check", "on_promote_check"],
 	"austerity": ["on_place_cost"],
 	"recession": ["on_clock_refill"],
 	"filibuster": ["on_enemy_turn_start"],
@@ -1149,7 +1151,8 @@ const REGISTRY := {
 ## the telemetry tally skip them. Before this, holding Bilderberg plus any two
 ## on_price Artefacts paid +15 Gold per Shop tile per frame, and a Shop redraw
 ## spent Mona Lisa's echo on a discount recompute (review pass 1, 2026-09-06).
-const QUERY_HOOKS := ["on_price", "on_sanction_check", "on_merge_check", "on_place_cost"]
+const QUERY_HOOKS := ["on_price", "on_sanction_check", "on_merge_check", "on_place_cost",
+	"on_promote_check"]
 
 
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
@@ -1948,6 +1951,13 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.blocked = true
 		["regulation", "on_merge_check"]:
 			if ctx.a == "pawn" or ctx.b == "pawn":
+				ctx.blocked = true
+		["regulation", "on_promote_check"]:
+			# NO-70: "merged OR PROMOTED" — the ▲ badge is a same-id merge and
+			# already refused above; this closes the Promote Item. Its own hook,
+			# not merge_ok(id, id), so Genghis Khan's total merge block
+			# (kings.gd "nomerge") does not silently swallow the Item too.
+			if ctx.id == "pawn":
 				ctx.blocked = true
 		["austerity", "on_place_cost"]:
 			ctx.cost *= 2

@@ -401,6 +401,11 @@ static func merge_ok(g, a: String, b: String) -> bool:
 	return not ArtefactHooks.run(g, "on_merge_check", {"a": a, "b": b, "blocked": false}).blocked
 
 
+## False when Regulation blocks promoting this piece type with the Promote Item (NO-70).
+static func promote_ok(g, id: String) -> bool:
+	return not ArtefactHooks.run(g, "on_promote_check", {"id": id, "blocked": false}).blocked
+
+
 ## Placement gold cost, doubled by Austerity.
 static func deploy_cost(g) -> int:
 	return ArtefactHooks.run(g, "on_place_cost", {"cost": Tuning.PLACEMENT_COST}).cost

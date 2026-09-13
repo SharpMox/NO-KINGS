@@ -225,7 +225,16 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   and it synced before anyone noticed. **It could not be reverted.** Drive device checks from
   `--scenario` instead: `game.gd` guards the save path on `is_scenario`, so scenario runs do
   not autosave and cannot touch a real run. Verify that guard held afterwards rather than
-  assuming it.
+  assuming it. On a device, launch the scenario from the in-app TEST menu: Android never
+  receives `--scenario`, and scenarios do not autosave. Exception (user ruling 2026-09-13): a
+  scenario skips the menu, so it cannot verify a menu or login feature. For those, test on
+  Max's install only with his explicit approval, on the menu, login and Scores screens, never
+  tapping Continue, Play or a board tile.
+- **Networking works from an editor deploy and fails silently in CLI and store builds.**
+  Godot's exporter injects `INTERNET` only for editor remote-debug deploys
+  (`export_plugin.cpp:3714`), and our preset declares only `ACCESS_NETWORK_STATE`; sync works
+  because Play services does the networking in its own process (NO-75). Set
+  `permissions/internet=true` before adding any direct network call.
 - **UI first, bypasses second.** Any change touching UI runs the click probes BEFORE the
   headless sweeps: `godot --path game -s tests/test_menu_clicks.gd` and
   `-s tests/test_game_clicks.gd` (windowed — Godot headless still drops GUI picking, re-verified on 4.7).

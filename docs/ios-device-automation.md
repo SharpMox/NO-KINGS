@@ -99,6 +99,42 @@ step 6 brings them back. **No human, no WebDriverAgent, no Appium.**
 `--scenario N` works the same way, so any TEST scenario can be booted and
 screenshotted from the Mac.
 
+## The simulator loop — no phone, no Apple ID, no signing (2026-09-14, NO-89)
+
+Same export, then an ad-hoc simulator build; everything after that is a directory
+on the Mac. What it established and could not is in `device-verification.md`.
+
+```sh
+xcrun simctl create NK-iPhone-11 com.apple.CoreSimulator.SimDeviceType.iPhone-11 \
+  com.apple.CoreSimulator.SimRuntime.iOS-26-5        # once; the iOS 26.5 runtime takes an iPhone 11
+xcrun simctl boot $UDID && xcrun simctl bootstatus $UDID -b
+# step 1 + 2 above (export, write the entitlements), then:
+xcodebuild -project nokings.xcodeproj -scheme nokings -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' -configuration Debug \
+  CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \
+  CODE_SIGN_ENTITLEMENTS="$PWD/nokings/nokings.entitlements" build
+xcrun simctl install $UDID ~/Library/Developer/Xcode/DerivedData/nokings-*/Build/Products/Debug-iphonesimulator/nokings.app
+xcrun simctl launch --terminate-running-process $UDID com.sharpunk.nokings -- --drive user://drive
+D=$(xcrun simctl get_app_container $UDID com.sharpunk.nokings data)/Documents/drive
+# write $D/cmd.txt, poll $D/ack.txt for the seq — no copy to/from
+xcrun simctl io $UDID screenshot --mask=black out.png   # paints the notch: the one capture that shows a safe-area defect
+xcrun simctl spawn $UDID log show --last 5m --predicate 'process == "nokings"'   # Godot's printerr lands here
+xcrun simctl shutdown $UDID
+```
+
+- **The bare `--` is needed here too.** `simctl launch` passes it through.
+- **`codesign -d --entitlements` shows `{}` on a simulator build and is the wrong
+  instrument**: they are in the Mach-O section, `otool -s __TEXT __entitlements`, and
+  GameKit's log confirms it by starting authentication.
+- **Geometry matches the iPhone 11** (`viewport=480x1038 window=828x1792`), so layout
+  numbers compare directly with device runs.
+- **`drive.gd` cannot hold a touch.** For a long press, hold the mouse on the
+  Simulator window (Simulator.app turns it into a touch); the driver's `probe` then
+  reads the result.
+- **Not reachable here**: anything needing Game Center or iCloud (no Apple ID; signing
+  one in is an account action), and going offline (the simulator rides the Mac's
+  network path, `simctl` has no network verb).
+
 ---
 
 ## Traps, each of which cost time

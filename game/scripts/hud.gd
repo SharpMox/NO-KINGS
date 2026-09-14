@@ -78,6 +78,21 @@ const STOCK_BADGE_FONT := 13
 const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the icon's centre
 const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
 ## ----------------------------------------------------------------------------
+
+## ---- STOCK DRAWER TUNING (NO-84) --------------------------------------------
+## Every spacing number for the Stock Drawer lives in THIS block. Canvas px.
+## It opens DOWNWARD from the Header's bottom edge (g.hud_top), full width, at
+## a FIXED height computed from a fraction of the board's own pixel height —
+## not measured at runtime, so it never resizes as stacks come and go. It
+## overlays the board (ADR-0004's board-as-slack-absorber solve is untouched:
+## this drawer never feeds back into the layout, only paints over it).
+const STOCK_DRAWER_FRAC := 2.0 / 3.0 ## drawer height, as a fraction of the board's pixel height
+const STOCK_DRAWER_CAP_FRAC := 1.0 / 3.0 ## Captured Stock column's share of the drawer width
+const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
+const STOCK_DRAWER_CAP_COLS := 2 ## Captured Stock grid columns
+const STOCK_DRAWER_COLS := 3 ## Stock grid columns
+const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## ----------------------------------------------------------------------------
 ## The first King's wave (data/kings.gd: "wave 50 -> king 1"; data/waves.gd row
 ## 50). The ⚑ Wave counter's denominator until that King falls (NO-82).
 const WIN_WAVE := 50
@@ -155,7 +170,12 @@ var tip_label: Label
 ## Which artefact row the popup is currently describing, so tapping the same row
 ## again closes it. Empty when nothing is shown.
 var tip_key := ""
-var pool_box := HBoxContainer.new()
+## NO-84: Captured Stock (left third) and Stock (right two thirds) are two
+## independent grids now, not one strip — each inside its own ScrollContainer
+## so dragging one side never scrolls the other (story 36).
+var stock_grid := GridContainer.new()
+var captured_grid := GridContainer.new()
+var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
 var item_box := HBoxContainer.new() # held-items strip
 ## issue 52: pressable Activate chips, for activatable Artefacts. NO-32 removed
 ## the Army Ability chip that issue 67 added here — the Ability lives on the
@@ -525,7 +545,6 @@ func build(game) -> void:
 	inv_box.add_child(activate_box)
 	inv_box.add_child(artefact_box)
 	var drawer_specs := [ # name, content, x, width, height
-		["stock", pool_box, 0.0, vp.x, DRAWER_H + 70.0],
 		["inventory", inv_box, 0.0, vp.x, DRAWER_H * 2 + 70.0],
 	]
 	for spec in drawer_specs:
@@ -544,6 +563,58 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
+	# ---- THE STOCK DRAWER (NO-84) --------------------------------------------
+	# Opens downward from the Header's bottom edge, next to the button that
+	# opens it (story 31) — everything else in this file opens above the deck,
+	# so this one is built separately rather than folded into drawer_specs.
+	var stock_h: float = roundf(STOCK_DRAWER_FRAC * Tuning.BOARD_H * g.tile)
+	var stock_panel := PanelContainer.new()
+	var stock_bg := StyleBoxFlat.new()
+	stock_bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
+	stock_panel.add_theme_stylebox_override("panel", stock_bg)
+	stock_panel.position = Vector2(0, g.hud_top)
+	stock_panel.custom_minimum_size = Vector2(vp.x, stock_h)
+	stock_panel.clip_contents = true # NO-84: never paints over the board below it
+	stock_panel.visible = false
+	var stock_row := HBoxContainer.new()
+	stock_row.add_theme_constant_override("separation", 0)
+	# LEFT: Captured Stock, a fixed fraction of the width — fixed so the split
+	# never moves as pieces are captured or deployed (story 38).
+	var cap_w: float = roundf(vp.x * STOCK_DRAWER_CAP_FRAC)
+	var cap_col := VBoxContainer.new()
+	cap_col.custom_minimum_size = Vector2(cap_w, stock_h)
+	captured_hint.text = "Captured pieces land here"
+	captured_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	captured_hint.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD * 2.0, 0)
+	captured_hint.modulate = Color(1, 1, 1, 0.6)
+	captured_hint.add_theme_font_size_override("font_size", 11)
+	captured_hint.visible = false
+	cap_col.add_child(captured_hint)
+	var cap_scroll := ScrollContainer.new()
+	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
+	cap_scroll.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	captured_grid.columns = STOCK_DRAWER_CAP_COLS
+	captured_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
+	captured_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
+	cap_scroll.add_child(captured_grid)
+	cap_col.add_child(cap_scroll)
+	stock_row.add_child(cap_col)
+	# RIGHT: Stock, the remaining two thirds.
+	var stock_w: float = vp.x - cap_w
+	var stock_col := VBoxContainer.new()
+	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
+	var stock_scroll := ScrollContainer.new()
+	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
+	stock_scroll.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	stock_grid.columns = STOCK_DRAWER_COLS
+	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
+	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
+	stock_scroll.add_child(stock_grid)
+	stock_col.add_child(stock_scroll)
+	stock_row.add_child(stock_col)
+	stock_panel.add_child(stock_row)
+	drawers["stock"] = stock_panel
+	add_child(stock_panel)
 	# NO-59: the description popup. ONE instance, owned by the HUD rather than by
 	# a row, because hud.refresh() frees and rebuilds every strip child — a panel
 	# parented to a row would be destroyed by the next refresh, which happens on
@@ -767,7 +838,7 @@ func refresh() -> void:
 	multi_confirm_btn.visible = g.item_active >= 0 and not g.item_selected.is_empty() \
 		and g.items[g.item_active].target == "multi"
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
-	_rebuild_pool_strip()
+	_rebuild_stock_drawer()
 	_rebuild_item_strip()
 	# issue 100: the Power is always on, so it is stated, not offered. The
 	# Ability's 1-Action cost rides along here too — that cost is the
@@ -822,34 +893,18 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 	return g.gold >= (Shop.convert_price(g, entry) if cap else Economy.deploy_cost(g))
 
 
-## issue 96: the divider between Stock and Captured Stock. Carries the RULE
-## that makes the pool different ("no deploy"), not just a name — the
-## constraint is the reason the section exists, and a label that only said
-## "Captured" would leave the player to discover the rule by being refused.
-func _add_captured_header() -> void:
-	var sep := VSeparator.new()
-	sep.custom_minimum_size = Vector2(10, 0)
-	pool_box.add_child(sep)
-	var lbl := Label.new()
-	# 2026-09-10: the ⇄ badge sits on EVERY captured entry now, not just an
-	# armed one, so the hint names the control instead of the gesture that used
-	# to arm one ("tap: convert", which never converted anything). "no merge"
-	# joins "no deploy" for the reason the rule was put here in the first
-	# place: it is the constraint that makes the section exist, and a phone has
-	# no tooltip to discover it in. Lines stay short — this label sits INSIDE
-	# the horizontal strip, so its width is width the pieces do not get.
-	lbl.text = "CAPTURED\nno deploy/merge\n⇄ = convert"
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.add_theme_color_override("font_color", Color(1.0, 0.8, 0.8))
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	pool_box.add_child(lbl)
+## NO-84: every stack button across both grids, Stock first then Captured —
+## the flat order _rebuild_stock_drawer used to hold as one strip. Used
+## wherever code needs to sweep "every stack on screen" rather than one side.
+func pool_buttons() -> Array:
+	return stock_grid.get_children() + captured_grid.get_children()
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
 func stack_button_at(screen: Vector2) -> Button:
-	if not pool_box.is_visible_in_tree(): # stock drawer closed: no targets
+	if not (drawers["stock"] as Control).is_visible_in_tree(): # closed: no targets
 		return null
-	for c in pool_box.get_children():
+	for c in pool_buttons():
 		if c is Button and not c.is_queued_for_deletion() and c.has_meta("id") \
 				and (c as Button).get_global_rect().has_point(screen):
 			return c
@@ -1046,184 +1101,35 @@ func _rebuild_item_strip() -> void:
 		item_box.add_child(btn)
 
 
-func _rebuild_pool_strip() -> void:
-	for c in pool_box.get_children():
+## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),
+## Captured on the left, Stock on the right — replaces the single strip issue
+## 96 gave a labelled divider inside. The two pools still obey different
+## rules (Captured can convert but never deploy or merge, issue 60/2026-09-10)
+## but that is now which GRID an entry is in, not a tint plus a tooltip a
+## phone can't show anyway.
+func _rebuild_stock_drawer() -> void:
+	for c in stock_grid.get_children():
 		c.queue_free()
-	var captured_marked := false
+	for c in captured_grid.get_children():
+		c.queue_free()
+	var cap_count := 0
 	for st in _stacks():
-		# issue 96: Captured Stock becomes its own LABELLED section rather than
-		# a tinted tail of the same run of buttons. The two pools obey different
-		# rules — a Captured entry can merge, convert and sell but can NEVER be
-		# deployed (issue 60) — and the only signals for that were a warm tint
-		# and a tooltip suffix. This is a portrait TOUCH game: the tooltip does
-		# not exist on a phone, so a player could not tell which of their pieces
-		# were placeable. _stacks() returns stock first then captured, so the
-		# first captured stack is the boundary.
-		if st.cap and not captured_marked:
-			captured_marked = true
-			_add_captured_header()
-		var btn := Button.new()
-		var id: String = st.id
-		var cap: bool = st.cap
-		if g.textures.has(id): # piece icon instead of glyph text (round 3)
-			btn.icon = g.piece_tex(id) # Stock is always yours: the player token
-			btn.expand_icon = true
-			# was 46. Every icon in the game now measures ICON, deliberately just
-			# under a 59px board tile, so a piece reads the same wherever it is.
-			btn.custom_minimum_size = Vector2(ICON, ICON)
+		var btn := _build_stack_button(st)
+		if st.cap:
+			cap_count += 1
+			captured_grid.add_child(btn)
 		else:
-			btn.text = g.defs[id].glyph
-			btn.add_theme_font_size_override("font_size", 22)
-		# `not cap` is load-bearing, not decoration: placing_id is only ever a
-		# STOCK id now (game.gd), so without it a captured row holding the same
-		# piece id as the armed Stock stack would light up armed too.
-		var armed: bool = not cap and g.placing_id == id and g.armed_entry == st.entry
-		var show_promote: bool = armed \
-				and st.count >= 2 and MergeLogic.pair_ok(g, id, id) \
-				and g.state == g.State.PLAYER_TURN and g.actions_left > 0
-		# 2026-09-06: Captured -> Stock conversion on the entry itself. It lived
-		# only in the Shop's Sell mode — four taps deep, and unreachable before
-		# SHOP_UNLOCK_WAVE since issue 101 locks the panel — so early captures
-		# could not be converted at all.
-		#
-		# 2026-09-10: ALWAYS SHOWN, on every captured entry. It used to appear
-		# only on an armed stack and only when ▲ promote did not claim the
-		# corner first — so holding two of a piece hid Convert behind the merge
-		# it lost the corner to, which is exactly the "tap to convert tries to
-		# merge instead" the user reported. Merge is gone from Captured Stock
-		# and arming it does nothing, so the badge has no reason to hide.
-		var show_convert: bool = cap
-		if st.count > 1:
-			# corner badge keeps the icon full-size (no inline text); it yields
-			# the top-right corner to the ▲ promote button when that shows
-			var badge := Label.new()
-			badge.text = str(st.count)
-			badge.add_theme_font_size_override("font_size", 11)
-			badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-			badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-			badge.add_theme_constant_override("outline_size", 4)
-			if show_promote:
-				badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-				badge.offset_left = 3
-				badge.offset_right = 16
-				badge.offset_bottom = 12
-			else:
-				badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-				badge.offset_left = -16
-				badge.offset_bottom = 12
-			btn.add_child(badge)
-		# issue 97: the price of acting on this entry, on the entry itself —
-		# deploy cost for a Stock piece, conversion cost for a Captured one.
-		# BOTH the base and the effective number when they differ, because
-		# showing only the effective one hides that a modifier exists and
-		# showing only the base is a lie: a Horde pawn deploys FREE (Endless
-		# Ranks) and a Qin Shi Huang deploy costs double (The Great Wall).
-		# Read from the live calls, never re-derived here — re-implementing the
-		# modifiers in the HUD would be a second copy of the rules, and it
-		# would drift.
-		var price := Label.new()
-		if cap:
-			price.text = "$%d" % Shop.convert_price(g, st.entry)
-		else:
-			var base: int = Tuning.PLACEMENT_COST
-			var eff: int = Economy.deploy_cost(g)
-			if id == "pawn" and Armies.endless_ranks(g):
-				eff = 0 # Endless Ranks is scoped to pawns at _place, so the
-					# generic deploy_cost() does not know about it
-			price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
-		price.add_theme_font_size_override("font_size", 10)
-		price.add_theme_color_override("font_color",
-			Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
-		price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-		price.add_theme_constant_override("outline_size", 4)
-		price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		price.offset_top = -13
-		btn.add_child(price)
-		if show_promote:
-			# round ▲ badge floating over the stack's top-right corner: it
-			# overhangs the drawer's top edge and pokes out a little to the
-			# right of the icon (the stock scroll doesn't clip)
-			var promote := Button.new()
-			# issue 97: the merge's price, on the control that starts it.
-			# Free under Close Ranks? No — that Power waives the ACTION only
-			# (merge_logic.can_afford_merge), so the Gold shows regardless.
-			promote.text = "▲$%d" % Tuning.MERGE_COST
-			promote.add_theme_font_size_override("font_size", 11)
-			promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
-			var round := StyleBoxFlat.new()
-			round.bg_color = Color(0.3, 0.6, 1.0) # player blue
-			round.set_corner_radius_all(9)
-			for style in ["normal", "hover", "pressed"]:
-				promote.add_theme_stylebox_override(style, round)
-			promote.tooltip_text = "Promote: merge two into one"
-			promote.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-			promote.offset_left = -14
-			promote.offset_right = 4
-			promote.offset_top = -9
-			promote.offset_bottom = 9
-			promote.pressed.connect(func() -> void: promote_pressed.emit(id))
-			btn.add_child(promote)
-		if show_convert:
-			var convert := Button.new()
-			convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
-			convert.add_theme_font_size_override("font_size", 11)
-			convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
-			convert.disabled = not Shop.can_convert(g, st.entry)
-			var pill := StyleBoxFlat.new()
-			pill.bg_color = Color(0.3, 0.6, 1.0) # player blue, same as ▲
-			pill.set_corner_radius_all(9)
-			for style in ["normal", "hover", "pressed", "disabled"]:
-				convert.add_theme_stylebox_override(style, pill)
-			convert.tooltip_text = "Convert to Stock (deployable)"
-			convert.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-			convert.offset_left = -26
-			convert.offset_right = 4
-			convert.offset_top = -9
-			convert.offset_bottom = 9
-			var entry: Variant = st.entry
-			convert.pressed.connect(func() -> void: convert_pressed.emit(entry))
-			btn.add_child(convert)
-		btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
-		if armed:
-			btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-		elif not cap and g.merge_highlights.has(id):
-			btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-		elif not cap and Economy.sanctioned(g, id):
-			btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
-		elif cap:
-			btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
-		if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
-			var mark := Label.new()
-			mark.text = "◆"
-			mark.add_theme_font_size_override("font_size", 11)
-			mark.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-			mark.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-			mark.offset_left = -14
-			mark.offset_top = -14
-			btn.add_child(mark)
-		btn.set_meta("id", id) # drop-target lookup for drag merges
-		btn.set_meta("cap", cap)
-		btn.set_meta("entry", st.entry)
-		btn.pressed.connect(func() -> void: stack_pressed.emit(st.entry, cap, st.count))
-		btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
-		# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
-		# rather than a straight win. These buttons are drag SOURCES — button_down
-		# arms a deploy — so a press now also reaches the ScrollContainer and can
-		# start a scroll. The conflict is small in practice and the deadzone
-		# bounds it: this strip is horizontal, a deploy drag goes UP to the board,
-		# and a mostly-vertical drag moves a horizontal scroll barely at all.
-		# Against that, a full Stock (22 stacks was a real save) cannot currently
-		# be drag-scrolled at all — the one complaint Max has already made about
-		# this drawer. Flagged rather than assumed: if deploying from a long Stock
-		# ever feels like it drifts, this line is the suspect.
-		btn.mouse_filter = Control.MOUSE_FILTER_PASS
-		pool_box.add_child(btn)
+			stock_grid.add_child(btn)
+	# story 37: the hint only while the column would otherwise be blank — an
+	# empty GridContainer has no size of its own to hang a message on.
+	captured_hint.visible = cap_count == 0
 	if g.state == g.State.SETUP and g.selected.x >= 0:
 		# empty slot: tap it (or drop the dragged piece on the strip) to take
-		# the selected board piece back into stock
+		# the selected board piece back into stock — lives with Stock, the
+		# side it returns pieces to.
 		var slot := Button.new()
 		slot.text = "+"
-		# NO-36: this still read a hardcoded 46 -- the exact pre-ICON stock-stack
+		# NO-36: this still read a hardcoded 46 -- the exact pre-ICON stock-strip
 		# size -- while every stack button beside it in this same container is
 		# ICON. Found by extending the one-icon-size pin past stock_strip.
 		slot.custom_minimum_size = Vector2(ICON, ICON)
@@ -1232,4 +1138,166 @@ func _rebuild_pool_strip() -> void:
 		slot.tooltip_text = "Put the piece back into stock"
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		pool_box.add_child(slot)
+		stock_grid.add_child(slot)
+
+
+## One stack button (Stock or Captured entry) — everything from the icon down
+## to its drag/tap wiring. Split out of _rebuild_stock_drawer so that
+## function only decides which grid an entry lands in.
+func _build_stack_button(st: Dictionary) -> Button:
+	var btn := Button.new()
+	var id: String = st.id
+	var cap: bool = st.cap
+	if g.textures.has(id): # piece icon instead of glyph text (round 3)
+		btn.icon = g.piece_tex(id) # Stock is always yours: the player token
+		btn.expand_icon = true
+		# was 46. Every icon in the game now measures ICON, deliberately just
+		# under a 59px board tile, so a piece reads the same wherever it is.
+		btn.custom_minimum_size = Vector2(ICON, ICON)
+	else:
+		btn.text = g.defs[id].glyph
+		btn.add_theme_font_size_override("font_size", 22)
+	# `not cap` is load-bearing, not decoration: placing_id is only ever a
+	# STOCK id now (game.gd), so without it a captured row holding the same
+	# piece id as the armed Stock stack would light up armed too.
+	var armed: bool = not cap and g.placing_id == id and g.armed_entry == st.entry
+	var show_promote: bool = armed \
+			and st.count >= 2 and MergeLogic.pair_ok(g, id, id) \
+			and g.state == g.State.PLAYER_TURN and g.actions_left > 0
+	# 2026-09-06: Captured -> Stock conversion on the entry itself. It lived
+	# only in the Shop's Sell mode — four taps deep, and unreachable before
+	# SHOP_UNLOCK_WAVE since issue 101 locks the panel — so early captures
+	# could not be converted at all.
+	#
+	# 2026-09-10: ALWAYS SHOWN, on every captured entry. It used to appear
+	# only on an armed stack and only when ▲ promote did not claim the
+	# corner first — so holding two of a piece hid Convert behind the merge
+	# it lost the corner to, which is exactly the "tap to convert tries to
+	# merge instead" the user reported. Merge is gone from Captured Stock
+	# and arming it does nothing, so the badge has no reason to hide.
+	var show_convert: bool = cap
+	if st.count > 1:
+		# corner badge keeps the icon full-size (no inline text); it yields
+		# the top-right corner to the ▲ promote button when that shows
+		var badge := Label.new()
+		badge.text = str(st.count)
+		badge.add_theme_font_size_override("font_size", 11)
+		badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+		badge.add_theme_constant_override("outline_size", 4)
+		if show_promote:
+			badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			badge.offset_left = 3
+			badge.offset_right = 16
+			badge.offset_bottom = 12
+		else:
+			badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+			badge.offset_left = -16
+			badge.offset_bottom = 12
+		btn.add_child(badge)
+	# issue 97: the price of acting on this entry, on the entry itself —
+	# deploy cost for a Stock piece, conversion cost for a Captured one.
+	# BOTH the base and the effective number when they differ, because
+	# showing only the effective one hides that a modifier exists and
+	# showing only the base is a lie: a Horde pawn deploys FREE (Endless
+	# Ranks) and a Qin Shi Huang deploy costs double (The Great Wall).
+	# Read from the live calls, never re-derived here — re-implementing the
+	# modifiers in the HUD would be a second copy of the rules, and it
+	# would drift.
+	var price := Label.new()
+	if cap:
+		price.text = "$%d" % Shop.convert_price(g, st.entry)
+	else:
+		var base: int = Tuning.PLACEMENT_COST
+		var eff: int = Economy.deploy_cost(g)
+		if id == "pawn" and Armies.endless_ranks(g):
+			eff = 0 # Endless Ranks is scoped to pawns at _place, so the
+				# generic deploy_cost() does not know about it
+		price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
+	price.add_theme_font_size_override("font_size", 10)
+	price.add_theme_color_override("font_color",
+		Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
+	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+	price.add_theme_constant_override("outline_size", 4)
+	price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	price.offset_top = -13
+	btn.add_child(price)
+	if show_promote:
+		# round ▲ badge floating over the stack's top-right corner: it
+		# overhangs the drawer's top edge and pokes out a little to the
+		# right of the icon (the stock scroll doesn't clip)
+		var promote := Button.new()
+		# issue 97: the merge's price, on the control that starts it.
+		# Free under Close Ranks? No — that Power waives the ACTION only
+		# (merge_logic.can_afford_merge), so the Gold shows regardless.
+		promote.text = "▲$%d" % Tuning.MERGE_COST
+		promote.add_theme_font_size_override("font_size", 11)
+		promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		var round := StyleBoxFlat.new()
+		round.bg_color = Color(0.3, 0.6, 1.0) # player blue
+		round.set_corner_radius_all(9)
+		for style in ["normal", "hover", "pressed"]:
+			promote.add_theme_stylebox_override(style, round)
+		promote.tooltip_text = "Promote: merge two into one"
+		promote.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		promote.offset_left = -14
+		promote.offset_right = 4
+		promote.offset_top = -9
+		promote.offset_bottom = 9
+		promote.pressed.connect(func() -> void: promote_pressed.emit(id))
+		btn.add_child(promote)
+	if show_convert:
+		var convert := Button.new()
+		convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
+		convert.add_theme_font_size_override("font_size", 11)
+		convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		convert.disabled = not Shop.can_convert(g, st.entry)
+		var pill := StyleBoxFlat.new()
+		pill.bg_color = Color(0.3, 0.6, 1.0) # player blue, same as ▲
+		pill.set_corner_radius_all(9)
+		for style in ["normal", "hover", "pressed", "disabled"]:
+			convert.add_theme_stylebox_override(style, pill)
+		convert.tooltip_text = "Convert to Stock (deployable)"
+		convert.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		convert.offset_left = -26
+		convert.offset_right = 4
+		convert.offset_top = -9
+		convert.offset_bottom = 9
+		var entry: Variant = st.entry
+		convert.pressed.connect(func() -> void: convert_pressed.emit(entry))
+		btn.add_child(convert)
+	btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
+	if armed:
+		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
+	elif not cap and g.merge_highlights.has(id):
+		btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
+	elif not cap and Economy.sanctioned(g, id):
+		btn.modulate = Color(1.0, 0.45, 0.45) # Sanctions: unplaceable
+	elif cap:
+		btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
+	if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
+		var mark := Label.new()
+		mark.text = "◆"
+		mark.add_theme_font_size_override("font_size", 11)
+		mark.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+		mark.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		mark.offset_left = -14
+		mark.offset_top = -14
+		btn.add_child(mark)
+	btn.set_meta("id", id) # drop-target lookup for drag merges
+	btn.set_meta("cap", cap)
+	btn.set_meta("entry", st.entry)
+	btn.pressed.connect(func() -> void: stack_pressed.emit(st.entry, cap, st.count))
+	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
+	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
+	# rather than a straight win. These buttons are drag SOURCES — button_down
+	# arms a deploy — so a press now also reaches the ScrollContainer and can
+	# start a scroll. The conflict is small in practice and the deadzone
+	# bounds it: this strip is horizontal, a deploy drag goes UP to the board,
+	# and a mostly-vertical drag moves a horizontal scroll barely at all.
+	# Against that, a full Stock (22 stacks was a real save) cannot currently
+	# be drag-scrolled at all — the one complaint Max has already made about
+	# this drawer. Flagged rather than assumed: if deploying from a long Stock
+	# ever feels like it drifts, this line is the suspect.
+	btn.mouse_filter = Control.MOUSE_FILTER_PASS
+	return btn

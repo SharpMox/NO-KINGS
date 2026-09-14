@@ -134,7 +134,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		stock_index = g.stock.size() - 1 # captured now — a handler appending its
 			# own Stock grant during on_rank_up (Bigfoot Toenail Clipping) must
 			# not shift which entry Holy Grail Coaster's stock case converts
-		g.fx_at = Vector2((g.hud.pool_box.get_parent() as Control).get_global_rect().get_center())
+		g.fx_at = Vector2((g.hud.drawers["stock"] as Control).get_global_rect().get_center())
 	if ids[0] == ids[1]: # a same-id merge advances the promotion chain — a Rank
 		# Up, distinct from a Fusion of two different pieces (artefact hook 19).
 		# result_tile.x < 0 means the result landed in Stock, not the board —

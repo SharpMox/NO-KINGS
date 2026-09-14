@@ -170,6 +170,7 @@ var drawer_buttons := {} # name -> Button (count text updates)
 var stock_armed := Control.new() # draws the armed piece on the Stock button
 var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
 var menu_button := Button.new() # ☰, the Header's top-right corner
+var menu_tap := Control.new() # NO-60: its tap area, bigger than the glyph
 var multi_confirm_btn := Button.new() # floating "Extract N" confirm
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
@@ -325,6 +326,19 @@ func build(game) -> void:
 			b.add_theme_stylebox_override(style, compact)
 	menu_button.pressed.connect(func() -> void: toggle_menu(true))
 	add_child(menu_button)
+	# NO-60: the glyph stays put (content-sized, top-right corner) but its tap
+	# area gets the same treatment as the Stock button below — the Header's
+	# full height, out to the physical corner. Left edge matches the button's
+	# own, so it still stops short of Stock by HEADER_GAP same as before; a
+	# transparent overlay on top rather than enlarging menu_button itself,
+	# which would have recentred the glyph in the bigger rect (visual change).
+	menu_tap.position = Vector2(menu_button.position.x, y0)
+	menu_tap.custom_minimum_size = Vector2(vp.x - menu_button.position.x, HEADER_H)
+	menu_tap.mouse_filter = Control.MOUSE_FILTER_STOP
+	menu_tap.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed:
+			toggle_menu(true))
+	add_child(menu_tap)
 	# THE STOCK BUTTON (stories 7-12). Its tap area is the Header's full height
 	# and runs from the counters column to the menu button — and no further:
 	# the bottom edge IS g.hud_top, where the board starts, and the right edge

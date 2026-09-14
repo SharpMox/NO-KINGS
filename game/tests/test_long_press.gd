@@ -18,6 +18,9 @@ const HOLD_S := 0.65
 var fails := 0
 var recording := false
 var foreign_motion := 0
+## [DEBUG-lp-flake] which part of a long press is in flight: "hold" or "release".
+## Read only by _instrument's log line; it changes nothing the checks see.
+var hold_phase := ""
 
 
 func check(cond: bool, label: String) -> void:
@@ -56,10 +59,13 @@ func _long_press(at: Vector2) -> bool:
 	foreign_motion = 0
 	recording = true
 	_mouse(true, at)
+	hold_phase = "hold" # [DEBUG-lp-flake]
 	await create_timer(HOLD_S).timeout
 	recording = false
+	hold_phase = "release" # [DEBUG-lp-flake]
 	_release_at(at)
 	await process_frame
+	hold_phase = "" # [DEBUG-lp-flake]
 	return foreign_motion == 0
 
 
@@ -80,7 +86,30 @@ func _boot_game() -> Node:
 	game._set_drawer("inventory")
 	await process_frame
 	await process_frame
+	_instrument(game) # [DEBUG-lp-flake]
 	return game
+
+
+## [DEBUG-lp-flake] LOG ONLY. The intermittent "Parent node is busy setting up
+## children" failure (full run_all only, never reproduced in isolation) showed the
+## item's pressed firing inside a long press and re-entering through
+## _set_drawer(""). This records, for any pressed during a hold or its release,
+## the hovered control, the button mask and the caller stack, so the next natural
+## occurrence carries its own diagnosis. Connected after the HUD's handler, so it
+## runs second and alters nothing. Remove with the flake's fix.
+func _instrument(game: Node) -> void:
+	for grid in [game.hud.items_grid, game.hud.artefacts_grid]:
+		for c in grid.get_children():
+			if c is Button:
+				var btn: Button = c
+				btn.pressed.connect(func() -> void:
+					if hold_phase == "":
+						return
+					print("[DEBUG-lp-flake] pressed during %s on '%s': hovered=%s mask=%d focus=%s" % [
+						hold_phase, btn.text, root.gui_get_hovered_control(),
+						Input.get_mouse_button_mask(), root.gui_get_focus_owner()])
+					for f in get_stack():
+						print("[DEBUG-lp-flake]   at %s:%d %s" % [f.source, f.line, f.function]))
 
 
 func _item_button(game: Node, key: String) -> Button:

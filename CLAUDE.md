@@ -275,6 +275,14 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   a bug in code the run never touched (NO-88, 2026-09-14). The menu suites now
   `SyncQueue.clear()` at start. Two Godot processes across worktrees is never safe,
   windowed or headless, even when neither is the full suite.
+- **Serialise Godot across sessions with a lock directory.** When more than one session or
+  agent may run Godot, take `/tmp/nokings-godot.lock` and run and release in ONE foreground
+  call: `until mkdir /tmp/nokings-godot.lock 2>/dev/null; do sleep 30; done; <godot or
+  run_all.sh>; rc=$?; rmdir /tmp/nokings-godot.lock; exit $rc`. Never hold it across a wait (a
+  verifier that waited for user idle while holding it stalled everyone). **Only the holder
+  removes it**: ask the holder instead. `ps` from one session can't see another's processes,
+  so "no Godot running" proves nothing. On 2026-09-14 a live lock was cleared twice, and each
+  time two suites overlapped and the results were discarded.
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

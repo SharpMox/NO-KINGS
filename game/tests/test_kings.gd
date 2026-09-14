@@ -221,11 +221,14 @@ func _init() -> void:
 	# path in _begin_player_turn queued wave 51 while the King was still
 	# pending, so he never landed in his own wave (8/8 seeds, NO-80's probe).
 	# Driven through the real turn advance, with a non-Trump King.
-	var ec: Node2D = _boot({"board": [], "wave": 49})
+	# Line-up pinned at BOOT, like `g` above: with an empty board the boot's own
+	# early clear queues wave 50 before any later assignment could take effect,
+	# and since NO-80 a rolled Donald Trump would enter at once instead.
+	var ec: Node2D = _boot({"board": [], "wave": 49,
+		"king_order": ["nero", "xerxes_i", "qin_shi_huang", "nebuchadnezzar_ii"]})
 	await process_frame
 	await process_frame
 	ec.autoplay = true # no timers, no Shop panel on the restock wave
-	ec.king_order = ["nero"]
 	ec._queue_wave(50)
 	WaveLogic.spawn_pending(ec)
 	for pos in ec.board.keys():

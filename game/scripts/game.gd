@@ -531,6 +531,13 @@ func _ready() -> void:
 	if args.has("--seed"): # issue 75: reproduce a run exactly
 		next_seed = args[args.find("--seed") + 1]
 	_layout_board()
+	# NO-57: the platform can settle the notch/cutout inset a frame or two
+	# after boot, or change it outright (rotation, split-screen) — recompute
+	# on the root viewport's own size_changed rather than trusting the boot
+	# read forever. This is the viewport's signal, not a Control's `resized`:
+	# binding to a rebuilt Control's own resize is the feedback loop the
+	# stock strip already got burned by (CLAUDE.md, layout traps).
+	get_viewport().size_changed.connect(_layout_board)
 	add_child(_pulse)
 	_pulse.draw.connect(_draw_pulse)
 	defs = Rules.load_pieces()

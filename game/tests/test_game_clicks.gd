@@ -710,6 +710,25 @@ func _init() -> void:
 		"a tap on the menu button opens the menu, never Stock")
 	check(await _click_button_in(game.hud.game_menu, "Resume"), "Resume clickable")
 	await process_frame
+	# NO-60: the tap area is the Header's FULL height, not the glyph's own
+	# content-sized rect — tap its top and bottom edges, well outside mr, and
+	# confirm each opens the menu and never Stock.
+	var menu_tap_r: Rect2 = HUD.menu_tap.get_global_rect()
+	check(is_equal_approx(menu_tap_r.position.y, game.safe_top) and is_equal_approx(menu_tap_r.size.y, HUD.HEADER_H),
+		"the menu button's tap area is the Header's full height, from the inset down")
+	check(menu_tap_r.position.x >= sr.end.x - 0.5, "...and it never reaches over the Stock button")
+	_click(Vector2(menu_tap_r.get_center().x, menu_tap_r.position.y + 1.0))
+	await process_frame
+	check(game.game_menu.visible and game.drawer_open == "",
+		"a tap on the TOP edge of the tap area opens the menu, never Stock")
+	check(await _click_button_in(game.hud.game_menu, "Resume"), "Resume clickable (top edge)")
+	await process_frame
+	_click(Vector2(menu_tap_r.get_center().x, menu_tap_r.end.y - 1.0))
+	await process_frame
+	check(game.game_menu.visible and game.drawer_open == "",
+		"a tap on the BOTTOM edge of the tap area opens the menu, never Stock")
+	check(await _click_button_in(game.hud.game_menu, "Resume"), "Resume clickable (bottom edge)")
+	await process_frame
 	check(_click_stock(game), "the Header's Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock", "...and it is the Stock drawer")

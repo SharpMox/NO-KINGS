@@ -193,10 +193,10 @@ check needs a human's eyes, or a batch pushed in advance. And test it on a scree
 that has a network-only control (Scores → Global ranking): the main menu of a
 bound player shows no offline notice, by design (`menu.gd:357-369`).
 
-**A `--scenario` / `--autoplay` launch owns the whole process.** The args
-persist, so every Main Menu load bounces back into the game (NO-77). To hand the
-phone to a human for a normal run, kill the app and reopen it from the
-home-screen icon.
+**A `--scenario` / `--autoplay` launch is honoured once** (NO-77, fixed): the
+args persist for the whole process, but only the first Game boot reads them, so
+pause → Main Menu shows the menu and Play starts a normal run. Before the fix
+every Main Menu load bounced back into the scenario.
 
 **The Claude Code permission classifier refuses a driver tap on the
 account-switch prompt** as a real-world transaction (twice, 2026-09-13). Plan for

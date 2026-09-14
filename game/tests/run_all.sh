@@ -90,6 +90,9 @@ for t in rules save cloud_save assets waves kings endless armies scores history 
 	run "test_$t" --headless -s "tests/test_$t.gd"
 done
 
+# NO-77: needs the real flag on the command line, so it sits outside the loop.
+run test_launch_bypass --headless -s tests/test_launch_bypass.gd -- --scenario 0
+
 run autoplay --headless -- --autoplay
 
 echo "---"

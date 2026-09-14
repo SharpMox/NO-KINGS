@@ -48,6 +48,12 @@ static var next_tier: String = Tuning.DEFAULT_TIER
 ## the new-run screen. Kept as the raw String the player typed so it can be
 ## shown back to them verbatim on the results screen.
 static var next_seed: String = ""
+## NO-77: a `--autoplay` / `--scenario N` launch is honoured by the FIRST Game
+## boot only. The args last for the whole process, so without this every
+## later Menu load (pause -> Main Menu) re-forwarded into a fresh copy of the
+## scenario, and Play re-applied it. Set by the first Game._ready, read by
+## menu.gd before it forwards and by the arg checks below.
+static var cli_bypass_used := false
 
 
 ## Any string -> a stable seed. Digits are used as-is so "12345" behaves like
@@ -498,7 +504,9 @@ func _ready() -> void:
 	Settings.apply(settings_data)
 	animations_on = settings_data.get("animations_on", true)
 	var args := OS.get_cmdline_user_args()
-	autoplay = args.has("--autoplay")
+	var first_boot := not cli_bypass_used # NO-77: the launch bypass fires once
+	cli_bypass_used = true
+	autoplay = first_boot and args.has("--autoplay")
 	autoplay_exit = autoplay
 	# issue 74: no pixel filter here or anywhere — a full-screen quantising
 	# post-effect would quantise everything composited below it, art included.
@@ -571,7 +579,7 @@ func _ready() -> void:
 	add_child(modals)
 	modals.build(self)
 	_connect_modals()
-	if args.has("--scenario"): # headless/CLI scenario boot, by index
+	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
 	if next_config.is_empty():

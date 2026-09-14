@@ -550,7 +550,9 @@ func _ready() -> void:
 		get_window().size = Vector2i(int(h * 480.0 / 800.0), h) # keep portrait aspect
 		get_window().move_to_center()
 	var args := OS.get_cmdline_user_args()
-	if args.has("--autoplay") or args.has("--scenario"):
+	# NO-77: once only — the args outlive the first Game, this scene does not.
+	if not GameScript.cli_bypass_used \
+			and (args.has("--autoplay") or args.has("--scenario")):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
 		return
 	# issue 84: send anything queued while offline BEFORE pulling the mirror.

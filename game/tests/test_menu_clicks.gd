@@ -460,19 +460,15 @@ func _init() -> void:
 			and _find_button(sw, "Not now") != null,
 		"it asks instead, offering both answers")
 	var prompt_text := _find_label(sw, "Switch to the new account?")
-	# A PREFIX of the owner id, not the whole thing: it has no recorded name, so
-	# it falls back to its id — and NO-54 then shortens that id to what fits.
-	check(prompt_text != null and OWNER_64.substr(0, 20) in prompt_text.text
+	# NO-76: the owner has no recorded name, so it is called "this device's
+	# account" — not its id, not even a prefix of it. The iPhone showed the
+	# full 64-hex id; no player recognises that as theirs.
+	check(prompt_text != null and "this device's account" in prompt_text.text
 			and "Memory Player" in prompt_text.text,
 		"and the prompt NAMES BOTH accounts — \"an account changed\" is not answerable")
-	# NO-54: and it names them by DISPLAY NAME, not by id. Both halves of the
-	# rule are in that one assertion: the live account shows the backend's name
-	# ("Memory Player", not its id "memory-account"), and the owner — bound
-	# above with no name recorded — falls back to its id. This line pins the
-	# fallback explicitly, because the useful failure is showing a BLANK where a
-	# nameless account should show its id.
-	check(prompt_text != null and not ("memory-account" in prompt_text.text),
-		"the live account is named, not identified — no raw id where a name exists")
+	check(prompt_text != null and not (OWNER_64.substr(0, 20) in prompt_text.text)
+			and not ("memory-account" in prompt_text.text),
+		"neither account is shown as an id — a name where one exists, a generic label where none does")
 
 	# NO-55: the layout consequence, which is what actually reached the player.
 	# A Label with AUTOWRAP_OFF reports its full text width as its MINIMUM, a
@@ -518,8 +514,8 @@ func _init() -> void:
 		-1, sw.switch_prompt_label.get_theme_font_size("font_size")).x
 	check(fitted_w <= vp_w,
 		"...and what is left actually FITS the screen (%.0f <= %.0f)" % [fitted_w, vp_w])
-	check(sw._who(sw.switch_prompt_label, "", "short-id") == "short-id",
-		"an account with no recorded name falls back to its id, never to a blank")
+	check(sw._who(sw.switch_prompt_label, "", "another account") == "another account",
+		"an account with no recorded name falls back to the caller's label, never to a blank")
 
 	# Decline: pre-NO-11 behaviour for the session, but said out loud.
 	check(await _click_button(sw, "Not now"), "Not now clickable")

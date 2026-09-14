@@ -15,6 +15,8 @@ extends SceneTree
 const Account := preload("res://scripts/account.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const MemoryBackend := preload("res://scripts/cloud/cloud_backend_memory.gd")
+# NO-76: the shape of a Game Center player id, as the iPhone showed it.
+const HEX_64 := "a26b4668036156e12dcca5ee5856704f3f55f827cee5720427156111d3f55f82"
 
 var fails := 0
 
@@ -99,6 +101,65 @@ func _init() -> void:
 	await process_frame
 	check(_prompt_showing(menu), "a different signed-in owner IS asked to switch")
 	check(Account.owner() == "google-alice", "...and nothing rebinds until they answer")
+	menu.queue_free()
+	await process_frame
+
+	# ---- NO-76: the prompt never shows a raw player id ------------------------
+	# The iPhone's owner was bound before NO-54 recorded names, so the prompt
+	# printed the 64-hex Game Center id, cut to the width, with the sentence's
+	# "." wrapped onto a line of its own. An id is nothing a player recognises;
+	# a nameless account gets a generic label instead. Asserted on the text the
+	# player reads, on the prompt AND on the note left after declining.
+	_fresh_install()
+	Account.sign_in(Account.GOOGLE, HEX_64, [])
+	menu = await _menu()
+	menu._on_sign_in_finished(true)
+	await process_frame
+	check(_prompt_showing(menu), "precondition: a nameless owner is asked to switch")
+	var hex := RegEx.create_from_string("(?i)[0-9a-f]{64}")
+	var prompt: String = menu.switch_prompt_label.text
+	check(hex.search(prompt) == null, "the prompt shows no 64-hex player id")
+	check("this device's account" in prompt,
+		"...a nameless owner is called this device's account")
+	check("Memory Player" in prompt, "...and the live account keeps its display name")
+	menu._on_switch_declined()
+	await process_frame
+	check(hex.search(menu.login_note.text) == null, "declining shows no id either")
+	check("this device's account" in menu.login_note.text,
+		"...and names the owner the same way")
+	menu.queue_free()
+	await process_frame
+
+	# A recorded name is still shown — and a long one WRAPS rather than overflows.
+	_fresh_install()
+	var long_name := "Maximilian Alexander von Hohenzollern IV" # 40 chars
+	Account.sign_in(Account.GOOGLE, HEX_64, [], long_name)
+	menu = await _menu()
+	menu._on_sign_in_finished(true)
+	await process_frame
+	await process_frame
+	var label: Label = menu.switch_prompt_label
+	var vp_w: float = root.get_visible_rect().size.x
+	check(long_name in label.text, "a recorded display name is what the prompt shows")
+	check(label.size.x <= vp_w,
+		"...and the label fits the screen (%.0f <= %.0f)" % [label.size.x, vp_w])
+	menu.queue_free()
+	await process_frame
+	# Wider still — a legal 64-character CJK name, wider than the screen at any
+	# viewport: _who caps it at the text width, so the sentence around it always
+	# overruns that width and must WRAP rather than push the menu sideways.
+	_fresh_install()
+	Account.sign_in(Account.GOOGLE, HEX_64, [], "山".repeat(64))
+	menu = await _menu()
+	menu._on_sign_in_finished(true)
+	await process_frame
+	await process_frame
+	label = menu.switch_prompt_label
+	check(label.get_line_count() > label.text.count("\n") + 1,
+		"a name as wide as the screen wraps onto a further line (%d lines)"
+			% label.get_line_count())
+	check(label.size.x <= vp_w,
+		"...and the label still fits the screen (%.0f <= %.0f)" % [label.size.x, vp_w])
 	menu.queue_free()
 	await process_frame
 

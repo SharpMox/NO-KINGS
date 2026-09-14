@@ -145,8 +145,11 @@ func _init() -> void:
 
 	# --- issue 90: a King wave is TWO segments -------------------------------
 	# Segment 1 is Tuning.KING_SEGMENT_TURNS turns of buffed enemies with NO
-	# King on the board; the King arrives for segment 2.
-	var g: Node2D = _boot({"board": [], "wave": 49})
+	# King on the board; the King arrives for segment 2. Pinned to Nero: since
+	# NO-80 Donald Trump is the one King who skips the segment, so a rolled
+	# line-up could put the exception under a test of the rule.
+	var g: Node2D = _boot({"board": [], "wave": 49,
+		"king_order": ["nero", "xerxes_i", "qin_shi_huang", "nebuchadnezzar_ii"]})
 	await process_frame
 	await process_frame
 	g._queue_wave(50)
@@ -154,6 +157,13 @@ func _init() -> void:
 	var k := Rules.find_king(g.board, Rules.ENEMY)
 	check(k.x < 0, "segment 1: no King on the board yet")
 	check(not g.pending_king.is_empty(), "the King is held, not discarded")
+	check(Kings.active_id(g) == "nero",
+		"and the active King is resolved from the HELD King, not the board")
+	# the Ability needs the King ON THE BOARD: during segment 1 the Power is
+	# live but the King has not arrived, and an Ability from a King the player
+	# cannot see or attack would be unanswerable
+	check(not Kings.fire_ability(g), "no Ability during segment 1 — the King is not there yet")
+	check(not g.king_ability_used_this_wave, "and nothing is spent by the attempt")
 	g.turns_since_wave = Tuning.KING_SEGMENT_TURNS - 1
 	WaveLogic.release_king_if_due(g)
 	check(not g.pending_king.is_empty(),
@@ -211,11 +221,14 @@ func _init() -> void:
 	# path in _begin_player_turn queued wave 51 while the King was still
 	# pending, so he never landed in his own wave (8/8 seeds, NO-80's probe).
 	# Driven through the real turn advance, with a non-Trump King.
-	var ec: Node2D = _boot({"board": [], "wave": 49})
+	# Line-up pinned at BOOT, like `g` above: with an empty board the boot's own
+	# early clear queues wave 50 before any later assignment could take effect,
+	# and since NO-80 a rolled Donald Trump would enter at once instead.
+	var ec: Node2D = _boot({"board": [], "wave": 49,
+		"king_order": ["nero", "xerxes_i", "qin_shi_huang", "nebuchadnezzar_ii"]})
 	await process_frame
 	await process_frame
 	ec.autoplay = true # no timers, no Shop panel on the restock wave
-	ec.king_order = ["nero"]
 	ec._queue_wave(50)
 	WaveLogic.spawn_pending(ec)
 	for pos in ec.board.keys():
@@ -303,14 +316,15 @@ func _init() -> void:
 
 	# the Power comes on with the WAVE, and is live through segment 1 — before
 	# the King is on the board at all (ruling 6)
-	var t: Node2D = _boot({"board": [], "wave": 49})
+	# One enemy on the board: with none, _begin_player_turn's early clear
+	# queues wave 50 at boot from a ROLLED line-up, before king_order is set,
+	# and the explicit queue below would then be a second King wave 50.
+	var t: Node2D = _boot({"board": [["pawn", 1, 3, 9]], "wave": 49})
 	await process_frame
 	await process_frame
 	t.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
 	t._queue_wave(50)
-	check(not t.king_power_abilities.is_empty(), "the King's Power is in force during segment 1")
-	check(Kings.active_id(t) == "donald_trump",
-		"and the active King is resolved from the HELD King, not the board")
+	check(not t.king_power_abilities.is_empty(), "the King's Power is in force from the wave's start")
 	var live := false
 	for a in t.king_abilities_active:
 		if t.king_power_abilities.has(a.get("key", "")):
@@ -367,20 +381,32 @@ func _init() -> void:
 			leaked = true
 	check(not leaked, "and its Tariff is removed, not left running")
 
-	# the Ability needs the King ON THE BOARD: during segment 1 the Power is
-	# live but the King has not arrived, and an Ability from a King the player
-	# cannot see or attack would be unanswerable
+	# --- NO-80: Donald Trump enters the board at the START of his wave ------
+	# User ruling 2026-09-13: his Tariffs charge from turn 0, and the HUD rework
+	# shows them on his piece's info panel — unreachable while he is held off
+	# the board. A rule specific to him (a kit flag); every other King keeps
+	# the issue-90 segment, asserted with Nero above.
 	t._queue_wave(50)
-	check(not Kings.fire_ability(t), "no Ability during segment 1 — the King is not there yet")
-	check(not t.king_ability_used_this_wave, "and nothing is spent by the attempt")
-
-	t.turns_since_wave = 99
-	WaveLogic.release_king_if_due(t)
 	WaveLogic.spawn_pending(t)
+	var tk := Rules.find_king(t.board, Rules.ENEMY)
+	check(tk.x >= 0, "Trump is on the board on turn 0 of his wave")
+	check(tk.y == Tuning.SPAWN_ROW, "...landed on the spawn row like any arrival")
+	check(t.pending_king.is_empty(), "and nothing is held back for a segment 2")
+	check(tk.x >= 0 and t.board[tk].get("king_id", "") == "donald_trump",
+		"the board piece carries his id")
+	check(Kings.active_id(t) == "donald_trump", "and the active King is resolved from the board")
+	check(t._king_alive(), "the live King is what bars the wave from advancing now")
+	check(t.king_power_abilities.size() == 1, "his first Tariff is in force with him")
+	# save/resume mid-wave lands on the same state: a board King, nothing pending
+	check(SaveConfig.to_config(t).get("pending_king", {}).is_empty(),
+		"a mid-wave save holds no pending King for him")
+	# ASSUMPTION (NO-80 open sub-question): the once-per-Wave Ability requires
+	# the King on the board, so with him there from turn 0 it is available from
+	# turn 0. Flagged in the PR for Max to confirm.
 	t.board[Vector2i(3, 2)] = {"id": "queen", "owner": Rules.PLAYER}
 	t.board[Vector2i(4, 2)] = {"id": "pawn", "owner": Rules.PLAYER}
 	var before: int = t._player_pieces().size()
-	check(Kings.fire_ability(t), "segment 2: the Ability fires")
+	check(Kings.fire_ability(t), "turn 0: the Ability is available with him (NO-80 assumption)")
 	check(t.king_ability_used_this_wave, "and marks itself used")
 	check(t._player_pieces().size() == before - 1,
 		"JD Vance destroyed a player piece (%d -> %d)" % [before, t._player_pieces().size()])

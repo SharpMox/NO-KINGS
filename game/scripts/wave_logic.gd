@@ -73,7 +73,13 @@ static func queue(g, n: int) -> void:
 			# Tuning.KING_SEGMENT_TURNS turns of buffed enemies; the King is
 			# held here and released by game.gd's turn advance.
 			entry.king_id = king.id
-			g.pending_king = entry
+			if Kings.kit_of(king.id).get("enters_at_start", false):
+				# NO-80: a King whose kit says so lands WITH its wave. push_front
+				# for the same reason release_king_if_due does: the landing
+				# guarantee in spawn_pending only inspects the head of the queue.
+				g.pending_spawn.push_front(entry)
+			else:
+				g.pending_king = entry
 			continue
 		g.pending_spawn.append(entry)
 	if Tuning.KING_ABILITIES_SCHEDULED: # off for now — see Tuning.KING_ABILITIES_SCHEDULED

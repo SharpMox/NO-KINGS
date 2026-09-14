@@ -282,6 +282,11 @@ const KITS := {
 		"ability_name": "Diplomatic Visit – JD Vance",
 		"ability_desc": "Destroys your highest-value piece on the board.",
 		"ability_catalog_key": "jd_vance",
+		# NO-80 (user ruling 2026-09-13): he skips the issue-90 segment and is
+		# on the board from turn 0 of his wave — his Tariffs charge from turn 0
+		# and are read off his piece's info panel, which needs him there. His
+		# alone; every other King keeps the segment. Read by WaveLogic.queue.
+		"enters_at_start": true,
 	},
 	"benjamin_netanyahu": {
 		"power_name": "Iron Dome",

@@ -155,6 +155,15 @@ static func _hand_written() -> Array:
 		{"name": "Header: Wave 51 after the win", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
 			"wave": 51, "kings_defeated": 1, "score": 2000, "stock": ["pawn"]}},
+		# NO-80: Donald Trump enters at the START of his wave. Boots one END
+		# TURN short of wave 50 (cadence 6 + 5 pieces) with him first in the
+		# line-up, so the next turn queues his wave and he lands at once — the
+		# entry path itself, not a board pre-seeded with him.
+		{"name": "King wave: Donald Trump from turn 0 (NO-80)", "cfg": {
+			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1]],
+			"wave": 49, "turns_since_wave": 10,
+			"king_order": ["donald_trump", "benjamin_netanyahu", "vladimir_putin", "kim_jong_un"],
+			"score": 1000}},
 		# --- merging ---
 		{"name": "Merge: promotion pair (pool)", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"], "gold": 300}},

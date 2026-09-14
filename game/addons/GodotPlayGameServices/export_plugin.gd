@@ -37,6 +37,11 @@ class AndroidExportPlugin extends EditorExportPlugin:
 
 
 	func _export_begin(features: PackedStringArray, is_debug: bool, path: String, flags: int) -> void:
+		# NO-KINGS local patch (NO-92), not in upstream v3.4.0: Godot calls _export_begin
+		# for every platform, so an iOS export tried to write the Android template and
+		# crashed on a null FileAccess wherever android/build/ is absent. Keep on re-vendor.
+		if not _supports_platform(get_export_platform()):
+			return
 		var id = get_option("godot_play_game_services/game_id")
 		if id == "":
 			printerr("[{plugin_name}] Export [Game id] is empty.".format({"plugin_name": _plugin_name}))

@@ -207,6 +207,34 @@ func _init() -> void:
 	check(snap.get("pending_king", {}).get("king_id", "") == "nero",
 		"a pending King is captured into the save")
 
+	# NO-93: segment 1 cleared EARLY must not skip the King. The early-clear
+	# path in _begin_player_turn queued wave 51 while the King was still
+	# pending, so he never landed in his own wave (8/8 seeds, NO-80's probe).
+	# Driven through the real turn advance, with a non-Trump King.
+	var ec: Node2D = _boot({"board": [], "wave": 49})
+	await process_frame
+	await process_frame
+	ec.autoplay = true # no timers, no Shop panel on the restock wave
+	ec.king_order = ["nero"]
+	ec._queue_wave(50)
+	WaveLogic.spawn_pending(ec)
+	for pos in ec.board.keys():
+		if ec.board[pos].owner == Rules.ENEMY:
+			ec.board.erase(pos) # segment 1 wiped out on turn one
+	ec.board[Vector2i(0, 0)] = {"id": "queen", "owner": Rules.PLAYER} # no starvation
+	var landed := Vector2i(-1, -1)
+	for turn in Tuning.KING_SEGMENT_TURNS + 3:
+		await ec._enemy_turn()
+		check(ec.wave == 50, "turn %d after the early clear: still wave 50 (%d)" % [turn + 1, ec.wave])
+		landed = Rules.find_king(ec.board, Rules.ENEMY)
+		if landed.x >= 0 or ec.wave != 50:
+			break
+	check(landed.x >= 0, "the King still enters his own wave after an early clear")
+	check(landed.x >= 0 and ec.board[landed].get("king_id", "") == "nero", "and it is Nero")
+	check(ec.pending_king.is_empty(), "pending_king is consumed by his arrival")
+	ec.queue_free()
+	await process_frame
+
 	# --- issue 91: the Power/Ability engine ---------------------------------
 	# Trump is the only King whose kit is ruled; the other 15 no-op by design.
 	check(Kings.kit_of("donald_trump").has("power_name"), "Trump has a kit")

@@ -1064,7 +1064,7 @@ func _begin_player_turn() -> void:
 	for pos in board: # timed buffs (Slow/Aura/Smog) age one player turn
 		BuffLogic.tick(board[pos])
 	# board cleared early -> skip the cadence wait, next wave arrives now
-	if wave < Waves.WAVES.size() and pending_spawn.is_empty() and not _any_enemy():
+	if _board_cleared():
 		WaveLogic.queue(self, wave + 1)
 	WaveLogic.spawn_pending(self)
 	# Nothing on the board, nothing in Stock, and nothing captured to convert
@@ -1184,11 +1184,12 @@ func _enemy_turn() -> void:
 	turns_since_wave += 1
 	WaveLogic.release_king_if_due(self) # issue 90: segment 1 -> segment 2
 	Kings.stack_power_if_due(self) # an escalating Power gains its next Tariff
-	# `pending_king.is_empty()` is load-bearing, not defensive. Through segment
-	# 1 there is no King on the board, so `_king_alive()` is false — without
-	# this the cadence would queue the NEXT wave and walk straight past a King
-	# wave whose King had not arrived yet.
-	if wave < Waves.WAVES.size() and not _king_alive() and pending_king.is_empty() \
+	# `_king_to_come()` is load-bearing, not defensive. Through segment 1, and
+	# on the turn release_king_if_due() above moves him into pending_spawn,
+	# there is no King on the board, so `_king_alive()` is false — without this
+	# the cadence would queue the NEXT wave and walk straight past a King wave
+	# whose King had not arrived yet (NO-93).
+	if wave < Waves.WAVES.size() and not _king_alive() and not _king_to_come() \
 			and turns_since_wave >= _cadence():
 		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
@@ -2281,8 +2282,18 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 
 
 ## No enemy left, nothing incoming, and more waves to come — the turn is over.
+## NO-93: a King wave is not cleared while its King is still to come — without
+## this the early-clear path queued the next wave over him.
 func _board_cleared() -> bool:
-	return not _any_enemy() and pending_spawn.is_empty() and wave < Waves.WAVES.size()
+	return not _any_enemy() and pending_spawn.is_empty() and not _king_to_come() \
+		and wave < Waves.WAVES.size()
+
+
+## The wave's King has not landed yet: held for segment 2, or released into
+## pending_spawn and waiting for the next spawn. Both wave-advance paths (the
+## cadence in _enemy_turn, the early clear in _begin_player_turn) must hold.
+func _king_to_come() -> bool:
+	return not pending_king.is_empty() or pending_spawn.any(func(e): return e.id == "king")
 
 
 ## Long-range = any non-leap move (ride or bent ride) — the Tariff on

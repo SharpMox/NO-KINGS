@@ -407,7 +407,7 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	var stack_btn: Button = null
-	for c in game.hud.pool_box.get_children():
+	for c in game.hud.pool_buttons():
 		if c is Button and c.has_meta("id"):
 			stack_btn = c
 			break
@@ -423,6 +423,14 @@ func _init() -> void:
 		await process_frame
 		check(drag_started[0],
 			"pressing a Stock stack still arms a deploy — PASS did not cost the drag source")
+	# NO-84 story 36: Captured Stock and Stock are two separate
+	# ScrollContainers now, not one strip -- that IS what makes dragging
+	# one side never scroll the other, so the structural check is the
+	# behavioural guarantee.
+	check(game.hud.stock_grid.get_parent() is ScrollContainer
+			and game.hud.captured_grid.get_parent() is ScrollContainer
+			and game.hud.stock_grid.get_parent() != game.hud.captured_grid.get_parent(),
+		"Stock and Captured Stock scroll in separate containers, independently")
 	game.queue_free()
 	await process_frame
 

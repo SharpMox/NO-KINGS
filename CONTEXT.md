@@ -72,7 +72,7 @@ Was the preview at the top of the Deck showing the piece types in Stock, one ico
 _Avoid_: using it for anything on screen today.
 
 **Drawer**:
-A panel that opens upward over the Deck to hold what does not fit on the main view — Stock and Inventory. Placement happens by dragging a piece out of the open Stock Drawer, which is what makes the Drawer the place Stock is *operated* while the Header's Stock button only reports it.
+A panel holding what does not fit on the main view — Stock and Inventory — that opens next to the button that opens it rather than in one fixed place. The Stock Drawer opens downward from the Header's Stock button, over the top of the board; the Inventory Drawer opens upward from the Deck's Inventory button, over the bottom of the board. Placement happens by dragging a piece out of the open Stock Drawer, which is what makes the Drawer the place Stock is *operated* while the Header's Stock button only reports it.
 _Avoid_: "modal", "panel", "menu" — a Box or the Shop is a different thing.
 
 ### Godot domain

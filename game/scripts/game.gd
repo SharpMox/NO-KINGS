@@ -468,8 +468,10 @@ var hud := HudScript.new()
 # (the widgets themselves live in scripts/hud.gd)
 var drawer_open: String:
 	get: return hud.drawer_open
-var pool_box: HBoxContainer:
-	get: return hud.pool_box
+## NO-84: every stack button across both Stock Drawer grids, Stock first then
+## Captured — kept for probes and code that used to sweep the one-strip pool.
+var pool_box: Array:
+	get: return hud.pool_buttons()
 var pass_button: Button:
 	get: return hud.pass_button
 var game_menu: PanelContainer:
@@ -1646,7 +1648,7 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
 	merge_highlights = MergeLogic.partner_ids(self)
-	for c in hud.pool_box.get_children():
+	for c in hud.pool_buttons():
 		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
 			c.modulate = Color(0.8, 1.1, 1.4)
 	queue_redraw()
@@ -1774,6 +1776,13 @@ func _input(event: InputEvent) -> void:
 				or (state == State.PLAYER_TURN and actions_left > 0)):
 			drawer_autoclosed = ""
 			_place(entry, t)
+			# NO-84 story 41/42/43: a successful drag-drop deploy reopens
+			# the Stock Drawer only if there is still something to do in
+			# it. SETUP already reopens it unconditionally (_place's own
+			# "keep the placement flow going" branch), so this only fires
+			# mid-turn.
+			if state == State.PLAYER_TURN and _stock_drawer_reopens():
+				_set_drawer("stock")
 		else: # dropped elsewhere (incl. back on the button = plain tap)
 			if drawer_autoclosed != "": # the drag closed it, nothing happened:
 				_set_drawer.call_deferred(drawer_autoclosed) # give it back
@@ -1839,7 +1848,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						and board.has(from) and merge_highlights.has(board[t].id):
 					MergeLogic.do_merge(self, from, t) # dragged onto a partner: merge onto its tile
 				elif state == State.SETUP and t.x < 0 and (
-						(hud.pool_box.is_visible_in_tree() and (hud.pool_box.get_parent() as Control)
+						(hud.drawer_open == "stock" and (hud.drawers["stock"] as Control)
 							.get_global_rect().has_point(event.position))
 						or (hud.drawer_buttons["stock"] as Control)
 							.get_global_rect().has_point(event.position)):
@@ -2019,6 +2028,24 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
 		_set_drawer("stock") # keep the placement flow going
 	_refresh()
+
+
+## NO-84 story 41-43: is there still something to do in the Stock Drawer, mid-
+## turn, after a drag-drop closed it? A Stock stack the player can afford to
+## deploy (mirrors the price hud.gd's pool strip shows, incl. Endless Ranks'
+## free pawns), or a Captured Stock entry they can afford to convert.
+func _stock_drawer_reopens() -> bool:
+	if actions_left <= 0:
+		return false
+	for e in stock:
+		var id: String = e if e is String else e.id
+		var cost: int = 0 if (id == "pawn" and Armies.endless_ranks(self)) else Economy.deploy_cost(self)
+		if gold >= cost:
+			return true
+	for e in captured:
+		if Shop.can_convert(self, e):
+			return true
+	return false
 
 
 ## SETUP-only: pieces slide anywhere open in the zone and can return to stock.

@@ -15,6 +15,7 @@ const Armies := preload("res://scripts/armies.gd") # issue 100
 const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 const Scenarios := preload("res://data/scenarios.gd") # NO-83: the Header scenarios
 const Kings := preload("res://data/kings.gd") # NO-83: escalate Trump's Power by hand
+const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/convert costs
 
 var fails := 0
 
@@ -29,11 +30,10 @@ func check(cond: bool, label: String) -> void:
 
 
 
-## issue 96: the pool strip is no longer buttons-only — a VSeparator and a
-## label mark where Captured Stock begins — so "the first stack" is the first
-## BUTTON, not the first child.
+## NO-84: pool_box is already buttons-only (both grids hold nothing else), but
+## the is-Button check stays cheap insurance against a future non-button child.
 func _first_pool_stack(game: Node2D) -> Button:
-	for c in game.pool_box.get_children():
+	for c in game.pool_box:
 		if c is Button:
 			return c
 	return null
@@ -154,11 +154,45 @@ func _mouse_button(at: Vector2, pressed: bool) -> void:
 ## rebuilds its buttons, so a row held across one is a freed node.
 func _pool_rows(game: Node2D, cap: bool) -> Array:
 	var out := []
-	for c in game.pool_box.get_children():
+	for c in game.pool_box:
 		if c is Button and not c.is_queued_for_deletion() \
 				and c.has_meta("cap") and bool(c.get_meta("cap")) == cap:
 			out.append(c)
 	return out
+
+
+## NO-84: press a stack button, move the cursor to a screen point, release —
+## one full press-drag-drop cycle, for the Stock Drawer reopen-rule checks.
+func _drag_drop(root: Node, from_btn: Button, to: Vector2) -> void:
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = from_btn.get_global_rect().get_center()
+	press.global_position = press.position
+	root.push_input(press)
+	await process_frame
+	# NO-84: the Stock Drawer now covers the top of the board, so `to` itself
+	# can sit under its footprint. Cross a point well outside it first — that
+	# is what auto-closes the drawer — so the release below reads as a drop
+	# on the (by then revealed) board, not "inside the open drawer" (misinput
+	# guard, hud.gd/game.gd's `covered` check).
+	var away := InputEventMouseMotion.new()
+	away.position = Vector2(10, 10000)
+	away.global_position = away.position
+	root.push_input(away)
+	await process_frame
+	var motion := InputEventMouseMotion.new()
+	motion.position = to
+	motion.global_position = to
+	root.push_input(motion)
+	await process_frame
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.position = to
+	release.global_position = to
+	root.push_input(release)
+	await process_frame
 
 
 ## Poll until the enemy turn hands control back (animations + ENEMY_TURN_PAUSE
@@ -270,7 +304,8 @@ func _init() -> void:
 	# of the block is here to prove.
 	check(_click_stock(game), "Stock button opens the drawer")
 	await process_frame
-	check(game.drawer_open == "stock" and game.pool_box.is_visible_in_tree(),
+	check(game.drawer_open == "stock"
+			and (game.hud.drawers["stock"] as Control).is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
 	check(_pool_rows(game, false).size() == 1,
 		"2 Stock pawns still show as ONE stack — Stock stacking is unchanged")
@@ -810,7 +845,7 @@ func _init() -> void:
 	check(_click_stock(icon_game), "Stock drawer opens for the pool strip")
 	await process_frame
 	var pool_btns: Array = []
-	for c in icon_game.hud.pool_box.get_children():
+	for c in icon_game.hud.pool_buttons():
 		if c is Button:
 			pool_btns.append(c)
 	check(not pool_btns.is_empty(), "(setup) the pool strip actually holds buttons to measure")
@@ -830,7 +865,7 @@ func _init() -> void:
 	icon_game.hud.refresh()
 	await process_frame
 	var plus_slot: Button = null
-	for c in icon_game.hud.pool_box.get_children():
+	for c in icon_game.hud.pool_buttons():
 		if c is Button and (c as Button).text == "+":
 			plus_slot = c
 	check(plus_slot != null, "(setup) the take-back \"+\" slot is present in SETUP with a selection")
@@ -988,6 +1023,21 @@ func _init() -> void:
 		if zone.x >= 0:
 			break
 	check(zone.x >= 0, "the open drawer covers at least one board tile to test with")
+	# NO-84: the Drawer now covers the TOP of the board (high y, since
+	# _tile_px draws y=0 at the screen BOTTOM) and leaves the SETUP zone
+	# (y < PLAYER_ZONE_ROWS, always at the bottom) uncovered by construction
+	# -- so `zone` above can never double as a legal SETUP placement tile
+	# any more. `target` is a second, separate empty zone tile for the
+	# "drag out, then actually deploy" half of this test.
+	var target := Vector2i(-1, -1)
+	for ty in range(Tuning.PLAYER_ZONE_ROWS):
+		for tx in range(8):
+			if not game.board.has(Vector2i(tx, ty)):
+				target = Vector2i(tx, ty)
+				break
+		if target.x >= 0:
+			break
+	check(target.x >= 0, "(setup) an empty zone tile exists to deploy onto")
 	var zone_px: Vector2 = game._tile_px(zone) + Vector2(game.tile, game.tile) / 2
 	var zone_motion := InputEventMouseMotion.new()
 	zone_motion.position = zone_px
@@ -1016,25 +1066,39 @@ func _init() -> void:
 	check(not game.board.has(zone) and game.stock.size() == stock_before,
 		"a drop inside the open drawer places nothing (misinput guard)")
 
-	# dragging OUT closes the drawer; the drop then lands on the revealed tile
+	# dragging OUT closes the drawer; the drop then lands on the revealed tile.
+	# NO-84: the drawer opens from the TOP now — row 3 sits in the uncovered
+	# band the Drawer is required to leave visible, but above the SETUP zone
+	# (y < PLAYER_ZONE_ROWS) so it is genuinely "outside", not a placement
+	# tile itself (this is a MOTION, not a release, so occupancy doesn't
+	# matter either way).
 	root.push_input(d_press.duplicate())
 	await process_frame
-	var high_px: Vector2 = game._tile_px(Vector2i(4, 6)) + Vector2(game.tile, game.tile) / 2
+	var high_px: Vector2 = game._tile_px(Vector2i(7, 3)) + Vector2(game.tile, game.tile) / 2
 	var d_motion := InputEventMouseMotion.new()
 	d_motion.position = high_px
 	d_motion.global_position = high_px
 	root.push_input(d_motion)
 	await process_frame
 	check(game.drawer_open == "", "dragging out of the drawer closes it")
-	root.push_input(zone_motion.duplicate())
+	var target_px: Vector2 = game._tile_px(target) + Vector2(game.tile, game.tile) / 2
+	var target_motion := InputEventMouseMotion.new()
+	target_motion.position = target_px
+	target_motion.global_position = target_px
+	root.push_input(target_motion)
 	await process_frame
-	root.push_input(d_release.duplicate())
+	var target_release := InputEventMouseButton.new()
+	target_release.button_index = MOUSE_BUTTON_LEFT
+	target_release.pressed = false
+	target_release.position = target_px
+	target_release.global_position = target_px
+	root.push_input(target_release)
 	await process_frame
-	check(game.board.has(zone) and game.stock.size() == stock_before - 1,
-		"drag from the stock strip places the piece on the zone tile")
+	check(game.board.has(target) and game.stock.size() == stock_before - 1,
+		"drag from the stock strip places the piece on the target tile")
 
 	# a CANCELLED drag (invalid drop spot) reopens the drawer it auto-closed
-	var live2: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
+	var live2: Button = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
 	var l2_press: InputEventMouseButton = d_press.duplicate()
 	l2_press.position = live2.get_global_rect().get_center()
@@ -1059,21 +1123,23 @@ func _init() -> void:
 		"a cancelled drop reopens the drawer, placing nothing")
 
 	# setup free repositioning: tap the placed piece, tap another zone tile
-	# (the drawer overlays the zone now — an outside tap closes it first)
-	_click(game._tile_px(Vector2i(4, 8)) + Vector2(game.tile, game.tile) / 2)
+	# (the drawer overlays the zone now — an outside tap closes it first).
+	# NO-84: the "outside" tap needs to be outside the drawer's new TOP
+	# footprint — (7, 0) again, same as high_px above.
+	_click(game._tile_px(Vector2i(7, 3)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.drawer_open == "", "an outside tap closes the drawer")
-	_click(game._tile_px(zone) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(target) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	check(game.board.has(Vector2i(2, 1)) and not game.board.has(Vector2i(4, 0)),
+	check(game.board.has(Vector2i(2, 1)) and not game.board.has(target),
 		"setup: tap-tap relocates a placed piece freely")
 
 	# selecting a placed piece offers an empty stock slot to put it back
 	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	var slots: Array = game.pool_box.get_children().filter(func(b: Node) -> bool:
+	var slots: Array = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.text == "+" and not b.is_queued_for_deletion())
 	check(not slots.is_empty(), "setup: selecting a placed piece shows the put-back slot")
 
@@ -1107,7 +1173,7 @@ func _init() -> void:
 	# to free the button before its arming tap fired
 	check(_click_stock(game), "Stock button reopens the drawer")
 	await process_frame
-	var live_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
+	var live_stack: Button = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
 	_click(live_stack.get_global_rect().get_center())
 	await process_frame
@@ -1118,7 +1184,7 @@ func _init() -> void:
 			and game.drawer_buttons["stock"].get_parent() == game.hud
 			and game.stock_armed.is_visible_in_tree(),
 		"the armed marker rides the HEADER's Stock button overlay (NO-83)")
-	_click(game._tile_px(Vector2i(6, 8)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(Vector2i(6, 3)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.placing_id != "" and game.drawer_open == "",
 		"outside tap closes the drawer but keeps the armed piece")
@@ -1142,19 +1208,16 @@ func _init() -> void:
 	await process_frame
 	check(_click_stock(game), "Stock drawer opens")
 	await process_frame
-	# issue 96: Captured Stock is its own LABELLED section, not a tinted tail.
-	# The two pools obey different rules (a Captured entry can never be
-	# deployed, issue 60, nor merged since 2026-09-10) and the only signals
-	# were a tint and a tooltip — and a tooltip does not exist on a phone,
-	# which is the target platform.
-	var pool_labels := ""
-	for c in game.hud.pool_box.get_children():
-		if c is Label:
-			pool_labels += c.text
-	check("CAPTURED" in pool_labels,
-		"the Captured section is labelled in the pool strip")
-	check("no deploy" in pool_labels and "⇄" in pool_labels,
-		"and the label carries the rule and the control, not just the name")
+	# NO-84: Captured Stock and Stock are two independent grids now, not a
+	# tinted tail of one strip with a label marking the boundary (issue 96).
+	# The two pools still obey different rules (a Captured entry can never be
+	# deployed, issue 60, nor merged since 2026-09-10) — that is now which
+	# GRID an entry is in.
+	check(_pool_rows(game, true).all(func(b: Button) -> bool:
+				return b.get_parent() == game.hud.captured_grid)
+			and _pool_rows(game, false).all(func(b: Button) -> bool:
+				return b.get_parent() == game.hud.stock_grid),
+		"Captured Stock and Stock are separate grids, not a tinted tail of one strip")
 	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST: the bishops were captured after
 	# the rook, so they sit above it — the reverse of g.captured's own order.
 	check(game.captured == ["rook", "bishop", "bishop"],
@@ -1993,7 +2056,7 @@ func _init() -> void:
 	check(_click_ability(game),
 		"the deck button is clickable again after a targeting cancel")
 	await process_frame
-	check(game.pool_box.get_child_count() == 1, "(setup) the Stock strip shows the one pawn stack")
+	check(game.pool_box.size() == 1, "(setup) the Stock strip shows the one pawn stack")
 	var pawn_stack: Button = _first_pool_stack(game)
 	_click(pawn_stack.get_global_rect().get_center()) # the tap IS the target — no separate confirm
 	await process_frame
@@ -2058,6 +2121,67 @@ func _init() -> void:
 	check(not game.buff_pick_open and game.army_ability_used_this_wave \
 			and game.stock.size() == 2 and game.stock.count("pawn") == 2,
 		"confirming activates it: 2 pawns added to Stock")
+
+	# NO-84: the Stock Drawer's grid split, empty hint, clipping, and the
+	# reopen rule's three live branches after a successful mid-turn drag-drop
+	# (cancel is already covered above; SETUP's own always-reopen is separate
+	# and untouched).
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 3, "gold": 100, "stock": ["pawn", "pawn"],
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(_click_stock(game), "NO-84: Stock drawer opens")
+	await process_frame
+	check((game.hud.drawers["stock"] as Control).clip_contents,
+		"NO-84: the Stock Drawer clips its contents")
+	check(game.hud.captured_hint.visible,
+		"NO-84: with no Captured Stock, the left side shows the empty hint")
+	# Three deploys follow, one Action each (Tuning.ACTIONS_PER_TURN is 2) — a
+	# generous budget keeps the turn from auto-passing mid-sequence, which
+	# would end PLAYER_TURN and mask the reopen rule under test, not exercise it.
+	game.actions_left = 10
+
+	# reopens: a Stock stack is still affordable to deploy. Deploy targets are
+	# y < PLAYER_ZONE_ROWS or adjacent to a player piece (Rules.placement_tiles)
+	# — (1,1) is a neighbour of the queen at (2,2) and empty.
+	var deploy_cost: int = Economy.deploy_cost(game)
+	game.gold = deploy_cost * 3
+	var tile_a := Vector2i(1, 1)
+	await _drag_drop(root, _pool_rows(game, false)[0],
+		game._tile_px(tile_a) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(tile_a) and game.drawer_open == "stock",
+		"NO-84: reopens after a drop — a Stock stack is still affordable")
+
+	# reopens: Stock is now empty, but a Captured entry is affordable to convert
+	game.captured = ["bishop"]
+	game.hud.refresh()
+	await process_frame
+	game.gold = maxi(deploy_cost, Shop.convert_price(game, "bishop")) * 3
+	var tile_b := Vector2i(3, 1) # also a neighbour of the queen, still empty
+	await _drag_drop(root, _pool_rows(game, false)[0],
+		game._tile_px(tile_b) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(tile_b) and game.stock.is_empty() and game.drawer_open == "stock",
+		"NO-84: reopens after a drop — Stock is empty but Captured Stock can convert")
+	check(not game.hud.captured_hint.visible,
+		"NO-84: the empty hint is gone once a Captured Stock entry exists")
+
+	# stays closed: nothing left to deploy or convert
+	game.captured = []
+	game.stock = ["pawn"]
+	game.hud.refresh()
+	await process_frame
+	var tile_c := Vector2i(1, 3) # also a neighbour of the queen, still empty
+	await _drag_drop(root, _pool_rows(game, false)[0],
+		game._tile_px(tile_c) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(tile_c) and game.drawer_open == "",
+		"NO-84: stays closed after a drop when nothing is left to deploy or convert")
 
 	print("---")
 	if fails == 0:

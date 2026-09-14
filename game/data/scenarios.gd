@@ -63,6 +63,18 @@ static func _hand_written() -> Array:
 		{"name": "Captured stock: convert & sell", "cfg": {
 			"board": ZONE_PAWNS, "captured": ["rook", "rook", "knight", "pawn"],
 			"stock": ["pawn"], "score": 500, "wave": 5}},
+		# NO-84: both Stock Drawer grids full at once — Captured Stock never
+		# stacks (one row per piece), so fourteen distinct captured pieces
+		# force that column to scroll; the large Stock does the same for the
+		# right column, mixing duplicates (real stacks) with distinct ids.
+		{"name": "Stock Drawer: full Captured Stock and a large Stock", "cfg": {
+			"board": ZONE_PAWNS, "score": 500, "wave": 5, "gold": 1000,
+			"captured": ["rook", "knight", "bishop", "queen", "ferz", "wazir",
+				"champion", "archbishop", "chancellor", "gnu", "buffalo",
+				"kirin", "alibaba", "squirrel"],
+			"stock": ["pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
+				"rook", "rook", "rook", "knight", "knight", "bishop", "queen",
+				"ferz", "wazir", "champion", "gnu", "buffalo"]}},
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 			"wave": 2, "stock": ["pawn"], "score": 100}},

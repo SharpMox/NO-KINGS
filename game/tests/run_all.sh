@@ -64,6 +64,9 @@ run() {
 if [ "${1:-}" != "--headless" ]; then
 	run menu-clicks -s tests/test_menu_clicks.gd
 	run game-clicks -s tests/test_game_clicks.gd
+	# NO-57: same probe, with a notch inset — the Header must still lay out
+	# below it, not just on the un-notched 0px case above.
+	run game-clicks-notch -s tests/test_game_clicks.gd -- --safe-top 56
 	# Touch-drag probe. ScrollContainer only drag-scrolls when the DisplayServer
 	# reports a touchscreen, which a desktop does only under this project
 	# setting — and Input has no runtime setter for it, so it goes through

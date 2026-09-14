@@ -25,6 +25,69 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `dd96d9c` — 2026-09-14, Android emulator, not a phone — NO-69 and NO-90
+
+**AVD `nokings_api35` (arm64, emulator-5580), not a physical phone.** Debug build
+from `origin/main` at `dd96d9c` (post-PR #423), AAB -> `bundletool build-apks`
+--connected-device -> install, debug keystore. Launched via `am start` on
+`GodotAppLauncher`. Screenshots: `~/Documents/nokings-builds/no-69-90-emulator-2026-09-14/`.
+
+**Touch-input trap hit during this pass**: plain `adb shell input tap` on the
+Intro scene's CONTINUE button and on small pill/icon controls repeatedly did
+nothing, across many retries, coordinate grids, motionevent DOWN/UP pairs, and a
+fresh relaunch — while taps on full-width menu rows worked fine. Hardware Back
+(`input keyevent KEYCODE_BACK`), which Intro's `_notification` handler treats as
+an explicit advance, broke through it immediately. Not diagnosed further (out of
+scope for this pass); worth knowing before the next agent burns a budget on it.
+
+### NO-69 — soft keyboard covers TEST search results
+
+**COVERED.** Opened TEST, tapped the search field, typed to bring up the IME.
+The soft keyboard occupies the bottom ~47% of the screen (device 1080x2400);
+with a query typed ("king", 30 of 390 matches) only about 7 result rows remain
+visible above the keyboard, the rest scrolled under it with no visible
+affordance that more exist above the fold except the "N of 390" counter.
+Screenshot: `NO-69-keyboard-covers-search.png`. Not fixed in this pass per
+instructions — reported only.
+
+### NO-90 — Captured Stock, against the current NO-84 header-drawer UI
+
+Reached via TEST -> search "capture" -> `Combo: Captured Stock merges and
+converts, but cannot deploy` (`captured: [rook, rook, knight, pawn], stock:
+[pawn]`). Drawer opens down from the Header: Captured pieces left, Stock right,
+confirming NO-84's layout. All six checks from `captured-stock-spec.md` (NO-46):
+
+1. **Convert always wins over merge, even holding 2+ copies — PASS.** Tapped
+   the inline "⇄$37" convert pill on one of the two captured rooks; it
+   converted to Stock (gold $400 -> $363, a rook appeared on the Stock side at
+   $20) with no merge attempted. Screenshot: `27-tap-convert-pill.png`.
+2. **Captured pieces shown individually, not stacked, most recent first —
+   PASS.** The two captured rooks rendered as two separate tiles (not one
+   stack with a "2" badge), each independently priced; display order was
+   pawn, knight, rook, rook — the reverse of the scenario's capture-order
+   array, i.e. most recent first.
+3. **No merge option in captured stock — PASS.** No ▲ promote badge ever
+   appeared on a captured tile. `hud.gd`: `show_promote` requires `not cap`.
+4. **No deploy option in captured stock — PASS.** `game.gd`
+   `_on_stack_drag_start`: `if cap: return` before any arm/placement logic —
+   captured entries can never become the armed/placing stack.
+5. **Dragging a captured piece shows no deploy highlights — PASS.** Swiped
+   from a captured knight toward the board; no highlight tiles appeared, gold
+   and board state unchanged. Screenshot: `NO-90-drag-captured-no-highlight.png`.
+   Backed by the same early-return in (4) — the highlight code path never runs.
+6. **Only CONVERT and SELL exist for captured stock — PASS.** Convert
+   confirmed working inline (1); Sell is reached through the Shop's Sell mode
+   (unchanged by NO-84); no other action surfaces on a captured tile.
+
+All six: **PASS** against the redesigned header-drawer UI.
+
+### Still unverified
+
+Everything else about the NO-84 header-drawer redesign beyond these six
+checks (e.g. Stock-side deploy/promote flows, drawer open/close affordances,
+scroll behavior with a long Captured or Stock list) — not exercised here.
+
+---
 ## `936275b` — 2026-09-14, iOS SIMULATOR — the recent iOS fixes, no iPhone (NO-89)
 
 **Not hardware.** An `iPhone 11` simulator (iOS 26.5 runtime, Xcode 26.6), created and

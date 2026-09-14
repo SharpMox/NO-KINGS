@@ -468,6 +468,11 @@ var test_scroll: ScrollContainer
 ## writer. One place decides, from state it owns.
 var test_filter: LineEdit
 var test_head: Label
+## NO-69: the soft keyboard covers the TEST list's results (measured on the
+## Android emulator: ~47% of the screen, hiding all but ~7 of 30 rows). -1
+## means "ask DisplayServer for real"; tests set this to inject a height
+## without a real IME, then call _update_test_scroll_for_keyboard() directly.
+var keyboard_height_override := -1
 var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
 var army_center: ScrollContainer
@@ -825,6 +830,15 @@ func _ready() -> void:
 	# never by appearing.
 	test_filter.focus_mode = Control.FOCUS_CLICK
 	test_filter.text_changed.connect(func(_t: String) -> void: _apply_test_filter())
+	# NO-69: only poll while the field is focused (mobile IME height has no
+	# signal in Godot 4.7 — DisplayServer.virtual_keyboard_get_height() is
+	# poll-only), and stop the moment focus leaves so desktop pays nothing.
+	test_filter.focus_entered.connect(func() -> void: set_process(true))
+	test_filter.focus_exited.connect(func() -> void:
+		set_process(false)
+		keyboard_height_override = -1
+		_update_test_scroll_for_keyboard())
+	set_process(false)
 	test_box.add_child(test_filter)
 	var back := _button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
@@ -1334,6 +1348,30 @@ func _apply_test_filter() -> void:
 		sec.relabel.call(open, shown)
 	test_head.text = "Test scenarios — %d of %d" % [hits, Scenarios.all().size()] \
 		if searching else "Test scenarios — %d boards" % Scenarios.all().size()
+
+
+func _process(_delta: float) -> void:
+	_update_test_scroll_for_keyboard()
+
+
+## NO-69: shrinks the results ScrollContainer above the soft keyboard while
+## the search field is focused. DisplayServer.virtual_keyboard_get_height()
+## reports real screen pixels; the viewport runs canvas_items stretch at a
+## fixed 480x800, so the height is rescaled by canvas-px-per-screen-px before
+## it is subtracted from the container's bottom offset. Desktop always
+## reports 0, so offset_bottom lands back on its original -24.
+func _update_test_scroll_for_keyboard() -> void:
+	if test_scroll == null:
+		return
+	var kb_px := keyboard_height_override if keyboard_height_override >= 0 \
+		else DisplayServer.virtual_keyboard_get_height()
+	if kb_px <= 0:
+		test_scroll.offset_bottom = -24
+		return
+	var window_h := DisplayServer.window_get_size().y
+	var canvas_h := get_viewport_rect().size.y
+	var scale := canvas_h / float(window_h) if window_h > 0 else 1.0
+	test_scroll.offset_bottom = -24 - kb_px * scale
 
 
 func _test_row_text(name: String, sec: String) -> String:

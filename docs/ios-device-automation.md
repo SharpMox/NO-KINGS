@@ -58,19 +58,14 @@ TEAM=DGT6GH7583
 # 1. export the Xcode project (headless, no signing involved)
 godot --headless --path game --export-debug "iOS" ../build/ios/nokings.zip
 
-# 2. WRITE THE ENTITLEMENTS. The exporter emits an EMPTY dict even with both
-#    plugins enabled in the preset, and a signed app without these has no Game
-#    Center and no iCloud (NO-47). Do this after EVERY export.
-cat > build/ios/nokings/nokings.entitlements <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>$(TeamIdentifierPrefix)com.sharpunk.nokings</string>
-	<key>com.apple.developer.game-center</key>
-	<true/>
-</dict></plist>
-PLIST
+# 2. CHECK THE ENTITLEMENTS. The exporter writes them from the preset's
+#    `entitlements/game_center` and `entitlements/additional` keys (NO-47); the
+#    `plugins/*` switches never did, and a signed app without these has no Game
+#    Center and no iCloud. Expect both keys here; if the dict is empty, the
+#    preset lost them.
+plutil -p build/ios/nokings/nokings.entitlements
+# "com.apple.developer.game-center" => true
+# "com.apple.developer.ubiquity-kvstore-identifier" => "$(TeamIdentifierPrefix)com.sharpunk.nokings"
 
 # 3. build and sign (headless, reuses the profile from the one-time step)
 cd build/ios
@@ -108,7 +103,7 @@ on the Mac. What it established and could not is in `device-verification.md`.
 xcrun simctl create NK-iPhone-11 com.apple.CoreSimulator.SimDeviceType.iPhone-11 \
   com.apple.CoreSimulator.SimRuntime.iOS-26-5        # once; the iOS 26.5 runtime takes an iPhone 11
 xcrun simctl boot $UDID && xcrun simctl bootstatus $UDID -b
-# step 1 + 2 above (export, write the entitlements), then:
+# step 1 + 2 above (export, check the entitlements), then:
 xcodebuild -project nokings.xcodeproj -scheme nokings -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' -configuration Debug \
   CODE_SIGN_IDENTITY="-" CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES \

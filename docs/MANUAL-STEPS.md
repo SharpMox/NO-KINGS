@@ -598,7 +598,9 @@ D1 step 3) and **not** the bundle id.
    instrument.
 2. **Capabilities on the identifier.** developer.apple.com -> Identifiers -> that bundle id ->
    enable **Game Center** and **iCloud (Key-Value storage)**. KV needs no container; the
-   entitlement is `com.apple.developer.ubiquitous-key-value-store`.
+   entitlement is `com.apple.developer.ubiquity-kvstore-identifier` (what `codesign` reads
+   off the signed device build, `device-verification.md`), written by the preset's
+   `entitlements/additional`.
 3. **The leaderboard.** App Store Connect -> the app -> Game Center -> a leaderboard named
    **High Score**, classic, integer, best score, high to low. Send its **Leaderboard ID**
    (public). It drops into `LEADERBOARD_HIGH_SCORE` in

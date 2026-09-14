@@ -413,6 +413,18 @@ defect is the exporter's silence, and the rule is: fill that file in after every
 export, or you get a signed app with no Game Center and no iCloud, which produces
 the log line that misled this project in September.
 
+**Closed 2026-09-14 — the silence was ours, not the exporter's.** Godot 4.7 fills
+`$entitlements_full` from four preset keys, `entitlements/game_center`,
+`entitlements/push_notifications`, `entitlements/increased_memory_limit` and
+`entitlements/additional` (`editor/export/editor_export_platform_apple_embedded.cpp:318-321`,
+`:495-508` at `4.7-stable`); none was set. `plugins/GameCenter=true` only links the
+xcframework, and a `.gdip`'s `capabilities=` (`gamekit` in `gamecenter.gdip`) lands in
+`UIRequiredDeviceCapabilities` — the exporter's own comment: "They don't enable
+anything" (`:513-514`). The preset now carries `entitlements/game_center=true` and the
+kvstore key in `entitlements/additional`; a fresh export writes both, `plutil -lint`
+clean, and the hand-written step is gone from the recipe. Not re-signed on a device
+since — the signing half of this section still stands on the 2026-09-10 evidence.
+
 ### Game Center authentication SUCCEEDS on real hardware
 
 Read off Xcode's console, from the plugin's own event:

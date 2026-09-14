@@ -209,7 +209,7 @@ func _init() -> void:
 		"item and artefact slots go SOLD")
 	check(game.actions_left == 0, "neither purchase touched actions_left (issue 64)")
 	game._refresh()
-	check(game.hud.item_box.get_child_count() == game.items.size(),
+	check(game.hud.items_grid.get_child_count() == game.items.size(),
 		"bought items show in the Inventory drawer strip")
 	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
 			% (game.items.size() + game.artefacts.size()),

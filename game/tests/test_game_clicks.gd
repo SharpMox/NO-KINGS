@@ -825,7 +825,7 @@ func _init() -> void:
 		"Inventory opens for the item strip")
 	await process_frame
 	var item_btns: Array = []
-	for c in icon_game.hud.item_box.get_children():
+	for c in icon_game.hud.items_grid.get_children():
 		if c is Button:
 			item_btns.append(c)
 	check(not item_btns.is_empty(), "(setup) the item strip actually holds buttons to measure")
@@ -925,9 +925,9 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens after the icon-size pin")
+	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box cancel/pick flow")
 	await process_frame
-	check(await _click_button_in(game.hud.item_box, "Buff Box"),
+	check(await _click_button_in(game.hud.items_grid, "Buff Box"),
 		"Buff Box clickable in the drawer")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
@@ -969,9 +969,11 @@ func _init() -> void:
 	await process_frame
 	check(not game.buff_pick_open and game.items.size() == 1,
 		"cancelling the choice modal closes it and leaves the item unspent")
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens after cancel")
-	await process_frame
-	check(await _click_button_in(game.hud.item_box, "Buff Box"), "Buff Box clickable again")
+	# NO-85 story 58: cancelling targeting always reopens the Drawer — no
+	# manual reopen needed any more (this used to be a click).
+	check(game.hud.drawer_open == "inventory",
+		"the Inventory Drawer reopened on its own after the cancel")
+	check(await _click_button_in(game.hud.items_grid, "Buff Box"), "Buff Box clickable again")
 	await process_frame
 	var buff_btn := _first_option_button(game.modals.buff_panel)
 	check(buff_btn != null and "\n" in buff_btn.text,
@@ -1318,11 +1320,11 @@ func _init() -> void:
 		"Inventory button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "inventory"
-			and game.hud.item_box.is_visible_in_tree()
-			and game.hud.artefact_box.is_visible_in_tree(),
+			and game.hud.items_grid.is_visible_in_tree()
+			and game.hud.artefacts_grid.is_visible_in_tree(),
 		"inventory drawer shows items and artefacts together")
 	var inv_acts: int = game.actions_left
-	check(await _click_button_in(game.hud.item_box, "Blitz"),
+	check(await _click_button_in(game.hud.items_grid, "Blitz"),
 		"item clickable in the inventory drawer")
 	await process_frame
 	check(game.item_targets.size() == 1 and game.item_targets[0] == Vector2i(2, 4),
@@ -1353,7 +1355,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Drone Strike")
 	await process_frame # let the drawer lay out before clicking into it
-	check(await _click_button_in(game.hud.item_box, "Drone Strike"),
+	check(await _click_button_in(game.hud.items_grid, "Drone Strike"),
 		"Drone Strike clickable in the drawer")
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
@@ -1378,7 +1380,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Extraction")
 	await process_frame # drawer layout before clicking into it
-	check(await _click_button_in(game.hud.item_box, "Extraction"),
+	check(await _click_button_in(game.hud.items_grid, "Extraction"),
 		"Extraction clickable in the drawer")
 	await process_frame
 	check(not game.hud.multi_confirm_btn.visible, "no confirm button before any pick")
@@ -1903,9 +1905,10 @@ func _init() -> void:
 	await _await_player_turn(game)
 	check(game.arrows.is_empty(), "arrows clear at turn end (scratchpad, never saved)")
 
-	# --- Artefact activation (issue 52): the Activate section, confirm/
-	# cancel, and Bovine Tractor Beam's targeted cancel. New interactive UI —
-	# Godot headless drops GUI picking, which is why this probe exists.
+	# --- Artefact activation (issue 52, NO-85): the ⚡ cell in the Artefacts
+	# grid, confirm/cancel, and Bovine Tractor Beam's targeted cancel. New
+	# interactive UI — Godot headless drops GUI picking, which is why this
+	# probe exists.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"wave": 1, "gold": 100, "score": 0,
@@ -1915,37 +1918,36 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	# (the empty-vs-held Activate-section sizing itself is asserted headlessly
+	# (the empty-vs-held Artefacts-grid sizing itself is asserted headlessly
 	# in test_items_artefacts_4.gd; this probe exists for CLICKABILITY, which
 	# headless can't verify — Godot headless drops GUI picking)
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
-	# NO-32: issue 67 put an Army Ability chip in this row too, so the Ability
-	# was reachable from two places and the count here was 2. The chip is gone;
-	# the row is Artefact-only again.
-	check(game.hud.activate_box.get_child_count() == 1,
-		"the drawer shows ONE Activate chip: the Artefact's, and no Army Ability chip")
+	# NO-85: the Artefacts grid holds every held Artefact, activatable or not.
+	# This scenario holds exactly one, so the grid has exactly one cell.
+	check(game.hud.artefacts_grid.get_child_count() == 1,
+		"the Artefacts grid shows ONE cell: the Artefact's, and no Army Ability chip")
 	var star_chips := 0
-	for c in game.hud.activate_box.get_children():
+	for c in game.hud.artefacts_grid.get_children():
 		if c is Button and (c as Button).text.begins_with("★"):
 			star_chips += 1
 	check(star_chips == 0,
-		"no ★ chip survives in the Activate row — the Ability has exactly one home")
-	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
-		"the Activate chip is clickable")
+		"no ★ chip survives in the Artefacts grid — the Ability has exactly one home")
+	check(await _click_button_in(game.hud.artefacts_grid, "⚡Oak Island Wishing Well"),
+		"the ⚡ cell is clickable")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
-		"clicking an untargeted Activate chip opens the confirm modal (user ruling: no target = confirm)")
+		"clicking an untargeted ⚡ cell opens the confirm modal (user ruling: no target = confirm)")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
 	await process_frame
 	check(not game.buff_pick_open and game.gold == 100 and not game.oak_island_used_this_turn \
 			and game._artefact_count("oak-island-wishing-well") == 1,
 		"cancelling the confirm costs nothing — no Gold, no charge, Artefact untouched")
 	# the confirm modal is the only thing that closed — this activation never
-	# touches the drawer (unlike a targeted Item), so the chip is still
+	# touches the drawer (unlike a targeted Item), so the cell is still
 	# directly clickable with no need to reopen Inventory
-	check(await _click_button_in(game.hud.activate_box, "⚡Oak Island Wishing Well"),
-		"the Activate chip is clickable again after a cancel, drawer untouched")
+	check(await _click_button_in(game.hud.artefacts_grid, "⚡Oak Island Wishing Well"),
+		"the ⚡ cell is clickable again after a cancel, drawer untouched")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
@@ -1969,7 +1971,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
 	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
 		"the Bovine Tractor Beam chip is clickable")
 	await process_frame
 	check(not game.buff_pick_open and game.artefact_targeting_key == "bovine-tractor-beam" \
@@ -1980,13 +1982,13 @@ func _init() -> void:
 	check(game.artefact_target_stage_a == Vector2i(7, 10), "tapping the enemy Rook on the board stages it")
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
 	await process_frame
-	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
 		"the chip stays clickable mid-targeting (to cancel)")
 	await process_frame
 	check(game.artefact_targeting_key == "" and game.board.has(Vector2i(7, 10)) \
 			and not game.bovine_used_this_wave and game._artefact_count("bovine-tractor-beam") == 1,
 		"tapping the chip again CANCELS FROM TARGETING — no move, no charge, Artefact untouched")
-	check(await _click_button_in(game.hud.activate_box, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
 		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A again
@@ -1997,6 +1999,51 @@ func _init() -> void:
 	check(game.artefact_targeting_key == "" and not game.board.has(Vector2i(7, 10)) \
 			and game.board.get(bovine_dest, {}).get("id", "") == "rook" and game.bovine_used_this_wave,
 		"completing both taps relocates the enemy piece and spends the once-per-Wave charge")
+	# NO-85 story 60: this scenario holds only Bovine, now spent for the Wave —
+	# nothing left to do in the Inventory Drawer, so it stays closed.
+	check(game.hud.drawer_open == "",
+		"after Bovine completes with nothing else usable, the Inventory Drawer stays closed")
+
+	# --- NO-85 stories 58-60: the Inventory Drawer reopen rule, all three
+	# branches, on Items (Bovine above already covered the ⚡ Artefact "stays
+	# closed" branch). Two Sniper Items and two enemy pieces, each one Sniper
+	# needs an enemy ATTACKED by a player piece (item_logic.gd's own gate):
+	# the rook sits on the queen's diagonal, the pawn on her row, neither
+	# obstructed.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 1,
+		"board": [["queen", 0, 2, 2], ["rook", 1, 5, 5], ["pawn", 1, 7, 2]],
+		"items": ["sniper", "sniper"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.actions_left = 5 # generous: isolates the reopen rule from auto-pass-at-0
+	check(await _click_button_in(game.hud, "Inventory 2"), "Inventory opens for the reopen-rule probe")
+	await process_frame
+	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable")
+	await process_frame
+	check(game.item_active == 0 and game.hud.drawer_open == "",
+		"arming an Item that needs a board target closes the Drawer")
+	check(await _click_button_in(game.hud, "Inventory 2"), "reopen to reach the item and cancel it")
+	await process_frame
+	check(await _click_button_in(game.hud.items_grid, "Sniper"), "tap the armed Sniper again: cancel")
+	await process_frame
+	check(game.item_active == -1 and game.hud.drawer_open == "inventory",
+		"cancelling targeting always reopens the Drawer (story 58)")
+	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable again")
+	await process_frame
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # Sniper's target: the rook
+	await process_frame
+	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
+		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
+	check(await _click_button_in(game.hud.items_grid, "Sniper"), "the remaining Sniper clickable")
+	await process_frame
+	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
+	await process_frame
+	check(game.items.is_empty() and game.hud.drawer_open == "",
+		"after using the last Item, the Drawer stays closed — nothing left usable (story 60)")
 
 	# --- issue 67: the Army Ability chip — same Activate section, but 1
 	# Action (not 0) and its own confirm-vs-targeting shapes. Old Guard's

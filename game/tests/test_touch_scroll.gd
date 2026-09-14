@@ -235,6 +235,12 @@ func _init() -> void:
 		# drawer's height — and an assertion with 37px of room and a 24px
 		# deadzone is one layout tweak away from being unable to fail. The tap
 		# assertions below get their own scenario instead.
+		#
+		# NO-85: the Artefacts grid packs far denser than the old wrapping
+		# strip (INV_ARTEFACTS_COLS columns instead of one long flow), so the
+		# original 16 keys no longer overflow the drawer at all (measured:
+		# -56px of range, i.e. it FITS). Doubled to 32 so this stays a genuine
+		# scroll-range assertion regardless of exact column tuning.
 		"artefacts": ["27-club-punch-card", "tinfoil-hat",
 			"area-51-parking-permit", "fort-knox-iou",
 			"fema-summer-camp-flyer", "zurich-gnome-figurine",
@@ -242,7 +248,15 @@ func _init() -> void:
 			"tungsten-filled-gold-bar", "crop-circle-plank",
 			"mar-a-lago-toilet-papers", "suspiciously-large-femur",
 			"daylight-savings-jar", "phantom-punch-glove",
-			"naruto-run-manual", "social-credit-report-card"],
+			"naruto-run-manual", "social-credit-report-card",
+			"mk-ultra-sugar-cube", "frog-pride-flag",
+			"hoffa-s-cement-shoes", "witness-protection-mustache",
+			"5g-microchips", "frame-25",
+			"satoshi-s-private-key", "capstone-polish",
+			"golden-buddha-bobblehead", "charlemagne-s-birth-certificate",
+			"nigerian-prince-wire-transfer", "curtain-rods-bag-rifle-shaped",
+			"obedience-flavored-tap-water", "cia-heart-attack-gun",
+			"dihydrogen-monoxide-battery", "walt-s-cryonic-capsule"],
 		"wave": 3, "gold": 200, "seed": 1}
 	GameScript.is_scenario = true
 	var game: Node = load("res://scenes/Game.tscn").instantiate()
@@ -266,87 +280,43 @@ func _init() -> void:
 	# that began on blank drawer space would have scrolled even with the bug —
 	# which is exactly how a device test on 2026-09-10 reported "the drawer
 	# scrolls fine" against a scenario holding no artefacts at all.
-	var art_row: Control = game.hud.artefact_box.get_child(0)
+	var art_row: Control = game.hud.artefacts_grid.get_child(0)
 	var inv_before: int = inv_sc.scroll_vertical
 	await _drag(art_row.get_global_rect().get_center(), Vector2(0, -30), 6)
 	check(inv_sc.scroll_vertical != inv_before,
 		"a drag STARTING ON an artefact row scrolls the inventory drawer (%d -> %d)"
 			% [inv_before, inv_sc.scroll_vertical])
-	# NO-59 LIVES OR DIES HERE: that drag must NOT also have popped a
-	# description. The rows pass their press through to the scroller now, so
-	# "tap" and "the start of a drag" are the same first event, and telling them
-	# apart is the whole risk of putting a reveal on this gesture.
+	# that drag must NOT also have popped a description — a scroll is not a tap.
 	check(not game.hud.tip_panel.visible,
-		"...and the drag does NOT pop a description — a scroll is not a tap")
+		"...and the drag does NOT pop a description")
 
-	# --- NO-59: tap an artefact row to read it, and stay on screen -----------
-	# Three positions, not the comfortable middle one: the popup is anchored to
-	# a row, and a row near an edge of a 480-wide portrait screen is exactly
-	# where an anchored panel goes off it. That is the failure NO-55 was.
-	var vpr: Vector2 = root.get_visible_rect().size
-	var rows: Array[Control] = []
-	for c in game.hud.artefact_box.get_children():
-		if c is Control:
-			rows.append(c)
-	check(rows.size() >= 3, "enough artefact rows to test edges (%d)" % rows.size())
-	# leftmost, rightmost and lowest row actually on screen in the drawer
-	var probes := {}
-	for r in rows:
-		var gr: Rect2 = r.get_global_rect()
-		if gr.position.y < inv_sc.global_position.y \
-				or gr.end.y > inv_sc.global_position.y + inv_sc.size.y:
-			continue # scrolled out of the drawer: its rect is not where a finger lands
-		if not probes.has("left") or gr.position.x < probes["left"].get_global_rect().position.x:
-			probes["left"] = r
-		if not probes.has("right") or gr.end.x > probes["right"].get_global_rect().end.x:
-			probes["right"] = r
-		if not probes.has("low") or gr.end.y > probes["low"].get_global_rect().end.y:
-			probes["low"] = r
-	check(probes.size() == 3, "found a left, right and bottom row to tap")
-	for where in ["left", "right", "low"]:
-		var r: Control = probes[where]
-		game.hud.hide_tip()
-		var p: Vector2 = r.get_global_rect().get_center()
-		_mouse(true, p)
-		await process_frame
-		_mouse(false, p)
-		await process_frame
-		check(game.hud.tip_panel.visible, "tapping the %s artefact row shows its description" % where)
-		# THE ASSERTION THAT MATTERS: fully inside the viewport, all four edges.
-		var tr: Rect2 = game.hud.tip_panel.get_global_rect()
-		check(tr.position.x >= 0.0 and tr.position.y >= 0.0
-				and tr.end.x <= vpr.x and tr.end.y <= vpr.y,
-			"...and the popup is fully on screen at the %s edge (%s in %s)"
-				% [where, tr, vpr])
-		check(game.hud.tip_label.text != "",
-			"...and it actually says something")
-	# Tapping the same row again closes it; so does closing the drawer.
-	var same: Control = probes["low"]
-	var same_at: Vector2 = same.get_global_rect().get_center()
+	# NO-65 fix, structural: nothing in this drawer paints outside it any more.
+	check(inv_sc.clip_contents, "the Inventory Drawer's ScrollContainer clips its contents")
+
+	# --- NO-85 story 53: a plain TAP on a passive Artefact cell does nothing —
+	# no description (that moved to long-press, tested in test_long_press.gd),
+	# no state change. Long-press-vs-tap on Items, passive and ⚡ Artefacts is
+	# probed there with the cross-contamination-safe long-press helper; this
+	# file's job is the drag/scroll gesture, not the hold timing.
+	# The drag above scrolled child(0) out of the drawer's visible area —
+	# scroll back to top first, or the tap lands outside the drawer instead.
+	inv_sc.scroll_vertical = 0
+	await process_frame
+	var art_cell: Control = game.hud.artefacts_grid.get_child(0)
+	var art_tap_at: Vector2 = art_cell.get_global_rect().get_center()
 	game.hud.hide_tip()
-	_mouse(true, same_at)
+	_mouse(true, art_tap_at)
 	await process_frame
-	_mouse(false, same_at)
-	await process_frame
-	check(game.hud.tip_panel.visible, "precondition: the description is up")
-	_mouse(true, same_at)
-	await process_frame
-	_mouse(false, same_at)
-	await process_frame
-	check(not game.hud.tip_panel.visible, "tapping the same row again closes it")
-	_mouse(true, same_at)
-	await process_frame
-	_mouse(false, same_at)
-	await process_frame
-	game._set_drawer("inventory") # closes it — set_drawer toggles
+	_mouse(false, art_tap_at)
 	await process_frame
 	check(not game.hud.tip_panel.visible,
-		"closing the drawer takes the description with it")
+		"a plain tap on a passive Artefact cell shows no description (NO-85: tap no longer describes)")
+	check(game.hud.drawer_open == "inventory",
+		"...and does not close or otherwise disturb the drawer")
 
-	# ...and the strips that share the drawer still take a tap. item_box and
-	# activate_box build their rows as Buttons, whose default filter was also
-	# STOP, so they were changed too — and a Button set to PASS that stopped
-	# firing would be a silent, much worse regression than the one being fixed.
+	# ...and the Items grid shares the drawer and its cells still take a tap —
+	# they are Buttons set to PASS (NO-45), same as the Artefacts grid, and a
+	# Button flipped to PASS that stopped firing would be a silent regression.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {
@@ -366,7 +336,7 @@ func _init() -> void:
 		if c is ScrollContainer:
 			inv_sc = c
 	var item_btn: Button = null
-	for c in game.hud.item_box.get_children():
+	for c in game.hud.items_grid.get_children():
 		if c is Button:
 			item_btn = c
 			break

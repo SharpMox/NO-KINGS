@@ -2049,6 +2049,30 @@ func _stock_drawer_reopens() -> bool:
 	return false
 
 
+## NO-85 story 59-60: is there still something to do in the Inventory Drawer
+## after an action closed it? An Item still held (no per-item afford check
+## exists — held is usable, same as before this slice), or an activatable
+## Artefact still available. Mirrors _stock_drawer_reopens' shape.
+func _inventory_drawer_reopens() -> bool:
+	if state != State.PLAYER_TURN or box_open or buff_pick_open or win_open:
+		return false
+	if not items.is_empty():
+		return true
+	for key in _activatable_held_keys():
+		if _artefact_activation_available(key):
+			return true
+	return false
+
+
+## Reopen the Inventory Drawer only if it isn't already the one showing (the
+## toggle in hud.set_drawer would otherwise CLOSE it) and something is left
+## to do in it — the "after use" half of stories 58-60. Cancels reopen
+## unconditionally instead (story 58), called separately at each cancel site.
+func _reopen_inventory_if_usable() -> void:
+	if hud.drawer_open != "inventory" and _inventory_drawer_reopens():
+		_set_drawer("inventory")
+
+
 ## SETUP-only: pieces slide anywhere open in the zone and can return to stock.
 func _setup_relocate(from: Vector2i, to: Vector2i) -> void:
 	board[to] = board[from]
@@ -2423,7 +2447,10 @@ func _use_item(index: int) -> void:
 		return
 	if item_active == index: # tap again to cancel targeting
 		_item_reset()
-		_refresh()
+		if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+			_set_drawer("inventory")
+		else:
+			_refresh()
 		return
 	if hud.drawer_open != "": # using an item hands the board back (targeting)
 		_set_drawer("")
@@ -2569,7 +2596,10 @@ func _buff_chosen(key: String) -> void:
 ## other targeting.
 func _buff_pick_cancelled() -> void:
 	_item_reset()
-	_refresh()
+	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+		_set_drawer("inventory")
+	else:
+		_refresh()
 
 
 ## Yalta Cocktail Napkin (issue 44): "On 5-Wave Milestone: choose one — +100
@@ -2693,7 +2723,7 @@ func _item_confirm_multi() -> void:
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
-		else Vector2(hud.item_box.get_global_rect().get_center())
+		else Vector2(hud.items_grid.get_global_rect().get_center())
 	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
 	# Nuclear Football Menu (issue 26): Items are free of their Action cost
 	# while the Clock is under 60s. Single call site, so no hook needed.
@@ -2765,6 +2795,9 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 		return _on_pass() # last action, or the item cleared the last enemy
+	_reopen_inventory_if_usable() # NO-85 story 59-60: every item completion
+		# funnels through here, so one call covers _use_item's instant branch,
+		# _item_click's final branch and _item_confirm_multi.
 	_refresh()
 
 
@@ -3267,6 +3300,8 @@ func _zapruder_resolve() -> void:
 func _begin_artefact_targeting(key: String) -> void:
 	if artefact_targeting_key == key: # tap again to cancel — same shape as _use_item
 		_artefact_targeting_reset()
+		if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+			return _set_drawer("inventory")
 		return _refresh()
 	if not _artefact_activation_available(key):
 		return
@@ -3318,6 +3353,7 @@ func _artefact_target_click(tile: Vector2i) -> void:
 	_add_slide(from, tile)
 	board[tile] = board[from]
 	board.erase(from)
+	_reopen_inventory_if_usable() # NO-85 story 59-60
 	_refresh()
 
 

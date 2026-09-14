@@ -25,6 +25,61 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `936275b` — 2026-09-14, iOS SIMULATOR — the recent iOS fixes, no iPhone (NO-89)
+
+**Not hardware.** An `iPhone 11` simulator (iOS 26.5 runtime, Xcode 26.6), created and
+booted from `simctl`, no Apple ID signed in. Debug build of `main` `936275b` (post-#412),
+exported headlessly and built with `xcodebuild -sdk iphonesimulator` under ad-hoc signing
+(`CODE_SIGN_IDENTITY="-"`, the README recipe) — no provisioning, no team. Driven with
+`drive.gd` exactly as on the phone, plus one macOS mouse hold on the Simulator window
+for the long press. Nobody touched a device. Evidence, 12 screenshots and `ack_1..10.txt`:
+`~/Documents/nokings-builds/no-89-simulator-2026-09-14/`.
+
+Same geometry as the borrowed iPhone 11: `probe` reports `viewport=480x1038
+window=828x1792`, so every layout number below is directly comparable with the
+2026-09-13 entries.
+
+### Confirmed on the simulator
+
+| What | Observed | Evidence |
+| --- | --- | --- |
+| **The simulator path works end to end** | Export → simulator build → install → `simctl launch … -- --drive user://drive` (the bare `--` is needed here too) → `cmd.txt`/`ack.txt` written straight into the app container (`simctl get_app_container <udid> com.sharpunk.nokings data`). No code change. | `ack_1.txt`, `sim.sh` |
+| **Entitlements on a simulator build** | `codesign -d --entitlements` shows `{}`, but that reads the signature blob; simulator builds embed them in the Mach-O `__TEXT,__entitlements` section, where `otool -s` shows both keys, and GameKit's own log has no "missing entitlement" line — it started authentication. This resolves the README's "unresolved" note for Debug: the instrument was wrong, not the build. | `otool`, `log show` |
+| **Godot's `printerr` reaches the host** | `xcrun simctl spawn <udid> log show --predicate 'process == "nokings"'` carries `[drive] listening in user://drive` at Error level — the log transport the device lacks. | `log show` |
+| **NO-64, online half** | Login screen: both provider buttons live, no "No internet connection". Guest main menu: "Sign in to sync" live, no notice. | `s2_login.png`, `s3_menu.png`, `ack_2/3.txt` |
+| **NO-56** Quit hidden on iOS | Main-menu probe: Play, Scores, Games History, Guide, About, Sign in to sync, Settings, TEST. No Quit. | `ack_3.txt` |
+| **NO-55** menu layout (guest case) | Title and nine buttons centred (`x=124, w=232` in 480), all inside the 1038 viewport; login labels 440 wide. Nothing clipped. | `s3_menu.png`, `s2_login.png` |
+| **NO-17** art on artefact rows, both branches | Scenario 29: all sixteen rows carry painted art (all sixteen are painted, so that scenario never shows the placeholder). Scenario 113 (`Stargate Divination Crystal`, unpainted): the shared diamond placeholder on its row. | `s5_drawer.png`, `s7_scrolled.png`, `s10_placeholder.png` |
+| **1aeaa4a** tap an artefact for its description | `Crop Circle Plank` → "On 5-Wave Milestone: 2 random allied pieces get +1 Piece Buff; -10 Gold". | `s6_desc.png`, `ack_6.txt` |
+| **NO-45** drawer drag-scroll | One `drag_text` moved every row by 583 px. | `s7_scrolled.png`, `ack_7.txt` |
+| **NO-72** long press | Scenario 30, `Blitz` held 1.2 s through the Simulator window (a macOS mouse hold, since `drive.gd` has no hold verb — its longest press is ~12 frames): the description appeared, and the probe diff before/after is that one label; nothing armed. | `s9_longpress.png`, `ack_8.txt` vs `ack_9.txt` |
+| **NO-57 safe area, reproduced in a PNG for the first time** | `simctl io screenshot --mask=black` paints the notch into the capture: `★500` and `$200` vanish under it, the clock survives at the left. The device screenshot pipeline cannot show this (`ios-device-automation.md`); the simulator can. A reproduction, not a fix. | `s11_masked_notch.png`, `s11_bezel_notch.png` |
+
+### Not observable on the simulator, and why
+
+- **NO-64 offline half.** iOS detection is an `NWPathMonitor`; the simulator shares
+  the Mac's network path, `simctl` has no network verb, and the Mac's own network was
+  off-limits. A Network Link Conditioner profile changes loss, not path status. Also
+  a guest's Scores screen builds no `Global ranking`, so the third notice is out of
+  reach regardless.
+- **NO-54** (name in the switch prompt), **NO-86** (first bind), **NO-88** (Continue
+  after a cloud restore), **the iCloud KV round trip**. All need Game Center: no Apple
+  ID on this simulator (`MobileMeAccounts` domain absent), GameKit's boot check failed
+  with `GKErrorDomain` 3 and 6. Signing one in is an account action, not done.
+- **The notch by eye, real signing, a provisioning profile.** Hardware only.
+- **NO-61** (Back) is Android-only. N/A.
+
+### Also seen
+
+- **NO-65** (drawer list unclipped, painting over the deck) reproduces on the
+  simulator (`s5_drawer.png`), as on the phone.
+- The generated per-artefact scenarios do not follow `artefacts.json` order: 91
+  hand-written + json position 22 predicted `Satoshi's Private Key` at index 113 and
+  got `Stargate Divination Crystal`. Harmless here (both unpainted), but do not
+  compute an index that way — read the name off the probe.
+
+---
+
 ## `e8160ab` — 2026-09-13, iOS — tombstone and the safe-area measurement
 
 **Same session as the entries below**, not filed in `docs/device-verification.md` at

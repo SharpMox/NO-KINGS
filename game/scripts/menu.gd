@@ -310,14 +310,14 @@ func _on_logout() -> void:
 func _ask_to_switch(id: String) -> void:
 	_switch_pending_id = id
 	# NO-54: NAMES, not ids. Both halves: the live account through the backend,
-	# the outgoing one from what was stored when it was bound. _who falls back to
-	# the id per side, so a provider that gives no name degrades to today's
-	# behaviour on that line alone rather than blanking it.
+	# the outgoing one from what was stored when it was bound. NO-76: a side with
+	# no recorded name gets a generic label, never its id — the iPhone showed a
+	# 64-hex Game Center id, which no player can recognise as theirs.
 	switch_prompt_label.text = ("This device is now signed in to %s as %s.\n" +
 		"This install's progress belongs to %s.\nSwitch to the new account?") \
 		% [Account.label(_NATIVE_PROVIDER()),
-			_who(switch_prompt_label, CloudSave.backend.account_name(), id),
-			_who(switch_prompt_label, Account.owner_name(), Account.owner())]
+			_who(switch_prompt_label, CloudSave.backend.account_name(), "another account"),
+			_who(switch_prompt_label, Account.owner_name(), "this device's account")]
 	switch_prompt.visible = true
 
 
@@ -351,7 +351,7 @@ func _on_switch_declined() -> void:
 	# after declining.
 	login_note.text = ("Playing as %s. This device is signed in to a different " +
 		"%s account, so sync is paused until you accept the switch.") \
-		% [_who(login_note, Account.owner_name(), Account.owner()),
+		% [_who(login_note, Account.owner_name(), "this device's account"),
 			Account.label(_NATIVE_PROVIDER())]
 
 
@@ -1253,8 +1253,11 @@ func _wrap_account_text(l: Label) -> void:
 	l.custom_minimum_size.x = _text_width()
 
 
-## NO-54: what to CALL an account on screen — its display name, or the id when
-## no name was recorded. Truncated so a name can never be absurdly long, which
+## NO-54: what to CALL an account on screen — its display name, or `fallback`
+## when no name was recorded. NO-76: the fallback is a generic label the caller
+## chooses ("another account"), never the id — an id is 64 hex characters that
+## fill the line and mean nothing to the player looking at them.
+## Truncated so a name can never be absurdly long, which
 ## is the value half of the user's ruling ("your display name, shortened if
 ## long"); _wrap_account_text is the layout half, and neither substitutes for
 ## the other.
@@ -1267,8 +1270,8 @@ func _wrap_account_text(l: Label) -> void:
 ## ponytail: trims one character at a time. The ceiling is the length of a
 ## display name, measured once per prompt; a binary search if that ever shows up
 ## in a profile.
-func _who(l: Label, name: String, id: String) -> String:
-	var text := name if name != "" else id
+func _who(l: Label, name: String, fallback: String) -> String:
+	var text := name if name != "" else fallback
 	var font := l.get_theme_font("font")
 	if font == null:
 		return text

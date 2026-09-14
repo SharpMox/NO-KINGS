@@ -13,6 +13,8 @@ const Items := preload("res://data/items.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Armies := preload("res://scripts/armies.gd") # issue 100
 const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
+const Scenarios := preload("res://data/scenarios.gd") # NO-83: the Header scenarios
+const Kings := preload("res://data/kings.gd") # NO-83: escalate Trump's Power by hand
 
 var fails := 0
 
@@ -63,6 +65,64 @@ func _click_ability(game: Node) -> bool:
 		return false
 	_click(btn.get_global_rect().get_center())
 	return true
+
+
+## NO-83: Stock opens from the Header's icon button, which carries a badge
+## rather than a "Stock N" text, so it is reached by rect instead of by text.
+func _click_stock(game: Node2D) -> bool:
+	var btn: Button = game.hud.drawer_buttons["stock"]
+	if not btn.is_visible_in_tree():
+		return false
+	_click(btn.get_global_rect().get_center())
+	return true
+
+
+## A double-tap: the press carries `double_click`, the release does not.
+func _double_click(at: Vector2) -> void:
+	_click(at)
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.double_click = true
+	press.position = at
+	press.global_position = at
+	root.push_input(press)
+	var release: InputEventMouseButton = press.duplicate()
+	release.pressed = false
+	release.double_click = false
+	root.push_input(release)
+
+
+## A board point the panel's BACKDROP covers — `preferred` if no visible
+## Button of the panel sits over it, else the first tile whose centre none
+## does. A click that lands on a modal's own button is consumed, and a probe
+## asserting "the modal blocked the board" then passes for the wrong reason.
+func _backdrop_point(game: Node2D, panel: Control, preferred: Vector2i) -> Vector2:
+	var buttons: Array = panel.find_children("*", "Button", true, false)
+	var tiles: Array = [preferred]
+	for y in Tuning.BOARD_H:
+		for x in Tuning.BOARD_W:
+			tiles.append(Vector2i(x, y))
+	for t in tiles:
+		var p: Vector2 = game._tile_px(t) + Vector2(game.tile, game.tile) / 2
+		var covered := false
+		for b in buttons:
+			if (b as Control).is_visible_in_tree() and (b as Control).get_global_rect().has_point(p):
+				covered = true
+				break
+		if not covered:
+			return p
+	return game._tile_px(preferred) + Vector2(game.tile, game.tile) / 2
+
+
+## True when some Label under `node` contains `text`.
+func _has_label_text(node: Node, text: String) -> bool:
+	if node is Label and text in (node as Label).text:
+		return true
+	for c in node.get_children():
+		if _has_label_text(c, text):
+			return true
+	return false
 
 
 func _click(at: Vector2) -> void:
@@ -208,7 +268,7 @@ func _init() -> void:
 	# press-dragging one paints NO deploy targets on a board it can never be
 	# placed on. Deployable Stock is untouched, which the ▲ merge at the end
 	# of the block is here to prove.
-	check(await _click_button_in(game.hud, "Stock 4"), "Stock button opens the drawer")
+	check(_click_stock(game), "Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock" and game.pool_box.is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
@@ -524,19 +584,30 @@ func _init() -> void:
 	# the deck. The tree reported one order and the screen showed another, and it
 	# cost several rounds of screenshots to find. Order is load-bearing here —
 	# the whole design is "board, then status, then the thumb row lowest".
-	var deck: Node = game.hud.stock_strip.get_parent()
-	check(game.hud.stock_strip.get_index() == 0,
-		"deck order: the stock strip sits directly under the board")
-	check(game.hud.act_row.get_index() == deck.get_child_count() - 1,
+	# NO-83 cut the Deck to three rows: the drawers (Inventory | Shop, equal
+	# halves), the Power badge, and the thumb row. Stock lives in the Header.
+	var HUD: CanvasLayer = game.hud
+	var deck: Node = HUD.nav_row.get_parent()
+	check(HUD.nav_row.get_index() == 0,
+		"deck order: the drawers row sits directly under the board")
+	check(HUD.act_row.get_index() == deck.get_child_count() - 1,
 		"deck order: Ability and PASS are the LAST row, in the thumb arc")
+	check(deck.get_child_count() == 3,
+		"NO-83: no stock strip and no status line in the Deck (%d rows)" % deck.get_child_count())
+	var nav_kids: Array = HUD.nav_row.get_children()
+	check(nav_kids.size() == 2 and nav_kids[0] == HUD.drawer_buttons["inventory"]
+			and nav_kids[1] == HUD.shop_button,
+		"NO-83: the button row is Inventory then Shop, nothing else")
+	check(absf((nav_kids[0] as Control).size.x - (nav_kids[1] as Control).size.x) <= 1.0,
+		"NO-83: ...in equal halves (%s vs %s)" % [(nav_kids[0] as Control).size.x, (nav_kids[1] as Control).size.x])
+	check(not HUD.king_ability_button.is_inside_tree() and not HUD.arrow_button.is_inside_tree(),
+		"NO-83: the ⚠ and Arrows buttons are off screen...")
+	check(not HUD.king_ability_button.pressed.get_connections().is_empty()
+			and not HUD.arrow_button.pressed.get_connections().is_empty()
+			and HUD.king_ability_button.text.begins_with("⚠"),
+		"...but keep their handlers and state")
 
 	# ---- NO-33 / ADR-0004: the BOARD absorbs slack, the deck is a SUM -------
-	# Design C made the strip the absorber. A strip built from fixed icon rows
-	# spends a continuous quantity in discrete steps, so the remainder is dead by
-	# construction — and a wider strip needs fewer rows and wastes MORE, which is
-	# why NO-25 read it as a tablet bug. The board absorbs now.
-	check(game.hud.stock_strip.size_flags_vertical != Control.SIZE_EXPAND_FILL,
-		"NO-33: the stock strip no longer absorbs leftover height")
 	# THE GUARD. The deck's height is a sum of constants, never a runtime
 	# measurement (measuring needs a second layout pass, and a control that
 	# measures itself before layout caches nonsense — CLAUDE.md, layout traps).
@@ -544,17 +615,11 @@ func _init() -> void:
 	# moment a deck row is added or a font moves under one.
 	var rest := 0.0
 	for c in deck.get_children():
-		if c != game.hud.stock_strip:
-			rest += (c as Control).get_combined_minimum_size().y
+		rest += (c as Control).get_combined_minimum_size().y
 	rest += deck.get_theme_constant("separation") * (deck.get_child_count() - 1)
-	check(is_equal_approx(rest, GameScript.DECK_BELOW_STRIP),
-		"NO-33: DECK_BELOW_STRIP (%s) still matches the built deck (%s)"
-			% [GameScript.DECK_BELOW_STRIP, rest])
-	check(is_equal_approx(game.hud.stock_strip.get_combined_minimum_size().y,
-			game.hud.ICON + GameScript.STRIP_CHROME),
-		"NO-33: STRIP_CHROME still matches the strip's real one-row height (%s vs %s)"
-			% [game.hud.stock_strip.get_combined_minimum_size().y,
-				game.hud.ICON + GameScript.STRIP_CHROME])
+	check(is_equal_approx(rest, GameScript.DECK_ROWS),
+		"NO-33: DECK_ROWS (%s) still matches the built deck (%s)"
+			% [GameScript.DECK_ROWS, rest])
 	# The closed form reproduces the numbers design C was tuned against: on a
 	# 9:20 phone the WIDTH term wins at tile 59, which is exactly where ICON's
 	# literal 52 came from. If this pair ever stops agreeing, the -7 relationship
@@ -563,6 +628,102 @@ func _init() -> void:
 		"NO-33: a 9:20 phone still solves to tile 59, as design C shipped it")
 	check(GameScript.board_tile_for(Vector2(480.0, 1066.0)) - GameScript.ICON_GAP == 52,
 		"NO-33: ...and ICON on that phone is still 52, the constant it replaced")
+	# NO-83: the notch inset is ADDED to the Header, and the board pays for it.
+	check(GameScript.board_tile_for(Vector2(480.0, 800.0), HUD.HEADER_H + 56.0)
+			< GameScript.board_tile_for(Vector2(480.0, 800.0), HUD.HEADER_H),
+		"NO-83: an iPhone 11 inset (56px) costs the board tile, not the Header")
+
+	# ---- NO-83: THE HEADER --------------------------------------------------
+	var stock_btn: Button = HUD.drawer_buttons["stock"]
+	var sr: Rect2 = stock_btn.get_global_rect()
+	var mr: Rect2 = HUD.menu_button.get_global_rect()
+	var mid_r: Rect2 = (HUD.wave_label.get_parent() as Control).get_global_rect()
+	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
+			and is_equal_approx(game.board_px.y, game.hud_top),
+		"the Header is the inset plus HEADER_H, and the board starts right under it")
+	check(HUD.clock_label.size.y >= HUD.HEADER_H / 2.0 - 0.5,
+		"the Clock line is half the Header tall (%s)" % HUD.clock_label.size.y)
+	var cr: Rect2 = HUD.clock_label.get_global_rect()
+	var gr: Rect2 = HUD.gold_label.get_global_rect()
+	check(cr.position.y >= game.safe_top and cr.end.y <= HUD.score_label.get_global_rect().position.y + 0.5
+			and HUD.score_label.get_global_rect().end.y <= gr.position.y + 0.5 and gr.end.y <= game.hud_top + 0.5,
+		"Clock, then Score, then Gold, all inside the Header and below the inset")
+	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
+		"the menu button sits in the top-right corner, below the inset")
+	check(is_equal_approx(sr.position.y, game.safe_top) and is_equal_approx(sr.size.y, HUD.HEADER_H),
+		"the Stock button's tap area is the Header's full height, from the inset down")
+	check(sr.end.y <= game.hud_top + 0.5, "...and it never reaches over the board")
+	check(sr.end.x <= mr.position.x + 0.5, "...nor over the menu button")
+	check(sr.position.x >= mid_r.end.x - 0.5 and sr.position.x - mid_r.end.x <= HUD.HEADER_GAP + 0.5,
+		"...and it extends left to the counters column")
+	check(HUD.stock_badge.text == "0" and HUD.stock_badge.is_visible_in_tree(),
+		"the Stock badge counts the pool (empty here: 0)")
+	check(stock_btn.icon != null, "the Stock button shows a piece icon")
+	# A tap on the top EDGE of the top-right board tile — the board point
+	# nearest the Stock button — reaches the board, never Stock. The rect
+	# exclusion is the geometry; the click proves the routing.
+	var tr_tile := Vector2i(Tuning.BOARD_W - 1, Tuning.BOARD_H - 1)
+	var tr_px: Vector2 = game._tile_px(tr_tile) + Vector2(game.tile / 2.0, 1.0)
+	check(game._tile_at(tr_px) == tr_tile and not sr.has_point(tr_px),
+		"(setup) the top-right tile's top edge is a board point outside the Stock button")
+	_click(tr_px)
+	await process_frame
+	check(game.drawer_open == "", "a tap on the top-right board tile never opens Stock")
+	_click(mr.get_center())
+	await process_frame
+	check(game.game_menu.visible and game.drawer_open == "",
+		"a tap on the menu button opens the menu, never Stock")
+	check(await _click_button_in(game.hud.game_menu, "Resume"), "Resume clickable")
+	await process_frame
+	check(_click_stock(game), "the Header's Stock button opens the drawer")
+	await process_frame
+	check(game.drawer_open == "stock", "...and it is the Stock drawer")
+	check(_click_stock(game), "the Stock button toggles the drawer shut")
+	await process_frame
+	check(game.drawer_open == "", "...closed again")
+	# (the armed marker on this button is asserted in the SETUP block below,
+	# where a Stock stack exists to arm)
+	# ⚑ WAVE COUNTER: out of 50 until the first King falls, then out of 201
+	var wave_was: int = game.wave
+	var kd_was: int = game.kings_defeated
+	var tsw_was: int = game.turns_since_wave
+	game.wave = 1
+	game.kings_defeated = 0
+	HUD.refresh()
+	check(HUD.wave_label.text == "⚑ 1/50", "Wave 1 reads ⚑ 1/50 (got %s)" % HUD.wave_label.text)
+	game.wave = 50
+	HUD.refresh()
+	check(HUD.wave_label.text == "⚑ 50/50", "Wave 50 reads ⚑ 50/50 (got %s)" % HUD.wave_label.text)
+	game.wave = 51
+	game.kings_defeated = 1
+	HUD.refresh()
+	check(HUD.wave_label.text == "⚑ 51/201", "Wave 51 after the win reads ⚑ 51/201 (got %s)" % HUD.wave_label.text)
+	# ⏳ TURN COUNTER: turns played out of the upcoming Wave's cadence — Wave 4
+	# is three pawns (data/waves.gd), so 6 + 3
+	game.wave = 3
+	game.kings_defeated = 0
+	game.turns_since_wave = 2
+	HUD.refresh()
+	check(HUD.turn_label.text == "⏳ 2/9", "turn counter counts 2 of Wave 4's 9 (got %s)" % HUD.turn_label.text)
+	game.pending_king = {"id": "king", "king_id": "donald_trump"}
+	HUD.refresh()
+	check(HUD.turn_label.text == "⏳ Donald Trump",
+		"turn counter names a PENDING King (got %s)" % HUD.turn_label.text)
+	game.pending_king = {}
+	game.wave = 201
+	HUD.refresh()
+	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
+	# a long King name is cut with an ellipsis: the label never leaves its
+	# column or reaches the Stock button, whatever the text
+	HUD.turn_label.text = "⏳ " + "Maximilian ".repeat(6)
+	await process_frame
+	var tl: Rect2 = HUD.turn_label.get_global_rect()
+	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.x <= sr.position.x + 0.5,
+		"a long King name ellipsises inside the counters column (%s wide)" % tl.size.x)
+	game.wave = wave_was
+	game.kings_defeated = kd_was
+	game.turns_since_wave = tsw_was
+	HUD.refresh()
 
 	# ONE ICON SIZE. Items were 30px, stock stacks 46, the strip 52 before this
 	# was pulled onto a single constant; nothing but a pin stops them drifting
@@ -619,15 +780,7 @@ func _init() -> void:
 	await process_frame
 	var ICON_PX: int = icon_game.hud.ICON
 
-	# 1. the stock strip under the board (rebuilt from _pool(), needs a sane width)
-	var stock_btns: Array = icon_game.hud.stock_strip.find_children("*", "Button", true, false)
-	check(not stock_btns.is_empty(), "(setup) the stock strip actually holds buttons to measure")
-	var odd_stock: Array = []
-	for b in stock_btns:
-		if (b as Button).custom_minimum_size != Vector2(ICON_PX, ICON_PX):
-			odd_stock.append((b as Button).custom_minimum_size)
-	check(odd_stock.is_empty(),
-		"stock strip: every icon is exactly ICON x ICON (%d), found: %s" % [ICON_PX, str(odd_stock)])
+	# (1. was the stock strip under the board — retired by NO-83.)
 
 	# 2. the item strip, in the Inventory drawer. KNOWN EXCEPTION, asserted
 	# rather than skipped: the button carries the item NAME beside the icon, so
@@ -654,7 +807,7 @@ func _init() -> void:
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
 	# drawer has to be OPEN for this container to hold anything at all.
-	check(await _click_button_in(icon_game.hud, "Stock 2"), "Stock drawer opens for the pool strip")
+	check(_click_stock(icon_game), "Stock drawer opens for the pool strip")
 	await process_frame
 	var pool_btns: Array = []
 	for c in icon_game.hud.pool_box.get_children():
@@ -686,6 +839,51 @@ func _init() -> void:
 
 	icon_game.queue_free()
 	await process_frame
+
+	# ---- NO-83: Donald Trump's info panel lists the Tariffs in force ---------
+	# The Header scenario boots him with three Tariffs. His Power draws on the
+	# King Ability catalogue (the only one that does), so his double-tap panel
+	# carries the same rows the ⚠ overlay shows — and gains a row when his
+	# Power escalates.
+	var trump_cfg := {}
+	for s in Scenarios.all():
+		if str(s.name).begins_with("Header: King Wave"):
+			trump_cfg = s.cfg
+	check(not trump_cfg.is_empty(), "(setup) the Header King Wave scenario exists")
+	GameScript.next_config = trump_cfg.duplicate(true)
+	var trump_game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(trump_game)
+	await process_frame
+	await process_frame
+	check(trump_game.hud.turn_label.text == "⏳ Donald Trump",
+		"turn counter names the King while he is alive (got %s)" % trump_game.hud.turn_label.text)
+	check(trump_game.hud.wave_label.text == "⚑ 50/50", "his Wave reads ⚑ 50/50")
+	var king_px: Vector2 = trump_game._tile_px(Vector2i(3, 10)) + Vector2(trump_game.tile, trump_game.tile) / 2
+	_double_click(king_px)
+	await process_frame
+	check(trump_game.preview_open, "double-tap on the King opens his info panel")
+	check(_has_label_text(trump_game.preview_panel, "Tariff on Move")
+			and _has_label_text(trump_game.preview_panel, "Tariff on Capture")
+			and _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
+		"...listing each Tariff in force by name")
+	check(_has_label_text(trump_game.preview_panel, "Each piece move costs extra gold."),
+		"...with its description")
+	check(not _has_label_text(trump_game.preview_panel, "Tariff on Long-Range"),
+		"(setup) the fourth Tariff is not in force yet")
+	check(await _click_button_in(trump_game.preview_panel, "Close"), "Close clickable")
+	await process_frame
+	trump_game.turns_since_wave = 30 # past the fourth stack step
+	Kings.stack_power_if_due(trump_game)
+	await create_timer(0.45).timeout # past the double-tap window of the last one
+	_double_click(king_px)
+	await process_frame
+	check(trump_game.preview_open and _has_label_text(trump_game.preview_panel, "Tariff on Long-Range"),
+		"the panel lists a Tariff that came into force since it was last opened")
+	check(await _click_button_in(trump_game.preview_panel, "Close"), "Close clickable again")
+	await process_frame
+	trump_game.queue_free()
+	await process_frame
+
 	GameScript.next_config = {"wave": 3,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -879,7 +1077,8 @@ func _init() -> void:
 		return b is Button and b.text == "+" and not b.is_queued_for_deletion())
 	check(not slots.is_empty(), "setup: selecting a placed piece shows the put-back slot")
 
-	# and dragging a placed piece onto the stock strip takes it back
+	# and dragging a placed piece onto the Header's Stock button takes it back
+	# (NO-83: drawer_buttons["stock"] IS the Header button — the Deck has none)
 	var piece_px: Vector2 = game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2
 	var strip_px: Vector2 = (game.drawer_buttons["stock"] as Control).get_global_rect().get_center()
 	var b_press := InputEventMouseButton.new()
@@ -902,12 +1101,11 @@ func _init() -> void:
 	root.push_input(b_release)
 	await process_frame
 	check(not game.board.has(Vector2i(2, 1)) and game.stock.size() == stock_before,
-		"setup: drop on the Stock button returns the piece to stock")
+		"setup: drop on the Header's Stock button returns the piece to stock")
 
 	# tap-to-place regression (2026-07-07): strip rebuilds on press/release used
 	# to free the button before its arming tap fired
-	check(await _click_button_in(game.hud, "Stock %d" % stock_before),
-		"Stock button reopens the drawer")
+	check(_click_stock(game), "Stock button reopens the drawer")
 	await process_frame
 	var live_stack: Button = game.pool_box.get_children().filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
@@ -916,8 +1114,10 @@ func _init() -> void:
 	await process_frame
 	check(game.placing_id != "", "setup: tapping a stack arms placement")
 	check(game.placing_id != "" and game.textures.has(game.placing_id) \
-			and game.stock_armed.get_parent() == game.drawer_buttons["stock"],
-		"the armed piece rides the Stock button overlay")
+			and game.stock_armed.get_parent() == game.drawer_buttons["stock"]
+			and game.drawer_buttons["stock"].get_parent() == game.hud
+			and game.stock_armed.is_visible_in_tree(),
+		"the armed marker rides the HEADER's Stock button overlay (NO-83)")
 	_click(game._tile_px(Vector2i(6, 8)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.placing_id != "" and game.drawer_open == "",
@@ -940,7 +1140,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Stock 3"), "Stock drawer opens")
+	check(_click_stock(game), "Stock drawer opens")
 	await process_frame
 	# issue 96: Captured Stock is its own LABELLED section, not a tinted tail.
 	# The two pools obey different rules (a Captured entry can never be
@@ -985,7 +1185,7 @@ func _init() -> void:
 	# it is on EVERY captured entry now, with no arming step and no ▲ merge to
 	# lose the corner to when a duplicate is held.
 	if game.drawer_open != "stock":
-		check(await _click_button_in(game.hud, "Stock 3"), "Stock drawer reopens")
+		check(_click_stock(game), "Stock drawer reopens")
 		await process_frame
 	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
 		# tap on the same entry inside it opens the piece preview instead
@@ -1461,8 +1661,15 @@ func _init() -> void:
 	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
 	# holds the player queen, and the control below the tariff section proves
 	# this exact tap selects her with no panel up.
+	#
+	# NO-83 moved the board 66px down and the queen's tile landed under the
+	# pick's own Buy button: the click was CONSUMED, "selects nothing" passed
+	# for the wrong reason, and "still open" failed (CLAUDE.md, tests that pass
+	# for the wrong reason). The tap now goes to the queen's tile only when no
+	# button of the pick covers it, else to a tile the backdrop covers.
 	game.selected = Vector2i(-1, -1)
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	var pick_tap: Vector2 = _backdrop_point(game, game.reinforce_panel, Vector2i(2, 2))
+	_click(pick_tap)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1),
 		"NO-5: a board tap under the open reinforcement pick selects nothing")
@@ -1477,8 +1684,10 @@ func _init() -> void:
 	check(not game.reinforce_panel.visible and not game.pending_reinforce,
 		"Done closes the shop and clears the pending flag")
 
-	# tariff button in the top row opens the detail overlay
-	check(await _click_button_in(game.hud, "⚠1"), "tariff button clickable")
+	# the ⚠ button is off screen (NO-83) but its state and handler stay: the
+	# text still counts, and its signal still opens the detail overlay
+	check(game.hud.king_ability_button.text == "⚠1", "the ⚠ button still counts the Tariff in force")
+	game.hud.king_ability_pressed.emit()
 	await process_frame
 	check(game.king_ability_panel != null and game.king_ability_panel.visible, "tariff overlay opens")
 
@@ -1553,7 +1762,8 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Arrows"), "Arrows button clickable")
+	# NO-83: the Arrows button is off screen; its signal and handler stay
+	game.hud.arrow_toggle_pressed.emit()
 	await process_frame
 	check(game.arrow_mode, "Arrows toggles arrow mode on")
 	var qpx2: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
@@ -1607,7 +1817,7 @@ func _init() -> void:
 	await process_frame
 	check(game.arrows.is_empty(), "Clear removes every arrow")
 
-	check(await _click_button_in(game.hud, "Arrows"), "Arrows button toggles off")
+	game.hud.arrow_toggle_pressed.emit()
 	await process_frame
 	check(not game.arrow_mode, "arrow mode is off again")
 	_click(qpx2)
@@ -1616,8 +1826,9 @@ func _init() -> void:
 	_click(qpx2) # deselect before the lifetime check below
 	await process_frame
 
-	check(await _click_button_in(game.hud, "Arrows"), "Arrows re-enabled")
+	game.hud.arrow_toggle_pressed.emit()
 	await process_frame
+	check(game.arrow_mode, "Arrows re-enabled")
 	root.push_input(a_press.duplicate())
 	await process_frame
 	root.push_input(a_motion.duplicate())

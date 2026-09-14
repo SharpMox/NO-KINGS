@@ -246,8 +246,8 @@ func _init() -> void:
 		# NO-33: call the game's own solver rather than keeping a second copy of
 		# the formula here — this copy silently disagreed the moment ADR-0004
 		# coupled the tile to ICON.
-		bg.tile = bg.board_tile_for(Vector2(vw, vh))
-		bg.board_px = Vector2(roundf((vw - bg.tile * Tuning.BOARD_W) / 2.0), bg.HUD_TOP)
+		bg.tile = bg.board_tile_for(Vector2(vw, vh), bg.hud_top)
+		bg.board_px = Vector2(roundf((vw - bg.tile * Tuning.BOARD_W) / 2.0), bg.hud_top)
 		var board_l: float = bg.board_px.x
 		var board_r: float = bg.board_px.x + Tuning.BOARD_W * bg.tile
 		var escaped: Array = []

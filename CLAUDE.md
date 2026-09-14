@@ -269,6 +269,12 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   display: **serialise the suite runs**, don't parallelise them. A probe failure during a
   concurrent run is not evidence of a bug, and — just as important — a *pass* during one
   is not evidence of correctness either. Re-run alone before believing either result.
+- **Every worktree shares one `user://` — the save folder is keyed by project name.** A
+  stale `user://sync_queue.json` left by a run in one checkout is drained at the next boot
+  in another, and it overwrote the cloud save a menu test expected; the failure looked like
+  a bug in code the run never touched (NO-88, 2026-09-14). The menu suites now
+  `SyncQueue.clear()` at start. Two Godot processes across worktrees is never safe,
+  windowed or headless, even when neither is the full suite.
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

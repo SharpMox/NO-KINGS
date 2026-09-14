@@ -1513,23 +1513,22 @@ func _init() -> void:
 	bcancel.queue_free()
 	await process_frame
 
-	# The Activate section: issue 67 made it PERMANENT — every run holds a
-	# Army Ability chip now, so "absent entirely when empty" (issue 52's
-	# original acceptance) no longer applies. Probed directly rather than
-	# assumed: 0/INV_H_BASE originally, 1/INV_H_ACTIVATE while issue 67's Army
-	# Ability chip lived here, and 0/INV_H_ACTIVATE now NO-32 has removed it --
-	# empty row, height held flat on purpose.
+	# NO-85: the separate Activate section is GONE — an activatable Artefact
+	# joins the Artefacts grid instead, marked with a ⚡ (story 50). The
+	# drawer's height is now a flat constant regardless of content (story 46),
+	# so there is nothing left to probe for "grows to fit it"; just the grid
+	# content and that the height never moves.
 	var no_activ := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 1})
 	await process_frame
 	no_activ._refresh()
 	await process_frame # queue_free() on the boot's own first-built chip is
 		# deferred — let it resolve before counting (same reason held_activ
 		# below already does this)
-	check(no_activ.hud.activate_box.get_child_count() == 0 \
-			and no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_H_ACTIVATE,
-		"Activate section: EMPTY with no activatable Artefact held (NO-32 removed the " +
-		"Army Ability chip that used to sit here) — the drawer keeps INV_H_ACTIVATE anyway, " +
-		"a flat height by choice rather than a consequence of something always being in the row")
+	check(no_activ.hud.artefacts_grid.get_child_count() == 1 \
+			and no_activ.hud.artefacts_grid.get_child(0) is Label,
+		"Artefacts grid: no Artefact held shows the \"no artefacts yet\" hint alone")
+	check(no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_DRAWER_H,
+		"...and the drawer is the flat NO-85 height, holding nothing")
 	no_activ.queue_free()
 	await process_frame
 
@@ -1539,11 +1538,11 @@ func _init() -> void:
 	held_activ._refresh()
 	await process_frame # queue_free() on the rebuilt chip is deferred — let it
 		# resolve before counting, else a stale one lingers alongside the fresh one
-	check(held_activ.hud.activate_box.get_child_count() == 1,
-		"Activate section: the Artefact chip alone (1 before issue 67 added an Army Ability " +
-		"chip beside it, 2 while that chip existed, 1 again now NO-32 has removed it)")
-	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_H_ACTIVATE,
-		"Activate section: the drawer grows one row to fit it")
+	check(held_activ.hud.artefacts_grid.get_child_count() == 1 \
+			and (held_activ.hud.artefacts_grid.get_child(0) as Button).text.begins_with("⚡"),
+		"Artefacts grid: one held activatable Artefact, in the grid, ⚡-marked (story 50)")
+	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_DRAWER_H,
+		"...and the drawer's height is unchanged — flat regardless of content (story 46)")
 	held_activ.queue_free()
 	await process_frame
 

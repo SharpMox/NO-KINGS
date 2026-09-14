@@ -48,14 +48,23 @@ const TIP_MARGIN := 8.0
 ## (ViewConfiguration.getLongPressTimeout), so it feels like every other long
 ## press on the device rather than a number picked here.
 const LONG_PRESS_MS := 500
-## +1 row while the Activate strip is up, +48 more for issue 100's Army Power
-## line (two wrapped rows at 13px on a 480-wide portrait screen). Issue 67 made
-## this height unconditional because the Army Ability chip was always in the
-## Activate section; NO-32 removed that chip, so the section can be empty again
-## and the height is now a flat choice rather than a consequence. Left flat
-## deliberately: a drawer that changes height as Artefacts come and go is a
-## worse trade than one empty row.
-const INV_H_ACTIVATE := DRAWER_H * 3 + 118.0
+## ---- INVENTORY DRAWER TUNING (NO-85) ----------------------------------------
+## Every spacing number for the Inventory Drawer lives in THIS block. Canvas
+## px. It opens UPWARD from the button row (story 45), over the lower board,
+## at a FIXED height whatever it holds (story 46) — not measured at runtime,
+## so it never resizes as Items/Artefacts come and go. One scrolling column:
+## an Items grid, then an Artefacts grid (story 47) — the separate Activate
+## section is gone, and an activatable Artefact joins the Artefacts grid with
+## a ⚡ marker instead (issue 52's chip idiom, carried over verbatim).
+##
+## INV_DRAWER_H keeps the old flat value (was INV_H_ACTIVATE: +1 row for the
+## Activate strip, +48 for issue 100's Army Power line) rather than
+## re-deriving it, so nothing jumps on this PR alone.
+const INV_DRAWER_H := DRAWER_H * 3 + 118.0
+const INV_ITEMS_COLS := 3 ## Items grid columns
+const INV_ARTEFACTS_COLS := 3 ## Artefacts grid columns
+const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## ----------------------------------------------------------------------------
 
 ## ---- HEADER TUNING (NO-83) -------------------------------------------------
 ## Every spacing number in the Header lives in THIS block, so tuning it on the
@@ -176,11 +185,12 @@ var tip_key := ""
 var stock_grid := GridContainer.new()
 var captured_grid := GridContainer.new()
 var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
-var item_box := HBoxContainer.new() # held-items strip
-## issue 52: pressable Activate chips, for activatable Artefacts. NO-32 removed
-## the Army Ability chip that issue 67 added here — the Ability lives on the
-## deck button alone now, so this row can legitimately be empty again.
-var activate_box := HBoxContainer.new()
+## NO-85: Items, one scrolling grid (story 48) — replaces the item_box strip.
+var items_grid := GridContainer.new()
+## NO-85: Artefacts, one scrolling grid (story 49) — replaces artefact_box
+## (passive rows) AND activate_box (issue 52's Activate chips, now merged in
+## with a ⚡ marker per story 50, instead of a separate section).
+var artefacts_grid := GridContainer.new()
 ## issue 100: the Army POWER, written out in the drawer. It was previously
 ## readable in exactly two places — the tooltip of the Ability chip (deleted by
 ## NO-32; the deck button carries that tooltip now), and the army-select screen
@@ -211,12 +221,6 @@ var nav_row: HBoxContainer
 ## backwards. Set once in build(), before anything reads it.
 var ICON: int = 52
 
-## HFlow, not HBox (NO-17): with art beside each name the row measured 1495px
-## against a 533px viewport and simply ran off the screen — it already clipped
-## the last entry when it was text-only, and art made that worse rather than
-## causing it. Wrapping is what makes the art visible at all.
-var artefact_box := HFlowContainer.new() # passive Artefacts only (issue 52
-	# moved the 6 activatable keys out into activate_box above)
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
 
@@ -513,11 +517,15 @@ func build(game) -> void:
 
 	# drawers above the button row, one at a time, overlaying the board, full
 	# width and running to the screen bottom; the button bar re-fronts below so
-	# it stays visible and clickable over them. Inventory stacks the held-items
-	# strip over the artefact strip (money-and-shop/03), with the issue-52
-	# Activate section between them, shown/sized only while it has content.
-	artefact_box.add_theme_constant_override("separation", 16)
-	activate_box.add_theme_constant_override("separation", 8)
+	# it stays visible and clickable over them. Inventory scrolls as ONE column
+	# (story 47): the Items grid, then the Artefacts grid — no separate
+	# Activate section any more (NO-85).
+	items_grid.columns = INV_ITEMS_COLS
+	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
+	artefacts_grid.columns = INV_ARTEFACTS_COLS
+	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0, 0)
@@ -541,11 +549,10 @@ func build(game) -> void:
 	deck.move_child(power_badge, 1)
 	deck.move_child(act_row, 2)
 	# (the power label used to sit here; design C moved it onto the deck)
-	inv_box.add_child(item_box)
-	inv_box.add_child(activate_box)
-	inv_box.add_child(artefact_box)
+	inv_box.add_child(items_grid)
+	inv_box.add_child(artefacts_grid)
 	var drawer_specs := [ # name, content, x, width, height
-		["inventory", inv_box, 0.0, vp.x, DRAWER_H * 2 + 70.0],
+		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
 	]
 	for spec in drawer_specs:
 		var panel := PanelContainer.new()
@@ -558,7 +565,9 @@ func build(game) -> void:
 		var sc := ScrollContainer.new()
 		sc.scroll_deadzone = DRAWER_SCROLL_DEADZONE # NO-45
 		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
-		sc.clip_contents = false # the ▲ promote badge overhangs the drawer top
+		# NO-65 fix: nothing in this drawer overhangs it any more (no promote
+		# badge lives in Items/Artefacts — that was Stock's), so clip for real.
+		sc.clip_contents = true
 		sc.add_child(spec[1])
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
@@ -709,31 +718,26 @@ func hide_tip() -> void:
 		tip_panel.visible = false
 
 
-## NO-59: a TAP on an artefact row, and specifically NOT a drag.
+## NO-72: a LONG PRESS on an Item or Artefact cell shows its description and
+## does not fire the control. A tap on a cell already does something (an item
+## arms, a ⚡ artefact activates), so unlike NO-59's original tap-to-describe
+## (retired by NO-85 — see hide_tip's callers) the reveal gesture has to be a
+## hold, and it must work on a DISABLED cell too (story 55: greyed-out still
+## explains).
 ##
-## An artefact row is an HBoxContainer, not a Button, so there is no `pressed`
-## signal that Godot has already taught to cancel when a ScrollContainer takes
-## the gesture over. This is that distinction, written out: remember where the
-## press landed, and act on the release only if the finger barely moved.
+## Cancelled by moving past DRAWER_SCROLL_DEADZONE, the number the scroller
+## uses to call a drag a scroll, so a scroll can never also be a long press.
+## GLOBAL positions, because gui_input's own `position` is relative to the
+## control and travels WITH it during a scroll — a finger moving 180px up
+## while its cell moves 180px up would read as a local delta of zero, making
+## every drag look like it never moved. Each press gets its own token, so a
+## timer left over from a quick earlier press cannot fire into this one — and
+## show_tip toggles on a repeated key, so a double fire would open and then
+## shut.
 ##
-## The threshold is DRAWER_SCROLL_DEADZONE deliberately — the same number the
-## container uses to decide a drag IS a scroll. One constant means the two
-## answers can never disagree, and "it did not become a scroll" is exactly what
-## "it was a tap" has to mean here, because NO-45 made this row pass its press
-## through to the scroller.
-## NO-72: a LONG PRESS on an item or Activate chip shows its description. A tap
-## on these already does something (an item arms, a chip activates), so unlike
-## an artefact row (_tip_input below) the gesture has to be a hold.
-##
-## Cancelled by moving past DRAWER_SCROLL_DEADZONE, the number the scroller uses
-## to call a drag a scroll, so a scroll can never also be a long press. GLOBAL
-## positions for the reason _tip_input gives. Each press gets its own token, so
-## a timer left over from a quick earlier press cannot fire into this one — and
-## show_tip toggles on a repeated key, so a double fire would open and then shut.
-##
-## When it fires, `lp_fired` makes the Button's own `pressed` handler swallow the
-## release that ends the hold. The next PRESS clears it, so a hold released off
-## the button cannot leak into a later tap.
+## When it fires, `lp_fired` makes the Button's own `pressed` handler swallow
+## the release that ends the hold. The next PRESS clears it, so a hold
+## released off the button cannot leak into a later tap.
 func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if not e.pressed:
@@ -751,26 +755,6 @@ func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent) ->
 	elif e is InputEventMouseMotion and btn.has_meta("lp_token") \
 			and e.global_position.distance_to(btn.get_meta("lp_from")) > DRAWER_SCROLL_DEADZONE:
 		btn.remove_meta("lp_token")
-
-
-func _tip_input(row: Control, key: String, desc: String, e: InputEvent) -> void:
-	if not (e is InputEventMouseButton) or e.button_index != MOUSE_BUTTON_LEFT:
-		return
-	# GLOBAL position, not the local one gui_input hands out, and this is not a
-	# detail — it is the difference between working and silently never firing the
-	# guard. A gui_input `position` is relative to the ROW, and during a scroll
-	# the row travels with the content: a finger moving 180px up while its row
-	# moves 180px up reads as a local delta of ZERO, so every drag looked like a
-	# tap. Caught by the assertion below, not by reading the code.
-	if e.pressed:
-		row.set_meta("tip_press_at", e.global_position)
-		return
-	if not row.has_meta("tip_press_at"):
-		return
-	var from: Vector2 = row.get_meta("tip_press_at")
-	row.remove_meta("tip_press_at")
-	if e.global_position.distance_to(from) <= DRAWER_SCROLL_DEADZONE:
-		show_tip(key, desc, row.get_global_rect())
 
 
 func refresh() -> void:
@@ -839,7 +823,7 @@ func refresh() -> void:
 		and g.items[g.item_active].target == "multi"
 	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
 	_rebuild_stock_drawer()
-	_rebuild_item_strip()
+	_rebuild_items_grid()
 	# issue 100: the Power is always on, so it is stated, not offered. The
 	# Ability's 1-Action cost rides along here too — that cost is the
 	# deliberate contrast with Artefact activation and the Shop (both 0), and
@@ -872,14 +856,12 @@ func refresh() -> void:
 		army_ability_button.text += "  ·  1 Action"
 		army_ability_button.disabled = false
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
-	_rebuild_activate_strip()
-	_rebuild_artefact_strip()
-	# issue 52 grew the drawer only when the Activate row had content; issue 67
-	# made that permanent because the Army Ability chip always filled it. NO-32
-	# deleted that chip, so the row can be empty — the height stays flat by
-	# choice (see INV_H_ACTIVATE), not because something is always in there.
+	_rebuild_artefacts_grid()
+	# NO-85: the drawer's height is a flat choice (INV_DRAWER_H), not a
+	# consequence of what it holds — it must not resize as Items/Artefacts
+	# come and go (story 46).
 	var inv_panel: PanelContainer = drawers["inventory"]
-	var inv_h := INV_H_ACTIVATE
+	var inv_h := INV_DRAWER_H
 	if inv_panel.custom_minimum_size.y != inv_h:
 		var inv_w: float = inv_panel.custom_minimum_size.x
 		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
@@ -953,135 +935,94 @@ func _stacks() -> Array:
 	return out
 
 
-## issue 52: activatable Artefacts (game.ACTIVATABLE_ARTEFACT_KEYS) get a
-## pressable chip in activate_box instead — this row keeps EXACTLY today's
-## quiet label treatment, for passive Artefacts only. "no artefacts yet"
-## still gates on the whole g.artefacts list (unchanged), not just the
+## NO-85: Items then Artefacts, in ONE scrolling column — the Artefacts grid
+## holds BOTH passive and activatable entries now (story 47/50), replacing the
+## old artefact_box (passive rows, tap-to-describe) + activate_box (issue 52's
+## Activate chips) split. Tap uses (arms/activates), long-press describes,
+## for every entry including greyed ones (stories 51-55) — one mechanism,
+## reusing NO-72's _long_press_input for both kinds, instead of passive rows
+## having their own tap-to-describe path (NO-59's _tip_input — retired here,
+## it had no other caller).
+## "no artefacts yet" still gates on the whole g.artefacts list, not just the
 ## passive subset: holding only an activatable Artefact is not "nothing".
-func _rebuild_artefact_strip() -> void:
-	for c in artefact_box.get_children():
+func _rebuild_artefacts_grid() -> void:
+	for c in artefacts_grid.get_children():
 		c.queue_free()
 	if g.artefacts.is_empty():
 		var none := Label.new()
 		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
-		artefact_box.add_child(none)
-		hide_tip() # NO-59: nothing left to describe
+		artefacts_grid.add_child(none)
+		hide_tip() # nothing left to describe
 		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
 	var seen := {}
 	for t in g.artefacts:
-		if seen.has(t.key) or g.ACTIVATABLE_ARTEFACT_KEYS.has(t.key):
+		if seen.has(t.key):
 			continue
 		seen[t.key] = true
-		# NO-17: art where it exists, the shared placeholder where it does not,
-		# so the row is the same height for every artefact. A Button rather than
-		# a Label purely because Button carries an icon slot next to its text;
-		# it is not pressable (a passive artefact has nothing to press) and says
-		# so via disabled, with the font colour restored so it does not read as
-		# unavailable.
-		# A TextureRect beside a Label, NOT a disabled Button with an icon slot.
-		# The Button route looked shorter and cost two rounds: a disabled Button
-		# tints its icon with icon_disabled_color, so the art loaded, resolved
-		# and drew at zero alpha — every texture-level assert passed while the
-		# row rendered as bare text, and only a screenshot caught it. A passive
-		# artefact is not a button anyway; this says so.
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 6)
-		row.tooltip_text = t.description
-		# NO-45: PASS, not STOP. STOP was set here "so the tooltip shows" and it
-		# also stopped the press reaching the drawer's ScrollContainer, so the
-		# artefact list could not be drag-scrolled on a phone — reproduced on
-		# desktop and on a physical iPhone 11. PASS still delivers the press to
-		# this row, which is what a tooltip needs; see DRAWER_SCROLL_DEADZONE.
-		row.mouse_filter = Control.MOUSE_FILTER_PASS
-		# NO-59: tap the row to read its description. Passive artefacts are the
-		# only drawer rows where a plain tap is FREE — every other row in both
-		# drawers already spends a tap (an item arms, a chip activates, a Stock
-		# stack arms a deploy), so attaching a reveal to the same gesture there
-		# would change what those controls do.
-		var key: String = t.key
-		var desc: String = t.description
-		row.gui_input.connect(func(e: InputEvent) -> void: _tip_input(row, key, desc, e))
-		var art := TextureRect.new()
-		art.texture = g.artefact_tex(t.key)
-		art.custom_minimum_size = Vector2(ICON, ICON)
-		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(art)
-		var l := Label.new()
-		l.text = "%s%s" % [t.name, " ×%d" % counts[t.key] if counts[t.key] > 1 else ""]
-		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(l)
-		artefact_box.add_child(row)
-	# NO-59: the rows the popup was anchored to have just been freed. Keep it up
-	# only while the artefact it describes is still held — otherwise a consumed
-	# artefact leaves a description of something the player no longer has.
+		artefacts_grid.add_child(_build_artefact_cell(t.key, counts[t.key]))
+	# the cell the popup was anchored to may have just been freed. Keep it up
+	# only while the artefact it describes is still held — otherwise a
+	# consumed artefact leaves a description of something no longer held.
 	if tip_key != "" and not seen.has(tip_key):
 		hide_tip()
 
 
-## issue 52: the Activate section — entry point 1 ("click the Artefact in
-## the list") and 2 ("a dedicated section in the Items menu") are the SAME
-## widget here, since this codebase's single Inventory drawer already holds
-## both Items and Artefacts (there is no second menu to put a distinct copy
-## in). Empty (no activatable Artefact held) leaves activate_box with zero
-## children again, now NO-32 has removed the Army Ability chip that made the
-## row permanently occupied; the drawer height is flat regardless.
-func _rebuild_activate_strip() -> void:
-	for c in activate_box.get_children():
-		c.queue_free()
-	for key in g._activatable_held_keys():
-		var entry: Dictionary = g._artefact_entry(key)
-		var count: int = g._artefact_count(key)
-		var btn := Button.new()
-		# NO-17: the ⚡ stays. It is not decoration here — it marks the chip as
-		# ACTIVATABLE, which is the one thing separating this strip from the
-		# passive artefacts below it, and the art cannot carry that distinction.
-		btn.text = "⚡%s%s" % [entry.name, " ×%d" % count if count > 1 else ""]
-		btn.icon = g.artefact_tex(key)
-		btn.expand_icon = true
-		btn.add_theme_constant_override("icon_max_width", ICON - 8)
-		btn.custom_minimum_size = Vector2(0, ICON)
-		# these ARE buttons and go disabled when the activation is unavailable,
-		# so the same icon_disabled_color trap applies — without this the art
-		# vanishes exactly when the chip is greyed, which is most of the time.
-		btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
+## One Artefacts-grid cell — passive or activatable (story 50: activatable
+## joins the same grid with a ⚡ marker rather than a separate section).
+## Always a Button (NO-17: a disabled Button still carries its icon, once
+## icon_disabled_color is set — the earlier bare-TextureRect route lost that
+## and rendered art at zero alpha) so long-press works identically on both:
+## gui_input still arrives on a DISABLED Button, which is most of the time for
+## an unavailable activatable one, and "why can't I use this?" is exactly when
+## the description is wanted (story 55).
+func _build_artefact_cell(key: String, count: int) -> Button:
+	var entry: Dictionary = g._artefact_entry(key)
+	var activatable: bool = g.ACTIVATABLE_ARTEFACT_KEYS.has(key)
+	var btn := Button.new()
+	btn.text = "%s%s%s" % ["⚡" if activatable else "", entry.name,
+		" ×%d" % count if count > 1 else ""]
+	btn.icon = g.artefact_tex(key)
+	btn.expand_icon = true
+	btn.add_theme_constant_override("icon_max_width", ICON - 8)
+	btn.custom_minimum_size = Vector2(0, ICON)
+	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
+	btn.tooltip_text = entry.description
+	if activatable:
 		var targeting: bool = g.artefact_targeting_key == key
 		btn.disabled = not (g._artefact_activation_available(key) or targeting)
-		btn.tooltip_text = entry.description
 		if targeting: # mid-targeting (Bovine): tint like an active Item, tap
-			# again to cancel — same shape _rebuild_item_strip already uses
+			# again to cancel — same shape _use_item already uses
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		btn.pressed.connect(func() -> void:
 			if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
 				btn.remove_meta("lp_fired")
 				return
 			artefact_activate_pressed.emit(key))
-		# gui_input still arrives on a DISABLED chip, which is most of the time —
-		# and "why can't I use this?" is exactly when the description is wanted.
-		btn.gui_input.connect(func(e: InputEvent) -> void:
-			_long_press_input(btn, key, entry.description, e))
-		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		activate_box.add_child(btn)
+	else: # story 53: a tap does nothing — a passive Artefact has nothing to press
+		btn.disabled = true
+	btn.gui_input.connect(func(e: InputEvent) -> void:
+		_long_press_input(btn, key, entry.description, e))
+	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
+	btn.set_meta("key", key) # lookup for probes/tests
+	return btn
 
 
-func _rebuild_item_strip() -> void:
-	for c in item_box.get_children():
+func _rebuild_items_grid() -> void:
+	for c in items_grid.get_children():
 		c.queue_free()
 	for i in g.items.size():
 		var btn := Button.new()
 		if g.item_icons.has(g.items[i].key):
 			btn.icon = g.item_icons[g.items[i].key]
 			# icon_max_width clamps AND reserves layout space; expand_icon
-			# would let the icon collapse to 0 in a packed strip.
+			# would let the icon collapse to 0 in a packed grid.
 			# ICON - 8 rather than ICON: this button carries the item NAME beside
-			# its icon, so the glyph is inset to keep the row the same height as
-			# every other strip instead of taller than all of them.
+			# its icon, so the glyph is inset to keep the cell the same height as
+			# every other cell instead of taller than all of them.
 			btn.add_theme_constant_override("icon_max_width", ICON - 8)
 			btn.custom_minimum_size = Vector2(0, ICON)
 			btn.text = g.items[i].name
@@ -1098,7 +1039,7 @@ func _rebuild_item_strip() -> void:
 		btn.gui_input.connect(func(e: InputEvent) -> void:
 			_long_press_input(btn, "item:%d" % i, g.items[i].description, e))
 		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		item_box.add_child(btn)
+		items_grid.add_child(btn)
 
 
 ## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),

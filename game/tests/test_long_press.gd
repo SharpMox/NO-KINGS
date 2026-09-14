@@ -67,7 +67,10 @@ func _boot_game() -> Node:
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
 		"items": ["sniper", "blitz"],
-		"artefacts": ["moscovium-glow-stick"],
+		# NO-85: one activatable (moscovium) and one passive (tinfoil-hat), so
+		# the same boot covers tap-vs-long-press on both kinds of Artefacts
+		# grid cell, alongside the Items grid above.
+		"artefacts": ["moscovium-glow-stick", "tinfoil-hat"],
 		"stock": ["pawn"], "wave": 1, "gold": 200, "seed": 1}
 	GameScript.is_scenario = true
 	var game: Node = load("res://scenes/Game.tscn").instantiate()
@@ -83,7 +86,16 @@ func _boot_game() -> Node:
 func _item_button(game: Node, key: String) -> Button:
 	for i in game.items.size():
 		if game.items[i].key == key:
-			return game.hud.item_box.get_child(i)
+			return game.hud.items_grid.get_child(i)
+	return null
+
+
+## NO-85: cells carry their key as meta (hud.gd's _build_artefact_cell), so
+## lookup does not depend on grid order.
+func _artefact_cell(game: Node, key: String) -> Button:
+	for c in game.hud.artefacts_grid.get_children():
+		if c is Button and c.get_meta("key", "") == key:
+			return c
 	return null
 
 
@@ -121,12 +133,12 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# --- a long press on an ACTIVATE CHIP shows its description, does not activate
+	# --- a long press on a ⚡ ARTEFACT CELL shows its description, does not activate
 	# Moscovium Glow Stick is free and always available while held, so a plain
 	# press WOULD open the activation confirm — which is what must not happen.
 	game = await _boot_game()
-	var chip: Button = game.hud.activate_box.get_child(0) if game.hud.activate_box.get_child_count() > 0 else null
-	check(chip != null and not chip.disabled, "the inventory drawer has a live Activate chip")
+	var chip: Button = _artefact_cell(game, "moscovium-glow-stick")
+	check(chip != null and not chip.disabled, "the Artefacts grid has a live ⚡ cell")
 	clean = false
 	for attempt in 3:
 		game.hud.hide_tip()
@@ -134,8 +146,8 @@ func _init() -> void:
 			clean = true
 			break
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
-	check(clean, "a long press on the chip completed without real cursor motion")
-	check(game.hud.tip_panel.visible, "a long press on an Activate chip shows its description")
+	check(clean, "a long press on the cell completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a ⚡ Artefact cell shows its description")
 	check(game.hud.tip_label.text == game._artefact_entry("moscovium-glow-stick").description,
 		"...and it is that artefact's description")
 	check(not game.buff_pick_open, "...and does NOT open the activation confirm")
@@ -145,6 +157,35 @@ func _init() -> void:
 	check(game.hud.tip_panel.visible and tr.position.x >= 0.0 and tr.position.y >= 0.0
 			and tr.end.x <= vp.x and tr.end.y <= vp.y,
 		"...and the popup is visible and fully on screen (%s in %s)" % [tr, vp])
+	game.queue_free()
+	await process_frame
+
+	# --- NO-85 story 53/54/55: a PASSIVE Artefact cell — tap does nothing, long
+	# press still describes it. This is the one cell that is disabled forever
+	# (not just conditionally, like an unavailable ⚡ one), so it is the sharpest
+	# check that long-press still reaches a permanently-greyed cell.
+	game = await _boot_game()
+	var passive := _artefact_cell(game, "tinfoil-hat")
+	check(passive != null and passive.disabled, "the Artefacts grid has a passive (always-disabled) cell")
+	game.hud.hide_tip()
+	var pat: Vector2 = passive.get_global_rect().get_center()
+	_mouse(true, pat)
+	await process_frame
+	_release_at(pat)
+	await process_frame
+	check(not game.hud.tip_panel.visible, "a short tap on a passive Artefact cell shows no description")
+	check(not game.buff_pick_open, "...and does nothing else either")
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(pat):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the passive cell completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a passive Artefact cell shows its description")
+	check(game.hud.tip_label.text == game._artefact_entry("tinfoil-hat").description,
+		"...and it is that artefact's description")
 	game.queue_free()
 	await process_frame
 

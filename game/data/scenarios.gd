@@ -75,6 +75,19 @@ static func _hand_written() -> Array:
 			"stock": ["pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn", "pawn",
 				"rook", "rook", "rook", "knight", "knight", "bishop", "queen",
 				"ferz", "wazir", "champion", "gnu", "buffalo"]}},
+		# NO-85: the Inventory Drawer's one scrolling column (Items grid, then
+		# Artefacts grid) with enough of each to force a scroll — several
+		# Items, several passive Artefacts and two ⚡ Artefacts mixed into the
+		# same grid (story 50).
+		{"name": "Inventory Drawer: several Items, passive and ⚡ Artefacts", "cfg": {
+			"board": ZONE_PAWNS, "score": 500, "wave": 5, "gold": 1000,
+			"items": ["blitz", "sniper", "air_strike", "demote", "promote",
+				"invert", "tactical_reposition", "decoy_swap"],
+			"artefacts": ["27-club-punch-card", "tinfoil-hat",
+				"area-51-parking-permit", "fort-knox-iou",
+				"fema-summer-camp-flyer", "zurich-gnome-figurine",
+				"nero-s-marshmallow-stick", "pre-scratched-lottery-ticket",
+				"oak-island-wishing-well", "fifa-complimentary-yacht"]}},
 		{"name": "Early clear: bonus for beating the cadence", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 			"wave": 2, "stock": ["pawn"], "score": 100}},
@@ -169,10 +182,8 @@ static func _hand_written() -> Array:
 		# scrollable range and an assertion that could barely fail. Sixteen
 		# leaves real room, and the probe asserts the margin rather than a bare
 		# inequality so this cannot go vacuous unnoticed.
-		# Deliberately all PASSIVE keys: an activatable artefact is moved out of
-		# artefact_box into activate_box (hud.gd's _rebuild_artefact_strip skips
-		# ACTIVATABLE_ARTEFACT_KEYS), which would silently shorten the list this
-		# scenario exists to lengthen.
+		# All PASSIVE keys — predates NO-85, which merged activatable Artefacts
+		# into this same grid; kept passive-only since nothing needs it mixed.
 		{"name": "Artefacts: sixteen held, so the drawer list actually scrolls", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 			"artefacts": ["27-club-punch-card", "tinfoil-hat",

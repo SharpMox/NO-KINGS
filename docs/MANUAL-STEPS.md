@@ -1,8 +1,9 @@
 # Manual steps only you can do — the blockers on NO-10, NO-12 and NO-13 (archive issues 86 / 87)
 
 Everything in this file needs an account, a payment, a device or a GUI login. Nothing here can
-be done from the dev loop, which is why these two slices are stalled while the rest of the
-backlog is merged.
+be done from the dev loop. Section A (Android / Play Games) and section E (the release
+keystore) are largely done as of 2026-09-15 — what's left in each is marked inline. iOS
+(section D) still has open items.
 
 Ordered so that **section A unblocks Android entirely**. iOS is deliberately last — see
 issue 87 for why it is the harder half.
@@ -100,6 +101,14 @@ Two constraints the dialog states, worth not tripping over:
 Then **Properties -> Edit properties** and set a display name — required before testing.
 
 ### A5a. Configure the OAuth consent screen FIRST
+
+**Brand verification: DONE 2026-09-15.** sharpunk.com is verified as a Domain property in
+Search Console (that covers `nokings.sharpunk.com`). Branding is set to: home page
+`https://nokings.sharpunk.com/`, privacy `https://nokings.sharpunk.com/privacy.html`, terms
+`https://nokings.sharpunk.com/terms.html`, authorized domain `sharpunk.com`, logo from
+`game/icon.png` at 120x120. The first attempt failed with "home page URL is not registered to
+you" because it predated the Search Console verification — do that first if this ever needs
+redoing. Changing the name, logo, home page or privacy URL later re-triggers verification.
 
 **Add credential is greyed out until this exists.** The Credentials page offers a **Configure**
 link that sends you to the Cloud console — recent versions call this **Google Auth Platform**
@@ -267,6 +276,8 @@ consumer-facing listings, and a Personal account shows **an individual's name an
 where an Organisation account shows the company's. For anything shipped publicly that alone
 justifies it.
 
+**SUBMITTED 2026-09-15, now in Google's review.**
+
 ### The signing-in email does NOT set the account type
 
 Easy to misread, and it costs money to act on: the Console shows
@@ -313,10 +324,12 @@ So the revised order:
    (Membership details) or the D&B record; it is the same nine digits either way.
 2. **Continue section A on the existing Personal account** whenever you like. Sign-in, Saved
    Games, leaderboards and device testing do not care about account type.
-3. **Convert whenever you want to**: new payments profile of the organisation type -> verify
-   -> link to the existing developer account. What is still needed for that, and none of it is
-   a wait: the official organisation documents, an identity document for the account owner,
-   sharpunk.com verified in Search Console (the domain is already owned), and no second $25.
+3. ~~Convert whenever you want to~~ — **SUBMITTED 2026-09-15, in Google's review.** The order
+   that worked: set sharpunk.com as the website in Play Console Account details and verify it
+   there (Play confirms it via Search Console), then **Change account type** (the organisation
+   form: type, size, phone in +33 format with no spaces), then a **new** organisation payments
+   profile, then **Verify organization** with the Kbis extract and an ID. A generic Play error
+   (`7560E8F6`) appeared once and cleared on retry.
 
 The developer account **ID stays the same** through that conversion (`5660342400699971142`),
 so the PGS project, the OAuth credential and the leaderboard ids created in section A are
@@ -324,9 +337,10 @@ expected to survive it — they are bound to the app and the PGS project, not to
 profile. Worth confirming rather than assuming at conversion time, but it is not a reason to
 delay section A.
 
-One thing to check before filing: the address that becomes public is the company's **siège
-social**. If Sharpunk is registered at a home address, an Organisation account does not hide it
-— a domiciliation service would.
+**Checked, not a home address.** Sharpunk is domiciled with Vivienne Domiciliation, so the
+public address is a registered office: **SHARPUNK SAS, SIREN 108 625 393, 47 rue Vivienne,
+75002 Paris**. D-U-N-S **288013708**. Organisation accounts show the legal name, legal
+address, developer email AND developer phone publicly — all four, not just name and address.
 
 ---
 
@@ -546,10 +560,9 @@ saying "UNVERIFIED ON DEVICE" cannot update itself once merged.
 
 ## C. Only when you actually publish — not needed for any of the above
 
-- **A release keystore**, kept somewhere safe and backed up. Losing it means never being able
-  to update the app. Its SHA-1 needs its own credential (step A4 again).
+- **A release keystore** — exists, see section E.
 - **`gradle_build/export_format=1`** — Google Play requires an **AAB**, not an APK, for new
-  apps. Currently `0`.
+  apps. Set, see section E.
 - Store listing copy, screenshots, a privacy policy URL, and the content questionnaires.
 
 ---
@@ -670,29 +683,43 @@ Not needed from you: the Apple ID password or 2FA codes, ever.
 app. Issue 86 measured the difference: **28.9 MB as an AAB against 78 MB as an APK**, because
 the native libs are stored compressed again.
 
-That leaves exactly one blocker, and it is the one thing an agent must not create for you.
+That blocker is now cleared. What follows is a record of the key that exists, not a recipe
+for making one.
 
 ### What the key IS
 
-Not something you download. You **generate** it, once, with `keytool` from the JDK already
-installed for the Android build:
+**It exists — DONE 2026-09-09. Do NOT run `keytool -genkey` again.** That would generate a
+new, different upload key and orphan the one already registered with Google Play.
+
+`~/keystores/nokings-upload.keystore`, PKCS12 (one password for both the store and the key),
+alias `nokings`, valid to 2054-01-25. Owner: CN=Maxime Charpentier, OU=Software, O=Sharpunk,
+L=Paris, ST=Paris, C=FR.
+
+| | |
+| --- | --- |
+| SHA-1 | `37:18:E3:91:79:03:B1:E1:FA:9D:C8:56:03:D7:71:21:A5:30:9A:63` |
+| SHA-256 | `7D:F2:9B:C0:62:89:72:FE:F6:A8:BA:7B:4D:07:72:3C:05:F9:FD:9B:77:DF:09:EB:04:7F:74:BD:45:8F:8E:F1` |
+
+The password lives in the macOS Keychain, service `nokings-keystore` — see "How the key
+reaches the build" below for reading it at invocation time. **A note labelled CHESSBRAWL
+holds a different, older keystore password; it does NOT open this keystore.**
+
+**Call keytool through `$JAVA_HOME`, not by bare name,** for any future check against this
+key (e.g. `keytool -list -v` or `-printcert`). macOS ships a stub at `/usr/bin/keytool` that
+is first on `PATH` and is not a real tool — it answers every invocation with *"The operation
+couldn't be completed. Unable to locate a Java Runtime."* `which keytool` finds the stub and
+tells you nothing, which is how this was hit for real on 2026-09-09:
 
 ```sh
-mkdir -p ~/keystores
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-"$JAVA_HOME/bin/keytool" -genkey -v -keystore ~/keystores/nokings-upload.keystore \
-  -alias nokings -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-**Call keytool through `$JAVA_HOME`, not by bare name.** macOS ships a stub at
-`/usr/bin/keytool` that is first on `PATH` and is not a real tool — it answers every
-invocation with *"The operation couldn't be completed. Unable to locate a Java Runtime."*
-`which keytool` finds the stub and tells you nothing, which is how this was hit for real on
-2026-09-09. The JDK installed for the Android build is the working one, same as the debug
-fingerprint command further up already assumes.
+### Off-Mac backup — DONE
 
-It asks for a keystore password, a key password and some identity fields. The file plus those
-two passwords and the alias are the whole credential.
+The keystore file lives in an AES-256 encrypted disk image in iCloud Drive
+(`nokings-keystore-backup.dmg`). Its passwords are in Max's own notes, not in the repo.
+`hdiutil` must run from a real Terminal — from a harness shell with no TTY it fails with
+"Inappropriate ioctl for device".
 
 ### Why it is handled differently from every other config
 
@@ -704,9 +731,7 @@ Two consequences, both non-negotiable:
 
 - **It never goes in the repo.** See "How the key reaches the build" below — this is the
   part with a real, specific leak path, not a general caution.
-- **Back it up somewhere that is not this machine.** A password manager or an encrypted
-  archive. The file, BOTH passwords and the alias — all four, or none of it works. Not
-  `~/Downloads`.
+- **Backed up somewhere that is not this machine — DONE.** See "Off-Mac backup" above.
 
 ### How the key reaches the build — environment variables, never the editor UI
 
@@ -759,23 +784,55 @@ keys"). There is no opt-in step to remember at app-entry creation — this page 
 was. What it means for the key above is unchanged: it is an **upload** key, not the final
 signing key.
 
-Google does NOT generate the upload key for you. You still run the `keytool` command above:
-Play needs your first AAB signed with something, and registers that as your upload key. What
+Google does NOT generate the upload key for you — Play needed a first AAB signed with
+something, and registered that as the upload key (the `keytool` run recorded above). What
 enrolment buys is recovery — a lost upload key is reset by generating a new one, exporting its
 certificate to PEM, and submitting a reset request in the Play Console. A lost key on an app
 that was NOT enrolled is terminal.
 
-### What I can do once the key exists
+**Confirmed in Play Console 2026-09-15:** Play App Signing is **ON** ("Releases are signed by
+Google Play") and Automatic protection is **ON**.
 
-Everything else is already prepared. Build:
+### Verified release build recipe (2026-09-15)
+
+From a worktree at `main`: copy `game/android/build` and `.build_version` from the primary
+checkout (see "The build template does not exist in a git worktree" in section B), then:
 
 ```sh
-cd game && godot --headless --path . --export-release "Android" ../build/nokings.aab
+GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$HOME/keystores/nokings-upload.keystore" \
+GODOT_ANDROID_KEYSTORE_RELEASE_USER=nokings \
+GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$(security find-generic-password -s nokings-keystore -w)" \
+godot --headless --path game --export-release "Android" ../build/nokings.aab
 ```
 
+`export_presets.cfg` stays clean — no keystore fields get written to it. Check the signer
+with `keytool -printcert -jarfile <aab>` and the manifest with
+`bundletool dump manifest --bundle=<aab>`.
+
 The preset is otherwise complete — `arm64-v8a` only, `com.sharpunk.nokings`, launcher icons
-wired, Play Games app id `292256536070` set, `package/signed=true`.
+wired, Play Games app id `292256536070` set, `package/signed=true`. version/name is `0.1.0`
+since PR #434 (version/code 1), matching iOS `short_version` 0.1.0.
 
 **Corrected 2026-09-07:** issue 86 recorded *"No project icon specified — a store build will
 want one."* That is stale. `project.godot` carries `config/icon="res://icon.png"` and the
 file exists. Nothing owed there.
+
+### Play Console status (2026-09-15)
+
+Internal testing release **"1 (0.1.0)"** went live 2026-09-15 22:41. Play warnings on that
+release: no deobfuscation file (not applicable — Godot game logic is native) and no native
+debug symbols (tracked as a follow-up).
+
+A newly released first internal build can show "Item not found" on the phone for a while
+even after Play Console shows it "Available to internal testers." Wait before debugging.
+
+### NEXT: an OAuth credential for the Play App Signing key
+
+Section A5 gave the Android OAuth credential the **debug** SHA-1. A Play-installed build is
+signed with the **app signing key** (held by Google, not `nokings-upload.keystore`) — a
+different SHA-1 — so sign-in is expected to fail on a Play-installed build until a matching
+Android OAuth credential is added for it: Play Console -> Test and release -> App integrity
+-> App signing, read the SHA-1 there, then repeat A5 with it.
+
+**A Play-signed build cannot install over a debug-signed one** (signature mismatch), and
+uninstalling the debug build deletes its local save. Never do that on Max's phone.

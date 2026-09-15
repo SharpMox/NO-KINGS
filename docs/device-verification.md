@@ -25,6 +25,32 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `feat/no-68-driver-type-verb` (PR #433) — 2026-09-15, iOS SIMULATOR pass on retry — NO-68
+
+**Supersedes the BLOCKED entry directly below.** Build `995c3c7`, iOS SIMULATOR
+`NK-iPhone-11` (iOS 26.5), not hardware. `--drive` came up clean this time —
+`log_after_launch.txt`: `[drive] listening in user://drive`. Sequence: `type x`
+with nothing focused acked `fail type no LineEdit or TextEdit focused — tap_text
+the field first`; `tap_text 'search scenarios'` then `type 'capture'` then
+`wait_text 'Captures & highlights'` all acked `ok`, and the intervening `probe`
+came back clean. The TEST menu's own header confirmed the filter actually ran:
+"Test scenarios — 391 boards" before, "52 of 391" after, with only capture-tagged
+rows left in the list. Evidence: `~/Documents/nokings-builds/no-68-simulator-retry-2026-09-15/`
+(`ack_1.txt`–`ack_6.txt`, `log_after_launch.txt`, `after_type.png`, `sim.sh`).
+
+**The earlier BLOCKED run did not reproduce.** An interleaved A/B the same
+afternoon (NO-96) ran main and `no68` builds back to back, 11 runs, 11/11 pass —
+`~/Documents/nokings-builds/no-96-simulator-2026-09-15/ab-table.csv`. Probable
+cause: contention with other agents' concurrent builds/suites on the same Mac,
+not proven.
+
+**Still unverified**: real iPhone hardware; the soft keyboard, layout under it,
+autocorrect and paste, none of which `type` exercises on any platform (same
+NOT-COVERED list as the entry below, `docs/ios-device-automation.md`,
+`docs/MANUAL-STEPS.md` section B).
+
+---
+
 ## `feat/no-68-driver-type-verb` (PR #433) — 2026-09-15, desktop verified, simulator BLOCKED — NO-68
 
 **The driver's new `type` verb** (`game/scripts/drive.gd`): sends real `InputEventKey`

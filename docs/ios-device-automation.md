@@ -335,7 +335,7 @@ check as more than it is:**
 Those four stay by-eye checks — see `docs/MANUAL-STEPS.md` section B, which
 carries the same list next to the note it corrects.
 
-**Proven on the desktop suite, not (yet) on hardware or the simulator.**
+**Proven on the desktop suite and the iOS simulator; not yet on real hardware.**
 `game/tests/test_drive_type.gd` drives the verb through the real
 cmd.txt/ack.txt protocol against the TEST menu's own search LineEdit (NO-58):
 asserts the failure with nothing focused, the failure with something focused
@@ -343,15 +343,17 @@ that is not a text field, `tap_text` finding the empty box by its placeholder,
 and — once focus is granted with `grab_focus()` (headless drops GUI picking,
 same reason `tests/test_drive.gd` never asserts a tap actually landed; that
 half is the windowed click probes' job) — the field's own `text`, the filtered
-list showing the match, and every non-matching row hidden. A simulator run
+list showing the match, and every non-matching row hidden. A first simulator run
 against `NK-iPhone-11` (2026-09-15)
 got through build/install/launch cleanly but could not complete a single
 `--drive` round trip at all (not specific to `type` — `probe` alone never
 acked either), while the identical mechanism worked immediately on desktop and
 `--screenshot` worked on the same simulator launch. Full diagnosis:
-`~/Documents/nokings-builds/no-68-simulator-2026-09-15/BLOCKED.txt`. Until that
-is resolved, `type` on real iOS hardware/simulator is unverified — the desktop
-suite proof above is what stands behind this verb today.
+`~/Documents/nokings-builds/no-68-simulator-2026-09-15/BLOCKED.txt`. A retry the
+same afternoon passed — `docs/device-verification.md` (newest entry) — and the
+earlier failure did not reproduce in an 11/11 interleaved A/B (NO-96). Real iOS
+hardware remains unverified; the desktop suite proof plus the simulator retry is
+what stands behind this verb today.
 
 ---
 

@@ -25,6 +25,56 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `25e9c5f` — 2026-09-16, Android, Play Console internal testing — first Play-distributed build on hardware — NO-12
+
+**Nothing Phone 2a**, over the Play Store, not sideloaded. Signed release AAB
+`nokings-release-0.1.0.aab`, built from `main` `25e9c5f`: versionCode 1, versionName
+0.1.0, arm64-v8a, target SDK 36, min API 24, 29.6 MB (30.9 MB as reported by Play for
+new installs). Signed with the upload key (SHA-1
+`37:18:E3:91:79:03:B1:E1:FA:9D:C8:56:03:D7:71:21:A5:30:9A:63`), then re-signed by
+Google under Play App Signing. Uploaded by Max to the Play Console internal testing
+track, release "1 (0.1.0)", live 2026-09-15 22:41. Installed from the internal
+testing link. This is the first time a Play-distributed build of this game has run
+on hardware; every earlier Android entry in this file is a debug sideload.
+
+### Play Games credentials, registered ahead of this pass
+
+A second Android OAuth client
+(`292256536070-h9tm5be7v3q43sjt6n6tuh29tp06o3jq.apps.googleusercontent.com`) was
+registered for the Play signing fingerprint
+(`CD:6E:01:E1:A7:59:11:BA:CA:67:5F:7D:9D:51:34:CA:65:52:4A:26`), which is what Play
+Games Services asked for. The app signing key's classical SHA-1 is
+`13:D6:D5:A8:34:DA:C3:B5:D8:2A:72:32:C4:46:44:8F:41:48:96:94`. Both Android
+credentials show Published in Play Games Services. No app change was needed: the
+game embeds only the game id `292256536070`.
+
+### Confirmed on hardware
+
+| What | Observed |
+| --- | --- |
+| Signature mismatch enforced | The Play Store refused to install over the existing debug build (different signature), as expected. |
+| Pre-uninstall state | The debug build still read "Cloud scores included." before removal. |
+| Play Games sign-in | After uninstalling the debug build and installing the Play build, sign-in succeeded. |
+| Continue | Appeared on the main menu. |
+| Cloud scores | Score rows (1000 at wave 10, 700 at wave 9) came back from the cloud. |
+
+Evidence: Max, by eye, in this session. No screenshots.
+
+### Also seen
+
+Android warned that the previously installed copy did not come from the Play
+Store, accurate for a sideloaded debug build. Play Console's "Automatic
+protection" (prevent unofficial installs) is on.
+
+### Still unverified
+
+Everything else about this build: no gameplay pass, no leaderboard submit from a
+Play build, no reinstall-restore cycle beyond this one, nothing on iOS. The local
+save was not backed up before the uninstall (Max chose to rely on the cloud copy;
+it restored).
+
+---
+
 ## `feat/no-68-driver-type-verb` (PR #433) — 2026-09-15, iOS SIMULATOR pass on retry — NO-68
 
 **Supersedes the BLOCKED entry directly below.** Build `995c3c7`, iOS SIMULATOR

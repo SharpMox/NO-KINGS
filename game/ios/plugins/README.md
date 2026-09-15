@@ -21,27 +21,37 @@ cp -R bin/{gamecenter,icloud}.{debug,release}.xcframework <this dir>/
 
 ## APPLY THE PATCHES IN THIS DIRECTORY BEFORE BUILDING
 
-The vendored binaries are **not** pristine upstream. Three patches, applied
-with `patch -p1` from `~/godot-ios-plugins`, in any order — they touch
-different lines of `plugins/gamecenter/game_center.mm`:
+The vendored binaries are **not** pristine upstream. Four patches, applied
+with `patch -p1` from `~/godot-ios-plugins`, touch `plugins/gamecenter/game_center.mm`:
 
 | Patch | What it fixes |
 |---|---|
 | `gamecenter-godot47-window.patch` | Godot 4.7 leaves the app delegate's `window` nil, so `authenticate()` could never present its view controller. |
 | `gamecenter-utf8-strings.patch` | The plugin handed Godot a UTF-8 `const char *`, whose `String` constructor parses **Latin-1** (`core/string/ustring.h`), mangling every non-Latin player name (NO-52). |
 | `gamecenter-scoped-ids.patch` | Reports `scopedIDsArePersistent`, Apple's documented way to tell whether `teamPlayerID` is stable or unique per app launch (NO-53). |
+| `gamecenter-submit-score.patch` | `post_score()` submitted through `GKScore`/`reportScores:withCompletionHandler:`, deprecated since iOS 14. Moves it to `GKLeaderboard submitScore:context:player:leaderboardIDs:completionHandler:` and drops the `respondsToSelector:@selector(reportScores)` guard, which checked a selector name that never matched and so never fired (NO-48). Guarded with `if (@available(iOS 14, *))` since the plugin's own `SConstruct` still floors at `-miphoneos-version-min=12.0`; this project's export (`application/min_ios_version` in `export_presets.cfg`) is 14.0, so the `else` branch (`ERR_UNAVAILABLE`) is not reachable on a build made from this preset. |
 
-**A rebuild that skips them silently reintroduces all three**, and two of the
-three are invisible on an English-language account with a persistent id. Verify
-after applying:
+**The first three touch different lines and apply in any order. The fourth
+does not** — it rewrites `post_score()` whole, including the line
+`gamecenter-utf8-strings.patch` already touched (the error branch's
+`error_description`), so **apply `gamecenter-submit-score.patch` after
+`gamecenter-utf8-strings.patch`**, not before. Verified 2026-09-15: applying
+all four in the order listed in this table, onto pristine upstream, reproduces
+the vendored source byte-for-byte (matching `md5`).
+
+**A rebuild that skips them silently reintroduces all four**, and three of the
+four are invisible on an English-language account with a persistent id and no
+score submitted. Verify after applying:
 
 ```sh
 grep -c 'String::utf8(\[player' plugins/gamecenter/game_center.mm   # expect 2
 grep -c 'scopedIDsArePersistent'  plugins/gamecenter/game_center.mm   # expect 2
 grep -c 'nk_root_controller'      plugins/gamecenter/game_center.mm   # expect 3
+grep -c 'GKLeaderboard submitScore' plugins/gamecenter/game_center.mm # expect 1
+grep -c 'GKScore'                 plugins/gamecenter/game_center.mm   # expect 1 (the patch's own comment, not a call)
 ```
 
-All three are candidates for upstream PRs; none is specific to this project.
+All four are candidates for upstream PRs; none is specific to this project.
 
 ## `connectivity` — OUR plugin, not upstream's (NO-64)
 

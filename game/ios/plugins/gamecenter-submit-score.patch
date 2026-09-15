@@ -1,0 +1,55 @@
+diff --git a/plugins/gamecenter/game_center.mm b/plugins/gamecenter/game_center.mm
+--- a/plugins/gamecenter/game_center.mm
++++ b/plugins/gamecenter/game_center.mm
+@@ -176,25 +176,34 @@
+ 	String category = p_score["category"];
+
+ 	NSString *cat_str = [[NSString alloc] initWithUTF8String:category.utf8().get_data()];
+-	GKScore *reporter = [[GKScore alloc] initWithLeaderboardIdentifier:cat_str];
+-	reporter.value = score;
+
+-	ERR_FAIL_COND_V([GKScore respondsToSelector:@selector(reportScores)], ERR_UNAVAILABLE);
+-
+-	[GKScore reportScores:@[ reporter ]
+-			withCompletionHandler:^(NSError *error) {
+-				Dictionary ret;
+-				ret["type"] = "post_score";
+-				if (error == nil) {
+-					ret["result"] = "ok";
+-				} else {
+-					ret["result"] = "error";
+-					ret["error_code"] = (int64_t)error.code;
+-					ret["error_description"] = String::utf8([error.localizedDescription UTF8String]);
+-				};
++	// LOCAL PATCH (NO KINGS, 2026-09-15): GKScore/-reportScores:withCompletionHandler:
++	// is deprecated since iOS 14 in favour of GKLeaderboard's class method below
++	// (NO-48). The respondsToSelector guard this replaces checked a selector named
++	// "reportScores" — the real one is "reportScores:withCompletionHandler:" — so it
++	// never matched and never fired; it read as an availability check and was not
++	// one. The @available guard below is a real one. Candidate for an upstream PR.
++	if (@available(iOS 14, *)) {
++		[GKLeaderboard submitScore:(NSInteger)score
++							context:0
++							 player:[GKLocalPlayer localPlayer]
++					 leaderboardIDs:@[ cat_str ]
++				  completionHandler:^(NSError *error) {
++			Dictionary ret;
++			ret["type"] = "post_score";
++			if (error == nil) {
++				ret["result"] = "ok";
++			} else {
++				ret["result"] = "error";
++				ret["error_code"] = (int64_t)error.code;
++				ret["error_description"] = String::utf8([error.localizedDescription UTF8String]);
++			};
+
+-				pending_events.push_back(ret);
+-			}];
++			pending_events.push_back(ret);
++		}];
++	} else {
++		return ERR_UNAVAILABLE;
++	}
+
+ 	return OK;
+ };

@@ -248,30 +248,6 @@ func _init() -> void:
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 
-	# --- Tariffs: identical draw at every tier — the severity-shift lever is
-	# gone (user call: rejected as illegible) ---
-	var t1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
-	await process_frame
-	t1.rng.seed = 99
-	Economy.activate_king_ability(t1, "Mild")
-	var drawn_1: String = t1.king_abilities_seen[0] if not t1.king_abilities_seen.is_empty() else ""
-	t1.queue_free()
-	await process_frame
-
-	GameScript.next_tier = "Tier 5"
-	var t5 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
-	await process_frame
-	t5.rng.seed = 99
-	Economy.activate_king_ability(t5, "Mild")
-	var drawn_5: String = t5.king_abilities_seen[0] if not t5.king_abilities_seen.is_empty() else ""
-	t5.queue_free()
-	await process_frame
-	GameScript.next_tier = Tuning.DEFAULT_TIER
-
-	check(drawn_1 != "" and drawn_1 == drawn_5,
-		"the same Mild draw lands identically at Tier 1 and Tier 5 (no severity shift): %s"
-			% drawn_1)
-
 	# --- issue 59: the enemy takes 2 Actions at Tier 5, 1 at Tiers 1-4 — a
 	# live boot, not just the pure Tuning math above, to prove Economy.
 	# enemy_actions actually reads g.next_tier when it seeds on_enemy_turn_start ---

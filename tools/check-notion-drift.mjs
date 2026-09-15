@@ -28,7 +28,11 @@
 //   Artefacts       app.notion.com/p/dcfc4879530547c785278f198b85f3cb   (180 rows)
 //   Items           app.notion.com/p/4bb01465387746e0beac20f382e7544c   (16)
 //   Pieces          app.notion.com/p/a0cc1983c47541b6a92922f0113dc627   (39)
-//   Tariffs Catalog app.notion.com/p/8906ed7b41da4b64a800f30af3494c8d   (19)
+//   Tariffs Catalog app.notion.com/p/8906ed7b41da4b64a800f30af3494c8d   (9)
+//
+// Tariffs went 19 -> 9 on 2026-09-15 (NO-95): the ten King Abilities no run
+// could reach moved to the Notion page "Parked King Abilities", and Inflation
+// was renamed Tariff on Gold Gain. The two sides hold the same 9 entries.
 //
 // Tariffs went 21 -> 19 on 2026-09-09, and the catalog is now
 // game/data/king_abilities.gd (const ABILITIES). Two rows went:

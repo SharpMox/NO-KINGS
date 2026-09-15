@@ -274,10 +274,11 @@ const KITS := {
 		"power_name": "Tariff",
 		"power_desc": "A new Tariff comes into force every few turns, for the whole of this King's wave.",
 		# ESCALATING (design 2026-09-09). Ordered by tier so the wave tightens
-		# rather than opening at full strength: the five Mild Tariffs first,
-		# then the two Moderate ones. Trump is the only King whose Power is a
-		# catalog entry at all, so this field is his alone.
-		"power_catalog_escalation": ["move_cost", "capture_cost", "pass_cost",
+		# rather than opening at full strength: the six Mild Tariffs first,
+		# then the two Moderate ones. Tariff on Gold Gain second (NO-95), so it
+		# lands at turn 10. Trump is the only King whose Power is a catalog
+		# entry at all, so this field is his alone.
+		"power_catalog_escalation": ["move_cost", "inflation", "capture_cost", "pass_cost",
 			"long_range_cost", "ability_cost", "deploy_cost", "fuse_cost"],
 		"ability_name": "Diplomatic Visit – JD Vance",
 		"ability_desc": "Destroys your highest-value piece on the board.",

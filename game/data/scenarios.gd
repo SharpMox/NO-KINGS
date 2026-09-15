@@ -149,8 +149,8 @@ static func _hand_written() -> Array:
 				["king", 1, 3, 10, {"king_id": "donald_trump"}], ["rook", 1, 2, 10], ["bishop", 1, 4, 10]],
 			"wave": 50, "score": 1000, "gold": 300, "turns_since_wave": 20,
 			"king_power_id": "donald_trump",
-			"king_abilities": ["move_cost", "capture_cost", "pass_cost"],
-			"king_power_abilities": ["move_cost", "capture_cost", "pass_cost"]}},
+			"king_abilities": ["move_cost", "inflation", "capture_cost"],
+			"king_power_abilities": ["move_cost", "inflation", "capture_cost"]}},
 		# Wave 51 after the win: ⚑ reads 51/201, ⏳ counts toward Wave 52.
 		{"name": "Header: Wave 51 after the win", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
@@ -385,20 +385,8 @@ static func _hand_written() -> Array:
 			"gold": 500, "items": ["blitz"], "captured": ["pawn", "pawn"], "stock": ["pawn"], "score": 1000}},
 		{"name": "Tariffs: all persistent", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 3, 6]],
-			"king_abilities": ["inflation", "sanctions", "regulation", "austerity", "recession", "trade_war", "filibuster"],
+			"king_abilities": ["inflation"],
 			"stock": ["pawn", "pawn", "rook"], "captured": ["pawn", "pawn"], "wave": 8, "score": 1000}},
-		{"name": "Regulation: pawn promotion blocked (NO-70)", "cfg": {
-			"board": [["pawn", 0, 2, 1], ["sergeant", 0, 3, 1], ["pawn", 1, 3, 6]],
-			"king_abilities": ["regulation"], "items": ["promote"], "stock": ["pawn", "pawn"],
-			"gold": 200, "wave": 8}},
-		{"name": "One-off: Forced Audit", "cfg": {
-			"board": ZONE_PAWNS, "captured": ["rook", "queen", "pawn"], "oneoffs": ["forced_audit"]}},
-		{"name": "One-off: Asset Seizure", "cfg": {
-			"board": ZONE_PAWNS, "stock": ["rook", "queen", "pawn"], "oneoffs": ["asset_seizure"]}},
-		{"name": "One-off: Asset Freeze", "cfg": {
-			"board": ZONE_PAWNS, "score": 1000, "oneoffs": ["asset_freeze"]}},
-		{"name": "One-off: Hostile Takeover", "cfg": {
-			"board": ZONE_PAWNS + [["rook", 0, 2, 1], ["bishop", 0, 3, 1]], "oneoffs": ["hostile_takeover"]}},
 		{"name": "One-off: JD Vance", "cfg": {
 			"board": ZONE_PAWNS + [["queen", 0, 3, 1]], "oneoffs": ["jd_vance"]}},
 		# --- full piece set ---

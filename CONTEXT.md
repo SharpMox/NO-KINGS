@@ -30,12 +30,15 @@ _Avoid_: using it for the starting kit — that is an Army.
 **Signature piece**:
 The piece (and its Family) that gives an Army its identity — the GDD's "unique Queen" reinterpreted after dropping queen-grade centerpieces as too strong. Team special abilities and Piece Cases from the GDD are deferred, not implemented.
 
+**King Ability**:
+An entry in the King Ability catalogue (`game/data/king_abilities.gd`) that a King's kit draws on. Only Donald Trump draws on it: his Tariffs, and his Ability, JD Vance. Ten more are parked as design stock on the Notion page "Parked King Abilities" (NO-95).
+
 **Tariff**:
-Donald Trump's King Power: a King Ability from the catalogue (`game/data/king_abilities.gd`) that comes into force during his Wave and escalates every few turns, active only while his Wave lasts (`Kings.apply_power` clears it when the next Wave spawns). Three kinds: **action** (Gold surcharge when the taxed action happens), **persistent** (rule modifier, e.g. Inflation), **oneoff** (applies instantly on activation). The every-10th-wave schedule this entry used to describe is switched off (`Tuning.KING_ABILITIES_SCHEDULED`); corrected by NO-83.
+A King Ability that Donald Trump's Power stacks during his Wave: a surcharge on a taxed action, or a standing modifier (Tariff on Gold Gain). One more comes into force every `Tuning.KING_TARIFF_STACK_TURNS` turns, and the whole stack clears when the next Wave spawns (`Kings.apply_power`). JD Vance is a King Ability used as Trump's Ability, never a Tariff.
 _Avoid_: "debuff", "curse"
 
 **Tariff suppression**:
-What Counter-Intel does (grilled 2026-07-17): action and persistent tariffs stop applying for the rest of the current wave, ending when the next wave spawns. Oneoff tariffs are untouched — they already fired. Replaces the deleted turn-counted version (`counter_intel_turns`).
+What Counter-Intel does (grilled 2026-07-17): action and persistent tariffs stop applying for the rest of the current wave, ending when the next wave spawns. Replaces the deleted turn-counted version (`counter_intel_turns`).
 
 **Stock entry**:
 One element of the player's Stock: a bare piece id, or `{id + opaque piece state}` for a piece returned from the board carrying state (e.g. a future buff). Stock never interprets the state — see ADR-0002. Distinct-state copies stack separately in the HUD.

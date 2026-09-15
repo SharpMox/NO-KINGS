@@ -308,8 +308,7 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 26: spawn roster modifiers (HAARP Volume Knob, Wuhan Vial
-	# Label, Pigeon Charging Cable) — on_wave_roster, Trade War's own
-	# prerequisite (issue 13), not a new one
+	# Label, Pigeon Charging Cable) — on_wave_roster
 	var haarp := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "score": 0, "gold": 0, "artefacts": ["haarp-volume-knob"]})
 	await process_frame
@@ -465,7 +464,7 @@ func _init() -> void:
 	# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
 	# Assembly Manual) — on_wave_clear + _milestone5_hit, PER-ARTEFACT
 	# (ruled 2026-08-28), silk-road-coupon's cadence, not the GLOBAL 10-wave
-	# on_clock_refill hook. acquired_wave forced to 1 to isolate the handler's
+	# Clock refill. acquired_wave forced to 1 to isolate the handler's
 	# own cadence math from the acquisition-stamping coverage below.
 	var arkb := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 99999, "artefacts": ["ark-s-bunkbed"]})

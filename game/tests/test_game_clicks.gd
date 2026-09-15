@@ -917,12 +917,12 @@ func _init() -> void:
 	await process_frame
 	check(trump_game.preview_open, "double-tap on the King opens his info panel")
 	check(_has_label_text(trump_game.preview_panel, "Tariff on Move")
-			and _has_label_text(trump_game.preview_panel, "Tariff on Capture")
-			and _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
+			and _has_label_text(trump_game.preview_panel, "Tariff on Gold Gain")
+			and _has_label_text(trump_game.preview_panel, "Tariff on Capture"),
 		"...listing each Tariff in force by name")
 	check(_has_label_text(trump_game.preview_panel, "Each piece move costs extra gold."),
 		"...with its description")
-	check(not _has_label_text(trump_game.preview_panel, "Tariff on Long-Range"),
+	check(not _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
 		"(setup) the fourth Tariff is not in force yet")
 	check(await _click_button_in(trump_game.preview_panel, "Close"), "Close clickable")
 	await process_frame
@@ -931,7 +931,7 @@ func _init() -> void:
 	await create_timer(0.45).timeout # past the double-tap window of the last one
 	_double_click(king_px)
 	await process_frame
-	check(trump_game.preview_open and _has_label_text(trump_game.preview_panel, "Tariff on Long-Range"),
+	check(trump_game.preview_open and _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
 		"the panel lists a Tariff that came into force since it was last opened")
 	check(await _click_button_in(trump_game.preview_panel, "Close"), "Close clickable again")
 	await process_frame

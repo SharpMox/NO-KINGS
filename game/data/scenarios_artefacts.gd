@@ -36,10 +36,9 @@ const FAMILIES := [
 	["Items", ["on_item_consume"]],
 	["Buffs", ["on_buff_apply", "on_buff_consume", "on_buff_removal"]],
 	["Boxes", ["on_box_open"]],
-	["Wave clear", ["on_wave_clear", "on_wave_spawn", "on_wave_roster",
-		"on_clock_refill"]],
+	["Wave clear", ["on_wave_clear", "on_wave_spawn", "on_wave_roster"]],
 	["Turn", ["on_turn_start", "on_turn_end", "on_enemy_turn_start", "on_deploy",
-		"on_merge_check", "on_place_cost", "on_sanction_check", "on_rank_up",
+		"on_merge_check", "on_place_cost", "on_rank_up",
 		"on_king_ability_apply", "on_game_over"]],
 	["Economy", ["on_score_change", "on_gold_change", "on_gold_gain", "on_gold_zero"]],
 ]

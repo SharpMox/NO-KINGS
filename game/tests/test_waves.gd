@@ -119,16 +119,6 @@ func _init() -> void:
 	w.queue_free()
 	await process_frame
 
-	# Tariff schedule: every 10th wave through 150, catalog tiers
-	var tiers := {
-		10: "Mild", 20: "Mild", 30: "Mild", 40: "Moderate", 50: "Severe",
-		60: "Mild", 70: "Mild", 80: "Moderate", 90: "Moderate", 100: "Severe",
-		110: "Mild", 120: "Moderate", 130: "Moderate", 140: "Severe", 150: "Severe",
-	}
-	check(KingAbilities.SCHEDULE.size() == 15, "15 tariff waves")
-	for n in tiers:
-		check(KingAbilities.SCHEDULE.get(n) == tiers[n], "wave %d tariff is %s" % [n, tiers[n]])
-
 	# --- early-clear bonus: emptying the board before the next wave pays out
 	# score + clock scaled by the turns to spare, once per wave (2026-07-07) ---
 	var g: Node2D = _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]], "wave": 2})

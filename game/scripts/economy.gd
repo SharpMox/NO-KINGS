@@ -304,20 +304,7 @@ static func record_history(g, won: bool) -> void:
 		Leaderboard.merger_for("history")) # union
 
 
-# --- tariffs (penalties every 10th wave; see data/tariffs.gd) ---
-
-static func activate_king_ability(g, tier: String) -> void:
-	# Tariffs behave identically at every difficulty tier (07-difficulty-ranks
-	# rework — the severity-shift lever was rejected as illegible).
-	var pool := KingAbilities.ABILITIES.filter(func(t: Dictionary) -> bool:
-		if t.tier != tier:
-			return false
-		# Mild may repeat; Moderate/Severe are run-unique (GDD Wave Catalog)
-		return tier == "Mild" or not g.king_abilities_seen.has(t.name))
-	if pool.is_empty():
-		return
-	apply_king_ability(g, pool[g.rng.randi() % pool.size()])
-
+# --- King Abilities (data/king_abilities.gd; reached through Kings only) ---
 
 static func activate_king_ability_by_key(g, key: String) -> void:
 	for t in KingAbilities.ABILITIES:
@@ -355,63 +342,33 @@ static func apply_king_ability(g, t: Dictionary) -> void:
 ## they always did (Merchants of Death Sample Case's own reward doesn't wait
 ## on the pick either).
 static func resolve_king_ability(g, t: Dictionary) -> void:
-	if t.kind == "oneoff":
-		match t.key:
-			"forced_audit":
-				g.captured.clear()
-			"asset_seizure":
-				g.stock.clear()
-			"asset_freeze":
-				g.gold /= 2
-			"hostile_takeover":
-				var mine: Array[Vector2i] = g._player_pieces()
-				if not mine.is_empty():
-					g.board[mine[g.rng.randi() % mine.size()]].owner = Rules.ENEMY
-			"jd_vance":
-				var best := Vector2i(-1, -1)
-				for pos in g._player_pieces():
-					if best.x < 0 or g.defs[g.board[pos].id].value > g.defs[g.board[best].id].value:
-						best = pos
-				if best.x >= 0:
-					g._destroy(best)
+	if t.kind == "oneoff": # JD Vance is the only one-off left (NO-95)
+		if t.key == "jd_vance":
+			var best := Vector2i(-1, -1)
+			for pos in g._player_pieces():
+				if best.x < 0 or g.defs[g.board[pos].id].value > g.defs[g.board[best].id].value:
+					best = pos
+			if best.x >= 0:
+				g._destroy(best)
 		return
 	g.king_abilities_active.append(t)
-	if t.key == "sanctions": # fix the barred type at trigger time
-		var types := {}
-		for e in g.stock + g.captured:
-			types[e if e is String else e.id] = true
-		if not types.is_empty():
-			g.sanctioned_id = types.keys()[g.rng.randi() % types.size()]
 
 
-# --- issue 13: narrow query wrappers for the tariff keys that gate/modify
-# behaviour rather than charge gold — each just unpacks the ctx an
-# ArtefactHooks.run() call filled in, mirroring earn()/gain()/capture_score()
-# above for artefacts. Replaces the ad hoc `if tariff_on(g, "...")` branches
-# that used to sit inline at every call site (see artefact_hooks.gd header).
+# --- issue 13: narrow query wrappers for the keys that gate/modify behaviour
+# rather than charge gold — each just unpacks the ctx an ArtefactHooks.run()
+# call filled in, mirroring earn()/gain()/capture_score() above for artefacts.
 
-## True when `id` (an uncaptured piece type) is barred from placement by
-## Sanctions.
-static func sanctioned(g, id: String) -> bool:
-	return ArtefactHooks.run(g, "on_sanction_check", {"id": id, "blocked": false}).blocked
-
-
-## False when Regulation blocks this merge pair (a fielded Pawn on either side).
+## False when a King Power (Genghis Khan) blocks this merge pair.
 static func merge_ok(g, a: String, b: String) -> bool:
 	return not ArtefactHooks.run(g, "on_merge_check", {"a": a, "b": b, "blocked": false}).blocked
 
 
-## False when Regulation blocks promoting this piece type with the Promote Item (NO-70).
-static func promote_ok(g, id: String) -> bool:
-	return not ArtefactHooks.run(g, "on_promote_check", {"id": id, "blocked": false}).blocked
-
-
-## Placement gold cost, doubled by Austerity.
+## Placement gold cost, doubled by Qin Shi Huang's Power.
 static func deploy_cost(g) -> int:
 	return ArtefactHooks.run(g, "on_place_cost", {"cost": Tuning.PLACEMENT_COST}).cost
 
 
-## Enemy actions this turn — 2 at Tier 5, 1 at Tiers 1-4 (issue 59), +1 under Filibuster.
+## Enemy actions this turn — 2 at Tier 5, 1 at Tiers 1-4 (issue 59), plus King Powers.
 static func enemy_actions(g) -> int:
 	return ArtefactHooks.run(g, "on_enemy_turn_start",
 		{"actions": Tuning.enemy_actions_per_turn(g.next_tier)}).actions

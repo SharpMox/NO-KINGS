@@ -477,7 +477,7 @@ var ARTEFACTS = [
     conspiracy: "The Bermuda Triangle", url: "https://en.wikipedia.org/wiki/Bermuda_Triangle",
     summary: "The patch of Atlantic where ships and planes are said to vanish and compasses to spin. Insurers price it as ordinary ocean; the legend prices it considerably higher." },
   { name: "Amber Room Bubble Wrap", rarity: "Uncommon", type: "Passive", bonus: ["Gold"], status: "KEEP", implemented: true,
-    effect: "Your Gold gains ignore Inflation and other gold-reducing King Abilities",
+    effect: "Your Gold gains can't be reduced",
     conspiracy: "The lost Amber Room", url: "https://en.wikipedia.org/wiki/Amber_Room",
     summary: "A chamber paneled entirely in amber and gold — looted by the Wehrmacht in 1941, last seen crated in Königsberg in 1945, then gone. Divers, miners and con men have been finding it ever since; none has produced a panel." },
   { name: "Black Knight Morse Code", rarity: "Uncommon", type: "Trigger", bonus: ["Score", "Time"], status: "KEEP", implemented: true,

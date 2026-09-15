@@ -61,7 +61,7 @@ static func queue(g, n: int) -> void:
 	var king: Dictionary = Kings.select(g.rng, n, g.king_order) if roster.has("king") else {}
 	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
 		Color(1.0, 0.8, 0.3))
-	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # Trade War (issue 13)
+	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # roster Artefacts (issue 26)
 	# issue 91: the King's Power comes on with its WAVE, not with the King —
 	# ruling 6 makes it live for both segments, so the 15 turns before the King
 	# lands already carry that King's identity.
@@ -82,11 +82,6 @@ static func queue(g, n: int) -> void:
 				g.pending_king = entry
 			continue
 		g.pending_spawn.append(entry)
-	if Tuning.KING_ABILITIES_SCHEDULED: # off for now — see Tuning.KING_ABILITIES_SCHEDULED
-		if n == 2:
-			Economy.activate_king_ability_by_key(g, "inflation") # T0, GDD: fires after wave 1
-		elif KingAbilities.SCHEDULE.has(n):
-			Economy.activate_king_ability(g, KingAbilities.SCHEDULE[n])
 	# The 10-Wave beat, now ONE event (user ruling 2026-09-06): the
 	# reinforcement pick and the Clock refill together, at the START of waves
 	# 11/21/31… A MODULO, not the old 4-entry REINFORCE_WAVES list, so it keeps
@@ -103,10 +98,7 @@ static func queue(g, n: int) -> void:
 	# (game.gd consumes it directly), so it would need writing twice.
 	if n > 1 and (n - 1) % Tuning.MILESTONE_WAVES == 0:
 		g.pending_reinforce = true # consumed at the next player-turn start
-		var ctx := ArtefactHooks.run(g, "on_clock_refill", {"refill": Tuning.CLOCK_REFILL_MS})
-		Economy.add_clock(g, ctx.refill, "milestone") # Recession (issue 13) halves
-			# ctx.refill via the same on_clock_refill hook, BEFORE this call — issue
-			# 35 routes the actual application through the Clock choke point
+		Economy.add_clock(g, Tuning.CLOCK_REFILL_MS, "milestone")
 	ArtefactHooks.run(g, "on_wave_spawn", {"wave": n})
 
 

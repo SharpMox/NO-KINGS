@@ -975,7 +975,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Your Gold gains ignore Inflation and other gold-reducing King Abilities",
+  "effect": "Your Gold gains can't be reduced",
   "conspiracy": "The lost Amber Room",
   "implemented": true
  },

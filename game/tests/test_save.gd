@@ -160,7 +160,7 @@ func _init() -> void:
 		# issue 69 repointed "greed"/"move" (removed game-native keys) to
 		# surviving catalog Artefacts of the same held-copy shape.
 		"artefacts": ["voynich-dictionary", "voynich-dictionary", "cia-exploding-cigar"],
-		"king_abilities": ["inflation", "inflation", "austerity"],
+		"king_abilities": ["inflation", "inflation", "move_cost"],
 		"oneoffs": [], "wave": 23, "turns_since_wave": 4, "kings_defeated": 1,
 		"lost_player": 5, "lost_enemy": 9,
 		"pending": [{"id": "bishop"}, {"id": "pawn"}],

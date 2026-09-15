@@ -3958,7 +3958,7 @@ func _connect_hud() -> void:
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.multi_confirm_pressed.connect(_item_confirm_multi)
-	hud.item_pressed.connect(_use_item)
+	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)
 	hud.promote_pressed.connect(func(id: String) -> void:

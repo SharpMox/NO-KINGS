@@ -56,13 +56,14 @@
 </header>
 
 <main class="doc">
-  <p class="stamp">Last updated: 2 September 2026 · Applies to the NO KINGS mobile game.</p>
+  <p class="stamp">Last updated: 15 September 2026 · Applies to the NO KINGS mobile game.</p>
 
   <div class="callout">
     <p><strong>The short version.</strong> NO KINGS has no servers, no analytics, no advertising
     and no third-party tracking. Everything the game stores stays on your device unless you
-    choose to sign in to Google Play Games — and even then, your saves go to <em>your own</em>
-    Google account storage, not to us. We never receive them.</p>
+    choose to sign in to Google Play Games (Android) or Game Center (iOS). Even then, your
+    saves go to <em>your own</em> Google or Apple account storage, not to us. We never receive
+    them.</p>
   </div>
 
   <h2>Who is responsible</h2>
@@ -81,7 +82,7 @@
     <li>Your settings, such as sound and animation preferences.</li>
   </ul>
 
-  <h2>What happens if you sign in to Google Play Games</h2>
+  <h2>What happens if you sign in to Google Play Games (Android)</h2>
   <p>Signing in is optional. The game is fully playable without it, and declining costs you
   nothing but cloud backup and leaderboards. If you do sign in:</p>
 
@@ -118,6 +119,48 @@
   That transfer is governed by Google's terms and safeguards, not by ours, because the data
   never passes through our hands.</p>
 
+  <h2>What happens if you sign in to Game Center (iOS)</h2>
+  <p>Signing in is optional here too. The game is fully playable without it, and declining
+  costs you nothing but cloud backup and the leaderboard. If you do sign in:</p>
+
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Where it goes</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Your Game Center player identifier</td>
+        <td>Stays with Apple. The game reads it to know which account a save belongs to.</td>
+        <td>So a save restored on a new device is yours and not someone else's.</td>
+      </tr>
+      <tr>
+        <td>Your save data (a few kilobytes)</td>
+        <td><strong>Your own</strong> iCloud key-value storage.</td>
+        <td>So progress survives a reinstall or a new phone.</td>
+      </tr>
+      <tr>
+        <td>Your score and Game Center display name</td>
+        <td>Apple's leaderboard for this game.</td>
+        <td>Automatically, from a completed real run. Never from a test or scenario run.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Game Center also shows the game your display name. We save it on this device, alongside
+  the account link, and use it only in the app's own account-switch prompt, the message that
+  appears if you change which Game Center account is signed in on this device, so you can
+  confirm the switch. It is never sent anywhere by us.</p>
+
+  <p>In every case Apple is the party actually holding the data, under
+  <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener">Apple's own privacy policy</a>.
+  Sharpunk operates no server for this game and holds no copy of your saves, your account
+  identifier or your scores.</p>
+
+  <h3>Data leaving the EU</h3>
+  <p>Apple processes this data on infrastructure that may sit outside the European Union.
+  That transfer is governed by Apple's terms and safeguards, not by ours, because the data
+  never passes through our hands.</p>
+
   <h2>What the game does not do</h2>
   <ul>
     <li>No analytics or telemetry SDK of any kind.</li>
@@ -129,23 +172,26 @@
 
   <h2>How long anything is kept</h2>
   <p>Local data lasts until you delete it or uninstall the game. Cloud saves and leaderboard
-  entries live in your Google account for as long as you keep them.</p>
+  entries live in your Google or Apple account for as long as you keep them.</p>
 
   <h2>Removing your data</h2>
   <ul>
     <li><strong>Local data:</strong> uninstall the game, or clear its storage in your device settings.</li>
-    <li><strong>Cloud saves:</strong> delete them from the Play Games app, under your profile's
-      saved-games list for NO KINGS.</li>
-    <li><strong>Leaderboard entries and your Play Games profile:</strong> managed in your Google
-      account, since they belong to Google's service rather than to us.</li>
+    <li><strong>Cloud saves (Android):</strong> delete them from the Play Games app, under your
+      profile's saved-games list for NO KINGS.</li>
+    <li><strong>Cloud saves (iOS):</strong> the current run is removed automatically the moment
+      it ends; your local high-score table and run history sync to your own iCloud key-value
+      storage under your Apple account, where Apple holds them.</li>
+    <li><strong>Leaderboard entries and your Play Games or Game Center profile:</strong> managed
+      in your Google or Apple account, since they belong to that service rather than to us.</li>
   </ul>
 
   <h2>Your rights</h2>
   <p>Under the GDPR you have the right to access, correct, erase and port your personal data,
   and to object to or restrict its processing. Because Sharpunk holds none of your data for
-  this game, requests about saves, scores or your player profile are answered by Google, and
-  the routes above are the fastest way to act on them. For anything concerning Sharpunk
-  specifically, write to <a href="mailto:sharpunk.soft@gmail.com">sharpunk.soft@gmail.com</a>.</p>
+  this game, requests about saves, scores or your player profile are answered by Google or
+  Apple, and the routes above are the fastest way to act on them. For anything concerning
+  Sharpunk specifically, write to <a href="mailto:sharpunk.soft@gmail.com">sharpunk.soft@gmail.com</a>.</p>
   <p>If you believe your data has been mishandled you may complain to the French supervisory
   authority, the <a href="https://www.cnil.fr/" target="_blank" rel="noopener">CNIL</a>.</p>
 
@@ -155,9 +201,9 @@
   knowingly collect data from them — in practice it collects nothing from anyone, because
   nothing reaches us at all.</p>
   <p>In France the age of valid consent for online services is 15. A player under that age
-  should have a parent or guardian read this policy before signing in to Google Play Games.
-  Declining to sign in costs nothing but cloud saves and leaderboards, and stops any data
-  leaving the device.</p>
+  should have a parent or guardian read this policy before signing in to Google Play Games or
+  Game Center. Declining to sign in costs nothing but cloud saves and leaderboards, and stops
+  any data leaving the device.</p>
 
   <h2>Changes</h2>
   <p>If the game gains a feature that changes any of the above — a different platform's cloud
@@ -166,7 +212,7 @@
 </main>
 
 <footer class="foot">
-  <p class="foot-lead">NO KINGS stores what it must, on your device, and asks Google to hold the rest under your own account.</p>
+  <p class="foot-lead">NO KINGS stores what it must, on your device, and asks Google or Apple to hold the rest under your own account.</p>
   <p><a href="terms.html">Terms of use</a> · <a href="codex.html">Back to the codex</a>. Built as a single static HTML file — no servers, no frameworks.</p>
 </footer>
 

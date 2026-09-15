@@ -25,6 +25,71 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `feat/no-68-driver-type-verb` (PR #433) — 2026-09-15, iOS SIMULATOR pass on retry — NO-68
+
+**Supersedes the BLOCKED entry directly below.** Build `995c3c7`, iOS SIMULATOR
+`NK-iPhone-11` (iOS 26.5), not hardware. `--drive` came up clean this time —
+`log_after_launch.txt`: `[drive] listening in user://drive`. Sequence: `type x`
+with nothing focused acked `fail type no LineEdit or TextEdit focused — tap_text
+the field first`; `tap_text 'search scenarios'` then `type 'capture'` then
+`wait_text 'Captures & highlights'` all acked `ok`, and the intervening `probe`
+came back clean. The TEST menu's own header confirmed the filter actually ran:
+"Test scenarios — 391 boards" before, "52 of 391" after, with only capture-tagged
+rows left in the list. Evidence: `~/Documents/nokings-builds/no-68-simulator-retry-2026-09-15/`
+(`ack_1.txt`–`ack_6.txt`, `log_after_launch.txt`, `after_type.png`, `sim.sh`).
+
+**The earlier BLOCKED run did not reproduce.** An interleaved A/B the same
+afternoon (NO-96) ran main and `no68` builds back to back, 11 runs, 11/11 pass —
+`~/Documents/nokings-builds/no-96-simulator-2026-09-15/ab-table.csv`. Probable
+cause: contention with other agents' concurrent builds/suites on the same Mac,
+not proven.
+
+**Still unverified**: real iPhone hardware; the soft keyboard, layout under it,
+autocorrect and paste, none of which `type` exercises on any platform (same
+NOT-COVERED list as the entry below, `docs/ios-device-automation.md`,
+`docs/MANUAL-STEPS.md` section B).
+
+---
+
+## `feat/no-68-driver-type-verb` (PR #433) — 2026-09-15, desktop verified, simulator BLOCKED — NO-68
+
+**The driver's new `type` verb** (`game/scripts/drive.gd`): sends real `InputEventKey`
+events through `Input.parse_input_event`, refuses when nothing holds focus, and falls
+back to a `LineEdit`'s `placeholder_text` so `tap_text`/`probe` can aim at an otherwise
+empty field. Full writeup: `docs/ios-device-automation.md`.
+
+**Desktop: verified, real device/simulator: NOT verified.** `game/tests/test_drive_type.gd`
+proves the verb headless through the real cmd.txt/ack.txt protocol against the TEST menu's
+own search box (NO-58) — both refusal paths, `tap_text` finding the empty field by its
+placeholder, and the LineEdit's own text + the filtered list once focus is granted the way
+headless can grant it (`grab_focus()`, since headless drops GUI picking). `run_all.sh` ALL
+GREEN, run twice.
+
+**Simulator attempt (`NK-iPhone-11`, iOS 26.5) BLOCKED, not swept under the rug.** Build,
+install and launch via the documented recipe all succeeded — export rc=0, both entitlement
+keys present, `xcodebuild` BUILD SUCCEEDED, `simctl install`/`launch` clean, and three live
+screenshots 1s/4s/9s after one launch show the Godot splash then the intro video genuinely
+playing (frame content changes between them — the process is not suspended). But the
+`--drive` cmd.txt/ack.txt round trip never completed: not one batch acked, across 8+ launches
+(plain, `--console`, before/after a full `simctl uninstall`+reinstall for a fresh container),
+waits up to 30+ seconds. Isolated the cause rather than guessing: the IDENTICAL mechanism —
+a real windowed boot through `intro.gd`, not the test harness — acked a `probe` in under a
+second on **desktop**, ruling out a GDScript bug; and on the SAME simulator launch,
+`--screenshot` (same `should_bypass()` flag family) worked immediately while `--drive` never
+produced its `[drive] listening` log line, in either flag order. So `--drive` specifically is
+not reaching this simulator session's args, upstream of anything this PR's code touches.
+Full diagnosis, screenshots and logs (not committed, matches the existing local-evidence
+pattern): `~/Documents/nokings-builds/no-68-simulator-2026-09-15/BLOCKED.txt`.
+
+**Genuinely untested**: `type` (and the placeholder fallback) on real iOS hardware or in a
+working simulator session; the soft keyboard, layout under it, autocorrect and paste, which
+`type` deliberately does not cover on any platform (docs/ios-device-automation.md,
+docs/MANUAL-STEPS.md section B both carry the same NOT-COVERED list). Android: `drive.gd`
+has never run there at all (pre-existing, unrelated to this PR) — Android typing stays on
+`adb shell input text`.
+
+---
+
 ## `dd96d9c` — 2026-09-14, Android emulator, not a phone — NO-69 and NO-90
 
 **AVD `nokings_api35` (arm64, emulator-5580), not a physical phone.** Debug build

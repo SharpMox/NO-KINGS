@@ -9,7 +9,7 @@ extends Node
 ## platforms. Recipe for the host side: docs/ios-device-automation.md.
 ##
 ## IT IS A TEST HARNESS, NOT A FEATURE. The vocabulary below is deliberately
-## eight verbs with no composition, no variables and no control flow — enough to
+## nine verbs with no composition, no variables and no control flow — enough to
 ## reach a screen and report what is on it. Resist growing it into a scripting
 ## language; if a question needs branching, the HOST branches, which is the whole
 ## point of an interactive loop rather than a launch-time batch.
@@ -182,6 +182,19 @@ func _run(line: String) -> void:
 			_touch(at, false)
 			await _frames(2)
 			_ok(verb, "'%s' at %d,%d" % [s, at.x, at.y])
+		"type":
+			var s := _rest(line, verb)
+			if s == "":
+				return _fail(verb, "needs <text>")
+			var focus := get_viewport().gui_get_focus_owner()
+			if focus == null or not (focus is LineEdit or focus is TextEdit):
+				return _fail(verb, "no LineEdit or TextEdit focused — tap_text the field first")
+			for ch in s:
+				_key(ch.unicode_at(0), true)
+				await _frames(1)
+				_key(ch.unicode_at(0), false)
+				await _frames(1)
+			_ok(verb, "'%s'" % s)
 		"drag":
 			if a.size() < 5:
 				return _fail(verb, "needs <x1> <y1> <x2> <y2>")
@@ -274,7 +287,16 @@ func _text_of(c: Control) -> String:
 	if not (c is Button or c is Label or c is LineEdit or c is RichTextLabel):
 		return ""
 	var v: Variant = c.get("text")
-	return str(v) if v != null else ""
+	var t := str(v) if v != null else ""
+	# An EMPTY LineEdit has nothing in `text` to find it by — the search box
+	# NO-58 added reads "" until someone types into it, which made it
+	# unreachable by tap_text/probe before a single character existed in it.
+	# The placeholder is what a player actually sees on that empty field, so
+	# it stands in only while `text` itself is empty; the moment `type`
+	# delivers a character this falls away on its own.
+	if t == "" and c is LineEdit:
+		t = c.placeholder_text
+	return t
 
 
 func _controls() -> Array[Control]:
@@ -352,6 +374,18 @@ func _touch(at: Vector2, pressed: bool) -> void:
 	var e := InputEventScreenTouch.new()
 	e.index = 0
 	e.position = _to_window(at)
+	e.pressed = pressed
+	Input.parse_input_event(e)
+
+
+## One key event, unicode only — no keycode, so this cannot fire a control's
+## keyboard shortcuts, only deliver text. That is deliberate: `type` exists to
+## answer "does this field receive what I send it", not to exercise Tab order
+## or accelerators. A LineEdit/TextEdit inserts on `unicode >= 32` regardless
+## of `keycode`, the same as an IME composing a character.
+func _key(unicode: int, pressed: bool) -> void:
+	var e := InputEventKey.new()
+	e.unicode = unicode
 	e.pressed = pressed
 	Input.parse_input_event(e)
 

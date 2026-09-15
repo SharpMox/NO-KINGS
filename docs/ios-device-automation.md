@@ -288,6 +288,75 @@ tap no longer needs one either.
 
 ---
 
+## `type <text>` — NO-68, the driver can now put text into a field
+
+Every device session that needed to verify a LineEdit before this fell back to
+`adb shell input text` (Android) or nothing at all (iOS has no such fallback),
+which goes through the OS IME and proves nothing about whether the *tap* gave
+the Godot control focus — the half that actually breaks. `type` sends one
+`InputEventKey` per character (unicode set, pressed then released) through
+`Input.parse_input_event`, the same path `tap`/`tap_text` already use, so
+`tap_text <field>` then `type <query>` proves the tap landed AND the field
+received what a player would type.
+
+```
+tap_text search scenarios
+type Movement
+wait_text Movement & drag 3000
+```
+
+**Refuses rather than typing nowhere.** Before sending a single character it
+checks `get_viewport().gui_get_focus_owner()`; null OR anything that is not a
+`LineEdit`/`TextEdit` fails the whole batch with a reason
+(`fail type no LineEdit or TextEdit focused — tap_text the field first`), the
+same "a driver whose failures look like successes is worse than no driver"
+rule every other verb here follows.
+
+**An EMPTY field has to be aimed at by its placeholder.** `tap_text`/`probe`
+find a control by its `text`, and an untouched `LineEdit` has none — the NO-58
+search box reads `""` until someone types into it, which made it unreachable
+by text until `_text_of()` fell back to `placeholder_text` for that one case.
+Once a character lands, the real text takes over and the placeholder fallback
+stops applying — there is no ambiguity between the two.
+
+**NOT COVERED by `type`, and this is deliberate — do not read a green `type`
+check as more than it is:**
+
+- **The soft keyboard appearing at all.** `type` delivers key events directly;
+  it never asks iOS/Android to raise a keyboard, so it proves nothing about
+  whether one would actually show for a real tap.
+- **Layout reflowing under that keyboard.** NO-69's keyboard-height seam
+  (`menu.gd`'s `keyboard_height_override`) is exercised in the headless suite
+  by simulating a height, not by `type` driving a real IME.
+- **Autocorrect / predictive text.** `type` sends exactly the characters
+  given, nothing an IME would insert, substitute or suggest.
+- **Paste.** No clipboard is involved; `type` is keystroke-only.
+
+Those four stay by-eye checks — see `docs/MANUAL-STEPS.md` section B, which
+carries the same list next to the note it corrects.
+
+**Proven on the desktop suite and the iOS simulator; not yet on real hardware.**
+`game/tests/test_drive_type.gd` drives the verb through the real
+cmd.txt/ack.txt protocol against the TEST menu's own search LineEdit (NO-58):
+asserts the failure with nothing focused, the failure with something focused
+that is not a text field, `tap_text` finding the empty box by its placeholder,
+and — once focus is granted with `grab_focus()` (headless drops GUI picking,
+same reason `tests/test_drive.gd` never asserts a tap actually landed; that
+half is the windowed click probes' job) — the field's own `text`, the filtered
+list showing the match, and every non-matching row hidden. A first simulator run
+against `NK-iPhone-11` (2026-09-15)
+got through build/install/launch cleanly but could not complete a single
+`--drive` round trip at all (not specific to `type` — `probe` alone never
+acked either), while the identical mechanism worked immediately on desktop and
+`--screenshot` worked on the same simulator launch. Full diagnosis:
+`~/Documents/nokings-builds/no-68-simulator-2026-09-15/BLOCKED.txt`. A retry the
+same afternoon passed — `docs/device-verification.md` (newest entry) — and the
+earlier failure did not reproduce in an 11/11 interleaved A/B (NO-96). Real iOS
+hardware remains unverified; the desktop suite proof plus the simulator retry is
+what stands behind this verb today.
+
+---
+
 ## A DISTRIBUTION archive (TestFlight) — three things that block it
 
 Attempted 2026-09-10 and **not completed**; recorded because all three are

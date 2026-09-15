@@ -516,8 +516,17 @@ passing `--drive <dir>` needs `OS.get_cmdline_user_args()` to be populated at la
 `--esa command_line_args` on top of the already-wrong activity produced nothing. It is not
 needed here — **Android has `adb shell input`**, which iOS does not, and that absence is the
 entire reason `drive.gd` exists. `input tap`, `input swipe`, `input keyevent 4` for Back,
-`input text` for typing (the driver has no typing verb at all) and `exec-out screencap -p`
-cover the whole verification surface.
+`input text` for typing and `exec-out screencap -p` cover the whole verification surface.
+
+**Update, NO-68 (2026-09-15): the driver DOES have a typing verb now** — `type <text>`, which
+sends real `InputEventKey` events through `Input.parse_input_event`, refuses when nothing
+holds focus, and is proven against the TEST menu's search box in the desktop suite
+(`game/tests/test_drive_type.gd`). It still has never run on Android for the reason above
+(`--drive` needs `OS.get_cmdline_user_args()`, which this platform's launch path does not
+populate), so `adb shell input text` remains what verifies Android typing — it is the iOS/
+simulator gap this closed, not the Android one. And even where `type` runs, it does NOT cover
+the soft keyboard appearing, layout reflowing under it, autocorrect, or paste — those stay
+by-eye checks. Full verb docs and the NOT-COVERED list: `docs/ios-device-automation.md`.
 
 **Coordinates for `input tap` are DEVICE pixels.** `project.godot` is 480x800 with
 `stretch/aspect = expand`, which scales by `min(screen.x/480, screen.y/800)` and never

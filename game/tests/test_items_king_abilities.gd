@@ -236,50 +236,20 @@ func _init() -> void:
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 
-	# --- issue 54: Exhibit 399, driven directly through economy.gd's
-	# activate_king_ability_by_key.
-
-	var ex_ctrl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4})
+	# --- NO-81: Exhibit 399 no longer intercepts King Abilities (it is a capture
+	# trigger now, test_items_artefacts_2.gd). Held through Donald Trump's Wave,
+	# his Tariff lands at once and no choice modal opens.
+	var ex_trump := _boot({"board": [], "wave": 49, "artefacts": ["exhibit-399"]})
 	await process_frame
-	Economy.activate_king_ability_by_key(ex_ctrl, "move_cost")
-	check(not ex_ctrl.buff_pick_open and ex_ctrl.king_abilities_active.size() == 1,
-		"control: without Exhibit 399, a Tariff applies immediately, no choice pick")
-	ex_ctrl.queue_free()
 	await process_frame
-
-	var ex_apply := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4,
-		"artefacts": ["exhibit-399"]})
-	await process_frame
-	Economy.activate_king_ability_by_key(ex_apply, "move_cost")
-	check(ex_apply.buff_pick_open and ex_apply.king_abilities_active.is_empty(),
-		"Exhibit 399: opens the choice pick instead of applying immediately")
-	ex_apply.modals.choice_chosen.emit(true) # "Let it apply"
-	check(not ex_apply.buff_pick_open and ex_apply.king_abilities_active.size() == 1 \
-			and ex_apply.king_abilities_active[0].key == "move_cost",
-		"Exhibit 399: 'Let it apply' resolves the Tariff normally")
-	ex_apply.queue_free()
-	await process_frame
-
-	var ex_block := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4,
-		"artefacts": ["exhibit-399"]})
-	await process_frame
-	Economy.activate_king_ability_by_key(ex_block, "move_cost")
-	check(ex_block.buff_pick_open, "(setup) the choice pick is open")
-	ex_block.modals.choice_pick_cancelled.emit() # "Block it"
-	check(not ex_block.buff_pick_open and ex_block.king_abilities_active.is_empty(),
-		"Exhibit 399: 'Block it' — the Tariff never lands")
-	ex_block.queue_free()
-	await process_frame
-
-	# same-hook reward handlers still fire regardless of the pending pick
-	# (Salvation Gift Card precedent, artefact_hooks.gd header)
-	var ex_reward := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4, "gold": 0,
-		"artefacts": ["exhibit-399", "merchants-of-death-sample-case"]})
-	await process_frame
-	Economy.activate_king_ability_by_key(ex_reward, "move_cost")
-	check(ex_reward.gold == 100 and ex_reward.buff_pick_open,
-		"Exhibit 399 + Merchants of Death Sample Case: the reward pays immediately, independent of the pending pick")
-	ex_reward.queue_free()
+	ex_trump.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
+	ex_trump._queue_wave(50)
+	var trump_live := false
+	for a in ex_trump.king_abilities_active:
+		trump_live = trump_live or ex_trump.king_power_abilities.has(a.get("key", ""))
+	check(trump_live and not ex_trump.buff_pick_open,
+		"Exhibit 399: Donald Trump's Tariff applies immediately — the old choice modal never opens")
+	ex_trump.queue_free()
 	await process_frame
 
 	# --- issue 56: SETI's Red Marker, redesigned — "on acquiring this

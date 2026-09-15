@@ -610,6 +610,130 @@ func _init() -> void:
 	both.queue_free()
 	await process_frame
 
+	# --- NO-81: Exhibit 399 — "On your first Capture each Turn: destroy a random
+	# adjacent enemy piece (not the King)". Destruction, not capture: the only
+	# Score/Gold is the capture's own, which the control boot (same board, no
+	# Artefact) measures. The queen captures (2,2) -> (3,2); "adjacent" is the
+	# 8 tiles around (3,2). The far rook keeps the board from clearing.
+	var ex_ctrl := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["knight", 1, 4, 3],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	ex_ctrl.actions_left = 5
+	var ctrl_s: int = ex_ctrl.score
+	var ctrl_g: int = ex_ctrl.gold
+	ex_ctrl._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	var capture_score_gain: int = ex_ctrl.score - ctrl_s
+	var capture_gold_gain: int = ex_ctrl.gold - ctrl_g
+	check(ex_ctrl.board.has(Vector2i(4, 3)), "(control) without Exhibit 399 the adjacent knight survives")
+	ex_ctrl.queue_free()
+	await process_frame
+
+	var ex := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["knight", 1, 4, 3],
+		["rook", 1, 7, 10]], "wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	ex.actions_left = 5
+	var ex_s: int = ex.score
+	var ex_g: int = ex.gold
+	ex._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(not ex.board.has(Vector2i(4, 3)) and ex.board.has(Vector2i(7, 10)) and ex.lost_enemy == 2,
+		"Exhibit 399: the first Capture destroys exactly one adjacent enemy (lost_enemy %d)" % ex.lost_enemy)
+	check(ex.score - ex_s == capture_score_gain and ex.gold - ex_g == capture_gold_gain,
+		"Exhibit 399: Score and Gold rise only by the capture itself (+%d/+%d, control +%d/+%d)"
+			% [ex.score - ex_s, ex.gold - ex_g, capture_score_gain, capture_gold_gain])
+	check(ex.captured == ["pawn"], "Exhibit 399: the destroyed piece never reaches Captured Stock")
+	ex.queue_free()
+	await process_frame
+
+	var ex_king := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["king", 1, 4, 3],
+		["rook", 1, 7, 10]], "wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	ex_king.actions_left = 5
+	ex_king._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(ex_king.board.has(Vector2i(4, 3)) and ex_king.board[Vector2i(4, 3)].id == "king" \
+			and ex_king.lost_enemy == 1,
+		"Exhibit 399: a King adjacent and alone is never destroyed")
+	ex_king.queue_free()
+	await process_frame
+
+	var ex_twice := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["knight", 1, 4, 3],
+		["pawn", 1, 3, 5], ["knight", 1, 4, 6], ["rook", 1, 7, 10]], "wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	ex_twice.actions_left = 5
+	ex_twice._move_player(Vector2i(2, 2), Vector2i(3, 2)) # 1st Capture: destroys (4,3)
+	ex_twice._move_player(Vector2i(3, 2), Vector2i(3, 5)) # 2nd Capture: (4,6) is adjacent
+	check(not ex_twice.board.has(Vector2i(4, 3)) and ex_twice.board.has(Vector2i(4, 6)),
+		"Exhibit 399: a second Capture in the same Turn destroys nothing")
+	ex_twice.queue_free()
+	await process_frame
+
+	var ex_none := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2],
+		["pawn", 1, 3, 5], ["knight", 1, 4, 6], ["rook", 1, 7, 10]], "wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	ex_none.actions_left = 5
+	ex_none._move_player(Vector2i(2, 2), Vector2i(3, 2)) # 1st Capture: nothing adjacent
+	check(ex_none.lost_enemy == 1, "Exhibit 399: no adjacent enemy — nothing happens")
+	ex_none._move_player(Vector2i(3, 2), Vector2i(3, 5)) # 2nd Capture: the trigger is spent
+	check(ex_none.board.has(Vector2i(4, 6)) and ex_none.lost_enemy == 2,
+		"Exhibit 399: ...and the trigger is still spent for that Turn")
+	ex_none.queue_free()
+	await process_frame
+
+	var ex_two := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2], ["knight", 1, 4, 3],
+		["bishop", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3, "artefacts": ["exhibit-399", "exhibit-399"]})
+	await process_frame
+	ex_two.actions_left = 5
+	ex_two._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(not ex_two.board.has(Vector2i(4, 3)) and not ex_two.board.has(Vector2i(2, 3)) \
+			and ex_two.lost_enemy == 3,
+		"Exhibit 399 x2: two copies destroy two different adjacent enemies")
+	ex_two.queue_free()
+	await process_frame
+
+	# Multicapture takes its most valuable neighbour (the rook, paid); 399 then
+	# destroys a different adjacent enemy (the knight, unpaid). The control holds
+	# the same Multicapture with no Artefact, so its gains are the paid part.
+	var mc_board := [["queen", 0, 2, 2, {"buffs": [{"key": "multicapture"}]}], ["pawn", 1, 3, 2],
+		["rook", 1, 4, 2], ["knight", 1, 4, 3], ["rook", 1, 7, 10]]
+	var mc_ctrl := _boot({"board": mc_board.duplicate(true), "wave": 3})
+	await process_frame
+	mc_ctrl.actions_left = 5
+	var mcc_s: int = mc_ctrl.score
+	var mcc_g: int = mc_ctrl.gold
+	mc_ctrl._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	var mc_paid_s: int = mc_ctrl.score - mcc_s
+	var mc_paid_g: int = mc_ctrl.gold - mcc_g
+	check(not mc_ctrl.board.has(Vector2i(4, 2)) and mc_ctrl.board.has(Vector2i(4, 3)),
+		"(control) Multicapture alone takes the rook and leaves the knight")
+	mc_ctrl.queue_free()
+	await process_frame
+
+	var mc := _boot({"board": mc_board.duplicate(true), "wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	mc.actions_left = 5
+	var mc_s: int = mc.score
+	var mc_g: int = mc.gold
+	mc._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(not mc.board.has(Vector2i(4, 2)) and not mc.board.has(Vector2i(4, 3)) and mc.lost_enemy == 3,
+		"Multicapture + Exhibit 399: the rook is captured and the knight destroyed")
+	check(mc.captured.has("rook") and not mc.captured.has("knight"),
+		"Multicapture + Exhibit 399: only the Multicapture victim reaches Captured Stock")
+	check(mc.score - mc_s == mc_paid_s and mc.gold - mc_g == mc_paid_g,
+		"Multicapture + Exhibit 399: the destroyed knight pays nothing (+%d/+%d, control +%d/+%d)"
+			% [mc.score - mc_s, mc.gold - mc_g, mc_paid_s, mc_paid_g])
+	mc.queue_free()
+	await process_frame
+
+	var ex_shield := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2],
+		["knight", 1, 4, 3, {"buffs": [{"key": "shield"}]}], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["exhibit-399"]})
+	await process_frame
+	ex_shield.actions_left = 5
+	ex_shield._move_player(Vector2i(2, 2), Vector2i(3, 2))
+	check(not ex_shield.board.has(Vector2i(4, 3)),
+		"Exhibit 399: Shield does not protect the destroyed piece")
+	ex_shield.queue_free()
+	await process_frame
+
 	# Fireproof Pajamas — blocks Item/Tariff destruction (_destroy's choke
 	# point), leaves ordinary Capture untouched
 	var fire := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 4]],

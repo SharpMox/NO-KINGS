@@ -31,7 +31,6 @@
 		"on_buff_apply"
 	],
 	"mar-a-lago-toilet-papers": [
-		"on_clock_refill",
 		"on_price",
 		"on_wave_roster",
 		"on_wave_spawn"
@@ -53,7 +52,6 @@
 		"on_clock_change"
 	],
 	"silk-road-coupon": [
-		"on_clock_refill",
 		"on_wave_roster",
 		"on_wave_spawn"
 	],

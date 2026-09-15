@@ -255,8 +255,6 @@ static func apply(g, cfg: Dictionary) -> void:
 				g.artefacts.append(inst)
 	for key in cfg.get("king_abilities", []) + cfg.get("oneoffs", []):
 		Economy.activate_king_ability_by_key(g, key)
-	if cfg.has("sanctioned_id"): # a save must restore the exact barred type
-		g.sanctioned_id = cfg.sanctioned_id
 	if cfg.has("king_abilities_seen"): # activation above re-logged; restore the truth
 		g.king_abilities_seen = cfg.king_abilities_seen.duplicate()
 	g.king_abilities_suppressed = cfg.get("king_abilities_off", false)
@@ -428,7 +426,6 @@ static func to_config(g) -> Dictionary:
 		"shop_lane_b_progress": g.shop_lane_b_progress, # issue 64: must round-trip
 			# with the save or the resumed run's Lane-B progress bar silently
 			# restarts at 0 (issue 55's shipped bug, same class)
-		"sanctioned_id": g.sanctioned_id,
 		"skip_enemy_turns": g.skip_enemy_turns,
 		"king_abilities_off": g.king_abilities_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),

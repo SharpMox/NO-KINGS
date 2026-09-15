@@ -422,7 +422,7 @@ func _init() -> void:
 	# Crop Circle Plank: "5-Wave Milestone" is PER-ARTEFACT (ruled 2026-08-28)
 	# — this held copy counts its own 5 waves from its own acquisition, fired
 	# off the just-cleared wave (on_wave_clear), not the engine's own GLOBAL
-	# 10-wave on_clock_refill cadence. acquired_wave is forced to 1 here so the
+	# 10-wave Clock refill cadence. acquired_wave is forced to 1 here so the
 	# test can isolate the handler's own cadence math (_milestone5_hit) from
 	# the separate acquisition-stamping coverage below — wave 5 clearing is
 	# then this copy's beat 5 (1 + 4), a real 5-Wave Milestone.
@@ -451,8 +451,8 @@ func _init() -> void:
 	crop_off.queue_free()
 	await process_frame
 
-	# John Titor's Crypto Wallet: was left wired to on_clock_refill (the GLOBAL
-	# 10-wave beat) when the rest of this "5-Wave Milestone" batch moved to
+	# John Titor's Crypto Wallet: was left wired to the GLOBAL
+	# 10-wave beat when the rest of this "5-Wave Milestone" batch moved to
 	# the per-artefact on_wave_clear + _milestone5_hit cadence — paid at half
 	# the intended rate. Acquired wave 2: fires clearing wave 6 (2+4, beat 1)
 	# and wave 11 (2+9, beat 2). Waves 8-11 are jumped directly (g.wave set,
@@ -477,33 +477,17 @@ func _init() -> void:
 	cw.queue_free()
 	await process_frame
 
-	# --- issue 58: on_milestone renamed to on_clock_refill — pure rename, no
-	# behaviour change. Its two listeners were the "timer" artefact and the
-	# Recession tariff; issue 69 removed "timer" (no catalog artefact has
-	# taken its place on this hook), so only the tariff remains to prove the
-	# hook still fires on the GLOBAL 10-Wave beat (Tuning.MILESTONE_WAVES —
-	# the start of wave 11), unrelated to the PER-ARTEFACT "5-Wave Milestone"
-	# cadence covered above (Crop Circle Plank/John Titor). The
-	# artefact-computed-first/tariff-halves-on-top ordering this block used to
-	# also prove is moot with no artefact left on the hook — the ordering
-	# guarantee itself is unchanged (see this file's own header note above),
-	# just currently unexercised by anything other than the tariff.
+	# --- the GLOBAL 10-Wave Clock refill (Tuning.MILESTONE_WAVES — the start of
+	# wave 11), unrelated to the PER-ARTEFACT "5-Wave Milestone" cadence covered
+	# above (Crop Circle Plank/John Titor). It was the on_clock_refill hook
+	# until NO-95 parked Recession, its last listener.
 	var refill := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 10, "clock_s": 0})
 	await process_frame
 	WaveLogic.queue(refill, 11) # starting wave 11: the GLOBAL beat fires
 	check(refill.clock_ms == Tuning.CLOCK_REFILL_MS,
-		"the renamed on_clock_refill hook still fires: base refill, no artefact left on the hook")
+		"the GLOBAL 10-Wave beat refills the Clock by the base amount")
 	refill.queue_free()
-	await process_frame
-
-	var refill_recession := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 10, "clock_s": 0, "king_abilities": ["recession"]})
-	await process_frame
-	WaveLogic.queue(refill_recession, 11)
-	check(refill_recession.clock_ms == Tuning.CLOCK_REFILL_MS * 0.5,
-		"the renamed on_clock_refill hook still fires Recession: halves the base refill")
-	refill_recession.queue_free()
 	await process_frame
 
 	# MK-Ultra Sugar Cube: On Deploy, the deployed piece gets a Tactical buff

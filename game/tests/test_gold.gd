@@ -49,8 +49,8 @@ func _init() -> void:
 
 	Economy.activate_king_ability_by_key(game, "inflation")
 	Economy.earn(game, 100)
-	check(game.score == 1500, "Inflation never touches score") # issue 57: x10
-	check(game.gold == 140, "Inflation taxes gold (-10% per stack)")
+	check(game.score == 1500, "Tariff on Gold Gain never touches score") # issue 57: x10
+	check(game.gold == 140, "Tariff on Gold Gain taxes gold (-10% per stack)")
 
 	# --- every former score cost hits gold instead (issue 02) ---
 	var s: int = game.score
@@ -67,11 +67,6 @@ func _init() -> void:
 	Economy.charge(game, "move_cost")
 	check(game.score == s, "tariff charges never touch score")
 	check(game.gold == m - Tuning.KING_ABILITY_ACTION_COST, "tariff charges debit gold")
-
-	m = game.gold
-	Economy.activate_king_ability_by_key(game, "asset_freeze")
-	check(game.score == s, "Asset Freeze never touches score")
-	check(game.gold == m / 2, "Asset Freeze halves gold")
 
 	s = game.score
 	m = game.gold

@@ -10,7 +10,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Shop := preload("res://scripts/shop.gd")
-const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Kings := preload("res://data/kings.gd")
 
 var fails := 0
 
@@ -141,21 +141,28 @@ func _init() -> void:
 	panama.queue_free()
 	await process_frame
 
-	var panama2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 0, "artefacts": ["panama-papers-shredder"], "king_abilities": ["inflation"]})
-	await process_frame
-	Economy.earn(panama2, 100)
-	check(panama2.gold == 100, "Panama Papers Shredder: Inflation (Mild) doesn't reduce Gold gains")
-	panama2.queue_free()
-	await process_frame
-
-	var amber := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 0, "artefacts": ["amber-room-bubble-wrap"], "king_abilities": ["inflation"]})
-	await process_frame
-	Economy.earn(amber, 100)
-	check(amber.gold == 100, "Amber Room Bubble Wrap: ignores Inflation's Gold-gain reduction")
-	amber.queue_free()
-	await process_frame
+	# NO-95: Tariff on Gold Gain reaches play through Donald Trump's Power, second
+	# in his escalation, so it is driven through his Wave here rather than
+	# seeded. Once with nothing held, then against each gain-immunity Artefact.
+	for held: String in ["", "panama-papers-shredder", "amber-room-bubble-wrap"]:
+		var dt := _boot({"board": [], "wave": 49, "artefacts": [held] if held != "" else []})
+		await process_frame
+		await process_frame
+		dt.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
+		dt._queue_wave(50)
+		var label := held if held != "" else "nothing held"
+		check(not dt.king_power_abilities.has("inflation"),
+			"Trump's Wave (%s): Tariff on Gold Gain is not in force at turn 0" % label)
+		dt.turns_since_wave = Tuning.KING_TARIFF_STACK_TURNS
+		Kings.stack_power_if_due(dt)
+		check(dt.king_power_abilities.has("inflation"),
+			"Trump's Wave (%s): Tariff on Gold Gain comes into force at turn %d" % [label, Tuning.KING_TARIFF_STACK_TURNS])
+		dt.gold = 0
+		Economy.earn(dt, 100)
+		var want := 90 if held == "" else 100
+		check(dt.gold == want, "Trump's Wave (%s): earning 100 Gold pays %d (got %d)" % [label, want, dt.gold])
+		dt.queue_free()
+		await process_frame
 
 	var ark := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 500, "artefacts": ["ark-grounding-cable"], "king_abilities": ["move_cost"]})
@@ -170,12 +177,12 @@ func _init() -> void:
 	var salvation := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 0, "artefacts": ["salvation-gift-card"]})
 	await process_frame
-	Economy.activate_king_ability_by_key(salvation, "sanctions")
-	check(salvation.king_abilities_active.is_empty() and salvation.sanctioned_id == "",
+	Economy.activate_king_ability_by_key(salvation, "move_cost")
+	check(salvation.king_abilities_active.is_empty(),
 		"Salvation Gift Card: the first Tariff applied is cancelled")
 	check(not salvation.salvation_charged, "Salvation Gift Card: spent after cancelling")
-	Economy.activate_king_ability_by_key(salvation, "regulation")
-	check(salvation.king_abilities_active.size() == 1 and salvation.king_abilities_active[0].key == "regulation",
+	Economy.activate_king_ability_by_key(salvation, "capture_cost")
+	check(salvation.king_abilities_active.size() == 1 and salvation.king_abilities_active[0].key == "capture_cost",
 		"Salvation Gift Card: a second Tariff applies normally once spent")
 	salvation.artefacts[0].acquired_wave = 1 # per-artefact cadence (2026-08-28):
 		# isolate the handler's own math from acquisition-stamping coverage below
@@ -185,8 +192,7 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 45: Y2K Patch Floppy Disk (on_wave_spawn arms, on_enemy_turn_
-	# start consumes) — grouped here, not in an items_artefacts_*.gd file,
-	# because its own spec calls out checking the Filibuster interaction
+	# start consumes)
 	var y2k := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"]})
 	await process_frame
@@ -213,26 +219,8 @@ func _init() -> void:
 	y2k2.queue_free()
 	await process_frame
 
-	# Y2K + Filibuster on the same hook: run() always dispatches the
-	# artefacts group before the tariffs group (header's "Tariff/artefact
-	# ordering" note), so Y2K's zeroed ctx.actions is always the base
-	# Filibuster's own "+1" composes on top of — deterministic by group
-	# order, never by where the two keys happen to alphabetically sort
-	# (they're in different groups, so that comparison never runs).
-	var y2kf := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"], "king_abilities": ["filibuster"]})
-	await process_frame
-	WaveLogic.queue(y2kf, y2kf.wave + 1)
-	check(Economy.enemy_actions(y2kf) == 1,
-		"Y2K + Filibuster: the first enemy Turn gets exactly Filibuster's own +1 (Y2K's base cancelled, not the tariff's)")
-	check(Economy.enemy_actions(y2kf) == Tuning.ENEMY_ACTIONS_PER_TURN + 1,
-		"Y2K + Filibuster: the second enemy Turn is Filibuster's usual +1 on top of the normal Turn")
-	y2kf.queue_free()
-	await process_frame
-
 	# issue 59: Tier 5 doubles the enemy's base — Y2K still skips exactly ONE
-	# enemy Turn on top of that tier value, and Filibuster's +1 still composes
-	# on top of Y2K's zeroed base, same as at Tier 1 above.
+	# enemy Turn on top of that tier value.
 	GameScript.next_tier = "Tier 5"
 	var y2k5 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"]})
@@ -248,25 +236,8 @@ func _init() -> void:
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 
-	GameScript.next_tier = "Tier 5"
-	var y2kf5 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["y2k-patch-floppy-disk"], "king_abilities": ["filibuster"]})
-	await process_frame
-	WaveLogic.queue(y2kf5, y2kf5.wave + 1)
-	check(Economy.enemy_actions(y2kf5) == 1,
-		"Y2K + Filibuster at Tier 5: the first enemy Turn is still exactly Filibuster's own +1 (Y2K's Tier-5 base cancelled)")
-	check(Economy.enemy_actions(y2kf5) == 3,
-		"Y2K + Filibuster at Tier 5: the second enemy Turn is Filibuster's +1 on top of the normal Tier-5 2 actions")
-	y2kf5.queue_free()
-	await process_frame
-	GameScript.next_tier = Tuning.DEFAULT_TIER
-
-	# --- issue 54: Exhibit 399, dormant — Tuning.KING_ABILITIES_SCHEDULED is false
-	# (2026-08-29 ruling), so Tariffs never activate in a live run and this
-	# can only be exercised by driving economy.gd's apply_king_ability/
-	# activate_king_ability_by_key directly, as below. NOT exercised in a live run.
-	check(not Tuning.KING_ABILITIES_SCHEDULED,
-		"(context) Tariffs are off in a live run — Exhibit 399 below is only ever driven directly")
+	# --- issue 54: Exhibit 399, driven directly through economy.gd's
+	# activate_king_ability_by_key.
 
 	var ex_ctrl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4})
 	await process_frame
@@ -314,8 +285,8 @@ func _init() -> void:
 	# --- issue 56: SETI's Red Marker, redesigned — "on acquiring this
 	# Artefact: remove a random active Tariff (if any), and open a Big
 	# Artefact Box." The Box opening is UNCONDITIONAL — the one thing that
-	# matters, since KING_ABILITIES_SCHEDULED is false above, so the no-Tariff-
-	# active case (asserted first) is the only one a live run ever exercises.
+	# matters, since a Tariff is active only during Donald Trump's Wave, so the
+	# no-Tariff-active case (asserted first) is the common one.
 	var seti_live := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 999})
 	await process_frame
@@ -332,9 +303,7 @@ func _init() -> void:
 	seti_live.queue_free()
 	await process_frame
 
-	# The Tariff-removal half, driven directly — it can't happen in a live
-	# run (KING_ABILITIES_SCHEDULED is false), so this exercises it the same way
-	# Exhibit 399 above does.
+	# The Tariff-removal half, with a Tariff seeded directly.
 	var seti_tar := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 999, "king_abilities": ["move_cost"]})
 	await process_frame
@@ -352,7 +321,7 @@ func _init() -> void:
 	# --- review pass 3: the echo layer's `fired` counted TARIFFS as "your
 	# Artefacts". Bilderberg paid +15 on one Artefact + one Tariff firing
 	# together, and Mona Lisa's "first Artefact trigger each Turn" echoed a
-	# live Inflation into a second -10% (reachable in play via Trump's Power).
+	# live Tariff on Gold Gain into a second -10% (reachable via Trump's Power).
 	var bil := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4, "gold": 0,
 		"artefacts": ["bilderberg-hotel-slippers", "panama-papers-shredder"], "king_abilities": ["inflation"]})
 	await process_frame
@@ -368,32 +337,8 @@ func _init() -> void:
 	await process_frame
 	mona.mona_lisa_turn_done = false
 	check(Economy.gain(mona, 100) == 90,
-		"review pass 3: Mona Lisa never echoes a Tariff — Inflation applies once, not twice")
+		"review pass 3: Mona Lisa never echoes a Tariff — Tariff on Gold Gain applies once, not twice")
 	mona.queue_free()
-	await process_frame
-
-	# --- NO-70: Regulation blocks pawn PROMOTION as well as merging (Notion:
-	# "Pawns can no longer be merged or promoted"). The ▲ badge is a same-id
-	# merge (game.gd promote_pressed -> MergeLogic.do_merge), the Promote Item
-	# is the other entry point. The unregulated control is test_items.gd's
-	# "promote advances a pawn to its next tier".
-	var reg := _boot({"board": [["pawn", 0, 2, 2], ["sergeant", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 500, "stock": ["pawn", "pawn"], "king_abilities": ["regulation"]})
-	await process_frame
-	MergeLogic.do_merge(reg, {"id": "pawn"}, {"id": "pawn"}) # what the ▲ badge presses
-	check(reg.stock.count("pawn") == 2 and reg.pending_merge.is_empty(),
-		"Regulation: the ▲ badge's same-id pawn merge is refused")
-	check(not MergeLogic.pair_ok(reg, "pawn", "pawn"),
-		"Regulation: the ▲ badge stays hidden on a pawn stack (hud.gd reads pair_ok)")
-	reg.items.append(_item("promote", "tile"))
-	reg._use_item(0)
-	reg._item_click(Vector2i(2, 2))
-	check(reg.board[Vector2i(2, 2)].id == "pawn" and reg.items.size() == 1,
-		"Regulation: the Promote Item refuses a pawn — id unchanged, Item unspent")
-	reg._item_click(Vector2i(3, 2)) # the Item is still armed: a non-pawn target
-	check(reg.board[Vector2i(3, 2)].id == "arrow-pawn" and reg.items.is_empty(),
-		"Regulation: a non-pawn still promotes with the Item")
-	reg.queue_free()
 	await process_frame
 
 	print("---")

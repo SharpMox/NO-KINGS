@@ -62,14 +62,6 @@ const SELL_RATE := 0.5
 ## first value chosen to be clearly "more" without being prohibitive; the
 ## balance pass owns the number, now that issue 103 can measure it.
 const CONVERT_RATE := 0.75
-## Automatic tariff scheduling — OFF for now (user call 2026-08-28), pending
-## the combined Kings + Tariffs design pass. This ONLY stops the every-10-waves
-## draw and the T0 Inflation in wave_logic.gd. The whole system stays live and
-## testable: the catalog, the hooks slice 13 migrated onto ArtefactHooks, the
-## tariff-intercepting artefacts, and direct activation via a scenario/save
-## config or Economy.activate_king_ability all behave exactly as before. Flip this
-## back to true to restore the cadence — nothing else needs touching.
-const KING_ABILITIES_SCHEDULED := false
 
 const STUN_MISSES := 2            # Stun: turns the attacker loses, its own
                                    # side's turns (user call 2026-08-28)

@@ -24,7 +24,7 @@
 const FIRES = {
   "Economy.add_clock": ["on_clock_change"], // economy.gd:167
   "g._apply_buff": ["on_buff_apply"], // game.gd:2478
-  "WaveLogic.queue": ["on_wave_roster", "on_clock_refill", "on_wave_spawn"], // wave_logic.gd:59,80,91
+  "WaveLogic.queue": ["on_wave_roster", "on_wave_spawn"], // wave_logic.gd:64,105
   "Shop.price": ["on_price"], // shop.gd:164
   "Shop.buy": ["on_purchase", "on_gold_zero"], // shop.gd:329,312
 };

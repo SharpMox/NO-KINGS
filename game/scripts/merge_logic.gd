@@ -22,7 +22,7 @@ static func origin_id(g) -> String:
 	return ""
 
 
-## Valid pair under the current tariffs (Regulation blocks pawn merges).
+## Valid pair under the current King Power (Genghis Khan blocks every merge).
 static func pair_ok(g, a: String, b: String) -> bool:
 	if not Economy.merge_ok(g, a, b):
 		return false

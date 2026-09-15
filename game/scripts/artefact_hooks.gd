@@ -126,7 +126,7 @@
 ## identically — the ad hoc `if Economy.tariff_on(g, "...")` branches that
 ## used to sit inline in game.gd/wave_logic.gd/merge_logic.gd/hud.gd are now
 ## REGISTRY entries + _dispatch cases like any artefact. `tariff_on` is gone;
-## Economy grew narrow query wrappers instead (sanctioned/merge_ok/
+## Economy grew narrow query wrappers instead (merge_ok/
 ## deploy_cost/enemy_actions), mirroring how earn()/gain()/capture_score()
 ## already wrapped run() for artefacts. Kept file/class name: tariffs are
 ## conceptually "artefacts the GDD calls tariffs" — still artefact-shaped
@@ -140,12 +140,10 @@
 ## was the one thing `tariff_on` did that a plain REGISTRY lookup didn't).
 ##
 ## Two semantics coexist deliberately, same as the artefact-stacking note
-## above: most tariff handlers are idempotent gates (Sanctions/Regulation/
-## Austerity/Filibuster/Trade War, and the 8 action-cost keys on on_charge) —
-## a key held twice (Mild tiers may redraw the same tariff) still only gates
-## once, because the handler *sets* a ctx field rather than accumulating.
-## Inflation is the deliberate stacking exception (data/tariffs.gd: "-10% per
-## stack"): its on_gold_gain handler does `ctx.amount *= 0.9`, so N held
+## above: the 7 action-cost handlers on on_charge are idempotent gates — a key
+## held twice still only gates once, because the handler *sets* a ctx field
+## rather than accumulating. Tariff on Gold Gain (key "inflation") is the
+## deliberate stacking exception ("reduced 10%, stacks"): its on_gold_gain handler does `ctx.amount *= 0.9`, so N held
 ## copies compound multiplicatively — one dispatch per copy, same mechanism
 ## artefacts use for additive stacking, just a multiplicative handler body.
 ## Covered by test_gold.gd (single stack) and test_items.gd's counter-intel
@@ -155,17 +153,14 @@
 ## tariffs group (two separately-sorted passes, not one merged sort) so a
 ## shared hook keeps computing the artefact-modified base first and applying
 ## the tariff modifier on top, exactly the order the pre-migration call site
-## used. on_clock_refill was the one shared hook this mattered for (artefact
-## "timer" + tariff "recession": `refill` built by the artefact hook run,
-## then halved by Recession right after it, outside the hook) — "timer" was
-## removed in issue 69 (no catalog artefact has taken its place on this hook
-## since), so the tariff is currently the hook's only registrant, but the
-## dispatch-order guarantee stays in place for whichever artefact reaches it
-## next. A single alphabetical sort across both groups would have flipped
-## that ordering for any key sorting before "timer".
+## used. on_gold_gain is where it matters today: Panama Papers Shredder and
+## Amber Room Bubble Wrap set ctx.gain_immune before Tariff on Gold Gain reads
+## it. A single alphabetical sort across both groups would make that depend
+## on key names. (on_clock_refill, the first shared hook, went with Recession
+## in NO-95, when ten unreachable King Abilities were parked in Notion.)
 ##
-## Oneoff tariffs (forced_audit, hostile_takeover, asset_seizure, jd_vance,
-## asset_freeze) stay on Economy.apply_king_ability's own `match t.key` — that's
+## The one oneoff King Ability (jd_vance) stays on
+## Economy.resolve_king_ability's own branch — that's
 ## already a single non-scattered dispatch point (fires once, at activation),
 ## not an ad hoc branch repeated at multiple call sites, so folding it into
 ## REGISTRY/_dispatch too would add a hook with no behavioural or
@@ -398,10 +393,10 @@
 ## - on_deploy's ctx grew `skip_action` (Hitler's Argentinian Passport: the
 ##   deploy still happens, `actions_left` just isn't spent) — seeded false by
 ##   game.gd's `_place`, the same output-field pattern as on_charge's
-##   `charged` and on_sanction_check's `blocked`.
-## - on_wave_roster (already wired for Trade War, issue 13) gets its first
-##   artefact users: HAARP Volume Knob / Wuhan Vial Label add a piece the
-##   same way Trade War does (drawn from the wave's own mix, never the King);
+##   `charged` and on_merge_check's `blocked`.
+## - on_wave_roster (first wired for Trade War, issue 13; parked in NO-95) gets
+##   its first artefact users: HAARP Volume Knob / Wuhan Vial Label add a piece
+##   drawn from the wave's own mix, never the King;
 ##   Pigeon Charging Cable removes one, floored so a wave never spawns with
 ##   zero non-King pieces.
 ## - Some rows never needed a REGISTRY/hook entry at all — Nazca Boarding
@@ -496,12 +491,13 @@
 ## hooks can't express changing whether/how a Tariff applies") added the
 ## filter/scale/cancel shapes those two hooks were missing:
 ## - Panama Papers Shredder ("Mild Tariffs don't affect you") and Amber Room
-##   Bubble Wrap ("ignore Inflation and other gold-reducing Tariffs") both
+##   Bubble Wrap ("Your Gold gains can't be reduced", reworded NO-95) both
 ##   dispatch before the tariff they're gating (artefacts-before-tariffs
 ##   ordering, header above) and set a ctx flag the gated tariff's own case
 ##   reads — `on_charge`'s 5 Mild action-cost keys check `ctx.mild_blocked`
 ##   (split from the 2 Moderate keys, deploy_cost/fuse_cost, which don't);
-##   `on_gold_gain`'s Inflation checks `ctx.gain_immune`, set by either
+##   `on_gold_gain`'s Tariff on Gold Gain (and Nero's Power, kings.gd)
+##   checks `ctx.gain_immune`, set by either
 ##   artefact (a boolean gate, not a percentage — no compounding to reason
 ##   about). Neither artefact touches on_king_ability_apply/on_king_ability_charge
 ##   themselves (issue 19's "a Tariff was applied/charged" meta-notifications
@@ -651,11 +647,10 @@
 ##   `moved_this_turn`. Boolean grant, not additive: 2 held copies still
 ##   grant exactly one free move per eligible piece, same non-stacking
 ##   precedent as Y2K Patch Floppy Disk above.
-## - Exhibit 399 ("you choose between 2 options") is wired but genuinely
-##   dormant: Tuning.KING_ABILITIES_SCHEDULED is false (2026-08-29 ruling), so
-##   Tariffs never activate in a live run and this can only be exercised by
-##   calling economy.gd's `apply_king_ability`/`activate_king_ability_by_key` directly —
-##   done in game/tests/test_items_king_abilities.gd. Its on_king_ability_apply handler
+## - Exhibit 399 ("you choose between 2 options") shipped dormant, while the
+##   every-10-Waves schedule was off (deleted in NO-95); a King Ability now
+##   reaches it only through Donald Trump's Wave. Covered by
+##   game/tests/test_items_king_abilities.gd. Its on_king_ability_apply handler
 ##   sets a new `ctx.choice` output flag (mirrors `ctx.cancel`'s shape);
 ##   apply_king_ability defers the Tariff's actual effect (now split out as
 ##   `resolve_king_ability`) to game.gd's `_open_exhibit_choice`, which reframes
@@ -755,8 +750,8 @@
 ##   remove a random active Tariff and open a Big Artefact Box." An ordinary
 ##   self-referential on_purchase handler (REGISTRY/_dispatch below) — the
 ##   one thing that matters is that the Box opens UNCONDITIONALLY, not only
-##   when a Tariff happened to be removed: Tuning.KING_ABILITIES_SCHEDULED is false,
-##   so no Tariff is ever active in a live run today, and a Box gated on the
+##   when a Tariff happened to be removed: a Tariff is active only during
+##   Donald Trump's Wave, and a Box gated on the
 ##   removal would leave this Artefact dead on arrival all over again, the
 ##   exact defect the redesign exists to fix. Big (5 choices, 1 pick, user
 ##   ruling). Covered by test_items_artefacts_4.gd (no Tariff active — the
@@ -807,15 +802,13 @@ const Box := preload("res://scripts/box.gd")
 
 const HOOKS := [
 	"on_capture", "on_piece_lost", "on_deploy",
-	"on_wave_clear", "on_wave_spawn", "on_clock_refill",
+	"on_wave_clear", "on_wave_spawn",
 	"on_turn_start", "on_turn_end", "on_shop_restock", "on_purchase",
 	"on_gold_change", "on_score_change", "on_box_open", "on_game_over", "on_price",
 	"on_item_consume", "on_rank_up", "on_king_ability_apply", "on_king_ability_charge",
 	# --- issue 13: tariff-only trigger points (see header) ---
-	"on_charge", "on_gold_gain", "on_sanction_check", "on_merge_check",
+	"on_charge", "on_gold_gain", "on_merge_check",
 	"on_place_cost", "on_enemy_turn_start", "on_wave_roster",
-	# --- NO-70: may this piece rank up via the Promote Item? (Economy.promote_ok) ---
-	"on_promote_check",
 	# --- issue 23: Piece Buff lifecycle choke points (see header) ---
 	"on_buff_apply", "on_buff_consume", "on_demote", "on_piece_demoted", "on_buff_removal",
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
@@ -910,12 +903,6 @@ const REGISTRY := {
 	"deploy_cost": ["on_charge"],
 	"fuse_cost": ["on_charge"],
 	"inflation": ["on_gold_gain"],
-	"sanctions": ["on_sanction_check"],
-	"regulation": ["on_merge_check", "on_promote_check"],
-	"austerity": ["on_place_cost"],
-	"recession": ["on_clock_refill"],
-	"filibuster": ["on_enemy_turn_start"],
-	"trade_war": ["on_wave_roster"],
 
 	# --- issue 19: on_piece_lost (game.gd _lose_player_piece, 5 call sites) ---
 	"satoshi-s-private-key": ["on_wave_clear", "on_piece_lost"],
@@ -1004,7 +991,7 @@ const REGISTRY := {
 	"salvation-gift-card": ["on_king_ability_apply", "on_wave_clear"],
 
 	# --- issue 26: spawn roster modifiers (WaveLogic.queue's existing
-	# on_wave_roster dispatch — trade_war's own prerequisite, not a new one) ---
+	# on_wave_roster dispatch) ---
 	"haarp-volume-knob": ["on_wave_roster", "on_wave_clear"],
 	"wuhan-vial-label": ["on_wave_roster", "on_capture"],
 	"pigeon-charging-cable": ["on_wave_roster"],
@@ -1020,11 +1007,11 @@ const REGISTRY := {
 
 	# --- issue 26: "5-Wave Milestone" (on_wave_clear + _milestone5_hit, the
 	# silk-road-coupon/crop-circle-plank cadence — PER-ARTEFACT, ruled
-	# 2026-08-28; a different one than on_clock_refill's own GLOBAL 10-wave
-	# clock-refill trigger, see there) ---
+	# 2026-08-28; a different one than wave_logic.gd's GLOBAL 10-wave
+	# Clock refill) ---
 	"ark-s-bunkbed": ["on_wave_clear", "on_purchase"],
 	"trojan-horse-assembly-manual": ["on_wave_clear"],
-	# was left on on_clock_refill (the GLOBAL 10-wave beat) when the other 8
+	# was left on the GLOBAL 10-wave beat (then a hook) when the other 8
 	# were converted above — paid at half the intended rate; moved to this
 	# per-artefact cadence 2026-08-28 (user-reported)
 	"john-titor-s-crypto-wallet": ["on_wave_clear"],
@@ -1142,7 +1129,7 @@ const REGISTRY := {
 ## Two held sources, dispatched as two separately key-sorted groups —
 ## artefacts (g.artefacts) always before tariffs (g.king_abilities_active, skipped
 ## entirely while g.king_abilities_suppressed) — see the header for why a single
-## merged sort would be wrong for the one hook (on_clock_refill) both groups use.
+## merged sort would be wrong for a hook both groups use (on_gold_gain).
 ## QUERY hooks answer a question ("what does this cost?", "is this merge
 ## allowed?") and are dispatched from READ paths — Shop.price() on every tile
 ## of every Shop redraw, the HUD's per-stack deploy/convert prices, autoplay's
@@ -1151,8 +1138,7 @@ const REGISTRY := {
 ## the telemetry tally skip them. Before this, holding Bilderberg plus any two
 ## on_price Artefacts paid +15 Gold per Shop tile per frame, and a Shop redraw
 ## spent Mona Lisa's echo on a discount recompute (review pass 1, 2026-09-06).
-const QUERY_HOOKS := ["on_price", "on_sanction_check", "on_merge_check", "on_place_cost",
-	"on_promote_check"]
+const QUERY_HOOKS := ["on_price", "on_merge_check", "on_place_cost"]
 
 
 static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
@@ -1405,7 +1391,7 @@ static func _adjacent_ally(g, pos: Vector2i) -> Vector2i:
 
 
 ## "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, not the GLOBAL
-## 10-wave beat (Tuning.MILESTONE_WAVES / on_clock_refill, wave_logic.gd's
+## 10-wave beat (Tuning.MILESTONE_WAVES, wave_logic.gd's
 ## Clock refill + reinforcement pick at the start of waves 11/21/31… —
 ## untouched, a genuinely different cadence). Each held
 ## copy counts its own 5 waves from its own acquisition — ruled 2026-08-28,
@@ -1743,7 +1729,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["golden-buddha-bobblehead", "on_wave_clear"]:
 			g.gold += roundi(ctx.gold_base * 0.05)
 
-		# --- issue 16: on_wave_spawn / on_clock_refill / on_purchase / on_game_over ---
+		# --- issue 16: on_wave_spawn / on_purchase / on_game_over ---
 		["nigerian-prince-wire-transfer", "on_wave_spawn"]:
 			g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 			g.gold += 10
@@ -1823,8 +1809,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				ctx.amount -= ctx.base * 0.50
 		["silk-road-coupon", "on_wave_clear"]:
 			# "5-Wave Milestone" (12 effect texts) is PER-ARTEFACT, a different
-			# cadence than on_clock_refill's own GLOBAL 10-wave clock-refill
-			# trigger — see _milestone5_hit's header above.
+			# cadence than the GLOBAL 10-wave Clock refill — see
+			# _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
 		["john-titor-s-crypto-wallet", "on_wave_clear"]:
@@ -1941,36 +1927,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.key == key:
 				ctx.charged = true
 		["inflation", "on_gold_gain"]:
-			# stacks multiplicatively per held copy (header) — data/tariffs.gd:
-			# "All gold gains reduced 10% (stacks)". ctx.gain_immune (issue 22:
-			# Panama Papers Shredder / Amber Room Bubble Wrap) skips it entirely.
+			# Tariff on Gold Gain: stacks multiplicatively per held copy (header).
+			# ctx.gain_immune (issue 22: Panama Papers Shredder / Amber Room
+			# Bubble Wrap) skips it entirely.
 			if not ctx.get("gain_immune", false):
 				ctx.amount *= 0.9
-		["sanctions", "on_sanction_check"]:
-			if ctx.id == g.sanctioned_id:
-				ctx.blocked = true
-		["regulation", "on_merge_check"]:
-			if ctx.a == "pawn" or ctx.b == "pawn":
-				ctx.blocked = true
-		["regulation", "on_promote_check"]:
-			# NO-70: "merged OR PROMOTED" — the ▲ badge is a same-id merge and
-			# already refused above; this closes the Promote Item. Its own hook,
-			# not merge_ok(id, id), so Genghis Khan's total merge block
-			# (kings.gd "nomerge") does not silently swallow the Item too.
-			if ctx.id == "pawn":
-				ctx.blocked = true
-		["austerity", "on_place_cost"]:
-			ctx.cost *= 2
-		["recession", "on_clock_refill"]:
-			ctx.refill *= 0.5
-		["filibuster", "on_enemy_turn_start"]:
-			ctx.actions += 1
-		["trade_war", "on_wave_roster"]:
-			# +1 piece per wave, drawn from the wave's own mix, never the King
-			# (review 2026-07-03)
-			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
-			if not extras.is_empty():
-				ctx.roster.append(extras[g.rng.randi() % extras.size()])
 
 		# --- issue 19: on_piece_lost (game.gd _lose_player_piece) ---
 		# issue 53: every handler below except fireproof-pajamas now also
@@ -2283,10 +2244,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["panama-papers-shredder", "on_charge"]:
 			ctx.mild_blocked = true # only the 5 Mild-tier keys' case checks this
 		["panama-papers-shredder", "on_gold_gain"]:
-			ctx.gain_immune = true # Inflation is the one Mild on_gold_gain tariff
+			ctx.gain_immune = true # Tariff on Gold Gain is the one Mild on_gold_gain tariff
 		["amber-room-bubble-wrap", "on_gold_gain"]:
-			ctx.gain_immune = true # same flag: "ignore Inflation and other
-				# gold-reducing Tariffs" is the same gate regardless of tier
+			ctx.gain_immune = true # same flag: "Your Gold gains can't be reduced",
+				# regardless of tier — Nero's Power respects it too (kings.gd)
 		["ark-grounding-cable", "on_charge"]:
 			ctx.amount -= ctx.base * 0.5 # off the immutable base, additive per copy
 		["salvation-gift-card", "on_king_ability_apply"]:
@@ -2297,8 +2258,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if _milestone5_hit(g.wave, acquired_wave): # same cadence as Silk Road Coupon (issue 18)
 				g.salvation_charged = true
 
-		# --- issue 26: spawn roster modifiers (on_wave_roster, WaveLogic.queue
-		# — trade_war's own prerequisite above, not a new one) ---
+		# --- issue 26: spawn roster modifiers (on_wave_roster, WaveLogic.queue) ---
 		["haarp-volume-knob", "on_wave_roster"]:
 			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
 			if not extras.is_empty():
@@ -2317,7 +2277,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.gold += roundi(ctx.base * 0.25)
 		["pigeon-charging-cable", "on_wave_roster"]:
 			# -1 piece per wave, floored so a wave never spawns with zero
-			# non-King pieces — same "never the King" rule as trade_war/HAARP/
+			# non-King pieces — same "never the King" rule as HAARP/
 			# Wuhan above, just subtracting instead of adding
 			var pigeon_extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
 			if pigeon_extras.size() > 1:
@@ -2457,7 +2417,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["mar-a-lago-toilet-papers", "on_wave_clear"]:
 			# "5-Wave Milestone" — the silk-road-coupon/crop-circle-plank
 			# PER-ARTEFACT cadence (issue 26/28), not the GLOBAL 10-wave
-			# on_clock_refill hook (see REGISTRY's issue-26 comment). The free
+			# Clock refill (see REGISTRY's issue-26 comment). The free
 			# slot is picked HERE, once, and stamped onto the actual
 			# g.shop_stock Dictionary (a plain field, same shape as roll()'s
 			# own "biased" tag) — never re-rolled inside Shop.price(), which
@@ -2537,18 +2497,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# consumes once — the second copy's own dispatch is then a no-op,
 			# so 2 copies still skip exactly ONE Turn, never two.
 			# ctx.actions = 0 is an ABSOLUTE override (there is no "skip"
-			# concept to add to), not a delta off a base — and it composes
-			# safely with Filibuster's own additive "+1" on this same hook
-			# because run() always dispatches the artefacts group before the
-			# tariffs group (header's "Tariff/artefact ordering" note): this
-			# handler's zeroed ctx.actions is always the base Filibuster's
-			# "+1" lands on top of, deterministically, by group order — never
-			# by where "filibuster" happens to alphabetically sort against
-			# "y2k-patch-floppy-disk" (they're in different groups, so that
-			# comparison never even runs). Net result held together: the
-			# enemy's first Turn gets exactly Filibuster's bonus action, not
-			# the normal 1 and not 0 — the same "artefact base, tariff modifies
-			# on top" shape on_clock_refill/Recession already established.
+			# concept to add to), not a delta off a base.
 			if g.y2k_armed:
 				g.y2k_armed = false
 				ctx.actions = 0
@@ -2635,9 +2584,8 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# the bought copy to g.artefacts BEFORE calling run() (see there),
 			# so ctx.key == this key on the very dispatch for buying it. BOTH
 			# halves always run — the Box opening unconditionally is the whole
-			# point of the redesign (KING_ABILITIES_SCHEDULED is false today, so the
-			# Tariff-removal half never actually fires in a live run, only in
-			# test_items_king_abilities.gd driving g.king_abilities_active directly).
+			# point of the redesign (a Tariff is active only during Donald
+			# Trump's Wave, so most purchases have nothing to remove).
 			if ctx.kind == "artefact" and ctx.key == "seti-s-red-marker":
 				if not g.king_abilities_active.is_empty():
 					g.king_abilities_active.remove_at(g.rng.randi() % g.king_abilities_active.size())

@@ -516,10 +516,9 @@
 ##   cancel. Recharge state (`g.salvation_charged`, starts true) is consumed
 ##   on a successful veto and restored on_wave_clear at wave%5==0, the same
 ##   cadence Silk Road Coupon already established (issue 18).
-## - Exhibit 399 (tariff choice) and SETI's Red Marker (tariff inversion) stay
-##   unimplemented — both need a design ruling before any code (a blocking
-##   modal choice; a per-Tariff "equivalent bonus" table) — see the issue 22
-##   Outcome / Notion questions.
+## - Exhibit 399 (tariff choice) and SETI's Red Marker (tariff inversion) stayed
+##   unimplemented here — both needed a design ruling (issue 54 and issue 56
+##   below; Exhibit 399 was later redesigned outright in NO-81).
 ##
 ## issue 31 (capture-context effects) added:
 ## - Curtain Rods Bag ("first Capture each Wave: double Score, but it pays no
@@ -647,18 +646,14 @@
 ##   `moved_this_turn`. Boolean grant, not additive: 2 held copies still
 ##   grant exactly one free move per eligible piece, same non-stacking
 ##   precedent as Y2K Patch Floppy Disk above.
-## - Exhibit 399 ("you choose between 2 options") shipped dormant, while the
-##   every-10-Waves schedule was off (deleted in NO-95); a King Ability now
-##   reaches it only through Donald Trump's Wave. Covered by
-##   game/tests/test_items_king_abilities.gd. Its on_king_ability_apply handler
-##   sets a new `ctx.choice` output flag (mirrors `ctx.cancel`'s shape);
-##   apply_king_ability defers the Tariff's actual effect (now split out as
-##   `resolve_king_ability`) to game.gd's `_open_exhibit_choice`, which reframes
-##   "2 options" as the existing tariff-cancel mechanism (Salvation Gift
-##   Card's own veto) handed to the player as a real choice via the issue-41
-##   choice-pick seam, instead of firing automatically and with no recharge
-##   limit. `ctx.cancel` is still checked first, so Salvation's automatic
-##   veto wins outright if both are somehow held.
+## - Exhibit 399 shipped here as a Tariff choice ("Let it apply" / "Block it").
+##   NO-81 (Max, 2026-09-15) replaced it outright: "On your first Capture each
+##   Turn: destroy a random adjacent enemy piece (not the King)". Its on_capture
+##   handler counts `ctx.exhibit_destroys` (the turn_capture_index == 0 gate
+##   USS Eldridge uses); game.gd's _move_player destroys that many random
+##   adjacent non-King enemies right after Multicapture, through _destroy, so
+##   it is destruction (no Score, Gold or Captured Stock) and Shield does not
+##   protect the target.
 ## - SETI's Red Marker ("one random active Tariff is inverted into its
 ##   equivalent bonus") stays unimplemented: it needs a per-Tariff "what's
 ##   this one's opposite" table that doesn't exist in data/tariffs.gd — the
@@ -1100,7 +1095,7 @@ const REGISTRY := {
 	"inflatable-vietcong-torpedo": ["on_wave_clear"],
 	"hellfire-club-discord-invite": ["on_turn_start"],
 	"pegasus-free-trial": ["on_turn_start"],
-	"exhibit-399": ["on_king_ability_apply"],
+	"exhibit-399": ["on_capture"], # NO-81: redesigned from a Tariff choice
 
 	# --- issue 55: meta-dispatch and capture conversion (the last 3). Troll
 	# Farm Employee of the Month and Ecdysis Sheddings deliberately have NO
@@ -2566,8 +2561,14 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				if g.board[pos].owner == Rules.PLAYER and g.board[pos].id != "king" \
 						and g.defs[g.board[pos].id].next == null:
 					g.board[pos].blitz_free_move = true
-		["exhibit-399", "on_king_ability_apply"]:
-			ctx.choice = true
+		["exhibit-399", "on_capture"]:
+			# NO-81: "On your first Capture each Turn: destroy a random adjacent
+			# enemy piece (not the King)". An OUTPUT count, +1 per held copy
+			# (additive stacking); game.gd's _move_player picks the targets after
+			# Multicapture has taken its own. attacker_pos rules out anything but
+			# your own piece capturing by moving.
+			if ctx.turn_capture_index == 0 and ctx.attacker_pos.x >= 0:
+				ctx.exhibit_destroys += 1
 
 		# --- issue 55: meta-dispatch and capture conversion (see this file's
 		# own header for Troll Farm/Ecdysis, both pure _run_meta_triggers

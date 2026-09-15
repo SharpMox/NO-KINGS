@@ -167,9 +167,6 @@ var uap_used_this_wave := false # UAP Breath Mint: once per Wave, reset
 	# on_wave_clear (artefact_hooks.gd, issue 54) — same idiom as Hoffa above
 var torpedo_used_this_wave := false # Inflatable Vietcong Torpedo: once per
 	# Wave, reset on_wave_clear (artefact_hooks.gd, issue 54)
-var exhibit_399_tariff: Dictionary = {} # Exhibit 399 (issue 54): the Tariff whose apply is paused behind the
-	# choice pick, stashed here so the callback (_exhibit_399_chosen) can
-	# still resolve it after economy.gd's apply_king_ability has already returned
 var salvation_charged := true # Salvation Gift Card: ready to veto the next
 	# Tariff applied; consumed on use, restored on_wave_clear at wave%5==0
 	# (artefact hook 22)
@@ -2153,6 +2150,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			# below fires its own capture_score call that overwrites
 			# g.last_capture_ctx with a fresh ctx for its OWN victim.
 		var grant_buffs: Array = last_capture_ctx.get("grant_buffs", [])
+		var exhibit_destroys: int = last_capture_ctx.get("exhibit_destroys", 0) # NO-81,
+			# snapshotted for the same reason: Multicapture overwrites the ctx
 		if BuffLogic.has(board[from], "critical"):
 			_consume_buff(from, "critical")
 			_add_float(to, "Critical!", COL_MERGE)
@@ -2189,6 +2188,22 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				lost_enemy += 1
 				_add_pop(also)
 				board.erase(also)
+		# Exhibit 399 (NO-81): after Multicapture, one random adjacent non-King
+		# enemy per held copy. _destroy, not a capture: no Score, Gold or
+		# Captured Stock, and Shield does not protect the target.
+		for i in exhibit_destroys:
+			var near: Array[Vector2i] = []
+			for dx in [-1, 0, 1]:
+				for dy in [-1, 0, 1]:
+					var at: Vector2i = to + Vector2i(dx, dy)
+					if at != to and board.has(at) and board[at].owner == Rules.ENEMY \
+							and board[at].id != "king":
+						near.append(at)
+			if near.is_empty():
+				break
+			var hit: Vector2i = near[rng.randi() % near.size()]
+			_add_float(hit, "Exhibit 399!", COL_CAPTURE)
+			_destroy(hit)
 		Economy.charge(self, "capture_cost")
 		lost_enemy += 1
 		if BuffLogic.has(victim, "piece_bounty"): # Bounty (issue 48), enemy
@@ -2640,33 +2655,6 @@ func _yalta_chosen(value: String) -> void:
 ## just forfeit it and close (issue 44).
 func _yalta_pick_cancelled() -> void:
 	pass
-
-
-## Exhibit 399 (issue 54; a King Ability reaches it only during Donald Trump's
-## Wave): "you choose between 2 options" reframed as the tariff-cancel
-## mechanism Salvation Gift Card already has (economy.gd's resolve_king_ability),
-## just handed to the player as a real choice instead of firing
-## automatically and with no recharge limit. `t` is stashed because
-## apply_king_ability's on_king_ability_apply dispatch has already returned by the time
-## this opens — the mutation itself waits for the pick, same shape as every
-## other choice-modal consumer here (Yalta/Bounty above).
-func _open_exhibit_choice(t: Dictionary) -> void:
-	exhibit_399_tariff = t
-	if autoplay: # bot: let it apply, never stall on a modal
-		return _exhibit_399_chosen(true)
-	_open_choice_pick("✦ Exhibit 399 — %s: choose one:" % t.name,
-		[{"label": "Let it apply", "value": true}], "Block it",
-		_exhibit_399_chosen, _exhibit_399_blocked)
-
-
-func _exhibit_399_chosen(_value: bool) -> void:
-	Economy.resolve_king_ability(self, exhibit_399_tariff)
-	exhibit_399_tariff = {}
-	_refresh()
-
-
-func _exhibit_399_blocked() -> void:
-	exhibit_399_tariff = {} # "Block it": the Tariff never lands, nothing to undo
 
 
 ## Targeting shim — the item targeting rules live in scripts/item_logic.gd.

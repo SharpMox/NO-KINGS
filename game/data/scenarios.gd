@@ -242,6 +242,20 @@ static func _hand_written() -> Array:
 				["pawn", 0, 6, 1, {"buffs": [{"key": "bomb"}]}],
 				["rook", 1, 2, 5], ["pawn", 1, 3, 5], ["knight", 1, 3, 8]],
 			"items": ["buff_box"], "stock": ["pawn"], "score": 500, "wave": 1}},
+		# --- NO-81: Exhibit 399 — the queen's first Capture destroys a random
+		# adjacent enemy (not the King). Capture (3,5) from (3,3).
+		{"name": "Exhibit 399: several adjacent enemies", "cfg": {
+			"board": [["queen", 0, 3, 3], ["pawn", 1, 3, 5], ["knight", 1, 2, 6], ["bishop", 1, 4, 6],
+				["pawn", 1, 4, 5], ["rook", 1, 7, 10]],
+			"artefacts": ["exhibit-399"], "score": 500, "wave": 3}},
+		{"name": "Exhibit 399 + Multicapture", "cfg": {
+			"board": [["queen", 0, 3, 3, {"buffs": [{"key": "multicapture"}]}], ["pawn", 1, 3, 5],
+				["rook", 1, 4, 5], ["knight", 1, 2, 6], ["pawn", 1, 4, 6], ["rook", 1, 7, 10]],
+			"artefacts": ["exhibit-399"], "score": 500, "wave": 3}},
+		{"name": "Exhibit 399: King adjacent", "cfg": {
+			"board": [["queen", 0, 3, 6], ["pawn", 1, 3, 9], ["king", 1, 3, 10],
+				["rook", 1, 0, 10], ["bishop", 1, 7, 10]],
+			"artefacts": ["exhibit-399"], "score": 500, "wave": 50}},
 		{"name": "Artefacts: mixed simple triggers", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 2, 4], ["pawn", 1, 3, 4], ["rook", 1, 4, 5]],
 			"artefacts": ["stargate-divination-crystal", "library-of-alexandria-matchbox",

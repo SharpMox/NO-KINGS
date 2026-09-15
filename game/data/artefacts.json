@@ -2031,11 +2031,11 @@
   "key": "exhibit-399",
   "name": "Exhibit 399",
   "rarity": "Legendary",
-  "type": "Passive",
+  "type": "Trigger",
   "bonus": [
    "Special"
   ],
-  "effect": "When a King Ability would be applied: you choose between 2 options",
+  "effect": "On your first Capture each Turn: destroy a random adjacent enemy piece (not the King)",
   "conspiracy": "The Warren Commission",
   "implemented": true
  },

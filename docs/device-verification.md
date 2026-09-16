@@ -25,6 +25,56 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `bcbc8d3` — 2026-09-16, Android **EMULATOR, not hardware** — NO-10 Back / tall-screen fill / logout, three checks
+
+**Not a device.** Emulator AVD `nokings_api35` (system-images/android-35/google_apis,
+1080x2400 @420dpi, arm64-v8a, `PlayStore.enabled=no`), booted `-no-window`, driven from the
+Mac with `adb shell input` — no phone involved, per Max's approval 2026-09-16 to run the
+emulator-able subset of NO-10 now. Debug AAB built from `origin/main` at `bcbc8d3` in an
+isolated worktree, installed via bundletool per `docs/MANUAL-STEPS.md` section B. Evidence
+(30 screenshots + `run.log`): `~/Documents/nokings-builds/no-10-emulator-2026-09-16/`.
+
+### Confirmed on the emulator
+
+| What | Observed |
+| --- | --- |
+| **NO-61 Back, intro** | Skips to the main menu, pid unchanged. |
+| **NO-61 Back, main menu with a panel open** | Tested on both Settings and TEST (the exact panel the pre-fix bug quit from) — Back closes the panel back to the main menu, does not quit. |
+| **NO-61 Back, in a run** | Opens the "Paused" menu (Resume/Guide/Settings/Main Menu) over the board. |
+| **NO-61 Back, pause menu open** | Closes it directly (no confirm dialog), resumes the exact same board state. |
+| **NO-61 Back, result screen** | From the post-run results screen (Restart/Main Menu), Back returns to the main menu. |
+| **NO-61 Back never exits** | `pidof com.sharpunk.nokings` read after every single Back press above (intro, both panels, in-run, pause, results): pid `3744` throughout, never missing. |
+| **NO-10 tall-screen (9:20) fill** | Measured with PIL, sampling pixel-color transitions down two vertical lines (x=40, x=1040) of the real in-game HUD (wave-50 TEST scenario, not the pre-deploy preview). Top HUD chrome: y 0-380. Board: y 380-1964 (1584px = the board's 12 logical rows at Tuning.BOARD_H=12, ~132px/row — confirmed by counting the purple/cream transition period). Bottom chrome (Inventory/Shop drawers, army banner, thumb row): y 1964-2400. Sum 380+1584+436=2400 exactly; the board's border sits flush against both the HUD divider and the drawer bar. **No dead band measured** — the extra rows a 9:20 screen has room for (12 vs a nominal 8) are exactly what the board uses to fill it. |
+
+### NOT RUN
+
+- **PR #307 logout park/restore.** `adb shell dumpsys account` showed `Accounts: 0` — no
+  Google account on this AVD (no Play Store, `PlayStore.enabled=no`). Tapping "Sign in with
+  Google" reached a real async call ("Signing in…") that failed cleanly after ~8s: *"Google
+  sign-in didn't complete. Check your connection. You can try again."* Confirms Play Games
+  sign-in is genuinely unavailable here, not a missed tap or a hang. With no way to sign in
+  there is no signed-in state to log out of and nothing to restore, so this check could not
+  be run at all — recorded as NOT RUN rather than guessed at.
+
+### Seen, not chased (outside this pass's scope)
+
+- On the wave-1 deploy screen (before pressing Start, army/tier already chosen), several
+  `adb shell input tap`s (Inventory tab, a Stock-piece drag) produced no visible change —
+  screenshots byte-identical across five different taps. Hardware Back on the same screen
+  did work (opened the pause menu correctly, see above), so input generally reaches the app;
+  this looks like the same "plain tap does nothing on some controls" class of trap noted
+  elsewhere for this AVD, not a NO-61 regression. Not investigated further — out of scope for
+  this pass, and the Back/tall-screen/logout checks were all completed via TEST scenarios
+  instead, which start already mid-run.
+
+### Still unverified (hardware)
+
+- Nothing in this entry changes what real hardware has or hasn't confirmed — see the
+  hardware entries below. This pass exists only to close the three checks NO-10 said were
+  emulator-able, ahead of a phone pass.
+
+---
+
 ## `25e9c5f` — 2026-09-16, Android, Play Console internal testing — first Play-distributed build on hardware — NO-12
 
 **Nothing Phone 2a**, over the Play Store, not sideloaded. Signed release AAB

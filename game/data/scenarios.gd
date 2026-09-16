@@ -77,9 +77,9 @@ static func _hand_written() -> Array:
 				"ferz", "wazir", "champion", "gnu", "buffalo"]}},
 		# NO-85: the Inventory Drawer's one scrolling column (Items grid, then
 		# Artefacts grid) with enough of each to force a scroll — several
-		# Items, several passive Artefacts and two ⚡ Artefacts mixed into the
+		# Items, several passive Artefacts and two ✹ Artefacts mixed into the
 		# same grid (story 50).
-		{"name": "Inventory Drawer: several Items, passive and ⚡ Artefacts", "cfg": {
+		{"name": "Inventory Drawer: several Items, passive and ✹ Artefacts", "cfg": {
 			"board": ZONE_PAWNS, "score": 500, "wave": 5, "gold": 1000,
 			"items": ["blitz", "sniper", "air_strike", "demote", "promote",
 				"invert", "tactical_reposition", "decoy_swap"],
@@ -142,7 +142,7 @@ static func _hand_written() -> Array:
 		# --- NO-83: the Header ---
 		# Donald Trump with THREE Tariffs already in force (his Power escalates
 		# every KING_TARIFF_STACK_TURNS turns; turns_since_wave 20 is what
-		# stack_power_if_due would have reached by itself). ⏳ reads his name;
+		# stack_power_if_due would have reached by itself). ⧖ reads his name;
 		# double-tap the King to read the three in his info panel.
 		{"name": "Header: King Wave — Donald Trump, Tariffs in force", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 0, 0, 1], ["rook", 0, 5, 1],
@@ -151,7 +151,7 @@ static func _hand_written() -> Array:
 			"king_power_id": "donald_trump",
 			"king_abilities": ["move_cost", "inflation", "capture_cost"],
 			"king_power_abilities": ["move_cost", "inflation", "capture_cost"]}},
-		# Wave 51 after the win: ⚑ reads 51/201, ⏳ counts toward Wave 52.
+		# Wave 51 after the win: ⚑ reads 51/201, ⧖ counts toward Wave 52.
 		{"name": "Header: Wave 51 after the win", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
 			"wave": 51, "kings_defeated": 1, "score": 2000, "stock": ["pawn"]}},

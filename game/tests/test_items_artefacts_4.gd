@@ -1514,7 +1514,7 @@ func _init() -> void:
 	await process_frame
 
 	# NO-85: the separate Activate section is GONE — an activatable Artefact
-	# joins the Artefacts grid instead, marked with a ⚡ (story 50). The
+	# joins the Artefacts grid instead, marked with a ✹ (story 50). The
 	# drawer's height is now a flat constant regardless of content (story 46),
 	# so there is nothing left to probe for "grows to fit it"; just the grid
 	# content and that the height never moves.
@@ -1539,8 +1539,8 @@ func _init() -> void:
 	await process_frame # queue_free() on the rebuilt chip is deferred — let it
 		# resolve before counting, else a stale one lingers alongside the fresh one
 	check(held_activ.hud.artefacts_grid.get_child_count() == 1 \
-			and (held_activ.hud.artefacts_grid.get_child(0) as Button).text.begins_with("⚡"),
-		"Artefacts grid: one held activatable Artefact, in the grid, ⚡-marked (story 50)")
+			and (held_activ.hud.artefacts_grid.get_child(0) as Button).text.begins_with("✹"),
+		"Artefacts grid: one held activatable Artefact, in the grid, ✹-marked (story 50)")
 	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_DRAWER_H,
 		"...and the drawer's height is unchanged — flat regardless of content (story 46)")
 	held_activ.queue_free()

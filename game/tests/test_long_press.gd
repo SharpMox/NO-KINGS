@@ -162,12 +162,12 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# --- a long press on a ⚡ ARTEFACT CELL shows its description, does not activate
+	# --- a long press on a ✹ ARTEFACT CELL shows its description, does not activate
 	# Moscovium Glow Stick is free and always available while held, so a plain
 	# press WOULD open the activation confirm — which is what must not happen.
 	game = await _boot_game()
 	var chip: Button = _artefact_cell(game, "moscovium-glow-stick")
-	check(chip != null and not chip.disabled, "the Artefacts grid has a live ⚡ cell")
+	check(chip != null and not chip.disabled, "the Artefacts grid has a live ✹ cell")
 	clean = false
 	for attempt in 3:
 		game.hud.hide_tip()
@@ -176,7 +176,7 @@ func _init() -> void:
 			break
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the cell completed without real cursor motion")
-	check(game.hud.tip_panel.visible, "a long press on a ⚡ Artefact cell shows its description")
+	check(game.hud.tip_panel.visible, "a long press on a ✹ Artefact cell shows its description")
 	check(game.hud.tip_label.text == game._artefact_entry("moscovium-glow-stick").description,
 		"...and it is that artefact's description")
 	check(not game.buff_pick_open, "...and does NOT open the activation confirm")
@@ -191,7 +191,7 @@ func _init() -> void:
 
 	# --- NO-85 story 53/54/55: a PASSIVE Artefact cell — tap does nothing, long
 	# press still describes it. This is the one cell that is disabled forever
-	# (not just conditionally, like an unavailable ⚡ one), so it is the sharpest
+	# (not just conditionally, like an unavailable ✹ one), so it is the sharpest
 	# check that long-press still reaches a permanently-greyed cell.
 	game = await _boot_game()
 	var passive := _artefact_cell(game, "tinfoil-hat")

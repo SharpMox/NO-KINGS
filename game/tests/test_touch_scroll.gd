@@ -295,7 +295,7 @@ func _init() -> void:
 
 	# --- NO-85 story 53: a plain TAP on a passive Artefact cell does nothing —
 	# no description (that moved to long-press, tested in test_long_press.gd),
-	# no state change. Long-press-vs-tap on Items, passive and ⚡ Artefacts is
+	# no state change. Long-press-vs-tap on Items, passive and ✹ Artefacts is
 	# probed there with the cross-contamination-safe long-press helper; this
 	# file's job is the drag/scroll gesture, not the hold timing.
 	# The drag above scrolled child(0) out of the drawer's visible area —

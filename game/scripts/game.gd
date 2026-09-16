@@ -752,7 +752,7 @@ func _deploy_highlight_tiles() -> Array:
 
 
 func _clock_text() -> String:
-	return "⏱ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
+	return "◷ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
 
 
 
@@ -1434,7 +1434,7 @@ func _king_alive() -> bool:
 
 
 ## Display name of the King currently on the board — or, before he lands, of
-## the one pending (NO-83: the ⏳ counter names him through segment 1 too) — or
+## the one pending (NO-83: the ⧖ counter names him through segment 1 too) — or
 ## "King" if there is none / it wasn't spawned with an identity (hand-written
 ## test scenarios).
 func _king_name() -> String:

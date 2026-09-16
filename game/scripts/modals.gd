@@ -583,7 +583,7 @@ func _shop_icon(slot: Dictionary) -> Variant:
 			return g.artefact_tex(slot.key)
 		_: # box — no painted art for any of the 9 yet
 			return g.art_placeholder if g.art_placeholder != null \
-				else {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "📦")
+				else {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "▣")
 
 
 ## One icon tile with a price badge; sold tiles grey out but keep their slot
@@ -1065,7 +1065,7 @@ func show_box(options: Array) -> void:
 	box_panel.move_to_front()
 	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
 		# top of a Box's own native picks (Huge = 2 — issue 47)
-	var title := "📦 %s %s Box — pick %d:" % [
+	var title := "▣ %s %s Box — pick %d:" % [
 		str(g.box_size).capitalize(), str(g.box_only_kind).capitalize(), picks]
 	var box := _box_vbox(title)
 	for opt in options:

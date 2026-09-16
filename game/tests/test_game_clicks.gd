@@ -752,16 +752,16 @@ func _init() -> void:
 	game.kings_defeated = 1
 	HUD.refresh()
 	check(HUD.wave_label.text == "⚑ 51/201", "Wave 51 after the win reads ⚑ 51/201 (got %s)" % HUD.wave_label.text)
-	# ⏳ TURN COUNTER: turns played out of the upcoming Wave's cadence — Wave 4
+	# ⧖ TURN COUNTER: turns played out of the upcoming Wave's cadence — Wave 4
 	# is three pawns (data/waves.gd), so 6 + 3
 	game.wave = 3
 	game.kings_defeated = 0
 	game.turns_since_wave = 2
 	HUD.refresh()
-	check(HUD.turn_label.text == "⏳ 2/9", "turn counter counts 2 of Wave 4's 9 (got %s)" % HUD.turn_label.text)
+	check(HUD.turn_label.text == "⧖ 2/9", "turn counter counts 2 of Wave 4's 9 (got %s)" % HUD.turn_label.text)
 	game.pending_king = {"id": "king", "king_id": "donald_trump"}
 	HUD.refresh()
-	check(HUD.turn_label.text == "⏳ Donald Trump",
+	check(HUD.turn_label.text == "⧖ Donald Trump",
 		"turn counter names a PENDING King (got %s)" % HUD.turn_label.text)
 	game.pending_king = {}
 	game.wave = 201
@@ -769,7 +769,7 @@ func _init() -> void:
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
 	# a long King name is cut with an ellipsis: the label never leaves its
 	# column or reaches the Stock button, whatever the text
-	HUD.turn_label.text = "⏳ " + "Maximilian ".repeat(6)
+	HUD.turn_label.text = "⧖ " + "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
 	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.x <= sr.position.x + 0.5,
@@ -909,7 +909,7 @@ func _init() -> void:
 	root.add_child(trump_game)
 	await process_frame
 	await process_frame
-	check(trump_game.hud.turn_label.text == "⏳ Donald Trump",
+	check(trump_game.hud.turn_label.text == "⧖ Donald Trump",
 		"turn counter names the King while he is alive (got %s)" % trump_game.hud.turn_label.text)
 	check(trump_game.hud.wave_label.text == "⚑ 50/50", "his Wave reads ⚑ 50/50")
 	var king_px: Vector2 = trump_game._tile_px(Vector2i(3, 10)) + Vector2(trump_game.tile, trump_game.tile) / 2
@@ -1924,7 +1924,7 @@ func _init() -> void:
 	await _await_player_turn(game)
 	check(game.arrows.is_empty(), "arrows clear at turn end (scratchpad, never saved)")
 
-	# --- Artefact activation (issue 52, NO-85): the ⚡ cell in the Artefacts
+	# --- Artefact activation (issue 52, NO-85): the ✹ cell in the Artefacts
 	# grid, confirm/cancel, and Bovine Tractor Beam's targeted cancel. New
 	# interactive UI — Godot headless drops GUI picking, which is why this
 	# probe exists.
@@ -1952,11 +1952,11 @@ func _init() -> void:
 			star_chips += 1
 	check(star_chips == 0,
 		"no ★ chip survives in the Artefacts grid — the Ability has exactly one home")
-	check(await _click_button_in(game.hud.artefacts_grid, "⚡Oak Island Wishing Well"),
-		"the ⚡ cell is clickable")
+	check(await _click_button_in(game.hud.artefacts_grid, "✹Oak Island Wishing Well"),
+		"the ✹ cell is clickable")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
-		"clicking an untargeted ⚡ cell opens the confirm modal (user ruling: no target = confirm)")
+		"clicking an untargeted ✹ cell opens the confirm modal (user ruling: no target = confirm)")
 	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel clickable on the confirm modal")
 	await process_frame
 	check(not game.buff_pick_open and game.gold == 100 and not game.oak_island_used_this_turn \
@@ -1965,8 +1965,8 @@ func _init() -> void:
 	# the confirm modal is the only thing that closed — this activation never
 	# touches the drawer (unlike a targeted Item), so the cell is still
 	# directly clickable with no need to reopen Inventory
-	check(await _click_button_in(game.hud.artefacts_grid, "⚡Oak Island Wishing Well"),
-		"the ⚡ cell is clickable again after a cancel, drawer untouched")
+	check(await _click_button_in(game.hud.artefacts_grid, "✹Oak Island Wishing Well"),
+		"the ✹ cell is clickable again after a cancel, drawer untouched")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
@@ -1990,7 +1990,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
 	await process_frame
-	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
 		"the Bovine Tractor Beam chip is clickable")
 	await process_frame
 	check(not game.buff_pick_open and game.artefact_targeting_key == "bovine-tractor-beam" \
@@ -2001,13 +2001,13 @@ func _init() -> void:
 	check(game.artefact_target_stage_a == Vector2i(7, 10), "tapping the enemy Rook on the board stages it")
 	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
 	await process_frame
-	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
 		"the chip stays clickable mid-targeting (to cancel)")
 	await process_frame
 	check(game.artefact_targeting_key == "" and game.board.has(Vector2i(7, 10)) \
 			and not game.bovine_used_this_wave and game._artefact_count("bovine-tractor-beam") == 1,
 		"tapping the chip again CANCELS FROM TARGETING — no move, no charge, Artefact untouched")
-	check(await _click_button_in(game.hud.artefacts_grid, "⚡Bovine Tractor Beam"),
+	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
 		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A again
@@ -2024,7 +2024,7 @@ func _init() -> void:
 		"after Bovine completes with nothing else usable, the Inventory Drawer stays closed")
 
 	# --- NO-85 stories 58-60: the Inventory Drawer reopen rule, all three
-	# branches, on Items (Bovine above already covered the ⚡ Artefact "stays
+	# branches, on Items (Bovine above already covered the ✹ Artefact "stays
 	# closed" branch). Two Sniper Items and two enemy pieces, each one Sniper
 	# needs an enemy ATTACKED by a player piece (item_logic.gd's own gate):
 	# the rook sits on the queen's diagonal, the pawn on her row, neither

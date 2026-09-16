@@ -31,7 +31,10 @@ rm -f "$import_log"
 # real intermittent bug is worse than the flake.
 other_godot=""
 if [ "${1:-}" != "--headless" ]; then
-	other_godot=$(pgrep -f '[Gg]odot' 2>/dev/null || true)
+	# Match the process NAME, not the command line: -f matched any process whose
+	# args merely mention Godot, so `GODOT=~/Applications/Godot.app/...` in a
+	# wrapper's own command line tripped this warning with no Godot running.
+	other_godot=$(pgrep -ix godot 2>/dev/null || true)
 	if [ -n "$other_godot" ]; then
 		echo "WARNING: other Godot process(es) running (pid:$(printf '%s' "$other_godot" | tr '\n' ' '))"
 		echo "WARNING: menu-clicks/game-clicks need an uncontended machine — a failure below may be contention, not a regression. Close other Godot instances and re-run to confirm."

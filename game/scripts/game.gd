@@ -102,6 +102,18 @@ const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
 	# outside the blue/red side palette — decorative, not player or enemy state
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
+# NO-101: text-mode glyph marking the four LITERAL inv- ids (inv-sergeant,
+# inv-arrow-pawn, inv-kirin-plus, inv-kirin-plus-plus) only — never the ten
+# inversion pairs that turn a piece into an ordinary existing piece (those
+# keep that piece's own id, so this check never sees them; out of scope per
+# Max's ruling 2026-09-16). U+27F2 ANTICLOCKWISE OPEN CIRCLE ARROW; no glyph
+# in Open Sans SemiBold, so an OS fallback font renders it, same as every
+# other symbol on this board — confirmed monochrome on macOS. At the corner
+# mark's first size (tile * 0.3) it rendered as an unreadable speck; that
+# was a SIZE bug, not missing glyph coverage (U+21BA renders no bigger from
+# the same fallback) — fixed by sizing the mark for legibility below.
+const INV_MARK_GLYPH := "⟲"
+
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
 var board_px := Vector2(24, 120)
@@ -3902,6 +3914,39 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var glyph: String = defs[p.id].glyph
 		var size := 40 if glyph.length() <= 1 else 22
 		draw_string(font, px + Vector2(0, tile * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, tile, size, col)
+	if _is_inversion_marked(p.id): # NO-101: over the token, corner only, never hides the piece
+		var side_col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
+		var mark_size := _inv_mark_size()
+		draw_string(font, _inv_mark_px(px, mark_size), INV_MARK_GLYPH,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, mark_size, side_col)
+
+
+## NO-101: true for exactly the four literal inv- ids, never the ten
+## inversion pairs that resolve to an ordinary piece's own id (out of scope,
+## Max's ruling 2026-09-16). Shared by `_draw_piece` and
+## tests/test_board_draw.gd so the probe can never diverge from what the
+## draw call actually checks.
+func _is_inversion_marked(id: String) -> bool:
+	return id.begins_with("inv-")
+
+
+## NO-101's inversion glyph, sized off the tile so it reads at any board
+## scale (a fixed pixel size measured unreadable — a few px of ink — at the
+## mobile tile size). Floor keeps it legible if the board ever shrinks
+## further; the glyph itself is small within its own font metrics, so 56% of
+## the tile lands it clearly short of covering the piece.
+func _inv_mark_size() -> int:
+	return maxi(18, int(tile * 0.56))
+
+
+## Where NO-101's inversion glyph sits on a tile, from the tile's top-left
+## pixel — pinned to the top-right corner and scaled with `size` so it never
+## drifts off-tile as `_inv_mark_size` changes. `draw_string`'s y is the
+## BASELINE, not the glyph's top: it must sit far enough down for the
+## glyph's ascent (~0.8 * size) to still land inside this tile and not the
+## one above it — measured wrong once already (NO-101).
+func _inv_mark_px(px: Vector2, size: int) -> Vector2:
+	return px + Vector2(tile - size * 0.9, size * 0.92)
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

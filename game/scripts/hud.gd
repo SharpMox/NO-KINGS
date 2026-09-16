@@ -55,7 +55,7 @@ const LONG_PRESS_MS := 500
 ## so it never resizes as Items/Artefacts come and go. One scrolling column:
 ## an Items grid, then an Artefacts grid (story 47) — the separate Activate
 ## section is gone, and an activatable Artefact joins the Artefacts grid with
-## a ⚡ marker instead (issue 52's chip idiom, carried over verbatim).
+## a ✹ marker instead (issue 52's chip idiom, carried over verbatim).
 ##
 ## INV_DRAWER_H keeps the old flat value (was INV_H_ACTIVATE: +1 row for the
 ## Activate strip, +48 for issue 100's Army Power line) rather than
@@ -78,7 +78,7 @@ const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the
 const CLOCK_FONT := 36 ## glyph size inside the Clock line, which is HEADER_H / 2 tall
 const SCORE_FONT := 17 ## a 17px Label is 25px tall: 4 + 55 + 25 + 25 fits the 110
 const GOLD_FONT := 17
-const COUNTER_FONT := 15 ## the ⚑ Wave and ⏳ turn counters
+const COUNTER_FONT := 15 ## the ⚑ Wave and ⧖ turn counters
 const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
 const MENU_FONT := 15
 const MENU_W := 34.0 ## the ☰ button's footprint in the corner
@@ -190,7 +190,7 @@ var captured_hint := Label.new() # "no Captured Stock yet" — shown only when e
 var items_grid := GridContainer.new()
 ## NO-85: Artefacts, one scrolling grid (story 49) — replaces artefact_box
 ## (passive rows) AND activate_box (issue 52's Activate chips, now merged in
-## with a ⚡ marker per story 50, instead of a separate section).
+## with a ✹ marker per story 50, instead of a separate section).
 var artefacts_grid := GridContainer.new()
 ## issue 100: the Army POWER, written out in the drawer. It was previously
 ## readable in exactly two places — the tooltip of the Ability chip (deleted by
@@ -283,7 +283,7 @@ func build(game) -> void:
 	for l in [clock_label, score_label, gold_label]:
 		left.add_child(l)
 	add_child(left)
-	# CENTRE, flush to the bottom: ⚑ Wave over ⏳ turns. The column has a fixed
+	# CENTRE, flush to the bottom: ⚑ Wave over ⧖ turns. The column has a fixed
 	# width so a long King name is cut with an ellipsis rather than pushing into
 	# the Stock button (story 20).
 	var mid := VBoxContainer.new()
@@ -734,7 +734,7 @@ func hide_tip() -> void:
 
 ## NO-72: a LONG PRESS on an Item or Artefact cell shows its description and
 ## does not fire the control. A tap on a cell already does something (an item
-## arms, a ⚡ artefact activates), so unlike NO-59's original tap-to-describe
+## arms, a ✹ artefact activates), so unlike NO-59's original tap-to-describe
 ## (retired by NO-85 — see hide_tip's callers) the reveal gesture has to be a
 ## hold, and it must work on a DISABLED cell too (story 55: greyed-out still
 ## explains).
@@ -788,15 +788,15 @@ func refresh() -> void:
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
 	wave_label.text = "⚑ %d/%d" % [g.wave,
 		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
-	# ⏳ TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
+	# ⧖ TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
 	# The King's name instead while he is alive OR pending (no Wave arrives
 	# until he is checkmated); blank after the last Wave, when no Wave is coming.
 	if g._king_alive() or not g.pending_king.is_empty():
-		turn_label.text = "⏳ %s" % g._king_name()
+		turn_label.text = "⧖ %s" % g._king_name()
 	elif g.wave >= Waves.WAVES.size():
 		turn_label.text = ""
 	else:
-		turn_label.text = "⏳ %d/%d" % [g.turns_since_wave, g._cadence()]
+		turn_label.text = "⧖ %d/%d" % [g.turns_since_wave, g._cadence()]
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false
@@ -986,7 +986,7 @@ func _rebuild_artefacts_grid() -> void:
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
-## joins the same grid with a ⚡ marker rather than a separate section).
+## joins the same grid with a ✹ marker rather than a separate section).
 ## Always a Button (NO-17: a disabled Button still carries its icon, once
 ## icon_disabled_color is set — the earlier bare-TextureRect route lost that
 ## and rendered art at zero alpha) so long-press works identically on both:
@@ -997,7 +997,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	var entry: Dictionary = g._artefact_entry(key)
 	var activatable: bool = g.ACTIVATABLE_ARTEFACT_KEYS.has(key)
 	var btn := Button.new()
-	btn.text = "%s%s%s" % ["⚡" if activatable else "", entry.name,
+	btn.text = "%s%s%s" % ["✹" if activatable else "", entry.name,
 		" ×%d" % count if count > 1 else ""]
 	btn.icon = g.artefact_tex(key)
 	btn.expand_icon = true

@@ -1001,8 +1001,6 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		" ×%d" % count if count > 1 else ""]
 	btn.icon = g.artefact_tex(key)
 	btn.expand_icon = true
-	btn.add_theme_constant_override("icon_max_width", ICON - 8)
-	btn.custom_minimum_size = Vector2(0, ICON)
 	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
 	btn.tooltip_text = entry.description
 	if activatable:
@@ -1011,18 +1009,40 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		if targeting: # mid-targeting (Bovine): tint like an active Item, tap
 			# again to cancel — same shape _use_item already uses
 			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(func() -> void:
-			if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
-				btn.remove_meta("lp_fired")
-				return
-			artefact_activate_pressed.emit(key))
 	else: # story 53: a tap does nothing — a passive Artefact has nothing to press
 		btn.disabled = true
-	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, key, entry.description, e))
-	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
+	# NO-99: pressed only ever reaches artefact_activate_pressed while
+	# activatable is true, because a passive cell is disabled above and a
+	# disabled Button never fires `pressed` — connecting it unconditionally
+	# here (rather than only inside the activatable branch) changes nothing.
+	_wire_grid_button(btn, true, key, entry.description, func() -> void:
+		artefact_activate_pressed.emit(key))
 	btn.set_meta("key", key) # lookup for probes/tests
 	return btn
+
+
+## NO-99: the icon sizing, lp_fired tap-vs-long-press guard, gui_input
+## wiring and drag-scroll passthrough every drawer grid button (Artefacts,
+## Items) shares. `has_icon` is false only for an Items cell with no art,
+## which stays glyph-sized rather than reserving icon layout space it isn't
+## using.
+func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String, on_tap: Callable) -> void:
+	if has_icon:
+		# icon_max_width clamps AND reserves layout space; expand_icon
+		# would let the icon collapse to 0 in a packed grid. ICON - 8 rather
+		# than ICON: these buttons carry a name/count beside the icon, so the
+		# glyph is inset to keep the cell the same height as every other one
+		# instead of taller than all of them.
+		btn.add_theme_constant_override("icon_max_width", ICON - 8)
+		btn.custom_minimum_size = Vector2(0, ICON)
+	btn.pressed.connect(func() -> void:
+		if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
+			btn.remove_meta("lp_fired")
+			return
+		on_tap.call())
+	btn.gui_input.connect(func(e: InputEvent) -> void:
+		_long_press_input(btn, lp_key, lp_desc, e))
+	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
 func _rebuild_items_grid() -> void:
@@ -1030,29 +1050,17 @@ func _rebuild_items_grid() -> void:
 		c.queue_free()
 	for i in g.items.size():
 		var btn := Button.new()
-		if g.item_icons.has(g.items[i].key):
+		var has_icon: bool = g.item_icons.has(g.items[i].key)
+		if has_icon:
 			btn.icon = g.item_icons[g.items[i].key]
-			# icon_max_width clamps AND reserves layout space; expand_icon
-			# would let the icon collapse to 0 in a packed grid.
-			# ICON - 8 rather than ICON: this button carries the item NAME beside
-			# its icon, so the glyph is inset to keep the cell the same height as
-			# every other cell instead of taller than all of them.
-			btn.add_theme_constant_override("icon_max_width", ICON - 8)
-			btn.custom_minimum_size = Vector2(0, ICON)
 			btn.text = g.items[i].name
 		else:
 			btn.text = "✦" + g.items[i].name
 		btn.tooltip_text = "%s (%s)\n%s" % [g.items[i].name, g.items[i].tier, g.items[i].description]
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
-		btn.pressed.connect(func() -> void:
-			if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
-				btn.remove_meta("lp_fired")
-				return
+		_wire_grid_button(btn, has_icon, "item:%d" % i, g.items[i].description, func() -> void:
 			item_pressed.emit(i))
-		btn.gui_input.connect(func(e: InputEvent) -> void:
-			_long_press_input(btn, "item:%d" % i, g.items[i].description, e))
-		btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		items_grid.add_child(btn)
 
 

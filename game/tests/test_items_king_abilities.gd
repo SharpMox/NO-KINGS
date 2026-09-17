@@ -76,6 +76,13 @@ func _init() -> void:
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
 	check(c.gold == 500 - 3 * Economy.tariff_cut(c.defs["queen"].value, Tuning.TARIFF_LR_PCT),
 		"riding 3 squares charges 3x the long-range tariff")
+	# NO-105: the held-check itself, because the bug it replaces was a guard
+	# that silently answered false forever — "nothing was charged" cannot
+	# tell a working exemption from a dead code path.
+	check(Economy.tariff_fires(c, "long_range_cost"),
+		"tariff_fires: a held tariff answers true")
+	check(not Economy.tariff_fires(c, "move_cost"),
+		"tariff_fires: an unheld tariff answers false")
 	var gold_after: int = c.gold
 	c._move_player(Vector2i(5, 2), Vector2i(6, 4)) # knight leap
 	check(c.gold == gold_after, "leaps stay exempt from the long-range tariff")
@@ -91,6 +98,8 @@ func _init() -> void:
 	ci._use_item(0)
 	ci._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(ci.gold == 500, "counter-intel suppresses the move tariff")
+	check(not Economy.tariff_fires(ci, "move_cost"),
+		"tariff_fires: suppression makes a held tariff answer false")
 	ci.queue_free()
 	await process_frame
 

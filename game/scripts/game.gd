@@ -2292,11 +2292,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# Tariff the player was holding — a queen dispatched "long_range_cost",
 	# matched nothing held, and moved free.
 	# Suppression counts: while king_abilities_suppressed (Counter-Intel) no
-	# tariff charges at all, so Long-Range cannot be the one that fires.
+	# tariff charges at all, so Long-Range cannot be the one that fires —
+	# Economy.tariff_fires checks that centrally, alongside the held-tariff
+	# match itself.
 	var mover_value: int = defs[board[from].id].value
 	var lr_fires: bool = _is_long_range(board[from].id) \
-		and not king_abilities_suppressed \
-		and "long_range_cost" in king_abilities_active
+		and Economy.tariff_fires(self, "long_range_cost")
 	if lr_fires:
 		var d := to - from
 		Economy.charge(self, "long_range_cost",

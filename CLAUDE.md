@@ -335,6 +335,13 @@ comes back.
 - **Rate coefficients are flat constants, not percentages.** Any effect converting Gold to
   Score by a coefficient does not scale with an economy-wide multiplier and must be scaled
   explicitly.
+- **Score only accumulates — the game never charges it.** No action, tariff, price or fee
+  spends Score; `Economy.gain` calls it an "up-only performance metric" (`economy.gd:70`).
+  The single exception is the **Templar Debit Card** (`shop.gd:319`), which pays a Shop
+  shortfall from Score at a flat 10:1 and is unreachable unless the card is held, because
+  `can_buy()` only admits such a purchase by counting `_score_credit(g)`. Ruled 2026-09-17:
+  that stays the one thing that spends Score. A catalog entry denominating a cost in Score
+  is therefore stale by construction — that is what produced NO-105's 200/500/1000 ladder.
 
 Judgement calls made to ship, each cheap to reverse and none specced:
 

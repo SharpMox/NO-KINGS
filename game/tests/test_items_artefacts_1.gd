@@ -46,7 +46,9 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 
 
 func _item(key: String, target: String) -> Dictionary:
-	return {"key": key, "name": key, "tier": "T", "target": target, "description": ""}
+	# NO-105: tier must be a real Tuning.SHOP_ITEM_PRICE key — Tariff on Item
+	# now prices off it (Economy.tariff_cut), so a placeholder tier errors.
+	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
 func _init() -> void:

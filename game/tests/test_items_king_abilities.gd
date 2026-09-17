@@ -338,15 +338,16 @@ func _init() -> void:
 	acq.queue_free()
 	await process_frame
 
-	# the Zapruder return is NOT an acquisition: an Item handed back after use
-	# was already charged on use, so charging again would tax one Item twice
+	# NO-108: a Zapruder return IS an acquisition and pays the tariff. The call
+	# must go through grant_item, the wrapper _zapruder_resolve now uses — a
+	# direct ItemLogic.grant would never charge and would prove nothing.
 	var zap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 500, "king_abilities": ["ability_cost"]})
 	await process_frame
 	var g_zap: int = zap.gold
-	ItemLogic.grant(zap, Items.ITEMS[0]) # the path _zapruder_resolve uses
-	check(zap.gold == g_zap,
-		"NO-103: an Item RETURNED (Zapruder) is not an acquisition and is not taxed")
+	ArtefactHooks.grant_item(zap, Items.ITEMS[0]) # the path _zapruder_resolve uses
+	check(zap.gold == g_zap - Tuning.KING_ABILITY_ACTION_COST,
+		"NO-108: an Item RETURNED (Zapruder) is an acquisition and IS taxed")
 	zap.queue_free()
 	await process_frame
 

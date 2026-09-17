@@ -3247,7 +3247,7 @@ func _repeat_last_action() -> void:
 ## checks the Item cap (an Item-return activation is always offered — the cap
 ## only gates whether _zapruder_resolve's grant actually lands, same
 ## "spent either way" shape as every other full-inventory acquisition path,
-## e.g. _box_choose's own ItemLogic.grant).
+## e.g. _box_choose's own ArtefactHooks.grant_item).
 func _zapruder_available() -> bool:
 	if action_log.is_empty():
 		return false
@@ -3270,8 +3270,10 @@ func _zapruder_resolve() -> void:
 		"move", "capture":
 			_repeat_last_action()
 		"item":
-			ItemLogic.grant(self, last.item) # refuses at a full inventory (issue 53) —
-				# the once-per-Wave charge above is already spent either way
+			ArtefactHooks.grant_item(self, last.item) # refuses at a full inventory
+				# (issue 53) — the once-per-Wave charge above is already spent
+				# either way. Routed through grant_item so the returned Item pays
+				# Tariff on Item like any other acquisition (user ruling 2026-09-17).
 		"place":
 			var piece: Dictionary = board[last.pos].duplicate() # same "duplicate,
 				# strip owner, bare id if that's all that's left" shape as

@@ -1,6 +1,6 @@
 # 03 — Always-openable Shop that pauses the Clock
 
-Status: todo
+Status: done — shipped 2026-08-27 in `41deeb0`; the pause is now a difficulty lever
 
 ## Parent
 
@@ -28,3 +28,22 @@ The GDD makes the pause a Difficulty-Ranks lever (higher ranks leave the Clock r
 ## Blocked by
 
 - 01 — rename
+
+## Outcome
+
+Shipped 2026-08-27 in `41deeb0` *feat(shop): open the Shop in any state and pause the clock
+while it is up* (touched `game.gd`, `test_game_clicks.gd`, `test_shop.gd` and this slice
+file). The `Status: todo` line above was never updated, which made an instruction audit on
+2026-09-17 read it as unstarted work.
+
+**The pause is no longer unconditional.** This file says "the prototype has no difficulty
+system, so the pause is unconditional here and the lever lands with difficulty ranks" — the
+lever has since landed. `game.gd:969` now reads
+`var tier_pauses := not Tuning.clock_never_pauses(next_tier) and (game_menu_open or
+shop_open() or ...)`, so higher tiers leave the Clock running exactly as the GDD specifies.
+The OS-backgrounded pause (slice 06) always wins and is not a difficulty lever; `win_open`
+is deliberately excluded from the tier-gated list.
+
+The known gap above still stands as written: the Clock stops, but the enemy-turn coroutine
+keeps resolving behind the panel. Still accepted, still worth revisiting only if the enemy
+turn grows long enough to matter.

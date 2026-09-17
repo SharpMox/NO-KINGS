@@ -157,6 +157,14 @@ through Play Games and iCloud, and a 33-suite test harness plus a full autoplay 
   migrated; the archive deliberately was not.
   `NOTION-QUESTIONS.md` there holds the ten GDD questions and the user's answers (all
   resolved by 2026-08-30); check it before changing an Artefact's effect.
+- **The rest of `.scratch/` is archive or data — nothing there is live work.**
+  `money-and-shop/` (PRs #48–#54), `rework-items/` (PR #58) and `shop-gdd-sync/`
+  (`3abf75e`, `41deeb0`) are closed PRD folders in the same shape as `gdd-gaps/`;
+  `playtest/` holds autoplay CSVs, not tickets. **Trust a `Status:` line only after
+  checking git** — `shop-gdd-sync/` still read "in progress" with two slices marked
+  `todo` on 2026-09-17, three weeks after both shipped, and an audit nearly migrated
+  them into Linear as new work. One of them would have reintroduced a restock design
+  that issue 64 had already superseded.
 - One slice → one branch → one PR, rebased on `main` before pushing, same as the reference site.
 - **The Notion GDD is the design source of truth** for the catalogs (Pieces, Items,
   Artefacts, Tariffs, Piece Buffs). When Notion and the code disagree, that is a finding —

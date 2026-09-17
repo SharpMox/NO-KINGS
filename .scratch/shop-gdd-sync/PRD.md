@@ -1,6 +1,9 @@
 # PRD: Shop — GDD sync
 
-Status: in progress
+Status: done — all 3 slices shipped 2026-08-27 (01 verified 2026-09-06, 02 `3abf75e`,
+03 `41deeb0`). Closed out 2026-09-17; see each slice's Outcome. The restock design in
+slice 02 was later superseded by the issue-64 two-lane restock — do not reimplement it
+from this PRD. **This folder is now a read-only archive, like `gdd-gaps/`.**
 
 ## Problem Statement
 

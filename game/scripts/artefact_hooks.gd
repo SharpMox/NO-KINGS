@@ -1478,15 +1478,16 @@ static func grant(g, entry: Dictionary) -> bool:
 static func grant_item(g, item: Dictionary) -> bool:
 	if not ItemLogic.grant(g, item):
 		return false
-	charge_item_acquisition(g)
+	charge_item_acquisition(g, item)
 	return true
 
 
 ## The charge itself, for the one acquisition path that does not go through
 ## ItemLogic.grant: Shop.buy appends directly, because Shop.can_buy() already
 ## refuses a full inventory so the cap path is unreachable from there.
-static func charge_item_acquisition(g) -> void:
-	Economy.charge(g, "ability_cost")
+static func charge_item_acquisition(g, item: Dictionary) -> void:
+	Economy.charge(g, "ability_cost",
+		Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE[item.tier], Tuning.TARIFF_ITEM_PCT))
 
 
 const RARITIES := ["Common", "Uncommon", "Rare", "Legendary"]

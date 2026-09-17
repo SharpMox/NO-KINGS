@@ -147,7 +147,8 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	# "a Fuse consumes two pieces" draws no distinction and both ids are
 	# already in scope here regardless of which branch just ran above.
 	ArtefactHooks.run(g, "on_fuse", {"a_id": ids[0], "b_id": ids[1]})
-	Economy.charge(g, "fuse_cost")
+	Economy.charge(g, "fuse_cost",
+		Economy.tariff_cut(Tuning.MERGE_COST, Tuning.TARIFF_FUSE_PCT))
 	g.placing_id = ""
 	g._clear_selection()
 	if (g.actions_left == 0 and not Armies.merge_free(g)) or g._board_cleared():

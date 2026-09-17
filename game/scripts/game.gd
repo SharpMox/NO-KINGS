@@ -2027,7 +2027,8 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 		if not deploy_ctx.skip_action:
 			actions_left -= 1
 		_log_action("place", {"pos": tile}) # issue 56: Zapruder's Deploy-return reads this back
-		Economy.charge(self, "deploy_cost")
+		Economy.charge(self, "deploy_cost",
+			Economy.tariff_cut(Tuning.PLACEMENT_COST, Tuning.TARIFF_DEPLOY_PCT))
 		if not (Armies.endless_ranks(self) and id == "pawn"): # issue 68:
 			# Endless Ranks (The Horde) waives the base deploy cost for pawns
 			# only — majors still pay (though Horde's own kit fields none).
@@ -2216,7 +2217,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			var hit: Vector2i = near[rng.randi() % near.size()]
 			_add_float(hit, "Exhibit 399!", COL_CAPTURE)
 			_destroy(hit)
-		Economy.charge(self, "capture_cost")
+		Economy.charge(self, "capture_cost",
+			Economy.tariff_cut(defs[victim.id].value, Tuning.TARIFF_CAPTURE_PCT))
 		lost_enemy += 1
 		if BuffLogic.has(victim, "piece_bounty"): # Bounty (issue 48), enemy
 			# half — still your Turn, so the choice pick is safe right here.
@@ -2284,10 +2286,18 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		else:
 			captured.append(victim.id)
 		_add_pop(to)
-	Economy.charge(self, "move_cost")
+	# NO-105: a long-range move pays the Long-Range Tariff INSTEAD of the Move
+	# Tariff (user ruling 2026-09-17) — distance is what is being taxed, and
+	# billing both for one move double-dips.
+	var mover_value: int = defs[board[from].id].value
 	if _is_long_range(board[from].id):
 		var d := to - from
-		Economy.charge(self, "long_range_cost", Tuning.TARIFF_LR_PER_SQUARE * maxi(absi(d.x), absi(d.y)))
+		Economy.charge(self, "long_range_cost",
+			Economy.tariff_cut(mover_value, Tuning.TARIFF_LR_PCT) \
+				* maxi(absi(d.x), absi(d.y)))
+	else:
+		Economy.charge(self, "move_cost",
+			Economy.tariff_cut(mover_value, Tuning.TARIFF_MOVE_PCT))
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
@@ -2719,7 +2729,8 @@ func _item_confirm_multi() -> void:
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
 		else Vector2(hud.items_grid.get_global_rect().get_center())
-	Economy.charge(self, "ability_cost") # on use — a cancelled targeting costs nothing
+	Economy.charge(self, "ability_cost", # on use — a cancelled targeting costs nothing
+		Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE[it.tier], Tuning.TARIFF_ITEM_PCT))
 	# Nuclear Football Menu (issue 26): Items are free of their Action cost
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):

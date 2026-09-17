@@ -277,6 +277,18 @@ const SHOP_LANE_B_SCORE := 5000
 const KING_ABILITY_ACTION_COST := 10     # per tariffed action
 const TARIFF_LR_PER_SQUARE := 5    # Tariff on Long-Range, per square moved
 
+## NO-105 (user ruling 2026-09-17): a Tariff takes a cut of what the taxed
+## thing is WORTH, not a flat fee. Mild tariffs bill a percentage of an asset's
+## Shop value; Moderate ones bill a percentage of what the action already
+## costs. See docs/adr/0003-tariff-cost-model.md for why the bases differ.
+## Every result is rounded DOWN with a floor of 1 — a Tariff is never free.
+const TARIFF_MOVE_PCT := 0.10       # of the moving piece's value
+const TARIFF_CAPTURE_PCT := 0.10    # of the CAPTURED piece's value
+const TARIFF_LR_PCT := 0.03         # of the moving piece's value, PER SQUARE
+const TARIFF_ITEM_PCT := 0.60       # of the Item's Shop price for its tier
+const TARIFF_DEPLOY_PCT := 0.60     # of PLACEMENT_COST
+const TARIFF_FUSE_PCT := 0.60       # of MERGE_COST
+
 # Armies (grilled 2026-07-03; slimmed 2026-07-08 — "too many pieces"): three
 # 11-piece starting stocks, one shape: 8 cheap base pieces + 3 specials.
 # Each army's identity is its signature piece and merge chain — the GDD's

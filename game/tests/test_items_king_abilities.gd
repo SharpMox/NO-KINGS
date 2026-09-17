@@ -44,7 +44,9 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 
 
 func _item(key: String, target: String) -> Dictionary:
-	return {"key": key, "name": key, "tier": "T", "target": target, "description": ""}
+	# NO-105: tier must be a real Tuning.SHOP_ITEM_PRICE key — Tariff on Item
+	# now prices off it (Economy.tariff_cut), so a placeholder tier errors.
+	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
 func _init() -> void:
@@ -60,7 +62,7 @@ func _init() -> void:
 	check(b.gold == 500, "cancelled item charges no ability tariff")
 	b._use_item(0)
 	b._item_click(Vector2i(2, 2)) # complete the use
-	check(b.gold == 500 - Tuning.KING_ABILITY_ACTION_COST,
+	check(b.gold == 500 - Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE["Tactical"], Tuning.TARIFF_ITEM_PCT),
 		"completed item charges the ability tariff once")
 	b.queue_free()
 	await process_frame
@@ -72,7 +74,7 @@ func _init() -> void:
 	await process_frame
 	c.gold = 500
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
-	check(c.gold == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
+	check(c.gold == 500 - 3 * Economy.tariff_cut(c.defs["queen"].value, Tuning.TARIFF_LR_PCT),
 		"riding 3 squares charges 3x the long-range tariff")
 	var gold_after: int = c.gold
 	c._move_player(Vector2i(5, 2), Vector2i(6, 4)) # knight leap
@@ -94,7 +96,10 @@ func _init() -> void:
 
 	# --- counter-intel: persistent tariffs pause too; the next wave's spawn
 	# ends the suppression (CONTEXT.md: Tariff suppression)
-	var cj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+	# NO-105: a leaper (pawn), not a rider — a long-range piece now pays the
+	# Long-Range tariff INSTEAD of Move (see the ADR), so it would never
+	# exercise the "move tariff resumes" check below.
+	var cj := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "king_abilities": ["move_cost", "inflation"]})
 	await process_frame
 	cj.gold = 500
@@ -108,7 +113,7 @@ func _init() -> void:
 	Economy.earn(cj, 10)
 	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")
 	cj._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(cj.gold == 519 - Tuning.KING_ABILITY_ACTION_COST,
+	check(cj.gold == 519 - Economy.tariff_cut(cj.defs["pawn"].value, Tuning.TARIFF_MOVE_PCT),
 		"next wave spawn ends the suppression (move tariff resumes)")
 	cj.queue_free()
 	await process_frame
@@ -324,7 +329,7 @@ func _init() -> void:
 	# a granted Item charges once
 	var g_before: int = acq.gold
 	ArtefactHooks.grant_item(acq, Items.ITEMS[0])
-	check(acq.gold == g_before - Tuning.KING_ABILITY_ACTION_COST,
+	check(acq.gold == g_before - Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE[Items.ITEMS[0].tier], Tuning.TARIFF_ITEM_PCT),
 		"NO-103: an Item grant charges Tariff on Item once")
 
 	# a grant REFUSED at the Item cap charges nothing

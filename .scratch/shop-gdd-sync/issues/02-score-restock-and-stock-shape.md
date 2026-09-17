@@ -1,6 +1,6 @@
 # 02 — Score-driven restock and the new stock shape
 
-Status: todo
+Status: done — shipped 2026-08-27 in `3abf75e`; the restock half was later superseded
 
 ## Parent
 
@@ -31,3 +31,23 @@ Unchanged: prices, the 1/value piece weighting, the base-piece pool and its excl
 ## Blocked by
 
 - 01 — rename
+
+## Outcome
+
+Shipped 2026-08-27 in `3abf75e` *feat(shop): restock on score thresholds and sell typed
+boxes* (11 files, +110/−35). This file's `Status: todo` was never updated, which made an
+instruction audit on 2026-09-17 read it as unstarted work and nearly migrate it into Linear
+as a Backlog issue.
+
+**Typed boxes shipped and are live:** `shop.gd:21` is
+`const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}` — 6 box slots, typed 2/2/2.
+The slot-modifier deferral above still holds: no Artefact adds slots, so the seam has no
+caller.
+
+**The Score-threshold restock is SUPERSEDED — do not reimplement it from this file.** The
+1000/+500 ladder was replaced entirely by the issue-64 two-lane restock: Lane A every
+`Tuning.SHOP_RESTOCK_WAVES` (5) waves in `wave_logic.gd:49`, Lane B every 10,000 banked
+Score, reset by Lane A (`shop.gd:216-242`). `economy.gd:21-22` records the reason — the
+thresholds were unreachable, since a median Crown run ends near Score 300 against a first
+threshold of 1000. Linear NO-16 (Done) carries the user ruling: keep Lane A at every 5
+waves, revisit the 10,000 Score threshold.

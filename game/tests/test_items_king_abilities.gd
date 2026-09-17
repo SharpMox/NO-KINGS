@@ -96,10 +96,10 @@ func _init() -> void:
 
 	# --- counter-intel: persistent tariffs pause too; the next wave's spawn
 	# ends the suppression (CONTEXT.md: Tariff suppression)
-	# NO-105: a leaper (pawn), not a rider — a long-range piece now pays the
-	# Long-Range tariff INSTEAD of Move (see the ADR), so it would never
-	# exercise the "move tariff resumes" check below.
-	var cj := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+	# NO-105: only Move is held here (no Long-Range), so a rider still pays
+	# the Move Tariff — Long-Range only preempts it when Long-Range is
+	# itself held (see the ADR).
+	var cj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "king_abilities": ["move_cost", "inflation"]})
 	await process_frame
 	cj.gold = 500
@@ -113,7 +113,7 @@ func _init() -> void:
 	Economy.earn(cj, 10)
 	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")
 	cj._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(cj.gold == 519 - Economy.tariff_cut(cj.defs["pawn"].value, Tuning.TARIFF_MOVE_PCT),
+	check(cj.gold == 519 - Economy.tariff_cut(cj.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
 		"next wave spawn ends the suppression (move tariff resumes)")
 	cj.queue_free()
 	await process_frame

@@ -2287,10 +2287,17 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			captured.append(victim.id)
 		_add_pop(to)
 	# NO-105: a long-range move pays the Long-Range Tariff INSTEAD of the Move
-	# Tariff (user ruling 2026-09-17) — distance is what is being taxed, and
-	# billing both for one move double-dips.
+	# Tariff, but ONLY when Long-Range is actually HELD (user ruling
+	# 2026-09-17). Skipping on piece type alone let every slider escape a Move
+	# Tariff the player was holding — a queen dispatched "long_range_cost",
+	# matched nothing held, and moved free.
+	# Suppression counts: while king_abilities_suppressed (Counter-Intel) no
+	# tariff charges at all, so Long-Range cannot be the one that fires.
 	var mover_value: int = defs[board[from].id].value
-	if _is_long_range(board[from].id):
+	var lr_fires: bool = _is_long_range(board[from].id) \
+		and not king_abilities_suppressed \
+		and "long_range_cost" in king_abilities_active
+	if lr_fires:
 		var d := to - from
 		Economy.charge(self, "long_range_cost",
 			Economy.tariff_cut(mover_value, Tuning.TARIFF_LR_PCT) \

@@ -23,16 +23,25 @@ is 84 gold to move it once, which makes fielding your best pieces irrational). 1
 of value keeps Mild tariffs mild instead — 1 gold for a pawn, 14 for a Valkyrie.
 
 A long-range move pays the Long-Range Tariff **instead of** the Move Tariff, not
-both — distance is what is being taxed, and billing both for one move double-dips.
+both, **but only when Long-Range is actually held** (and not suppressed — user
+ruling 2026-09-17, narrowed). Holding Move alone still taxes a slider's move: the
+first implementation skipped on piece type alone, which exempted every rook,
+bishop and queen from a held Move Tariff — the move dispatched
+`"long_range_cost"`, matched nothing held, and cost nothing. Caught by a test that
+had to swap its fixture piece to keep asserting anything, because the queen it
+used was moving free. Suppression is part of the same condition: while
+Counter-Intel suppresses tariffs, none charge, so Long-Range cannot be the one
+that fires.
 
 ## Consequences
 
 - The Notion Tariffs Cost column (200/500/1000) is superseded by these values
   rather than reconciled with them; it was unbuildable as written.
-- A long-range piece moving one square pays 3% of its value rather than 10%, so a
-  one-square rook or bishop step is cheaper than the same step with a knight.
-  Accepted deliberately for simplicity — the alternative was a "greater of the
-  two" floor between the Move and Long-Range tariffs.
+- With both Move and Long-Range held, a long-range piece moving one square pays
+  3% of its value rather than 10%, so a one-square rook or bishop step is
+  cheaper than the same step with a knight. Accepted deliberately for
+  simplicity — the alternative was a "greater of the two" floor between the
+  Move and Long-Range tariffs.
 - The blocked/reflected move charge (`game.gd` ~2130) still bills the flat
   default. That move never lands, so rebasing it was out of scope; it is a known,
   deliberate inconsistency, not an oversight.

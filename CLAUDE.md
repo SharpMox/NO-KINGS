@@ -241,18 +241,11 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   The CLI bypasses (`--scenario`, `--autoplay`, `--screenshot`) skip the interactive
   layer entirely; they once green-lit a fully dead main menu. Extend the probes when
   adding buttons/flows.
-- **Run the suite in the foreground WITH AN EXPLICIT TIMEOUT: `timeout: 600000`.** This is
-  the single most-repeated mistake in this repo — **four** agents have now lost their turn
-  to it, with work uncommitted and unpushed. The mechanism is not carelessness: `run_all.sh`
-  takes **~190 s** (192/193/193 s over three full runs on 2026-09-08, 183 s `--headless`),
-  the Bash tool's default timeout is **120s**, and on hitting that the harness
-  *auto-backgrounds* the command. Until PR #355 it was worse still: the watchdog's orphaned
-  `sleep` held stdout open for up to 300 s AFTER the verdict printed, so a run could look
-  unfinished five minutes after it was. So "run it in the foreground" is not
-  achievable by intent alone — without the explicit timeout it gets backgrounded no matter
-  what you meant, and then the agent sits waiting on a task that has already ended.
-  Pass `timeout: 600000` (10 minutes, the maximum) and let it block until it prints its
-  verdict.
+- **Run the suite in the foreground WITH AN EXPLICIT TIMEOUT: `timeout: 600000`.** The
+  suite takes ~190 s (246 s as of 2026-09-17) and the Bash tool's default timeout is 120 s,
+  so without the explicit value the harness auto-backgrounds the run and the agent then
+  waits on a task that already ended. Intent is not enough — pass the timeout. Four agents
+  have lost their turn to this, with work uncommitted.
 - **A/B a suspected flake by INTERLEAVING runs, not by batching them.** Running 15 on a
   branch, then 20 on `main`, and comparing the rates is invalid when the flake is
   load-sensitive: the two batches ran under different machine load, so the comparison
@@ -395,6 +388,20 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
 
 ## Working method (both parts)
 
+- **Status reports use a fixed shape.** A title naming the task/issue numbers with a few
+  words of context (`NO-98 (Play symbols upload)`, never bare `NO-98`), then only the
+  sections that have content: **Status** (what is true now) · **Warnings** (risks,
+  blockers, what went wrong) · **Questions** (decisions only Max can make) ·
+  **Actions** (what Max must do). Short and factual — state the fact and the
+  consequence, nothing else. Never narrate planning, what is blocked, or what comes
+  next; that reasoning is silent (see `~/.claude/CLAUDE.md`, "NEVER narrate planning").
+- **Judge the WHOLE task before the first edit, then dispatch.** This session does the
+  judgement — root cause, which call sites qualify, what to exclude and why — and writes
+  it as a verbatim spec; a `model: "sonnet"` subagent applies it and reports counts and
+  failures; this session verifies and ships the PR. **More than ~3 edits, or any repeated
+  mechanical pass (call sites, renames, test cases), goes to a subagent even when each
+  step looks small.** "Each piece is small" is the sound of drifting past this rule — the
+  test is the sum, not the increment.
 - **Grill before building — almost always.** For any new feature, refactor, design
   change, or non-trivial decision, start with `grill-with-docs` (or `grill-me` for
   non-code planning). Skip only for mechanical work (renames, formatting, applying an

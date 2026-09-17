@@ -45,6 +45,27 @@ const SCORE_MULTIPLIER := 10
 ## here. `base`/`amount` (issue 22) let Ark Grounding Cable scale the amount
 ## before it's deducted — same immutable-base/additive-amount contract as
 ## on_score_change, off ctx.base, never the running ctx.amount.
+## NO-105: a Tariff bills a percentage of a reference value, rounded DOWN with
+## a floor of 1 so a cheap asset is still taxed something. Every tariff call
+## site goes through here so the rounding rule lives in one place.
+static func tariff_cut(base: int, pct: float) -> int:
+	return maxi(1, int(floor(float(base) * pct)))
+
+
+## Does this Tariff actually fire right now? king_abilities_active holds the
+## tariff DICTIONARIES, not their keys, so a `"key" in` membership test is
+## silently always false — that shipped once (NO-105) and killed the
+## Long-Range tariff outright. Suppression is part of the answer: while
+## Counter-Intel holds, no tariff charges at all.
+static func tariff_fires(g, key: String) -> bool:
+	if g.king_abilities_suppressed:
+		return false
+	for t in g.king_abilities_active:
+		if t.key == key:
+			return true
+	return false
+
+
 static func charge(g, key: String, amount: int = Tuning.KING_ABILITY_ACTION_COST) -> void:
 	var ctx := ArtefactHooks.run(g, "on_charge",
 		{"key": key, "charged": false, "base": float(amount), "amount": float(amount)})

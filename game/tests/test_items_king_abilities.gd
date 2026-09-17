@@ -44,7 +44,9 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 
 
 func _item(key: String, target: String) -> Dictionary:
-	return {"key": key, "name": key, "tier": "T", "target": target, "description": ""}
+	# NO-105: tier must be a real Tuning.SHOP_ITEM_PRICE key — Tariff on Item
+	# now prices off it (Economy.tariff_cut), so a placeholder tier errors.
+	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
 func _init() -> void:
@@ -60,7 +62,7 @@ func _init() -> void:
 	check(b.gold == 500, "cancelled item charges no ability tariff")
 	b._use_item(0)
 	b._item_click(Vector2i(2, 2)) # complete the use
-	check(b.gold == 500 - Tuning.KING_ABILITY_ACTION_COST,
+	check(b.gold == 500 - Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE["Tactical"], Tuning.TARIFF_ITEM_PCT),
 		"completed item charges the ability tariff once")
 	b.queue_free()
 	await process_frame
@@ -72,8 +74,15 @@ func _init() -> void:
 	await process_frame
 	c.gold = 500
 	c._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
-	check(c.gold == 500 - 3 * Tuning.TARIFF_LR_PER_SQUARE,
+	check(c.gold == 500 - 3 * Economy.tariff_cut(c.defs["queen"].value, Tuning.TARIFF_LR_PCT),
 		"riding 3 squares charges 3x the long-range tariff")
+	# NO-105: the held-check itself, because the bug it replaces was a guard
+	# that silently answered false forever — "nothing was charged" cannot
+	# tell a working exemption from a dead code path.
+	check(Economy.tariff_fires(c, "long_range_cost"),
+		"tariff_fires: a held tariff answers true")
+	check(not Economy.tariff_fires(c, "move_cost"),
+		"tariff_fires: an unheld tariff answers false")
 	var gold_after: int = c.gold
 	c._move_player(Vector2i(5, 2), Vector2i(6, 4)) # knight leap
 	check(c.gold == gold_after, "leaps stay exempt from the long-range tariff")
@@ -89,11 +98,16 @@ func _init() -> void:
 	ci._use_item(0)
 	ci._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(ci.gold == 500, "counter-intel suppresses the move tariff")
+	check(not Economy.tariff_fires(ci, "move_cost"),
+		"tariff_fires: suppression makes a held tariff answer false")
 	ci.queue_free()
 	await process_frame
 
 	# --- counter-intel: persistent tariffs pause too; the next wave's spawn
 	# ends the suppression (CONTEXT.md: Tariff suppression)
+	# NO-105: only Move is held here (no Long-Range), so a rider still pays
+	# the Move Tariff — Long-Range only preempts it when Long-Range is
+	# itself held (see the ADR).
 	var cj := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "king_abilities": ["move_cost", "inflation"]})
 	await process_frame
@@ -108,7 +122,7 @@ func _init() -> void:
 	Economy.earn(cj, 10)
 	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")
 	cj._move_player(Vector2i(2, 2), Vector2i(2, 3))
-	check(cj.gold == 519 - Tuning.KING_ABILITY_ACTION_COST,
+	check(cj.gold == 519 - Economy.tariff_cut(cj.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
 		"next wave spawn ends the suppression (move tariff resumes)")
 	cj.queue_free()
 	await process_frame
@@ -324,7 +338,7 @@ func _init() -> void:
 	# a granted Item charges once
 	var g_before: int = acq.gold
 	ArtefactHooks.grant_item(acq, Items.ITEMS[0])
-	check(acq.gold == g_before - Tuning.KING_ABILITY_ACTION_COST,
+	check(acq.gold == g_before - Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE[Items.ITEMS[0].tier], Tuning.TARIFF_ITEM_PCT),
 		"NO-103: an Item grant charges Tariff on Item once")
 
 	# a grant REFUSED at the Item cap charges nothing
@@ -346,7 +360,8 @@ func _init() -> void:
 	await process_frame
 	var g_zap: int = zap.gold
 	ArtefactHooks.grant_item(zap, Items.ITEMS[0]) # the path _zapruder_resolve uses
-	check(zap.gold == g_zap - Tuning.KING_ABILITY_ACTION_COST,
+	check(zap.gold == g_zap - Economy.tariff_cut(
+			Tuning.SHOP_ITEM_PRICE[Items.ITEMS[0].tier], Tuning.TARIFF_ITEM_PCT),
 		"NO-108: an Item RETURNED (Zapruder) is an acquisition and IS taxed")
 	zap.queue_free()
 	await process_frame

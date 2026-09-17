@@ -3270,8 +3270,10 @@ func _zapruder_resolve() -> void:
 		"move", "capture":
 			_repeat_last_action()
 		"item":
-			ItemLogic.grant(self, last.item) # refuses at a full inventory (issue 53) —
-				# the once-per-Wave charge above is already spent either way
+			ArtefactHooks.grant_item(self, last.item) # refuses at a full inventory
+				# (issue 53) — the once-per-Wave charge above is already spent
+				# either way. Routed through grant_item so the returned Item pays
+				# Tariff on Item like any other acquisition (user ruling 2026-09-17).
 		"place":
 			var piece: Dictionary = board[last.pos].duplicate() # same "duplicate,
 				# strip owner, bare id if that's all that's left" shape as

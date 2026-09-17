@@ -1466,11 +1466,15 @@ static func grant(g, entry: Dictionary) -> bool:
 ## Economy.charge is itself inert unless the tariff is held: the on_charge
 ## dispatch below only sets ctx.charged when a held tariff's key matches.
 ##
-## NOT for Items RETURNED to the inventory — Zapruder's Director's Cut
-## (game.gd's _zapruder_resolve) hands back an Item the player already owned
-## and was already charged for on use; taxing the refund would charge twice
-## for one Item and blunt an artefact whose whole point is compensation.
-## That site calls ItemLogic.grant directly, on purpose.
+## ALSO for Items RETURNED to the inventory — Zapruder's Director's Cut
+## (game.gd's _zapruder_resolve) routes its Item return through here too.
+## 821544b originally exempted it, reasoning that an Item already charged on
+## use would be taxed twice for one Item, blunting an artefact whose whole
+## point is compensation. REVERSED by user ruling 2026-09-17: a return is an
+## acquisition and pays like one. The double charge is the intended cost of
+## replaying an Item while the tariff is held, not an oversight to route
+## around — so do not add a bypass here for any future "return" effect
+## without asking.
 static func grant_item(g, item: Dictionary) -> bool:
 	if not ItemLogic.grant(g, item):
 		return false

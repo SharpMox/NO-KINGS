@@ -325,7 +325,11 @@ static func buy(g, index: int) -> bool:
 		"piece":
 			g.stock.append(slot.key)
 		"item":
-			g.items.append(_catalog(slot))
+			g.items.append(_catalog(slot)) # NO-103: can_buy() already refuses a
+				# full inventory, so this never hits ItemLogic.grant's cap path
+			ArtefactHooks.charge_item_acquisition(g) # Tariff on Item taxes
+				# buying as well as using — after the purchase, so a refused
+				# buy costs nothing
 		"artefact":
 			var entry: Dictionary = _catalog(slot).duplicate() # never mutate the
 				# shared catalog Dictionary — stamp a per-copy acquisition wave

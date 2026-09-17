@@ -289,6 +289,9 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
+- **Suite runs go to Aux by default.** The probes are windowed, so a run on Main takes over
+  Max's screen. Dispatch `game/tests/run_all.sh` to the Aux session and verify the result
+  here. Main runs it when Max asks for it on Main.
 
 ### Tests that pass for the wrong reason
 

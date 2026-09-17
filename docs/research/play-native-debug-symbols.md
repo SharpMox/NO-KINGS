@@ -193,3 +193,57 @@ retroactive either. Crashes before the upload stay unsymbolicated forever.
   the size limit differs by upload path (neither page ties its number to UI
   vs. API vs. Gradle-embedded upload; each states one number with no
   qualification).
+
+## DONE — uploaded 2026-09-17
+
+`native-debug-symbols-nokings-0.1.0-symtab.zip`, 28061251 bytes, SHA256
+`90d83611b7f98c971c15a8eb167ab68643d50556da584ebb67b7f7c90eb0038d`, attached to
+**version code 1 / 0.1.0** (artifact `4860230669253486127`). Play renames it to
+`native-debug-symbols.zip` on its side and lists it at 28.1 MB.
+
+The symbol-table build was chosen over the 182 MB full-debug zip. **arm64-v8a
+only is correct, not a gap**: `game/export_presets.cfg` ships `arm64-v8a=true`
+with `armeabi-v7a`, `x86` and `x86_64` all false, so there is no second ABI whose
+symbols could be missing. Worth re-checking that if the export ever gains an
+architecture — symbols are not retroactive, so a missing ABI cannot be repaired
+for crashes already recorded.
+
+### The navigation route, because it is not guessable
+
+Every future release needs this, and the failure mode presents as "the button
+does nothing":
+
+1. NO KINGS → **Test and release → App bundle explorer**.
+2. In the version row, the **"View app version" control exists TWICE**. One twin
+   is `display:none`; the real one is a ~40px arrow rendered past the viewport
+   (x≈1458 at 1271px wide). Clicks land on the hidden twin and silently do
+   nothing. `scrollIntoView({inline:'center'})` before the click is the fix —
+   hover emulation is a red herring.
+3. That lands on `…/app-bundle-explorer?artifactId=<id>`, tabs
+   Details | **Downloads** | Delivery | Comparison.
+4. **Downloads** → Assets table. `Native debug symbols` is the **second** upload
+   control; the first is `ReTrace mapping file`. An unattached row shows no size
+   and no download icon.
+
+Direct URL, for reference:
+`play.google.com/console/u/0/developers/5660342400699971142/app/4973836996004489929/app-bundle-explorer?artifactId=4860230669253486127&tab=downloads`
+
+Also present and **not to be touched**: a hidden (0×0, `aria-hidden`) "Upload
+documents to verify your organization" form, and an unrendered stepper
+"1 Confirm version for update / 2 Select targeting criteria". Neither is part of
+this task; the second is a release-targeting flow.
+
+### Who performs the upload
+
+**An agent upload is blocked.** On the Aux machine the file-chooser intercept
+plus `DOM.setFileInputFiles` on the Upload control was denied by the permission
+classifier even with the user's direct approval, and that denial was not routed
+around — not on Aux, and not by re-running it from the other machine, since the
+denial attaches to the action rather than to the keyboard. Max performed it by
+hand.
+
+**Standing route for production-console writes: the agent prepares, verifies and
+confirms; Max clicks.** Everything reversible — navigation, reading state,
+staging and hash-verifying the file, checking ABI coverage, re-reading the target
+row immediately beforehand, and verifying afterwards — is agent work. The
+irreversible click is not.

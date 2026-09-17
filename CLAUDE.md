@@ -403,6 +403,12 @@ Deferred: GitNexus (no GDScript support), GodotIQ Pro (paid), Coding-Solo/godot-
   **Actions** (what Max must do). Short and factual — state the fact and the
   consequence, nothing else. Never narrate planning, what is blocked, or what comes
   next; that reasoning is silent (see `~/.claude/CLAUDE.md`, "NEVER narrate planning").
+- **Screen-clicking work goes to Aux; code and PRs stay on Main.** User ruling
+  2026-09-17: *"anything you need to click the screen for should be sent to Aux"*,
+  *"PR and codes changes i would rather tbe handled on this machine"*. Main advises the
+  split and may send Aux verification tasks. A production-console action Aux's classifier
+  denied must not be re-run on Main — the denial attaches to the action, not the machine.
+  What Aux is and how to reach it: memory `aux-machine-second-mac`.
 - **Judge the WHOLE task before the first edit, then dispatch.** This session does the
   judgement — root cause, which call sites qualify, what to exclude and why — and writes
   it as a verbatim spec; a `model: "sonnet"` subagent applies it and reports counts and

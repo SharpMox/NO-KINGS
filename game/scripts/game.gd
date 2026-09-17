@@ -2657,7 +2657,7 @@ func _yalta_chosen(value: String) -> void:
 		"gold":
 			Economy.earn(self, 100, "yalta-cocktail-napkin")
 		"item":
-			ItemLogic.grant(self, Items.ITEMS[rng.randi() % Items.ITEMS.size()])
+			ArtefactHooks.grant_item(self, Items.ITEMS[rng.randi() % Items.ITEMS.size()]) # NO-103
 		"clock":
 			Economy.add_clock(self, 15000.0, "yalta-cocktail-napkin")
 	_refresh()
@@ -3671,9 +3671,10 @@ func _box_choose(opt: Dictionary) -> void:
 		"piece":
 			stock.append(opt.payload) # lands in Stock, like a Shop piece purchase (issue 47)
 		"item":
-			ItemLogic.grant(self, opt.payload) # issue 53: refuses at capacity —
-				# the Box pick is spent either way (box_offer.erase(opt) below),
-				# same "acquisition refused" shape as every other grant path
+			ArtefactHooks.grant_item(self, opt.payload) # issue 53: refuses at
+				# capacity — the Box pick is spent either way (box_offer.erase(opt)
+				# below), same "acquisition refused" shape as every other grant
+				# path. NO-103: charges Tariff on Item only if it lands.
 		"artefact":
 			var entry: Dictionary = opt.payload.duplicate() # never mutate the
 				# shared catalog Dictionary rolled by Box.roll_options — stamp a

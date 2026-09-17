@@ -1445,6 +1445,46 @@ static func grant(g, entry: Dictionary) -> bool:
 	return true
 
 
+## NO-103: grant one Item AND charge Tariff on Item for the acquisition.
+##
+## Tariff on Item taxes acquiring an Item as well as using one (user ruling
+## 2026-09-17), so an Item bought and then used is charged twice. Every
+## acquisition path routes through here instead of calling ItemLogic.grant
+## directly, so a new grant site cannot silently escape the tariff.
+##
+## WHY IT LIVES HERE and not in ItemLogic.grant, which is the obvious home:
+## item_logic.gd cannot reach Economy.charge. economy.gd preloads shop.gd,
+## shop.gd preloads item_logic.gd, and this file preloads item_logic.gd too —
+## so item_logic.gd can preload neither Economy nor ArtefactHooks without a
+## cycle. That is the same constraint that makes shop.gd inline its own gold
+## debit rather than call Economy.spend_gold (see shop.gd's note there). This
+## file already preloads Economy, so the wrapper sits here and every grant
+## caller (game.gd, modals.gd, this file) already preloads ArtefactHooks.
+##
+## CHARGES ONLY ON A LANDED GRANT — a refusal at the Item cap costs nothing,
+## so a full inventory is never taxed for an Item it did not receive.
+## Economy.charge is itself inert unless the tariff is held: the on_charge
+## dispatch below only sets ctx.charged when a held tariff's key matches.
+##
+## NOT for Items RETURNED to the inventory — Zapruder's Director's Cut
+## (game.gd's _zapruder_resolve) hands back an Item the player already owned
+## and was already charged for on use; taxing the refund would charge twice
+## for one Item and blunt an artefact whose whole point is compensation.
+## That site calls ItemLogic.grant directly, on purpose.
+static func grant_item(g, item: Dictionary) -> bool:
+	if not ItemLogic.grant(g, item):
+		return false
+	charge_item_acquisition(g)
+	return true
+
+
+## The charge itself, for the one acquisition path that does not go through
+## ItemLogic.grant: Shop.buy appends directly, because Shop.can_buy() already
+## refuses a full inventory so the cap path is unreachable from there.
+static func charge_item_acquisition(g) -> void:
+	Economy.charge(g, "ability_cost")
+
+
 const RARITIES := ["Common", "Uncommon", "Rare", "Legendary"]
 
 ## Illuminati Fridge Magnet's "own Artefacts of every rarity" check — reads
@@ -1877,7 +1917,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["frame-25", "on_wave_clear"]:
 			var tac_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 				return it.tier == "Tactical")
-			ItemLogic.grant(g, tac_pool[g.rng.randi() % tac_pool.size()])
+			grant_item(g, tac_pool[g.rng.randi() % tac_pool.size()])
 			g.gold = maxi(g.gold - 10, 0)
 		["manna-vending-machine", "on_wave_clear"]:
 			# issue 58 redesign: was a flat "+2 Items" grant, which issue 53's
@@ -1901,7 +1941,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				if tier == "Tactical":
 					var pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 						return it.tier == "Tactical")
-					ItemLogic.grant(g, pool[g.rng.randi() % pool.size()])
+					grant_item(g, pool[g.rng.randi() % pool.size()])
 
 		# --- issue 13: tariff system ---
 		# The 7 action-cost tariffs share one hook: charge() calls run() once
@@ -1961,7 +2001,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g.nibiru_wave_streak = 0
 		["flight-19-blackbox", "on_piece_lost"]:
 			if not ctx.uncounted:
-				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
+				grant_item(g, _random_item_of_tier(g.rng, "Tactical"))
 		["backmasked-vinyl", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
@@ -2005,14 +2045,14 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.tier == "Tactical":
 				g.item_use_tactical_count += 1
 				if g.item_use_tactical_count % 3 == 0:
-					ItemLogic.grant(g, _random_item_of_tier(g.rng, "Strategic"))
+					grant_item(g, _random_item_of_tier(g.rng, "Strategic"))
 			elif ctx.tier == "Strategic":
 				g.item_use_strategic_count += 1
 				if g.item_use_strategic_count % 3 == 0:
-					ItemLogic.grant(g, _random_item_of_tier(g.rng, "Decisive"))
+					grant_item(g, _random_item_of_tier(g.rng, "Decisive"))
 		["defense-lobbyist-business-card", "on_item_consume"]:
 			if ctx.tier != "Tactical":
-				ItemLogic.grant(g, _random_item_of_tier(g.rng, "Tactical"))
+				grant_item(g, _random_item_of_tier(g.rng, "Tactical"))
 
 		# --- issue 19: on_rank_up (merge_logic.gd commit_merge, game.gd "promote") ---
 		["witness-protection-mustache", "on_rank_up"]:

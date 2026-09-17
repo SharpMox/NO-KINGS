@@ -11,6 +11,9 @@ const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-103
+const ItemLogic := preload("res://scripts/item_logic.gd") # NO-103
+const Items := preload("res://data/items.gd") # NO-103
 
 var fails := 0
 
@@ -309,6 +312,53 @@ func _init() -> void:
 	check(Economy.gain(mona, 100) == 90,
 		"review pass 3: Mona Lisa never echoes a Tariff — Tariff on Gold Gain applies once, not twice")
 	mona.queue_free()
+	await process_frame
+
+	# --- NO-103: Tariff on Item charges on ACQUISITION as well as on use ---
+	# User ruling 2026-09-17: buying an Item, or an effect granting one, is
+	# taxed like using one. Buy-then-use is therefore charged twice.
+	var acq := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 500, "king_abilities": ["ability_cost"]})
+	await process_frame
+
+	# a granted Item charges once
+	var g_before: int = acq.gold
+	ArtefactHooks.grant_item(acq, Items.ITEMS[0])
+	check(acq.gold == g_before - Tuning.KING_ABILITY_ACTION_COST,
+		"NO-103: an Item grant charges Tariff on Item once")
+
+	# a grant REFUSED at the Item cap charges nothing
+	while ItemLogic.has_room(acq):
+		ItemLogic.grant(acq, Items.ITEMS[0])
+	var g_full: int = acq.gold
+	check(not ArtefactHooks.grant_item(acq, Items.ITEMS[0]),
+		"NO-103: a grant at a full inventory is refused")
+	check(acq.gold == g_full,
+		"NO-103: a REFUSED grant charges nothing — no tax for an Item you did not get")
+	acq.queue_free()
+	await process_frame
+
+	# the Zapruder return is NOT an acquisition: an Item handed back after use
+	# was already charged on use, so charging again would tax one Item twice
+	var zap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 500, "king_abilities": ["ability_cost"]})
+	await process_frame
+	var g_zap: int = zap.gold
+	ItemLogic.grant(zap, Items.ITEMS[0]) # the path _zapruder_resolve uses
+	check(zap.gold == g_zap,
+		"NO-103: an Item RETURNED (Zapruder) is not an acquisition and is not taxed")
+	zap.queue_free()
+	await process_frame
+
+	# with no Tariff held, acquisition is free — the charge is inert
+	var untaxed := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 500})
+	await process_frame
+	var g_untaxed: int = untaxed.gold
+	ArtefactHooks.grant_item(untaxed, Items.ITEMS[0])
+	check(untaxed.gold == g_untaxed,
+		"NO-103: no Tariff held — an Item grant costs nothing")
+	untaxed.queue_free()
 	await process_frame
 
 	print("---")

@@ -360,7 +360,8 @@ func _init() -> void:
 	await process_frame
 	var g_zap: int = zap.gold
 	ArtefactHooks.grant_item(zap, Items.ITEMS[0]) # the path _zapruder_resolve uses
-	check(zap.gold == g_zap - Tuning.KING_ABILITY_ACTION_COST,
+	check(zap.gold == g_zap - Economy.tariff_cut(
+			Tuning.SHOP_ITEM_PRICE[Items.ITEMS[0].tier], Tuning.TARIFF_ITEM_PCT),
 		"NO-108: an Item RETURNED (Zapruder) is an acquisition and IS taxed")
 	zap.queue_free()
 	await process_frame

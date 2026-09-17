@@ -271,16 +271,17 @@ const SHOP_UNLOCK_WAVE := 5
 ## play, this number is the lever — not the wipe, which is now a ruling.
 const SHOP_LANE_B_SCORE := 5000
 
-# Tariff costs: upstream catalog says 200/500/1000, scaled to the /10 economy;
-# halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate more than most
-# captures earn (fleet data: Crown median score 30 at run end)
+# The flat Tariff fallback: upstream catalog says 200/500/1000, scaled to the
+# /10 economy; halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate
+# more than most captures earn (fleet data: Crown median score 30 at run end).
+# Since NO-105 only Tariff on Pass and the blocked-move charge still bill this
+# flat amount; every other tariff bills a percentage of a reference value below.
 const KING_ABILITY_ACTION_COST := 10     # per tariffed action
-const TARIFF_LR_PER_SQUARE := 5    # Tariff on Long-Range, per square moved
 
 ## NO-105 (user ruling 2026-09-17): a Tariff takes a cut of what the taxed
 ## thing is WORTH, not a flat fee. Mild tariffs bill a percentage of an asset's
 ## Shop value; Moderate ones bill a percentage of what the action already
-## costs. See docs/adr/0003-tariff-cost-model.md for why the bases differ.
+## costs. See docs/adr/0005-tariff-cost-model.md for why the bases differ.
 ## Every result is rounded DOWN with a floor of 1 — a Tariff is never free.
 const TARIFF_MOVE_PCT := 0.10       # of the moving piece's value
 const TARIFF_CAPTURE_PCT := 0.10    # of the CAPTURED piece's value

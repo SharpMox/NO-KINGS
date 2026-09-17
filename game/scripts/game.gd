@@ -3247,7 +3247,7 @@ func _repeat_last_action() -> void:
 ## checks the Item cap (an Item-return activation is always offered — the cap
 ## only gates whether _zapruder_resolve's grant actually lands, same
 ## "spent either way" shape as every other full-inventory acquisition path,
-## e.g. _box_choose's own ItemLogic.grant).
+## e.g. _box_choose's own ArtefactHooks.grant_item).
 func _zapruder_available() -> bool:
 	if action_log.is_empty():
 		return false

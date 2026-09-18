@@ -232,14 +232,6 @@ var act_row: HBoxContainer
 ## The drawers row: Inventory and Shop, equal halves (NO-83 retired the Deck's
 ## Stock button — Stock opens from the Header).
 var nav_row: HBoxContainer
-## One size for every menu icon, deliberately just under a board tile so the
-## deck reads as smaller than the board without looking like a different game.
-## NO-33 / ADR-0004: derived from the tile rather than fixed at 52. As a literal
-## it only held that relationship on tall phones — on any shape wider than 3:5
-## the tile is ~40 and the deck icons were LARGER than the board pieces, which is
-## backwards. Set once in build(), before anything reads it.
-var ICON: int = 52
-
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
 
@@ -268,12 +260,18 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
 
 
+## NO-119: the tooltip/long-press text for an Items or Artefacts grid cell —
+## name on its own line, then the description. Shared so a cell's tap target
+## (no name text any more) and the popup that names it can never say two
+## different things, and so tests asserting "the popup shows THAT entry's
+## text" build the expected string from the same place the product code does.
+static func _grid_tip_desc(entry_name: String, description: String) -> String:
+	return "%s\n%s" % [entry_name, description]
+
+
 func build(game) -> void:
 	g = game
 	var vp: Vector2 = g.get_viewport_rect().size
-	# NO-33 / ADR-0004: one-way. _layout_board has already solved the tile for
-	# this viewport, so ICON reads it rather than anything measuring itself.
-	ICON = maxi(1, g.tile - g.ICON_GAP)
 	# ---- THE HEADER (NO-82/NO-83) -------------------------------------------
 	# The band above the board: g.hud_top tall, of which the top g.safe_top is
 	# the platform's notch inset. The background is painted from y = 0 so it runs
@@ -1167,12 +1165,16 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	var entry: Dictionary = g._artefact_entry(key)
 	var activatable: bool = g.ACTIVATABLE_ARTEFACT_KEYS.has(key)
 	var btn := Button.new()
-	btn.text = "%s%s%s" % ["✹" if activatable else "", entry.name,
-		" ×%d" % count if count > 1 else ""]
+	# NO-119: no name text on the cell any more — ✹ (activatable) and the
+	# stack count are live state, same reasoning the Shop's price badge stays
+	# on an otherwise nameless tile (CLAUDE.md). The name moves into
+	# tooltip_text / the long-press description below, since that's now the
+	# only place it's shown.
+	btn.text = "%s%s" % ["✹" if activatable else "", " ×%d" % count if count > 1 else ""]
 	btn.icon = g.artefact_tex(key)
-	btn.expand_icon = true
 	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
-	btn.tooltip_text = entry.description
+	var desc := _grid_tip_desc(entry.name, entry.description)
+	btn.tooltip_text = desc
 	if activatable:
 		var targeting: bool = g.artefact_targeting_key == key
 		btn.disabled = not (g._artefact_activation_available(key) or targeting)
@@ -1189,7 +1191,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	# tell an Artefact tip apart from a Board or Stock one (show_tip is now a
 	# shared popup, not this grid's alone) — bare `key` would make every
 	# non-Artefact tip look like an artefact no longer held and get closed.
-	_wire_grid_button(btn, true, "artefact:" + key, entry.description, func() -> void:
+	_wire_grid_button(btn, true, "artefact:" + key, desc, func() -> void:
 		artefact_activate_pressed.emit(key))
 	btn.set_meta("key", key) # lookup for probes/tests
 	return btn
@@ -1200,15 +1202,16 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 ## Items) shares. `has_icon` is false only for an Items cell with no art,
 ## which stays glyph-sized rather than reserving icon layout space it isn't
 ## using.
+##
+## NO-119: no cell carries name text beside its icon any more, so there's
+## nothing left to reserve width for — every cell with an icon is a flat
+## Tuning.OFFBOARD_ICON square, expand_icon filling it rather than collapsing
+## to 0 in the packed grid (the same square shape _build_stack_button and
+## modals.gd's Shop tiles already use).
 func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String, on_tap: Callable) -> void:
 	if has_icon:
-		# icon_max_width clamps AND reserves layout space; expand_icon
-		# would let the icon collapse to 0 in a packed grid. ICON - 8 rather
-		# than ICON: these buttons carry a name/count beside the icon, so the
-		# glyph is inset to keep the cell the same height as every other one
-		# instead of taller than all of them.
-		btn.add_theme_constant_override("icon_max_width", ICON - 8)
-		btn.custom_minimum_size = Vector2(0, ICON)
+		btn.expand_icon = true
+		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
 	btn.pressed.connect(func() -> void:
 		if btn.has_meta("lp_fired"): # NO-72: this release ended a long press
 			btn.remove_meta("lp_fired")
@@ -1225,16 +1228,21 @@ func _rebuild_items_grid() -> void:
 	for i in g.items.size():
 		var btn := Button.new()
 		var has_icon: bool = g.item_icons.has(g.items[i].key)
+		# NO-119: no name text on the cell — the glyph fallback stands alone,
+		# same as the Shop's own icon fallback (_shop_icon/_shop_tile).
 		if has_icon:
 			btn.icon = g.item_icons[g.items[i].key]
-			btn.text = g.items[i].name
 		else:
-			btn.text = "✦" + g.items[i].name
+			btn.text = "✦"
+		var desc := _grid_tip_desc(g.items[i].name, g.items[i].description)
 		btn.tooltip_text = "%s (%s)\n%s" % [g.items[i].name, g.items[i].tier, g.items[i].description]
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
-		_wire_grid_button(btn, has_icon, "item:%d" % i, g.items[i].description, func() -> void:
+		_wire_grid_button(btn, has_icon, "item:%d" % i, desc, func() -> void:
 			item_pressed.emit(i))
+		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
+			# this cell by (probes/tests) — same convention _build_artefact_cell
+			# already uses
 		items_grid.add_child(btn)
 
 
@@ -1266,10 +1274,9 @@ func _rebuild_stock_drawer() -> void:
 		# side it returns pieces to.
 		var slot := Button.new()
 		slot.text = "+"
-		# NO-36: this still read a hardcoded 46 -- the exact pre-ICON stock-strip
-		# size -- while every stack button beside it in this same container is
-		# ICON. Found by extending the one-icon-size pin past stock_strip.
-		slot.custom_minimum_size = Vector2(ICON, ICON)
+		# NO-119: every stack button beside it in this same container is
+		# Tuning.OFFBOARD_ICON — keep this one square with them.
+		slot.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
 		slot.add_theme_font_size_override("font_size", 22)
 		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
 		slot.tooltip_text = "Put the piece back into stock"
@@ -1288,9 +1295,12 @@ func _build_stack_button(st: Dictionary) -> Button:
 	if g.textures.has(id): # piece icon instead of glyph text (round 3)
 		btn.icon = g.piece_tex(id) # Stock is always yours: the player token
 		btn.expand_icon = true
-		# was 46. Every icon in the game now measures ICON, deliberately just
-		# under a 59px board tile, so a piece reads the same wherever it is.
-		btn.custom_minimum_size = Vector2(ICON, ICON)
+		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
+		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
+		# tile (that relationship — "so a piece reads the same wherever it
+		# is" — is what NO-119 explicitly overrides for icons outside the
+		# board).
+		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
 	else:
 		btn.text = g.defs[id].glyph
 		btn.add_theme_font_size_override("font_size", 22)

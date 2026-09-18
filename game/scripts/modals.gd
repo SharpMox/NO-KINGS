@@ -68,7 +68,14 @@ var sell_expanded_kind := "" # "" (none), "piece", "captured", "item", "artefact
 var sell_expanded_index := -1 # index into the matching g.stock/g.captured/
 	# g.items/g.artefacts array — a SEPARATE counter from shop_expanded_index
 	# since Sell mode indexes held entries, not g.shop_stock slots
-const SHOP_TILE := 46.0 # matches the pool-strip icon size (hud.gd) for visual rhythm
+## NO-119: PIECES/STOCK is a wrapping grid, not a fixed-width row, now that
+## its tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — Buy mode
+## holds up to 8 (Shop.ROWS.piece), but Sell mode's row is the player's whole
+## live Stock (unbounded), and either one would overflow a single-row
+## HBoxContainer well before it overflowed this column's width. Arithmetic,
+## not taste: 5 x 72 + 4 x 4 = 376 fits the drawer's ~412px content width
+## (draw_w 432 minus the 10px margins each side); 6 would need 452.
+const SHOP_PIECES_COLS := 5
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
@@ -481,12 +488,8 @@ func show_shop() -> void:
 		# band, ARTEFACTS/ITEMS stay put (now held entries, not shop slots),
 		# CAPTURED replaces BOXES (nothing in a Box is ever sellable)
 		pieces_band.add_child(_shop_zone_label("STOCK"))
-		var pieces_row := HBoxContainer.new()
-		pieces_row.alignment = BoxContainer.ALIGNMENT_CENTER
-		pieces_row.add_theme_constant_override("separation", 4)
-		for i in g.stock.size():
-			pieces_row.add_child(_sell_tile("piece", i))
-		pieces_band.add_child(pieces_row)
+		pieces_band.add_child(_piece_grid(func(i: int) -> Button: return _sell_tile("piece", i),
+			g.stock.size()))
 		left_col.add_child(_sell_sub_zone("ARTEFACTS", "artefact", g.artefacts.size()))
 		left_col.add_child(_sell_sub_zone("ITEMS", "item", g.items.size()))
 		right_col.add_child(_sell_sub_zone("CAPTURED", "captured", g.captured.size()))
@@ -495,12 +498,7 @@ func show_shop() -> void:
 		for i in g.shop_stock.size():
 			by_kind[g.shop_stock[i].kind].append(i)
 		pieces_band.add_child(_shop_zone_label("PIECES"))
-		var pieces_row := HBoxContainer.new()
-		pieces_row.alignment = BoxContainer.ALIGNMENT_CENTER
-		pieces_row.add_theme_constant_override("separation", 4)
-		for i in by_kind.piece:
-			pieces_row.add_child(_shop_tile(i))
-		pieces_band.add_child(pieces_row)
+		pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
 		left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact))
 		left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item))
 		right_col.add_child(_shop_sub_zone("BOXES", by_kind.box))
@@ -615,6 +613,24 @@ func _shop_zone_label(text: String) -> Label:
 	return l
 
 
+## NO-119: the PIECES/STOCK band's own centered, wrapping grid — SHOP_PIECES_COLS
+## wide, built from whatever `tile_of` returns (a _shop_tile or _sell_tile
+## closure) for each of `indices` (an Array of shop-slot indices, or a plain
+## count for Sell mode's `for i in g.stock.size()`). Kept separate from
+## _shop_sub_zone below: that one expands to fill a fixed-height column, this
+## one sits in a top band sized to its own content.
+func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
+	var center := CenterContainer.new()
+	var grid := GridContainer.new()
+	grid.columns = SHOP_PIECES_COLS
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	for i in indices:
+		grid.add_child(tile_of.call(i))
+	center.add_child(grid)
+	return center
+
+
 ## A labeled, centered grid of tiles that expands to fill its share of the
 ## lower block's height — this is what gives ARTEFACTS/ITEMS their upper/lower
 ## halves and BOXES the full height of the lower-right (money-and-shop/04
@@ -664,7 +680,7 @@ func _shop_icon(slot: Dictionary) -> Variant:
 func _shop_tile(index: int) -> Button:
 	var slot: Dictionary = g.shop_stock[index]
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(SHOP_TILE, SHOP_TILE)
+	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
 	btn.clip_text = true # multi-char glyph fallbacks ("vRg") must never grow the tile
 	btn.set_meta("shop_index", index)
 	var icon: Variant = _shop_icon(slot)
@@ -803,7 +819,7 @@ func _sell_tile(kind: String, index: int) -> Button:
 	var entry: Variant = _sell_entries(kind)[index]
 	var id := _sell_id(kind, entry)
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(SHOP_TILE, SHOP_TILE)
+	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
 	btn.clip_text = true
 	btn.set_meta("sell_kind", kind)
 	btn.set_meta("sell_index", index)

@@ -32,6 +32,17 @@ func tile_set(arr: Array) -> Dictionary:
 	return out
 
 
+## NO-122: how many blast zones cover each tile — _bomb_highlight_tiles()
+## keeps duplicates (one entry per zone) precisely so this can be counted
+## from the array _draw() itself iterates, rather than a second dedicated
+## return shape.
+func tile_counts(arr: Array) -> Dictionary:
+	var out := {}
+	for t in arr:
+		out[t] = out.get(t, 0) + 1
+	return out
+
+
 func _init() -> void:
 	var matches: Array = Scenarios.all().filter(
 		func(e: Dictionary) -> bool: return e.name.begins_with("NO-122: bomb blast"))
@@ -66,6 +77,23 @@ func _init() -> void:
 		matches_expected = matches_expected and got.has(k)
 	check(matches_expected,
 		"selecting the bomb queen highlights its own ring + the capture ring (got %s)" % [got.keys()])
+
+	# NO-122 cross-hatch: exactly the 4 tiles inside BOTH 3x3 rings (the
+	# queen's own square at 3,3 and its capture ring at 4,4 overlap on their
+	# shared corner) should read as multiply covered — the observable
+	# consequence _draw's cross-hatch is keyed on, not a flag.
+	var expect_multi := tile_set([
+		Vector2i(3, 3), Vector2i(4, 3), Vector2i(3, 4), Vector2i(4, 4)])
+	var counts := tile_counts(game._bomb_highlight_tiles())
+	var multi := {}
+	for k in counts:
+		if counts[k] > 1:
+			multi[k] = true
+	var multi_matches := multi.size() == expect_multi.size()
+	for k in expect_multi:
+		multi_matches = multi_matches and multi.has(k)
+	check(multi_matches,
+		"exactly the 4 shared tiles are covered by more than one blast zone (got %s)" % [multi.keys()])
 
 	# Deselect: the preview clears.
 	game._clear_selection()

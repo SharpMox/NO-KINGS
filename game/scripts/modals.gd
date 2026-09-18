@@ -675,6 +675,19 @@ func _shop_icon(slot: Dictionary) -> Variant:
 				else {"piece": "♟", "artefact": "◈", "item": "⚔"}.get(slot.key, "▣")
 
 
+## NO-119: true when `_shop_icon`'s Texture2D for this slot is the shared
+## placeholder rather than painted art. Boxes always are — no painted Box
+## art exists yet (Box.gd); an Artefact is only when its key has landed no
+## art. Pieces/Items never reach here Texture2D-false: their fallback is a
+## glyph String, not a shared placeholder image.
+func _shop_icon_is_placeholder(slot: Dictionary) -> bool:
+	match slot.kind:
+		"artefact":
+			return not g.artefact_icons.has(slot.key)
+		_:
+			return slot.kind != "piece" and slot.kind != "item" # box
+
+
 ## One icon tile with a price badge; sold tiles grey out but keep their slot
 ## meta.shop_index (index into g.shop_stock) exists for the click probes.
 func _shop_tile(index: int) -> Button:
@@ -687,6 +700,18 @@ func _shop_tile(index: int) -> Button:
 	if icon is Texture2D:
 		btn.icon = icon
 		btn.expand_icon = true
+		if _shop_icon_is_placeholder(slot): # NO-119: initials over the placeholder
+			var init_badge := Label.new()
+			init_badge.text = g.initials_of(Shop.display_name(g, slot))
+			init_badge.add_theme_font_size_override("font_size", 13)
+			init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
+			init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+			init_badge.add_theme_constant_override("outline_size", 4)
+			init_badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			init_badge.offset_left = 3
+			init_badge.offset_right = 26
+			init_badge.offset_bottom = 16
+			btn.add_child(init_badge)
 	else:
 		btn.text = str(icon)
 		btn.add_theme_font_size_override("font_size", 16)

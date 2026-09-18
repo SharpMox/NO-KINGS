@@ -1594,8 +1594,16 @@ func _init() -> void:
 	held_activ._refresh()
 	await process_frame # queue_free() on the rebuilt chip is deferred — let it
 		# resolve before counting, else a stale one lingers alongside the fresh one
-	check(held_activ.hud.artefacts_grid.get_child_count() == 1 \
-			and (held_activ.hud.artefacts_grid.get_child(0) as Button).text.begins_with("✹"),
+	# NO-119 coordinator fix (2026-09-18): the ✹ marker moved from Button.text
+	# to a child Label (so it stops competing with the icon for the Button's
+	# own layout — see hud.gd's _build_artefact_cell) — find it among the
+	# cell's children rather than reading Button.text directly.
+	var held_cell: Button = held_activ.hud.artefacts_grid.get_child(0)
+	var held_marked := false
+	for c in held_cell.get_children():
+		if c is Label and (c as Label).text.begins_with("✹"):
+			held_marked = true
+	check(held_activ.hud.artefacts_grid.get_child_count() == 1 and held_marked,
 		"Artefacts grid: one held activatable Artefact, in the grid, ✹-marked (story 50)")
 	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_DRAWER_H,
 		"...and the drawer's height is unchanged — flat regardless of content (story 46)")

@@ -1179,18 +1179,42 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	var entry: Dictionary = g._artefact_entry(key)
 	var activatable: bool = g.ACTIVATABLE_ARTEFACT_KEYS.has(key)
 	var btn := Button.new()
+	btn.icon = g.artefact_tex(key)
+	btn.expand_icon = true
+	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
 	# NO-119: no name text on the cell any more — ✹ (activatable) and the
 	# stack count are live state, same reasoning the Shop's price badge stays
 	# on an otherwise nameless tile (CLAUDE.md). The name moves into
 	# tooltip_text / the long-press description below, since that's now the
 	# only place it's shown.
-	btn.text = "%s%s" % ["✹" if activatable else "", " ×%d" % count if count > 1 else ""]
-	btn.icon = g.artefact_tex(key)
-	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
+	#
+	# A child Label, not Button.text: Button lays icon+text out together when
+	# both are set, and that layout isn't queryable, so a second badge (the
+	# initials one below) anchored to the BUTTON's rect lands beside the icon,
+	# not on it (found 2026-09-18, coordinator review). Text-only-if-needed +
+	# expand_icon with no competing Button.text is what makes the icon fill
+	# the whole button — the same guarantee the Shop's icon-only tiles already
+	# have (modals.gd _shop_tile) — so corner badges anchored to the button's
+	# rect are anchored to the icon's rect too, same idiom as the stack count
+	# / ADR-0002 mark in _build_stack_button below.
+	var marker_text := "%s%s" % ["✹" if activatable else "", " ×%d" % count if count > 1 else ""]
+	if marker_text != "":
+		var marker := Label.new()
+		marker.text = marker_text
+		marker.add_theme_font_size_override("font_size", 12)
+		marker.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+		marker.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+		marker.add_theme_constant_override("outline_size", 4)
+		marker.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		marker.offset_left = -40
+		marker.offset_top = -16
+		btn.add_child(marker)
 	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
 		# the shared placeholder so two unpainted artefacts read apart at a
 		# glance, same corner-badge idiom as the stack count in hud.gd's
-		# _build_stack_button (child Label, not a texture)
+		# _build_stack_button (child Label, not a texture). Same offsets as
+		# modals.gd's _shop_tile (icon-only there too, confirmed landing on
+		# the art, not beside it).
 		var init_badge := Label.new()
 		init_badge.text = g.initials_of(entry.name)
 		init_badge.add_theme_font_size_override("font_size", 13)
@@ -1199,10 +1223,8 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		init_badge.add_theme_constant_override("outline_size", 4)
 		init_badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		init_badge.offset_left = 3
-		init_badge.offset_top = 22 # the icon sits below the button's own top
-			# padding, not at its y=0 edge (measured NO-119 2026-09-18)
 		init_badge.offset_right = 26
-		init_badge.offset_bottom = 38
+		init_badge.offset_bottom = 16
 		btn.add_child(init_badge)
 	var desc := _grid_tip_desc(entry.name, entry.description)
 	btn.tooltip_text = desc

@@ -260,6 +260,15 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
 
 
+## NO-119: the tooltip/long-press text for an Items or Artefacts grid cell —
+## name on its own line, then the description. Shared so a cell's tap target
+## (no name text any more) and the popup that names it can never say two
+## different things, and so tests asserting "the popup shows THAT entry's
+## text" build the expected string from the same place the product code does.
+static func _grid_tip_desc(entry_name: String, description: String) -> String:
+	return "%s\n%s" % [entry_name, description]
+
+
 func build(game) -> void:
 	g = game
 	var vp: Vector2 = g.get_viewport_rect().size
@@ -1164,7 +1173,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	btn.text = "%s%s" % ["✹" if activatable else "", " ×%d" % count if count > 1 else ""]
 	btn.icon = g.artefact_tex(key)
 	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
-	var desc := "%s\n%s" % [entry.name, entry.description]
+	var desc := _grid_tip_desc(entry.name, entry.description)
 	btn.tooltip_text = desc
 	if activatable:
 		var targeting: bool = g.artefact_targeting_key == key
@@ -1225,7 +1234,7 @@ func _rebuild_items_grid() -> void:
 			btn.icon = g.item_icons[g.items[i].key]
 		else:
 			btn.text = "✦"
-		var desc := "%s\n%s" % [g.items[i].name, g.items[i].description]
+		var desc := _grid_tip_desc(g.items[i].name, g.items[i].description)
 		btn.tooltip_text = "%s (%s)\n%s" % [g.items[i].name, g.items[i].tier, g.items[i].description]
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)

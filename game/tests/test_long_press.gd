@@ -192,7 +192,8 @@ func _init() -> void:
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press completed without real cursor motion")
 	check(game.hud.tip_panel.visible, "a long press on an item shows its description")
-	check(game.hud.tip_label.text == game.items[0].description,
+	check(game.hud.tip_label.text
+			== game.hud._grid_tip_desc(game.items[0].name, game.items[0].description),
 		"...and it is that item's description")
 	check(game.item_active == -1, "...and does NOT arm the item")
 	game.queue_free()
@@ -213,7 +214,9 @@ func _init() -> void:
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the cell completed without real cursor motion")
 	check(game.hud.tip_panel.visible, "a long press on a ✹ Artefact cell shows its description")
-	check(game.hud.tip_label.text == game._artefact_entry("moscovium-glow-stick").description,
+	check(game.hud.tip_label.text == game.hud._grid_tip_desc(
+			game._artefact_entry("moscovium-glow-stick").name,
+			game._artefact_entry("moscovium-glow-stick").description),
 		"...and it is that artefact's description")
 	check(not game.buff_pick_open, "...and does NOT open the activation confirm")
 	var tr: Rect2 = game.hud.tip_panel.get_global_rect()
@@ -249,7 +252,9 @@ func _init() -> void:
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the passive cell completed without real cursor motion")
 	check(game.hud.tip_panel.visible, "a long press on a passive Artefact cell shows its description")
-	check(game.hud.tip_label.text == game._artefact_entry("tinfoil-hat").description,
+	check(game.hud.tip_label.text == game.hud._grid_tip_desc(
+			game._artefact_entry("tinfoil-hat").name,
+			game._artefact_entry("tinfoil-hat").description),
 		"...and it is that artefact's description")
 	game.queue_free()
 	await process_frame

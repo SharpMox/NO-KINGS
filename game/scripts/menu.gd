@@ -15,6 +15,7 @@ const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
 const GlobalBoard := preload("res://scripts/global_board.gd")
 const Connectivity := preload("res://scripts/connectivity.gd")
+const HudScript := preload("res://scripts/hud.gd") # HEADER_H, for the TEST menu's device-info readout
 
 const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
 const IosBridge := preload("res://scripts/cloud/ios_cloud_bridge.gd")
@@ -129,7 +130,7 @@ func _notification(what: int) -> void:
 		army_center.visible = true
 		return
 	var panels: Array[Control] = [test_scroll, army_center, scores_center,
-		history_scroll, about_center, guide_scroll, settings_panel]
+		history_scroll, about_center, guide_scroll, settings_panel, device_info_center]
 	for p in panels:
 		if is_instance_valid(p) and p.visible:
 			p.visible = false
@@ -481,6 +482,13 @@ var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
 var about_center: CenterContainer
+## Diagnostic-only (no issue yet, 2026-09-18): Max reported the Header
+## reserving extra space on a phone he describes as having no notch, and
+## desktop could not reproduce it. Nobody has read DisplayServer's actual
+## numbers off that hardware, and a device-model lookup table was rejected
+## as unbounded — the platform already reports this, so this panel just
+## surfaces it. Read-only; never touches layout.
+var device_info_center: CenterContainer
 var guide_scroll: ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
@@ -844,6 +852,12 @@ func _ready() -> void:
 		test_scroll.visible = false
 		main_box.visible = true)
 	back.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
+	# Diagnostic-only (2026-09-18, no issue yet): TEST is the one menu Android
+	# reaches with no CLI flag — see device_info_center's own comment. Sits
+	# beside Back so it's reachable without scrolling past the scenario
+	# sections.
+	var device_info_btn := _button(test_box, "Device info", 20, _show_device_info)
+	device_info_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list, same as every row/header/Back above
 	# issue 77: 53 scenarios in one flat column is unscannable. Sections are
 	# DERIVED from the names rather than stored, so scenarios.gd is untouched
 	# and anything added later groups itself by how it is named.
@@ -1080,6 +1094,12 @@ func _ready() -> void:
 
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]
+		# Diagnostic-only (2026-09-18): reaches the notch-diagnostic panel from
+		# the command line for a desktop capture, the same idiom as --safe-top
+		# probing the Game scene's Header without a phone.
+		if args.has("--show-device-info"):
+			_show_tests()
+			_show_device_info()
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(dir.path_join("menu.png"))
@@ -1222,6 +1242,58 @@ func _show_about() -> void:
 	_button(box, "← Back", 20, func() -> void:
 		about_center.visible = false
 		main_box.visible = true)
+
+
+## Diagnostic-only readout of the platform's own safe-area numbers, so a
+## report from Max's hardware is a screenshot instead of a guess. Built from
+## the same calls the layout code already uses (safe_top_px, HudScript.HEADER_H)
+## plus the raw DisplayServer/OS values behind them — never a device-model
+## table (rejected: unbounded, and the platform already reports this).
+func _device_info_text() -> String:
+	var vp := get_viewport_rect().size
+	var win := DisplayServer.window_get_size()
+	var safe := DisplayServer.get_display_safe_area()
+	var usable := DisplayServer.screen_get_usable_rect()
+	var screen := DisplayServer.screen_get_size()
+	var safe_top := GameScript.safe_top_px(vp)
+	var hud_top := safe_top + HudScript.HEADER_H
+	return "\n".join([
+		"model: %s" % OS.get_model_name(),
+		"os: %s %s" % [OS.get_name(), OS.get_version()],
+		"window size: %s" % win,
+		"safe area: pos %s  size %s" % [safe.position, safe.size],
+		"usable rect: pos %s  size %s" % [usable.position, usable.size],
+		"screen size: %s" % screen,
+		"safe_top_px: %.1f" % safe_top,
+		"hud_top: %.1f" % hud_top,
+	])
+
+
+func _show_device_info() -> void:
+	test_scroll.visible = false
+	if device_info_center:
+		device_info_center.queue_free()
+	device_info_center = CenterContainer.new()
+	device_info_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(device_info_center)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	device_info_center.add_child(box)
+	var head := Label.new()
+	head.text = "Device info"
+	head.add_theme_font_size_override("font_size", 24)
+	box.add_child(head)
+	var body := Label.new()
+	body.text = _device_info_text()
+	body.add_theme_font_size_override("font_size", 14)
+	# WORD_SMART, not off: a long Rect2i string is one unbroken token on a
+	# 480px-wide phone otherwise, same trap _wrap_account_text documents.
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size.x = _text_width()
+	box.add_child(body)
+	_button(box, "← Back", 20, func() -> void:
+		device_info_center.visible = false
+		test_scroll.visible = true)
 
 
 func _army_summary(army: Array) -> String:

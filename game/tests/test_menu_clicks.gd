@@ -131,7 +131,10 @@ func _init() -> void:
 		"scenarios are grouped into collapsible sections (%d headers)" % headers.size())
 	var showing := 0
 	for sec_child in menu.test_scroll.get_child(0).get_children():
+		# "Device info" is a fixed row beside Back, not a scenario section —
+		# same exclusion as "← Back".
 		if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
+				and sec_child.text != "Device info" \
 				and not sec_child.text.begins_with("▸"):
 			showing += 1
 	check(showing == 0, "every section starts collapsed (%d rows showing)" % showing)
@@ -144,6 +147,7 @@ func _init() -> void:
 	var deepest := ""
 	for sec_child in menu.test_scroll.get_child(0).get_children():
 		if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
+				and sec_child.text != "Device info" \
 				and not sec_child.text.begins_with("▸") \
 				and not sec_child.text.begins_with("▾"):
 			deepest = sec_child.text

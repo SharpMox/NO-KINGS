@@ -306,6 +306,17 @@ var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var drag_moved := false # the pointer left the origin tile (tap vs aborted drag)
 var drag_reselect := false # the pressed piece was already selected (re-click)
+# NO-120: long-press-to-describe a board piece. token 0 = none pending,
+# mirroring hud.gd's _long_press_input meta idiom (see _board_long_press_start).
+var board_lp_token := 0
+var board_lp_from := Vector2.ZERO
+var board_lp_prev_selected := Vector2i(-1, -1)
+var board_lp_fired := false # a hold completed for the tile now in board_lp_pending_tile
+# a press classified as a COMMIT (_board_tap_is_readonly false) never calls
+# _on_tile_clicked itself — the tile waits here for release to run it, and
+# only if board_lp_fired is still false when release arrives (see the
+# hazard this guards against in _board_tap_is_readonly's header).
+var board_lp_pending_tile := Vector2i(-1, -1)
 # Arrow Planning (Notion): purely decorative — never read by rules/AI. A
 # scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
 var arrow_mode := false # while on, board drags draw arrows instead of selecting
@@ -1823,6 +1834,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
 		arrow_from = Vector2i(-1, -1)
+		board_lp_token = 0 # NO-120: none of these states can complete a hold
+		board_lp_pending_tile = Vector2i(-1, -1) # ...or a deferred commit
 		return
 	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
 		# item/artefact targeting still owns board taps
@@ -1832,6 +1845,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _tile_at(event.position) != drag_from:
 				drag_moved = true # a real drag, not a tap in place
 			queue_redraw()
+		# NO-120: past the same deadzone hud.gd's _long_press_input cancels a
+		# drawer long-press on, cancel a pending board one too.
+		if board_lp_token != 0 and event.position.distance_to(board_lp_from) > HudScript.DRAWER_SCROLL_DEADZONE:
+			board_lp_token = 0
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
@@ -1864,19 +1881,48 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh()
 			if event.double_click and at.x >= 0 and board.has(at):
 				drag_from = Vector2i(-1, -1)
+				board_lp_token = 0 # NO-120: this click's own press already armed one
+				board_lp_pending_tile = Vector2i(-1, -1) # ...or deferred a commit
 				# double-tap: piece info (a King's carries his active Abilities)
 				return _show_preview(board[at].id, board[at].get("king_id", ""))
-			var was_selected := at.x >= 0 and at == selected
-			if at.x >= 0:
-				_on_tile_clicked(at)
-			# a selection of an OWN piece also starts a potential drag (enemy
-			# recon selections are read-only — never draggable)
-			if selected == at and at.x >= 0 and board.has(at) \
-					and board[at].owner == Rules.PLAYER:
-				drag_from = at
-				drag_moved = false
-				drag_reselect = was_selected # in-place release = re-click
+			var occupied := at.x >= 0 and board.has(at)
+			# NO-120: a hold is offered on every occupied tile, but a press that
+			# would COMMIT (a move, a capture, a merge, a deploy, an item/
+			# Artefact/Ability effect — _board_tap_is_readonly's header has the
+			# full list) must not run _on_tile_clicked until release, so a
+			# still-pending hold can never let a capture through underneath it.
+			var commits := occupied and not _board_tap_is_readonly(at)
+			if occupied:
+				_board_long_press_start(at, event.position, commits)
+			if commits:
+				board_lp_pending_tile = at
+			else:
+				var was_selected := at.x >= 0 and at == selected
+				if at.x >= 0:
+					_on_tile_clicked(at)
+				# a selection of an OWN piece also starts a potential drag
+				# (enemy recon selections are read-only — never draggable)
+				if selected == at and at.x >= 0 and board.has(at) \
+						and board[at].owner == Rules.PLAYER:
+					drag_from = at
+					drag_moved = false
+					drag_reselect = was_selected # in-place release = re-click
 		else:
+			board_lp_token = 0 # NO-120: release cancels any pending long-press timer
+			if board_lp_pending_tile.x >= 0:
+				# NO-120: the commit this press deferred runs now — but only as
+				# a clean tap: released back on the same tile, and no hold beat
+				# it to showing the description instead. Whatever the hold's
+				# timer did or didn't do, this press started no drag (a
+				# committing tile is never a drag source), so there is nothing
+				# else for this release to resolve.
+				var pt := board_lp_pending_tile
+				board_lp_pending_tile = Vector2i(-1, -1)
+				var fired := board_lp_fired
+				board_lp_fired = false
+				if not fired and _tile_at(event.position) == pt:
+					_on_tile_clicked(pt)
+				return
 			if drag_from.x >= 0: # release ends a drag
 				var t := _tile_at(event.position)
 				var from := drag_from
@@ -1965,6 +2011,95 @@ func _tile_at(screen: Vector2) -> Vector2i:
 	return Vector2i(x, y) if Rules.in_bounds(Vector2i(x, y)) else Vector2i(-1, -1)
 
 
+## NO-120: true when a press on `at` (occupied — the only case a long press
+## ever arms on) resolves to a READ-ONLY branch of _on_tile_clicked: select
+## an own piece, recon-select/dismiss an enemy, or clear the selection.
+## Mirrors _on_tile_clicked's own branches, in the same order, end to end.
+##
+## Everything else COMMITS — Economy.charge, a capture, a merge, a deploy, an
+## action spent — and the caller must not run it on press: a hold is still
+## pending at that point, and undoing a selection afterwards (which is all
+## the original long-press revert did) cannot undo a capture. Found in
+## review (2026-09-18): a piece selected, an enemy on a legal destination,
+## long-pressed to read it — _on_tile_clicked committed the capture on the
+## press, half a second before the hold even fired.
+##
+## Every branch here, in _on_tile_clicked's own order:
+##   artefact_targeting_key / army_board_targeting / item_active / placing_id
+##     — every tap in these modes stages or commits an effect (Bovine's
+##     target, an Item's multi/pair/area staging, a Stock deploy-merge) —
+##     never read-only, so never run on press while any is active.
+##   state == SETUP: only _setup_relocate commits, and it only ever targets
+##     an EMPTY legal_dests tile — never one `at` can be (board.has(at) is
+##     guaranteed by the caller), so every SETUP press here is a plain select.
+##   state == PLAYER_TURN, selected legal_dests.has(at): _move_player — a
+##     move or a capture.
+##   state == PLAYER_TURN, `at` a merge partner: MergeLogic.do_merge.
+##   everything else: select an own piece, recon-select/dismiss an enemy, or
+##     clear the selection — read-only.
+func _board_tap_is_readonly(at: Vector2i) -> bool:
+	if artefact_targeting_key != "" or army_board_targeting or item_active >= 0 \
+			or placing_id != "":
+		return false
+	if state == State.SETUP:
+		return true
+	if selected.x >= 0 and legal_dests.has(at) and board.has(selected) \
+			and board[selected].owner == Rules.PLAYER:
+		return false
+	if selected.x >= 0 and at != selected and board[at].owner == Rules.PLAYER \
+			and merge_highlights.has(board[at].id):
+		return false
+	return true
+
+
+## NO-120: long-press a board piece to show its description (name + any
+## Piece Buffs it carries). The board is drawn in _draw, not built from
+## Controls, so there is no Button for hud.gd's _long_press_input to hook —
+## this mirrors that function's token+timer+deadzone idiom directly over the
+## board's own press/release/motion handling, rather than adding a second
+## input path.
+##
+## `is_commit` (see _board_tap_is_readonly) decides what a firing hold does:
+## a read-only press already ran _on_tile_clicked immediately, same as any
+## other press, so firing UNDOES that — restores the selection from before
+## the press and drops any armed drag. A committing press never ran
+## _on_tile_clicked at all (the caller left it in board_lp_pending_tile for
+## release instead), so there is nothing to undo — firing only has to mark
+## itself so release knows to swallow the deferred tap rather than run it.
+func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) -> void:
+	board_lp_prev_selected = selected
+	board_lp_from = press_pos
+	board_lp_fired = false
+	var piece: Dictionary = board[at]
+	var token := Time.get_ticks_usec()
+	board_lp_token = token
+	get_tree().create_timer(HudScript.LONG_PRESS_MS / 1000.0).timeout.connect(func() -> void:
+		if board_lp_token != token:
+			return
+		board_lp_token = 0
+		board_lp_fired = true
+		if not is_commit:
+			drag_from = Vector2i(-1, -1)
+			selected = board_lp_prev_selected
+			if selected.x >= 0 and board.has(selected):
+				legal_dests = Rules.moves_for(board, selected, defs)
+				legal_paths = Rules.move_paths(board, selected, defs)
+			else:
+				selected = Vector2i(-1, -1)
+				legal_dests.clear()
+				legal_paths.clear()
+			queue_redraw()
+		hud.show_tip("board:%s" % str(at), BuffLogic.describe(piece.id, piece, defs),
+			Rect2(_tile_px(at), Vector2(tile, tile))))
+
+
+## NO-120: _board_tap_is_readonly mirrors this function's branches — which
+## ones commit, which only select — to decide whether a press can run
+## straight away or has to wait out a possible hold first. Add or change a
+## COMMITTING branch here and that mirror goes stale silently: it keeps
+## classifying the new branch as read-only, runs it on press again, and the
+## capture-on-long-press hazard that function's header describes comes back.
+## Update both, in the same commit.
 func _on_tile_clicked(tile: Vector2i) -> void:
 	if artefact_targeting_key != "": # Bovine Tractor Beam (52) staging; board
 		# clicks feed it, same priority Item targeting already has below

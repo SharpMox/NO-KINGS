@@ -146,6 +146,24 @@ func _artefact_cell(game: Node, key: String) -> Button:
 	return null
 
 
+## NO-120: Stock/Captured cells carry id + cap as meta (hud.gd's
+## _build_stack_button), so lookup does not depend on grid order either.
+## Root cause of the "short tap on a Stock cell still arms it" flake
+## (2026-09-18): called right after _set_drawer("stock"), which just
+## triggered _rebuild_stock_drawer — the OLD button is still in
+## get_children() (queue_free is deferred, not immediate) and sorts before
+## the new one Godot just add_child()'d. Same trap test_game_clicks.gd's
+## _pool_rows already documents ("a row held across one is a freed node")
+## and already guards against the same way.
+func _stock_button(game: Node, id: String, cap: bool) -> Button:
+	var grid: Control = game.hud.captured_grid if cap else game.hud.stock_grid
+	for c in grid.get_children():
+		if c is Button and not c.is_queued_for_deletion() \
+				and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
+			return c
+	return null
+
+
 func _init() -> void:
 	create_timer(60.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: probe still running after 60s — force quit")
@@ -274,6 +292,161 @@ func _init() -> void:
 	await process_frame
 	check(not game.hud.tip_panel.visible, "a drag starting on an item shows no description, even held past the threshold")
 	check(game.item_active == -1, "...and does not arm the item")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-120: a long press on a BOARD PIECE shows its description, and does
+	# not select it. The board is drawn in _draw, not built from Controls, so
+	# this exercises _board_long_press_start (game.gd) rather than
+	# hud.gd's _long_press_input — no Button, no gui_input to hold.
+	game = await _boot_game()
+	game._set_drawer("") # the queen tile used sits low enough to be covered
+		# by the open Inventory drawer otherwise
+	check(game.selected == Vector2i(-1, -1), "nothing selected before the press")
+	var queen_at := Vector2i(2, 1) # the player Queen _boot_game()'s config places
+	var qpos: Vector2 = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(qpos):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the board piece completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a board piece shows its description")
+	check(game.hud.tip_label.text == game.defs["queen"].name,
+		"...and it is that piece's name")
+	check(game.selected == Vector2i(-1, -1), "...and does NOT select the piece")
+	game.queue_free()
+	await process_frame
+
+	# --- a SHORT TAP on the same board piece still selects it, as before -------
+	game = await _boot_game()
+	game._set_drawer("")
+	game.hud.hide_tip()
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	check(game.selected == queen_at, "a short tap on a board piece still selects it")
+	check(not game.hud.tip_panel.visible, "...and shows no description")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-120 hazard (found in review 2026-09-18): long-pressing an ENEMY
+	# piece on a legal destination of the current selection must NOT capture
+	# it. _on_tile_clicked used to run on press, before the hold could even
+	# resolve — the tooltip appeared over a board that had already changed.
+	# Assert what a capture would have changed (the enemy gone, gold, actions
+	# spent), never `selected` alone — a restored `selected` reads green even
+	# while the capture already happened (CLAUDE.md: assert the observable
+	# consequence, never the flag that was just written).
+	var enemy_at := Vector2i(2, 6) # the enemy Pawn _boot_game()'s config
+		# places, directly up the Queen's own file — a legal capture
+	game = await _boot_game()
+	game._set_drawer("")
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos) # select the Queen first (a short tap — not timed)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	check(game.selected == queen_at, "the Queen is selected before the hazard press")
+	check(game.legal_dests.has(enemy_at), "the enemy Pawn is a legal capture from here")
+	var gold_before: int = game.gold
+	var actions_before: int = game.actions_left
+	var epos: Vector2 = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(epos):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the enemy completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on the enemy shows its description")
+	check(game.hud.tip_label.text == game.defs["pawn"].name, "...and it is that piece's name")
+	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.ENEMY,
+		"...and the enemy Pawn is STILL on the board — not captured")
+	check(game.gold == gold_before, "...and gold is unchanged")
+	check(game.actions_left == actions_before, "...and no action was spent")
+	game.queue_free()
+	await process_frame
+
+	# --- positive control: a SHORT TAP on that same enemy still captures it,
+	# so the hazard test above cannot pass by the press simply missing --------
+	game = await _boot_game()
+	game._set_drawer("")
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	actions_before = game.actions_left
+	epos = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, epos)
+	await process_frame
+	_release_at(epos)
+	await process_frame
+	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.PLAYER \
+			and game.board[enemy_at].id == "queen",
+		"(control) a short tap on the same enemy DOES capture — the Queen lands there")
+	check(not game.board.has(queen_at), "(control) ...and the Queen's old tile is empty")
+	check(game.actions_left == actions_before - 1, "(control) ...and an action was spent")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-120: a long press on a STOCK cell shows its description, through
+	# _long_press_input exactly like an Inventory cell, and does not arm it ---
+	game = await _boot_game()
+	game._set_drawer("stock")
+	await _await_drawer_settled(game, "stock") # NO-118
+	var pawn_btn := _stock_button(game, "pawn", false)
+	check(pawn_btn != null, "the Stock drawer has the pawn stack _boot_game() placed")
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(pawn_btn.get_global_rect().get_center()):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the Stock cell completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a Stock cell shows its description")
+	check(game.hud.tip_label.text == game.defs["pawn"].name,
+		"...and it is that piece's name")
+	check(game.placing_id == "", "...and does NOT arm it for deploy")
+	game.queue_free()
+	await process_frame
+
+	# --- a SHORT TAP on the same Stock cell still arms it, as before -----------
+	game = await _boot_game()
+	game._set_drawer("stock")
+	# NO-120 flake, root-caused 2026-09-18, hit AGAIN once #464's drawer slide
+	# landed on main (2026-09-19) — two INDEPENDENT waits, both needed, do not
+	# delete either as "redundant":
+	#   1. _await_drawer_settled (NO-118): the panel itself takes
+	#      Tuning.PANEL_SLIDE_S of real time to slide from drawer_hidden to
+	#      drawer_rest. Read a rect before that finishes and it's the panel's
+	#      MID-SLIDE position, most of a drawer-height off from where it lands.
+	#   2. The plain `await process_frame` below it: GridContainer defers its
+	#      OWN layout sort to the next idle frame, independent of the panel's
+	#      position — the panel arriving at rest does not imply the grid
+	#      inside it has also sorted the freshly rebuilt row into its column.
+	# A LONG press tolerates skipping both (the hold outlasts them, and the
+	# tip is tracked by object, not by screen position); a SHORT tap's release
+	# does not — it lands wherever the button's rect says it is RIGHT NOW,
+	# stale or not.
+	await _await_drawer_settled(game, "stock") # NO-118
+	game.hud.hide_tip()
+	pawn_btn = _stock_button(game, "pawn", false)
+	await process_frame # grid sort, independent of the drawer-settle above
+	var ppos: Vector2 = pawn_btn.get_global_rect().get_center()
+	_mouse(true, ppos)
+	await process_frame
+	_release_at(ppos)
+	await process_frame
+	check(game.placing_id == "pawn", "a short tap on a Stock cell still arms it")
+	check(not game.hud.tip_panel.visible, "...and shows no description")
 	game.queue_free()
 	await process_frame
 

@@ -350,6 +350,18 @@ comes back.
   returns the doomed node. Guard with `not c.is_queued_for_deletion()`.
   `test_game_clicks.gd`'s `_pool_rows` already documents and guards this exact case; a
   newer helper in the same file didn't, and that cost a debugging session.
+- **A cold worktree's missing `.godot/` import cache fakes probe failures unrelated to
+  the branch under test.** Measured twice on 2026-09-18, in separate worktrees: one agent
+  saw 4 failures and suspected `main` had pre-existing breakage, another saw a different 4
+  and suspected its own diff. Both sets vanished after a single
+  `godot --headless --path game --import` (296 and 372 resources cached respectively), and
+  neither set touched code either branch had changed — a reachability argument, not just a
+  disappearing rate. `game/tests/run_all.sh` already runs this import up front, for exactly
+  this reason ("Fresh worktrees have no .godot/ import cache, and Godot's on-demand import
+  races with the first suite's resource loads — intermittently 'Failed loading resource' on
+  item SVG icons"); the gap is running a probe directly, skipping `run_all.sh`, which is
+  what iterating on one suite does. A red result from a cold worktree is not evidence about
+  the branch — warm the cache and re-run before bisecting.
 
 ### Layout traps the device taught
 

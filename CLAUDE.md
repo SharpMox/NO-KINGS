@@ -288,19 +288,21 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   Godot running" proves nothing; on 2026-09-14 a live lock was cleared twice and both times
   the overlapping suites' results were discarded.
 - **The `--screenshot` seam is windowed, and its flag goes after the bare `--`.**
-  `OS.get_cmdline_user_args()` (`game.gd:521`) returns only args after `--`; put
-  `--screenshot` before it and the guard at `game.gd:531` never matches, so the call at
-  `game.gd:534` never fires — a silent hang, no output, no error. `--headless` hangs the
-  same way for a different reason: inside `_screenshot_and_quit` (`game.gd:3780`), the two
-  awaits on `RenderingServer.frame_post_draw` at `game.gd:3786-3787` never resolve, because
-  headless has no rendering server drawing frames. Headless stays correct for
-  `-s tests/...` suites; only this seam needs a window. `game.gd:3788` always saves
-  `<dir>/game.png`, so give each capture its own directory:
+  `OS.get_cmdline_user_args()` (`_ready`, `game.gd:521`) returns only args after `--`; put
+  `--screenshot` before it and `_ready`'s `--screenshot` handling never sees it, so neither
+  capture path below ever fires — a silent hang, no output, no error. `--headless` hangs
+  the same way for a different reason: the shared `_capture_and_quit` helper awaits
+  `RenderingServer.frame_post_draw` twice, which never resolves headless (no rendering
+  server drawing frames). Headless stays correct for `-s tests/...` suites; only this seam
+  needs a window. `_capture_and_quit` always saves `<dir>/game.png`, so give each capture
+  its own directory:
   ```sh
   tools/godot-lock.sh godot --path game -- --screenshot /tmp/shot-a
   ```
-  `_screenshot_and_quit` (`game.gd:3780`) places the stock at random and passes once, so it
-  captures an in-run board, not a chosen state — a specific state needs a scenario.
+  `_screenshot_and_quit` places the stock at random and passes once — an in-run board, not
+  a chosen state. For a chosen state, add `--scenario N` plus either `--select X,Y` (a real
+  tap via `_on_tile_clicked`) or `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`);
+  `_debug_state_screenshot` drives those instead (NO-122).
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

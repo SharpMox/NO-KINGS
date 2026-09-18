@@ -3817,10 +3817,7 @@ func _screenshot_and_quit(dir: String) -> void:
 	while not stock.is_empty() and not open.is_empty():
 		_place(stock[rng.randi() % stock.size()], open.pop_at(rng.randi() % open.size()))
 	_on_pass()
-	await RenderingServer.frame_post_draw
-	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))
-	get_tree().quit()
+	await _capture_and_quit(dir)
 
 
 ## Debug: like _screenshot_and_quit, but for a scenario already boarded and
@@ -3844,6 +3841,13 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		if args.has("--anchor"):
 			var xy := args[args.find("--anchor") + 1].split(",")
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
+	await _capture_and_quit(dir)
+
+
+## Shared tail for the two debug screenshot paths above (NO-122): wait for
+## the frame just drawn to land, save it, quit. One copy so the two paths
+## can't drift apart on how a capture actually happens.
+func _capture_and_quit(dir: String) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))

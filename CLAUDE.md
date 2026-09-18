@@ -300,9 +300,10 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   tools/godot-lock.sh godot --path game -- --screenshot /tmp/shot-a
   ```
   `_screenshot_and_quit` places the stock at random and passes once — an in-run board, not
-  a chosen state. For a chosen state, add `--scenario N` plus either `--select X,Y` (a real
-  tap via `_on_tile_clicked`) or `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`);
-  `_debug_state_screenshot` drives those instead (NO-122).
+  a chosen state. For a chosen state, add `--scenario N` plus `--select X,Y` (a real tap
+  via `_on_tile_clicked`), `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`),
+  `--open-shop`, or `--open-drawer NAME` (NO-119) — for capturing a state the default boot
+  doesn't reach. `_debug_state_screenshot` drives all of them (NO-122).
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
@@ -335,6 +336,20 @@ comes back.
 - **Assert the observable consequence, never the flag that was just written.** A crisp-text
   change shipped as a complete no-op because it set a property nothing reads, and a
   property read-back would have "passed".
+- **A freshly added control's `get_global_rect()` is not usable until the next idle
+  frame.** `GridContainer` defers its layout sort, so a lookup that immediately takes
+  `get_global_rect().get_center()` gets the button's pre-sort position — `x=0`, then
+  `x=160` a frame later. A long press survives it (the hold gives the sort time, and the
+  tip tracks by object reference); a short tap's release lands on a sibling and the click
+  is silently lost. Await a frame between the lookup and the position read. Sibling of the
+  stock-strip bullet below (a control measuring itself before layout) — same defer,
+  different axis.
+- **`queue_free()` is deferred, so a freed node is still in `get_children()` for a frame —
+  and sorts BEFORE its replacement.** A rebuild that frees a row and adds its successor in
+  the same call leaves `[OLD(queued), NEW]`, so a naive "first child matching X" lookup
+  returns the doomed node. Guard with `not c.is_queued_for_deletion()`.
+  `test_game_clicks.gd`'s `_pool_rows` already documents and guards this exact case; a
+  newer helper in the same file didn't, and that cost a debugging session.
 
 ### Layout traps the device taught
 
@@ -345,6 +360,18 @@ comes back.
   `resized`** — that is a feedback loop when the rebuild changes its own children.
 - **Centring content in a span splits empty space into two gaps.** Flush to one edge puts
   all the slack in one place where something can absorb it.
+- **A visible Control absorbs clicks before `_unhandled_input` ever runs.** Godot's GUI
+  picking hands a press to any visible Control whose rect contains it, with the default
+  `MOUSE_FILTER_STOP`, before unhandled input is dispatched — so a panel that is logically
+  "closed" but still `visible` for a close animation eats board taps for the whole
+  animation. Found when NO-118's 0.18s close slide let the Stock drawer swallow clicks:
+  its hidden position sits exactly one drawer-height above rest, so while "closed" its
+  rect still covered the whole Header, including the Header's own Stock button. Godot
+  does not cascade a parent's `MOUSE_FILTER_IGNORE` to its children, so setting the filter
+  on the panel alone is not enough — the fix has to recurse. `hud.gd`'s
+  `_set_drawer_clickable` is the worked example: it saves and restores each descendant's
+  exact prior filter rather than blanket-setting `STOP`, because NO-45's rows are
+  deliberately `PASS`, not `STOP`, for drag-scroll.
 
 ### Standing rulings — read before triaging a "bug"
 

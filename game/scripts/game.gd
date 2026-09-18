@@ -769,7 +769,8 @@ func _deploy_highlight_tiles() -> Array:
 
 
 func _clock_text() -> String:
-	return "◷ %02d:%02d.%01d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms / 100) % 10]
+	# NO-114: no icon, and milliseconds rather than tenths.
+	return "%02d:%02d.%03d" % [int(clock_ms / 60000), int(clock_ms / 1000) % 60, int(clock_ms) % 1000]
 
 
 

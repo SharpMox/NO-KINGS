@@ -60,14 +60,13 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
-## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
-## target now stages it and waits — this headless-drives the second tap that
-## opens the confirm gate plus the gate's own Confirm, so existing effect
-## assertions still read like a single commit.
+## NO-124: a tap on a valid "tile"/"pair"/"area" target now stages it AND
+## shows the floating Confirm affordance in the same call (no re-tap) — this
+## headless-drives that one tap plus the affordance's own Confirm, so
+## existing effect assertions still read like a single commit.
 func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_click(t)
-	g._item_click(t)
-	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+	g._item_confirm_target()
 
 
 func _init() -> void:
@@ -455,7 +454,8 @@ func _init() -> void:
 	nfm.state = nfm.State.PLAYER_TURN
 	nfm.actions_left = 2
 	nfm.items.append(_item("counter_intel", ""))
-	nfm._use_item(0)
+	nfm._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	nfm._item_confirm_untargeted()
 	check(nfm.actions_left == 2,
 		"Nuclear Football Menu: Items don't spend an Action while the Clock is under 60s")
 	nfm.queue_free()
@@ -467,7 +467,8 @@ func _init() -> void:
 	nfm_control.state = nfm_control.State.PLAYER_TURN
 	nfm_control.actions_left = 2
 	nfm_control.items.append(_item("counter_intel", ""))
-	nfm_control._use_item(0)
+	nfm_control._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	nfm_control._item_confirm_untargeted()
 	check(nfm_control.actions_left == 1,
 		"(control) Nuclear Football Menu: Items spend an Action at full Clock")
 	nfm_control.queue_free()

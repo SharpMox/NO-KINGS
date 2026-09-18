@@ -46,14 +46,13 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
-## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
-## target now stages it and waits — this headless-drives the second tap that
-## opens the confirm gate plus the gate's own Confirm, so existing effect
-## assertions still read like a single commit.
+## NO-124: a tap on a valid "tile"/"pair"/"area" target now stages it AND
+## shows the floating Confirm affordance in the same call (no re-tap) — this
+## headless-drives that one tap plus the affordance's own Confirm, so
+## existing effect assertions still read like a single commit.
 func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_click(t)
-	g._item_click(t)
-	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+	g._item_confirm_target()
 
 
 func _init() -> void:

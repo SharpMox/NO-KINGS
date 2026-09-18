@@ -52,22 +52,19 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 	return game
 
 
-## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
-## target now stages it and waits — this headless-drives the second tap that
-## opens the confirm gate plus the gate's own Confirm, so existing effect
-## assertions still read like a single commit.
+## NO-124: a tap on a valid "tile"/"pair"/"area" target now stages it AND
+## shows the floating Confirm affordance in the same call (no re-tap) — this
+## headless-drives that one tap plus the affordance's own Confirm, so
+## existing effect assertions still read like a single commit.
 func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_click(t)
-	g._item_click(t)
-	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+	g._item_confirm_target()
 
 
-## NO-121: Bovine Tractor Beam's own stage-B tap, same shape.
+## NO-124: Bovine Tractor Beam's own stage-B tap, same shape.
 func _artefact_confirm_tap(g, t: Vector2i) -> void:
-	var a: Vector2i = g.artefact_target_stage_a
 	g._artefact_target_click(t)
-	g._artefact_target_click(t)
-	g._artefact_target_confirmed({"a": a, "b": t})
+	g._artefact_confirm_target()
 
 
 func _init() -> void:
@@ -1379,7 +1376,8 @@ func _init() -> void:
 	zap_item.actions_left = 5
 	zap_item.items.append({"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic",
 		"target": "", "description": ""})
-	zap_item._use_item(0) # target "" resolves instantly, no tile click needed
+	zap_item._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	zap_item._item_confirm_untargeted()
 	check(zap_item.items.is_empty(), "setup: Counter-Intel consumed")
 	check(zap_item._artefact_activation_available("zapruder-s-director-s-cut"),
 		"Zapruder's Director's Cut: available after an Item use")
@@ -1399,6 +1397,7 @@ func _init() -> void:
 	zap_full.items.append({"key": "counter_intel", "name": "Counter-Intel", "tier": "Strategic",
 		"target": "", "description": ""})
 	zap_full._use_item(0) # the Item Zapruder will try (and fail) to return
+	zap_full._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
 	for i in 3: # refill to the cap with something else, as if drawn meanwhile
 		zap_full.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical",
 			"target": "tile", "action_cost": 0, "description": ""})
@@ -1469,11 +1468,11 @@ func _init() -> void:
 	bov.queue_free()
 	await process_frame
 
-	# NO-121: Bovine's own stage-B tap goes through the same pending/confirm
-	# gate as an Item's final tap — a tap stages without committing, a
-	# different tap moves the stage, the same tile again opens the gate, and
-	# cancelling the gate costs nothing (asserted on the observable
-	# consequence: the piece's position and the once-per-Wave charge).
+	# NO-124: Bovine's own stage-B tap stages AND shows the floating Confirm
+	# affordance in the same tap (no re-tap) — a different tap moves the
+	# stage, and cancelling (tap the Activate chip again) costs nothing
+	# (asserted on the observable consequence: the piece's position and the
+	# once-per-Wave charge).
 	var bpend := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "artefacts": ["bovine-tractor-beam"]})
 	await process_frame
@@ -1483,22 +1482,19 @@ func _init() -> void:
 		"setup: at least two empty deploy tiles to move the pending pick between")
 	var dest_a: Vector2i = bpend.artefact_targets[0]
 	var dest_b: Vector2i = bpend.artefact_targets[1]
-	bpend._artefact_target_click(dest_a) # first tap: stage only
+	bpend._artefact_target_click(dest_a) # one tap: stage AND show Confirm
 	check(bpend.artefact_pending_tile == dest_a, "a tap stages the destination as pending")
+	check(bpend.hud.multi_confirm_btn.visible, "the floating Confirm affordance shows")
 	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
 		"staging a destination spends nothing — the Rook has not moved, the Wave charge is unspent")
 	bpend._artefact_target_click(dest_b) # a DIFFERENT valid destination: pending moves
 	check(bpend.artefact_pending_tile == dest_b, "a different tap moves the pending destination")
+	check(bpend.hud.multi_confirm_btn.visible, "the affordance stays up across a re-stage")
 	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
 		"moving the pending destination still spends nothing")
-	bpend._artefact_target_click(dest_b) # the SAME tile again: opens the confirm gate
-	check(bpend.buff_pick_open and bpend.modals.buff_panel.visible,
-		"re-tapping the pending destination opens the confirm gate")
-	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
-		"the open gate itself still hasn't moved the piece")
-	bpend._choice_pick_cancelled() # "Cancel"
-	check(not bpend.buff_pick_open and bpend.artefact_targeting_key == "",
-		"cancelling the confirm gate disarms Bovine Tractor Beam entirely")
+	bpend._activate_artefact("bovine-tractor-beam") # tap the Activate chip again: cancel
+	check(bpend.artefact_targeting_key == "" and bpend.artefact_pending_tile == Vector2i(-1, -1),
+		"cancelling disarms Bovine Tractor Beam entirely")
 	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave \
 			and bpend._artefact_activation_available("bovine-tractor-beam"),
 		"cancel costs nothing — the Rook stayed put, the Wave charge is unspent, still available")

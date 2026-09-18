@@ -112,7 +112,9 @@ signal pass_pressed
 signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
-signal multi_confirm_pressed # the floating Extract button
+signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
+	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
+	# final confirm (see multi_confirm_btn's own declaration below)
 signal item_pressed(index: int)
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
@@ -186,7 +188,10 @@ var stock_armed := Control.new() # draws the armed piece on the Stock button
 var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
 var menu_button := Button.new() # ☰, the Header's top-right corner
 var menu_tap := Control.new() # NO-60: its tap area, bigger than the glyph
-var multi_confirm_btn := Button.new() # floating "Extract N" confirm
+var multi_confirm_btn := Button.new() # NO-124: floating targeting-confirm —
+	# "Extract N" for a "multi" Item's picks, "Confirm" for a staged
+	# tile/pair/area Item target, an untargeted Item, or Bovine Tractor
+	# Beam's staged target (see refresh()'s visibility/text below)
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
 ## panel parented to a row would not survive the next state change.
@@ -454,7 +459,8 @@ func build(game) -> void:
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
-	# floating confirm for "multi" items: shows once >= 1 piece is picked
+	# NO-124: floating targeting-confirm, shown once there's something to
+	# confirm — see refresh() for exactly when, per targeting shape
 	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
 	multi_confirm_btn.position = Vector2(vp.x / 2 - 70, vp.y - 96)
 	multi_confirm_btn.custom_minimum_size = Vector2(140, 40)
@@ -1001,9 +1007,26 @@ func refresh() -> void:
 	# armed-placement tint (2026-07-07 palette) marks the toggle as active
 	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
 	arrow_clear_button.visible = g.arrow_mode
-	multi_confirm_btn.visible = g.item_active >= 0 and not g.item_selected.is_empty() \
-		and g.items[g.item_active].target == "multi"
-	multi_confirm_btn.text = "Extract %d" % g.item_selected.size()
+	# NO-124: generalised from "multi"'s own Extract button to every targeted
+	# Item/Artefact's final confirm — visible whenever there's a complete,
+	# spendable target staged (or, for an untargeted Item, as soon as it's
+	# armed — there's nothing to stage). Bovine Tractor Beam and Item
+	# targeting are mutually exclusive (game.gd), so at most one of these two
+	# conditions is ever true at once.
+	var item_confirm := false
+	var item_confirm_text := "Confirm"
+	if g.item_active >= 0:
+		var it: Dictionary = g.items[g.item_active]
+		if it.target == "multi":
+			item_confirm = not g.item_selected.is_empty()
+			item_confirm_text = "Extract %d" % g.item_selected.size()
+		elif it.target == "":
+			item_confirm = true
+		else:
+			item_confirm = g.item_pending_tile.x >= 0
+	var artefact_confirm: bool = g.artefact_targeting_key != "" and g.artefact_pending_tile.x >= 0
+	multi_confirm_btn.visible = item_confirm or artefact_confirm
+	multi_confirm_btn.text = item_confirm_text
 	_rebuild_stock_drawer()
 	_rebuild_items_grid()
 	# issue 100: the Power is always on, so it is stated, not offered. The

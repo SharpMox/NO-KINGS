@@ -58,14 +58,13 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
-## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
-## target now stages it and waits — this headless-drives the second tap that
-## opens the confirm gate plus the gate's own Confirm, so existing effect
-## assertions still read like a single commit.
+## NO-124: a tap on a valid "tile"/"pair"/"area" target now stages it AND
+## shows the floating Confirm affordance in the same call (no re-tap) — this
+## headless-drives that one tap plus the affordance's own Confirm, so
+## existing effect assertions still read like a single commit.
 func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_click(t)
-	g._item_click(t)
-	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+	g._item_confirm_target()
 
 
 func _init() -> void:
@@ -114,7 +113,8 @@ func _init() -> void:
 	await process_frame
 	ci.gold = 500
 	ci.items.append(_item("counter_intel", ""))
-	ci._use_item(0)
+	ci._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	ci._item_confirm_untargeted()
 	ci._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(ci.gold == 500, "counter-intel suppresses the move tariff")
 	check(not Economy.tariff_fires(ci, "move_cost"),
@@ -132,7 +132,8 @@ func _init() -> void:
 	await process_frame
 	cj.gold = 500
 	cj.items.append(_item("counter_intel", ""))
-	cj._use_item(0)
+	cj._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	cj._item_confirm_untargeted()
 	Economy.earn(cj, 10)
 	check(cj.gold == 510, "suppressed inflation taxes no gains")
 	cj._refresh()

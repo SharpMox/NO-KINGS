@@ -69,6 +69,23 @@ func _long_press(at: Vector2) -> bool:
 	return foreign_motion == 0
 
 
+## NO-118: hud.gd's _slide_drawer takes Tuning.PANEL_SLIDE_S of real time to
+## carry a drawer from drawer_hidden[key] to drawer_rest[key]. A long press
+## aimed at a control inside the drawer, sent before that settles, reads a
+## rect that is still mid-slide. Poll process_frame, bounded, until the
+## drawer's own Control sits at its cached rest position; the bound means a
+## broken tween fails loudly here instead of every downstream check silently
+## missing.
+func _await_drawer_settled(game: Node, key: String) -> void:
+	var panel: Control = game.hud.drawers[key]
+	var rest: Vector2 = game.hud.drawer_rest[key]
+	var polls := 0
+	while panel.position != rest and polls < 60:
+		await process_frame
+		polls += 1
+	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
+
+
 func _boot_game() -> Node:
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
@@ -86,6 +103,7 @@ func _boot_game() -> Node:
 	game._set_drawer("inventory")
 	await process_frame
 	await process_frame
+	await _await_drawer_settled(game, "inventory") # NO-118
 	_instrument(game) # [DEBUG-lp-flake]
 	return game
 

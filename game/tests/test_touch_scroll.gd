@@ -52,6 +52,23 @@ func _find_button(node: Node, text: String) -> Button:
 	return null
 
 
+## NO-118: hud.gd's _slide_drawer takes Tuning.PANEL_SLIDE_S of real time to
+## carry a drawer from drawer_hidden[key] to drawer_rest[key]. A drag/tap
+## aimed at a control inside the drawer, sent before that settles, reads a
+## rect that is still mid-slide. Poll process_frame, bounded, until the
+## drawer's own Control sits at its cached rest position; the bound means a
+## broken tween fails loudly here instead of every downstream check silently
+## missing.
+func _await_drawer_settled(game: Node, key: String) -> void:
+	var panel: Control = game.hud.drawers[key]
+	var rest: Vector2 = game.hud.drawer_rest[key]
+	var polls := 0
+	while panel.position != rest and polls < 60:
+		await process_frame
+		polls += 1
+	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
+
+
 func _mouse(pressed: bool, at: Vector2) -> void:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT
@@ -266,6 +283,7 @@ func _init() -> void:
 	game._set_drawer("inventory")
 	await process_frame
 	await process_frame
+	await _await_drawer_settled(game, "inventory") # NO-118
 
 	var inv_sc: ScrollContainer = null # reused by the second scenario below
 	for c in (game.hud.drawers["inventory"] as Control).get_children():
@@ -331,6 +349,7 @@ func _init() -> void:
 	game._set_drawer("inventory")
 	await process_frame
 	await process_frame
+	await _await_drawer_settled(game, "inventory") # NO-118
 	inv_sc = null
 	for c in (game.hud.drawers["inventory"] as Control).get_children():
 		if c is ScrollContainer:
@@ -376,6 +395,7 @@ func _init() -> void:
 	game._set_drawer("stock")
 	await process_frame
 	await process_frame
+	await _await_drawer_settled(game, "stock") # NO-118
 	var stack_btn: Button = null
 	for c in game.hud.pool_buttons():
 		if c is Button and c.has_meta("id"):

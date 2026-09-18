@@ -1179,6 +1179,23 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	btn.text = "%s%s" % ["✹" if activatable else "", " ×%d" % count if count > 1 else ""]
 	btn.icon = g.artefact_tex(key)
 	btn.add_theme_color_override("icon_disabled_color", Color(1, 1, 1, 0.55))
+	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
+		# the shared placeholder so two unpainted artefacts read apart at a
+		# glance, same corner-badge idiom as the stack count in hud.gd's
+		# _build_stack_button (child Label, not a texture)
+		var init_badge := Label.new()
+		init_badge.text = g.initials_of(entry.name)
+		init_badge.add_theme_font_size_override("font_size", 13)
+		init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
+		init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
+		init_badge.add_theme_constant_override("outline_size", 4)
+		init_badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		init_badge.offset_left = 3
+		init_badge.offset_top = 22 # the icon sits below the button's own top
+			# padding, not at its y=0 edge (measured NO-119 2026-09-18)
+		init_badge.offset_right = 26
+		init_badge.offset_bottom = 38
+		btn.add_child(init_badge)
 	var desc := _grid_tip_desc(entry.name, entry.description)
 	btn.tooltip_text = desc
 	if activatable:

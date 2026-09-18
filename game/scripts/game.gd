@@ -765,6 +765,18 @@ func artefact_tex(key: String) -> Texture2D:
 	return artefact_icons.get(key, art_placeholder)
 
 
+## NO-119: initials for a badge shown over placeholder art (Artefacts,
+## Boxes), so two otherwise-identical unpainted icons read apart without a
+## long-press. First letter of each of the first two words, uppercased
+## ("Tinfoil Hat" -> "TH"); a single-word name (only "Apocrypha" today)
+## gives its first two letters instead, so the badge is always two chars.
+func initials_of(display_name: String) -> String:
+	var words := display_name.split(" ", false)
+	if words.size() >= 2:
+		return (words[0][0] + words[1][0]).to_upper()
+	return display_name.substr(0, 2).to_upper()
+
+
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
 	safe_top = safe_top_px(vp)

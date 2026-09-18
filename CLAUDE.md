@@ -287,6 +287,20 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   removes it** — ask the holder. `ps` from one session can't see another's processes, so "no
   Godot running" proves nothing; on 2026-09-14 a live lock was cleared twice and both times
   the overlapping suites' results were discarded.
+- **The `--screenshot` seam is windowed, and its flag goes after the bare `--`.**
+  `OS.get_cmdline_user_args()` (`game.gd:521`) returns only args after `--`; put
+  `--screenshot` before it and the guard at `game.gd:531` never matches, so the call at
+  `game.gd:534` never fires — a silent hang, no output, no error. `--headless` hangs the
+  same way for a different reason: inside `_screenshot_and_quit` (`game.gd:3780`), the two
+  awaits on `RenderingServer.frame_post_draw` at `game.gd:3786-3787` never resolve, because
+  headless has no rendering server drawing frames. Headless stays correct for
+  `-s tests/...` suites; only this seam needs a window. `game.gd:3788` always saves
+  `<dir>/game.png`, so give each capture its own directory:
+  ```sh
+  tools/godot-lock.sh godot --path game -- --screenshot /tmp/shot-a
+  ```
+  `_screenshot_and_quit` (`game.gd:3780`) places the stock at random and passes once, so it
+  captures an in-run board, not a chosen state — a specific state needs a scenario.
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
@@ -294,7 +308,8 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
 - **Suite runs go to Aux by default.** The probes are windowed, so a run on Main takes over
   Max's screen. Dispatch `game/tests/run_all.sh` to the Aux session and verify the result
-  here. Main runs it when Max asks for it on Main.
+  here. Main runs it when Max asks for it on Main. (As of 2026-09-18 Aux has no Godot
+  installed, so this cannot be followed until it does — a suite run means Main.)
 
 ### Tests that pass for the wrong reason
 

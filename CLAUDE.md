@@ -276,26 +276,17 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   a bug in code the run never touched (NO-88, 2026-09-14). The menu suites now
   `SyncQueue.clear()` at start. Two Godot processes across worktrees is never safe,
   windowed or headless, even when neither is the full suite.
-- **Serialise Godot across sessions with a lock directory.** When more than one session or
-  agent may run Godot, take `/tmp/nokings-godot.lock` and run and release in ONE foreground
-  call, **with a trap**:
-  ```sh
-  until mkdir /tmp/nokings-godot.lock 2>/dev/null; do sleep 30; done
-  trap 'rmdir /tmp/nokings-godot.lock 2>/dev/null' EXIT INT TERM HUP
-  <godot or run_all.sh>; rc=$?; rmdir /tmp/nokings-godot.lock; exit $rc
-  ```
-  **The trap is load-bearing.** Without it an interrupted or killed run leaves the lock held
-  with no process alive to clear it: the `mkdir` has run and the `rmdir` never does. Measured
-  2026-09-18 on both machines — a user interrupt and a killed background task both deliver
-  SIGTERM, which the trap catches; it happened for real on Main on 2026-09-17 at 18:01:44.
-  A trap does NOT catch SIGKILL, power loss or a session dying outright, so it narrows the
-  window rather than closing it. Note also that a **"rejected" tool result is not proof the
-  command never ran** — that is exactly how the 09-17 orphan happened, so check the lock after
-  any interrupted call. Never hold it across a wait (a verifier that waited for user idle while
-  holding it stalled everyone). **Only the holder removes it**: ask the holder instead. `ps`
-  from one session can't see another's processes, so "no Godot running" proves nothing. On
-  2026-09-14 a live lock was cleared twice, and each time two suites overlapped and the results
-  were discarded.
+- **Serialise Godot with the lock script.** `tools/godot-lock.sh <cmd>` takes
+  `/tmp/nokings-godot.lock`, records its pid inside it, runs the command and releases even
+  when killed. **Never hand-roll a `mkdir`/`rmdir` pair**: a killed run never reaches its
+  `rmdir` (happened 2026-09-17 18:01:44), a trap alone fires late because bash defers it
+  while blocked on a foreground child (28 s late, measured 2026-09-18), and nothing catches
+  SIGKILL — the recorded pid is what lets a later contender clear a provably dead holder.
+  The script's header has the detail.
+  Never hold it across a wait (that stalled everyone once). Otherwise **only the holder
+  removes it** — ask the holder. `ps` from one session can't see another's processes, so "no
+  Godot running" proves nothing; on 2026-09-14 a live lock was cleared twice and both times
+  the overlapping suites' results were discarded.
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

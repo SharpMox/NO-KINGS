@@ -506,11 +506,19 @@ func build(game) -> void:
 	# appended into its own text — Button's autowrap re-flowed the whole
 	# string past the name+status line instead of honoring an inserted "\n",
 	# growing the row. A Label with its own fixed budget is predictable.
-	army_ability_hint.add_theme_font_size_override("font_size", 11)
+	# NO-115 fix (coordinator review 2026-09-18): act_row sits flush to the
+	# screen bottom, so ANY shortfall in this Label's reserved height shows up
+	# as the hint's own descenders sliced by the viewport edge, not just
+	# visual crowding. 16px was sized for one bare line and didn't leave room
+	# for descenders (p/y/g, all present in the truncated hint text) at this
+	# font size. Shrinking the font and widening the reserved height is the
+	# "fit inside the existing 60px budget" fix — act_row's own height is
+	# unchanged, so board_tile_for()'s output can't move.
+	army_ability_hint.add_theme_font_size_override("font_size", 10)
 	army_ability_hint.add_theme_color_override("font_color", Color(0.78, 0.71, 0.55))
 	army_ability_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	army_ability_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	army_ability_hint.custom_minimum_size = Vector2(0, 16)
+	army_ability_hint.custom_minimum_size = Vector2(0, 22)
 	var ability_col := VBoxContainer.new()
 	ability_col.add_theme_constant_override("separation", 1)
 	ability_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL

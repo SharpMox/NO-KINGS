@@ -2127,7 +2127,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		else:
 			_consume_buff(to, "shield")
 			_add_float(to, "Blocked", COL_MERGE)
-		Economy.charge(self, "move_cost")
+		# NO-105 pattern, missed here: bill the same move-percentage the
+		# unblocked path charges (line ~2307), off the attacker snapshotted
+		# in moving_piece above — board[from] may already be the reflecting
+		# defender by this point, moving_piece never is.
+		Economy.charge(self, "move_cost",
+			Economy.tariff_cut(defs[moving_piece.id].value, Tuning.TARIFF_MOVE_PCT))
 		if blitz_free:
 			moving_piece.erase("blitz_free_move")
 		else:

@@ -306,6 +306,11 @@ var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var drag_moved := false # the pointer left the origin tile (tap vs aborted drag)
 var drag_reselect := false # the pressed piece was already selected (re-click)
+# NO-120: long-press-to-describe a board piece. token 0 = none pending,
+# mirroring hud.gd's _long_press_input meta idiom (see _board_long_press_start).
+var board_lp_token := 0
+var board_lp_from := Vector2.ZERO
+var board_lp_prev_selected := Vector2i(-1, -1)
 # Arrow Planning (Notion): purely decorative — never read by rules/AI. A
 # scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
 var arrow_mode := false # while on, board drags draw arrows instead of selecting
@@ -1823,6 +1828,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
 		arrow_from = Vector2i(-1, -1)
+		board_lp_token = 0 # NO-120: none of these states can complete a hold
 		return
 	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
 		# item/artefact targeting still owns board taps
@@ -1832,6 +1838,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _tile_at(event.position) != drag_from:
 				drag_moved = true # a real drag, not a tap in place
 			queue_redraw()
+		# NO-120: past the same deadzone hud.gd's _long_press_input cancels a
+		# drawer long-press on, cancel a pending board one too.
+		if board_lp_token != 0 and event.position.distance_to(board_lp_from) > HudScript.DRAWER_SCROLL_DEADZONE:
+			board_lp_token = 0
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
@@ -1864,8 +1874,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh()
 			if event.double_click and at.x >= 0 and board.has(at):
 				drag_from = Vector2i(-1, -1)
+				board_lp_token = 0 # NO-120: this click's own press already armed one
 				# double-tap: piece info (a King's carries his active Abilities)
 				return _show_preview(board[at].id, board[at].get("king_id", ""))
+			if at.x >= 0 and board.has(at):
+				_board_long_press_start(at, event.position)
 			var was_selected := at.x >= 0 and at == selected
 			if at.x >= 0:
 				_on_tile_clicked(at)
@@ -1877,6 +1890,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				drag_moved = false
 				drag_reselect = was_selected # in-place release = re-click
 		else:
+			board_lp_token = 0 # NO-120: release cancels any pending long-press timer
 			if drag_from.x >= 0: # release ends a drag
 				var t := _tile_at(event.position)
 				var from := drag_from
@@ -1963,6 +1977,42 @@ func _tile_at(screen: Vector2) -> Vector2i:
 	var x := int(local.x / tile)
 	var y := Tuning.BOARD_H - 1 - int(local.y / tile)
 	return Vector2i(x, y) if Rules.in_bounds(Vector2i(x, y)) else Vector2i(-1, -1)
+
+
+## NO-120: long-press a board piece to show its description (name + any
+## Piece Buffs it carries). The board is drawn in _draw, not built from
+## Controls, so there is no Button for hud.gd's _long_press_input to hook —
+## this mirrors that function's token+timer+deadzone idiom directly over the
+## board's own press/release/motion handling, rather than adding a second
+## input path.
+##
+## The press that starts the hold already runs its usual tap logic
+## (_on_tile_clicked, and the drag-arm right after it) immediately, same as
+## any other press — a firing timer UNDOES that: restores the selection from
+## before the press and drops any armed drag, which is what stops a long
+## press from also selecting or dragging the piece.
+func _board_long_press_start(at: Vector2i, press_pos: Vector2) -> void:
+	board_lp_prev_selected = selected
+	board_lp_from = press_pos
+	var piece: Dictionary = board[at]
+	var token := Time.get_ticks_usec()
+	board_lp_token = token
+	get_tree().create_timer(HudScript.LONG_PRESS_MS / 1000.0).timeout.connect(func() -> void:
+		if board_lp_token != token:
+			return
+		board_lp_token = 0
+		drag_from = Vector2i(-1, -1)
+		selected = board_lp_prev_selected
+		if selected.x >= 0 and board.has(selected):
+			legal_dests = Rules.moves_for(board, selected, defs)
+			legal_paths = Rules.move_paths(board, selected, defs)
+		else:
+			selected = Vector2i(-1, -1)
+			legal_dests.clear()
+			legal_paths.clear()
+		queue_redraw()
+		hud.show_tip("board:%s" % str(at), BuffLogic.describe(piece.id, piece, defs),
+			Rect2(_tile_px(at), Vector2(tile, tile))))
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:

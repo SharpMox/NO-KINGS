@@ -326,6 +326,68 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
+	# --- NO-120 hazard (found in review 2026-09-18): long-pressing an ENEMY
+	# piece on a legal destination of the current selection must NOT capture
+	# it. _on_tile_clicked used to run on press, before the hold could even
+	# resolve — the tooltip appeared over a board that had already changed.
+	# Assert what a capture would have changed (the enemy gone, gold, actions
+	# spent), never `selected` alone — a restored `selected` reads green even
+	# while the capture already happened (CLAUDE.md: assert the observable
+	# consequence, never the flag that was just written).
+	var enemy_at := Vector2i(2, 6) # the enemy Pawn _boot_game()'s config
+		# places, directly up the Queen's own file — a legal capture
+	game = await _boot_game()
+	game._set_drawer("")
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos) # select the Queen first (a short tap — not timed)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	check(game.selected == queen_at, "the Queen is selected before the hazard press")
+	check(game.legal_dests.has(enemy_at), "the enemy Pawn is a legal capture from here")
+	var gold_before: int = game.gold
+	var actions_before: int = game.actions_left
+	var epos: Vector2 = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(epos):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the enemy completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on the enemy shows its description")
+	check(game.hud.tip_label.text == game.defs["pawn"].name, "...and it is that piece's name")
+	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.ENEMY,
+		"...and the enemy Pawn is STILL on the board — not captured")
+	check(game.gold == gold_before, "...and gold is unchanged")
+	check(game.actions_left == actions_before, "...and no action was spent")
+	game.queue_free()
+	await process_frame
+
+	# --- positive control: a SHORT TAP on that same enemy still captures it,
+	# so the hazard test above cannot pass by the press simply missing --------
+	game = await _boot_game()
+	game._set_drawer("")
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	actions_before = game.actions_left
+	epos = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, epos)
+	await process_frame
+	_release_at(epos)
+	await process_frame
+	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.PLAYER \
+			and game.board[enemy_at].id == "queen",
+		"(control) a short tap on the same enemy DOES capture — the Queen lands there")
+	check(not game.board.has(queen_at), "(control) ...and the Queen's old tile is empty")
+	check(game.actions_left == actions_before - 1, "(control) ...and an action was spent")
+	game.queue_free()
+	await process_frame
+
 	# --- NO-120: a long press on a STOCK cell shows its description, through
 	# _long_press_input exactly like an Inventory cell, and does not arm it ---
 	game = await _boot_game()

@@ -78,8 +78,9 @@ const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the
 const CLOCK_FONT := 36 ## glyph size inside the Clock line, which is HEADER_H / 2 tall
 const SCORE_FONT := 17 ## a 17px Label is 25px tall: 4 + 55 + 25 + 25 fits the 110
 const GOLD_FONT := 17
-const COUNTER_FONT := 15 ## the ⚑ Wave and ⧖ turn counters
+const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
 const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
+const SYMBOL_W := 16.0 ## NO-114: fixed column for ★/$ so their digits align
 const MENU_FONT := 15
 const MENU_W := 34.0 ## the ☰ button's footprint in the corner
 const STOCK_ICON := 44 ## the piece icon on the Stock button
@@ -276,14 +277,35 @@ func build(game) -> void:
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	# NO-114: ★ and $ are different glyph widths, so the bare symbol+number
+	# labels didn't line up their digits. A fixed-width symbol column fixes it
+	# without a monospace font.
+	var score_symbol := Label.new()
+	score_symbol.text = "★"
+	score_symbol.add_theme_font_size_override("font_size", SCORE_FONT)
+	score_symbol.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
+	score_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
+	var gold_symbol := Label.new()
+	gold_symbol.text = "$"
+	gold_symbol.add_theme_font_size_override("font_size", GOLD_FONT)
+	gold_symbol.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
+	var score_row := HBoxContainer.new()
+	score_row.add_theme_constant_override("separation", 0)
+	for l in [score_symbol, score_label]:
+		score_row.add_child(l)
+	var gold_row := HBoxContainer.new()
+	gold_row.add_theme_constant_override("separation", 0)
+	for l in [gold_symbol, gold_label]:
+		gold_row.add_child(l)
 	var left := VBoxContainer.new()
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
 	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
 	left.add_theme_constant_override("separation", 0)
-	for l in [clock_label, score_label, gold_label]:
+	for l in [clock_label, score_row, gold_row]:
 		left.add_child(l)
 	add_child(left)
-	# CENTRE, flush to the bottom: ⚑ Wave over ⧖ turns. The column has a fixed
+	# CENTRE, flush to the bottom: ⚑ Wave over turns. The column has a fixed
 	# width so a long King name is cut with an ellipsis rather than pushing into
 	# the Stock button (story 20).
 	var mid := VBoxContainer.new()
@@ -782,21 +804,26 @@ func refresh() -> void:
 	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
 		if shop_locked else ""
 	clock_label.text = g._clock_text()
-	score_label.text = "★%d" % g.score
-	gold_label.text = "$%d" % g.gold
+	score_label.text = "%d" % g.score
+	gold_label.text = "%d" % g.gold
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
-	wave_label.text = "⚑ %d/%d" % [g.wave,
+	# NO-114: blank during a King wave — the King's own name in turn_label is
+	# enough, and showing both crowded the centre column.
+	var king_wave: bool = g._king_alive() or not g.pending_king.is_empty()
+	wave_label.text = "" if king_wave else "⚑ %d/%d" % [g.wave,
 		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
-	# ⧖ TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
+	# TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
 	# The King's name instead while he is alive OR pending (no Wave arrives
 	# until he is checkmated); blank after the last Wave, when no Wave is coming.
-	if g._king_alive() or not g.pending_king.is_empty():
-		turn_label.text = "⧖ %s" % g._king_name()
+	# NO-114: dropped the ⧖ glyph — no painted icon fits it, and the name/count
+	# reads fine unprefixed.
+	if king_wave:
+		turn_label.text = g._king_name()
 	elif g.wave >= Waves.WAVES.size():
 		turn_label.text = ""
 	else:
-		turn_label.text = "⧖ %d/%d" % [g.turns_since_wave, g._cadence()]
+		turn_label.text = "%d/%d" % [g.turns_since_wave, g._cadence()]
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false

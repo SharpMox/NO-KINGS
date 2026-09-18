@@ -72,6 +72,7 @@ static func charge(g, key: String, amount: int = Tuning.KING_ABILITY_ACTION_COST
 	if ctx.charged:
 		var charged_amount := roundi(ctx.amount) # issue 22: Ark Grounding Cable scales this
 		spend_gold(g, charged_amount) # issue 26: floor + on_gold_zero (Zero-Point Energy Drink)
+		g.tariff_charges[key] = g.tariff_charges.get(key, 0) + charged_amount # NO-109: per-tariff attribution
 		ArtefactHooks.run(g, "on_king_ability_charge", {"key": key, "amount": charged_amount})
 
 

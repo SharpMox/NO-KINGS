@@ -11,6 +11,11 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
 
+## NO-118: the shared duration for every Drawer/Shop slide (open and close
+## alike) — one constant so hud.gd and modals.gd, which each animate their
+## own panel, can't drift apart on it.
+const PANEL_SLIDE_S := 0.18
+
 ## Newest-first run log, capped so the file cannot grow forever. Lives here
 ## rather than in economy.gd because leaderboard.gd needs it too and preloading
 ## economy there drags in the whole gameplay chain -- which is why that file

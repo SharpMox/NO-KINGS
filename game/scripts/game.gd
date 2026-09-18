@@ -1839,6 +1839,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
 				_set_drawer("")
+			# NO-118: same "outside closes it" trigger as the drawer above,
+			# but this one CONSUMES the press instead of falling through —
+			# deliberately diverging from the drawer, not an inconsistency to
+			# "fix" later. The drawer's fall-through is itself deliberate:
+			# dragging a Stock piece out of the drawer onto a tile depends on
+			# that same press reaching the board. The Shop has no such
+			# gesture, and its "outside" strip (the sliver shop_panel's 90%
+			# width doesn't cover) sits over board column 0 — so without
+			# consuming, the same tap that dismisses the Shop can also
+			# select or complete a move on a piece there. That is exactly
+			# the mis-tap class CLAUDE.md's device-testing section opens
+			# with (a stray tap deploying a piece and syncing before anyone
+			# noticed). Goes through modals.close_shop(), the same path the
+			# Close button uses, so shop_closed still fires either way.
+			if shop_open() and not (modals.shop_panel as Control) \
+					.get_global_rect().has_point(event.position):
+				modals.close_shop()
+				return # consumed: `at` below is never acted on by this press
 			if at.x < 0: # dead UI space: a no-interaction press drops selection
 				if selected.x >= 0 or placing_id != "":
 					placing_id = ""

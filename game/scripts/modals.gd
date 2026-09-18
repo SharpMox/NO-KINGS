@@ -50,6 +50,13 @@ var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
+var _shop_tween: Tween # NO-118: the in-flight slide, if any — killed before a
+	# new one starts (a tween on a freed node throws, and show_shop() frees
+	# shop_panel on every fresh open)
+var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
+	# way hud.gd caches drawer_rest — read-only for probes that need to know
+	# when the open slide has actually settled rather than duplicating the
+	# vp.x - draw_w formula themselves
 var _shop_dock: PanelContainer # the detail dock — refilled on a tile tap, so a
 	# tap no longer frees and rebuilds the whole ~80-node drawer (review pass 2)
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
@@ -359,6 +366,9 @@ func show_preview(id: String, king_id := "") -> void:
 ## fresh SOLD/affordability state.
 func show_shop() -> void:
 	var was_open := shop_panel != null and shop_panel.visible
+	if _shop_tween: # NO-118: kill before the panel it targets is freed below
+		_shop_tween.kill()
+		_shop_tween = null
 	if shop_panel:
 		shop_panel.queue_free()
 	if not was_open:
@@ -375,6 +385,7 @@ func show_shop() -> void:
 	shop_panel.add_theme_stylebox_override("panel", bg)
 	shop_panel.position = Vector2(vp.x - draw_w, 0)
 	shop_panel.size = Vector2(draw_w, vp.y)
+	shop_rest = shop_panel.position
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -424,9 +435,7 @@ func show_shop() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 14)
-	close.pressed.connect(func() -> void:
-		shop_panel.visible = false
-		shop_closed.emit())
+	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
 	header.add_child(close)
 	root.add_child(header)
 
@@ -508,6 +517,70 @@ func show_shop() -> void:
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
+	if not was_open: # NO-118: a rebuild while already open (mode toggle, Buy,
+		# Restock, ...) reuses the fresh panel at rest with no re-animation —
+		# it never left the screen.
+		_slide_shop(true)
+
+
+## NO-118: slides shop_panel between its rest position (vp.x - draw_w, 0) and
+## fully off-screen to the right, swift in-out. `opening` sets the direction;
+## on a close, shop_panel is only hidden once the tween finishes. Skips the
+## tween in autoplay/headless-with-animations-off, same seam every other HUD
+## animation is gated on (see hud.gd's _slide_drawer).
+##
+## NO-118 fix (found via hud.gd's own drawers): `visible` stays true for the
+## whole close slide, and a visible Control with the default
+## MOUSE_FILTER_STOP still absorbs any click in its rect via Godot's own GUI
+## picking before game.gd's _unhandled_input ever sees it — a board tap
+## landing where the Shop used to sit was silently eaten for up to
+## PANEL_SLIDE_S after "closing". IGNORE the instant a close starts; restore
+## STOP the instant an open starts, so an open Shop still blocks the board.
+##
+## Godot does not cascade a parent's IGNORE to its children, so shop_panel's
+## own descendants (its ScrollContainers, tiles, ...) need the same treatment
+## — unlike hud.gd's drawers, this needs no save/restore: show_shop() frees
+## this exact panel and builds a fresh one (with fresh default filters) on
+## every subsequent open, so there is nothing to restore it TO.
+func _slide_shop(opening: bool) -> void:
+	if _shop_tween:
+		_shop_tween.kill()
+		_shop_tween = null
+	var rest: Vector2 = shop_panel.position # already Vector2(vp.x - draw_w, 0)
+	var hidden := rest + Vector2(shop_panel.size.x, 0) # off the right edge
+	var filter := Control.MOUSE_FILTER_STOP if opening else Control.MOUSE_FILTER_IGNORE
+	shop_panel.mouse_filter = filter
+	if not opening:
+		# Descendants are set to IGNORE here but never explicitly restored on
+		# open — that's only safe because show_shop() frees this exact
+		# shop_panel and builds a fresh one (default filters) on every
+		# subsequent open. If the Shop is ever changed to reuse a panel
+		# instead of rebuilding it (the kind of change modals.gd's own
+		# _shop_dock comment describes doing for the tile-tap case), this
+		# needs the same save/restore hud.gd's _set_drawer_clickable does,
+		# or every control in here stays permanently unclickable.
+		for c in shop_panel.find_children("*", "Control", true, false):
+			(c as Control).mouse_filter = filter
+	if g.autoplay or not g.animations_on:
+		if not opening:
+			shop_panel.visible = false
+		return
+	if opening:
+		shop_panel.position = hidden
+	_shop_tween = shop_panel.create_tween()
+	_shop_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_shop_tween.tween_property(shop_panel, "position", rest if opening else hidden, Tuning.PANEL_SLIDE_S)
+	if not opening:
+		_shop_tween.finished.connect(func() -> void: shop_panel.visible = false)
+
+
+## NO-118: the one path that closes the Shop — the Close button and an
+## outside click (game.gd's _unhandled_input) both call this, so
+## shop_closed always fires and whatever listens to it (game.gd:4121:
+## _refresh()) still runs, whichever of the two triggered the close.
+func close_shop() -> void:
+	_slide_shop(false)
+	shop_closed.emit()
 
 
 ## The dock's content for the current expanded tile (or the hint). Called

@@ -67,14 +67,66 @@ func _click_ability(game: Node) -> bool:
 	return true
 
 
+## NO-118: hud.gd's _slide_drawer takes Tuning.PANEL_SLIDE_S of real time to
+## carry a drawer from drawer_hidden[key] to drawer_rest[key]. A press aimed
+## at a control inside the drawer, sent before that settles, lands on wherever
+## the panel actually is mid-slide — usually nothing. Poll process_frame,
+## bounded, until the drawer's own Control sits at its cached rest position;
+## the bound means a broken tween fails loudly here instead of every
+## press-inside-the-drawer check downstream silently missing.
+func _await_drawer_settled(game: Node, key: String) -> void:
+	var panel: Control = game.hud.drawers[key]
+	var rest: Vector2 = game.hud.drawer_rest[key]
+	var polls := 0
+	while panel.position != rest and polls < 60:
+		await process_frame
+		polls += 1
+	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
+
+
 ## NO-83: Stock opens from the Header's icon button, which carries a badge
 ## rather than a "Stock N" text, so it is reached by rect instead of by text.
+## NO-118: awaits the slide settling whenever this click OPENS the drawer (a
+## second call that closes it has nothing to settle at — closing tweens
+## toward drawer_hidden, never drawer_rest).
 func _click_stock(game: Node2D) -> bool:
 	var btn: Button = game.hud.drawer_buttons["stock"]
 	if not btn.is_visible_in_tree():
 		return false
 	_click(btn.get_global_rect().get_center())
+	if game.hud.drawer_open == "stock":
+		await _await_drawer_settled(game, "stock")
 	return true
+
+
+## NO-118: every "Inventory N" open goes through here rather than a bare
+## _click_button_in, so the drawer's slide is always settled before a caller
+## presses something inside it — one place to get right instead of the
+## dozen-plus call sites this button text appears at.
+func _click_inventory(game: Node, label: String) -> bool:
+	var clicked: bool = await _click_button_in(game.hud, label)
+	if clicked and game.hud.drawer_open == "inventory":
+		await _await_drawer_settled(game, "inventory")
+	return clicked
+
+
+## NO-118: the Shop is a full-screen modal (modals.gd), not one of
+## hud.drawers, so it needs its own settle wait — same shape as
+## _await_drawer_settled, against modals.shop_rest instead of
+## hud.drawer_rest[key]. A rebuild while already open (Buy, Sell toggle,
+## Restock, ...) never animates (modals.gd's show_shop() only calls
+## _slide_shop when it wasn't already open), so this only actually waits on
+## a fresh open — cheap to call unconditionally either way.
+func _click_shop(game: Node) -> bool:
+	var clicked: bool = await _click_button_in(game.hud, "Shop")
+	if clicked and game.shop_open():
+		var polls := 0
+		while game.modals.shop_panel.position != game.modals.shop_rest and polls < 60:
+			await process_frame
+			polls += 1
+		check(game.modals.shop_panel.position == game.modals.shop_rest,
+			"the shop's slide settled before use")
+	return clicked
 
 
 ## A double-tap: the press carries `double_click`, the release does not.
@@ -302,7 +354,7 @@ func _init() -> void:
 	# press-dragging one paints NO deploy targets on a board it can never be
 	# placed on. Deployable Stock is untouched, which the ▲ merge at the end
 	# of the block is here to prove.
-	check(_click_stock(game), "Stock button opens the drawer")
+	check(await _click_stock(game), "Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock"
 			and (game.hud.drawers["stock"] as Control).is_visible_in_tree(),
@@ -588,7 +640,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for the Buff Box")
 	# issue 100: the Army POWER is written out in the drawer. It used to live
 	# only in the Ability chip's TOOLTIP and on the army-select screen, and
 	# this is a portrait touch game — a hover tooltip is unreachable once a run
@@ -729,10 +781,10 @@ func _init() -> void:
 		"a tap on the BOTTOM edge of the tap area opens the menu, never Stock")
 	check(await _click_button_in(game.hud.game_menu, "Resume"), "Resume clickable (bottom edge)")
 	await process_frame
-	check(_click_stock(game), "the Header's Stock button opens the drawer")
+	check(await _click_stock(game), "the Header's Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock", "...and it is the Stock drawer")
-	check(_click_stock(game), "the Stock button toggles the drawer shut")
+	check(await _click_stock(game), "the Stock button toggles the drawer shut")
 	await process_frame
 	check(game.drawer_open == "", "...closed again")
 	# (the armed marker on this button is asserted in the SETUP block below,
@@ -841,7 +893,7 @@ func _init() -> void:
 	# rather than skipped: the button carries the item NAME beside the icon, so
 	# its width is free and the icon is clamped to ICON - 8 (hud.gd's comment at
 	# the icon_max_width override). Its HEIGHT is still a flat ICON.
-	check(await _click_button_in(icon_game.hud, "Inventory 1"),
+	check(await _click_inventory(icon_game, "Inventory 1"),
 		"Inventory opens for the item strip")
 	await process_frame
 	var item_btns: Array = []
@@ -862,7 +914,7 @@ func _init() -> void:
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
 	# drawer has to be OPEN for this container to hold anything at all.
-	check(_click_stock(icon_game), "Stock drawer opens for the pool strip")
+	check(await _click_stock(icon_game), "Stock drawer opens for the pool strip")
 	await process_frame
 	var pool_btns: Array = []
 	for c in icon_game.hud.pool_buttons():
@@ -945,7 +997,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for the Buff Box cancel/pick flow")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for the Buff Box cancel/pick flow")
 	await process_frame
 	check(await _click_button_in(game.hud.items_grid, "Buff Box"),
 		"Buff Box clickable in the drawer")
@@ -993,6 +1045,9 @@ func _init() -> void:
 	# manual reopen needed any more (this used to be a click).
 	check(game.hud.drawer_open == "inventory",
 		"the Inventory Drawer reopened on its own after the cancel")
+	# NO-118: an auto-reopen (game logic, not _click_inventory) — its own
+	# settle wait, same reason as SETUP's auto-open above.
+	await _await_drawer_settled(game, "inventory")
 	check(await _click_button_in(game.hud.items_grid, "Buff Box"), "Buff Box clickable again")
 	await process_frame
 	var buff_btn := _first_option_button(game.modals.buff_panel)
@@ -1018,6 +1073,11 @@ func _init() -> void:
 	await process_frame
 	check(game.state == game.State.SETUP, "empty config boots into SETUP")
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
+	# NO-118: SETUP opens the Stock drawer on boot (game.gd:645), not through
+	# _click_stock — a separate settle wait, since the geometry below
+	# (drawer_rect, the press on stack_btn) reads the drawer's real on-screen
+	# extent and a mid-slide Y would give the wrong covered-tile set.
+	await _await_drawer_settled(game, "stock")
 	var stack_btn: Button = _first_pool_stack(game)
 	var stock_before: int = game.stock.size()
 	# releasing INSIDE the open drawer must never place under it (2026-07-08)
@@ -1118,6 +1178,11 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(target) and game.stock.size() == stock_before - 1,
 		"drag from the stock strip places the piece on the target tile")
+	# NO-118: a successful SETUP placement reopens the Stock drawer
+	# unconditionally (_place's own "keep the placement flow going" branch,
+	# game.gd) — a fresh slide, own settle wait before the next press reads
+	# a row's rect.
+	await _await_drawer_settled(game, "stock")
 
 	# a CANCELLED drag (invalid drop spot) reopens the drawer it auto-closed
 	var live2: Button = game.pool_box.filter(func(b: Node) -> bool:
@@ -1193,7 +1258,7 @@ func _init() -> void:
 
 	# tap-to-place regression (2026-07-07): strip rebuilds on press/release used
 	# to free the button before its arming tap fired
-	check(_click_stock(game), "Stock button reopens the drawer")
+	check(await _click_stock(game), "Stock button reopens the drawer")
 	await process_frame
 	var live_stack: Button = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
@@ -1228,7 +1293,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(_click_stock(game), "Stock drawer opens")
+	check(await _click_stock(game), "Stock drawer opens")
 	await process_frame
 	# NO-84: Captured Stock and Stock are two independent grids now, not a
 	# tinted tail of one strip with a label marking the boundary (issue 96).
@@ -1270,7 +1335,7 @@ func _init() -> void:
 	# it is on EVERY captured entry now, with no arming step and no ▲ merge to
 	# lose the corner to when a duplicate is held.
 	if game.drawer_open != "stock":
-		check(_click_stock(game), "Stock drawer reopens")
+		check(await _click_stock(game), "Stock drawer reopens")
 		await process_frame
 	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
 		# tap on the same entry inside it opens the piece preview instead
@@ -1336,7 +1401,7 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.moved_this_turn.has(Vector2i(2, 4)), "the queen is spent for the turn")
-	check(await _click_button_in(game.hud, "Inventory 2"),
+	check(await _click_inventory(game, "Inventory 2"),
 		"Inventory button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "inventory"
@@ -1373,7 +1438,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Drone Strike")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Drone Strike")
 	await process_frame # let the drawer lay out before clicking into it
 	check(await _click_button_in(game.hud.items_grid, "Drone Strike"),
 		"Drone Strike clickable in the drawer")
@@ -1398,7 +1463,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Extraction")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Extraction")
 	await process_frame # drawer layout before clicking into it
 	check(await _click_button_in(game.hud.items_grid, "Extraction"),
 		"Extraction clickable in the drawer")
@@ -1426,7 +1491,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	check(await _click_shop(game), "Shop button clickable")
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
 		"the shop drawer opens")
@@ -1464,7 +1529,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Shop"), "Shop reopens after the locked-state check")
+	check(await _click_shop(game), "Shop reopens after the locked-state check")
 	await process_frame
 
 	# issue 64: the Lane B restock progress bar — a real Control built by
@@ -1529,7 +1594,15 @@ func _init() -> void:
 	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
 	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
-	await process_frame
+	# NO-118: Close now animates the panel off-screen and only hides it when
+	# that tween finishes. Condition-based, same idiom as
+	# _await_drawer_settled above, rather than a fixed timer: poll the exact
+	# thing the check below asserts, bounded, so a broken tween fails loudly
+	# instead of the wait silently outrunning or undershooting the animation.
+	var shop_close_polls := 0
+	while game.modals.shop_panel.visible and shop_close_polls < 60:
+		await process_frame
+		shop_close_polls += 1
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
 	# Selling + Captured -> Stock conversion (issue 60): the Shop drawer's
@@ -1544,7 +1617,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	check(await _click_shop(game), "Shop button clickable")
 	await process_frame
 	check(await _click_button_in(game.modals.shop_panel, "Sell"), "the Sell toggle is clickable")
 	await process_frame
@@ -1644,7 +1717,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	check(await _click_shop(game), "Shop button clickable")
 	await process_frame
 	check(await _click_button_in(game.modals.shop_panel, "Restock ($20)"),
 		"the Restock button shows and is clickable while Jet Fuel Vial is held")
@@ -1672,7 +1745,7 @@ func _init() -> void:
 	# the Shop is reachable in any state, not just your turn (GDD Shop page)
 	var was_state: int = game.state
 	game.state = game.State.ENEMY_TURN
-	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable off-turn")
+	check(await _click_shop(game), "Shop button clickable off-turn")
 	await process_frame
 	check(game.modals.shop_panel.visible, "the shop opens during the enemy turn")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "off-turn shop closes")
@@ -1693,7 +1766,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Shop"), "(setup) Shop button clickable, All-Seeing Eye held")
+	check(await _click_shop(game), "(setup) Shop button clickable, All-Seeing Eye held")
 	await process_frame
 	var box_slot_index := -1
 	var box_slot_size := ""
@@ -1941,7 +2014,7 @@ func _init() -> void:
 	# (the empty-vs-held Artefacts-grid sizing itself is asserted headlessly
 	# in test_items_artefacts_4.gd; this probe exists for CLICKABILITY, which
 	# headless can't verify — Godot headless drops GUI picking)
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
 	# NO-85: the Artefacts grid holds every held Artefact, activatable or not.
 	# This scenario holds exactly one, so the grid has exactly one cell.
@@ -1989,7 +2062,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
 	await process_frame
 	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
 		"the Bovine Tractor Beam chip is clickable")
@@ -2000,7 +2073,7 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A: the enemy Rook
 	await process_frame
 	check(game.artefact_target_stage_a == Vector2i(7, 10), "tapping the enemy Rook on the board stages it")
-	check(await _click_button_in(game.hud, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
+	check(await _click_inventory(game, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
 	await process_frame
 	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
 		"the chip stays clickable mid-targeting (to cancel)")
@@ -2040,24 +2113,26 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	game.actions_left = 5 # generous: isolates the reopen rule from auto-pass-at-0
-	check(await _click_button_in(game.hud, "Inventory 2"), "Inventory opens for the reopen-rule probe")
+	check(await _click_inventory(game, "Inventory 2"), "Inventory opens for the reopen-rule probe")
 	await process_frame
 	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable")
 	await process_frame
 	check(game.item_active == 0 and game.hud.drawer_open == "",
 		"arming an Item that needs a board target closes the Drawer")
-	check(await _click_button_in(game.hud, "Inventory 2"), "reopen to reach the item and cancel it")
+	check(await _click_inventory(game, "Inventory 2"), "reopen to reach the item and cancel it")
 	await process_frame
 	check(await _click_button_in(game.hud.items_grid, "Sniper"), "tap the armed Sniper again: cancel")
 	await process_frame
 	check(game.item_active == -1 and game.hud.drawer_open == "inventory",
 		"cancelling targeting always reopens the Drawer (story 58)")
+	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
 	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable again")
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # Sniper's target: the rook
 	await process_frame
 	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
 		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
+	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
 	check(await _click_button_in(game.hud.items_grid, "Sniper"), "the remaining Sniper clickable")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
@@ -2123,6 +2198,11 @@ func _init() -> void:
 	check(_click_ability(game),
 		"the deck button is clickable again after a targeting cancel")
 	await process_frame
+	# NO-118: re-clicking the ability re-stages targeting, which reopens the
+	# Stock drawer the same way it did the first time (line 2157 above) —
+	# game logic, not _click_stock, so its own settle wait before the press
+	# below reads a real on-screen rect.
+	await _await_drawer_settled(game, "stock")
 	check(game.pool_box.size() == 1, "(setup) the Stock strip shows the one pawn stack")
 	var pawn_stack: Button = _first_pool_stack(game)
 	_click(pawn_stack.get_global_rect().get_center()) # the tap IS the target — no separate confirm
@@ -2201,7 +2281,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(_click_stock(game), "NO-84: Stock drawer opens")
+	check(await _click_stock(game), "NO-84: Stock drawer opens")
 	await process_frame
 	check((game.hud.drawers["stock"] as Control).clip_contents,
 		"NO-84: the Stock Drawer clips its contents")
@@ -2230,6 +2310,10 @@ func _init() -> void:
 	await process_frame
 	game.gold = maxi(deploy_cost, Shop.convert_price(game, "bishop")) * 3
 	var tile_b := Vector2i(3, 1) # also a neighbour of the queen, still empty
+	# NO-118: the previous drop's auto-reopen (line 2275) is a fresh slide,
+	# not a click through _click_stock — its own settle wait before reading
+	# the row's rect again.
+	await _await_drawer_settled(game, "stock")
 	await _drag_drop(root, _pool_rows(game, false)[0],
 		game._tile_px(tile_b) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
@@ -2244,6 +2328,7 @@ func _init() -> void:
 	game.hud.refresh()
 	await process_frame
 	var tile_c := Vector2i(1, 3) # also a neighbour of the queen, still empty
+	await _await_drawer_settled(game, "stock") # NO-118: the 2nd drop's auto-reopen, own settle wait
 	await _drag_drop(root, _pool_rows(game, false)[0],
 		game._tile_px(tile_c) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
@@ -2296,7 +2381,7 @@ func _button_prefix(node: Node, prefix: String) -> Button:
 ## enemy is gone), so every Box click-probe drives this same real-click path.
 ## Assumes the Shop is closed and the player's turn is active on entry.
 func _buy_a_box(game: Node2D) -> void:
-	check(await _click_button_in(game.hud, "Shop"), "Shop button clickable")
+	check(await _click_shop(game), "Shop button clickable")
 	await process_frame
 	var tile: Button = null
 	var tile_index := -1

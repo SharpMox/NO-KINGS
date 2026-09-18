@@ -692,6 +692,11 @@ const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept
 ## as the relationship rather than the pair of numbers it produced on one screen.
 const ICON_GAP := 7
+## NO-116: the board sat flush under the Header, so the whose-turn outline
+## (drawn 4px OUTSET from the board, 3px wide) had its top edge land under the
+## Header and get clipped. Just enough top margin for the outset + half the
+## stroke width (4 + 1.5) to clear it — not a return to centring (2026-09-05).
+const BOARD_TOP_MARGIN := 6.0
 
 
 ## The one-way, closed-form solve (ADR-0004, amended by NO-83). With the strip
@@ -738,7 +743,7 @@ func _layout_board() -> void:
 	var vp := get_viewport_rect().size
 	safe_top = safe_top_px(vp)
 	hud_top = safe_top + HudScript.HEADER_H
-	var top := hud_top
+	var top := hud_top + BOARD_TOP_MARGIN
 	tile = board_tile_for(vp, top)
 	# PULLED UP under the top strip rather than centred in the span (user ruling,
 	# 2026-09-05). Centring split the leftover height into a gap above AND below

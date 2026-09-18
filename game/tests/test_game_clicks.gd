@@ -674,8 +674,8 @@ func _init() -> void:
 	var mr: Rect2 = HUD.menu_button.get_global_rect()
 	var mid_r: Rect2 = (HUD.wave_label.get_parent() as Control).get_global_rect()
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
-			and is_equal_approx(game.board_px.y, game.hud_top),
-		"the Header is the inset plus HEADER_H, and the board starts right under it")
+			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
+		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
 	check(HUD.clock_label.size.y >= HUD.HEADER_H / 2.0 - 0.5,
 		"the Clock line is half the Header tall (%s)" % HUD.clock_label.size.y)
 	var cr: Rect2 = HUD.clock_label.get_global_rect()

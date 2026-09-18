@@ -1084,7 +1084,16 @@ func _init() -> void:
 	await process_frame
 	check(not game.buff_pick_open and not game.item_targets.is_empty(),
 		"picking a choice closes the modal and resumes targeting (the continuation)")
-	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2) # NO-121: first tap stages
+	await process_frame
+	check(not game.items.is_empty() and game.item_pending_tile == Vector2i(2, 2),
+		"NO-121: staging the buff's target does not spend the Item yet")
+	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2) # re-tap: open the confirm gate
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"NO-121: re-tapping the pending target opens the confirm gate")
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the Buff Box confirm gate")
 	await process_frame
 	check(game.items.is_empty(), "targeting the buff spends the item, closing the loop")
 
@@ -1458,10 +1467,26 @@ func _init() -> void:
 	# NO-121 trap (CLAUDE.md "tests that pass for the wrong reason"): the gate
 	# is a full-rect panel — a click aimed at a board tile now lands on its
 	# backdrop and must be CONSUMED there, not reach the board underneath.
-	# Click somewhere that is not Confirm/Cancel and assert both that nothing
-	# committed AND that the gate is still open (a click that did nothing
-	# would look identical to one silently mis-routed to the board).
-	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	# A hardcoded corner is a geometry assertion in disguise (the Buff Box
+	# check above hit exactly this: (0,0) sits inside the modal's own button
+	# column) — FIND a tile the gate's box does not cover, rather than naming
+	# one, and assert both that nothing committed AND that the gate survived
+	# (a click that did nothing would look identical to one silently
+	# mis-routed to the board).
+	var gate_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
+	var gate_rect: Rect2 = gate_box.get_global_rect()
+	var gate_backdrop := Vector2(-1, -1)
+	for by in Tuning.BOARD_H:
+		for bx in Tuning.BOARD_W:
+			var c: Vector2 = game._tile_px(Vector2i(bx, by)) + Vector2(game.tile, game.tile) / 2
+			if not gate_rect.has_point(c):
+				gate_backdrop = c
+				break
+		if gate_backdrop.x >= 0.0:
+			break
+	check(gate_backdrop.x >= 0.0,
+		"(setup) a board tile exists over the confirm gate's backdrop rather than its buttons")
+	_click(gate_backdrop)
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible
 			and not game.items.is_empty(),
@@ -1549,6 +1574,9 @@ func _init() -> void:
 	check(not game.buff_pick_open and game.item_active == -1
 			and not game.items.is_empty() and game.board.has(Vector2i(4, 4)),
 		"NO-121: cancelling disarms Extraction entirely — nothing spent, board untouched")
+	# NO-85 story 58: cancelling always reopens the Drawer, on its own slide
+	# (NO-118) — settle before clicking into it, same as every other reopen.
+	await _await_drawer_settled(game, "inventory")
 	check(await _click_button_in(game.hud.items_grid, "Extraction"),
 		"Extraction re-armable after a cancel")
 	await process_frame
@@ -2223,14 +2251,24 @@ func _init() -> void:
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
 	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "Sniper clickable again")
 	await process_frame
-	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # Sniper's target: the rook
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # Sniper's target: the rook (stage)
+	await process_frame
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # re-tap: open the confirm gate (NO-121)
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the first Sniper's confirm gate")
 	await process_frame
 	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
 		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
 	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "the remaining Sniper clickable")
 	await process_frame
-	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
+	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn (stage)
+	await process_frame
+	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # re-tap: open the confirm gate (NO-121)
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the second Sniper's confirm gate")
 	await process_frame
 	check(game.items.is_empty() and game.hud.drawer_open == "",
 		"after using the last Item, the Drawer stays closed — nothing left usable (story 60)")

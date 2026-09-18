@@ -175,6 +175,11 @@ var drawer_buttons := {} # name -> Button (count text updates)
 var drawer_rest := {} # name -> Vector2
 var drawer_hidden := {} # name -> Vector2, off-screen along this drawer's own slide axis
 var _drawer_tweens := {} # name -> Tween
+## NO-118: name -> {Control: int}, the descendant mouse_filter values
+## overridden to IGNORE while the drawer is closed/closing, so they can be
+## restored exactly (not reset to a blanket STOP) on the next open. See
+## _set_drawer_clickable's own comment for why this has to recurse at all.
+var _drawer_saved_filters := {}
 var stock_armed := Control.new() # draws the armed piece on the Stock button
 var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
 var menu_button := Button.new() # ☰, the Header's top-right corner
@@ -686,6 +691,44 @@ func build(game) -> void:
 	# the screen showed another.
 
 
+## NO-118: a panel's own mouse_filter alone is not enough — Godot does not
+## cascade a parent's MOUSE_FILTER_IGNORE to its children, so a descendant
+## (a drawer's ScrollContainer, in particular) goes on absorbing clicks in
+## its own rect even while the panel itself is set to ignore them. Found via
+## a real failure: the Stock drawer's HIDDEN position sits directly above
+## its rest position by its own height, which for the Stock drawer means
+## hidden's bottom edge lands exactly on the Header's bottom edge — so while
+## "closed" (hidden, mid-slide-out, or freshly killed mid-tween), the panel's
+## rect still geometrically covers the whole Header, INCLUDING the Header's
+## own Stock button, and a click meant for that button was landing on the
+## drawer's ScrollContainer instead.
+##
+## `clickable=false` walks every descendant Control once, remembers its
+## current filter (NO-45's rows are deliberately MOUSE_FILTER_PASS, not
+## STOP, for the drag-scroll behaviour documented at DRAWER_SCROLL_DEADZONE
+## above — this must restore that exact value, never a blanket STOP) and
+## sets it to IGNORE. `clickable=true` restores every remembered value. Saves
+## only once per close (a second close call while already closed would
+## otherwise capture and "restore" IGNORE, permanently losing the original).
+func _set_drawer_clickable(key: String, clickable: bool) -> void:
+	var panel: Control = drawers[key]
+	if clickable:
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		var saved: Dictionary = _drawer_saved_filters.get(key, {})
+		for c in saved:
+			if is_instance_valid(c):
+				c.mouse_filter = saved[c]
+		_drawer_saved_filters.erase(key)
+	else:
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not _drawer_saved_filters.has(key):
+			var saved := {}
+			for c in panel.find_children("*", "Control", true, false):
+				saved[c] = (c as Control).mouse_filter
+				(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_drawer_saved_filters[key] = saved
+
+
 ## NO-118: slides `panel` along its own axis between drawer_rest[key] and
 ## drawer_hidden[key], swift in-out. `opening` sets the direction; the caller
 ## has already flipped `visible` true before calling this for an open (a
@@ -698,6 +741,17 @@ func build(game) -> void:
 ##
 ## Kills whatever tween is already running on this drawer first: a second
 ## toggle before the first tween finishes must replace it, not race it.
+##
+## NO-118 fix: `visible` stays true for the whole close slide (see above), and
+## a visible Control with the default MOUSE_FILTER_STOP still absorbs a click
+## anywhere in its rect via Godot's own GUI picking, BEFORE that click can
+## ever reach _unhandled_input — regardless of drawer_open having already
+## flipped to "". A press landing on the still-sliding panel (e.g. a board
+## tile the drawer used to cover) was silently eaten instead of reaching the
+## board, for up to PANEL_SLIDE_S after the "close". _set_drawer_clickable
+## below turns that off the instant a close starts and back on the instant an
+## open starts, so an open drawer still blocks the board underneath it
+## exactly as before.
 func _slide_drawer(key: String, opening: bool) -> void:
 	if _drawer_tweens.get(key):
 		(_drawer_tweens[key] as Tween).kill()
@@ -705,6 +759,7 @@ func _slide_drawer(key: String, opening: bool) -> void:
 	var panel: Control = drawers[key]
 	var rest: Vector2 = drawer_rest[key]
 	var hidden: Vector2 = drawer_hidden[key]
+	_set_drawer_clickable(key, opening)
 	if g.autoplay or not g.animations_on:
 		panel.position = rest
 		if not opening:

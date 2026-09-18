@@ -551,6 +551,14 @@ func _slide_shop(opening: bool) -> void:
 	var filter := Control.MOUSE_FILTER_STOP if opening else Control.MOUSE_FILTER_IGNORE
 	shop_panel.mouse_filter = filter
 	if not opening:
+		# Descendants are set to IGNORE here but never explicitly restored on
+		# open — that's only safe because show_shop() frees this exact
+		# shop_panel and builds a fresh one (default filters) on every
+		# subsequent open. If the Shop is ever changed to reuse a panel
+		# instead of rebuilding it (the kind of change modals.gd's own
+		# _shop_dock comment describes doing for the tile-tap case), this
+		# needs the same save/restore hud.gd's _set_drawer_clickable does,
+		# or every control in here stays permanently unclickable.
 		for c in shop_panel.find_children("*", "Control", true, false):
 			(c as Control).mouse_filter = filter
 	if g.autoplay or not g.animations_on:

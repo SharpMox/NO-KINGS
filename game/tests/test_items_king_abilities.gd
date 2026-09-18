@@ -26,6 +26,15 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## NO-113: prints the observed value on failure, so a numeric failure needs no
+## instrument-and-rerun round trip. Use it for any assertion on an amount.
+func check_eq(actual: Variant, expected: Variant, label: String) -> void:
+	if actual == expected:
+		check(true, label)
+	else:
+		check(false, "%s — expected %s, got %s" % [label, expected, actual])
+
+
 ## Fixtures are deterministic by default (slice 36: a flaky suite makes every
 ## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
 ## out — only for a test that genuinely wants variance.

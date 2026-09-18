@@ -146,6 +146,16 @@ func _artefact_cell(game: Node, key: String) -> Button:
 	return null
 
 
+## NO-120: Stock/Captured cells carry id + cap as meta (hud.gd's
+## _build_stack_button), so lookup does not depend on grid order either.
+func _stock_button(game: Node, id: String, cap: bool) -> Button:
+	var grid: Control = game.hud.captured_grid if cap else game.hud.stock_grid
+	for c in grid.get_children():
+		if c is Button and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
+			return c
+	return null
+
+
 func _init() -> void:
 	create_timer(60.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: probe still running after 60s — force quit")
@@ -274,6 +284,81 @@ func _init() -> void:
 	await process_frame
 	check(not game.hud.tip_panel.visible, "a drag starting on an item shows no description, even held past the threshold")
 	check(game.item_active == -1, "...and does not arm the item")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-120: a long press on a BOARD PIECE shows its description, and does
+	# not select it. The board is drawn in _draw, not built from Controls, so
+	# this exercises _board_long_press_start (game.gd) rather than
+	# hud.gd's _long_press_input — no Button, no gui_input to hold.
+	game = await _boot_game()
+	game._set_drawer("") # the queen tile used sits low enough to be covered
+		# by the open Inventory drawer otherwise
+	check(game.selected == Vector2i(-1, -1), "nothing selected before the press")
+	var queen_at := Vector2i(2, 1) # the player Queen _boot_game()'s config places
+	var qpos: Vector2 = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(qpos):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the board piece completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a board piece shows its description")
+	check(game.hud.tip_label.text == game.defs["queen"].name,
+		"...and it is that piece's name")
+	check(game.selected == Vector2i(-1, -1), "...and does NOT select the piece")
+	game.queue_free()
+	await process_frame
+
+	# --- a SHORT TAP on the same board piece still selects it, as before -------
+	game = await _boot_game()
+	game._set_drawer("")
+	game.hud.hide_tip()
+	qpos = game._tile_px(queen_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, qpos)
+	await process_frame
+	_release_at(qpos)
+	await process_frame
+	check(game.selected == queen_at, "a short tap on a board piece still selects it")
+	check(not game.hud.tip_panel.visible, "...and shows no description")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-120: a long press on a STOCK cell shows its description, through
+	# _long_press_input exactly like an Inventory cell, and does not arm it ---
+	game = await _boot_game()
+	game._set_drawer("stock")
+	var pawn_btn := _stock_button(game, "pawn", false)
+	check(pawn_btn != null, "the Stock drawer has the pawn stack _boot_game() placed")
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(pawn_btn.get_global_rect().get_center()):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the Stock cell completed without real cursor motion")
+	check(game.hud.tip_panel.visible, "a long press on a Stock cell shows its description")
+	check(game.hud.tip_label.text == game.defs["pawn"].name,
+		"...and it is that piece's name")
+	check(game.placing_id == "", "...and does NOT arm it for deploy")
+	game.queue_free()
+	await process_frame
+
+	# --- a SHORT TAP on the same Stock cell still arms it, as before -----------
+	game = await _boot_game()
+	game._set_drawer("stock")
+	game.hud.hide_tip()
+	pawn_btn = _stock_button(game, "pawn", false)
+	var ppos: Vector2 = pawn_btn.get_global_rect().get_center()
+	_mouse(true, ppos)
+	await process_frame
+	_release_at(ppos)
+	await process_frame
+	check(game.placing_id == "pawn", "a short tap on a Stock cell still arms it")
+	check(not game.hud.tip_panel.visible, "...and shows no description")
 	game.queue_free()
 	await process_frame
 

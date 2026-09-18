@@ -26,6 +26,15 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## NO-113: prints the observed value on failure, so a numeric failure needs no
+## instrument-and-rerun round trip. Use it for any assertion on an amount.
+func check_eq(actual: Variant, expected: Variant, label: String) -> void:
+	if actual == expected:
+		check(true, label)
+	else:
+		check(false, "%s — expected %s, got %s" % [label, expected, actual])
+
+
 ## Fixtures are deterministic by default (slice 36: a flaky suite makes every
 ## green claim unfalsifiable). Pass a "seed" in cfg, or seed_it=false, to opt
 ## out — only for a test that genuinely wants variance.
@@ -375,6 +384,117 @@ func _init() -> void:
 	check(untaxed.gold == g_untaxed,
 		"NO-103: no Tariff held — an Item grant costs nothing")
 	untaxed.queue_free()
+	await process_frame
+
+	# --- NO-111: per-tariff charge coverage — one fixture per tariff key,
+	# each holding ONLY that key, so the gold delta can only be attributed to
+	# it. Where the real action also moves gold through a second path
+	# (capture score via Economy.earn, the base Place/Merge cost), driving it
+	# would make the delta a compound number, not the tariff alone — those
+	# three drive Economy.charge directly instead, per the task spec.
+
+	var mv := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "king_abilities": ["move_cost"]})
+	await process_frame
+	var g_mv: int = mv.gold
+	mv._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check_eq(g_mv - mv.gold, Economy.tariff_cut(mv.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
+		"move_cost bills TARIFF_MOVE_PCT of the mover's value")
+	mv.queue_free()
+	await process_frame
+
+	var cap := _boot({"board": [], "wave": 3, "gold": 500, "king_abilities": ["capture_cost"]})
+	await process_frame
+	var g_cap: int = cap.gold
+	# a real capture also pays capture score through Economy.earn — drive the
+	# charge directly instead of contaminating the delta with that gain.
+	Economy.charge(cap, "capture_cost", Economy.tariff_cut(cap.defs["rook"].value, Tuning.TARIFF_CAPTURE_PCT))
+	check_eq(g_cap - cap.gold, Economy.tariff_cut(cap.defs["rook"].value, Tuning.TARIFF_CAPTURE_PCT),
+		"capture_cost bills TARIFF_CAPTURE_PCT of the captured piece's value")
+	cap.queue_free()
+	await process_frame
+
+	var lr := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "king_abilities": ["long_range_cost"]})
+	await process_frame
+	var g_lr: int = lr.gold
+	lr._move_player(Vector2i(2, 2), Vector2i(2, 5)) # queen rides 3 squares
+	check_eq(g_lr - lr.gold, 3 * Economy.tariff_cut(lr.defs["queen"].value, Tuning.TARIFF_LR_PCT),
+		"long_range_cost bills TARIFF_LR_PCT of the mover's value, per square")
+	lr.queue_free()
+	await process_frame
+
+	var abl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "king_abilities": ["ability_cost"]})
+	await process_frame
+	var g_abl: int = abl.gold
+	abl.items.append(_item("demote", "tile"))
+	abl._use_item(0)
+	abl._item_click(Vector2i(2, 2))
+	check_eq(g_abl - abl.gold, Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE["Tactical"], Tuning.TARIFF_ITEM_PCT),
+		"ability_cost bills TARIFF_ITEM_PCT of SHOP_ITEM_PRICE[tier]")
+	abl.queue_free()
+	await process_frame
+
+	var dep := _boot({"board": [], "wave": 3, "gold": 500, "king_abilities": ["deploy_cost"]})
+	await process_frame
+	var g_dep: int = dep.gold
+	# a real Place also spends the base PLACEMENT_COST through Economy.deploy_cost()
+	# — same reasoning as capture_cost above.
+	Economy.charge(dep, "deploy_cost", Economy.tariff_cut(Tuning.PLACEMENT_COST, Tuning.TARIFF_DEPLOY_PCT))
+	check_eq(g_dep - dep.gold, Economy.tariff_cut(Tuning.PLACEMENT_COST, Tuning.TARIFF_DEPLOY_PCT),
+		"deploy_cost bills TARIFF_DEPLOY_PCT of PLACEMENT_COST")
+	dep.queue_free()
+	await process_frame
+
+	var fus := _boot({"board": [], "wave": 3, "gold": 500, "king_abilities": ["fuse_cost"]})
+	await process_frame
+	var g_fus: int = fus.gold
+	# a real commit_merge also spends the base MERGE_COST — same reasoning.
+	Economy.charge(fus, "fuse_cost", Economy.tariff_cut(Tuning.MERGE_COST, Tuning.TARIFF_FUSE_PCT))
+	check_eq(g_fus - fus.gold, Economy.tariff_cut(Tuning.MERGE_COST, Tuning.TARIFF_FUSE_PCT),
+		"fuse_cost bills TARIFF_FUSE_PCT of MERGE_COST")
+	fus.queue_free()
+	await process_frame
+
+	var ps := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 500, "king_abilities": ["pass_cost"]})
+	await process_frame
+	var g_ps: int = ps.gold
+	ps._on_pass()
+	check_eq(g_ps - ps.gold, Tuning.KING_ABILITY_ACTION_COST,
+		"pass_cost bills the flat KING_ABILITY_ACTION_COST — Pass taxes no asset")
+	ps.queue_free()
+	await process_frame
+
+	# a shield/reflect-blocked attack still bills move_cost (game.gd:2130) —
+	# coverage for the earlier commit on this branch that fixed it to bill
+	# TARIFF_MOVE_PCT instead of the stale flat KING_ABILITY_ACTION_COST.
+	# Off the ATTACKER's value, never the defender's: that's the whole point
+	# of the fix, so queen (90) attacking rook (50) is deliberate — a wrong
+	# derivation would read as a wrong number here, not just a missing charge.
+	var blk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 3, {"buffs": [{"key": "shield"}]}]],
+		"wave": 3, "gold": 500, "king_abilities": ["move_cost"]})
+	await process_frame
+	var g_blk: int = blk.gold
+	blk._move_player(Vector2i(2, 2), Vector2i(2, 3)) # shield repels; the attempt still costs
+	check_eq(g_blk - blk.gold, Economy.tariff_cut(blk.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
+		"a shield-blocked attack bills TARIFF_MOVE_PCT of the ATTACKER's value")
+	blk.queue_free()
+	await process_frame
+
+	# reflect is the sharper case: _move_player reassigns board[from] to the
+	# DEFENDER before this charge runs (the counter-attack), so a derivation
+	# reading board[from].id here — instead of the moving_piece snapshot taken
+	# before that reassignment — would silently bill the wrong piece.
+	var rfl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 3, {"buffs": [{"key": "reflect"}]}]],
+		"wave": 3, "gold": 500, "king_abilities": ["move_cost"]})
+	await process_frame
+	var g_rfl: int = rfl.gold
+	rfl._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check_eq(g_rfl - rfl.gold, Economy.tariff_cut(rfl.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
+		"a reflect-blocked attack still bills the ATTACKER's value, not the counter-attacking defender's")
+	rfl.queue_free()
 	await process_frame
 
 	print("---")

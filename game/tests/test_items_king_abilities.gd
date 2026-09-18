@@ -467,6 +467,36 @@ func _init() -> void:
 	ps.queue_free()
 	await process_frame
 
+	# a shield/reflect-blocked attack still bills move_cost (game.gd:2130) —
+	# coverage for the earlier commit on this branch that fixed it to bill
+	# TARIFF_MOVE_PCT instead of the stale flat KING_ABILITY_ACTION_COST.
+	# Off the ATTACKER's value, never the defender's: that's the whole point
+	# of the fix, so queen (90) attacking rook (50) is deliberate — a wrong
+	# derivation would read as a wrong number here, not just a missing charge.
+	var blk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 3, {"buffs": [{"key": "shield"}]}]],
+		"wave": 3, "gold": 500, "king_abilities": ["move_cost"]})
+	await process_frame
+	var g_blk: int = blk.gold
+	blk._move_player(Vector2i(2, 2), Vector2i(2, 3)) # shield repels; the attempt still costs
+	check_eq(g_blk - blk.gold, Economy.tariff_cut(blk.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
+		"a shield-blocked attack bills TARIFF_MOVE_PCT of the ATTACKER's value")
+	blk.queue_free()
+	await process_frame
+
+	# reflect is the sharper case: _move_player reassigns board[from] to the
+	# DEFENDER before this charge runs (the counter-attack), so a derivation
+	# reading board[from].id here — instead of the moving_piece snapshot taken
+	# before that reassignment — would silently bill the wrong piece.
+	var rfl := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 2, 3, {"buffs": [{"key": "reflect"}]}]],
+		"wave": 3, "gold": 500, "king_abilities": ["move_cost"]})
+	await process_frame
+	var g_rfl: int = rfl.gold
+	rfl._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check_eq(g_rfl - rfl.gold, Economy.tariff_cut(rfl.defs["queen"].value, Tuning.TARIFF_MOVE_PCT),
+		"a reflect-blocked attack still bills the ATTACKER's value, not the counter-attacking defender's")
+	rfl.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL TARIFF CHECKS OK")

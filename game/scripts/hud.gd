@@ -804,21 +804,26 @@ func refresh() -> void:
 	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
 		if shop_locked else ""
 	clock_label.text = g._clock_text()
-	score_label.text = "★%d" % g.score
-	gold_label.text = "$%d" % g.gold
+	score_label.text = "%d" % g.score
+	gold_label.text = "%d" % g.gold
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
-	wave_label.text = "⚑ %d/%d" % [g.wave,
+	# NO-114: blank during a King wave — the King's own name in turn_label is
+	# enough, and showing both crowded the centre column.
+	var king_wave: bool = g._king_alive() or not g.pending_king.is_empty()
+	wave_label.text = "" if king_wave else "⚑ %d/%d" % [g.wave,
 		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
-	# ⧖ TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
+	# TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
 	# The King's name instead while he is alive OR pending (no Wave arrives
 	# until he is checkmated); blank after the last Wave, when no Wave is coming.
-	if g._king_alive() or not g.pending_king.is_empty():
-		turn_label.text = "⧖ %s" % g._king_name()
+	# NO-114: dropped the ⧖ glyph — no painted icon fits it, and the name/count
+	# reads fine unprefixed.
+	if king_wave:
+		turn_label.text = g._king_name()
 	elif g.wave >= Waves.WAVES.size():
 		turn_label.text = ""
 	else:
-		turn_label.text = "⧖ %d/%d" % [g.turns_since_wave, g._cadence()]
+		turn_label.text = "%d/%d" % [g.turns_since_wave, g._cadence()]
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false

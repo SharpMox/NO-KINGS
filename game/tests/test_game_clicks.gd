@@ -752,24 +752,25 @@ func _init() -> void:
 	game.kings_defeated = 1
 	HUD.refresh()
 	check(HUD.wave_label.text == "⚑ 51/201", "Wave 51 after the win reads ⚑ 51/201 (got %s)" % HUD.wave_label.text)
-	# ⧖ TURN COUNTER: turns played out of the upcoming Wave's cadence — Wave 4
-	# is three pawns (data/waves.gd), so 6 + 3
+	# TURN COUNTER: turns played out of the upcoming Wave's cadence — Wave 4
+	# is three pawns (data/waves.gd), so 6 + 3. NO-114 dropped the ⧖ glyph.
 	game.wave = 3
 	game.kings_defeated = 0
 	game.turns_since_wave = 2
 	HUD.refresh()
-	check(HUD.turn_label.text == "⧖ 2/9", "turn counter counts 2 of Wave 4's 9 (got %s)" % HUD.turn_label.text)
+	check(HUD.turn_label.text == "2/9", "turn counter counts 2 of Wave 4's 9 (got %s)" % HUD.turn_label.text)
 	game.pending_king = {"id": "king", "king_id": "donald_trump"}
 	HUD.refresh()
-	check(HUD.turn_label.text == "⧖ Donald Trump",
+	check(HUD.turn_label.text == "Donald Trump",
 		"turn counter names a PENDING King (got %s)" % HUD.turn_label.text)
+	check(HUD.wave_label.text == "", "NO-114: the Wave counter blanks while a King is pending/alive")
 	game.pending_king = {}
 	game.wave = 201
 	HUD.refresh()
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
 	# a long King name is cut with an ellipsis: the label never leaves its
 	# column or reaches the Stock button, whatever the text
-	HUD.turn_label.text = "⧖ " + "Maximilian ".repeat(6)
+	HUD.turn_label.text = "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
 	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.x <= sr.position.x + 0.5,
@@ -909,9 +910,9 @@ func _init() -> void:
 	root.add_child(trump_game)
 	await process_frame
 	await process_frame
-	check(trump_game.hud.turn_label.text == "⧖ Donald Trump",
+	check(trump_game.hud.turn_label.text == "Donald Trump",
 		"turn counter names the King while he is alive (got %s)" % trump_game.hud.turn_label.text)
-	check(trump_game.hud.wave_label.text == "⚑ 50/50", "his Wave reads ⚑ 50/50")
+	check(trump_game.hud.wave_label.text == "", "NO-114: the Wave counter is blank while a King is alive")
 	var king_px: Vector2 = trump_game._tile_px(Vector2i(3, 10)) + Vector2(trump_game.tile, trump_game.tile) / 2
 	_double_click(king_px)
 	await process_frame

@@ -50,6 +50,9 @@ var overlay := PanelContainer.new() # end/win screens
 var merge_panel: PanelContainer # merge confirmation (shows the result piece)
 var reinforce_panel: PanelContainer # the reinforcement shop overlay
 var shop_panel: Panel # the Shop drawer (shop-drawer-ui/08)
+var _shop_tween: Tween # NO-118: the in-flight slide, if any — killed before a
+	# new one starts (a tween on a freed node throws, and show_shop() frees
+	# shop_panel on every fresh open)
 var _shop_dock: PanelContainer # the detail dock — refilled on a tile tap, so a
 	# tap no longer frees and rebuilds the whole ~80-node drawer (review pass 2)
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
@@ -359,6 +362,9 @@ func show_preview(id: String, king_id := "") -> void:
 ## fresh SOLD/affordability state.
 func show_shop() -> void:
 	var was_open := shop_panel != null and shop_panel.visible
+	if _shop_tween: # NO-118: kill before the panel it targets is freed below
+		_shop_tween.kill()
+		_shop_tween = null
 	if shop_panel:
 		shop_panel.queue_free()
 	if not was_open:
@@ -425,7 +431,7 @@ func show_shop() -> void:
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 14)
 	close.pressed.connect(func() -> void:
-		shop_panel.visible = false
+		_slide_shop(false) # NO-118: animated close; hides shop_panel itself when done
 		shop_closed.emit())
 	header.add_child(close)
 	root.add_child(header)
@@ -508,6 +514,34 @@ func show_shop() -> void:
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
+	if not was_open: # NO-118: a rebuild while already open (mode toggle, Buy,
+		# Restock, ...) reuses the fresh panel at rest with no re-animation —
+		# it never left the screen.
+		_slide_shop(true)
+
+
+## NO-118: slides shop_panel between its rest position (vp.x - draw_w, 0) and
+## fully off-screen to the right, swift in-out. `opening` sets the direction;
+## on a close, shop_panel is only hidden once the tween finishes. Skips the
+## tween in autoplay/headless-with-animations-off, same seam every other HUD
+## animation is gated on (see hud.gd's _slide_drawer).
+func _slide_shop(opening: bool) -> void:
+	if _shop_tween:
+		_shop_tween.kill()
+		_shop_tween = null
+	var rest: Vector2 = shop_panel.position # already Vector2(vp.x - draw_w, 0)
+	var hidden := rest + Vector2(shop_panel.size.x, 0) # off the right edge
+	if g.autoplay or not g.animations_on:
+		if not opening:
+			shop_panel.visible = false
+		return
+	if opening:
+		shop_panel.position = hidden
+	_shop_tween = shop_panel.create_tween()
+	_shop_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_shop_tween.tween_property(shop_panel, "position", rest if opening else hidden, Tuning.PANEL_SLIDE_S)
+	if not opening:
+		_shop_tween.finished.connect(func() -> void: shop_panel.visible = false)
 
 
 ## The dock's content for the current expanded tile (or the hint). Called

@@ -167,6 +167,14 @@ var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> PanelContainer
 var drawer_buttons := {} # name -> Button (count text updates)
+## NO-118: each drawer's rest position and its fully-off-screen origin, set
+## once in build() (Stock's own geometry never moves after that; the
+## Inventory drawer is FIXED height too — see INV_DRAWER_H above), plus the
+## in-flight Tween per drawer so a second toggle before the first finishes
+## can kill it instead of racing it.
+var drawer_rest := {} # name -> Vector2
+var drawer_hidden := {} # name -> Vector2, off-screen along this drawer's own slide axis
+var _drawer_tweens := {} # name -> Tween
 var stock_armed := Control.new() # draws the armed piece on the Stock button
 var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
 var menu_button := Button.new() # ☰, the Header's top-right corner
@@ -586,6 +594,10 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
+		drawer_rest[spec[0]] = panel.position
+		# NO-118: Inventory slides in from the LEFT — off-screen is its own
+		# width to the left of rest, not a move of where it rests.
+		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
 	# ---- THE STOCK DRAWER (NO-84) --------------------------------------------
 	# Opens downward from the Header's bottom edge, next to the button that
 	# opens it (story 31) — everything else in this file opens above the deck,
@@ -638,6 +650,10 @@ func build(game) -> void:
 	stock_panel.add_child(stock_row)
 	drawers["stock"] = stock_panel
 	add_child(stock_panel)
+	drawer_rest["stock"] = stock_panel.position
+	# NO-118: Stock slides in from the TOP — off-screen is its own height
+	# above rest, tucked behind the Header.
+	drawer_hidden["stock"] = stock_panel.position - Vector2(0, stock_h)
 	# NO-59: the description popup. ONE instance, owned by the HUD rather than by
 	# a row, because hud.refresh() frees and rebuilds every strip child — a panel
 	# parented to a row would be destroyed by the next refresh, which happens on
@@ -670,12 +686,51 @@ func build(game) -> void:
 	# the screen showed another.
 
 
+## NO-118: slides `panel` along its own axis between drawer_rest[key] and
+## drawer_hidden[key], swift in-out. `opening` sets the direction; the caller
+## has already flipped `visible` true before calling this for an open (a
+## tween never renders on a hidden Control) and this hides it again, only
+## once the close tween finishes, for a close.
+##
+## Skips the tween entirely in autoplay/headless-with-animations-off — same
+## seam `animations_on`/`autoplay` already gate every other HUD animation on
+## (game.gd:1046 etc.), so a scenario sweep never stalls 0.18s per toggle.
+##
+## Kills whatever tween is already running on this drawer first: a second
+## toggle before the first tween finishes must replace it, not race it.
+func _slide_drawer(key: String, opening: bool) -> void:
+	if _drawer_tweens.get(key):
+		(_drawer_tweens[key] as Tween).kill()
+		_drawer_tweens.erase(key)
+	var panel: Control = drawers[key]
+	var rest: Vector2 = drawer_rest[key]
+	var hidden: Vector2 = drawer_hidden[key]
+	if g.autoplay or not g.animations_on:
+		panel.position = rest
+		if not opening:
+			panel.visible = false
+		return
+	if opening:
+		panel.position = hidden
+	var tw := create_tween()
+	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(panel, "position", rest if opening else hidden, Tuning.PANEL_SLIDE_S)
+	if not opening:
+		tw.finished.connect(func() -> void: panel.visible = false)
+	_drawer_tweens[key] = tw
+
+
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
 ## Visibility only — selection/board consequences live in game.gd's handler.
 func set_drawer(which: String) -> void:
+	var prev := drawer_open
 	drawer_open = "" if drawer_open == which else which
 	for name in drawers:
-		drawers[name].visible = drawer_open == name
+		if drawer_open == name and prev != name: # newly opening
+			(drawers[name] as Control).visible = true
+			_slide_drawer(name, true)
+		elif drawer_open != name and prev == name: # newly closing
+			_slide_drawer(name, false)
 	hide_tip() # NO-59: a description outlives neither its drawer nor its row
 
 

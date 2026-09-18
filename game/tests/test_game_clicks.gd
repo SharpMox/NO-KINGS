@@ -1528,7 +1528,11 @@ func _init() -> void:
 	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
 	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
-	await process_frame
+	# NO-118: Close now animates the panel off-screen and only hides it when
+	# that tween finishes — one frame is no longer enough to observe the
+	# close. Wait out the slide (plus a margin) rather than the old single
+	# process_frame.
+	await create_timer(Tuning.PANEL_SLIDE_S + 0.1).timeout
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
 	# Selling + Captured -> Stock conversion (issue 60): the Shop drawer's

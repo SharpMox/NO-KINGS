@@ -383,9 +383,13 @@ func build(game) -> void:
 	# one piece, and the rows below expand into it rather than leaving a gap.
 	var deck_top: float = g.board_px.y + g.tile * Tuning.BOARD_H + 6.0
 	var deck := VBoxContainer.new()
-	deck.position = Vector2(4, deck_top)
 	deck_h = vp.y - deck_top
-	deck.custom_minimum_size = Vector2(vp.x - 8, deck_h - 6.0)
+	# NO-115: the deck runs flush to both screen edges and the bottom — it used
+	# to sit 4px in on each side and stop 6px short of the bottom, leaving a
+	# dead strip under the thumb row. act_row (its last child) claims that
+	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
+	deck.position = Vector2(0, deck_top)
+	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
 
@@ -463,7 +467,10 @@ func build(game) -> void:
 	army_ability_button.pressed.connect(func() -> void: army_ability_pressed.emit())
 	act_row = HBoxContainer.new()
 	act_row.add_theme_constant_override("separation", 5)
-	act_row.size_flags_vertical = Control.SIZE_SHRINK_END
+	# NO-115: EXPAND claims the deck's now-unused trailing space (see deck's
+	# own comment above); SHRINK_END keeps act_row pinned at its own 60px
+	# minimum and docks it at the bottom of that space, flush to the screen.
+	act_row.size_flags_vertical = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
 	act_row.custom_minimum_size = Vector2(0, 60)
 	act_row.add_child(army_ability_button)
 	act_row.add_child(pass_button)

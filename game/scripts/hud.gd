@@ -14,6 +14,7 @@ const Guide := preload("res://scripts/guide.gd")
 const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-120: tip content for Stock/Captured
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -1148,7 +1149,9 @@ func _rebuild_artefacts_grid() -> void:
 	# the cell the popup was anchored to may have just been freed. Keep it up
 	# only while the artefact it describes is still held — otherwise a
 	# consumed artefact leaves a description of something no longer held.
-	if tip_key != "" and not seen.has(tip_key):
+	# Scoped to "artefact:" keys (NO-120): an open Board or Stock tip is not
+	# in `seen` either, but it is not this grid's to close.
+	if tip_key.begins_with("artefact:") and not seen.has(tip_key.trim_prefix("artefact:")):
 		hide_tip()
 
 
@@ -1182,7 +1185,11 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	# activatable is true, because a passive cell is disabled above and a
 	# disabled Button never fires `pressed` — connecting it unconditionally
 	# here (rather than only inside the activatable branch) changes nothing.
-	_wire_grid_button(btn, true, key, entry.description, func() -> void:
+	# NO-120: prefixed so _rebuild_artefacts_grid's own-tip cleanup below can
+	# tell an Artefact tip apart from a Board or Stock one (show_tip is now a
+	# shared popup, not this grid's alone) — bare `key` would make every
+	# non-Artefact tip look like an artefact no longer held and get closed.
+	_wire_grid_button(btn, true, "artefact:" + key, entry.description, func() -> void:
 		artefact_activate_pressed.emit(key))
 	btn.set_meta("key", key) # lookup for probes/tests
 	return btn
@@ -1415,7 +1422,20 @@ func _build_stack_button(st: Dictionary) -> Button:
 	btn.set_meta("id", id) # drop-target lookup for drag merges
 	btn.set_meta("cap", cap)
 	btn.set_meta("entry", st.entry)
-	btn.pressed.connect(func() -> void: stack_pressed.emit(st.entry, cap, st.count))
+	# NO-120: long-press shows the piece's name + any Piece Buffs it carries
+	# (state Stock never interprets itself, ADR-0002 — st.entry is the state
+	# Dictionary when there is one). "cap:"/"stock:" so the same id held in
+	# both grids at once gets two distinct tip keys, never one toggling shut
+	# the other's popup.
+	var lp_desc: String = BuffLogic.describe(id, st.entry if st.entry is Dictionary else {}, g.defs)
+	var lp_key := ("cap:" if cap else "stock:") + id
+	btn.pressed.connect(func() -> void:
+		if btn.has_meta("lp_fired"): # NO-72's swallow, same as every other long-press cell
+			btn.remove_meta("lp_fired")
+			return
+		stack_pressed.emit(st.entry, cap, st.count))
+	btn.gui_input.connect(func(e: InputEvent) -> void:
+		_long_press_input(btn, lp_key, lp_desc, e))
 	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down

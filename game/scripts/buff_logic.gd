@@ -114,6 +114,20 @@ static func name_of(key: String) -> String:
 	return key
 
 
+## NO-120: name + any catalogued Piece Buffs `piece` carries, for the
+## long-press description shared by the board (game.gd) and the Stock/
+## Captured drawer (hud.gd). Skips `stunned` — the module header's non-Buff
+## debuff riding the same list — since it has no PIECE_BUFFS entry to match.
+static func describe(id: String, piece: Dictionary, defs: Dictionary) -> String:
+	var text: String = defs[id].name
+	for b in of(piece):
+		for pb in Items.PIECE_BUFFS:
+			if pb.key == b.key:
+				text += "\n%s: %s" % [pb.name, pb.description]
+				break
+	return text
+
+
 ## A capture attempt on `victim` that an effect stops. Returns true when the
 ## attempt is repelled — the attacker does not move and nothing is captured
 ## (GDD Pieces & Movement: a repelled attacker returns to its starting tile).

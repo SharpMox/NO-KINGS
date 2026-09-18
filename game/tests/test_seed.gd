@@ -11,6 +11,12 @@ extends SceneTree
 ## Run headless:  godot --headless --path game -s tests/test_seed.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const Scenarios := preload("res://data/scenarios.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
+
+## NO-110: same shape as test_scenarios.gd's sweep, BOT_STEPS included — enough
+## to hit a few captures, not a full run.
+const STEPS := 40
 
 var fails := 0
 
@@ -32,6 +38,38 @@ func _stream(seed_text: String, draws: int) -> Array:
 	return out
 
 
+## NO-110: boots a real game from `cfg` (same idiom as test_scenarios.gd),
+## lets the bot autoplay `steps` frames, and fingerprints the result with the
+## existing save serializer — SaveConfig.to_config(g) — rather than inventing
+## a second one.
+##
+## One key it returns is NOT seed-derived: "clock_s" drains by the real
+## wall-clock `delta` handed to _process() every frame (game.gd:989,
+## deliberately not routed through g.rng), so two runs of the very same seed
+## still see slightly different frame timing and a different clock_s — that
+## would fail the "same seed" assertion below for a reason that has nothing
+## to do with the seed. It's erased before comparing. Everything else
+## to_config() writes comes from g.rng draws, turn/wave counters, or board
+## state, all of which the seed (and the fixed step count) fully determine.
+func _fingerprint(cfg: Dictionary, steps: int) -> Dictionary:
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.autoplay = true
+	var i := 0
+	while i < steps and game.state != GameScript.State.GAME_OVER:
+		await process_frame
+		i += 1
+	var snapshot: Dictionary = SaveConfig.to_config(game)
+	snapshot.erase("clock_s")
+	game.queue_free()
+	await process_frame
+	return snapshot
+
+
 func _init() -> void:
 	check(GameScript.seed_of("12345") == 12345,
 		"a numeric seed is used as-is, so it means what a player expects")
@@ -50,6 +88,42 @@ func _init() -> void:
 	# empty means "roll one", the pre-existing behaviour
 	check(GameScript.next_seed == "",
 		"the default is empty, i.e. a fresh random seed as before")
+
+	# --- end-to-end: does a whole RUN reproduce, not just the raw stream? ---
+	# The checks above only prove the SURFACE — a seed reaches the generator,
+	# and two raw streams diverge. They say nothing about a full run, where
+	# autoplay.gd itself draws from g.rng for every bot decision (move choice,
+	# item use, army-ability rolls — see autoplay.gd), on top of wave spawns
+	# (wave_logic.gd) and Box/Shop rolls. Same argument as above applies here:
+	# asserting only "same seed reproduces a run" would pass trivially if
+	# g.rng were never actually reached, since a stray "randomize()" or a bare
+	# randi() would still look "reproducible" run after run in-process. Both
+	# directions are required again.
+	var scenario_cfg: Dictionary = {}
+	for s in Scenarios.all():
+		if s.name == "Captures & highlights":
+			scenario_cfg = s.cfg
+			break
+	check(not scenario_cfg.is_empty(), "the 'Captures & highlights' scenario exists to seed this run")
+
+	var cfg_a: Dictionary = scenario_cfg.duplicate(true)
+	cfg_a.seed = 90210
+	var run_a: Dictionary = await _fingerprint(cfg_a, STEPS)
+
+	var cfg_b: Dictionary = scenario_cfg.duplicate(true)
+	cfg_b.seed = 90210
+	var run_b: Dictionary = await _fingerprint(cfg_b, STEPS)
+
+	check(run_a == run_b,
+		"SAME seed -> identical run state after %d bot-played steps (SaveConfig.to_config)" % STEPS)
+
+	var cfg_c: Dictionary = scenario_cfg.duplicate(true)
+	cfg_c.seed = 90211
+	var run_c: Dictionary = await _fingerprint(cfg_c, STEPS)
+
+	check(run_a != run_c,
+		"DIFFERENT seed -> diverging run state — without this, the SAME-seed " +
+		"check above would pass even if the run never touched g.rng at all")
 
 	print("---")
 	if fails == 0:

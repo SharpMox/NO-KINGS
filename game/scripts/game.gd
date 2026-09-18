@@ -528,10 +528,8 @@ func _ready() -> void:
 	# The hard-edged text that shipped in its place was removed 2026-09-06 at
 	# the user's ask; the CRT overlay (scripts/crt_overlay.gd) is the one
 	# look-changer, and it only shades/warps the finished frame.
-	if args.has("--screenshot"):
+	if args.has("--screenshot"): # fired once the scenario (if any) is booted, below
 		screenshot_dir = args[args.find("--screenshot") + 1]
-		if not autoplay: # with --autoplay, the end screen is captured instead
-			_screenshot_and_quit(screenshot_dir)
 	if args.has("--clock"): # debug: short clock to reach the end screen fast
 		clock_ms = float(args[args.find("--clock") + 1]) * 1000.0
 	if args.has("--steps"): # debug: shorter autoplay cap for scenario sweeps
@@ -663,6 +661,11 @@ func _ready() -> void:
 		print("SCENARIO OK")
 		get_tree().quit()
 	_refresh()
+	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
+		if is_scenario and (args.has("--select") or args.has("--arm-item")):
+			_debug_state_screenshot(screenshot_dir, args) # NO-122: arm a preview, then shoot
+		else:
+			_screenshot_and_quit(screenshot_dir)
 
 
 ## The two bands the board sits between. The top one is the HEADER (NO-82/83):
@@ -2825,17 +2828,48 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	_refresh()
 
 
+## On-board tiles within 1 square of `at`, `at` included — the bomb blast
+## radius. Shared by `_detonate` (the actual destruction) and `_draw`'s
+## blast-preview highlight (NO-122), so the preview can't drift from the
+## effect it previews.
+func _blast_tiles(at: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var pos := at + Vector2i(dx, dy)
+			if Rules.in_bounds(pos):
+				out.append(pos)
+	return out
+
+
+## NO-122: every tile the bomb blast preview should wash right now — the
+## piece's own blast radius while it's selected (it might stay put and be
+## the one captured), plus each legal capture destination's blast radius
+## where the blast would actually land (attacker or victim carrying bomb,
+## same trigger _detonate's callers use at game.gd:1312-1320/2242-2252). A
+## dedicated function, not inlined in `_draw`, so a headless test can assert
+## the exact tile set rather than a flag (CLAUDE.md, "tests that pass for
+## the wrong reason").
+func _bomb_highlight_tiles() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if selected.x >= 0 and board.has(selected) and BuffLogic.has(board[selected], "bomb"):
+		out.append_array(_blast_tiles(selected))
+	for d in legal_dests:
+		if board.has(d) and (BuffLogic.has(board[d], "bomb")
+				or (board.has(selected) and BuffLogic.has(board[selected], "bomb"))):
+			out.append_array(_blast_tiles(d))
+	return out
+
+
 ## Bomb blast: everything within 1 square of `at`, the bomb piece included.
 ## Destruction, not capture (CONTEXT.md) — no score, no Captured Stock, and
 ## destroyed allies do not return to Stock. The King is unaffected, as with
 ## Drone Strike.
 func _detonate(at: Vector2i) -> void:
 	_add_float(at, "Boom!", COL_CAPTURE)
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			var pos := at + Vector2i(dx, dy)
-			if board.has(pos) and board[pos].id != "king":
-				_destroy(pos)
+	for pos in _blast_tiles(at):
+		if board.has(pos) and board[pos].id != "king":
+			_destroy(pos)
 
 
 ## Item destruction: piece leaves the board — no score, no captured stock.
@@ -3789,6 +3823,33 @@ func _screenshot_and_quit(dir: String) -> void:
 	get_tree().quit()
 
 
+## Debug: like _screenshot_and_quit, but for a scenario already boarded and
+## ready to play — arms a highlight preview instead of placing/passing, so
+## the shot proves NO-122's blast/strike zone. Drives the same functions a
+## real tap does: `--select X,Y` calls _on_tile_clicked (piece select);
+## `--arm-item KEY` [`--anchor X,Y`] calls _use_item then _item_click (item
+## arm + anchor). Used by the agent for visual verification (windowed run
+## required — see game/CLAUDE.md, "screenshot seam").
+func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
+	await get_tree().process_frame # let _ready finish first
+	if args.has("--select"):
+		var xy := args[args.find("--select") + 1].split(",")
+		_on_tile_clicked(Vector2i(int(xy[0]), int(xy[1])))
+	elif args.has("--arm-item"):
+		var key := args[args.find("--arm-item") + 1]
+		for i in items.size():
+			if items[i].key == key:
+				_use_item(i)
+				break
+		if args.has("--anchor"):
+			var xy := args[args.find("--anchor") + 1].split(",")
+			_item_click(Vector2i(int(xy[0]), int(xy[1])))
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))
+	get_tree().quit()
+
+
 # --- rendering ---
 
 func _draw() -> void:
@@ -3819,6 +3880,8 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
+	for pos in _bomb_highlight_tiles(): # NO-122: faint red wash over what a bomb would destroy
+		draw_rect(Rect2(_tile_px(pos), Vector2(tile, tile)), Color(COL_CAPTURE, 0.22))
 	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
 		for t in item_targets:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)

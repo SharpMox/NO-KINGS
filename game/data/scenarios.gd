@@ -242,6 +242,14 @@ static func _hand_written() -> Array:
 				["pawn", 0, 6, 1, {"buffs": [{"key": "bomb"}]}],
 				["rook", 1, 2, 5], ["pawn", 1, 3, 5], ["knight", 1, 3, 8]],
 			"items": ["buff_box"], "stock": ["pawn"], "score": 500, "wave": 1}},
+		# NO-122: bomb blast + drone strike zone previews. Queen at (3,3)
+		# carries bomb and can legally capture the pawn at (4,4), so
+		# selecting it exercises both preview triggers (piece selected,
+		# capture destination); "drone_strike" gives the other preview
+		# a live anchor to arm.
+		{"name": "NO-122: bomb blast + drone strike zone preview", "cfg": {
+			"board": [["queen", 0, 3, 3, {"buffs": [{"key": "bomb"}]}], ["pawn", 1, 4, 4]],
+			"items": ["drone_strike"], "score": 500, "wave": 1}},
 		# --- NO-81: Exhibit 399 — the queen's first Capture destroys a random
 		# adjacent enemy (not the King). Capture (3,5) from (3,3).
 		{"name": "Exhibit 399: several adjacent enemies", "cfg": {

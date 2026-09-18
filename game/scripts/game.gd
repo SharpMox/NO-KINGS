@@ -100,6 +100,11 @@ const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
 const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
 	# outside the blue/red side palette — decorative, not player or enemy state
+const HATCH_SPACING := 8.0 # NO-122: pitch of the cross-hatch drawn over a
+	# blast-preview tile covered by more than one zone — alpha-stacking alone
+	# made overlapping tiles indistinguishable from singly-covered ones
+const HATCH_ALPHA := 0.35 # NO-122: hatch line alpha, on top of the existing
+	# Color(COL_CAPTURE, 0.22) wash
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
 # NO-101: text-mode glyph marking the four LITERAL inv- ids (inv-sergeant,
@@ -3108,6 +3113,24 @@ func _bomb_highlight_tiles() -> Array[Vector2i]:
 	return out
 
 
+## NO-122: a diagonal cross over a square blast-preview tile — both "\" and
+## "/" families, offset by HATCH_SPACING, so an overlapping tile reads as a
+## denser texture rather than relying on stacked alpha alone. `r` is always
+## square (board tiles are); each pass is closed-form (no clipping library):
+## for offset c in [-s, s], the "\" line enters/exits whichever pair of edges
+## admits it, and its mirror across the vertical axis is the "/" line.
+func _draw_crosshatch(r: Rect2) -> void:
+	var col := Color(COL_CAPTURE, HATCH_ALPHA)
+	var s := r.size.x
+	var c := -s
+	while c <= s:
+		var a: Vector2 = Vector2(0, c) if c >= 0 else Vector2(-c, 0)
+		var b: Vector2 = Vector2(s - c, s) if c >= 0 else Vector2(s, s + c)
+		draw_line(r.position + a, r.position + b, col, 1.0)
+		draw_line(r.position + Vector2(s - a.x, a.y), r.position + Vector2(s - b.x, b.y), col, 1.0)
+		c += HATCH_SPACING
+
+
 ## Bomb blast: everything within 1 square of `at`, the bomb piece included.
 ## Destruction, not capture (CONTEXT.md) — no score, no Captured Stock, and
 ## destroyed allies do not return to Stock. The King is unaffected, as with
@@ -4182,8 +4205,14 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
-	for pos in _bomb_highlight_tiles(): # NO-122: faint red wash over what a bomb would destroy
-		draw_rect(Rect2(_tile_px(pos), Vector2(tile, tile)), Color(COL_CAPTURE, 0.22))
+	var blast_counts := {} # NO-122: tile -> how many blast zones cover it
+	for pos in _bomb_highlight_tiles():
+		blast_counts[pos] = blast_counts.get(pos, 0) + 1
+	for pos in blast_counts: # faint red wash over what a bomb would destroy
+		var blast_rect := Rect2(_tile_px(pos), Vector2(tile, tile))
+		draw_rect(blast_rect, Color(COL_CAPTURE, 0.22))
+		if blast_counts[pos] > 1: # overlap: alpha-stacking alone reads as one wash
+			_draw_crosshatch(blast_rect)
 	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
 		for t in item_targets:
 			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)

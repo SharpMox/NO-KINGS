@@ -2093,6 +2093,13 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			Rect2(_tile_px(at), Vector2(tile, tile))))
 
 
+## NO-120: _board_tap_is_readonly mirrors this function's branches — which
+## ones commit, which only select — to decide whether a press can run
+## straight away or has to wait out a possible hold first. Add or change a
+## COMMITTING branch here and that mirror goes stale silently: it keeps
+## classifying the new branch as read-only, runs it on press again, and the
+## capture-on-long-press hazard that function's header describes comes back.
+## Update both, in the same commit.
 func _on_tile_clicked(tile: Vector2i) -> void:
 	if artefact_targeting_key != "": # Bovine Tractor Beam (52) staging; board
 		# clicks feed it, same priority Item targeting already has below

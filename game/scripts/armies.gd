@@ -129,6 +129,23 @@ static func display_name(id: String) -> String:
 	return str(entry(id).display_name)
 
 
+## NO-115: the deck's Ability button shows this next to the name so a player
+## does not have to remember what pressing it does — there is no hover to
+## read the tooltip on a touch screen. Reuses ability_desc rather than new
+## copy per army; truncated at the last word boundary within HINT_CHARS so a
+## long sentence still fits the button's fixed-height row.
+const HINT_CHARS := 45
+
+static func ability_hint(id: String) -> String:
+	var desc: String = str(entry(id).ability_desc)
+	if desc.length() <= HINT_CHARS:
+		return desc
+	var cut: int = desc.rfind(" ", HINT_CHARS)
+	if cut == -1:
+		cut = HINT_CHARS
+	return desc.substr(0, cut) + "…"
+
+
 ## Close Ranks (The Muster): merges cost no Action — read by merge_logic.gd's
 ## three actions_left gates/decrement.
 static func merge_free(g) -> bool:

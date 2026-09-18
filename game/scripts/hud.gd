@@ -204,6 +204,9 @@ var army_power_label := Label.new()
 ## The Army Ability, promoted out of the Inventory drawer onto the deck so its
 ## readiness is visible without opening a menu (design C).
 var army_ability_button := Button.new()
+## NO-115: a short reminder of what the Ability DOES, under its name — there
+## is no hover to read the tooltip on a touch screen mid-run.
+var army_ability_hint := Label.new()
 ## Height of the control deck. Drawers open ABOVE it rather than covering it:
 ## the deck is the persistent surface in design C, and a drawer that buries PASS
 ## and the Ability takes the two most-pressed controls away exactly when the
@@ -405,9 +408,13 @@ func build(game) -> void:
 	# one piece, and the rows below expand into it rather than leaving a gap.
 	var deck_top: float = g.board_px.y + g.tile * Tuning.BOARD_H + 6.0
 	var deck := VBoxContainer.new()
-	deck.position = Vector2(4, deck_top)
 	deck_h = vp.y - deck_top
-	deck.custom_minimum_size = Vector2(vp.x - 8, deck_h - 6.0)
+	# NO-115: the deck runs flush to both screen edges and the bottom — it used
+	# to sit 4px in on each side and stop 6px short of the bottom, leaving a
+	# dead strip under the thumb row. act_row (its last child) claims that
+	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
+	deck.position = Vector2(0, deck_top)
+	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
 
@@ -481,13 +488,30 @@ func build(game) -> void:
 		Color(0.427, 0.373, 0.180), 8, 11, 6)
 	army_ability_button.add_theme_color_override("font_color", Color(0.953, 0.886, 0.675))
 	army_ability_button.add_theme_color_override("font_disabled_color", Color(0.62, 0.62, 0.62))
-	army_ability_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	army_ability_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	army_ability_button.pressed.connect(func() -> void: army_ability_pressed.emit())
+	# NO-115: the effect hint (set in refresh()), UNDER the button rather than
+	# appended into its own text — Button's autowrap re-flowed the whole
+	# string past the name+status line instead of honoring an inserted "\n",
+	# growing the row. A Label with its own fixed budget is predictable.
+	army_ability_hint.add_theme_font_size_override("font_size", 11)
+	army_ability_hint.add_theme_color_override("font_color", Color(0.78, 0.71, 0.55))
+	army_ability_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	army_ability_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	army_ability_hint.custom_minimum_size = Vector2(0, 16)
+	var ability_col := VBoxContainer.new()
+	ability_col.add_theme_constant_override("separation", 1)
+	ability_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ability_col.add_child(army_ability_button)
+	ability_col.add_child(army_ability_hint)
 	act_row = HBoxContainer.new()
 	act_row.add_theme_constant_override("separation", 5)
-	act_row.size_flags_vertical = Control.SIZE_SHRINK_END
+	# NO-115: EXPAND claims the deck's now-unused trailing space (see deck's
+	# own comment above); SHRINK_END keeps act_row pinned at its own 60px
+	# minimum and docks it at the bottom of that space, flush to the screen.
+	act_row.size_flags_vertical = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
 	act_row.custom_minimum_size = Vector2(0, 60)
-	act_row.add_child(army_ability_button)
+	act_row.add_child(ability_col)
 	act_row.add_child(pass_button)
 	deck.add_child(act_row)
 
@@ -897,6 +921,9 @@ func refresh() -> void:
 		army_ability_button.text += "  ·  1 Action"
 		army_ability_button.disabled = false
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
+	# NO-115: a reminder of what pressing this DOES, since the tooltip above
+	# is unreachable on a touch screen mid-run.
+	army_ability_hint.text = Armies.ability_hint(g.next_army)
 	_rebuild_artefacts_grid()
 	# NO-85: the drawer's height is a flat choice (INV_DRAWER_H), not a
 	# consequence of what it holds — it must not resize as Items/Artefacts

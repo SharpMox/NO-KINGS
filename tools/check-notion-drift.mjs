@@ -141,11 +141,12 @@
 // whitespace to single spaces and trims. Applied identically to both sides
 // so it can't hide a real difference that happens to look like a note.
 //
-// Tariffs' Description is compared too, but expect a wall of mismatches
-// there: game/data/king_abilities.gd's own header says its costs and wording are a
-// deliberate paraphrase of the upstream Notion economy ("scaled ~/100 —
-// flagged for a design pass"), not a verbatim mirror like Items/Artefacts.
-// Name and Tier mismatches on Tariffs are the ones worth acting on.
+// Tariffs' Description is NOT compared (NO-112): Notion holds the full design
+// sentence and the repo holds the short in-game blurb, so every row differed
+// by construction and buried the real findings under nine permanent false
+// positives. The section prints an informational count of how many rows
+// still differ, as a tripwire, but it doesn't count toward the total. Name
+// and Tier mismatches on Tariffs are the ones worth acting on.
 //
 // Artefacts' STATUS (the ?/BASIC/REWORK/KEEP/REMOVE design-triage select) is
 // compared verbatim, no normalisation. It was left out originally and drifted
@@ -291,21 +292,25 @@ section(
   )
 );
 
-// ---- Tariffs: Name / Tier / Description -------------------------------
+// ---- Tariffs: Name / Tier -----------------------------------------------
+// Description is deliberately NOT compared — see the note pushed below.
+const tariffNotionRows = (snapshot.tariffs ?? [])
+  .filter((r) => r.Name != null)
+  .map((r) => ({ key: normName(r.Name), tier: r.Tier, description: r.Description }));
+const tariffRepoRows = tariffsArr.map((t) => ({ key: normName(t.name), tier: t.tier, description: t.description }));
 section(
   "Tariffs",
-  diffCatalog(
-    "tariffs",
-    (snapshot.tariffs ?? [])
-      .filter((r) => r.Name != null)
-      .map((r) => ({ key: normName(r.Name), tier: r.Tier, description: r.Description })),
-    tariffsArr.map((t) => ({ key: normName(t.name), tier: t.tier, description: t.description })),
-    [
-      ["Tier", "tier", "tier"],
-      ["Description", "description", "description", (a, b) => coreText(a) === coreText(b)],
-    ]
-  )
+  diffCatalog("tariffs", tariffNotionRows, tariffRepoRows, [["Tier", "tier", "tier"]])
 );
+// NO-112: Notion's Description is the full design sentence, the repo's is the
+// short in-game blurb — they differ by construction on every row, so comparing
+// them buried the real findings under nine permanent false positives. The count
+// stays as a tripwire: a NEW row, or a row that suddenly matches, is worth a look.
+const tariffDescDiff = tariffRepoRows.filter((r) => {
+  const n = tariffNotionRows.find((x) => x.key === r.key);
+  return n && coreText(n.description) !== coreText(r.description);
+}).length;
+report.push(`  note: Tariff Description not compared — design sentence vs in-game blurb; ${tariffDescDiff}/${tariffNotionRows.length} rows differ by design (NO-112)`);
 
 console.log(`Notion drift report — snapshot fetched ${snapshot.fetchedAt ?? "(no timestamp in snapshot)"}`);
 console.log(report.join("\n"));

@@ -50,25 +50,20 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
-## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
-## target now stages it and waits (a different tile re-stages; the SAME tile
-## again opens the confirm gate) — this headless-drives that second tap plus
-## the gate's own Confirm, so existing effect assertions still read like a
-## single commit. For an "area" item, call this AFTER its own anchor tap
-## (unchanged — an anchor still only previews); it supplies the "stage" tap,
-## the "open the gate" tap, and Confirm.
+## NO-124: a tap on a valid "tile"/"pair"/"area" target now stages it AND
+## shows the floating Confirm affordance in the same call (no re-tap) — this
+## headless-drives that one tap plus the affordance's own Confirm, so
+## existing effect assertions still read like a single commit.
 func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_click(t)
-	g._item_click(t)
-	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+	g._item_confirm_target()
 
 
-## NO-121: the Extract button (_item_confirm_multi) now opens the same
-## confirm gate instead of committing — this finishes it.
+## NO-124: the floating Confirm affordance IS the commit for a "multi" item
+## now (no second gate behind it) — this is just _item_confirm_multi, kept
+## as its own helper so call sites read the same as every other target type.
 func _item_confirm_multi_tap(g) -> void:
-	var payload := {"index": g.item_active, "picks": g.item_selected.duplicate()}
 	g._item_confirm_multi()
-	g._item_multi_confirmed(payload)
 
 
 func _init() -> void:
@@ -158,9 +153,9 @@ func _init() -> void:
 	ds.gold = 100
 	ds.items.append(_item("drone_strike", "area"))
 	ds._use_item(0)
-	ds._item_click(Vector2i(3, 5)) # anchor: preview only, not spent yet
-	check(not ds.items.is_empty(), "area anchor tap previews without spending")
-	_item_confirm_tap(ds, Vector2i(3, 5)) # confirm (one more tap + the gate's own Confirm)
+	ds._item_click(Vector2i(3, 5)) # NO-124: one tap stages the anchor AND shows Confirm
+	check(not ds.items.is_empty(), "staging the anchor spends nothing yet")
+	ds._item_confirm_target() # Confirm
 	check(not ds.board.has(Vector2i(3, 5)) and not ds.board.has(Vector2i(2, 4))
 		and not ds.board.has(Vector2i(4, 6)), "drone strike clears the 3x3 (ally included)")
 	check(ds.board.has(Vector2i(3, 4)), "the King survives a drone strike")
@@ -183,8 +178,8 @@ func _init() -> void:
 	de._use_item(0) # tap the armed item: cancel, unspent
 	check(de.items.size() == 1 and de.item_active == -1, "area cancel leaves the item unspent")
 	de._use_item(0)
-	de._item_click(Vector2i(0, 0))
-	_item_confirm_tap(de, Vector2i(0, 0)) # confirm at the corner
+	de._item_click(Vector2i(0, 0)) # NO-124: one tap stages the anchor AND shows Confirm
+	de._item_confirm_target() # confirm at the corner
 	check(not de.board.has(Vector2i(0, 0)) and not de.board.has(Vector2i(1, 1)),
 		"corner strike destroys the on-board part")
 	de.queue_free()
@@ -396,12 +391,13 @@ func _init() -> void:
 			== Rules.placement_tiles(rd_board),
 		"Rapid Deployment stage B is exactly the Deploy tile set")
 
-	# --- NO-121: target confirmation state machine. A tap stages the target
-	# and previews it without spending anything; a DIFFERENT tap moves the
-	# stage; the SAME tile again opens the confirm gate (still unspent); and
-	# cancelling costs nothing — asserted on the observable consequence
-	# (item count, board, gold), never an internal flag alone (CLAUDE.md:
-	# "Tests that pass for the wrong reason").
+	# --- NO-124: target confirmation state machine. A tap stages the target
+	# and shows the floating Confirm affordance immediately — no re-tap; a
+	# DIFFERENT tap moves the stage and keeps the affordance up; nothing is
+	# spent until Confirm; and cancelling (tap the armed chip again) costs
+	# nothing — asserted on the observable consequence (item count, board,
+	# gold), never an internal flag alone (CLAUDE.md: "Tests that pass for
+	# the wrong reason").
 	# NO-105: BOTH targets must actually be demotable (a chainless piece
 	# is not a valid target — see the pre-existing "Demote offers a promoted
 	# piece but not a chainless one" check above), so the "different tap"
@@ -412,39 +408,35 @@ func _init() -> void:
 	tc.actions_left = 3
 	tc.items.append(_item("demote", "tile"))
 	tc._use_item(0)
-	tc._item_click(Vector2i(2, 2)) # first tap: stage only, do not commit
+	tc._item_click(Vector2i(2, 2)) # one tap: stage AND show the Confirm affordance
 	check(tc.item_pending_tile == Vector2i(2, 2), "a tap stages the target as pending")
 	check(tc.hud.tip_key != "", "the pending target's description shows")
+	check(tc.hud.multi_confirm_btn.visible, "the floating Confirm affordance shows")
 	check(tc.items.size() == 1 and tc.board[Vector2i(2, 2)].id == "archbishop" and tc.gold == 500,
 		"staging a target spends nothing — item unconsumed, board and gold untouched")
 	tc._item_click(Vector2i(4, 2)) # a DIFFERENT valid target: pending moves
 	check(tc.item_pending_tile == Vector2i(4, 2), "a different tap moves the pending target")
+	check(tc.hud.multi_confirm_btn.visible, "the affordance stays up across a re-stage")
 	check(tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
 		"moving the pending target still spends nothing")
-	tc._item_click(Vector2i(4, 2)) # the SAME tile again: opens the confirm gate
-	check(tc.buff_pick_open and tc.modals.buff_panel.visible,
-		"re-tapping the pending tile opens the confirm gate")
-	check(tc.items.size() == 1 and tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
-		"the open gate itself still hasn't spent anything")
-	tc._choice_pick_cancelled() # "Cancel"
-	check(not tc.buff_pick_open and tc.item_active == -1,
-		"cancelling the confirm gate disarms the Item entirely")
+	tc._use_item(0) # tap the armed chip again: cancel
+	check(tc.item_active == -1 and tc.item_pending_tile == Vector2i(-1, -1),
+		"cancelling disarms the Item entirely")
 	check(tc.items.size() == 1 and tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
 		"cancel costs nothing — item unconsumed, board and gold untouched")
 	tc.queue_free()
 	await process_frame
 
 	# --- confirming actually commits: the Item is spent and its effect lands.
-	# Drives the real button-press path (_choice_picked, wired to the stored
-	# Callable), not the internal handler directly.
+	# Drives the real button-press path (hud.multi_confirm_pressed, wired to
+	# _confirm_target_pressed), not the internal handler directly.
 	var tc2 := _boot({"board": [["archbishop", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	tc2.actions_left = 3
 	tc2.items.append(_item("demote", "tile"))
 	tc2._use_item(0)
-	tc2._item_click(Vector2i(2, 2)) # stage
-	tc2._item_click(Vector2i(2, 2)) # open the confirm gate
-	tc2._choice_picked({"index": 0, "a": Vector2i(-1, -1), "b": Vector2i(2, 2)}) # "Confirm"
+	tc2._item_click(Vector2i(2, 2)) # NO-124: one tap stages AND shows Confirm
+	tc2.hud.multi_confirm_pressed.emit() # "Confirm"
 	check(tc2.items.is_empty() and tc2.board[Vector2i(2, 2)].id == "bishop",
 		"confirming commits: the Item is spent and its effect lands")
 	tc2.queue_free()

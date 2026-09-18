@@ -283,7 +283,8 @@ func _init() -> void:
 	await process_frame
 	arms.items.append({"key": "x1", "name": "x1", "tier": "Strategic", "target": "", "description": ""})
 	arms.actions_left = 5
-	arms._use_item(0)
+	arms._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	arms._item_confirm_untargeted()
 	check(arms.gold == 25, "Arms Fair Goodie Bag: +25 Gold on a Strategic Item use")
 	arms.queue_free()
 	await process_frame
@@ -294,7 +295,8 @@ func _init() -> void:
 	doom.items.append({"key": "x2", "name": "x2", "tier": "Decisive", "target": "", "description": ""})
 	doom.actions_left = 5
 	var clock_doom: float = doom.clock_ms
-	doom._use_item(0)
+	doom._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	doom._item_confirm_untargeted()
 	check(doom.score == 2000 and doom.clock_ms > clock_doom, # issue 57: x10
 		"Doomsday Autoclicker: +200 Score and +10s Clock on a Decisive Item use")
 	doom.queue_free()
@@ -306,6 +308,7 @@ func _init() -> void:
 	tape.items.append({"key": "x3", "name": "x3", "tier": "Tactical", "target": "", "description": ""})
 	tape.actions_left = 5
 	tape._use_item(0) # the ONLY held Item — Tape Eraser Magnet's "last held" gate
+	tape._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
 	check(tape.score == 1000 and tape.gold == 50, # issue 57: Score x10, Gold untouched
 		"Tape Eraser Magnet: +100 Score and +50 Gold on using your last held Item")
 	tape.queue_free()
@@ -331,12 +334,14 @@ func _init() -> void:
 	lobbyist.items.append({"key": "x4", "name": "x4", "tier": "Strategic", "target": "", "description": ""})
 	lobbyist.actions_left = 5
 	lobbyist._use_item(0) # non-Tactical use: the grant lands, then x4 itself is removed
+	lobbyist._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
 	check(lobbyist.items.size() == 1 and lobbyist.items[0].tier == "Tactical",
 		"Defense Lobbyist Business Card: a non-Tactical use grants a Tactical Item")
 	lobbyist.items.clear()
 	lobbyist.items.append({"key": "x5", "name": "x5", "tier": "Tactical", "target": "", "description": ""})
 	lobbyist.actions_left = 5
 	lobbyist._use_item(0) # a Tactical use grants nothing
+	lobbyist._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
 	check(lobbyist.items.is_empty(), "Defense Lobbyist Business Card: no grant on a Tactical use")
 	lobbyist.queue_free()
 	await process_frame
@@ -346,10 +351,12 @@ func _init() -> void:
 	await process_frame
 	cancel.items.append({"key": "y1", "name": "y1", "tier": "Tactical", "target": "", "description": ""})
 	cancel.actions_left = 5
-	cancel._use_item(0)
+	cancel._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	cancel._item_confirm_untargeted()
 	check(cancel.items.size() == 1, "Dihydrogen Monoxide Battery: the first Tactical use this Wave is not consumed")
 	cancel.actions_left = 5
 	cancel._use_item(0) # second use this Wave: both artefacts already spent their free use
+	cancel._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
 	check(cancel.items.is_empty(), "the second use this Wave IS consumed")
 	cancel.queue_free()
 	await process_frame
@@ -360,7 +367,8 @@ func _init() -> void:
 	for i in 3:
 		fidelity.items.append({"key": "z", "name": "z", "tier": "Tactical", "target": "", "description": ""})
 		fidelity.actions_left = 5
-		fidelity._use_item(0)
+		fidelity._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+		fidelity._item_confirm_untargeted()
 	check(fidelity.items.size() == 1 and fidelity.items[0].tier == "Strategic",
 		"33rd Degree Fidelity Card: the 3rd Tactical use grants a Strategic Item")
 	fidelity.queue_free()

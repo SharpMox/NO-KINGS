@@ -326,7 +326,8 @@ func _init() -> void:
 	ehh.actions_left = 2
 	ehh.actions_max = 2
 	ehh.items.append(_item("counter_intel", ""))
-	ehh._use_item(0) # untargeted Item, resolves immediately — costs 1 action
+	ehh._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	ehh._item_confirm_untargeted() # costs 1 action
 	check(ehh.actions_left == 2 and ehh.actions_max == 3,
 		"Elvish Hard Hat: an Item as the Turn's first Action refunds it and grants +1 Action")
 	check(ehh.action_log.size() == 1 and ehh.action_log[0].kind == "item",
@@ -355,7 +356,8 @@ func _init() -> void:
 	ehh_second.actions_max = 2
 	ehh_second._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first action: a move
 	ehh_second.items.append(_item("counter_intel", ""))
-	ehh_second._use_item(0) # second action: an Item — too late for the bonus
+	ehh_second._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	ehh_second._item_confirm_untargeted() # second action: an Item — too late for the bonus
 	check(ehh_second.actions_left == 0 and ehh_second.actions_max == 2,
 		"Elvish Hard Hat doesn't fire on an Item that isn't the Turn's first Action")
 	ehh_second.queue_free()
@@ -369,7 +371,8 @@ func _init() -> void:
 	ehh_base.actions_left = 1
 	ehh_base.actions_max = 1
 	ehh_base.items.append(_item("counter_intel", ""))
-	ehh_base._use_item(0)
+	ehh_base._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	ehh_base._item_confirm_untargeted()
 	check(ehh_base.actions_left == 0 and ehh_base.state == ehh_base.State.ENEMY_TURN,
 		"baseline: spending a single-action Turn's only action on an Item auto-passes the turn")
 	ehh_base.queue_free()
@@ -385,7 +388,8 @@ func _init() -> void:
 	ehh_trap.actions_left = 1
 	ehh_trap.actions_max = 1
 	ehh_trap.items.append(_item("counter_intel", ""))
-	ehh_trap._use_item(0)
+	ehh_trap._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
+	ehh_trap._item_confirm_untargeted()
 	check(ehh_trap.actions_left == 1 and ehh_trap.state == ehh_trap.State.PLAYER_TURN,
 		"Elvish Hard Hat refunds the Item's action before the auto-pass check — an already-passed turn is never resurrected because the turn never passes")
 	ehh_trap.queue_free()

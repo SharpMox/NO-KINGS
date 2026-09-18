@@ -2698,8 +2698,22 @@ func _use_item(index: int) -> void:
 		_set_drawer("")
 	var it: Dictionary = items[index]
 	if it.target == "":
-		_consume_item(index, it)
-		_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
+		# NO-124: Max's click budget is "select, confirm" for an untargeted
+		# Item — arming used to commit on the spot (1 click), one short of
+		# that floor. Arm and show the floating Confirm affordance instead;
+		# only the affordance actually spends it (autoplay drives no UI, so
+		# it still resolves in the one call, same as every other bypass here).
+		if autoplay:
+			_consume_item(index, it)
+			return _item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
+		item_active = index
+		item_stage_a = Vector2i(-1, -1) # NO-121: same "no stale state from a
+		item_targets = [] # previous item" guard as the targeted arm below —
+		item_pending_tile = Vector2i(-1, -1) # this one just has nothing to stage
+		hud.hide_tip()
+		_clear_selection()
+		placing_id = ""
+		_refresh()
 		return
 	if it.key == "buff_box" and pending_buff == "": # pick the buff, then the target
 		item_active = index
@@ -2725,6 +2739,22 @@ func _item_reset() -> void:
 	pending_buff = ""
 	hud.hide_tip() # NO-121: a description left over from browsing targets
 		# must not outlive the targeting it described
+
+
+## NO-124: commits an armed, untargeted Item — the floating Confirm
+## affordance's handler when the active Item has no target (Counter-Intel,
+## Surprise Attack). Mirrors _item_confirm_target/_item_confirm_multi below;
+## Cancel needs no button of its own, since tapping the armed chip again
+## (_use_item's own "tap again to cancel" branch) already disarms for free.
+func _item_confirm_untargeted() -> void:
+	if item_active < 0:
+		return
+	var it: Dictionary = items[item_active]
+	if it.target != "":
+		return
+	_consume_item(item_active, it)
+	_item_reset()
+	_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
 
 
 ## Return the run to the last state the save schema can represent, so
@@ -2757,7 +2787,8 @@ func _rollback_for_save() -> void:
 		_choice_pick_cancelled()
 	if item_active != -1:
 		_item_reset() # nothing is consumed at _begin targeting: _consume_item
-			# runs on the instant-item branch or on confirm, never here
+			# runs only on confirm (NO-124: including an untargeted Item's own
+			# confirm now — arming it no longer commits on the spot), never here
 	if artefact_targeting_key != "":
 		_artefact_targeting_reset()
 	if army_targeting:
@@ -2909,15 +2940,10 @@ func _item_target_tip(t: Vector2i) -> void:
 
 func _item_click(tile: Vector2i) -> void:
 	var it: Dictionary = items[item_active]
-	if it.target == "area": # any tap re-anchors the preview; a second tap on
-		# the same anchor stages it for confirm below (NO-121) instead of
-		# committing straight away
+	if it.target == "area": # any tap re-anchors the preview and restages it
 		if tile != item_stage_a:
 			item_stage_a = tile
 			item_targets = _item_stage_targets(it, tile)
-			_item_target_tip(tile)
-			_refresh()
-			return
 	elif not item_targets.has(tile):
 		return
 	if it.target == "multi": # taps toggle; hud's Extract button confirms
@@ -2934,81 +2960,79 @@ func _item_click(tile: Vector2i) -> void:
 		_item_target_tip(tile)
 		_refresh()
 		return
-	# NO-121: the tap that used to commit right here now stages the target
-	# and waits — autoplay.gd's Buff Box branch is the one caller that drives
-	# this single call expecting a full commit (it has no confirm to
-	# bypass, same as _item_confirm_multi's own autoplay branch below), so it
-	# skips straight past the gate. A real player's tap on a DIFFERENT valid
-	# target re-stages (fresh description); only a second tap on the SAME
-	# tile opens the confirm gate. Nothing is spent either way until then —
-	# Economy.charge for ability_cost fires inside _item_apply, on commit.
+	# NO-124: `tile` is now a complete, confirmable target — a "tile" item's
+	# only valid tap, a "pair"'s second pick, or an "area" anchor (fresh or
+	# re-anchored, both land here since the branch above never returns early
+	# any more). Max's click budget is select/target/confirm, so the old
+	# "tap the SAME tile again to open a gate" (NO-121) is gone: stage it and
+	# show the floating Confirm affordance right away. A different valid tap
+	# just re-stages (the branches above), and only the Confirm affordance
+	# actually spends the Item — Economy.charge for ability_cost still fires
+	# inside _item_apply, on commit, so a target that's never confirmed costs
+	# nothing. autoplay.gd's Buff Box branch is the one caller that drives
+	# this single call expecting a full commit (it has no affordance to
+	# press), so it still skips straight past the stage.
 	if autoplay:
 		_consume_item(item_active, it)
 		var auto_a := item_stage_a
 		_buff_pick = pending_buff
 		_item_reset()
 		return _item_apply(it, auto_a, tile)
-	if item_pending_tile != tile:
-		item_pending_tile = tile
-		_item_target_tip(tile)
-		_refresh()
+	item_pending_tile = tile
+	_item_target_tip(tile)
+	_refresh()
+
+
+## NO-124: commits the target staged in item_pending_tile — the floating
+## Confirm affordance's handler (hud.gd's multi_confirm_btn, generalised to
+## every targeting shape rather than just "multi"'s own Extract). Cancel
+## needs no button of its own: tapping the armed chip again (_use_item)
+## already disarms for free, same gesture whether or not a target is staged.
+func _item_confirm_target() -> void:
+	if item_active < 0 or item_pending_tile.x < 0:
 		return
+	var it: Dictionary = items[item_active]
 	var a := item_stage_a
-	var payload := {"index": item_active, "a": a, "b": tile}
-	_open_choice_pick("Use %s?" % it.name, [{"label": "Confirm", "value": payload}],
-		"Cancel", _item_target_confirmed, _item_target_cancelled)
-
-
-func _item_target_confirmed(payload: Dictionary) -> void:
-	if item_active != payload.index: # state moved on (e.g. a save rollback
-		return                       # cancelled it already) — nothing to commit
-	var it: Dictionary = items[payload.index]
+	var b := item_pending_tile
 	_consume_item(item_active, it)
 	_buff_pick = pending_buff # _item_reset clears it; the effect still needs it
 	_item_reset()
-	_item_apply(it, payload.a, payload.b)
+	_item_apply(it, a, b)
 
 
-## Cancelling the confirm disarms the Item entirely, same as tapping its chip
-## again (_use_item) — consistent with "a cancelled targeting costs nothing"
-## (_item_apply's own ability_cost comment below): nothing was ever charged,
-## so there is nothing partial to preserve, and re-arming is one tap away.
-func _item_target_cancelled() -> void:
-	_item_reset()
-	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
-		_set_drawer("inventory")
-	else:
-		_refresh()
-
-
-## The Extract button on a "multi" item's current selection (>= 1 picks
-## required). NO-121: this WAS the commit — it now opens the same confirm
-## gate the "tile"/"pair"/"area" tap does, so every Item shape asks once
-## before it actually spends. autoplay.gd calls this directly expecting a
-## full commit (it drives no UI, so there's nothing for it to confirm),
-## same bypass as _item_click's own autoplay branch above.
+## The floating Confirm affordance's handler for a "multi" item's current
+## selection (>= 1 picks required) — the same affordance tile/pair/area
+## items use for their own final confirm (_item_confirm_target above).
+## NO-121 had this open a SECOND confirm-gate modal on top of itself; NO-124
+## removes that — pressing the floating button IS the confirm now, matching
+## Max's select/target/confirm click budget. autoplay.gd calls this directly
+## expecting a full commit (it drives no UI, so there's nothing to confirm).
 func _item_confirm_multi() -> void:
 	if item_active < 0 or item_selected.is_empty():
 		return
 	var it: Dictionary = items[item_active]
-	if autoplay:
-		return _item_multi_confirmed({"index": item_active, "picks": item_selected.duplicate()})
-	var payload := {"index": item_active, "picks": item_selected.duplicate()}
-	_open_choice_pick("Use %s on %d target%s?" % [it.name, item_selected.size(),
-			"" if item_selected.size() == 1 else "s"],
-		[{"label": "Confirm", "value": payload}], "Cancel",
-		_item_multi_confirmed, _item_target_cancelled)
-
-
-func _item_multi_confirmed(payload: Dictionary) -> void:
-	if item_active != payload.index:
-		return
-	var it: Dictionary = items[payload.index]
 	_consume_item(item_active, it)
-	_extract_sel = payload.picks
+	_extract_sel = item_selected.duplicate()
 	_buff_pick = pending_buff
 	_item_reset()
 	_item_apply(it, Vector2i(-1, -1), Vector2i(-1, -1))
+
+
+## NO-124: the floating Confirm affordance's single entry point (hud.gd's
+## multi_confirm_pressed) — routes to whichever targeting is actually live.
+## Item targeting and Bovine Tractor Beam targeting are mutually exclusive
+## (_army_ability_available/_artefact_activation_available), so at most one
+## branch below is ever reachable.
+func _confirm_target_pressed() -> void:
+	if item_active >= 0:
+		var it: Dictionary = items[item_active]
+		if it.target == "multi":
+			return _item_confirm_multi()
+		if it.target == "":
+			return _item_confirm_untargeted()
+		return _item_confirm_target()
+	if artefact_targeting_key != "":
+		_artefact_confirm_target()
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
@@ -3087,8 +3111,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
 		return _on_pass() # last action, or the item cleared the last enemy
 	_reopen_inventory_if_usable() # NO-85 story 59-60: every item completion
-		# funnels through here, so one call covers _use_item's instant branch,
-		# _item_click's final branch and _item_confirm_multi.
+		# funnels through here, so one call covers _item_confirm_untargeted,
+		# _item_confirm_target and _item_confirm_multi.
 	_refresh()
 
 
@@ -3695,43 +3719,33 @@ func _artefact_target_click(tile: Vector2i) -> void:
 				Rect2(_tile_px(tile), Vector2(self.tile, self.tile)))
 		_refresh()
 		return
-	# NO-121: the second pick used to commit on the spot; it now stages once
-	# (tile is always empty here — Rules.placement_tiles — so there is never
-	# a piece to describe) and waits for a re-tap on the SAME tile before
-	# opening the confirm gate, same shape as _item_click's own final tap.
-	# autoplay.gd drives both picks itself with no confirm to bypass — same
-	# reasoning as _item_click's autoplay branch.
+	# NO-124: the second pick is now a complete, confirmable target — stage it
+	# and show the floating Confirm affordance right away (tile is always
+	# empty here, Rules.placement_tiles, so there is never a piece to
+	# describe). The old re-tap-the-SAME-tile gate (NO-121) is gone, same
+	# change as _item_click's own final tap. autoplay.gd drives both picks
+	# itself with no affordance to bypass — same reasoning as _item_click's
+	# autoplay branch.
 	if autoplay:
 		return _commit_artefact_target(artefact_target_stage_a, tile)
-	if artefact_pending_tile != tile:
-		artefact_pending_tile = tile
-		_refresh()
+	artefact_pending_tile = tile
+	_refresh()
+
+
+## NO-124: commits Bovine Tractor Beam's staged target — the floating
+## Confirm affordance's handler while Artefact targeting (rather than Item
+## targeting) is active. Cancel needs no button of its own: tapping the
+## Activate chip again (_begin_artefact_targeting) already disarms for free.
+func _artefact_confirm_target() -> void:
+	if artefact_targeting_key == "" or artefact_pending_tile.x < 0:
 		return
-	var payload := {"a": artefact_target_stage_a, "b": tile}
-	_open_choice_pick("Use %s?" % _artefact_entry(artefact_targeting_key).name,
-		[{"label": "Confirm", "value": payload}], "Cancel",
-		_artefact_target_confirmed, _artefact_target_cancelled)
-
-
-func _artefact_target_confirmed(payload: Dictionary) -> void:
-	if artefact_targeting_key == "": # state moved on — nothing to commit
-		return
-	_commit_artefact_target(payload.a, payload.b)
-
-
-func _artefact_target_cancelled() -> void:
-	_artefact_targeting_reset()
-	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
-		_set_drawer("inventory")
-	else:
-		_refresh()
+	_commit_artefact_target(artefact_target_stage_a, artefact_pending_tile)
 
 
 func _commit_artefact_target(from: Vector2i, to: Vector2i) -> void:
 	_artefact_targeting_reset()
 	bovine_used_this_wave = true # charged only now — both picks landed; a
-		# cancel (re-tapping the chip, or the confirm gate's own Cancel)
-		# never reaches this line
+		# cancel (re-tapping the Activate chip) never reaches this line
 	_add_slide(from, to)
 	board[to] = board[from]
 	board.erase(from)
@@ -4424,7 +4438,7 @@ func _connect_hud() -> void:
 	hud.king_ability_pressed.connect(_show_king_abilities)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
-	hud.multi_confirm_pressed.connect(_item_confirm_multi)
+	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)

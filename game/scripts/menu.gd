@@ -856,7 +856,8 @@ func _ready() -> void:
 	# reaches with no CLI flag — see device_info_center's own comment. Sits
 	# beside Back so it's reachable without scrolling past the scenario
 	# sections.
-	_button(test_box, "Device info", 20, _show_device_info)
+	var device_info_btn := _button(test_box, "Device info", 20, _show_device_info)
+	device_info_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list, same as every row/header/Back above
 	# issue 77: 53 scenarios in one flat column is unscannable. Sections are
 	# DERIVED from the names rather than stored, so scenarios.gd is untouched
 	# and anything added later groups itself by how it is named.

@@ -148,7 +148,10 @@ func _init() -> void:
 		"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
 	var row: Button = null
 	for c in scroll.get_child(0).get_children():
-		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back":
+		# "Device info" is a fixed row beside Back, not a scenario — same
+		# exclusion as test_menu_clicks.gd's accordion-collapse check.
+		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back" \
+				and c.text != "Device info":
 			var r: Rect2 = c.get_global_rect()
 			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
 				row = c
@@ -175,7 +178,10 @@ func _init() -> void:
 	fired = false
 	row = null
 	for c in scroll.get_child(0).get_children():
-		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back":
+		# "Device info" is a fixed row beside Back, not a scenario — same
+		# exclusion as test_menu_clicks.gd's accordion-collapse check.
+		if c is Button and c.visible and not c.text.begins_with("▾") and c.text != "← Back" \
+				and c.text != "Device info":
 			var r: Rect2 = c.get_global_rect()
 			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
 				row = c

@@ -1441,7 +1441,33 @@ func _init() -> void:
 	await process_frame
 	check(game.item_targets.size() == 1 and game.item_targets[0] == Vector2i(2, 4),
 		"Blitz offers the queen (its only own piece), whether moved or not")
+	# NO-121: the tap that used to commit now stages the target and shows its
+	# description, waiting for a confirm — a real click, not an internal call.
 	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.item_pending_tile == Vector2i(2, 4) and not game.items.is_empty(),
+		"NO-121: the first tap stages the target — the Item is not spent yet")
+	check(game.hud.tip_key != "", "NO-121: the pending target's description shows")
+	# a click elsewhere on the board while nothing is pending yet still just
+	# re-stages (Blitz has only the one legal target here, so re-tapping the
+	# SAME tile is the only way to reach the gate)
+	_click(game._tile_px(Vector2i(2, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"NO-121: re-tapping the pending tile opens the confirm gate")
+	# NO-121 trap (CLAUDE.md "tests that pass for the wrong reason"): the gate
+	# is a full-rect panel — a click aimed at a board tile now lands on its
+	# backdrop and must be CONSUMED there, not reach the board underneath.
+	# Click somewhere that is not Confirm/Cancel and assert both that nothing
+	# committed AND that the gate is still open (a click that did nothing
+	# would look identical to one silently mis-routed to the board).
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible
+			and not game.items.is_empty(),
+		"NO-121: a backdrop click is consumed by the gate, not the board underneath")
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the Item confirm gate")
 	await process_frame
 	check(game.items.is_empty() and not game.moved_this_turn.has(Vector2i(2, 4))
 			and game.actions_left == inv_acts,
@@ -1456,7 +1482,8 @@ func _init() -> void:
 		"the freed second move genuinely happens and still costs no action")
 
 	# Drone Strike: area targeting by real clicks — anchor previews the 3x3,
-	# tapping the anchor again confirms the wipe (rework-items/02)
+	# tapping the anchor again stages it, a third tap opens the confirm gate
+	# (NO-121; the wipe itself used to happen straight off the second tap)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4],
@@ -1474,14 +1501,24 @@ func _init() -> void:
 	await process_frame
 	check(game.item_active >= 0 and game.item_targets.size() == 9,
 		"anchor click previews the 3x3")
-	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # re-tap: stage
+	await process_frame
+	check(game.item_pending_tile == Vector2i(5, 5) and not game.items.is_empty(),
+		"NO-121: re-tapping the anchor stages it — still not spent")
+	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # re-tap: open the gate
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"NO-121: a third anchor tap opens the confirm gate")
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the Drone Strike confirm gate")
 	await process_frame
 	check(not game.board.has(Vector2i(5, 5)) and not game.board.has(Vector2i(4, 4))
 			and game.items.is_empty(),
-		"anchor re-click confirms the strike")
+		"confirming the anchor wipes the 3x3")
 
 	# Extraction: multi targeting by real clicks — taps toggle picks, the
-	# floating Extract button confirms (rework-items/03)
+	# floating Extract button now opens the confirm gate instead of
+	# committing directly (NO-121; rework-items/03)
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
@@ -1502,9 +1539,29 @@ func _init() -> void:
 		"picking a piece shows the Extract confirm")
 	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
 	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible and not game.items.is_empty()
+			and game.board.has(Vector2i(4, 4)),
+		"NO-121: the Extract button opens the confirm gate instead of committing")
+	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"),
+		"NO-121: Cancel clickable on the Extract confirm gate")
+	await process_frame
+	check(not game.buff_pick_open and game.item_active == -1
+			and not game.items.is_empty() and game.board.has(Vector2i(4, 4)),
+		"NO-121: cancelling disarms Extraction entirely — nothing spent, board untouched")
+	check(await _click_button_in(game.hud.items_grid, "Extraction"),
+		"Extraction re-armable after a cancel")
+	await process_frame
+	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the Extract confirm gate")
+	await process_frame
 	check(not game.board.has(Vector2i(4, 4)) and game.stock.has("knight")
 			and game.items.is_empty(),
-		"Extract click returns the pick to Stock")
+		"Extract confirm returns the pick to Stock")
 
 	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
 	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for
@@ -2076,8 +2133,10 @@ func _init() -> void:
 		"confirming activates it: 25 Gold spent, +400 Score (earn() also grants " +
 		"the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
 
-	# Bovine Tractor Beam: the one TARGETED activation — no confirm modal;
-	# tapping the chip again mid-targeting cancels instead (user ruling).
+	# Bovine Tractor Beam: the one TARGETED activation. Tapping the chip again
+	# MID-STAGE (before stage B) still cancels straight from targeting, no
+	# confirm modal involved (user ruling, unchanged). NO-121 put a confirm
+	# gate behind stage B itself, same shape as an Item's own final tap.
 	# Targeting DOES hand the drawer back to the board (same as a targeted
 	# Item), so cancelling requires reopening Inventory to reach the chip.
 	game.queue_free()
@@ -2114,11 +2173,20 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A again
 	await process_frame
 	var bovine_dest: Vector2i = game.artefact_targets[0]
-	_click(game._tile_px(bovine_dest) + Vector2(game.tile, game.tile) / 2) # stage B: commit
+	_click(game._tile_px(bovine_dest) + Vector2(game.tile, game.tile) / 2) # stage B: stage only (NO-121)
+	await process_frame
+	check(game.artefact_pending_tile == bovine_dest and game.board.has(Vector2i(7, 10)),
+		"NO-121: the first stage-B tap stages the destination — the Rook has not moved yet")
+	_click(game._tile_px(bovine_dest) + Vector2(game.tile, game.tile) / 2) # re-tap: open the confirm gate
+	await process_frame
+	check(game.buff_pick_open and game.modals.buff_panel.visible,
+		"NO-121: re-tapping the pending destination opens the confirm gate")
+	check(await _click_button_in(game.modals.buff_panel, "Confirm"),
+		"NO-121: Confirm clickable on the Bovine Tractor Beam confirm gate")
 	await process_frame
 	check(game.artefact_targeting_key == "" and not game.board.has(Vector2i(7, 10)) \
 			and game.board.get(bovine_dest, {}).get("id", "") == "rook" and game.bovine_used_this_wave,
-		"completing both taps relocates the enemy piece and spends the once-per-Wave charge")
+		"confirming relocates the enemy piece and spends the once-per-Wave charge")
 	# NO-85 story 60: this scenario holds only Bovine, now spent for the Wave —
 	# nothing left to do in the Inventory Drawer, so it stays closed.
 	check(game.hud.drawer_open == "",

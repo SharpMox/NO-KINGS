@@ -46,6 +46,16 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
+## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
+## target now stages it and waits — this headless-drives the second tap that
+## opens the confirm gate plus the gate's own Confirm, so existing effect
+## assertions still read like a single commit.
+func _item_confirm_tap(g, t: Vector2i) -> void:
+	g._item_click(t)
+	g._item_click(t)
+	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+
+
 func _init() -> void:
 	# --- Piece Buffs (slice 03): Buff Box picks a buff, then targets a piece;
 	# Shield repels one capture from either side; Critical doubles one capture
@@ -63,7 +73,7 @@ func _init() -> void:
 	bb._buff_chosen("shield")
 	check(bb.item_targets.has(Vector2i(2, 2)) and bb.item_targets.has(Vector2i(3, 3)),
 		"buff targeting offers both allies and enemies")
-	bb._item_click(Vector2i(2, 2)) # shield the queen
+	_item_confirm_tap(bb, Vector2i(2, 2)) # shield the queen
 	check(BuffLogic.has(bb.board[Vector2i(2, 2)], "shield"), "the buff lands on the target")
 	check(bb.items.is_empty(), "the Buff Box is spent")
 
@@ -123,7 +133,7 @@ func _init() -> void:
 	BuffLogic.add(rj.board[Vector2i(2, 2)], "shield")
 	rj.items.append(_item("radar_jamming", "tile"))
 	rj._use_item(0)
-	rj._item_click(Vector2i(2, 2))
+	_item_confirm_tap(rj, Vector2i(2, 2))
 	check(BuffLogic.of(rj.board[Vector2i(2, 2)]).is_empty(),
 		"Radar Jamming strips piece buffs")
 	rj.queue_free()
@@ -373,14 +383,14 @@ func _init() -> void:
 	check(not ArtefactHooks._demoted(pr.defs, pr_ranked), "a freshly Ranked piece is not Demoted")
 
 	pr._use_item(0) # "demote"
-	pr._item_click(Vector2i(3, 2)) # sergeant -> pawn (chain_base)
+	_item_confirm_tap(pr, Vector2i(3, 2)) # sergeant -> pawn (chain_base)
 	var pr_demoted: Dictionary = pr.board[Vector2i(3, 2)]
 	check(pr_demoted.id == "pawn" and pr_demoted.get("peak_ranked", false),
 		"Demote drops the id to base but the peak-rank stamp survives")
 	check(ArtefactHooks._demoted(pr.defs, pr_demoted), "below its own peak rank: Demoted")
 
 	pr._use_item(0) # "promote" — "demote" was consumed above, shifting it to index 0
-	pr._item_click(Vector2i(3, 2)) # pawn -> sergeant again: re-Ranked
+	_item_confirm_tap(pr, Vector2i(3, 2)) # pawn -> sergeant again: re-Ranked
 	var pr_reranked: Dictionary = pr.board[Vector2i(3, 2)]
 	check(not ArtefactHooks._demoted(pr.defs, pr_reranked),
 		"re-promoting past the old peak clears Demoted (ruled option b, not \"was ever demoted\")")

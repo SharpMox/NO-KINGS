@@ -50,6 +50,27 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
+## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
+## target now stages it and waits (a different tile re-stages; the SAME tile
+## again opens the confirm gate) — this headless-drives that second tap plus
+## the gate's own Confirm, so existing effect assertions still read like a
+## single commit. For an "area" item, call this AFTER its own anchor tap
+## (unchanged — an anchor still only previews); it supplies the "stage" tap,
+## the "open the gate" tap, and Confirm.
+func _item_confirm_tap(g, t: Vector2i) -> void:
+	g._item_click(t)
+	g._item_click(t)
+	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+
+
+## NO-121: the Extract button (_item_confirm_multi) now opens the same
+## confirm gate instead of committing — this finishes it.
+func _item_confirm_multi_tap(g) -> void:
+	var payload := {"index": g.item_active, "picks": g.item_selected.duplicate()}
+	g._item_confirm_multi()
+	g._item_multi_confirmed(payload)
+
+
 func _init() -> void:
 	# --- review bug 1 (reworked for buttonless merging): removing a selected
 	# piece with an item must drop the selection, not leave a stale board ref
@@ -61,7 +82,7 @@ func _init() -> void:
 	check(a.merge_highlights.has("pawn"), "selection highlights its merge partner")
 	a.items.append(_item("asset_recovery", "tile"))
 	a._use_item(0)
-	a._item_click(Vector2i(2, 2)) # duplicate the selected pawn into stock
+	_item_confirm_tap(a, Vector2i(2, 2)) # duplicate the selected pawn into stock
 	check(a.selected == Vector2i(-1, -1), "item use clears the selection")
 	a._refresh() # would error on a stale board ref
 	check(a.stock.has("pawn") and a.board.has(Vector2i(2, 2)),
@@ -77,7 +98,7 @@ func _init() -> void:
 	await process_frame
 	d.items.append(_item("promote", "tile"))
 	d._use_item(0)
-	d._item_click(Vector2i(2, 2))
+	_item_confirm_tap(d, Vector2i(2, 2))
 	check(d.board[Vector2i(2, 2)].id == "sergeant", "promote advances a pawn to its next tier")
 	d.queue_free()
 	await process_frame
@@ -87,7 +108,7 @@ func _init() -> void:
 	await process_frame
 	e.items.append(_item("invert", "tile"))
 	e._use_item(0)
-	e._item_click(Vector2i(2, 2))
+	_item_confirm_tap(e, Vector2i(2, 2))
 	check(e.board[Vector2i(2, 2)].id == "inv-sergeant", "invert swaps a piece for its inv- counterpart")
 	e.queue_free()
 	await process_frame
@@ -104,7 +125,7 @@ func _init() -> void:
 	check(f.item_targets.has(Vector2i(0, 0)), "zone tiles are deploy tiles")
 	check(f.item_targets.has(Vector2i(3, 3)),
 		"tiles touching an ally are deploy tiles")
-	f._item_click(Vector2i(0, 0))
+	_item_confirm_tap(f, Vector2i(0, 0))
 	check(f.board.has(Vector2i(0, 0)) and not f.board.has(Vector2i(2, 2)),
 		"rapid deployment moves the piece")
 	f.queue_free()
@@ -122,7 +143,7 @@ func _init() -> void:
 	h._use_item(0)
 	check(h.item_targets.size() == 1 and h.item_targets.has(Vector2i(3, 5)),
 		"radar jamming targets only buffed pieces")
-	h._item_click(Vector2i(3, 5))
+	_item_confirm_tap(h, Vector2i(3, 5))
 	check(BuffLogic.of(h.board[Vector2i(3, 5)]).is_empty(),
 		"radar jamming strips the piece buff")
 	h.queue_free()
@@ -139,7 +160,7 @@ func _init() -> void:
 	ds._use_item(0)
 	ds._item_click(Vector2i(3, 5)) # anchor: preview only, not spent yet
 	check(not ds.items.is_empty(), "area anchor tap previews without spending")
-	ds._item_click(Vector2i(3, 5)) # confirm
+	_item_confirm_tap(ds, Vector2i(3, 5)) # confirm (one more tap + the gate's own Confirm)
 	check(not ds.board.has(Vector2i(3, 5)) and not ds.board.has(Vector2i(2, 4))
 		and not ds.board.has(Vector2i(4, 6)), "drone strike clears the 3x3 (ally included)")
 	check(ds.board.has(Vector2i(3, 4)), "the King survives a drone strike")
@@ -163,7 +184,7 @@ func _init() -> void:
 	check(de.items.size() == 1 and de.item_active == -1, "area cancel leaves the item unspent")
 	de._use_item(0)
 	de._item_click(Vector2i(0, 0))
-	de._item_click(Vector2i(0, 0)) # confirm at the corner
+	_item_confirm_tap(de, Vector2i(0, 0)) # confirm at the corner
 	check(not de.board.has(Vector2i(0, 0)) and not de.board.has(Vector2i(1, 1)),
 		"corner strike destroys the on-board part")
 	de.queue_free()
@@ -189,7 +210,7 @@ func _init() -> void:
 	ex._use_item(0)
 	ex._item_click(Vector2i(2, 2))
 	ex._item_click(Vector2i(3, 3))
-	ex._item_confirm_multi()
+	_item_confirm_multi_tap(ex)
 	check(ex.items.is_empty() and ex.stock.has("dragon-king") and ex.stock.has("pawn")
 		and not ex.board.has(Vector2i(2, 2)) and not ex.board.has(Vector2i(3, 3)),
 		"confirm returns the selection to Stock at current identity")
@@ -208,7 +229,7 @@ func _init() -> void:
 	ez._use_item(0)
 	ez._item_click(Vector2i(2, 2))
 	ez._item_click(Vector2i(4, 2))
-	ez._item_confirm_multi()
+	_item_confirm_multi_tap(ez)
 	var stateful := {"id": "knight", "buff": true}
 	check(ez.stock.has(stateful) and ez.stock.has("knight"),
 		"state rides into Stock; the plain copy stays a bare id")
@@ -243,7 +264,7 @@ func _init() -> void:
 	dm._use_item(0)
 	check(dm.item_targets.has(Vector2i(2, 2)) and not dm.item_targets.has(Vector2i(4, 2)),
 		"Demote offers a promoted piece but not a chainless one")
-	dm._item_click(Vector2i(2, 2))
+	_item_confirm_tap(dm, Vector2i(2, 2))
 	check(dm.board[Vector2i(2, 2)].id == "bishop",
 		"Demote sends the Archbishop back to Bishop, its chain base")
 	dm.queue_free()
@@ -374,6 +395,60 @@ func _init() -> void:
 	check(ItemLogic.stage_targets(rd_board, rd_defs, "rapid_deployment", Vector2i(2, 1))
 			== Rules.placement_tiles(rd_board),
 		"Rapid Deployment stage B is exactly the Deploy tile set")
+
+	# --- NO-121: target confirmation state machine. A tap stages the target
+	# and previews it without spending anything; a DIFFERENT tap moves the
+	# stage; the SAME tile again opens the confirm gate (still unspent); and
+	# cancelling costs nothing — asserted on the observable consequence
+	# (item count, board, gold), never an internal flag alone (CLAUDE.md:
+	# "Tests that pass for the wrong reason").
+	# NO-105: BOTH targets must actually be demotable (a chainless piece
+	# is not a valid target — see the pre-existing "Demote offers a promoted
+	# piece but not a chainless one" check above), so the "different tap"
+	# assertion below exercises a real re-stage, not a silently ignored tap.
+	var tc := _boot({"board": [["archbishop", 0, 2, 2], ["sergeant", 0, 4, 2],
+		["rook", 1, 7, 10]], "wave": 3, "gold": 500})
+	await process_frame
+	tc.actions_left = 3
+	tc.items.append(_item("demote", "tile"))
+	tc._use_item(0)
+	tc._item_click(Vector2i(2, 2)) # first tap: stage only, do not commit
+	check(tc.item_pending_tile == Vector2i(2, 2), "a tap stages the target as pending")
+	check(tc.hud.tip_key != "", "the pending target's description shows")
+	check(tc.items.size() == 1 and tc.board[Vector2i(2, 2)].id == "archbishop" and tc.gold == 500,
+		"staging a target spends nothing — item unconsumed, board and gold untouched")
+	tc._item_click(Vector2i(4, 2)) # a DIFFERENT valid target: pending moves
+	check(tc.item_pending_tile == Vector2i(4, 2), "a different tap moves the pending target")
+	check(tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
+		"moving the pending target still spends nothing")
+	tc._item_click(Vector2i(4, 2)) # the SAME tile again: opens the confirm gate
+	check(tc.buff_pick_open and tc.modals.buff_panel.visible,
+		"re-tapping the pending tile opens the confirm gate")
+	check(tc.items.size() == 1 and tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
+		"the open gate itself still hasn't spent anything")
+	tc._choice_pick_cancelled() # "Cancel"
+	check(not tc.buff_pick_open and tc.item_active == -1,
+		"cancelling the confirm gate disarms the Item entirely")
+	check(tc.items.size() == 1 and tc.board[Vector2i(4, 2)].id == "sergeant" and tc.gold == 500,
+		"cancel costs nothing — item unconsumed, board and gold untouched")
+	tc.queue_free()
+	await process_frame
+
+	# --- confirming actually commits: the Item is spent and its effect lands.
+	# Drives the real button-press path (_choice_picked, wired to the stored
+	# Callable), not the internal handler directly.
+	var tc2 := _boot({"board": [["archbishop", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	tc2.actions_left = 3
+	tc2.items.append(_item("demote", "tile"))
+	tc2._use_item(0)
+	tc2._item_click(Vector2i(2, 2)) # stage
+	tc2._item_click(Vector2i(2, 2)) # open the confirm gate
+	tc2._choice_picked({"index": 0, "a": Vector2i(-1, -1), "b": Vector2i(2, 2)}) # "Confirm"
+	check(tc2.items.is_empty() and tc2.board[Vector2i(2, 2)].id == "bishop",
+		"confirming commits: the Item is spent and its effect lands")
+	tc2.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

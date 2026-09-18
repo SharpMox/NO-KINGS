@@ -60,6 +60,16 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
+## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
+## target now stages it and waits — this headless-drives the second tap that
+## opens the confirm gate plus the gate's own Confirm, so existing effect
+## assertions still read like a single commit.
+func _item_confirm_tap(g, t: Vector2i) -> void:
+	g._item_click(t)
+	g._item_click(t)
+	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+
+
 func _init() -> void:
 	# --- issue 23: on_buff_consume (Amityville Ouija Board, Cleopatra's Hairpin)
 	# — game.gd's new _consume_buff choke point
@@ -96,7 +106,7 @@ func _init() -> void:
 	gbr2.actions_left = 5
 	gbr2.items.append(_item("demote", "tile"))
 	gbr2._use_item(0)
-	gbr2._item_click(Vector2i(2, 2))
+	_item_confirm_tap(gbr2, Vector2i(2, 2))
 	check(gbr2.board[Vector2i(2, 2)].id == "pawn" and gbr2.gold == 25,
 		"Guidestone Blood Ritual: +25 Gold whenever a piece (ally or enemy) is Demoted")
 	gbr2.queue_free()
@@ -125,7 +135,7 @@ func _init() -> void:
 	ppr.items.append(_item("buff_box", "tile"))
 	ppr._use_item(0)
 	ppr._buff_chosen("shield")
-	ppr._item_click(Vector2i(2, 2)) # buff the queen — the pawn at (3,3) is adjacent
+	_item_confirm_tap(ppr, Vector2i(2, 2)) # buff the queen — the pawn at (3,3) is adjacent
 	check(BuffLogic.has(ppr.board[Vector2i(2, 2)], "shield")
 			and BuffLogic.has(ppr.board[Vector2i(3, 3)], "shield"),
 		"Pied Piper's Rat Census: applying a Piece Buff copies it to one adjacent ally")
@@ -145,7 +155,7 @@ func _init() -> void:
 		mrna.items.append(_item("buff_box", "tile"))
 		mrna._use_item(0)
 		mrna._buff_chosen("shield")
-		mrna._item_click(t)
+		_item_confirm_tap(mrna, t)
 	check(mrna.board[Vector2i(4, 4)].id == "sergeant",
 		"mRNA Firmware Update: every 3rd Piece Buff you apply also Ranks Up that piece")
 	mrna.queue_free()
@@ -170,13 +180,13 @@ func _init() -> void:
 	ant.actions_left = 5
 	ant.items.append(_item("demote", "tile"))
 	ant._use_item(0)
-	ant._item_click(Vector2i(2, 2))
+	_item_confirm_tap(ant, Vector2i(2, 2))
 	check(ant.board[Vector2i(2, 2)].id == "sergeant",
 		"Antikythera Warranty Card: your pieces cannot be Demoted")
 	BuffLogic.add(ant.board[Vector2i(2, 2)], "shield")
 	ant.items.append(_item("radar_jamming", "tile"))
 	ant._use_item(0)
-	ant._item_click(Vector2i(2, 2))
+	_item_confirm_tap(ant, Vector2i(2, 2))
 	check(BuffLogic.has(ant.board[Vector2i(2, 2)], "shield"),
 		"Antikythera Warranty Card: your Piece Buffs cannot be removed by Radar Jamming")
 	ant.queue_free()
@@ -188,7 +198,7 @@ func _init() -> void:
 	atl.actions_left = 5
 	atl.items.append(_item("demote", "tile"))
 	atl._use_item(0)
-	atl._item_click(Vector2i(2, 2))
+	_item_confirm_tap(atl, Vector2i(2, 2))
 	check(atl.board[Vector2i(2, 2)].id == "sergeant",
 		"Atlantis Snow Globe: your pieces cannot be Demoted")
 	atl.queue_free()

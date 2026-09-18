@@ -52,6 +52,24 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 	return game
 
 
+## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
+## target now stages it and waits — this headless-drives the second tap that
+## opens the confirm gate plus the gate's own Confirm, so existing effect
+## assertions still read like a single commit.
+func _item_confirm_tap(g, t: Vector2i) -> void:
+	g._item_click(t)
+	g._item_click(t)
+	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+
+
+## NO-121: Bovine Tractor Beam's own stage-B tap, same shape.
+func _artefact_confirm_tap(g, t: Vector2i) -> void:
+	var a: Vector2i = g.artefact_target_stage_a
+	g._artefact_target_click(t)
+	g._artefact_target_click(t)
+	g._artefact_target_confirmed({"a": a, "b": t})
+
+
 func _init() -> void:
 	# --- issue 21: echo and meta-triggers (ArtefactHooks._run_meta_triggers) ---
 
@@ -284,7 +302,7 @@ func _init() -> void:
 	bfree._use_item(0)
 	check(bfree.item_targets.has(Vector2i(2, 2)) and not bfree.item_targets.has(Vector2i(0, 0)),
 		"Blitz offers the un-moved queen but excludes the King")
-	bfree._item_click(Vector2i(2, 2))
+	_item_confirm_tap(bfree, Vector2i(2, 2))
 	check(bfree.items.is_empty() and bfree.actions_left == 2, "Blitz costs 0 actions to use")
 	check(bfree.board[Vector2i(2, 2)].get("blitz_free_move", false),
 		"Blitz marks the target's next move/capture as free")
@@ -305,7 +323,7 @@ func _init() -> void:
 		"queen is spent for the turn, 1 action left")
 	bt2._use_item(0)
 	check(bt2.item_targets.has(Vector2i(2, 3)), "Blitz can target an already-moved piece too")
-	bt2._item_click(Vector2i(2, 3))
+	_item_confirm_tap(bt2, Vector2i(2, 3))
 	check(not bt2.moved_this_turn.has(Vector2i(2, 3)) and bt2.actions_left == 1,
 		"Blitz lifts the one-move-per-piece lock, still costing nothing itself")
 	bt2._move_player(Vector2i(2, 3), Vector2i(2, 4))
@@ -318,7 +336,7 @@ func _init() -> void:
 		"wave": 3, "items": ["blitz"]})
 	await process_frame
 	bt3._use_item(0)
-	bt3._item_click(Vector2i(2, 2))
+	_item_confirm_tap(bt3, Vector2i(2, 2))
 	check(bt3.board[Vector2i(2, 2)].get("blitz_free_move", false), "flag set this turn")
 	bt3._begin_player_turn() # simulate the next player turn starting
 	check(not bt3.board[Vector2i(2, 2)].get("blitz_free_move", false),
@@ -338,7 +356,7 @@ func _init() -> void:
 	await process_frame
 	check(bz.actions_left == 1, "Tier 5 grants exactly 1 action at turn start")
 	bz._use_item(0) # Blitz on the un-moved queen
-	bz._item_click(Vector2i(2, 2))
+	_item_confirm_tap(bz, Vector2i(2, 2))
 	check(bz.actions_left == 1 and bz.state == bz.State.PLAYER_TURN,
 		"Blitz itself costs no action, even at Tier 5 — no auto-pass either")
 	bz._move_player(Vector2i(2, 2), Vector2i(2, 3)) # the marked free move
@@ -812,7 +830,7 @@ func _init() -> void:
 	apr._place("knight", Vector2i(0, 0)) # Deployed this Wave — still "did not move"
 	apr._use_item(0)
 	apr._item_click(Vector2i(4, 4)) # stage A: the pawn
-	apr._item_click(Vector2i(4, 5)) # stage B: shoved 1 square — no Action of ITS own
+	_item_confirm_tap(apr, Vector2i(4, 5)) # stage B: shoved 1 square — no Action of ITS own
 	WaveLogic.queue(apr, apr.wave + 1) # clears wave 3
 	check(apr.gold == 6, "Alien Pet Rocks: +2 Gold each for the deployed knight, the " +
 		"shoved pawn, and the untouched bishop (6) — the queen that actually moved doesn't pay")
@@ -1417,8 +1435,10 @@ func _init() -> void:
 	zap_merge.queue_free()
 	await process_frame
 
-	# Bovine Tractor Beam: the one TARGETED activation — no confirm, cancels
-	# from targeting instead (user ruling)
+	# Bovine Tractor Beam: the one TARGETED activation. NO-121 put a confirm
+	# gate behind its stage-B tap, same as an Item's own final tap; cancelling
+	# MID-STAGE (before stage B) still cancels straight from targeting, no
+	# confirm involved (bcancel below).
 	var bov_notarget := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "artefacts": ["bovine-tractor-beam"]}) # an enemy in the initial
 		# config, else _begin_player_turn's "board cleared -> next Wave" branch
@@ -1438,7 +1458,7 @@ func _init() -> void:
 	bov._artefact_target_click(Vector2i(7, 10)) # stage A: the enemy Rook
 	check(bov.artefact_target_stage_a == Vector2i(7, 10), "setup: stage A picked (the enemy Rook)")
 	var dest: Vector2i = bov.artefact_targets[0] # an empty tile on the player's side
-	bov._artefact_target_click(dest)
+	_artefact_confirm_tap(bov, dest)
 	check(not bov.board.has(Vector2i(7, 10)) and bov.board.get(dest, {}).get("id", "") == "rook" \
 			and bov.board[dest].owner == Rules.ENEMY,
 		"Bovine Tractor Beam: the enemy piece relocates to the picked tile on the player's side, ownership unchanged")
@@ -1447,6 +1467,42 @@ func _init() -> void:
 	check(not bov._artefact_activation_available("bovine-tractor-beam"),
 		"Bovine Tractor Beam: unavailable again — once per Wave already spent")
 	bov.queue_free()
+	await process_frame
+
+	# NO-121: Bovine's own stage-B tap goes through the same pending/confirm
+	# gate as an Item's final tap — a tap stages without committing, a
+	# different tap moves the stage, the same tile again opens the gate, and
+	# cancelling the gate costs nothing (asserted on the observable
+	# consequence: the piece's position and the once-per-Wave charge).
+	var bpend := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "artefacts": ["bovine-tractor-beam"]})
+	await process_frame
+	bpend._activate_artefact("bovine-tractor-beam")
+	bpend._artefact_target_click(Vector2i(7, 10)) # stage A: the enemy Rook
+	check(bpend.artefact_targets.size() >= 2,
+		"setup: at least two empty deploy tiles to move the pending pick between")
+	var dest_a: Vector2i = bpend.artefact_targets[0]
+	var dest_b: Vector2i = bpend.artefact_targets[1]
+	bpend._artefact_target_click(dest_a) # first tap: stage only
+	check(bpend.artefact_pending_tile == dest_a, "a tap stages the destination as pending")
+	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
+		"staging a destination spends nothing — the Rook has not moved, the Wave charge is unspent")
+	bpend._artefact_target_click(dest_b) # a DIFFERENT valid destination: pending moves
+	check(bpend.artefact_pending_tile == dest_b, "a different tap moves the pending destination")
+	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
+		"moving the pending destination still spends nothing")
+	bpend._artefact_target_click(dest_b) # the SAME tile again: opens the confirm gate
+	check(bpend.buff_pick_open and bpend.modals.buff_panel.visible,
+		"re-tapping the pending destination opens the confirm gate")
+	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave,
+		"the open gate itself still hasn't moved the piece")
+	bpend._choice_pick_cancelled() # "Cancel"
+	check(not bpend.buff_pick_open and bpend.artefact_targeting_key == "",
+		"cancelling the confirm gate disarms Bovine Tractor Beam entirely")
+	check(bpend.board.has(Vector2i(7, 10)) and not bpend.bovine_used_this_wave \
+			and bpend._artefact_activation_available("bovine-tractor-beam"),
+		"cancel costs nothing — the Rook stayed put, the Wave charge is unspent, still available")
+	bpend.queue_free()
 	await process_frame
 
 	# Jet Fuel Vial: the Shop-only 7th (not part of the in-run Activate set)

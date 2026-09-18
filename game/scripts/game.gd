@@ -1830,6 +1830,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
 				_set_drawer("")
+			# NO-118: same shape, mirrored for the Shop — it isn't one of
+			# hud.drawers (modals.gd owns shop_panel), so it needs its own
+			# check. Goes through modals.close_shop(), the same path the
+			# Close button uses, so shop_closed still fires. Like the drawer
+			# branch above, this does NOT consume the event: `at` below is
+			# still read from the original press, so the same press that
+			# reveals the board also acts on the tile underneath — that is
+			# what the drawer branch already does (see its own comment), and
+			# this mirrors it rather than diverging.
+			if shop_open() and not (modals.shop_panel as Control) \
+					.get_global_rect().has_point(event.position):
+				modals.close_shop()
 			if at.x < 0: # dead UI space: a no-interaction press drops selection
 				if selected.x >= 0 or placing_id != "":
 					placing_id = ""

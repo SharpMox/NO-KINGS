@@ -430,9 +430,7 @@ func show_shop() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 14)
-	close.pressed.connect(func() -> void:
-		_slide_shop(false) # NO-118: animated close; hides shop_panel itself when done
-		shop_closed.emit())
+	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
 	header.add_child(close)
 	root.add_child(header)
 
@@ -542,6 +540,15 @@ func _slide_shop(opening: bool) -> void:
 	_shop_tween.tween_property(shop_panel, "position", rest if opening else hidden, Tuning.PANEL_SLIDE_S)
 	if not opening:
 		_shop_tween.finished.connect(func() -> void: shop_panel.visible = false)
+
+
+## NO-118: the one path that closes the Shop — the Close button and an
+## outside click (game.gd's _unhandled_input) both call this, so
+## shop_closed always fires and whatever listens to it (game.gd:4121:
+## _refresh()) still runs, whichever of the two triggered the close.
+func close_shop() -> void:
+	_slide_shop(false)
+	shop_closed.emit()
 
 
 ## The dock's content for the current expanded tile (or the hint). Called

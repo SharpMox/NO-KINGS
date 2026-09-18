@@ -932,6 +932,9 @@ func refresh() -> void:
 	var inv_panel: PanelContainer = drawers["inventory"]
 	var inv_h := INV_DRAWER_H
 	if inv_panel.custom_minimum_size.y != inv_h:
+		# NO-118: build() always sets custom_minimum_size.y to this same
+		# INV_DRAWER_H, so this branch is unreachable — the position write
+		# below can never stale drawer_rest["inventory"].
 		var inv_w: float = inv_panel.custom_minimum_size.x
 		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
 		inv_panel.position = Vector2(inv_panel.position.x,

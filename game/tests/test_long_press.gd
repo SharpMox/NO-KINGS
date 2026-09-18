@@ -400,6 +400,7 @@ func _init() -> void:
 	# _long_press_input exactly like an Inventory cell, and does not arm it ---
 	game = await _boot_game()
 	game._set_drawer("stock")
+	await _await_drawer_settled(game, "stock") # NO-118
 	var pawn_btn := _stock_button(game, "pawn", false)
 	check(pawn_btn != null, "the Stock drawer has the pawn stack _boot_game() placed")
 	clean = false
@@ -420,19 +421,25 @@ func _init() -> void:
 	# --- a SHORT TAP on the same Stock cell still arms it, as before -----------
 	game = await _boot_game()
 	game._set_drawer("stock")
+	# NO-120 flake, root-caused 2026-09-18, hit AGAIN once #464's drawer slide
+	# landed on main (2026-09-19) — two INDEPENDENT waits, both needed, do not
+	# delete either as "redundant":
+	#   1. _await_drawer_settled (NO-118): the panel itself takes
+	#      Tuning.PANEL_SLIDE_S of real time to slide from drawer_hidden to
+	#      drawer_rest. Read a rect before that finishes and it's the panel's
+	#      MID-SLIDE position, most of a drawer-height off from where it lands.
+	#   2. The plain `await process_frame` below it: GridContainer defers its
+	#      OWN layout sort to the next idle frame, independent of the panel's
+	#      position — the panel arriving at rest does not imply the grid
+	#      inside it has also sorted the freshly rebuilt row into its column.
+	# A LONG press tolerates skipping both (the hold outlasts them, and the
+	# tip is tracked by object, not by screen position); a SHORT tap's release
+	# does not — it lands wherever the button's rect says it is RIGHT NOW,
+	# stale or not.
+	await _await_drawer_settled(game, "stock") # NO-118
 	game.hud.hide_tip()
 	pawn_btn = _stock_button(game, "pawn", false)
-	# NO-120 flake, root-caused 2026-09-18: _set_drawer("stock") just rebuilt
-	# the grid; GridContainer defers its own layout sort to the next idle
-	# frame, so get_global_rect() here can still report the freshly-added
-	# button at its stale, unsorted position. A LONG press survives this
-	# (the hold gives the sort time to settle before it matters, and the
-	# tip is tracked by object, not by screen position); a SHORT tap does
-	# not — the release lands wherever the button ends up once it settles,
-	# which can be a different control entirely. One frame is what the
-	# earlier freed-button trap (test_game_clicks.gd's _pool_rows) already
-	# waits out; here the row survives, but not yet at its settled rect.
-	await process_frame
+	await process_frame # grid sort, independent of the drawer-settle above
 	var ppos: Vector2 = pawn_btn.get_global_rect().get_center()
 	_mouse(true, ppos)
 	await process_frame

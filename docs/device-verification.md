@@ -25,6 +25,41 @@ that the probes were telling the truth about hardware.
 
 ---
 
+## `feat/notch-diagnostic` — 2026-09-18, desktop only, no hardware run yet — Header notch inset on Max's own device
+
+Max reported the Header reserving extra space on a phone he describes as
+having no notch. Desktop could not reproduce it: with the safe-top inset
+forced to 0 the Header's content starts at row 42, forced to 56 it starts at
+row 157 — a 115px shift against ~119px expected, inside anti-aliasing noise.
+NO-83's formula (`hud_top = safe_top + HudScript.HEADER_H`, `game.gd`) is
+correct by inspection, and there is no dead space inside the Header's own
+110px. **Nobody has read the actual `DisplayServer.get_display_safe_area()`
+numbers off Max's hardware.** The only prior on-device measurement in this
+file is an iPhone 11 (`e8160ab`, below: 48pt top inset / 56 canvas px) — a
+different device, iOS, not necessarily the platform Max's phone runs. A
+device-model lookup table was rejected as unbounded; the platform already
+reports the real numbers, so this pass just surfaces them.
+
+Added a read-only diagnostic — TEST menu → "Device info"
+(`game/scripts/menu.gd`, `_show_device_info` / `_device_info_text`) — that
+reports `OS.get_model_name()`, `OS.get_name()`/version,
+`DisplayServer.window_get_size()`, `get_display_safe_area()`,
+`screen_get_usable_rect()`, `screen_get_size()`, and the `safe_top_px` /
+`hud_top` values the layout actually uses. Desktop capture (windowed, under
+the lock, `--screenshot <dir> --show-device-info`):
+`~/Documents/nokings-builds/notch-diagnostic-2026-09-18/menu.png` — every
+value reads 0 or its desktop equivalent, as expected (`safe_top_px` returns
+0 because `OS.has_feature("mobile")` is false on desktop; `hud_top` reads
+110.0, exactly `HudScript.HEADER_H`).
+
+### Still unverified
+
+| What | Why it matters |
+| --- | --- |
+| **The Header's real safe-area numbers on Max's phone** | Whether the reserved space is bogus (a status-bar leftover, `immersive_mode` not taking effect) or correct platform behaviour for a punch-hole camera cutout — the fix differs completely, and nobody has read the numbers to tell which. Read them from TEST → Device info on the device and report back. |
+
+---
+
 ## `bcbc8d3` — 2026-09-16, Android **EMULATOR, not hardware** — NO-10 Back / tall-screen fill / logout, three checks
 
 **Not a device.** Emulator AVD `nokings_api35` (system-images/android-35/google_apis,

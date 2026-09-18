@@ -58,6 +58,16 @@ func _item(key: String, target: String) -> Dictionary:
 	return {"key": key, "name": key, "tier": "Tactical", "target": target, "description": ""}
 
 
+## NO-121: the tap that used to commit a "tile"/"pair"/"area" Item's final
+## target now stages it and waits — this headless-drives the second tap that
+## opens the confirm gate plus the gate's own Confirm, so existing effect
+## assertions still read like a single commit.
+func _item_confirm_tap(g, t: Vector2i) -> void:
+	g._item_click(t)
+	g._item_click(t)
+	g._item_target_confirmed({"index": g.item_active, "a": g.item_stage_a, "b": t})
+
+
 func _init() -> void:
 	# --- review bug 4: ability tariff charges when the item is USED, once —
 	# cancelling a targeted item costs nothing
@@ -70,7 +80,7 @@ func _init() -> void:
 	b._use_item(0) # tap again: cancel
 	check(b.gold == 500, "cancelled item charges no ability tariff")
 	b._use_item(0)
-	b._item_click(Vector2i(2, 2)) # complete the use
+	_item_confirm_tap(b, Vector2i(2, 2)) # complete the use
 	check(b.gold == 500 - Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE["Tactical"], Tuning.TARIFF_ITEM_PCT),
 		"completed item charges the ability tariff once")
 	b.queue_free()
@@ -430,7 +440,7 @@ func _init() -> void:
 	var g_abl: int = abl.gold
 	abl.items.append(_item("demote", "tile"))
 	abl._use_item(0)
-	abl._item_click(Vector2i(2, 2))
+	_item_confirm_tap(abl, Vector2i(2, 2))
 	check_eq(g_abl - abl.gold, Economy.tariff_cut(Tuning.SHOP_ITEM_PRICE["Tactical"], Tuning.TARIFF_ITEM_PCT),
 		"ability_cost bills TARIFF_ITEM_PCT of SHOP_ITEM_PRICE[tier]")
 	abl.queue_free()

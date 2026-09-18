@@ -1133,7 +1133,13 @@ func _rebuild_artefacts_grid() -> void:
 		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
 		artefacts_grid.add_child(none)
-		hide_tip() # nothing left to describe
+		# NO-121: scoped to this grid's OWN "artefact:" keys, same as the
+		# non-empty branch below — an unscoped hide_tip() here was wiping a
+		# Board/Item-target tip (NO-120/NO-121) on every refresh whenever the
+		# player held zero artefacts, since _refresh() runs right after
+		# show_tip() for those.
+		if tip_key.begins_with("artefact:"):
+			hide_tip()
 		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind

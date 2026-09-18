@@ -148,10 +148,18 @@ func _artefact_cell(game: Node, key: String) -> Button:
 
 ## NO-120: Stock/Captured cells carry id + cap as meta (hud.gd's
 ## _build_stack_button), so lookup does not depend on grid order either.
+## Root cause of the "short tap on a Stock cell still arms it" flake
+## (2026-09-18): called right after _set_drawer("stock"), which just
+## triggered _rebuild_stock_drawer — the OLD button is still in
+## get_children() (queue_free is deferred, not immediate) and sorts before
+## the new one Godot just add_child()'d. Same trap test_game_clicks.gd's
+## _pool_rows already documents ("a row held across one is a freed node")
+## and already guards against the same way.
 func _stock_button(game: Node, id: String, cap: bool) -> Button:
 	var grid: Control = game.hud.captured_grid if cap else game.hud.stock_grid
 	for c in grid.get_children():
-		if c is Button and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
+		if c is Button and not c.is_queued_for_deletion() \
+				and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
 			return c
 	return null
 
@@ -414,6 +422,17 @@ func _init() -> void:
 	game._set_drawer("stock")
 	game.hud.hide_tip()
 	pawn_btn = _stock_button(game, "pawn", false)
+	# NO-120 flake, root-caused 2026-09-18: _set_drawer("stock") just rebuilt
+	# the grid; GridContainer defers its own layout sort to the next idle
+	# frame, so get_global_rect() here can still report the freshly-added
+	# button at its stale, unsorted position. A LONG press survives this
+	# (the hold gives the sort time to settle before it matters, and the
+	# tip is tracked by object, not by screen position); a SHORT tap does
+	# not — the release lands wherever the button ends up once it settles,
+	# which can be a different control entirely. One frame is what the
+	# earlier freed-button trap (test_game_clicks.gd's _pool_rows) already
+	# waits out; here the row survives, but not yet at its settled rect.
+	await process_frame
 	var ppos: Vector2 = pawn_btn.get_global_rect().get_center()
 	_mouse(true, ppos)
 	await process_frame

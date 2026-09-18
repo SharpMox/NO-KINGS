@@ -56,6 +56,30 @@ func _click_button_in(node: Node, text: String) -> bool:
 	return false
 
 
+## NO-119: items_grid/artefacts_grid cells carry no name text any more (the
+## tooltip/long-press carries it instead), so probes that used to find a cell
+## by _click_button_in's text match now match its "key" meta instead —
+## hud.gd sets that meta on every cell for exactly this (Items: NO-119,
+## Artefacts: pre-existing, "lookup for probes/tests"). Same shape and same
+## scroll-into-view handling as _click_button_in otherwise.
+func _click_grid_cell(node: Node, key: String) -> bool:
+	if node is Button and node.has_meta("key") and node.get_meta("key") == key \
+			and node.is_visible_in_tree():
+		var p: Node = node.get_parent()
+		while p:
+			if p is ScrollContainer:
+				p.ensure_control_visible(node)
+				await process_frame
+				break
+			p = p.get_parent()
+		_click(node.get_global_rect().get_center())
+		return true
+	for c in node.get_children():
+		if await _click_grid_cell(c, key):
+			return true
+	return false
+
+
 ## NO-32: the Army Ability lives on the DECK button alone now, not in a drawer
 ## chip, so reaching it needs no Inventory step. Every Ability press below goes
 ## through here, which is also the pin that the deck button is the one home.
@@ -865,12 +889,19 @@ func _init() -> void:
 		"and it comes back ready once an Action exists again")
 	await process_frame
 
-	# ---- ONE ICON SIZE, ACROSS ALL THREE STRIPS (NO-36) ---------------------
+	# ---- ONE ICON SIZE, ACROSS ALL THREE STRIPS (NO-36, resized NO-119) ------
 	# Items were 30px, stock stacks 46, the strip 52 before these were pulled
 	# onto one constant. PR #312's pin named that drift but walked only
 	# stock_strip — and on a config with no Stock that container is empty, so the
 	# pin asserted nothing whatsoever. The two strips that ACTUALLY drifted, the
 	# item strip and the pool strip, were never inspected.
+	#
+	# NO-119 dropped the icon size's tie to the board tile (hud.gd's old ICON
+	# var) in favour of a flat Tuning.OFFBOARD_ICON for every off-board grid,
+	# and dropped the item strip's name text — so the KNOWN EXCEPTION below
+	# (item cells sized ICON-8 to leave room for a name beside the icon) is
+	# gone too: every cell, item or pool, is now the same OFFBOARD_ICON square,
+	# no separate case.
 	#
 	# So: a dedicated instance holding Stock AND items, both drawers visited, and
 	# every strip asserted NON-EMPTY first — a vacuous pass is the exact failure
@@ -885,14 +916,12 @@ func _init() -> void:
 	root.add_child(icon_game)
 	await process_frame
 	await process_frame
-	var ICON_PX: int = icon_game.hud.ICON
+	var ICON_PX: int = int(Tuning.OFFBOARD_ICON)
 
 	# (1. was the stock strip under the board — retired by NO-83.)
 
-	# 2. the item strip, in the Inventory drawer. KNOWN EXCEPTION, asserted
-	# rather than skipped: the button carries the item NAME beside the icon, so
-	# its width is free and the icon is clamped to ICON - 8 (hud.gd's comment at
-	# the icon_max_width override). Its HEIGHT is still a flat ICON.
+	# 2. the item strip, in the Inventory drawer. No name text any more
+	# (NO-119), so it's the same flat square as every other off-board cell.
 	check(await _click_inventory(icon_game, "Inventory 1"),
 		"Inventory opens for the item strip")
 	await process_frame
@@ -903,13 +932,11 @@ func _init() -> void:
 	check(not item_btns.is_empty(), "(setup) the item strip actually holds buttons to measure")
 	var odd_item: Array = []
 	for b in item_btns:
-		if (b as Button).custom_minimum_size.y != ICON_PX \
-				or (b as Button).get_theme_constant("icon_max_width") != ICON_PX - 8:
-			odd_item.append([(b as Button).custom_minimum_size.y,
-				(b as Button).get_theme_constant("icon_max_width")])
+		if (b as Button).custom_minimum_size != Vector2(ICON_PX, ICON_PX):
+			odd_item.append((b as Button).custom_minimum_size)
 	check(odd_item.is_empty(),
-		"item strip: height is ICON (%d) and the icon clamps to ICON-8 (%d), found: %s"
-			% [ICON_PX, ICON_PX - 8, str(odd_item)])
+		"item strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s"
+			% [ICON_PX, str(odd_item)])
 
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
@@ -926,12 +953,12 @@ func _init() -> void:
 		if (b as Button).custom_minimum_size != Vector2(ICON_PX, ICON_PX):
 			odd_pool.append((b as Button).custom_minimum_size)
 	check(odd_pool.is_empty(),
-		"pool strip: every icon is exactly ICON x ICON (%d), found: %s" % [ICON_PX, str(odd_pool)])
+		"pool strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s" % [ICON_PX, str(odd_pool)])
 
 	# The pool strip grows a "+" take-back slot, but ONLY in SETUP with a board
 	# piece selected -- which is why it kept a hardcoded 46 long after every
-	# stack button beside it moved to ICON. Force that state rather than leave
-	# the one control the pin cannot otherwise reach untested.
+	# stack button beside it moved onto the shared constant. Force that state
+	# rather than leave the one control the pin cannot otherwise reach untested.
 	icon_game.state = icon_game.State.SETUP
 	icon_game.selected = Vector2i(2, 2)
 	icon_game.hud.refresh()
@@ -942,7 +969,7 @@ func _init() -> void:
 			plus_slot = c
 	check(plus_slot != null, "(setup) the take-back \"+\" slot is present in SETUP with a selection")
 	check(plus_slot != null and plus_slot.custom_minimum_size == Vector2(ICON_PX, ICON_PX),
-		"pool strip: the \"+\" take-back slot is ICON too (%d), not the pre-ICON 46" % ICON_PX)
+		"pool strip: the \"+\" take-back slot is OFFBOARD_ICON too (%d), not the pre-NO-36 46" % ICON_PX)
 
 	icon_game.queue_free()
 	await process_frame
@@ -999,7 +1026,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for the Buff Box cancel/pick flow")
 	await process_frame
-	check(await _click_button_in(game.hud.items_grid, "Buff Box"),
+	check(await _click_grid_cell(game.hud.items_grid, "buff_box"),
 		"Buff Box clickable in the drawer")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
@@ -1048,7 +1075,7 @@ func _init() -> void:
 	# NO-118: an auto-reopen (game logic, not _click_inventory) — its own
 	# settle wait, same reason as SETUP's auto-open above.
 	await _await_drawer_settled(game, "inventory")
-	check(await _click_button_in(game.hud.items_grid, "Buff Box"), "Buff Box clickable again")
+	check(await _click_grid_cell(game.hud.items_grid, "buff_box"), "Buff Box clickable again")
 	await process_frame
 	var buff_btn := _first_option_button(game.modals.buff_panel)
 	check(buff_btn != null and "\n" in buff_btn.text,
@@ -1409,7 +1436,7 @@ func _init() -> void:
 			and game.hud.artefacts_grid.is_visible_in_tree(),
 		"inventory drawer shows items and artefacts together")
 	var inv_acts: int = game.actions_left
-	check(await _click_button_in(game.hud.items_grid, "Blitz"),
+	check(await _click_grid_cell(game.hud.items_grid, "blitz"),
 		"item clickable in the inventory drawer")
 	await process_frame
 	check(game.item_targets.size() == 1 and game.item_targets[0] == Vector2i(2, 4),
@@ -1440,7 +1467,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Drone Strike")
 	await process_frame # let the drawer lay out before clicking into it
-	check(await _click_button_in(game.hud.items_grid, "Drone Strike"),
+	check(await _click_grid_cell(game.hud.items_grid, "drone_strike"),
 		"Drone Strike clickable in the drawer")
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2)
@@ -1465,7 +1492,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Extraction")
 	await process_frame # drawer layout before clicking into it
-	check(await _click_button_in(game.hud.items_grid, "Extraction"),
+	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
 		"Extraction clickable in the drawer")
 	await process_frame
 	check(not game.hud.multi_confirm_btn.visible, "no confirm button before any pick")
@@ -2026,7 +2053,7 @@ func _init() -> void:
 			star_chips += 1
 	check(star_chips == 0,
 		"no ★ chip survives in the Artefacts grid — the Ability has exactly one home")
-	check(await _click_button_in(game.hud.artefacts_grid, "✹Oak Island Wishing Well"),
+	check(await _click_grid_cell(game.hud.artefacts_grid, "oak-island-wishing-well"),
 		"the ✹ cell is clickable")
 	await process_frame
 	check(game.buff_pick_open and game.modals.buff_panel.visible,
@@ -2039,7 +2066,7 @@ func _init() -> void:
 	# the confirm modal is the only thing that closed — this activation never
 	# touches the drawer (unlike a targeted Item), so the cell is still
 	# directly clickable with no need to reopen Inventory
-	check(await _click_button_in(game.hud.artefacts_grid, "✹Oak Island Wishing Well"),
+	check(await _click_grid_cell(game.hud.artefacts_grid, "oak-island-wishing-well"),
 		"the ✹ cell is clickable again after a cancel, drawer untouched")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
@@ -2064,7 +2091,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Bovine Tractor Beam")
 	await process_frame
-	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
+	check(await _click_grid_cell(game.hud.artefacts_grid, "bovine-tractor-beam"),
 		"the Bovine Tractor Beam chip is clickable")
 	await process_frame
 	check(not game.buff_pick_open and game.artefact_targeting_key == "bovine-tractor-beam" \
@@ -2075,13 +2102,13 @@ func _init() -> void:
 	check(game.artefact_target_stage_a == Vector2i(7, 10), "tapping the enemy Rook on the board stages it")
 	check(await _click_inventory(game, "Inventory 1"), "Inventory reopens to reach the chip mid-targeting")
 	await process_frame
-	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
+	check(await _click_grid_cell(game.hud.artefacts_grid, "bovine-tractor-beam"),
 		"the chip stays clickable mid-targeting (to cancel)")
 	await process_frame
 	check(game.artefact_targeting_key == "" and game.board.has(Vector2i(7, 10)) \
 			and not game.bovine_used_this_wave and game._artefact_count("bovine-tractor-beam") == 1,
 		"tapping the chip again CANCELS FROM TARGETING — no move, no charge, Artefact untouched")
-	check(await _click_button_in(game.hud.artefacts_grid, "✹Bovine Tractor Beam"),
+	check(await _click_grid_cell(game.hud.artefacts_grid, "bovine-tractor-beam"),
 		"the chip is clickable again after a targeting cancel (drawer still open post-cancel)")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2) # stage A again
@@ -2115,25 +2142,25 @@ func _init() -> void:
 	game.actions_left = 5 # generous: isolates the reopen rule from auto-pass-at-0
 	check(await _click_inventory(game, "Inventory 2"), "Inventory opens for the reopen-rule probe")
 	await process_frame
-	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable")
+	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "Sniper clickable")
 	await process_frame
 	check(game.item_active == 0 and game.hud.drawer_open == "",
 		"arming an Item that needs a board target closes the Drawer")
 	check(await _click_inventory(game, "Inventory 2"), "reopen to reach the item and cancel it")
 	await process_frame
-	check(await _click_button_in(game.hud.items_grid, "Sniper"), "tap the armed Sniper again: cancel")
+	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "tap the armed Sniper again: cancel")
 	await process_frame
 	check(game.item_active == -1 and game.hud.drawer_open == "inventory",
 		"cancelling targeting always reopens the Drawer (story 58)")
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
-	check(await _click_button_in(game.hud.items_grid, "Sniper"), "Sniper clickable again")
+	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "Sniper clickable again")
 	await process_frame
 	_click(game._tile_px(Vector2i(5, 5)) + Vector2(game.tile, game.tile) / 2) # Sniper's target: the rook
 	await process_frame
 	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
 		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
-	check(await _click_button_in(game.hud.items_grid, "Sniper"), "the remaining Sniper clickable")
+	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "the remaining Sniper clickable")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
 	await process_frame

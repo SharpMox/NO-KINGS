@@ -673,7 +673,8 @@ func _ready() -> void:
 		get_tree().quit()
 	_refresh()
 	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
-		if is_scenario and (args.has("--select") or args.has("--arm-item")):
+		if is_scenario and (args.has("--select") or args.has("--arm-item")
+				or args.has("--open-shop") or args.has("--open-drawer")):
 			_debug_state_screenshot(screenshot_dir, args) # NO-122: arm a preview, then shoot
 		else:
 			_screenshot_and_quit(screenshot_dir)
@@ -3984,7 +3985,10 @@ func _screenshot_and_quit(dir: String) -> void:
 ## the shot proves NO-122's blast/strike zone. Drives the same functions a
 ## real tap does: `--select X,Y` calls _on_tile_clicked (piece select);
 ## `--arm-item KEY` [`--anchor X,Y`] calls _use_item then _item_click (item
-## arm + anchor). Used by the agent for visual verification (windowed run
+## arm + anchor); `--open-shop` calls _open_shop(); `--open-drawer NAME`
+## calls _set_drawer(NAME) ("inventory" or "stock") — NO-119: the Shop and
+## the drawers have no CLI reach otherwise, and verifying an off-board grid
+## needs one open. Used by the agent for visual verification (windowed run
 ## required — see game/CLAUDE.md, "screenshot seam").
 func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 	await get_tree().process_frame # let _ready finish first
@@ -4000,6 +4004,14 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		if args.has("--anchor"):
 			var xy := args[args.find("--anchor") + 1].split(",")
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
+	elif args.has("--open-shop"):
+		_open_shop()
+		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout # let the
+			# NO-118 slide finish — animations_on defaults true, so the panel
+			# is still moving 2 frames after this call returns
+	elif args.has("--open-drawer"):
+		_set_drawer(args[args.find("--open-drawer") + 1])
+		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
 	await _capture_and_quit(dir)
 
 

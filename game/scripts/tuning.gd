@@ -16,6 +16,14 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
 ## own panel, can't drift apart on it.
 const PANEL_SLIDE_S := 0.18
 
+## NO-119: every icon OUTSIDE the board (Shop, Inventory Drawer, Stock Drawer)
+## reads at this one fixed size, with no name label beside it — the tooltip /
+## long-press carries the name instead. Same drift-guard shape as
+## PANEL_SLIDE_S above: one constant so hud.gd and modals.gd's grids can't
+## drift apart on it (the old split was SHOP_TILE at 46 vs a tile-relative
+## ICON of ~52 in hud.gd).
+const OFFBOARD_ICON := 72.0
+
 ## Newest-first run log, capped so the file cannot grow forever. Lives here
 ## rather than in economy.gd because leaderboard.gd needs it too and preloading
 ## economy there drags in the whole gameplay chain -- which is why that file

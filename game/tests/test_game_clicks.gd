@@ -1577,7 +1577,7 @@ func _init() -> void:
 	# NO-85 story 58: cancelling always reopens the Drawer, on its own slide
 	# (NO-118) — settle before clicking into it, same as every other reopen.
 	await _await_drawer_settled(game, "inventory")
-	check(await _click_button_in(game.hud.items_grid, "Extraction"),
+	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
 		"Extraction re-armable after a cancel")
 	await process_frame
 	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)

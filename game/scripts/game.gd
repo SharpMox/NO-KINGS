@@ -448,6 +448,11 @@ var king_abilities_suppressed := false # Counter-Intel: off for the rest of the 
 var king_abilities_seen: Array = [] # every activation, for the end screens
 var rng := RandomNumberGenerator.new()
 
+## NO-109: per-tariff Gold charged this run, keyed by tariff key. Diagnostic
+## only — a gold total cannot attribute a charge, which is why a balance
+## question about tariffs could not be answered at all. Not saved.
+var tariff_charges := {}
+
 var autoplay := false
 var autoplay_exit := false # quit-on-game-over: CLI --autoplay runs only, so the
                            # in-process scenario sweep (test_scenarios) survives

@@ -52,6 +52,11 @@ func _init() -> void:
 			steps += 1
 		check(true, "[%d] %s — bot survived %d frames%s" % [i, s.name, steps,
 			" (game over)" if game.state == GameScript.State.GAME_OVER else ""])
+		# NO-109: a readout, not an assertion — the sweep still only checks
+		# "did it boot" / "did it crash" (see the check(true, ...) above).
+		# This makes the end state a per-scenario record instead of nothing,
+		# so a tariff balance question is measurable from a sweep run.
+		print("    gold=%d score=%d wave=%d tariffs=%s" % [game.gold, game.score, game.wave, game.tariff_charges])
 		game.queue_free()
 		await process_frame
 

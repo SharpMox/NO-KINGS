@@ -23,13 +23,22 @@ const BackGuard := preload("res://scripts/back_guard.gd")
 const VIDEO := preload("res://assets/video/nokings_intro.ogv")
 const LOOP_VIDEO := preload("res://assets/video/nokings_intro_endloop.ogv")
 const NATIVE_SIZE := Vector2(128, 228)
-## Fit to WIDTH (NO-117): fitting BOTH axes (minf) picked the height-bound
-## factor on our 480x800 viewport — 3.509 vs. 3.75 width-bound — leaving
-## ~15px of black bar down each side. Scaling to width alone fills the screen
-## edge to edge and overflows height instead (~55px on 480x800); the existing
-## centring below splits that evenly, so it's cropped off the top and bottom
-## by the viewport edge rather than composited. Full width, a little height
-## lost, no bars.
+## Fit to WIDTH, capped (NO-117): fitting BOTH axes (minf) picked the
+## height-bound factor on our 480x800 viewport — 3.509 vs. 3.75 width-bound —
+## leaving ~15px of black bar down each side. A pure width-fit fixes that,
+## but `window/stretch/aspect="expand"` (project.godot) keeps height at 800
+## and lets width grow past 480 on the editor, desktop runs, the click probes
+## and the screenshot seam, none of which are locked to phone-portrait like a
+## real device is (`window/handheld/orientation=1`). Uncapped, a 16:9 desktop
+## window (~1422x800) would demand scale 11.1 and crop away two thirds of the
+## frame.
+##
+## So MAX_CROP bounds the width-fit to 1.25x the height-bound scale, i.e. at
+## most ~12.5% of the viewport height cropped off each edge:
+## - 480x800 (phone): width-fit (3.75) stays under the cap (3.509*1.25=4.39),
+##   so it wins outright — full width, no bars, ~27.5px cropped per edge.
+## - ~1422x800 (16:9 desktop): the cap wins instead (4.39 vs. 11.1) — the clip
+##   letterboxes (bars on the sides) rather than being gutted.
 ##
 ## This replaces a fixed x3, chosen back when the canvas was always 480x800.
 ## That constant left ~48px of black either side on a phone. The old note
@@ -37,8 +46,9 @@ const NATIVE_SIZE := Vector2(128, 228)
 ## TEXTURE_FILTER_NEAREST, so the trade is not softness but uneven pixel
 ## blocks at non-integer scales. Ruled acceptable: filling the screen matters
 ## more here than perfectly square pixels (user, 2026-09-05).
+const MAX_CROP := 1.25
 static func _scale_for(vp: Vector2) -> float:
-	return vp.x / NATIVE_SIZE.x
+	return minf(vp.x / NATIVE_SIZE.x, vp.y / NATIVE_SIZE.y * MAX_CROP)
 
 ## Comfortably longer than the 11.5s clip, short enough that a player staring at
 ## a stream that never decoded gets somewhere rather than force-quitting.

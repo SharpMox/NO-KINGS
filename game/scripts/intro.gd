@@ -23,11 +23,13 @@ const BackGuard := preload("res://scripts/back_guard.gd")
 const VIDEO := preload("res://assets/video/nokings_intro.ogv")
 const LOOP_VIDEO := preload("res://assets/video/nokings_intro_endloop.ogv")
 const NATIVE_SIZE := Vector2(128, 228)
-## The clip is as WIDE as the device allows: the largest scale that still fits
-## both axes, so nothing is cropped. On a 9:20 phone that is width-bound and
-## the video spans the full screen width; on a squarer 3:5 window it becomes
-## height-bound instead and stops short of the edges, which is the correct
-## answer there — overflowing would crop the frame.
+## Fit to WIDTH (NO-117): fitting BOTH axes (minf) picked the height-bound
+## factor on our 480x800 viewport — 3.509 vs. 3.75 width-bound — leaving
+## ~15px of black bar down each side. Scaling to width alone fills the screen
+## edge to edge and overflows height instead (~55px on 480x800); the existing
+## centring below splits that evenly, so it's cropped off the top and bottom
+## by the viewport edge rather than composited. Full width, a little height
+## lost, no bars.
 ##
 ## This replaces a fixed x3, chosen back when the canvas was always 480x800.
 ## That constant left ~48px of black either side on a phone. The old note
@@ -36,7 +38,7 @@ const NATIVE_SIZE := Vector2(128, 228)
 ## blocks at non-integer scales. Ruled acceptable: filling the screen matters
 ## more here than perfectly square pixels (user, 2026-09-05).
 static func _scale_for(vp: Vector2) -> float:
-	return minf(vp.x / NATIVE_SIZE.x, vp.y / NATIVE_SIZE.y)
+	return vp.x / NATIVE_SIZE.x
 
 ## Comfortably longer than the 11.5s clip, short enough that a player staring at
 ## a stream that never decoded gets somewhere rather than force-quitting.

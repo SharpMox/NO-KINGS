@@ -2750,48 +2750,8 @@ func _chain_of(id: String) -> Array:
 	return chain
 
 
-func _draw_preview_diagram(dia: Control, id: String, cells: int, cell: int) -> void:
-	var c := cells / 2
-	for x in cells:
-		for y in cells:
-			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
-				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
-	if textures.has(id):
-		dia.draw_texture_rect(piece_tex(id),
-			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
-	for m in defs[id].moves:
-		if m.type == "bent": # pivot step, then a ride outward from the pivot
-			var steps := [[int(m.pivot[0]), int(m.pivot[1])]]
-			var bx: int = int(m.pivot[0]) + int(m.dir[0])
-			var by: int = int(m.pivot[1]) + int(m.dir[1])
-			while absi(bx) <= c and absi(by) <= c:
-				steps.append([bx, by])
-				bx += int(m.dir[0])
-				by += int(m.dir[1])
-			for st in steps:
-				_diagram_mark(dia, c, cell, int(st[0]), int(st[1]), m.mode)
-			continue
-		for dir in m.dirs:
-			var reach: int = int(m.get("range", 0)) if m.type == "ride" else 1
-			if reach == 0:
-				reach = cells # unbounded ride: to the diagram edge
-			for s in range(1, reach + 1):
-				if absi(int(dir[0]) * s) > c or absi(int(dir[1]) * s) > c:
-					break
-				_diagram_mark(dia, c, cell, int(dir[0]) * s, int(dir[1]) * s, m.mode)
-
-
-func _diagram_mark(dia: Control, c: int, cell: int, dx: int, dy: int, mode: String) -> void:
-	var pc := Vector2(c + dx, c - dy) * cell + Vector2(cell, cell) / 2 # +y is up
-	match mode:
-		"both":
-			dia.draw_circle(pc, cell * 0.17, Color(0.22, 0.55, 0.28))
-		"move":
-			dia.draw_arc(pc, cell * 0.17, 0, TAU, 16, Color(0.22, 0.55, 0.28), 2.5)
-		"capture":
-			var d := cell * 0.13
-			dia.draw_line(pc - Vector2(d, d), pc + Vector2(d, d), Color(0.8, 0.2, 0.2), 3.0)
-			dia.draw_line(pc + Vector2(d, -d), pc - Vector2(d, -d), Color(0.8, 0.2, 0.2), 3.0)
+# NO-139: the diagram renderer moved to its own script, scripts/piece_diagram.gd
+# (PieceDiagram.draw), called directly from modals.gd's show_preview.
 
 
 func _reinforce_ids() -> Array:

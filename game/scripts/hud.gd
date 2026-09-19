@@ -758,10 +758,7 @@ func build(game) -> void:
 	band_collapse.tooltip_text = "Hide"
 	band_collapse.add_theme_font_size_override("font_size", 13)
 	_style_button(band_collapse, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
-	band_collapse.pressed.connect(func() -> void:
-		army_band_open = false
-		army_band.visible = false
-		army_band_reopen.visible = true)
+	band_collapse.pressed.connect(collapse_army_band)
 	band_header.add_child(band_collapse)
 	band_col.add_child(band_header)
 	band_col.add_child(army_ability_hint) # NO-128: moved out of act_row
@@ -775,6 +772,29 @@ func build(game) -> void:
 	king_ability_button.visible = false
 	band_col.add_child(king_ability_button)
 	army_band.add_child(band_col)
+	# NO-128 (coordinator review 2026-09-19, second round): the board is not a
+	# Control — it's drawn in game.gd's _draw and its taps arrive through
+	# _unhandled_input, which Godot's GUI picking only reaches AFTER every
+	# visible Control has had first refusal (CLAUDE.md's "A visible Control
+	# absorbs clicks before _unhandled_input ever runs"). army_band overlays
+	# the board's own tiles while open, and PanelContainer/VBoxContainer/
+	# HBoxContainer all default to MOUSE_FILTER_STOP, so left as built above
+	# it silently ate every tap on a covered tile — 3 SETUP click-probe
+	# failures, caught only because the probes are windowed (headless drops
+	# GUI picking entirely and would never have seen it).
+	#
+	# Fix: IGNORE on the panel and both plain layout containers, so a tap
+	# anywhere in the band that isn't one of ITS OWN controls falls through
+	# to the board underneath. Godot does NOT cascade IGNORE to children
+	# (same CLAUDE.md bullet — _set_drawer_clickable exists for exactly this
+	# asymmetry), so band_collapse and king_ability_button, both left at
+	# their default STOP, keep working — a filter set high in this tree has
+	# no effect on a control below it that never asked to inherit it.
+	# army_power_label and army_ability_hint need no change: Label already
+	# defaults to IGNORE.
+	army_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# NO-128 (coordinator review 2026-09-19, route 2 of 2 offered): army_band
 	# is NOT a deck row. A deck row is a permanent reservation — DECK_ROWS is
 	# sized once at boot and never revisited (ADR-0004), so a collapsible row
@@ -1107,6 +1127,15 @@ func update_clock(ms: float) -> void:
 	_clock_seen = true
 
 
+## NO-128: collapses army_band — the visibility half of what the "▴" button
+## and the mutual-exclusion guards below do. Public: game.gd's SETUP boot
+## calls it too (see its own call site for why).
+func collapse_army_band() -> void:
+	army_band_open = false
+	army_band.visible = false
+	army_band_reopen.visible = true
+
+
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
 ## Visibility only — selection/board consequences live in game.gd's handler.
 func set_drawer(which: String) -> void:
@@ -1117,9 +1146,7 @@ func set_drawer(which: String) -> void:
 	# downward from the Header instead, so it never reaches that rect and
 	# needs no guard here. Only one of the two can be on screen at a time.
 	if drawer_open == "inventory" and army_band_open:
-		army_band_open = false
-		army_band.visible = false
-		army_band_reopen.visible = true
+		collapse_army_band()
 	for name in drawers:
 		if drawer_open == name and prev != name: # newly opening
 			(drawers[name] as Control).visible = true

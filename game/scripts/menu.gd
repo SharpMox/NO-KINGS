@@ -558,14 +558,6 @@ static func _window_size_requested() -> bool:
 	return DisplayServer.window_get_size() != want
 
 
-## NO-146 carousel fix (Max, screenshot report — six Armies read as one):
-## fraction of the scroller's own width left un-covered by the resting card,
-## so the next card's edge peeks in. 12-15% is the usual carousel range; 14%
-## picked within it. See the carousel build below for why this replaces a
-## full-width card.
-const ARMY_PEEK_FRACTION := 0.14
-
-
 func _ready() -> void:
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
@@ -1051,17 +1043,20 @@ func _ready() -> void:
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", 0)
 	army_scroll.add_child(army_row)
-	# NO-136 hides scrollbars game-wide, so the card edge is the only signal
-	# that more Armies exist — the full-width card this comment used to
-	# describe hid all six behind an undiscoverable swipe (found by Max on a
-	# screenshot: six Armies, looked like one). Sizing the card at less than
-	# the scroller's own width (ARMY_PEEK_FRACTION above) leaves a peek of the
-	# next card at rest, the standard carousel affordance: you can see there
-	# is more, so no second mechanism has to stay in sync with it. The dots
-	# below are added on top, not instead — belt and suspenders on a report
-	# that was specifically "I could not tell", not a request to remove them.
+	# NO-136 hides scrollbars game-wide, so nothing in this scroller signals
+	# there is more content by default — the full-width card (still true
+	# below) hid all six Armies behind an undiscoverable swipe (Max, from a
+	# screenshot: six Armies, looked like one). The fix is the dot row further
+	# down, not a peek: a peek was tried here and reverted, because these
+	# cards are a CenterContainer of free-flowing, autowrap text with no
+	# border or panel behind it — there is no clean card edge for a peek to
+	# reveal. A narrower card_w just let a slice of the NEXT card's body text
+	# bleed into the margin as stray glyph fragments (a lone "Y", a clipped
+	# "This T"), reading as a text-rendering bug rather than a hint. Any
+	# future peek attempt needs a bordered/backgrounded card first, or it
+	# will fail the same way regardless of the percentage chosen.
 	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
-	var card_w: float = scroll_w * (1.0 - ARMY_PEEK_FRACTION)
+	var card_w: float = scroll_w
 	var army_names: Array = Tuning.ARMIES.keys() # dot count/order follows this, not a hand count
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
@@ -1097,13 +1092,13 @@ func _ready() -> void:
 		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
 		card_box.add_child(ability)
-	# NO-146: page dots underneath the carousel — a second, independent signal
-	# that there are more Armies than the one card on screen, on top of the
-	# peek above. Filled for the resting card, hollow for the rest; count and
-	# order come from army_names (Tuning.ARMIES), so a 7th Army needs no edit
-	# here. Godot's ScrollContainer has no page-snap, so scroll_horizontal /
-	# card_w is an approximation — exact once the swipe settles, which is the
-	# only time this reads it (dragging mid-swipe still nudges it live).
+	# NO-146: page dots underneath the carousel — THE affordance now that the
+	# peek attempt above was reverted. Filled for the resting card, hollow for
+	# the rest; count and order come from army_names (Tuning.ARMIES), so a 7th
+	# Army needs no edit here. Godot's ScrollContainer has no page-snap, so
+	# scroll_horizontal / card_w is an approximation — exact once the swipe
+	# settles, which is the only time this reads it (dragging mid-swipe still
+	# nudges it live).
 	var army_dots := Label.new()
 	army_dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	army_dots.add_theme_font_size_override("font_size", 14)

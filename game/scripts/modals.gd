@@ -252,7 +252,26 @@ func _merge_glyph_label(text: String) -> Label:
 ## sort). Any of the three may be null (no art for that id); tween_property
 ## calls are just skipped for it. Ends by hiding merge_panel, the same state
 ## change the no-animation branch above makes immediately.
+##
+## Hardware fix (coordinator diagnosis, eleven downstream menu-click
+## failures): merge_panel stays `visible` for the whole MERGE_ANIM_S outro,
+## and a visible Control with the default MOUSE_FILTER_STOP still absorbs
+## every click in its rect via Godot's own GUI picking before
+## _unhandled_input ever runs — CLAUDE.md's documented trap, and the exact
+## one NO-118 already hit on the Shop's close-slide. Hiding the panel only
+## in the tween's callback left it a full-screen invisible input blocker for
+## 350ms after the player had already confirmed. IGNORE goes on the instant
+## the animation starts, not when it ends; the tween itself is now purely
+## visual. Same idiom as _slide_shop above (IGNORE the instant a close
+## starts, recursed into descendants since Godot doesn't cascade a parent's
+## filter to its children) rather than hud.gd's _set_drawer_clickable's
+## save/restore: no restore is needed here for the same reason _slide_shop
+## needs none — show_merge_confirm frees this exact panel and builds a
+## fresh one, default filters, on every subsequent open.
 func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: TextureRect) -> void:
+	merge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in merge_panel.find_children("*", "Control", true, false):
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var tw := merge_panel.create_tween()
 	tw.set_parallel(true)
 	if a_tex:
@@ -274,6 +293,15 @@ func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: T
 ## mirrored it into a `*_open` flag the way preview_open/box_open do. Box Pick
 ## stays deliberately excluded — GDD: "decisive picks rewarded, indecision
 ## punished" — that one IS a difficulty lever.
+##
+## NO-140: `merge_panel.visible` deliberately still reads true for the whole
+## MERGE_ANIM_S outro, even though the panel stopped ACCEPTING input the
+## instant Merge was pressed (_play_merge_animation). Visible is the right
+## predicate here regardless: the outro is a modal moment on screen whose
+## length the player didn't choose, so the Clock stays paused through it,
+## same as it would for a tween-free instant close — the two are decoupled
+## on purpose, not entangled. Don't read this as "input-blocked", it never
+## meant that; it means "there is still a modal up".
 func pause_modal_open() -> bool:
 	return (is_instance_valid(king_ability_panel) and king_ability_panel.visible) \
 		or (is_instance_valid(merge_panel) and merge_panel.visible) \

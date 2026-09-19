@@ -455,13 +455,37 @@ func _init() -> void:
 	check(game.stock == ["sergeant"] and game.captured == ["pawn", "pawn"],
 		"confirming promotes the STOCK pawn pair and leaves Captured Stock untouched")
 
+	# NO-140 hardware fix (coordinator diagnosis): merge_panel stays `visible`
+	# for the MERGE_ANIM_S outro tween, and a visible full-rect panel at the
+	# default MOUSE_FILTER_STOP silently ate every click underneath it for
+	# that whole window — Pass, a double-tap, the ☰ menu, all swallowed on
+	# real hardware. The fix moves the panel to MOUSE_FILTER_IGNORE the
+	# instant Merge is pressed, not when the tween finishes. Prove it here,
+	# not just trust it: the panel is STILL visible/animating one frame after
+	# the click (below), yet the Pass click that follows immediately — landing
+	# well inside the 0.35s window — goes through anyway.
+	check(game.modals.merge_panel.visible, "the merge outro is still animating one frame later")
+
 	# PASS hands the turn over, banks the +5s turn bonus, and comes back
 	var clock_before: float = game.clock_ms
-	_click(game.pass_button.get_global_rect().get_center())
+	_click(game.pass_button.get_global_rect().get_center()) # deliberately mid-animation
 	await _await_player_turn(game) # enemy turn runs (animated + paced path)
-	check(game.state == game.State.PLAYER_TURN, "PASS cycles through the enemy turn")
+	check(game.state == game.State.PLAYER_TURN,
+		"PASS reaches the enemy turn even clicked mid-merge-animation — the panel no longer eats it")
 	check(game.clock_ms >= clock_before + 4000, # 5s bonus minus a little ticking
 		"finishing the turn grants the clock bonus")
+
+	# ...and the animation itself genuinely finishes and hides the panel —
+	# polled against Tuning.MERGE_ANIM_S rather than a guessed frame count,
+	# so the wait and the tween's real duration can never drift apart. By now
+	# the enemy-turn wait above has almost certainly already covered it; this
+	# is the explicit, derived proof rather than an incidental one.
+	var merge_polls := 0
+	var merge_poll_max := int(ceil(Tuning.MERGE_ANIM_S * 60.0)) + 30 # generous margin past one 60fps tween
+	while game.modals.merge_panel.visible and merge_polls < merge_poll_max:
+		await process_frame
+		merge_polls += 1
+	check(not game.modals.merge_panel.visible, "the merge outro animation completes and hides the panel")
 
 	# double-tap on the queen opens the piece preview; Close dismisses it
 	var at: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2

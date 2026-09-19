@@ -1670,18 +1670,26 @@ func _init() -> void:
 	await process_frame
 	check(game.hud.multi_confirm_btn.visible and game.hud.multi_confirm_btn.text == "Extract 1",
 		"picking a piece shows the Extract confirm")
-	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing") —
-	# NO-124: Cancel is the same "reopen the drawer, tap the armed chip again"
-	# gesture every Item uses, since the floating button no longer opens a
-	# second gate with its own Cancel.
-	check(await _click_inventory(game, "Inventory 1"), "Inventory reopens to reach the armed chip")
-	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
-		"tapping the armed chip cancels Extraction")
+	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing").
+	# NO-137 SUPERSEDED NO-124's cancel gesture here: this block used to
+	# reopen the Inventory drawer and tap the armed chip again, but NO-137's
+	# backdrop is MOUSE_FILTER_STOP over the whole deck (Shop/Inventory/
+	# Ability/Pass) WHILE CONFIRM IS SHOWING — "these are not clickable right
+	# now" is the ticket's own wording — so that reopen click is now
+	# absorbed on purpose. Don't restore the reopen-and-retap version on the
+	# grounds that it "used to pass"; cancel through multi_cancel_btn
+	# instead, same as a player now must. The observable CONSEQUENCE is
+	# unchanged (CLAUDE.md: "assert the observable consequence, never the
+	# flag that was just written") — item_active/items/board(4,4) below are
+	# the same assertions the old gesture made.
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
 	await process_frame
 	check(game.item_active == -1 and not game.items.is_empty() and game.board.has(Vector2i(4, 4)),
-		"NO-124: cancelling disarms Extraction entirely — nothing spent, board untouched")
+		"NO-124/NO-137: cancelling disarms Extraction entirely — nothing spent, board untouched")
 	# NO-85 story 58: cancelling always reopens the Drawer, on its own slide
 	# (NO-118) — settle before clicking into it, same as every other reopen.
+	# _confirm_target_cancelled (game.gd) reopens Inventory the same way the
+	# old chip-tap cancel did.
 	await _await_drawer_settled(game, "inventory")
 	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
 		"Extraction re-armable after a cancel")
@@ -1693,6 +1701,51 @@ func _init() -> void:
 	check(not game.board.has(Vector2i(4, 4)) and game.stock.has("knight")
 			and game.items.is_empty(),
 		"Extract confirm returns the pick to Stock")
+
+	# NO-137: the floating Confirm's backdrop + Cancel. Bottom UI (Shop/
+	# Inventory) must read as "not clickable" while armed, and Cancel must
+	# cost nothing (Economy.charge only ever runs from _item_apply, on a
+	# commit — neither reset behind Cancel goes near it).
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
+		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"], "gold": 100}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_inventory(game, "Inventory 1"), "NO-137: Inventory opens for Extraction")
+	await process_frame
+	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
+		"NO-137: Extraction clickable in the drawer")
+	await process_frame
+	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.hud.multi_confirm_btn.visible, "NO-137: Confirm shows, staged")
+	check(game.hud.confirm_backdrop.visible and game.hud.multi_cancel_btn.visible,
+		"NO-137: the backdrop and Cancel appear alongside Confirm")
+	var gold_before: int = game.gold
+	# CLAUDE.md: "a probe can pass because its click was CONSUMED" — click
+	# exactly where the Shop/Inventory buttons sit (now covered by the
+	# backdrop) and assert BOTH that neither opened AND that the targeting
+	# this backdrop belongs to survived; a swallowed click alone would
+	# satisfy the first half either way.
+	_click(game.hud.shop_button.get_global_rect().get_center())
+	await process_frame
+	check(not game.shop_open() and game.hud.multi_confirm_btn.visible
+			and game.hud.confirm_backdrop.visible,
+		"NO-137: the backdrop blocks Shop, and the targeting behind it survives the click")
+	_click(game.hud.drawer_buttons["inventory"].get_global_rect().get_center())
+	await process_frame
+	check(game.hud.drawer_open != "inventory" and game.hud.multi_confirm_btn.visible,
+		"NO-137: the backdrop blocks Inventory too")
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.item_active == -1 and game.board.has(Vector2i(4, 4)) and game.gold == gold_before,
+		"NO-137: Cancel disarms for free — board untouched, no Gold spent")
+	check(not game.hud.multi_confirm_btn.visible and not game.hud.confirm_backdrop.visible
+			and not game.hud.multi_cancel_btn.visible,
+		"NO-137: Confirm/backdrop/Cancel all hide together once cancelled")
 
 	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
 	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for

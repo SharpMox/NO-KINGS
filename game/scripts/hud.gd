@@ -146,6 +146,9 @@ signal stack_preview_requested(id: String, cap: bool, entry: Variant) # NO-138:
 signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
 	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
 	# final confirm (see multi_confirm_btn's own declaration below)
+signal multi_cancel_pressed # NO-137: the Cancel button underneath it — same
+	# entry-point shape as multi_confirm_pressed, but resets targeting instead
+	# of committing it (see multi_cancel_btn's own declaration below)
 signal item_pressed(index: int)
 signal item_preview_requested(index: int) # NO-144: an Item cell's long
 	# press — same "own menu" preview pieces get (stack_preview_requested
@@ -258,6 +261,11 @@ var multi_confirm_btn := Button.new() # NO-124: floating targeting-confirm —
 	# "Extract N" for a "multi" Item's picks, "Confirm" for a staged
 	# tile/pair/area Item target, an untargeted Item, or Bovine Tractor
 	# Beam's staged target (see refresh()'s visibility/text below)
+var multi_cancel_btn := Button.new() # NO-137: sits underneath multi_confirm_btn
+var confirm_backdrop := ColorRect.new() # NO-137: dims the bottom UI (Shop/
+	# Inventory/Ability/Pass) while Confirm/Cancel float over it, so those
+	# buttons read as "not clickable right now" instead of merely being
+	# covered — see build()'s own comment for the MOUSE_FILTER_STOP choice.
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
 ## panel parented to a row would not survive the next state change.
@@ -552,6 +560,14 @@ func build(game) -> void:
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
+	# NO-145 (hardware round 2): deck used to also be hooked here as a
+	# swipe-to-open surface (its own unclaimed area, MOUSE_FILTER_STOP).
+	# Real hardware showed that gap is not reliable — NO-128 took DECK_ROWS
+	# from 132 to 98 without shrinking nav_row/act_row, squeezing or
+	# removing the gap a press was aimed at, so the press landed on a
+	# child before deck.gui_input ever saw it. Coordinator ruling: all
+	# three open gestures now start on an empty board tile only
+	# (game.gd's _swipe_open_may_begin) — no dependence on deck geometry.
 
 	# NO-83: the stock strip and the status line are gone from the Deck. The
 	# strip's job (which pieces you hold, without opening anything) moves to
@@ -593,6 +609,28 @@ func build(game) -> void:
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
+	# NO-137: a semi-transparent backdrop over the bottom UI (Shop/Inventory/
+	# Ability/Pass) while an Item/Artefact's floating Confirm is up. Sized to
+	# `deck`'s own rect exactly (deck_top/deck_h, both already computed above
+	# for `deck` itself) — "the bottom buttons" the ticket names, nothing
+	# more (army_band, above the board, is untouched).
+	#
+	# MOUSE_FILTER_STOP here is the point, not a trap to dodge: added as a
+	# LATER sibling than `deck`, so Godot's front-to-back GUI picking gives
+	# it first refusal over deck's buttons and it absorbs the press — they
+	# read as "not clickable right now" because they genuinely aren't.
+	# multi_confirm_btn/multi_cancel_btn are added AFTER this (later still),
+	# so they stay clickable on top of it. Unlike _set_drawer_clickable's
+	# IGNORE case (which must fall THROUGH to the board), this wants to
+	# BLOCK, so no per-descendant filter save/restore is needed — deck's own
+	# buttons keep whatever filter they already have; only what sits above
+	# them (this backdrop) changes.
+	confirm_backdrop.color = Color(0, 0, 0, 0.55)
+	confirm_backdrop.position = Vector2(0, deck_top)
+	confirm_backdrop.custom_minimum_size = Vector2(vp.x, deck_h)
+	confirm_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	confirm_backdrop.visible = false
+	add_child(confirm_backdrop)
 	# NO-124: floating targeting-confirm, shown once there's something to
 	# confirm — see refresh() for exactly when, per targeting shape
 	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
@@ -601,6 +639,19 @@ func build(game) -> void:
 	multi_confirm_btn.visible = false
 	multi_confirm_btn.pressed.connect(func() -> void: multi_confirm_pressed.emit())
 	add_child(multi_confirm_btn)
+	# NO-137: Cancel, underneath Confirm. NO-121's "tap the armed chip again"
+	# path still works unchanged; this just gives it an affordance right next
+	# to Confirm instead of requiring the Inventory drawer be reopened first.
+	# Costs nothing: game.gd's handler only resets targeting state (the same
+	# reset the chip-tap path already uses) — Economy.charge only ever runs
+	# from _item_apply, on an actual commit.
+	multi_cancel_btn.text = "Cancel"
+	multi_cancel_btn.add_theme_font_size_override("font_size", 15)
+	multi_cancel_btn.position = Vector2(vp.x / 2 - 70, vp.y - 48)
+	multi_cancel_btn.custom_minimum_size = Vector2(140, 40)
+	multi_cancel_btn.visible = false
+	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
+	add_child(multi_cancel_btn)
 	# floating Clear-all for Arrow Planning: only worth showing while the mode
 	# is on (top bar has no room to spare — money-and-shop already fills it)
 	arrow_clear_button.text = "Clear"
@@ -871,6 +922,11 @@ func build(game) -> void:
 		# tip_panel/game_menu already rely on to stay on top of everything.
 		move_child(panel, deck.get_index())
 		drawer_rest[spec[0]] = panel.position
+		# NO-145: `panel`'s own default MOUSE_FILTER_STOP (unset above — only
+		# `bg` was set to IGNORE) already claims any press inside its rect
+		# that `sc`/cells don't; gui_input reports exactly that leftover
+		# "chrome", the surface a reverse-close swipe must start on.
+		panel.gui_input.connect(_on_chrome_swipe_input.bind(spec[0]))
 		# NO-118: Inventory slides in from the LEFT — off-screen is its own
 		# width to the left of rest, not a move of where it rests.
 		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
@@ -938,6 +994,16 @@ func build(game) -> void:
 	stock_scroll.add_child(stock_align)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
+	# NO-145: stock_panel is a PanelContainer, which stretches its one child
+	# (stock_row) to fill it exactly — no chrome at THAT level to hook, unlike
+	# the plain-Control inventory panel above. cap_col/stock_col each hold
+	# only ONE sized-smaller child of their own (cap_scroll/stock_scroll, by
+	# STOCK_DRAWER_PAD), so the leftover slack a VBoxContainer leaves around
+	# an unexpanded child is this drawer's own "chrome or edge, not a
+	# scrollable cell" — same STOP-claims-its-own-rect mechanism as the
+	# inventory panel's gui_input, one level deeper in this drawer's tree.
+	cap_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
+	stock_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
 	stock_panel.add_child(stock_row)
 	drawers["stock"] = stock_panel
 	add_child(stock_panel)
@@ -1178,6 +1244,50 @@ func set_drawer(which: String) -> void:
 	hide_tip() # NO-59: a description outlives neither its drawer nor its row
 
 
+## NO-145: swipe-to-CLOSE a drawer via its own chrome — press/release
+## tracked here and hooked to each drawer panel's `gui_input` in build()
+## rather than routed through game.gd's _unhandled_input: `panel` (and
+## Stock's `cap_col`/`stock_col`) are Controls with the default
+## MOUSE_FILTER_STOP, so a press over their own unclaimed area (never over
+## a ScrollContainer or a cell — those claim their own rect first, same STOP
+## mechanism) is exactly what `gui_input` reports and _unhandled_input never
+## sees at all (CLAUDE.md: "a visible Control absorbs clicks before
+## _unhandled_input ever runs").
+##
+## `source` is the drawer key ("stock"/"inventory", drawers[key].gui_input).
+##
+## Hardware round 2 (coordinator diagnosis): this used to ALSO handle the
+## OPEN gesture via deck.gui_input ("__deck__"), aimed at the gap between
+## nav_row and act_row. NO-128 shrank DECK_ROWS without shrinking those
+## rows, squeezing that gap shut, and the press landed on a child before
+## deck.gui_input ever saw it. Ruling: every open gesture now starts on an
+## empty board tile instead (game.gd's _swipe_open_may_begin) — this
+## function only ever closes a drawer that's already open.
+var _chrome_swipe_from := Vector2.ZERO
+var _chrome_swipe_source := ""
+
+func _on_chrome_swipe_input(event: InputEvent, source: String) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_chrome_swipe_from = event.position
+		_chrome_swipe_source = source
+		return
+	if _chrome_swipe_source != source:
+		return
+	_chrome_swipe_source = ""
+	var dir := Tuning.classify_swipe(event.position - _chrome_swipe_from)
+	# Reverse of the OPENING SWIPE (the gesture Max named), not of the
+	# panel's own slide direction — Stock opens on a DOWN swipe and slides
+	# down, so its reverse is up either way; Inventory opens on an UP swipe
+	# but slides in from the LEFT (see build()'s own note), so its
+	# reverse-close is DOWN, matching the gesture, not the motion.
+	var want := "up" if source == "stock" else "down"
+	if dir == want and drawer_open == source:
+		set_drawer(source) # same key toggles it closed
+		drawer_changed.emit()
+
+
 ## NO-59: the tap-to-describe popup.
 ##
 ## WHY IT EXISTS. NO-45 set the drawer rows to MOUSE_FILTER_PASS so the lists
@@ -1397,8 +1507,13 @@ func refresh() -> void:
 		else:
 			item_confirm = g.item_pending_tile.x >= 0
 	var artefact_confirm: bool = g.artefact_targeting_key != "" and g.artefact_pending_tile.x >= 0
-	multi_confirm_btn.visible = item_confirm or artefact_confirm
+	var armed_targeting: bool = item_confirm or artefact_confirm
+	multi_confirm_btn.visible = armed_targeting
 	multi_confirm_btn.text = item_confirm_text
+	# NO-137: the backdrop and Cancel appear/disappear together with Confirm —
+	# there is nothing for either to do before Confirm itself would show.
+	multi_cancel_btn.visible = armed_targeting
+	confirm_backdrop.visible = armed_targeting
 	_rebuild_stock_drawer()
 	_rebuild_items_grid()
 	# issue 100: the Power is always on, so it is stated, not offered. The

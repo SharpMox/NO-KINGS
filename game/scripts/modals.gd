@@ -502,6 +502,14 @@ func show_shop() -> void:
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_%s" % side, 10)
 	shop_panel.add_child(margin)
+	# NO-145: `margin` fills shop_panel's whole rect (MarginContainer, default
+	# MOUSE_FILTER_STOP) but only INSETS `root` by 10px — that 10px ring
+	# around root (and any of root's own unclaimed space) is what gui_input
+	# reports here, the Shop's own "chrome or edge, not a scrollable cell"
+	# a reverse-close swipe may start on. Reconnected every show_shop() call
+	# since margin is rebuilt fresh each time (no save/restore needed, same
+	# reasoning as _slide_shop's own descendant-filter comment above).
+	margin.gui_input.connect(_on_shop_chrome_input)
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
@@ -667,6 +675,29 @@ func _slide_shop(opening: bool) -> void:
 func close_shop() -> void:
 	_slide_shop(false)
 	shop_closed.emit()
+
+
+## NO-145: reverse-of-the-opening-swipe close — the Shop opens on a leftward
+## swipe starting on an empty board tile (game.gd's _swipe_open_may_begin;
+## hardware round 2 dropped the edge-proximity requirement — see tuning.gd),
+## so it closes on a rightward swipe, started anywhere on its own chrome
+## (margin.gui_input above — never on a scrollable cell, which claims its
+## own rect first via the same MOUSE_FILTER_STOP mechanism).
+var _shop_swipe_from := Vector2.ZERO
+var _shop_swipe_down := false
+
+func _on_shop_chrome_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_shop_swipe_from = event.position
+		_shop_swipe_down = true
+		return
+	if not _shop_swipe_down:
+		return
+	_shop_swipe_down = false
+	if Tuning.classify_swipe(event.position - _shop_swipe_from) == "right":
+		close_shop()
 
 
 ## The dock's content for the current expanded tile (or the hint). Called

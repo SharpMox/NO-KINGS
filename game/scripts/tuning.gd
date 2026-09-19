@@ -16,6 +16,46 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
 ## own panel, can't drift apart on it.
 const PANEL_SLIDE_S := 0.18
 
+## NO-145: swipe-to-open/close the Stock/Inventory/Shop panels. One shared
+## classifier (classify_swipe below) so game.gd (board opens) and hud.gd/
+## modals.gd (each panel's own chrome closes) all agree on what counts as a
+## swipe, instead of independent guesses drifting.
+##
+## Hardware round 2 (coordinator diagnosis): the first cut also let an open
+## swipe begin on `deck`'s own unclaimed area, and gated the Shop's opening
+## swipe on an edge-proximity constant derived from an assumed 60px tile
+## (480 / BOARD_W 8). Both were wrong on real hardware — NO-128 shrank
+## DECK_ROWS (132 -> 98) between when that was written and when it ran,
+## squeezing the deck gap a press was aimed at, and the board is centred
+## with margins (`game.gd`'s `board_px`), not full-width, at a tile size
+## that had already dropped to ~51px by the time this ran. Both failures
+## trace to a surface/number this ticket's own report had flagged as
+## unverified. Fix: ALL THREE open gestures now begin only on an empty
+## board tile — the one surface that passed on hardware first try — and
+## SWIPE_EDGE_ZONE is gone; a leftward swipe reads as "opens the Shop"
+## anywhere on the board, no edge proximity required.
+const SWIPE_MIN_DIST := 40.0 ## px a press must travel before it's a swipe
+	## rather than a tap or a drag — comfortably past hud.gd's
+	## DRAWER_SCROLL_DEADZONE (24), so a scroll's own deadzone is never read
+	## as a swipe underneath it.
+const SWIPE_AXIS_RATIO := 1.5 ## the dominant axis must beat the other by
+	## this factor or the drag is too diagonal to call any direction.
+
+## NO-145: `delta` is a press's total (release position - press position)
+## movement. Returns "up"/"down"/"left"/"right" once it clears
+## SWIPE_MIN_DIST with a dominant axis (SWIPE_AXIS_RATIO); "" if it's too
+## short or too diagonal to call.
+static func classify_swipe(delta: Vector2) -> String:
+	if delta.length() < SWIPE_MIN_DIST:
+		return ""
+	var ax := absf(delta.x)
+	var ay := absf(delta.y)
+	if ax > ay * SWIPE_AXIS_RATIO:
+		return "right" if delta.x > 0 else "left"
+	if ay > ax * SWIPE_AXIS_RATIO:
+		return "down" if delta.y > 0 else "up"
+	return ""
+
 ## NO-119: every icon OUTSIDE the board (Shop, Inventory Drawer, Stock Drawer)
 ## reads at this one fixed size, with no name label beside it — the tooltip /
 ## long-press carries the name instead. Same drift-guard shape as

@@ -345,6 +345,13 @@ var board_lp_fired := false # a hold completed for the tile now in board_lp_pend
 # only if board_lp_fired is still false when release arrives (see the
 # hazard this guards against in _board_tap_is_readonly's header).
 var board_lp_pending_tile := Vector2i(-1, -1)
+# NO-145: swipe-to-open a panel, tracked only on a press this ticket's own
+# eligibility rule (_swipe_open_may_begin below) accepted — an empty board
+# tile only, never a surface with existing drag/tap meaning, so this never
+# races drag_from/board_lp_* above. _swipe_from is the press position;
+# _swipe_eligible whether THIS press qualified at all.
+var _swipe_from := Vector2.ZERO
+var _swipe_eligible := false
 # Arrow Planning (Notion): purely decorative — never read by rules/AI. A
 # scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
 var arrow_mode := false # while on, board drags draw arrows instead of selecting
@@ -1910,6 +1917,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		arrow_from = Vector2i(-1, -1)
 		board_lp_token = 0 # NO-120: none of these states can complete a hold
 		board_lp_pending_tile = Vector2i(-1, -1) # ...or a deferred commit
+		_swipe_eligible = false # NO-145: ditto — a press swallowed here must
+			# never let a later release, once the state clears, fire a swipe
+			# off a stale flag/position from an unrelated gesture
 		return
 	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
 		# item/artefact targeting still owns board taps
@@ -1926,6 +1936,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
+			# NO-145: capture swipe eligibility FIRST, off the state exactly as
+			# it stood when this press landed — the drawer/Shop auto-close
+			# branches right below mutate hud.drawer_open/shop_open() for
+			# THIS press, and _swipe_open_may_begin must see the pre-mutation
+			# values (a press that closes a drawer via outside-tap is a tap,
+			# not the start of an open-swipe on the same gesture).
+			_swipe_from = event.position
+			_swipe_eligible = _swipe_open_may_begin(at)
 			# any press outside an open drawer closes it to reveal the board
 			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
@@ -1982,6 +2000,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					drag_moved = false
 					drag_reselect = was_selected # in-place release = re-click
 		else:
+			# NO-145: the swipe-to-open gesture — an empty board tile ONLY
+			# (see _swipe_open_may_begin; hardware round 2 dropped deck
+			# chrome and the Shop's edge-proximity check, both of which
+			# failed on real hardware — tuning.gd has the diagnosis). Never
+			# returns early: for every press this accepted, the rest of this
+			# release branch below is already a no-op (no drag_from, no
+			# board_lp_pending_tile — both require an occupied origin tile,
+			# which _swipe_open_may_begin refuses), so letting it fall
+			# through changes nothing.
+			if _swipe_eligible:
+				_swipe_eligible = false
+				match Tuning.classify_swipe(event.position - _swipe_from):
+					"down": _set_drawer("stock") # Max: "swipe down opens Stock"
+					"up": _set_drawer("inventory") # Max: "swipe up opens Inventory"
+					"left": _open_shop() # Shop slides in from the right — the
+						# swipe DIRECTION carries that meaning; no edge
+						# proximity needed (SWIPE_EDGE_ZONE removed)
 			board_lp_token = 0 # NO-120: release cancels any pending long-press timer
 			if board_lp_pending_tile.x >= 0:
 				# NO-120: the commit this press deferred runs now — but only as
@@ -2086,6 +2121,36 @@ func _tile_at(screen: Vector2) -> Vector2i:
 	var x := int(local.x / tile)
 	var y := Tuning.BOARD_H - 1 - int(local.y / tile)
 	return Vector2i(x, y) if Rules.in_bounds(Vector2i(x, y)) else Vector2i(-1, -1)
+
+
+## NO-145: true when a press starting at `at` (a _tile_at result) may become
+## a swipe-to-open gesture. Deliberately conservative — the ticket's own
+## warning is that a swipe recogniser stealing an existing drag is worse than
+## no swipe at all:
+##   - never while a drawer or the Shop is already open — a swipe closing one
+##     of those belongs to that panel's own chrome (hud.gd/modals.gd), not
+##     the board; see their own _on_*_chrome_input for the reverse gesture.
+##   - never on an occupied tile — that always has selection/drag meaning
+##     (own-piece drag, enemy recon, a captured target, ...).
+##   - never off the board (at.x < 0) — the coordinator's hardware round 2
+##     ruling narrowed this to ONE surface, the empty board tile, after
+##     deck-chrome and an assumed-tile-width edge zone both failed on real
+##     hardware (see tuning.gd's SWIPE_MIN_DIST comment for the full
+##     diagnosis). All three open gestures — down/up/left — now start here
+##     and only here.
+##   - on an EMPTY tile, only when nothing is already armed/selected that a
+##     press there would otherwise resolve against — an empty tile that IS a
+##     legal destination for a current selection, or a staged Item/Artefact
+##     target, or an Arrow Planning draw, already commits on THIS press
+##     (_on_tile_clicked fires immediately below, not on release), so a
+##     swipe can never begin from one without also stepping on that commit.
+func _swipe_open_may_begin(at: Vector2i) -> bool:
+	if hud.drawer_open != "" or shop_open():
+		return false
+	if at.x < 0 or board.has(at):
+		return false
+	return selected.x < 0 and placing_id == "" and item_active < 0 \
+			and artefact_targeting_key == "" and not arrow_mode
 
 
 ## NO-120: true when a press on `at` (occupied — the only case a long press
@@ -3095,6 +3160,25 @@ func _confirm_target_pressed() -> void:
 		return _item_confirm_target()
 	if artefact_targeting_key != "":
 		_artefact_confirm_target()
+
+
+## NO-137: the floating Cancel affordance's entry point (hud.gd's
+## multi_cancel_pressed) — the same reset either branch's own "tap the armed
+## chip again" gesture already used (_use_item/_begin_artefact_targeting),
+## just reachable without reopening the Inventory drawer first. Costs
+## nothing: Economy.charge only ever runs from _item_apply, on a commit, and
+## neither reset below goes near it.
+func _confirm_target_cancelled() -> void:
+	if item_active >= 0:
+		_item_reset()
+	elif artefact_targeting_key != "":
+		_artefact_targeting_reset()
+	else:
+		return
+	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+		_set_drawer("inventory")
+	else:
+		_refresh()
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
@@ -4627,6 +4711,7 @@ func _connect_hud() -> void:
 	hud.artefact_preview_requested.connect(func(key: String) -> void:
 		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
+	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)

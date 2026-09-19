@@ -426,3 +426,47 @@ static func starting_stock(army: String, tier: String) -> Array:
 			out.append(id)
 		counts.erase(id)
 	return out
+
+
+## NO-148: the handicaps above, as DATA — the single source rank_center's
+## per-tier descriptions are generated from, keyed to the tier they first
+## apply at (a TIERS index), so a retune here can't silently drift the copy
+## a player reads.
+##
+## FINDING (2026-09-19): the prose summary at this section's top undercounts
+## Tier 3. issue 78 added clock_start_ms's cut at the SAME threshold as
+## shop_row_delta (tier_index >= 2) without folding it into that "each tier
+## is the one below plus one more" comment, so Tier 3 actually introduces TWO
+## handicaps, not one — test_tiers.gd already pins both thresholds
+## independently, so the code and the tests agree; only the prose was stale.
+## This list is generated from what the gating functions actually do; the
+## comment at the top of this section is not, and should be read as
+## superseded by it.
+const TIER_HANDICAPS := [
+	{"at": 1, "text": "The Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)"},
+	{"at": 2, "text": "Starting Clock drops from 15 minutes to 5"},
+	{"at": 2, "text": "Shop stocks 1 fewer of each kind"},
+	{"at": 3, "text": "Starting Stock halved per piece type, rounding up (singletons survive)"},
+	{"at": 4, "text": "-1 action per turn, enemy actions per turn 2 instead of 1"},
+]
+
+## Handicaps newly introduced AT this tier — empty for Tier 1.
+static func new_handicaps(tier: String) -> Array[String]:
+	var idx := tier_index(tier)
+	var out: Array[String] = []
+	for h in TIER_HANDICAPS:
+		if h.at == idx:
+			out.append(h.text)
+	return out
+
+
+## Every handicap already active at a tier BELOW this one, in the order they
+## were introduced — what a tier's description lists underneath its own new
+## handicap(s) (NO-148: cumulative, with the new part identifiable).
+static func lower_handicaps(tier: String) -> Array[String]:
+	var idx := tier_index(tier)
+	var out: Array[String] = []
+	for h in TIER_HANDICAPS:
+		if h.at < idx:
+			out.append(h.text)
+	return out

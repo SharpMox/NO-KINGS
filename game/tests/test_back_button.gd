@@ -87,7 +87,7 @@ func _init() -> void:
 	root.add_child(menu)
 	await process_frame
 	await process_frame
-	check(_find_button(menu, "TEST") != null, "precondition: the main menu is up")
+	check(_find_button(menu, "Play") != null, "precondition: the main menu is up") # NO-147: TEST no longer lives here
 
 	menu.test_scroll.visible = true
 	menu.main_box.visible = false
@@ -105,7 +105,7 @@ func _init() -> void:
 	# The documented behaviour must SURVIVE the guard: from the bare main menu
 	# there is nowhere up, so Back quits. A guard that swallowed this would be a
 	# regression in the opposite direction, which is why it is pinned.
-	check(_find_button(menu, "TEST") != null,
+	check(_find_button(menu, "Play") != null, # NO-147: TEST no longer lives here
 		"the menu still offers its panels after a Back")
 
 	# A SECOND, SEPARATE press still works — the window must not latch.

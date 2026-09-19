@@ -129,8 +129,24 @@ func _notification(what: int) -> void:
 		rank_center.visible = false
 		army_center.visible = true
 		return
-	var panels: Array[Control] = [test_scroll, army_center, scores_center,
-		history_scroll, about_center, guide_scroll, settings_panel, device_info_center]
+	# NO-147: TEST and About now live inside Settings, and Games History
+	# inside Scores — same "Back lands where its own on-screen button does"
+	# shape as the tier picker above, so all three get bespoke treatment
+	# rather than the generic main-menu jump below.
+	if is_instance_valid(test_scroll) and test_scroll.visible:
+		test_scroll.visible = false
+		settings_panel.visible = true
+		return
+	if is_instance_valid(about_center) and about_center.visible:
+		about_center.visible = false
+		settings_panel.visible = true
+		return
+	if is_instance_valid(history_scroll) and history_scroll.visible:
+		history_scroll.visible = false
+		scores_center.visible = true
+		return
+	var panels: Array[Control] = [army_center, scores_center,
+		guide_scroll, settings_panel, device_info_center]
 	for p in panels:
 		if is_instance_valid(p) and p.visible:
 			p.visible = false
@@ -476,7 +492,7 @@ var test_head: Label
 var keyboard_height_override := -1
 var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
-var army_center: ScrollContainer
+var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is nested inside now
 var rank_center: CenterContainer
 var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
@@ -658,11 +674,9 @@ func _ready() -> void:
 	_refresh_continue()
 	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "Scores", 24, _show_scores)
-	_button(main_box, "Games History", 24, _show_history)
 	_button(main_box, "Guide", 24, func() -> void:
 		main_box.visible = false
 		guide_scroll.visible = true)
-	_button(main_box, "About", 24, _show_about)
 	# issue 83's ruling — "a guest keeps their progress when they sign in" — had
 	# no way to happen: the login screen only ever appears on a first run, so
 	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
@@ -689,22 +703,32 @@ func _ready() -> void:
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
-	_button(main_box, "TEST", 24, _show_tests)
-	# NO-56: iOS has no sanctioned self-termination, so get_tree().quit() is a
-	# no-op there and the button is a visibly dead control — the same defect the
-	# hardware-Back handler above exists to avoid ("a gesture that silently does
-	# nothing reads as a frozen app"). Apple's HIG says not to offer Quit at all.
-	# GATED, NOT DELETED: Quit is legitimate on Android and desktop. The
-	# fall-through to quit() at the end of _back() stays — on iOS there is no
-	# hardware back, so it is unreachable rather than wrong.
-	if not _IS_IOS():
-		_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
+	# NO-147 (Max, 2026-09-19): Quit is REMOVED, not merely hidden — "people
+	# can just close the app." Android's hardware Back already quits from the
+	# bare main menu (NO-61; the get_tree().quit() fall-through at the end of
+	# _notification above), so the button only duplicated a platform
+	# affordance every player already has. Do not re-add it on noticing it's
+	# gone — this is deliberate.
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart
 	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
 		Callable(), _on_logout)
+	# NO-147: About and TEST fold into Settings (eight main-menu entries down
+	# to four). Appended here rather than inside settings.gd's own build() —
+	# that panel is ALSO embedded in the in-game pause menu (hud.gd), and
+	# neither About (main-menu chrome) nor TEST (a scenario launcher) belongs
+	# mid-run. settings_panel.get_child(0) is that build()'s own
+	# VBoxContainer, always ending [.., ← Back]; the two new rows are appended
+	# and then moved in front of whatever is currently last, so Back stays
+	# the last row regardless of whether the Log out rows above it exist.
+	var settings_box := settings_panel.get_child(0) as VBoxContainer
+	var settings_back := settings_box.get_child(settings_box.get_child_count() - 1) as Button
+	var about_btn := _button(settings_box, "About", 24, _show_about)
+	var settings_test_btn := _button(settings_box, "TEST", 24, _show_tests)
+	settings_box.move_child(about_btn, settings_back.get_index())
+	settings_box.move_child(settings_test_btn, settings_back.get_index())
 
 	# issue 83: the login screen. Shown ONLY on a first run — once an account
 	# exists, needs_login() is false forever and this never appears again.
@@ -851,7 +875,7 @@ func _ready() -> void:
 	test_box.add_child(test_filter)
 	var back := _button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
-		main_box.visible = true)
+		settings_panel.visible = true) # NO-147: TEST is reached through Settings now
 	back.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 	# Diagnostic-only (2026-09-18, no issue yet): TEST is the one menu Android
 	# reaches with no CLI flag — see device_info_center's own comment. Sits
@@ -982,14 +1006,19 @@ func _ready() -> void:
 					y += c.size.y + 4.0
 			test_scroll.set_deferred("scroll_vertical", int(y)))
 
-	# army select: Play goes here; each army is a button + composition line.
-	# ScrollContainer, not CenterContainer (issue 68): 6 Armies' worth of
-	# buttons + roster + Power/Ability lines overflow the fixed 480x800
-	# portrait window — the same scrollable-list shape test_scroll/
-	# history_scroll/guide_scroll already use below, so every entry (and the
-	# trailing Back button) stays reachable regardless of Army count.
-	army_center = ScrollContainer.new()
-	army_center.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
+	# army select: Play goes here. NO-146: a horizontal CAROUSEL, one Army at a
+	# time, each decorated by its starting pieces as a "group picture" (the
+	# same treatment NO-141 gives the Reinforcements screen).
+	#
+	# NO-146 is the ONE deliberate exception to this codebase's "no horizontal
+	# scrolling" rule (reference-site CLAUDE.md, carried into the game) — a
+	# carousel's whole point is a sideways swipe. Do not read the scroller
+	# below as an oversight and "fix" it back to vertical: test_scroll (the
+	# TEST menu's scenario list, further up this file) sets
+	# horizontal_scroll_mode to DISABLED on ITS OWN scroller for the opposite
+	# reason — issue 77, "a long scenario name must wrap or clip, never push
+	# the list sideways" — and the two are not the same container.
+	army_center = VBoxContainer.new()
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	army_center.offset_left = 40
 	army_center.offset_top = 30
@@ -997,48 +1026,61 @@ func _ready() -> void:
 	army_center.offset_bottom = -30
 	army_center.visible = false
 	add_child(army_center)
-	var army_box := VBoxContainer.new()
-	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# On a 9:20 phone the six entries were sized for 480x800 and simply stopped
-	# halfway down, leaving the bottom ~45% empty. Same answer as the in-run
-	# deck: the leftover height goes into the BUTTONS, which makes them easier
-	# to hit, rather than into a void under the last one.
-	army_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# issue 68 tightened this from 12: six Armies' worth of entries have to
-	# fit 480x800 without scrolling. The ScrollContainer above stays as the
-	# safety net for a seventh.
-	army_box.add_theme_constant_override("separation", 5)
-	army_center.add_child(army_box)
 	var pick := Label.new()
 	pick.text = "Choose your Army" # issue 67: replaces the Army pick
 	pick.add_theme_font_size_override("font_size", 22)
-	army_box.add_child(pick)
+	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	army_center.add_child(pick)
+	var army_scroll := ScrollContainer.new() # the carousel strip itself
+	army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
+	army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Same touch-drag fix test_scroll carries (CLAUDE.md, "Layout traps"): a
+	# Button's default mouse_filter is STOP, which would otherwise eat a swipe
+	# that starts on the card's own Army button before drag_touching sets.
+	army_scroll.scroll_deadzone = 24
+	army_center.add_child(army_scroll)
+	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
+	army_row.add_theme_constant_override("separation", 0)
+	army_scroll.add_child(army_row)
+	# Card width = the scroller's own available width, so exactly one Army
+	# fills the screen per swipe rather than letting the next card peek in.
+	var card_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
-		var army_btn := _button(army_box, Armies.display_name(army_name), 18,
+		var card := CenterContainer.new()
+		card.custom_minimum_size = Vector2(card_w, 0)
+		army_row.add_child(card)
+		var card_box := VBoxContainer.new()
+		card_box.add_theme_constant_override("separation", 6)
+		card.add_child(card_box)
+		var army_btn := _button(card_box, Armies.display_name(army_name), 20,
 			func() -> void:
 				GameScript.next_army = army_name
 				army_center.visible = false
 				rank_center.visible = true)
-		# only the buttons stretch: the roster and power lines under each one
-		# are reference text and stay at their natural height
-		army_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		var roster := Label.new()
-		roster.text = _army_summary(Tuning.ARMIES[army_name])
-		roster.add_theme_font_size_override("font_size", 11)
-		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		roster.modulate = Color(1, 1, 1, 0.7)
-		army_box.add_child(roster)
+		army_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the carousel
+		card_box.add_child(_army_group_picture(Tuning.ARMIES[army_name]))
 		var kit: Dictionary = Armies.entry(army_name)
-		var powers := Label.new()
-		powers.text = "%s · %s" % [kit.power_name, kit.ability_name]
-		powers.add_theme_font_size_override("font_size", 10)
-		powers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		powers.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
+		var power := Label.new()
+		power.text = "%s\n%s" % [kit.power_name, kit.power_desc]
+		power.add_theme_font_size_override("font_size", 11)
+		power.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		power.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		power.custom_minimum_size.x = card_w - 40.0
+		power.modulate = Color(1, 1, 1, 0.7)
+		card_box.add_child(power)
+		var ability := Label.new()
+		ability.text = "%s\n%s" % [kit.ability_name, kit.ability_desc]
+		ability.add_theme_font_size_override("font_size", 11)
+		ability.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ability.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ability.custom_minimum_size.x = card_w - 40.0
+		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
-		army_box.add_child(powers)
-	_button(army_box, "← Back", 20, func() -> void:
+		card_box.add_child(ability)
+	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
 
@@ -1055,9 +1097,42 @@ func _ready() -> void:
 	rank_pick.text = "Choose your difficulty"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
-	# issue 75: the seed field. Sits on the LAST screen before a run starts, so
-	# it is the final thing set and cannot be lost by backing out of a later
-	# step. Empty = a fresh random seed, exactly as before.
+	# NO-148: one row per tier, icon + description, description GENERATED from
+	# Tuning.TIER_HANDICAPS rather than hand-written — see _tier_description().
+	# The tier BUTTON keeps the bare "Tier N" text test_menu_clicks.gd clicks by
+	# (and the save's own next_tier value); the description is a separate Label
+	# beside it, never folded into the button's own text.
+	for tier_name in Tuning.TIERS:
+		var tier_row := HBoxContainer.new()
+		tier_row.add_theme_constant_override("separation", 10)
+		rank_box.add_child(tier_row)
+		var tier_icon := Label.new()
+		tier_icon.text = _tier_icon_text(tier_name)
+		tier_icon.add_theme_font_size_override("font_size", 18)
+		tier_icon.custom_minimum_size = Vector2(70, 0)
+		tier_row.add_child(tier_icon)
+		var tier_col := VBoxContainer.new()
+		tier_col.add_theme_constant_override("separation", 2)
+		tier_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tier_row.add_child(tier_col)
+		_button(tier_col, tier_name, 26, func() -> void:
+			GameScript.next_tier = tier_name
+			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
+			GameScript.next_config = {}
+			GameScript.is_scenario = false
+			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		var tier_desc := Label.new()
+		tier_desc.text = _tier_description(tier_name)
+		tier_desc.add_theme_font_size_override("font_size", 11)
+		tier_desc.modulate = Color(1, 1, 1, 0.7)
+		tier_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# icon column (70) + the row separation (10) — same "state an explicit
+		# minimum or autowrap collapses to zero" fix _wrap_account_text documents.
+		tier_desc.custom_minimum_size.x = _text_width() - 80.0
+		tier_col.add_child(tier_desc)
+	# issue 75: the seed field. NO-148 moves it to the BOTTOM, under the tiers,
+	# so it is still the final thing set before a run starts — its own
+	# behaviour (focus_mode, "" = random) is untouched, only its position moved.
 	var seed_row := VBoxContainer.new()
 	seed_row.add_theme_constant_override("separation", 2)
 	var seed_label := Label.new()
@@ -1075,13 +1150,6 @@ func _ready() -> void:
 	seed_field.focus_mode = Control.FOCUS_CLICK
 	seed_row.add_child(seed_field)
 	rank_box.add_child(seed_row)
-	for tier_name in Tuning.TIERS:
-		_button(rank_box, tier_name, 26, func() -> void:
-			GameScript.next_tier = tier_name
-			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
-			GameScript.next_config = {}
-			GameScript.is_scenario = false
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(rank_box, "← Back", 20, func() -> void:
 		rank_center.visible = false
 		army_center.visible = true)
@@ -1111,7 +1179,11 @@ func _ready() -> void:
 					army_center.visible = false
 					rank_center.visible = true
 				"scores": _show_scores()
-				"history": _show_history()
+				"history": # NO-147: nested under Scores now — build it first,
+					# same idiom as "rank" building its Army pick above, so
+					# a screenshot doesn't need Scores opened as a separate step
+					_show_scores()
+					_show_history()
 				"about": _show_about()
 				"guide":
 					main_box.visible = false
@@ -1138,8 +1210,13 @@ func _ready() -> void:
 		get_tree().change_scene_to_file("res://scenes/Game.tscn")
 
 
+## NO-147: reached from Settings now, so settings_panel is hidden here rather
+## than left showing underneath (main_box.visible = false stays too — the
+## --show-screen "tests"/"device-info" bypasses reach this straight from a
+## fresh main menu, where settings_panel is already hidden).
 func _show_tests() -> void:
 	main_box.visible = false
+	settings_panel.visible = false
 	test_scroll.visible = true
 
 
@@ -1208,15 +1285,21 @@ func _show_scores() -> void:
 			int(e.wave), int(e.kings), "" if int(e.kings) == 1 else "s"]
 		row.add_theme_font_size_override("font_size", 18)
 		box.add_child(row)
+	# NO-147: Games History folds into Scores — a door to the per-run log
+	# beside the ranked top-10 above, same shape as the Global ranking door.
+	_button(box, "Games History", 20, _show_history)
 	_button(box, "← Back", 20, func() -> void:
 		scores_center.visible = false
 		main_box.visible = true)
 
 
 ## Games History: every real run's summary, newest first — distinct from the
-## ranked top-10 Highscores above (05-menus-and-settings).
+## ranked top-10 Highscores above (05-menus-and-settings). NO-147: reached
+## from Scores only, so scores_center is guaranteed built by the time this
+## runs — hidden here rather than left showing underneath.
 func _show_history() -> void:
 	main_box.visible = false
+	scores_center.visible = false
 	if history_scroll:
 		history_scroll.queue_free()
 	history_scroll = ScrollContainer.new()
@@ -1250,11 +1333,14 @@ func _show_history() -> void:
 		box.add_child(row)
 	_button(box, "← Back", 20, func() -> void:
 		history_scroll.visible = false
-		main_box.visible = true)
+		scores_center.visible = true) # NO-147: reached from Scores now
 
 
+## NO-147: reached from Settings now, so settings_panel is hidden here rather
+## than left showing underneath.
 func _show_about() -> void:
 	main_box.visible = false
+	settings_panel.visible = false
 	if about_center:
 		about_center.queue_free()
 	about_center = CenterContainer.new()
@@ -1274,7 +1360,7 @@ func _show_about() -> void:
 	box.add_child(body)
 	_button(box, "← Back", 20, func() -> void:
 		about_center.visible = false
-		main_box.visible = true)
+		settings_panel.visible = true) # NO-147: reached from Settings now
 
 
 ## Diagnostic-only readout of the platform's own safe-area numbers, so a
@@ -1329,14 +1415,64 @@ func _show_device_info() -> void:
 		test_scroll.visible = true)
 
 
-func _army_summary(army: Array) -> String:
-	var counts := {} # insertion-ordered, so the summary follows the army list
+## NO-146: the Army carousel's "group picture" — starting pieces shown
+## together as art. One icon per distinct piece id, de-duplicated the same
+## way the old text roster summary was (insertion-ordered counts), with a
+## "×N" badge standing in for a repeated piece instead of a "%d× %s" word.
+func _army_group_picture(army: Array) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var counts := {} # insertion-ordered, so the picture follows the army list
 	for id in army:
 		counts[id] = counts.get(id, 0) + 1
-	var parts := []
 	for id in counts:
-		parts.append(("%d× %s" % [counts[id], id]) if counts[id] > 1 else id)
-	return " · ".join(parts)
+		var col := VBoxContainer.new()
+		var icon := TextureRect.new()
+		icon.texture = GameScript.load_piece_tex(id) # player side (the default)
+		icon.custom_minimum_size = Vector2(40, 40)
+		# EXPAND_IGNORE_SIZE, or a 192x192 source PNG overrides the minimum
+		# above with its own native size — same pairing modals.gd's own
+		# piece-art TextureRects already use.
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if GameScript.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
+			icon.modulate = GameScript.COL_SIDE_PLAYER
+		col.add_child(icon)
+		if counts[id] > 1:
+			var count_label := Label.new()
+			count_label.text = "×%d" % counts[id]
+			count_label.add_theme_font_size_override("font_size", 11)
+			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(count_label)
+		row.add_child(col)
+	return row
+
+
+## NO-148: a filled/hollow dot meter standing in for real tier artwork — none
+## exists in game/assets (checked before writing this). Derived from
+## Tuning.tier_index like the description below, not authored per tier, so
+## it is a placeholder that is at least never wrong. Flagged in the ticket
+## report: swap this for painted icons by replacing this one function.
+func _tier_icon_text(tier_name: String) -> String:
+	var idx := Tuning.tier_index(tier_name)
+	return "●".repeat(idx + 1) + "○".repeat(Tuning.TIERS.size() - idx - 1)
+
+
+## NO-148 (Max, 2026-09-19): each tier's description states its OWN new
+## handicap(s) first, then every handicap every lower tier already added —
+## cumulative, with the new part identifiable. GENERATED from
+## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
+## hand-written, so retuning a threshold there moves this copy for free.
+func _tier_description(tier_name: String) -> String:
+	var new_h := Tuning.new_handicaps(tier_name)
+	if new_h.is_empty():
+		return "No handicaps"
+	var lines := new_h.duplicate()
+	var lower_h := Tuning.lower_handicaps(tier_name)
+	if not lower_h.is_empty():
+		lines.append("Also: " + ", ".join(lower_h))
+	return "\n".join(lines)
 
 
 ## NO-55: how wide an account label may be. One number, read from the viewport

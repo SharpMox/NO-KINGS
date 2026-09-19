@@ -125,6 +125,13 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 
+	# NO-147: TEST now nests inside Settings — open it first.
+	var settings_btn := _find_button(menu, "Settings")
+	check(settings_btn != null, "Settings button visible")
+	_mouse(true, settings_btn.get_global_rect().get_center())
+	_mouse(false, settings_btn.get_global_rect().get_center())
+	await process_frame
+
 	var test_btn := _find_button(menu, "TEST")
 	check(test_btn != null, "TEST button visible")
 	_mouse(true, test_btn.get_global_rect().get_center())

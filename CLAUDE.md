@@ -287,6 +287,19 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   removes it** — ask the holder. `ps` from one session can't see another's processes, so "no
   Godot running" proves nothing; on 2026-09-14 a live lock was cleared twice and both times
   the overlapping suites' results were discarded.
+- **The lock serialises Godot, not the git checkout in front of it.** `git checkout
+  --detach <ref> && tools/godot-lock.sh <cmd>` leaves the checkout outside the lock, so on
+  a shared checkout (Aux) a second agent can detach to a different ref mid-run and the
+  first agent silently tests the second agent's code — caught mid-task 2026-09-19, unknown
+  how many times it wasn't. Put both steps inside one locked command:
+  `tools/godot-lock.sh sh -c "git fetch --prune -q && git checkout --detach -q origin/<ref> && <cmd>"`.
+  Use `origin/<ref>`, not the bare branch name: for a branch Aux has never checked out
+  locally (the normal case — one shared checkout, many agents' branches), plain `--detach
+  <ref>` fails with `fatal: '--detach' cannot be used with '-b/-B/--orphan'` — git's DWIM
+  resolves the name to `origin/<ref>` and implicitly adds `-b` to track it, which collides
+  with `--detach` (reproduced 2026-09-19). This is on top of, not instead of, the
+  `user://` sharing above — that's about state two runs read, this is about which code a
+  run under the lock is even running.
 - **The `--screenshot` seam is windowed, and its flag goes after the bare `--`.**
   `OS.get_cmdline_user_args()` (`_ready`, `game.gd:521`) returns only args after `--`; put
   `--screenshot` before it and `_ready`'s `--screenshot` handling never sees it, so neither
@@ -378,6 +391,14 @@ comes back.
   item SVG icons"); the gap is running a probe directly, skipping `run_all.sh`, which is
   what iterating on one suite does. A red result from a cold worktree is not evidence about
   the branch — warm the cache and re-run before bisecting.
+- **A bare `godot -s tests/X.gd` has no watchdog, and lies in both directions.**
+  `run_all.sh`'s `run()` backgrounds the suite and races a `sleep "$TIMEOUT"; kill "$pid"`
+  watchdog against it (`game/tests/run_all.sh:47-56`); a direct invocation gets neither —
+  `test_board_draw.gd` hung 7 minutes before being killed by hand on 2026-09-19, while a
+  120s watchdog an agent improvised for `test_scenarios.gd` (genuinely 190-250s) killed it
+  early and reported a phantom failure, same day. Wrap a direct run yourself and size the
+  timeout to the suite — 300s minimum for `test_scenarios.gd`, matching `run_all.sh`'s own
+  default (`TIMEOUT="${TIMEOUT:-300}"`, line 12).
 
 ### Layout traps the device taught
 

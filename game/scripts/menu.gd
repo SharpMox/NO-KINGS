@@ -1133,6 +1133,7 @@ func _ready() -> void:
 					login_center.visible = true
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
+		DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing
 		get_viewport().get_texture().get_image().save_png(dir.path_join("menu.png"))
 		get_tree().change_scene_to_file("res://scenes/Game.tscn")
 

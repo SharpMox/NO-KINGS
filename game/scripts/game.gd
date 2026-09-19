@@ -4255,6 +4255,7 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 func _capture_and_quit(dir: String) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
+	DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing
 	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))
 	get_tree().quit()
 

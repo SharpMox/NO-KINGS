@@ -75,6 +75,50 @@ func _init() -> void:
 	check(game.stock.size() == stock_n + 1, "reinforce buy adds the piece")
 	check(game.score == s and game.gold == m, "reinforce buys are free")
 
+	# --- NO-127: Score/Gold gain pulses, driven by refresh() seeing the value
+	# CHANGE — not by refresh() itself running (it runs on nearly every state
+	# change; a Tween re-armed each call never plays, per this file's CLAUDE.md) ---
+	var hud: CanvasLayer = game.hud # game is Node2D (_boot()'s return type),
+		# which doesn't declare .hud, so the access is untyped and := can't
+		# infer a type from it — same trap as NO-150's `var diag := t + d`
+	# game.hud has already been refreshed once by the normal boot sequence
+	# (game.gd's own _refresh() call, before any of the actions above) — so
+	# calling refresh() here would be a SECOND observation, not the first.
+	# Resetting the seen-flags is what actually isolates "the first
+	# observation never pulses" from boot's own timing.
+	hud._score_seen = false
+	hud._gold_seen = false
+	# _gain_tweens is a persistent record keyed by counter name that nothing
+	# ever erases — the earlier, entirely legitimate gains above already
+	# wrote "gold"/"score" into it, and that record outlives the seen-flags
+	# above. Clearing it is part of constructing "unseen", not an
+	# afterthought: without it, the check below asks "has this key ever
+	# existed" when it means "did THIS call start a tween".
+	hud._gain_tweens.clear()
+	hud.refresh() # baseline only
+	check(not hud._gain_tweens.has("gold") and not hud._gain_tweens.has("score"),
+		"the first observation never pulses (baseline only, not a gain)")
+
+	Economy.earn(game, 20)
+	hud.refresh()
+	check(hud._gain_tweens.has("gold") and (hud._gain_tweens["gold"] as Tween).is_running(),
+		"a Gold gain squish-pulses the Gold row")
+	check(hud._gain_tweens.has("score") and (hud._gain_tweens["score"] as Tween).is_running(),
+		"a Score gain pulses the Score row the same way")
+
+	var gold_tw: Tween = hud._gain_tweens["gold"]
+	hud.refresh() # nothing changed since — must NOT restart it
+	check(hud._gain_tweens["gold"] == gold_tw,
+		"refresh() alone, value unchanged, never restarts the pulse")
+
+	game.animations_on = false
+	Economy.earn(game, 20)
+	hud._gain_tweens.erase("gold")
+	hud.refresh()
+	check(not hud._gain_tweens.has("gold"),
+		"the Settings animations toggle turns the gain pulse off")
+	game.animations_on = true
+
 	game.queue_free()
 	await process_frame
 

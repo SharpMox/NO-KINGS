@@ -107,6 +107,13 @@ const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the ic
 const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
 ## ----------------------------------------------------------------------------
 
+## NO-127: below this, the Clock shakes + pulses red continuously as an
+## urgency cue. Literally "under two minutes" per the ticket.
+const CLOCK_URGENT_MS := 120000.0
+## NO-126: the Score reads as a 6-digit odometer; greyed padding, unit text.
+const SCORE_DIGITS := 6
+const SCORE_ZERO_COLOR := Color(0.45, 0.45, 0.45)
+
 ## ---- STOCK DRAWER TUNING (NO-84) --------------------------------------------
 ## Every spacing number for the Stock Drawer lives in THIS block. Canvas px.
 ## It opens DOWNWARD from the Header's bottom edge (g.hud_top), full width, at
@@ -177,8 +184,12 @@ func toggle_menu(open: bool) -> void:
 var g # the Game node — read-only from here; mutations go up via signals
 
 var clock_label := Label.new()
-var score_label := Label.new()
+var score_label := Label.new() # NO-126: the coloured, significant digits only
+var score_zeros_label := Label.new() # NO-126: greyed leading-zero padding
+var score_pts_label := Label.new() # NO-126: greyed " Pts" unit
+var score_row := HBoxContainer.new() # NO-127: pulsed as one unit on a gain
 var gold_label := Label.new() # spendable currency (score is the metric)
+var gold_row := HBoxContainer.new() # NO-127: pulsed as one unit on a gain
 var wave_label := Label.new()
 var turn_label := Label.new()
 var pass_button := Button.new()
@@ -204,6 +215,32 @@ var _drawer_tweens := {} # name -> Tween
 ## restored exactly (not reset to a blanket STOP) on the next open. See
 ## _set_drawer_clickable's own comment for why this has to recurse at all.
 var _drawer_saved_filters := {}
+## NO-127: key -> Tween, the in-flight "gain" pulse or minute-shake per
+## counter (Score/Gold/Clock) — same kill-first idiom as _drawer_tweens, so a
+## second trigger before the first finishes replaces it instead of racing it.
+var _gain_tweens := {}
+## NO-127: last value refresh()/update_clock() actually RENDERED, so a gain
+## animation is driven by the value changing, never by refresh() itself
+## running (refresh() runs on nearly every state change). Paired with an
+## explicit "have we observed one yet" flag rather than a sentinel VALUE
+## (e.g. -1) — a sentinel is indistinguishable from a legitimate reading
+## once any counter's real value can coincide with it, and the Clock's own
+## per-frame delta can be negative. The first observation always just
+## establishes the baseline; only a later CHANGE against it animates.
+var _score_shown := 0
+var _score_seen := false
+var _gold_shown := 0
+var _gold_seen := false
+var _clock_shown_ms := 0.0
+var _clock_shown_min := 0
+var _clock_seen := false
+## NO-127: the continuous under-2-minutes shake+pulse. Two loop Tweens (one
+## per animated property) rather than one, so killing/restarting never has to
+## unpick a parallel/chain sequence.
+var _urgent_tweens: Array = []
+var _clock_urgent_on := false # whether the loop above is ACTUALLY playing —
+	# tracks the Settings toggle and autoplay too, not just the ms threshold,
+	# so flipping either mid-run starts/stops it correctly.
 var stock_armed := Control.new() # draws the armed piece on the Stock button
 var stock_badge := Label.new() # the Stock count, on the Header's Stock button (NO-83)
 var menu_button := Button.new() # ☰, the Header's top-right corner
@@ -318,6 +355,14 @@ func build(game) -> void:
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
+	# NO-126: the odometer look — greyed padding zeros before the coloured
+	# digits, greyed unit after. Same font, just a different colour, so all
+	# three sit on one baseline in one row.
+	score_zeros_label.add_theme_font_size_override("font_size", SCORE_FONT)
+	score_zeros_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
+	score_pts_label.text = " Pts"
+	score_pts_label.add_theme_font_size_override("font_size", SCORE_FONT)
+	score_pts_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
 	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	# NO-114: ★ and $ are different glyph widths, so the bare symbol+number
@@ -333,11 +378,12 @@ func build(game) -> void:
 	gold_symbol.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_symbol.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	gold_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
-	var score_row := HBoxContainer.new()
 	score_row.add_theme_constant_override("separation", 0)
-	for l in [score_symbol, score_label]:
+	# NO-126: zeros immediately after the symbol column — same x as the Gold
+	# row's value (NO-114's alignment), the odometer padding just rides ahead
+	# of the coloured digits instead of replacing them.
+	for l in [score_symbol, score_zeros_label, score_label, score_pts_label]:
 		score_row.add_child(l)
-	var gold_row := HBoxContainer.new()
 	gold_row.add_theme_constant_override("separation", 0)
 	for l in [gold_symbol, gold_label]:
 		gold_row.add_child(l)
@@ -887,6 +933,94 @@ func _slide_drawer(key: String, opening: bool) -> void:
 	_drawer_tweens[key] = tw
 
 
+## NO-127: squish-grow-settle when a counter GAINS (Score, Gold, or the
+## Clock via a time grant). Swift — three short legs, ~0.2s total. Same gate
+## as every other HUD animation (`_slide_drawer` above is the precedent), so
+## a headless sweep never even creates a Tween to wait on.
+func _pulse_gain(node: Control, key: String) -> void:
+	if g.autoplay or not g.animations_on:
+		return
+	if _gain_tweens.get(key):
+		(_gain_tweens[key] as Tween).kill()
+	node.pivot_offset = node.size / 2.0
+	var tw := create_tween()
+	tw.tween_property(node, "scale", Vector2(0.82, 1.22), 0.06)
+	tw.tween_property(node, "scale", Vector2(1.1, 0.94), 0.07)
+	tw.tween_property(node, "scale", Vector2.ONE, 0.08)
+	_gain_tweens[key] = tw
+
+
+## NO-127: minute-rollover cue on the Clock — grows then shakes back level.
+## One-shot; shares `_gain_tweens`'s "clock" slot with `_pulse_gain` (kill-
+## first idiom) since both animate the same Label. Suppressed once the
+## continuous under-2-minutes loop owns `rotation` (see `_apply_clock_urgent`)
+## — two Tweens racing the same property is what "fights" would mean, not an
+## extra emphasis.
+func _shake_clock_minute() -> void:
+	if g.autoplay or not g.animations_on:
+		return
+	if _gain_tweens.get("clock"):
+		(_gain_tweens["clock"] as Tween).kill()
+	clock_label.pivot_offset = clock_label.size / 2.0
+	var tw := create_tween()
+	tw.tween_property(clock_label, "scale", Vector2(1.35, 1.35), 0.07)
+	for deg in [6, -6, 3, 0]:
+		tw.tween_property(clock_label, "rotation", deg_to_rad(deg), 0.045)
+	tw.tween_property(clock_label, "scale", Vector2.ONE, 0.1)
+	_gain_tweens["clock"] = tw
+
+
+## NO-127: the continuous "under two minutes" urgency cue — shake + pulse
+## red, looping, while `ms` stays below CLOCK_URGENT_MS. Driven off `want`
+## CHANGING (the ms threshold crossing, or the Settings toggle / autoplay
+## flipping), never off being called every frame — update_clock() calls this
+## every frame, but the early-return below makes every no-op call free.
+func _apply_clock_urgent(ms: float) -> void:
+	var want: bool = ms < CLOCK_URGENT_MS and not g.autoplay and g.animations_on
+	if want == _clock_urgent_on:
+		return
+	_clock_urgent_on = want
+	for tw in _urgent_tweens:
+		if tw:
+			(tw as Tween).kill()
+	_urgent_tweens.clear()
+	clock_label.rotation = 0.0
+	clock_label.modulate = Color.WHITE
+	if not want:
+		return
+	clock_label.pivot_offset = clock_label.size / 2.0
+	var rot_tw := create_tween().set_loops()
+	rot_tw.tween_property(clock_label, "rotation", deg_to_rad(4), 0.1)
+	rot_tw.tween_property(clock_label, "rotation", deg_to_rad(-4), 0.1)
+	var col_tw := create_tween().set_loops()
+	col_tw.tween_property(clock_label, "modulate", Color(1.0, 0.25, 0.2), 0.3)
+	col_tw.tween_property(clock_label, "modulate", Color.WHITE, 0.3)
+	_urgent_tweens = [rot_tw, col_tw]
+
+
+## NO-127: the single seam every Clock text update goes through — game.gd's
+## per-frame drain AND refresh()'s on-state-change set both call this instead
+## of writing `clock_label.text` directly, so the three Clock animations
+## trigger off the ms VALUE changing, never off how often either caller runs.
+func update_clock(ms: float) -> void:
+	clock_label.text = g._clock_text()
+	var whole_min: int = int(ms / 60000.0)
+	# NO-127: settle urgency FIRST. The 2-minute mark IS a minute boundary, so
+	# the instant the urgency loop claims `rotation` is the same instant
+	# whole_min changes — checking _clock_urgent_on before this call would
+	# see last frame's stale answer and fire the one-shot shake into the loop
+	# that starts this same frame, fighting over the same property.
+	_apply_clock_urgent(ms)
+	if _clock_seen: # not the first observation — there's a baseline to compare against
+		if ms > _clock_shown_ms + 1.0: # a real GAIN, not per-frame float drift
+			_pulse_gain(clock_label, "clock")
+		elif whole_min != _clock_shown_min and not _clock_urgent_on:
+			_shake_clock_minute()
+	_clock_shown_ms = ms
+	_clock_shown_min = whole_min
+	_clock_seen = true
+
+
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
 ## Visibility only — selection/board consequences live in game.gd's handler.
 func set_drawer(which: String) -> void:
@@ -1003,9 +1137,26 @@ func refresh() -> void:
 	shop_button.text = "Shop (W%d)" % Tuning.SHOP_UNLOCK_WAVE if shop_locked else "Shop"
 	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
 		if shop_locked else ""
-	clock_label.text = g._clock_text()
-	score_label.text = "%d" % g.score
+	update_clock(g.clock_ms) # NO-127: routes through the shared seam (see its header)
+	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
+	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`
+	# is just str(g.score), whatever length that is, and the padding floors at 0.
+	var digits := str(g.score)
+	score_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
+	score_label.text = digits
 	gold_label.text = "%d" % g.gold
+	# NO-127: gain pulses, driven off the value CHANGING (refresh() itself
+	# runs on nearly every state change, which is not the same thing — see
+	# _pulse_gain's header). The first observation establishes the baseline
+	# and never pulses.
+	if _score_seen and g.score > _score_shown:
+		_pulse_gain(score_row, "score")
+	_score_shown = g.score
+	_score_seen = true
+	if _gold_seen and g.gold > _gold_shown:
+		_pulse_gain(gold_row, "gold")
+	_gold_shown = g.gold
+	_gold_seen = true
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
 	# NO-114: blank during a King wave — the King's own name in turn_label is

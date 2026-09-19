@@ -99,6 +99,66 @@ func _init() -> void:
 	bk.queue_free()
 	await process_frame
 
+	# --- NO-127: the three Clock animations, each driven by the ms VALUE
+	# changing between two update_clock() calls, never by how often the
+	# function itself is called (the refresh()-restarts-it trap this file's
+	# CLAUDE.md documents for every HUD animation) ---
+	var hc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "clock_s": 300.0}) # comfortably above the 2-minute urgency line
+	await process_frame
+	var hud: CanvasLayer = hc.hud # hc is Node2D (_boot()'s return type), which
+		# doesn't declare .hud, so the access is untyped and := can't infer a
+		# type from it — same trap as NO-150's `var diag := t + d`
+	# hud has already had update_clock() called on it repeatedly since boot —
+	# once by game.gd's own boot-time _refresh(), and again every frame since
+	# via the per-frame drain in _process() — so this is not really "the
+	# first call" from the engine's perspective. Resetting _clock_seen is
+	# what actually isolates "the first observation never animates" from
+	# that, and pinning clock_ms clear of a minute boundary stops the drain
+	# from coincidentally crossing one between here and the assertion.
+	hc.clock_ms = 300500.0
+	hud._clock_seen = false
+	# _gain_tweens is a persistent record keyed by counter name that nothing
+	# ever erases — the per-frame drain above may already have shaken across
+	# a minute boundary before this point, writing "clock" into it, and that
+	# record outlives _clock_seen. Clearing it is part of constructing
+	# "unseen", not an afterthought: without it, the check below asks "has
+	# this key ever existed" when it means "did THIS call start a tween".
+	hud._gain_tweens.clear()
+	hud.update_clock(hc.clock_ms) # baseline only
+	check(not hud._gain_tweens.has("clock") and not hud._clock_urgent_on,
+		"the first observation never animates (baseline only, nothing to compare yet)")
+
+	Economy.add_clock(hc, 5000.0, "test") # a real GAIN
+	hud.update_clock(hc.clock_ms)
+	check(hud._gain_tweens.has("clock") and (hud._gain_tweens["clock"] as Tween).is_running(),
+		"a Clock gain squish-pulses the Clock label")
+
+	var pulse_tw: Tween = hud._gain_tweens["clock"]
+	hc.clock_ms -= 65000.0 # crosses a whole-minute boundary, no gain, still well above 2:00
+	hud.update_clock(hc.clock_ms)
+	check(hud._gain_tweens["clock"] != pulse_tw and not hud._clock_urgent_on,
+		"the minute changing (no gain, not urgent) replaces it with the grow+shake, kill-first")
+
+	hc.clock_ms = 100000.0 # under CLOCK_URGENT_MS (120000) — also crosses a minute
+	hud.update_clock(hc.clock_ms)
+	check(hud._clock_urgent_on and hud._urgent_tweens.size() == 2,
+		"dropping under 2 minutes starts the continuous shake+pulse loop")
+
+	hc.clock_ms = 125000.0 # back above it
+	hud.update_clock(hc.clock_ms)
+	check(not hud._clock_urgent_on and hud._urgent_tweens.is_empty(),
+		"back above 2 minutes stops the loop")
+
+	hc.animations_on = false
+	hc.clock_ms = 90000.0
+	hud.update_clock(hc.clock_ms)
+	check(not hud._clock_urgent_on,
+		"the Settings animations toggle keeps the urgency loop off even under 2 minutes")
+	hc.animations_on = true
+	hc.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL CLOCK CHECKS OK")

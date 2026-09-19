@@ -107,6 +107,26 @@ const HATCH_ALPHA := 0.35 # NO-122: hatch line alpha, on top of the existing
 	# Color(COL_CAPTURE, 0.22) wash
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
+# NO-129: reachable-zone outline, a steadier selection ring, and larger/
+# semi-transparent move+capture indicators — a spread of legal moves read as
+# scattered marks rather than one shape. No new COL_* here: the outline and
+# ring reuse COL_MOVE/COL_ENEMY/COL_SELECT/COL_CAPTURE at a different alpha.
+const ZONE_OUTLINE_ALPHA := 0.55
+const ZONE_OUTLINE_WIDTH := 2.0
+const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
+const SELECT_RING_WIDTH := 3.0 # fixed (was 3.0-4.5 jitter)
+const SELECT_RING_ALPHA_MIN := 0.5
+const SELECT_RING_ALPHA_RANGE := 0.3 # breathes 0.5-0.8; old pulse swung 0.45-0.85
+	# stacked with radius+width jitter, which read as flashing, not "clean"
+const MOVE_INDICATOR_ALPHA := 0.55 # was 0.85 (recon) / 0.9 (player) baked in
+const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots)
+const CAPTURE_RING_RADIUS := 0.48 # tile fraction, was 0.44
+const CAPTURE_RING_WIDTH := 4.5 # was 3.0
+const CAPTURE_RING_ALPHA := 0.6 # was opaque (COL_CAPTURE has no alpha)
+const ARROW_WIDTH := 4.5 # was 3.0 — ride-move arrow only, not Arrow Planning
+const ARROW_HEAD_LEN := 20.0 # was 14.0
+const ARROW_HEAD_HALF := 11.0 # was 8.0
+
 # NO-101: text-mode glyph marking the four LITERAL inv- ids (inv-sergeant,
 # inv-arrow-pawn, inv-kirin-plus, inv-kirin-plus-plus) only — never the ten
 # inversion pairs that turn a piece into an ordinary existing piece (those
@@ -1984,18 +2004,21 @@ func _draw_linked_dots(origin: Vector2, line: Array, col: Color) -> void:
 		var c: Vector2 = _tile_px(t) + Vector2(tile, tile) / 2
 		draw_dashed_line(prev, c, Color(col, 0.65), 2.5, 5.0)
 		if not board.has(t):
-			draw_circle(c, 8, col)
+			draw_circle(c, MOVE_DOT_RADIUS, col) # NO-129: was a fixed 8px
 		prev = c
 
 
 ## Slide indicator: shaft from the piece toward the ride's end, arrowhead at
-## the last reachable tile (a capture there keeps its ring on top).
-func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color) -> void:
+## the last reachable tile (a capture there keeps its ring on top). Sizing
+## defaults to the NO-129 move/capture dimensions; Arrow Planning's decorative
+## overlay (unrelated feature) passes its own, unchanged, smaller numbers.
+func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color,
+		width := ARROW_WIDTH, head_len := ARROW_HEAD_LEN, head_half := ARROW_HEAD_HALF) -> void:
 	var dir := (to_px - from_px).normalized()
-	draw_line(from_px + dir * (tile * 0.35), to_px - dir * 10.0, col, 3.0)
+	draw_line(from_px + dir * (tile * 0.35), to_px - dir * 10.0, col, width)
 	var side := Vector2(-dir.y, dir.x)
 	draw_colored_polygon(PackedVector2Array([to_px,
-		to_px - dir * 14.0 + side * 8.0, to_px - dir * 14.0 - side * 8.0]), col)
+		to_px - dir * head_len + side * head_half, to_px - dir * head_len - side * head_half]), col)
 
 
 ## Arrow Planning: drag draws a decorative arrow; redrawing the same one
@@ -4289,7 +4312,14 @@ func _draw() -> void:
 	for d in legal_dests:
 		if board.has(d): # capturable target: red tile tint + ring around the piece
 			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE, 0.3))
-			draw_arc(_tile_px(d) + half, tile * 0.44, 0, TAU, 32, COL_CAPTURE, 3.0)
+			draw_arc(_tile_px(d) + half, tile * CAPTURE_RING_RADIUS, 0, TAU, 32,
+				Color(COL_CAPTURE, CAPTURE_RING_ALPHA), CAPTURE_RING_WIDTH) # NO-129: larger + semi-transparent
+	# NO-129: one outline around the whole reachable zone, so a spread of
+	# move/capture squares reads as a shape rather than each square drawn on
+	# its own — reusable, NO-130 calls _draw_zone_outline for an Item's zone.
+	if not legal_dests.is_empty():
+		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
+			else Color(COL_MOVE, ZONE_OUTLINE_ALPHA))
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):
@@ -4297,12 +4327,12 @@ func _draw() -> void:
 	else:
 		# movement by shape: leaps = dots, rides = arrows, bent rides = dots
 		# linked by a line (game-feel 2026-07-07)
-		var col := Color(COL_ENEMY, 0.85) if recon else Color(COL_MOVE, 0.9)
+		var col := Color(COL_ENEMY, MOVE_INDICATOR_ALPHA) if recon else Color(COL_MOVE, MOVE_INDICATOR_ALPHA)
 		for p in legal_paths:
 			match p.kind:
 				"leap":
 					if not board.has(p.to):
-						draw_circle(_tile_px(p.to) + half, 10, col)
+						draw_circle(_tile_px(p.to) + half, MOVE_DOT_RADIUS, col) # NO-129: was a fixed 10px
 				"ride":
 					if p.get("hop", false): # leap-rider: linked dots, not a slide
 						_draw_linked_dots(_tile_px(selected) + half, p.line, col)
@@ -4361,26 +4391,46 @@ func _draw() -> void:
 	# arrows persist independent of arrow_mode (toggling off just stops adding
 	# more) and are cleared at turn end (scratchpad, never saved)
 	for a in arrows:
-		_draw_move_arrow(_tile_px(a.from) + half, _tile_px(a.to) + half, COL_ARROW)
+		_draw_move_arrow(_tile_px(a.from) + half, _tile_px(a.to) + half, COL_ARROW, 3.0, 14.0, 8.0)
 	if arrow_from.x >= 0:
 		var arrow_cur := _tile_at(get_global_mouse_position())
 		if arrow_cur.x >= 0 and arrow_cur != arrow_from:
-			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW)
+			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW, 3.0, 14.0, 8.0)
+
+
+## NO-129: outlines the PERIMETER of a tile set as one shape — an edge is
+## drawn only where a tile's neighbour is outside the set, so a spread of
+## squares reads as a silhouette instead of each square boxed on its own
+## (which read as scattered marks). Reusable: NO-130 calls this for an armed
+## Item's own target zone, same as the move/capture call site in `_draw`.
+func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH) -> void:
+	for t in tiles:
+		var px := _tile_px(t)
+		if not tiles.has(Vector2i(t.x, t.y + 1)): # nothing above on screen
+			draw_line(px, px + Vector2(tile, 0), col, width)
+		if not tiles.has(Vector2i(t.x, t.y - 1)): # nothing below
+			draw_line(px + Vector2(0, tile), px + Vector2(tile, tile), col, width)
+		if not tiles.has(Vector2i(t.x - 1, t.y)): # nothing to the left
+			draw_line(px, px + Vector2(0, tile), col, width)
+		if not tiles.has(Vector2i(t.x + 1, t.y)): # nothing to the right
+			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), col, width)
 
 
 ## The animated ring around the selected piece — drawn by `_pulse`, a child
 ## canvas item that is the only thing redrawn per frame while something is
-## selected (the board itself only redraws on state changes).
+## selected (the board itself only redraws on state changes). NO-129: radius
+## and width are now fixed (only alpha still breathes) — the old triple
+## jitter on radius+width+alpha together read as flashing, not a clean ring.
 func _draw_pulse() -> void:
 	if selected.x < 0 or not board.has(selected):
 		return
 	var recon: bool = board[selected].owner == Rules.ENEMY
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	var pc := Color(COL_CAPTURE, 0.45 + 0.4 * pulse) if recon \
-			else Color(0.4, 0.7, 1.0, 0.45 + 0.4 * pulse)
+	var base := COL_CAPTURE if recon else COL_SELECT
+	var pc := Color(base, SELECT_RING_ALPHA_MIN + SELECT_RING_ALPHA_RANGE * pulse)
 	_pulse.draw_arc(_tile_px(selected) + Vector2(tile, tile) / 2,
-		tile * (0.46 + 0.035 * pulse), 0, TAU, 40, pc, 3.0 + 1.5 * pulse)
+		tile * SELECT_RING_RADIUS, 0, TAU, 40, pc, SELECT_RING_WIDTH)
 
 
 ## Token art for a piece; the player token unless a side is named.

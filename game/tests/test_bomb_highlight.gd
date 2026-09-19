@@ -47,6 +47,9 @@ func _init() -> void:
 	var matches: Array = Scenarios.all().filter(
 		func(e: Dictionary) -> bool: return e.name.begins_with("NO-122: bomb blast"))
 	check(matches.size() == 1, "exactly one NO-122 bomb-preview scenario exists")
+	if matches.size() != 1:
+		quit(1)
+		return
 	var cfg: Dictionary = matches[0].cfg.duplicate()
 	cfg.seed = 1
 	GameScript.next_config = cfg

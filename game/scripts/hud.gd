@@ -144,6 +144,9 @@ signal stack_preview_requested(id: String) # NO-138: a Stock/Captured cell's
 signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
 	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
 	# final confirm (see multi_confirm_btn's own declaration below)
+signal multi_cancel_pressed # NO-137: the Cancel button underneath it — same
+	# entry-point shape as multi_confirm_pressed, but resets targeting instead
+	# of committing it (see multi_cancel_btn's own declaration below)
 signal item_pressed(index: int)
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
@@ -251,6 +254,11 @@ var multi_confirm_btn := Button.new() # NO-124: floating targeting-confirm —
 	# "Extract N" for a "multi" Item's picks, "Confirm" for a staged
 	# tile/pair/area Item target, an untargeted Item, or Bovine Tractor
 	# Beam's staged target (see refresh()'s visibility/text below)
+var multi_cancel_btn := Button.new() # NO-137: sits underneath multi_confirm_btn
+var confirm_backdrop := ColorRect.new() # NO-137: dims the bottom UI (Shop/
+	# Inventory/Ability/Pass) while Confirm/Cancel float over it, so those
+	# buttons read as "not clickable right now" instead of merely being
+	# covered — see build()'s own comment for the MOUSE_FILTER_STOP choice.
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
 ## panel parented to a row would not survive the next state change.
@@ -586,6 +594,28 @@ func build(game) -> void:
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
+	# NO-137: a semi-transparent backdrop over the bottom UI (Shop/Inventory/
+	# Ability/Pass) while an Item/Artefact's floating Confirm is up. Sized to
+	# `deck`'s own rect exactly (deck_top/deck_h, both already computed above
+	# for `deck` itself) — "the bottom buttons" the ticket names, nothing
+	# more (army_band, above the board, is untouched).
+	#
+	# MOUSE_FILTER_STOP here is the point, not a trap to dodge: added as a
+	# LATER sibling than `deck`, so Godot's front-to-back GUI picking gives
+	# it first refusal over deck's buttons and it absorbs the press — they
+	# read as "not clickable right now" because they genuinely aren't.
+	# multi_confirm_btn/multi_cancel_btn are added AFTER this (later still),
+	# so they stay clickable on top of it. Unlike _set_drawer_clickable's
+	# IGNORE case (which must fall THROUGH to the board), this wants to
+	# BLOCK, so no per-descendant filter save/restore is needed — deck's own
+	# buttons keep whatever filter they already have; only what sits above
+	# them (this backdrop) changes.
+	confirm_backdrop.color = Color(0, 0, 0, 0.55)
+	confirm_backdrop.position = Vector2(0, deck_top)
+	confirm_backdrop.custom_minimum_size = Vector2(vp.x, deck_h)
+	confirm_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	confirm_backdrop.visible = false
+	add_child(confirm_backdrop)
 	# NO-124: floating targeting-confirm, shown once there's something to
 	# confirm — see refresh() for exactly when, per targeting shape
 	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
@@ -594,6 +624,19 @@ func build(game) -> void:
 	multi_confirm_btn.visible = false
 	multi_confirm_btn.pressed.connect(func() -> void: multi_confirm_pressed.emit())
 	add_child(multi_confirm_btn)
+	# NO-137: Cancel, underneath Confirm. NO-121's "tap the armed chip again"
+	# path still works unchanged; this just gives it an affordance right next
+	# to Confirm instead of requiring the Inventory drawer be reopened first.
+	# Costs nothing: game.gd's handler only resets targeting state (the same
+	# reset the chip-tap path already uses) — Economy.charge only ever runs
+	# from _item_apply, on an actual commit.
+	multi_cancel_btn.text = "Cancel"
+	multi_cancel_btn.add_theme_font_size_override("font_size", 15)
+	multi_cancel_btn.position = Vector2(vp.x / 2 - 70, vp.y - 48)
+	multi_cancel_btn.custom_minimum_size = Vector2(140, 40)
+	multi_cancel_btn.visible = false
+	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
+	add_child(multi_cancel_btn)
 	# floating Clear-all for Arrow Planning: only worth showing while the mode
 	# is on (top bar has no room to spare — money-and-shop already fills it)
 	arrow_clear_button.text = "Clear"
@@ -1390,8 +1433,13 @@ func refresh() -> void:
 		else:
 			item_confirm = g.item_pending_tile.x >= 0
 	var artefact_confirm: bool = g.artefact_targeting_key != "" and g.artefact_pending_tile.x >= 0
-	multi_confirm_btn.visible = item_confirm or artefact_confirm
+	var armed_targeting: bool = item_confirm or artefact_confirm
+	multi_confirm_btn.visible = armed_targeting
 	multi_confirm_btn.text = item_confirm_text
+	# NO-137: the backdrop and Cancel appear/disappear together with Confirm —
+	# there is nothing for either to do before Confirm itself would show.
+	multi_cancel_btn.visible = armed_targeting
+	confirm_backdrop.visible = armed_targeting
 	_rebuild_stock_drawer()
 	_rebuild_items_grid()
 	# issue 100: the Power is always on, so it is stated, not offered. The

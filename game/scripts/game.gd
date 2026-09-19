@@ -3094,6 +3094,25 @@ func _confirm_target_pressed() -> void:
 		_artefact_confirm_target()
 
 
+## NO-137: the floating Cancel affordance's entry point (hud.gd's
+## multi_cancel_pressed) — the same reset either branch's own "tap the armed
+## chip again" gesture already used (_use_item/_begin_artefact_targeting),
+## just reachable without reopening the Inventory drawer first. Costs
+## nothing: Economy.charge only ever runs from _item_apply, on a commit, and
+## neither reset below goes near it.
+func _confirm_target_cancelled() -> void:
+	if item_active >= 0:
+		_item_reset()
+	elif artefact_targeting_key != "":
+		_artefact_targeting_reset()
+	else:
+		return
+	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+		_set_drawer("inventory")
+	else:
+		_refresh()
+
+
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	fx_at = _tile_px(b) + Vector2(tile, tile) / 2 if b.x >= 0 \
 		else Vector2(hud.items_grid.get_global_rect().get_center())
@@ -4602,6 +4621,7 @@ func _connect_hud() -> void:
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.stack_preview_requested.connect(func(id: String) -> void: _show_preview(id)) # NO-138
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
+	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)

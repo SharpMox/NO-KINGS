@@ -16,6 +16,36 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
 ## own panel, can't drift apart on it.
 const PANEL_SLIDE_S := 0.18
 
+## NO-145: swipe-to-open/close the Stock/Inventory/Shop panels. One shared
+## classifier (classify_swipe below) so game.gd (board/deck-chrome opens),
+## hud.gd (drawer-chrome closes) and modals.gd (Shop-chrome close) all agree
+## on what counts as a swipe, instead of three independent guesses drifting.
+const SWIPE_MIN_DIST := 40.0 ## px a press must travel before it's a swipe
+	## rather than a tap or a drag — comfortably past hud.gd's
+	## DRAWER_SCROLL_DEADZONE (24), so a scroll's own deadzone is never read
+	## as a swipe underneath it.
+const SWIPE_AXIS_RATIO := 1.5 ## the dominant axis must beat the other by
+	## this factor or the drag is too diagonal to call any direction.
+const SWIPE_EDGE_ZONE := 60.0 ## how close to the screen's right edge (px) a
+	## leftward swipe must START to open the Shop — it slides in from the
+	## right (modals.gd), so only a swipe beginning near that edge reads as
+	## "opening the Shop" rather than an ordinary leftward drag mid-board.
+
+## NO-145: `delta` is a press's total (release position - press position)
+## movement. Returns "up"/"down"/"left"/"right" once it clears
+## SWIPE_MIN_DIST with a dominant axis (SWIPE_AXIS_RATIO); "" if it's too
+## short or too diagonal to call.
+static func classify_swipe(delta: Vector2) -> String:
+	if delta.length() < SWIPE_MIN_DIST:
+		return ""
+	var ax := absf(delta.x)
+	var ay := absf(delta.y)
+	if ax > ay * SWIPE_AXIS_RATIO:
+		return "right" if delta.x > 0 else "left"
+	if ay > ax * SWIPE_AXIS_RATIO:
+		return "down" if delta.y > 0 else "up"
+	return ""
+
 ## NO-119: every icon OUTSIDE the board (Shop, Inventory Drawer, Stock Drawer)
 ## reads at this one fixed size, with no name label beside it — the tooltip /
 ## long-press carries the name instead. Same drift-guard shape as

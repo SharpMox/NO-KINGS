@@ -1694,6 +1694,51 @@ func _init() -> void:
 			and game.items.is_empty(),
 		"Extract confirm returns the pick to Stock")
 
+	# NO-137: the floating Confirm's backdrop + Cancel. Bottom UI (Shop/
+	# Inventory) must read as "not clickable" while armed, and Cancel must
+	# cost nothing (Economy.charge only ever runs from _item_apply, on a
+	# commit — neither reset behind Cancel goes near it).
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
+		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"], "gold": 100}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_inventory(game, "Inventory 1"), "NO-137: Inventory opens for Extraction")
+	await process_frame
+	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
+		"NO-137: Extraction clickable in the drawer")
+	await process_frame
+	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.hud.multi_confirm_btn.visible, "NO-137: Confirm shows, staged")
+	check(game.hud.confirm_backdrop.visible and game.hud.multi_cancel_btn.visible,
+		"NO-137: the backdrop and Cancel appear alongside Confirm")
+	var gold_before: int = game.gold
+	# CLAUDE.md: "a probe can pass because its click was CONSUMED" — click
+	# exactly where the Shop/Inventory buttons sit (now covered by the
+	# backdrop) and assert BOTH that neither opened AND that the targeting
+	# this backdrop belongs to survived; a swallowed click alone would
+	# satisfy the first half either way.
+	_click(game.hud.shop_button.get_global_rect().get_center())
+	await process_frame
+	check(not game.shop_open() and game.hud.multi_confirm_btn.visible
+			and game.hud.confirm_backdrop.visible,
+		"NO-137: the backdrop blocks Shop, and the targeting behind it survives the click")
+	_click(game.hud.drawer_buttons["inventory"].get_global_rect().get_center())
+	await process_frame
+	check(game.hud.drawer_open != "inventory" and game.hud.multi_confirm_btn.visible,
+		"NO-137: the backdrop blocks Inventory too")
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.item_active == -1 and game.board.has(Vector2i(4, 4)) and game.gold == gold_before,
+		"NO-137: Cancel disarms for free — board untouched, no Gold spent")
+	check(not game.hud.multi_confirm_btn.visible and not game.hud.confirm_backdrop.visible
+			and not game.hud.multi_cancel_btn.visible,
+		"NO-137: Confirm/backdrop/Cancel all hide together once cancelled")
+
 	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
 	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for
 	# gold only, no Action cost (issue 64), the tile greys SOLD in place,

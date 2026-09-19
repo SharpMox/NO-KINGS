@@ -69,6 +69,21 @@ func _await_drawer_settled(game: Node, key: String) -> void:
 	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
 
 
+## NO-145: a point inside `container`'s own rect but OUTSIDE `content`'s —
+## the slack a Container leaves around a child sized smaller than itself,
+## i.e. the "chrome or edge, not a scrollable cell" a reverse-close swipe
+## must land on. Self-computed from the live rects rather than a guessed
+## pixel offset, so it tracks the real layout instead of assuming this
+## file's own math; the check() below turns a wrong layout assumption into
+## a clear, named failure instead of a silently-wrong swipe target.
+func _chrome_point(container: Control, content: Control) -> Vector2:
+	var cr := container.get_global_rect()
+	var pr := content.get_global_rect()
+	check(cr.size.x > pr.size.x or cr.size.y > pr.size.y,
+		"NO-145: %s leaves slack around its content for chrome" % container.name)
+	return Vector2(cr.position.x + cr.size.x - 2.0, pr.position.y + pr.size.y - 2.0)
+
+
 func _mouse(pressed: bool, at: Vector2) -> void:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT
@@ -443,6 +458,125 @@ func _init() -> void:
 			and cap_sc is ScrollContainer
 			and stock_sc != cap_sc,
 		"Stock and Captured Stock scroll in separate containers, independently")
+	game.queue_free()
+	await process_frame
+
+	# ---- NO-145: swipe-to-open/close, and that it never steals an existing
+	# drag. Board background / deck chrome opens; a drawer/Shop's own chrome
+	# (never a scrollable cell) closes by reversing the OPENING GESTURE.
+	GameScript.next_config = {
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 200, "seed": 1}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+
+	# Swipe DOWN on empty board background opens Stock (Max: "swipe down
+	# opens Stock"). (4, 4) is empty in this config.
+	check(game.hud.drawer_open == "", "NO-145: nothing open before the swipe")
+	var board_bg: Vector2 = game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2
+	await _drag(board_bg, Vector2(0, 15), 6) # 90px down, well past SWIPE_MIN_DIST (40)
+	check(game.hud.drawer_open == "stock", "NO-145: swipe down on empty board opens Stock")
+	await _await_drawer_settled(game, "stock")
+
+	# Reverse swipe (UP), started on the Stock drawer's OWN CHROME — the
+	# slack a VBoxContainer leaves around a child sized smaller than itself
+	# (cap_scroll, by STOCK_DRAWER_PAD) — never on a cell, which claims its
+	# own rect first (NO-45's PASS rows). Self-computed from the live rects,
+	# not a guessed pixel offset.
+	var cap_scroll: ScrollContainer = game.hud.captured_grid.get_parent() as ScrollContainer
+	check(cap_scroll != null, "NO-145: found the Captured Stock ScrollContainer")
+	var cap_col: Control = cap_scroll.get_parent() as Control
+	var stock_chrome := _chrome_point(cap_col, cap_scroll)
+	await _drag(stock_chrome, Vector2(0, -15), 6) # 90px up
+	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Stock's own chrome closes it")
+
+	# Swipe UP on deck chrome opens Inventory (Max: "swipe up opens
+	# Inventory") — the gap BETWEEN the drawers row and the thumb row, never
+	# one of their buttons.
+	var inv_btn_rect: Rect2 = (game.hud.drawer_buttons["inventory"] as Control).get_global_rect()
+	var ability_rect: Rect2 = game.hud.army_ability_button.get_global_rect()
+	var deck_chrome := Vector2(inv_btn_rect.position.x + 4,
+		(inv_btn_rect.position.y + inv_btn_rect.size.y + ability_rect.position.y) / 2.0)
+	await _drag(deck_chrome, Vector2(0, -15), 6)
+	check(game.hud.drawer_open == "inventory", "NO-145: swipe up on deck chrome opens Inventory")
+	await _await_drawer_settled(game, "inventory")
+
+	# Reverse swipe (DOWN) on the Inventory drawer's own chrome closes it —
+	# reverses the GESTURE (up), not the panel's own left-to-right slide;
+	# see build()'s own note on why those two differ for Inventory.
+	var inv_panel: Control = game.hud.drawers["inventory"]
+	var inv_sc2: ScrollContainer = null
+	for c in inv_panel.get_children():
+		if c is ScrollContainer:
+			inv_sc2 = c
+	check(inv_sc2 != null, "NO-145: found the Inventory drawer's ScrollContainer")
+	var inv_chrome := _chrome_point(inv_panel, inv_sc2)
+	await _drag(inv_chrome, Vector2(0, 15), 6)
+	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Inventory's own chrome closes it")
+
+	# Leftward swipe starting near the RIGHT EDGE opens the Shop (it slides
+	# in from the right) — column 7 (the board's last column) is both
+	# "board background" (empty here) and within SWIPE_EDGE_ZONE of the
+	# right edge, since the board spans the full 480px viewport width.
+	var edge_pt: Vector2 = game._tile_px(Vector2i(7, 4)) + Vector2(game.tile, game.tile) / 2
+	await _drag(edge_pt, Vector2(-15, 0), 6)
+	check(game.shop_open(), "NO-145: leftward swipe near the right edge opens the Shop")
+	var shop_polls := 0
+	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
+		await process_frame
+		shop_polls += 1
+
+	# Reverse swipe (RIGHT), started on the Shop's own chrome (the 10px
+	# margin ring around its content), closes it.
+	var shop_margin: Control = game.modals.shop_panel.get_child(0) as Control
+	var shop_root: Control = shop_margin.get_child(0) as Control
+	var shop_chrome := _chrome_point(shop_margin, shop_root)
+	await _drag(shop_chrome, Vector2(15, 0), 6)
+	check(not game.shop_open(), "NO-145: reverse swipe on the Shop's own chrome closes it")
+
+	# ---- regression: a swipe-SHAPED drag starting ON A CELL must never
+	# open/close anything — that press belongs to drag-scroll (NO-45's PASS
+	# rows) or a Stock deploy-drag, never the swipe recogniser.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {
+		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"artefacts": ["27-club-punch-card", "tinfoil-hat", "area-51-parking-permit",
+			"fort-knox-iou", "fema-summer-camp-flyer", "zurich-gnome-figurine"],
+		"wave": 3, "gold": 200, "seed": 1}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game._set_drawer("inventory")
+	await process_frame
+	await process_frame
+	await _await_drawer_settled(game, "inventory")
+	var art_row2: Control = game.hud.artefacts_grid.get_child(0)
+	await _drag(art_row2.get_global_rect().get_center(), Vector2(0, -15), 6) # swipe-shaped, starts on a cell
+	check(game.hud.drawer_open == "inventory",
+		"NO-145: a swipe-shaped drag starting on an Artefact cell never closes the drawer")
+	game._set_drawer("stock")
+	await process_frame
+	await process_frame
+	await _await_drawer_settled(game, "stock")
+	var stack_btn2: Button = null
+	for c in game.hud.pool_buttons():
+		if c is Button and c.has_meta("id"):
+			stack_btn2 = c
+			break
+	check(stack_btn2 != null, "NO-145: the stock drawer has a stack button to test")
+	if stack_btn2 != null:
+		var drag_started2 := [false]
+		game.hud.stack_drag_started.connect(func(_e: Variant, _c: bool) -> void:
+			drag_started2[0] = true)
+		await _drag(stack_btn2.get_global_rect().get_center(), Vector2(0, -15), 6) # swipe-shaped, starts on a cell
+		check(drag_started2[0],
+			"NO-145: a swipe-shaped drag on a Stock stack still arms a deploy — the swipe recogniser left it alone")
 	game.queue_free()
 	await process_frame
 

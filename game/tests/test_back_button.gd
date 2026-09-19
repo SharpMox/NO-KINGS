@@ -99,14 +99,28 @@ func _init() -> void:
 	# get_tree().quit(). Asserted on what a player sees — the panel closed and
 	# the menu came back — rather than on the guard having been consulted.
 	check(not menu.test_scroll.visible, "one Back closes the open panel")
-	check(menu.main_box.visible, "...and the main menu is showing again")
+	# NO-147: TEST nests one level UNDER Settings now (Main -> Settings ->
+	# TEST), so the panel Back lands on is Settings, not the bare main menu —
+	# same "Back lands one level up" shape the tier picker already had
+	# returning to the army picker. PINNED BOTH WAYS, not just "eventually
+	# reaches the main menu": one Back reaches Settings and does NOT reach the
+	# main menu; a second reaches it. A future re-nesting that buries TEST one
+	# level deeper must turn this red, not stay permissively green.
+	check(menu.settings_panel.visible, "...and Settings is showing again")
+	check(_find_button(menu, "Play") == null,
+		"...and one Back does NOT reach the main menu — it is one level away")
 	check(is_instance_valid(menu), "...and the app is still alive")
+
+	# A second, later press (BackGuard reset, same idiom the "SEPARATE press"
+	# check below uses) walks the remaining level: Settings -> the main menu.
+	await _press_back_once()
+	check(not menu.settings_panel.visible, "a second Back closes Settings too")
 
 	# The documented behaviour must SURVIVE the guard: from the bare main menu
 	# there is nowhere up, so Back quits. A guard that swallowed this would be a
 	# regression in the opposite direction, which is why it is pinned.
-	check(_find_button(menu, "Play") != null, # NO-147: TEST no longer lives here
-		"the menu still offers its panels after a Back")
+	check(_find_button(menu, "Play") != null,
+		"...and now, two Backs in, the menu offers its panels again")
 
 	# A SECOND, SEPARATE press still works — the window must not latch.
 	menu.test_scroll.visible = true

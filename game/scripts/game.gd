@@ -4458,7 +4458,7 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 		for d in [Vector2i(1, -1), Vector2i(1, 1)]: # NE + SE catches every
 			# diagonal pair exactly once: a tile's SW/NW touch is its
 			# neighbour's own NE/SE, checked from that neighbour instead.
-			var diag := t + d
+			var diag: Vector2i = t + d
 			if not tiles.has(diag):
 				continue
 			if tiles.has(Vector2i(t.x + d.x, t.y)) or tiles.has(Vector2i(t.x, t.y + d.y)):

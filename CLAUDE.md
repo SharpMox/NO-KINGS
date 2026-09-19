@@ -292,9 +292,14 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   a shared checkout (Aux) a second agent can detach to a different ref mid-run and the
   first agent silently tests the second agent's code — caught mid-task 2026-09-19, unknown
   how many times it wasn't. Put both steps inside one locked command:
-  `tools/godot-lock.sh sh -c "git checkout --detach -q <ref> && <cmd>"`. This is on top of,
-  not instead of, the `user://` sharing above — that's about state two runs read, this is
-  about which code a run under the lock is even running.
+  `tools/godot-lock.sh sh -c "git fetch --prune -q && git checkout --detach -q origin/<ref> && <cmd>"`.
+  Use `origin/<ref>`, not the bare branch name: for a branch Aux has never checked out
+  locally (the normal case — one shared checkout, many agents' branches), plain `--detach
+  <ref>` fails with `fatal: '--detach' cannot be used with '-b/-B/--orphan'` — git's DWIM
+  resolves the name to `origin/<ref>` and implicitly adds `-b` to track it, which collides
+  with `--detach` (reproduced 2026-09-19). This is on top of, not instead of, the
+  `user://` sharing above — that's about state two runs read, this is about which code a
+  run under the lock is even running.
 - **The `--screenshot` seam is windowed, and its flag goes after the bare `--`.**
   `OS.get_cmdline_user_args()` (`_ready`, `game.gd:521`) returns only args after `--`; put
   `--screenshot` before it and `_ready`'s `--screenshot` handling never sees it, so neither

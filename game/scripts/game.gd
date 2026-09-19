@@ -1069,7 +1069,7 @@ func _process(delta: float) -> void:
 		if clock_ms <= 0:
 			clock_ms = 0
 			return _game_over(false, "Clock out")
-		hud.clock_label.text = _clock_text()
+		hud.update_clock(clock_ms) # NO-127: routes through hud.gd's shared seam
 		if autoplay:
 			AutoplayBot.step(self)
 	if not anims.is_empty():

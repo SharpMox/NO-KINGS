@@ -75,6 +75,34 @@ func _init() -> void:
 	check(game.stock.size() == stock_n + 1, "reinforce buy adds the piece")
 	check(game.score == s and game.gold == m, "reinforce buys are free")
 
+	# --- NO-127: Score/Gold gain pulses, driven by refresh() seeing the value
+	# CHANGE — not by refresh() itself running (it runs on nearly every state
+	# change; a Tween re-armed each call never plays, per this file's CLAUDE.md) ---
+	var hud := game.hud
+	hud.refresh() # this hud instance's first-ever refresh — baseline only
+	check(not hud._gain_tweens.has("gold") and not hud._gain_tweens.has("score"),
+		"the very first refresh never pulses (boot, not a gain)")
+
+	Economy.earn(game, 20)
+	hud.refresh()
+	check(hud._gain_tweens.has("gold") and (hud._gain_tweens["gold"] as Tween).is_running(),
+		"a Gold gain squish-pulses the Gold row")
+	check(hud._gain_tweens.has("score") and (hud._gain_tweens["score"] as Tween).is_running(),
+		"a Score gain pulses the Score row the same way")
+
+	var gold_tw: Tween = hud._gain_tweens["gold"]
+	hud.refresh() # nothing changed since — must NOT restart it
+	check(hud._gain_tweens["gold"] == gold_tw,
+		"refresh() alone, value unchanged, never restarts the pulse")
+
+	game.animations_on = false
+	Economy.earn(game, 20)
+	hud._gain_tweens.erase("gold")
+	hud.refresh()
+	check(not hud._gain_tweens.has("gold"),
+		"the Settings animations toggle turns the gain pulse off")
+	game.animations_on = true
+
 	game.queue_free()
 	await process_frame
 

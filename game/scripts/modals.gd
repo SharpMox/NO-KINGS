@@ -700,17 +700,20 @@ func _shop_tile(index: int) -> Button:
 	if icon is Texture2D:
 		btn.icon = icon
 		btn.expand_icon = true
-		if _shop_icon_is_placeholder(slot): # NO-119: initials over the placeholder
+		if _shop_icon_is_placeholder(slot): # NO-119: initials over the placeholder,
+			# centred on the art rather than the corner (Max's call 2026-09-19) -
+			# full-rect Label + centred alignment, same idiom as hud.gd's
+			# _build_artefact_cell.
 			var init_badge := Label.new()
 			init_badge.text = g.initials_of(Shop.display_name(g, slot))
 			init_badge.add_theme_font_size_override("font_size", 13)
 			init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
 			init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 			init_badge.add_theme_constant_override("outline_size", 4)
-			init_badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-			init_badge.offset_left = 3
-			init_badge.offset_right = 26
-			init_badge.offset_bottom = 16
+			init_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE # must not eat the tap
+			init_badge.set_anchors_preset(Control.PRESET_FULL_RECT)
+			init_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			init_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			btn.add_child(init_badge)
 	else:
 		btn.text = str(icon)

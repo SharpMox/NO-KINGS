@@ -62,9 +62,11 @@ const LONG_PRESS_MS := 500
 ## Activate strip, +48 for issue 100's Army Power line) rather than
 ## re-deriving it, so nothing jumps on this PR alone.
 const INV_DRAWER_H := DRAWER_H * 3 + 118.0
-const INV_ITEMS_COLS := 3 ## Items grid columns
-const INV_ARTEFACTS_COLS := 3 ## Artefacts grid columns
 const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## NO-132: both grids are full width (472px avail: the drawer's 480 minus the
+## ScrollContainer's 8px inset) — Tuning.grid_cols(472, 6) fits 6, capped at
+## the OFFBOARD_GRID_COLS standard, so both land on 5 (set where the grids
+## are built, off the same `vp.x - 8.0` the ScrollContainer itself uses).
 ## ----------------------------------------------------------------------------
 
 ## ---- HEADER TUNING (NO-83) -------------------------------------------------
@@ -100,8 +102,11 @@ const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it ru
 const STOCK_DRAWER_FRAC := 2.0 / 3.0 ## drawer height, as a fraction of the board's pixel height
 const STOCK_DRAWER_CAP_FRAC := 1.0 / 3.0 ## Captured Stock column's share of the drawer width
 const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
-const STOCK_DRAWER_CAP_COLS := 2 ## Captured Stock grid columns
-const STOCK_DRAWER_COLS := 3 ## Stock grid columns
+## NO-132: column counts aren't fixed here — cap_w/stock_w below are already
+## runtime values (vp.x split by STOCK_DRAWER_CAP_FRAC), so their grids call
+## Tuning.grid_cols() directly off the same width the ScrollContainer uses,
+## rather than a second hand-picked constant that could drift from it.
+## Captured (~154px avail) fits 2; Stock (~314px avail) fits 4.
 const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## ----------------------------------------------------------------------------
 ## The first King's wave (data/kings.gd: "wave 50 -> king 1"; data/waves.gd row
@@ -606,10 +611,10 @@ func build(game) -> void:
 	# it stays visible and clickable over them. Inventory scrolls as ONE column
 	# (story 47): the Items grid, then the Artefacts grid — no separate
 	# Activate section any more (NO-85).
-	items_grid.columns = INV_ITEMS_COLS
+	items_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
-	artefacts_grid.columns = INV_ARTEFACTS_COLS
+	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	army_power_label.add_theme_font_size_override("font_size", 13)
@@ -694,7 +699,7 @@ func build(game) -> void:
 	cap_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	cap_scroll.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
-	captured_grid.columns = STOCK_DRAWER_CAP_COLS
+	captured_grid.columns = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
 	captured_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
 	captured_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
 	cap_scroll.add_child(captured_grid)
@@ -708,7 +713,7 @@ func build(game) -> void:
 	stock_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	stock_scroll.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
-	stock_grid.columns = STOCK_DRAWER_COLS
+	stock_grid.columns = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
 	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
 	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
 	stock_scroll.add_child(stock_grid)

@@ -561,14 +561,20 @@ func _init() -> void:
 	await process_frame
 	await _buy_a_box(game)
 	check(game.box_open, "buying a Box opens the roll modal")
-	var opt_btn := _first_option_button(game.box_panel)
-	check(opt_btn != null and "\n" in opt_btn.text,
-		"box options describe themselves (two-line label)")
+	var opt_tile := _first_option_tile(game.box_panel)
+	check(opt_tile != null, "box options render as a tile grid (NO-133)")
 	var loot_before: int = game.items.size() + game.artefacts.size() + game.stock.size()
 	var native_picks: int = Box.SIZES[game.box_size].picks
-	for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all
-		_click(_first_option_button(game.box_panel).get_global_rect().get_center())
+	var box_described := false
+	for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all,
+		# select-then-confirm each one (NO-133): tap the tile, then its Pick button
+		_click(_first_option_tile(game.box_panel).get_global_rect().get_center())
 		await process_frame
+		var pick_btn := _box_pick_button(game.box_panel)
+		box_described = box_described or pick_btn != null
+		_click(pick_btn.get_global_rect().get_center())
+		await process_frame
+	check(box_described, "selecting a box tile reveals its description and a Pick confirm (NO-133)")
 	check(not game.box_open, "picking every offered option closes the box")
 	check(game.items.size() + game.artefacts.size() + game.stock.size() > loot_before,
 		"the picked reward is applied")
@@ -596,7 +602,9 @@ func _init() -> void:
 		"NO-38: clicking Sell frees one slot and pays the sell price")
 	check(game.box_open and _sell_button(game.box_panel) == null,
 		"NO-38: the Box survives the sale and the Sell row is gone")
-	_click(_first_option_button(game.box_panel).get_global_rect().get_center())
+	_click(_first_option_tile(game.box_panel).get_global_rect().get_center()) # NO-133: select...
+	await process_frame
+	_click(_box_pick_button(game.box_panel).get_global_rect().get_center()) # ...then confirm
 	await process_frame
 	check(not game.box_open and game.items.size() == items_before,
 		"NO-38: the pick then lands and closes the Box")
@@ -618,9 +626,14 @@ func _init() -> void:
 	var mad_libs_total: int = Box.SIZES[game.box_size].picks + 1 # +1 Nostradamus copy
 	var mad_libs_picks := 0
 	while game.box_open:
-		var mad_libs_opt := _first_option_button(game.box_panel)
+		var mad_libs_opt := _first_option_tile(game.box_panel)
 		check(mad_libs_opt != null, "an option is offered (pick %d)" % (mad_libs_picks + 1))
-		_click(mad_libs_opt.get_global_rect().get_center())
+		_click(mad_libs_opt.get_global_rect().get_center()) # NO-133: select...
+		await process_frame
+		var mad_libs_pick_btn := _box_pick_button(game.box_panel)
+		check(mad_libs_pick_btn != null,
+			"selecting reveals a Pick confirm (pick %d)" % (mad_libs_picks + 1))
+		_click(mad_libs_pick_btn.get_global_rect().get_center()) # ...then confirm
 		await process_frame
 		mad_libs_picks += 1
 		if mad_libs_picks < mad_libs_total:
@@ -2481,6 +2494,33 @@ func _first_option_button(node: Node) -> Button:
 		return node
 	for c in node.get_children():
 		var hit := _first_option_button(c)
+		if hit:
+			return hit
+	return null
+
+
+## NO-133: the Box's own options are an icon grid now (meta.box_index, same
+## idiom as _shop_tile's meta.shop_index) — distinct from _first_option_button
+## above, which still matches the choice-pick modal's plain text buttons
+## (buff_panel) unchanged. Tapping this SELECTS the option; _box_pick_button
+## below is the second tap that confirms it.
+func _first_option_tile(node: Node) -> Button:
+	if node is Button and node.has_meta("box_index"):
+		return node
+	for c in node.get_children():
+		var hit := _first_option_tile(c)
+		if hit:
+			return hit
+	return null
+
+
+## The floating "Pick" confirm that appears in the Box's detail dock once a
+## tile is selected (meta.box_pick, same idiom as box_index above).
+func _box_pick_button(node: Node) -> Button:
+	if node is Button and node.has_meta("box_pick"):
+		return node
+	for c in node.get_children():
+		var hit := _box_pick_button(c)
 		if hit:
 			return hit
 	return null

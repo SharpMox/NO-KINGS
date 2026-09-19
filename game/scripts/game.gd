@@ -4192,12 +4192,15 @@ func _screenshot_and_quit(dir: String) -> void:
 ## ("inventory" or "stock") — NO-119: the Shop and the drawers have no CLI
 ## reach otherwise, and verifying an off-board grid needs one open.
 ## `--show-screen NAME` reaches panels no board tap opens on its own:
-## "pause" (hud.toggle_menu), "king-abilities" (_show_king_abilities), and
-## "tip"/"preview" [`--anchor X,Y`] (the long-press description tooltip /
-## the piece-or-King preview modal, for the board tile at the anchor) —
-## screenshot capture for a screenshot task (2026-09-19), one flag rather
-## than a fourth board-tap-shaped one for each. Used by the agent for visual
-## verification (windowed run required — see game/CLAUDE.md, "screenshot seam").
+## "pause" (hud.toggle_menu), "king-abilities" (_show_king_abilities),
+## "box" (_open_box_pick on a fresh Box.random_slot — a real Box normally
+## takes a Shop purchase or a Bounty capture to reach, neither of which
+## --select's two-tap budget can drive), and "tip"/"preview" [`--anchor X,Y`]
+## (the long-press description tooltip / the piece-or-King preview modal, for
+## the board tile at the anchor) — screenshot capture for a screenshot task
+## (2026-09-19), one flag rather than a fourth board-tap-shaped one for each.
+## Used by the agent for visual verification (windowed run required — see
+## game/CLAUDE.md, "screenshot seam").
 func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 	await get_tree().process_frame # let _ready finish first
 	if args.has("--select"):
@@ -4231,6 +4234,8 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			hud.toggle_menu(true)
 		elif screen == "king-abilities":
 			_show_king_abilities()
+		elif screen == "box":
+			_open_box_pick(Box.random_slot(self))
 		elif (screen == "tip" or screen == "preview") and args.has("--anchor"):
 			var xy := args[args.find("--anchor") + 1].split(",")
 			var at := Vector2i(int(xy[0]), int(xy[1]))

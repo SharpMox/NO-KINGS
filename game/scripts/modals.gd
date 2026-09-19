@@ -73,15 +73,42 @@ var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can asser
 ## site-wide standard — Tuning.OFFBOARD_GRID_COLS is the same 5, so the band
 ## no longer carries its own agreeing constant.
 ##
-## NO-132: the lower band's ARTEFACTS/ITEMS (left_col) and BOXES/CAPTURED
-## (right_col) split the same 412px on `lower`'s 1.15 / 0.85 stretch ratio,
-## less its own 8px separation: left ~232px, right ~172px. At the same 4px
-## separation, Tuning.grid_cols gives left_col 3 columns (76*3-4=224 <= 232)
-## and right_col 2 (76*2-4=148 <= 172; 76*3-4=224 does not fit). Neither
-## reaches the 5-column standard — the drawer is only 90% of the 480px
-## screen, and this band is one of two side by side in it.
-const SHOP_SUBZONE_LEFT_W := 232.0
-const SHOP_SUBZONE_RIGHT_W := 172.0
+## NO-132 gave the lower band's side-by-side ARTEFACTS/ITEMS and BOXES
+## columns 3 and 2 columns respectively (412px split 1.15/0.85 by stretch
+## ratio, less `lower`'s own 8px separation: ~232px and ~172px — grid_cols
+## floors at 76*cols-4, so 3 needs 224 and 2 needs 148). Neither reached the
+## 5-column standard, and NO-144 didn't move these numbers (Buy and the old
+## Sell mode shared this exact geometry) — closing the gap needed ~448px of
+## column budget against `lower`'s 404, 44px short, and no re-split of the
+## same 404px helped both sides — 3/3 for one side always cost the other
+## its 2.
+##
+## NO-142: stacked instead — ARTEFACTS, ITEMS and BOXES each now get the
+## FULL 412px `lower` width, one below another, so all three hit
+## Tuning.OFFBOARD_GRID_COLS (5 x 72 + 4 x 4 = 376 <= 412; 6 needs 452),
+## matching PIECES above them and the site-wide standard. What pays for the
+## extra band is the vertical room NO-144 freed: PIECES used to become
+## STOCK in Sell mode — the player's whole live Stock, unbounded (a real
+## save once held 22, 5 rows at 5 columns, 376px). PIECES is Buy-only now,
+## capped at Shop.ROWS.piece (8, fewer at Tier 3+): always <=2 rows, ~152px.
+## `lower` is root's only EXPAND_FILL child, so every byte PIECES no longer
+## needs at its old worst case, `lower` keeps — up to ~224px more,
+## guaranteed rather than best-case.
+##
+## The stacked layout's own worst case, from Shop.ROWS (base, before any
+## Tier 3+ reduction — the max, never more): ARTEFACTS ceil(4/5)=1 row,
+## ITEMS ceil(4/5)=1 row, BOXES ceil(6/5)=2 rows (72*2+4=148px). Content
+## height per zone = its grid + a zone label + the label-to-grid 4px
+## separation (_shop_sub_zone's own `wrap`); the label's own height isn't
+## measured here (no Godot run from this seat — see the label-height note
+## on _shop_zone_label), estimated ~16px from this file's other measured
+## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts
+## ARTEFACTS/ITEMS at ~92px each, BOXES at ~168px, plus 2 gaps at `lower`'s
+## own 8px separation between the 3 stacked zones: ~368px total — about
+## 28px MORE than the old side-by-side minimum (~340px, the taller of the
+## two old columns), comfortably inside the ~224px NO-144 freed. If a real
+## measurement ever puts a zone label taller than assumed here, recheck
+## against the ~224px margin before assuming it still fits.
 const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
@@ -444,9 +471,9 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 ## for, and it made click probes racy against the panel's in-flight position;
 ## simplest is the instant show every other panel here already uses.
 ## Never scrolls — every slot in g.shop_stock renders as an icon tile with a
-## price badge, grouped into four fixed zones (PIECES full-width top band;
-## ARTEFACTS/ITEMS stacked lower-left; BOXES lower-right, full height) so the
-## grid geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
+## price badge, grouped into four fixed zones, all full-width and stacked
+## top to bottom (PIECES, ARTEFACTS, ITEMS, BOXES — NO-142) so the grid
+## geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
 ## Tapping a tile expands the fixed-height detail dock at the bottom with its
 ## name, effect text and Buy; buy rows emit an index and game.gd reopens for
 ## fresh SOLD/affordability state.
@@ -547,30 +574,22 @@ func show_shop() -> void:
 
 	var pieces_band := VBoxContainer.new()
 	pieces_band.add_theme_constant_override("separation", 4)
-	var lower := HBoxContainer.new()
+	# NO-142: ARTEFACTS, ITEMS and BOXES stacked full-width, not split into
+	# side-by-side columns — the drawer's 412px content width only fits 2
+	# columns of columns (3 and 2, see the SHOP_SUBZONE_SEP comment above);
+	# stacked, each one gets the whole width and reaches the site-wide 5.
+	var lower := VBoxContainer.new()
 	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	lower.add_theme_constant_override("separation", 8)
-	var left_col := VBoxContainer.new()
-	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left_col.size_flags_stretch_ratio = 1.15
-	lower.add_child(left_col)
-	var right_col := VBoxContainer.new()
-	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right_col.size_flags_stretch_ratio = 0.85
-	lower.add_child(right_col)
 
 	var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
 	for i in g.shop_stock.size():
 		by_kind[g.shop_stock[i].kind].append(i)
 	pieces_band.add_child(_shop_zone_label("PIECES"))
 	pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
-	var left_cols := Tuning.grid_cols(SHOP_SUBZONE_LEFT_W, SHOP_SUBZONE_SEP) # NO-132
-	var right_cols := Tuning.grid_cols(SHOP_SUBZONE_RIGHT_W, SHOP_SUBZONE_SEP) # NO-132
-	left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, left_cols))
-	left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item, left_cols))
-	right_col.add_child(_shop_sub_zone("BOXES", by_kind.box, right_cols))
+	lower.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, Tuning.OFFBOARD_GRID_COLS))
+	lower.add_child(_shop_sub_zone("ITEMS", by_kind.item, Tuning.OFFBOARD_GRID_COLS))
+	lower.add_child(_shop_sub_zone("BOXES", by_kind.box, Tuning.OFFBOARD_GRID_COLS))
 	root.add_child(pieces_band)
 	root.add_child(lower)
 
@@ -671,6 +690,10 @@ func _fill_shop_dock() -> void:
 		_shop_dock.add_child(hint)
 
 
+## font_size 12; its rendered height isn't measured anywhere in this file
+## (NO-142's vertical-fit estimate above assumes ~16px, by analogy with
+## hud.gd's own measured font metrics — never taken on a running Godot from
+## this seat).
 func _shop_zone_label(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -703,16 +726,17 @@ func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
 	return center
 
 
-## A labeled, centered grid of tiles that expands to fill its share of the
-## lower block's height — this is what gives ARTEFACTS/ITEMS their upper/lower
-## halves and BOXES the full height of the lower-right (money-and-shop/04
-## kept the logic; shop-drawer-ui/08 is only the geometry).
+## A labeled, centered grid of tiles that expands to fill its share of
+## `lower`'s height — one zone of the full-width stack (money-and-shop/04
+## kept the logic; shop-drawer-ui/08 and NO-142 are only the geometry, side
+## by side then stacked).
 ##
-## NO-132: `cols` is the caller's Tuning.grid_cols() result for its own share
-## of the lower band (SHOP_SUBZONE_LEFT_W/RIGHT_W above) — left_col and
-## right_col differ, so this can no longer hardcode one column count for
-## both. custom_minimum_size.x reserves the full `cols`-wide row the same way
-## _piece_grid does, so a short row aligns instead of centering itself.
+## NO-132: `cols` reserves the full row's width up front (Tuning.grid_row_w),
+## the same way _piece_grid does, so a short row aligns instead of centring
+## itself. NO-142: every caller now passes Tuning.OFFBOARD_GRID_COLS, now
+## that ARTEFACTS/ITEMS/BOXES all get the full drawer width — `cols` stays a
+## parameter rather than hardcoding the constant in here, same as
+## _piece_grid takes `tile_of` as a parameter rather than assuming its caller.
 func _shop_sub_zone(title_text: String, indices: Array, cols: int) -> VBoxContainer:
 	var wrap := VBoxContainer.new()
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL

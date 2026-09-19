@@ -319,7 +319,26 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   [--sell]`, `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
   ("pause"/"king-abilities"/"tip"/"preview" — panels no board tap opens on its own) — for
   capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives all of
-  them (NO-122, extended for the 2026-09-19 screenshot pass).
+  them (NO-122, extended for the 2026-09-19 screenshot pass). Four more traps, found
+  2026-09-19/20 and each silent: (1) without `--scenario N`, `is_scenario` gates the whole
+  debug-capture path (`game.gd:720-726`) — `--select`/`--arm-item`/`--open-shop`/
+  `--open-drawer`/`--show-screen` all fall through to the plain default-board capture, no
+  error; proven by a control run where `--show-screen pause` and `--show-screen preview`,
+  different branches inside `_debug_state_screenshot`, produced byte-identical captures —
+  only a gate upstream of both explains that. (2) `--show-screen tip`/`preview` additionally
+  need `--anchor` (`game.gd:4274`) or they no-op inside the branch even once the gate above
+  is satisfied. (3) the board is randomised per boot unless `--seed` is passed, so a fixed
+  `--anchor` without a scenario or seed is a coin flip — and `SPAWN_ROW := BOARD_H - 1`
+  (`tuning.gd:7`) means y=11 is the TOP row and y=0 the bottom: player pieces sit at
+  y=0/y=1, not y=10/y=11. (4) `game.png` is not byte-reproducible run to run — the HUD
+  clock is drawn into it, so two captures of the identical state differed at byte 33127
+  (`4:59.795` vs `4:59.809`). Never hash or diff `game.png`; `menu.png` has no clock and
+  came back byte-identical across four runs with different flags, which is what proved
+  (1) — compare `menu.png`, crop the HUD, or assert what's on screen. Working invocation
+  for a chosen state:
+  ```sh
+  tools/godot-lock.sh godot --path game -- --scenario 1 --screenshot /tmp/shot-a --show-screen preview --anchor x,y
+  ```
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

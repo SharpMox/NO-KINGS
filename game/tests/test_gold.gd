@@ -78,7 +78,9 @@ func _init() -> void:
 	# --- NO-127: Score/Gold gain pulses, driven by refresh() seeing the value
 	# CHANGE — not by refresh() itself running (it runs on nearly every state
 	# change; a Tween re-armed each call never plays, per this file's CLAUDE.md) ---
-	var hud := game.hud
+	var hud: CanvasLayer = game.hud # game is Node2D (_boot()'s return type),
+		# which doesn't declare .hud, so the access is untyped and := can't
+		# infer a type from it — same trap as NO-150's `var diag := t + d`
 	hud.refresh() # this hud instance's first-ever refresh — baseline only
 	check(not hud._gain_tweens.has("gold") and not hud._gain_tweens.has("score"),
 		"the very first refresh never pulses (boot, not a gain)")

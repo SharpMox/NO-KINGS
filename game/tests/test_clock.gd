@@ -106,7 +106,9 @@ func _init() -> void:
 	var hc := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "clock_s": 300.0}) # comfortably above the 2-minute urgency line
 	await process_frame
-	var hud := hc.hud
+	var hud: CanvasLayer = hc.hud # hc is Node2D (_boot()'s return type), which
+		# doesn't declare .hud, so the access is untyped and := can't infer a
+		# type from it — same trap as NO-150's `var diag := t + d`
 	hud.update_clock(hc.clock_ms) # the very first call (boot) — baseline only
 	check(not hud._gain_tweens.has("clock") and not hud._clock_urgent_on,
 		"update_clock's first-ever call never animates (nothing to compare yet)")

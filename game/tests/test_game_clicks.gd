@@ -765,7 +765,6 @@ func _init() -> void:
 	var stock_btn: Button = HUD.drawer_buttons["stock"]
 	var sr: Rect2 = stock_btn.get_global_rect()
 	var mr: Rect2 = HUD.menu_button.get_global_rect()
-	var mid_r: Rect2 = (HUD.wave_label.get_parent() as Control).get_global_rect()
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
@@ -782,12 +781,20 @@ func _init() -> void:
 		"Score, then Gold, then Clock, all inside the Header and below the inset")
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
-	check(is_equal_approx(sr.position.y, game.safe_top) and is_equal_approx(sr.size.y, HUD.HEADER_H),
-		"the Stock button's tap area is the Header's full height, from the inset down")
+	# NO-131: the enlarged NO-83 tap zone is gone — the Stock button is a
+	# regular button, sized to its own icon+padding, not the Header's full
+	# height. is_equal_approx would have PASSED by accident once NO-125
+	# shrank HEADER_H to 75 (close to the button's own content height), so
+	# this asserts strictly-smaller-than plus vertical centring, not just
+	# "not the exact HEADER_H value".
+	check(sr.size.y < HUD.HEADER_H - 0.5,
+		"the Stock button's rect no longer spans the Header's full height")
+	check(is_equal_approx(sr.get_center().y, game.safe_top + HUD.HEADER_H / 2.0),
+		"...it sits vertically centred in the Header instead")
+	check(sr.position.y >= game.safe_top - 0.5, "...never above the inset")
 	check(sr.end.y <= game.hud_top + 0.5, "...and it never reaches over the board")
-	check(sr.end.x <= mr.position.x + 0.5, "...nor over the menu button")
-	check(sr.position.x >= mid_r.end.x - 0.5 and sr.position.x - mid_r.end.x <= HUD.HEADER_GAP + 0.5,
-		"...and it extends left to the counters column")
+	check(is_equal_approx(sr.end.x, mr.position.x - HUD.HEADER_GAP),
+		"...it stops HEADER_GAP short of the menu button, same gap as before")
 	check(HUD.stock_badge.text == "0" and HUD.stock_badge.is_visible_in_tree(),
 		"the Stock badge counts the pool (empty here: 0)")
 	check(stock_btn.icon != null, "the Stock button shows a piece icon")

@@ -16,6 +16,11 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
 ## own panel, can't drift apart on it.
 const PANEL_SLIDE_S := 0.18
 
+## NO-140: the merge-confirm's sources-fade/result-grows animation — longer
+## than PANEL_SLIDE_S on purpose, a slide reads at a glance but "the two
+## becoming the result" needs a beat to register.
+const MERGE_ANIM_S := 0.35
+
 ## NO-145: swipe-to-open/close the Stock/Inventory/Shop panels. One shared
 ## classifier (classify_swipe below) so game.gd (board opens) and hud.gd/
 ## modals.gd (each panel's own chrome closes) all agree on what counts as a

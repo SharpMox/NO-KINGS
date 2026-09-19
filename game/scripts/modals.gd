@@ -149,6 +149,13 @@ func build(game) -> void:
 	g.hud.add_child(overlay)
 
 
+## NO-140: `a_id`/`b_id` are shown as art now too, not just `result` — "the
+## trade visible rather than described". Confirming plays a short animation
+## (the two sources fading while the result grows to full size) before the
+## panel actually closes; gated on g.animations_on and skipped under
+## g.autoplay, same seam _slide_shop uses. MergeLogic.do_merge already never
+## calls this at all under autoplay (it commits straight through), so that
+## path is doubly safe — this gate is only the belt to that braces.
 func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
@@ -162,32 +169,52 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
-	if g.textures.has(result):
-		var tex := TextureRect.new()
-		tex.texture = g.piece_tex(result)
-		tex.custom_minimum_size = Vector2(96, 96)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		box.add_child(tex)
+
+	var art_row := HBoxContainer.new()
+	art_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	art_row.add_theme_constant_override("separation", 10)
+	var a_tex := _merge_piece_tex(a_id)
+	var b_tex := _merge_piece_tex(b_id)
+	var result_tex := _merge_piece_tex(result)
+	if a_tex:
+		art_row.add_child(a_tex)
+	art_row.add_child(_merge_glyph_label("+"))
+	if b_tex:
+		art_row.add_child(b_tex)
+	art_row.add_child(_merge_glyph_label("→"))
+	if result_tex:
+		# starts as a dim preview; confirming grows/brightens it to full while
+		# a_tex/b_tex fade — see _play_merge_animation.
+		result_tex.pivot_offset = result_tex.custom_minimum_size / 2
+		result_tex.scale = Vector2(0.7, 0.7)
+		result_tex.modulate.a = 0.55
+		art_row.add_child(result_tex)
+	box.add_child(art_row)
+
 	var what := Label.new()
 	what.text = "%s + %s → %s" % [g.defs[a_id].name, g.defs[b_id].name, g.defs[result].name]
-	what.add_theme_font_size_override("font_size", 20)
+	what.add_theme_font_size_override("font_size", 16)
 	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(what)
+
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16)
 	var yes := Button.new()
 	yes.text = "Merge"
 	yes.add_theme_font_size_override("font_size", 22)
-	yes.pressed.connect(func() -> void:
-		merge_panel.visible = false
-		merge_confirmed.emit())
-	row.add_child(yes)
 	var no := Button.new()
 	no.text = "Cancel"
 	no.add_theme_font_size_override("font_size", 22)
+	yes.pressed.connect(func() -> void:
+		yes.disabled = true # a second tap mid-animation must not re-fire the commit
+		no.disabled = true
+		merge_confirmed.emit()
+		if g.autoplay or not g.animations_on:
+			merge_panel.visible = false
+		else:
+			_play_merge_animation(a_tex, b_tex, result_tex))
+	row.add_child(yes)
 	no.pressed.connect(func() -> void:
 		merge_panel.visible = false
 		merge_cancelled.emit())
@@ -195,6 +222,48 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	box.add_child(row)
 	g.hud.add_child(merge_panel)
 	merge_panel.move_to_front() # above the drawers and bottom bar
+
+
+## One off-board-standard-sized icon (Tuning.OFFBOARD_ICON, same as the Shop/
+## Drawer grids) for `id`, or null when it has no art — guarded the same way
+## every other modals.gd icon is (`g.textures.has`).
+func _merge_piece_tex(id: String) -> TextureRect:
+	if not g.textures.has(id):
+		return null
+	var tex := TextureRect.new()
+	tex.texture = g.piece_tex(id)
+	tex.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return tex
+
+
+func _merge_glyph_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 20)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return l
+
+
+## NO-140: sources fade out, the result scales/brightens to full — reads as
+## "the two becoming the result" without moving anything out of art_row's own
+## HBoxContainer layout (a position tween would fight the container's own
+## sort). Any of the three may be null (no art for that id); tween_property
+## calls are just skipped for it. Ends by hiding merge_panel, the same state
+## change the no-animation branch above makes immediately.
+func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: TextureRect) -> void:
+	var tw := merge_panel.create_tween()
+	tw.set_parallel(true)
+	if a_tex:
+		tw.tween_property(a_tex, "modulate:a", 0.0, Tuning.MERGE_ANIM_S)
+	if b_tex:
+		tw.tween_property(b_tex, "modulate:a", 0.0, Tuning.MERGE_ANIM_S)
+	if result_tex:
+		tw.tween_property(result_tex, "scale", Vector2.ONE, Tuning.MERGE_ANIM_S) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(result_tex, "modulate:a", 1.0, Tuning.MERGE_ANIM_S)
+	tw.chain().tween_callback(func() -> void: merge_panel.visible = false)
 
 
 ## Tier-1 pause parity (user ruling 2026-09-04: the gap was an oversight, not

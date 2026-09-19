@@ -685,7 +685,8 @@ func _ready() -> void:
 	_refresh()
 	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
 		if is_scenario and (args.has("--select") or args.has("--arm-item")
-				or args.has("--open-shop") or args.has("--open-drawer")):
+				or args.has("--open-shop") or args.has("--open-drawer")
+				or args.has("--show-screen")):
 			_debug_state_screenshot(screenshot_dir, args) # NO-122: arm a preview, then shoot
 		else:
 			_screenshot_and_quit(screenshot_dir)
@@ -4159,18 +4160,27 @@ func _screenshot_and_quit(dir: String) -> void:
 ## Debug: like _screenshot_and_quit, but for a scenario already boarded and
 ## ready to play — arms a highlight preview instead of placing/passing, so
 ## the shot proves NO-122's blast/strike zone. Drives the same functions a
-## real tap does: `--select X,Y` calls _on_tile_clicked (piece select);
-## `--arm-item KEY` [`--anchor X,Y`] calls _use_item then _item_click (item
-## arm + anchor); `--open-shop` calls _open_shop(); `--open-drawer NAME`
-## calls _set_drawer(NAME) ("inventory" or "stock") — NO-119: the Shop and
-## the drawers have no CLI reach otherwise, and verifying an off-board grid
-## needs one open. Used by the agent for visual verification (windowed run
-## required — see game/CLAUDE.md, "screenshot seam").
+## real tap does: `--select X,Y[;X,Y]` calls _on_tile_clicked once per pair,
+## in order — a second pair completes a move/capture/merge the first pair's
+## selection started, the same two taps a player would make; `--arm-item KEY`
+## [`--anchor X,Y`] calls _use_item then _item_click (item arm + anchor);
+## `--open-shop` [`--sell`] calls _open_shop(), then flips modals.shop_sell_mode
+## for the Shop's other tab; `--open-drawer NAME` calls _set_drawer(NAME)
+## ("inventory" or "stock") — NO-119: the Shop and the drawers have no CLI
+## reach otherwise, and verifying an off-board grid needs one open.
+## `--show-screen NAME` reaches panels no board tap opens on its own:
+## "pause" (hud.toggle_menu), "king-abilities" (_show_king_abilities), and
+## "tip"/"preview" [`--anchor X,Y`] (the long-press description tooltip /
+## the piece-or-King preview modal, for the board tile at the anchor) —
+## screenshot capture for a screenshot task (2026-09-19), one flag rather
+## than a fourth board-tap-shaped one for each. Used by the agent for visual
+## verification (windowed run required — see game/CLAUDE.md, "screenshot seam").
 func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 	await get_tree().process_frame # let _ready finish first
 	if args.has("--select"):
-		var xy := args[args.find("--select") + 1].split(",")
-		_on_tile_clicked(Vector2i(int(xy[0]), int(xy[1])))
+		for pair in args[args.find("--select") + 1].split(";"):
+			var xy := pair.split(",")
+			_on_tile_clicked(Vector2i(int(xy[0]), int(xy[1])))
 	elif args.has("--arm-item"):
 		var key := args[args.find("--arm-item") + 1]
 		for i in items.size():
@@ -4182,12 +4192,32 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
 	elif args.has("--open-shop"):
 		_open_shop()
+		if args.has("--sell"):
+			modals.shop_sell_mode = true
+			modals.show_shop() # rebuild: show_shop() only resets the mode on a
+				# FRESH open, so re-calling it while already open keeps this true
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout # let the
 			# NO-118 slide finish — animations_on defaults true, so the panel
 			# is still moving 2 frames after this call returns
 	elif args.has("--open-drawer"):
 		_set_drawer(args[args.find("--open-drawer") + 1])
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
+	elif args.has("--show-screen"):
+		var screen := args[args.find("--show-screen") + 1]
+		if screen == "pause":
+			hud.toggle_menu(true)
+		elif screen == "king-abilities":
+			_show_king_abilities()
+		elif (screen == "tip" or screen == "preview") and args.has("--anchor"):
+			var xy := args[args.find("--anchor") + 1].split(",")
+			var at := Vector2i(int(xy[0]), int(xy[1]))
+			if board.has(at):
+				if screen == "tip":
+					hud.show_tip("board:%s" % str(at),
+						BuffLogic.describe(board[at].id, board[at], defs),
+						Rect2(_tile_px(at), Vector2(tile, tile)))
+				else:
+					_show_preview(board[at].id, board[at].get("king_id", ""))
 	await _capture_and_quit(dir)
 
 

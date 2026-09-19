@@ -46,7 +46,8 @@ reports `OS.get_model_name()`, `OS.get_name()`/version,
 `DisplayServer.window_get_size()`, `get_display_safe_area()`,
 `screen_get_usable_rect()`, `screen_get_size()`, and the `safe_top_px` /
 `hud_top` values the layout actually uses. Desktop capture (windowed, under
-the lock, `--screenshot <dir> --show-device-info`):
+the lock, `--screenshot <dir> --show-screen device-info` — folded into the
+generic `--show-screen` menu flag 2026-09-19, was `--show-device-info`):
 `~/Documents/nokings-builds/notch-diagnostic-2026-09-18/menu.png` — every
 value reads 0 or its desktop equivalent, as expected (`safe_top_px` returns
 0 because `OS.has_feature("mobile")` is false on desktop; `hud_top` reads

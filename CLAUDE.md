@@ -300,10 +300,13 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   tools/godot-lock.sh godot --path game -- --screenshot /tmp/shot-a
   ```
   `_screenshot_and_quit` places the stock at random and passes once — an in-run board, not
-  a chosen state. For a chosen state, add `--scenario N` plus `--select X,Y` (a real tap
-  via `_on_tile_clicked`), `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`),
-  `--open-shop`, or `--open-drawer NAME` (NO-119) — for capturing a state the default boot
-  doesn't reach. `_debug_state_screenshot` drives all of them (NO-122).
+  a chosen state. For a chosen state, add `--scenario N` plus `--select X,Y[;X,Y]` (one or
+  two real taps via `_on_tile_clicked` — a second pair completes a move/capture/merge the
+  first started), `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`), `--open-shop
+  [--sell]`, `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
+  ("pause"/"king-abilities"/"tip"/"preview" — panels no board tap opens on its own) — for
+  capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives all of
+  them (NO-122, extended for the 2026-09-19 screenshot pass).
 - **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
   first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
   TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.

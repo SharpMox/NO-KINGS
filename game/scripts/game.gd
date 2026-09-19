@@ -111,8 +111,11 @@ const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 # semi-transparent move+capture indicators — a spread of legal moves read as
 # scattered marks rather than one shape. No new COL_* here: the outline and
 # ring reuse COL_MOVE/COL_ENEMY/COL_SELECT/COL_CAPTURE at a different alpha.
-const ZONE_OUTLINE_ALPHA := 0.55
-const ZONE_OUTLINE_WIDTH := 2.0
+# NO-150: 0.55/2.0 didn't read at a glance (flagged at NO-129 review) — bumped
+# by eye against the NO-129 screenshots until the outline is unmistakable
+# beside the board grid without overpowering the move dots/arrows.
+const ZONE_OUTLINE_ALPHA := 0.9
+const ZONE_OUTLINE_WIDTH := 3.5
 const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
 const SELECT_RING_WIDTH := 3.0 # fixed (was 3.0-4.5 jitter)
 const SELECT_RING_ALPHA_MIN := 0.5
@@ -4423,8 +4426,10 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 ## NO-129: outlines the PERIMETER of a tile set as one shape — an edge is
 ## drawn only where a tile's neighbour is outside the set, so a spread of
 ## squares reads as a silhouette instead of each square boxed on its own
-## (which read as scattered marks). Reusable: NO-130's `_draw_target_zone`
-## calls this for both the bomb blast preview and an armed Item's zone.
+## (which read as scattered marks). NO-150 adds diagonal bridging below, so
+## a ride's corner-touching tiles read as one band too. Reusable: NO-130's
+## `_draw_target_zone` calls this for both the bomb blast preview and an
+## armed Item's zone.
 func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH) -> void:
 	for t in tiles:
 		var px := _tile_px(t)
@@ -4436,6 +4441,29 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 			draw_line(px, px + Vector2(0, tile), col, width)
 		if not tiles.has(Vector2i(t.x + 1, t.y)): # nothing to the right
 			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), col, width)
+	# NO-150: a diagonal ride's tiles touch only at one corner each, so the
+	# four edge checks above box every tile separately — a staircase, not a
+	# band (raised at NO-129 review, deliberately left; Max asked for it
+	# fixed 2026-09-19). Two squares sharing a single point have no simple
+	# (non-self-intersecting) outline that reads as joined without either
+	# the crossing edges this already draws, or inflating the tiles into
+	# real overlap — tried both by hand before writing this and neither is
+	# a small change. So this bridges the pinch instead of tracing it: for
+	# every corner-only diagonal touch (no orthogonal tile linking them),
+	# stroke straight through both tiles' centres. Consecutive centres along
+	# a ride are exactly collinear, so a whole diagonal draws as one
+	# unbroken line rather than a dashed approximation of one.
+	var half := Vector2(tile, tile) * 0.5
+	for t in tiles:
+		for d in [Vector2i(1, -1), Vector2i(1, 1)]: # NE + SE catches every
+			# diagonal pair exactly once: a tile's SW/NW touch is its
+			# neighbour's own NE/SE, checked from that neighbour instead.
+			var diag: Vector2i = t + d
+			if not tiles.has(diag):
+				continue
+			if tiles.has(Vector2i(t.x + d.x, t.y)) or tiles.has(Vector2i(t.x, t.y + d.y)):
+				continue # already joined by a real shared edge — no pinch
+			draw_line(_tile_px(t) + half, _tile_px(diag) + half, col, width)
 
 
 ## The animated ring around the selected piece — drawn by `_pulse`, a child

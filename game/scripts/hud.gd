@@ -807,7 +807,20 @@ func build(game) -> void:
 	stock_grid.columns = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
 	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
 	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
-	stock_scroll.add_child(stock_grid)
+	# NO-135: a ScrollContainer always places its content flush at its own
+	# top-left, so grid_cols()'s floor-remainder (and a short last row) used
+	# to strand its slack at the drawer's outer right edge. Captured Stock
+	# stays flush left (default placement, against the screen edge — already
+	# correct); force Stock's grid to its full row width (same guard as
+	# modals.gd's _piece_grid/_shop_sub_zone) and right-align that box in a
+	# wrapper spanning the scroll viewport, so both sections' slack collects
+	# in one gap against the shared Captured/Stock boundary instead.
+	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_grid.columns, STOCK_DRAWER_CELL_SEP) # NO-135
+	var stock_align := HBoxContainer.new()
+	stock_align.alignment = BoxContainer.ALIGNMENT_END
+	stock_align.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, 0)
+	stock_align.add_child(stock_grid)
+	stock_scroll.add_child(stock_align)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
 	stock_panel.add_child(stock_row)

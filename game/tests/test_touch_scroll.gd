@@ -423,9 +423,18 @@ func _init() -> void:
 	# ScrollContainers now, not one strip -- that IS what makes dragging
 	# one side never scroll the other, so the structural check is the
 	# behavioural guarantee.
-	check(game.hud.stock_grid.get_parent() is ScrollContainer
-			and game.hud.captured_grid.get_parent() is ScrollContainer
-			and game.hud.stock_grid.get_parent() != game.hud.captured_grid.get_parent(),
+	# NO-135: stock_grid's direct parent is now a right-alignment wrapper
+	# (not the ScrollContainer itself), so walk to the nearest ScrollContainer
+	# ancestor instead of asserting a direct parent.
+	var stock_sc: Node = game.hud.stock_grid.get_parent()
+	while stock_sc != null and not (stock_sc is ScrollContainer):
+		stock_sc = stock_sc.get_parent()
+	var cap_sc: Node = game.hud.captured_grid.get_parent()
+	while cap_sc != null and not (cap_sc is ScrollContainer):
+		cap_sc = cap_sc.get_parent()
+	check(stock_sc is ScrollContainer
+			and cap_sc is ScrollContainer
+			and stock_sc != cap_sc,
 		"Stock and Captured Stock scroll in separate containers, independently")
 	game.queue_free()
 	await process_frame

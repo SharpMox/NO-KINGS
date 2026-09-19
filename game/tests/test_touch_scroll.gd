@@ -479,7 +479,16 @@ func _init() -> void:
 	# swipe on each panel's own chrome.
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "gold": 200, "seed": 1}
+		# NO-145 (hardware round 3): wave 5, not 3 — this block also swipes the
+		# Shop open, and _open_shop() (game.gd) refuses below
+		# Tuning.SHOP_UNLOCK_WAVE (5), a gate the Stock/Inventory drawers'
+		# _set_drawer has no equivalent of. That asymmetry, not the
+		# recogniser, was the leftward-swipe failure: classify_swipe already
+		# returned "left" correctly (same arithmetic as the "up"/"down" cases
+		# that passed), and game.gd's "left" arm already calls _open_shop()
+		# — the same entry point the Shop button uses — but the call landed
+		# on the wave gate and returned before modals.show_shop() ever ran.
+		"wave": 5, "gold": 200, "seed": 1}
 	GameScript.is_scenario = true
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -533,8 +542,19 @@ func _init() -> void:
 	# from the right) — no edge-proximity requirement any more (coordinator
 	# ruling: SWIPE_EDGE_ZONE deleted, the swipe DIRECTION alone carries
 	# "opens from the edge it slides from").
+	#
+	# NO-145 (hardware round 3): a bare pass/fail here says only "it did not
+	# open" — no observed value to diagnose a future regression with. Compute
+	# classify_swipe independently (same delta the drag below sends) so a
+	# failure distinguishes "the recogniser didn't call this a swipe" from
+	# "it did, and _open_shop() refused anyway" (e.g. the wave gate this
+	# round's actual failure traced to).
+	var shop_swipe_delta := Vector2(-15, 0) * 6 # matches the _drag() below
+	var shop_swipe_dir := Tuning.classify_swipe(shop_swipe_delta)
 	await _drag(board_bg, Vector2(-15, 0), 6)
-	check(game.shop_open(), "NO-145: leftward swipe on the empty board opens the Shop")
+	check(game.shop_open(),
+		"NO-145: leftward swipe on the empty board opens the Shop (classify_swipe=%s, wave=%d/%d unlock, shop_open()=%s)"
+			% [shop_swipe_dir, game.wave, Tuning.SHOP_UNLOCK_WAVE, game.shop_open()])
 	var shop_polls := 0
 	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
 		await process_frame

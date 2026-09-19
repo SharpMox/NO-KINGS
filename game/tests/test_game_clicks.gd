@@ -714,26 +714,42 @@ func _init() -> void:
 	# the whole design is "board, then status, then the thumb row lowest".
 	# NO-83 cut the Deck to three rows: the drawers (Inventory | Shop, equal
 	# halves), the Power badge, and the thumb row. Stock lives in the Header.
+	# NO-128 reordered it: the band (renamed army_band — Power, the Ability
+	# hint, and the King Abilities button) now sits ABOVE the drawers row, not
+	# below it, so index 0 changed from nav_row to army_band.
 	var HUD: CanvasLayer = game.hud
 	var deck: Node = HUD.nav_row.get_parent()
-	check(HUD.nav_row.get_index() == 0,
-		"deck order: the drawers row sits directly under the board")
+	check(HUD.army_band.get_index() == 0,
+		"NO-128: deck order: the band sits directly under the board")
+	check(HUD.nav_row.get_index() == 1,
+		"NO-128: deck order: the drawers row comes next")
 	check(HUD.act_row.get_index() == deck.get_child_count() - 1,
 		"deck order: Ability and PASS are the LAST row, in the thumb arc")
 	check(deck.get_child_count() == 3,
 		"NO-83: no stock strip and no status line in the Deck (%d rows)" % deck.get_child_count())
+	# NO-128: nav_row grew a middle child, army_band_reopen, that reopens the
+	# band once it's collapsed. It isn't EXPAND_FILL, so Inventory and Shop —
+	# now the first and third children — stay equal to EACH OTHER either side
+	# of it, just narrower than their old halves.
 	var nav_kids: Array = HUD.nav_row.get_children()
-	check(nav_kids.size() == 2 and nav_kids[0] == HUD.drawer_buttons["inventory"]
-			and nav_kids[1] == HUD.shop_button,
-		"NO-83: the button row is Inventory then Shop, nothing else")
-	check(absf((nav_kids[0] as Control).size.x - (nav_kids[1] as Control).size.x) <= 1.0,
-		"NO-83: ...in equal halves (%s vs %s)" % [(nav_kids[0] as Control).size.x, (nav_kids[1] as Control).size.x])
-	check(not HUD.king_ability_button.is_inside_tree() and not HUD.arrow_button.is_inside_tree(),
-		"NO-83: the ⚠ and Arrows buttons are off screen...")
+	check(nav_kids.size() == 3 and nav_kids[0] == HUD.drawer_buttons["inventory"]
+			and nav_kids[1] == HUD.army_band_reopen and nav_kids[2] == HUD.shop_button,
+		"NO-128: the button row is Inventory, the band's reopen wedge, then Shop")
+	check(absf((nav_kids[0] as Control).size.x - (nav_kids[2] as Control).size.x) <= 1.0,
+		"NO-83: ...Inventory and Shop stay equal halves either side of the wedge (%s vs %s)"
+			% [(nav_kids[0] as Control).size.x, (nav_kids[2] as Control).size.x])
+	check(not HUD.army_band_reopen.visible,
+		"NO-128: the reopen wedge is hidden — the band starts open")
+	# NO-128 finally gives king_ability_button the home NO-83 promised it: it
+	# is in the tree now (inside army_band), just hidden until an ability is
+	# active. arrow_button has no ticket moving it yet, so it stays off-screen.
+	check(HUD.king_ability_button.is_inside_tree() and not HUD.king_ability_button.visible
+			and not HUD.arrow_button.is_inside_tree(),
+		"NO-128: the King Abilities button is parented (hidden, no ability active); Arrows stays off screen")
 	check(not HUD.king_ability_button.pressed.get_connections().is_empty()
 			and not HUD.arrow_button.pressed.get_connections().is_empty()
 			and HUD.king_ability_button.text.begins_with("⚠"),
-		"...but keep their handlers and state")
+		"...both keep their handlers and state")
 
 	# ---- NO-33 / ADR-0004: the BOARD absorbs slack, the deck is a SUM -------
 	# THE GUARD. The deck's height is a sum of constants, never a runtime
@@ -741,12 +757,21 @@ func _init() -> void:
 	# measures itself before layout caches nonsense — CLAUDE.md, layout traps).
 	# A sum can drift from the thing it describes, so this is what fails the
 	# moment a deck row is added or a font moves under one.
+	# NO-128: DECK_ROWS budgets for army_band's WORST CASE (open, with the King
+	# Abilities button showing), because the board is sized once at boot and
+	# must never overflow once an ability activates mid-run. This scenario has
+	# no King ability active, so king_ability_button is hidden and Container
+	# excludes it from army_band's live minimum size — add its reserved
+	# contribution back by hand rather than faking king_abilities_active,
+	# which later checks in this same scenario depend on staying empty.
 	var rest := 0.0
 	for c in deck.get_children():
 		rest += (c as Control).get_combined_minimum_size().y
 	rest += deck.get_theme_constant("separation") * (deck.get_child_count() - 1)
+	if not HUD.king_ability_button.visible:
+		rest += HUD.king_ability_button.get_combined_minimum_size().y + HUD.BAND_GAP
 	check(is_equal_approx(rest, GameScript.DECK_ROWS),
-		"NO-33: DECK_ROWS (%s) still matches the built deck (%s)"
+		"NO-33/NO-128: DECK_ROWS (%s) still matches the built deck's worst case (%s)"
 			% [GameScript.DECK_ROWS, rest])
 	# The closed form reproduces the numbers design C was tuned against: on a
 	# 9:20 phone the WIDTH term wins at tile 59, which is exactly where ICON's

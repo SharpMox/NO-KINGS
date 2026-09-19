@@ -736,7 +736,22 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## needs a second layout pass, and a control that measures itself before layout
 ## caches nonsense (CLAUDE.md, layout traps).
 ## NO-83 retired the stock strip and the status line, so the sum is three rows.
-const DECK_ROWS := 132.0 ## drawers 32 + power 28 + act 60 + 2 gaps x 6
+## NO-128 (UNVERIFIED — no Godot run; see the PR): army_band grew a moved-in
+## Ability hint and a conditional King Abilities button, and is now the
+## deck's WORST CASE budget rather than a row that always renders the same
+## size — the band is collapsible and the King Abilities button shows only
+## while an ability is active, so the board is sized once, at boot, for the
+## largest the band can ever be, and never overflows when it grows into that.
+## band = padding 10 (5 top + 5 bottom, unchanged) + header 22 (the power
+## label's row, now shared with band_collapse — ESTIMATED at the TALLER of
+## the two: the collapse button's own font_size 13 + the "compact" style's
+## 1px top/bottom margins, extrapolated from NO-125's measured font-size ->
+## Label-height pairs, comes out ~22 against the label's own previously-
+## measured 18) + BAND_GAP 1 + hint 22 (unchanged, moved verbatim from
+## act_row) + BAND_GAP 1 + king-ability ~22 (same font-size extrapolation as
+## the collapse button — not measured on this button itself, since it was
+## never on screen before this ticket).
+const DECK_ROWS := 182.0 ## drawers 32 + band 78 + act 60 + 2 gaps x 6
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept

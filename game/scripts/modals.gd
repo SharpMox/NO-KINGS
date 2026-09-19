@@ -1088,7 +1088,9 @@ func show_reinforce() -> void:
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the
-## top-bar warning button; purely informational, Close dismisses.
+## King Abilities warning button, in army_band while an ability is active
+## (NO-128; built in the Header but parked off-screen by NO-83 before that).
+## Purely informational, Close dismisses.
 func show_king_abilities() -> void:
 	if king_ability_panel:
 		king_ability_panel.queue_free()

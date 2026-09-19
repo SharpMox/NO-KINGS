@@ -553,6 +553,11 @@ func build(game) -> void:
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
+	# NO-145: deck's own unclaimed area (default MOUSE_FILTER_STOP, so its
+	# buttons below still get first refusal over their own rects) is the
+	# "deck chrome" surface the swipe-to-open gesture may begin on — see
+	# _on_chrome_swipe_input's own header.
+	deck.gui_input.connect(_on_chrome_swipe_input.bind("__deck__"))
 
 	# NO-83: the stock strip and the status line are gone from the Deck. The
 	# strip's job (which pieces you hold, without opening anything) moves to
@@ -907,6 +912,11 @@ func build(game) -> void:
 		# tip_panel/game_menu already rely on to stay on top of everything.
 		move_child(panel, deck.get_index())
 		drawer_rest[spec[0]] = panel.position
+		# NO-145: `panel`'s own default MOUSE_FILTER_STOP (unset above — only
+		# `bg` was set to IGNORE) already claims any press inside its rect
+		# that `sc`/cells don't; gui_input reports exactly that leftover
+		# "chrome", the surface a reverse-close swipe must start on.
+		panel.gui_input.connect(_on_chrome_swipe_input.bind(spec[0]))
 		# NO-118: Inventory slides in from the LEFT — off-screen is its own
 		# width to the left of rest, not a move of where it rests.
 		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
@@ -974,6 +984,16 @@ func build(game) -> void:
 	stock_scroll.add_child(stock_align)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
+	# NO-145: stock_panel is a PanelContainer, which stretches its one child
+	# (stock_row) to fill it exactly — no chrome at THAT level to hook, unlike
+	# the plain-Control inventory panel above. cap_col/stock_col each hold
+	# only ONE sized-smaller child of their own (cap_scroll/stock_scroll, by
+	# STOCK_DRAWER_PAD), so the leftover slack a VBoxContainer leaves around
+	# an unexpanded child is this drawer's own "chrome or edge, not a
+	# scrollable cell" — same STOP-claims-its-own-rect mechanism as the
+	# inventory panel's gui_input, one level deeper in this drawer's tree.
+	cap_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
+	stock_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
 	stock_panel.add_child(stock_row)
 	drawers["stock"] = stock_panel
 	add_child(stock_panel)
@@ -1212,6 +1232,57 @@ func set_drawer(which: String) -> void:
 		elif drawer_open != name and prev == name: # newly closing
 			_slide_drawer(name, false)
 	hide_tip() # NO-59: a description outlives neither its drawer nor its row
+
+
+## NO-145: swipe-to-open (deck chrome) and swipe-to-close (a drawer's own
+## chrome) — one shared press/release tracker, hooked to each surface's
+## `gui_input` in build() rather than routed through game.gd's
+## _unhandled_input: `deck` and each drawer panel are Controls with the
+## default MOUSE_FILTER_STOP, so a press over their own unclaimed area
+## (never over a ScrollContainer or a cell — those claim their own rect
+## first, same STOP mechanism) is exactly what `gui_input` reports and
+## _unhandled_input never sees at all (CLAUDE.md: "a visible Control absorbs
+## clicks before _unhandled_input ever runs").
+##
+## `source` is "__deck__" for the OPEN gesture (deck.gui_input) or a drawer
+## key ("stock"/"inventory", drawers[key].gui_input) for that drawer's own
+## reverse-CLOSE gesture. Only one Control ever receives a given press, so
+## one pair of tracking vars covers both without racing.
+var _chrome_swipe_from := Vector2.ZERO
+var _chrome_swipe_source := ""
+
+func _on_chrome_swipe_input(event: InputEvent, source: String) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_chrome_swipe_from = event.position
+		_chrome_swipe_source = source
+		return
+	if _chrome_swipe_source != source:
+		return
+	_chrome_swipe_source = ""
+	var dir := Tuning.classify_swipe(event.position - _chrome_swipe_from)
+	if source == "__deck__":
+		match dir:
+			"down": # Max: "swipe down opens Stock"
+				set_drawer("stock")
+				drawer_changed.emit()
+			"up": # Max: "swipe up opens Inventory"
+				set_drawer("inventory")
+				drawer_changed.emit()
+			"left": # Shop slides in from the right — only near that edge
+				if _chrome_swipe_from.x >= g.get_viewport_rect().size.x - Tuning.SWIPE_EDGE_ZONE:
+					shop_pressed.emit()
+	else:
+		# Reverse of the OPENING SWIPE (the gesture Max named), not of the
+		# panel's own slide direction — Stock opens on a DOWN swipe and
+		# slides down, so its reverse is up either way; Inventory opens on
+		# an UP swipe but slides in from the LEFT (see build()'s own note),
+		# so its reverse-close is DOWN, matching the gesture, not the motion.
+		var want := "up" if source == "stock" else "down"
+		if dir == want and drawer_open == source:
+			set_drawer(source) # same key toggles it closed
+			drawer_changed.emit()
 
 
 ## NO-59: the tap-to-describe popup.

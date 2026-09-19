@@ -1061,7 +1061,6 @@ func _ready() -> void:
 				army_center.visible = false
 				rank_center.visible = true)
 		army_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the carousel
-		army_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_box.add_child(_army_group_picture(Tuning.ARMIES[army_name]))
 		var kit: Dictionary = Armies.entry(army_name)
 		var power := Label.new()

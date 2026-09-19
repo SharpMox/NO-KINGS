@@ -311,8 +311,21 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
 - **Suite runs go to Aux by default.** The probes are windowed, so a run on Main takes over
   Max's screen. Dispatch `game/tests/run_all.sh` to the Aux session and verify the result
-  here. Main runs it when Max asks for it on Main. (As of 2026-09-18 Aux has no Godot
-  installed, so this cannot be followed until it does — a suite run means Main.)
+  here. Main runs it when Max asks for it on Main. Aux runs **Godot
+  4.7.stable.official.5b4e0cb0f** — the same build string as Main, at `~/bin/godot`
+  (symlinked to `~/Applications/Godot.app/Contents/MacOS/Godot`). `GODOT=` is mandatory:
+  Aux's non-interactive ssh shell reads no profile, so `PATH` is just the system default
+  and a bare `godot` is not found; `run_all.sh` already reads a `GODOT` override
+  (`GODOT="${GODOT:-godot}"`), so nothing in the repo needed to change.
+  ```sh
+  ssh aux 'cd ~/NO-KINGS && GODOT=$HOME/bin/godot tools/godot-lock.sh game/tests/run_all.sh'
+  ```
+  Sync Aux's checkout before a run — nothing else keeps it current, and a stale checkout
+  verifies stale code. The Godot lock and `user://` are per-machine, so an Aux run is safe
+  alongside Main's own work — unlike the same-machine cross-worktree hazard above, this is
+  not a shared-state risk. Verified 2026-09-19: headless suite ALL GREEN, and the windowed
+  `test_menu_clicks.gd` 121 ok / 0 fail over ssh, matching Main's own 121/0 despite
+  different GPUs (Intel Iris 6100 vs. an M2) — both run the Compatibility renderer.
 
 ### Tests that pass for the wrong reason
 

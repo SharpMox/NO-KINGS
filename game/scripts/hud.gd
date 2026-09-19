@@ -107,6 +107,10 @@ const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the ic
 const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
 ## ----------------------------------------------------------------------------
 
+## NO-126: the Score reads as a 6-digit odometer; greyed padding, unit text.
+const SCORE_DIGITS := 6
+const SCORE_ZERO_COLOR := Color(0.45, 0.45, 0.45)
+
 ## ---- STOCK DRAWER TUNING (NO-84) --------------------------------------------
 ## Every spacing number for the Stock Drawer lives in THIS block. Canvas px.
 ## It opens DOWNWARD from the Header's bottom edge (g.hud_top), full width, at
@@ -177,7 +181,9 @@ func toggle_menu(open: bool) -> void:
 var g # the Game node — read-only from here; mutations go up via signals
 
 var clock_label := Label.new()
-var score_label := Label.new()
+var score_label := Label.new() # NO-126: the coloured, significant digits only
+var score_zeros_label := Label.new() # NO-126: greyed leading-zero padding
+var score_pts_label := Label.new() # NO-126: greyed " Pts" unit
 var gold_label := Label.new() # spendable currency (score is the metric)
 var wave_label := Label.new()
 var turn_label := Label.new()
@@ -318,6 +324,14 @@ func build(game) -> void:
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
+	# NO-126: the odometer look — greyed padding zeros before the coloured
+	# digits, greyed unit after. Same font, just a different colour, so all
+	# three sit on one baseline in one row.
+	score_zeros_label.add_theme_font_size_override("font_size", SCORE_FONT)
+	score_zeros_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
+	score_pts_label.text = " Pts"
+	score_pts_label.add_theme_font_size_override("font_size", SCORE_FONT)
+	score_pts_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
 	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	# NO-114: ★ and $ are different glyph widths, so the bare symbol+number
@@ -335,7 +349,10 @@ func build(game) -> void:
 	gold_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
 	var score_row := HBoxContainer.new()
 	score_row.add_theme_constant_override("separation", 0)
-	for l in [score_symbol, score_label]:
+	# NO-126: zeros immediately after the symbol column — same x as the Gold
+	# row's value (NO-114's alignment), the odometer padding just rides ahead
+	# of the coloured digits instead of replacing them.
+	for l in [score_symbol, score_zeros_label, score_label, score_pts_label]:
 		score_row.add_child(l)
 	var gold_row := HBoxContainer.new()
 	gold_row.add_theme_constant_override("separation", 0)
@@ -977,7 +994,12 @@ func refresh() -> void:
 	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
 		if shop_locked else ""
 	clock_label.text = g._clock_text()
-	score_label.text = "%d" % g.score
+	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
+	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`
+	# is just str(g.score), whatever length that is, and the padding floors at 0.
+	var digits := str(g.score)
+	score_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
+	score_label.text = digits
 	gold_label.text = "%d" % g.gold
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.

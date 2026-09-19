@@ -189,7 +189,7 @@ var king_ability_button := Button.new() # top-row tariff count; opens the overla
 var arrow_button := Button.new() # Arrow Planning: toggles decorative drawing mode
 var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
-var drawers := {} # name -> PanelContainer
+var drawers := {} # name -> Control (the "stock" entry is a PanelContainer; NO-134 made "inventory" a plain Control so its background can outsize its scroll content)
 var drawer_buttons := {} # name -> Button (count text updates)
 ## NO-118: each drawer's rest position and its fully-off-screen origin, set
 ## once in build() (Stock's own geometry never moves after that; the
@@ -674,13 +674,25 @@ func build(game) -> void:
 		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
 	]
 	for spec in drawer_specs:
-		var panel := PanelContainer.new()
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
-		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - deck_h - spec[4]) # above the deck
-		panel.custom_minimum_size = Vector2(spec[3], spec[4])
+		# NO-134: `panel` is a plain Control now, not a PanelContainer — a
+		# PanelContainer forces EVERY child to fill its full rect, which is
+		# fine for one child (`sc`) but wrong once a second one (`bg`) needs a
+		# taller rect than `sc`'s own fixed content height. `bg` paints the
+		# full extended height (content height + the deck's own height, so
+		# the background runs behind the bottom button row); `sc` keeps its
+		# old fixed size and position, unaffected.
+		var panel := Control.new()
+		var full_h: float = spec[4] + deck_h
+		panel.position = Vector2(spec[2], vp.y - deck_h - spec[4]) # above the deck — unchanged: NO-118 caches this as drawer_rest/drawer_hidden
+		panel.custom_minimum_size = Vector2(spec[3], full_h)
 		panel.visible = false
+		var bg := Panel.new()
+		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		var bg_style := StyleBoxFlat.new()
+		bg_style.bg_color = Color(0.1, 0.1, 0.13, 0.97)
+		bg.add_theme_stylebox_override("panel", bg_style)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE # paint only; the deck (moved on top below) handles its own input
+		panel.add_child(bg)
 		var sc := ScrollContainer.new()
 		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 		sc.scroll_deadzone = DRAWER_SCROLL_DEADZONE # NO-45
@@ -692,6 +704,11 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
+		# NO-134: behind the deck, so the deck's buttons paint on top of the
+		# extended background and win Godot's GUI picking over it (front-to-
+		# back, last sibling first) — the same z-order mechanism this file's
+		# tip_panel/game_menu already rely on to stay on top of everything.
+		move_child(panel, deck.get_index())
 		drawer_rest[spec[0]] = panel.position
 		# NO-118: Inventory slides in from the LEFT — off-screen is its own
 		# width to the left of rest, not a move of where it rests.
@@ -1103,15 +1120,18 @@ func refresh() -> void:
 	_rebuild_artefacts_grid()
 	# NO-85: the drawer's height is a flat choice (INV_DRAWER_H), not a
 	# consequence of what it holds — it must not resize as Items/Artefacts
-	# come and go (story 46).
-	var inv_panel: PanelContainer = drawers["inventory"]
+	# come and go (story 46). NO-134: the panel's own custom_minimum_size.y
+	# also carries the deck-covering background (see build()'s drawer_specs
+	# loop), so the flat constant compared here is INV_DRAWER_H + deck_h.
+	var inv_panel: Control = drawers["inventory"]
 	var inv_h := INV_DRAWER_H
-	if inv_panel.custom_minimum_size.y != inv_h:
+	var full_h := inv_h + deck_h
+	if inv_panel.custom_minimum_size.y != full_h:
 		# NO-118: build() always sets custom_minimum_size.y to this same
-		# INV_DRAWER_H, so this branch is unreachable — the position write
-		# below can never stale drawer_rest["inventory"].
+		# value, so this branch is unreachable — the position write below can
+		# never stale drawer_rest["inventory"].
 		var inv_w: float = inv_panel.custom_minimum_size.x
-		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
+		inv_panel.custom_minimum_size = Vector2(inv_w, full_h)
 		inv_panel.position = Vector2(inv_panel.position.x,
 			g.get_viewport_rect().size.y - deck_h - inv_h)
 

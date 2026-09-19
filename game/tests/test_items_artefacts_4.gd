@@ -1579,7 +1579,11 @@ func _init() -> void:
 	check(no_activ.hud.artefacts_grid.get_child_count() == 1 \
 			and no_activ.hud.artefacts_grid.get_child(0) is Label,
 		"Artefacts grid: no Artefact held shows the \"no artefacts yet\" hint alone")
-	check(no_activ.hud.drawers["inventory"].custom_minimum_size.y == no_activ.hud.INV_DRAWER_H,
+	# NO-134: custom_minimum_size.y now also carries the deck-covering
+	# background (build()'s drawer_specs loop), so the flat constant here is
+	# INV_DRAWER_H + deck_h, not INV_DRAWER_H alone.
+	check(no_activ.hud.drawers["inventory"].custom_minimum_size.y
+			== no_activ.hud.INV_DRAWER_H + no_activ.hud.deck_h,
 		"...and the drawer is the flat NO-85 height, holding nothing")
 	no_activ.queue_free()
 	await process_frame
@@ -1601,7 +1605,9 @@ func _init() -> void:
 			held_marked = true
 	check(held_activ.hud.artefacts_grid.get_child_count() == 1 and held_marked,
 		"Artefacts grid: one held activatable Artefact, in the grid, ✹-marked (story 50)")
-	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y == held_activ.hud.INV_DRAWER_H,
+	# NO-134: see the matching comment on the no_activ check above.
+	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y
+			== held_activ.hud.INV_DRAWER_H + held_activ.hud.deck_h,
 		"...and the drawer's height is unchanged — flat regardless of content (story 46)")
 	held_activ.queue_free()
 	await process_frame

@@ -1820,10 +1820,13 @@ func _init() -> void:
 		shop_close_polls += 1
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
-	# Selling + Captured -> Stock conversion (issue 60): the Shop drawer's
-	# Sell/Buy toggle swaps in held Stock/Captured/Item/Artefact tiles for
-	# the shop_stock ones, so Sell can never be confused with Buy. A
-	# Captured Stock tile's detail dock offers BOTH Convert and Sell.
+	# Selling (NO-144): moved off the Shop entirely and onto the previewed
+	# thing's own menu — long-pressing a Stock entry (here: the same signal a
+	# real long press fires, hud.stack_preview_requested) opens its preview
+	# with a Sell button in it. Convert stays exactly where it already was
+	# (hud's own ⇄ badge on the Captured entry — tested separately above),
+	# and per NO-144's own ruling a Captured entry's preview offers no Sell
+	# at all: convert first, then sell from Stock like anything else.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -1832,75 +1835,45 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_shop(game), "Shop button clickable")
-	await process_frame
-	check(await _click_button_in(game.modals.shop_panel, "Sell"), "the Sell toggle is clickable")
-	await process_frame
-	check(game.modals.shop_sell_mode, "the Shop drawer switches to Sell mode")
 
-	var piece_tile: Button = null
-	var to_visit_sell: Array = [game.modals.shop_panel]
-	while not to_visit_sell.is_empty():
-		var n: Node = to_visit_sell.pop_back()
-		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "piece":
-			piece_tile = n
-			break
-		to_visit_sell.append_array(n.get_children())
-	check(piece_tile != null, "a Stock sell tile exists")
-	_click(piece_tile.get_global_rect().get_center())
+	game.hud.stack_preview_requested.emit("pawn", false, game.stock[0])
 	await process_frame
-	check(game.modals.sell_expanded_kind == "piece" and game.modals.sell_expanded_index == 0,
-		"tapping a Stock sell tile expands it")
+	check(game.preview_open, "long-pressing a Stock entry opens its preview")
 	var sell_stock_before: int = game.stock.size()
 	var sell_gold_before: int = game.gold
 	var sell_acts_before: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Sell (+$5)"),
-		"the Sell button in the expanded detail is clickable (pawn value 10, 50% floored = 5)")
+	check(await _click_button_in(game.preview_panel, "Sell (+$5)"),
+		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
 	check(game.stock.size() == sell_stock_before - 1 and game.gold == sell_gold_before + 5
 			and game.actions_left == sell_acts_before,
 		"selling the Stock piece removes it, pays Gold, and costs no Action (issue 64)")
+	check(not game.preview_open, "selling closes the preview, same as Close")
 
-	var cap_tile: Button = null
-	to_visit_sell = [game.modals.shop_panel]
-	while not to_visit_sell.is_empty():
-		var n: Node = to_visit_sell.pop_back()
-		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "captured":
-			cap_tile = n
+	game.hud.stack_preview_requested.emit("pawn", true, game.captured[0])
+	await process_frame
+	check(game.preview_open, "long-pressing a Captured entry opens its preview too")
+	var cap_preview_has_sell := false
+	var to_visit_pv: Array = [game.preview_panel]
+	while not to_visit_pv.is_empty():
+		var n: Node = to_visit_pv.pop_back()
+		if n is Button and (n as Button).text.begins_with("Sell"):
+			cap_preview_has_sell = true
 			break
-		to_visit_sell.append_array(n.get_children())
-	check(cap_tile != null, "a Captured Stock sell tile exists")
-	_click(cap_tile.get_global_rect().get_center())
+		to_visit_pv.append_array(n.get_children())
+	check(not cap_preview_has_sell,
+		"a Captured entry's preview offers no Sell — Convert first, then sell from Stock")
+	check(await _click_button_in(game.preview_panel, "Close"), "Close dismisses it")
 	await process_frame
-	check(game.modals.sell_expanded_kind == "captured", "tapping a Captured tile expands it")
-	var captured_before: int = game.captured.size()
-	var stock_before2: int = game.stock.size()
-	var gold_before2: int = game.gold
-	var convert_acts_before: int = game.actions_left
-	# issue 97: the Convert button carries its price, and that price now comes
-	# from CONVERT_RATE rather than SELL_RATE — so read it from the game rather
-	# than hardcoding a number that moves whenever the rate is tuned.
-	var convert_cost: int = Shop.convert_price(game, game.captured[0])
-	var convert_label := "Convert ($%d)" % convert_cost
-	check(await _click_button_in(game.modals.shop_panel, convert_label),
-		"Convert is clickable (%s)" % convert_label)
-	await process_frame
-	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
-			and game.gold == gold_before2 - convert_cost and game.actions_left == convert_acts_before,
-		"converting moves the piece from Captured Stock into ordinary Stock, debits Gold, costs no Action (issue 64)")
-
-	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
-	await process_frame
-	check(not game.modals.shop_sell_mode, "the Shop drawer is back in Buy mode")
 
 	# Direct deploy is gone (issue 60) and so is the merge (2026-09-10): the tap
 	# that used to arm a Captured stack arms nothing now, so a following
 	# Deploy-tile tap has nothing to place. Driven through the REAL tap rather
 	# than by setting the armed flags — there are none left to set — and paired
-	# with the Stock control, because "nothing was placed" is also what a tap
-	# swallowed by the open Shop panel would look like.
-	game.stock.append("pawn") # a fresh Stock piece so the drawer has both
-	game.captured.append("pawn") # the Convert above emptied Captured Stock
+	# with a Stock control, because "nothing was placed" is also what a tap
+	# that failed to arm ANYTHING would look like.
+	game.stock.append("pawn") # the Sell test above emptied Stock; Captured
+		# still has its own untouched pawn from the boot config
 	game._refresh()
 	var deploy_target := Vector2i(-1, -1)
 	for t in game._deploy_tiles():

@@ -894,18 +894,21 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
 			or preview_open or game_menu_open or win_open:
 		return
-	# double-tap on the same stack: piece info
+	# double-tap on the same stack: piece info (NO-144: Sell, for a Stock
+	# entry, is in there too — never for a Captured one, entry stays null)
 	var key := id + ("!" if cap else "")
 	var now := Time.get_ticks_msec()
 	if key == pool_click_key and now - pool_click_ms < 400:
 		pool_click_key = ""
-		return _show_preview(id)
+		return _show_preview(id, "", entry if not cap else null)
 	pool_click_key = key
 	pool_click_ms = now
 	# CAPTURED STOCK ARMS NOTHING (user ruling 2026-09-10). Its only two exits
 	# are Convert (the badge that now sits on every captured entry) and Sell
-	# (the Shop drawer) — issue 60 had already taken its deploy, and this slice
-	# takes its merge, which leaves the armed state with nothing left to do.
+	# (from Stock, after converting — NO-144 moved this off the Shop and onto
+	# the preview modal above) — issue 60 had already taken its deploy, and
+	# this slice takes its merge, which leaves the armed state with nothing
+	# left to do.
 	# Bailing here is also what stops the board painting deploy targets for a
 	# piece that cannot be deployed: those dots come from placing_id /
 	# pool_drag_id (see _deploy_highlight_tiles), and neither can ever hold a
@@ -4222,8 +4225,7 @@ func _screenshot_and_quit(dir: String) -> void:
 ## in order — a second pair completes a move/capture/merge the first pair's
 ## selection started, the same two taps a player would make; `--arm-item KEY`
 ## [`--anchor X,Y`] calls _use_item then _item_click (item arm + anchor);
-## `--open-shop` [`--sell`] calls _open_shop(), then flips modals.shop_sell_mode
-## for the Shop's other tab; `--open-drawer NAME` calls _set_drawer(NAME)
+## `--open-shop` calls _open_shop(); `--open-drawer NAME` calls _set_drawer(NAME)
 ## ("inventory" or "stock") — NO-119: the Shop and the drawers have no CLI
 ## reach otherwise, and verifying an off-board grid needs one open.
 ## `--show-screen NAME` reaches panels no board tap opens on its own:
@@ -4253,10 +4255,6 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
 	elif args.has("--open-shop"):
 		_open_shop()
-		if args.has("--sell"):
-			modals.shop_sell_mode = true
-			modals.show_shop() # rebuild: show_shop() only resets the mode on a
-				# FRESH open, so re-calling it while already open keeps this true
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout # let the
 			# NO-118 slide finish — animations_on defaults true, so the panel
 			# is still moving 2 frames after this call returns
@@ -4600,7 +4598,12 @@ func _connect_hud() -> void:
 	hud.king_ability_pressed.connect(_show_king_abilities)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
-	hud.stack_preview_requested.connect(func(id: String) -> void: _show_preview(id)) # NO-138
+	hud.stack_preview_requested.connect(func(id: String, cap: bool, entry: Variant) -> void:
+		_show_preview(id, "", entry if not cap else null)) # NO-138/NO-144
+	hud.item_preview_requested.connect(func(index: int) -> void:
+		_show_kind_preview("item", items[index].key, items[index])) # NO-144
+	hud.artefact_preview_requested.connect(func(key: String) -> void:
+		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
@@ -4711,13 +4714,8 @@ func _connect_modals() -> void:
 		get_tree().reload_current_scene())
 	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
-	modals.shop_sell_pressed.connect(func(kind: String, entry: Variant) -> void:
+	modals.sell_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-144
 		_sell(kind, entry)
-		modals.show_shop() # rebuild: fresh entries + affordability state
-		_refresh())
-	modals.shop_convert_pressed.connect(func(entry: Variant) -> void:
-		_convert_captured(entry)
-		modals.show_shop()
 		_refresh())
 	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
 		stock.append(id) # reinforce is free (money-and-shop/02)
@@ -4847,9 +4845,20 @@ func _show_win_screen() -> void:
 	modals.show_win_screen()
 
 
-func _show_preview(id: String, king_id := "") -> void:
+## `entry` (NO-144): the live Stock element behind this preview, when it's
+## one — a board tile or a Captured Stock entry pass none, so Sell is never
+## offered for either (Sell is Stock-only; Captured has Convert instead).
+func _show_preview(id: String, king_id := "", entry: Variant = null) -> void:
 	preview_open = true
-	modals.show_preview(id, king_id)
+	modals.show_preview("piece", id, king_id, entry)
+
+
+## NO-144: an Item/Artefact's own long-press menu — same preview modal a
+## piece gets, minus the movement diagram, plus Sell when `entry` (the live
+## g.items/g.artefacts element) is sellable.
+func _show_kind_preview(kind: String, id: String, entry: Variant) -> void:
+	preview_open = true
+	modals.show_preview(kind, id, "", entry)
 
 
 ## Opening the tariff overlay deselects, like menus and drawers.

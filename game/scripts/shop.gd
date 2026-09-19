@@ -386,20 +386,19 @@ static func _sell_base(g, kind: String, entry) -> float:
 ## (50% -> 62.5%), floored ONCE against the raw base — not 1.25x an
 ## already-floored sell_price(), which would silently disagree with "62.5%"
 ## on an odd value (e.g. a 7-value piece: floor(7*0.625)=4, not
-## floor(floor(7*0.5)*1.25)=3). Every REAL sell call site (game.gd._sell,
-## modals.gd's Sell-mode display) reads this, never sell_price() above —
-## Captured -> Stock conversion (game.gd._convert_captured, modals.gd's
-## Convert-mode display) keeps reading sell_price() at the flat rate; see
-## Armies.insider_rates' own header for why that split is deliberate.
+## floor(floor(7*0.5)*1.25)=3). Every REAL sell call site (game.gd._sell, the
+## preview modal's own Sell display — modals.gd show_preview) reads this,
+## never sell_price() above — Captured -> Stock conversion
+## (game.gd._convert_captured, hud.gd's ⇄ Convert badge) keeps reading
+## sell_price() at the flat rate; see Armies.insider_rates' own header for
+## why that split is deliberate.
 static func sell_payout(g, kind: String, entry) -> int:
 	var rate := Tuning.SELL_RATE * 1.25 if Armies.insider_rates(g) else Tuning.SELL_RATE
 	return floori(_sell_base(g, kind, entry) * rate)
 
 
-## The live array a held entry of `kind` lives in — the single place both
-## can_sell's "is it actually held" check and modals.gd's Sell-mode UI (whose
-## own _sell_entries delegates here) read from, so the two can never disagree
-## about what's sellable.
+## The live array a held entry of `kind` lives in — can_sell's own "is it
+## actually held" check.
 static func held_entries(g, kind: String) -> Array:
 	match kind:
 		"piece": return g.stock

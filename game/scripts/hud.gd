@@ -138,14 +138,21 @@ signal pass_pressed
 signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
-signal stack_preview_requested(id: String) # NO-138: a Stock/Captured cell's
-	# long press — game.gd owns _show_preview, hud.gd only asks for it (see
-	# `g`'s own "read-only from here" rule above)
+signal stack_preview_requested(id: String, cap: bool, entry: Variant) # NO-138:
+	# a Stock/Captured cell's long press — game.gd owns _show_preview, hud.gd
+	# only asks for it (see `g`'s own "read-only from here" rule above).
+	# cap/entry (NO-144): so game.gd can offer Sell for a Stock entry — never
+	# for a Captured one, which keeps Convert only (the ⇄ badge below).
 signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
 	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
 	# final confirm (see multi_confirm_btn's own declaration below)
 signal item_pressed(index: int)
+signal item_preview_requested(index: int) # NO-144: an Item cell's long
+	# press — same "own menu" preview pieces get (stack_preview_requested
+	# above), so Sell has somewhere to live for a held Item too
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
+signal artefact_preview_requested(key: String) # NO-144: same as
+	# item_preview_requested above, for a held Artefact
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal promote_pressed(id: String)
 signal convert_pressed(entry: Variant) # the ⇄ badge on a Captured entry (2026-09-06)
@@ -1246,10 +1253,10 @@ func hide_tip() -> void:
 ## released off the button cannot leak into a later tap.
 ##
 ## NO-138: `on_fire`, when given, replaces the default show_tip with
-## whatever the caller wants a long press to do instead — the piece preview
-## modal for a Stock/Captured cell (_build_stack_button below), which has a
-## piece id to show and no more need of the tip popup. `key`/`desc` are
-## unused in that case; pass "" for both.
+## whatever the caller wants a long press to do instead — the preview modal,
+## for a Stock/Captured cell (_build_stack_button below, `key`/`desc` unused,
+## pass "" for both) and, since NO-144, an Items/Artefacts cell too
+## (_wire_grid_button's own `on_long_press`, forwarded here as `on_fire`).
 func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on_fire := Callable()) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if not e.pressed:
@@ -1517,11 +1524,13 @@ func _stacks() -> Array:
 ## NO-85: Items then Artefacts, in ONE scrolling column — the Artefacts grid
 ## holds BOTH passive and activatable entries now (story 47/50), replacing the
 ## old artefact_box (passive rows, tap-to-describe) + activate_box (issue 52's
-## Activate chips) split. Tap uses (arms/activates), long-press describes,
-## for every entry including greyed ones (stories 51-55) — one mechanism,
-## reusing NO-72's _long_press_input for both kinds, instead of passive rows
-## having their own tap-to-describe path (NO-59's _tip_input — retired here,
-## it had no other caller).
+## Activate chips) split. Tap uses (arms/activates), long-press opens the
+## preview modal (NO-144: icon/name/description and, when sellable, Sell —
+## previously the description-only show_tip popup), for every entry including
+## greyed ones (stories 51-55) — one mechanism, reusing NO-72's
+## _long_press_input for both kinds, instead of passive rows having their own
+## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
+## caller).
 ## "no artefacts yet" still gates on the whole g.artefacts list, not just the
 ## passive subset: holding only an activatable Artefact is not "nothing".
 func _rebuild_artefacts_grid() -> void:
@@ -1532,13 +1541,6 @@ func _rebuild_artefacts_grid() -> void:
 		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
 		artefacts_grid.add_child(none)
-		# NO-121: scoped to this grid's OWN "artefact:" keys, same as the
-		# non-empty branch below — an unscoped hide_tip() here was wiping a
-		# Board/Item-target tip (NO-120/NO-121) on every refresh whenever the
-		# player held zero artefacts, since _refresh() runs right after
-		# show_tip() for those.
-		if tip_key.begins_with("artefact:"):
-			hide_tip()
 		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
@@ -1549,13 +1551,11 @@ func _rebuild_artefacts_grid() -> void:
 			continue
 		seen[t.key] = true
 		artefacts_grid.add_child(_build_artefact_cell(t.key, counts[t.key]))
-	# the cell the popup was anchored to may have just been freed. Keep it up
-	# only while the artefact it describes is still held — otherwise a
-	# consumed artefact leaves a description of something no longer held.
-	# Scoped to "artefact:" keys (NO-120): an open Board or Stock tip is not
-	# in `seen` either, but it is not this grid's to close.
-	if tip_key.begins_with("artefact:") and not seen.has(tip_key.trim_prefix("artefact:")):
-		hide_tip()
+	# NO-144: a held Artefact's long press opens the preview modal now, never
+	# show_tip (_build_artefact_cell passes on_long_press) — so tip_key can
+	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
+	# scope to. The NO-120/121 hide_tip() guards this used to need are gone
+	# with it.
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -1636,7 +1636,8 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	# shared popup, not this grid's alone) — bare `key` would make every
 	# non-Artefact tip look like an artefact no longer held and get closed.
 	_wire_grid_button(btn, true, "artefact:" + key, desc, func() -> void:
-		artefact_activate_pressed.emit(key))
+		artefact_activate_pressed.emit(key),
+		func() -> void: artefact_preview_requested.emit(key)) # NO-144
 	btn.set_meta("key", key) # lookup for probes/tests
 	return btn
 
@@ -1652,7 +1653,13 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 ## Tuning.OFFBOARD_ICON square, expand_icon filling it rather than collapsing
 ## to 0 in the packed grid (the same square shape _build_stack_button and
 ## modals.gd's Shop tiles already use).
-func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String, on_tap: Callable) -> void:
+##
+## NO-144: `on_long_press`, when given, replaces the default show_tip with
+## the preview modal (same `on_fire` override _build_stack_button's long
+## press already uses) — Items and Artefacts get their own Sell button there
+## now, same as Stock.
+func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String,
+		on_tap: Callable, on_long_press := Callable()) -> void:
 	if has_icon:
 		btn.expand_icon = true
 		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
@@ -1662,7 +1669,7 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 			return
 		on_tap.call())
 	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, lp_key, lp_desc, e))
+		_long_press_input(btn, lp_key, lp_desc, e, on_long_press))
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
@@ -1683,7 +1690,8 @@ func _rebuild_items_grid() -> void:
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		_wire_grid_button(btn, has_icon, "item:%d" % i, desc, func() -> void:
-			item_pressed.emit(i))
+			item_pressed.emit(i),
+			func() -> void: item_preview_requested.emit(i)) # NO-144
 		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
@@ -1887,7 +1895,8 @@ func _build_stack_button(st: Dictionary) -> Button:
 			return
 		stack_pressed.emit(st.entry, cap, st.count))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, "", "", e, func() -> void: stack_preview_requested.emit(id)))
+		_long_press_input(btn, "", "", e, func() -> void:
+			stack_preview_requested.emit(id, cap, st.entry)))
 	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down

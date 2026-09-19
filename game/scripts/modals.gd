@@ -38,7 +38,6 @@ signal sell_pressed(kind: String, entry: Variant) # NO-144: from the preview
 	# modal's Sell button — "piece" (Stock only, never Captured), "item",
 	# "artefact". Captured -> Stock conversion isn't here: it lives on the
 	# entry itself (hud.gd's own ⇄ badge, convert_pressed).
-signal reinforce_buy_pressed(id: String)
 signal reinforce_done_pressed
 signal preview_closed
 signal choice_chosen(value)
@@ -1011,7 +1010,11 @@ func _shop_detail(index: int) -> Control:
 	return row
 
 
-func show_reinforce() -> void:
+## NO-141 (Max, 2026-09-19): an announcement, not a shop — the pieces are
+## already in Stock by the time this shows (game.gd grants them the instant
+## pending_reinforce is consumed, before calling this); `ids` is that same
+## list, for display only. No Buy button, nothing left to choose or pay for.
+func show_reinforce(ids: Array) -> void:
 	if reinforce_panel:
 		reinforce_panel.queue_free()
 	reinforce_panel = PanelContainer.new()
@@ -1022,50 +1025,68 @@ func show_reinforce() -> void:
 	var center := CenterContainer.new()
 	reinforce_panel.add_child(center)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
 	var title := Label.new()
-	title.text = "REINFORCEMENTS"
+	title.text = "REINFORCEMENTS ARRIVED"
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := Label.new()
-	sub.text = "Wave %d cleared — restock your army's reserve, free of charge" % (g.wave - 1)
+	sub.text = "Wave %d cleared — added to Stock, free of charge" % (g.wave - 1)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
-	for id in g._reinforce_ids():
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		if g.textures.has(id):
-			var tex := TextureRect.new()
-			tex.texture = g.piece_tex(id)
-			tex.custom_minimum_size = Vector2(34, 34)
-			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(tex)
-		var what := Label.new()
-		what.text = str(g.defs[id].name)
-		what.add_theme_font_size_override("font_size", 17)
-		what.custom_minimum_size = Vector2(190, 0)
-		row.add_child(what)
-		var buy := Button.new()
-		buy.text = "Buy"
-		buy.add_theme_font_size_override("font_size", 17)
-		buy.pressed.connect(func() -> void: reinforce_buy_pressed.emit(id))
-		row.add_child(buy)
-		box.add_child(row)
-	var done := Button.new()
-	done.text = "Done"
-	done.add_theme_font_size_override("font_size", 22)
-	done.pressed.connect(func() -> void:
+	box.add_child(_reinforce_group_picture(ids))
+	var dismiss := Button.new()
+	dismiss.text = "Dismiss"
+	dismiss.add_theme_font_size_override("font_size", 22)
+	dismiss.pressed.connect(func() -> void:
 		reinforce_panel.visible = false
 		reinforce_done_pressed.emit())
-	box.add_child(done)
+	box.add_child(dismiss)
 	g.hud.add_child(reinforce_panel)
 	reinforce_panel.move_to_front()
+
+
+## NO-141: same "group picture" shape as the Army carousel (NO-146) — one
+## icon per distinct piece id, de-duplicated in arrival order, with a "×N"
+## badge standing in for a repeat, rather than a row per id. Two different
+## renderings of "a group picture" for the same concept would be a bug in
+## the making (Max asked for the phrase in both places), so this mirrors
+## _army_group_picture's shape rather than inventing its own.
+func _reinforce_group_picture(ids: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	var counts := {} # insertion-ordered, so the picture follows `ids`
+	for id in ids:
+		counts[id] = counts.get(id, 0) + 1
+	for id in counts:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		if g.textures.has(id):
+			var icon := TextureRect.new()
+			icon.texture = g.piece_tex(id)
+			icon.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			col.add_child(icon)
+		else:
+			var glyph := Label.new()
+			glyph.text = str(g.defs[id].glyph)
+			glyph.add_theme_font_size_override("font_size", 34)
+			glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(glyph)
+		if counts[id] > 1:
+			var count_label := Label.new()
+			count_label.text = "×%d" % counts[id]
+			count_label.add_theme_font_size_override("font_size", 12)
+			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(count_label)
+		row.add_child(col)
+	return row
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the

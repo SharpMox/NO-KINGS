@@ -2044,8 +2044,9 @@ func _init() -> void:
 	check(await _click_button_in(game.modals.shop_panel, "Buy"),
 		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
 
-	# reinforcement shop: opens pending at turn start, Buy is free and adds
-	# to stock, Done hands the turn back
+	# reinforcement shop: opens pending at turn start; NO-141 made the grant
+	# automatic (in Stock by the time the panel shows) and turned the panel
+	# into an announcement — no Buy button any more, Dismiss hands the turn back
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -2057,6 +2058,8 @@ func _init() -> void:
 	await process_frame
 	check(game.reinforce_panel != null and game.reinforce_panel.visible,
 		"the reinforcement shop opens at turn start")
+	check(game.stock.size() == game._reinforce_ids().size(),
+		"NO-141: the grant already landed in Stock before the screen ever showed")
 	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
 	# holds the player queen, and the control below the tariff section proves
 	# this exact tap selects her with no panel up.
@@ -2073,15 +2076,12 @@ func _init() -> void:
 	check(game.selected == Vector2i(-1, -1),
 		"NO-5: a board tap under the open reinforcement pick selects nothing")
 	check(game.reinforce_panel.visible, "...and the pick is still open")
-	var r_stock: int = game.stock.size()
-	check(await _click_button_in(game.reinforce_panel, "Buy"), "Buy clickable")
-	await process_frame
-	check(game.stock.size() == r_stock + 1 and game.score == 100 and game.gold == 0,
-		"Buy adds the piece to stock for free")
-	check(await _click_button_in(game.reinforce_panel, "Done"), "Done clickable")
+	check(not await _click_button_in(game.reinforce_panel, "Buy"),
+		"NO-141: no Buy button — the grant already happened, nothing left to click")
+	check(await _click_button_in(game.reinforce_panel, "Dismiss"), "Dismiss clickable")
 	await process_frame
 	check(not game.reinforce_panel.visible and not game.pending_reinforce,
-		"Done closes the shop and clears the pending flag")
+		"Dismiss closes the announcement and clears the pending flag")
 
 	# the ⚠ button is off screen (NO-83) but its state and handler stay: the
 	# text still counts, and its signal still opens the detail overlay

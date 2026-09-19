@@ -1200,7 +1200,8 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
-			modals.show_reinforce()
+			modals.show_reinforce(_grant_reinforcements()) # NO-141: granted the
+				# instant the screen fires — the modal is announcement only
 	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
 		pending_shop_open = false
 		if not autoplay: # the bot buys through Shop.buy and never opens the
@@ -2803,7 +2804,18 @@ func _reinforce_ids() -> Array:
 	return out
 
 
-
+## NO-141: one copy of each _reinforce_ids() straight into Stock — the same
+## free grant the old Buy button made per click (money-and-shop/02), now made
+## once, automatically, the instant the screen fires. Returns the ids granted
+## so the announcement modal shows exactly what arrived. Pure w.r.t. `ids`
+## (_reinforce_ids() is deterministic off next_army), so it is safe to call
+## again for display only — see save_config.gd's resume path, which does
+## exactly that without calling this.
+func _grant_reinforcements() -> Array:
+	var ids := _reinforce_ids()
+	for id in ids:
+		stock.append(id)
+	return ids
 
 
 
@@ -4824,9 +4836,6 @@ func _connect_modals() -> void:
 	modals.sell_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-144
 		_sell(kind, entry)
 		_refresh())
-	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
-		stock.append(id) # reinforce is free (money-and-shop/02)
-		modals.show_reinforce())
 	modals.reinforce_done_pressed.connect(func() -> void:
 		pending_reinforce = false
 		_refresh())

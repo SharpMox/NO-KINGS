@@ -123,9 +123,11 @@ static func _every_piece_boards() -> Array:
 	for i in ids.size():
 		theirs.append([ids[i], 1, i % 8, 11 - int(i / 8)]) # rows 11..7
 	theirs.append(["king", 1, ids.size() % 8, 11 - int(ids.size() / 8)])
+	# NO-149: renamed to ALL PIECES so it is findable by name in a list of 389
+	# — it existed already (2026-09-06) but only under a prose name.
 	return [
-		{"name": "Piece board: every type, your side (%d)" % ids.size(), "cfg": {
+		{"name": "ALL PIECES (%d, your side)" % ids.size(), "cfg": {
 			"board": mine, "gold": 300, "score": 500, "seed": 80}},
-		{"name": "Piece board: every type, both sides (%d + King)" % ids.size(), "cfg": {
+		{"name": "ALL PIECES (%d + King, both sides)" % ids.size(), "cfg": {
 			"board": mine + theirs, "gold": 300, "score": 500, "seed": 81}},
 	]

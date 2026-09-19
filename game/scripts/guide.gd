@@ -10,6 +10,7 @@ const GuideText := preload("res://data/guide_text.gd")
 ## when the panel's own Back button is pressed (hides the panel itself).
 static func build(layer: Node, on_back: Callable) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_left = 30
 	scroll.offset_top = 30

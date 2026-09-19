@@ -34,9 +34,15 @@ func check(cond: bool, label: String) -> void:
 
 
 func _init() -> void:
+	# NO-149 renamed this scenario to "ALL PIECES (%d, your side)" — match on
+	# "your side" rather than a prefix, since both ALL PIECES boards now share
+	# the "ALL PIECES (" lead-in and only the tail distinguishes them.
 	var matches: Array = Scenarios.all().filter(
-		func(e: Dictionary) -> bool: return e.name.begins_with("Piece board: every type, your side"))
+		func(e: Dictionary) -> bool: return e.name.contains("your side"))
 	check(matches.size() == 1, "exactly one 'every type, your side' scenario exists")
+	if matches.size() != 1:
+		quit(1)
+		return
 	var cfg: Dictionary = matches[0].cfg.duplicate()
 	cfg.seed = 1
 	GameScript.next_config = cfg

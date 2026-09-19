@@ -735,23 +735,20 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## moves under one. It is a sum rather than a measurement on purpose: measuring
 ## needs a second layout pass, and a control that measures itself before layout
 ## caches nonsense (CLAUDE.md, layout traps).
-## NO-83 retired the stock strip and the status line, so the sum is three rows.
-## NO-128 (UNVERIFIED — no Godot run; see the PR): army_band grew a moved-in
-## Ability hint and a conditional King Abilities button, and is now the
-## deck's WORST CASE budget rather than a row that always renders the same
-## size — the band is collapsible and the King Abilities button shows only
-## while an ability is active, so the board is sized once, at boot, for the
-## largest the band can ever be, and never overflows when it grows into that.
-## band = padding 10 (5 top + 5 bottom, unchanged) + header 22 (the power
-## label's row, now shared with band_collapse — ESTIMATED at the TALLER of
-## the two: the collapse button's own font_size 13 + the "compact" style's
-## 1px top/bottom margins, extrapolated from NO-125's measured font-size ->
-## Label-height pairs, comes out ~22 against the label's own previously-
-## measured 18) + BAND_GAP 1 + hint 22 (unchanged, moved verbatim from
-## act_row) + BAND_GAP 1 + king-ability ~22 (same font-size extrapolation as
-## the collapse button — not measured on this button itself, since it was
-## never on screen before this ticket).
-const DECK_ROWS := 182.0 ## drawers 32 + band 78 + act 60 + 2 gaps x 6
+## NO-83 retired the stock strip and the status line, so the sum was three
+## rows (drawers, power, act).
+## NO-128 (UNVERIFIED — no Godot run; see the PR; coordinator review
+## 2026-09-19 rejected an earlier version of this change that grew DECK_ROWS
+## to budget the Power/Ability/King-Abilities band's worst case, because a
+## permanent board-size cost paid at every boot for a collapsible row is
+## backwards — collapsing would have freed nothing, since the board is sized
+## once here and never revisited). The band (army_band, hud.gd) is no longer
+## a deck row at all: it overlays the board above the deck instead, exactly
+## like the Inventory drawer, sized by its own flat ARMY_BAND_H constant
+## (hud.gd) rather than by DECK_ROWS. So the sum drops back to two rows —
+## drawers and act — and DECK_ROWS actually SHRINKS versus the pre-NO-128
+## value of 132, because the always-reserved power row is gone too.
+const DECK_ROWS := 98.0 ## drawers 32 + act 60 + 1 gap x 6
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept

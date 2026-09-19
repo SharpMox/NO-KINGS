@@ -233,7 +233,7 @@ func _init() -> void:
 	# visible first: a hidden panel sits at (0,0) and would pass the bounds check
 	check(game.preview_panel.visible and item_tr.position.x >= 0.0 and item_tr.position.y >= 0.0
 			and item_tr.end.x <= item_vp.x and item_tr.end.y <= item_vp.y,
-		"...and the popup is visible and fully on screen (%s in %s)" % [item_tr, item_vp])
+		"...and the item's popup is visible and fully on screen (%s in %s)" % [item_tr, item_vp])
 	check(game.item_active == -1, "...and does NOT arm the item")
 	game.queue_free()
 	await process_frame
@@ -259,14 +259,14 @@ func _init() -> void:
 	check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").name),
 		"a long press on a ✹ Artefact cell shows its description")
 	check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").description),
-		"...and it is that artefact's description")
+		"...and it is the ✹ artefact's description")
 	check(not game.buff_pick_open, "...and does NOT open the activation confirm")
 	var tr: Rect2 = game.preview_panel.get_global_rect()
 	var vp: Vector2 = root.get_visible_rect().size
 	# visible first: a hidden panel sits at (0,0) and would pass the bounds check
 	check(game.preview_panel.visible and tr.position.x >= 0.0 and tr.position.y >= 0.0
 			and tr.end.x <= vp.x and tr.end.y <= vp.y,
-		"...and the popup is visible and fully on screen (%s in %s)" % [tr, vp])
+		"...and the ✹ artefact's popup is visible and fully on screen (%s in %s)" % [tr, vp])
 	game.queue_free()
 	await process_frame
 
@@ -300,7 +300,7 @@ func _init() -> void:
 	check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").name),
 		"a long press on a passive Artefact cell shows its description")
 	check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").description),
-		"...and it is that artefact's description")
+		"...and it is the passive artefact's description")
 	game.queue_free()
 	await process_frame
 
@@ -365,7 +365,7 @@ func _init() -> void:
 	check(clean, "a long press on the board piece completed without real cursor motion")
 	check(game.preview_open, "a long press on a board piece opens its preview modal")
 	check(_has_label_text(game.preview_panel, game.defs["queen"].name),
-		"...and it shows that piece's name")
+		"...and it shows the board piece's name")
 	check(game.selected == Vector2i(-1, -1), "...and does NOT select the piece")
 	game.queue_free()
 	await process_frame
@@ -380,7 +380,7 @@ func _init() -> void:
 	_release_at(qpos)
 	await process_frame
 	check(game.selected == queen_at, "a short tap on a board piece still selects it")
-	check(not game.preview_open, "...and opens no preview")
+	check(not game.preview_open, "...and opens no preview (board piece)")
 	game.queue_free()
 	await process_frame
 
@@ -415,7 +415,7 @@ func _init() -> void:
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the enemy completed without real cursor motion")
 	check(game.preview_open, "a long press on the enemy opens its preview modal")
-	check(_has_label_text(game.preview_panel, game.defs["pawn"].name), "...and it shows that piece's name")
+	check(_has_label_text(game.preview_panel, game.defs["pawn"].name), "...and it shows the enemy piece's name")
 	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.ENEMY,
 		"...and the enemy Pawn is STILL on the board — not captured")
 	check(game.gold == gold_before, "...and gold is unchanged")
@@ -465,7 +465,7 @@ func _init() -> void:
 	check(clean, "a long press on the Stock cell completed without real cursor motion")
 	check(game.preview_open, "a long press on a Stock cell opens its preview modal")
 	check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
-		"...and it shows that piece's name")
+		"...and it shows the Stock piece's name")
 	check(game.placing_id == "", "...and does NOT arm it for deploy")
 	game.queue_free()
 	await process_frame
@@ -498,7 +498,7 @@ func _init() -> void:
 	_release_at(ppos)
 	await process_frame
 	check(game.placing_id == "pawn", "a short tap on a Stock cell still arms it")
-	check(not game.preview_open, "...and opens no preview")
+	check(not game.preview_open, "...and opens no preview (Stock cell)")
 	game.queue_free()
 	await process_frame
 
@@ -524,7 +524,7 @@ func _init() -> void:
 	check(clean, "a long press on the enemy during targeting completed without real cursor motion")
 	check(game.preview_open, "...and opens the preview modal")
 	check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
-		"...and it shows that piece's name")
+		"...and it shows the targeted enemy's name")
 	check(game.item_active == 0, "...and Sniper is still armed, untouched")
 	check(game.item_pending_tile == Vector2i(-1, -1),
 		"...and does NOT stage the enemy as Sniper's target")

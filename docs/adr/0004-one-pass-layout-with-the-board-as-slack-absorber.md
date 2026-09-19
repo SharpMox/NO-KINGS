@@ -7,6 +7,23 @@
 > the fixed 44. The board stays the slack absorber, so a notched phone gets a smaller
 > tile. `ICON = tile - 7` and the rest below still hold.
 
+> **Amended 2026-09-19 (NO-128).** A collapsible band (Army Power, the Ability
+> hint, the King Abilities button) was nearly added as a fourth `DECK_ROWS` row,
+> sized for its OPEN state. That would have been a **worst-case-as-permanent-cost**
+> bug: `DECK_ROWS` is solved once at boot and never revisited (this ADR's whole
+> premise), so a collapsible row still has to be budgeted at its largest possible
+> size forever — collapsing it back down would free nothing the board could ever
+> use, since the board was never going to grow back. Rejected in review. Instead
+> the band (`army_band`, `hud.gd`) sits OUTSIDE the deck entirely: it overlays the
+> board above the deck, exactly like the Inventory drawer already does, sized by
+> its own flat constant (`ARMY_BAND_H`) rather than by `DECK_ROWS`. `DECK_ROWS`
+> drops back to two rows (drawers, act) and its value **shrinks**, since the
+> always-reserved power row is gone along with it — the board tile grows as a
+> result, not just holds steady. The general lesson: a UI element whose own size
+> varies at runtime (collapsed vs. open, a conditional child shown or hidden)
+> cannot be a `DECK_ROWS` row at all, only ever an overlay, because this ADR's
+> one-pass solve has nowhere to put a second read of it.
+
 Design C (issue 106) made the stock strip the slack absorber — `SIZE_EXPAND_FILL`
 under a board pinned flush to the top — so that leftover height would land in one
 place rather than splitting into two gaps. That worked on the three phone formats

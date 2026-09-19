@@ -109,9 +109,18 @@ func _init() -> void:
 	var hud: CanvasLayer = hc.hud # hc is Node2D (_boot()'s return type), which
 		# doesn't declare .hud, so the access is untyped and := can't infer a
 		# type from it — same trap as NO-150's `var diag := t + d`
-	hud.update_clock(hc.clock_ms) # the very first call (boot) — baseline only
+	# hud has already had update_clock() called on it repeatedly since boot —
+	# once by game.gd's own boot-time _refresh(), and again every frame since
+	# via the per-frame drain in _process() — so this is not really "the
+	# first call" from the engine's perspective. Resetting _clock_seen is
+	# what actually isolates "the first observation never animates" from
+	# that, and pinning clock_ms clear of a minute boundary stops the drain
+	# from coincidentally crossing one between here and the assertion.
+	hc.clock_ms = 300500.0
+	hud._clock_seen = false
+	hud.update_clock(hc.clock_ms) # baseline only
 	check(not hud._gain_tweens.has("clock") and not hud._clock_urgent_on,
-		"update_clock's first-ever call never animates (nothing to compare yet)")
+		"the first observation never animates (baseline only, nothing to compare yet)")
 
 	Economy.add_clock(hc, 5000.0, "test") # a real GAIN
 	hud.update_clock(hc.clock_ms)

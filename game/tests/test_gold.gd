@@ -81,9 +81,16 @@ func _init() -> void:
 	var hud: CanvasLayer = game.hud # game is Node2D (_boot()'s return type),
 		# which doesn't declare .hud, so the access is untyped and := can't
 		# infer a type from it — same trap as NO-150's `var diag := t + d`
-	hud.refresh() # this hud instance's first-ever refresh — baseline only
+	# game.hud has already been refreshed once by the normal boot sequence
+	# (game.gd's own _refresh() call, before any of the actions above) — so
+	# calling refresh() here would be a SECOND observation, not the first.
+	# Resetting the seen-flags is what actually isolates "the first
+	# observation never pulses" from boot's own timing.
+	hud._score_seen = false
+	hud._gold_seen = false
+	hud.refresh() # baseline only
 	check(not hud._gain_tweens.has("gold") and not hud._gain_tweens.has("score"),
-		"the very first refresh never pulses (boot, not a gain)")
+		"the first observation never pulses (baseline only, not a gain)")
 
 	Economy.earn(game, 20)
 	hud.refresh()

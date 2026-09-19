@@ -221,12 +221,19 @@ var _drawer_saved_filters := {}
 var _gain_tweens := {}
 ## NO-127: last value refresh()/update_clock() actually RENDERED, so a gain
 ## animation is driven by the value changing, never by refresh() itself
-## running (refresh() runs on nearly every state change). -1 = never shown
-## yet (boot); the first real value never animates.
-var _score_shown := -1
-var _gold_shown := -1
-var _clock_shown_ms := -1.0
-var _clock_shown_min := -1
+## running (refresh() runs on nearly every state change). Paired with an
+## explicit "have we observed one yet" flag rather than a sentinel VALUE
+## (e.g. -1) — a sentinel is indistinguishable from a legitimate reading
+## once any counter's real value can coincide with it, and the Clock's own
+## per-frame delta can be negative. The first observation always just
+## establishes the baseline; only a later CHANGE against it animates.
+var _score_shown := 0
+var _score_seen := false
+var _gold_shown := 0
+var _gold_seen := false
+var _clock_shown_ms := 0.0
+var _clock_shown_min := 0
+var _clock_seen := false
 ## NO-127: the continuous under-2-minutes shake+pulse. Two loop Tweens (one
 ## per animated property) rather than one, so killing/restarting never has to
 ## unpick a parallel/chain sequence.
@@ -977,13 +984,14 @@ func update_clock(ms: float) -> void:
 	# see last frame's stale answer and fire the one-shot shake into the loop
 	# that starts this same frame, fighting over the same property.
 	_apply_clock_urgent(ms)
-	if _clock_shown_ms >= 0.0: # not the first call (boot) — nothing to compare yet
+	if _clock_seen: # not the first observation — there's a baseline to compare against
 		if ms > _clock_shown_ms + 1.0: # a real GAIN, not per-frame float drift
 			_pulse_gain(clock_label, "clock")
 		elif whole_min != _clock_shown_min and not _clock_urgent_on:
 			_shake_clock_minute()
 	_clock_shown_ms = ms
 	_clock_shown_min = whole_min
+	_clock_seen = true
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -1112,13 +1120,16 @@ func refresh() -> void:
 	gold_label.text = "%d" % g.gold
 	# NO-127: gain pulses, driven off the value CHANGING (refresh() itself
 	# runs on nearly every state change, which is not the same thing — see
-	# _pulse_gain's header). -1 sentinel: the very first refresh never pulses.
-	if _score_shown >= 0 and g.score > _score_shown:
+	# _pulse_gain's header). The first observation establishes the baseline
+	# and never pulses.
+	if _score_seen and g.score > _score_shown:
 		_pulse_gain(score_row, "score")
 	_score_shown = g.score
-	if _gold_shown >= 0 and g.gold > _gold_shown:
+	_score_seen = true
+	if _gold_seen and g.gold > _gold_shown:
 		_pulse_gain(gold_row, "gold")
 	_gold_shown = g.gold
+	_gold_seen = true
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
 	# the whole table — Wave 50 reads 50/50, Wave 51 reads 51/201.
 	# NO-114: blank during a King wave — the King's own name in turn_label is

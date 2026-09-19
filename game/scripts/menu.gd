@@ -784,6 +784,7 @@ func _ready() -> void:
 	# issue 77: vertical only — a long scenario name must wrap or clip, never
 	# push the list sideways
 	test_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	test_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	# 2026-09-10 (Max, on the phone: "I can't scroll the test menu list ...
 	# using touchscreen"). Every row here is a Button, and a Button's default
 	# mouse_filter is STOP: Viewport::_gui_call_input marks a pointer press
@@ -988,6 +989,7 @@ func _ready() -> void:
 	# history_scroll/guide_scroll already use below, so every entry (and the
 	# trailing Back button) stays reachable regardless of Army count.
 	army_center = ScrollContainer.new()
+	army_center.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	army_center.offset_left = 40
 	army_center.offset_top = 30
@@ -1217,6 +1219,7 @@ func _show_history() -> void:
 	if history_scroll:
 		history_scroll.queue_free()
 	history_scroll = ScrollContainer.new()
+	history_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	history_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	history_scroll.offset_left = 40
 	history_scroll.offset_top = 30

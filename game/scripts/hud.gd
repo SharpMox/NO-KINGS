@@ -649,6 +649,7 @@ func build(game) -> void:
 		panel.custom_minimum_size = Vector2(spec[3], spec[4])
 		panel.visible = false
 		var sc := ScrollContainer.new()
+		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 		sc.scroll_deadzone = DRAWER_SCROLL_DEADZONE # NO-45
 		sc.custom_minimum_size = Vector2(spec[3] - 8, spec[4] - 8)
 		# NO-65 fix: nothing in this drawer overhangs it any more (no promote
@@ -690,6 +691,7 @@ func build(game) -> void:
 	captured_hint.visible = false
 	cap_col.add_child(captured_hint)
 	var cap_scroll := ScrollContainer.new()
+	cap_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	cap_scroll.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
 	captured_grid.columns = STOCK_DRAWER_CAP_COLS
@@ -703,6 +705,7 @@ func build(game) -> void:
 	var stock_col := VBoxContainer.new()
 	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
 	var stock_scroll := ScrollContainer.new()
+	stock_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	stock_scroll.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
 	stock_grid.columns = STOCK_DRAWER_COLS

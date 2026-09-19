@@ -189,7 +189,7 @@ var king_ability_button := Button.new() # top-row tariff count; opens the overla
 var arrow_button := Button.new() # Arrow Planning: toggles decorative drawing mode
 var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
-var drawers := {} # name -> PanelContainer
+var drawers := {} # name -> Control (the "stock" entry is a PanelContainer; NO-134 made "inventory" a plain Control so its background can outsize its scroll content)
 var drawer_buttons := {} # name -> Button (count text updates)
 ## NO-118: each drawer's rest position and its fully-off-screen origin, set
 ## once in build() (Stock's own geometry never moves after that; the
@@ -377,7 +377,7 @@ func build(game) -> void:
 	menu_button.text = "☰"
 	menu_button.add_theme_font_size_override("font_size", MENU_FONT)
 	menu_button.position = Vector2(vp.x - HEADER_PAD_X - MENU_W, y0 + HEADER_PAD_Y)
-	menu_button.custom_minimum_size = Vector2(MENU_W, 0)
+	menu_button.custom_minimum_size = Vector2(MENU_W, MENU_W) # NO-131: square, not content-height
 	# flat compact styling (2026-07-08); the two off-screen buttons keep theirs
 	for b: Button in [king_ability_button, arrow_button, menu_button]:
 		var compact := StyleBoxFlat.new()
@@ -404,24 +404,35 @@ func build(game) -> void:
 		if e is InputEventMouseButton and e.pressed:
 			toggle_menu(true))
 	add_child(menu_tap)
-	# THE STOCK BUTTON (stories 7-12). Its tap area is the Header's full height
-	# and runs from the counters column to the menu button — and no further:
-	# the bottom edge IS g.hud_top, where the board starts, and the right edge
-	# stops HEADER_GAP short of the menu, so neither can be hit by accident.
+	# THE STOCK BUTTON (stories 7-12). NO-131: a regular button now — its own
+	# rect, sized to its icon and padding, not stretched to the Header's full
+	# height and out to the counters column (NO-83's original enlarged tap
+	# zone). See test_game_clicks.gd's NO-83 block for why that zone existed
+	# (a tap on the top-right board tile, or on the menu button, must never
+	# open Stock) and confirmation the smaller rect still holds it.
 	var stock_btn := Button.new()
-	var stock_x: float = (vp.x + COUNTER_W) / 2.0 + HEADER_GAP
-	stock_btn.position = Vector2(stock_x, y0)
-	stock_btn.custom_minimum_size = Vector2(menu_button.position.x - HEADER_GAP - stock_x, HEADER_H)
+	var stock_pad := 4.0
 	if g.textures.has("pawn"):
 		stock_btn.icon = g.piece_tex("pawn") # Stock is always yours: the player token
 		stock_btn.expand_icon = true
 		stock_btn.add_theme_constant_override("icon_max_width", STOCK_ICON)
 	else:
 		stock_btn.text = "♟"
-	_style_button(stock_btn, Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 8, 4, 4)
+	_style_button(stock_btn, Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 8, stock_pad, stock_pad)
 	stock_btn.pressed.connect(func() -> void:
 		set_drawer("stock")
 		drawer_changed.emit())
+	# expand_icon lets the icon SHRINK for min-size purposes (it's what makes
+	# icon_max_width a cap rather than a fixed size), so get_combined_minimum_size()
+	# can't be trusted the way intro.gd's text-only Skip button trusts it —
+	# it collapsed this button to near-nothing. Pin the rect explicitly:
+	# icon + the padding just styled above, right-aligned before the menu
+	# button with the usual HEADER_GAP, centred in the Header's height.
+	var stock_size := Vector2(STOCK_ICON, STOCK_ICON) + Vector2(stock_pad, stock_pad) * 2.0
+	stock_btn.custom_minimum_size = stock_size
+	stock_btn.position = Vector2(menu_button.position.x - HEADER_GAP - stock_size.x,
+		y0 + (HEADER_H - stock_size.y) / 2.0)
+	add_child(stock_btn)
 	# the count badge, same idiom as a pool stack's: a corner label over the icon
 	stock_badge.add_theme_font_size_override("font_size", STOCK_BADGE_FONT)
 	stock_badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
@@ -440,7 +451,6 @@ func build(game) -> void:
 	stock_armed.draw.connect(_draw_stock_armed)
 	stock_btn.add_child(stock_armed)
 	drawer_buttons["stock"] = stock_btn
-	add_child(stock_btn)
 	# ---- THE CONTROL DECK (design C, user pick 2026-09-05) ------------------
 	# Everything under the board lives in one column that starts where the board
 	# ends and runs to the bottom edge. That is what removes the dead band: the
@@ -664,13 +674,25 @@ func build(game) -> void:
 		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
 	]
 	for spec in drawer_specs:
-		var panel := PanelContainer.new()
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.1, 0.1, 0.13, 0.97)
-		panel.add_theme_stylebox_override("panel", bg)
-		panel.position = Vector2(spec[2], vp.y - deck_h - spec[4]) # above the deck
-		panel.custom_minimum_size = Vector2(spec[3], spec[4])
+		# NO-134: `panel` is a plain Control now, not a PanelContainer — a
+		# PanelContainer forces EVERY child to fill its full rect, which is
+		# fine for one child (`sc`) but wrong once a second one (`bg`) needs a
+		# taller rect than `sc`'s own fixed content height. `bg` paints the
+		# full extended height (content height + the deck's own height, so
+		# the background runs behind the bottom button row); `sc` keeps its
+		# old fixed size and position, unaffected.
+		var panel := Control.new()
+		var full_h: float = spec[4] + deck_h
+		panel.position = Vector2(spec[2], vp.y - deck_h - spec[4]) # above the deck — unchanged: NO-118 caches this as drawer_rest/drawer_hidden
+		panel.custom_minimum_size = Vector2(spec[3], full_h)
 		panel.visible = false
+		var bg := Panel.new()
+		bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		var bg_style := StyleBoxFlat.new()
+		bg_style.bg_color = Color(0.1, 0.1, 0.13, 0.97)
+		bg.add_theme_stylebox_override("panel", bg_style)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE # paint only; the deck (moved on top below) handles its own input
+		panel.add_child(bg)
 		var sc := ScrollContainer.new()
 		sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 		sc.scroll_deadzone = DRAWER_SCROLL_DEADZONE # NO-45
@@ -682,6 +704,11 @@ func build(game) -> void:
 		panel.add_child(sc)
 		drawers[spec[0]] = panel
 		add_child(panel)
+		# NO-134: behind the deck, so the deck's buttons paint on top of the
+		# extended background and win Godot's GUI picking over it (front-to-
+		# back, last sibling first) — the same z-order mechanism this file's
+		# tip_panel/game_menu already rely on to stay on top of everything.
+		move_child(panel, deck.get_index())
 		drawer_rest[spec[0]] = panel.position
 		# NO-118: Inventory slides in from the LEFT — off-screen is its own
 		# width to the left of rest, not a move of where it rests.
@@ -1093,15 +1120,18 @@ func refresh() -> void:
 	_rebuild_artefacts_grid()
 	# NO-85: the drawer's height is a flat choice (INV_DRAWER_H), not a
 	# consequence of what it holds — it must not resize as Items/Artefacts
-	# come and go (story 46).
-	var inv_panel: PanelContainer = drawers["inventory"]
+	# come and go (story 46). NO-134: the panel's own custom_minimum_size.y
+	# also carries the deck-covering background (see build()'s drawer_specs
+	# loop), so the flat constant compared here is INV_DRAWER_H + deck_h.
+	var inv_panel: Control = drawers["inventory"]
 	var inv_h := INV_DRAWER_H
-	if inv_panel.custom_minimum_size.y != inv_h:
+	var full_h := inv_h + deck_h
+	if inv_panel.custom_minimum_size.y != full_h:
 		# NO-118: build() always sets custom_minimum_size.y to this same
-		# INV_DRAWER_H, so this branch is unreachable — the position write
-		# below can never stale drawer_rest["inventory"].
+		# value, so this branch is unreachable — the position write below can
+		# never stale drawer_rest["inventory"].
 		var inv_w: float = inv_panel.custom_minimum_size.x
-		inv_panel.custom_minimum_size = Vector2(inv_w, inv_h)
+		inv_panel.custom_minimum_size = Vector2(inv_w, full_h)
 		inv_panel.position = Vector2(inv_panel.position.x,
 			g.get_viewport_rect().size.y - deck_h - inv_h)
 

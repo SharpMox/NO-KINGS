@@ -138,6 +138,12 @@ func _init() -> void:
 	check(cj.gold == 510, "suppressed inflation taxes no gains")
 	cj._refresh()
 	check(cj.hud.king_ability_button.text.ends_with("·off"), "HUD marks tariffs suppressed")
+	# NO-128 (coordinator review 2026-09-19): an active King ability must
+	# never go invisible just because army_band is collapsed, so the reopen
+	# wedge carries its own warning glyph whenever one is active — regardless
+	# of the band's own open/closed state, which this scenario never touches.
+	check(cj.hud.army_band_reopen.text == "⚠▾",
+		"the reopen wedge warns of an active King ability even while unread")
 	WaveLogic.spawn(cj, 4)
 	Economy.earn(cj, 10)
 	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")

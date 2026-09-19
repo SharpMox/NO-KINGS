@@ -1183,6 +1183,14 @@ func _init() -> void:
 	await process_frame
 	check(game.state == game.State.SETUP, "empty config boots into SETUP")
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
+	# NO-128 (coordinator review 2026-09-19): SETUP places every piece on the
+	# same back rows army_band overlays when open, so it starts collapsed
+	# here — same call site and same reasoning as Stock starting open, just
+	# the opposite direction. Not a lock: the wedge (asserted visible) still
+	# reopens it on request.
+	check(not game.hud.army_band.visible and not game.hud.army_band_open
+			and game.hud.army_band_reopen.visible,
+		"army_band starts collapsed in SETUP, freeing the placement rows")
 	# NO-118: SETUP opens the Stock drawer on boot (game.gd:645), not through
 	# _click_stock — a separate settle wait, since the geometry below
 	# (drawer_rect, the press on stack_btn) reads the drawer's real on-screen
@@ -1388,6 +1396,45 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(6, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
+
+	# NO-128 (coordinator review 2026-09-19, second round): SETUP starting
+	# collapsed (checked above) sidesteps army_band entirely, so it doesn't
+	# by itself prove the click-transparency fix (hud.gd) — the case that
+	# needs proving is the player reopening the band mid-SETUP via the
+	# wedge. Row 0 is the row army_band's own geometry fully covers at a
+	# tile's CENTER (the point every click helper in this file targets):
+	# ARMY_BAND_H (78) exceeds one tile (~51) by more than the 6px gap
+	# between the board and the deck, so army_band's top edge sits above
+	# row 0's own top edge with margin to spare. Arm and place a second
+	# piece there, then reopen the band and tap-tap relocate it — if the
+	# transparency fix regressed, the band would eat the first tap and
+	# neither board.has() call below would change.
+	check(await _click_stock(game), "Stock button reopens the drawer again")
+	await process_frame
+	var live_stack2: Button = game.pool_box.filter(func(b: Node) -> bool:
+		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
+	_click(live_stack2.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	# an outside tap closes the drawer first (mirrors the (6,3) -> (6,1)
+	# pair just above) — placing on the very next tap, without it, would
+	# only dismiss the drawer and leave the piece still armed.
+	_click(game._tile_px(Vector2i(6, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.placing_id != "" and game.drawer_open == "",
+		"outside tap closes the drawer but keeps the armed piece, again")
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(Vector2i(0, 0)),
+		"a second piece lands at row 0, under where army_band opens")
+	_click(game.hud.army_band_reopen.get_global_rect().get_center())
+	check(game.hud.army_band.visible, "the wedge reopens army_band mid-SETUP")
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(3, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(Vector2i(3, 0)) and not game.board.has(Vector2i(0, 0)),
+		"setup: a tap-tap relocate reaches the board even under the OPEN band")
 
 	# clearing the last enemy auto-passes the turn; first, the two properties
 	# that need MORE THAN ONE captured piece to mean anything (user 2026-09-10):

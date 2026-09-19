@@ -686,6 +686,17 @@ func _ready() -> void:
 						artefacts.append(inst)
 						break
 		_set_drawer("stock") # SETUP starts in the placement flow
+		# NO-128 (coordinator review 2026-09-19): SETUP places every piece on
+		# the player's own back rows — exactly the rows army_band overlays
+		# while open. Transparency (hud.gd) already lets a tap reach the
+		# board underneath either way, but the player still can't SEE a
+		# piece or tile the band is painted over, and SETUP is the one phase
+		# where that matters most: placement is deliberate and there's no
+		# established board state yet to go on. Start collapsed here, the
+		# same way Stock starts open — the wedge still reopens it on
+		# request, same as it does for Inventory; this isn't a lock, just a
+		# better default for the phase most likely to need the space.
+		hud.collapse_army_band()
 	else:
 		SaveConfig.apply(self, next_config)
 	if args.has("--artefacts"): # balance sweep (issue 20): force a starting

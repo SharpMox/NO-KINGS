@@ -2103,20 +2103,28 @@ func _board_tap_is_readonly(at: Vector2i) -> bool:
 	return true
 
 
-## NO-120: long-press a board piece to show its description (name + any
-## Piece Buffs it carries). The board is drawn in _draw, not built from
-## Controls, so there is no Button for hud.gd's _long_press_input to hook —
-## this mirrors that function's token+timer+deadzone idiom directly over the
-## board's own press/release/motion handling, rather than adding a second
-## input path.
+## NO-120: long-press a board piece opens its preview modal. The board is
+## drawn in _draw, not built from Controls, so there is no Button for
+## hud.gd's _long_press_input to hook — this mirrors that function's
+## token+timer+deadzone idiom directly over the board's own press/release/
+## motion handling, rather than adding a second input path.
+##
+## NO-138: this used to open hud.gd's lightweight tip popup (show_tip); it
+## now opens the same richer preview modal a double-tap does (_show_preview),
+## so a long press means one thing everywhere it fires — including mid-
+## targeting, since `is_commit` below only changes what has to be undone
+## first, never whether the hold ends in a preview.
 ##
 ## `is_commit` (see _board_tap_is_readonly) decides what a firing hold does:
 ## a read-only press already ran _on_tile_clicked immediately, same as any
 ## other press, so firing UNDOES that — restores the selection from before
 ## the press and drops any armed drag. A committing press never ran
 ## _on_tile_clicked at all (the caller left it in board_lp_pending_tile for
-## release instead), so there is nothing to undo — firing only has to mark
-## itself so release knows to swallow the deferred tap rather than run it.
+## release instead); firing here clears that pending tile itself rather than
+## leaving it for release to clear, because _show_preview sets preview_open,
+## and _unhandled_input's own top guard for preview_open swallows this
+## press's release before it ever reaches that clean-up — left stuck, it
+## would corrupt the NEXT press's release handling (drag/move never rearms).
 func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) -> void:
 	board_lp_prev_selected = selected
 	board_lp_from = press_pos
@@ -2140,8 +2148,9 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 				legal_dests.clear()
 				legal_paths.clear()
 			queue_redraw()
-		hud.show_tip("board:%s" % str(at), BuffLogic.describe(piece.id, piece, defs),
-			Rect2(_tile_px(at), Vector2(tile, tile))))
+		else:
+			board_lp_pending_tile = Vector2i(-1, -1)
+		_show_preview(piece.id, piece.get("king_id", "")))
 
 
 ## NO-120: _board_tap_is_readonly mirrors this function's branches — which
@@ -4568,6 +4577,7 @@ func _connect_hud() -> void:
 	hud.king_ability_pressed.connect(_show_king_abilities)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
+	hud.stack_preview_requested.connect(func(id: String) -> void: _show_preview(id)) # NO-138
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)

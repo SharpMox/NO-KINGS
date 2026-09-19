@@ -14,7 +14,6 @@ const Guide := preload("res://scripts/guide.gd")
 const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
-const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-120: tip content for Stock/Captured
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -139,6 +138,9 @@ signal pass_pressed
 signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
+signal stack_preview_requested(id: String) # NO-138: a Stock/Captured cell's
+	# long press — game.gd owns _show_preview, hud.gd only asks for it (see
+	# `g`'s own "read-only from here" rule above)
 signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
 	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
 	# final confirm (see multi_confirm_btn's own declaration below)
@@ -1121,7 +1123,13 @@ func hide_tip() -> void:
 ## When it fires, `lp_fired` makes the Button's own `pressed` handler swallow
 ## the release that ends the hold. The next PRESS clears it, so a hold
 ## released off the button cannot leak into a later tap.
-func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent) -> void:
+##
+## NO-138: `on_fire`, when given, replaces the default show_tip with
+## whatever the caller wants a long press to do instead — the piece preview
+## modal for a Stock/Captured cell (_build_stack_button below), which has a
+## piece id to show and no more need of the tip popup. `key`/`desc` are
+## unused in that case; pass "" for both.
+func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on_fire := Callable()) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if not e.pressed:
 			btn.remove_meta("lp_token")
@@ -1134,7 +1142,10 @@ func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent) ->
 			if is_instance_valid(btn) and btn.get_meta("lp_token", 0) == token:
 				btn.remove_meta("lp_token")
 				btn.set_meta("lp_fired", true)
-				show_tip(key, desc, btn.get_global_rect()))
+				if on_fire.is_valid():
+					on_fire.call()
+				else:
+					show_tip(key, desc, btn.get_global_rect()))
 	elif e is InputEventMouseMotion and btn.has_meta("lp_token") \
 			and e.global_position.distance_to(btn.get_meta("lp_from")) > DRAWER_SCROLL_DEADZONE:
 		btn.remove_meta("lp_token")
@@ -1728,20 +1739,18 @@ func _build_stack_button(st: Dictionary) -> Button:
 	btn.set_meta("id", id) # drop-target lookup for drag merges
 	btn.set_meta("cap", cap)
 	btn.set_meta("entry", st.entry)
-	# NO-120: long-press shows the piece's name + any Piece Buffs it carries
-	# (state Stock never interprets itself, ADR-0002 — st.entry is the state
-	# Dictionary when there is one). "cap:"/"stock:" so the same id held in
-	# both grids at once gets two distinct tip keys, never one toggling shut
-	# the other's popup.
-	var lp_desc: String = BuffLogic.describe(id, st.entry if st.entry is Dictionary else {}, g.defs)
-	var lp_key := ("cap:" if cap else "stock:") + id
+	# NO-138: long-press opens the same preview modal a double-tap does
+	# (game.gd's _show_preview, via stack_preview_requested — this cell has a
+	# piece id, not a description to show, so on_fire bypasses show_tip
+	# entirely: NO-120's tip popup is retired for pieces, board and Stock/
+	# Captured alike).
 	btn.pressed.connect(func() -> void:
 		if btn.has_meta("lp_fired"): # NO-72's swallow, same as every other long-press cell
 			btn.remove_meta("lp_fired")
 			return
 		stack_pressed.emit(st.entry, cap, st.count))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, lp_key, lp_desc, e))
+		_long_press_input(btn, "", "", e, func() -> void: stack_preview_requested.emit(id)))
 	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down

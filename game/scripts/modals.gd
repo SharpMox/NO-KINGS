@@ -21,6 +21,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -436,11 +437,12 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var cells := 9 # covers the longest leap (Ying Long's 4)
 		var cell := 30
 		dia.custom_minimum_size = Vector2(cells, cells) * cell
-		dia.draw.connect(g._draw_preview_diagram.bind(dia, id, cells, cell))
+		var dia_tex: Texture2D = g.piece_tex(id) if g.textures.has(id) else null
+		dia.draw.connect(func() -> void: PieceDiagram.draw(dia, g.defs, id, cells, cell, dia_tex))
 		box.add_child(dia)
 
 		var legend := Label.new()
-		legend.text = "● move + capture      ○ move only      ✕ capture only"
+		legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
 		legend.add_theme_font_size_override("font_size", 13)
 		legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(legend)

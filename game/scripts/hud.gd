@@ -138,14 +138,24 @@ signal pass_pressed
 signal king_ability_pressed
 signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
-signal stack_preview_requested(id: String) # NO-138: a Stock/Captured cell's
-	# long press — game.gd owns _show_preview, hud.gd only asks for it (see
-	# `g`'s own "read-only from here" rule above)
+signal stack_preview_requested(id: String, cap: bool, entry: Variant) # NO-138:
+	# a Stock/Captured cell's long press — game.gd owns _show_preview, hud.gd
+	# only asks for it (see `g`'s own "read-only from here" rule above).
+	# cap/entry (NO-144): so game.gd can offer Sell for a Stock entry — never
+	# for a Captured one, which keeps Convert only (the ⇄ badge below).
 signal multi_confirm_pressed # NO-124: the floating targeting-confirm button —
 	# was "multi"'s own Extract, generalised to every targeted Item/Artefact's
 	# final confirm (see multi_confirm_btn's own declaration below)
+signal multi_cancel_pressed # NO-137: the Cancel button underneath it — same
+	# entry-point shape as multi_confirm_pressed, but resets targeting instead
+	# of committing it (see multi_cancel_btn's own declaration below)
 signal item_pressed(index: int)
+signal item_preview_requested(index: int) # NO-144: an Item cell's long
+	# press — same "own menu" preview pieces get (stack_preview_requested
+	# above), so Sell has somewhere to live for a held Item too
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
+signal artefact_preview_requested(key: String) # NO-144: same as
+	# item_preview_requested above, for a held Artefact
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal promote_pressed(id: String)
 signal convert_pressed(entry: Variant) # the ⇄ badge on a Captured entry (2026-09-06)
@@ -251,6 +261,11 @@ var multi_confirm_btn := Button.new() # NO-124: floating targeting-confirm —
 	# "Extract N" for a "multi" Item's picks, "Confirm" for a staged
 	# tile/pair/area Item target, an untargeted Item, or Bovine Tractor
 	# Beam's staged target (see refresh()'s visibility/text below)
+var multi_cancel_btn := Button.new() # NO-137: sits underneath multi_confirm_btn
+var confirm_backdrop := ColorRect.new() # NO-137: dims the bottom UI (Shop/
+	# Inventory/Ability/Pass) while Confirm/Cancel float over it, so those
+	# buttons read as "not clickable right now" instead of merely being
+	# covered — see build()'s own comment for the MOUSE_FILTER_STOP choice.
 ## NO-59: the description popup and its text. Built once in build(), owned by
 ## the HUD rather than by any row — hud.refresh() frees every strip child, so a
 ## panel parented to a row would not survive the next state change.
@@ -545,6 +560,14 @@ func build(game) -> void:
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	deck.add_theme_constant_override("separation", 6)
 	add_child(deck)
+	# NO-145 (hardware round 2): deck used to also be hooked here as a
+	# swipe-to-open surface (its own unclaimed area, MOUSE_FILTER_STOP).
+	# Real hardware showed that gap is not reliable — NO-128 took DECK_ROWS
+	# from 132 to 98 without shrinking nav_row/act_row, squeezing or
+	# removing the gap a press was aimed at, so the press landed on a
+	# child before deck.gui_input ever saw it. Coordinator ruling: all
+	# three open gestures now start on an empty board tile only
+	# (game.gd's _swipe_open_may_begin) — no dependence on deck geometry.
 
 	# NO-83: the stock strip and the status line are gone from the Deck. The
 	# strip's job (which pieces you hold, without opening anything) moves to
@@ -586,6 +609,28 @@ func build(game) -> void:
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
+	# NO-137: a semi-transparent backdrop over the bottom UI (Shop/Inventory/
+	# Ability/Pass) while an Item/Artefact's floating Confirm is up. Sized to
+	# `deck`'s own rect exactly (deck_top/deck_h, both already computed above
+	# for `deck` itself) — "the bottom buttons" the ticket names, nothing
+	# more (army_band, above the board, is untouched).
+	#
+	# MOUSE_FILTER_STOP here is the point, not a trap to dodge: added as a
+	# LATER sibling than `deck`, so Godot's front-to-back GUI picking gives
+	# it first refusal over deck's buttons and it absorbs the press — they
+	# read as "not clickable right now" because they genuinely aren't.
+	# multi_confirm_btn/multi_cancel_btn are added AFTER this (later still),
+	# so they stay clickable on top of it. Unlike _set_drawer_clickable's
+	# IGNORE case (which must fall THROUGH to the board), this wants to
+	# BLOCK, so no per-descendant filter save/restore is needed — deck's own
+	# buttons keep whatever filter they already have; only what sits above
+	# them (this backdrop) changes.
+	confirm_backdrop.color = Color(0, 0, 0, 0.55)
+	confirm_backdrop.position = Vector2(0, deck_top)
+	confirm_backdrop.custom_minimum_size = Vector2(vp.x, deck_h)
+	confirm_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	confirm_backdrop.visible = false
+	add_child(confirm_backdrop)
 	# NO-124: floating targeting-confirm, shown once there's something to
 	# confirm — see refresh() for exactly when, per targeting shape
 	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
@@ -594,6 +639,19 @@ func build(game) -> void:
 	multi_confirm_btn.visible = false
 	multi_confirm_btn.pressed.connect(func() -> void: multi_confirm_pressed.emit())
 	add_child(multi_confirm_btn)
+	# NO-137: Cancel, underneath Confirm. NO-121's "tap the armed chip again"
+	# path still works unchanged; this just gives it an affordance right next
+	# to Confirm instead of requiring the Inventory drawer be reopened first.
+	# Costs nothing: game.gd's handler only resets targeting state (the same
+	# reset the chip-tap path already uses) — Economy.charge only ever runs
+	# from _item_apply, on an actual commit.
+	multi_cancel_btn.text = "Cancel"
+	multi_cancel_btn.add_theme_font_size_override("font_size", 15)
+	multi_cancel_btn.position = Vector2(vp.x / 2 - 70, vp.y - 48)
+	multi_cancel_btn.custom_minimum_size = Vector2(140, 40)
+	multi_cancel_btn.visible = false
+	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
+	add_child(multi_cancel_btn)
 	# floating Clear-all for Arrow Planning: only worth showing while the mode
 	# is on (top bar has no room to spare — money-and-shop already fills it)
 	arrow_clear_button.text = "Clear"
@@ -864,6 +922,11 @@ func build(game) -> void:
 		# tip_panel/game_menu already rely on to stay on top of everything.
 		move_child(panel, deck.get_index())
 		drawer_rest[spec[0]] = panel.position
+		# NO-145: `panel`'s own default MOUSE_FILTER_STOP (unset above — only
+		# `bg` was set to IGNORE) already claims any press inside its rect
+		# that `sc`/cells don't; gui_input reports exactly that leftover
+		# "chrome", the surface a reverse-close swipe must start on.
+		panel.gui_input.connect(_on_chrome_swipe_input.bind(spec[0]))
 		# NO-118: Inventory slides in from the LEFT — off-screen is its own
 		# width to the left of rest, not a move of where it rests.
 		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
@@ -931,6 +994,16 @@ func build(game) -> void:
 	stock_scroll.add_child(stock_align)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
+	# NO-145: stock_panel is a PanelContainer, which stretches its one child
+	# (stock_row) to fill it exactly — no chrome at THAT level to hook, unlike
+	# the plain-Control inventory panel above. cap_col/stock_col each hold
+	# only ONE sized-smaller child of their own (cap_scroll/stock_scroll, by
+	# STOCK_DRAWER_PAD), so the leftover slack a VBoxContainer leaves around
+	# an unexpanded child is this drawer's own "chrome or edge, not a
+	# scrollable cell" — same STOP-claims-its-own-rect mechanism as the
+	# inventory panel's gui_input, one level deeper in this drawer's tree.
+	cap_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
+	stock_col.gui_input.connect(_on_chrome_swipe_input.bind("stock"))
 	stock_panel.add_child(stock_row)
 	drawers["stock"] = stock_panel
 	add_child(stock_panel)
@@ -1171,6 +1244,50 @@ func set_drawer(which: String) -> void:
 	hide_tip() # NO-59: a description outlives neither its drawer nor its row
 
 
+## NO-145: swipe-to-CLOSE a drawer via its own chrome — press/release
+## tracked here and hooked to each drawer panel's `gui_input` in build()
+## rather than routed through game.gd's _unhandled_input: `panel` (and
+## Stock's `cap_col`/`stock_col`) are Controls with the default
+## MOUSE_FILTER_STOP, so a press over their own unclaimed area (never over
+## a ScrollContainer or a cell — those claim their own rect first, same STOP
+## mechanism) is exactly what `gui_input` reports and _unhandled_input never
+## sees at all (CLAUDE.md: "a visible Control absorbs clicks before
+## _unhandled_input ever runs").
+##
+## `source` is the drawer key ("stock"/"inventory", drawers[key].gui_input).
+##
+## Hardware round 2 (coordinator diagnosis): this used to ALSO handle the
+## OPEN gesture via deck.gui_input ("__deck__"), aimed at the gap between
+## nav_row and act_row. NO-128 shrank DECK_ROWS without shrinking those
+## rows, squeezing that gap shut, and the press landed on a child before
+## deck.gui_input ever saw it. Ruling: every open gesture now starts on an
+## empty board tile instead (game.gd's _swipe_open_may_begin) — this
+## function only ever closes a drawer that's already open.
+var _chrome_swipe_from := Vector2.ZERO
+var _chrome_swipe_source := ""
+
+func _on_chrome_swipe_input(event: InputEvent, source: String) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_chrome_swipe_from = event.position
+		_chrome_swipe_source = source
+		return
+	if _chrome_swipe_source != source:
+		return
+	_chrome_swipe_source = ""
+	var dir := Tuning.classify_swipe(event.position - _chrome_swipe_from)
+	# Reverse of the OPENING SWIPE (the gesture Max named), not of the
+	# panel's own slide direction — Stock opens on a DOWN swipe and slides
+	# down, so its reverse is up either way; Inventory opens on an UP swipe
+	# but slides in from the LEFT (see build()'s own note), so its
+	# reverse-close is DOWN, matching the gesture, not the motion.
+	var want := "up" if source == "stock" else "down"
+	if dir == want and drawer_open == source:
+		set_drawer(source) # same key toggles it closed
+		drawer_changed.emit()
+
+
 ## NO-59: the tap-to-describe popup.
 ##
 ## WHY IT EXISTS. NO-45 set the drawer rows to MOUSE_FILTER_PASS so the lists
@@ -1246,10 +1363,10 @@ func hide_tip() -> void:
 ## released off the button cannot leak into a later tap.
 ##
 ## NO-138: `on_fire`, when given, replaces the default show_tip with
-## whatever the caller wants a long press to do instead — the piece preview
-## modal for a Stock/Captured cell (_build_stack_button below), which has a
-## piece id to show and no more need of the tip popup. `key`/`desc` are
-## unused in that case; pass "" for both.
+## whatever the caller wants a long press to do instead — the preview modal,
+## for a Stock/Captured cell (_build_stack_button below, `key`/`desc` unused,
+## pass "" for both) and, since NO-144, an Items/Artefacts cell too
+## (_wire_grid_button's own `on_long_press`, forwarded here as `on_fire`).
 func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on_fire := Callable()) -> void:
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 		if not e.pressed:
@@ -1390,8 +1507,13 @@ func refresh() -> void:
 		else:
 			item_confirm = g.item_pending_tile.x >= 0
 	var artefact_confirm: bool = g.artefact_targeting_key != "" and g.artefact_pending_tile.x >= 0
-	multi_confirm_btn.visible = item_confirm or artefact_confirm
+	var armed_targeting: bool = item_confirm or artefact_confirm
+	multi_confirm_btn.visible = armed_targeting
 	multi_confirm_btn.text = item_confirm_text
+	# NO-137: the backdrop and Cancel appear/disappear together with Confirm —
+	# there is nothing for either to do before Confirm itself would show.
+	multi_cancel_btn.visible = armed_targeting
+	confirm_backdrop.visible = armed_targeting
 	_rebuild_stock_drawer()
 	_rebuild_items_grid()
 	# issue 100: the Power is always on, so it is stated, not offered. The
@@ -1517,11 +1639,13 @@ func _stacks() -> Array:
 ## NO-85: Items then Artefacts, in ONE scrolling column — the Artefacts grid
 ## holds BOTH passive and activatable entries now (story 47/50), replacing the
 ## old artefact_box (passive rows, tap-to-describe) + activate_box (issue 52's
-## Activate chips) split. Tap uses (arms/activates), long-press describes,
-## for every entry including greyed ones (stories 51-55) — one mechanism,
-## reusing NO-72's _long_press_input for both kinds, instead of passive rows
-## having their own tap-to-describe path (NO-59's _tip_input — retired here,
-## it had no other caller).
+## Activate chips) split. Tap uses (arms/activates), long-press opens the
+## preview modal (NO-144: icon/name/description and, when sellable, Sell —
+## previously the description-only show_tip popup), for every entry including
+## greyed ones (stories 51-55) — one mechanism, reusing NO-72's
+## _long_press_input for both kinds, instead of passive rows having their own
+## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
+## caller).
 ## "no artefacts yet" still gates on the whole g.artefacts list, not just the
 ## passive subset: holding only an activatable Artefact is not "nothing".
 func _rebuild_artefacts_grid() -> void:
@@ -1532,13 +1656,6 @@ func _rebuild_artefacts_grid() -> void:
 		none.text = "no artefacts yet"
 		none.modulate = Color(1, 1, 1, 0.6)
 		artefacts_grid.add_child(none)
-		# NO-121: scoped to this grid's OWN "artefact:" keys, same as the
-		# non-empty branch below — an unscoped hide_tip() here was wiping a
-		# Board/Item-target tip (NO-120/NO-121) on every refresh whenever the
-		# player held zero artefacts, since _refresh() runs right after
-		# show_tip() for those.
-		if tip_key.begins_with("artefact:"):
-			hide_tip()
 		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
@@ -1549,13 +1666,11 @@ func _rebuild_artefacts_grid() -> void:
 			continue
 		seen[t.key] = true
 		artefacts_grid.add_child(_build_artefact_cell(t.key, counts[t.key]))
-	# the cell the popup was anchored to may have just been freed. Keep it up
-	# only while the artefact it describes is still held — otherwise a
-	# consumed artefact leaves a description of something no longer held.
-	# Scoped to "artefact:" keys (NO-120): an open Board or Stock tip is not
-	# in `seen` either, but it is not this grid's to close.
-	if tip_key.begins_with("artefact:") and not seen.has(tip_key.trim_prefix("artefact:")):
-		hide_tip()
+	# NO-144: a held Artefact's long press opens the preview modal now, never
+	# show_tip (_build_artefact_cell passes on_long_press) — so tip_key can
+	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
+	# scope to. The NO-120/121 hide_tip() guards this used to need are gone
+	# with it.
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -1631,12 +1746,14 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	# activatable is true, because a passive cell is disabled above and a
 	# disabled Button never fires `pressed` — connecting it unconditionally
 	# here (rather than only inside the activatable branch) changes nothing.
-	# NO-120: prefixed so _rebuild_artefacts_grid's own-tip cleanup below can
-	# tell an Artefact tip apart from a Board or Stock one (show_tip is now a
-	# shared popup, not this grid's alone) — bare `key` would make every
-	# non-Artefact tip look like an artefact no longer held and get closed.
+	# The "artefact:" + key prefix is a leftover of NO-120's own tip-cleanup
+	# scoping in _rebuild_artefacts_grid, which NO-144 removed (an Artefact
+	# long press opens the preview modal now, never show_tip, so tip_key can
+	# no longer carry one) — kept here only as the lp_key _long_press_input
+	# still takes, unused since on_long_press below always overrides it.
 	_wire_grid_button(btn, true, "artefact:" + key, desc, func() -> void:
-		artefact_activate_pressed.emit(key))
+		artefact_activate_pressed.emit(key),
+		func() -> void: artefact_preview_requested.emit(key)) # NO-144
 	btn.set_meta("key", key) # lookup for probes/tests
 	return btn
 
@@ -1652,7 +1769,13 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 ## Tuning.OFFBOARD_ICON square, expand_icon filling it rather than collapsing
 ## to 0 in the packed grid (the same square shape _build_stack_button and
 ## modals.gd's Shop tiles already use).
-func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String, on_tap: Callable) -> void:
+##
+## NO-144: `on_long_press`, when given, replaces the default show_tip with
+## the preview modal (same `on_fire` override _build_stack_button's long
+## press already uses) — Items and Artefacts get their own Sell button there
+## now, same as Stock.
+func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: String,
+		on_tap: Callable, on_long_press := Callable()) -> void:
 	if has_icon:
 		btn.expand_icon = true
 		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
@@ -1662,7 +1785,7 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 			return
 		on_tap.call())
 	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, lp_key, lp_desc, e))
+		_long_press_input(btn, lp_key, lp_desc, e, on_long_press))
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
@@ -1683,7 +1806,8 @@ func _rebuild_items_grid() -> void:
 		if g.item_active == i:
 			btn.modulate = Color(0.5, 1.3, 1.3)
 		_wire_grid_button(btn, has_icon, "item:%d" % i, desc, func() -> void:
-			item_pressed.emit(i))
+			item_pressed.emit(i),
+			func() -> void: item_preview_requested.emit(i)) # NO-144
 		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
@@ -1887,7 +2011,8 @@ func _build_stack_button(st: Dictionary) -> Button:
 			return
 		stack_pressed.emit(st.entry, cap, st.count))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
-		_long_press_input(btn, "", "", e, func() -> void: stack_preview_requested.emit(id)))
+		_long_press_input(btn, "", "", e, func() -> void:
+			stack_preview_requested.emit(id, cap, st.entry)))
 	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down

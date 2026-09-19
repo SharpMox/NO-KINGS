@@ -322,7 +322,11 @@ static func _resume_turn(g, cfg: Dictionary) -> void:
 		g.box_black_book_pending = bool(cfg.get("box_black_book_pending", false))
 		g.modals.show_box(g.box_offer)
 	if g.pending_reinforce and not g.autoplay:
-		g.modals.show_reinforce()
+		# NO-141: display only — the grant already happened when the screen
+		# first fired and stock was saved with it (_reinforce_ids() is
+		# deterministic off next_army, so recomputing it here for display
+		# never re-grants); same idempotent-reopen idiom as the Box above.
+		g.modals.show_reinforce(g._reinforce_ids())
 	if g.pending_shop_open and not g.autoplay:
 		g.pending_shop_open = false
 		g._open_shop()

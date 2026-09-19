@@ -345,6 +345,13 @@ var board_lp_fired := false # a hold completed for the tile now in board_lp_pend
 # only if board_lp_fired is still false when release arrives (see the
 # hazard this guards against in _board_tap_is_readonly's header).
 var board_lp_pending_tile := Vector2i(-1, -1)
+# NO-145: swipe-to-open a panel, tracked only on a press this ticket's own
+# eligibility rule (_swipe_open_may_begin below) accepted — an empty board
+# tile only, never a surface with existing drag/tap meaning, so this never
+# races drag_from/board_lp_* above. _swipe_from is the press position;
+# _swipe_eligible whether THIS press qualified at all.
+var _swipe_from := Vector2.ZERO
+var _swipe_eligible := false
 # Arrow Planning (Notion): purely decorative — never read by rules/AI. A
 # scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
 var arrow_mode := false # while on, board drags draw arrows instead of selecting
@@ -894,18 +901,21 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
 			or preview_open or game_menu_open or win_open:
 		return
-	# double-tap on the same stack: piece info
+	# double-tap on the same stack: piece info (NO-144: Sell, for a Stock
+	# entry, is in there too — never for a Captured one, entry stays null)
 	var key := id + ("!" if cap else "")
 	var now := Time.get_ticks_msec()
 	if key == pool_click_key and now - pool_click_ms < 400:
 		pool_click_key = ""
-		return _show_preview(id)
+		return _show_preview(id, "", entry if not cap else null)
 	pool_click_key = key
 	pool_click_ms = now
 	# CAPTURED STOCK ARMS NOTHING (user ruling 2026-09-10). Its only two exits
 	# are Convert (the badge that now sits on every captured entry) and Sell
-	# (the Shop drawer) — issue 60 had already taken its deploy, and this slice
-	# takes its merge, which leaves the armed state with nothing left to do.
+	# (from Stock, after converting — NO-144 moved this off the Shop and onto
+	# the preview modal above) — issue 60 had already taken its deploy, and
+	# this slice takes its merge, which leaves the armed state with nothing
+	# left to do.
 	# Bailing here is also what stops the board painting deploy targets for a
 	# piece that cannot be deployed: those dots come from placing_id /
 	# pool_drag_id (see _deploy_highlight_tiles), and neither can ever hold a
@@ -1190,7 +1200,8 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
-			modals.show_reinforce()
+			modals.show_reinforce(_grant_reinforcements()) # NO-141: granted the
+				# instant the screen fires — the modal is announcement only
 	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
 		pending_shop_open = false
 		if not autoplay: # the bot buys through Shop.buy and never opens the
@@ -1907,6 +1918,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		arrow_from = Vector2i(-1, -1)
 		board_lp_token = 0 # NO-120: none of these states can complete a hold
 		board_lp_pending_tile = Vector2i(-1, -1) # ...or a deferred commit
+		_swipe_eligible = false # NO-145: ditto — a press swallowed here must
+			# never let a later release, once the state clears, fire a swipe
+			# off a stale flag/position from an unrelated gesture
 		return
 	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
 		# item/artefact targeting still owns board taps
@@ -1923,6 +1937,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var at := _tile_at(event.position)
 		if event.pressed:
+			# NO-145: capture swipe eligibility FIRST, off the state exactly as
+			# it stood when this press landed — the drawer/Shop auto-close
+			# branches right below mutate hud.drawer_open/shop_open() for
+			# THIS press, and _swipe_open_may_begin must see the pre-mutation
+			# values (a press that closes a drawer via outside-tap is a tap,
+			# not the start of an open-swipe on the same gesture).
+			_swipe_from = event.position
+			_swipe_eligible = _swipe_open_may_begin(at)
 			# any press outside an open drawer closes it to reveal the board
 			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
 					.get_global_rect().has_point(event.position):
@@ -1979,6 +2001,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					drag_moved = false
 					drag_reselect = was_selected # in-place release = re-click
 		else:
+			# NO-145: the swipe-to-open gesture — an empty board tile ONLY
+			# (see _swipe_open_may_begin; hardware round 2 dropped deck
+			# chrome and the Shop's edge-proximity check, both of which
+			# failed on real hardware — tuning.gd has the diagnosis). Never
+			# returns early: for every press this accepted, the rest of this
+			# release branch below is already a no-op (no drag_from, no
+			# board_lp_pending_tile — both require an occupied origin tile,
+			# which _swipe_open_may_begin refuses), so letting it fall
+			# through changes nothing.
+			if _swipe_eligible:
+				_swipe_eligible = false
+				match Tuning.classify_swipe(event.position - _swipe_from):
+					"down": _set_drawer("stock") # Max: "swipe down opens Stock"
+					"up": _set_drawer("inventory") # Max: "swipe up opens Inventory"
+					"left": _open_shop() # Shop slides in from the right — the
+						# swipe DIRECTION carries that meaning; no edge
+						# proximity needed (SWIPE_EDGE_ZONE removed)
 			board_lp_token = 0 # NO-120: release cancels any pending long-press timer
 			if board_lp_pending_tile.x >= 0:
 				# NO-120: the commit this press deferred runs now — but only as
@@ -2083,6 +2122,36 @@ func _tile_at(screen: Vector2) -> Vector2i:
 	var x := int(local.x / tile)
 	var y := Tuning.BOARD_H - 1 - int(local.y / tile)
 	return Vector2i(x, y) if Rules.in_bounds(Vector2i(x, y)) else Vector2i(-1, -1)
+
+
+## NO-145: true when a press starting at `at` (a _tile_at result) may become
+## a swipe-to-open gesture. Deliberately conservative — the ticket's own
+## warning is that a swipe recogniser stealing an existing drag is worse than
+## no swipe at all:
+##   - never while a drawer or the Shop is already open — a swipe closing one
+##     of those belongs to that panel's own chrome (hud.gd/modals.gd), not
+##     the board; see their own _on_*_chrome_input for the reverse gesture.
+##   - never on an occupied tile — that always has selection/drag meaning
+##     (own-piece drag, enemy recon, a captured target, ...).
+##   - never off the board (at.x < 0) — the coordinator's hardware round 2
+##     ruling narrowed this to ONE surface, the empty board tile, after
+##     deck-chrome and an assumed-tile-width edge zone both failed on real
+##     hardware (see tuning.gd's SWIPE_MIN_DIST comment for the full
+##     diagnosis). All three open gestures — down/up/left — now start here
+##     and only here.
+##   - on an EMPTY tile, only when nothing is already armed/selected that a
+##     press there would otherwise resolve against — an empty tile that IS a
+##     legal destination for a current selection, or a staged Item/Artefact
+##     target, or an Arrow Planning draw, already commits on THIS press
+##     (_on_tile_clicked fires immediately below, not on release), so a
+##     swipe can never begin from one without also stepping on that commit.
+func _swipe_open_may_begin(at: Vector2i) -> bool:
+	if hud.drawer_open != "" or shop_open():
+		return false
+	if at.x < 0 or board.has(at):
+		return false
+	return selected.x < 0 and placing_id == "" and item_active < 0 \
+			and artefact_targeting_key == "" and not arrow_mode
 
 
 ## NO-120: true when a press on `at` (occupied — the only case a long press
@@ -2681,48 +2750,8 @@ func _chain_of(id: String) -> Array:
 	return chain
 
 
-func _draw_preview_diagram(dia: Control, id: String, cells: int, cell: int) -> void:
-	var c := cells / 2
-	for x in cells:
-		for y in cells:
-			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
-				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
-	if textures.has(id):
-		dia.draw_texture_rect(piece_tex(id),
-			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
-	for m in defs[id].moves:
-		if m.type == "bent": # pivot step, then a ride outward from the pivot
-			var steps := [[int(m.pivot[0]), int(m.pivot[1])]]
-			var bx: int = int(m.pivot[0]) + int(m.dir[0])
-			var by: int = int(m.pivot[1]) + int(m.dir[1])
-			while absi(bx) <= c and absi(by) <= c:
-				steps.append([bx, by])
-				bx += int(m.dir[0])
-				by += int(m.dir[1])
-			for st in steps:
-				_diagram_mark(dia, c, cell, int(st[0]), int(st[1]), m.mode)
-			continue
-		for dir in m.dirs:
-			var reach: int = int(m.get("range", 0)) if m.type == "ride" else 1
-			if reach == 0:
-				reach = cells # unbounded ride: to the diagram edge
-			for s in range(1, reach + 1):
-				if absi(int(dir[0]) * s) > c or absi(int(dir[1]) * s) > c:
-					break
-				_diagram_mark(dia, c, cell, int(dir[0]) * s, int(dir[1]) * s, m.mode)
-
-
-func _diagram_mark(dia: Control, c: int, cell: int, dx: int, dy: int, mode: String) -> void:
-	var pc := Vector2(c + dx, c - dy) * cell + Vector2(cell, cell) / 2 # +y is up
-	match mode:
-		"both":
-			dia.draw_circle(pc, cell * 0.17, Color(0.22, 0.55, 0.28))
-		"move":
-			dia.draw_arc(pc, cell * 0.17, 0, TAU, 16, Color(0.22, 0.55, 0.28), 2.5)
-		"capture":
-			var d := cell * 0.13
-			dia.draw_line(pc - Vector2(d, d), pc + Vector2(d, d), Color(0.8, 0.2, 0.2), 3.0)
-			dia.draw_line(pc + Vector2(d, -d), pc - Vector2(d, -d), Color(0.8, 0.2, 0.2), 3.0)
+# NO-139: the diagram renderer moved to its own script, scripts/piece_diagram.gd
+# (PieceDiagram.draw), called directly from modals.gd's show_preview.
 
 
 func _reinforce_ids() -> Array:
@@ -2735,7 +2764,18 @@ func _reinforce_ids() -> Array:
 	return out
 
 
-
+## NO-141: one copy of each _reinforce_ids() straight into Stock — the same
+## free grant the old Buy button made per click (money-and-shop/02), now made
+## once, automatically, the instant the screen fires. Returns the ids granted
+## so the announcement modal shows exactly what arrived. Pure w.r.t. `ids`
+## (_reinforce_ids() is deterministic off next_army), so it is safe to call
+## again for display only — see save_config.gd's resume path, which does
+## exactly that without calling this.
+func _grant_reinforcements() -> Array:
+	var ids := _reinforce_ids()
+	for id in ids:
+		stock.append(id)
+	return ids
 
 
 
@@ -3092,6 +3132,25 @@ func _confirm_target_pressed() -> void:
 		return _item_confirm_target()
 	if artefact_targeting_key != "":
 		_artefact_confirm_target()
+
+
+## NO-137: the floating Cancel affordance's entry point (hud.gd's
+## multi_cancel_pressed) — the same reset either branch's own "tap the armed
+## chip again" gesture already used (_use_item/_begin_artefact_targeting),
+## just reachable without reopening the Inventory drawer first. Costs
+## nothing: Economy.charge only ever runs from _item_apply, on a commit, and
+## neither reset below goes near it.
+func _confirm_target_cancelled() -> void:
+	if item_active >= 0:
+		_item_reset()
+	elif artefact_targeting_key != "":
+		_artefact_targeting_reset()
+	else:
+		return
+	if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
+		_set_drawer("inventory")
+	else:
+		_refresh()
 
 
 func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
@@ -4222,8 +4281,7 @@ func _screenshot_and_quit(dir: String) -> void:
 ## in order — a second pair completes a move/capture/merge the first pair's
 ## selection started, the same two taps a player would make; `--arm-item KEY`
 ## [`--anchor X,Y`] calls _use_item then _item_click (item arm + anchor);
-## `--open-shop` [`--sell`] calls _open_shop(), then flips modals.shop_sell_mode
-## for the Shop's other tab; `--open-drawer NAME` calls _set_drawer(NAME)
+## `--open-shop` calls _open_shop(); `--open-drawer NAME` calls _set_drawer(NAME)
 ## ("inventory" or "stock") — NO-119: the Shop and the drawers have no CLI
 ## reach otherwise, and verifying an off-board grid needs one open.
 ## `--show-screen NAME` reaches panels no board tap opens on its own:
@@ -4253,10 +4311,6 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
 	elif args.has("--open-shop"):
 		_open_shop()
-		if args.has("--sell"):
-			modals.shop_sell_mode = true
-			modals.show_shop() # rebuild: show_shop() only resets the mode on a
-				# FRESH open, so re-calling it while already open keeps this true
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout # let the
 			# NO-118 slide finish — animations_on defaults true, so the panel
 			# is still moving 2 frames after this call returns
@@ -4520,6 +4574,28 @@ func piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
 	return textures[id][owner]
 
 
+## NO-146: the same lookup, usable BEFORE any Game exists — the menu's Army
+## carousel shows starting-fleet art with no live Game to read `textures`
+## from. Same file-probing rule as the `_ready()` loop above that populates
+## `textures`: a painted <id>-light/-dark pair first, the shared monochrome
+## <id>.svg second. Never indexes `textures` — this is a fresh, independent
+## lookup for a context that has none.
+static func load_piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
+	var side := "light" if owner == Rules.PLAYER else "dark"
+	var painted := "res://assets/pieces/%s-%s.png" % [id, side]
+	if ResourceLoader.exists(painted):
+		return load(painted)
+	var mono := "res://assets/pieces/%s.svg" % id
+	return load(mono) if ResourceLoader.exists(mono) else null
+
+
+## Whether `id` is on the shared-monochrome fallback path and so needs the
+## side tint (COL_SIDE_PLAYER/COL_SIDE_ENEMY) applied at draw time — mirrors
+## `mono_art` above, for a caller with no live Game to read it from.
+static func is_mono_piece(id: String) -> bool:
+	return not ResourceLoader.exists("res://assets/pieces/%s-light.png" % id)
+
+
 ## `inset` is negative on purpose: the painted tokens read better slightly
 ## overflowing their square than padded inside it (user call 2026-08-27).
 func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -2.0) -> void:
@@ -4600,8 +4676,14 @@ func _connect_hud() -> void:
 	hud.king_ability_pressed.connect(_show_king_abilities)
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
-	hud.stack_preview_requested.connect(func(id: String) -> void: _show_preview(id)) # NO-138
+	hud.stack_preview_requested.connect(func(id: String, cap: bool, entry: Variant) -> void:
+		_show_preview(id, "", entry if not cap else null)) # NO-138/NO-144
+	hud.item_preview_requested.connect(func(index: int) -> void:
+		_show_kind_preview("item", items[index].key, items[index])) # NO-144
+	hud.artefact_preview_requested.connect(func(key: String) -> void:
+		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
+	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)
@@ -4711,17 +4793,9 @@ func _connect_modals() -> void:
 		get_tree().reload_current_scene())
 	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
-	modals.shop_sell_pressed.connect(func(kind: String, entry: Variant) -> void:
+	modals.sell_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-144
 		_sell(kind, entry)
-		modals.show_shop() # rebuild: fresh entries + affordability state
 		_refresh())
-	modals.shop_convert_pressed.connect(func(entry: Variant) -> void:
-		_convert_captured(entry)
-		modals.show_shop()
-		_refresh())
-	modals.reinforce_buy_pressed.connect(func(id: String) -> void:
-		stock.append(id) # reinforce is free (money-and-shop/02)
-		modals.show_reinforce())
 	modals.reinforce_done_pressed.connect(func() -> void:
 		pending_reinforce = false
 		_refresh())
@@ -4847,9 +4921,20 @@ func _show_win_screen() -> void:
 	modals.show_win_screen()
 
 
-func _show_preview(id: String, king_id := "") -> void:
+## `entry` (NO-144): the live Stock element behind this preview, when it's
+## one — a board tile or a Captured Stock entry pass none, so Sell is never
+## offered for either (Sell is Stock-only; Captured has Convert instead).
+func _show_preview(id: String, king_id := "", entry: Variant = null) -> void:
 	preview_open = true
-	modals.show_preview(id, king_id)
+	modals.show_preview("piece", id, king_id, entry)
+
+
+## NO-144: an Item/Artefact's own long-press menu — same preview modal a
+## piece gets, minus the movement diagram, plus Sell when `entry` (the live
+## g.items/g.artefacts element) is sellable.
+func _show_kind_preview(kind: String, id: String, entry: Variant) -> void:
+	preview_open = true
+	modals.show_preview(kind, id, "", entry)
 
 
 ## Opening the tariff overlay deselects, like menus and drawers.

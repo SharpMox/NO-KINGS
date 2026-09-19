@@ -71,9 +71,9 @@ func _init() -> void:
 	s = game.score
 	m = game.gold
 	var stock_n: int = game.stock.size()
-	game.modals.reinforce_buy_pressed.emit("pawn")
-	check(game.stock.size() == stock_n + 1, "reinforce buy adds the piece")
-	check(game.score == s and game.gold == m, "reinforce buys are free")
+	var granted: Array = game._grant_reinforcements() # NO-141: automatic grant, no Buy button
+	check(game.stock.size() == stock_n + granted.size(), "the reinforcement grant adds every piece")
+	check(game.score == s and game.gold == m, "reinforcements are free")
 
 	# --- NO-127: Score/Gold gain pulses, driven by refresh() seeing the value
 	# CHANGE — not by refresh() itself running (it runs on nearly every state

@@ -160,7 +160,7 @@ func _init() -> void:
 	await create_timer(0.2).timeout
 	check(c1.clock_ms == before_merge, "Tier 1: the merge confirm pauses the Clock")
 	c1.modals.merge_panel.visible = false
-	c1.modals.show_reinforce()
+	c1.modals.show_reinforce([]) # NO-141: ids only feed the group picture — this exercises the panel, not the grant
 	var before_reinf: float = c1.clock_ms
 	await create_timer(0.2).timeout
 	check(c1.clock_ms == before_reinf,
@@ -232,7 +232,7 @@ func _init() -> void:
 	await create_timer(0.2).timeout
 	check(c2.clock_ms < t2_merge, "Tier 2+: the merge confirm no longer pauses the Clock")
 	c2.modals.merge_panel.visible = false
-	c2.modals.show_reinforce()
+	c2.modals.show_reinforce([]) # NO-141: ids only feed the group picture — this exercises the panel, not the grant
 	var t2_reinf: float = c2.clock_ms
 	await create_timer(0.2).timeout
 	check(c2.clock_ms < t2_reinf,

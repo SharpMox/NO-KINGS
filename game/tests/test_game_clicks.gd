@@ -20,12 +20,35 @@ const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/conver
 var fails := 0
 
 
-func check(cond: bool, label: String) -> void:
+## NO-113: `detail` is printed alongside a failing label — the observed values
+## the assertion actually depends on — so a failure says what was true instead
+## of just that something wasn't. Optional and appended only on failure, so
+## every existing two-argument call site is unchanged.
+func check(cond: bool, label: String, detail := "") -> bool:
 	if not cond:
-		push_error("FAIL: " + label)
+		push_error("FAIL: " + label + (" -- " + detail if detail != "" else ""))
 		fails += 1
 	else:
 		print("ok: " + label)
+	return cond
+
+
+## NO-113: the detail a failed _click_button_in/_click_grid_cell lookup needs
+## most — what buttons actually exist under `node`, and whether each is
+## visible — so "clickable" failing can distinguish missing/hidden/mislabeled
+## from actually covered-and-unclickable.
+func _button_texts_in(node: Node) -> String:
+	var out: Array[String] = []
+	_collect_button_texts(node, out)
+	return ", ".join(out) if not out.is_empty() else "(no buttons found under this node)"
+
+
+func _collect_button_texts(node: Node, out: Array[String]) -> void:
+	if node is Button:
+		out.append("%s%s" % [(node as Button).text,
+			"" if node.is_visible_in_tree() else " [hidden]"])
+	for c in node.get_children():
+		_collect_button_texts(c, out)
 
 
 
@@ -455,13 +478,50 @@ func _init() -> void:
 	check(game.stock == ["sergeant"] and game.captured == ["pawn", "pawn"],
 		"confirming promotes the STOCK pawn pair and leaves Captured Stock untouched")
 
+	# NO-140 hardware fix (coordinator diagnosis): merge_panel stays `visible`
+	# for the MERGE_ANIM_S outro tween, and a visible full-rect panel at the
+	# default MOUSE_FILTER_STOP silently ate every click underneath it for
+	# that whole window — Pass, a double-tap, the ☰ menu, all swallowed on
+	# real hardware. The fix moves the panel to MOUSE_FILTER_IGNORE the
+	# instant Merge is pressed, not when the tween finishes. Prove it here,
+	# not just trust it: the panel is STILL visible/animating one frame after
+	# the click (below), yet the Pass click that follows immediately — landing
+	# well inside the 0.35s window — goes through anyway.
+	check(game.modals.merge_panel.visible, "the merge outro is still animating one frame later")
+
 	# PASS hands the turn over, banks the +5s turn bonus, and comes back
 	var clock_before: float = game.clock_ms
-	_click(game.pass_button.get_global_rect().get_center())
+	_click(game.pass_button.get_global_rect().get_center()) # deliberately mid-animation
 	await _await_player_turn(game) # enemy turn runs (animated + paced path)
-	check(game.state == game.State.PLAYER_TURN, "PASS cycles through the enemy turn")
+	# NO-113/NO-140: merge_panel (modals.gd) is a PRESET_FULL_RECT,
+	# move_to_front()'d PanelContainer that the "Merge" confirm above only
+	# HIDES at the end of a Tuning.MERGE_ANIM_S (0.35s) tween. It used to keep
+	# MOUSE_FILTER_STOP for that whole window and swallow this click — and the
+	# next 13 too, all the way through the in-game menu. _play_merge_animation
+	# now sets IGNORE on the panel and its descendants the instant Merge is
+	# pressed, so the outro is visual only. This click is deliberately made
+	# MID-ANIMATION: it is the regression proof, not incidental timing.
+	check(game.state == game.State.PLAYER_TURN,
+		"PASS reaches the enemy turn even clicked mid-merge-animation — the panel no longer eats it")
 	check(game.clock_ms >= clock_before + 4000, # 5s bonus minus a little ticking
-		"finishing the turn grants the clock bonus")
+		"finishing the turn grants the clock bonus",
+		"clock_before=%.0f clock_ms=%.0f state=%s merge_panel.visible=%s pause_modal_open=%s game_menu_open=%s box_open=%s buff_pick_open=%s win_open=%s pass_button.disabled=%s" % [
+			clock_before, game.clock_ms, game.State.keys()[game.state],
+			game.modals.merge_panel.visible, game.modals.pause_modal_open(),
+			game.game_menu_open, game.box_open, game.buff_pick_open, game.win_open,
+			game.pass_button.disabled])
+
+	# ...and the animation itself genuinely finishes and hides the panel —
+	# polled against Tuning.MERGE_ANIM_S rather than a guessed frame count,
+	# so the wait and the tween's real duration can never drift apart. By now
+	# the enemy-turn wait above has almost certainly already covered it; this
+	# is the explicit, derived proof rather than an incidental one.
+	var merge_polls := 0
+	var merge_poll_max := int(ceil(Tuning.MERGE_ANIM_S * 60.0)) + 30 # generous margin past one 60fps tween
+	while game.modals.merge_panel.visible and merge_polls < merge_poll_max:
+		await process_frame
+		merge_polls += 1
+	check(not game.modals.merge_panel.visible, "the merge outro animation completes and hides the panel")
 
 	# double-tap on the queen opens the piece preview; Close dismisses it
 	var at: Vector2 = game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2
@@ -478,47 +538,77 @@ func _init() -> void:
 	release.double_click = false
 	root.push_input(release)
 	await process_frame
-	check(game.preview_open, "double-tap opens the piece preview")
-	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable")
+	check(game.preview_open, "double-tap opens the piece preview",
+		"preview_open=%s state=%s board.has((2,2))=%s selected=%s merge_panel.visible=%s game_menu_open=%s drawer_open=%s" % [
+			game.preview_open, game.State.keys()[game.state], game.board.has(Vector2i(2, 2)),
+			game.selected, game.modals.merge_panel.visible, game.game_menu_open, game.hud.drawer_open])
+	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable",
+		"preview_open=%s preview_panel.visible_in_tree=%s buttons=%s" % [
+			game.preview_open,
+			is_instance_valid(game.preview_panel) and game.preview_panel.is_visible_in_tree(),
+			_button_texts_in(game.preview_panel) if is_instance_valid(game.preview_panel) else "(preview_panel is null)"])
 	await process_frame
 	check(not game.preview_open, "Close dismisses the preview")
 
 	# in-game menu: opens, pauses the clock, Resume returns
 	check(await _click_button_in(game.hud, "☰"), "menu button clickable")
 	await process_frame
-	check(game.game_menu_open, "menu opens")
+	check(game.game_menu_open, "menu opens",
+		"game_menu_open=%s game_menu.visible=%s merge_panel.visible=%s state=%s win_open=%s box_open=%s buff_pick_open=%s" % [
+			game.game_menu_open, game.game_menu.visible, game.modals.merge_panel.visible,
+			game.State.keys()[game.state], game.win_open, game.box_open, game.buff_pick_open])
 	var frozen: float = game.clock_ms
 	await create_timer(0.4).timeout
 	check(game.clock_ms == frozen, "clock pauses while the menu is open")
 
 	# Guide and Settings (05-menus-and-settings): each opens over the pause
 	# menu and its own Back returns to the pause menu, not straight to Resume
-	check(await _click_button_in(game.game_menu, "Guide"), "in-game Guide button clickable")
+	check(await _click_button_in(game.game_menu, "Guide"), "in-game Guide button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
-	check(await _click_button_in(game.game_menu, "← Back"), "in-game Guide Back clickable")
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Guide Back clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
-	check(await _click_button_in(game.game_menu, "Settings"), "in-game Settings button clickable")
+	check(await _click_button_in(game.game_menu, "Settings"), "in-game Settings button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 	var sound_on: bool = Settings.load_settings().sound_on
 	check(await _click_button_in(game.game_menu, "Sound: %s" % ("On" if sound_on else "Off")),
-		"in-game Sound toggle clickable")
+		"in-game Sound toggle clickable",
+		"sound_on=%s wanted_label=%s game_menu.visible=%s buttons=%s" % [
+			sound_on, "Sound: %s" % ("On" if sound_on else "Off"), game.game_menu.visible,
+			_button_texts_in(game.game_menu)])
 	await process_frame
-	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists")
+	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists",
+		"sound_on_before=%s sound_on_after=%s" % [sound_on, Settings.load_settings().sound_on])
 
 	# Animations toggle (06): live-applies to the running game, no restart —
 	# game.animations_on flips the instant the button is pressed
 	check(game.animations_on, "animations start on by default")
 	var anims_on: bool = Settings.load_settings().animations_on
 	check(await _click_button_in(game.game_menu, "Animations: %s" % ("On" if anims_on else "Reduced")),
-		"in-game Animations toggle clickable")
+		"in-game Animations toggle clickable",
+		"anims_on=%s wanted_label=%s game_menu.visible=%s buttons=%s" % [
+			anims_on, "Animations: %s" % ("On" if anims_on else "Reduced"), game.game_menu.visible,
+			_button_texts_in(game.game_menu)])
 	await process_frame
-	check(Settings.load_settings().animations_on != anims_on, "in-game Animations toggle persists")
-	check(not game.animations_on, "in-game Animations toggle applies live, no restart")
+	check(Settings.load_settings().animations_on != anims_on, "in-game Animations toggle persists",
+		"anims_on_before=%s anims_on_after=%s" % [anims_on, Settings.load_settings().animations_on])
+	check(not game.animations_on, "in-game Animations toggle applies live, no restart",
+		"game.animations_on=%s settings.animations_on=%s" % [
+			game.animations_on, Settings.load_settings().animations_on])
 
-	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable")
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 
-	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable")
+	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 	check(not game.game_menu_open, "Resume closes the menu")
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
@@ -1670,18 +1760,26 @@ func _init() -> void:
 	await process_frame
 	check(game.hud.multi_confirm_btn.visible and game.hud.multi_confirm_btn.text == "Extract 1",
 		"picking a piece shows the Extract confirm")
-	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing") —
-	# NO-124: Cancel is the same "reopen the drawer, tap the armed chip again"
-	# gesture every Item uses, since the floating button no longer opens a
-	# second gate with its own Cancel.
-	check(await _click_inventory(game, "Inventory 1"), "Inventory reopens to reach the armed chip")
-	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
-		"tapping the armed chip cancels Extraction")
+	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing").
+	# NO-137 SUPERSEDED NO-124's cancel gesture here: this block used to
+	# reopen the Inventory drawer and tap the armed chip again, but NO-137's
+	# backdrop is MOUSE_FILTER_STOP over the whole deck (Shop/Inventory/
+	# Ability/Pass) WHILE CONFIRM IS SHOWING — "these are not clickable right
+	# now" is the ticket's own wording — so that reopen click is now
+	# absorbed on purpose. Don't restore the reopen-and-retap version on the
+	# grounds that it "used to pass"; cancel through multi_cancel_btn
+	# instead, same as a player now must. The observable CONSEQUENCE is
+	# unchanged (CLAUDE.md: "assert the observable consequence, never the
+	# flag that was just written") — item_active/items/board(4,4) below are
+	# the same assertions the old gesture made.
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
 	await process_frame
 	check(game.item_active == -1 and not game.items.is_empty() and game.board.has(Vector2i(4, 4)),
-		"NO-124: cancelling disarms Extraction entirely — nothing spent, board untouched")
+		"NO-124/NO-137: cancelling disarms Extraction entirely — nothing spent, board untouched")
 	# NO-85 story 58: cancelling always reopens the Drawer, on its own slide
 	# (NO-118) — settle before clicking into it, same as every other reopen.
+	# _confirm_target_cancelled (game.gd) reopens Inventory the same way the
+	# old chip-tap cancel did.
 	await _await_drawer_settled(game, "inventory")
 	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
 		"Extraction re-armable after a cancel")
@@ -1693,6 +1791,51 @@ func _init() -> void:
 	check(not game.board.has(Vector2i(4, 4)) and game.stock.has("knight")
 			and game.items.is_empty(),
 		"Extract confirm returns the pick to Stock")
+
+	# NO-137: the floating Confirm's backdrop + Cancel. Bottom UI (Shop/
+	# Inventory) must read as "not clickable" while armed, and Cancel must
+	# cost nothing (Economy.charge only ever runs from _item_apply, on a
+	# commit — neither reset behind Cancel goes near it).
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
+		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"], "gold": 100}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(await _click_inventory(game, "Inventory 1"), "NO-137: Inventory opens for Extraction")
+	await process_frame
+	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
+		"NO-137: Extraction clickable in the drawer")
+	await process_frame
+	_click(game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.hud.multi_confirm_btn.visible, "NO-137: Confirm shows, staged")
+	check(game.hud.confirm_backdrop.visible and game.hud.multi_cancel_btn.visible,
+		"NO-137: the backdrop and Cancel appear alongside Confirm")
+	var gold_before: int = game.gold
+	# CLAUDE.md: "a probe can pass because its click was CONSUMED" — click
+	# exactly where the Shop/Inventory buttons sit (now covered by the
+	# backdrop) and assert BOTH that neither opened AND that the targeting
+	# this backdrop belongs to survived; a swallowed click alone would
+	# satisfy the first half either way.
+	_click(game.hud.shop_button.get_global_rect().get_center())
+	await process_frame
+	check(not game.shop_open() and game.hud.multi_confirm_btn.visible
+			and game.hud.confirm_backdrop.visible,
+		"NO-137: the backdrop blocks Shop, and the targeting behind it survives the click")
+	_click(game.hud.drawer_buttons["inventory"].get_global_rect().get_center())
+	await process_frame
+	check(game.hud.drawer_open != "inventory" and game.hud.multi_confirm_btn.visible,
+		"NO-137: the backdrop blocks Inventory too")
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.item_active == -1 and game.board.has(Vector2i(4, 4)) and game.gold == gold_before,
+		"NO-137: Cancel disarms for free — board untouched, no Gold spent")
+	check(not game.hud.multi_confirm_btn.visible and not game.hud.confirm_backdrop.visible
+			and not game.hud.multi_cancel_btn.visible,
+		"NO-137: Confirm/backdrop/Cancel all hide together once cancelled")
 
 	# Shop: bottom-row button opens the right-edge drawer, which never scrolls
 	# — tap a tile to expand it (name/effect/Buy), Buy purchases a piece for
@@ -1820,10 +1963,13 @@ func _init() -> void:
 		shop_close_polls += 1
 	check(not game.modals.shop_panel.visible, "the shop drawer closes")
 
-	# Selling + Captured -> Stock conversion (issue 60): the Shop drawer's
-	# Sell/Buy toggle swaps in held Stock/Captured/Item/Artefact tiles for
-	# the shop_stock ones, so Sell can never be confused with Buy. A
-	# Captured Stock tile's detail dock offers BOTH Convert and Sell.
+	# Selling (NO-144): moved off the Shop entirely and onto the previewed
+	# thing's own menu — long-pressing a Stock entry (here: the same signal a
+	# real long press fires, hud.stack_preview_requested) opens its preview
+	# with a Sell button in it. Convert stays exactly where it already was
+	# (hud's own ⇄ badge on the Captured entry — tested separately above),
+	# and per NO-144's own ruling a Captured entry's preview offers no Sell
+	# at all: convert first, then sell from Stock like anything else.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -1832,75 +1978,45 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_shop(game), "Shop button clickable")
-	await process_frame
-	check(await _click_button_in(game.modals.shop_panel, "Sell"), "the Sell toggle is clickable")
-	await process_frame
-	check(game.modals.shop_sell_mode, "the Shop drawer switches to Sell mode")
 
-	var piece_tile: Button = null
-	var to_visit_sell: Array = [game.modals.shop_panel]
-	while not to_visit_sell.is_empty():
-		var n: Node = to_visit_sell.pop_back()
-		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "piece":
-			piece_tile = n
-			break
-		to_visit_sell.append_array(n.get_children())
-	check(piece_tile != null, "a Stock sell tile exists")
-	_click(piece_tile.get_global_rect().get_center())
+	game.hud.stack_preview_requested.emit("pawn", false, game.stock[0])
 	await process_frame
-	check(game.modals.sell_expanded_kind == "piece" and game.modals.sell_expanded_index == 0,
-		"tapping a Stock sell tile expands it")
+	check(game.preview_open, "long-pressing a Stock entry opens its preview")
 	var sell_stock_before: int = game.stock.size()
 	var sell_gold_before: int = game.gold
 	var sell_acts_before: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Sell (+$5)"),
-		"the Sell button in the expanded detail is clickable (pawn value 10, 50% floored = 5)")
+	check(await _click_button_in(game.preview_panel, "Sell (+$5)"),
+		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
 	check(game.stock.size() == sell_stock_before - 1 and game.gold == sell_gold_before + 5
 			and game.actions_left == sell_acts_before,
 		"selling the Stock piece removes it, pays Gold, and costs no Action (issue 64)")
+	check(not game.preview_open, "selling closes the preview, same as Close")
 
-	var cap_tile: Button = null
-	to_visit_sell = [game.modals.shop_panel]
-	while not to_visit_sell.is_empty():
-		var n: Node = to_visit_sell.pop_back()
-		if n is Button and n.has_meta("sell_kind") and n.get_meta("sell_kind") == "captured":
-			cap_tile = n
+	game.hud.stack_preview_requested.emit("pawn", true, game.captured[0])
+	await process_frame
+	check(game.preview_open, "long-pressing a Captured entry opens its preview too")
+	var cap_preview_has_sell := false
+	var to_visit_pv: Array = [game.preview_panel]
+	while not to_visit_pv.is_empty():
+		var n: Node = to_visit_pv.pop_back()
+		if n is Button and (n as Button).text.begins_with("Sell"):
+			cap_preview_has_sell = true
 			break
-		to_visit_sell.append_array(n.get_children())
-	check(cap_tile != null, "a Captured Stock sell tile exists")
-	_click(cap_tile.get_global_rect().get_center())
+		to_visit_pv.append_array(n.get_children())
+	check(not cap_preview_has_sell,
+		"a Captured entry's preview offers no Sell — Convert first, then sell from Stock")
+	check(await _click_button_in(game.preview_panel, "Close"), "Close dismisses it")
 	await process_frame
-	check(game.modals.sell_expanded_kind == "captured", "tapping a Captured tile expands it")
-	var captured_before: int = game.captured.size()
-	var stock_before2: int = game.stock.size()
-	var gold_before2: int = game.gold
-	var convert_acts_before: int = game.actions_left
-	# issue 97: the Convert button carries its price, and that price now comes
-	# from CONVERT_RATE rather than SELL_RATE — so read it from the game rather
-	# than hardcoding a number that moves whenever the rate is tuned.
-	var convert_cost: int = Shop.convert_price(game, game.captured[0])
-	var convert_label := "Convert ($%d)" % convert_cost
-	check(await _click_button_in(game.modals.shop_panel, convert_label),
-		"Convert is clickable (%s)" % convert_label)
-	await process_frame
-	check(game.captured.size() == captured_before - 1 and game.stock.size() == stock_before2 + 1
-			and game.gold == gold_before2 - convert_cost and game.actions_left == convert_acts_before,
-		"converting moves the piece from Captured Stock into ordinary Stock, debits Gold, costs no Action (issue 64)")
-
-	check(await _click_button_in(game.modals.shop_panel, "Buy"), "the toggle switches back to Buy mode")
-	await process_frame
-	check(not game.modals.shop_sell_mode, "the Shop drawer is back in Buy mode")
 
 	# Direct deploy is gone (issue 60) and so is the merge (2026-09-10): the tap
 	# that used to arm a Captured stack arms nothing now, so a following
 	# Deploy-tile tap has nothing to place. Driven through the REAL tap rather
 	# than by setting the armed flags — there are none left to set — and paired
-	# with the Stock control, because "nothing was placed" is also what a tap
-	# swallowed by the open Shop panel would look like.
-	game.stock.append("pawn") # a fresh Stock piece so the drawer has both
-	game.captured.append("pawn") # the Convert above emptied Captured Stock
+	# with a Stock control, because "nothing was placed" is also what a tap
+	# that failed to arm ANYTHING would look like.
+	game.stock.append("pawn") # the Sell test above emptied Stock; Captured
+		# still has its own untouched pawn from the boot config
 	game._refresh()
 	var deploy_target := Vector2i(-1, -1)
 	for t in game._deploy_tiles():
@@ -2018,8 +2134,9 @@ func _init() -> void:
 	check(await _click_button_in(game.modals.shop_panel, "Buy"),
 		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
 
-	# reinforcement shop: opens pending at turn start, Buy is free and adds
-	# to stock, Done hands the turn back
+	# reinforcement shop: opens pending at turn start; NO-141 made the grant
+	# automatic (in Stock by the time the panel shows) and turned the panel
+	# into an announcement — no Buy button any more, Dismiss hands the turn back
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -2031,6 +2148,8 @@ func _init() -> void:
 	await process_frame
 	check(game.reinforce_panel != null and game.reinforce_panel.visible,
 		"the reinforcement shop opens at turn start")
+	check(game.stock.size() == game._reinforce_ids().size(),
+		"NO-141: the grant already landed in Stock before the screen ever showed")
 	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
 	# holds the player queen, and the control below the tariff section proves
 	# this exact tap selects her with no panel up.
@@ -2047,15 +2166,12 @@ func _init() -> void:
 	check(game.selected == Vector2i(-1, -1),
 		"NO-5: a board tap under the open reinforcement pick selects nothing")
 	check(game.reinforce_panel.visible, "...and the pick is still open")
-	var r_stock: int = game.stock.size()
-	check(await _click_button_in(game.reinforce_panel, "Buy"), "Buy clickable")
-	await process_frame
-	check(game.stock.size() == r_stock + 1 and game.score == 100 and game.gold == 0,
-		"Buy adds the piece to stock for free")
-	check(await _click_button_in(game.reinforce_panel, "Done"), "Done clickable")
+	check(not await _click_button_in(game.reinforce_panel, "Buy"),
+		"NO-141: no Buy button — the grant already happened, nothing left to click")
+	check(await _click_button_in(game.reinforce_panel, "Dismiss"), "Dismiss clickable")
 	await process_frame
 	check(not game.reinforce_panel.visible and not game.pending_reinforce,
-		"Done closes the shop and clears the pending flag")
+		"Dismiss closes the announcement and clears the pending flag")
 
 	# the ⚠ button is off screen (NO-83) but its state and handler stay: the
 	# text still counts, and its signal still opens the detail overlay

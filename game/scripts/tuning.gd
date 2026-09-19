@@ -16,6 +16,51 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
 ## own panel, can't drift apart on it.
 const PANEL_SLIDE_S := 0.18
 
+## NO-140: the merge-confirm's sources-fade/result-grows animation — longer
+## than PANEL_SLIDE_S on purpose, a slide reads at a glance but "the two
+## becoming the result" needs a beat to register.
+const MERGE_ANIM_S := 0.35
+
+## NO-145: swipe-to-open/close the Stock/Inventory/Shop panels. One shared
+## classifier (classify_swipe below) so game.gd (board opens) and hud.gd/
+## modals.gd (each panel's own chrome closes) all agree on what counts as a
+## swipe, instead of independent guesses drifting.
+##
+## Hardware round 2 (coordinator diagnosis): the first cut also let an open
+## swipe begin on `deck`'s own unclaimed area, and gated the Shop's opening
+## swipe on an edge-proximity constant derived from an assumed 60px tile
+## (480 / BOARD_W 8). Both were wrong on real hardware — NO-128 shrank
+## DECK_ROWS (132 -> 98) between when that was written and when it ran,
+## squeezing the deck gap a press was aimed at, and the board is centred
+## with margins (`game.gd`'s `board_px`), not full-width, at a tile size
+## that had already dropped to ~51px by the time this ran. Both failures
+## trace to a surface/number this ticket's own report had flagged as
+## unverified. Fix: ALL THREE open gestures now begin only on an empty
+## board tile — the one surface that passed on hardware first try — and
+## SWIPE_EDGE_ZONE is gone; a leftward swipe reads as "opens the Shop"
+## anywhere on the board, no edge proximity required.
+const SWIPE_MIN_DIST := 40.0 ## px a press must travel before it's a swipe
+	## rather than a tap or a drag — comfortably past hud.gd's
+	## DRAWER_SCROLL_DEADZONE (24), so a scroll's own deadzone is never read
+	## as a swipe underneath it.
+const SWIPE_AXIS_RATIO := 1.5 ## the dominant axis must beat the other by
+	## this factor or the drag is too diagonal to call any direction.
+
+## NO-145: `delta` is a press's total (release position - press position)
+## movement. Returns "up"/"down"/"left"/"right" once it clears
+## SWIPE_MIN_DIST with a dominant axis (SWIPE_AXIS_RATIO); "" if it's too
+## short or too diagonal to call.
+static func classify_swipe(delta: Vector2) -> String:
+	if delta.length() < SWIPE_MIN_DIST:
+		return ""
+	var ax := absf(delta.x)
+	var ay := absf(delta.y)
+	if ax > ay * SWIPE_AXIS_RATIO:
+		return "right" if delta.x > 0 else "left"
+	if ay > ax * SWIPE_AXIS_RATIO:
+		return "down" if delta.y > 0 else "up"
+	return ""
+
 ## NO-119: every icon OUTSIDE the board (Shop, Inventory Drawer, Stock Drawer)
 ## reads at this one fixed size, with no name label beside it — the tooltip /
 ## long-press carries the name instead. Same drift-guard shape as
@@ -425,4 +470,48 @@ static func starting_stock(army: String, tier: String) -> Array:
 		for i in ceili(counts[id] / 2.0):
 			out.append(id)
 		counts.erase(id)
+	return out
+
+
+## NO-148: the handicaps above, as DATA — the single source rank_center's
+## per-tier descriptions are generated from, keyed to the tier they first
+## apply at (a TIERS index), so a retune here can't silently drift the copy
+## a player reads.
+##
+## FINDING (2026-09-19): the prose summary at this section's top undercounts
+## Tier 3. issue 78 added clock_start_ms's cut at the SAME threshold as
+## shop_row_delta (tier_index >= 2) without folding it into that "each tier
+## is the one below plus one more" comment, so Tier 3 actually introduces TWO
+## handicaps, not one — test_tiers.gd already pins both thresholds
+## independently, so the code and the tests agree; only the prose was stale.
+## This list is generated from what the gating functions actually do; the
+## comment at the top of this section is not, and should be read as
+## superseded by it.
+const TIER_HANDICAPS := [
+	{"at": 1, "text": "The Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)"},
+	{"at": 2, "text": "Starting Clock drops from 15 minutes to 5"},
+	{"at": 2, "text": "Shop stocks 1 fewer of each kind"},
+	{"at": 3, "text": "Starting Stock halved per piece type, rounding up (singletons survive)"},
+	{"at": 4, "text": "-1 action per turn, enemy actions per turn 2 instead of 1"},
+]
+
+## Handicaps newly introduced AT this tier — empty for Tier 1.
+static func new_handicaps(tier: String) -> Array[String]:
+	var idx := tier_index(tier)
+	var out: Array[String] = []
+	for h in TIER_HANDICAPS:
+		if h.at == idx:
+			out.append(h.text)
+	return out
+
+
+## Every handicap already active at a tier BELOW this one, in the order they
+## were introduced — what a tier's description lists underneath its own new
+## handicap(s) (NO-148: cumulative, with the new part identifiable).
+static func lower_handicaps(tier: String) -> Array[String]:
+	var idx := tier_index(tier)
+	var out: Array[String] = []
+	for h in TIER_HANDICAPS:
+		if h.at < idx:
+			out.append(h.text)
 	return out

@@ -97,19 +97,18 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 
-	# NO-56: Quit is offered on every platform that can honour it and on no
-	# platform that cannot. Written as the invariant rather than as "Quit
-	# exists", because the rule is the gate: iOS cannot self-terminate, so a
-	# Quit button there is a dead control. The suite only ever runs off-iOS, so
-	# what this actually guards is the other half — that gating it did not
-	# delete it from desktop and Android, which is what NO-56 explicitly rules
-	# against. The iOS half is unobservable from here and is not claimed.
-	check((_find_button(menu, "Quit") != null) == (not MenuScript._IS_IOS()),
-		"Quit is offered exactly on the platforms that can quit")
+	# NO-147 (Max, 2026-09-19): Quit is REMOVED on every platform — "people
+	# can just close the app." Android's hardware Back already quits from the
+	# bare main menu (NO-61), so the button only duplicated a platform
+	# affordance every player already has.
+	check(_find_button(menu, "Quit") == null, "NO-147: Quit is gone, on every platform")
 
 	# TEST opens the scenario list (this click is what PR #20 shipped broken:
-	# the hidden submenu's ScrollContainer swallowed every mouse event)
-	check(await _click_button(menu, "TEST"), "TEST button visible")
+	# the hidden submenu's ScrollContainer swallowed every mouse event).
+	# NO-147: TEST now nests inside Settings, reached in two taps.
+	check(await _click_button(menu, "Settings"), "Settings button clickable")
+	await process_frame
+	check(await _click_button(menu, "TEST"), "NO-147: TEST reached from Settings")
 	await process_frame
 	check(_find_button(menu, "← Back") != null, "TEST opens the scenario list")
 	# issue 77: the list is sectioned, and the point of sectioning is that every
@@ -235,13 +234,16 @@ func _init() -> void:
 	check(_find_button(menu, deepest) != null,
 		"...and the section that was open before the search is still open")
 
-	# Back returns to the main menu
+	# Back returns to the Settings panel TEST was opened from — NO-147: TEST
+	# nests under Settings now, same "Back lands one level up" shape the tier
+	# picker already carried for returning to the army picker.
 	check(await _click_button(menu, "← Back"), "Back button clickable")
 	await process_frame
-	check(_find_button(menu, "Play") != null, "Back restores the main menu")
-	check(_find_button(menu, "← Back") == null, "scenario list hidden again")
+	check(_find_button(menu, "Sound: On") != null, "Back restores the Settings panel")
+	check(not menu.test_scroll.visible, "scenario list hidden again")
 
-	# a scenario button loads its config into the game boot slot
+	# a scenario button loads its config into the game boot slot. Settings is
+	# still the visible panel from the Back above, so TEST is reachable again.
 	await _click_button(menu, "TEST")
 	await process_frame
 	GameScript.next_config = {}
@@ -310,6 +312,13 @@ func _init() -> void:
 	var f := FileAccess.open(GameScript.SCORES_PATH, FileAccess.WRITE)
 	f.store_string(JSON.stringify([{"score": 512, "wave": 7, "kings": 0}]))
 	f = null
+	# NO-147: Games History folds into Scores, so its fixture is written up
+	# front too — the walk below goes Scores -> Games History -> back to
+	# Scores -> back to the main menu.
+	var hf := FileAccess.open(GameScript.HISTORY_PATH, FileAccess.WRITE)
+	hf.store_string(JSON.stringify(
+		[{"score": 77, "wave": 4, "kings": 0, "king_abilities": 1, "lost": 2, "won": false}]))
+	hf = null
 	menu = load("res://scenes/Menu.tscn").instantiate()
 	root.add_child(menu)
 	await process_frame
@@ -322,22 +331,17 @@ func _init() -> void:
 		"the Scores screen states whether cloud scores are included")
 	await process_frame
 	check(_find_label(menu, "512") != null, "score list shows the stored run")
-	check(await _click_button(menu, "← Back"), "scores Back clickable")
-	await process_frame
-	check(_find_button(menu, "Play") != null, "scores Back restores the main menu")
-	DirAccess.remove_absolute(GameScript.SCORES_PATH)
-
-	# Games History: per-run log, distinct from the top-10 Highscores above
-	var hf := FileAccess.open(GameScript.HISTORY_PATH, FileAccess.WRITE)
-	hf.store_string(JSON.stringify(
-		[{"score": 77, "wave": 4, "kings": 0, "king_abilities": 1, "lost": 2, "won": false}]))
-	hf = null
-	check(await _click_button(menu, "Games History"), "Games History button clickable")
+	check(await _click_button(menu, "Games History"), "NO-147: Games History reached from Scores")
 	await process_frame
 	check(_find_label(menu, "77") != null, "history list shows the stored run")
 	check(await _click_button(menu, "← Back"), "history Back clickable")
 	await process_frame
-	check(_find_button(menu, "Play") != null, "history Back restores the main menu")
+	check(_find_label(menu, "512") != null,
+		"NO-147: history's Back restores Scores, not the main menu directly")
+	check(await _click_button(menu, "← Back"), "scores Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "scores Back restores the main menu")
+	DirAccess.remove_absolute(GameScript.SCORES_PATH)
 	DirAccess.remove_absolute(GameScript.HISTORY_PATH)
 
 	# Guide: shared rules reference (identical copy lives in the in-game menu)
@@ -348,13 +352,19 @@ func _init() -> void:
 	await process_frame
 	check(_find_button(menu, "Play") != null, "Guide Back restores the main menu")
 
-	# About: credits/version
-	check(await _click_button(menu, "About"), "About button clickable")
+	# About: credits/version. NO-147: folds into Settings.
+	check(await _click_button(menu, "Settings"), "Settings button clickable (About)")
+	await process_frame
+	check(await _click_button(menu, "About"), "NO-147: About reached from Settings")
 	await process_frame
 	check(_find_label(menu, "NO KINGS") != null, "About panel shows its heading")
 	check(await _click_button(menu, "← Back"), "About Back clickable")
 	await process_frame
-	check(_find_button(menu, "Play") != null, "About Back restores the main menu")
+	check(_find_button(menu, "Sound: On") != null,
+		"NO-147: About's Back restores Settings, not the main menu directly")
+	check(await _click_button(menu, "← Back"), "Settings Back clickable (About)")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "Settings Back restores the main menu")
 
 	# Settings: the Sound toggle round-trips to user://settings.json (clean
 	# slate came from the SETTINGS_PATH wipe at the top) — the shell 06

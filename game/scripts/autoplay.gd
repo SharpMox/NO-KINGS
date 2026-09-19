@@ -303,9 +303,19 @@ static func reinforce(g) -> void:
 ##     strategy — a bot that relied on it would be selling right up to the edge
 ##     of a softlock every run and calling that a measurement.
 ##
-## Sells through g._sell, the same entry point the Sell-mode panel calls, so
-## the tally and Insider Rates' payout bonus both apply exactly as they do for
-## a player. Costs no Action (issue 64), like the Shop and conversion beside it.
+## Sells through g._sell, the same entry point the player's own Sell button
+## calls, so the tally and Insider Rates' payout bonus both apply exactly as
+## they do for a player. Costs no Action (issue 64), like the Shop and
+## conversion beside it.
+##
+## NO-144: the player's own Sell path moved off the Shop and onto the
+## preview modal, and dropped Captured Stock as a direct target (Convert
+## first, then sell from Stock) — this bot strategy still sells Captured
+## Stock directly via Shop.can_sell/g._sell("captured", ...), unchanged.
+## Left alone deliberately: it's a separately measured, tuned balance
+## strategy (see the "MEASURED 2026-09-07" note below), not the Shop UI this
+## ticket touched, and retuning it wasn't asked for — flagged for a call on
+## whether the bot should now be limited to what the UI can still reach.
 static func try_sell(g) -> bool:
 	if g.gold >= SELL_GOLD_FLOOR:
 		return false

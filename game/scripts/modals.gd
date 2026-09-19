@@ -21,6 +21,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -33,10 +34,11 @@ signal win_end_pressed
 signal shop_buy_pressed(index: int)
 signal shop_closed
 signal shop_restock_pressed # issue 52: Jet Fuel Vial's Restock button
-signal shop_sell_pressed(kind: String, entry: Variant) # issue 60
 signal box_sell_pressed(entry: Dictionary) # NO-38: sell a held Item from inside an Item Box
-signal shop_convert_pressed(entry: Variant) # issue 60: Captured -> Stock
-signal reinforce_buy_pressed(id: String)
+signal sell_pressed(kind: String, entry: Variant) # NO-144: from the preview
+	# modal's Sell button — "piece" (Stock only, never Captured), "item",
+	# "artefact". Captured -> Stock conversion isn't here: it lives on the
+	# entry itself (hud.gd's own ⇄ badge, convert_pressed).
 signal reinforce_done_pressed
 signal preview_closed
 signal choice_chosen(value)
@@ -62,31 +64,51 @@ var _shop_dock: PanelContainer # the detail dock — refilled on a tile tap, so 
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
-var shop_sell_mode := false # issue 60: Sell/Buy toggle on the Shop drawer —
-	# exposed so probes can assert on it, same as shop_expanded_index above
-var sell_expanded_kind := "" # "" (none), "piece", "captured", "item", "artefact"
-var sell_expanded_index := -1 # index into the matching g.stock/g.captured/
-	# g.items/g.artefacts array — a SEPARATE counter from shop_expanded_index
-	# since Sell mode indexes held entries, not g.shop_stock slots
-## NO-119: PIECES/STOCK is a wrapping grid, not a fixed-width row, now that
-## its tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — Buy mode
-## holds up to 8 (Shop.ROWS.piece), but Sell mode's row is the player's whole
-## live Stock (unbounded), and either one would overflow a single-row
-## HBoxContainer well before it overflowed this column's width. Arithmetic,
-## not taste: 5 x 72 + 4 x 4 = 376 fits the drawer's ~412px content width
-## (draw_w 432 minus the 10px margins each side); 6 would need 452. NO-132
-## folds this into the site-wide standard — Tuning.OFFBOARD_GRID_COLS is the
-## same 5, so the band no longer carries its own agreeing constant.
+## NO-119: PIECES is a wrapping grid, not a fixed-width row, now that its
+## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 8 of
+## them (Shop.ROWS.piece) would overflow a single-row HBoxContainer well
+## before it overflowed this column's width. Arithmetic, not taste: 5 x 72 +
+## 4 x 4 = 376 fits the drawer's ~412px content width (draw_w 432 minus the
+## 10px margins each side); 6 would need 452. NO-132 folds this into the
+## site-wide standard — Tuning.OFFBOARD_GRID_COLS is the same 5, so the band
+## no longer carries its own agreeing constant.
 ##
-## NO-132: the lower band's ARTEFACTS/ITEMS (left_col) and BOXES/CAPTURED
-## (right_col) split the same 412px on `lower`'s 1.15 / 0.85 stretch ratio,
-## less its own 8px separation: left ~232px, right ~172px. At the same 4px
-## separation, Tuning.grid_cols gives left_col 3 columns (76*3-4=224 <= 232)
-## and right_col 2 (76*2-4=148 <= 172; 76*3-4=224 does not fit). Neither
-## reaches the 5-column standard — the drawer is only 90% of the 480px
-## screen, and this band is one of two side by side in it.
-const SHOP_SUBZONE_LEFT_W := 232.0
-const SHOP_SUBZONE_RIGHT_W := 172.0
+## NO-132 gave the lower band's side-by-side ARTEFACTS/ITEMS and BOXES
+## columns 3 and 2 columns respectively (412px split 1.15/0.85 by stretch
+## ratio, less `lower`'s own 8px separation: ~232px and ~172px — grid_cols
+## floors at 76*cols-4, so 3 needs 224 and 2 needs 148). Neither reached the
+## 5-column standard, and NO-144 didn't move these numbers (Buy and the old
+## Sell mode shared this exact geometry) — closing the gap needed ~448px of
+## column budget against `lower`'s 404, 44px short, and no re-split of the
+## same 404px helped both sides — 3/3 for one side always cost the other
+## its 2.
+##
+## NO-142: stacked instead — ARTEFACTS, ITEMS and BOXES each now get the
+## FULL 412px `lower` width, one below another, so all three hit
+## Tuning.OFFBOARD_GRID_COLS (5 x 72 + 4 x 4 = 376 <= 412; 6 needs 452),
+## matching PIECES above them and the site-wide standard. What pays for the
+## extra band is the vertical room NO-144 freed: PIECES used to become
+## STOCK in Sell mode — the player's whole live Stock, unbounded (a real
+## save once held 22, 5 rows at 5 columns, 376px). PIECES is Buy-only now,
+## capped at Shop.ROWS.piece (8, fewer at Tier 3+): always <=2 rows, ~152px.
+## `lower` is root's only EXPAND_FILL child, so every byte PIECES no longer
+## needs at its old worst case, `lower` keeps — up to ~224px more,
+## guaranteed rather than best-case.
+##
+## The stacked layout's own worst case, from Shop.ROWS (base, before any
+## Tier 3+ reduction — the max, never more): ARTEFACTS ceil(4/5)=1 row,
+## ITEMS ceil(4/5)=1 row, BOXES ceil(6/5)=2 rows (72*2+4=148px). Content
+## height per zone = its grid + a zone label + the label-to-grid 4px
+## separation (_shop_sub_zone's own `wrap`); the label's own height isn't
+## measured here (no Godot run from this seat — see the label-height note
+## on _shop_zone_label), estimated ~16px from this file's other measured
+## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts
+## ARTEFACTS/ITEMS at ~92px each, BOXES at ~168px, plus 2 gaps at `lower`'s
+## own 8px separation between the 3 stacked zones: ~368px total — about
+## 28px MORE than the old side-by-side minimum (~340px, the taller of the
+## two old columns), comfortably inside the ~224px NO-144 freed. If a real
+## measurement ever puts a zone label taller than assumed here, recheck
+## against the ~224px margin before assuming it still fits.
 const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
@@ -127,6 +149,13 @@ func build(game) -> void:
 	g.hud.add_child(overlay)
 
 
+## NO-140: `a_id`/`b_id` are shown as art now too, not just `result` — "the
+## trade visible rather than described". Confirming plays a short animation
+## (the two sources fading while the result grows to full size) before the
+## panel actually closes; gated on g.animations_on and skipped under
+## g.autoplay, same seam _slide_shop uses. MergeLogic.do_merge already never
+## calls this at all under autoplay (it commits straight through), so that
+## path is doubly safe — this gate is only the belt to that braces.
 func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
@@ -140,32 +169,52 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
-	if g.textures.has(result):
-		var tex := TextureRect.new()
-		tex.texture = g.piece_tex(result)
-		tex.custom_minimum_size = Vector2(96, 96)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		box.add_child(tex)
+
+	var art_row := HBoxContainer.new()
+	art_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	art_row.add_theme_constant_override("separation", 10)
+	var a_tex := _merge_piece_tex(a_id)
+	var b_tex := _merge_piece_tex(b_id)
+	var result_tex := _merge_piece_tex(result)
+	if a_tex:
+		art_row.add_child(a_tex)
+	art_row.add_child(_merge_glyph_label("+"))
+	if b_tex:
+		art_row.add_child(b_tex)
+	art_row.add_child(_merge_glyph_label("→"))
+	if result_tex:
+		# starts as a dim preview; confirming grows/brightens it to full while
+		# a_tex/b_tex fade — see _play_merge_animation.
+		result_tex.pivot_offset = result_tex.custom_minimum_size / 2
+		result_tex.scale = Vector2(0.7, 0.7)
+		result_tex.modulate.a = 0.55
+		art_row.add_child(result_tex)
+	box.add_child(art_row)
+
 	var what := Label.new()
 	what.text = "%s + %s → %s" % [g.defs[a_id].name, g.defs[b_id].name, g.defs[result].name]
-	what.add_theme_font_size_override("font_size", 20)
+	what.add_theme_font_size_override("font_size", 16)
 	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(what)
+
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 16)
 	var yes := Button.new()
 	yes.text = "Merge"
 	yes.add_theme_font_size_override("font_size", 22)
-	yes.pressed.connect(func() -> void:
-		merge_panel.visible = false
-		merge_confirmed.emit())
-	row.add_child(yes)
 	var no := Button.new()
 	no.text = "Cancel"
 	no.add_theme_font_size_override("font_size", 22)
+	yes.pressed.connect(func() -> void:
+		yes.disabled = true # a second tap mid-animation must not re-fire the commit
+		no.disabled = true
+		merge_confirmed.emit()
+		if g.autoplay or not g.animations_on:
+			merge_panel.visible = false
+		else:
+			_play_merge_animation(a_tex, b_tex, result_tex))
+	row.add_child(yes)
 	no.pressed.connect(func() -> void:
 		merge_panel.visible = false
 		merge_cancelled.emit())
@@ -173,6 +222,67 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	box.add_child(row)
 	g.hud.add_child(merge_panel)
 	merge_panel.move_to_front() # above the drawers and bottom bar
+
+
+## One off-board-standard-sized icon (Tuning.OFFBOARD_ICON, same as the Shop/
+## Drawer grids) for `id`, or null when it has no art — guarded the same way
+## every other modals.gd icon is (`g.textures.has`).
+func _merge_piece_tex(id: String) -> TextureRect:
+	if not g.textures.has(id):
+		return null
+	var tex := TextureRect.new()
+	tex.texture = g.piece_tex(id)
+	tex.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return tex
+
+
+func _merge_glyph_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 20)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return l
+
+
+## NO-140: sources fade out, the result scales/brightens to full — reads as
+## "the two becoming the result" without moving anything out of art_row's own
+## HBoxContainer layout (a position tween would fight the container's own
+## sort). Any of the three may be null (no art for that id); tween_property
+## calls are just skipped for it. Ends by hiding merge_panel, the same state
+## change the no-animation branch above makes immediately.
+##
+## Hardware fix (coordinator diagnosis, eleven downstream menu-click
+## failures): merge_panel stays `visible` for the whole MERGE_ANIM_S outro,
+## and a visible Control with the default MOUSE_FILTER_STOP still absorbs
+## every click in its rect via Godot's own GUI picking before
+## _unhandled_input ever runs — CLAUDE.md's documented trap, and the exact
+## one NO-118 already hit on the Shop's close-slide. Hiding the panel only
+## in the tween's callback left it a full-screen invisible input blocker for
+## 350ms after the player had already confirmed. IGNORE goes on the instant
+## the animation starts, not when it ends; the tween itself is now purely
+## visual. Same idiom as _slide_shop above (IGNORE the instant a close
+## starts, recursed into descendants since Godot doesn't cascade a parent's
+## filter to its children) rather than hud.gd's _set_drawer_clickable's
+## save/restore: no restore is needed here for the same reason _slide_shop
+## needs none — show_merge_confirm frees this exact panel and builds a
+## fresh one, default filters, on every subsequent open.
+func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: TextureRect) -> void:
+	merge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in merge_panel.find_children("*", "Control", true, false):
+		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tw := merge_panel.create_tween()
+	tw.set_parallel(true)
+	if a_tex:
+		tw.tween_property(a_tex, "modulate:a", 0.0, Tuning.MERGE_ANIM_S)
+	if b_tex:
+		tw.tween_property(b_tex, "modulate:a", 0.0, Tuning.MERGE_ANIM_S)
+	if result_tex:
+		tw.tween_property(result_tex, "scale", Vector2.ONE, Tuning.MERGE_ANIM_S) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(result_tex, "modulate:a", 1.0, Tuning.MERGE_ANIM_S)
+	tw.chain().tween_callback(func() -> void: merge_panel.visible = false)
 
 
 ## Tier-1 pause parity (user ruling 2026-09-04: the gap was an oversight, not
@@ -183,6 +293,15 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 ## mirrored it into a `*_open` flag the way preview_open/box_open do. Box Pick
 ## stays deliberately excluded — GDD: "decisive picks rewarded, indecision
 ## punished" — that one IS a difficulty lever.
+##
+## NO-140: `merge_panel.visible` deliberately still reads true for the whole
+## MERGE_ANIM_S outro, even though the panel stopped ACCEPTING input the
+## instant Merge was pressed (_play_merge_animation). Visible is the right
+## predicate here regardless: the outro is a modal moment on screen whose
+## length the player didn't choose, so the Clock stays paused through it,
+## same as it would for a tween-free instant close — the two are decoupled
+## on purpose, not entangled. Don't read this as "input-blocked", it never
+## meant that; it means "there is still a modal up".
 func pause_modal_open() -> bool:
 	return (is_instance_valid(king_ability_panel) and king_ability_panel.visible) \
 		or (is_instance_valid(merge_panel) and merge_panel.visible) \
@@ -306,8 +425,21 @@ func show_win_screen() -> void:
 
 ## `king_id` (NO-83): a King whose Power draws on the King Ability catalogue —
 ## only Donald Trump does (kings.gd) — lists the Abilities in force under his
-## diagram, the same rows the ⚠ overlay shows.
-func show_preview(id: String, king_id := "") -> void:
+## diagram, the same rows the ⚠ overlay shows. Piece-only; ignored for
+## `kind` != "piece".
+##
+## NO-144: "long-press = the thing's own menu" — Sell now lives here, not in
+## a Shop mode of its own. `kind` is "piece" (board tile, or a Stock/Captured
+## stack — the diagram/chain/King-Ability sections below are piece-only),
+## "item" or "artefact" (icon + name + description, no diagram). `entry` is
+## the live g.stock/g.items/g.artefacts element Shop.can_sell/sell_payout
+## read — null for anything not sellable from here (a board tile, a Captured
+## Stock entry: Convert and Sell are not the same thing, and Convert stays on
+## the entry itself, hud.gd's own ⇄ badge). The Sell button is built only
+## when `entry` is given, and disabled (never omitted) when Shop.can_sell
+## says no for a dynamic reason (not the player's turn, the starvation
+## softlock) — same convention as the Shop's own Buy/Convert buttons.
+func show_preview(kind: String, id: String, king_id := "", entry: Variant = null) -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
 	# Raised for the same reason every other panel is. preview_panel and
@@ -322,53 +454,104 @@ func show_preview(id: String, king_id := "") -> void:
 	box.add_theme_constant_override("separation", 10)
 	center.add_child(box)
 
-	var title := Label.new()
-	title.text = g.defs[id].name
-	title.add_theme_font_size_override("font_size", 30)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
+	if kind == "piece":
+		var title := Label.new()
+		title.text = g.defs[id].name
+		title.add_theme_font_size_override("font_size", 30)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(title)
 
-	var dia := Control.new()
-	var cells := 9 # covers the longest leap (Ying Long's 4)
-	var cell := 30
-	dia.custom_minimum_size = Vector2(cells, cells) * cell
-	dia.draw.connect(g._draw_preview_diagram.bind(dia, id, cells, cell))
-	box.add_child(dia)
+		var dia := Control.new()
+		var cells := 9 # covers the longest leap (Ying Long's 4)
+		var cell := 30
+		dia.custom_minimum_size = Vector2(cells, cells) * cell
+		var dia_tex: Texture2D = g.piece_tex(id) if g.textures.has(id) else null
+		dia.draw.connect(func() -> void: PieceDiagram.draw(dia, g.defs, id, cells, cell, dia_tex))
+		box.add_child(dia)
 
-	var legend := Label.new()
-	legend.text = "● move + capture      ○ move only      ✕ capture only"
-	legend.add_theme_font_size_override("font_size", 13)
-	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(legend)
+		var legend := Label.new()
+		legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
+		legend.add_theme_font_size_override("font_size", 13)
+		legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(legend)
 
-	var chain: Array = g._chain_of(id)
-	if chain.size() > 1:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		row.add_theme_constant_override("separation", 8)
-		for i in chain.size():
-			if i > 0:
-				var arrow := Label.new()
-				arrow.text = "→"
-				arrow.add_theme_font_size_override("font_size", 22)
-				row.add_child(arrow)
-			var tr := TextureRect.new()
-			tr.texture = g.piece_tex(chain[i]) if g.textures.has(chain[i]) else null
-			tr.custom_minimum_size = Vector2(48, 48)
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			if chain[i] != id:
-				tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
-			row.add_child(tr)
-		box.add_child(row)
+		var chain: Array = g._chain_of(id)
+		if chain.size() > 1:
+			var row := HBoxContainer.new()
+			row.alignment = BoxContainer.ALIGNMENT_CENTER
+			row.add_theme_constant_override("separation", 8)
+			for i in chain.size():
+				if i > 0:
+					var arrow := Label.new()
+					arrow.text = "→"
+					arrow.add_theme_font_size_override("font_size", 22)
+					row.add_child(arrow)
+				var tr := TextureRect.new()
+				tr.texture = g.piece_tex(chain[i]) if g.textures.has(chain[i]) else null
+				tr.custom_minimum_size = Vector2(48, 48)
+				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				if chain[i] != id:
+					tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
+				row.add_child(tr)
+			box.add_child(row)
 
-	var kit: Dictionary = Kings.kit_of(king_id)
-	if kit.has("power_catalog_key") or kit.has("power_catalog_escalation"):
-		var head := Label.new()
-		head.text = "%s — King Abilities in force" % str(kit.get("power_name", ""))
-		head.add_theme_font_size_override("font_size", 15)
-		head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(head)
-		_add_king_ability_rows(box, 14, 12)
+		var kit: Dictionary = Kings.kit_of(king_id)
+		if kit.has("power_catalog_key") or kit.has("power_catalog_escalation"):
+			var head := Label.new()
+			head.text = "%s — King Abilities in force" % str(kit.get("power_name", ""))
+			head.add_theme_font_size_override("font_size", 15)
+			head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(head)
+			_add_king_ability_rows(box, 14, 12)
+	else: # "item" / "artefact" — icon, name, description; no movement diagram
+		var title := Label.new()
+		title.text = str(entry.name)
+		title.add_theme_font_size_override("font_size", 26)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(title)
+
+		# artefact_tex() never returns null (art or the shared placeholder);
+		# an Item can, so it falls back to the same "✦" glyph its drawer cell
+		# and the Shop's own _shop_icon already use.
+		var icon: Variant = g.item_icons.get(id) if kind == "item" else g.artefact_tex(id)
+		if icon is Texture2D:
+			var tex := TextureRect.new()
+			tex.texture = icon
+			tex.custom_minimum_size = Vector2(72, 72)
+			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			box.add_child(tex)
+		else:
+			var glyph := Label.new()
+			glyph.text = "✦"
+			glyph.add_theme_font_size_override("font_size", 40)
+			glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(glyph)
+
+		var desc_text := str(entry.get("description", ""))
+		if desc_text != "":
+			var desc := Label.new()
+			desc.text = desc_text
+			desc.add_theme_font_size_override("font_size", 15)
+			desc.modulate = Color(1, 1, 1, 0.8)
+			desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
+			box.add_child(desc)
+
+	if entry != null:
+		var sell := Button.new()
+		sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
+		sell.disabled = not Shop.can_sell(g, kind, entry)
+		sell.add_theme_font_size_override("font_size", 18)
+		sell.pressed.connect(func() -> void:
+			preview_panel.visible = false
+			preview_closed.emit() # same reset Close does — sale must not
+				# leave preview_open stuck true (it deadens board input)
+			sell_pressed.emit(kind, entry))
+		box.add_child(sell)
 
 	var close := Button.new()
 	close.text = "Close"
@@ -386,9 +569,9 @@ func show_preview(id: String, king_id := "") -> void:
 ## for, and it made click probes racy against the panel's in-flight position;
 ## simplest is the instant show every other panel here already uses.
 ## Never scrolls — every slot in g.shop_stock renders as an icon tile with a
-## price badge, grouped into four fixed zones (PIECES full-width top band;
-## ARTEFACTS/ITEMS stacked lower-left; BOXES lower-right, full height) so the
-## grid geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
+## price badge, grouped into four fixed zones, all full-width and stacked
+## top to bottom (PIECES, ARTEFACTS, ITEMS, BOXES — NO-142) so the grid
+## geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
 ## Tapping a tile expands the fixed-height detail dock at the bottom with its
 ## name, effect text and Buy; buy rows emit an index and game.gd reopens for
 ## fresh SOLD/affordability state.
@@ -401,9 +584,6 @@ func show_shop() -> void:
 		shop_panel.queue_free()
 	if not was_open:
 		shop_expanded_index = -1 # fresh open always starts collapsed
-		shop_sell_mode = false # fresh open always starts in Buy mode
-		sell_expanded_kind = ""
-		sell_expanded_index = -1
 
 	var vp: Vector2 = g.get_viewport_rect().size
 	var draw_w := roundi(vp.x * 0.9) # "~90% of the screen up to full"
@@ -420,6 +600,14 @@ func show_shop() -> void:
 	for side in ["left", "top", "right", "bottom"]:
 		margin.add_theme_constant_override("margin_%s" % side, 10)
 	shop_panel.add_child(margin)
+	# NO-145: `margin` fills shop_panel's whole rect (MarginContainer, default
+	# MOUSE_FILTER_STOP) but only INSETS `root` by 10px — that 10px ring
+	# around root (and any of root's own unclaimed space) is what gui_input
+	# reports here, the Shop's own "chrome or edge, not a scrollable cell"
+	# a reverse-close swipe may start on. Reconnected every show_shop() call
+	# since margin is rebuilt fresh each time (no save/restore needed, same
+	# reasoning as _slide_shop's own descendant-filter comment above).
+	margin.gui_input.connect(_on_shop_chrome_input)
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
@@ -431,37 +619,25 @@ func show_shop() -> void:
 	title.add_theme_font_size_override("font_size", 22)
 	header.add_child(title)
 	var sub := Label.new()
-	# issue 64: buying/selling/converting are all free of the Action cost now.
-	# NO-143: dropped the "no Action cost" suffix on Buy — noise, since the
-	# absence of a cost doesn't need saying on every entry.
-	sub.text = ("$%d — sell for 50%%, or convert Captured to Stock" % g.gold) \
-		if shop_sell_mode else ("$%d" % g.gold)
+	# issue 64: buying is free of the Action cost. NO-143: dropped the "no
+	# Action cost" suffix — noise, since the absence of a cost doesn't need
+	# saying on every entry. NO-144: Sell/Convert moved off this label
+	# entirely — Sell is now the previewed thing's own menu (modals.gd
+	# show_preview), Convert the entry's own badge (hud.gd).
+	sub.text = "$%d" % g.gold
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.modulate = Color(1, 1, 1, 0.75)
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(sub)
-	if g._held("jet-fuel-vial") and not shop_sell_mode: # issue 52: only while
-		# held (user ruling — a Shop control, not part of the in-run Activate
-		# section) and only in Buy mode — Restock rerolls g.shop_stock, which
-		# Sell mode doesn't even render
+	if g._held("jet-fuel-vial"): # issue 52: only while held (user ruling — a
+		# Shop control, not part of the in-run Activate section)
 		var restock := Button.new()
 		restock.text = "Restock ($20)"
 		restock.add_theme_font_size_override("font_size", 13)
 		restock.disabled = not g._jet_fuel_restock_available()
 		restock.pressed.connect(func() -> void: shop_restock_pressed.emit())
 		header.add_child(restock)
-	var mode_btn := Button.new() # issue 60: Sell/Buy toggle — a distinct mode
-		# rather than a parallel list, so Sell can never be confused with Buy
-		# on the deliberately no-scroll drawer (issue 60's own UI note)
-	mode_btn.text = "Buy" if shop_sell_mode else "Sell"
-	mode_btn.add_theme_font_size_override("font_size", 14)
-	mode_btn.pressed.connect(func() -> void:
-		shop_sell_mode = not shop_sell_mode
-		sell_expanded_kind = ""
-		sell_expanded_index = -1
-		show_shop())
-	header.add_child(mode_btn)
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 14)
@@ -471,8 +647,7 @@ func show_shop() -> void:
 
 	# issue 64: Lane B restock progress — Score banked toward the next
 	# Score-driven restock (Lane A, every 5 Waves, needs no bar: it's a
-	# guaranteed beat, not something to watch fill). Shown in both Buy and
-	# Sell mode since it reflects Shop state, not the active mode.
+	# guaranteed beat, not something to watch fill).
 	var lane_b_row := HBoxContainer.new()
 	lane_b_row.add_theme_constant_override("separation", 6)
 	var lane_b_label := Label.new()
@@ -505,43 +680,22 @@ func show_shop() -> void:
 
 	var pieces_band := VBoxContainer.new()
 	pieces_band.add_theme_constant_override("separation", 4)
-	var lower := HBoxContainer.new()
+	# NO-142: ARTEFACTS, ITEMS and BOXES stacked full-width, not split into
+	# side-by-side columns — the drawer's 412px content width only fits 2
+	# columns of columns (3 and 2, see the SHOP_SUBZONE_SEP comment above);
+	# stacked, each one gets the whole width and reaches the site-wide 5.
+	var lower := VBoxContainer.new()
 	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	lower.add_theme_constant_override("separation", 8)
-	var left_col := VBoxContainer.new()
-	left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left_col.size_flags_stretch_ratio = 1.15
-	lower.add_child(left_col)
-	var right_col := VBoxContainer.new()
-	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right_col.size_flags_stretch_ratio = 0.85
-	lower.add_child(right_col)
 
-	if shop_sell_mode:
-		# same 4-zone geometry as Buy (issue 60): STOCK replaces the PIECES
-		# band, ARTEFACTS/ITEMS stay put (now held entries, not shop slots),
-		# CAPTURED replaces BOXES (nothing in a Box is ever sellable)
-		pieces_band.add_child(_shop_zone_label("STOCK"))
-		pieces_band.add_child(_piece_grid(func(i: int) -> Button: return _sell_tile("piece", i),
-			g.stock.size()))
-		var left_cols := Tuning.grid_cols(SHOP_SUBZONE_LEFT_W, SHOP_SUBZONE_SEP) # NO-132
-		var right_cols := Tuning.grid_cols(SHOP_SUBZONE_RIGHT_W, SHOP_SUBZONE_SEP) # NO-132
-		left_col.add_child(_sell_sub_zone("ARTEFACTS", "artefact", g.artefacts.size(), left_cols))
-		left_col.add_child(_sell_sub_zone("ITEMS", "item", g.items.size(), left_cols))
-		right_col.add_child(_sell_sub_zone("CAPTURED", "captured", g.captured.size(), right_cols))
-	else:
-		var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
-		for i in g.shop_stock.size():
-			by_kind[g.shop_stock[i].kind].append(i)
-		pieces_band.add_child(_shop_zone_label("PIECES"))
-		pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
-		var left_cols := Tuning.grid_cols(SHOP_SUBZONE_LEFT_W, SHOP_SUBZONE_SEP) # NO-132
-		var right_cols := Tuning.grid_cols(SHOP_SUBZONE_RIGHT_W, SHOP_SUBZONE_SEP) # NO-132
-		left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, left_cols))
-		left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item, left_cols))
-		right_col.add_child(_shop_sub_zone("BOXES", by_kind.box, right_cols))
+	var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
+	for i in g.shop_stock.size():
+		by_kind[g.shop_stock[i].kind].append(i)
+	pieces_band.add_child(_shop_zone_label("PIECES"))
+	pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
+	lower.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, Tuning.OFFBOARD_GRID_COLS))
+	lower.add_child(_shop_sub_zone("ITEMS", by_kind.item, Tuning.OFFBOARD_GRID_COLS))
+	lower.add_child(_shop_sub_zone("BOXES", by_kind.box, Tuning.OFFBOARD_GRID_COLS))
 	root.add_child(pieces_band)
 	root.add_child(lower)
 
@@ -555,9 +709,9 @@ func show_shop() -> void:
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
-	if not was_open: # NO-118: a rebuild while already open (mode toggle, Buy,
-		# Restock, ...) reuses the fresh panel at rest with no re-animation —
-		# it never left the screen.
+	if not was_open: # NO-118: a rebuild while already open (Buy, Restock, ...)
+		# reuses the fresh panel at rest with no re-animation — it never left
+		# the screen.
 		_slide_shop(true)
 
 
@@ -621,6 +775,29 @@ func close_shop() -> void:
 	shop_closed.emit()
 
 
+## NO-145: reverse-of-the-opening-swipe close — the Shop opens on a leftward
+## swipe starting on an empty board tile (game.gd's _swipe_open_may_begin;
+## hardware round 2 dropped the edge-proximity requirement — see tuning.gd),
+## so it closes on a rightward swipe, started anywhere on its own chrome
+## (margin.gui_input above — never on a scrollable cell, which claims its
+## own rect first via the same MOUSE_FILTER_STOP mechanism).
+var _shop_swipe_from := Vector2.ZERO
+var _shop_swipe_down := false
+
+func _on_shop_chrome_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if event.pressed:
+		_shop_swipe_from = event.position
+		_shop_swipe_down = true
+		return
+	if not _shop_swipe_down:
+		return
+	_shop_swipe_down = false
+	if Tuning.classify_swipe(event.position - _shop_swipe_from) == "right":
+		close_shop()
+
+
 ## The dock's content for the current expanded tile (or the hint). Called
 ## from show_shop and from every tile tap; the tiles themselves are untouched
 ## by a tap, so nothing else needs rebuilding. free(), not queue_free(): the
@@ -629,10 +806,7 @@ func close_shop() -> void:
 func _fill_shop_dock() -> void:
 	for c in _shop_dock.get_children():
 		c.free()
-	if shop_sell_mode and sell_expanded_index >= 0 \
-			and sell_expanded_index < _sell_entries(sell_expanded_kind).size():
-		_shop_dock.add_child(_sell_detail(sell_expanded_kind, sell_expanded_index))
-	elif not shop_sell_mode and shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
+	if shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
 		_shop_dock.add_child(_shop_detail(shop_expanded_index))
 	else:
 		var hint := Label.new()
@@ -645,6 +819,10 @@ func _fill_shop_dock() -> void:
 		_shop_dock.add_child(hint)
 
 
+## font_size 12; its rendered height isn't measured anywhere in this file
+## (NO-142's vertical-fit estimate above assumes ~16px, by analogy with
+## hud.gd's own measured font metrics — never taken on a running Godot from
+## this seat).
 func _shop_zone_label(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -653,13 +831,12 @@ func _shop_zone_label(text: String) -> Label:
 	return l
 
 
-## NO-119: the PIECES/STOCK band's own centered, wrapping grid —
-## Tuning.OFFBOARD_GRID_COLS wide, built from whatever `tile_of` returns (a
-## _shop_tile or _sell_tile closure) for each of `indices` (an Array of
-## shop-slot indices, or a plain count for Sell mode's `for i in
-## g.stock.size()`). Kept separate from _shop_sub_zone below: that one
-## expands to fill a fixed-height column, this one sits in a top band sized
-## to its own content.
+## NO-119: the Shop's PIECES band and the Box pick's own top band share this
+## centered, wrapping grid — Tuning.OFFBOARD_GRID_COLS wide, built from
+## whatever `tile_of` returns (_shop_tile or _box_tile) for each of `indices`
+## (an Array of slot/option indices, or a plain count). Kept separate from
+## _shop_sub_zone below: that one expands to fill a fixed-height column, this
+## one sits in a top band sized to its own content.
 ##
 ## NO-132: custom_minimum_size.x is forced to the FULL row's width (see
 ## Tuning.grid_row_w) before the CenterContainer sees it, so fewer than
@@ -678,16 +855,17 @@ func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
 	return center
 
 
-## A labeled, centered grid of tiles that expands to fill its share of the
-## lower block's height — this is what gives ARTEFACTS/ITEMS their upper/lower
-## halves and BOXES the full height of the lower-right (money-and-shop/04
-## kept the logic; shop-drawer-ui/08 is only the geometry).
+## A labeled, centered grid of tiles that expands to fill its share of
+## `lower`'s height — one zone of the full-width stack (money-and-shop/04
+## kept the logic; shop-drawer-ui/08 and NO-142 are only the geometry, side
+## by side then stacked).
 ##
-## NO-132: `cols` is the caller's Tuning.grid_cols() result for its own share
-## of the lower band (SHOP_SUBZONE_LEFT_W/RIGHT_W above) — left_col and
-## right_col differ, so this can no longer hardcode one column count for
-## both. custom_minimum_size.x reserves the full `cols`-wide row the same way
-## _piece_grid does, so a short row aligns instead of centering itself.
+## NO-132: `cols` reserves the full row's width up front (Tuning.grid_row_w),
+## the same way _piece_grid does, so a short row aligns instead of centring
+## itself. NO-142: every caller now passes Tuning.OFFBOARD_GRID_COLS, now
+## that ARTEFACTS/ITEMS/BOXES all get the full drawer width — `cols` stays a
+## parameter rather than hardcoding the constant in here, same as
+## _piece_grid takes `tile_of` as a parameter rather than assuming its caller.
 func _shop_sub_zone(title_text: String, indices: Array, cols: int) -> VBoxContainer:
 	var wrap := VBoxContainer.new()
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -862,190 +1040,11 @@ func _shop_detail(index: int) -> Control:
 	return row
 
 
-# --- Sell / Convert mode (issue 60) — same tile/sub-zone/detail-dock shapes
-# as Buy above, reading held entries (g.stock/g.captured/g.items/g.artefacts)
-# instead of g.shop_stock slots. `kind`: "piece" (Stock), "captured"
-# (Captured Stock), "item", "artefact".
-
-func _sell_entries(kind: String) -> Array:
-	return Shop.held_entries(g, kind)
-
-
-func _sell_id(kind: String, entry: Variant) -> String:
-	if kind == "item" or kind == "artefact":
-		return str(entry.key)
-	return entry if entry is String else entry.id
-
-
-## Icon or price-badge glyph — mirrors _shop_icon's per-kind vocabulary.
-func _sell_icon(kind: String, id: String) -> Variant:
-	match kind:
-		"piece", "captured":
-			return g.piece_tex(id) if g.textures.has(id) else g.defs[id].glyph
-		"item":
-			return g.item_icons[id] if g.item_icons.has(id) else "✦"
-		_: # "artefact"
-			return "◈"
-
-
-func _sell_name(kind: String, entry: Variant, id: String) -> String:
-	if kind == "item" or kind == "artefact":
-		return str(entry.name)
-	return str(g.defs[id].name)
-
-
-## One icon tile with a sell-price badge; meta.sell_kind/sell_index (into the
-## matching held-entry array) exist for the click probes, same role
-## meta.shop_index plays for _shop_tile.
-func _sell_tile(kind: String, index: int) -> Button:
-	var entry: Variant = _sell_entries(kind)[index]
-	var id := _sell_id(kind, entry)
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
-	btn.clip_text = true
-	btn.set_meta("sell_kind", kind)
-	btn.set_meta("sell_index", index)
-	var icon: Variant = _sell_icon(kind, id)
-	if icon is Texture2D:
-		btn.icon = icon
-		btn.expand_icon = true
-	else:
-		btn.text = str(icon)
-		btn.add_theme_font_size_override("font_size", 16)
-	btn.tooltip_text = _sell_name(kind, entry, id)
-	if kind == "artefact":
-		var rarity := str(entry.get("rarity", "")) # issue 20: rarity legibility
-		if rarity != "":
-			btn.self_modulate = Tuning.ARTEFACT_RARITY_COLOR[rarity]
-	if kind == "captured": # a visual tell distinct from ordinary Stock
-		btn.modulate = Color(1.0, 0.85, 0.6)
-	var price := Label.new()
-	price.text = "+$%d" % Shop.sell_payout(g, kind, entry)
-	price.add_theme_font_size_override("font_size", 10)
-	price.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-	price.add_theme_constant_override("outline_size", 3)
-	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	price.offset_left = -32
-	price.offset_top = -14
-	btn.add_child(price)
-	btn.pressed.connect(func() -> void:
-		if sell_expanded_kind == kind and sell_expanded_index == index:
-			sell_expanded_kind = ""
-			sell_expanded_index = -1
-		else:
-			sell_expanded_kind = kind
-			sell_expanded_index = index
-		_fill_shop_dock())
-	return btn
-
-
-## Labeled, centered grid of sell tiles for one kind — same geometry as
-## _shop_sub_zone (a held-entry index range instead of a slot index list),
-## including its NO-132 `cols` parameter and row-width alignment fix.
-func _sell_sub_zone(title_text: String, kind: String, count: int, cols: int) -> VBoxContainer:
-	var wrap := VBoxContainer.new()
-	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wrap.add_theme_constant_override("separation", 4)
-	wrap.add_child(_shop_zone_label(title_text))
-	var center := CenterContainer.new()
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var grid := GridContainer.new()
-	grid.columns = cols
-	grid.add_theme_constant_override("h_separation", SHOP_SUBZONE_SEP)
-	grid.add_theme_constant_override("v_separation", SHOP_SUBZONE_SEP)
-	grid.custom_minimum_size.x = Tuning.grid_row_w(cols, SHOP_SUBZONE_SEP) # NO-132
-	for i in count:
-		grid.add_child(_sell_tile(kind, i))
-	center.add_child(grid)
-	wrap.add_child(center)
-	return wrap
-
-
-## The expanded tile: icon, name, sell price, and Sell — plus, for a
-## Captured Stock entry only, a second Convert button (the only way a
-## captured piece becomes deployable again — see game.gd._convert_captured).
-func _sell_detail(kind: String, index: int) -> Control:
-	var entry: Variant = _sell_entries(kind)[index]
-	var id := _sell_id(kind, entry)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	var icon: Variant = _sell_icon(kind, id)
-	if icon is Texture2D:
-		var tex := TextureRect.new()
-		tex.texture = icon
-		tex.custom_minimum_size = Vector2(56, 56)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		row.add_child(tex)
-	else:
-		var glyph := Label.new()
-		glyph.text = str(icon)
-		glyph.add_theme_font_size_override("font_size", 34)
-		glyph.custom_minimum_size = Vector2(56, 56)
-		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(glyph)
-
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 2)
-	var name := Label.new()
-	name.text = "%s — sell +$%d" % [_sell_name(kind, entry, id), Shop.sell_payout(g, kind, entry)]
-	name.add_theme_font_size_override("font_size", 16)
-	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.add_child(name)
-	if kind == "captured":
-		var tag := Label.new()
-		tag.text = "Captured — convert to Stock, or sell"
-		tag.add_theme_font_size_override("font_size", 12)
-		tag.modulate = Color(1.0, 0.85, 0.6)
-		info.add_child(tag)
-	elif kind == "artefact":
-		var rarity := str(entry.get("rarity", ""))
-		if rarity != "":
-			var rlabel := Label.new()
-			rlabel.text = rarity
-			rlabel.add_theme_font_size_override("font_size", 12)
-			rlabel.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
-			info.add_child(rlabel)
-	if kind == "item" or kind == "artefact":
-		var desc_text := str(entry.get("description", ""))
-		if desc_text != "":
-			var desc := Label.new()
-			desc.text = desc_text
-			desc.add_theme_font_size_override("font_size", 12)
-			desc.modulate = Color(1, 1, 1, 0.8)
-			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			info.add_child(desc)
-	row.add_child(info)
-
-	var buttons := VBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 4)
-	if kind == "captured":
-		var convert := Button.new()
-		convert.text = "Convert ($%d)" % Shop.convert_price(g, entry) # issue 97
-		convert.disabled = not Shop.can_convert(g, entry)
-		convert.add_theme_font_size_override("font_size", 13)
-		convert.pressed.connect(func() -> void:
-			sell_expanded_kind = ""
-			sell_expanded_index = -1
-			shop_convert_pressed.emit(entry))
-		buttons.add_child(convert)
-	var sell := Button.new()
-	sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
-	sell.disabled = not Shop.can_sell(g, kind, entry)
-	sell.add_theme_font_size_override("font_size", 13)
-	sell.pressed.connect(func() -> void:
-		sell_expanded_kind = ""
-		sell_expanded_index = -1
-		shop_sell_pressed.emit(kind, entry))
-	buttons.add_child(sell)
-	row.add_child(buttons)
-	return row
-
-
-func show_reinforce() -> void:
+## NO-141 (Max, 2026-09-19): an announcement, not a shop — the pieces are
+## already in Stock by the time this shows (game.gd grants them the instant
+## pending_reinforce is consumed, before calling this); `ids` is that same
+## list, for display only. No Buy button, nothing left to choose or pay for.
+func show_reinforce(ids: Array) -> void:
 	if reinforce_panel:
 		reinforce_panel.queue_free()
 	reinforce_panel = PanelContainer.new()
@@ -1056,50 +1055,68 @@ func show_reinforce() -> void:
 	var center := CenterContainer.new()
 	reinforce_panel.add_child(center)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
+	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
 	var title := Label.new()
-	title.text = "REINFORCEMENTS"
+	title.text = "REINFORCEMENTS ARRIVED"
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := Label.new()
-	sub.text = "Wave %d cleared — restock your army's reserve, free of charge" % (g.wave - 1)
+	sub.text = "Wave %d cleared — added to Stock, free of charge" % (g.wave - 1)
 	sub.add_theme_font_size_override("font_size", 15)
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
-	for id in g._reinforce_ids():
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		row.alignment = BoxContainer.ALIGNMENT_CENTER
-		if g.textures.has(id):
-			var tex := TextureRect.new()
-			tex.texture = g.piece_tex(id)
-			tex.custom_minimum_size = Vector2(34, 34)
-			tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(tex)
-		var what := Label.new()
-		what.text = str(g.defs[id].name)
-		what.add_theme_font_size_override("font_size", 17)
-		what.custom_minimum_size = Vector2(190, 0)
-		row.add_child(what)
-		var buy := Button.new()
-		buy.text = "Buy"
-		buy.add_theme_font_size_override("font_size", 17)
-		buy.pressed.connect(func() -> void: reinforce_buy_pressed.emit(id))
-		row.add_child(buy)
-		box.add_child(row)
-	var done := Button.new()
-	done.text = "Done"
-	done.add_theme_font_size_override("font_size", 22)
-	done.pressed.connect(func() -> void:
+	box.add_child(_reinforce_group_picture(ids))
+	var dismiss := Button.new()
+	dismiss.text = "Dismiss"
+	dismiss.add_theme_font_size_override("font_size", 22)
+	dismiss.pressed.connect(func() -> void:
 		reinforce_panel.visible = false
 		reinforce_done_pressed.emit())
-	box.add_child(done)
+	box.add_child(dismiss)
 	g.hud.add_child(reinforce_panel)
 	reinforce_panel.move_to_front()
+
+
+## NO-141: same "group picture" shape as the Army carousel (NO-146) — one
+## icon per distinct piece id, de-duplicated in arrival order, with a "×N"
+## badge standing in for a repeat, rather than a row per id. Two different
+## renderings of "a group picture" for the same concept would be a bug in
+## the making (Max asked for the phrase in both places), so this mirrors
+## _army_group_picture's shape rather than inventing its own.
+func _reinforce_group_picture(ids: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	var counts := {} # insertion-ordered, so the picture follows `ids`
+	for id in ids:
+		counts[id] = counts.get(id, 0) + 1
+	for id in counts:
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		if g.textures.has(id):
+			var icon := TextureRect.new()
+			icon.texture = g.piece_tex(id)
+			icon.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			col.add_child(icon)
+		else:
+			var glyph := Label.new()
+			glyph.text = str(g.defs[id].glyph)
+			glyph.add_theme_font_size_override("font_size", 34)
+			glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(glyph)
+		if counts[id] > 1:
+			var count_label := Label.new()
+			count_label.text = "×%d" % counts[id]
+			count_label.add_theme_font_size_override("font_size", 12)
+			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(count_label)
+		row.add_child(col)
+	return row
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the

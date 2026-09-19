@@ -624,9 +624,10 @@ func _init() -> void:
 	wash.queue_free()
 	await process_frame
 
-	# --- issue 60: the full UI round-trip through the modal signals (same
-	# wiring shop_buy_pressed already exercises elsewhere in this file) —
-	# Sell mode toggle, a Sell action, and a Convert action.
+	# --- NO-144: the full UI round-trip through the modal/hud signals (same
+	# wiring shop_buy_pressed already exercises elsewhere in this file) — Sell
+	# moved off the Shop and onto the preview modal's own signal; Convert
+	# still goes through hud's own badge signal, unchanged by this slice.
 	var ui := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 1000})
 	await process_frame
@@ -634,19 +635,13 @@ func _init() -> void:
 	ui.actions_left = 5
 	ui.stock.append("pawn")
 	ui.captured.append("pawn")
-	ui._open_shop()
-	check(ui.modals.shop_panel.visible and not ui.modals.shop_sell_mode,
-		"the Shop opens fresh in Buy mode")
-	ui.modals.shop_sell_mode = true
-	ui.modals.show_shop()
-	check(ui.modals.shop_sell_mode, "the Sell toggle switches modes")
 	var ui_stock_before: int = ui.stock.size()
-	ui.modals.shop_sell_pressed.emit("piece", ui.stock[0])
-	check(ui.stock.size() == ui_stock_before - 1, "shop_sell_pressed sells through the same wiring shop_buy_pressed uses")
+	ui.modals.sell_pressed.emit("piece", ui.stock[0])
+	check(ui.stock.size() == ui_stock_before - 1, "sell_pressed sells through the same wiring shop_buy_pressed uses")
 	var ui_captured_before: int = ui.captured.size()
-	ui.modals.shop_convert_pressed.emit(ui.captured[0])
+	ui.hud.convert_pressed.emit(ui.captured[0])
 	check(ui.captured.size() == ui_captured_before - 1 and ui.stock.has("pawn"),
-		"shop_convert_pressed converts through the same wiring")
+		"hud's own Convert badge signal converts through the same wiring")
 	ui.queue_free()
 	await process_frame
 

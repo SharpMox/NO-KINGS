@@ -431,9 +431,11 @@ func show_shop() -> void:
 	title.add_theme_font_size_override("font_size", 22)
 	header.add_child(title)
 	var sub := Label.new()
-	# issue 64: buying/selling/converting are all free of the Action cost now
+	# issue 64: buying/selling/converting are all free of the Action cost now.
+	# NO-143: dropped the "no Action cost" suffix on Buy — noise, since the
+	# absence of a cost doesn't need saying on every entry.
 	sub.text = ("$%d — sell for 50%%, or convert Captured to Stock" % g.gold) \
-		if shop_sell_mode else ("$%d — no Action cost" % g.gold)
+		if shop_sell_mode else ("$%d" % g.gold)
 	sub.add_theme_font_size_override("font_size", 12)
 	sub.modulate = Color(1, 1, 1, 0.75)
 	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -486,6 +488,19 @@ func show_shop() -> void:
 	shop_lane_b_bar.value = g.shop_lane_b_progress
 	shop_lane_b_bar.show_percentage = false
 	shop_lane_b_bar.custom_minimum_size = Vector2(0, 10)
+	# NO-143: reads as a gauge — a sunken groove behind a rounded fill in
+	# Score's own colour (hud.gd:357) — rather than the bare default bar.
+	# Presentation only: value/min/max are unchanged from issue 64.
+	var gauge_bg := StyleBoxFlat.new()
+	gauge_bg.bg_color = Color(0.05, 0.05, 0.07, 0.9)
+	gauge_bg.border_color = Color(0.4, 0.4, 0.48)
+	gauge_bg.set_border_width_all(1)
+	gauge_bg.set_corner_radius_all(5)
+	var gauge_fill := StyleBoxFlat.new()
+	gauge_fill.bg_color = Color(0.95, 0.8, 0.25) # Score amber (hud.gd:357)
+	gauge_fill.set_corner_radius_all(5)
+	shop_lane_b_bar.add_theme_stylebox_override("background", gauge_bg)
+	shop_lane_b_bar.add_theme_stylebox_override("fill", gauge_fill)
 	root.add_child(shop_lane_b_bar)
 
 	var pieces_band := VBoxContainer.new()

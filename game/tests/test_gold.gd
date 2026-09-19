@@ -88,6 +88,13 @@ func _init() -> void:
 	# observation never pulses" from boot's own timing.
 	hud._score_seen = false
 	hud._gold_seen = false
+	# _gain_tweens is a persistent record keyed by counter name that nothing
+	# ever erases — the earlier, entirely legitimate gains above already
+	# wrote "gold"/"score" into it, and that record outlives the seen-flags
+	# above. Clearing it is part of constructing "unseen", not an
+	# afterthought: without it, the check below asks "has this key ever
+	# existed" when it means "did THIS call start a tween".
+	hud._gain_tweens.clear()
 	hud.refresh() # baseline only
 	check(not hud._gain_tweens.has("gold") and not hud._gain_tweens.has("score"),
 		"the first observation never pulses (baseline only, not a gain)")

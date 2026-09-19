@@ -118,6 +118,13 @@ func _init() -> void:
 	# from coincidentally crossing one between here and the assertion.
 	hc.clock_ms = 300500.0
 	hud._clock_seen = false
+	# _gain_tweens is a persistent record keyed by counter name that nothing
+	# ever erases — the per-frame drain above may already have shaken across
+	# a minute boundary before this point, writing "clock" into it, and that
+	# record outlives _clock_seen. Clearing it is part of constructing
+	# "unseen", not an afterthought: without it, the check below asks "has
+	# this key ever existed" when it means "did THIS call start a tween".
+	hud._gain_tweens.clear()
 	hud.update_clock(hc.clock_ms) # baseline only
 	check(not hud._gain_tweens.has("clock") and not hud._clock_urgent_on,
 		"the first observation never animates (baseline only, nothing to compare yet)")

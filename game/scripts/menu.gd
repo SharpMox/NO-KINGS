@@ -1106,11 +1106,7 @@ func _ready() -> void:
 		var tier_row := HBoxContainer.new()
 		tier_row.add_theme_constant_override("separation", 10)
 		rank_box.add_child(tier_row)
-		var tier_icon := Label.new()
-		tier_icon.text = _tier_icon_text(tier_name)
-		tier_icon.add_theme_font_size_override("font_size", 18)
-		tier_icon.custom_minimum_size = Vector2(70, 0)
-		tier_row.add_child(tier_icon)
+		tier_row.add_child(_tier_icon(tier_name))
 		var tier_col := VBoxContainer.new()
 		tier_col.add_theme_constant_override("separation", 2)
 		tier_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1449,14 +1445,29 @@ func _army_group_picture(army: Array) -> Control:
 	return row
 
 
-## NO-148: a filled/hollow dot meter standing in for real tier artwork — none
-## exists in game/assets (checked before writing this). Derived from
-## Tuning.tier_index like the description below, not authored per tier, so
-## it is a placeholder that is at least never wrong. Flagged in the ticket
-## report: swap this for painted icons by replacing this one function.
-func _tier_icon_text(tier_name: String) -> String:
-	var idx := Tuning.tier_index(tier_name)
-	return "●".repeat(idx + 1) + "○".repeat(Tuning.TIERS.size() - idx - 1)
+## NO-148 (Max, 2026-09-20): piece token per tier, ascending through his own
+## ladder order — Pawn, Rook, Bishop, Knight, Queen. (His list read "Pawn Rook
+## ... Knight Queen"; Bishop is the piece he meant by "Tower", which has no
+## art or codex id — confirmed directly.) Replaces the dot-meter placeholder.
+const TIER_PIECE_IDS := ["pawn", "rook", "bishop", "knight", "queen"]
+
+## Player-side token for `tier_name`, same TextureRect idiom as the Army
+## carousel's group picture (_army_group_picture): 40x40, EXPAND_IGNORE_SIZE +
+## STRETCH_KEEP_ASPECT_CENTERED so the 192x192 source doesn't override the
+## minimum size. 40x40 fits inside the row's existing 70px icon column
+## (carried over unchanged below) with room to spare — Tuning.OFFBOARD_ICON
+## (72px) is sized for the off-board strip, not a menu row, and would crowd
+## the description text beside it.
+func _tier_icon(tier_name: String) -> Control:
+	var wrap := CenterContainer.new()
+	wrap.custom_minimum_size = Vector2(70, 0)
+	var icon := TextureRect.new()
+	icon.texture = GameScript.load_piece_tex(TIER_PIECE_IDS[Tuning.tier_index(tier_name)])
+	icon.custom_minimum_size = Vector2(40, 40)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	wrap.add_child(icon)
+	return wrap
 
 
 ## NO-148 (Max, 2026-09-19): each tier's description states its OWN new

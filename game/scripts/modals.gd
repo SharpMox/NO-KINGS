@@ -648,21 +648,19 @@ func show_shop() -> void:
 	# issue 64: Lane B restock progress — Score banked toward the next
 	# Score-driven restock (Lane A, every 5 Waves, needs no bar: it's a
 	# guaranteed beat, not something to watch fill).
-	var lane_b_row := HBoxContainer.new()
-	lane_b_row.add_theme_constant_override("separation", 6)
-	var lane_b_label := Label.new()
-	lane_b_label.text = "Next restock: %d / %d Score" \
-		% [g.shop_lane_b_progress, Tuning.SHOP_LANE_B_SCORE]
-	lane_b_label.add_theme_font_size_override("font_size", 11)
-	lane_b_label.modulate = Color(1, 1, 1, 0.7)
-	lane_b_row.add_child(lane_b_label)
-	root.add_child(lane_b_row)
 	shop_lane_b_bar = ProgressBar.new()
 	shop_lane_b_bar.min_value = 0
 	shop_lane_b_bar.max_value = Tuning.SHOP_LANE_B_SCORE
 	shop_lane_b_bar.value = g.shop_lane_b_progress
 	shop_lane_b_bar.show_percentage = false
-	shop_lane_b_bar.custom_minimum_size = Vector2(0, 10)
+	# NO-143 (Max, 2026-09-20): the label moves INSIDE the bar, so the bar has
+	# to be tall enough to hold it — sized off the label's own font metrics
+	# (ThemeDB.fallback_font, since the bar isn't in the tree yet to ask its
+	# own theme) plus 4px breathing room (2 top, 2 bottom), not a guessed
+	# round number.
+	var restock_font_size := 12
+	var restock_line_h := ThemeDB.fallback_font.get_height(restock_font_size)
+	shop_lane_b_bar.custom_minimum_size = Vector2(0, restock_line_h + 4)
 	# NO-143: reads as a gauge — a sunken groove behind a rounded fill in
 	# Score's own colour (hud.gd:357) — rather than the bare default bar.
 	# Presentation only: value/min/max are unchanged from issue 64.
@@ -676,6 +674,27 @@ func show_shop() -> void:
 	gauge_fill.set_corner_radius_all(5)
 	shop_lane_b_bar.add_theme_stylebox_override("background", gauge_bg)
 	shop_lane_b_bar.add_theme_stylebox_override("fill", gauge_fill)
+	# NO-143: the label lives INSIDE the bar now (was a separate row above
+	# it) — "Restock: %d /%d" is Max's own spacing, space before the slash,
+	# none after, reproduced literally, not tidied. FULL_RECT + centred both
+	# ways so it sits in the middle of the gauge regardless of fill width.
+	# White-on-black outline reads against both the dark groove and the
+	# amber fill as the fill crosses under it — a flat colour can't do both.
+	# MOUSE_FILTER_IGNORE: CLAUDE.md's "a visible Control absorbs clicks
+	# before _unhandled_input runs" — this Label sits inside a Shop panel
+	# with its own swipe/click handling, so it must not be able to eat a
+	# press meant for the panel underneath.
+	var lane_b_label := Label.new()
+	lane_b_label.text = "Restock: %d /%d" % [g.shop_lane_b_progress, Tuning.SHOP_LANE_B_SCORE]
+	lane_b_label.add_theme_font_size_override("font_size", restock_font_size)
+	lane_b_label.add_theme_color_override("font_color", Color.WHITE)
+	lane_b_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lane_b_label.add_theme_constant_override("outline_size", 3)
+	lane_b_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lane_b_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lane_b_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lane_b_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop_lane_b_bar.add_child(lane_b_label)
 	root.add_child(shop_lane_b_bar)
 
 	var pieces_band := VBoxContainer.new()

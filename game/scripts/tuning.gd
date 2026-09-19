@@ -24,6 +24,30 @@ const PANEL_SLIDE_S := 0.18
 ## ICON of ~52 in hud.gd).
 const OFFBOARD_ICON := 72.0
 
+## NO-132: the one column-count standard for every off-board grid (Shop,
+## Inventory Drawer, Stock Drawer, and whatever NO-133/NO-142 build next). A
+## grid spanning the full screen width uses this many columns; a narrower
+## one computes its own cap with grid_cols() below, off the SAME cell size
+## and separation, so nothing is a hand-picked number that happens to agree.
+const OFFBOARD_GRID_COLS := 5
+
+## NO-132: how many OFFBOARD_ICON cells, `sep` apart, fit in `avail_w` —
+## capped at OFFBOARD_GRID_COLS so a wide container never exceeds the
+## standard just because it has the room.
+static func grid_cols(avail_w: float, sep: float) -> int:
+	var fit := int(floor((avail_w + sep) / (OFFBOARD_ICON + sep)))
+	return clampi(fit, 1, OFFBOARD_GRID_COLS)
+
+## NO-132: the pixel width of a full `cols`-wide row. A GridContainer inside
+## a CenterContainer shrinks to whatever it actually holds, so a row with
+## fewer than `cols` entries gets centered as its OWN smaller block — sliding
+## into the middle of the lane instead of sitting at columns 1..n. Forcing
+## the GridContainer's custom_minimum_size.x to this fixed width first means
+## the CenterContainer centers the FULL row instead: the reserved box never
+## shrinks, and the actual cells still pack from the grid's own left edge.
+static func grid_row_w(cols: int, sep: float) -> float:
+	return cols * OFFBOARD_ICON + maxi(cols - 1, 0) * sep
+
 ## Newest-first run log, capped so the file cannot grow forever. Lives here
 ## rather than in economy.gd because leaderboard.gd needs it too and preloading
 ## economy there drags in the whole gameplay chain -- which is why that file

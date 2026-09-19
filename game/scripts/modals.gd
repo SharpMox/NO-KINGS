@@ -74,8 +74,20 @@ var sell_expanded_index := -1 # index into the matching g.stock/g.captured/
 ## live Stock (unbounded), and either one would overflow a single-row
 ## HBoxContainer well before it overflowed this column's width. Arithmetic,
 ## not taste: 5 x 72 + 4 x 4 = 376 fits the drawer's ~412px content width
-## (draw_w 432 minus the 10px margins each side); 6 would need 452.
-const SHOP_PIECES_COLS := 5
+## (draw_w 432 minus the 10px margins each side); 6 would need 452. NO-132
+## folds this into the site-wide standard — Tuning.OFFBOARD_GRID_COLS is the
+## same 5, so the band no longer carries its own agreeing constant.
+##
+## NO-132: the lower band's ARTEFACTS/ITEMS (left_col) and BOXES/CAPTURED
+## (right_col) split the same 412px on `lower`'s 1.15 / 0.85 stretch ratio,
+## less its own 8px separation: left ~232px, right ~172px. At the same 4px
+## separation, Tuning.grid_cols gives left_col 3 columns (76*3-4=224 <= 232)
+## and right_col 2 (76*2-4=148 <= 172; 76*3-4=224 does not fit). Neither
+## reaches the 5-column standard — the drawer is only 90% of the 480px
+## screen, and this band is one of two side by side in it.
+const SHOP_SUBZONE_LEFT_W := 232.0
+const SHOP_SUBZONE_RIGHT_W := 172.0
+const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
@@ -490,18 +502,22 @@ func show_shop() -> void:
 		pieces_band.add_child(_shop_zone_label("STOCK"))
 		pieces_band.add_child(_piece_grid(func(i: int) -> Button: return _sell_tile("piece", i),
 			g.stock.size()))
-		left_col.add_child(_sell_sub_zone("ARTEFACTS", "artefact", g.artefacts.size()))
-		left_col.add_child(_sell_sub_zone("ITEMS", "item", g.items.size()))
-		right_col.add_child(_sell_sub_zone("CAPTURED", "captured", g.captured.size()))
+		var left_cols := Tuning.grid_cols(SHOP_SUBZONE_LEFT_W, SHOP_SUBZONE_SEP) # NO-132
+		var right_cols := Tuning.grid_cols(SHOP_SUBZONE_RIGHT_W, SHOP_SUBZONE_SEP) # NO-132
+		left_col.add_child(_sell_sub_zone("ARTEFACTS", "artefact", g.artefacts.size(), left_cols))
+		left_col.add_child(_sell_sub_zone("ITEMS", "item", g.items.size(), left_cols))
+		right_col.add_child(_sell_sub_zone("CAPTURED", "captured", g.captured.size(), right_cols))
 	else:
 		var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
 		for i in g.shop_stock.size():
 			by_kind[g.shop_stock[i].kind].append(i)
 		pieces_band.add_child(_shop_zone_label("PIECES"))
 		pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
-		left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact))
-		left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item))
-		right_col.add_child(_shop_sub_zone("BOXES", by_kind.box))
+		var left_cols := Tuning.grid_cols(SHOP_SUBZONE_LEFT_W, SHOP_SUBZONE_SEP) # NO-132
+		var right_cols := Tuning.grid_cols(SHOP_SUBZONE_RIGHT_W, SHOP_SUBZONE_SEP) # NO-132
+		left_col.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, left_cols))
+		left_col.add_child(_shop_sub_zone("ITEMS", by_kind.item, left_cols))
+		right_col.add_child(_shop_sub_zone("BOXES", by_kind.box, right_cols))
 	root.add_child(pieces_band)
 	root.add_child(lower)
 
@@ -613,18 +629,25 @@ func _shop_zone_label(text: String) -> Label:
 	return l
 
 
-## NO-119: the PIECES/STOCK band's own centered, wrapping grid — SHOP_PIECES_COLS
-## wide, built from whatever `tile_of` returns (a _shop_tile or _sell_tile
-## closure) for each of `indices` (an Array of shop-slot indices, or a plain
-## count for Sell mode's `for i in g.stock.size()`). Kept separate from
-## _shop_sub_zone below: that one expands to fill a fixed-height column, this
-## one sits in a top band sized to its own content.
+## NO-119: the PIECES/STOCK band's own centered, wrapping grid —
+## Tuning.OFFBOARD_GRID_COLS wide, built from whatever `tile_of` returns (a
+## _shop_tile or _sell_tile closure) for each of `indices` (an Array of
+## shop-slot indices, or a plain count for Sell mode's `for i in
+## g.stock.size()`). Kept separate from _shop_sub_zone below: that one
+## expands to fill a fixed-height column, this one sits in a top band sized
+## to its own content.
+##
+## NO-132: custom_minimum_size.x is forced to the FULL row's width (see
+## Tuning.grid_row_w) before the CenterContainer sees it, so fewer than
+## Tuning.OFFBOARD_GRID_COLS tiles still start at column 1 — a 3-piece row
+## sits at columns 1-3, not centered across the whole band.
 func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
 	var center := CenterContainer.new()
 	var grid := GridContainer.new()
-	grid.columns = SHOP_PIECES_COLS
+	grid.columns = Tuning.OFFBOARD_GRID_COLS
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
+	grid.custom_minimum_size.x = Tuning.grid_row_w(Tuning.OFFBOARD_GRID_COLS, 4.0) # NO-132
 	for i in indices:
 		grid.add_child(tile_of.call(i))
 	center.add_child(grid)
@@ -635,7 +658,13 @@ func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
 ## lower block's height — this is what gives ARTEFACTS/ITEMS their upper/lower
 ## halves and BOXES the full height of the lower-right (money-and-shop/04
 ## kept the logic; shop-drawer-ui/08 is only the geometry).
-func _shop_sub_zone(title_text: String, indices: Array) -> VBoxContainer:
+##
+## NO-132: `cols` is the caller's Tuning.grid_cols() result for its own share
+## of the lower band (SHOP_SUBZONE_LEFT_W/RIGHT_W above) — left_col and
+## right_col differ, so this can no longer hardcode one column count for
+## both. custom_minimum_size.x reserves the full `cols`-wide row the same way
+## _piece_grid does, so a short row aligns instead of centering itself.
+func _shop_sub_zone(title_text: String, indices: Array, cols: int) -> VBoxContainer:
 	var wrap := VBoxContainer.new()
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	wrap.add_theme_constant_override("separation", 4)
@@ -643,9 +672,10 @@ func _shop_sub_zone(title_text: String, indices: Array) -> VBoxContainer:
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
+	grid.columns = cols
+	grid.add_theme_constant_override("h_separation", SHOP_SUBZONE_SEP)
+	grid.add_theme_constant_override("v_separation", SHOP_SUBZONE_SEP)
+	grid.custom_minimum_size.x = Tuning.grid_row_w(cols, SHOP_SUBZONE_SEP) # NO-132
 	for i in indices:
 		grid.add_child(_shop_tile(i))
 	center.add_child(grid)
@@ -887,8 +917,9 @@ func _sell_tile(kind: String, index: int) -> Button:
 
 
 ## Labeled, centered grid of sell tiles for one kind — same geometry as
-## _shop_sub_zone (a held-entry index range instead of a slot index list).
-func _sell_sub_zone(title_text: String, kind: String, count: int) -> VBoxContainer:
+## _shop_sub_zone (a held-entry index range instead of a slot index list),
+## including its NO-132 `cols` parameter and row-width alignment fix.
+func _sell_sub_zone(title_text: String, kind: String, count: int, cols: int) -> VBoxContainer:
 	var wrap := VBoxContainer.new()
 	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	wrap.add_theme_constant_override("separation", 4)
@@ -896,9 +927,10 @@ func _sell_sub_zone(title_text: String, kind: String, count: int) -> VBoxContain
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
+	grid.columns = cols
+	grid.add_theme_constant_override("h_separation", SHOP_SUBZONE_SEP)
+	grid.add_theme_constant_override("v_separation", SHOP_SUBZONE_SEP)
+	grid.custom_minimum_size.x = Tuning.grid_row_w(cols, SHOP_SUBZONE_SEP) # NO-132
 	for i in count:
 		grid.add_child(_sell_tile(kind, i))
 	center.add_child(grid)

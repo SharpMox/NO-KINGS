@@ -81,11 +81,14 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## paid, and 36 needs 50. 75/50 only clear that budget if either the Clock
 ## shrinks or Score/Gold do; the ticket protects the Clock specifically, but
 ## Score/Gold shrinking to fit was left open, so that's the lever pulled
-## here: CLOCK_FONT drops 36 -> 15 (get_height 22px, the largest that fits;
-## 16 -> 23px missed by 1px). 15 is legible — it's the same size the ⚑ Wave
-## counter already ships at (COUNTER_FONT) — but it costs the Clock its old
-## visual prominence as the biggest thing in the Header; it now reads at
-## the same size as the smallest counters instead of 2x their height.
+## here: CLOCK_FONT drops 36 -> 15 (get_height 22px). 16 (23px) lands
+## exactly on the 23px boundary with zero slack against rounding; 15 leaves
+## 1px, matching how tight this same column's fit already ran before this
+## ticket (SCORE_FONT's comment: 109 of 110, never landed on the exact
+## edge). 15 is legible — it's the same size the ⚑ Wave counter already
+## ships at (COUNTER_FONT) — but it costs the Clock its old visual
+## prominence as the biggest thing in the Header; it now reads at the same
+## size as the smallest counters instead of 2x their height.
 const HEADER_H := 75.0
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
 const HEADER_PAD_Y := 2.0 ## NO-125: halved from 4 — the only slack left once HEADER_H is at its content floor

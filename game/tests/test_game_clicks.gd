@@ -1670,18 +1670,26 @@ func _init() -> void:
 	await process_frame
 	check(game.hud.multi_confirm_btn.visible and game.hud.multi_confirm_btn.text == "Extract 1",
 		"picking a piece shows the Extract confirm")
-	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing") —
-	# NO-124: Cancel is the same "reopen the drawer, tap the armed chip again"
-	# gesture every Item uses, since the floating button no longer opens a
-	# second gate with its own Cancel.
-	check(await _click_inventory(game, "Inventory 1"), "Inventory reopens to reach the armed chip")
-	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
-		"tapping the armed chip cancels Extraction")
+	# Cancel costs nothing (CLAUDE.md: "a cancelled targeting costs nothing").
+	# NO-137 SUPERSEDED NO-124's cancel gesture here: this block used to
+	# reopen the Inventory drawer and tap the armed chip again, but NO-137's
+	# backdrop is MOUSE_FILTER_STOP over the whole deck (Shop/Inventory/
+	# Ability/Pass) WHILE CONFIRM IS SHOWING — "these are not clickable right
+	# now" is the ticket's own wording — so that reopen click is now
+	# absorbed on purpose. Don't restore the reopen-and-retap version on the
+	# grounds that it "used to pass"; cancel through multi_cancel_btn
+	# instead, same as a player now must. The observable CONSEQUENCE is
+	# unchanged (CLAUDE.md: "assert the observable consequence, never the
+	# flag that was just written") — item_active/items/board(4,4) below are
+	# the same assertions the old gesture made.
+	_click(game.hud.multi_cancel_btn.get_global_rect().get_center())
 	await process_frame
 	check(game.item_active == -1 and not game.items.is_empty() and game.board.has(Vector2i(4, 4)),
-		"NO-124: cancelling disarms Extraction entirely — nothing spent, board untouched")
+		"NO-124/NO-137: cancelling disarms Extraction entirely — nothing spent, board untouched")
 	# NO-85 story 58: cancelling always reopens the Drawer, on its own slide
 	# (NO-118) — settle before clicking into it, same as every other reopen.
+	# _confirm_target_cancelled (game.gd) reopens Inventory the same way the
+	# old chip-tap cancel did.
 	await _await_drawer_settled(game, "inventory")
 	check(await _click_grid_cell(game.hud.items_grid, "extraction"),
 		"Extraction re-armable after a cancel")

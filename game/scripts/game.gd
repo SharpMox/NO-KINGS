@@ -4284,17 +4284,9 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
-	var blast_counts := {} # NO-122: tile -> how many blast zones cover it
-	for pos in _bomb_highlight_tiles():
-		blast_counts[pos] = blast_counts.get(pos, 0) + 1
-	for pos in blast_counts: # faint red wash over what a bomb would destroy
-		var blast_rect := Rect2(_tile_px(pos), Vector2(tile, tile))
-		draw_rect(blast_rect, Color(COL_CAPTURE, 0.22))
-		if blast_counts[pos] > 1: # overlap: alpha-stacking alone reads as one wash
-			_draw_crosshatch(blast_rect)
-	if item_active >= 0: # item targeting: cyan rings, stage-A pick in yellow
-		for t in item_targets:
-			draw_arc(_tile_px(t) + Vector2(tile, tile) / 2, tile * 0.38, 0, TAU, 24, Color(0.25, 0.8, 0.85), 3.0)
+	_draw_target_zone(_bomb_highlight_tiles()) # NO-122 wash, NO-130 shared
+	if item_active >= 0: # item targeting: same zone indicator as the bomb
+		_draw_target_zone(item_targets) # NO-130: "what this will affect"
 		if item_stage_a.x >= 0:
 			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
 		for s in item_selected: # multi picks fill like the stage-A tile
@@ -4316,7 +4308,8 @@ func _draw() -> void:
 				Color(COL_CAPTURE, CAPTURE_RING_ALPHA), CAPTURE_RING_WIDTH) # NO-129: larger + semi-transparent
 	# NO-129: one outline around the whole reachable zone, so a spread of
 	# move/capture squares reads as a shape rather than each square drawn on
-	# its own — reusable, NO-130 calls _draw_zone_outline for an Item's zone.
+	# its own — reused by NO-130's _draw_target_zone for the bomb blast
+	# preview and an armed Item's zone.
 	if not legal_dests.is_empty():
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 			else Color(COL_MOVE, ZONE_OUTLINE_ALPHA))
@@ -4398,11 +4391,34 @@ func _draw() -> void:
 			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW, 3.0, 14.0, 8.0)
 
 
+## NO-130: "this is what the thing you are holding will affect" — a
+## COL_CAPTURE wash per tile, a cross-hatch where more than one zone covers
+## the same tile (NO-122), and the perimeter outline below (NO-129) so a
+## spread reads as one shape. Shared by the bomb blast preview and an armed
+## Item's target zone: one indicator, one meaning, one place to change it.
+func _draw_target_zone(tiles: Array[Vector2i]) -> void:
+	if tiles.is_empty():
+		return
+	var counts := {} # tile -> how many zones cover it
+	var unique: Array[Vector2i] = [] # deduped, so an overlap tile's own
+		# perimeter edges aren't drawn (and alpha-stacked) twice below
+	for pos in tiles:
+		if not counts.has(pos):
+			unique.append(pos)
+		counts[pos] = counts.get(pos, 0) + 1
+	for pos in unique:
+		var r := Rect2(_tile_px(pos), Vector2(tile, tile))
+		draw_rect(r, Color(COL_CAPTURE, 0.22))
+		if counts[pos] > 1: # overlap: alpha-stacking alone reads as one wash
+			_draw_crosshatch(r)
+	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA))
+
+
 ## NO-129: outlines the PERIMETER of a tile set as one shape — an edge is
 ## drawn only where a tile's neighbour is outside the set, so a spread of
 ## squares reads as a silhouette instead of each square boxed on its own
-## (which read as scattered marks). Reusable: NO-130 calls this for an armed
-## Item's own target zone, same as the move/capture call site in `_draw`.
+## (which read as scattered marks). Reusable: NO-130's `_draw_target_zone`
+## calls this for both the bomb blast preview and an armed Item's zone.
 func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH) -> void:
 	for t in tiles:
 		var px := _tile_px(t)

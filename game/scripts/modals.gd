@@ -92,6 +92,15 @@ var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
 	# just the panel field, not a Buff-specific behaviour
+## NO-133: the Box pick rebuilt as a select-then-confirm icon grid, same shape
+## as the Shop's own tiles (shop_expanded_index / _shop_dock above) — a tap
+## selects a tile and fills the dock below with its description; it takes a
+## second tap on the dock's Pick button to actually commit.
+var box_expanded_index := -1 # which offered tile is selected, -1 = none
+var _box_options: Array = [] # the options show_box was last called with, so
+	# _box_tile/_box_detail can read by index without re-threading the array
+	# through every closure the way _shop_tile reads g.shop_stock directly
+var _box_dock: PanelContainer # refilled on a tile tap — same idiom as _shop_dock
 
 
 func build(game) -> void:
@@ -1205,6 +1214,131 @@ func hide_choice_pick() -> void:
 		buff_panel = null
 
 
+## Icon for a Box option — mirrors _shop_icon's per-kind vocabulary, reading
+## a Box option's shape (kind/name/description/payload/tier) instead of a
+## shop_stock slot's.
+func _box_icon(opt: Dictionary) -> Variant:
+	match opt.kind:
+		"piece":
+			return g.piece_tex(opt.payload) if g.textures.has(opt.payload) else g.defs[opt.payload].glyph
+		"item":
+			return g.item_icons[opt.payload.key] if g.item_icons.has(opt.payload.key) else "✦"
+		_: # "artefact"
+			return g.artefact_tex(opt.payload.key)
+
+
+## One icon tile per offered option (NO-133: was a full-width button carrying
+## its own header + description text, which is what overflowed a phone
+## screen once a Huge Box's 7 options stacked one per row). Tapping SELECTS
+## it — box_expanded_index drives _fill_box_dock() below, same select-then-
+## confirm shape NO-121/124 gave Items and NO-119 gave every other grid.
+## meta.box_index exists for the click probes, same role meta.shop_index
+## plays for _shop_tile.
+func _box_tile(index: int) -> Button:
+	var opt: Dictionary = _box_options[index]
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
+	btn.clip_text = true
+	btn.set_meta("box_index", index)
+	var icon: Variant = _box_icon(opt)
+	if icon is Texture2D:
+		btn.icon = icon
+		btn.expand_icon = true
+	else:
+		btn.text = str(icon)
+		btn.add_theme_font_size_override("font_size", 16)
+	btn.tooltip_text = opt.name
+	if opt.kind == "artefact": # issue 20: rarity legibility, same as _shop_tile
+		var rarity := str(opt.payload.get("rarity", ""))
+		if rarity != "":
+			btn.self_modulate = Tuning.ARTEFACT_RARITY_COLOR[rarity]
+	btn.pressed.connect(func() -> void:
+		box_expanded_index = -1 if box_expanded_index == index else index
+		_fill_box_dock())
+	return btn
+
+
+## The dock's content for the selected tile (or the hint) — refilled on every
+## tap, same shape as _fill_shop_dock.
+func _fill_box_dock() -> void:
+	for c in _box_dock.get_children():
+		c.free()
+	if box_expanded_index >= 0 and box_expanded_index < _box_options.size():
+		_box_dock.add_child(_box_detail(box_expanded_index))
+	else:
+		var hint := Label.new()
+		hint.text = "Tap an entry for details"
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		hint.modulate = Color(1, 1, 1, 0.5)
+		hint.add_theme_font_size_override("font_size", 13)
+		_box_dock.add_child(hint)
+
+
+## The expanded option: icon, name/kind header, effect text and a Pick
+## confirm — the second tap of the select-then-confirm pair. meta.box_pick
+## exists for the click probes, same role meta.shop_index plays for _shop_tile.
+func _box_detail(index: int) -> Control:
+	var opt: Dictionary = _box_options[index]
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var icon: Variant = _box_icon(opt)
+	if icon is Texture2D:
+		var tex := TextureRect.new()
+		tex.texture = icon
+		tex.custom_minimum_size = Vector2(56, 56)
+		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(tex)
+	else:
+		var glyph := Label.new()
+		glyph.text = str(icon)
+		glyph.add_theme_font_size_override("font_size", 34)
+		glyph.custom_minimum_size = Vector2(56, 56)
+		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(glyph)
+
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 2)
+	var header := ""
+	match opt.kind:
+		"piece":
+			header = "♟ %s — Piece · joins Stock" % opt.name
+		"item":
+			header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
+		"artefact":
+			var rarity: String = str(opt.payload.get("rarity", ""))
+			header = "◈ %s — Artefact%s · passive, rest of the run" \
+				% [opt.name, (" · %s" % rarity) if rarity != "" else ""]
+	var name := Label.new()
+	name.text = header
+	name.add_theme_font_size_override("font_size", 14)
+	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if opt.kind == "artefact": # issue 20: rarity legibility
+		var rarity: String = str(opt.payload.get("rarity", ""))
+		if rarity != "":
+			name.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
+	info.add_child(name)
+	var desc := Label.new()
+	desc.text = opt.description
+	desc.add_theme_font_size_override("font_size", 12)
+	desc.modulate = Color(1, 1, 1, 0.8)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.add_child(desc)
+	row.add_child(info)
+
+	var pick := Button.new()
+	pick.text = "Pick"
+	pick.set_meta("box_pick", true)
+	pick.add_theme_font_size_override("font_size", 15)
+	pick.pressed.connect(func() -> void: box_chosen.emit(opt))
+	row.add_child(pick)
+	return row
+
+
 func show_box(options: Array) -> void:
 	# Above everything, like every other panel. Without this a Box could open
 	# behind the Shop — reachable on any restock wave that also queues a Bounty
@@ -1212,35 +1346,27 @@ func show_box(options: Array) -> void:
 	# the Shop, could not act, and the clock kept draining, because Box Pick is
 	# deliberately excluded from the tier pause list.
 	box_panel.move_to_front()
+	_box_options = options
+	box_expanded_index = -1 # NO-133: a fresh render — reroll/sell also call
+		# back in here with a new/changed offer, so nothing carries over
 	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
 		# top of a Box's own native picks (Huge = 2 — issue 47)
 	var title := "▣ %s %s Box — pick %d:" % [
 		str(g.box_size).capitalize(), str(g.box_only_kind).capitalize(), picks]
 	var box := _box_vbox(title)
-	for opt in options:
-		var b := Button.new()
-		var header := ""
-		match opt.kind:
-			"piece":
-				header = "♟ %s — Piece · joins Stock" % opt.name
-			"item":
-				header = "⚔ %s — Item · %s · single use" % [opt.name, opt.tier]
-			"artefact":
-				var rarity: String = str(opt.payload.get("rarity", ""))
-				header = "◈ %s — Artefact%s · passive, rest of the run" \
-					% [opt.name, (" · %s" % rarity) if rarity != "" else ""]
-		b.text = header + "\n" + opt.description
-		if opt.kind == "item" and g.item_icons.has(opt.payload.key):
-			b.icon = g.item_icons[opt.payload.key]
-			b.add_theme_constant_override("icon_max_width", 30)
-		if opt.kind == "artefact": # issue 20: rarity legibility
-			var rarity: String = str(opt.payload.get("rarity", ""))
-			if rarity != "":
-				b.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
-		b.add_theme_font_size_override("font_size", 16)
-		b.custom_minimum_size = Vector2(420, 0)
-		b.pressed.connect(func() -> void: box_chosen.emit(opt))
-		box.add_child(b)
+	# NO-133: the icon grid (was one full-width button per option, each two
+	# lines of header + description — that's what overflowed a phone screen
+	# once a Huge Box's 7 options stacked). _piece_grid is the same NO-132
+	# helper the Shop's own PIECES/STOCK band uses, so a Small Box's 3 tiles
+	# still start at column 1 instead of centering as their own short block.
+	box.add_child(_piece_grid(_box_tile, options.size()))
+	_box_dock = PanelContainer.new()
+	_box_dock.custom_minimum_size = Vector2(0, 92) # matches _shop_dock's own fixed height
+	var dock_bg := StyleBoxFlat.new()
+	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
+	_box_dock.add_theme_stylebox_override("panel", dock_bg)
+	_fill_box_dock()
+	box.add_child(_box_dock)
 	if g.box_only_kind == "item" and not ItemLogic.has_room(g):
 		# NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
 		# Box. The Shop cannot open under it (one modal at a time), and issue

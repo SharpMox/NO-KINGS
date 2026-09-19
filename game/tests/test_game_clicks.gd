@@ -1397,44 +1397,59 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
 
-	# NO-128 (coordinator review 2026-09-19, second round): SETUP starting
-	# collapsed (checked above) sidesteps army_band entirely, so it doesn't
-	# by itself prove the click-transparency fix (hud.gd) — the case that
-	# needs proving is the player reopening the band mid-SETUP via the
-	# wedge. Row 0 is the row army_band's own geometry fully covers at a
-	# tile's CENTER (the point every click helper in this file targets):
-	# ARMY_BAND_H (78) exceeds one tile (~51) by more than the 6px gap
-	# between the board and the deck, so army_band's top edge sits above
-	# row 0's own top edge with margin to spare. Arm and place a second
-	# piece there, then reopen the band and tap-tap relocate it — if the
-	# transparency fix regressed, the band would eat the first tap and
-	# neither board.has() call below would change.
-	check(await _click_stock(game), "Stock button reopens the drawer again")
+	# NO-128 (coordinator review 2026-09-19, third round): the second-round
+	# version of this check threaded through the ~130 lines of SETUP state
+	# above (which tile was empty, which drawer was open, whether an extra
+	# outside tap was needed) and broke 4 checks, most likely one root cause
+	# cascading through the rest — exactly the fragility flagged when it was
+	# written. Rather than keep chasing it through someone else's state, a
+	# dedicated, freshly-booted SETUP scenario is simpler and worth more:
+	# the only state in play here is what this block itself creates.
+	game.queue_free()
 	await process_frame
-	var live_stack2: Button = game.pool_box.filter(func(b: Node) -> bool:
+	GameScript.next_config = {} # fresh run -> SETUP placement phase
+	GameScript.next_army = "Crown"
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(game.state == game.State.SETUP, "army_band transparency: fresh SETUP boot")
+	check(not game.hud.army_band.visible and game.hud.army_band_reopen.visible,
+		"army_band transparency: starts collapsed, same as the earlier SETUP check")
+	await _await_drawer_settled(game, "stock") # SETUP opens Stock on boot
+	var tband_stack: Button = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
-	_click(live_stack2.get_global_rect().get_center())
+	_click(tband_stack.get_global_rect().get_center())
 	await process_frame
 	await process_frame
-	# an outside tap closes the drawer first (mirrors the (6,3) -> (6,1)
-	# pair just above) — placing on the very next tap, without it, would
-	# only dismiss the drawer and leave the piece still armed.
+	check(game.placing_id != "", "army_band transparency: arming succeeds")
+	# an outside tap dismisses Stock before the placement tap, same pattern
+	# as every other SETUP placement in this file (e.g. the (6,3) -> (6,1)
+	# pair above, before this block replaced its own copy of that pattern).
 	_click(game._tile_px(Vector2i(6, 3)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.placing_id != "" and game.drawer_open == "",
-		"outside tap closes the drawer but keeps the armed piece, again")
+		"army_band transparency: outside tap dismisses Stock, keeps the armed piece")
+	# Row 0 is the row army_band's own geometry fully covers at a tile's
+	# CENTER point (the point every click helper in this file targets):
+	# ARMY_BAND_H (78) exceeds one tile (~51) by more than the 6px gap
+	# between the board and the deck, verified by hand against the formula,
+	# not measured.
 	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(0, 0)),
-		"a second piece lands at row 0, under where army_band opens")
+		"army_band transparency: places at row 0, under where the band opens")
 	_click(game.hud.army_band_reopen.get_global_rect().get_center())
-	check(game.hud.army_band.visible, "the wedge reopens army_band mid-SETUP")
+	check(game.hud.army_band.visible, "army_band transparency: the wedge reopens it mid-SETUP")
+	# tap-tap relocate — both taps land inside army_band's now-open rect.
+	# If the transparency fix regressed, the band eats the first tap and
+	# neither board.has() call below changes.
 	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	_click(game._tile_px(Vector2i(3, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(3, 0)) and not game.board.has(Vector2i(0, 0)),
-		"setup: a tap-tap relocate reaches the board even under the OPEN band")
+		"army_band transparency: a tap-tap relocate reaches the board even under the OPEN band")
 
 	# clearing the last enemy auto-passes the turn; first, the two properties
 	# that need MORE THAN ONE captured piece to mean anything (user 2026-09-10):

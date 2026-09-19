@@ -1631,10 +1631,11 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	# activatable is true, because a passive cell is disabled above and a
 	# disabled Button never fires `pressed` — connecting it unconditionally
 	# here (rather than only inside the activatable branch) changes nothing.
-	# NO-120: prefixed so _rebuild_artefacts_grid's own-tip cleanup below can
-	# tell an Artefact tip apart from a Board or Stock one (show_tip is now a
-	# shared popup, not this grid's alone) — bare `key` would make every
-	# non-Artefact tip look like an artefact no longer held and get closed.
+	# The "artefact:" + key prefix is a leftover of NO-120's own tip-cleanup
+	# scoping in _rebuild_artefacts_grid, which NO-144 removed (an Artefact
+	# long press opens the preview modal now, never show_tip, so tip_key can
+	# no longer carry one) — kept here only as the lp_key _long_press_input
+	# still takes, unused since on_long_press below always overrides it.
 	_wire_grid_button(btn, true, "artefact:" + key, desc, func() -> void:
 		artefact_activate_pressed.emit(key),
 		func() -> void: artefact_preview_requested.emit(key)) # NO-144

@@ -756,8 +756,10 @@ func _init() -> void:
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
-	check(HUD.clock_label.size.y >= HUD.CLOCK_H - 0.5,
-		"the Clock line is CLOCK_H tall (%s)" % HUD.clock_label.size.y)
+	# NO-125: the Clock box follows CLOCK_FONT's own metric now, not a fixed constant.
+	var clock_font_h: float = HUD.clock_label.get_theme_default_font().get_height(HUD.CLOCK_FONT)
+	check(HUD.clock_label.size.y >= clock_font_h - 0.5,
+		"the Clock line covers its own font's height (%s vs %s)" % [HUD.clock_label.size.y, clock_font_h])
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()

@@ -287,6 +287,14 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   removes it** — ask the holder. `ps` from one session can't see another's processes, so "no
   Godot running" proves nothing; on 2026-09-14 a live lock was cleared twice and both times
   the overlapping suites' results were discarded.
+- **The lock serialises Godot, not the git checkout in front of it.** `git checkout
+  --detach <ref> && tools/godot-lock.sh <cmd>` leaves the checkout outside the lock, so on
+  a shared checkout (Aux) a second agent can detach to a different ref mid-run and the
+  first agent silently tests the second agent's code — caught mid-task 2026-09-19, unknown
+  how many times it wasn't. Put both steps inside one locked command:
+  `tools/godot-lock.sh sh -c "git checkout --detach -q <ref> && <cmd>"`. This is on top of,
+  not instead of, the `user://` sharing above — that's about state two runs read, this is
+  about which code a run under the lock is even running.
 - **The `--screenshot` seam is windowed, and its flag goes after the bare `--`.**
   `OS.get_cmdline_user_args()` (`_ready`, `game.gd:521`) returns only args after `--`; put
   `--screenshot` before it and `_ready`'s `--screenshot` handling never sees it, so neither

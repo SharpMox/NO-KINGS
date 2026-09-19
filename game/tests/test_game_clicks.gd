@@ -20,12 +20,35 @@ const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/conver
 var fails := 0
 
 
-func check(cond: bool, label: String) -> void:
+## NO-113: `detail` is printed alongside a failing label — the observed values
+## the assertion actually depends on — so a failure says what was true instead
+## of just that something wasn't. Optional and appended only on failure, so
+## every existing two-argument call site is unchanged.
+func check(cond: bool, label: String, detail := "") -> bool:
 	if not cond:
-		push_error("FAIL: " + label)
+		push_error("FAIL: " + label + (" -- " + detail if detail != "" else ""))
 		fails += 1
 	else:
 		print("ok: " + label)
+	return cond
+
+
+## NO-113: the detail a failed _click_button_in/_click_grid_cell lookup needs
+## most — what buttons actually exist under `node`, and whether each is
+## visible — so "clickable" failing can distinguish missing/hidden/mislabeled
+## from actually covered-and-unclickable.
+func _button_texts_in(node: Node) -> String:
+	var out: Array[String] = []
+	_collect_button_texts(node, out)
+	return ", ".join(out) if not out.is_empty() else "(no buttons found under this node)"
+
+
+func _collect_button_texts(node: Node, out: Array[String]) -> void:
+	if node is Button:
+		out.append("%s%s" % [(node as Button).text,
+			"" if node.is_visible_in_tree() else " [hidden]"])
+	for c in node.get_children():
+		_collect_button_texts(c, out)
 
 
 
@@ -470,10 +493,23 @@ func _init() -> void:
 	var clock_before: float = game.clock_ms
 	_click(game.pass_button.get_global_rect().get_center()) # deliberately mid-animation
 	await _await_player_turn(game) # enemy turn runs (animated + paced path)
+	# NO-113/NO-140: merge_panel (modals.gd) is a PRESET_FULL_RECT,
+	# move_to_front()'d PanelContainer that the "Merge" confirm above only
+	# HIDES at the end of a Tuning.MERGE_ANIM_S (0.35s) tween. It used to keep
+	# MOUSE_FILTER_STOP for that whole window and swallow this click — and the
+	# next 13 too, all the way through the in-game menu. _play_merge_animation
+	# now sets IGNORE on the panel and its descendants the instant Merge is
+	# pressed, so the outro is visual only. This click is deliberately made
+	# MID-ANIMATION: it is the regression proof, not incidental timing.
 	check(game.state == game.State.PLAYER_TURN,
 		"PASS reaches the enemy turn even clicked mid-merge-animation — the panel no longer eats it")
 	check(game.clock_ms >= clock_before + 4000, # 5s bonus minus a little ticking
-		"finishing the turn grants the clock bonus")
+		"finishing the turn grants the clock bonus",
+		"clock_before=%.0f clock_ms=%.0f state=%s merge_panel.visible=%s pause_modal_open=%s game_menu_open=%s box_open=%s buff_pick_open=%s win_open=%s pass_button.disabled=%s" % [
+			clock_before, game.clock_ms, game.State.keys()[game.state],
+			game.modals.merge_panel.visible, game.modals.pause_modal_open(),
+			game.game_menu_open, game.box_open, game.buff_pick_open, game.win_open,
+			game.pass_button.disabled])
 
 	# ...and the animation itself genuinely finishes and hides the panel —
 	# polled against Tuning.MERGE_ANIM_S rather than a guessed frame count,
@@ -502,47 +538,77 @@ func _init() -> void:
 	release.double_click = false
 	root.push_input(release)
 	await process_frame
-	check(game.preview_open, "double-tap opens the piece preview")
-	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable")
+	check(game.preview_open, "double-tap opens the piece preview",
+		"preview_open=%s state=%s board.has((2,2))=%s selected=%s merge_panel.visible=%s game_menu_open=%s drawer_open=%s" % [
+			game.preview_open, game.State.keys()[game.state], game.board.has(Vector2i(2, 2)),
+			game.selected, game.modals.merge_panel.visible, game.game_menu_open, game.hud.drawer_open])
+	check(await _click_button_in(game.preview_panel, "Close"), "Close button clickable",
+		"preview_open=%s preview_panel.visible_in_tree=%s buttons=%s" % [
+			game.preview_open,
+			is_instance_valid(game.preview_panel) and game.preview_panel.is_visible_in_tree(),
+			_button_texts_in(game.preview_panel) if is_instance_valid(game.preview_panel) else "(preview_panel is null)"])
 	await process_frame
 	check(not game.preview_open, "Close dismisses the preview")
 
 	# in-game menu: opens, pauses the clock, Resume returns
 	check(await _click_button_in(game.hud, "☰"), "menu button clickable")
 	await process_frame
-	check(game.game_menu_open, "menu opens")
+	check(game.game_menu_open, "menu opens",
+		"game_menu_open=%s game_menu.visible=%s merge_panel.visible=%s state=%s win_open=%s box_open=%s buff_pick_open=%s" % [
+			game.game_menu_open, game.game_menu.visible, game.modals.merge_panel.visible,
+			game.State.keys()[game.state], game.win_open, game.box_open, game.buff_pick_open])
 	var frozen: float = game.clock_ms
 	await create_timer(0.4).timeout
 	check(game.clock_ms == frozen, "clock pauses while the menu is open")
 
 	# Guide and Settings (05-menus-and-settings): each opens over the pause
 	# menu and its own Back returns to the pause menu, not straight to Resume
-	check(await _click_button_in(game.game_menu, "Guide"), "in-game Guide button clickable")
+	check(await _click_button_in(game.game_menu, "Guide"), "in-game Guide button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
-	check(await _click_button_in(game.game_menu, "← Back"), "in-game Guide Back clickable")
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Guide Back clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
-	check(await _click_button_in(game.game_menu, "Settings"), "in-game Settings button clickable")
+	check(await _click_button_in(game.game_menu, "Settings"), "in-game Settings button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 	var sound_on: bool = Settings.load_settings().sound_on
 	check(await _click_button_in(game.game_menu, "Sound: %s" % ("On" if sound_on else "Off")),
-		"in-game Sound toggle clickable")
+		"in-game Sound toggle clickable",
+		"sound_on=%s wanted_label=%s game_menu.visible=%s buttons=%s" % [
+			sound_on, "Sound: %s" % ("On" if sound_on else "Off"), game.game_menu.visible,
+			_button_texts_in(game.game_menu)])
 	await process_frame
-	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists")
+	check(Settings.load_settings().sound_on != sound_on, "in-game Sound toggle persists",
+		"sound_on_before=%s sound_on_after=%s" % [sound_on, Settings.load_settings().sound_on])
 
 	# Animations toggle (06): live-applies to the running game, no restart —
 	# game.animations_on flips the instant the button is pressed
 	check(game.animations_on, "animations start on by default")
 	var anims_on: bool = Settings.load_settings().animations_on
 	check(await _click_button_in(game.game_menu, "Animations: %s" % ("On" if anims_on else "Reduced")),
-		"in-game Animations toggle clickable")
+		"in-game Animations toggle clickable",
+		"anims_on=%s wanted_label=%s game_menu.visible=%s buttons=%s" % [
+			anims_on, "Animations: %s" % ("On" if anims_on else "Reduced"), game.game_menu.visible,
+			_button_texts_in(game.game_menu)])
 	await process_frame
-	check(Settings.load_settings().animations_on != anims_on, "in-game Animations toggle persists")
-	check(not game.animations_on, "in-game Animations toggle applies live, no restart")
+	check(Settings.load_settings().animations_on != anims_on, "in-game Animations toggle persists",
+		"anims_on_before=%s anims_on_after=%s" % [anims_on, Settings.load_settings().animations_on])
+	check(not game.animations_on, "in-game Animations toggle applies live, no restart",
+		"game.animations_on=%s settings.animations_on=%s" % [
+			game.animations_on, Settings.load_settings().animations_on])
 
-	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable")
+	check(await _click_button_in(game.game_menu, "← Back"), "in-game Settings Back clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 
-	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable")
+	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 	check(not game.game_menu_open, "Resume closes the menu")
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH)

@@ -492,7 +492,7 @@ var test_head: Label
 var keyboard_height_override := -1
 var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
-var army_center: ScrollContainer
+var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is nested inside now
 var rank_center: CenterContainer
 var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
@@ -1006,14 +1006,19 @@ func _ready() -> void:
 					y += c.size.y + 4.0
 			test_scroll.set_deferred("scroll_vertical", int(y)))
 
-	# army select: Play goes here; each army is a button + composition line.
-	# ScrollContainer, not CenterContainer (issue 68): 6 Armies' worth of
-	# buttons + roster + Power/Ability lines overflow the fixed 480x800
-	# portrait window — the same scrollable-list shape test_scroll/
-	# history_scroll/guide_scroll already use below, so every entry (and the
-	# trailing Back button) stays reachable regardless of Army count.
-	army_center = ScrollContainer.new()
-	army_center.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
+	# army select: Play goes here. NO-146: a horizontal CAROUSEL, one Army at a
+	# time, each decorated by its starting pieces as a "group picture" (the
+	# same treatment NO-141 gives the Reinforcements screen).
+	#
+	# NO-146 is the ONE deliberate exception to this codebase's "no horizontal
+	# scrolling" rule (reference-site CLAUDE.md, carried into the game) — a
+	# carousel's whole point is a sideways swipe. Do not read the scroller
+	# below as an oversight and "fix" it back to vertical: test_scroll (the
+	# TEST menu's scenario list, further up this file) sets
+	# horizontal_scroll_mode to DISABLED on ITS OWN scroller for the opposite
+	# reason — issue 77, "a long scenario name must wrap or clip, never push
+	# the list sideways" — and the two are not the same container.
+	army_center = VBoxContainer.new()
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	army_center.offset_left = 40
 	army_center.offset_top = 30
@@ -1021,48 +1026,62 @@ func _ready() -> void:
 	army_center.offset_bottom = -30
 	army_center.visible = false
 	add_child(army_center)
-	var army_box := VBoxContainer.new()
-	army_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# On a 9:20 phone the six entries were sized for 480x800 and simply stopped
-	# halfway down, leaving the bottom ~45% empty. Same answer as the in-run
-	# deck: the leftover height goes into the BUTTONS, which makes them easier
-	# to hit, rather than into a void under the last one.
-	army_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# issue 68 tightened this from 12: six Armies' worth of entries have to
-	# fit 480x800 without scrolling. The ScrollContainer above stays as the
-	# safety net for a seventh.
-	army_box.add_theme_constant_override("separation", 5)
-	army_center.add_child(army_box)
 	var pick := Label.new()
 	pick.text = "Choose your Army" # issue 67: replaces the Army pick
 	pick.add_theme_font_size_override("font_size", 22)
-	army_box.add_child(pick)
+	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	army_center.add_child(pick)
+	var army_scroll := ScrollContainer.new() # the carousel strip itself
+	army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
+	army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# Same touch-drag fix test_scroll carries (CLAUDE.md, "Layout traps"): a
+	# Button's default mouse_filter is STOP, which would otherwise eat a swipe
+	# that starts on the card's own Army button before drag_touching sets.
+	army_scroll.scroll_deadzone = 24
+	army_center.add_child(army_scroll)
+	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
+	army_row.add_theme_constant_override("separation", 0)
+	army_scroll.add_child(army_row)
+	# Card width = the scroller's own available width, so exactly one Army
+	# fills the screen per swipe rather than letting the next card peek in.
+	var card_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
-		var army_btn := _button(army_box, Armies.display_name(army_name), 18,
+		var card := CenterContainer.new()
+		card.custom_minimum_size = Vector2(card_w, 0)
+		army_row.add_child(card)
+		var card_box := VBoxContainer.new()
+		card_box.add_theme_constant_override("separation", 6)
+		card.add_child(card_box)
+		var army_btn := _button(card_box, Armies.display_name(army_name), 20,
 			func() -> void:
 				GameScript.next_army = army_name
 				army_center.visible = false
 				rank_center.visible = true)
-		# only the buttons stretch: the roster and power lines under each one
-		# are reference text and stay at their natural height
-		army_btn.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		var roster := Label.new()
-		roster.text = _army_summary(Tuning.ARMIES[army_name])
-		roster.add_theme_font_size_override("font_size", 11)
-		roster.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		roster.modulate = Color(1, 1, 1, 0.7)
-		army_box.add_child(roster)
+		army_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the carousel
+		army_btn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		card_box.add_child(_army_group_picture(Tuning.ARMIES[army_name]))
 		var kit: Dictionary = Armies.entry(army_name)
-		var powers := Label.new()
-		powers.text = "%s · %s" % [kit.power_name, kit.ability_name]
-		powers.add_theme_font_size_override("font_size", 10)
-		powers.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		powers.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
+		var power := Label.new()
+		power.text = "%s\n%s" % [kit.power_name, kit.power_desc]
+		power.add_theme_font_size_override("font_size", 11)
+		power.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		power.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		power.custom_minimum_size.x = card_w - 40.0
+		power.modulate = Color(1, 1, 1, 0.7)
+		card_box.add_child(power)
+		var ability := Label.new()
+		ability.text = "%s\n%s" % [kit.ability_name, kit.ability_desc]
+		ability.add_theme_font_size_override("font_size", 11)
+		ability.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ability.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ability.custom_minimum_size.x = card_w - 40.0
+		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
-		army_box.add_child(powers)
-	_button(army_box, "← Back", 20, func() -> void:
+		card_box.add_child(ability)
+	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
 
@@ -1397,14 +1416,38 @@ func _show_device_info() -> void:
 		test_scroll.visible = true)
 
 
-func _army_summary(army: Array) -> String:
-	var counts := {} # insertion-ordered, so the summary follows the army list
+## NO-146: the Army carousel's "group picture" — starting pieces shown
+## together as art. One icon per distinct piece id, de-duplicated the same
+## way the old text roster summary was (insertion-ordered counts), with a
+## "×N" badge standing in for a repeated piece instead of a "%d× %s" word.
+func _army_group_picture(army: Array) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var counts := {} # insertion-ordered, so the picture follows the army list
 	for id in army:
 		counts[id] = counts.get(id, 0) + 1
-	var parts := []
 	for id in counts:
-		parts.append(("%d× %s" % [counts[id], id]) if counts[id] > 1 else id)
-	return " · ".join(parts)
+		var col := VBoxContainer.new()
+		var icon := TextureRect.new()
+		icon.texture = GameScript.load_piece_tex(id) # player side (the default)
+		icon.custom_minimum_size = Vector2(40, 40)
+		# EXPAND_IGNORE_SIZE, or a 192x192 source PNG overrides the minimum
+		# above with its own native size — same pairing modals.gd's own
+		# piece-art TextureRects already use.
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if GameScript.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
+			icon.modulate = GameScript.COL_SIDE_PLAYER
+		col.add_child(icon)
+		if counts[id] > 1:
+			var count_label := Label.new()
+			count_label.text = "×%d" % counts[id]
+			count_label.add_theme_font_size_override("font_size", 11)
+			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			col.add_child(count_label)
+		row.add_child(col)
+	return row
 
 
 ## NO-148: a filled/hollow dot meter standing in for real tier artwork — none

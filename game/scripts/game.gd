@@ -4520,6 +4520,28 @@ func piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
 	return textures[id][owner]
 
 
+## NO-146: the same lookup, usable BEFORE any Game exists — the menu's Army
+## carousel shows starting-fleet art with no live Game to read `textures`
+## from. Same file-probing rule as the `_ready()` loop above that populates
+## `textures`: a painted <id>-light/-dark pair first, the shared monochrome
+## <id>.svg second. Never indexes `textures` — this is a fresh, independent
+## lookup for a context that has none.
+static func load_piece_tex(id: String, owner := Rules.PLAYER) -> Texture2D:
+	var side := "light" if owner == Rules.PLAYER else "dark"
+	var painted := "res://assets/pieces/%s-%s.png" % [id, side]
+	if ResourceLoader.exists(painted):
+		return load(painted)
+	var mono := "res://assets/pieces/%s.svg" % id
+	return load(mono) if ResourceLoader.exists(mono) else null
+
+
+## Whether `id` is on the shared-monochrome fallback path and so needs the
+## side tint (COL_SIDE_PLAYER/COL_SIDE_ENEMY) applied at draw time — mirrors
+## `mono_art` above, for a caller with no live Game to read it from.
+static func is_mono_piece(id: String) -> bool:
+	return not ResourceLoader.exists("res://assets/pieces/%s-light.png" % id)
+
+
 ## `inset` is negative on purpose: the painted tokens read better slightly
 ## overflowing their square than padded inside it (user call 2026-08-27).
 func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -2.0) -> void:

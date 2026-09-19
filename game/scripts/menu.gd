@@ -1094,12 +1094,41 @@ func _ready() -> void:
 
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]
-		# Diagnostic-only (2026-09-18): reaches the notch-diagnostic panel from
-		# the command line for a desktop capture, the same idiom as --safe-top
-		# probing the Game scene's Header without a phone.
-		if args.has("--show-device-info"):
-			_show_tests()
-			_show_device_info()
+		# Screenshot pass (2026-09-19): one generic flag for whichever menu
+		# panel the capture wants, rather than a flag per panel — folds in
+		# the 2026-09-18 --show-device-info, which named only that one panel.
+		if args.has("--show-screen"):
+			match args[args.find("--show-screen") + 1]:
+				"tests": _show_tests()
+				"armies": _show_armies()
+				"rank": # the tier picker sits past an Army pick, not its own
+					# button — reached the same way the "← Back" on rank_box
+					# does, so a screenshot doesn't need an Army actually chosen
+					_show_armies()
+					GameScript.next_army = Tuning.ARMIES.keys()[0]
+					army_center.visible = false
+					rank_center.visible = true
+				"scores": _show_scores()
+				"history": _show_history()
+				"about": _show_about()
+				"guide":
+					main_box.visible = false
+					guide_scroll.visible = true
+				"settings":
+					main_box.visible = false
+					settings_panel.visible = true
+				"device-info": # diagnostic-only: the notch-diagnostic panel
+					# from the command line, the same idiom as --safe-top
+					# probing the Game scene's Header without a phone
+					_show_tests()
+					_show_device_info()
+				"login":
+					# --screenshot bypasses the login gate above (a fresh
+					# checkout would otherwise photograph it instead of the
+					# main menu) — asking for it BY NAME opts back in, no
+					# sign-in required either way, just the panel showing
+					main_box.visible = false
+					login_center.visible = true
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(dir.path_join("menu.png"))

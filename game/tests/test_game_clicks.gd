@@ -714,26 +714,73 @@ func _init() -> void:
 	# the whole design is "board, then status, then the thumb row lowest".
 	# NO-83 cut the Deck to three rows: the drawers (Inventory | Shop, equal
 	# halves), the Power badge, and the thumb row. Stock lives in the Header.
+	# NO-128 (coordinator review 2026-09-19, route 2 of 2 offered) cut it to
+	# TWO: the band (renamed army_band — Power, the Ability hint, and the King
+	# Abilities button) is no longer a deck row at all. An earlier version of
+	# this change made it a collapsible THIRD row and grew DECK_ROWS to budget
+	# its worst case, which was rejected — the board is sized once at boot and
+	# never revisited, so a permanent reservation for a collapsible row costs
+	# the board every run whether or not the row is ever open. army_band now
+	# overlays the board above the deck instead, exactly like the Inventory
+	# drawer, so it isn't part of the deck's sum at all.
 	var HUD: CanvasLayer = game.hud
 	var deck: Node = HUD.nav_row.get_parent()
+	check(HUD.army_band.get_parent() != deck,
+		"NO-128: army_band is not a deck row — it overlays the board instead")
 	check(HUD.nav_row.get_index() == 0,
 		"deck order: the drawers row sits directly under the board")
 	check(HUD.act_row.get_index() == deck.get_child_count() - 1,
 		"deck order: Ability and PASS are the LAST row, in the thumb arc")
-	check(deck.get_child_count() == 3,
-		"NO-83: no stock strip and no status line in the Deck (%d rows)" % deck.get_child_count())
+	check(deck.get_child_count() == 2,
+		"NO-128: the band left the Deck — drawers and act are the only two rows left (%d)"
+			% deck.get_child_count())
+	# NO-128: nav_row grew a middle child, army_band_reopen, that reopens the
+	# band once it's collapsed. It isn't EXPAND_FILL, so Inventory and Shop —
+	# now the first and third children — stay equal to EACH OTHER either side
+	# of it, just narrower than their old halves.
 	var nav_kids: Array = HUD.nav_row.get_children()
-	check(nav_kids.size() == 2 and nav_kids[0] == HUD.drawer_buttons["inventory"]
-			and nav_kids[1] == HUD.shop_button,
-		"NO-83: the button row is Inventory then Shop, nothing else")
-	check(absf((nav_kids[0] as Control).size.x - (nav_kids[1] as Control).size.x) <= 1.0,
-		"NO-83: ...in equal halves (%s vs %s)" % [(nav_kids[0] as Control).size.x, (nav_kids[1] as Control).size.x])
-	check(not HUD.king_ability_button.is_inside_tree() and not HUD.arrow_button.is_inside_tree(),
-		"NO-83: the ⚠ and Arrows buttons are off screen...")
+	check(nav_kids.size() == 3 and nav_kids[0] == HUD.drawer_buttons["inventory"]
+			and nav_kids[1] == HUD.army_band_reopen and nav_kids[2] == HUD.shop_button,
+		"NO-128: the button row is Inventory, the band's reopen wedge, then Shop")
+	check(absf((nav_kids[0] as Control).size.x - (nav_kids[2] as Control).size.x) <= 1.0,
+		"NO-83: ...Inventory and Shop stay equal halves either side of the wedge (%s vs %s)"
+			% [(nav_kids[0] as Control).size.x, (nav_kids[2] as Control).size.x])
+	# Opening Inventory above (line 684, to reach army_power_label/the Ability
+	# button) already exercised the NO-128 mutual exclusion below — it
+	# silently collapsed army_band as a side effect, and closing Inventory
+	# again never auto-reopens it (no magic reopen; only the wedge does).
+	# Reopen it now to reach the clean baseline the invariants below assume;
+	# army_band_reopen's own handler closes Inventory as it goes, so one
+	# click does both.
+	_click(HUD.army_band_reopen.get_global_rect().get_center())
+	check(HUD.drawer_open == "" and not HUD.army_band_reopen.visible
+			and HUD.army_band.visible and HUD.army_band_open,
+		"NO-128: reopening the band also closed Inventory (same screen rect)")
+	# NO-128: army_band overlays the SAME screen rect Inventory's drawer opens
+	# into (both anchored to deck_top, extending upward) — see the mutual
+	# exclusion in hud.gd's set_drawer() and army_band_reopen's own handler.
+	# Opening Inventory here must close the band, or the two panels overlap.
+	# Clicked by direct reference (not _click_inventory's text-match helper —
+	# the button's text carries a live item/artefact count this scenario
+	# doesn't pin) via the real synthetic-input path, same as every other
+	# button in this file.
+	_click(HUD.drawer_buttons["inventory"].get_global_rect().get_center())
+	await _await_drawer_settled(game, "inventory")
+	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible and HUD.army_band_reopen.visible,
+		"NO-128: opening Inventory collapses army_band (same screen rect)")
+	_click(HUD.army_band_reopen.get_global_rect().get_center())
+	check(HUD.drawer_open == "" and HUD.army_band.visible and not HUD.army_band_reopen.visible,
+		"NO-128: reopening the band closes Inventory back (same screen rect)")
+	# NO-128 finally gives king_ability_button the home NO-83 promised it: it
+	# is in the tree now (inside army_band), just hidden until an ability is
+	# active. arrow_button has no ticket moving it yet, so it stays off-screen.
+	check(HUD.king_ability_button.is_inside_tree() and not HUD.king_ability_button.visible
+			and not HUD.arrow_button.is_inside_tree(),
+		"NO-128: the King Abilities button is parented (hidden, no ability active); Arrows stays off screen")
 	check(not HUD.king_ability_button.pressed.get_connections().is_empty()
 			and not HUD.arrow_button.pressed.get_connections().is_empty()
 			and HUD.king_ability_button.text.begins_with("⚠"),
-		"...but keep their handlers and state")
+		"...both keep their handlers and state")
 
 	# ---- NO-33 / ADR-0004: the BOARD absorbs slack, the deck is a SUM -------
 	# THE GUARD. The deck's height is a sum of constants, never a runtime
@@ -741,6 +788,9 @@ func _init() -> void:
 	# measures itself before layout caches nonsense — CLAUDE.md, layout traps).
 	# A sum can drift from the thing it describes, so this is what fails the
 	# moment a deck row is added or a font moves under one.
+	# NO-128: army_band left the deck entirely (see above), so this sum no
+	# longer has anything state-dependent in it — DECK_ROWS is back to being a
+	# plain sum of always-rendered rows, same as before NO-128 ever touched it.
 	var rest := 0.0
 	for c in deck.get_children():
 		rest += (c as Control).get_combined_minimum_size().y
@@ -1133,6 +1183,14 @@ func _init() -> void:
 	await process_frame
 	check(game.state == game.State.SETUP, "empty config boots into SETUP")
 	check(game.pass_button.text == "START", "setup shows START instead of PASS")
+	# NO-128 (coordinator review 2026-09-19): SETUP places every piece on the
+	# same back rows army_band overlays when open, so it starts collapsed
+	# here — same call site and same reasoning as Stock starting open, just
+	# the opposite direction. Not a lock: the wedge (asserted visible) still
+	# reopens it on request.
+	check(not game.hud.army_band.visible and not game.hud.army_band_open
+			and game.hud.army_band_reopen.visible,
+		"army_band starts collapsed in SETUP, freeing the placement rows")
 	# NO-118: SETUP opens the Stock drawer on boot (game.gd:645), not through
 	# _click_stock — a separate settle wait, since the geometry below
 	# (drawer_rect, the press on stack_btn) reads the drawer's real on-screen
@@ -1338,6 +1396,60 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(6, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(6, 1)), "setup: tapping a zone tile places the piece")
+
+	# NO-128 (coordinator review 2026-09-19, third round): the second-round
+	# version of this check threaded through the ~130 lines of SETUP state
+	# above (which tile was empty, which drawer was open, whether an extra
+	# outside tap was needed) and broke 4 checks, most likely one root cause
+	# cascading through the rest — exactly the fragility flagged when it was
+	# written. Rather than keep chasing it through someone else's state, a
+	# dedicated, freshly-booted SETUP scenario is simpler and worth more:
+	# the only state in play here is what this block itself creates.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {} # fresh run -> SETUP placement phase
+	GameScript.next_army = "Crown"
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	check(game.state == game.State.SETUP, "army_band transparency: fresh SETUP boot")
+	check(not game.hud.army_band.visible and game.hud.army_band_reopen.visible,
+		"army_band transparency: starts collapsed, same as the earlier SETUP check")
+	await _await_drawer_settled(game, "stock") # SETUP opens Stock on boot
+	var tband_stack: Button = game.pool_box.filter(func(b: Node) -> bool:
+		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
+	_click(tband_stack.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(game.placing_id != "", "army_band transparency: arming succeeds")
+	# an outside tap dismisses Stock before the placement tap, same pattern
+	# as every other SETUP placement in this file (e.g. the (6,3) -> (6,1)
+	# pair above, before this block replaced its own copy of that pattern).
+	_click(game._tile_px(Vector2i(6, 3)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.placing_id != "" and game.drawer_open == "",
+		"army_band transparency: outside tap dismisses Stock, keeps the armed piece")
+	# Row 0 is the row army_band's own geometry fully covers at a tile's
+	# CENTER point (the point every click helper in this file targets):
+	# ARMY_BAND_H (78) exceeds one tile (~51) by more than the 6px gap
+	# between the board and the deck, verified by hand against the formula,
+	# not measured.
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(Vector2i(0, 0)),
+		"army_band transparency: places at row 0, under where the band opens")
+	_click(game.hud.army_band_reopen.get_global_rect().get_center())
+	check(game.hud.army_band.visible, "army_band transparency: the wedge reopens it mid-SETUP")
+	# tap-tap relocate — both taps land inside army_band's now-open rect.
+	# If the transparency fix regressed, the band eats the first tap and
+	# neither board.has() call below changes.
+	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	_click(game._tile_px(Vector2i(3, 0)) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.board.has(Vector2i(3, 0)) and not game.board.has(Vector2i(0, 0)),
+		"army_band transparency: a tap-tap relocate reaches the board even under the OPEN band")
 
 	# clearing the last enemy auto-passes the turn; first, the two properties
 	# that need MORE THAN ONE captured piece to mean anything (user 2026-09-10):

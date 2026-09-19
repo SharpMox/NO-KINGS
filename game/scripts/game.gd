@@ -686,6 +686,17 @@ func _ready() -> void:
 						artefacts.append(inst)
 						break
 		_set_drawer("stock") # SETUP starts in the placement flow
+		# NO-128 (coordinator review 2026-09-19): SETUP places every piece on
+		# the player's own back rows — exactly the rows army_band overlays
+		# while open. Transparency (hud.gd) already lets a tap reach the
+		# board underneath either way, but the player still can't SEE a
+		# piece or tile the band is painted over, and SETUP is the one phase
+		# where that matters most: placement is deliberate and there's no
+		# established board state yet to go on. Start collapsed here, the
+		# same way Stock starts open — the wedge still reopens it on
+		# request, same as it does for Inventory; this isn't a lock, just a
+		# better default for the phase most likely to need the space.
+		hud.collapse_army_band()
 	else:
 		SaveConfig.apply(self, next_config)
 	if args.has("--artefacts"): # balance sweep (issue 20): force a starting
@@ -735,8 +746,20 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## moves under one. It is a sum rather than a measurement on purpose: measuring
 ## needs a second layout pass, and a control that measures itself before layout
 ## caches nonsense (CLAUDE.md, layout traps).
-## NO-83 retired the stock strip and the status line, so the sum is three rows.
-const DECK_ROWS := 132.0 ## drawers 32 + power 28 + act 60 + 2 gaps x 6
+## NO-83 retired the stock strip and the status line, so the sum was three
+## rows (drawers, power, act).
+## NO-128 (UNVERIFIED — no Godot run; see the PR; coordinator review
+## 2026-09-19 rejected an earlier version of this change that grew DECK_ROWS
+## to budget the Power/Ability/King-Abilities band's worst case, because a
+## permanent board-size cost paid at every boot for a collapsible row is
+## backwards — collapsing would have freed nothing, since the board is sized
+## once here and never revisited). The band (army_band, hud.gd) is no longer
+## a deck row at all: it overlays the board above the deck instead, exactly
+## like the Inventory drawer, sized by its own flat ARMY_BAND_H constant
+## (hud.gd) rather than by DECK_ROWS. So the sum drops back to two rows —
+## drawers and act — and DECK_ROWS actually SHRINKS versus the pre-NO-128
+## value of 132, because the always-reserved power row is gone too.
+const DECK_ROWS := 98.0 ## drawers 32 + act 60 + 1 gap x 6
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept

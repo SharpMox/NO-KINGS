@@ -74,12 +74,24 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## phone means editing one place. Canvas px on the 480-wide viewport. Nothing
 ## here is measured at runtime: game.gd's board solve reads HEADER_H, and the
 ## notch inset (g.safe_top) is ADDED above it, never taken out of it.
-const HEADER_H := 110.0 ## 2.5 x the 44px strip it replaces (NO-82)
+## NO-125: shrunk from 110 toward the Stock button's 44px icon — but not all
+## the way to the ticket's 75/50 targets. The LEFT column stacks three
+## full-size rows (Score, Gold, Clock) and its floor is their real content,
+## not taste: Font.get_height() measured on Aux (2026-09-19) gives a 17px
+## row 24px tall and the 36px Clock 50px tall, so Score+Gold+Clock alone are
+## 100px (with CLOCK_H's 2px of breathing room) before any padding. 75/50
+## only fit if the Clock shrinks (the ticket explicitly forbids that) or
+## Score/Gold shrink to near-illegible or the two merge onto one row (a
+## design change past "restack" — flagged back rather than guessed at
+## here). 106 clears that 100px floor plus the halved HEADER_PAD_Y below
+## with 2px of slack against rounding, rather than landing exactly on it.
+const HEADER_H := 106.0
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
-const HEADER_PAD_Y := 4.0 ## gap under the inset and above the bottom edge
+const HEADER_PAD_Y := 2.0 ## NO-125: halved from 4 — the only slack left once HEADER_H is at its content floor
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
-const CLOCK_FONT := 36 ## glyph size inside the Clock line, which is HEADER_H / 2 tall
-const SCORE_FONT := 17 ## a 17px Label is 25px tall: 4 + 55 + 25 + 25 fits the 110
+const CLOCK_FONT := 36 ## glyph size inside the Clock line — kept full size (NO-125 protects Clock legibility)
+const CLOCK_H := 52.0 ## NO-125: the Clock box, sized to its measured content (Font.get_height(36) == 50 on Aux) plus 2px breathing room — replaces the old HEADER_H / 2 fraction, which stopped covering the glyph once HEADER_H shrank
+const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125): 2 + 24 + 24 + 52 fits the 106, 2px to spare
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
 const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
@@ -293,10 +305,10 @@ func build(game) -> void:
 	header_bg.size = Vector2(vp.x, g.hud_top)
 	header_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header_bg)
-	# LEFT: Clock, half the Header tall, then Score, then Gold — a fixed reading
-	# order (NO-82 stories 4-5).
+	# LEFT: Score, then Gold, then Clock at the bottom (NO-125 restack; was
+	# Clock/Score/Gold, NO-82 stories 4-5 — Max wants the timer last).
 	clock_label.add_theme_font_size_override("font_size", CLOCK_FONT)
-	clock_label.custom_minimum_size = Vector2(0, HEADER_H / 2.0)
+	clock_label.custom_minimum_size = Vector2(0, CLOCK_H)
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
@@ -327,7 +339,7 @@ func build(game) -> void:
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
 	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
 	left.add_theme_constant_override("separation", 0)
-	for l in [clock_label, score_row, gold_row]:
+	for l in [score_row, gold_row, clock_label]:
 		left.add_child(l)
 	add_child(left)
 	# CENTRE, flush to the bottom: ⚑ Wave over turns. The column has a fixed

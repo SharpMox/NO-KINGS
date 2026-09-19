@@ -756,13 +756,15 @@ func _init() -> void:
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
-	check(HUD.clock_label.size.y >= HUD.HEADER_H / 2.0 - 0.5,
-		"the Clock line is half the Header tall (%s)" % HUD.clock_label.size.y)
+	check(HUD.clock_label.size.y >= HUD.CLOCK_H - 0.5,
+		"the Clock line is CLOCK_H tall (%s)" % HUD.clock_label.size.y)
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
-	check(cr.position.y >= game.safe_top and cr.end.y <= HUD.score_label.get_global_rect().position.y + 0.5
-			and HUD.score_label.get_global_rect().end.y <= gr.position.y + 0.5 and gr.end.y <= game.hud_top + 0.5,
-		"Clock, then Score, then Gold, all inside the Header and below the inset")
+	var sr2: Rect2 = HUD.score_label.get_global_rect()
+	# NO-125: restacked to Score, Gold, Clock — the timer at the bottom.
+	check(sr2.position.y >= game.safe_top and sr2.end.y <= gr.position.y + 0.5
+			and gr.end.y <= cr.position.y + 0.5 and cr.end.y <= game.hud_top + 0.5,
+		"Score, then Gold, then Clock, all inside the Header and below the inset")
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
 	check(is_equal_approx(sr.position.y, game.safe_top) and is_equal_approx(sr.size.y, HUD.HEADER_H),

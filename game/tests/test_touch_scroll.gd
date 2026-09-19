@@ -559,12 +559,14 @@ func _init() -> void:
 	# classify_swipe independently (same delta the drag below sends) so a
 	# failure distinguishes "the recogniser didn't call this a swipe" from
 	# "it did, and _open_shop() refused anyway" (e.g. the wave gate this
-	# round's actual failure traced to).
+	# round's actual failure traced to). NO-113's `detail` param (landed
+	# after this was first written as a formatted label) now carries it
+	# instead, so a PASS still reads as one line.
 	var shop_swipe_delta := Vector2(-15, 0) * 6 # matches the _drag() below
 	var shop_swipe_dir := Tuning.classify_swipe(shop_swipe_delta)
 	await _drag(board_bg, Vector2(-15, 0), 6)
-	check(game.shop_open(),
-		"NO-145: leftward swipe on the empty board opens the Shop (classify_swipe=%s, wave=%d/%d unlock, shop_open()=%s)"
+	check(game.shop_open(), "NO-145: leftward swipe on the empty board opens the Shop",
+		"classify_swipe=%s, wave=%d/%d unlock, shop_open()=%s"
 			% [shop_swipe_dir, game.wave, Tuning.SHOP_UNLOCK_WAVE, game.shop_open()])
 	var shop_polls := 0
 	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
@@ -576,8 +578,30 @@ func _init() -> void:
 	var shop_margin: Control = game.modals.shop_panel.get_child(0) as Control
 	var shop_root: Control = shop_margin.get_child(0) as Control
 	var shop_chrome := _chrome_point(shop_margin, shop_root)
+	# NO-145 (hardware round 4): "did _on_shop_chrome_input even run" is
+	# observable independently of shop_open() — modals.close_shop() is the
+	# ONLY path this swipe can reach, and it always emits shop_closed, so
+	# catching that signal proves the handler ran and classified the drag as
+	# "right", decoupled from shop_panel's own async hide below.
+	var shop_close_dir := Tuning.classify_swipe(Vector2(15, 0) * 6) # same delta as the drag below
+	var shop_close_fired := [false]
+	game.modals.shop_closed.connect(func() -> void: shop_close_fired[0] = true)
 	await _drag(shop_chrome, Vector2(15, 0), 6)
-	check(not game.shop_open(), "NO-145: reverse swipe on the Shop's own chrome closes it")
+	check(shop_close_fired[0],
+		"NO-145: the reverse swipe on Shop chrome reached _on_shop_chrome_input and called close_shop()",
+		"classify_swipe=%s shop_open()-immediately-after-drag=%s" % [shop_close_dir, game.shop_open()])
+	# modals.gd's _slide_shop(false) only flips shop_panel.visible — what
+	# shop_open() reads — once its close TWEEN finishes (Tuning.PANEL_SLIDE_S
+	# later, modals.gd:766), the same async gap the OPEN side's own
+	# shop_polls loop above already waits out. Asserting shop_open() with no
+	# equivalent wait here would fail even when the close fired correctly.
+	var shop_close_polls := 0
+	while game.modals.shop_panel.visible and shop_close_polls < 60:
+		await process_frame
+		shop_close_polls += 1
+	check(not game.shop_open(), "NO-145: reverse swipe on the Shop's own chrome closes it",
+		"shop_panel.visible=%s after %d settle polls (shop_closed fired=%s)"
+			% [game.modals.shop_panel.visible, shop_close_polls, shop_close_fired[0]])
 
 	# ---- regression: a swipe-SHAPED drag starting ON A CELL must never
 	# open/close anything — that press belongs to drag-scroll (NO-45's PASS
@@ -588,6 +612,18 @@ func _init() -> void:
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["27-club-punch-card", "tinfoil-hat", "area-51-parking-permit",
 			"fort-knox-iou", "fema-summer-camp-flyer", "zurich-gnome-figurine"],
+		# NO-145 (hardware round 4): a Stock stack button, explicitly — this
+		# config never had a "stock" key (unchanged since this block's very
+		# first commit, e4607a7, git-show confirmed), so SaveConfig.apply
+		# defaulted g.stock to cfg.get("stock", []) = empty (save_config.gd:
+		# 112). Not fallout from the Shop close above and not the wave 3->5
+		# bump on the earlier block (THIS config's own wave was always 3,
+		# untouched by that fix) — a fixture gap present since day one, only
+		# now reached because execution used to crash on shop_panel.get_
+		# child(0) while shop_panel was still null (Shop refused to open at
+		# wave 3), silently skipping everything below it, this block
+		# included. Diagnostic detail on the check below proves it live.
+		"stock": ["pawn", "pawn", "knight"],
 		"wave": 3, "gold": 200, "seed": 1}
 	GameScript.is_scenario = true
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -611,7 +647,8 @@ func _init() -> void:
 		if c is Button and c.has_meta("id"):
 			stack_btn2 = c
 			break
-	check(stack_btn2 != null, "NO-145: the stock drawer has a stack button to test")
+	check(stack_btn2 != null, "NO-145: the stock drawer has a stack button to test",
+		"stock=%s shop_open()=%s drawer_open=%s" % [game.stock, game.shop_open(), game.hud.drawer_open])
 	if stack_btn2 != null:
 		var drag_started2 := [false]
 		game.hud.stack_drag_started.connect(func(_e: Variant, _c: bool) -> void:

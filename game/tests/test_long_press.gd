@@ -5,6 +5,11 @@ extends SceneTree
 ## documents. Its own file rather than a section of test_touch_scroll.gd,
 ## because that suite's taps raced the real cursor until NO-71, and a check that
 ## HOLDS for half a second is far more exposed to the same thing.
+##
+## NO-138: a long press on a PIECE (board, Stock, Captured) opens the preview
+## modal instead — game.preview_open / game.preview_panel, not hud's tip
+## popup. The tip popup stays only for Item/Artefact cells below, which have
+## no piece to preview.
 
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
@@ -164,6 +169,17 @@ func _stock_button(game: Node, id: String, cap: bool) -> Button:
 	return null
 
 
+## True when some Label under `node` contains `text` — same helper
+## test_game_clicks.gd uses to inspect the preview modal (NO-138).
+func _has_label_text(node: Node, text: String) -> bool:
+	if node is Label and text in (node as Label).text:
+		return true
+	for c in node.get_children():
+		if _has_label_text(c, text):
+			return true
+	return false
+
+
 func _init() -> void:
 	create_timer(60.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: probe still running after 60s — force quit")
@@ -300,10 +316,10 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# --- NO-120: a long press on a BOARD PIECE shows its description, and does
-	# not select it. The board is drawn in _draw, not built from Controls, so
-	# this exercises _board_long_press_start (game.gd) rather than
-	# hud.gd's _long_press_input — no Button, no gui_input to hold.
+	# --- NO-138 (was NO-120's tip): a long press on a BOARD PIECE opens its
+	# preview modal, and does not select it. The board is drawn in _draw, not
+	# built from Controls, so this exercises _board_long_press_start (game.gd)
+	# rather than hud.gd's _long_press_input — no Button, no gui_input to hold.
 	game = await _boot_game()
 	game._set_drawer("") # the queen tile used sits low enough to be covered
 		# by the open Inventory drawer otherwise
@@ -318,9 +334,9 @@ func _init() -> void:
 			break
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the board piece completed without real cursor motion")
-	check(game.hud.tip_panel.visible, "a long press on a board piece shows its description")
-	check(game.hud.tip_label.text == game.defs["queen"].name,
-		"...and it is that piece's name")
+	check(game.preview_open, "a long press on a board piece opens its preview modal")
+	check(_has_label_text(game.preview_panel, game.defs["queen"].name),
+		"...and it shows that piece's name")
 	check(game.selected == Vector2i(-1, -1), "...and does NOT select the piece")
 	game.queue_free()
 	await process_frame
@@ -335,7 +351,7 @@ func _init() -> void:
 	_release_at(qpos)
 	await process_frame
 	check(game.selected == queen_at, "a short tap on a board piece still selects it")
-	check(not game.hud.tip_panel.visible, "...and shows no description")
+	check(not game.preview_open, "...and opens no preview")
 	game.queue_free()
 	await process_frame
 
@@ -369,8 +385,8 @@ func _init() -> void:
 			break
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the enemy completed without real cursor motion")
-	check(game.hud.tip_panel.visible, "a long press on the enemy shows its description")
-	check(game.hud.tip_label.text == game.defs["pawn"].name, "...and it is that piece's name")
+	check(game.preview_open, "a long press on the enemy opens its preview modal")
+	check(_has_label_text(game.preview_panel, game.defs["pawn"].name), "...and it shows that piece's name")
 	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.ENEMY,
 		"...and the enemy Pawn is STILL on the board — not captured")
 	check(game.gold == gold_before, "...and gold is unchanged")
@@ -401,8 +417,10 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# --- NO-120: a long press on a STOCK cell shows its description, through
-	# _long_press_input exactly like an Inventory cell, and does not arm it ---
+	# --- NO-138 (was NO-120's tip): a long press on a STOCK cell opens its
+	# preview modal, through _long_press_input exactly like an Inventory cell
+	# (on_fire replaces show_tip — see _build_stack_button), and does not
+	# arm it for deploy ---
 	game = await _boot_game()
 	game._set_drawer("stock")
 	await _await_drawer_settled(game, "stock") # NO-118
@@ -416,9 +434,9 @@ func _init() -> void:
 			break
 		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
 	check(clean, "a long press on the Stock cell completed without real cursor motion")
-	check(game.hud.tip_panel.visible, "a long press on a Stock cell shows its description")
-	check(game.hud.tip_label.text == game.defs["pawn"].name,
-		"...and it is that piece's name")
+	check(game.preview_open, "a long press on a Stock cell opens its preview modal")
+	check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
+		"...and it shows that piece's name")
 	check(game.placing_id == "", "...and does NOT arm it for deploy")
 	game.queue_free()
 	await process_frame
@@ -451,7 +469,57 @@ func _init() -> void:
 	_release_at(ppos)
 	await process_frame
 	check(game.placing_id == "pawn", "a short tap on a Stock cell still arms it")
-	check(not game.hud.tip_panel.visible, "...and shows no description")
+	check(not game.preview_open, "...and opens no preview")
+	game.queue_free()
+	await process_frame
+
+	# --- NO-138: a long press during ITEM TARGETING opens the preview modal —
+	# before this, NO-121 left an occupied tile's hold showing nothing while
+	# targeting was active, because every tap in that mode classifies as a
+	# commit (_board_tap_is_readonly). Reuses enemy_at from the hazard test
+	# above: the Queen can capture the enemy Pawn there, so Sniper
+	# (target == "tile") accepts it as a target too.
+	game = await _boot_game()
+	game._set_drawer("")
+	game._use_item(0) # arms Sniper — NO-124: select, target, confirm
+	check(game.item_active == 0, "Sniper is armed before the hazard press")
+	check(game.item_targets.has(enemy_at), "the enemy Pawn is a legal Sniper target")
+	epos = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	clean = false
+	for attempt in 3:
+		game.hud.hide_tip()
+		if await _long_press(epos):
+			clean = true
+			break
+		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+	check(clean, "a long press on the enemy during targeting completed without real cursor motion")
+	check(game.preview_open, "...and opens the preview modal")
+	check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
+		"...and it shows that piece's name")
+	check(game.item_active == 0, "...and Sniper is still armed, untouched")
+	check(game.item_pending_tile == Vector2i(-1, -1),
+		"...and does NOT stage the enemy as Sniper's target")
+	check(game.board_lp_pending_tile == Vector2i(-1, -1),
+		"...and leaves no deferred tap behind for the next press to trip over")
+	check(game.board.has(enemy_at) and game.board[enemy_at].owner == GameScript.Rules.ENEMY,
+		"...and the enemy Pawn is untouched")
+	game.queue_free()
+	await process_frame
+
+	# --- positive control: a SHORT TAP on the same enemy still stages it as
+	# Sniper's target, so the hazard test above cannot pass by the press
+	# simply missing ---
+	game = await _boot_game()
+	game._set_drawer("")
+	game._use_item(0)
+	epos = game._tile_px(enemy_at) + Vector2(game.tile, game.tile) / 2
+	_mouse(true, epos)
+	await process_frame
+	_release_at(epos)
+	await process_frame
+	check(game.item_pending_tile == enemy_at,
+		"(control) a short tap on the enemy stages it as Sniper's target")
+	check(not game.preview_open, "(control) ...and opens no preview")
 	game.queue_free()
 	await process_frame
 

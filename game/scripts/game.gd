@@ -346,9 +346,9 @@ var board_lp_fired := false # a hold completed for the tile now in board_lp_pend
 # hazard this guards against in _board_tap_is_readonly's header).
 var board_lp_pending_tile := Vector2i(-1, -1)
 # NO-145: swipe-to-open a panel, tracked only on a press this ticket's own
-# eligibility rule (_swipe_open_may_begin below) accepted — board background
-# or deck chrome, never a surface with existing drag/tap meaning, so this
-# never races drag_from/board_lp_* above. _swipe_from is the press position;
+# eligibility rule (_swipe_open_may_begin below) accepted — an empty board
+# tile only, never a surface with existing drag/tap meaning, so this never
+# races drag_from/board_lp_* above. _swipe_from is the press position;
 # _swipe_eligible whether THIS press qualified at all.
 var _swipe_from := Vector2.ZERO
 var _swipe_eligible := false
@@ -1997,22 +1997,23 @@ func _unhandled_input(event: InputEvent) -> void:
 					drag_moved = false
 					drag_reselect = was_selected # in-place release = re-click
 		else:
-			# NO-145: the swipe-to-open gesture — board background and deck
-			# chrome only (see _swipe_open_may_begin; deck chrome's own half
-			# lives in hud.gd's _on_deck_chrome_input, same classifier, same
-			# dispatch). Never returns early: for every press this accepted,
-			# the rest of this release branch below is already a no-op (no
-			# drag_from, no board_lp_pending_tile — both require an occupied
-			# origin tile, which _swipe_open_may_begin refuses), so letting it
-			# fall through changes nothing.
+			# NO-145: the swipe-to-open gesture — an empty board tile ONLY
+			# (see _swipe_open_may_begin; hardware round 2 dropped deck
+			# chrome and the Shop's edge-proximity check, both of which
+			# failed on real hardware — tuning.gd has the diagnosis). Never
+			# returns early: for every press this accepted, the rest of this
+			# release branch below is already a no-op (no drag_from, no
+			# board_lp_pending_tile — both require an occupied origin tile,
+			# which _swipe_open_may_begin refuses), so letting it fall
+			# through changes nothing.
 			if _swipe_eligible:
 				_swipe_eligible = false
 				match Tuning.classify_swipe(event.position - _swipe_from):
 					"down": _set_drawer("stock") # Max: "swipe down opens Stock"
 					"up": _set_drawer("inventory") # Max: "swipe up opens Inventory"
-					"left": # Shop slides in from the right — only near that edge
-						if _swipe_from.x >= get_viewport_rect().size.x - Tuning.SWIPE_EDGE_ZONE:
-							_open_shop()
+					"left": _open_shop() # Shop slides in from the right — the
+						# swipe DIRECTION carries that meaning; no edge
+						# proximity needed (SWIPE_EDGE_ZONE removed)
 			board_lp_token = 0 # NO-120: release cancels any pending long-press timer
 			if board_lp_pending_tile.x >= 0:
 				# NO-120: the commit this press deferred runs now — but only as
@@ -2128,21 +2129,22 @@ func _tile_at(screen: Vector2) -> Vector2i:
 ##     the board; see their own _on_*_chrome_input for the reverse gesture.
 ##   - never on an occupied tile — that always has selection/drag meaning
 ##     (own-piece drag, enemy recon, a captured target, ...).
+##   - never off the board (at.x < 0) — the coordinator's hardware round 2
+##     ruling narrowed this to ONE surface, the empty board tile, after
+##     deck-chrome and an assumed-tile-width edge zone both failed on real
+##     hardware (see tuning.gd's SWIPE_MIN_DIST comment for the full
+##     diagnosis). All three open gestures — down/up/left — now start here
+##     and only here.
 ##   - on an EMPTY tile, only when nothing is already armed/selected that a
 ##     press there would otherwise resolve against — an empty tile that IS a
 ##     legal destination for a current selection, or a staged Item/Artefact
 ##     target, or an Arrow Planning draw, already commits on THIS press
 ##     (_on_tile_clicked fires immediately below, not on release), so a
 ##     swipe can never begin from one without also stepping on that commit.
-##   - off the board entirely (at.x < 0) is always eligible: the ONLY thing
-##     that branch does today is drop a selection if one exists, a one-shot
-##     that already ran on press and has nothing left for a release to race.
 func _swipe_open_may_begin(at: Vector2i) -> bool:
 	if hud.drawer_open != "" or shop_open():
 		return false
-	if at.x < 0:
-		return true
-	if board.has(at):
+	if at.x < 0 or board.has(at):
 		return false
 	return selected.x < 0 and placing_id == "" and item_active < 0 \
 			and artefact_targeting_key == "" and not arrow_mode

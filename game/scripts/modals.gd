@@ -630,10 +630,11 @@ func close_shop() -> void:
 
 
 ## NO-145: reverse-of-the-opening-swipe close — the Shop opens on a leftward
-## swipe near the right edge (game.gd/hud.gd's own "__deck__"/board-chrome
-## handling), so it closes on a rightward swipe, started anywhere on its own
-## chrome (margin.gui_input above — never on a scrollable cell, which claims
-## its own rect first via the same MOUSE_FILTER_STOP mechanism).
+## swipe starting on an empty board tile (game.gd's _swipe_open_may_begin;
+## hardware round 2 dropped the edge-proximity requirement — see tuning.gd),
+## so it closes on a rightward swipe, started anywhere on its own chrome
+## (margin.gui_input above — never on a scrollable cell, which claims its
+## own rect first via the same MOUSE_FILTER_STOP mechanism).
 var _shop_swipe_from := Vector2.ZERO
 var _shop_swipe_down := false
 

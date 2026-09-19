@@ -22,6 +22,7 @@ const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
 const Drive := preload("res://scripts/drive.gd")
 const GameScript := preload("res://scripts/game.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 # A member, not a local: a GDScript lambda captures locals BY VALUE, so a
@@ -82,6 +83,20 @@ func _chrome_point(container: Control, content: Control) -> Vector2:
 	check(cr.size.x > pr.size.x or cr.size.y > pr.size.y,
 		"NO-145: %s leaves slack around its content for chrome" % container.name)
 	return Vector2(cr.position.x + cr.size.x - 2.0, pr.position.y + pr.size.y - 2.0)
+
+
+## NO-145 (hardware round 2): the first empty board tile, found from LIVE
+## `game.board` state rather than a hardcoded (x, y) — CLAUDE.md's
+## "hardcoded tile coordinates in drag tests are geometry assertions in
+## disguise" applies here exactly as it did to the fixed 60px edge zone
+## that round's diagnosis found and removed.
+func _empty_board_tile(game: Node) -> Vector2i:
+	for y in Tuning.BOARD_H:
+		for x in Tuning.BOARD_W:
+			var t := Vector2i(x, y)
+			if not game.board.has(t):
+				return t
+	return Vector2i(-1, -1)
 
 
 func _mouse(pressed: bool, at: Vector2) -> void:
@@ -454,9 +469,14 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# ---- NO-145: swipe-to-open/close, and that it never steals an existing
-	# drag. Board background / deck chrome opens; a drawer/Shop's own chrome
-	# (never a scrollable cell) closes by reversing the OPENING GESTURE.
+	# ---- NO-145 (hardware round 2 — coordinator ruling): every open gesture
+	# starts on an empty BOARD tile, one surface for all three directions.
+	# Deck chrome (squeezed shut by NO-128's DECK_ROWS shrink) and the Shop's
+	# edge-proximity check (derived from an assumed 60px tile the board's
+	# actual centred-with-margins layout never had) both failed on real
+	# hardware — see tuning.gd for the full diagnosis. This is the one
+	# surface that passed first try. Close gestures are UNCHANGED: reverse-
+	# swipe on each panel's own chrome.
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 200, "seed": 1}
@@ -465,13 +485,17 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
+	# NO-145: found from LIVE board state, not a hardcoded (x, y) — CLAUDE.md's
+	# "hardcoded tile coordinates in drag tests are geometry assertions in
+	# disguise" is exactly the class of mistake the fixed edge zone above was.
+	var empty_tile := _empty_board_tile(game)
+	check(empty_tile.x >= 0, "NO-145: found an empty board tile to swipe from")
+	var board_bg: Vector2 = game._tile_px(empty_tile) + Vector2(game.tile, game.tile) / 2
 
-	# Swipe DOWN on empty board background opens Stock (Max: "swipe down
-	# opens Stock"). (4, 4) is empty in this config.
+	# Swipe DOWN on the empty board tile opens Stock (Max: "swipe down opens Stock").
 	check(game.hud.drawer_open == "", "NO-145: nothing open before the swipe")
-	var board_bg: Vector2 = game._tile_px(Vector2i(4, 4)) + Vector2(game.tile, game.tile) / 2
 	await _drag(board_bg, Vector2(0, 15), 6) # 90px down, well past SWIPE_MIN_DIST (40)
-	check(game.hud.drawer_open == "stock", "NO-145: swipe down on empty board opens Stock")
+	check(game.hud.drawer_open == "stock", "NO-145: swipe down on the empty board opens Stock")
 	await _await_drawer_settled(game, "stock")
 
 	# Reverse swipe (UP), started on the Stock drawer's OWN CHROME — the
@@ -486,15 +510,10 @@ func _init() -> void:
 	await _drag(stock_chrome, Vector2(0, -15), 6) # 90px up
 	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Stock's own chrome closes it")
 
-	# Swipe UP on deck chrome opens Inventory (Max: "swipe up opens
-	# Inventory") — the gap BETWEEN the drawers row and the thumb row, never
-	# one of their buttons.
-	var inv_btn_rect: Rect2 = (game.hud.drawer_buttons["inventory"] as Control).get_global_rect()
-	var ability_rect: Rect2 = game.hud.army_ability_button.get_global_rect()
-	var deck_chrome := Vector2(inv_btn_rect.position.x + 4,
-		(inv_btn_rect.position.y + inv_btn_rect.size.y + ability_rect.position.y) / 2.0)
-	await _drag(deck_chrome, Vector2(0, -15), 6)
-	check(game.hud.drawer_open == "inventory", "NO-145: swipe up on deck chrome opens Inventory")
+	# Swipe UP on the SAME empty board tile opens Inventory (Max: "swipe up
+	# opens Inventory") — nothing changed about the board between gestures.
+	await _drag(board_bg, Vector2(0, -15), 6)
+	check(game.hud.drawer_open == "inventory", "NO-145: swipe up on the empty board opens Inventory")
 	await _await_drawer_settled(game, "inventory")
 
 	# Reverse swipe (DOWN) on the Inventory drawer's own chrome closes it —
@@ -510,13 +529,12 @@ func _init() -> void:
 	await _drag(inv_chrome, Vector2(0, 15), 6)
 	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Inventory's own chrome closes it")
 
-	# Leftward swipe starting near the RIGHT EDGE opens the Shop (it slides
-	# in from the right) — column 7 (the board's last column) is both
-	# "board background" (empty here) and within SWIPE_EDGE_ZONE of the
-	# right edge, since the board spans the full 480px viewport width.
-	var edge_pt: Vector2 = game._tile_px(Vector2i(7, 4)) + Vector2(game.tile, game.tile) / 2
-	await _drag(edge_pt, Vector2(-15, 0), 6)
-	check(game.shop_open(), "NO-145: leftward swipe near the right edge opens the Shop")
+	# Leftward swipe on the empty board tile opens the Shop (it slides in
+	# from the right) — no edge-proximity requirement any more (coordinator
+	# ruling: SWIPE_EDGE_ZONE deleted, the swipe DIRECTION alone carries
+	# "opens from the edge it slides from").
+	await _drag(board_bg, Vector2(-15, 0), 6)
+	check(game.shop_open(), "NO-145: leftward swipe on the empty board opens the Shop")
 	var shop_polls := 0
 	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
 		await process_frame

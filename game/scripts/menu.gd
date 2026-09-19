@@ -558,6 +558,14 @@ static func _window_size_requested() -> bool:
 	return DisplayServer.window_get_size() != want
 
 
+## NO-146 carousel fix (Max, screenshot report — six Armies read as one):
+## fraction of the scroller's own width left un-covered by the resting card,
+## so the next card's edge peeks in. 12-15% is the usual carousel range; 14%
+## picked within it. See the carousel build below for why this replaces a
+## full-width card.
+const ARMY_PEEK_FRACTION := 0.14
+
+
 func _ready() -> void:
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
@@ -1043,9 +1051,18 @@ func _ready() -> void:
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", 0)
 	army_scroll.add_child(army_row)
-	# Card width = the scroller's own available width, so exactly one Army
-	# fills the screen per swipe rather than letting the next card peek in.
-	var card_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	# NO-136 hides scrollbars game-wide, so the card edge is the only signal
+	# that more Armies exist — the full-width card this comment used to
+	# describe hid all six behind an undiscoverable swipe (found by Max on a
+	# screenshot: six Armies, looked like one). Sizing the card at less than
+	# the scroller's own width (ARMY_PEEK_FRACTION above) leaves a peek of the
+	# next card at rest, the standard carousel affordance: you can see there
+	# is more, so no second mechanism has to stay in sync with it. The dots
+	# below are added on top, not instead — belt and suspenders on a report
+	# that was specifically "I could not tell", not a request to remove them.
+	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	var card_w: float = scroll_w * (1.0 - ARMY_PEEK_FRACTION)
+	var army_names: Array = Tuning.ARMIES.keys() # dot count/order follows this, not a hand count
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
@@ -1080,6 +1097,21 @@ func _ready() -> void:
 		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
 		card_box.add_child(ability)
+	# NO-146: page dots underneath the carousel — a second, independent signal
+	# that there are more Armies than the one card on screen, on top of the
+	# peek above. Filled for the resting card, hollow for the rest; count and
+	# order come from army_names (Tuning.ARMIES), so a 7th Army needs no edit
+	# here. Godot's ScrollContainer has no page-snap, so scroll_horizontal /
+	# card_w is an approximation — exact once the swipe settles, which is the
+	# only time this reads it (dragging mid-swipe still nudges it live).
+	var army_dots := Label.new()
+	army_dots.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	army_dots.add_theme_font_size_override("font_size", 14)
+	army_dots.text = _army_dot_text(0, army_names.size())
+	army_center.add_child(army_dots)
+	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var idx := clampi(roundi(army_scroll.scroll_horizontal / card_w), 0, army_names.size() - 1)
+		army_dots.text = _army_dot_text(idx, army_names.size()))
 	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
@@ -1443,6 +1475,15 @@ func _army_group_picture(army: Array) -> Control:
 			col.add_child(count_label)
 		row.add_child(col)
 	return row
+
+
+## NO-146: filled dot for `current`, hollow for the rest, out of `count` —
+## no fixed six, so a 7th Army (a bigger army_names) just gets a longer row.
+func _army_dot_text(current: int, count: int) -> String:
+	var dots := PackedStringArray()
+	for i in count:
+		dots.append("●" if i == current else "○")
+	return " ".join(dots)
 
 
 ## NO-148 (Max, 2026-09-20): piece token per tier, ascending through his own

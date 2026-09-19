@@ -1234,20 +1234,20 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		btn.add_child(marker)
 	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
 		# the shared placeholder so two unpainted artefacts read apart at a
-		# glance, same corner-badge idiom as the stack count in hud.gd's
-		# _build_stack_button (child Label, not a texture). Same offsets as
-		# modals.gd's _shop_tile (icon-only there too, confirmed landing on
-		# the art, not beside it).
+		# glance. Centred on the art, not the corner (NO-119, Max's call
+		# 2026-09-19): expand_icon fills the Button with the icon, so a
+		# full-rect Label with centred text alignment lands on the art
+		# without depending on the Label's own (frame-late) minimum size.
 		var init_badge := Label.new()
 		init_badge.text = g.initials_of(entry.name)
 		init_badge.add_theme_font_size_override("font_size", 13)
 		init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
 		init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		init_badge.add_theme_constant_override("outline_size", 4)
-		init_badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-		init_badge.offset_left = 3
-		init_badge.offset_right = 26
-		init_badge.offset_bottom = 16
+		init_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE # must not eat the tap
+		init_badge.set_anchors_preset(Control.PRESET_FULL_RECT)
+		init_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		init_badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		btn.add_child(init_badge)
 	var desc := _grid_tip_desc(entry.name, entry.description)
 	btn.tooltip_text = desc

@@ -43,6 +43,12 @@ func _init() -> void:
 	await process_frame
 	var menu := m as MenuScript
 
+	# NO-147: TEST now nests inside Settings — open it first.
+	var settings_btn := _find_button(m, "Settings")
+	check(settings_btn != null, "precondition: the Settings button exists")
+	settings_btn.pressed.emit()
+	await process_frame
+
 	var test_btn := _find_button(m, "TEST")
 	check(test_btn != null, "precondition: the TEST button exists")
 	test_btn.pressed.emit()

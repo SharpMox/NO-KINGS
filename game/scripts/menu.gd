@@ -129,8 +129,24 @@ func _notification(what: int) -> void:
 		rank_center.visible = false
 		army_center.visible = true
 		return
-	var panels: Array[Control] = [test_scroll, army_center, scores_center,
-		history_scroll, about_center, guide_scroll, settings_panel, device_info_center]
+	# NO-147: TEST and About now live inside Settings, and Games History
+	# inside Scores — same "Back lands where its own on-screen button does"
+	# shape as the tier picker above, so all three get bespoke treatment
+	# rather than the generic main-menu jump below.
+	if is_instance_valid(test_scroll) and test_scroll.visible:
+		test_scroll.visible = false
+		settings_panel.visible = true
+		return
+	if is_instance_valid(about_center) and about_center.visible:
+		about_center.visible = false
+		settings_panel.visible = true
+		return
+	if is_instance_valid(history_scroll) and history_scroll.visible:
+		history_scroll.visible = false
+		scores_center.visible = true
+		return
+	var panels: Array[Control] = [army_center, scores_center,
+		guide_scroll, settings_panel, device_info_center]
 	for p in panels:
 		if is_instance_valid(p) and p.visible:
 			p.visible = false
@@ -658,11 +674,9 @@ func _ready() -> void:
 	_refresh_continue()
 	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "Scores", 24, _show_scores)
-	_button(main_box, "Games History", 24, _show_history)
 	_button(main_box, "Guide", 24, func() -> void:
 		main_box.visible = false
 		guide_scroll.visible = true)
-	_button(main_box, "About", 24, _show_about)
 	# issue 83's ruling — "a guest keeps their progress when they sign in" — had
 	# no way to happen: the login screen only ever appears on a first run, so
 	# once start_guest() wrote an account file, Account.sign_in()'s rebind was
@@ -689,22 +703,32 @@ func _ready() -> void:
 	_button(main_box, "Settings", 24, func() -> void:
 		main_box.visible = false
 		settings_panel.visible = true)
-	_button(main_box, "TEST", 24, _show_tests)
-	# NO-56: iOS has no sanctioned self-termination, so get_tree().quit() is a
-	# no-op there and the button is a visibly dead control — the same defect the
-	# hardware-Back handler above exists to avoid ("a gesture that silently does
-	# nothing reads as a frozen app"). Apple's HIG says not to offer Quit at all.
-	# GATED, NOT DELETED: Quit is legitimate on Android and desktop. The
-	# fall-through to quit() at the end of _back() stays — on iOS there is no
-	# hardware back, so it is unreachable rather than wrong.
-	if not _IS_IOS():
-		_button(main_box, "Quit", 20, func() -> void: get_tree().quit())
+	# NO-147 (Max, 2026-09-19): Quit is REMOVED, not merely hidden — "people
+	# can just close the app." Android's hardware Back already quits from the
+	# bare main menu (NO-61; the get_tree().quit() fall-through at the end of
+	# _notification above), so the button only duplicated a platform
+	# affordance every player already has. Do not re-add it on noticing it's
+	# gone — this is deliberate.
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart
 	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
 		Callable(), _on_logout)
+	# NO-147: About and TEST fold into Settings (eight main-menu entries down
+	# to four). Appended here rather than inside settings.gd's own build() —
+	# that panel is ALSO embedded in the in-game pause menu (hud.gd), and
+	# neither About (main-menu chrome) nor TEST (a scenario launcher) belongs
+	# mid-run. settings_panel.get_child(0) is that build()'s own
+	# VBoxContainer, always ending [.., ← Back]; the two new rows are appended
+	# and then moved in front of whatever is currently last, so Back stays
+	# the last row regardless of whether the Log out rows above it exist.
+	var settings_box := settings_panel.get_child(0) as VBoxContainer
+	var settings_back := settings_box.get_child(settings_box.get_child_count() - 1) as Button
+	var about_btn := _button(settings_box, "About", 24, _show_about)
+	var settings_test_btn := _button(settings_box, "TEST", 24, _show_tests)
+	settings_box.move_child(about_btn, settings_back.get_index())
+	settings_box.move_child(settings_test_btn, settings_back.get_index())
 
 	# issue 83: the login screen. Shown ONLY on a first run — once an account
 	# exists, needs_login() is false forever and this never appears again.
@@ -851,7 +875,7 @@ func _ready() -> void:
 	test_box.add_child(test_filter)
 	var back := _button(test_box, "← Back", 20, func() -> void:
 		test_scroll.visible = false
-		main_box.visible = true)
+		settings_panel.visible = true) # NO-147: TEST is reached through Settings now
 	back.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
 	# Diagnostic-only (2026-09-18, no issue yet): TEST is the one menu Android
 	# reaches with no CLI flag — see device_info_center's own comment. Sits
@@ -1111,7 +1135,11 @@ func _ready() -> void:
 					army_center.visible = false
 					rank_center.visible = true
 				"scores": _show_scores()
-				"history": _show_history()
+				"history": # NO-147: nested under Scores now — build it first,
+					# same idiom as "rank" building its Army pick above, so
+					# a screenshot doesn't need Scores opened as a separate step
+					_show_scores()
+					_show_history()
 				"about": _show_about()
 				"guide":
 					main_box.visible = false
@@ -1138,8 +1166,13 @@ func _ready() -> void:
 		get_tree().change_scene_to_file("res://scenes/Game.tscn")
 
 
+## NO-147: reached from Settings now, so settings_panel is hidden here rather
+## than left showing underneath (main_box.visible = false stays too — the
+## --show-screen "tests"/"device-info" bypasses reach this straight from a
+## fresh main menu, where settings_panel is already hidden).
 func _show_tests() -> void:
 	main_box.visible = false
+	settings_panel.visible = false
 	test_scroll.visible = true
 
 
@@ -1208,15 +1241,21 @@ func _show_scores() -> void:
 			int(e.wave), int(e.kings), "" if int(e.kings) == 1 else "s"]
 		row.add_theme_font_size_override("font_size", 18)
 		box.add_child(row)
+	# NO-147: Games History folds into Scores — a door to the per-run log
+	# beside the ranked top-10 above, same shape as the Global ranking door.
+	_button(box, "Games History", 20, _show_history)
 	_button(box, "← Back", 20, func() -> void:
 		scores_center.visible = false
 		main_box.visible = true)
 
 
 ## Games History: every real run's summary, newest first — distinct from the
-## ranked top-10 Highscores above (05-menus-and-settings).
+## ranked top-10 Highscores above (05-menus-and-settings). NO-147: reached
+## from Scores only, so scores_center is guaranteed built by the time this
+## runs — hidden here rather than left showing underneath.
 func _show_history() -> void:
 	main_box.visible = false
+	scores_center.visible = false
 	if history_scroll:
 		history_scroll.queue_free()
 	history_scroll = ScrollContainer.new()
@@ -1250,11 +1289,14 @@ func _show_history() -> void:
 		box.add_child(row)
 	_button(box, "← Back", 20, func() -> void:
 		history_scroll.visible = false
-		main_box.visible = true)
+		scores_center.visible = true) # NO-147: reached from Scores now
 
 
+## NO-147: reached from Settings now, so settings_panel is hidden here rather
+## than left showing underneath.
 func _show_about() -> void:
 	main_box.visible = false
+	settings_panel.visible = false
 	if about_center:
 		about_center.queue_free()
 	about_center = CenterContainer.new()
@@ -1274,7 +1316,7 @@ func _show_about() -> void:
 	box.add_child(body)
 	_button(box, "← Back", 20, func() -> void:
 		about_center.visible = false
-		main_box.visible = true)
+		settings_panel.visible = true) # NO-147: reached from Settings now
 
 
 ## Diagnostic-only readout of the platform's own safe-area numbers, so a

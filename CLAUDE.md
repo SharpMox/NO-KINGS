@@ -386,6 +386,14 @@ comes back.
   item SVG icons"); the gap is running a probe directly, skipping `run_all.sh`, which is
   what iterating on one suite does. A red result from a cold worktree is not evidence about
   the branch — warm the cache and re-run before bisecting.
+- **A bare `godot -s tests/X.gd` has no watchdog, and lies in both directions.**
+  `run_all.sh`'s `run()` backgrounds the suite and races a `sleep "$TIMEOUT"; kill "$pid"`
+  watchdog against it (`game/tests/run_all.sh:47-56`); a direct invocation gets neither —
+  `test_board_draw.gd` hung 7 minutes before being killed by hand on 2026-09-19, while a
+  120s watchdog an agent improvised for `test_scenarios.gd` (genuinely 190-250s) killed it
+  early and reported a phantom failure, same day. Wrap a direct run yourself and size the
+  timeout to the suite — 300s minimum for `test_scenarios.gd`, matching `run_all.sh`'s own
+  default (`TIMEOUT="${TIMEOUT:-300}"`, line 12).
 
 ### Layout traps the device taught
 

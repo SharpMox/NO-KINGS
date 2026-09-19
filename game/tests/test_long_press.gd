@@ -38,12 +38,16 @@ var foreign_motion := 0
 var hold_phase := ""
 
 
-func check(cond: bool, label: String) -> void:
+## NO-113: `detail` is printed alongside a failing label — see
+## test_game_clicks.gd's copy for the rationale. Optional, so every existing
+## two-argument call site is unchanged.
+func check(cond: bool, label: String, detail := "") -> bool:
 	if not cond:
-		push_error("FAIL: " + label)
+		push_error("FAIL: " + label + (" -- " + detail if detail != "" else ""))
 		fails += 1
 	else:
 		print("ok: " + label)
+	return cond
 
 
 func _mouse(pressed: bool, at: Vector2) -> void:

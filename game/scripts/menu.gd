@@ -1079,9 +1079,42 @@ func _ready() -> void:
 	rank_pick.text = "Choose your difficulty"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
-	# issue 75: the seed field. Sits on the LAST screen before a run starts, so
-	# it is the final thing set and cannot be lost by backing out of a later
-	# step. Empty = a fresh random seed, exactly as before.
+	# NO-148: one row per tier, icon + description, description GENERATED from
+	# Tuning.TIER_HANDICAPS rather than hand-written — see _tier_description().
+	# The tier BUTTON keeps the bare "Tier N" text test_menu_clicks.gd clicks by
+	# (and the save's own next_tier value); the description is a separate Label
+	# beside it, never folded into the button's own text.
+	for tier_name in Tuning.TIERS:
+		var tier_row := HBoxContainer.new()
+		tier_row.add_theme_constant_override("separation", 10)
+		rank_box.add_child(tier_row)
+		var tier_icon := Label.new()
+		tier_icon.text = _tier_icon_text(tier_name)
+		tier_icon.add_theme_font_size_override("font_size", 18)
+		tier_icon.custom_minimum_size = Vector2(70, 0)
+		tier_row.add_child(tier_icon)
+		var tier_col := VBoxContainer.new()
+		tier_col.add_theme_constant_override("separation", 2)
+		tier_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tier_row.add_child(tier_col)
+		_button(tier_col, tier_name, 26, func() -> void:
+			GameScript.next_tier = tier_name
+			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
+			GameScript.next_config = {}
+			GameScript.is_scenario = false
+			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		var tier_desc := Label.new()
+		tier_desc.text = _tier_description(tier_name)
+		tier_desc.add_theme_font_size_override("font_size", 11)
+		tier_desc.modulate = Color(1, 1, 1, 0.7)
+		tier_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		# icon column (70) + the row separation (10) — same "state an explicit
+		# minimum or autowrap collapses to zero" fix _wrap_account_text documents.
+		tier_desc.custom_minimum_size.x = _text_width() - 80.0
+		tier_col.add_child(tier_desc)
+	# issue 75: the seed field. NO-148 moves it to the BOTTOM, under the tiers,
+	# so it is still the final thing set before a run starts — its own
+	# behaviour (focus_mode, "" = random) is untouched, only its position moved.
 	var seed_row := VBoxContainer.new()
 	seed_row.add_theme_constant_override("separation", 2)
 	var seed_label := Label.new()
@@ -1099,13 +1132,6 @@ func _ready() -> void:
 	seed_field.focus_mode = Control.FOCUS_CLICK
 	seed_row.add_child(seed_field)
 	rank_box.add_child(seed_row)
-	for tier_name in Tuning.TIERS:
-		_button(rank_box, tier_name, 26, func() -> void:
-			GameScript.next_tier = tier_name
-			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
-			GameScript.next_config = {}
-			GameScript.is_scenario = false
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(rank_box, "← Back", 20, func() -> void:
 		rank_center.visible = false
 		army_center.visible = true)
@@ -1379,6 +1405,32 @@ func _army_summary(army: Array) -> String:
 	for id in counts:
 		parts.append(("%d× %s" % [counts[id], id]) if counts[id] > 1 else id)
 	return " · ".join(parts)
+
+
+## NO-148: a filled/hollow dot meter standing in for real tier artwork — none
+## exists in game/assets (checked before writing this). Derived from
+## Tuning.tier_index like the description below, not authored per tier, so
+## it is a placeholder that is at least never wrong. Flagged in the ticket
+## report: swap this for painted icons by replacing this one function.
+func _tier_icon_text(tier_name: String) -> String:
+	var idx := Tuning.tier_index(tier_name)
+	return "●".repeat(idx + 1) + "○".repeat(Tuning.TIERS.size() - idx - 1)
+
+
+## NO-148 (Max, 2026-09-19): each tier's description states its OWN new
+## handicap(s) first, then every handicap every lower tier already added —
+## cumulative, with the new part identifiable. GENERATED from
+## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
+## hand-written, so retuning a threshold there moves this copy for free.
+func _tier_description(tier_name: String) -> String:
+	var new_h := Tuning.new_handicaps(tier_name)
+	if new_h.is_empty():
+		return "No handicaps"
+	var lines := new_h.duplicate()
+	var lower_h := Tuning.lower_handicaps(tier_name)
+	if not lower_h.is_empty():
+		lines.append("Also: " + ", ".join(lower_h))
+	return "\n".join(lines)
 
 
 ## NO-55: how wide an account label may be. One number, read from the viewport

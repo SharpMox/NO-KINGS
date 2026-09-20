@@ -310,10 +310,15 @@ var army_ability_hint := Label.new()
 ## for whether or not the band is ever open (coordinator review 2026-09-19).
 var army_band := PanelContainer.new()
 var army_band_open := true
-## The wedge button between Inventory and Shop that reopens army_band; visible
-## only while the band is collapsed (refresh() never touches it — build()
-## sets its visibility once per toggle, there is nothing state-dependent to
-## redraw every frame).
+## NO-163: the ONE control that opens/closes army_band, anchored in the
+## button row between Inventory and Shop — ALWAYS visible there, never
+## moving. Before this it was two separate buttons in two separate places
+## (a "▴ Hide" wedge inside army_band itself, at the top of the header area;
+## this wedge, only shown once collapsed): the affordance for "control the
+## band" jumped from the top of the screen to the button row depending on
+## state, which is the exact "moves under the player's finger" failure this
+## ticket named. Now it's one Button whose glyph flips (_update_band_toggle
+## below) and whose position never does.
 var army_band_reopen := Button.new()
 ## NO-128: separation inside army_band's internal VBox. Its own constant (not
 ## reused from elsewhere) because it is a tighter internal stack, not a deck
@@ -558,7 +563,10 @@ func build(game) -> void:
 	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
 	deck.position = Vector2(0, deck_top)
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
-	deck.add_theme_constant_override("separation", 6)
+	# NO-163: was 6 — the gap between the drawers row and the thumb row
+	# underneath, closed so the whole deck (and the board it's traded against,
+	# ADR-0004) is shorter. game.gd's DECK_ROWS drops by the same 6.
+	deck.add_theme_constant_override("separation", 0)
 	add_child(deck)
 	# NO-145 (hardware round 2): deck used to also be hooked here as a
 	# swipe-to-open surface (its own unclaimed area, MOUSE_FILTER_STOP).
@@ -588,21 +596,24 @@ func build(game) -> void:
 		drawer_changed.emit())
 	drawer_buttons["inventory"] = inv
 	bar.add_child(inv)
-	# NO-128: the wedge that reopens army_band once it's collapsed. Fixed-
-	# width (no EXPAND_FILL), so Inventory and Shop stay equal to EACH OTHER
-	# on either side of it rather than to their old, wider halves.
-	army_band_reopen.text = "▾"
-	army_band_reopen.tooltip_text = "Show Army Power"
+	# NO-128/NO-163: the wedge that opens AND closes army_band. Fixed-width (no
+	# EXPAND_FILL), so Inventory and Shop stay equal to EACH OTHER on either
+	# side of it rather than to their old, wider halves. ALWAYS visible now
+	# (was hidden while the band was open, when a second button — band_collapse,
+	# inside army_band itself — did the closing instead; see this var's own
+	# declaration for why that was wrong).
 	army_band_reopen.add_theme_font_size_override("font_size", 13)
 	_style_button(army_band_reopen, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
-	army_band_reopen.visible = false
 	army_band_reopen.pressed.connect(func() -> void:
-		if drawer_open == "inventory": # NO-128: same screen rect as army_band
-			set_drawer("inventory") # already "inventory" -> toggles it closed
-			drawer_changed.emit()
-		army_band_open = true
-		army_band.visible = true
-		army_band_reopen.visible = false)
+		if army_band_open:
+			collapse_army_band()
+		else:
+			if drawer_open == "inventory": # NO-128: same screen rect as army_band
+				set_drawer("inventory") # already "inventory" -> toggles it closed
+				drawer_changed.emit()
+			army_band_open = true
+			army_band.visible = true
+		_update_band_toggle())
 	bar.add_child(army_band_reopen)
 	shop_button.text = "Shop"
 	shop_button.add_theme_font_size_override("font_size", 17)
@@ -795,7 +806,6 @@ func build(game) -> void:
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# custom_minimum_size.x is set below, once band_collapse's width is known
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
 	# issue 100 put this at the top of the Inventory drawer. Design C brings it
@@ -810,16 +820,7 @@ func build(game) -> void:
 	var band_header := HBoxContainer.new()
 	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
 	army_power_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# room for band_collapse beside it, inside army_band's own -20px padding
-	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0 - 28.0, 0)
 	band_header.add_child(army_power_label)
-	var band_collapse := Button.new()
-	band_collapse.text = "▴"
-	band_collapse.tooltip_text = "Hide"
-	band_collapse.add_theme_font_size_override("font_size", 13)
-	_style_button(band_collapse, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
-	band_collapse.pressed.connect(collapse_army_band)
-	band_header.add_child(band_collapse)
 	band_col.add_child(band_header)
 	band_col.add_child(army_ability_hint) # NO-128: moved out of act_row
 	# NO-128: the King Abilities button, built (styled, wired to
@@ -847,9 +848,12 @@ func build(game) -> void:
 	# anywhere in the band that isn't one of ITS OWN controls falls through
 	# to the board underneath. Godot does NOT cascade IGNORE to children
 	# (same CLAUDE.md bullet — _set_drawer_clickable exists for exactly this
-	# asymmetry), so band_collapse and king_ability_button, both left at
-	# their default STOP, keep working — a filter set high in this tree has
-	# no effect on a control below it that never asked to inherit it.
+	# asymmetry), so king_ability_button, left at its default STOP, keeps
+	# working — a filter set high in this tree has no effect on a control
+	# below it that never asked to inherit it. NO-163 moved the band's own
+	# open/close control (band_collapse) out of army_band entirely, onto the
+	# deck's nav_row (army_band_reopen) — nothing inside army_band claims
+	# input any more except king_ability_button.
 	# army_power_label and army_ability_hint need no change: Label already
 	# defaults to IGNORE.
 	army_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1041,6 +1045,7 @@ func build(game) -> void:
 	# drawers row to the bottom of the screen and undoing the row order set in
 	# build() - which is exactly how it presented: the tree said one order and
 	# the screen showed another.
+	_update_band_toggle() # NO-163: the toggle's initial glyph (army_band_open starts true)
 
 
 ## NO-118: a panel's own mouse_filter alone is not enough — Godot does not
@@ -1215,13 +1220,31 @@ func update_clock(ms: float) -> void:
 	_clock_seen = true
 
 
-## NO-128: collapses army_band — the visibility half of what the "▴" button
+## NO-128: collapses army_band — the visibility half of what army_band_reopen
 ## and the mutual-exclusion guards below do. Public: game.gd's SETUP boot
 ## calls it too (see its own call site for why).
 func collapse_army_band() -> void:
 	army_band_open = false
 	army_band.visible = false
-	army_band_reopen.visible = true
+	_update_band_toggle()
+
+
+## NO-163: the single toggle button's glyph/tooltip, kept in one place so
+## build()'s initial state, every press, and refresh()'s King-Abilities
+## warning can never say three different things. OPEN never warns even with
+## an active King ability — king_ability_button is visible INSIDE the band
+## then, so the toggle itself only ever needs to offer "Hide". CLOSED
+## borrows the warning glyph so an active ability stays visible while
+## collapsed, same as before NO-163 merged the two buttons into this one.
+func _update_band_toggle() -> void:
+	var warn: bool = g != null and not g.king_abilities_active.is_empty()
+	if army_band_open:
+		army_band_reopen.text = "▴"
+		army_band_reopen.tooltip_text = "Hide"
+	else:
+		army_band_reopen.text = "⚠▾" if warn else "▾"
+		army_band_reopen.tooltip_text = "King Abilities in force — tap to show" \
+			if warn else "Show Army Power"
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -1476,16 +1499,12 @@ func refresh() -> void:
 	king_ability_button.visible = not g.king_abilities_active.is_empty()
 	# NO-128 (coordinator review 2026-09-19): an active King ability must
 	# never go invisible just because the band is collapsed — that's exactly
-	# the thing a player must not lose track of. The wedge carries its own
-	# warning while one is active, whether or not the band happens to be
-	# open right now; tapping it still just reopens the band (uniform
-	# behaviour) rather than skipping straight to the modal.
-	if g.king_abilities_active.is_empty():
-		army_band_reopen.text = "▾"
-		army_band_reopen.tooltip_text = "Show Army Power"
-	else:
-		army_band_reopen.text = "⚠▾"
-		army_band_reopen.tooltip_text = "King Abilities in force — tap to show"
+	# the thing a player must not lose track of. The CLOSED glyph carries its
+	# own warning while one is active; tapping it still just reopens the band
+	# (uniform behaviour) rather than skipping straight to the modal. NO-163:
+	# both glyphs (open/closed) now live in _update_band_toggle, so a refresh
+	# mid-open never overwrites the "▴ Hide" state with the closed one.
+	_update_band_toggle()
 	# armed-placement tint (2026-07-07 palette) marks the toggle as active
 	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
 	arrow_clear_button.visible = g.arrow_mode
@@ -1532,8 +1551,8 @@ func refresh() -> void:
 	army_ability_button.text = "★ %s" % kit.ability_name
 	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived
 	# (its tooltip). The chip is gone, so the deck button inherits that tooltip
-	# verbatim — the button's own text carries the name and the cost, the tooltip
-	# carries what the Ability actually does.
+	# verbatim — the tooltip is the one place the cost lives now (NO-163
+	# dropped "1 Action" from the button's own text; ready needs no caveat).
 	army_ability_button.tooltip_text = "%s (1 Action)\n%s" % [
 		kit.power_name + " — always on. " + kit.ability_name, kit.ability_desc]
 	if g.army_ability_used_this_wave:
@@ -1545,7 +1564,6 @@ func refresh() -> void:
 		army_ability_button.disabled = true
 		army_ability_button.self_modulate = Color(1.0, 0.66, 0.62)
 	else:
-		army_ability_button.text += "  ·  1 Action"
 		army_ability_button.disabled = false
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
 	# NO-115: a reminder of what pressing this DOES, since the tooltip above

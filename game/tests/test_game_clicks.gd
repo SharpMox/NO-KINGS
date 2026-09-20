@@ -783,11 +783,13 @@ func _init() -> void:
 	# design C moved the Ability out of this drawer and onto the deck, so its
 	# cost is asserted where it now lives. The point of the move is the next
 	# check: you can read it WITHOUT opening anything.
-	check("1 Action" in game.hud.army_ability_button.text
-			or "no Action" in game.hud.army_ability_button.text
-			or "next wave" in game.hud.army_ability_button.text,
-		"the Ability states its cost or why it is unavailable (%s)"
-			% game.hud.army_ability_button.text)
+	# NO-163: the READY state no longer repeats "1 Action" in the button text
+	# (the tooltip, checked below, already carries the cost) — only an
+	# UNAVAILABLE button states why, on the button itself.
+	if game.hud.army_ability_button.disabled:
+		check("no Action" in game.hud.army_ability_button.text
+				or "next wave" in game.hud.army_ability_button.text,
+			"a disabled Ability states why (%s)" % game.hud.army_ability_button.text)
 	check(kit.ability_name in game.hud.army_ability_button.text,
 		"and names the ability itself")
 	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived.
@@ -843,9 +845,12 @@ func _init() -> void:
 	# army_band_reopen's own handler closes Inventory as it goes, so one
 	# click does both.
 	_click(HUD.army_band_reopen.get_global_rect().get_center())
-	check(HUD.drawer_open == "" and not HUD.army_band_reopen.visible
+	# NO-163: army_band_reopen is now ALWAYS visible (one control, anchored to
+	# the button row, that flips its own glyph rather than two controls that
+	# traded visibility) — assert the OPEN glyph instead of "not visible".
+	check(HUD.drawer_open == "" and HUD.army_band_reopen.text == "▴"
 			and HUD.army_band.visible and HUD.army_band_open,
-		"NO-128: reopening the band also closed Inventory (same screen rect)")
+		"NO-128/NO-163: reopening the band also closed Inventory (same screen rect)")
 	# NO-128: army_band overlays the SAME screen rect Inventory's drawer opens
 	# into (both anchored to deck_top, extending upward) — see the mutual
 	# exclusion in hud.gd's set_drawer() and army_band_reopen's own handler.
@@ -856,11 +861,12 @@ func _init() -> void:
 	# button in this file.
 	_click(HUD.drawer_buttons["inventory"].get_global_rect().get_center())
 	await _await_drawer_settled(game, "inventory")
-	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible and HUD.army_band_reopen.visible,
-		"NO-128: opening Inventory collapses army_band (same screen rect)")
+	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible
+			and HUD.army_band_reopen.text == "▾",
+		"NO-128/NO-163: opening Inventory collapses army_band (same screen rect)")
 	_click(HUD.army_band_reopen.get_global_rect().get_center())
-	check(HUD.drawer_open == "" and HUD.army_band.visible and not HUD.army_band_reopen.visible,
-		"NO-128: reopening the band closes Inventory back (same screen rect)")
+	check(HUD.drawer_open == "" and HUD.army_band.visible and HUD.army_band_reopen.text == "▴",
+		"NO-128/NO-163: reopening the band closes Inventory back (same screen rect)")
 	# NO-128 finally gives king_ability_button the home NO-83 promised it: it
 	# is in the tree now (inside army_band), just hidden until an ability is
 	# active. arrow_button has no ticket moving it yet, so it stays off-screen.
@@ -1052,9 +1058,13 @@ func _init() -> void:
 	game.actions_left = was_actions
 	game.army_ability_used_this_wave = was_used
 	game.hud.refresh()
-	check("1 Action" in game.hud.army_ability_button.text
+	# NO-163: ready no longer says "1 Action" (dropped from the button text) —
+	# assert the absence of both unavailability captions instead, plus enabled.
+	check(not ("no Action" in game.hud.army_ability_button.text)
+			and not ("next wave" in game.hud.army_ability_button.text)
 			and not game.hud.army_ability_button.disabled,
-		"and it comes back ready once an Action exists again")
+		"and it comes back ready once an Action exists again (%s)"
+			% game.hud.army_ability_button.text)
 	await process_frame
 
 	# ---- ONE ICON SIZE, ACROSS ALL THREE STRIPS (NO-36, resized NO-119) ------

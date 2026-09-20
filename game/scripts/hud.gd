@@ -506,6 +506,20 @@ func build(game) -> void:
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	clock_label.clip_text = true
+	# NO-162 DIAGNOSTIC round 2 — round 1's numbers were all internally
+	# consistent (budget satisfied, transforms identity) and the render was
+	# STILL wrong, so this checks the two remaining named candidates
+	# directly: `label_settings` (grep across the whole game/ tree found
+	# zero matches — this confirms that at runtime, not just in source) and
+	# whether the override just applied above actually reads back as
+	# `clock_size`, immediately, on THIS run (not inferred from an earlier
+	# one). Also prints the window's content scale — window_size/visible_rect
+	# round 1 showed (906,1494)/(485,800), a real ~1.868x ratio — in case
+	# font rasterization and get_string_size() diverge under it.
+	if OS.get_cmdline_user_args().has("--debug-clock"):
+		print("NO162-font label_settings=%s readback_size=%s content_scale_factor=%s content_scale_mode=%s"
+			% [clock_label.label_settings, clock_label.get_theme_font_size("font_size"),
+				get_window().content_scale_factor, get_window().content_scale_mode])
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	# NO-126: the odometer look — greyed padding zeros before the coloured

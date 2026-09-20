@@ -137,27 +137,42 @@ const ZONE_OUTLINE_WIDTH := 3.5
 const COL_ZONE_OUTLINE_MOVE := Color(0.55, 0.75, 1.0) # lighter than COL_MOVE
 	# (0.3, 0.55, 0.95) so the outline itself reads as distinct from the move
 	# dots/arrows it wraps, not a repeat of the same blue
-const COL_ZONE_OUTLINE_OVERLAP := Color(0.62, 0.32, 0.88) # where a move-tile
+const COL_ZONE_OUTLINE_OVERLAP := Color(0.95, 0.8, 0.15) # where a move-tile
 	# outline edge and a capture-tile outline edge fall on the identical
 	# boundary (two tiles of different kinds touching inside one reachable
 	# zone), drawn once in this colour. NOT relied on to emerge from
 	# stacking blue-then-red: both outline strokes sit at ZONE_OUTLINE_ALPHA
 	# 0.9, so the underlying layer would barely show through the top one —
 	# computed explicitly instead of hoped for (can't screenshot to check).
+	# NO-183: was a purple (0.62, 0.32, 0.88) sharing NO-177's aubergine dark
+	# square (#573F6E) hue family — flagged on that ticket as a predicted
+	# failure at ZONE_OUTLINE_ALPHA 0.6, never verified. Gold instead: it's
+	# purple's complement (strong contrast against the aubergine square by
+	# construction) and, pushed warmer/more saturated than COL_LIGHT's pale
+	# sage, reads against that square too. Distinct from COL_ARROW
+	# (0.95, 0.65, 0.15, more orange) so it doesn't collide with the
+	# decorative Arrow Planning overlay. NOT VERIFIED ON SCREEN.
 const COL_CAPTURE_TILE_TINT := Color(0.92, 0.18, 0.4) # capture-target tile
 	# wash, pushed pinker than COL_CAPTURE (0.85, 0.15, 0.15) by raising
 	# blue — the ring and the new capture outline stay pure COL_CAPTURE so
 	# only the tile fill shifts, not every red thing on the tile
 const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
-const SELECT_RING_WIDTH := 3.0 # fixed (was 3.0-4.5 jitter)
-const SELECT_RING_ALPHA_MIN := 0.5
-const SELECT_RING_ALPHA_RANGE := 0.3 # breathes 0.5-0.8; old pulse swung 0.45-0.85
+const SELECT_RING_WIDTH := 5.0 # NO-183: was 3.0 — _draw_pulse was correctly
+	# wired (added as a child canvas item, signal-connected, queue_redraw'd
+	# every _process frame a piece is selected) but read as invisible: a
+	# 3px ring in the SAME hue as the full-tile COL_SELECT/COL_CAPTURE wash
+	# it sits on top of (line ~4451) barely separated from that wash at a
+	# glance. Widened and see ALPHA below — NOT VERIFIED ON SCREEN, same
+	# lesson as NO-150's "technically present" outline.
+const SELECT_RING_ALPHA_MIN := 0.7 # NO-183: was 0.5
+const SELECT_RING_ALPHA_RANGE := 0.3 # breathes 0.7-1.0; old pulse swung 0.45-0.85
 	# stacked with radius+width jitter, which read as flashing, not "clean"
 const MOVE_INDICATOR_ALPHA := 0.55 # was 0.85 (recon) / 0.9 (player) baked in
-const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots)
-const CAPTURE_RING_RADIUS := 0.48 # tile fraction, was 0.44
-const CAPTURE_RING_WIDTH := 4.5 # was 3.0
-const CAPTURE_RING_ALPHA := 0.6 # was opaque (COL_CAPTURE has no alpha)
+const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots) —
+	# NO-183: the leap dot itself is gone (see the legal_paths match below);
+	# this constant now sizes only the hop/bent linked-dot path, which is
+	# unaffected (it shows the path SHAPE, not a plain destination marker,
+	# so it stayed out of "remove the circle indicators").
 const ARROW_WIDTH := 4.5 # was 3.0 — ride-move arrow only, not Arrow Planning
 const ARROW_HEAD_LEN := 20.0 # was 14.0
 const ARROW_HEAD_HALF := 11.0 # was 8.0
@@ -2111,14 +2126,25 @@ func _draw_linked_dots(origin: Vector2, line: Array, col: Color) -> void:
 ## the last reachable tile (a capture there keeps its ring on top). Sizing
 ## defaults to the NO-129 move/capture dimensions; Arrow Planning's decorative
 ## overlay (unrelated feature) passes its own, unchanged, smaller numbers.
-## NO-160: drawn as ONE polygon (shaft + head), not a separate `draw_line`
-## plus triangle. The old pair put the line's end 10px short of the tip while
-## the triangle's base sat `head_len` (14/20, always > 10) back from it — so
-## the line's last few pixels fell INSIDE the triangle and, both shapes
-## sharing the same semi-transparent `col`, that patch composited twice
-## (line-under-background, then triangle-over-that), reading visibly darker:
-## the shaft showed through the arrowhead. A single draw_colored_polygon call
-## composites against the background exactly once, everywhere.
+## NO-160: shaft and head composite against the background exactly once,
+## everywhere — the old separate `draw_line` + triangle put the line's end
+## 10px short of the tip while the triangle's base sat `head_len` (14/20,
+## always > 10) back from it, so the line's last few pixels fell INSIDE the
+## triangle and, both shapes sharing the same semi-transparent `col`, that
+## patch composited twice, reading visibly darker: the shaft showed through
+## the arrowhead.
+## NO-183: drawn as TWO convex polygons (a shaft quad, a head triangle)
+## sharing one exact edge at `shaft_end`, not NO-160's single 7-point
+## composite. That composite is concave at its two "shoulders" (the shaft is
+## narrower than the head, so the outline turns inward there) — fine for an
+## axis-aligned arrow, but for a diagonal one the shoulder edge runs at 45°
+## and Godot's polygon triangulator produced a sliver gap exactly there,
+## letting the shaft show through the head again (the same symptom NO-160
+## fixed, for a different reason). A quad and a triangle are each ALWAYS
+## convex regardless of rotation, so there is no shape for the triangulator
+## to get wrong at any angle; sharing the boundary exactly (no gap, no
+## overlap) keeps NO-160's double-composite fix intact. NOT VERIFIED ON
+## SCREEN — check a diagonal ride's arrow specifically, the case that broke.
 func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color,
 		width := ARROW_WIDTH, head_len := ARROW_HEAD_LEN, head_half := ARROW_HEAD_HALF) -> void:
 	var dir := (to_px - from_px).normalized()
@@ -2128,8 +2154,10 @@ func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color,
 	var half_w := width * 0.5
 	draw_colored_polygon(PackedVector2Array([
 		shaft_start - side * half_w, shaft_end - side * half_w,
-		shaft_end - side * head_half, to_px, shaft_end + side * head_half,
 		shaft_end + side * half_w, shaft_start + side * half_w,
+	]), col)
+	draw_colored_polygon(PackedVector2Array([
+		shaft_end - side * head_half, to_px, shaft_end + side * head_half,
 	]), col)
 
 
@@ -4457,14 +4485,19 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
-	# NO-176: explicit draw order — red over purple over blue. The reachable
-	# zone's own outline below (blue move edges, red capture edges, purple
-	# where the two meet inside the same zone — NO-161) is drawn FIRST, as
-	# the bottom layer; the bomb-blast preview and armed-Item zone are pure
-	# red and are drawn AFTER, on top, so a red capture edge is never hidden
-	# beneath a blue move edge where the two zones' tiles coincide (the bomb
-	# highlight in particular can share tiles with legal_dests — a capture
-	# destination that also carries a bomb is in both sets).
+	# NO-176: explicit draw order — red over gold over blue (NO-183: the
+	# overlap colour, was purple). The reachable zone's own outline below
+	# (blue move edges, red capture edges, gold where the two meet inside
+	# the same zone — NO-161) is drawn FIRST, as the bottom layer; the
+	# bomb-blast preview and armed-Item zone are pure red and are drawn
+	# AFTER, on top, so a red capture edge is never hidden beneath a blue
+	# move edge where the two zones' tiles coincide (the bomb highlight in
+	# particular can share tiles with legal_dests — a capture destination
+	# that also carries a bomb is in both sets). NO-183: the move/capture
+	# indicator arrows/dots below and Arrow Planning's own overlay (drawn
+	# last in this function) both come AFTER every hatch call above and
+	# below this comment, so an arrow always draws over a hatch fill, never
+	# under one.
 	# recon (enemy) paths draw red; the player's draw blue (palette rule)
 	var half := Vector2(tile, tile) / 2
 	var capture_dests: Array[Vector2i] = [] # NO-161: legal_dests is drawn as
@@ -4479,16 +4512,17 @@ func _draw() -> void:
 		# carries its element type at runtime regardless of which ternary
 		# branch is taken.
 	for d in legal_dests:
-		if board.has(d): # capturable target: pink-red tile tint + red ring around the piece
+		if board.has(d): # capturable target: pink-red tile tint. NO-183: the
+			# ring that used to sit on top of it is gone — the tint plus the
+			# zone outline below already mark this tile red, and this was
+			# pure duplication of that signal.
 			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE_TILE_TINT, 0.3))
-			draw_arc(_tile_px(d) + half, tile * CAPTURE_RING_RADIUS, 0, TAU, 32,
-				Color(COL_CAPTURE, CAPTURE_RING_ALPHA), CAPTURE_RING_WIDTH) # NO-129: larger + semi-transparent
 			capture_dests.append(d)
 	# NO-129: one outline around the whole reachable zone, so a spread of
 	# move/capture squares reads as a shape rather than each square drawn on
 	# its own — reused by NO-130's _draw_target_zone for the bomb blast
 	# preview and an armed Item's zone. NO-161: capture tiles draw red
-	# instead of blue and a move/capture boundary reads purple (see
+	# instead of blue and a move/capture boundary reads gold (see
 	# _draw_zone_outline); recon (enemy) zones are left as one uniform
 	# COL_ENEMY shape — the ticket's blue-vs-red contrast doesn't apply to a
 	# zone that's already all red, and there's no third recon-only colour to
@@ -4518,14 +4552,16 @@ func _draw() -> void:
 			if not board.has(d):
 				draw_circle(_tile_px(d) + half, 8, COL_PLACE)
 	else:
-		# movement by shape: leaps = dots, rides = arrows, bent rides = dots
-		# linked by a line (game-feel 2026-07-07)
+		# movement by shape: rides = arrows, bent rides / hop-riders = dots
+		# linked by a line (game-feel 2026-07-07). NO-183: a leap destination
+		# used to get its own dot here too — removed as a duplicate of the
+		# tile itself already reading as reachable (zone outline, and the
+		# hatch fill NO-184 adds); a bent/hop path keeps its linked dots
+		# because those trace the path's SHAPE, information a tile fill
+		# doesn't carry.
 		var col := Color(COL_ENEMY, MOVE_INDICATOR_ALPHA) if recon else Color(COL_MOVE, MOVE_INDICATOR_ALPHA)
 		for p in legal_paths:
 			match p.kind:
-				"leap":
-					if not board.has(p.to):
-						draw_circle(_tile_px(p.to) + half, MOVE_DOT_RADIUS, col) # NO-129: was a fixed 10px
 				"ride":
 					if p.get("hop", false): # leap-rider: linked dots, not a slide
 						_draw_linked_dots(_tile_px(selected) + half, p.line, col)
@@ -4698,6 +4734,14 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 ## selected (the board itself only redraws on state changes). NO-129: radius
 ## and width are now fixed (only alpha still breathes) — the old triple
 ## jitter on radius+width+alpha together read as flashing, not a clean ring.
+## NO-183: confirmed IMPLEMENTED, not missing — `_pulse` is added as a child
+## in _ready (so it draws after, i.e. on top of, this node's own _draw and
+## every piece token), wired via `_pulse.draw.connect(_draw_pulse)`, and
+## `_process` calls `_pulse.queue_redraw()` every frame a piece is selected.
+## The likely reason it read as invisible: this ring is COL_SELECT/COL_CAPTURE
+## (see SELECT_RING_WIDTH's comment), the same hue as the full-tile wash
+## `_draw` already fills the selected tile with — a thin 3px ring on top of a
+## same-colour tile wash barely separated at a glance. See SELECT_RING_WIDTH.
 func _draw_pulse() -> void:
 	if selected.x < 0 or not board.has(selected):
 		return

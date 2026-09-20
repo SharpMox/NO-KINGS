@@ -177,10 +177,14 @@ const MERGE_RESULT_SCALE := 1.7
 ## row and its matching text line (removed entirely, no replacement: the
 ## icons and labels below already say the same thing). Labels are discreet
 ## on the sources (named underneath their own icon, dimmed) and big/bold
-## above the result, so the result reads as the point of the screen. The
-## fade-sources/grow-result animation (_play_merge_animation) is unchanged —
-## "two fading below while one grows above" already reads as a pyramid
-## converging, more so than it did in the old side-by-side row.
+## above the result, so the result reads as the point of the screen.
+##
+## NO-187 (Max review): the result used to start as a dim 0.55-alpha preview,
+## which read as washed-out/de-emphasized for what is literally the reward
+## of the merge — it's fully opaque now, at rest and through the whole
+## confirm animation. Only the SCALE still previews small (_play_merge_
+## animation grows it to full on confirm, unchanged); the dimming that used
+## to fade in alongside it is gone, so that tween is gone too.
 func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
@@ -207,12 +211,13 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 
 	var result_tex := _merge_piece_tex(result, Tuning.OFFBOARD_ICON * MERGE_RESULT_SCALE)
 	if result_tex:
-		# starts as a dim preview; confirming grows/brightens it to full while
-		# the sources fade — see _play_merge_animation. SHRINK_CENTER so it
-		# stays centred at its own size if sources_row below ends up wider.
+		# NO-187: fully opaque at rest — only the SCALE still starts small and
+		# grows to full on confirm (_play_merge_animation); modulate.a no
+		# longer dips (was 0.55, read as washed-out for the merge's reward).
+		# SHRINK_CENTER so it stays centred at its own size if sources_row
+		# below ends up wider.
 		result_tex.pivot_offset = result_tex.custom_minimum_size / 2
 		result_tex.scale = Vector2(0.7, 0.7)
-		result_tex.modulate.a = 0.55
 		result_tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		box.add_child(result_tex)
 
@@ -226,9 +231,9 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	sources_row.add_child(_merge_source_col(b_id, b_tex))
 	box.add_child(sources_row)
 
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
+	# NO-187 (Max review): the shared commit/cancel shape (MODAL_CANCEL_GAP) —
+	# Merge centred, Cancel pushed clearly below it instead of sharing a row,
+	# so the two can't be mis-tapped into each other.
 	var yes := Button.new()
 	yes.text = "Merge"
 	yes.add_theme_font_size_override("font_size", 22)
@@ -243,12 +248,14 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 			merge_panel.visible = false
 		else:
 			_play_merge_animation(a_tex, b_tex, result_tex))
-	row.add_child(yes)
 	no.pressed.connect(func() -> void:
 		merge_panel.visible = false
 		merge_cancelled.emit())
-	row.add_child(no)
-	box.add_child(row)
+	box.add_child(_centered(yes))
+	var cancel_gap := Control.new()
+	cancel_gap.custom_minimum_size = Vector2(0, MODAL_CANCEL_GAP)
+	box.add_child(cancel_gap)
+	box.add_child(_centered(no))
 	g.hud.add_child(merge_panel)
 	merge_panel.move_to_front() # above the drawers and bottom bar
 
@@ -294,7 +301,7 @@ func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
 	return col
 
 
-## NO-140: sources fade out, the result scales/brightens to full — reads as
+## NO-140: sources fade out, the result scales up to full — reads as
 ## "the two becoming the result" without moving anything out of its own
 ## container layout (a position tween would fight the container's own sort;
 ## NO-169's pyramid arrangement — sources below fading, result above growing
@@ -302,6 +309,9 @@ func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
 ## did). Any of the three may be null (no art for that id); tween_property
 ## calls are just skipped for it. Ends by hiding merge_panel, the same state
 ## change the no-animation branch above makes immediately.
+##
+## NO-187: result_tex no longer tweens modulate:a — it starts and stays fully
+## opaque (show_merge_confirm), so there's no dimness left to animate out of.
 ##
 ## Hardware fix (coordinator diagnosis, eleven downstream menu-click
 ## failures): merge_panel stays `visible` for the whole MERGE_ANIM_S outro,
@@ -331,7 +341,6 @@ func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: T
 	if result_tex:
 		tw.tween_property(result_tex, "scale", Vector2.ONE, Tuning.MERGE_ANIM_S) \
 			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_property(result_tex, "modulate:a", 1.0, Tuning.MERGE_ANIM_S)
 	tw.chain().tween_callback(func() -> void: merge_panel.visible = false)
 
 

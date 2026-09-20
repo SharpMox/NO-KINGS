@@ -636,7 +636,13 @@ func _init() -> void:
 		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
 	await process_frame
 	cc.actions_left = 5
-	cc.artefacts.append({"key": "abduction-probe"})
+	# a minimal {"key":...} entry has no "name" — fine for BuffLogic, which
+	# never reads it, but commit_merge's trailing _refresh() rebuilds the
+	# Inventory drawer, and hud.gd's _build_artefact_cell reads entry.name
+	# for an unpainted icon's initials badge. Grant the real catalog entry,
+	# the same way test_shop.gd's artefact-purchase fixture does.
+	cc.artefacts.append(Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key == "abduction-probe")[0])
 	BuffLogic.add(cc.board[Vector2i(2, 2)], "shield")
 	BuffLogic.add(cc.board[Vector2i(2, 2)], "critical")
 	BuffLogic.add(cc.board[Vector2i(3, 2)], "taunt")
@@ -649,11 +655,16 @@ func _init() -> void:
 	cc.queue_free()
 	await process_frame
 
-	var cn := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 100})
+	# army explicit (not the default): next_army is a GameScript STATIC var
+	# (game.gd:43), so cc's Cult boot above otherwise leaks into every later
+	# _boot() in this run that omits "army" — SaveConfig.apply falls back to
+	# cfg.get("army", g.next_army), i.e. whatever the LAST boot left it as.
+	var cn := _boot({"army": "Crown", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
 	await process_frame
 	cn.actions_left = 5
-	cn.artefacts.append({"key": "abduction-probe"})
+	cn.artefacts.append(Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key == "abduction-probe")[0])
 	BuffLogic.add(cn.board[Vector2i(2, 2)], "shield")
 	BuffLogic.add(cn.board[Vector2i(2, 2)], "critical")
 	BuffLogic.add(cn.board[Vector2i(3, 2)], "taunt")
@@ -668,8 +679,8 @@ func _init() -> void:
 
 	# stunned (a debuff on the same list, not a catalogued Piece Buff) never
 	# transfers, even though the piece carrying it also has a real buff
-	var ms := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "gold": 100})
+	var ms := _boot({"army": "Crown", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
 	await process_frame
 	ms.actions_left = 5
 	BuffLogic.add(ms.board[Vector2i(2, 2)], "stunned", 2)
@@ -686,7 +697,7 @@ func _init() -> void:
 	# Dictionary, not the bare id — one that inherits none still appends a
 	# bare String (unrelated opaque state, e.g. peak_ranked, still discarded:
 	# see test_items.gd's "merging a stateful entry ... discards the state").
-	var msk := _boot({"board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+	var msk := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
 		"stock": [{"id": "pawn", "buffs": [{"key": "shield"}]}, "pawn"]})
 	await process_frame
 	msk.actions_left = 5
@@ -698,7 +709,7 @@ func _init() -> void:
 	msk.queue_free()
 	await process_frame
 
-	var msn := _boot({"board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+	var msn := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
 		"stock": ["pawn", "pawn"]})
 	await process_frame
 	msn.actions_left = 5

@@ -1308,10 +1308,10 @@ func _init() -> void:
 	await process_frame
 	check(trump_game.preview_open, "double-tap on the King opens his info panel")
 	check(_has_label_text(trump_game.preview_panel, "Tariff on Move")
-			and _has_label_text(trump_game.preview_panel, "Tariff on Gold Gain")
+			and _has_label_text(trump_game.preview_panel, "Tariff on $ Gain")
 			and _has_label_text(trump_game.preview_panel, "Tariff on Capture"),
 		"...listing each Tariff in force by name")
-	check(_has_label_text(trump_game.preview_panel, "Each piece move costs extra gold."),
+	check(_has_label_text(trump_game.preview_panel, "Each piece move costs extra $."),
 		"...with its description")
 	check(not _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
 		"(setup) the fourth Tariff is not in force yet")

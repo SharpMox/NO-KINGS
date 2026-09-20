@@ -585,11 +585,11 @@ func build(game) -> void:
 	gold_zeros_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	gold_zeros_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
 	gold_label.add_theme_font_size_override("font_size", SCORE_FONT)
-	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_label.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	var gold_symbol := Label.new()
 	gold_symbol.text = " $" # leading space is the gap, same idiom as score_pts_label's " Pts"
 	gold_symbol.add_theme_font_size_override("font_size", SCORE_FONT)
-	gold_symbol.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_symbol.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	gold_row.add_theme_constant_override("separation", 0)
 	for l in [gold_zeros_label, gold_label, gold_symbol]:
 		gold_row.add_child(l)
@@ -2372,7 +2372,7 @@ func _build_stack_button(st: Dictionary) -> Button:
 		# (merge_logic.can_afford_merge), so the Gold shows regardless.
 		promote.text = "▲$%d" % Tuning.MERGE_COST
 		promote.add_theme_font_size_override("font_size", 11)
-		promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0)) # NO-151: NOT COL_GOLD — green on the blue pill is ~1.6:1
 		var round := StyleBoxFlat.new()
 		round.bg_color = Color(0.3, 0.6, 1.0) # player blue
 		round.set_corner_radius_all(9)
@@ -2390,7 +2390,7 @@ func _build_stack_button(st: Dictionary) -> Button:
 		var convert := Button.new()
 		convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
 		convert.add_theme_font_size_override("font_size", 11)
-		convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0))
+		convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0)) # NO-151: NOT COL_GOLD — green on the blue pill is ~1.6:1
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		var pill := StyleBoxFlat.new()
 		pill.bg_color = Color(0.3, 0.6, 1.0) # player blue, same as ▲

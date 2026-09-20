@@ -315,6 +315,7 @@ const ARTEFACT_RARITY_COLOR := {
 	"Rare": Color(0.35, 0.6, 1.0),
 	"Legendary": Color(1.0, 0.72, 0.15),
 }
+const COL_GOLD := Color(0.35, 0.85, 0.4)   # NO-151: the currency green, shared by every $ display
 # Restock cadence (issue 64, user ruling 2026-08-30): two lanes REPLACE the
 # old rising Score-threshold curve (was BASE=1000/STEP=500 -> 1000/2500/4500/
 # 7000) entirely. Lane A is guaranteed, every SHOP_RESTOCK_WAVES Waves, first

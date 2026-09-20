@@ -10,6 +10,7 @@ const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
+const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
 const Account := preload("res://scripts/account.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const Leaderboard := preload("res://scripts/leaderboard.gd")
@@ -1061,7 +1062,7 @@ func _ready() -> void:
 				army_center.visible = false
 				rank_center.visible = true)
 		army_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the carousel
-		card_box.add_child(_army_group_picture(Tuning.ARMIES[army_name]))
+		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
 		var kit: Dictionary = Armies.entry(army_name)
 		var power := Label.new()
 		power.text = "%s\n%s" % [kit.power_name, kit.power_desc]
@@ -1411,40 +1412,6 @@ func _show_device_info() -> void:
 		test_scroll.visible = true)
 
 
-## NO-146: the Army carousel's "group picture" — starting pieces shown
-## together as art. One icon per distinct piece id, de-duplicated the same
-## way the old text roster summary was (insertion-ordered counts), with a
-## "×N" badge standing in for a repeated piece instead of a "%d× %s" word.
-func _army_group_picture(army: Array) -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	var counts := {} # insertion-ordered, so the picture follows the army list
-	for id in army:
-		counts[id] = counts.get(id, 0) + 1
-	for id in counts:
-		var col := VBoxContainer.new()
-		var icon := TextureRect.new()
-		icon.texture = GameScript.load_piece_tex(id) # player side (the default)
-		icon.custom_minimum_size = Vector2(40, 40)
-		# EXPAND_IGNORE_SIZE, or a 192x192 source PNG overrides the minimum
-		# above with its own native size — same pairing modals.gd's own
-		# piece-art TextureRects already use.
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if GameScript.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
-			icon.modulate = GameScript.COL_SIDE_PLAYER
-		col.add_child(icon)
-		if counts[id] > 1:
-			var count_label := Label.new()
-			count_label.text = "×%d" % counts[id]
-			count_label.add_theme_font_size_override("font_size", 11)
-			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			col.add_child(count_label)
-		row.add_child(col)
-	return row
-
-
 ## NO-148 (Max, 2026-09-20): piece token per tier, ascending through his own
 ## ladder order — Pawn, Rook, Bishop, Knight, Queen. (His list read "Pawn Rook
 ## ... Knight Queen"; Bishop is the piece he meant by "Tower", which has no
@@ -1452,7 +1419,7 @@ func _army_group_picture(army: Array) -> Control:
 const TIER_PIECE_IDS := ["pawn", "rook", "bishop", "knight", "queen"]
 
 ## Player-side token for `tier_name`, same TextureRect idiom as the Army
-## carousel's group picture (_army_group_picture): 40x40, EXPAND_IGNORE_SIZE +
+## carousel's piece mass (PieceMass.build, NO-157): 40x40, EXPAND_IGNORE_SIZE +
 ## STRETCH_KEEP_ASPECT_CENTERED so the 192x192 source doesn't override the
 ## minimum size. 40x40 fits inside the row's existing 70px icon column
 ## (carried over unchanged below) with room to spare — Tuning.OFFBOARD_ICON

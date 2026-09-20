@@ -90,7 +90,15 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## Clock's vertical room hard, since it now shares the centre band's height
 ## with the Turn/Wave line above it — CLOCK_FONT's ceiling (36, below) is
 ## very unlikely to be reached now; expect something closer to CLOCK_FONT_MIN.
-const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
+const HEADER_PAD_X := 10.0 ## gutter at the LEFT edge (the counters column)
+## NO-175 margin fix: the right column (Stock, ☰) reads its right-edge
+## gutter from THIS constant, not HEADER_PAD_X, so it equals the top/bottom
+## margin the buttons already get from being centred in HEADER_H (which is
+## HEADER_BTN + HEADER_PAD_Y*2 by construction — see HEADER_H's own
+## comment). Before this fix the right gutter was HEADER_PAD_X (10) against
+## a 2px top/bottom, which is the "random margin" Max flagged. HEADER_PAD_X
+## keeps a bigger value because the LEFT edge sits beside the Score/Gold
+## counters' text, not a square button, and was never part of the complaint.
 const HEADER_PAD_Y := 2.0
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
 const STOCK_ICON := 44 ## the piece icon on the Stock button
@@ -556,7 +564,7 @@ func build(game) -> void:
 	# the band is symmetric around centre at 2*(80-HEADER_GAP)=148px, not
 	# the full 200px between the two edges.
 	var mid_left_edge: float = HEADER_PAD_X + COUNTER_W
-	var mid_right_edge: float = vp.x - HEADER_PAD_X - HEADER_BTN * 2.0 - HEADER_GAP
+	var mid_right_edge: float = vp.x - HEADER_PAD_Y - HEADER_BTN * 2.0 - HEADER_GAP
 	var centre_x: float = vp.x / 2.0
 	var half_budget: float = minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP
 	var centre_w: float = half_budget * 2.0
@@ -697,7 +705,10 @@ func build(game) -> void:
 	var header_btn_y: float = y0 + (HEADER_H - HEADER_BTN) / 2.0
 	menu_button.text = "☰"
 	menu_button.add_theme_font_size_override("font_size", MENU_FONT)
-	menu_button.position = Vector2(vp.x - HEADER_PAD_X - HEADER_BTN, header_btn_y)
+	# NO-175 margin fix: right gutter is HEADER_PAD_Y, matching the top/bottom
+	# margin header_btn_y already gives the buttons (see HEADER_PAD_Y's own
+	# comment) — not HEADER_PAD_X, which would reintroduce the mismatch.
+	menu_button.position = Vector2(vp.x - HEADER_PAD_Y - HEADER_BTN, header_btn_y)
 	menu_button.custom_minimum_size = Vector2(HEADER_BTN, HEADER_BTN) # NO-131/NO-175: square, matches Stock
 	_style_button(menu_button, Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 8, STOCK_PAD, STOCK_PAD) # NO-175: same call as Stock (this block's header comment)
 	menu_button.pressed.connect(func() -> void: toggle_menu(true))
@@ -1698,7 +1709,7 @@ func refresh() -> void:
 	# not cached anywhere.
 	var vp: Vector2 = g.get_viewport_rect().size
 	var mid_left_edge: float = HEADER_PAD_X + COUNTER_W
-	var mid_right_edge: float = vp.x - HEADER_PAD_X - HEADER_BTN * 2.0 - HEADER_GAP
+	var mid_right_edge: float = vp.x - HEADER_PAD_Y - HEADER_BTN * 2.0 - HEADER_GAP
 	var centre_x: float = vp.x / 2.0
 	var centre_w: float = (minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP) * 2.0
 	var counter_font := turn_label.get_theme_default_font()

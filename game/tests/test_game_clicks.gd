@@ -998,6 +998,17 @@ func _init() -> void:
 			% [mid_left_edge, sr.position.x])
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
+	# NO-175 margin fix: "equal margin above, under and to the right" — read
+	# straight off the ☰ button's own live rect against the Header's own
+	# edges (safe_top, hud_top, viewport width), not a re-derivation of
+	# HEADER_PAD_Y/build()'s formula, so this fails on a real mismatch even
+	# if the two drift apart.
+	var margin_top: float = mr.position.y - game.safe_top
+	var margin_bottom: float = game.hud_top - mr.end.y
+	var margin_right: float = game.get_viewport_rect().size.x - mr.end.x
+	check(is_equal_approx(margin_top, margin_bottom) and is_equal_approx(margin_top, margin_right),
+		"NO-175: the ☰ button's top/bottom/right margins are equal (top=%s bottom=%s right=%s)"
+			% [margin_top, margin_bottom, margin_right])
 	# NO-131: the enlarged NO-83 tap zone is gone — the Stock button is a
 	# regular button, sized to its own icon+padding, not the Header's full
 	# height.

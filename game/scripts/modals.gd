@@ -23,6 +23,7 @@ const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
 const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
+const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-185
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -185,7 +186,13 @@ const MERGE_RESULT_SCALE := 1.7
 ## confirm animation. Only the SCALE still previews small (_play_merge_
 ## animation grows it to full on confirm, unchanged); the dimming that used
 ## to fade in alongside it is gone, so that tween is gone too.
-func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
+## `a_piece`/`b_piece` (NO-185): the two sources' buffs-bearing Dictionaries
+## (merge_logic.gd's own `_piece_state`), {} when a source carries none.
+## Surfaced because commit_merge always builds a fresh
+## {"id": result, "owner": ...} — a merge silently discards both sources'
+## buffs, worth knowing before confirming.
+func show_merge_confirm(a_id: String, b_id: String, result: String,
+		a_piece: Dictionary = {}, b_piece: Dictionary = {}) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
 	merge_panel = PanelContainer.new()
@@ -226,9 +233,9 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	sources_row.add_theme_constant_override("separation", 10)
 	var a_tex := _merge_piece_tex(a_id, Tuning.OFFBOARD_ICON)
 	var b_tex := _merge_piece_tex(b_id, Tuning.OFFBOARD_ICON)
-	sources_row.add_child(_merge_source_col(a_id, a_tex))
+	sources_row.add_child(_merge_source_col(a_id, a_tex, a_piece))
 	sources_row.add_child(_merge_glyph_label("+"))
-	sources_row.add_child(_merge_source_col(b_id, b_tex))
+	sources_row.add_child(_merge_source_col(b_id, b_tex, b_piece))
 	box.add_child(sources_row)
 
 	# NO-187 (Max review): the shared commit/cancel shape (MODAL_CANCEL_GAP) —
@@ -286,7 +293,12 @@ func _merge_glyph_label(text: String) -> Label:
 ## NO-169: a source's icon with its own name discreetly UNDERNEATH — the
 ## pyramid's base. `tex` may be null (no art for `id`), same as every other
 ## icon here; the name label still shows either way.
-func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
+##
+## NO-185: `piece`'s catalogued buff names, if any, on a third line — amber,
+## not the name's own dim grey, since a merge is about to discard them (see
+## show_merge_confirm's header). BuffLogic.glyph_of(key) != "" is the same
+## "is this catalogued" test describe()/glyphs_of() use to skip "stunned".
+func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {}) -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 2)
@@ -298,6 +310,19 @@ func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
 	name.modulate = Color(1, 1, 1, 0.65) # discreet — the result's own name above carries the emphasis
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(name)
+	var buff_names: PackedStringArray = []
+	for b in BuffLogic.of(piece):
+		if BuffLogic.glyph_of(b.key) != "":
+			buff_names.append(BuffLogic.name_of(b.key))
+	if not buff_names.is_empty():
+		var buffs_label := Label.new()
+		buffs_label.text = "loses: %s" % ", ".join(buff_names)
+		buffs_label.add_theme_font_size_override("font_size", 11)
+		buffs_label.modulate = Color(1, 0.8, 0.35, 0.9) # amber: about to be discarded
+		buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		buffs_label.custom_minimum_size = Vector2(110, 0)
+		col.add_child(buffs_label)
 	return col
 
 
@@ -510,8 +535,12 @@ func show_win_screen() -> void:
 ## never both — see _show_shop_preview vs. _show_preview/_show_kind_preview
 ## in game.gd), so the two blocks below don't need to guard against both
 ## firing at once.
+## `piece` (NO-185): the buffs-bearing Dictionary for a "piece" kind — board[at]
+## or a Stock/Captured entry (game.gd's own `entry`, ADR-0002-shaped); {} for
+## a Shop slot (never owned, so never buffed) and ignored for "item"/
+## "artefact"/"box".
 func show_preview(kind: String, id: String, king_id := "", entry: Variant = null,
-		shop_index := -1) -> void:
+		shop_index := -1, piece: Dictionary = {}) -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
 	# Raised for the same reason every other panel is. preview_panel and
@@ -553,6 +582,20 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		box.add_child(dia)
 
 		_add_preview_legend() # NO-171: hidden by default behind a top-left button
+
+		# NO-185: reuses BuffLogic.describe() — the exact text NO-152's targeting
+		# tip already shows — dropping its first line (the piece name) since the
+		# title above already carries it.
+		var buff_lines: PackedStringArray = BuffLogic.describe(id, piece, g.defs).split("\n")
+		if buff_lines.size() > 1:
+			var buffs_label := Label.new()
+			buffs_label.text = "\n".join(buff_lines.slice(1))
+			buffs_label.add_theme_font_size_override("font_size", 14)
+			buffs_label.modulate = Color(1, 1, 1, 0.85)
+			buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			buffs_label.custom_minimum_size = Vector2(minf(260, g.get_viewport_rect().size.x - 96), 0)
+			box.add_child(buffs_label)
 
 		var chain: Array = g._chain_of(id)
 		if chain.size() > 1:

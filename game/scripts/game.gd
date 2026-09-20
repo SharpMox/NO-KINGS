@@ -216,6 +216,17 @@ const ARROW_HEAD_HALF := 11.0 # was 8.0
 # the same fallback) — fixed by sizing the mark for legibility below.
 const INV_MARK_GLYPH := "⟲"
 
+# NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
+# light ring behind each glyph, rather than a flat colour matched to the
+# background. A flat glyph colour can't win against all four combinations
+# this board can put behind it (the sage light square, the aubergine dark
+# square — NO-177 — and both the light and dark painted token art); a badge
+# with its own fixed contrast doesn't need to. NOT VERIFIED ON SCREEN —
+# screenshot at mobile tile size (~52px), light + dark, both chequer colours.
+const BUFF_BADGE_RING := Color(1, 1, 1, 0.92)
+const BUFF_BADGE_BG := Color(0.05, 0.05, 0.08, 0.9)
+const BUFF_BADGE_GLYPH_COL := Color.WHITE
+
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
 var board_px := Vector2(24, 120)
@@ -987,7 +998,8 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 	var now := Time.get_ticks_msec()
 	if key == pool_click_key and now - pool_click_ms < 400:
 		pool_click_key = ""
-		return _show_preview(id, "", entry if not cap else null)
+		return _show_preview(id, "", entry if not cap else null, # NO-185: buffs
+			entry if entry is Dictionary else {})
 	pool_click_key = key
 	pool_click_ms = now
 	# CAPTURED STOCK ARMS NOTHING (user ruling 2026-09-10). Its only two exits
@@ -2057,7 +2069,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				board_lp_token = 0 # NO-120: this click's own press already armed one
 				board_lp_pending_tile = Vector2i(-1, -1) # ...or deferred a commit
 				# double-tap: piece info (a King's carries his active Abilities)
-				return _show_preview(board[at].id, board[at].get("king_id", ""))
+				return _show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
 			var occupied := at.x >= 0 and board.has(at)
 			# NO-120: a hold is offered on every occupied tile, but a press that
 			# would COMMIT (a move, a capture, a merge, a deploy, an item/
@@ -2348,7 +2360,7 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			queue_redraw()
 		else:
 			board_lp_pending_tile = Vector2i(-1, -1)
-		_show_preview(piece.id, piece.get("king_id", "")))
+		_show_preview(piece.id, piece.get("king_id", ""), null, piece))
 
 
 ## NO-120: _board_tap_is_readonly mirrors this function's branches — which
@@ -4486,7 +4498,7 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 						BuffLogic.describe(board[at].id, board[at], defs),
 						Rect2(_tile_px(at), Vector2(tile, tile)))
 				else:
-					_show_preview(board[at].id, board[at].get("king_id", ""))
+					_show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
 	await _capture_and_quit(dir)
 
 
@@ -4860,6 +4872,28 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var mark_size := _inv_mark_size()
 		draw_string(font, _inv_mark_px(px, mark_size), INV_MARK_GLYPH,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, mark_size, side_col)
+	var buff_glyphs := BuffLogic.glyphs_of(p)
+	if not buff_glyphs.is_empty(): # NO-185: bottom edge — NO-101's mark owns the top-right corner
+		_draw_buff_badges(font, px, buff_glyphs)
+
+
+## NO-185: a row of small badges along the tile's bottom edge, one per
+## catalogued buff `p` carries (BuffLogic.glyphs_of) — capacity is base 2
+## (Tuning.PIECE_BUFF_CAP_BASE) +1 per held Abduction Probe, so more than 2-3
+## is a rare stacked-artefact case; shrinking the radius keeps any count
+## legible rather than capping the row and losing information.
+func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
+	var n := glyphs.size()
+	var r: float = tile * (0.16 if n <= 2 else 0.13)
+	var gap := r * 2.2
+	var start_x := px.x + tile / 2.0 - gap * (n - 1) / 2.0
+	var y := px.y + tile - r * 1.2
+	for i in n:
+		var c := Vector2(start_x + gap * i, y)
+		draw_circle(c, r, BUFF_BADGE_RING)
+		draw_circle(c, r - 1.5, BUFF_BADGE_BG)
+		draw_string(font, Vector2(c.x - r, c.y + r * 0.5), glyphs[i],
+			HORIZONTAL_ALIGNMENT_CENTER, r * 2, int(r * 1.4), BUFF_BADGE_GLYPH_COL)
 
 
 ## NO-101: true for exactly the four literal inv- ids, never the ten
@@ -4920,7 +4954,8 @@ func _connect_hud() -> void:
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.stack_preview_requested.connect(func(id: String, cap: bool, entry: Variant) -> void:
-		_show_preview(id, "", entry if not cap else null)) # NO-138/NO-144
+		_show_preview(id, "", entry if not cap else null, # NO-138/NO-144
+			entry if entry is Dictionary else {})) # NO-185: buffs
 	hud.item_preview_requested.connect(func(index: int) -> void:
 		_show_kind_preview("item", items[index].key, items[index])) # NO-144
 	hud.artefact_preview_requested.connect(func(key: String) -> void:
@@ -5169,9 +5204,13 @@ func _show_win_screen() -> void:
 ## `entry` (NO-144): the live Stock element behind this preview, when it's
 ## one — a board tile or a Captured Stock entry pass none, so Sell is never
 ## offered for either (Sell is Stock-only; Captured has Convert instead).
-func _show_preview(id: String, king_id := "", entry: Variant = null) -> void:
+## `piece` (NO-185): the buffs-bearing Dictionary to list in the modal —
+## board[at] for a board tile, or `entry` itself for a Stock/Captured stack
+## (ADR-0002: a stateful entry IS a piece Dictionary with `buffs`). Kept
+## separate from `entry` because a board tile has buffs but no Sell entry.
+func _show_preview(id: String, king_id := "", entry: Variant = null, piece: Dictionary = {}) -> void:
 	preview_open = true
-	modals.show_preview("piece", id, king_id, entry)
+	modals.show_preview("piece", id, king_id, entry, -1, piece)
 
 
 ## NO-144: an Item/Artefact's own long-press menu — same preview modal a

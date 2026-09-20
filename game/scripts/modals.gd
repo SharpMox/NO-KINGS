@@ -868,7 +868,7 @@ func show_shop() -> void:
 	# every player-facing currency, not touched here.
 	gold_label.text = "$%d" % g.gold
 	gold_label.add_theme_font_size_override("font_size", 14)
-	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_label.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	gold_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -1181,7 +1181,7 @@ func _shop_tile(index: int) -> Button:
 	var price := Label.new()
 	price.text = "$%d" % Shop.price(g, slot)
 	price.add_theme_font_size_override("font_size", 10)
-	price.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+	price.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 3)
 	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)

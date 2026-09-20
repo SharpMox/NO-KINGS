@@ -18,7 +18,9 @@ const Armies := preload("res://scripts/armies.gd")
 ## see _extra_item_slots / _extra_artefact_slots, additive per held copy
 ## (slice 15 stacking rule) and read straight off g.artefacts, the same way
 ## Shop.buy already reads slot.kind with no hook indirection.
-const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
+## NO-166: piece 8->10, box 6->5 — a stocking-density pass, not a mechanics
+## change; artefact/item rows are untouched.
+const ROWS := {"box": 5, "artefact": 4, "item": 4, "piece": 10}
 ## 2 slots each (GDD Shop page); every Box's SIZE is rolled independently in
 ## roll() below (issue 47 — Score Box and the mixed Box are both gone).
 const BOX_THEMES := ["piece", "artefact", "item"]
@@ -223,6 +225,18 @@ static func lane_a_restock(g) -> void:
 	g.shop_lane_b_progress = 0
 	g.shop_restocks += 1
 	roll(g)
+
+
+## NO-167: waves remaining until the next guaranteed Lane-A restock — the
+## exact `n % SHOP_RESTOCK_WAVES == 0` test wave_logic.gd's queue() fires
+## lane_a_restock on above, read forward from g.wave (itself part of every
+## save, save_config.gd) rather than a second counter, so this can never
+## drift from the real trigger and a resumed run reads the true distance,
+## not a guess. 0 only for the instant between a restock firing and the
+## next queue() call (never actually observed by the UI, which reads this
+## while a wave is already in progress).
+static func waves_until_lane_a(g) -> int:
+	return Tuning.SHOP_RESTOCK_WAVES - (g.wave % Tuning.SHOP_RESTOCK_WAVES)
 
 
 ## Lane B: g.shop_lane_b_progress banks Score earned (via Economy.earn/

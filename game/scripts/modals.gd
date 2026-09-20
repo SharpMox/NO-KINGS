@@ -66,8 +66,8 @@ var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
 ## NO-119: PIECES is a wrapping grid, not a fixed-width row, now that its
-## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 8 of
-## them (Shop.ROWS.piece) would overflow a single-row HBoxContainer well
+## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 10 of
+## them (Shop.ROWS.piece, NO-166) would overflow a single-row HBoxContainer well
 ## before it overflowed this column's width. Arithmetic, not taste: 5 x 72 +
 ## 4 x 4 = 376 fits the drawer's ~412px content width (draw_w 432 minus the
 ## 10px margins each side); 6 would need 452. NO-132 folds this into the
@@ -91,25 +91,28 @@ var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can asser
 ## extra band is the vertical room NO-144 freed: PIECES used to become
 ## STOCK in Sell mode — the player's whole live Stock, unbounded (a real
 ## save once held 22, 5 rows at 5 columns, 376px). PIECES is Buy-only now,
-## capped at Shop.ROWS.piece (8, fewer at Tier 3+): always <=2 rows, ~152px.
+## capped at Shop.ROWS.piece (10 as of NO-166, fewer at Tier 3+): still
+## always <=2 rows (ceil(10/5)=2, same as the old ceil(8/5)=2), ~152px — no
+## height change from NO-166's 8->10.
 ## `lower` is root's only EXPAND_FILL child, so every byte PIECES no longer
 ## needs at its old worst case, `lower` keeps — up to ~224px more,
 ## guaranteed rather than best-case.
 ##
 ## The stacked layout's own worst case, from Shop.ROWS (base, before any
 ## Tier 3+ reduction — the max, never more): ARTEFACTS ceil(4/5)=1 row,
-## ITEMS ceil(4/5)=1 row, BOXES ceil(6/5)=2 rows (72*2+4=148px). Content
-## height per zone = its grid + a zone label + the label-to-grid 4px
+## ITEMS ceil(4/5)=1 row, BOXES ceil(5/5)=1 row (72px) — NO-166 dropped
+## BOXES 6->5, which drops it from 2 rows to 1 (was ceil(6/5)=2, 72*2+4=148px).
+## Content height per zone = its grid + a zone label + the label-to-grid 4px
 ## separation (_shop_sub_zone's own `wrap`); the label's own height isn't
 ## measured here (no Godot run from this seat — see the label-height note
 ## on _shop_zone_label), estimated ~16px from this file's other measured
-## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts
-## ARTEFACTS/ITEMS at ~92px each, BOXES at ~168px, plus 2 gaps at `lower`'s
-## own 8px separation between the 3 stacked zones: ~368px total — about
-## 28px MORE than the old side-by-side minimum (~340px, the taller of the
-## two old columns), comfortably inside the ~224px NO-144 freed. If a real
-## measurement ever puts a zone label taller than assumed here, recheck
-## against the ~224px margin before assuming it still fits.
+## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts all
+## three zones at ~92px each (was ARTEFACTS/ITEMS ~92px, BOXES ~168px pre
+## NO-166), plus 2 gaps at `lower`'s own 8px separation between the 3
+## stacked zones: ~292px total (was ~368px) — NO-166 frees a further ~76px
+## on top of the ~224px NO-144 already freed, comfortably inside it either
+## way. If a real measurement ever puts a zone label taller than assumed
+## here, recheck against the ~224px margin before assuming it still fits.
 const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
@@ -123,7 +126,9 @@ var box_expanded_index := -1 # which offered tile is selected, -1 = none
 var _box_options: Array = [] # the options show_box was last called with, so
 	# _box_tile/_box_detail can read by index without re-threading the array
 	# through every closure the way _shop_tile reads g.shop_stock directly
-var _box_dock: PanelContainer # refilled on a tile tap — same idiom as _shop_dock
+var _box_dock: PanelContainer # refilled on a tile tap, same idiom as
+	# _shop_dock, but NO-168 dropped its fixed size/background — see
+	# _fill_box_dock's own header
 
 
 func build(game) -> void:
@@ -150,6 +155,10 @@ func build(game) -> void:
 	g.hud.add_child(overlay)
 
 
+## NO-169: 170% the size of the two below it — visually a pyramid, "two
+## below converging into one above".
+const MERGE_RESULT_SCALE := 1.7
+
 ## NO-140: `a_id`/`b_id` are shown as art now too, not just `result` — "the
 ## trade visible rather than described". Confirming plays a short animation
 ## (the two sources fading while the result grows to full size) before the
@@ -157,6 +166,16 @@ func build(game) -> void:
 ## g.autoplay, same seam _slide_shop uses. MergeLogic.do_merge already never
 ## calls this at all under autoplay (it commits straight through), so that
 ## path is doubly safe — this gate is only the belt to that braces.
+##
+## NO-169: rebuilt as a pyramid — result on top at MERGE_RESULT_SCALE, the
+## two sources underneath — replacing the old left-to-right "A + B → C" art
+## row and its matching text line (removed entirely, no replacement: the
+## icons and labels below already say the same thing). Labels are discreet
+## on the sources (named underneath their own icon, dimmed) and big/bold
+## above the result, so the result reads as the point of the screen. The
+## fade-sources/grow-result animation (_play_merge_animation) is unchanged —
+## "two fading below while one grows above" already reads as a pyramid
+## converging, more so than it did in the old side-by-side row.
 func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
@@ -171,32 +190,36 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
 
-	var art_row := HBoxContainer.new()
-	art_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	art_row.add_theme_constant_override("separation", 10)
-	var a_tex := _merge_piece_tex(a_id)
-	var b_tex := _merge_piece_tex(b_id)
-	var result_tex := _merge_piece_tex(result)
-	if a_tex:
-		art_row.add_child(a_tex)
-	art_row.add_child(_merge_glyph_label("+"))
-	if b_tex:
-		art_row.add_child(b_tex)
-	art_row.add_child(_merge_glyph_label("→"))
+	var result_name := Label.new()
+	result_name.text = g.defs[result].name
+	result_name.add_theme_font_size_override("font_size", 24)
+	# Godot has no bold font asset in this project (audited: no other Label
+	# here sets add_theme_font_override) — "bold" is approximated the same
+	# way the rest of this file contrasts emphasis, size + full opacity
+	# against the sources' smaller, dimmed labels below.
+	result_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(result_name)
+
+	var result_tex := _merge_piece_tex(result, Tuning.OFFBOARD_ICON * MERGE_RESULT_SCALE)
 	if result_tex:
 		# starts as a dim preview; confirming grows/brightens it to full while
-		# a_tex/b_tex fade — see _play_merge_animation.
+		# the sources fade — see _play_merge_animation. SHRINK_CENTER so it
+		# stays centred at its own size if sources_row below ends up wider.
 		result_tex.pivot_offset = result_tex.custom_minimum_size / 2
 		result_tex.scale = Vector2(0.7, 0.7)
 		result_tex.modulate.a = 0.55
-		art_row.add_child(result_tex)
-	box.add_child(art_row)
+		result_tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(result_tex)
 
-	var what := Label.new()
-	what.text = "%s + %s → %s" % [g.defs[a_id].name, g.defs[b_id].name, g.defs[result].name]
-	what.add_theme_font_size_override("font_size", 16)
-	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(what)
+	var sources_row := HBoxContainer.new()
+	sources_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	sources_row.add_theme_constant_override("separation", 10)
+	var a_tex := _merge_piece_tex(a_id, Tuning.OFFBOARD_ICON)
+	var b_tex := _merge_piece_tex(b_id, Tuning.OFFBOARD_ICON)
+	sources_row.add_child(_merge_source_col(a_id, a_tex))
+	sources_row.add_child(_merge_glyph_label("+"))
+	sources_row.add_child(_merge_source_col(b_id, b_tex))
+	box.add_child(sources_row)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -225,15 +248,16 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
-## One off-board-standard-sized icon (Tuning.OFFBOARD_ICON, same as the Shop/
-## Drawer grids) for `id`, or null when it has no art — guarded the same way
-## every other modals.gd icon is (`g.textures.has`).
-func _merge_piece_tex(id: String) -> TextureRect:
+## An icon at `size` (Tuning.OFFBOARD_ICON for the sources, NO-169's
+## MERGE_RESULT_SCALE multiple of it for the result) for `id`, or null when it
+## has no art — guarded the same way every other modals.gd icon is
+## (`g.textures.has`).
+func _merge_piece_tex(id: String, size: float) -> TextureRect:
 	if not g.textures.has(id):
 		return null
 	var tex := TextureRect.new()
 	tex.texture = g.piece_tex(id)
-	tex.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	tex.custom_minimum_size = Vector2(size, size)
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	return tex
@@ -247,10 +271,30 @@ func _merge_glyph_label(text: String) -> Label:
 	return l
 
 
+## NO-169: a source's icon with its own name discreetly UNDERNEATH — the
+## pyramid's base. `tex` may be null (no art for `id`), same as every other
+## icon here; the name label still shows either way.
+func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 2)
+	if tex:
+		col.add_child(tex)
+	var name := Label.new()
+	name.text = g.defs[id].name
+	name.add_theme_font_size_override("font_size", 12)
+	name.modulate = Color(1, 1, 1, 0.65) # discreet — the result's own name above carries the emphasis
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name)
+	return col
+
+
 ## NO-140: sources fade out, the result scales/brightens to full — reads as
-## "the two becoming the result" without moving anything out of art_row's own
-## HBoxContainer layout (a position tween would fight the container's own
-## sort). Any of the three may be null (no art for that id); tween_property
+## "the two becoming the result" without moving anything out of its own
+## container layout (a position tween would fight the container's own sort;
+## NO-169's pyramid arrangement — sources below fading, result above growing
+## — reads this motion even more literally than the old side-by-side row
+## did). Any of the three may be null (no art for that id); tween_property
 ## calls are just skipped for it. Ends by hiding merge_panel, the same state
 ## change the no-animation branch above makes immediately.
 ##
@@ -466,15 +510,21 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var cells := 9 # covers the longest leap (Ying Long's 4)
 		var cell := 30
 		dia.custom_minimum_size = Vector2(cells, cells) * cell
+		# NO-171 (root cause, not an offset nudge): PieceDiagram.draw paints the
+		# chequer from dia's own (0,0), assuming its rect IS the cells*cell box.
+		# Without SHRINK_CENTER, a plain Control defaults to filling the VBox's
+		# full width — and the legend line below (or the King Ability desc
+		# labels, sized to near the full viewport width) was routinely wider
+		# than 270px, stretching `dia` to match and pinning the painted board
+		# to its new left edge instead of centring it. The "item"/"artefact"
+		# branch's own icon TextureRect below already carries this same flag;
+		# `dia` was simply the one node in this function that never got it.
+		dia.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		var dia_tex: Texture2D = g.piece_tex(id) if g.textures.has(id) else null
 		dia.draw.connect(func() -> void: PieceDiagram.draw(dia, g.defs, id, cells, cell, dia_tex))
 		box.add_child(dia)
 
-		var legend := Label.new()
-		legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
-		legend.add_theme_font_size_override("font_size", 13)
-		legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(legend)
+		_add_preview_legend() # NO-171: hidden by default behind a top-left button
 
 		var chain: Array = g._chain_of(id)
 		if chain.size() > 1:
@@ -489,7 +539,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 					row.add_child(arrow)
 				var tr := TextureRect.new()
 				tr.texture = g.piece_tex(chain[i]) if g.textures.has(chain[i]) else null
-				tr.custom_minimum_size = Vector2(48, 48)
+				tr.custom_minimum_size = Vector2(96, 96) # NO-171: 2x the old 48
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				if chain[i] != id:
 					tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
@@ -563,6 +613,57 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 	box.add_child(close)
 
 
+## NO-171: the move legend, hidden by default behind a small button at the
+## panel's top-left, opening a small floating panel above it. preview_panel
+## is a PanelContainer, which stretches EVERY direct child to its own full
+## content rect (Godot's documented behaviour, same reason `center` alone
+## fills it today) — so the button and legend panel are free-positioned
+## children of an `overlay` Control (a plain Control, not a Container) that
+## is ITSELF the one direct child added here, rather than being added to
+## preview_panel directly, where PanelContainer would override their
+## position every layout pass. `overlay` is added after `center`, so it
+## draws on top, and carries MOUSE_FILTER_IGNORE so an empty part of it
+## (everywhere except the button/legend) doesn't steal taps meant for the
+## diagram or the Sell/Close buttons underneath — same idiom as _slide_shop's
+## own IGNORE comment (a parent's IGNORE doesn't disable a child's own STOP).
+## Being a sibling of `center` rather than a child of `box` is also what
+## makes "the diagram stays anchored as it toggles" true: an in-flow legend,
+## even above a correctly-centred diagram, would still push the diagram down
+## the screen by its own height every time it opened.
+##
+## Fixed top-left position, not measured against the diagram's own rect —
+## this screen has no Godot run available to size against a real layout, so
+## the numbers here (12px margin, a 220px-wide legend panel) are a
+## reasonable guess; verify there's no overlap with the title in the tallest
+## case (Sell + a chain + King Abilities) on real hardware.
+func _add_preview_legend() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.add_child(overlay)
+
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.05, 0.05, 0.07, 0.95)
+	panel.add_theme_stylebox_override("panel", bg)
+	panel.position = Vector2(12, 48)
+	panel.custom_minimum_size = Vector2(220, 0)
+	var legend := Label.new()
+	legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
+	legend.add_theme_font_size_override("font_size", 12)
+	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(legend)
+	overlay.add_child(panel)
+
+	var btn := Button.new()
+	btn.text = "?"
+	btn.tooltip_text = "Move legend"
+	btn.position = Vector2(12, 12)
+	btn.pressed.connect(func() -> void: panel.visible = not panel.visible)
+	overlay.add_child(btn) # after `panel`: draws on top if they ever overlap
+
+
 ## The Shop drawer: docked at the right edge, covering ~90% of the screen
 ## (a sliver of board stays visible on the left, reading as a drawer rather
 ## than the old full-screen modal). No entrance animation — this codebase has
@@ -613,24 +714,15 @@ func show_shop() -> void:
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
+	# NO-167: Close moved to the bottom (replacing the detail dock's empty-
+	# state hint, _fill_shop_dock below) — the header now carries only the
+	# title, the optional Restock button, and Gold pinned to the far right.
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "SHOP"
 	title.add_theme_font_size_override("font_size", 22)
 	header.add_child(title)
-	var sub := Label.new()
-	# issue 64: buying is free of the Action cost. NO-143: dropped the "no
-	# Action cost" suffix — noise, since the absence of a cost doesn't need
-	# saying on every entry. NO-144: Sell/Convert moved off this label
-	# entirely — Sell is now the previewed thing's own menu (modals.gd
-	# show_preview), Convert the entry's own badge (hud.gd).
-	sub.text = "$%d" % g.gold
-	sub.add_theme_font_size_override("font_size", 12)
-	sub.modulate = Color(1, 1, 1, 0.75)
-	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(sub)
 	if g._held("jet-fuel-vial"): # issue 52: only while held (user ruling — a
 		# Shop control, not part of the in-run Activate section)
 		var restock := Button.new()
@@ -639,11 +731,22 @@ func show_shop() -> void:
 		restock.disabled = not g._jet_fuel_restock_available()
 		restock.pressed.connect(func() -> void: shop_restock_pressed.emit())
 		header.add_child(restock)
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 14)
-	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
-	header.add_child(close)
+	var gold_label := Label.new()
+	# issue 64: buying is free of the Action cost. NO-143: dropped the "no
+	# Action cost" suffix — noise, since the absence of a cost doesn't need
+	# saying on every entry. NO-144: Sell/Convert moved off this label
+	# entirely — Sell is now the previewed thing's own menu (modals.gd
+	# show_preview), Convert the entry's own badge (hud.gd). NO-167: moved to
+	# the header's far right, in HUD's own Gold green (hud.gd:453) rather
+	# than a dimmed sub-label — NO-151 is the wider ticket for a $ symbol on
+	# every player-facing currency, not touched here.
+	gold_label.text = "$%d" % g.gold
+	gold_label.add_theme_font_size_override("font_size", 14)
+	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(gold_label)
 	root.add_child(header)
 
 	# issue 64: Lane B restock progress — Score banked toward the next
@@ -696,6 +799,34 @@ func show_shop() -> void:
 	lane_b_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lane_b_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop_lane_b_bar.add_child(lane_b_label)
+	# NO-167: Lane A (every Tuning.SHOP_RESTOCK_WAVES Waves, guaranteed) had no
+	# on-screen readout at all — this gauge only ever showed Lane B's Score
+	# progress. Shop.waves_until_lane_a(g) reads forward from g.wave, the same
+	# n % SHOP_RESTOCK_WAVES == 0 test wave_logic.gd actually fires the
+	# restock on, so this can't drift from it or from a resumed save. Same
+	# outline treatment as lane_b_label (must read over both the groove and
+	# the amber fill) and the same MOUSE_FILTER_IGNORE (must not steal a tap
+	# meant for the panel underneath), anchored to the right end instead of
+	# full-rect so the two labels don't overlap.
+	var lane_a_label := Label.new()
+	lane_a_label.text = "%dw" % Shop.waves_until_lane_a(g)
+	lane_a_label.tooltip_text = "Waves until the Shop's guaranteed restock (Lane A)"
+	lane_a_label.add_theme_font_size_override("font_size", restock_font_size)
+	lane_a_label.add_theme_color_override("font_color", Color.WHITE)
+	lane_a_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lane_a_label.add_theme_constant_override("outline_size", 3)
+	lane_a_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lane_a_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Explicit pixel offsets off the CENTER_RIGHT anchor point, same idiom as
+	# _shop_tile's own price badge (PRESET_BOTTOM_RIGHT + offset_left/top)
+	# rather than relying on the Label's natural (unmeasured) minimum size.
+	lane_a_label.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	lane_a_label.offset_left = -30
+	lane_a_label.offset_right = -6
+	lane_a_label.offset_top = -restock_line_h / 2.0
+	lane_a_label.offset_bottom = restock_line_h / 2.0
+	lane_a_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop_lane_b_bar.add_child(lane_a_label)
 	root.add_child(shop_lane_b_bar)
 
 	var pieces_band := VBoxContainer.new()
@@ -829,14 +960,17 @@ func _fill_shop_dock() -> void:
 	if shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
 		_shop_dock.add_child(_shop_detail(shop_expanded_index))
 	else:
-		var hint := Label.new()
-		hint.text = "Tap a tile for details"
-		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		hint.modulate = Color(1, 1, 1, 0.5)
-		hint.add_theme_font_size_override("font_size", 13)
-		_shop_dock.add_child(hint)
+		# NO-167: the empty-state "Tap a tile for details" hint is now the
+		# Shop's Close button (moved out of the header — see show_shop). An
+		# outside click and a rightward chrome swipe (_on_shop_chrome_input)
+		# both still close the Shop too, so collapsing an expanded tile (a tap
+		# away) is never the only way back to a visible Close.
+		var close := Button.new()
+		close.text = "Close"
+		close.add_theme_font_size_override("font_size", 16)
+		close.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
+		_shop_dock.add_child(close)
 
 
 ## font_size 12; its rendered height isn't measured anywhere in this file
@@ -1064,6 +1198,9 @@ func _shop_detail(index: int) -> Control:
 ## already in Stock by the time this shows (game.gd grants them the instant
 ## pending_reinforce is consumed, before calling this); `ids` is that same
 ## list, for display only. No Buy button, nothing left to choose or pay for.
+## NO-170: dropped the "Wave N cleared — added to Stock, free of charge"
+## subtitle — the title plus the mass of pieces below it already say this is
+## an announcement, not a choice.
 func show_reinforce(ids: Array) -> void:
 	if reinforce_panel:
 		reinforce_panel.queue_free()
@@ -1082,12 +1219,6 @@ func show_reinforce(ids: Array) -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Wave %d cleared — added to Stock, free of charge" % (g.wave - 1)
-	sub.add_theme_font_size_override("font_size", 15)
-	sub.modulate = Color(1, 1, 1, 0.8)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
 	box.add_child(PieceMass.build(ids)) # NO-157
 	var dismiss := Button.new()
 	dismiss.text = "Dismiss"
@@ -1135,6 +1266,11 @@ func show_king_abilities() -> void:
 ## One name + description pair per active King Ability, or a "none yet" line.
 ## Shared by the ⚠ overlay and a King's info panel (NO-83), so the two can
 ## never list different things.
+##
+## NO-172: no longer names the tariff's level ("(mild)") — `t.tier` (Mild/
+## Moderate/Severe, king_abilities.gd) still exists in the catalog and still
+## drives on_charge's mild_blocked case-match (artefact_hooks.gd), just no
+## longer echoed here; the effect text (`t.description`) is untouched.
 func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) -> void:
 	if g.king_abilities_active.is_empty():
 		var none := Label.new()
@@ -1144,7 +1280,7 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 		box.add_child(none)
 	for t in g.king_abilities_active:
 		var name := Label.new()
-		name.text = "%s  (%s)" % [t.name, t.tier]
+		name.text = t.name
 		name.add_theme_font_size_override("font_size", name_size)
 		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 		box.add_child(name)
@@ -1159,6 +1295,21 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 
 # --- box pick ---
 
+## NO-168: the Box grid's own icon size and column count — a DELIBERATE
+## exception to Tuning.OFFBOARD_ICON/OFFBOARD_GRID_COLS (the "every off-board
+## grid" standard: Shop, Inventory Drawer, Stock Drawer, and this screen until
+## now), not an accident: the box name and per-tile detail dock are both gone
+## (below), so the icons are the only thing left to carry the choice, hence
+## bigger. 4 columns is the smallest that keeps a Huge Box's 7 options to 2
+## rows (ceil(7/4)=2; 3 columns would need 3 rows) — Small/Big (3/5 options)
+## fit inside that same cap at 1-2 rows, never more. 100px is chosen so 4
+## columns + 3 gaps (BOX_SEP) still fits comfortably inside the 480px screen
+## width with no MarginContainer here (unlike the Shop drawer): 4*100+3*8=424,
+## leaving 28px total for the CenterContainer to split as margin.
+const BOX_ICON := 100.0
+const BOX_COLS := 4
+const BOX_SEP := 8.0
+
 func _box_clear() -> void:
 	for c in box_panel.get_children():
 		box_panel.remove_child(c) # gone NOW, not at frame end: a re-render mid-frame
@@ -1166,7 +1317,9 @@ func _box_clear() -> void:
 		c.queue_free()
 
 
-func _box_vbox(title_text: String) -> VBoxContainer:
+## NO-168: no title any more — the box name ("Small Item Box") is gone from
+## this screen; "PICK N" moved to its own label just above Skip (show_box).
+func _box_vbox() -> VBoxContainer:
 	_box_clear()
 	box_panel.visible = true
 	var center := CenterContainer.new()
@@ -1174,11 +1327,6 @@ func _box_vbox(title_text: String) -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	center.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
 	return box
 
 
@@ -1252,7 +1400,8 @@ func _box_icon(opt: Dictionary) -> Variant:
 func _box_tile(index: int) -> Button:
 	var opt: Dictionary = _box_options[index]
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
+	btn.custom_minimum_size = Vector2(BOX_ICON, BOX_ICON) # NO-168: bigger than
+		# the OFFBOARD_ICON standard — see BOX_ICON's own header
 	btn.clip_text = true
 	btn.set_meta("box_index", index)
 	var icon: Variant = _box_icon(opt)
@@ -1273,22 +1422,35 @@ func _box_tile(index: int) -> Button:
 	return btn
 
 
-## The dock's content for the selected tile (or the hint) — refilled on every
-## tap, same shape as _fill_shop_dock.
+## NO-168: BOX_COLS-wide (bigger-icon) grid for the Box's own options — kept
+## separate from _piece_grid (the Shop/Stock OFFBOARD_ICON-standard helper)
+## rather than parameterising it, since BOX_ICON/BOX_COLS are this screen's
+## own deliberate exception, not a second site-wide standard.
+func _box_grid(count: int) -> CenterContainer:
+	var center := CenterContainer.new()
+	var grid := GridContainer.new()
+	grid.columns = BOX_COLS
+	grid.add_theme_constant_override("h_separation", BOX_SEP)
+	grid.add_theme_constant_override("v_separation", BOX_SEP)
+	grid.custom_minimum_size.x = BOX_COLS * BOX_ICON + (BOX_COLS - 1) * BOX_SEP
+	for i in count:
+		grid.add_child(_box_tile(i))
+	center.add_child(grid)
+	return center
+
+
+## The selected tile's own detail (or nothing) — refilled on every tap, same
+## shape as _fill_shop_dock. NO-168: no placeholder hint any more ("Tap an
+## entry for details" and its own fixed-height dock panel are gone — the
+## "tap for detail" zone the ticket named); this sits empty, taking no space,
+## until a tile is actually selected, then shows the same name/description/
+## Pick row _box_detail always did, as a plain line under the grid rather
+## than inside a docked panel.
 func _fill_box_dock() -> void:
 	for c in _box_dock.get_children():
 		c.free()
 	if box_expanded_index >= 0 and box_expanded_index < _box_options.size():
 		_box_dock.add_child(_box_detail(box_expanded_index))
-	else:
-		var hint := Label.new()
-		hint.text = "Tap an entry for details"
-		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		hint.modulate = Color(1, 1, 1, 0.5)
-		hint.add_theme_font_size_override("font_size", 13)
-		_box_dock.add_child(hint)
 
 
 ## The expanded option: icon, name/kind header, effect text and a Pick
@@ -1365,21 +1527,17 @@ func show_box(options: Array) -> void:
 	box_expanded_index = -1 # NO-133: a fresh render — reroll/sell also call
 		# back in here with a new/changed offer, so nothing carries over
 	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
-		# top of a Box's own native picks (Huge = 2 — issue 47)
-	var title := "▣ %s %s Box — pick %d:" % [
-		str(g.box_size).capitalize(), str(g.box_only_kind).capitalize(), picks]
-	var box := _box_vbox(title)
-	# NO-133: the icon grid (was one full-width button per option, each two
-	# lines of header + description — that's what overflowed a phone screen
-	# once a Huge Box's 7 options stacked). _piece_grid is the same NO-132
-	# helper the Shop's own PIECES/STOCK band uses, so a Small Box's 3 tiles
-	# still start at column 1 instead of centering as their own short block.
-	box.add_child(_piece_grid(_box_tile, options.size()))
-	_box_dock = PanelContainer.new()
-	_box_dock.custom_minimum_size = Vector2(0, 92) # matches _shop_dock's own fixed height
-	var dock_bg := StyleBoxFlat.new()
-	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
-	_box_dock.add_theme_stylebox_override("panel", dock_bg)
+		# top of a Box's own native picks (Huge = 2 — issue 47); read off
+		# g.box_picks_left, itself seeded from Box.SIZES[size].picks
+		# (game.gd's _open_box_pick) — never a literal here.
+	var box := _box_vbox()
+	# NO-168: two rows, bigger icons (BOX_ICON/BOX_COLS, a deliberate
+	# exception — see their own header) — was the Shop/Stock OFFBOARD_ICON
+	# standard's 5-column _piece_grid (NO-133), which this screen no longer
+	# shares now that its name and per-tile dock chrome are gone.
+	box.add_child(_box_grid(options.size()))
+	_box_dock = PanelContainer.new() # NO-168: no fixed size/background any
+		# more — see _fill_box_dock's own header
 	_fill_box_dock()
 	box.add_child(_box_dock)
 	if g.box_only_kind == "item" and not ItemLogic.has_room(g):
@@ -1404,6 +1562,15 @@ func show_box(options: Array) -> void:
 		reroll.text = "Reroll (%d left)" % g.box_rerolls_left
 		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
 		box.add_child(reroll)
+	# NO-168: "PICK N" replaces the box-name title (gone from _box_vbox above)
+	# as this screen's one piece of header text — sat right above Skip, `picks`
+	# is the same value the old combined title used, off g.box_picks_left,
+	# never a literal.
+	var pick_label := Label.new()
+	pick_label.text = "PICK %d" % picks
+	pick_label.add_theme_font_size_override("font_size", 20)
+	pick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(pick_label)
 	var skip := Button.new()
 	# The Box's price, in Gold. The old label said "+20 score" while earn() paid
 	# ~20 Gold AND 200 Score — wrong currency and wrong by 10x at once.

@@ -783,7 +783,9 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## (hud.gd) rather than by DECK_ROWS. So the sum drops back to two rows —
 ## drawers and act — and DECK_ROWS actually SHRINKS versus the pre-NO-128
 ## value of 132, because the always-reserved power row is gone too.
-const DECK_ROWS := 98.0 ## drawers 32 + act 60 + 1 gap x 6
+## NO-163: the 6px gap between those two rows (hud.gd's `deck` separation) is
+## closed, so the sum drops again, 98 -> 92.
+const DECK_ROWS := 92.0 ## drawers 32 + act 60, no gap (NO-163)
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept

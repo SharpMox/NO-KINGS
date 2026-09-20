@@ -1576,9 +1576,13 @@ func _init() -> void:
 	await process_frame # queue_free() on the boot's own first-built chip is
 		# deferred — let it resolve before counting (same reason held_activ
 		# below already does this)
-	check(no_activ.hud.artefacts_grid.get_child_count() == 1 \
-			and no_activ.hud.artefacts_grid.get_child(0) is Label,
-		"Artefacts grid: no Artefact held shows the \"no artefacts yet\" hint alone")
+	# NO-165: the "no artefacts yet" text hint is gone — zero held Artefacts
+	# now shows a full row of empty-slot placeholders (Panels) instead, one
+	# per unit of ArtefactHooks.cap (the real bound; Tuning.ARTEFACT_CAP_BASE
+	# here since nothing in this scenario raises it).
+	check(no_activ.hud.artefacts_grid.get_child_count() == Tuning.ARTEFACT_CAP_BASE \
+			and no_activ.hud.artefacts_grid.get_child(0) is Panel,
+		"Artefacts grid: no Artefact held shows CAP empty slots, not a text hint")
 	# NO-134: custom_minimum_size.y now also carries the deck-covering
 	# background (build()'s drawer_specs loop), so the flat constant here is
 	# INV_DRAWER_H + deck_h, not INV_DRAWER_H alone.
@@ -1603,7 +1607,10 @@ func _init() -> void:
 	for c in held_cell.get_children():
 		if c is Label and (c as Label).text.begins_with("✹"):
 			held_marked = true
-	check(held_activ.hud.artefacts_grid.get_child_count() == 1 and held_marked,
+	# NO-165: total children now include the remaining empty-slot placeholders
+	# (cap 5, one real cell held), not just the one real cell.
+	check(held_activ.hud.artefacts_grid.get_child_count() == Tuning.ARTEFACT_CAP_BASE \
+			and held_marked,
 		"Artefacts grid: one held activatable Artefact, in the grid, ✹-marked (story 50)")
 	# NO-134: see the matching comment on the no_activ check above.
 	check(held_activ.hud.drawers["inventory"].custom_minimum_size.y

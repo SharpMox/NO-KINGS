@@ -126,7 +126,9 @@ var box_expanded_index := -1 # which offered tile is selected, -1 = none
 var _box_options: Array = [] # the options show_box was last called with, so
 	# _box_tile/_box_detail can read by index without re-threading the array
 	# through every closure the way _shop_tile reads g.shop_stock directly
-var _box_dock: PanelContainer # refilled on a tile tap — same idiom as _shop_dock
+var _box_dock: PanelContainer # refilled on a tile tap, same idiom as
+	# _shop_dock, but NO-168 dropped its fixed size/background — see
+	# _fill_box_dock's own header
 
 
 func build(game) -> void:
@@ -1195,6 +1197,21 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 
 # --- box pick ---
 
+## NO-168: the Box grid's own icon size and column count — a DELIBERATE
+## exception to Tuning.OFFBOARD_ICON/OFFBOARD_GRID_COLS (the "every off-board
+## grid" standard: Shop, Inventory Drawer, Stock Drawer, and this screen until
+## now), not an accident: the box name and per-tile detail dock are both gone
+## (below), so the icons are the only thing left to carry the choice, hence
+## bigger. 4 columns is the smallest that keeps a Huge Box's 7 options to 2
+## rows (ceil(7/4)=2; 3 columns would need 3 rows) — Small/Big (3/5 options)
+## fit inside that same cap at 1-2 rows, never more. 100px is chosen so 4
+## columns + 3 gaps (BOX_SEP) still fits comfortably inside the 480px screen
+## width with no MarginContainer here (unlike the Shop drawer): 4*100+3*8=424,
+## leaving 28px total for the CenterContainer to split as margin.
+const BOX_ICON := 100.0
+const BOX_COLS := 4
+const BOX_SEP := 8.0
+
 func _box_clear() -> void:
 	for c in box_panel.get_children():
 		box_panel.remove_child(c) # gone NOW, not at frame end: a re-render mid-frame
@@ -1202,7 +1219,9 @@ func _box_clear() -> void:
 		c.queue_free()
 
 
-func _box_vbox(title_text: String) -> VBoxContainer:
+## NO-168: no title any more — the box name ("Small Item Box") is gone from
+## this screen; "PICK N" moved to its own label just above Skip (show_box).
+func _box_vbox() -> VBoxContainer:
 	_box_clear()
 	box_panel.visible = true
 	var center := CenterContainer.new()
@@ -1210,11 +1229,6 @@ func _box_vbox(title_text: String) -> VBoxContainer:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	center.add_child(box)
-	var title := Label.new()
-	title.text = title_text
-	title.add_theme_font_size_override("font_size", 26)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(title)
 	return box
 
 
@@ -1288,7 +1302,8 @@ func _box_icon(opt: Dictionary) -> Variant:
 func _box_tile(index: int) -> Button:
 	var opt: Dictionary = _box_options[index]
 	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON) # NO-119
+	btn.custom_minimum_size = Vector2(BOX_ICON, BOX_ICON) # NO-168: bigger than
+		# the OFFBOARD_ICON standard — see BOX_ICON's own header
 	btn.clip_text = true
 	btn.set_meta("box_index", index)
 	var icon: Variant = _box_icon(opt)
@@ -1309,22 +1324,35 @@ func _box_tile(index: int) -> Button:
 	return btn
 
 
-## The dock's content for the selected tile (or the hint) — refilled on every
-## tap, same shape as _fill_shop_dock.
+## NO-168: BOX_COLS-wide (bigger-icon) grid for the Box's own options — kept
+## separate from _piece_grid (the Shop/Stock OFFBOARD_ICON-standard helper)
+## rather than parameterising it, since BOX_ICON/BOX_COLS are this screen's
+## own deliberate exception, not a second site-wide standard.
+func _box_grid(count: int) -> CenterContainer:
+	var center := CenterContainer.new()
+	var grid := GridContainer.new()
+	grid.columns = BOX_COLS
+	grid.add_theme_constant_override("h_separation", BOX_SEP)
+	grid.add_theme_constant_override("v_separation", BOX_SEP)
+	grid.custom_minimum_size.x = BOX_COLS * BOX_ICON + (BOX_COLS - 1) * BOX_SEP
+	for i in count:
+		grid.add_child(_box_tile(i))
+	center.add_child(grid)
+	return center
+
+
+## The selected tile's own detail (or nothing) — refilled on every tap, same
+## shape as _fill_shop_dock. NO-168: no placeholder hint any more ("Tap an
+## entry for details" and its own fixed-height dock panel are gone — the
+## "tap for detail" zone the ticket named); this sits empty, taking no space,
+## until a tile is actually selected, then shows the same name/description/
+## Pick row _box_detail always did, as a plain line under the grid rather
+## than inside a docked panel.
 func _fill_box_dock() -> void:
 	for c in _box_dock.get_children():
 		c.free()
 	if box_expanded_index >= 0 and box_expanded_index < _box_options.size():
 		_box_dock.add_child(_box_detail(box_expanded_index))
-	else:
-		var hint := Label.new()
-		hint.text = "Tap an entry for details"
-		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		hint.modulate = Color(1, 1, 1, 0.5)
-		hint.add_theme_font_size_override("font_size", 13)
-		_box_dock.add_child(hint)
 
 
 ## The expanded option: icon, name/kind header, effect text and a Pick
@@ -1401,21 +1429,17 @@ func show_box(options: Array) -> void:
 	box_expanded_index = -1 # NO-133: a fresh render — reroll/sell also call
 		# back in here with a new/changed offer, so nothing carries over
 	var picks: int = 1 + g.box_picks_left # Nostradamus Mad Libs stacks on
-		# top of a Box's own native picks (Huge = 2 — issue 47)
-	var title := "▣ %s %s Box — pick %d:" % [
-		str(g.box_size).capitalize(), str(g.box_only_kind).capitalize(), picks]
-	var box := _box_vbox(title)
-	# NO-133: the icon grid (was one full-width button per option, each two
-	# lines of header + description — that's what overflowed a phone screen
-	# once a Huge Box's 7 options stacked). _piece_grid is the same NO-132
-	# helper the Shop's own PIECES/STOCK band uses, so a Small Box's 3 tiles
-	# still start at column 1 instead of centering as their own short block.
-	box.add_child(_piece_grid(_box_tile, options.size()))
-	_box_dock = PanelContainer.new()
-	_box_dock.custom_minimum_size = Vector2(0, 92) # matches _shop_dock's own fixed height
-	var dock_bg := StyleBoxFlat.new()
-	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
-	_box_dock.add_theme_stylebox_override("panel", dock_bg)
+		# top of a Box's own native picks (Huge = 2 — issue 47); read off
+		# g.box_picks_left, itself seeded from Box.SIZES[size].picks
+		# (game.gd's _open_box_pick) — never a literal here.
+	var box := _box_vbox()
+	# NO-168: two rows, bigger icons (BOX_ICON/BOX_COLS, a deliberate
+	# exception — see their own header) — was the Shop/Stock OFFBOARD_ICON
+	# standard's 5-column _piece_grid (NO-133), which this screen no longer
+	# shares now that its name and per-tile dock chrome are gone.
+	box.add_child(_box_grid(options.size()))
+	_box_dock = PanelContainer.new() # NO-168: no fixed size/background any
+		# more — see _fill_box_dock's own header
 	_fill_box_dock()
 	box.add_child(_box_dock)
 	if g.box_only_kind == "item" and not ItemLogic.has_room(g):
@@ -1440,6 +1464,15 @@ func show_box(options: Array) -> void:
 		reroll.text = "Reroll (%d left)" % g.box_rerolls_left
 		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
 		box.add_child(reroll)
+	# NO-168: "PICK N" replaces the box-name title (gone from _box_vbox above)
+	# as this screen's one piece of header text — sat right above Skip, `picks`
+	# is the same value the old combined title used, off g.box_picks_left,
+	# never a literal.
+	var pick_label := Label.new()
+	pick_label.text = "PICK %d" % picks
+	pick_label.add_theme_font_size_override("font_size", 20)
+	pick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(pick_label)
 	var skip := Button.new()
 	# The Box's price, in Gold. The old label said "+20 score" while earn() paid
 	# ~20 Gold AND 200 Score — wrong currency and wrong by 10x at once.

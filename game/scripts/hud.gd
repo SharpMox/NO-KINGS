@@ -14,6 +14,9 @@ const Guide := preload("res://scripts/guide.gd")
 const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
+const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
+const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -2118,6 +2121,3 @@ func _build_stack_button(st: Dictionary) -> Button:
 	# ever feels like it drifts, this line is the suspect.
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS
 	return btn
-const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
-const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
-const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity

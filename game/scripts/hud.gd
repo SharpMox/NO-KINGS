@@ -491,6 +491,17 @@ func build(game) -> void:
 		clock_size -= 1
 	var clock_w: float = clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x
 	var clock_h: float = clock_font.get_height(clock_size)
+	# NO-162 DIAGNOSTIC, temporary — three fixes in a row have not stopped
+	# the reported clipping, and the coordinator's last message asked for
+	# printed numbers rather than another hypothesis. Gated so it never
+	# fires on a normal run; drop `--debug-clock` after `--` to capture it
+	# (matches the existing --screenshot/--scenario convention, game.gd's
+	# OS.get_cmdline_user_args() gate). Remove this block once the real fix
+	# lands.
+	if OS.get_cmdline_user_args().has("--debug-clock"):
+		print("NO162 vp=%s left_max_w=%s clock_size=%s clock_w=%s clock_h=%s window_size=%s visible_rect=%s"
+			% [vp, left_max_w, clock_size, clock_w, clock_h,
+				DisplayServer.window_get_size(), get_viewport().get_visible_rect()])
 	clock_label.add_theme_font_size_override("font_size", clock_size)
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -545,6 +556,13 @@ func build(game) -> void:
 	clock_label.size = Vector2(clock_w, clock_h)
 	clock_label.custom_minimum_size = Vector2(clock_w, clock_h)
 	add_child(clock_label)
+	# NO-162 DIAGNOSTIC, temporary — see the matching block above. Read back
+	# AFTER add_child(), in case anything downstream (a later refresh(), a
+	# parent transform) moves the Label from where it was just placed.
+	if OS.get_cmdline_user_args().has("--debug-clock"):
+		print("NO162-post pos=%s size=%s global_rect=%s global_xform=%s canvas_xform=%s"
+			% [clock_label.position, clock_label.size, clock_label.get_global_rect(),
+				clock_label.get_global_transform(), get_viewport().canvas_transform])
 	# CENTRE, flush to the bottom (NO-162): Gold now lives here — exactly the
 	# spot the Wave/Turn counters used to occupy — because those counters
 	# moved to the right, under the Stock+Menu row (see RIGHT, below).

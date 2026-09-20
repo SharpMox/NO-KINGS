@@ -194,7 +194,7 @@ const KITS := {
 	},
 	"nero": {
 		"power_name": "Rome Burns",
-		"power_desc": "Your Gold gains are halved this wave.",
+		"power_desc": "Your $ gains are halved this wave.",
 		"power_key": "burns",
 		"ability_name": "The Fire of Rome",
 		"ability_desc": "Every Item you are holding burns.",
@@ -254,7 +254,7 @@ const KITS := {
 	},
 	"adolf_hitler": {
 		"power_name": "Total War",
-		"power_desc": "Every piece you lose this wave also costs you Gold.",
+		"power_desc": "Every piece you lose this wave also costs you $.",
 		"power_key": "totalwar",
 		"ability_name": "Total Mobilisation",
 		"ability_desc": "The enemy takes an extra Action for the rest of this wave.",

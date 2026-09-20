@@ -7,7 +7,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 Gold (issue 16: Score is up-only, so this penalty debits Gold instead)",
+  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -50 $ (issue 16: Score is up-only, so this penalty debits $ instead)",
   "conspiracy": "The 27 Club",
   "implemented": true
  },
@@ -19,7 +19,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "+15% Score gain; -5% Gold gain",
+  "effect": "+15% Score gain; -5% $ gain",
   "conspiracy": "Tin foil hat",
   "implemented": true
  },
@@ -44,7 +44,7 @@
    "Score",
    "Item"
   ],
-  "effect": "While holding under 10 Gold: +50% Score gain; on Wave clear while under 10 Gold: open a Small Item Box",
+  "effect": "While holding under 10 $: +50% Score gain; on Wave clear while under 10 $: open a Small Item Box",
   "conspiracy": "Fort Knox's missing gold",
   "implemented": true
  },
@@ -56,7 +56,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "At Turn end: +2 Gold per enemy piece on your half of the Board",
+  "effect": "At Turn end: +2 $ per enemy piece on your half of the Board",
   "conspiracy": "FEMA camps",
   "implemented": true
  },
@@ -68,7 +68,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "At Wave end: refund 10% of Gold spent in the Shop",
+  "effect": "At Wave end: refund 10% of $ spent in the Shop",
   "conspiracy": "Swiss bank secrecy",
   "implemented": true
  },
@@ -81,7 +81,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Each Capture in a Turn gives +25% more Score and Gold than the previous one; resets at Turn end",
+  "effect": "Each Capture in a Turn gives +25% more Score and $ than the previous one; resets at Turn end",
   "conspiracy": "The Great Fire of Rome",
   "implemented": true
  },
@@ -117,7 +117,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On 5-Wave Milestone: 2 random allied pieces get +1 Piece Buff; -10 Gold",
+  "effect": "On 5-Wave Milestone: 2 random allied pieces get +1 Piece Buff; -10 $",
   "conspiracy": "Crop circles",
   "implemented": true
  },
@@ -142,7 +142,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +3 Gold",
+  "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +3 $",
   "conspiracy": "The hidden giant skeletons",
   "implemented": true
  },
@@ -155,7 +155,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "While the Clock is over 90s: +20% Score and +10% Gold gain; while under 30s: -20% Score and -10% Gold gain",
+  "effect": "While the Clock is over 90s: +20% Score and +10% $ gain; while under 30s: -20% Score and -10% $ gain",
   "conspiracy": "The Daylight Saving racket",
   "implemented": true
  },
@@ -191,7 +191,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -10 Gold (issue 16: Score is up-only, so this penalty debits Gold instead)",
+  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -10 $ (issue 16: Score is up-only, so this penalty debits $ instead)",
   "conspiracy": "The social credit system",
   "implemented": true
  },
@@ -264,7 +264,7 @@
   "bonus": [
    "Item"
   ],
-  "effect": "On Wave clear: +1 Tactical Item; -10 Gold",
+  "effect": "On Wave clear: +1 Tactical Item; -10 $",
   "conspiracy": "Subliminal advertising",
   "implemented": true
  },
@@ -276,7 +276,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: +2 Gold per allied piece on the Board; on losing a piece: -2 Gold",
+  "effect": "On Wave clear: +2 $ per allied piece on the Board; on losing a piece: -2 $",
   "conspiracy": "Satoshi Nakamoto",
   "implemented": true
  },
@@ -301,7 +301,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: +5% of your current Gold",
+  "effect": "On Wave clear: +5% of your current $",
   "conspiracy": "Yamashita's gold",
   "implemented": true
  },
@@ -326,7 +326,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On Wave start: +100 Score, +10 Gold, and -3s Clock",
+  "effect": "On Wave start: +100 Score, +10 $, and -3s Clock",
   "conspiracy": "The advance-fee scam",
   "implemented": true
  },
@@ -338,7 +338,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On your first Capture each Wave: double Score, but it pays no Gold",
+  "effect": "On your first Capture each Wave: double Score, but it pays no $",
   "conspiracy": "JFK assassination theories",
   "implemented": true
  },
@@ -362,7 +362,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On your first Capture with a Ranked or Buffed piece each Turn: +100% Gold",
+  "effect": "On your first Capture with a Ranked or Buffed piece each Turn: +100% $",
   "conspiracy": "The heart attack gun",
   "implemented": true
  },
@@ -422,7 +422,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "The Buff Box offers 4 Piece Buff choices instead of 3; each pick costs 5 Gold",
+  "effect": "The Buff Box offers 4 Piece Buff choices instead of 3; each pick costs 5 $",
   "conspiracy": "Numbers stations",
   "implemented": true
  },
@@ -446,7 +446,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "When one of your Piece Buffs of any tier triggers: +10 Gold",
+  "effect": "When one of your Piece Buffs of any tier triggers: +10 $",
   "conspiracy": "The Amityville Horror",
   "implemented": true
  },
@@ -483,7 +483,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "While holding 200+ Gold: +20% Score gain; Shop prices +5%",
+  "effect": "While holding 200+ $: +20% Score gain; Shop prices +5%",
   "conspiracy": "Skull and Bones",
   "implemented": true
  },
@@ -496,7 +496,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "While the Clock is under 30s: +100% Score gain and +50% Gold gain",
+  "effect": "While the Clock is under 30s: +100% Score gain and +50% $ gain",
   "conspiracy": "The Moscow–Washington hotline",
   "implemented": true
  },
@@ -509,7 +509,7 @@
    "Gold",
    "Special"
   ],
-  "effect": "Whenever two or more of your Artefacts trigger on the same event: +15 Gold",
+  "effect": "Whenever two or more of your Artefacts trigger on the same event: +15 $",
   "conspiracy": "The Bilderberg meeting",
   "implemented": true
  },
@@ -522,7 +522,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +10 Gold",
+  "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +10 $",
   "conspiracy": "The Sphinx's nose",
   "implemented": true
  },
@@ -534,7 +534,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Capture: +2 Gold; +10 more Gold if the captured piece had captured one of yours",
+  "effect": "On Capture: +2 $; +10 more $ if the captured piece had captured one of yours",
   "conspiracy": "The Chupacabra",
   "implemented": true
  },
@@ -558,7 +558,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "At Wave end: +2 Gold per allied piece that did not move this Wave",
+  "effect": "At Wave end: +2 $ per allied piece that did not move this Wave",
   "conspiracy": "Stonehenge",
   "implemented": true
  },
@@ -570,7 +570,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "5% of Score gains are also paid as Gold",
+  "effect": "5% of Score gains are also paid as $",
   "conspiracy": "El Dorado",
   "implemented": true
  },
@@ -582,7 +582,7 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Once per Wave: pay 20 Gold to restock the Shop",
+  "effect": "Once per Wave: pay 20 $ to restock the Shop",
   "conspiracy": "Controlled demolition claims",
   "implemented": true
  },
@@ -606,7 +606,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Fuse: refund 50% of both consumed pieces' value combined as Gold",
+  "effect": "On Fuse: refund 50% of both consumed pieces' value combined as $",
   "conspiracy": "The organ-theft legend",
   "implemented": true
  },
@@ -619,7 +619,7 @@
    "Gold",
    "Item"
   ],
-  "effect": "While all your Item slots are full: +30% Gold gain",
+  "effect": "While all your Item slots are full: +30% $ gain",
   "conspiracy": "Denver Airport",
   "implemented": true
  },
@@ -632,7 +632,7 @@
    "Score",
    "Shop"
   ],
-  "effect": "Whenever you buy in the Shop: +5 Score per Gold spent",
+  "effect": "Whenever you buy in the Shop: +5 Score per $ spent",
   "conspiracy": "Putin's Palace",
   "implemented": true
  },
@@ -645,7 +645,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On your first Score gain and first Gold gain each Turn: they trigger again",
+  "effect": "On your first Score gain and first $ gain each Turn: they trigger again",
   "conspiracy": "The simulation hypothesis",
   "implemented": true
  },
@@ -657,7 +657,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; Captures give +25% more Gold",
+  "effect": "Enemy Waves spawn +1 extra piece; Captures give +25% more $",
   "conspiracy": "The lab leak question",
   "implemented": true
  },
@@ -670,7 +670,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Inverted pieces give double Score and Gold on Capture",
+  "effect": "Inverted pieces give double Score and $ on Capture",
   "conspiracy": "Modern flat Earth",
   "implemented": true
  },
@@ -731,7 +731,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On clearing a Wave without losing a piece: +200 Score and +20 Gold",
+  "effect": "On clearing a Wave without losing a piece: +200 Score and +20 $",
   "conspiracy": "QAnon",
   "implemented": true
  },
@@ -767,7 +767,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Strategic Item use: +25 Gold",
+  "effect": "On Strategic Item use: +25 $",
   "conspiracy": "War profiteering",
   "implemented": true
  },
@@ -791,7 +791,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On Wave clear: -5 Gold, +1 Piece Buff",
+  "effect": "On Wave clear: -5 $, +1 Piece Buff",
   "conspiracy": "Scientology auditing",
   "implemented": true
  },
@@ -803,7 +803,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "On Wave clear: -15 Gold, +3 Piece Buffs",
+  "effect": "On Wave clear: -15 $, +3 Piece Buffs",
   "conspiracy": "Xenu",
   "implemented": true
  },
@@ -815,7 +815,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: +5 Gold per Artefact you own",
+  "effect": "On Wave clear: +5 $ per Artefact you own",
   "conspiracy": "The Trilateral Commission",
   "implemented": true
  },
@@ -827,7 +827,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: +10% of your current Gold",
+  "effect": "On Wave clear: +10% of your current $",
   "conspiracy": "Federal Reserve lore",
   "implemented": true
  },
@@ -852,7 +852,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On your first Capture each Wave: double Score and Gold",
+  "effect": "On your first Capture each Wave: double Score and $",
   "conspiracy": "The Voynich manuscript",
   "implemented": true
  },
@@ -865,7 +865,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Pieces carrying a Piece Buff give double Score and +50% Gold on Capture",
+  "effect": "Pieces carrying a Piece Buff give double Score and +50% $ on Capture",
   "conspiracy": "Operation Mockingbird",
   "implemented": true
  },
@@ -901,7 +901,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "When one of your Decisive Piece Buffs (Trap, Reflect, Bomb) triggers: +100 Gold",
+  "effect": "When one of your Decisive Piece Buffs (Trap, Reflect, Bomb) triggers: +100 $",
   "conspiracy": "The death of Cleopatra",
   "implemented": true
  },
@@ -913,7 +913,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Whenever a new King Ability is applied: +100 Gold",
+  "effect": "Whenever a new King Ability is applied: +100 $",
   "conspiracy": "Merchants of Death",
   "implemented": true
  },
@@ -925,7 +925,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Whenever a piece (ally or enemy) is Demoted or consumes/loses a Piece Buff: +25 Gold",
+  "effect": "Whenever a piece (ally or enemy) is Demoted or consumes/loses a Piece Buff: +25 $",
   "conspiracy": "The Georgia Guidestones",
   "implemented": true
  },
@@ -938,7 +938,7 @@
    "Special",
    "Piece"
   ],
-  "effect": "Once per Wave, when one of your pieces would be captured: pay 15 Gold and it survives",
+  "effect": "Once per Wave, when one of your pieces would be captured: pay 15 $ and it survives",
   "conspiracy": "The Gulf of Tonkin incident",
   "implemented": true
  },
@@ -963,7 +963,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "While the Clock is under 60s: +50% Score gain and +25% Gold gain",
+  "effect": "While the Clock is under 60s: +50% Score gain and +25% $ gain",
   "conspiracy": "The Bermuda Triangle",
   "implemented": true
  },
@@ -975,7 +975,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Your Gold gains can't be reduced",
+  "effect": "Your $ gains can't be reduced",
   "conspiracy": "The lost Amber Room",
   "implemented": true
  },
@@ -1024,7 +1024,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On 5-Wave Milestone: +1 Gold per 5 seconds left on the Clock",
+  "effect": "On 5-Wave Milestone: +1 $ per 5 seconds left on the Clock",
   "conspiracy": "John Titor",
   "implemented": true
  },
@@ -1061,7 +1061,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On using your last held Item: +100 Score and +50 Gold",
+  "effect": "On using your last held Item: +100 Score and +50 $",
   "conspiracy": "The 18½-minute gap",
   "implemented": true
  },
@@ -1073,7 +1073,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: +2 Gold per piece in your Captured Stock",
+  "effect": "On Wave clear: +2 $ per piece in your Captured Stock",
   "conspiracy": "The alien autopsy film",
   "implemented": true
  },
@@ -1098,7 +1098,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Ranked pieces give double Gold on Capture; Demoted pieces give no Score on Capture",
+  "effect": "Ranked pieces give double $ on Capture; Demoted pieces give no Score on Capture",
   "conspiracy": "The Phoebus cartel",
   "implemented": true
  },
@@ -1123,7 +1123,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On losing a piece carrying a Piece Buff: +150 Gold and +150 Score",
+  "effect": "On losing a piece carrying a Piece Buff: +150 $ and +150 Score",
   "conspiracy": "The Lusitania",
   "implemented": true
  },
@@ -1147,7 +1147,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On losing a Ranked piece: +150 Gold",
+  "effect": "On losing a Ranked piece: +150 $",
   "conspiracy": "The Knights Templar",
   "implemented": true
  },
@@ -1221,7 +1221,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Whenever a \"Capture\" Artefact triggers: +2 Gold and +20 Score",
+  "effect": "Whenever a \"Capture\" Artefact triggers: +2 $ and +20 Score",
   "conspiracy": "The Illuminati card game",
   "implemented": true
  },
@@ -1233,7 +1233,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On buying an Artefact: each other Artefact you own pays +5 Gold",
+  "effect": "On buying an Artefact: each other Artefact you own pays +5 $",
   "conspiracy": "The deep state",
   "implemented": true
  },
@@ -1295,7 +1295,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Enemies destroyed by Items award their Score and Gold value",
+  "effect": "Enemies destroyed by Items award their Score and $ value",
   "conspiracy": "The missing trillions",
   "implemented": true
  },
@@ -1343,7 +1343,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Gold paid by other Artefacts is increased by 25%",
+  "effect": "$ paid by other Artefacts is increased by 25%",
   "conspiracy": "The New World Order",
   "implemented": true
  },
@@ -1391,7 +1391,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On 5-Wave Milestone: choose one — +100 Gold / +1 Item / +15s Clock",
+  "effect": "On 5-Wave Milestone: choose one — +100 $ / +1 Item / +15s Clock",
   "conspiracy": "The Yalta Conference",
   "implemented": true
  },
@@ -1440,7 +1440,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On Capture: +1 Gold and +10 Score per piece in your Stock",
+  "effect": "On Capture: +1 $ and +10 Score per piece in your Stock",
   "conspiracy": "The burning of the Library of Alexandria",
   "implemented": true
  },
@@ -1452,7 +1452,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On losing a piece: refund 75% of its value as Gold",
+  "effect": "On losing a piece: refund 75% of its value as $",
   "conspiracy": "D.B. Cooper",
   "implemented": true
  },
@@ -1560,7 +1560,7 @@
   "bonus": [
    "Time"
   ],
-  "effect": "Per 10 Gold gained: +5s Clock",
+  "effect": "Per 10 $ gained: +5s Clock",
   "conspiracy": "The 2012 phenomenon",
   "implemented": true
  },
@@ -1572,7 +1572,7 @@
   "bonus": [
    "Shop"
   ],
-  "effect": "Shop purchases can take your Gold negative, down to -100",
+  "effect": "Shop purchases can take your $ negative, down to -100",
   "conspiracy": "The Hollow Earth",
   "implemented": true
  },
@@ -1645,7 +1645,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% Score and Gold",
+  "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% Score and $",
   "conspiracy": "The Priory of Sion",
   "implemented": true
  },
@@ -1670,7 +1670,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Once per Turn: you may pay 25 Gold for +400 Score",
+  "effect": "Once per Turn: you may pay 25 $ for +400 Score",
   "conspiracy": "The Oak Island money pit",
   "implemented": true
  },
@@ -1706,7 +1706,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "While you own Artefacts of every rarity: +50% Gold gain",
+  "effect": "While you own Artefacts of every rarity: +50% $ gain",
   "conspiracy": "The Illuminati",
   "implemented": true
  },
@@ -1731,7 +1731,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 Gold",
+  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +15 $",
   "conspiracy": "HAARP",
   "implemented": true
  },
@@ -1755,7 +1755,7 @@
   "bonus": [
    "Special"
   ],
-  "effect": "On use: the strongest enemy piece vanishes, paying no Score or Gold; recharges at every 2nd 5-Wave Milestone",
+  "effect": "On use: the strongest enemy piece vanishes, paying no Score or $; recharges at every 2nd 5-Wave Milestone",
   "conspiracy": "The Roanoke Colony",
   "implemented": true
  },
@@ -1803,7 +1803,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On declining a Box Pick: +Gold equal to the Shop value of the Box's contents, whatever kind they are",
+  "effect": "On declining a Box Pick: +$ equal to the Shop value of the Box's contents, whatever kind they are",
   "conspiracy": "Cicada 3301",
   "implemented": true
  },
@@ -1828,7 +1828,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On use: until end of Turn, Score and Gold gains are tripled; this Artefact is consumed",
+  "effect": "On use: until end of Turn, Score and $ gains are tripled; this Artefact is consumed",
   "conspiracy": "Bob Lazar and Element 115",
   "implemented": true
  },
@@ -1852,7 +1852,7 @@
   "bonus": [
    "Action"
   ],
-  "effect": "On reaching exactly 0 Gold: +2 Actions that Turn",
+  "effect": "On reaching exactly 0 $: +2 Actions that Turn",
   "conspiracy": "Zero-point energy",
   "implemented": true
  },
@@ -1865,7 +1865,7 @@
    "Gold",
    "Score"
   ],
-  "effect": "+45% Gold and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs",
+  "effect": "+45% $ and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs",
   "conspiracy": "The Hope Diamond curse",
   "implemented": true
  },
@@ -1915,7 +1915,7 @@
    "Gold",
    "Time"
   ],
-  "effect": "At every Turn end: +10 Gold, +10 Score, +1s Clock; Shop prices +50%",
+  "effect": "At every Turn end: +10 $, +10 Score, +1s Clock; Shop prices +50%",
   "conspiracy": "Shrinkflation",
   "implemented": true
  },
@@ -1975,7 +1975,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On Game Over Screen: convert all your Gold into Score at 20x rate",
+  "effect": "On Game Over Screen: convert all your $ into Score at 20x rate",
   "conspiracy": "The Rapture Index",
   "implemented": true
  },
@@ -1987,7 +1987,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "On Wave clear: pays Gold starting at +10, growing +10 per Wave; collapses to 0 and restarts when you lose a piece",
+  "effect": "On Wave clear: pays $ starting at +10, growing +10 per Wave; collapses to 0 and restarts when you lose a piece",
   "conspiracy": "Nibiru",
   "implemented": true
  },
@@ -2059,7 +2059,7 @@
   "bonus": [
    "Action"
   ],
-  "effect": "You may spend 50 Gold to gain +1 Action, any number of times per Turn",
+  "effect": "You may spend 50 $ to gain +1 Action, any number of times per Turn",
   "conspiracy": "The FIFA corruption case",
   "implemented": true
  },
@@ -2132,7 +2132,7 @@
    "Shop",
    "Special"
   ],
-  "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 Gold",
+  "effect": "You may pay Shop costs with Score at a rate of 10 Score per 1 $",
   "conspiracy": "The Knights Templar",
   "implemented": true
  },

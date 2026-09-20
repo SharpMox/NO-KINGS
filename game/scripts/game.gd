@@ -3128,7 +3128,7 @@ func _open_yalta_pick() -> void:
 		return # same wave clear can already have a modal up, and rendering
 			# this on top means the player picks and the pick goes nowhere.
 	var offers := [
-		{"label": "+100 Gold", "value": "gold"},
+		{"label": "+$100", "value": "gold"},
 		{"label": "+1 Item", "value": "item"},
 		{"label": "+15s Clock", "value": "clock"},
 	]

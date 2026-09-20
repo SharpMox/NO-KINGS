@@ -1600,7 +1600,7 @@ func show_box(options: Array) -> void:
 		box.add_child(full)
 		for it in g.items:
 			var sell := Button.new()
-			sell.text = "Sell %s (+%d gold)" % [it.name, Shop.sell_payout(g, "item", it)]
+			sell.text = "Sell %s (+$%d)" % [it.name, Shop.sell_payout(g, "item", it)]
 			sell.add_theme_font_size_override("font_size", 16)
 			sell.custom_minimum_size = Vector2(420, 0)
 			sell.pressed.connect(func() -> void: box_sell_pressed.emit(it))
@@ -1629,6 +1629,6 @@ func show_box(options: Array) -> void:
 	var skip := Button.new()
 	# The Box's price, in Gold. The old label said "+20 score" while earn() paid
 	# ~20 Gold AND 200 Score — wrong currency and wrong by 10x at once.
-	skip.text = "Skip (+%d gold)" % Tuning.box_skip_gold(g.box_size)
+	skip.text = "Skip (+$%d)" % Tuning.box_skip_gold(g.box_size)
 	skip.pressed.connect(func() -> void: box_skipped.emit())
 	box.add_child(_centered(skip))

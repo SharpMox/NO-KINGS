@@ -25,11 +25,11 @@ const TEXT := (
 	"Stock, Inventory & Shop\n" +
 	"Captured enemies and unplaced pieces sit in Stock; items and " +
 	"artefacts sit in Inventory. The Shop sells pieces, items, artefacts, " +
-	"and boxes for gold, and restocks as your score climbs.\n\n" +
+	"and boxes for $, and restocks as your score climbs.\n\n" +
 
 	"King Abilities\n" +
 	"Every 10th wave applies a King Ability — an economic penalty (extra " +
-	"gold cost on an action type, a barred piece, etc.) that lasts until " +
+	"$ cost on an action type, a barred piece, etc.) that lasts until " +
 	"the run ends.\n\n" +
 
 	"Kings\n" +

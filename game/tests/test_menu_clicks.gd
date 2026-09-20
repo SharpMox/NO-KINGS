@@ -43,6 +43,18 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
+## NO-179: the carousel's own cards — one PanelContainer per Army, direct
+## children of army_row (the two end spacers are bare Controls, not
+## PanelContainers, so no further filter is needed).
+func _army_cards(node: Node) -> Array[PanelContainer]:
+	var out: Array[PanelContainer] = []
+	if node is PanelContainer:
+		out.append(node)
+	for c in node.get_children():
+		out.append_array(_army_cards(c))
+	return out
+
+
 func _find_button(node: Node, text: String) -> Button:
 	# visible-first: "← Back" exists in both the TEST and army submenus
 	if node is Button and node.text == text and node.is_visible_in_tree():
@@ -286,6 +298,25 @@ func _init() -> void:
 	check(_find_button(menu, "The Muster") != null, "Play opens the army select") # issue
 		# 67: "Crown" is still the save id (Tuning.ARMIES key) — the BUTTON now
 		# shows the Army's display name, "The Muster" ("The Levy" was vetoed)
+	# NO-179: the peek scale must apply on the FIRST render, not only after a
+	# scroll re-runs set_current — army-crown-peek.png caught a resting card
+	# 0 with its right-hand neighbour at full, uncropped size. Geometry, not
+	# a flag: assert the actual scale and that the scaled card fits the gap
+	# beside the resting card, mirroring the arithmetic set_current's own
+	# header documents (lead_w = (scroll_w - card_w) / 2 - ARMY_CARD_MARGIN).
+	await process_frame # menu.gd's _show_armies awaits one frame for the
+		# deferred container sort before re-applying the scale; give it one.
+	var cards := _army_cards(menu.army_center)
+	check(cards.size() > 1, "the carousel built more than one card")
+	if cards.size() > 1:
+		var neighbour: PanelContainer = cards[1]
+		check(is_equal_approx(neighbour.scale.x, MenuScript.ARMY_CARD_PEEK_SCALE),
+			"a non-resting card is scaled to ARMY_CARD_PEEK_SCALE on first render")
+		var scroll_w: float = menu.get_viewport_rect().size.x - 80.0
+		var card_w: float = scroll_w * MenuScript.ARMY_CARD_WIDTH_FRACTION
+		var lead_w: float = (scroll_w - card_w) / 2.0 - MenuScript.ARMY_CARD_MARGIN
+		check(neighbour.size.x * neighbour.scale.x <= lead_w + 1.0, # +1 for float slop
+			"the scaled neighbour's on-screen width fits the visible gap, uncropped")
 	check(await _click_button(menu, "← Back"), "army Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "army Back restores the main menu")

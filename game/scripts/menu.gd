@@ -495,6 +495,9 @@ var keyboard_height_override := -1
 var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
 var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is nested inside now
+## NO-179: the peek-scale setter built in _ready(), captured so _show_armies()
+## can re-run it once the screen is actually shown — see that call site.
+var _army_set_current: Callable
 var rank_center: PanelContainer # NO-190: a background panel now, not a bare CenterContainer
 ## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
 ## as a blue outline enclosing tiers 1..this one. NO-190: Confirm is what
@@ -1238,6 +1241,7 @@ func _ready() -> void:
 			c.pivot_offset = Vector2(0, card_h / 2.0) if i > idx \
 				else Vector2(card_w, card_h / 2.0)
 	set_current.call(0)
+	_army_set_current = set_current
 	# NO-158: clickable page dots — one per Army, filled for the resting
 	# card, hollow for the rest; a tap scrolls straight to that card. Count
 	# and order come from army_names (Tuning.ARMIES), so a 7th Army needs no
@@ -1458,6 +1462,23 @@ func _show_tests() -> void:
 func _show_armies() -> void:
 	main_box.visible = false
 	army_center.visible = true
+	# NO-179: set_current(0) already ran once in _ready(), but that ran while
+	# army_center was still hidden and the carousel's HBoxContainer had not
+	# had a frame to sort — see army-crown-peek.png vs. army-horde.png: the
+	# resting card (plain scale ONE, no layout dependency) is right on the
+	# very first render, but its neighbour, which needs the peek scale, is
+	# not — full size, cropped by the viewport edge, exactly what
+	# scale=ARMY_CARD_PEEK_SCALE looks like when it never took hold. It
+	# self-heals on the first scroll, because the scroll listener re-runs
+	# the same setter once the carousel has real, on-screen geometry — so
+	# re-run it here too, once the screen is genuinely shown, instead of
+	# waiting on the player to scroll first. One frame is enough for the
+	# container's deferred sort to settle (CLAUDE.md: a freshly added
+	# Control's geometry isn't usable until the next idle frame); guard on
+	# `visible` after the await in case Back was pressed in that one frame.
+	await get_tree().process_frame
+	if army_center.visible:
+		_army_set_current.call(0)
 
 
 ## NO-179: one small icon per unique piece TYPE in `ids`, first-occurrence

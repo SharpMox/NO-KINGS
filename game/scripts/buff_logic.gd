@@ -114,6 +114,47 @@ static func name_of(key: String) -> String:
 	return key
 
 
+## NO-185: one BMP Unicode glyph per catalogued Piece Buff, drawn as a small
+## badge over the board token — a first pass, not painted art (Max's ruling).
+## Picked from the same low-codepoint symbol/dingbat/arrow blocks as game.gd's
+## own INV_MARK_GLYPH (U+27F2), already confirmed to render through this
+## project's OS-fallback font for glyphs missing from Open Sans SemiBold — no
+## emoji-range (U+1F300+) codepoints, which this project has never proven out.
+## Every glyph is unique; none doubles up on another buff or on an unrelated
+## on-screen glyph (✦/✹/⚠/→ already mean other things elsewhere in the HUD).
+const PIECE_BUFF_GLYPHS := {
+	"shield": "⛨",       # U+26E8 cross-on-shield — blocks the next capture
+	"critical": "⚡",      # U+26A1 high voltage — next capture scores double
+	"multicapture": "⚔", # U+2694 crossed swords — takes a second victim too
+	"taunt": "‼",         # U+203C double exclamation — forces the enemy's aim
+	"stun": "⊘",          # U+2298 circled slash — captor loses its next turns
+	"bomb": "✴",          # U+2734 eight-point star — destroys on contact
+	"trap": "⌖",          # U+2316 position indicator — punishes the captor
+	"range": "➤",         # U+27A4 arrowhead — extends capture reach
+	"reflect": "↩",       # U+21A9 hooked arrow — bounces the attack back
+	"slow": "⏳",          # U+23F3 hourglass — moves like a Pawn, briefly
+	"aura": "✳",          # U+2733 eight-spoked asterisk — radiates to allies
+	"smog": "≋",          # U+224B triple tilde — radiates to enemies
+	"piece_bounty": "⚑",  # U+2691 black flag — marks a reward on capture
+}
+
+
+static func glyph_of(key: String) -> String:
+	return PIECE_BUFF_GLYPHS.get(key, "")
+
+
+## NO-185: the ordered glyphs for every catalogued buff `piece` carries — what
+## the board draws as badges over the token. Skips "stunned" the same way
+## describe() does (no PIECE_BUFFS entry, so glyph_of returns "").
+static func glyphs_of(piece: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for b in of(piece):
+		var glyph := glyph_of(b.key)
+		if glyph != "":
+			out.append(glyph)
+	return out
+
+
 ## NO-120: name + any catalogued Piece Buffs `piece` carries, for the
 ## long-press description shared by the board (game.gd) and the Stock/
 ## Captured drawer (hud.gd). Skips `stunned` — the module header's non-Buff

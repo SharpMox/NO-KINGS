@@ -17,6 +17,7 @@ const Armies := preload("res://scripts/armies.gd")
 const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
 const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
+const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-152: the targeting tip's diagram
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -46,6 +47,12 @@ const DRAWER_SCROLL_DEADZONE := 24
 ## of a 480-wide screen is where a popup anchored to its row goes off screen.
 const TIP_W := 240.0
 const TIP_MARGIN := 8.0
+## NO-152: a compact PieceDiagram above the text when show_tip is given a
+## piece id — same 9-cell board modals.gd's own preview uses (covers Ying
+## Long's 4-square leap), at roughly half its cell size (16 vs 30) so the
+## whole popup stays a small anchored tile-side tip, not a modal-sized panel.
+const TIP_DIA_CELLS := 9
+const TIP_DIA_CELL := 16
 ## NO-72: how long an item or Activate chip must be held to show its description
 ## instead of firing. Android's own long-press timeout
 ## (ViewConfiguration.getLongPressTimeout), so it feels like every other long
@@ -354,6 +361,13 @@ var confirm_backdrop := ColorRect.new() # NO-137: dims the bottom UI (Shop/
 ## panel parented to a row would not survive the next state change.
 var tip_panel: PanelContainer
 var tip_label: Label
+## NO-152: the compact movement diagram, shown above tip_label when show_tip
+## is given a piece id. Built once (like tip_panel/tip_label) and just
+## toggled/redrawn per call, rather than rebuilt, so a repeat tip doesn't
+## need a fresh `draw` connection.
+var tip_diagram: Control
+var tip_diagram_id := "" # "" hides tip_diagram; read by its own `draw` closure
+var tip_diagram_tex: Texture2D = null
 ## Which artefact row the popup is currently describing, so tapping the same row
 ## again closes it. Empty when nothing is shown.
 var tip_key := ""
@@ -1336,6 +1350,21 @@ func build(game) -> void:
 		_surface(Color(0.08, 0.08, 0.11, 0.97), Color(0.45, 0.45, 0.55), 8, 10, 8))
 	tip_panel.visible = false
 	tip_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# NO-152: a VBox so the diagram (when shown) stacks above the text — both
+	# still need their OWN MOUSE_FILTER_IGNORE, same reason as tip_panel's
+	# (CLAUDE.md: Godot doesn't cascade a parent's IGNORE to its children).
+	var tip_box := VBoxContainer.new()
+	tip_box.add_theme_constant_override("separation", 6)
+	tip_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_diagram = Control.new()
+	tip_diagram.custom_minimum_size = Vector2(TIP_DIA_CELLS, TIP_DIA_CELLS) * TIP_DIA_CELL
+	tip_diagram.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tip_diagram.visible = false
+	tip_diagram.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip_diagram.draw.connect(func() -> void:
+		if tip_diagram_id != "":
+			PieceDiagram.draw(tip_diagram, g.defs, tip_diagram_id, TIP_DIA_CELLS, TIP_DIA_CELL, tip_diagram_tex))
+	tip_box.add_child(tip_diagram)
 	tip_label = Label.new()
 	tip_label.add_theme_font_size_override("font_size", 13)
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1345,7 +1374,8 @@ func build(game) -> void:
 	# clamp below would then have nothing it could fit on screen. Same failure
 	# NO-55 was, arriving through a different control.
 	tip_label.custom_minimum_size = Vector2(minf(TIP_W, vp.x - TIP_MARGIN * 2), 0)
-	tip_panel.add_child(tip_label)
+	tip_box.add_child(tip_label)
+	tip_panel.add_child(tip_box)
 	add_child(tip_panel)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
 	# the button bar and the bar had to be raised above it; design C opens the
@@ -1639,12 +1669,20 @@ func _on_chrome_swipe_input(event: InputEvent, source: String) -> void:
 ## `anchor` is the row's global rect; the panel is placed BESIDE it (user ruling
 ## 2026-09-11: a small popup beside the item, not a line inside the drawer) and
 ## then clamped into the viewport.
-func show_tip(key: String, text: String, anchor: Rect2) -> void:
+##
+## `diagram_id` (NO-152): a piece id shows PieceDiagram's compact movement
+## diagram above the text; "" (every non-piece caller) hides it, same as
+## before this slice.
+func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> void:
 	if key == tip_key: # tapping the same row again closes it
 		hide_tip()
 		return
 	tip_key = key
 	tip_label.text = text
+	tip_diagram_id = diagram_id
+	tip_diagram_tex = g.piece_tex(diagram_id) if diagram_id != "" and g.textures.has(diagram_id) else null
+	tip_diagram.visible = diagram_id != ""
+	tip_diagram.queue_redraw()
 	tip_panel.visible = true
 	# The panel's size is not known until the container has sorted its children,
 	# and a position computed from a stale size is the whole bug this clamp

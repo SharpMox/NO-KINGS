@@ -70,6 +70,17 @@ static func partner_ids(g) -> Dictionary:
 	return out
 
 
+## NO-185: `ref`'s buffs-bearing piece Dictionary — g.board[ref] for a board
+## tile (a live piece Dictionary already), or `ref.entry` for a Stock/
+## Captured pick (ADR-0002: a stateful entry IS a piece Dictionary; a bare id
+## String carries no state). {} when there is none to show.
+static func _piece_state(g, ref: Variant) -> Dictionary:
+	if ref is Vector2i:
+		return g.board[ref]
+	var entry: Variant = ref.get("entry", null)
+	return entry if entry is Dictionary else {}
+
+
 ## Merge entry point: validates the pair, then asks for confirmation showing
 ## the result piece (the bot skips straight to the commit). Cancel keeps the
 ## origin selected so another partner can be picked.
@@ -85,7 +96,8 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 	if g.autoplay:
 		return commit_merge(g, a, b)
 	g.pending_merge = [a, b]
-	g.modals.show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions))
+	g.modals.show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions),
+		_piece_state(g, a), _piece_state(g, b)) # NO-185: buffs shown are about to be lost
 
 
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap

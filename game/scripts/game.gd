@@ -100,11 +100,19 @@ const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
 const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
 	# outside the blue/red side palette — decorative, not player or enemy state
-const HATCH_SPACING := 8.0 # NO-122: pitch of the cross-hatch drawn over a
-	# blast-preview tile covered by more than one zone — alpha-stacking alone
-	# made overlapping tiles indistinguishable from singly-covered ones
-const HATCH_ALPHA := 0.35 # NO-122: hatch line alpha, on top of the existing
-	# Color(COL_CAPTURE, 0.22) wash
+const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
+	# direction fills a target-zone tile with ordinary (single) coverage —
+	# NO-176 replaced the old flat Color(COL_CAPTURE, 0.22) rect wash with
+	# this. Both directions together (the existing crosshatch) mark a tile
+	# covered by more than one zone: direction COUNT is the overlap signal,
+	# not alpha-stacking, so single coverage and overlap stay distinguishable
+	# regardless of alpha tuning.
+const HATCH_ALPHA := 0.8 # NO-176: was 0.35 — that value was tuned (NO-122)
+	# as an accent layered ON TOP OF the flat wash above; now the hatch line
+	# is the tile's only fill, so it needs to read at a comparable weight on
+	# its own. NOT VERIFIED ON SCREEN — flag per NO-150's lesson.
+const HATCH_WIDTH := 2.0 # NO-176: named, was a bare 1.0 in draw_line;
+	# thickened to pair with HATCH_ALPHA above (also unverified on screen).
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
@@ -114,7 +122,12 @@ const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 # NO-150: 0.55/2.0 didn't read at a glance (flagged at NO-129 review) — bumped
 # by eye against the NO-129 screenshots until the outline is unmistakable
 # beside the board grid without overpowering the move dots/arrows.
-const ZONE_OUTLINE_ALPHA := 0.9
+const ZONE_OUTLINE_ALPHA := 0.6 # NO-176: was 0.9 — Max flagged real board
+	# screenshots ("careful of lines stacking up on each other and looking
+	# weird"). Safe only because _draw_zone_outline now draws every internal
+	# boundary edge exactly once (see its NO-176 comment below) — two 0.6
+	# strokes still compositing on the same edge is the exact "third colour"
+	# this drop is meant to avoid, not just soften.
 const ZONE_OUTLINE_WIDTH := 3.5
 # NO-161: board highlight palette. COL_MOVE/COL_CAPTURE stay as they were
 # (move dots/arrows, the capture ring) — these three are only for the zone
@@ -3316,22 +3329,36 @@ func _bomb_highlight_tiles() -> Array[Vector2i]:
 	return out
 
 
-## NO-122: a diagonal cross over a square blast-preview tile — both "\" and
-## "/" families, offset by HATCH_SPACING, so an overlapping tile reads as a
-## denser texture rather than relying on stacked alpha alone. `r` is always
-## square (board tiles are); each pass is closed-form (no clipping library):
-## for offset c in [-s, s], the "\" line enters/exits whichever pair of edges
-## admits it, and its mirror across the vertical axis is the "/" line.
-func _draw_crosshatch(r: Rect2) -> void:
+## NO-176: one diagonal family of a hatch over a square target-zone tile —
+## the "\" family, or its "/" mirror when `mirror` is true — offset by
+## HATCH_SPACING. `r` is always square (board tiles are); closed-form (no
+## clipping library): for offset c in [-s, s], the "\" line enters/exits
+## whichever pair of edges admits it, and its mirror across the vertical axis
+## is the "/" line. `_draw_target_zone` calls this once for ordinary (single)
+## zone coverage, and `_draw_crosshatch` below calls it twice — this is the
+## shared geometry, split out so a single-covered tile can get one family and
+## a doubly-covered tile can get both.
+func _draw_hatch(r: Rect2, mirror: bool = false) -> void:
 	var col := Color(COL_CAPTURE, HATCH_ALPHA)
 	var s := r.size.x
 	var c := -s
 	while c <= s:
 		var a: Vector2 = Vector2(0, c) if c >= 0 else Vector2(-c, 0)
 		var b: Vector2 = Vector2(s - c, s) if c >= 0 else Vector2(s, s + c)
-		draw_line(r.position + a, r.position + b, col, 1.0)
-		draw_line(r.position + Vector2(s - a.x, a.y), r.position + Vector2(s - b.x, b.y), col, 1.0)
+		if mirror:
+			draw_line(r.position + Vector2(s - a.x, a.y), r.position + Vector2(s - b.x, b.y), col, HATCH_WIDTH)
+		else:
+			draw_line(r.position + a, r.position + b, col, HATCH_WIDTH)
 		c += HATCH_SPACING
+
+
+## NO-122: both hatch families over a tile covered by more than one zone, so
+## it reads as a denser texture than the single-direction hatch
+## `_draw_target_zone` uses for ordinary coverage — direction count is the
+## overlap signal (see HATCH_ALPHA's comment), not stacked alpha.
+func _draw_crosshatch(r: Rect2) -> void:
+	_draw_hatch(r, false)
+	_draw_hatch(r, true)
 
 
 ## Bomb blast: everything within 1 square of `at`, the bomb piece included.
@@ -4428,21 +4455,14 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
-	_draw_target_zone(_bomb_highlight_tiles()) # NO-122 wash, NO-130 shared
-	if item_active >= 0: # item targeting: same zone indicator as the bomb
-		_draw_target_zone(item_targets) # NO-130: "what this will affect"
-		if item_stage_a.x >= 0:
-			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
-		for s in item_selected: # multi picks fill like the stage-A tile
-			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
-		if item_pending_tile.x >= 0: # NO-121: one more tap confirms this one —
-			# the same ring merge partners use, so "this completes it" reads
-			# consistently across both flows
-			draw_arc(_tile_px(item_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-				COL_MERGE, 3.0)
-	if artefact_pending_tile.x >= 0: # NO-121: Bovine Tractor Beam's own pending pick
-		draw_arc(_tile_px(artefact_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-			COL_MERGE, 3.0)
+	# NO-176: explicit draw order — red over purple over blue. The reachable
+	# zone's own outline below (blue move edges, red capture edges, purple
+	# where the two meet inside the same zone — NO-161) is drawn FIRST, as
+	# the bottom layer; the bomb-blast preview and armed-Item zone are pure
+	# red and are drawn AFTER, on top, so a red capture edge is never hidden
+	# beneath a blue move edge where the two zones' tiles coincide (the bomb
+	# highlight in particular can share tiles with legal_dests — a capture
+	# destination that also carries a bomb is in both sets).
 	# recon (enemy) paths draw red; the player's draw blue (palette rule)
 	var half := Vector2(tile, tile) / 2
 	var capture_dests: Array[Vector2i] = [] # NO-161: legal_dests is drawn as
@@ -4475,6 +4495,22 @@ func _draw() -> void:
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
 			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests)
+	_draw_target_zone(_bomb_highlight_tiles()) # NO-122/176 hatch, NO-130
+		# shared — drawn after the zone outline above (see NO-176 comment)
+	if item_active >= 0: # item targeting: same zone indicator as the bomb
+		_draw_target_zone(item_targets) # NO-130: "what this will affect"
+		if item_stage_a.x >= 0:
+			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
+		for s in item_selected: # multi picks fill like the stage-A tile
+			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
+		if item_pending_tile.x >= 0: # NO-121: one more tap confirms this one —
+			# the same ring merge partners use, so "this completes it" reads
+			# consistently across both flows
+			draw_arc(_tile_px(item_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
+				COL_MERGE, 3.0)
+	if artefact_pending_tile.x >= 0: # NO-121: Bovine Tractor Beam's own pending pick
+		draw_arc(_tile_px(artefact_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
+			COL_MERGE, 3.0)
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):
@@ -4554,10 +4590,11 @@ func _draw() -> void:
 
 
 ## NO-130: "this is what the thing you are holding will affect" — a
-## COL_CAPTURE wash per tile, a cross-hatch where more than one zone covers
-## the same tile (NO-122), and the perimeter outline below (NO-129) so a
-## spread reads as one shape. Shared by the bomb blast preview and an armed
-## Item's target zone: one indicator, one meaning, one place to change it.
+## COL_CAPTURE HATCH per tile (NO-176: was a flat wash), a denser CROSSHATCH
+## where more than one zone covers the same tile (NO-122), and the perimeter
+## outline below (NO-129) so a spread reads as one shape. Shared by the bomb
+## blast preview and an armed Item's target zone: one indicator, one meaning,
+## one place to change it.
 func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 	if tiles.is_empty():
 		return
@@ -4570,9 +4607,10 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 		counts[pos] = counts.get(pos, 0) + 1
 	for pos in unique:
 		var r := Rect2(_tile_px(pos), Vector2(tile, tile))
-		draw_rect(r, Color(COL_CAPTURE, 0.22))
-		if counts[pos] > 1: # overlap: alpha-stacking alone reads as one wash
+		if counts[pos] > 1: # overlap: the denser two-direction crosshatch
 			_draw_crosshatch(r)
+		else: # NO-176: single coverage — one hatch direction, not a wash
+			_draw_hatch(r)
 	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA))
 
 
@@ -4601,10 +4639,18 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 		var below := Vector2i(t.x, t.y - 1)
 		var left := Vector2i(t.x - 1, t.y)
 		var right := Vector2i(t.x + 1, t.y)
+		# NO-176: an internal boundary edge (both `t` and its neighbour are in
+		# `tiles`, disagreeing on capture-ness) sits between exactly two
+		# tiles and is reachable from EITHER side's check — from `t`'s
+		# "above"/"right" here, or from the neighbour's own "below"/"left"
+		# below. Drawing it from both sides put the same segment down twice:
+		# same colour, so invisible at the old ZONE_OUTLINE_ALPHA 0.9, but a
+		# real double composite once alpha dropped to 0.6 for this ticket —
+		# exactly the "lines stacking and looking weird" Max's caveat named.
+		# Only the "below"/"left" side draws the disagreement case; "above"/
+		# "right" only ever draws the perimeter case (no matching tile).
 		if not tiles.has(above): # nothing above on screen
 			draw_line(px, px + Vector2(tile, 0), capture_col if t_cap else col, width)
-		elif captures.has(above) != t_cap:
-			draw_line(px, px + Vector2(tile, 0), overlap_col, width)
 		if not tiles.has(below): # nothing below
 			draw_line(px + Vector2(0, tile), px + Vector2(tile, tile), capture_col if t_cap else col, width)
 		elif captures.has(below) != t_cap:
@@ -4615,8 +4661,6 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 			draw_line(px, px + Vector2(0, tile), overlap_col, width)
 		if not tiles.has(right): # nothing to the right
 			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), capture_col if t_cap else col, width)
-		elif captures.has(right) != t_cap:
-			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), overlap_col, width)
 	# NO-150: a diagonal ride's tiles touch only at one corner each, so the
 	# four edge checks above box every tile separately — a staircase, not a
 	# band (raised at NO-129 review, deliberately left; Max asked for it

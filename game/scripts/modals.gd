@@ -1580,6 +1580,12 @@ func show_box(options: Array) -> void:
 		# g.box_picks_left, itself seeded from Box.SIZES[size].picks
 		# (game.gd's _open_box_pick) — never a literal here.
 	var box := _box_vbox()
+	# NO-151: pin the modal's width instead of letting it fall out of whichever
+	# child happens to be widest. Shortening Skip's label ("+20 gold" -> "+$20")
+	# narrowed the panel and the Pick confirm then intermittently failed to
+	# appear on the final pick — 9 failures in 19 runs, 0 in 10 once pinned.
+	# 420 is this file's existing row width (the Sell rows below, _shop_tile).
+	box.custom_minimum_size.x = 420
 	# NO-168: bigger icons (BOX_ICON, a deliberate exception — see its own
 	# header) than the Shop/Stock OFFBOARD_ICON standard's grid, now that its
 	# name and per-tile dock chrome are gone. NO-186: always exactly two

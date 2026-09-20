@@ -442,39 +442,59 @@ func build(game) -> void:
 	# LEFT: Score, then Clock underneath (NO-162: Gold moved out to the centre
 	# column, into the Wave/Turn counters' old spot — see the CENTRE/RIGHT
 	# comments below).
-	# NO-162 fix (clock clipped off the left edge in Max's screenshot pass):
-	# CLOCK_FONT (36) is a CEILING now, not a fixed value. `_clock_text()`
-	# (game.gd) is "%02d:%02d.%03d" — ALWAYS 9 characters, never variable —
-	# and NO-125's own notes already named that 9-char width as the reason
-	# the font was shrunk to 15 in the first place; NO-162 undid the shrink
-	# without redoing that width check against the RESTACKED header, where
-	# the left column's real budget is bounded by where the Gold column
-	# (`mid`, built below) begins, not by the old 3-row layout's numbers.
-	# Measured from the REAL loaded font (same technique NO-125 already used
-	# for height, `get_height`) rather than a guessed pixel constant — a
-	# guess would drift the moment the theme's default font changes.
-	# Shrinks only as far as it has to, one point at a time. CLOCK_FONT_MIN is
-	# a hard anti-infinite-loop floor (12), not a design target — Max asked
-	# for a bigger timer, so nudging the search back toward NO-125's old 15
-	# would undo the ticket while looking like it fixed the bug. In a real
-	# 480-wide portrait run the fixed 9-character format should land well
-	# above 15 without ever approaching that floor; if it ever doesn't,
-	# that's a real layout problem worth flagging, not something to mask by
-	# quietly picking a small number.
-	var clock_sample := "00:00.000" # the fixed-width format, worst case == every case
+	# NO-162 fix, 3rd pass (clock clipped off the left edge in Max's
+	# screenshot pass — the leading "0" of "04:59.8xx" hard against x=0,
+	# identical across four independent boots, so it is permanent, not a
+	# transform mid-flight). Two earlier attempts on this same bug:
+	# - 1st: sized the font to fit `left_max_w` — correct arithmetic, but it
+	#   only bounds the TEXT's width, and says nothing about where the
+	#   Label's own BOX starts or how text aligns inside it.
+	# - 2nd: suspected the clock-gain/minute-shake pulse (hud.gd's
+	#   _pulse_gain/_shake_clock_minute scale the Label around its own
+	#   centre). Ruled out: identical clipping on four separate boots is not
+	#   consistent with a 0.17-0.35s tween being caught every single time.
+	# What's left, unfalsified: `clock_label` was a child of the `left`
+	# VBoxContainer below, which never had `horizontal_alignment` pinned and
+	# never had its OWN box width verified — only the text's. A box wider
+	# than `left_max_w`, with the default/inherited alignment centring text
+	# inside it, straddles the box's centre and overhangs the left edge
+	# while leaving the right side clear — exactly the four captures.
+	#
+	# Fix: stop trusting the container for this one Label. `clock_label` is
+	# no longer a child of `left` at all — position and size are explicit
+	# numbers, the same idiom this file already uses (and has never had a
+	# clipping report for) for the Stock button, Menu button, and the
+	# Wave/Turn/Gold columns below. `horizontal_alignment` is pinned to LEFT
+	# explicitly, and `clip_text` is on as a hard backstop: even if the
+	# width measurement below is ever imperfect, the rendered glyphs cannot
+	# escape a rect whose position is a literal number, not a container's
+	# guess.
+	#
+	# The width measurement itself (CLOCK_FONT=36 as a ceiling, shrinking
+	# toward CLOCK_FONT_MIN=12 only as far as needed) is unchanged from the
+	# 1st pass — that arithmetic was never the falsified part.
+	# `_clock_text()` (game.gd) is "%02d:%02d.%03d", ALWAYS 9 characters,
+	# never variable, so this sample is the only case that exists.
+	# Ruled out by inspection (no Godot run needed): a font-resource
+	# mismatch between measurement and render. `get_theme_default_font()`
+	# returns the FONT RESOURCE only; only `add_theme_font_size_override`
+	# is ever called on this Label (never `add_theme_font_override`), so
+	# the resource measured here and the resource actually drawn are the
+	# same object, and the SIZE passed to both `get_string_size` calls and
+	# the size override is the same `clock_size` variable.
+	var clock_sample := "00:00.000"
 	var left_max_w: float = (vp.x - COUNTER_W) / 2.0 - HEADER_PAD_X - 4.0 # 4px clear of the Gold column (`mid`)
 	var clock_font := clock_label.get_theme_default_font()
 	var clock_size := CLOCK_FONT
 	while clock_size > CLOCK_FONT_MIN \
 			and clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > left_max_w:
 		clock_size -= 1
+	var clock_w: float = clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x
+	var clock_h: float = clock_font.get_height(clock_size)
 	clock_label.add_theme_font_size_override("font_size", clock_size)
-	# The box follows the font's own metric (both axes now, not just height),
-	# so it can never claim more width than what actually fits `left_max_w`.
-	clock_label.custom_minimum_size = Vector2(
-		clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x,
-		clock_font.get_height(clock_size))
+	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	clock_label.clip_text = true
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	# NO-126: the odometer look — greyed padding zeros before the coloured
@@ -504,13 +524,27 @@ func build(game) -> void:
 	gold_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	for l in [gold_label, gold_symbol]:
 		gold_row.add_child(l)
+	# NO-162 fix, 3rd pass: `left` now holds ONLY score_row — Score was never
+	# reported clipped, so its existing container-driven layout is left
+	# alone (smallest possible diff against a working piece). Its height no
+	# longer needs to budget for the Clock underneath it.
+	var score_font := score_label.get_theme_default_font()
+	var score_h: float = score_font.get_height(SCORE_FONT)
 	var left := VBoxContainer.new()
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
-	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
-	left.add_theme_constant_override("separation", 0)
-	for l in [score_row, clock_label]:
-		left.add_child(l)
+	left.custom_minimum_size = Vector2(0, score_h)
+	left.add_child(score_row)
 	add_child(left)
+	# The Clock sits directly under Score, fully explicit (see this block's
+	# own header comment for why) — no container between it and the canvas.
+	# Both `size` (the actual rendered rect) and `custom_minimum_size` (what
+	# every other explicitly-positioned control in this file sets) are
+	# pinned to the same value, so there is no ambiguity about which one an
+	# unmanaged Label's rendering path actually reads.
+	clock_label.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y + score_h)
+	clock_label.size = Vector2(clock_w, clock_h)
+	clock_label.custom_minimum_size = Vector2(clock_w, clock_h)
+	add_child(clock_label)
 	# CENTRE, flush to the bottom (NO-162): Gold now lives here — exactly the
 	# spot the Wave/Turn counters used to occupy — because those counters
 	# moved to the right, under the Stock+Menu row (see RIGHT, below).

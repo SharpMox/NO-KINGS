@@ -917,25 +917,47 @@ func _init() -> void:
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
-	# NO-125: the Clock box follows its OWN applied font's metric, not a fixed
-	# constant. NO-162 fix: CLOCK_FONT (36) is a ceiling build() may shrink
-	# from if it doesn't fit the restacked left column — read back the size
-	# actually applied to the Label, not the ceiling constant, so this stays
-	# correct whichever one build() picked.
+	# NO-162 fix, 3rd pass. The first two attempts on this bug (font-fit
+	# search, then suspecting the clock-pulse tween) each shipped with an
+	# assertion that PASSED while a real device still showed the leading
+	# digit clipped off the left edge — both times because the assertion
+	# only read `get_global_rect()`, a Control's LAYOUT rect, which says
+	# nothing about where the container placed it or how the text aligned
+	# inside it. This block checks the things that actually determine what
+	# lands on screen: the Label is no longer inside any Container (so its
+	# rect IS its final position, not something a VBoxContainer computed),
+	# its alignment is pinned instead of inherited, and clip_text is the
+	# hard backstop — with all three true, `get_global_rect()` finally means
+	# what the two earlier passes assumed it meant.
+	check(HUD.clock_label.get_parent() == HUD,
+		"the Clock is a direct HUD child, not inside a Container that could reposition or resize it")
+	check(HUD.clock_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+		"the Clock's alignment is pinned, not left to a default/theme that could centre it")
+	check(HUD.clock_label.clip_text,
+		"the Clock cannot paint outside its own rect even if the width measurement below is ever wrong")
 	var clock_font_applied: int = HUD.clock_label.get_theme_font_size("font_size")
 	check(clock_font_applied <= HUD.CLOCK_FONT and clock_font_applied >= HUD.CLOCK_FONT_MIN,
 		"the applied Clock font sits between the floor and the ceiling (%s)" % clock_font_applied)
-	var clock_font_h: float = HUD.clock_label.get_theme_default_font().get_height(clock_font_applied)
-	check(HUD.clock_label.size.y >= clock_font_h - 0.5,
-		"the Clock line covers its own font's height (%s vs %s)" % [HUD.clock_label.size.y, clock_font_h])
-	# NO-162 fix: the clock must never claim more width than the left column's
-	# real budget (bounded by where the Gold column, `mid`, begins) — this is
-	# the regression test for "4:59.841 clipped off the left edge".
+	# The actual regression check for "04:59.833 clipped off the left edge":
+	# re-measure the fixed-width clock text at the APPLIED size, using the
+	# same live font the Label itself draws with (get_theme_default_font()
+	# returns the FONT RESOURCE, unaffected by the font_size override, so
+	# this is the same object build() measured against) — confirm it fits
+	# the real budget the Label's own rect was given, and confirm the rect
+	# starts no earlier than HEADER_PAD_X.
+	var clock_font_res: Font = HUD.clock_label.get_theme_default_font()
+	var clock_text_w: float = clock_font_res.get_string_size(
+		"00:00.000", HORIZONTAL_ALIGNMENT_LEFT, -1, clock_font_applied).x
+	check(clock_text_w <= HUD.clock_label.size.x + 0.5,
+		"the measured text width fits inside the Label's own rect (%s vs rect %s)"
+			% [clock_text_w, HUD.clock_label.size.x])
 	var clock_r: Rect2 = HUD.clock_label.get_global_rect()
 	var mid_left_x: float = (game.get_viewport_rect().size.x - HUD.COUNTER_W) / 2.0
 	check(clock_r.position.x >= HUD.HEADER_PAD_X - 0.5 and clock_r.end.x <= mid_left_x + 0.5,
-		"the Clock never clips off the left edge or reaches into the Gold column (%s, mid starts at %s)"
+		"the Clock's rect never starts before the left gutter or reaches into the Gold column (%s, mid starts at %s)"
 			% [clock_r, mid_left_x])
+	check(HUD.clock_label.size.y >= clock_font_res.get_height(clock_font_applied) - 0.5,
+		"the Clock line covers its own font's height")
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()

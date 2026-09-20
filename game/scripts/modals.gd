@@ -155,6 +155,10 @@ func build(game) -> void:
 	g.hud.add_child(overlay)
 
 
+## NO-169: 170% the size of the two below it — visually a pyramid, "two
+## below converging into one above".
+const MERGE_RESULT_SCALE := 1.7
+
 ## NO-140: `a_id`/`b_id` are shown as art now too, not just `result` — "the
 ## trade visible rather than described". Confirming plays a short animation
 ## (the two sources fading while the result grows to full size) before the
@@ -162,6 +166,16 @@ func build(game) -> void:
 ## g.autoplay, same seam _slide_shop uses. MergeLogic.do_merge already never
 ## calls this at all under autoplay (it commits straight through), so that
 ## path is doubly safe — this gate is only the belt to that braces.
+##
+## NO-169: rebuilt as a pyramid — result on top at MERGE_RESULT_SCALE, the
+## two sources underneath — replacing the old left-to-right "A + B → C" art
+## row and its matching text line (removed entirely, no replacement: the
+## icons and labels below already say the same thing). Labels are discreet
+## on the sources (named underneath their own icon, dimmed) and big/bold
+## above the result, so the result reads as the point of the screen. The
+## fade-sources/grow-result animation (_play_merge_animation) is unchanged —
+## "two fading below while one grows above" already reads as a pyramid
+## converging, more so than it did in the old side-by-side row.
 func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
@@ -176,32 +190,36 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	box.add_theme_constant_override("separation", 14)
 	center.add_child(box)
 
-	var art_row := HBoxContainer.new()
-	art_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	art_row.add_theme_constant_override("separation", 10)
-	var a_tex := _merge_piece_tex(a_id)
-	var b_tex := _merge_piece_tex(b_id)
-	var result_tex := _merge_piece_tex(result)
-	if a_tex:
-		art_row.add_child(a_tex)
-	art_row.add_child(_merge_glyph_label("+"))
-	if b_tex:
-		art_row.add_child(b_tex)
-	art_row.add_child(_merge_glyph_label("→"))
+	var result_name := Label.new()
+	result_name.text = g.defs[result].name
+	result_name.add_theme_font_size_override("font_size", 24)
+	# Godot has no bold font asset in this project (audited: no other Label
+	# here sets add_theme_font_override) — "bold" is approximated the same
+	# way the rest of this file contrasts emphasis, size + full opacity
+	# against the sources' smaller, dimmed labels below.
+	result_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(result_name)
+
+	var result_tex := _merge_piece_tex(result, Tuning.OFFBOARD_ICON * MERGE_RESULT_SCALE)
 	if result_tex:
 		# starts as a dim preview; confirming grows/brightens it to full while
-		# a_tex/b_tex fade — see _play_merge_animation.
+		# the sources fade — see _play_merge_animation. SHRINK_CENTER so it
+		# stays centred at its own size if sources_row below ends up wider.
 		result_tex.pivot_offset = result_tex.custom_minimum_size / 2
 		result_tex.scale = Vector2(0.7, 0.7)
 		result_tex.modulate.a = 0.55
-		art_row.add_child(result_tex)
-	box.add_child(art_row)
+		result_tex.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(result_tex)
 
-	var what := Label.new()
-	what.text = "%s + %s → %s" % [g.defs[a_id].name, g.defs[b_id].name, g.defs[result].name]
-	what.add_theme_font_size_override("font_size", 16)
-	what.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(what)
+	var sources_row := HBoxContainer.new()
+	sources_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	sources_row.add_theme_constant_override("separation", 10)
+	var a_tex := _merge_piece_tex(a_id, Tuning.OFFBOARD_ICON)
+	var b_tex := _merge_piece_tex(b_id, Tuning.OFFBOARD_ICON)
+	sources_row.add_child(_merge_source_col(a_id, a_tex))
+	sources_row.add_child(_merge_glyph_label("+"))
+	sources_row.add_child(_merge_source_col(b_id, b_tex))
+	box.add_child(sources_row)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -230,15 +248,16 @@ func show_merge_confirm(a_id: String, b_id: String, result: String) -> void:
 	merge_panel.move_to_front() # above the drawers and bottom bar
 
 
-## One off-board-standard-sized icon (Tuning.OFFBOARD_ICON, same as the Shop/
-## Drawer grids) for `id`, or null when it has no art — guarded the same way
-## every other modals.gd icon is (`g.textures.has`).
-func _merge_piece_tex(id: String) -> TextureRect:
+## An icon at `size` (Tuning.OFFBOARD_ICON for the sources, NO-169's
+## MERGE_RESULT_SCALE multiple of it for the result) for `id`, or null when it
+## has no art — guarded the same way every other modals.gd icon is
+## (`g.textures.has`).
+func _merge_piece_tex(id: String, size: float) -> TextureRect:
 	if not g.textures.has(id):
 		return null
 	var tex := TextureRect.new()
 	tex.texture = g.piece_tex(id)
-	tex.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	tex.custom_minimum_size = Vector2(size, size)
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	return tex
@@ -252,10 +271,30 @@ func _merge_glyph_label(text: String) -> Label:
 	return l
 
 
+## NO-169: a source's icon with its own name discreetly UNDERNEATH — the
+## pyramid's base. `tex` may be null (no art for `id`), same as every other
+## icon here; the name label still shows either way.
+func _merge_source_col(id: String, tex: TextureRect) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_theme_constant_override("separation", 2)
+	if tex:
+		col.add_child(tex)
+	var name := Label.new()
+	name.text = g.defs[id].name
+	name.add_theme_font_size_override("font_size", 12)
+	name.modulate = Color(1, 1, 1, 0.65) # discreet — the result's own name above carries the emphasis
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(name)
+	return col
+
+
 ## NO-140: sources fade out, the result scales/brightens to full — reads as
-## "the two becoming the result" without moving anything out of art_row's own
-## HBoxContainer layout (a position tween would fight the container's own
-## sort). Any of the three may be null (no art for that id); tween_property
+## "the two becoming the result" without moving anything out of its own
+## container layout (a position tween would fight the container's own sort;
+## NO-169's pyramid arrangement — sources below fading, result above growing
+## — reads this motion even more literally than the old side-by-side row
+## did). Any of the three may be null (no art for that id); tween_property
 ## calls are just skipped for it. Ends by hiding merge_panel, the same state
 ## change the no-animation branch above makes immediately.
 ##

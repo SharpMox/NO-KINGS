@@ -2148,8 +2148,8 @@ func _init() -> void:
 	await process_frame
 	check(game.reinforce_panel != null and game.reinforce_panel.visible,
 		"the reinforcement shop opens at turn start")
-	check(game.stock.size() == game._reinforce_ids().size(),
-		"NO-141: the grant already landed in Stock before the screen ever showed")
+	check(game.stock.size() == game._reinforce_ids().size() * 2,
+		"NO-141/NO-170: the grant already landed in Stock before the screen ever showed, two of each")
 	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
 	# holds the player queen, and the control below the tariff section proves
 	# this exact tap selects her with no panel up.

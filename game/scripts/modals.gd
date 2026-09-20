@@ -22,6 +22,7 @@ const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
+const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -1087,7 +1088,7 @@ func show_reinforce(ids: Array) -> void:
 	sub.modulate = Color(1, 1, 1, 0.8)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
-	box.add_child(_reinforce_group_picture(ids))
+	box.add_child(PieceMass.build(ids)) # NO-157
 	var dismiss := Button.new()
 	dismiss.text = "Dismiss"
 	dismiss.add_theme_font_size_override("font_size", 22)
@@ -1097,45 +1098,6 @@ func show_reinforce(ids: Array) -> void:
 	box.add_child(dismiss)
 	g.hud.add_child(reinforce_panel)
 	reinforce_panel.move_to_front()
-
-
-## NO-141: same "group picture" shape as the Army carousel (NO-146) — one
-## icon per distinct piece id, de-duplicated in arrival order, with a "×N"
-## badge standing in for a repeat, rather than a row per id. Two different
-## renderings of "a group picture" for the same concept would be a bug in
-## the making (Max asked for the phrase in both places), so this mirrors
-## _army_group_picture's shape rather than inventing its own.
-func _reinforce_group_picture(ids: Array) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 10)
-	var counts := {} # insertion-ordered, so the picture follows `ids`
-	for id in ids:
-		counts[id] = counts.get(id, 0) + 1
-	for id in counts:
-		var col := VBoxContainer.new()
-		col.alignment = BoxContainer.ALIGNMENT_CENTER
-		if g.textures.has(id):
-			var icon := TextureRect.new()
-			icon.texture = g.piece_tex(id)
-			icon.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			col.add_child(icon)
-		else:
-			var glyph := Label.new()
-			glyph.text = str(g.defs[id].glyph)
-			glyph.add_theme_font_size_override("font_size", 34)
-			glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			col.add_child(glyph)
-		if counts[id] > 1:
-			var count_label := Label.new()
-			count_label.text = "×%d" % counts[id]
-			count_label.add_theme_font_size_override("font_size", 12)
-			count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			col.add_child(count_label)
-		row.add_child(col)
-	return row
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the

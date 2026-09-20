@@ -377,6 +377,11 @@ var artefacts_grid := GridContainer.new()
 ## is LEGAL (Close Ranks makes merges free, Endless Ranks makes pawn deploys
 ## free), so a player who has forgotten theirs is misreading their own rules.
 var army_power_label := Label.new()
+## NO-180: the Power's own effect line, split out of army_power_label (which
+## used to carry name + effect on one row) so the band reads as three
+## distinct rows — Title (army + Power name), Subtitle (what the Power
+## does), Body (the Ability, below) — rather than one long run-on line.
+var army_power_desc_label := Label.new()
 ## The Army Ability, promoted out of the Inventory drawer onto the deck so its
 ## readiness is visible without opening a menu (design C).
 var army_ability_button := Button.new()
@@ -394,29 +399,59 @@ var army_ability_hint := Label.new()
 var army_band := PanelContainer.new()
 var army_band_open := true
 ## NO-163: the ONE control that opens/closes army_band, anchored in the
-## button row between Inventory and Shop — ALWAYS visible there, never
-## moving. Before this it was two separate buttons in two separate places
-## (a "▴ Hide" wedge inside army_band itself, at the top of the header area;
-## this wedge, only shown once collapsed): the affordance for "control the
-## band" jumped from the top of the screen to the button row depending on
-## state, which is the exact "moves under the player's finger" failure this
-## ticket named. Now it's one Button whose glyph flips (_update_band_toggle
-## below) and whose position never does.
+## button row — ALWAYS visible there, never moving. Before this it was two
+## separate buttons in two separate places (a "▴ Hide" wedge inside
+## army_band itself, at the top of the header area; this wedge, only shown
+## once collapsed): the affordance for "control the band" jumped from the
+## top of the screen to the button row depending on state, which is the
+## exact "moves under the player's finger" failure this ticket named. Now
+## it's one Button whose glyph flips (_update_band_toggle below) and whose
+## position never does. NO-180 moved it from between Inventory/Shop to
+## their LEFT — still the one fixed slot in nav_row, still never moving
+## between open and closed.
+## NO-180: re-added inside the band (top-right of band_header) alongside the
+## nav-row wedge below — NO-163 had merged the in-band hide control into that
+## wedge; Max wants a close affordance back inside the band too.
+var army_band_close := Button.new()
 var army_band_reopen := Button.new()
 ## NO-128: separation inside army_band's internal VBox. Its own constant (not
 ## reused from elsewhere) because it is a tighter internal stack, not a deck
 ## row gap.
 const BAND_GAP := 1
 ## NO-128: army_band's own fixed height, same convention as INV_DRAWER_H
-## (flat, never measured at runtime). ESTIMATED — padding 10 + header 22 (the
-## Power label's row, shared with the collapse button, taken as the taller of
-## the two per NO-125's font-size -> Label-height extrapolation) + BAND_GAP 1
-## + hint 22 (unchanged, moved verbatim from act_row) + BAND_GAP 1 +
-## king-ability ~22 (same extrapolation, unmeasured — neither control has
-## ever rendered before this ticket). Unlike DECK_ROWS this no longer feeds
-## the board-tile solve, so being off costs only a little dead space or a
-## tight fit inside this one overlay, never a tile.
-const ARMY_BAND_H := 78.0
+## (flat, never measured at runtime). ESTIMATED, revised for NO-180's 3-row
+## body (was 78 for 2 rows) — padding 10 + title 22 (army_power_label's row,
+## shared with army_band_close, taken as the taller of the two) + BAND_GAP 1
+## + subtitle 18 (army_power_desc_label, a smaller single line) + BAND_GAP 1
+## + body ~30 (army_ability_hint now wraps the FULL ability description
+## instead of a 45-char truncation — budgeted for ~2 wrapped lines at its
+## font size) + BAND_GAP 1 + king-ability ~22 (unchanged; hidden unless an
+## ability is active). Unlike DECK_ROWS this no longer feeds the board-tile
+## solve, so being off costs only a little dead space or a tight fit inside
+## this one overlay, never a tile — UNVERIFIED (no Godot run): confirm the
+## body never overlaps the deck below it on the longest ability_desc
+## (Syndicate's Hostile Takeover).
+const ARMY_BAND_H := 105.0
+## NO-180: clearance between army_band's own bottom edge and deck_top (the
+## button row it used to sit flush against, "glued to the bottom menu" per
+## the ticket). Purely repositions the overlay upward — ARMY_BAND_H itself is
+## unchanged by this, and neither value feeds DECK_ROWS/board_tile_for
+## (ADR-0004: army_band is not a deck row; that must stay true).
+const ARMY_BAND_MARGIN := 6.0
+## NO-181: the ONE gap between any two deck buttons — horizontal within
+## nav_row/act_row and vertical between the two rows alike. Before this,
+## nav_row and act_row separations happened to both read 5 while the actual
+## gap BETWEEN the rows was whatever leftover slack act_row's EXPAND|
+## SHRINK_END absorbed instead (deck's own separation was 0) — the same "two
+## constants that happen to agree" shape as NO-175's header gutter
+## (HEADER_PAD_X vs HEADER_PAD_Y). Reused by game.gd's DECK_ROWS so the two
+## accountings can't drift apart.
+const DECK_GAP := 5.0
+## NO-180: army_band_reopen's new square footprint, moved to the LEFT of the
+## Inventory/Shop pair — nav_row's own natural row height (32, live-checked
+## by test_game_clicks.gd against DECK_ROWS), reused so the button reads as
+## sized-to-its-row rather than an odd size dropped into it.
+const DECK_ICON_BTN := 32.0
 ## Height of the control deck. Drawers open ABOVE it rather than covering it:
 ## the deck is the persistent surface in design C, and a drawer that buries PASS
 ## and the Ability takes the two most-pressed controls away exactly when the
@@ -426,8 +461,8 @@ var deck_h := 0.0
 ## it before the power label exists and the final order is set afterwards.
 var act_row: HBoxContainer
 ## The drawers row: Inventory and Shop, equal halves (NO-83 retired the Deck's
-## Stock button — Stock opens from the Header). NO-128 wedges army_band_reopen
-## between them.
+## Stock button — Stock opens from the Header). NO-128 added army_band_reopen
+## beside them; NO-180 moved it to their LEFT, square, as an icon button.
 var nav_row: HBoxContainer
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
 
@@ -785,10 +820,13 @@ func build(game) -> void:
 	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
 	deck.position = Vector2(0, deck_top)
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
-	# NO-163: was 6 — the gap between the drawers row and the thumb row
-	# underneath, closed so the whole deck (and the board it's traded against,
-	# ADR-0004) is shorter. game.gd's DECK_ROWS drops by the same 6.
-	deck.add_theme_constant_override("separation", 0)
+	# NO-163 closed this to 0 (was 6). NO-181 reopens it to DECK_GAP — the SAME
+	# constant nav_row/act_row use for their own button gaps below, rather
+	# than an independently-chosen number — so the gap between the two rows
+	# reads as one deliberate value, not whatever slack was left over.
+	# game.gd's DECK_ROWS grows by DECK_GAP to match (it derives directly off
+	# this constant now).
+	deck.add_theme_constant_override("separation", DECK_GAP)
 	add_child(deck)
 	# NO-145 (hardware round 2): deck used to also be hooked here as a
 	# swipe-to-open surface (its own unclaimed area, MOUSE_FILTER_STOP).
@@ -804,28 +842,22 @@ func build(game) -> void:
 	# the Header's Stock badge; wave and turn moved up with it. The Deck is now
 	# the drawers row, the Power badge and the thumb row.
 	nav_row = HBoxContainer.new()
-	nav_row.add_theme_constant_override("separation", 5)
+	nav_row.add_theme_constant_override("separation", DECK_GAP)
 	nav_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	deck.add_child(nav_row)
 
 	var bar := nav_row
-	var inv := Button.new()
-	inv.text = "Inventory"
-	inv.add_theme_font_size_override("font_size", 17)
-	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inv.pressed.connect(func() -> void:
-		set_drawer("inventory")
-		drawer_changed.emit())
-	drawer_buttons["inventory"] = inv
-	bar.add_child(inv)
-	# NO-128/NO-163: the wedge that opens AND closes army_band. Fixed-width (no
-	# EXPAND_FILL), so Inventory and Shop stay equal to EACH OTHER on either
-	# side of it rather than to their old, wider halves. ALWAYS visible now
-	# (was hidden while the band was open, when a second button — band_collapse,
-	# inside army_band itself — did the closing instead; see this var's own
-	# declaration for why that was wrong).
-	army_band_reopen.add_theme_font_size_override("font_size", 13)
-	_style_button(army_band_reopen, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
+	# NO-128/NO-163/NO-180: the wedge that opens AND closes army_band. NO-180
+	# moves it to the LEFT of Inventory/Shop (was between them) and gives it a
+	# square, icon-button footprint instead of a thin wedge, so it reads as
+	# its own control rather than a divider — fixed-size either way (no
+	# EXPAND_FILL), so Inventory and Shop still stay equal to EACH OTHER.
+	# ALWAYS visible (was hidden while the band was open, when a second
+	# button — band_collapse, inside army_band itself — did the closing
+	# instead; see this var's own declaration for why that was wrong).
+	army_band_reopen.custom_minimum_size = Vector2(DECK_ICON_BTN, DECK_ICON_BTN)
+	army_band_reopen.add_theme_font_size_override("font_size", 15)
+	_style_button(army_band_reopen, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 16, 4, 4)
 	army_band_reopen.pressed.connect(func() -> void:
 		if army_band_open:
 			collapse_army_band()
@@ -837,6 +869,15 @@ func build(game) -> void:
 			army_band.visible = true
 		_update_band_toggle())
 	bar.add_child(army_band_reopen)
+	var inv := Button.new()
+	inv.text = "Inventory"
+	inv.add_theme_font_size_override("font_size", 17)
+	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inv.pressed.connect(func() -> void:
+		set_drawer("inventory")
+		drawer_changed.emit())
+	drawer_buttons["inventory"] = inv
+	bar.add_child(inv)
 	shop_button.text = "Shop"
 	shop_button.add_theme_font_size_override("font_size", 17)
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -945,7 +986,7 @@ func build(game) -> void:
 	ability_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ability_col.add_child(army_ability_button)
 	act_row = HBoxContainer.new()
-	act_row.add_theme_constant_override("separation", 5)
+	act_row.add_theme_constant_override("separation", DECK_GAP)
 	# NO-115: EXPAND claims the deck's now-unused trailing space (see deck's
 	# own comment above); SHRINK_END keeps act_row pinned at its own 60px
 	# minimum and docks it at the bottom of that space, flush to the screen.
@@ -978,7 +1019,7 @@ func build(game) -> void:
 
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
-	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true)
+	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true, g)
 	# Logging out mid-run LEAVES the run: its save was just parked under the
 	# account that owns it, and staying in a live game whose save now belongs to
 	# nobody would write a fresh unowned one on the next autosave. Back to the
@@ -1023,9 +1064,16 @@ func build(game) -> void:
 	items_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
+	# NO-182: without an explicit width, a GridContainer shrinks to whatever
+	# it actually holds (fewer than `columns` entries in the only/last row
+	# makes it narrower still), leaving empty space at the drawer's right edge
+	# instead of the full 5-column standard NO-132 names. stock_grid already
+	# forces this (NO-135); items_grid/artefacts_grid never did.
+	items_grid.custom_minimum_size.x = Tuning.grid_row_w(items_grid.columns, INV_CELL_SEP)
 	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
+	artefacts_grid.custom_minimum_size.x = Tuning.grid_row_w(artefacts_grid.columns, INV_CELL_SEP) # NO-182
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()
@@ -1040,11 +1088,33 @@ func build(game) -> void:
 	var band_col := VBoxContainer.new()
 	band_col.add_theme_constant_override("separation", BAND_GAP)
 	var band_header := HBoxContainer.new()
+	# NO-180: Title row — army + Power name only now (the effect moved to its
+	# own subtitle row below).
 	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
 	army_power_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	band_header.add_child(army_power_label)
+	# NO-180: the close affordance, re-added inside the band (top-right of the
+	# Title row — army_power_label's EXPAND_FILL above pushes it there for
+	# free) alongside the nav-row wedge (army_band_reopen), which still
+	# reopens it once collapsed. STOP is explicit: band_header is IGNORE
+	# (NO-128, so a tap elsewhere in the band falls through to the board) and
+	# Godot does not cascade that to children.
+	army_band_close.text = "✕"
+	army_band_close.tooltip_text = "Hide"
+	army_band_close.add_theme_font_size_override("font_size", 12)
+	army_band_close.custom_minimum_size = Vector2(20, 20)
+	army_band_close.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style_button(army_band_close, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 10, 2, 2)
+	army_band_close.pressed.connect(func() -> void: collapse_army_band())
+	band_header.add_child(army_band_close)
 	band_col.add_child(band_header)
-	band_col.add_child(army_ability_hint) # NO-128: moved out of act_row
+	# NO-180: Subtitle row — what the Power actually does (was folded into
+	# army_power_label's single combined line).
+	army_power_desc_label.add_theme_font_size_override("font_size", 11)
+	army_power_desc_label.add_theme_color_override("font_color", Color(0.65, 0.75, 0.62))
+	army_power_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	band_col.add_child(army_power_desc_label)
+	band_col.add_child(army_ability_hint) # NO-128: moved out of act_row; NO-180: Body row, full text
 	# NO-128: the King Abilities button, built (styled, wired to
 	# king_ability_pressed) in the Header section above but never added to the
 	# tree — NO-83 parked it there for "the Deck redesign" to give it a home.
@@ -1074,10 +1144,12 @@ func build(game) -> void:
 	# working — a filter set high in this tree has no effect on a control
 	# below it that never asked to inherit it. NO-163 moved the band's own
 	# open/close control (band_collapse) out of army_band entirely, onto the
-	# deck's nav_row (army_band_reopen) — nothing inside army_band claims
-	# input any more except king_ability_button.
-	# army_power_label and army_ability_hint need no change: Label already
-	# defaults to IGNORE.
+	# deck's nav_row (army_band_reopen). NO-180 put a close button back inside
+	# the band (army_band_close, band_header) — its own mouse_filter is set to
+	# STOP explicitly, above, for exactly this reason: nothing else inside
+	# army_band claims input except that and king_ability_button.
+	# army_power_label, army_power_desc_label and army_ability_hint need no
+	# change: Label already defaults to IGNORE.
 	army_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	band_col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	band_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1092,7 +1164,10 @@ func build(game) -> void:
 	# estimate, same convention as INV_DRAWER_H — but non-critical now: it
 	# only sizes this one overlay, not the board, so being off by a few px
 	# costs a little dead space or a tight fit here, never a tile.
-	army_band.position = Vector2(0, deck_top - ARMY_BAND_H)
+	# NO-180: ARMY_BAND_MARGIN lifts the band clear of deck_top instead of
+	# sitting flush against it ("glued to the bottom menu") — still just
+	# repositioning this one overlay, not a size or budget change.
+	army_band.position = Vector2(0, deck_top - ARMY_BAND_H - ARMY_BAND_MARGIN)
 	army_band.custom_minimum_size = Vector2(vp.x, ARMY_BAND_H)
 	add_child(army_band)
 	# Inventory's drawer panel occupies this SAME rect when open (both are
@@ -1221,7 +1296,7 @@ func build(game) -> void:
 	# to strand its slack at the drawer's outer right edge. Captured Stock
 	# stays flush left (default placement, against the screen edge — already
 	# correct); force Stock's grid to its full row width (same guard as
-	# modals.gd's _piece_grid/_shop_sub_zone) and right-align that box in a
+	# modals.gd's _shop_zone) and right-align that box in a
 	# wrapper spanning the scroll viewport, so both sections' slack collects
 	# in one gap against the shared Captured/Stock boundary instead.
 	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_grid.columns, STOCK_DRAWER_CELL_SEP) # NO-135
@@ -1470,13 +1545,19 @@ func collapse_army_band() -> void:
 ## then, so the toggle itself only ever needs to offer "Hide". CLOSED
 ## borrows the warning glyph so an active ability stays visible while
 ## collapsed, same as before NO-163 merged the two buttons into this one.
+## NO-180: the old ▴/▾ open/closed glyphs are gone — a round "i" info icon
+## now stands for the button in both states (it moved to a square footprint
+## specifically to read as an icon button, not a directional wedge). The
+## warning glyph is kept: it is an alert, not an open/closed indicator, and
+## dropping it would lose the one place an active-while-collapsed King
+## Ability is visible without opening the band.
 func _update_band_toggle() -> void:
 	var warn: bool = g != null and not g.king_abilities_active.is_empty()
 	if army_band_open:
-		army_band_reopen.text = "▴"
+		army_band_reopen.text = "ⓘ"
 		army_band_reopen.tooltip_text = "Hide"
 	else:
-		army_band_reopen.text = "⚠▾" if warn else "▾"
+		army_band_reopen.text = "⚠" if warn else "ⓘ"
 		army_band_reopen.tooltip_text = "King Abilities in force — tap to show" \
 			if warn else "Show Army Power"
 
@@ -1801,9 +1882,11 @@ func refresh() -> void:
 	# deliberate contrast with Artefact activation and the Shop (both 0), and
 	# it was also tooltip-only until now.
 	var kit: Dictionary = Armies.entry(g.next_army)
-	# the Power stays a statement; it is passive and there is nothing to press
-	army_power_label.text = "%s — %s: %s" % [
-		Armies.display_name(g.next_army), kit.power_name, kit.power_desc]
+	# the Power stays a statement; it is passive and there is nothing to press.
+	# NO-180: three rows now, not one combined line — Title (army + Power
+	# name), Subtitle (what the Power does), Body (the Ability, below).
+	army_power_label.text = "%s — %s" % [Armies.display_name(g.next_army), kit.power_name]
+	army_power_desc_label.text = str(kit.power_desc)
 	# THE ABILITY WEARS ITS OWN STATE (design C). Availability had to be visible
 	# without opening a menu, and the three states a player can be in are
 	# genuinely different problems: already used this wave, no Action to spend,
@@ -1828,8 +1911,12 @@ func refresh() -> void:
 		army_ability_button.disabled = false
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
 	# NO-115: a reminder of what pressing this DOES, since the tooltip above
-	# is unreachable on a touch screen mid-run.
-	army_ability_hint.text = Armies.ability_hint(g.next_army)
+	# is unreachable on a touch screen mid-run. NO-180: Body row — the FULL
+	# name + description, wrapped (autowrap_mode is already word-smart), not
+	# Armies.ability_hint()'s 45-char truncation. The band was mostly empty
+	# while the truncated hint left the rest of the description unreadable;
+	# ARMY_BAND_H grew to budget the extra wrapped lines this can now take.
+	army_ability_hint.text = "%s: %s" % [kit.ability_name, kit.ability_desc]
 	_rebuild_artefacts_grid()
 	# NO-85: the drawer's height is a flat choice (INV_DRAWER_H), not a
 	# consequence of what it holds — it must not resize as Items/Artefacts
@@ -1896,6 +1983,11 @@ func _stacks() -> Array:
 	# Stock grouping is by WHOLE entry (ADR-0002), so a piece carrying state
 	# stacks apart from plain copies of the same id.
 	#
+	# NO-182: Stock now reads MOST RECENTLY ACQUIRED FIRST too, matching
+	# Captured below ("the bottom becomes the top") — scan g.stock in reverse
+	# so a stack's first appearance (its Dictionary insertion order, which
+	# GDScript preserves) is the newest copy, not the oldest.
+	#
 	# CAPTURED NEVER STACKS (user ruling 2026-09-10): one row per captured
 	# piece, MOST RECENT CAPTURE FIRST. g.captured is append-ordered, so newest
 	# first is simply its reverse. A stack made sense while a captured pair
@@ -1903,7 +1995,8 @@ func _stacks() -> Array:
 	# piece, so a row is one piece and the count badge has nothing to count.
 	var out := []
 	var counts := {}
-	for e in g.stock:
+	for i in range(g.stock.size() - 1, -1, -1):
+		var e: Variant = g.stock[i]
 		counts[e] = counts.get(e, 0) + 1
 	for e in counts:
 		out.append({"entry": e, "id": (e if e is String else e.id),

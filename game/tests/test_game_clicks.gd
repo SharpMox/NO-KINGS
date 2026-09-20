@@ -2821,9 +2821,12 @@ func _button_prefix(node: Node, prefix: String) -> Button:
 	return null
 
 
-## Opens the Shop, taps the first affordable Box tile to expand it, then
-## clicks Buy — issue 47: Boxes only come from the Shop now (the box-carrier
-## enemy is gone), so every Box click-probe drives this same real-click path.
+## Opens the Shop, taps the first affordable Box tile to open its preview,
+## then clicks Buy in there — issue 47: Boxes only come from the Shop now
+## (the box-carrier enemy is gone), so every Box click-probe drives this same
+## real-click path. NO-167 (Max review, second pass): the tile no longer
+## expands in place — it opens its own preview (game.preview_panel), same as
+## every other Shop tile since the detail dock was deleted.
 ## Assumes the Shop is closed and the player's turn is active on entry.
 func _buy_a_box(game: Node2D) -> void:
 	check(await _click_shop(game), "Shop button clickable")
@@ -2844,5 +2847,7 @@ func _buy_a_box(game: Node2D) -> void:
 	check(tile != null, "(setup) an affordable Box tile exists")
 	_click(tile.get_global_rect().get_center())
 	await process_frame
-	check(await _click_button_in(game.modals.shop_panel, "Buy"), "(setup) Buy clickable on the expanded Box tile")
+	check(game.preview_open, "(setup) tapping the Box tile opens its preview")
+	check(await _click_button_in(game.preview_panel, "Buy"),
+		"(setup) Buy clickable in the Box tile's preview")
 	await process_frame

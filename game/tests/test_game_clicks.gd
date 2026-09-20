@@ -964,8 +964,17 @@ func _init() -> void:
 			% [mid_left_edge, sr.position.x])
 	check(HUD.clock_label.size.y >= clock_font_res.get_height(clock_font_applied) - 0.5,
 		"the Clock line covers its own font's height")
-	var gr: Rect2 = HUD.gold_label.get_global_rect()
-	var sr2: Rect2 = HUD.score_label.get_global_rect()
+	# NO-175 fix: these read the ZEROS labels, not the coloured-digit labels —
+	# score_label/gold_label are each their row's SECOND child, offset by
+	# their own zero-padding width, which only coincidentally matches between
+	# rows when Score and Gold happen to have the same digit count. The
+	# zeros label is each row's actual first/left-most child, so comparing
+	# ITS position is what genuinely tests "flush left" / "shares a left
+	# edge" — the first version of this block compared the wrong pair and
+	# reported a false "Turn is indented" failure (coordinator capture,
+	# 2026-09-20) that was really a test bug, not a turn_label bug.
+	var gr: Rect2 = HUD.gold_zeros_label.get_global_rect()
+	var sr2: Rect2 = HUD.score_zeros_label.get_global_rect()
 	var wtr: Rect2 = HUD.wave_label.get_global_rect()
 	var trr: Rect2 = HUD.turn_label.get_global_rect()
 	# NO-175: LEFT is now three tight rows, top to bottom — Turn/Wave, then
@@ -1088,15 +1097,23 @@ func _init() -> void:
 	check(wr.position.x <= HUD.HEADER_PAD_X + 10.0,
 		"NO-175: Wave sits flush left when Turn is blank, not shoved right (%s)" % wr.position.x)
 	# a long King name is cut with an ellipsis: the label never leaves its
-	# column, whatever the text. NO-175: that column is now the LEFT column's
-	# top row (Turn/Wave), not a spot relative to Stock — the invariant worth
-	# asserting is width (still at most COUNTER_W, shared with Wave on the
-	# same row) plus staying inside the Header.
+	# column, whatever the text. NO-175 fix, 2nd pass: turn_label's box is now
+	# HARD-SET to COUNTER_W in build() and never resized by content (a plain
+	# Control, not a Container — see build()'s own comment), so `tl.size.x`
+	# can no longer regress to the 504px overflow a live capture caught
+	# (2026-09-20, root cause: text_overrun_behavior alone does nothing
+	# without clip_text — the box grew to fit the full un-ellipsised text).
+	# Since the box is now fixed BY CONSTRUCTION, a rect check on it would
+	# pass even if `clip_text` were removed (CLAUDE.md: "a geometry
+	# assertion on a Control's rect cannot see clipping") — so this asserts
+	# `clip_text` itself, the property that actually makes the ink respect
+	# that fixed box, plus the size/position invariants.
 	HUD.turn_label.text = "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
-	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.y <= game.hud_top + 0.5,
-		"NO-175: a long King name ellipsises inside the left column (%s wide), still inside the Header" % tl.size.x)
+	check(HUD.turn_label.clip_text and tl.size.x <= HUD.COUNTER_W + 0.5
+			and tl.end.y <= game.hud_top + 0.5,
+		"NO-175: a long King name stays capped to the left column (clip_text on, %s wide), still inside the Header" % tl.size.x)
 	game.wave = wave_was
 	game.kings_defeated = kd_was
 	game.turns_since_wave = tsw_was

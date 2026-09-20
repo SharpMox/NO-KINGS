@@ -500,22 +500,42 @@ func build(game) -> void:
 	# stacked in the same VBox, so their zeros labels start at the same x
 	# and the digits share a left edge for free (NO-114's old SYMBOL_W trick
 	# only existed because the Score row used to lead with a ★).
-	var turn_wave_row := HBoxContainer.new()
-	turn_wave_row.add_theme_constant_override("separation", 6)
+	# NO-175 fix, 2nd pass: turn_wave_row is a plain Control now, not an
+	# HBoxContainer — the first fix (toggling turn_label's EXPAND flag with
+	# king_wave) traded one Container-driven surprise for another: without
+	# `clip_text`, `text_overrun_behavior` does nothing (Godot only trims
+	# rendered ink when the Control's OWN size is smaller than its content —
+	# clip_text is what makes that possible; the ellipsis mode alone just
+	# lets the Label's minimum size grow to fit the FULL text). So a long
+	# King name's un-ellipsised natural width dragged turn_label, this row
+	# and `left` itself out to 500+px (coordinator capture, 2026-09-20) —
+	# and separately, a SHORT "N/M" counter still wasn't flush left, because
+	# a Container distributes width by FLAGS, not by what's on screen; two
+	# rounds of guessing at that mechanism were both wrong.
+	# Fully explicit instead, same lesson as the Clock (its own header
+	# comment): turn_label is hard-capped to COUNTER_W (clip_text + ellipsis
+	# ON always, so a long name is deterministically trimmed regardless of
+	# state), and Wave's own x is computed in refresh() from turn_label's
+	# ACTUAL measured text width — not inferred from a Container flag.
+	var counter_font := turn_label.get_theme_default_font()
+	var counter_h: float = counter_font.get_height(COUNTER_FONT)
+	var turn_wave_row := Control.new()
+	turn_wave_row.custom_minimum_size = Vector2(COUNTER_W, counter_h)
+	turn_wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turn_label.add_theme_font_size_override("font_size", COUNTER_FONT)
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	# NO-175 fix: overrun/expand are set per-refresh(), not here — see the
-	# king_wave block in refresh(). An HBoxContainer's EXPAND child claims the
-	# row's leftover width regardless of whether it currently HAS content, so
-	# an unconditional EXPAND_FILL here made a genuinely empty turn_label (the
-	# "blank after the last Wave" state, NO-114) invisibly reserve ~90px and
-	# shove Wave right — looked like the whole row was indented (coordinator
-	# capture, 2026-09-20). turn_label only needs the wide, ellipsis-capable
-	# box while showing a King's name; Wave is guaranteed blank then (below),
-	# so there's no competition to lose.
+	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	turn_label.clip_text = true
+	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	turn_label.position = Vector2.ZERO
+	turn_label.size = Vector2(COUNTER_W, counter_h)
+	turn_label.custom_minimum_size = Vector2(COUNTER_W, counter_h)
 	turn_wave_row.add_child(turn_label)
 	wave_label.add_theme_font_size_override("font_size", COUNTER_FONT)
+	wave_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	wave_label.modulate = Color(1, 1, 1, 0.85)
+	wave_label.position = Vector2.ZERO # x is recomputed every refresh() from Turn's real width
+	wave_label.size = Vector2(COUNTER_W, counter_h)
 	turn_wave_row.add_child(wave_label)
 
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
@@ -1627,13 +1647,6 @@ func refresh() -> void:
 	# NO-114: blank during a King wave — the King's own name in turn_label is
 	# enough, and showing both crowded the centre column.
 	var king_wave: bool = g._king_alive() or not g.pending_king.is_empty()
-	# NO-175: turn_label only claims the row's leftover width (EXPAND_FILL,
-	# with ellipsis armed) while it might be showing a long King name — the
-	# rest of the time (a short "N/M" counter, or blank after the last Wave)
-	# it sits at its own natural size, so an empty turn_label can never push
-	# Wave to the right. See turn_wave_row's build()-time comment.
-	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if king_wave else TextServer.OVERRUN_NO_TRIMMING
-	turn_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL if king_wave else Control.SIZE_FILL
 	wave_label.text = "" if king_wave else "⚑ %d/%d" % [g.wave,
 		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
 	# TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.
@@ -1647,6 +1660,15 @@ func refresh() -> void:
 		turn_label.text = ""
 	else:
 		turn_label.text = "%d/%d" % [g.turns_since_wave, g._cadence()]
+	# NO-175: turn_wave_row is plain Controls, not an HBoxContainer (see
+	# build()'s comment) — Wave's x is placed right after Turn's ACTUAL
+	# rendered text width (measured, same technique the Clock uses), clamped
+	# to COUNTER_W since clip_text can visually trim Turn's ink narrower than
+	# its box. Turn itself never moves — it's pinned at x=0 in build().
+	var counter_font := turn_label.get_theme_default_font()
+	var turn_text_w: float = counter_font.get_string_size(
+		turn_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
+	wave_label.position.x = minf(turn_text_w, COUNTER_W) + 6.0 # 6 = the old row separation
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false

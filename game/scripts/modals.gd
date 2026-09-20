@@ -1141,6 +1141,9 @@ func _shop_detail(index: int) -> Control:
 ## already in Stock by the time this shows (game.gd grants them the instant
 ## pending_reinforce is consumed, before calling this); `ids` is that same
 ## list, for display only. No Buy button, nothing left to choose or pay for.
+## NO-170: dropped the "Wave N cleared — added to Stock, free of charge"
+## subtitle — the title plus the mass of pieces below it already say this is
+## an announcement, not a choice.
 func show_reinforce(ids: Array) -> void:
 	if reinforce_panel:
 		reinforce_panel.queue_free()
@@ -1159,12 +1162,6 @@ func show_reinforce(ids: Array) -> void:
 	title.add_theme_font_size_override("font_size", 26)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var sub := Label.new()
-	sub.text = "Wave %d cleared — added to Stock, free of charge" % (g.wave - 1)
-	sub.add_theme_font_size_override("font_size", 15)
-	sub.modulate = Color(1, 1, 1, 0.8)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(sub)
 	box.add_child(PieceMass.build(ids)) # NO-157
 	var dismiss := Button.new()
 	dismiss.text = "Dismiss"

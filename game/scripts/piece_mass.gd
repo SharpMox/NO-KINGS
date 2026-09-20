@@ -10,17 +10,22 @@
 ## Pure logic-over-nothing module, same shape as tuning.gd/armies.gd: no
 ## nodes of its own, one static entry point.
 
-const ICON := 40.0 # NO-146's own size for this card — small enough that
-	# Horde's 14 pawns (Tuning.ARMIES) still fit fanned inside a menu carousel
-	# card without cropping. Tuning.OFFBOARD_ICON (72px) is sized for the
-	# off-board strip's own row height, not a crowd of a dozen-plus
-	# overlapping tokens, and would force scrolling or clipping here.
+const ICON := 52.0 # 40 * 1.3 — Max, 2026-09-20: chose bigger icons over
+	# tighter packing ("i think we can just increase the size of the icons by
+	# 30%"). Was NO-146's original 40px; Tuning.OFFBOARD_ICON (72px) is sized
+	# for the off-board strip's own row height, not a crowd of a dozen-plus
+	# overlapping tokens, and would force scrolling or clipping here — see
+	# build()'s Horde-14 arithmetic below for the worst case at this size.
 const CELL := ICON * 0.6 # horizontal pitch, well under ICON so neighbours
-	# overlap — the "neatly packed" rank spacing, exact and un-jittered
-const JITTER_Y := 3.0 # px — Max, 2026-09-20: "barely not aligned
+	# overlap — the "neatly packed" rank spacing, exact and un-jittered.
+	# A RATIO of ICON, not an independent number: the next size change is
+	# one constant (ICON), not two literals that happen to agree today.
+const JITTER_Y := ICON * 0.075 # px — Max, 2026-09-20: "barely not aligned
 	# horizontally" — a small per-piece vertical wobble so a rank's baseline
 	# waves slightly rather than ruling dead straight. Deliberately small:
 	# any more and it reads as a blob again, same failure as the old scatter.
+	# Also a ratio of ICON (3px at the original 40px) so it scales with the
+	# icon instead of shrinking to a proportionally smaller wobble.
 const JITTER_ROT := 0.3 # radians (~17°) — the "random tilt" Max asked to
 	# keep; X position is NOT jittered any more (see build()), so this is
 	# the only thing that stops a rank looking stamped from one mould.
@@ -65,6 +70,13 @@ static func build(ids: Array) -> Control:
 	# for a couple of pieces, 2 up to 8, 3 beyond that — Crown/Cult/Old
 	# Guard/Wild Hunt's 11-piece armies and Horde's 14 all land on 3 ranks,
 	# never a near-square blob. Columns fill out whatever rows leaves over.
+	#
+	# Worst case at ICON=52, checked by hand (NO-157, 2026-09-20): Horde's 14
+	# pawns -> rows=3, cols=ceili(14/3)=5 -> mass width =
+	# (5-1)*31.2 + 52 + 2*(26+3.9) = 236.6px. The Army carousel card is
+	# `viewport.x - 80` wide (menu.gd _show_armies) = 400px at the 480px
+	# portrait width this project targets — 236.6px fits with ~163px to
+	# spare. Re-check this if ICON changes again; it is not enforced in code.
 	var n := ids.size()
 	var rows := 1
 	if n > 8:

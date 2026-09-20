@@ -262,6 +262,7 @@ var _gold_seen := false
 var _clock_shown_ms := 0.0
 var _clock_shown_min := 0
 var _clock_seen := false
+var _dbg_clock_printed := false ## NO-162 DIAGNOSTIC, temporary — see update_clock()
 ## NO-127: the continuous under-2-minutes shake+pulse. Two loop Tweens (one
 ## per animated property) rather than one, so killing/restarting never has to
 ## unpick a parallel/chain sequence.
@@ -1384,6 +1385,31 @@ func _apply_clock_urgent(ms: float) -> void:
 ## trigger off the ms VALUE changing, never off how often either caller runs.
 func update_clock(ms: float) -> void:
 	clock_label.text = g._clock_text()
+	# NO-162 DIAGNOSTIC round 4 — every candidate checked so far (fit-loop
+	# arithmetic, LabelSettings, font-resource identity, content scale,
+	# transforms, outline) reads correct, yet the coordinator's pixel scan
+	# of the actual capture still measured ink ~19.5% wider than
+	# get_string_size() reports at the applied size, starting left of the
+	# box. Round 1-3 all read values at BUILD time; this reads them from
+	# update_clock(), which runs every _process frame, right before the
+	# frame that's actually captured — in case something differs between
+	# "just after build()" and "the moment a real frame renders". One-shot
+	# (a per-frame print would flood stdout) via _dbg_clock_printed.
+	if OS.get_cmdline_user_args().has("--debug-clock") and not _dbg_clock_printed:
+		_dbg_clock_printed = true
+		var f := clock_label.get_theme_default_font()
+		var oversamp: Variant = "n/a (not a FontFile)"
+		var msdf: Variant = "n/a (not a FontFile)"
+		var fixed_sz: Variant = "n/a (not a FontFile)"
+		if f is FontFile:
+			oversamp = (f as FontFile).oversampling
+			msdf = (f as FontFile).multichannel_signed_distance_field
+			fixed_sz = (f as FontFile).fixed_size
+		print(("NO162-frame text=%s readback_size=%s min_size=%s size=%s pos=%s " +
+				"theme_type_variation=%s font_class=%s oversampling=%s msdf=%s fixed_size=%s")
+			% [clock_label.text, clock_label.get_theme_font_size("font_size"),
+				clock_label.get_minimum_size(), clock_label.size, clock_label.position,
+				clock_label.theme_type_variation, f.get_class(), oversamp, msdf, fixed_sz])
 	var whole_min: int = int(ms / 60000.0)
 	# NO-127: settle urgency FIRST. The 2-minute mark IS a minute boundary, so
 	# the instant the urgency loop claims `rotation` is the same instant

@@ -103,6 +103,22 @@ const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to f
 ## so the search is free to find whatever the real font actually needs
 ## rather than being nudged back toward the value this ticket undid.
 const CLOCK_FONT_MIN := 12
+## NO-162, closing fix. Five rounds of on-device measurement (glyph-level
+## pixel segmentation of real captures, not property reads — every property
+## on the Label read correct: font size, LabelSettings, content scale,
+## transforms, outline, theme_type_variation, oversampling) found the
+## rendered Clock text rasterises roughly 26% WIDER than
+## `Font.get_string_size()` reports at the exact same applied size, and
+## starts left of where the Label's own box begins. No mechanism was found
+## for this after exhausting every property that could plausibly cause it —
+## see the follow-up issue "Label glyphs rasterise ~26% wider than
+## get_string_size reports" for the full measurement log. Fitting the font
+## to 100% of the available width therefore reliably overflows; this fits
+## it to only this fraction of that width instead, so the ~26% inflation
+## still lands inside the column. EMPIRICAL, not aesthetic — a future
+## cleanup that raises this back toward 1.0 "because the maths says it
+## fits" will reintroduce the clipped leading digit.
+const CLOCK_FIT_HEADROOM := 0.8
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125)
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
@@ -442,52 +458,31 @@ func build(game) -> void:
 	# LEFT: Score, then Clock underneath (NO-162: Gold moved out to the centre
 	# column, into the Wave/Turn counters' old spot — see the CENTRE/RIGHT
 	# comments below).
-	# NO-162 fix, 3rd pass (clock clipped off the left edge in Max's
-	# screenshot pass — the leading "0" of "04:59.8xx" hard against x=0,
-	# identical across four independent boots, so it is permanent, not a
-	# transform mid-flight). Two earlier attempts on this same bug:
-	# - 1st: sized the font to fit `left_max_w` — correct arithmetic, but it
-	#   only bounds the TEXT's width, and says nothing about where the
-	#   Label's own BOX starts or how text aligns inside it.
-	# - 2nd: suspected the clock-gain/minute-shake pulse (hud.gd's
-	#   _pulse_gain/_shake_clock_minute scale the Label around its own
-	#   centre). Ruled out: identical clipping on four separate boots is not
-	#   consistent with a 0.17-0.35s tween being caught every single time.
-	# What's left, unfalsified: `clock_label` was a child of the `left`
-	# VBoxContainer below, which never had `horizontal_alignment` pinned and
-	# never had its OWN box width verified — only the text's. A box wider
-	# than `left_max_w`, with the default/inherited alignment centring text
-	# inside it, straddles the box's centre and overhangs the left edge
-	# while leaving the right side clear — exactly the four captures.
-	#
-	# Fix: stop trusting the container for this one Label. `clock_label` is
-	# no longer a child of `left` at all — position and size are explicit
-	# numbers, the same idiom this file already uses (and has never had a
-	# clipping report for) for the Stock button, Menu button, and the
-	# Wave/Turn/Gold columns below. `horizontal_alignment` is pinned to LEFT
-	# explicitly, and `clip_text` is on as a hard backstop: even if the
-	# width measurement below is ever imperfect, the rendered glyphs cannot
-	# escape a rect whose position is a literal number, not a container's
-	# guess.
-	#
-	# The width measurement itself (CLOCK_FONT=36 as a ceiling, shrinking
-	# toward CLOCK_FONT_MIN=12 only as far as needed) is unchanged from the
-	# 1st pass — that arithmetic was never the falsified part.
+	# NO-162, closing fix (clock clipped off the left edge in Max's
+	# screenshot pass — the leading digit hard against x=0). Chased across
+	# several rounds: `clock_label` is fully explicit now (no Container
+	# involved, position/size are literal numbers, `horizontal_alignment`
+	# pinned LEFT, `clip_text` on as a backstop) and every property that
+	# could plausibly explain the overflow read correct on the real device
+	# — font size, LabelSettings, content scale, transforms, outline,
+	# theme_type_variation, oversampling. None of it was the cause.
+	# On-device glyph measurement (not property reads) found the actual
+	# fix: the rendered text is ~26% wider than `get_string_size()` reports
+	# at the same applied size, for reasons that were never identified —
+	# see the follow-up issue "Label glyphs rasterise ~26% wider than
+	# get_string_size reports". CLOCK_FIT_HEADROOM (its own comment, above)
+	# is the empirical margin that absorbs it: the fit loop targets a
+	# FRACTION of the real available width, not all of it, so the
+	# unexplained inflation still lands inside the column.
 	# `_clock_text()` (game.gd) is "%02d:%02d.%03d", ALWAYS 9 characters,
 	# never variable, so this sample is the only case that exists.
-	# Ruled out by inspection (no Godot run needed): a font-resource
-	# mismatch between measurement and render. `get_theme_default_font()`
-	# returns the FONT RESOURCE only; only `add_theme_font_size_override`
-	# is ever called on this Label (never `add_theme_font_override`), so
-	# the resource measured here and the resource actually drawn are the
-	# same object, and the SIZE passed to both `get_string_size` calls and
-	# the size override is the same `clock_size` variable.
 	var clock_sample := "00:00.000"
 	var left_max_w: float = (vp.x - COUNTER_W) / 2.0 - HEADER_PAD_X - 4.0 # 4px clear of the Gold column (`mid`)
+	var clock_target_w: float = left_max_w * CLOCK_FIT_HEADROOM
 	var clock_font := clock_label.get_theme_default_font()
 	var clock_size := CLOCK_FONT
 	while clock_size > CLOCK_FONT_MIN \
-			and clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > left_max_w:
+			and clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > clock_target_w:
 		clock_size -= 1
 	var clock_w: float = clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x
 	var clock_h: float = clock_font.get_height(clock_size)

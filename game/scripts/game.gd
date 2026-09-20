@@ -4429,6 +4429,14 @@ func _draw() -> void:
 	var capture_dests: Array[Vector2i] = [] # NO-161: legal_dests is drawn as
 		# one outline shape, but the tiles with an enemy piece on them need
 		# to be told apart from a plain move destination
+	var no_captures: Array[Vector2i] = [] # NO-161 fix: a bare `[]` literal
+		# inline in the ternary below is an UNTYPED Array — GDScript does not
+		# infer the expected Array[Vector2i] from the argument position
+		# through a conditional expression, so passing it threw
+		# "Invalid type in function '_draw_zone_outline'... argument 4" on
+		# every recon-selection frame. A separately DECLARED typed variable
+		# carries its element type at runtime regardless of which ternary
+		# branch is taken.
 	for d in legal_dests:
 		if board.has(d): # capturable target: pink-red tile tint + red ring around the piece
 			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE_TILE_TINT, 0.3))
@@ -4447,7 +4455,7 @@ func _draw() -> void:
 	if not legal_dests.is_empty():
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
-			ZONE_OUTLINE_WIDTH, [] if recon else capture_dests)
+			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests)
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):

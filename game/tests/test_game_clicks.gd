@@ -917,10 +917,47 @@ func _init() -> void:
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
-	# NO-125: the Clock box follows CLOCK_FONT's own metric now, not a fixed constant.
-	var clock_font_h: float = HUD.clock_label.get_theme_default_font().get_height(HUD.CLOCK_FONT)
-	check(HUD.clock_label.size.y >= clock_font_h - 0.5,
-		"the Clock line covers its own font's height (%s vs %s)" % [HUD.clock_label.size.y, clock_font_h])
+	# NO-162 fix, 3rd pass. The first two attempts on this bug (font-fit
+	# search, then suspecting the clock-pulse tween) each shipped with an
+	# assertion that PASSED while a real device still showed the leading
+	# digit clipped off the left edge — both times because the assertion
+	# only read `get_global_rect()`, a Control's LAYOUT rect, which says
+	# nothing about where the container placed it or how the text aligned
+	# inside it. This block checks the things that actually determine what
+	# lands on screen: the Label is no longer inside any Container (so its
+	# rect IS its final position, not something a VBoxContainer computed),
+	# its alignment is pinned instead of inherited, and clip_text is the
+	# hard backstop — with all three true, `get_global_rect()` finally means
+	# what the two earlier passes assumed it meant.
+	check(HUD.clock_label.get_parent() == HUD,
+		"the Clock is a direct HUD child, not inside a Container that could reposition or resize it")
+	check(HUD.clock_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_LEFT,
+		"the Clock's alignment is pinned, not left to a default/theme that could centre it")
+	check(HUD.clock_label.clip_text,
+		"the Clock cannot paint outside its own rect even if the width measurement below is ever wrong")
+	var clock_font_applied: int = HUD.clock_label.get_theme_font_size("font_size")
+	check(clock_font_applied <= HUD.CLOCK_FONT and clock_font_applied >= HUD.CLOCK_FONT_MIN,
+		"the applied Clock font sits between the floor and the ceiling (%s)" % clock_font_applied)
+	# The actual regression check for "04:59.833 clipped off the left edge":
+	# re-measure the fixed-width clock text at the APPLIED size, using the
+	# same live font the Label itself draws with (get_theme_default_font()
+	# returns the FONT RESOURCE, unaffected by the font_size override, so
+	# this is the same object build() measured against) — confirm it fits
+	# the real budget the Label's own rect was given, and confirm the rect
+	# starts no earlier than HEADER_PAD_X.
+	var clock_font_res: Font = HUD.clock_label.get_theme_default_font()
+	var clock_text_w: float = clock_font_res.get_string_size(
+		"00:00.000", HORIZONTAL_ALIGNMENT_LEFT, -1, clock_font_applied).x
+	check(clock_text_w <= HUD.clock_label.size.x + 0.5,
+		"the measured text width fits inside the Label's own rect (%s vs rect %s)"
+			% [clock_text_w, HUD.clock_label.size.x])
+	var clock_r: Rect2 = HUD.clock_label.get_global_rect()
+	var mid_left_x: float = (game.get_viewport_rect().size.x - HUD.COUNTER_W) / 2.0
+	check(clock_r.position.x >= HUD.HEADER_PAD_X - 0.5 and clock_r.end.x <= mid_left_x + 0.5,
+		"the Clock's rect never starts before the left gutter or reaches into the Gold column (%s, mid starts at %s)"
+			% [clock_r, mid_left_x])
+	check(HUD.clock_label.size.y >= clock_font_res.get_height(clock_font_applied) - 0.5,
+		"the Clock line covers its own font's height")
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()
@@ -1949,17 +1986,22 @@ func _init() -> void:
 	check(tile != null, "an affordable piece tile exists")
 	_click(tile.get_global_rect().get_center())
 	await process_frame
-	check(game.modals.shop_expanded_index == tile_index, "tapping a tile expands it")
+	# NO-167 (Max review, second pass): a tile tap opens its own preview now,
+	# not an in-place dock — same "long press = the thing's own menu" shape
+	# NO-144 gave held Stock/Item/Artefact entries, mirrored here with Buy in
+	# Sell's place.
+	check(game.preview_open, "tapping a Shop tile opens its preview")
 	var sh_stock: int = game.stock.size()
 	var sh_gold: int = game.gold
 	var sh_acts: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Buy"),
-		"Buy clickable in the expanded tile")
+	check(await _click_button_in(game.preview_panel, "Buy"),
+		"Buy clickable in the tile's preview")
 	await process_frame
 	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
 			and game.actions_left == sh_acts,
 		"shop Buy adds the piece and debits gold, never an Action (issue 64)")
 	check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
+	check(not game.preview_open, "buying closes the preview, same as Close")
 	var sold_tile: Button = null
 	to_visit = [game.modals.shop_panel]
 	while not to_visit.is_empty():
@@ -1970,16 +2012,20 @@ func _init() -> void:
 		to_visit.append_array(n.get_children())
 	check(sold_tile != null and sold_tile.modulate.a < 0.9,
 		"the sold tile greys out and stays in place")
-	var shows_sold: bool = await _click_button_in(game.modals.shop_panel, "SOLD")
-	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
-	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
-	# NO-167: Close now lives in the dock's own empty state (it replaced the
-	# "Tap a tile for details" hint), not the header — collapse the expanded
-	# tile first, same as a player would (tap it again, or tap outside/swipe,
-	# both of which also close the Shop directly).
 	_click(sold_tile.get_global_rect().get_center())
 	await process_frame
-	check(game.modals.shop_expanded_index == -1, "tapping the expanded tile again collapses it")
+	check(game.preview_open, "the sold tile is still tappable to preview")
+	check(await _click_button_in(game.preview_panel, "SOLD"),
+		"the preview now shows SOLD instead of Buy")
+	check(await _click_button_in(game.preview_panel, "Close"),
+		"the preview's own Close is clickable")
+	await process_frame
+	check(not game.preview_open, "closing the preview leaves the Shop open behind it")
+	check(game.modals.shop_panel.visible, "...the Shop itself is untouched")
+	# NO-167 (Max review, second pass): Close is now PERMANENT at the bottom
+	# of the Shop — present whether or not a tile's preview is open, not an
+	# either/or with a detail zone (that either/or was the bug Max caught in
+	# the first review pass).
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	# NO-118: Close now animates the panel off-screen and only hides it when
 	# that tween finishes. Condition-based, same idiom as
@@ -2112,12 +2158,14 @@ func _init() -> void:
 	await process_frame
 	game.state = was_state
 
-	# All-Seeing Eye Contact Lens (issue 49): the Shop's box detail dock
-	# reveals contents only while holding it. A fresh boot so it's definitely
-	# held, then expand whichever Box slot rolled (preferring Huge — 7
-	# entries — when one shows up) and confirm the reveal Label carries the
-	# slot's exact contents WITHOUT breaking the Buy button underneath it —
-	# the concrete risk of a variable-length reveal in a fixed-height dock.
+	# All-Seeing Eye Contact Lens (issue 49): the Shop reveals a Box's
+	# contents only while holding it — NO-167 (second pass) moved this from
+	# the old detail dock into the tile's own preview modal. A fresh boot so
+	# it's definitely held, then preview whichever Box slot rolled
+	# (preferring Huge — 7 entries — when one shows up) and confirm the
+	# reveal Label carries the slot's exact contents WITHOUT breaking the
+	# Buy button underneath it — the concrete risk of a variable-length
+	# reveal in a panel that also has to fit a Buy button.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -2137,7 +2185,7 @@ func _init() -> void:
 			box_slot_size = s.size
 			if s.size == "huge": # the worst case (7 entries) — stop as soon as it's found
 				break
-	check(box_slot_index >= 0, "(setup) a Box slot exists to expand")
+	check(box_slot_index >= 0, "(setup) a Box slot exists to preview")
 	var box_button: Button = null
 	to_visit = [game.modals.shop_panel]
 	while not to_visit.is_empty():
@@ -2149,8 +2197,9 @@ func _init() -> void:
 	check(box_button != null, "(setup) the Box tile is clickable")
 	_click(box_button.get_global_rect().get_center())
 	await process_frame
+	check(game.preview_open, "tapping the Box tile opens its preview")
 	var reveal_label: Label = null
-	to_visit = [game.modals.shop_panel]
+	to_visit = [game.preview_panel]
 	while not to_visit.is_empty():
 		var n: Node = to_visit.pop_back()
 		if n is Label and n.text.begins_with("Contains: "):
@@ -2160,7 +2209,7 @@ func _init() -> void:
 	var expect_reveal := "Contains: %s" % Box.contents_names(game.shop_stock[box_slot_index].contents)
 	check(reveal_label != null and reveal_label.text == expect_reveal,
 		"All-Seeing Eye Contact Lens: the %s Box's reveal Label shows its exact contents" % box_slot_size)
-	check(await _click_button_in(game.modals.shop_panel, "Buy"),
+	check(await _click_button_in(game.preview_panel, "Buy"),
 		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
 
 	# reinforcement shop: opens pending at turn start; NO-141 made the grant
@@ -2809,9 +2858,12 @@ func _button_prefix(node: Node, prefix: String) -> Button:
 	return null
 
 
-## Opens the Shop, taps the first affordable Box tile to expand it, then
-## clicks Buy — issue 47: Boxes only come from the Shop now (the box-carrier
-## enemy is gone), so every Box click-probe drives this same real-click path.
+## Opens the Shop, taps the first affordable Box tile to open its preview,
+## then clicks Buy in there — issue 47: Boxes only come from the Shop now
+## (the box-carrier enemy is gone), so every Box click-probe drives this same
+## real-click path. NO-167 (Max review, second pass): the tile no longer
+## expands in place — it opens its own preview (game.preview_panel), same as
+## every other Shop tile since the detail dock was deleted.
 ## Assumes the Shop is closed and the player's turn is active on entry.
 func _buy_a_box(game: Node2D) -> void:
 	check(await _click_shop(game), "Shop button clickable")
@@ -2832,5 +2884,7 @@ func _buy_a_box(game: Node2D) -> void:
 	check(tile != null, "(setup) an affordable Box tile exists")
 	_click(tile.get_global_rect().get_center())
 	await process_frame
-	check(await _click_button_in(game.modals.shop_panel, "Buy"), "(setup) Buy clickable on the expanded Box tile")
+	check(game.preview_open, "(setup) tapping the Box tile opens its preview")
+	check(await _click_button_in(game.preview_panel, "Buy"),
+		"(setup) Buy clickable in the Box tile's preview")
 	await process_frame

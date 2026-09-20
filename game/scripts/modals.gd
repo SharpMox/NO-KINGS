@@ -33,6 +33,12 @@ signal box_reroll_pressed
 signal win_continue_pressed
 signal win_end_pressed
 signal shop_buy_pressed(index: int)
+signal shop_tile_preview_requested(index: int) # NO-167 (Max review 2026-09-20):
+	# a Shop tile tap opens the tile's own preview now — same "long press =
+	# the thing's own menu" shape NO-144 gave held Stock/Item/Artefact
+	# entries, mirrored for an unowned Shop slot (game.gd owns preview_open,
+	# hence the round trip rather than modals.gd calling show_preview
+	# directly — this file only reads `g`, never writes it).
 signal shop_closed
 signal shop_restock_pressed # issue 52: Jet Fuel Vial's Restock button
 signal box_sell_pressed(entry: Dictionary) # NO-38: sell a held Item from inside an Item Box
@@ -60,11 +66,8 @@ var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
 	# way hud.gd caches drawer_rest — read-only for probes that need to know
 	# when the open slide has actually settled rather than duplicating the
 	# vp.x - draw_w formula themselves
-var _shop_dock: PanelContainer # the detail dock — refilled on a tile tap, so a
-	# tap no longer frees and rebuilds the whole ~80-node drawer (review pass 2)
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
-	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
-var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
+	# exposed so probes can read/assert its value
 ## NO-119: PIECES is a wrapping grid, not a fixed-width row, now that its
 ## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 10 of
 ## them (Shop.ROWS.piece, NO-166) would overflow a single-row HBoxContainer well
@@ -113,22 +116,39 @@ var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can asser
 ## on top of the ~224px NO-144 already freed, comfortably inside it either
 ## way. If a real measurement ever puts a zone label taller than assumed
 ## here, recheck against the ~224px margin before assuming it still fits.
+##
+## NO-167 (Max review, second pass, 2026-09-20): the detail dock's own fixed
+## Vector2(0, 92) reservation is gone too — Buy moved into the tile's own
+## preview modal (show_preview), so the zone at the bottom of the Shop holds
+## only a permanent Close button now, not a dock sized for a name/icon/desc
+## row. A Button at font_size 16 isn't measured on a running Godot from this
+## seat either, but by the same ~1.3x-font-to-line-height ratio this file's
+## other estimates use (hud.gd's SCORE_FONT: 17px font, 24px tall) plus
+## Godot's default theme padding, ~44px is a reasonable estimate — freeing a
+## further ~48px, on top of the ~224px (NO-144) + ~76px (NO-166) already
+## freed: `lower`'s real margin is comfortably larger than the ~292px worst
+## case needs, nothing here currently spends the extra room, and nothing in
+## this ticket asked it to.
 const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
 	# just the panel field, not a Buff-specific behaviour
-## NO-133: the Box pick rebuilt as a select-then-confirm icon grid, same shape
-## as the Shop's own tiles (shop_expanded_index / _shop_dock above) — a tap
+## NO-133: the Box pick rebuilt as a select-then-confirm icon grid — a tap
 ## selects a tile and fills the dock below with its description; it takes a
-## second tap on the dock's Pick button to actually commit.
+## second tap on the dock's Pick button to actually commit. (The Shop's own
+## tiles used to share this select-then-confirm shape too; NO-167 replaced it
+## there with a tap opening the tile's own preview instead — see
+## shop_tile_preview_requested above. The Box pick keeps its own dock: NO-168
+## already gave it a reason of its own — bigger icons instead of a name/dock,
+## not a Shop-tile mirror.)
 var box_expanded_index := -1 # which offered tile is selected, -1 = none
 var _box_options: Array = [] # the options show_box was last called with, so
 	# _box_tile/_box_detail can read by index without re-threading the array
 	# through every closure the way _shop_tile reads g.shop_stock directly
-var _box_dock: PanelContainer # refilled on a tile tap, same idiom as
-	# _shop_dock, but NO-168 dropped its fixed size/background — see
-	# _fill_box_dock's own header
+var _box_dock: PanelContainer # refilled on a tile tap — NO-168 dropped its
+	# fixed size/background — see _fill_box_dock's own header (the Shop's own
+	# former dock, once the analogy here, is gone entirely as of NO-167)
 
 
 func build(game) -> void:
@@ -484,7 +504,20 @@ func show_win_screen() -> void:
 ## when `entry` is given, and disabled (never omitted) when Shop.can_sell
 ## says no for a dynamic reason (not the player's turn, the starvation
 ## softlock) — same convention as the Shop's own Buy/Convert buttons.
-func show_preview(kind: String, id: String, king_id := "", entry: Variant = null) -> void:
+##
+## NO-167 (Max review, second pass, 2026-09-20): `shop_index` mirrors `entry`
+## in the opposite direction — a Shop tile is unowned, so there is no `entry`
+## to sell, but the same modal now shows it too (name/rarity/description/
+## price, matching a held item/artefact's layout) with a Buy button in Sell's
+## place. `kind` is "box" here as well as "piece"/"item"/"artefact" — a Shop-
+## only kind that never had a preview before this, added to the "item"/
+## "artefact" branch below (no diagram, same as those two). Mutually
+## exclusive with `entry` in practice (a caller passes one or the other,
+## never both — see _show_shop_preview vs. _show_preview/_show_kind_preview
+## in game.gd), so the two blocks below don't need to guard against both
+## firing at once.
+func show_preview(kind: String, id: String, king_id := "", entry: Variant = null,
+		shop_index := -1) -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
 	# Raised for the same reason every other panel is. preview_panel and
@@ -501,7 +534,8 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 
 	if kind == "piece":
 		var title := Label.new()
-		title.text = g.defs[id].name
+		title.text = ("%s — $%d" % [g.defs[id].name, Shop.price(g, g.shop_stock[shop_index])]) \
+			if shop_index >= 0 else g.defs[id].name
 		title.add_theme_font_size_override("font_size", 30)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(title)
@@ -554,9 +588,17 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(head)
 			_add_king_ability_rows(box, 14, 12)
-	else: # "item" / "artefact" — icon, name, description; no movement diagram
+	else: # "item" / "artefact" / "box" (NO-167: box is new — a Shop-only
+		# kind, never previously owned or previewed) — icon, name,
+		# description; no movement diagram. shop_index >= 0 reads off the
+		# live unowned Shop slot (Shop's own display_name/description/
+		# rarity_of/price, icon via this file's own _shop_icon — already
+		# handles all four kinds, including box's placeholder); otherwise
+		# off `entry`, an owned g.items/g.artefacts element, same as before.
+		var slot: Dictionary = g.shop_stock[shop_index] if shop_index >= 0 else {}
 		var title := Label.new()
-		title.text = str(entry.name)
+		title.text = ("%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]) \
+			if shop_index >= 0 else str(entry.name)
 		title.add_theme_font_size_override("font_size", 26)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -564,8 +606,10 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 
 		# artefact_tex() never returns null (art or the shared placeholder);
 		# an Item can, so it falls back to the same "✦" glyph its drawer cell
-		# and the Shop's own _shop_icon already use.
-		var icon: Variant = g.item_icons.get(id) if kind == "item" else g.artefact_tex(id)
+		# and the Shop's own _shop_icon already use (which also covers box,
+		# with no painted art of its own yet either).
+		var icon: Variant = _shop_icon(slot) if shop_index >= 0 else \
+			(g.item_icons.get(id) if kind == "item" else g.artefact_tex(id))
 		if icon is Texture2D:
 			var tex := TextureRect.new()
 			tex.texture = icon
@@ -576,12 +620,27 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			box.add_child(tex)
 		else:
 			var glyph := Label.new()
-			glyph.text = "✦"
+			glyph.text = str(icon) if shop_index >= 0 else "✦" # a Shop slot's
+				# own glyph fallback already varies by kind (_shop_icon); an
+				# owned entry always fell back to the same ✦ regardless
 			glyph.add_theme_font_size_override("font_size", 40)
 			glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(glyph)
 
-		var desc_text := str(entry.get("description", ""))
+		# NO-167: rarity, previously only shown on the Shop's own tile/detail
+		# — now shown here for both a Shop preview and a held artefact's
+		# (entry.rarity is stamped at acquisition, shop.gd's buy()); an Item
+		# has no rarity either way, so this stays empty and skipped for one.
+		var rarity := Shop.rarity_of(slot) if shop_index >= 0 else str(entry.get("rarity", ""))
+		if rarity != "":
+			var rlabel := Label.new()
+			rlabel.text = rarity
+			rlabel.add_theme_font_size_override("font_size", 13)
+			rlabel.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
+			rlabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(rlabel)
+
+		var desc_text := Shop.description(slot) if shop_index >= 0 else str(entry.get("description", ""))
 		if desc_text != "":
 			var desc := Label.new()
 			desc.text = desc_text
@@ -591,6 +650,34 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
 			box.add_child(desc)
+
+		# All-Seeing Eye Contact Lens (49): "Boxes reveal their contents
+		# before you buy or choose them" — X-ray gated on holding the
+		# Artefact, not on the roll (issue 47 already rolls every Box
+		# unconditionally at stock time, so there is nothing left to gate
+		# but the display). Ported from the old _shop_detail (NO-167).
+		if shop_index >= 0 and slot.kind == "box" \
+				and g._artefact_count("all-seeing-eye-contact-lens") > 0:
+			var reveal := Label.new()
+			reveal.text = "Contains: %s" % Box.contents_names(slot.contents)
+			reveal.add_theme_font_size_override("font_size", 12)
+			reveal.modulate = Color(1, 1, 1, 0.65)
+			reveal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			reveal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(reveal)
+
+	if shop_index >= 0:
+		var slot: Dictionary = g.shop_stock[shop_index]
+		var buy := Button.new()
+		buy.text = "SOLD" if slot.sold else "Buy"
+		buy.disabled = not Shop.can_buy(g, slot)
+		buy.add_theme_font_size_override("font_size", 18)
+		buy.pressed.connect(func() -> void:
+			preview_panel.visible = false
+			preview_closed.emit() # same reset Close does — buying must not
+				# leave preview_open stuck true (it deadens board input)
+			shop_buy_pressed.emit(shop_index))
+		box.add_child(buy)
 
 	if entry != null:
 		var sell := Button.new()
@@ -672,11 +759,14 @@ func _add_preview_legend() -> void:
 ## simplest is the instant show every other panel here already uses.
 ## Never scrolls — every slot in g.shop_stock renders as an icon tile with a
 ## price badge, grouped into four fixed zones, all full-width and stacked
-## top to bottom (PIECES, ARTEFACTS, ITEMS, BOXES — NO-142) so the grid
-## geometry holds regardless of which tile is expanded (shop-drawer-ui/08).
-## Tapping a tile expands the fixed-height detail dock at the bottom with its
-## name, effect text and Buy; buy rows emit an index and game.gd reopens for
-## fresh SOLD/affordability state.
+## top to bottom (PIECES, ARTEFACTS, ITEMS, BOXES — NO-142). NO-167 (Max
+## review, second pass): tapping a tile no longer expands a dock in place —
+## it opens the tile's own preview (show_preview, shop_index >= 0), the same
+## modal a long-pressed Stock/Item/Artefact entry gets, with a Buy button
+## where Sell would be; buying there emits shop_buy_pressed and game.gd
+## reopens the Shop for fresh SOLD/affordability state. Close sits at the
+## bottom of the Shop itself, permanently — nothing else lives in that zone
+## any more, so there is no expanded/collapsed state for it to depend on.
 func show_shop() -> void:
 	var was_open := shop_panel != null and shop_panel.visible
 	if _shop_tween: # NO-118: kill before the panel it targets is freed below
@@ -684,8 +774,6 @@ func show_shop() -> void:
 		_shop_tween = null
 	if shop_panel:
 		shop_panel.queue_free()
-	if not was_open:
-		shop_expanded_index = -1 # fresh open always starts collapsed
 
 	var vp: Vector2 = g.get_viewport_rect().size
 	var draw_w := roundi(vp.x * 0.9) # "~90% of the screen up to full"
@@ -714,9 +802,10 @@ func show_shop() -> void:
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
-	# NO-167: Close moved to the bottom (replacing the detail dock's empty-
-	# state hint, _fill_shop_dock below) — the header now carries only the
-	# title, the optional Restock button, and Gold pinned to the far right.
+	# NO-167: Close moved to the bottom, permanently (see the plain Close
+	# Button after `lower` below — the old detail dock it replaced is gone
+	# entirely) — the header now carries only the title, the optional
+	# Restock button, and Gold pinned to the far right.
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	var title := Label.new()
@@ -850,13 +939,17 @@ func show_shop() -> void:
 	root.add_child(pieces_band)
 	root.add_child(lower)
 
-	_shop_dock = PanelContainer.new()
-	_shop_dock.custom_minimum_size = Vector2(0, 92)
-	var dock_bg := StyleBoxFlat.new()
-	dock_bg.bg_color = Color(0.14, 0.14, 0.17, 1.0)
-	_shop_dock.add_theme_stylebox_override("panel", dock_bg)
-	_fill_shop_dock()
-	root.add_child(_shop_dock)
+	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone
+	# entirely — its one real job, Buy, moved to the tile's own preview
+	# (shop_tile_preview_requested below; _shop_tile's press handler), so
+	# the zone that used to hold it "either the hint or the detail" had
+	# nothing left to justify existing. Close is simply the last thing in
+	# the Shop now — always present, since it's the only thing here.
+	var close := Button.new()
+	close.text = "Close"
+	close.add_theme_font_size_override("font_size", 16)
+	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
+	root.add_child(close)
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
@@ -898,8 +991,8 @@ func _slide_shop(opening: bool) -> void:
 		# open — that's only safe because show_shop() frees this exact
 		# shop_panel and builds a fresh one (default filters) on every
 		# subsequent open. If the Shop is ever changed to reuse a panel
-		# instead of rebuilding it (the kind of change modals.gd's own
-		# _shop_dock comment describes doing for the tile-tap case), this
+		# instead of rebuilding it (the kind of refill-not-rebuild the Box
+		# pick's own _box_dock/_fill_box_dock does for its tile taps), this
 		# needs the same save/restore hud.gd's _set_drawer_clickable does,
 		# or every control in here stays permanently unclickable.
 		for c in shop_panel.find_children("*", "Control", true, false):
@@ -947,30 +1040,6 @@ func _on_shop_chrome_input(event: InputEvent) -> void:
 	_shop_swipe_down = false
 	if Tuning.classify_swipe(event.position - _shop_swipe_from) == "right":
 		close_shop()
-
-
-## The dock's content for the current expanded tile (or the hint). Called
-## from show_shop and from every tile tap; the tiles themselves are untouched
-## by a tap, so nothing else needs rebuilding. free(), not queue_free(): the
-## tap comes from a TILE, never from a dock child, so nothing here is mid-signal,
-## and an immediately-freed dock can't be found by a same-frame probe.
-func _fill_shop_dock() -> void:
-	for c in _shop_dock.get_children():
-		c.free()
-	if shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
-		_shop_dock.add_child(_shop_detail(shop_expanded_index))
-	else:
-		# NO-167: the empty-state "Tap a tile for details" hint is now the
-		# Shop's Close button (moved out of the header — see show_shop). An
-		# outside click and a rightward chrome swipe (_on_shop_chrome_input)
-		# both still close the Shop too, so collapsing an expanded tile (a tap
-		# away) is never the only way back to a visible Close.
-		var close := Button.new()
-		close.text = "Close"
-		close.add_theme_font_size_override("font_size", 16)
-		close.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
-		_shop_dock.add_child(close)
 
 
 ## font_size 12; its rendered height isn't measured anywhere in this file
@@ -1120,78 +1189,11 @@ func _shop_tile(index: int) -> Button:
 	price.offset_left = -28
 	price.offset_top = -14
 	btn.add_child(price)
-	btn.pressed.connect(func() -> void:
-		shop_expanded_index = -1 if shop_expanded_index == index else index
-		_fill_shop_dock())
+	# NO-167 (Max review, second pass): a tap opens the tile's own preview
+	# instead of expanding an in-place dock — see show_preview's shop_index
+	# and _show_shop_preview (game.gd), which owns preview_open.
+	btn.pressed.connect(func() -> void: shop_tile_preview_requested.emit(index))
 	return btn
-
-
-## The expanded tile: icon, name, effect text (when the catalog has one) and
-## Buy/SOLD, docked at a fixed height so expanding never reflows the grids.
-func _shop_detail(index: int) -> Control:
-	var slot: Dictionary = g.shop_stock[index]
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	var icon: Variant = _shop_icon(slot)
-	if icon is Texture2D:
-		var tex := TextureRect.new()
-		tex.texture = icon
-		tex.custom_minimum_size = Vector2(56, 56)
-		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		row.add_child(tex)
-	else:
-		var glyph := Label.new()
-		glyph.text = str(icon)
-		glyph.add_theme_font_size_override("font_size", 34)
-		glyph.custom_minimum_size = Vector2(56, 56)
-		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(glyph)
-
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 2)
-	var name := Label.new()
-	name.text = "%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]
-	name.add_theme_font_size_override("font_size", 16)
-	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.add_child(name)
-	var rarity := Shop.rarity_of(slot) # issue 20: rarity legibility
-	if rarity != "":
-		var rlabel := Label.new()
-		rlabel.text = rarity
-		rlabel.add_theme_font_size_override("font_size", 12)
-		rlabel.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
-		info.add_child(rlabel)
-	var desc_text := Shop.description(slot)
-	if desc_text != "":
-		var desc := Label.new()
-		desc.text = desc_text
-		desc.add_theme_font_size_override("font_size", 12)
-		desc.modulate = Color(1, 1, 1, 0.8)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info.add_child(desc)
-	# All-Seeing Eye Contact Lens (49): "Boxes reveal their contents before
-	# you buy or choose them" — X-ray gated on holding the Artefact, not on
-	# the roll (issue 47 already rolls every Box unconditionally at stock
-	# time, so there is nothing left to gate but the display).
-	if slot.kind == "box" and g._artefact_count("all-seeing-eye-contact-lens") > 0:
-		var reveal := Label.new()
-		reveal.text = "Contains: %s" % Box.contents_names(slot.contents)
-		reveal.add_theme_font_size_override("font_size", 10)
-		reveal.modulate = Color(1, 1, 1, 0.65)
-		reveal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		info.add_child(reveal)
-	row.add_child(info)
-
-	var buy := Button.new()
-	buy.text = "SOLD" if slot.sold else "Buy"
-	buy.disabled = not Shop.can_buy(g, slot)
-	buy.add_theme_font_size_override("font_size", 15)
-	buy.pressed.connect(func() -> void: shop_buy_pressed.emit(index))
-	row.add_child(buy)
-	return row
 
 
 ## NO-141 (Max, 2026-09-19): an announcement, not a shop — the pieces are
@@ -1439,9 +1441,9 @@ func _box_grid(count: int) -> CenterContainer:
 	return center
 
 
-## The selected tile's own detail (or nothing) — refilled on every tap, same
-## shape as _fill_shop_dock. NO-168: no placeholder hint any more ("Tap an
-## entry for details" and its own fixed-height dock panel are gone — the
+## The selected tile's own detail (or nothing) — refilled on every tap.
+## NO-168: no placeholder hint any more ("Tap an entry for details" and its
+## own fixed-height dock panel are gone — the
 ## "tap for detail" zone the ticket named); this sits empty, taking no space,
 ## until a tile is actually selected, then shows the same name/description/
 ## Pick row _box_detail always did, as a plain line under the grid rather

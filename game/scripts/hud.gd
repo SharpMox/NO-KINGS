@@ -520,6 +520,26 @@ func build(game) -> void:
 		print("NO162-font label_settings=%s readback_size=%s content_scale_factor=%s content_scale_mode=%s"
 			% [clock_label.label_settings, clock_label.get_theme_font_size("font_size"),
 				get_window().content_scale_factor, get_window().content_scale_mode])
+	# NO-162 DIAGNOSTIC round 3 — everything checked so far reads correct
+	# (override reaches the node, no LabelSettings, content scale 1.0,
+	# get_theme_default_font() and get_theme_font("font") are the same
+	# object), yet the coordinator's cropped-pixel scan of the actual
+	# capture measured ink 175.6 wide against a 150.0 box, overhanging
+	# BOTH edges by ~12.8 — symmetric, which an advance-width mismatch
+	# cannot produce (that would scale one direction, not pad both). An
+	# outline is drawn outside the glyph path on every side and is exactly
+	# this shape. `clock_label` itself never calls
+	# add_theme_constant_override("outline_size", ...) or
+	# add_theme_color_override("font_outline_color", ...) anywhere in this
+	# file (only stock_badge/marker/init_badge/badge/price do, all
+	# DIFFERENT Labels) and no project-wide Theme resource exists to
+	# supply a default (grepped: no .theme file, no gui/theme/custom in
+	# project.godot) — so by source inspection this should read 0. Printing
+	# to confirm rather than trust that reading.
+	if OS.get_cmdline_user_args().has("--debug-clock"):
+		print("NO162-outline outline_size=%s font_outline_color=%s"
+			% [clock_label.get_theme_constant("outline_size"),
+				clock_label.get_theme_color("font_outline_color")])
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	# NO-126: the odometer look — greyed padding zeros before the coloured

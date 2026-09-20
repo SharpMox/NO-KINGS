@@ -93,7 +93,16 @@ const HEADER_H := 100.0
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
 const HEADER_PAD_Y := 2.0
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
-const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to fit the old HEADER_H
+const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to fit the old HEADER_H.
+## Ceiling only: build() measures the real font and shrinks toward this if
+## 36 doesn't fit the restacked left column's width (fix for the clipped
+## clock Max's screenshot pass caught) — see build()'s own comment. A real
+## 480-wide portrait run should land well clear of this — it is a hard
+## anti-infinite-loop floor (below which text stops being legible at all),
+## not a design target; it deliberately is NOT picked near NO-125's old 15,
+## so the search is free to find whatever the real font actually needs
+## rather than being nudged back toward the value this ticket undid.
+const CLOCK_FONT_MIN := 12
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125)
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
@@ -433,11 +442,38 @@ func build(game) -> void:
 	# LEFT: Score, then Clock underneath (NO-162: Gold moved out to the centre
 	# column, into the Wave/Turn counters' old spot — see the CENTRE/RIGHT
 	# comments below).
-	clock_label.add_theme_font_size_override("font_size", CLOCK_FONT)
-	# NO-125: the box follows the font's own metric instead of a hardcoded
-	# constant, so the next CLOCK_FONT change resizes it automatically rather
-	# than silently clipping the way the old HEADER_H / 2 fraction did.
-	clock_label.custom_minimum_size = Vector2(0, clock_label.get_theme_default_font().get_height(CLOCK_FONT))
+	# NO-162 fix (clock clipped off the left edge in Max's screenshot pass):
+	# CLOCK_FONT (36) is a CEILING now, not a fixed value. `_clock_text()`
+	# (game.gd) is "%02d:%02d.%03d" — ALWAYS 9 characters, never variable —
+	# and NO-125's own notes already named that 9-char width as the reason
+	# the font was shrunk to 15 in the first place; NO-162 undid the shrink
+	# without redoing that width check against the RESTACKED header, where
+	# the left column's real budget is bounded by where the Gold column
+	# (`mid`, built below) begins, not by the old 3-row layout's numbers.
+	# Measured from the REAL loaded font (same technique NO-125 already used
+	# for height, `get_height`) rather than a guessed pixel constant — a
+	# guess would drift the moment the theme's default font changes.
+	# Shrinks only as far as it has to, one point at a time. CLOCK_FONT_MIN is
+	# a hard anti-infinite-loop floor (12), not a design target — Max asked
+	# for a bigger timer, so nudging the search back toward NO-125's old 15
+	# would undo the ticket while looking like it fixed the bug. In a real
+	# 480-wide portrait run the fixed 9-character format should land well
+	# above 15 without ever approaching that floor; if it ever doesn't,
+	# that's a real layout problem worth flagging, not something to mask by
+	# quietly picking a small number.
+	var clock_sample := "00:00.000" # the fixed-width format, worst case == every case
+	var left_max_w: float = (vp.x - COUNTER_W) / 2.0 - HEADER_PAD_X - 4.0 # 4px clear of the Gold column (`mid`)
+	var clock_font := clock_label.get_theme_default_font()
+	var clock_size := CLOCK_FONT
+	while clock_size > CLOCK_FONT_MIN \
+			and clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > left_max_w:
+		clock_size -= 1
+	clock_label.add_theme_font_size_override("font_size", clock_size)
+	# The box follows the font's own metric (both axes now, not just height),
+	# so it can never claim more width than what actually fits `left_max_w`.
+	clock_label.custom_minimum_size = Vector2(
+		clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x,
+		clock_font.get_height(clock_size))
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))

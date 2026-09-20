@@ -917,10 +917,25 @@ func _init() -> void:
 	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
 			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
 		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
-	# NO-125: the Clock box follows CLOCK_FONT's own metric now, not a fixed constant.
-	var clock_font_h: float = HUD.clock_label.get_theme_default_font().get_height(HUD.CLOCK_FONT)
+	# NO-125: the Clock box follows its OWN applied font's metric, not a fixed
+	# constant. NO-162 fix: CLOCK_FONT (36) is a ceiling build() may shrink
+	# from if it doesn't fit the restacked left column — read back the size
+	# actually applied to the Label, not the ceiling constant, so this stays
+	# correct whichever one build() picked.
+	var clock_font_applied: int = HUD.clock_label.get_theme_font_size("font_size")
+	check(clock_font_applied <= HUD.CLOCK_FONT and clock_font_applied >= HUD.CLOCK_FONT_MIN,
+		"the applied Clock font sits between the floor and the ceiling (%s)" % clock_font_applied)
+	var clock_font_h: float = HUD.clock_label.get_theme_default_font().get_height(clock_font_applied)
 	check(HUD.clock_label.size.y >= clock_font_h - 0.5,
 		"the Clock line covers its own font's height (%s vs %s)" % [HUD.clock_label.size.y, clock_font_h])
+	# NO-162 fix: the clock must never claim more width than the left column's
+	# real budget (bounded by where the Gold column, `mid`, begins) — this is
+	# the regression test for "4:59.841 clipped off the left edge".
+	var clock_r: Rect2 = HUD.clock_label.get_global_rect()
+	var mid_left_x: float = (game.get_viewport_rect().size.x - HUD.COUNTER_W) / 2.0
+	check(clock_r.position.x >= HUD.HEADER_PAD_X - 0.5 and clock_r.end.x <= mid_left_x + 0.5,
+		"the Clock never clips off the left edge or reaches into the Gold column (%s, mid starts at %s)"
+			% [clock_r, mid_left_x])
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()

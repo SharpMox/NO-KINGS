@@ -2764,22 +2764,33 @@ func _reinforce_ids() -> Array:
 	return out
 
 
-## NO-141: one copy of each _reinforce_ids() straight into Stock — the same
-## free grant the old Buy button made per click (money-and-shop/02), now made
-## once, automatically, the instant the screen fires. NO-170 (Max, 2026-09-20,
-## "lets double up each piece, to make it count"): doubled to two of each —
-## still a bounded, deterministic grant, just a higher bound; no new tuning
-## number. Returns the ids actually granted (each one twice) so the
-## announcement modal's piece mass shows exactly what landed in Stock, never
-## fewer. `_reinforce_ids()` itself is untouched and stays one-of-each: it is
-## also read by autoplay.gd's bot (a separate, unrelated pick) and by
-## save_config.gd's resume path (display only, deliberately not this
-## function — see that call site).
-func _grant_reinforcements() -> Array:
+## NO-170 (Max, 2026-09-20, "lets double up each piece, to make it count"):
+## the doubled grant list, two of each _reinforce_ids() — pure, touches
+## nothing. Split out so `_grant_reinforcements()` (which mutates Stock) and
+## save_config.gd's resume display (which must never mutate Stock) build
+## their list from the exact same place. Before this split they agreed only
+## by coincidence — both independently read _reinforce_ids() and both
+## happened to want "one of each" — and doubling broke that coincidence: the
+## resume screen kept showing one-of-each while Stock already held two,
+## silently under-reporting by half on every background/resume cycle. A
+## shared source makes that discrepancy structurally impossible instead of
+## just currently absent. `_reinforce_ids()` itself stays one-of-each and
+## untouched — autoplay.gd's bot reads it directly for an unrelated pick.
+func _reinforce_grant_ids() -> Array:
 	var ids := []
 	for id in _reinforce_ids():
 		ids.append(id)
 		ids.append(id)
+	return ids
+
+
+## NO-141: the doubled grant (NO-170) straight into Stock — the same free
+## grant the old Buy button made per click (money-and-shop/02), now made
+## once, automatically, the instant the screen fires. Returns the ids
+## actually granted so the announcement modal's piece mass shows exactly
+## what landed in Stock, never fewer.
+func _grant_reinforcements() -> Array:
+	var ids := _reinforce_grant_ids()
 	stock.append_array(ids)
 	return ids
 

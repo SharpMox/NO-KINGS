@@ -974,6 +974,9 @@ func _init() -> void:
 	# just holds Stock+Menu — see below).
 	check(trr.position.y >= game.safe_top - 0.5 and trr.end.y <= sr2.position.y + 0.5,
 		"NO-175: Turn/Wave sits above Score in the left column")
+	check(absf(trr.position.x - sr2.position.x) <= 0.5,
+		"NO-175: Turn shares Score's left edge — flush left, not indented (%s vs %s)"
+			% [trr.position.x, sr2.position.x])
 	check(is_equal_approx(wtr.position.y, trr.position.y) and wtr.position.x >= trr.position.x,
 		"NO-175: '0/8  ⚑ 1/50' — Turn and Wave share a line, Wave after Turn")
 	check(sr2.position.y >= game.safe_top - 0.5 and sr2.end.y <= gr.position.y + 0.5,
@@ -1077,6 +1080,13 @@ func _init() -> void:
 	game.wave = 201
 	HUD.refresh()
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
+	# NO-175 regression (coordinator capture, 2026-09-20): an EMPTY turn_label
+	# must not still claim the row's leftover width — Wave has to render
+	# flush left, not indented ~90px behind an invisible EXPAND_FILL box.
+	await process_frame
+	var wr: Rect2 = HUD.wave_label.get_global_rect()
+	check(wr.position.x <= HUD.HEADER_PAD_X + 10.0,
+		"NO-175: Wave sits flush left when Turn is blank, not shoved right (%s)" % wr.position.x)
 	# a long King name is cut with an ellipsis: the label never leaves its
 	# column, whatever the text. NO-175: that column is now the LEFT column's
 	# top row (Turn/Wave), not a spot relative to Stock — the invariant worth

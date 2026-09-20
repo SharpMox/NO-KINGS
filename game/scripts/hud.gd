@@ -149,7 +149,12 @@ const CLOCK_POS_OFFSET_X := 20.0
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
 const COUNTER_W := 150.0 ## NO-175: the LEFT column's fixed width — a King's name ellipsises past it, same as Wave/Turn did before
-const MENU_FONT := 15
+## NO-175: was 15, sized for the old 34px button — coordinator feedback:
+## "reads as a small mark floating in a large box" now that the button is
+## HEADER_BTN(52). Scaled up toward the ratio Stock's icon fills its own
+## button (44/52 ≈ 0.85; a text glyph doesn't need quite that much given the
+## button's own left/right padding) — visual judgement call, re-check on capture.
+const MENU_FONT := 28
 const STOCK_ICON := 44 ## the piece icon on the Stock button
 const STOCK_PAD := 4.0 ## padding around the Stock icon, both axes
 ## NO-175: "pause menu and stock buttons are now the same size" — HEADER_BTN
@@ -499,8 +504,15 @@ func build(game) -> void:
 	turn_wave_row.add_theme_constant_override("separation", 6)
 	turn_label.add_theme_font_size_override("font_size", COUNTER_FONT)
 	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	turn_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL # a King's name ellipsises; Wave never needs to
+	# NO-175 fix: overrun/expand are set per-refresh(), not here — see the
+	# king_wave block in refresh(). An HBoxContainer's EXPAND child claims the
+	# row's leftover width regardless of whether it currently HAS content, so
+	# an unconditional EXPAND_FILL here made a genuinely empty turn_label (the
+	# "blank after the last Wave" state, NO-114) invisibly reserve ~90px and
+	# shove Wave right — looked like the whole row was indented (coordinator
+	# capture, 2026-09-20). turn_label only needs the wide, ellipsis-capable
+	# box while showing a King's name; Wave is guaranteed blank then (below),
+	# so there's no competition to lose.
 	turn_wave_row.add_child(turn_label)
 	wave_label.add_theme_font_size_override("font_size", COUNTER_FONT)
 	wave_label.modulate = Color(1, 1, 1, 0.85)
@@ -1615,6 +1627,13 @@ func refresh() -> void:
 	# NO-114: blank during a King wave — the King's own name in turn_label is
 	# enough, and showing both crowded the centre column.
 	var king_wave: bool = g._king_alive() or not g.pending_king.is_empty()
+	# NO-175: turn_label only claims the row's leftover width (EXPAND_FILL,
+	# with ellipsis armed) while it might be showing a long King name — the
+	# rest of the time (a short "N/M" counter, or blank after the last Wave)
+	# it sits at its own natural size, so an empty turn_label can never push
+	# Wave to the right. See turn_wave_row's build()-time comment.
+	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if king_wave else TextServer.OVERRUN_NO_TRIMMING
+	turn_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL if king_wave else Control.SIZE_FILL
 	wave_label.text = "" if king_wave else "⚑ %d/%d" % [g.wave,
 		WIN_WAVE if g.kings_defeated == 0 else Waves.WAVES.size()]
 	# TURN COUNTER: turns played this Wave out of the upcoming Wave's cadence.

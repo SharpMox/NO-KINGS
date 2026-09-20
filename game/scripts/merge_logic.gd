@@ -99,8 +99,7 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 	g.pending_merge = [a, b]
 	var a_piece := _piece_state(g, a)
 	var b_piece := _piece_state(g, b)
-	var result_buffs := BuffLogic.inherited(a_piece, b_piece,
-		BuffLogic.cap(g._artefact_count("abduction-probe"))) # NO-191
+	var result_buffs := BuffLogic.inherited(a_piece, b_piece, g.buff_cap()) # NO-191
 	g.modals.show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions),
 		a_piece, b_piece, result_buffs) # NO-191: the buffs the result will inherit
 
@@ -119,9 +118,10 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	var result := Rules.merge_result(ids, g.defs, g.fusions)
 	# NO-191: the union of both sources' catalogued Piece Buffs, capped —
 	# read BEFORE the erase loop below discards both sources for real, same
-	# reason consumed_states is snapshotted first.
-	var result_buffs := BuffLogic.inherited(_piece_state(g, a), _piece_state(g, b),
-		BuffLogic.cap(g._artefact_count("abduction-probe")))
+	# reason consumed_states is snapshotted first. g.buff_cap() is the SAME
+	# cap _apply_buff enforces (base + Abduction Probe + Communion) — never
+	# a second computation of it (this repo's most-repeated bug shape).
+	var result_buffs := BuffLogic.inherited(_piece_state(g, a), _piece_state(g, b), g.buff_cap())
 	# issue 56: snapshot both consumed pieces' ADR-0002 Stock-shaped state
 	# BEFORE the erase loop below discards it for real — Zapruder's
 	# Director's Cut reads this back off the action_log entry to return both

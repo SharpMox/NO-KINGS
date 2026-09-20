@@ -628,6 +628,44 @@ func _init() -> void:
 	mc.queue_free()
 	await process_frame
 
+	# cap must agree with _apply_buff's game.gd:buff_cap() — base + Abduction
+	# Probe + Communion, additive (issue 68). A merge that computed its own
+	# cap independently once truncated a Cult player below what the rest of
+	# the game promises them (base 2 + probe 1 + Communion 1 = 4, not 3).
+	var cc := _boot({"army": "Cult", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
+	await process_frame
+	cc.actions_left = 5
+	cc.artefacts.append({"key": "abduction-probe"})
+	BuffLogic.add(cc.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cc.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cc.board[Vector2i(3, 2)], "taunt")
+	BuffLogic.add(cc.board[Vector2i(3, 2)], "bomb")
+	MergeLogic.commit_merge(cc, Vector2i(2, 2), Vector2i(3, 2))
+	var cc_keys: Array = BuffLogic.of(cc.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(cc_keys == ["shield", "critical", "taunt", "bomb"],
+		"NO-191: Cult + Abduction Probe raises the merge cap to 4, same as _apply_buff — nothing truncated")
+	cc.queue_free()
+	await process_frame
+
+	var cn := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	cn.actions_left = 5
+	cn.artefacts.append({"key": "abduction-probe"})
+	BuffLogic.add(cn.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cn.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cn.board[Vector2i(3, 2)], "taunt")
+	BuffLogic.add(cn.board[Vector2i(3, 2)], "bomb")
+	MergeLogic.commit_merge(cn, Vector2i(2, 2), Vector2i(3, 2))
+	var cn_keys: Array = BuffLogic.of(cn.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(cn_keys == ["shield", "critical", "taunt"],
+		"NO-191: the same merge without Cult caps at 3 (base 2 + probe 1 only) — matches _apply_buff exactly")
+	cn.queue_free()
+	await process_frame
+
 	# stunned (a debuff on the same list, not a catalogued Piece Buff) never
 	# transfers, even though the piece carrying it also has a real buff
 	var ms := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],

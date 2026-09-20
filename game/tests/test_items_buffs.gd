@@ -613,19 +613,19 @@ func _init() -> void:
 
 	# cap: sources jointly exceed BuffLogic.cap(0) == 2 — truncated to the
 	# deterministic first-N: a's buffs in order, then b's
-	var mc := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+	var cap_g := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 100})
 	await process_frame
-	mc.actions_left = 5
-	BuffLogic.add(mc.board[Vector2i(2, 2)], "shield")
-	BuffLogic.add(mc.board[Vector2i(2, 2)], "critical")
-	BuffLogic.add(mc.board[Vector2i(3, 2)], "taunt")
-	MergeLogic.commit_merge(mc, Vector2i(2, 2), Vector2i(3, 2))
-	var mc_keys: Array = BuffLogic.of(mc.board[Vector2i(3, 2)]).map(
+	cap_g.actions_left = 5
+	BuffLogic.add(cap_g.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cap_g.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cap_g.board[Vector2i(3, 2)], "taunt")
+	MergeLogic.commit_merge(cap_g, Vector2i(2, 2), Vector2i(3, 2))
+	var cap_keys: Array = BuffLogic.of(cap_g.board[Vector2i(3, 2)]).map(
 		func(b: Dictionary) -> String: return b.key)
-	check(mc_keys == ["shield", "critical"],
+	check(cap_keys == ["shield", "critical"],
 		"NO-191: a union over cap truncates to the deterministic first-N, a's buffs before b's")
-	mc.queue_free()
+	cap_g.queue_free()
 	await process_frame
 
 	# cap must agree with _apply_buff's game.gd:buff_cap() — base + Abduction

@@ -452,12 +452,15 @@ func _init() -> void:
 		"(control) arming the STOCK stack DOES paint them — the check above is not vacuous")
 	check(game.merge_highlights.has("pawn"),
 		"(control) 'pawn' is a highlighted merge-partner id while that stack is armed")
+	# NO-164: the old warm-tint wash on Captured rows is gone — the enemy-red
+	# sprite itself is the signal now, so a captured pawn's modulate should
+	# sit at the plain default (WHITE), never the armed/merge-partner tints.
 	var cap_tint_ok := true
 	for row in _pool_rows(game, true):
-		if not (row as Button).modulate.is_equal_approx(Color(1.0, 0.8, 0.8)):
+		if not (row as Button).modulate.is_equal_approx(Color(1, 1, 1)):
 			cap_tint_ok = false
 	check(cap_tint_ok,
-		"and a captured pawn keeps its warm tint — never gold, never a merge partner")
+		"and a captured pawn stays untinted — never gold, never a merge partner")
 	var badges: Array = []
 	for row in _pool_rows(game, false):
 		for c in (row as Button).get_children():
@@ -783,11 +786,13 @@ func _init() -> void:
 	# design C moved the Ability out of this drawer and onto the deck, so its
 	# cost is asserted where it now lives. The point of the move is the next
 	# check: you can read it WITHOUT opening anything.
-	check("1 Action" in game.hud.army_ability_button.text
-			or "no Action" in game.hud.army_ability_button.text
-			or "next wave" in game.hud.army_ability_button.text,
-		"the Ability states its cost or why it is unavailable (%s)"
-			% game.hud.army_ability_button.text)
+	# NO-163: the READY state no longer repeats "1 Action" in the button text
+	# (the tooltip, checked below, already carries the cost) — only an
+	# UNAVAILABLE button states why, on the button itself.
+	if game.hud.army_ability_button.disabled:
+		check("no Action" in game.hud.army_ability_button.text
+				or "next wave" in game.hud.army_ability_button.text,
+			"a disabled Ability states why (%s)" % game.hud.army_ability_button.text)
 	check(kit.ability_name in game.hud.army_ability_button.text,
 		"and names the ability itself")
 	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived.
@@ -843,9 +848,12 @@ func _init() -> void:
 	# army_band_reopen's own handler closes Inventory as it goes, so one
 	# click does both.
 	_click(HUD.army_band_reopen.get_global_rect().get_center())
-	check(HUD.drawer_open == "" and not HUD.army_band_reopen.visible
+	# NO-163: army_band_reopen is now ALWAYS visible (one control, anchored to
+	# the button row, that flips its own glyph rather than two controls that
+	# traded visibility) — assert the OPEN glyph instead of "not visible".
+	check(HUD.drawer_open == "" and HUD.army_band_reopen.text == "▴"
 			and HUD.army_band.visible and HUD.army_band_open,
-		"NO-128: reopening the band also closed Inventory (same screen rect)")
+		"NO-128/NO-163: reopening the band also closed Inventory (same screen rect)")
 	# NO-128: army_band overlays the SAME screen rect Inventory's drawer opens
 	# into (both anchored to deck_top, extending upward) — see the mutual
 	# exclusion in hud.gd's set_drawer() and army_band_reopen's own handler.
@@ -856,11 +864,12 @@ func _init() -> void:
 	# button in this file.
 	_click(HUD.drawer_buttons["inventory"].get_global_rect().get_center())
 	await _await_drawer_settled(game, "inventory")
-	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible and HUD.army_band_reopen.visible,
-		"NO-128: opening Inventory collapses army_band (same screen rect)")
+	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible
+			and HUD.army_band_reopen.text == "▾",
+		"NO-128/NO-163: opening Inventory collapses army_band (same screen rect)")
 	_click(HUD.army_band_reopen.get_global_rect().get_center())
-	check(HUD.drawer_open == "" and HUD.army_band.visible and not HUD.army_band_reopen.visible,
-		"NO-128: reopening the band closes Inventory back (same screen rect)")
+	check(HUD.drawer_open == "" and HUD.army_band.visible and HUD.army_band_reopen.text == "▴",
+		"NO-128/NO-163: reopening the band closes Inventory back (same screen rect)")
 	# NO-128 finally gives king_ability_button the home NO-83 promised it: it
 	# is in the tree now (inside army_band), just hidden until an ability is
 	# active. arrow_button has no ticket moving it yet, so it stays off-screen.
@@ -915,22 +924,29 @@ func _init() -> void:
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()
-	# NO-125: restacked to Score, Gold, Clock — the timer at the bottom.
-	check(sr2.position.y >= game.safe_top and sr2.end.y <= gr.position.y + 0.5
-			and gr.end.y <= cr.position.y + 0.5 and cr.end.y <= game.hud_top + 0.5,
-		"Score, then Gold, then Clock, all inside the Header and below the inset")
+	var wtr: Rect2 = HUD.wave_label.get_global_rect()
+	# NO-162: restacked again — LEFT is now just Score then Clock (Gold moved
+	# to the CENTRE column, in Wave/Turn's old bottom-flush spot; Wave/Turn
+	# moved to the RIGHT, under Stock+Menu).
+	check(sr2.position.y >= game.safe_top and sr2.end.y <= cr.position.y + 0.5
+			and cr.end.y <= game.hud_top + 0.5,
+		"Score, then Clock, both inside the Header and below the inset")
+	check(gr.position.y >= game.safe_top and gr.end.y <= game.hud_top + 0.5,
+		"Gold sits inside the Header too, in the centre column")
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
 	# NO-131: the enlarged NO-83 tap zone is gone — the Stock button is a
 	# regular button, sized to its own icon+padding, not the Header's full
-	# height. is_equal_approx would have PASSED by accident once NO-125
-	# shrank HEADER_H to 75 (close to the button's own content height), so
-	# this asserts strictly-smaller-than plus vertical centring, not just
-	# "not the exact HEADER_H value".
+	# height.
 	check(sr.size.y < HUD.HEADER_H - 0.5,
 		"the Stock button's rect no longer spans the Header's full height")
-	check(is_equal_approx(sr.get_center().y, game.safe_top + HUD.HEADER_H / 2.0),
-		"...it sits vertically centred in the Header instead")
+	# NO-162: Stock anchors to the TOP now (was vertically centred) — the
+	# Wave/Turn stack sits directly under it, bottom-flush in the same
+	# column, so the two never overlap vertically.
+	check(is_equal_approx(sr.position.y, game.safe_top + HUD.HEADER_PAD_Y),
+		"...it sits flush to the top of the Header instead of centred")
+	check(wtr.position.y >= sr.end.y - 0.5,
+		"...and the Wave/Turn stack starts at or below where Stock ends (NO-162: 'underneath')")
 	check(sr.position.y >= game.safe_top - 0.5, "...never above the inset")
 	check(sr.end.y <= game.hud_top + 0.5, "...and it never reaches over the board")
 	check(is_equal_approx(sr.end.x, mr.position.x - HUD.HEADER_GAP),
@@ -1013,12 +1029,14 @@ func _init() -> void:
 	HUD.refresh()
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
 	# a long King name is cut with an ellipsis: the label never leaves its
-	# column or reaches the Stock button, whatever the text
+	# column, whatever the text. NO-162: that column now sits BELOW the Stock
+	# button (not beside it), so the invariant worth asserting is width (still
+	# COUNTER_W) plus no vertical reach back up into Stock's own rect.
 	HUD.turn_label.text = "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
-	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.x <= sr.position.x + 0.5,
-		"a long King name ellipsises inside the counters column (%s wide)" % tl.size.x)
+	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.position.y >= sr.end.y - 0.5,
+		"a long King name ellipsises inside the counters column (%s wide), below Stock" % tl.size.x)
 	game.wave = wave_was
 	game.kings_defeated = kd_was
 	game.turns_since_wave = tsw_was
@@ -1052,9 +1070,13 @@ func _init() -> void:
 	game.actions_left = was_actions
 	game.army_ability_used_this_wave = was_used
 	game.hud.refresh()
-	check("1 Action" in game.hud.army_ability_button.text
+	# NO-163: ready no longer says "1 Action" (dropped from the button text) —
+	# assert the absence of both unavailability captions instead, plus enabled.
+	check(not ("no Action" in game.hud.army_ability_button.text)
+			and not ("next wave" in game.hud.army_ability_button.text)
 			and not game.hud.army_ability_button.disabled,
-		"and it comes back ready once an Action exists again")
+		"and it comes back ready once an Action exists again (%s)"
+			% game.hud.army_ability_button.text)
 	await process_frame
 
 	# ---- ONE ICON SIZE, ACROSS ALL THREE STRIPS (NO-36, resized NO-119) ------
@@ -2148,8 +2170,8 @@ func _init() -> void:
 	await process_frame
 	check(game.reinforce_panel != null and game.reinforce_panel.visible,
 		"the reinforcement shop opens at turn start")
-	check(game.stock.size() == game._reinforce_ids().size(),
-		"NO-141: the grant already landed in Stock before the screen ever showed")
+	check(game.stock.size() == game._reinforce_ids().size() * 2,
+		"NO-141/NO-170: the grant already landed in Stock before the screen ever showed, two of each")
 	# Same NO-5 question for the panel that now opens every 10 Waves. Tile (2,2)
 	# holds the player queen, and the control below the tariff section proves
 	# this exact tap selects her with no panel up.
@@ -2348,8 +2370,14 @@ func _init() -> void:
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
 	# NO-85: the Artefacts grid holds every held Artefact, activatable or not.
-	# This scenario holds exactly one, so the grid has exactly one cell.
-	check(game.hud.artefacts_grid.get_child_count() == 1,
+	# This scenario holds exactly one, so the grid has exactly one REAL cell
+	# (NO-165: plus empty-slot placeholders filling out the rest of the cap,
+	# counted separately below since they're Panels, not Buttons).
+	var real_cells := 0
+	for c in game.hud.artefacts_grid.get_children():
+		if c is Button:
+			real_cells += 1
+	check(real_cells == 1,
 		"the Artefacts grid shows ONE cell: the Artefact's, and no Army Ability chip")
 	var star_chips := 0
 	for c in game.hud.artefacts_grid.get_children():

@@ -39,6 +39,16 @@ func _round_trip(g) -> Dictionary:
 	return JSON.parse_string(JSON.stringify(g._to_config()))
 
 
+## One TextureRect per piece is PieceMass.build()'s own shape (piece_mass.gd,
+## NO-157) — counting them under a built panel counts how many pieces it
+## actually rendered, the observable consequence a player would see.
+func _count_texture_rects(node: Node) -> int:
+	var n := 1 if node is TextureRect else 0
+	for c in node.get_children():
+		n += _count_texture_rects(c)
+	return n
+
+
 func _init() -> void:
 	# --- RESUME MID-TURN (NO-?? / backgrounding) -----------------------------
 	# The save format used to assume every save was taken at a TURN START:
@@ -510,6 +520,47 @@ func _init() -> void:
 		"every targeting flavour rolls back at background — including the two ARMY ones, "
 		+ "which the first cut's guard did not even name")
 	tg.queue_free()
+	await process_frame
+
+	# --- NO-170 REGRESSION: resume must show what Stock actually received ---
+	# The doubled reinforcement grant (NO-170) briefly broke this: the live
+	# grant path and save_config.gd's resume-display path each independently
+	# read a piece-id source and only agreed by coincidence (both wanted
+	# "one of each"). Doubling only the grant path split them apart — a real
+	# background/resume cycle would show HALF of what Stock actually holds,
+	# and nothing errors when it happens. This is a full round trip through
+	# real serialization (_round_trip, same idiom as the mid-turn cases
+	# above), not a direct call into save_config.gd, so it exercises the
+	# exact path a real app-resume takes.
+	#
+	# Asserts the RELATIONSHIP (shown == granted), not a literal count: if
+	# the grant multiplier changes again, this keeps testing the actual
+	# invariant instead of going red for the wrong reason.
+	var rf := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"pending_reinforce": true})
+	await process_frame
+	await process_frame
+	var granted: int = rf.stock.size() # cfg carries no "stock", so this IS
+		# the grant — nothing else could have put pieces in Stock
+	check(granted > 0, "(setup) the automatic grant landed pieces in Stock")
+	var rf_saved := _round_trip(rf)
+	rf.queue_free()
+	await process_frame
+	var rf_r := _boot(rf_saved)
+	await process_frame
+	await process_frame
+	# Guard the lookup rather than let a null panel fail some other way: a
+	# panel that silently isn't there is a different bug from a wrong count,
+	# and a missing check here would make this test pass by not running —
+	# the exact trap that cost three rounds of diagnosis on test_long_press.gd.
+	var panel: Node = rf_r.modals.reinforce_panel
+	check(panel != null, "resuming mid-turn reopens the reinforcement announcement")
+	if panel != null:
+		var shown := _count_texture_rects(panel)
+		check(shown == granted,
+			"NO-170: the resumed announcement shows exactly what Stock received (%d shown, %d granted)"
+				% [shown, granted])
+	rf_r.queue_free()
 	await process_frame
 
 	print("---")

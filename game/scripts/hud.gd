@@ -14,6 +14,9 @@ const Guide := preload("res://scripts/guide.gd")
 const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
 const Armies := preload("res://scripts/armies.gd")
+const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
+const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -73,31 +76,29 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## phone means editing one place. Canvas px on the 480-wide viewport. Nothing
 ## here is measured at runtime: game.gd's board solve reads HEADER_H, and the
 ## notch inset (g.safe_top) is ADDED above it, never taken out of it.
-## NO-125: hit the ticket's 75px target. Font.get_height() measured on Aux
-## (2026-09-19) showed the LEFT column's three stacked rows (Score, Gold,
-## Clock) don't fit 75 at the old CLOCK_FONT (36 -> 50px tall) — Score+Gold
-## alone are 48px, leaving only 23px for the Clock once HEADER_PAD_Y*2 is
-## paid, and 36 needs 50. 75/50 only clear that budget if either the Clock
-## shrinks or Score/Gold do; the ticket protects the Clock specifically, but
-## Score/Gold shrinking to fit was left open, so that's the lever pulled
-## here: CLOCK_FONT drops 36 -> 15 (get_height 22px). 16 (23px) lands
-## exactly on the 23px boundary with zero slack against rounding; 15 leaves
-## 1px, matching how tight this same column's fit already ran before this
-## ticket (SCORE_FONT's comment: 109 of 110, never landed on the exact
-## edge). 15 is legible — it's the same size the ⚑ Wave counter already
-## ships at (COUNTER_FONT) — but it costs the Clock its old visual
-## prominence as the biggest thing in the Header; it now reads at the same
-## size as the smallest counters instead of 2x their height.
-const HEADER_H := 75.0
+## NO-162: restacks the Header. Stock anchors to the top instead of centring
+## in HEADER_H; Wave/Turn move from the centre column to under the Stock+Menu
+## row (right side, bottom-flush); Gold takes Wave/Turn's old centre-column
+## slot (also bottom-flush); the Score's ★ is dropped, and Gold's $ moves
+## after its number. Moving Gold out drops the LEFT column to two rows
+## (Score, Clock) instead of NO-125's three — that's the room the Clock buys
+## back: CLOCK_FONT returns to its pre-NO-125 value (36, 50px tall per that
+## ticket's own Aux measurement). LEFT needs Score(24) + Clock(50) = 74; the
+## RIGHT column needs the same 74 (Stock's 52px button, top-flush, plus the
+## Wave/Turn stack's 44px, bottom-flush, at unchanged COUNTER_FONT). Both
+## columns share one HEADER_H, so it grows to fit the larger of the two plus
+## a few px of slack: 75 -> 100. UNVERIFIED — no Godot run; these are the
+## same get_height() figures NO-125 measured on Aux, not a fresh measurement.
+const HEADER_H := 100.0
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
-const HEADER_PAD_Y := 2.0 ## NO-125: halved from 4 — the only slack left once HEADER_H is at its content floor
+const HEADER_PAD_Y := 2.0
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
-const CLOCK_FONT := 15 ## NO-125: shrunk from 36 to fit 75 (see the HEADER_H note above) — was the largest text in the Header, now matches COUNTER_FONT
-const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125): 2 + 24 + 24 + 22 fits the 75, 1px to spare
+const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to fit the old HEADER_H
+const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125)
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
-const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
-const SYMBOL_W := 16.0 ## NO-114: fixed column for ★/$ so their digits align
+const COUNTER_W := 150.0 ## width of the Wave/Turn column and the Gold column; a King's name ellipsises past it
+const SYMBOL_W := 16.0 ## NO-114: fixed-width symbol column so a row's own digits don't jitter as its symbol's glyph width changes
 const MENU_FONT := 15
 const MENU_W := 34.0 ## the ☰ button's footprint in the corner
 const STOCK_ICON := 44 ## the piece icon on the Stock button
@@ -129,6 +130,12 @@ const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
 ## rather than a second hand-picked constant that could drift from it.
 ## Captured (~154px avail) fits 2; Stock (~314px avail) fits 4.
 const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## NO-164: a fixed visible divider between Captured Stock and Stock — was
+## nothing (separation 0), relying only on incidental slack (NO-135) landing
+## near the boundary, which isn't always there. Comes out of Stock's own
+## width (cap_w is still the NO-84 fixed fraction), so the split point never
+## moves as pieces are captured or deployed, same as before.
+const STOCK_DRAWER_GUTTER := 6.0
 ## ----------------------------------------------------------------------------
 ## The first King's wave (data/kings.gd: "wave 50 -> king 1"; data/waves.gd row
 ## 50). The ⚑ Wave counter's denominator until that King falls (NO-82).
@@ -310,10 +317,15 @@ var army_ability_hint := Label.new()
 ## for whether or not the band is ever open (coordinator review 2026-09-19).
 var army_band := PanelContainer.new()
 var army_band_open := true
-## The wedge button between Inventory and Shop that reopens army_band; visible
-## only while the band is collapsed (refresh() never touches it — build()
-## sets its visibility once per toggle, there is nothing state-dependent to
-## redraw every frame).
+## NO-163: the ONE control that opens/closes army_band, anchored in the
+## button row between Inventory and Shop — ALWAYS visible there, never
+## moving. Before this it was two separate buttons in two separate places
+## (a "▴ Hide" wedge inside army_band itself, at the top of the header area;
+## this wedge, only shown once collapsed): the affordance for "control the
+## band" jumped from the top of the screen to the button row depending on
+## state, which is the exact "moves under the player's finger" failure this
+## ticket named. Now it's one Button whose glyph flips (_update_band_toggle
+## below) and whose position never does.
 var army_band_reopen := Button.new()
 ## NO-128: separation inside army_band's internal VBox. Its own constant (not
 ## reused from elsewhere) because it is a tighter internal stack, not a deck
@@ -369,6 +381,32 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
 
 
+## NO-165: a section heading inside the Inventory drawer (Items, Artefacts).
+static func _section_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	return l
+
+
+## NO-165: an unfilled slot, signifying room left against whatever actually
+## bounds the holding (ItemLogic.cap / ArtefactHooks.cap) — same
+## Tuning.OFFBOARD_ICON footprint as a real cell (NO-132: a row of
+## placeholders is still a row for the 5-column grid standard). Decorative
+## only: MOUSE_FILTER_IGNORE, not PASS — a plain Control with no gui_input at
+## all can never become a click target or grow a long-press, which is a
+## stronger guarantee than the real cells' deliberate PASS (NO-45) needs to
+## make for their own drag-scroll passthrough.
+static func _empty_slot() -> Control:
+	var slot := Panel.new()
+	slot.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	slot.add_theme_stylebox_override("panel",
+		_surface(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.14), 6))
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return slot
+
+
 ## NO-119: the tooltip/long-press text for an Items or Artefacts grid cell —
 ## name on its own line, then the description. Shared so a cell's tap target
 ## (no name text any more) and the popup that names it can never say two
@@ -392,8 +430,9 @@ func build(game) -> void:
 	header_bg.size = Vector2(vp.x, g.hud_top)
 	header_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header_bg)
-	# LEFT: Score, then Gold, then Clock at the bottom (NO-125 restack; was
-	# Clock/Score/Gold, NO-82 stories 4-5 — Max wants the timer last).
+	# LEFT: Score, then Clock underneath (NO-162: Gold moved out to the centre
+	# column, into the Wave/Turn counters' old spot — see the CENTRE/RIGHT
+	# comments below).
 	clock_label.add_theme_font_size_override("font_size", CLOCK_FONT)
 	# NO-125: the box follows the font's own metric instead of a hardcoded
 	# constant, so the next CLOCK_FONT change resizes it automatically rather
@@ -412,50 +451,60 @@ func build(game) -> void:
 	score_pts_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
 	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
-	# NO-114: ★ and $ are different glyph widths, so the bare symbol+number
-	# labels didn't line up their digits. A fixed-width symbol column fixes it
-	# without a monospace font.
-	var score_symbol := Label.new()
-	score_symbol.text = "★"
-	score_symbol.add_theme_font_size_override("font_size", SCORE_FONT)
-	score_symbol.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	score_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
+	# NO-162: the ★ in front of the Score is gone — nothing else shares the
+	# LEFT column any more, so there is nothing left to align its digits
+	# against (NO-114's original reason for the fixed symbol column). Gold's
+	# $ moves AFTER its number instead of before it; SYMBOL_W still fixes its
+	# own column so the number's width never pushes the $ around.
 	var gold_symbol := Label.new()
 	gold_symbol.text = "$"
 	gold_symbol.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_symbol.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	gold_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
 	score_row.add_theme_constant_override("separation", 0)
-	# NO-126: zeros immediately after the symbol column — same x as the Gold
-	# row's value (NO-114's alignment), the odometer padding just rides ahead
-	# of the coloured digits instead of replacing them.
-	for l in [score_symbol, score_zeros_label, score_label, score_pts_label]:
+	for l in [score_zeros_label, score_label, score_pts_label]:
 		score_row.add_child(l)
-	gold_row.add_theme_constant_override("separation", 0)
-	for l in [gold_symbol, gold_label]:
+	gold_row.add_theme_constant_override("separation", 4) # NO-162: a gap now that $ trails the number
+	gold_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	for l in [gold_label, gold_symbol]:
 		gold_row.add_child(l)
 	var left := VBoxContainer.new()
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
 	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
 	left.add_theme_constant_override("separation", 0)
-	for l in [score_row, gold_row, clock_label]:
+	for l in [score_row, clock_label]:
 		left.add_child(l)
 	add_child(left)
-	# CENTRE, flush to the bottom: ⚑ Wave over turns. The column has a fixed
-	# width so a long King name is cut with an ellipsis rather than pushing into
-	# the Stock button (story 20).
+	# CENTRE, flush to the bottom (NO-162): Gold now lives here — exactly the
+	# spot the Wave/Turn counters used to occupy — because those counters
+	# moved to the right, under the Stock+Menu row (see RIGHT, below).
 	var mid := VBoxContainer.new()
 	mid.position = Vector2((vp.x - COUNTER_W) / 2.0, y0)
 	mid.custom_minimum_size = Vector2(COUNTER_W, HEADER_H - HEADER_PAD_Y)
 	mid.alignment = BoxContainer.ALIGNMENT_END
-	mid.add_theme_constant_override("separation", 0)
+	mid.add_child(gold_row)
+	add_child(mid)
+	# RIGHT, under the Stock+Menu row (NO-162; Wave/Turn used to be CENTRE):
+	# ⚑ Wave over turns, flush to the bottom of its own column exactly like
+	# Gold above — the two buttons occupy the TOP of the header, this stack
+	# the BOTTOM, so the two never have to share a measured height (CLAUDE.md
+	# layout traps: "Centring content in a span splits empty space into two
+	# gaps. Flush to one edge puts all the slack in one place"). Same fixed
+	# width as before so a long King name still ellipsises rather than
+	# pushing into the Stock button (story 20); right edge lines up with the
+	# Menu button's.
+	var right_counters := VBoxContainer.new()
+	right_counters.position = Vector2(vp.x - HEADER_PAD_X - COUNTER_W, y0)
+	right_counters.custom_minimum_size = Vector2(COUNTER_W, HEADER_H - HEADER_PAD_Y)
+	right_counters.alignment = BoxContainer.ALIGNMENT_END
+	right_counters.add_theme_constant_override("separation", 0)
 	for l: Label in [wave_label, turn_label]:
 		l.add_theme_font_size_override("font_size", COUNTER_FONT)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		mid.add_child(l)
+		right_counters.add_child(l)
 	wave_label.modulate = Color(1, 1, 1, 0.85)
-	add_child(mid)
+	add_child(right_counters)
 	# RIGHT: the menu in the corner, the Stock button just left of it.
 	king_ability_button.add_theme_font_size_override("font_size", 13)
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
@@ -523,8 +572,11 @@ func build(game) -> void:
 	# button with the usual HEADER_GAP, centred in the Header's height.
 	var stock_size := Vector2(STOCK_ICON, STOCK_ICON) + Vector2(stock_pad, stock_pad) * 2.0
 	stock_btn.custom_minimum_size = stock_size
+	# NO-162: anchored to the top (was vertically centred in HEADER_H) — the
+	# Wave/Turn stack now sits directly under it, bottom-flush in the same
+	# column (see RIGHT, above), so Stock has to own the TOP of that space.
 	stock_btn.position = Vector2(menu_button.position.x - HEADER_GAP - stock_size.x,
-		y0 + (HEADER_H - stock_size.y) / 2.0)
+		y0 + HEADER_PAD_Y)
 	add_child(stock_btn)
 	# the count badge, same idiom as a pool stack's: a corner label over the icon
 	stock_badge.add_theme_font_size_override("font_size", STOCK_BADGE_FONT)
@@ -558,7 +610,10 @@ func build(game) -> void:
 	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
 	deck.position = Vector2(0, deck_top)
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
-	deck.add_theme_constant_override("separation", 6)
+	# NO-163: was 6 — the gap between the drawers row and the thumb row
+	# underneath, closed so the whole deck (and the board it's traded against,
+	# ADR-0004) is shorter. game.gd's DECK_ROWS drops by the same 6.
+	deck.add_theme_constant_override("separation", 0)
 	add_child(deck)
 	# NO-145 (hardware round 2): deck used to also be hooked here as a
 	# swipe-to-open surface (its own unclaimed area, MOUSE_FILTER_STOP).
@@ -588,21 +643,24 @@ func build(game) -> void:
 		drawer_changed.emit())
 	drawer_buttons["inventory"] = inv
 	bar.add_child(inv)
-	# NO-128: the wedge that reopens army_band once it's collapsed. Fixed-
-	# width (no EXPAND_FILL), so Inventory and Shop stay equal to EACH OTHER
-	# on either side of it rather than to their old, wider halves.
-	army_band_reopen.text = "▾"
-	army_band_reopen.tooltip_text = "Show Army Power"
+	# NO-128/NO-163: the wedge that opens AND closes army_band. Fixed-width (no
+	# EXPAND_FILL), so Inventory and Shop stay equal to EACH OTHER on either
+	# side of it rather than to their old, wider halves. ALWAYS visible now
+	# (was hidden while the band was open, when a second button — band_collapse,
+	# inside army_band itself — did the closing instead; see this var's own
+	# declaration for why that was wrong).
 	army_band_reopen.add_theme_font_size_override("font_size", 13)
 	_style_button(army_band_reopen, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
-	army_band_reopen.visible = false
 	army_band_reopen.pressed.connect(func() -> void:
-		if drawer_open == "inventory": # NO-128: same screen rect as army_band
-			set_drawer("inventory") # already "inventory" -> toggles it closed
-			drawer_changed.emit()
-		army_band_open = true
-		army_band.visible = true
-		army_band_reopen.visible = false)
+		if army_band_open:
+			collapse_army_band()
+		else:
+			if drawer_open == "inventory": # NO-128: same screen rect as army_band
+				set_drawer("inventory") # already "inventory" -> toggles it closed
+				drawer_changed.emit()
+			army_band_open = true
+			army_band.visible = true
+		_update_band_toggle())
 	bar.add_child(army_band_reopen)
 	shop_button.text = "Shop"
 	shop_button.add_theme_font_size_override("font_size", 17)
@@ -795,7 +853,6 @@ func build(game) -> void:
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# custom_minimum_size.x is set below, once band_collapse's width is known
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
 	# issue 100 put this at the top of the Inventory drawer. Design C brings it
@@ -810,16 +867,7 @@ func build(game) -> void:
 	var band_header := HBoxContainer.new()
 	army_power_label.add_theme_color_override("font_color", Color(0.749, 0.878, 0.690))
 	army_power_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	# room for band_collapse beside it, inside army_band's own -20px padding
-	army_power_label.custom_minimum_size = Vector2(vp.x - 24.0 - 28.0, 0)
 	band_header.add_child(army_power_label)
-	var band_collapse := Button.new()
-	band_collapse.text = "▴"
-	band_collapse.tooltip_text = "Hide"
-	band_collapse.add_theme_font_size_override("font_size", 13)
-	_style_button(band_collapse, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 4, 7, 1)
-	band_collapse.pressed.connect(collapse_army_band)
-	band_header.add_child(band_collapse)
 	band_col.add_child(band_header)
 	band_col.add_child(army_ability_hint) # NO-128: moved out of act_row
 	# NO-128: the King Abilities button, built (styled, wired to
@@ -847,9 +895,12 @@ func build(game) -> void:
 	# anywhere in the band that isn't one of ITS OWN controls falls through
 	# to the board underneath. Godot does NOT cascade IGNORE to children
 	# (same CLAUDE.md bullet — _set_drawer_clickable exists for exactly this
-	# asymmetry), so band_collapse and king_ability_button, both left at
-	# their default STOP, keep working — a filter set high in this tree has
-	# no effect on a control below it that never asked to inherit it.
+	# asymmetry), so king_ability_button, left at its default STOP, keeps
+	# working — a filter set high in this tree has no effect on a control
+	# below it that never asked to inherit it. NO-163 moved the band's own
+	# open/close control (band_collapse) out of army_band entirely, onto the
+	# deck's nav_row (army_band_reopen) — nothing inside army_band claims
+	# input any more except king_ability_button.
 	# army_power_label and army_ability_hint need no change: Label already
 	# defaults to IGNORE.
 	army_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -880,7 +931,11 @@ func build(game) -> void:
 	# rows): the drawers row under the board, the thumb row last.
 	deck.move_child(nav_row, 0)
 	deck.move_child(act_row, 1)
+	# NO-165: name the two sections — the drawer used to run straight from
+	# Items into Artefacts with nothing marking the seam.
+	inv_box.add_child(_section_label("Items"))
 	inv_box.add_child(items_grid)
+	inv_box.add_child(_section_label("Artefacts"))
 	inv_box.add_child(artefacts_grid)
 	var drawer_specs := [ # name, content, x, width, height
 		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
@@ -967,8 +1022,16 @@ func build(game) -> void:
 	cap_scroll.add_child(captured_grid)
 	cap_col.add_child(cap_scroll)
 	stock_row.add_child(cap_col)
-	# RIGHT: Stock, the remaining two thirds.
-	var stock_w: float = vp.x - cap_w
+	# NO-164: the gutter — a fixed, always-visible divider, unlike the
+	# incidental slack NO-135 already routes here. IGNORE: purely decorative,
+	# never a target and never in the way of a drag reaching either scroller.
+	var gutter := ColorRect.new()
+	gutter.color = Color(1, 1, 1, 0.14)
+	gutter.custom_minimum_size = Vector2(STOCK_DRAWER_GUTTER, stock_h)
+	gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stock_row.add_child(gutter)
+	# RIGHT: Stock, the remaining two thirds minus the gutter just added.
+	var stock_w: float = vp.x - cap_w - STOCK_DRAWER_GUTTER
 	var stock_col := VBoxContainer.new()
 	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
 	var stock_scroll := ScrollContainer.new()
@@ -1041,6 +1104,7 @@ func build(game) -> void:
 	# drawers row to the bottom of the screen and undoing the row order set in
 	# build() - which is exactly how it presented: the tree said one order and
 	# the screen showed another.
+	_update_band_toggle() # NO-163: the toggle's initial glyph (army_band_open starts true)
 
 
 ## NO-118: a panel's own mouse_filter alone is not enough — Godot does not
@@ -1215,13 +1279,31 @@ func update_clock(ms: float) -> void:
 	_clock_seen = true
 
 
-## NO-128: collapses army_band — the visibility half of what the "▴" button
+## NO-128: collapses army_band — the visibility half of what army_band_reopen
 ## and the mutual-exclusion guards below do. Public: game.gd's SETUP boot
 ## calls it too (see its own call site for why).
 func collapse_army_band() -> void:
 	army_band_open = false
 	army_band.visible = false
-	army_band_reopen.visible = true
+	_update_band_toggle()
+
+
+## NO-163: the single toggle button's glyph/tooltip, kept in one place so
+## build()'s initial state, every press, and refresh()'s King-Abilities
+## warning can never say three different things. OPEN never warns even with
+## an active King ability — king_ability_button is visible INSIDE the band
+## then, so the toggle itself only ever needs to offer "Hide". CLOSED
+## borrows the warning glyph so an active ability stays visible while
+## collapsed, same as before NO-163 merged the two buttons into this one.
+func _update_band_toggle() -> void:
+	var warn: bool = g != null and not g.king_abilities_active.is_empty()
+	if army_band_open:
+		army_band_reopen.text = "▴"
+		army_band_reopen.tooltip_text = "Hide"
+	else:
+		army_band_reopen.text = "⚠▾" if warn else "▾"
+		army_band_reopen.tooltip_text = "King Abilities in force — tap to show" \
+			if warn else "Show Army Power"
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -1476,16 +1558,12 @@ func refresh() -> void:
 	king_ability_button.visible = not g.king_abilities_active.is_empty()
 	# NO-128 (coordinator review 2026-09-19): an active King ability must
 	# never go invisible just because the band is collapsed — that's exactly
-	# the thing a player must not lose track of. The wedge carries its own
-	# warning while one is active, whether or not the band happens to be
-	# open right now; tapping it still just reopens the band (uniform
-	# behaviour) rather than skipping straight to the modal.
-	if g.king_abilities_active.is_empty():
-		army_band_reopen.text = "▾"
-		army_band_reopen.tooltip_text = "Show Army Power"
-	else:
-		army_band_reopen.text = "⚠▾"
-		army_band_reopen.tooltip_text = "King Abilities in force — tap to show"
+	# the thing a player must not lose track of. The CLOSED glyph carries its
+	# own warning while one is active; tapping it still just reopens the band
+	# (uniform behaviour) rather than skipping straight to the modal. NO-163:
+	# both glyphs (open/closed) now live in _update_band_toggle, so a refresh
+	# mid-open never overwrites the "▴ Hide" state with the closed one.
+	_update_band_toggle()
 	# armed-placement tint (2026-07-07 palette) marks the toggle as active
 	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
 	arrow_clear_button.visible = g.arrow_mode
@@ -1532,8 +1610,8 @@ func refresh() -> void:
 	army_ability_button.text = "★ %s" % kit.ability_name
 	# NO-32: the drawer chip was the only place the Ability's DESCRIPTION lived
 	# (its tooltip). The chip is gone, so the deck button inherits that tooltip
-	# verbatim — the button's own text carries the name and the cost, the tooltip
-	# carries what the Ability actually does.
+	# verbatim — the tooltip is the one place the cost lives now (NO-163
+	# dropped "1 Action" from the button's own text; ready needs no caveat).
 	army_ability_button.tooltip_text = "%s (1 Action)\n%s" % [
 		kit.power_name + " — always on. " + kit.ability_name, kit.ability_desc]
 	if g.army_ability_used_this_wave:
@@ -1545,7 +1623,6 @@ func refresh() -> void:
 		army_ability_button.disabled = true
 		army_ability_button.self_modulate = Color(1.0, 0.66, 0.62)
 	else:
-		army_ability_button.text += "  ·  1 Action"
 		army_ability_button.disabled = false
 		army_ability_button.self_modulate = Color(1.3, 1.16, 0.72)
 	# NO-115: a reminder of what pressing this DOES, since the tooltip above
@@ -1646,17 +1723,9 @@ func _stacks() -> Array:
 ## _long_press_input for both kinds, instead of passive rows having their own
 ## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
 ## caller).
-## "no artefacts yet" still gates on the whole g.artefacts list, not just the
-## passive subset: holding only an activatable Artefact is not "nothing".
 func _rebuild_artefacts_grid() -> void:
 	for c in artefacts_grid.get_children():
 		c.queue_free()
-	if g.artefacts.is_empty():
-		var none := Label.new()
-		none.text = "no artefacts yet"
-		none.modulate = Color(1, 1, 1, 0.6)
-		artefacts_grid.add_child(none)
-		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
@@ -1671,6 +1740,15 @@ func _rebuild_artefacts_grid() -> void:
 	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
 	# scope to. The NO-120/121 hide_tip() guards this used to need are gone
 	# with it.
+	# NO-165: empty slots signify the CAP itself (ArtefactHooks.cap), not
+	# "one more grid cell" — a stacked cell already holds several copies
+	# (counts[key] above) behind its ×N badge, so the capacity actually spent
+	# is g.artefacts.size() (one per COPY, per that cap's own doc comment),
+	# never seen.size() (one per KIND). This also replaces the old "no
+	# artefacts yet" text for the zero-held case: a row of empty slots says
+	# the same thing and additionally states how many.
+	for i in ArtefactHooks.cap(g) - g.artefacts.size():
+		artefacts_grid.add_child(_empty_slot())
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -1812,6 +1890,11 @@ func _rebuild_items_grid() -> void:
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
 		items_grid.add_child(btn)
+	# NO-165: the remaining room, signified — ItemLogic.cap is the real bound
+	# (base 3, +3 per held Area 51 Parking Permit), so this is never a
+	# made-up number.
+	for i in ItemLogic.cap(g) - g.items.size():
+		items_grid.add_child(_empty_slot())
 
 
 ## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),
@@ -1861,7 +1944,16 @@ func _build_stack_button(st: Dictionary) -> Button:
 	var id: String = st.id
 	var cap: bool = st.cap
 	if g.textures.has(id): # piece icon instead of glyph text (round 3)
-		btn.icon = g.piece_tex(id) # Stock is always yours: the player token
+		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
+		# token says so without a label. A painted light/dark pair gets this
+		# for free from piece_tex's own owner param; the King's shared
+		# monochrome svg (mono_art) carries no side colour of its own — that
+		# only happens at board-draw time (game.gd's _draw_piece), which this
+		# Button icon bypasses entirely — so it's tinted the same
+		# COL_SIDE_ENEMY the board itself uses.
+		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
+		if cap and g.mono_art.has(id):
+			btn.modulate = g.COL_SIDE_ENEMY
 		btn.expand_icon = true
 		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
 		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
@@ -1986,8 +2078,11 @@ func _build_stack_button(st: Dictionary) -> Button:
 		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 	elif not cap and g.merge_highlights.has(id):
 		btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-	elif cap:
-		btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
+	# NO-164: the old "captured stock: warm tint" wash is gone — the enemy
+	# (dark) sprite set above IS the distinguishing signal now, so a captured
+	# entry's modulate stays at whatever the icon block set (default WHITE,
+	# or COL_SIDE_ENEMY for the King's untinted mono svg) unless armed/merge
+	# already claimed it above.
 	if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
 		var mark := Label.new()
 		mark.text = "◆"

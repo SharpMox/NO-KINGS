@@ -323,10 +323,15 @@ static func _resume_turn(g, cfg: Dictionary) -> void:
 		g.modals.show_box(g.box_offer)
 	if g.pending_reinforce and not g.autoplay:
 		# NO-141: display only — the grant already happened when the screen
-		# first fired and stock was saved with it (_reinforce_ids() is
-		# deterministic off next_army, so recomputing it here for display
-		# never re-grants); same idempotent-reopen idiom as the Box above.
-		g.modals.show_reinforce(g._reinforce_ids())
+		# first fired and stock was saved with it. NO-170: _reinforce_grant_ids()
+		# (deterministic off next_army, same as _reinforce_ids() underneath) is
+		# the SAME pure function _grant_reinforcements() built the original
+		# grant from, so recomputing it here for display can never drift from
+		# what Stock actually holds — same idempotent-reopen idiom as the Box
+		# above. Do not call _reinforce_ids() here: that's one-of-each, and
+		# the actual grant is two-of-each (NO-170) — showing that would
+		# silently under-report what the player was already given.
+		g.modals.show_reinforce(g._reinforce_grant_ids())
 	if g.pending_shop_open and not g.autoplay:
 		g.pending_shop_open = false
 		g._open_shop()

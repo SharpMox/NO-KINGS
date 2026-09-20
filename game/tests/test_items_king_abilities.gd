@@ -144,7 +144,7 @@ func _init() -> void:
 	# not SETUP), so it stays OPEN — where king_ability_button itself (already
 	# asserted above) is the visible warning, and the single toggle just
 	# offers "Hide", same as it would with no ability active at all.
-	check(cj.hud.army_band_reopen.text == "▴",
+	check(cj.hud.army_band_reopen.text == "ⓘ",
 		"the band-toggle offers Hide while open — the King Abilities button inside the band carries the warning")
 	WaveLogic.spawn(cj, 4)
 	Economy.earn(cj, 10)

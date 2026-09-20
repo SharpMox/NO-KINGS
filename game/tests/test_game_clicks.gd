@@ -780,8 +780,11 @@ func _init() -> void:
 	# this is a portrait touch game — a hover tooltip is unreachable once a run
 	# starts, so a Power that changes what is legal was effectively invisible.
 	var kit: Dictionary = Armies.entry(game.next_army)
+	# NO-180: the Power's name (Title row) and its effect (new Subtitle row,
+	# army_power_desc_label) are two separate Labels now, not one combined
+	# line — check each where it actually lives.
 	check(kit.power_name in game.hud.army_power_label.text
-			and kit.power_desc in game.hud.army_power_label.text,
+			and kit.power_desc in game.hud.army_power_desc_label.text,
 		"the Army Power is readable in the drawer without hovering (%s)" % kit.power_name)
 	# design C moved the Ability out of this drawer and onto the deck, so its
 	# cost is asserted where it now lives. The point of the move is the next
@@ -829,17 +832,18 @@ func _init() -> void:
 	check(deck.get_child_count() == 2,
 		"NO-128: the band left the Deck — drawers and act are the only two rows left (%d)"
 			% deck.get_child_count())
-	# NO-128: nav_row grew a middle child, army_band_reopen, that reopens the
-	# band once it's collapsed. It isn't EXPAND_FILL, so Inventory and Shop —
-	# now the first and third children — stay equal to EACH OTHER either side
-	# of it, just narrower than their old halves.
+	# NO-128 gave nav_row a middle child, army_band_reopen, that reopens the
+	# band once it's collapsed; NO-180 moved it to the LEFT of Inventory/Shop
+	# and gave it a square, fixed-size footprint (not EXPAND_FILL), so
+	# Inventory and Shop — now the second and third children — stay equal to
+	# EACH OTHER regardless of where the wedge sits.
 	var nav_kids: Array = HUD.nav_row.get_children()
-	check(nav_kids.size() == 3 and nav_kids[0] == HUD.drawer_buttons["inventory"]
-			and nav_kids[1] == HUD.army_band_reopen and nav_kids[2] == HUD.shop_button,
-		"NO-128: the button row is Inventory, the band's reopen wedge, then Shop")
-	check(absf((nav_kids[0] as Control).size.x - (nav_kids[2] as Control).size.x) <= 1.0,
+	check(nav_kids.size() == 3 and nav_kids[0] == HUD.army_band_reopen
+			and nav_kids[1] == HUD.drawer_buttons["inventory"] and nav_kids[2] == HUD.shop_button,
+		"NO-180: the button row is the band's reopen wedge, then Inventory, then Shop")
+	check(absf((nav_kids[1] as Control).size.x - (nav_kids[2] as Control).size.x) <= 1.0,
 		"NO-83: ...Inventory and Shop stay equal halves either side of the wedge (%s vs %s)"
-			% [(nav_kids[0] as Control).size.x, (nav_kids[2] as Control).size.x])
+			% [(nav_kids[1] as Control).size.x, (nav_kids[2] as Control).size.x])
 	# Opening Inventory above (line 684, to reach army_power_label/the Ability
 	# button) already exercised the NO-128 mutual exclusion below — it
 	# silently collapsed army_band as a side effect, and closing Inventory
@@ -851,7 +855,9 @@ func _init() -> void:
 	# NO-163: army_band_reopen is now ALWAYS visible (one control, anchored to
 	# the button row, that flips its own glyph rather than two controls that
 	# traded visibility) — assert the OPEN glyph instead of "not visible".
-	check(HUD.drawer_open == "" and HUD.army_band_reopen.text == "▴"
+	# NO-180 replaced the old ▴/▾ open/closed pair with a static round-"i"
+	# icon in both states (the warning glyph, unaffected here, is separate).
+	check(HUD.drawer_open == "" and HUD.army_band_reopen.text == "ⓘ"
 			and HUD.army_band.visible and HUD.army_band_open,
 		"NO-128/NO-163: reopening the band also closed Inventory (same screen rect)")
 	# NO-128: army_band overlays the SAME screen rect Inventory's drawer opens
@@ -865,10 +871,10 @@ func _init() -> void:
 	_click(HUD.drawer_buttons["inventory"].get_global_rect().get_center())
 	await _await_drawer_settled(game, "inventory")
 	check(HUD.drawer_open == "inventory" and not HUD.army_band.visible
-			and HUD.army_band_reopen.text == "▾",
+			and HUD.army_band_reopen.text == "ⓘ",
 		"NO-128/NO-163: opening Inventory collapses army_band (same screen rect)")
 	_click(HUD.army_band_reopen.get_global_rect().get_center())
-	check(HUD.drawer_open == "" and HUD.army_band.visible and HUD.army_band_reopen.text == "▴",
+	check(HUD.drawer_open == "" and HUD.army_band.visible and HUD.army_band_reopen.text == "ⓘ",
 		"NO-128/NO-163: reopening the band closes Inventory back (same screen rect)")
 	# NO-128 finally gives king_ability_button the home NO-83 promised it: it
 	# is in the tree now (inside army_band), just hidden until an ability is
@@ -1659,9 +1665,9 @@ func _init() -> void:
 		"army_band transparency: outside tap dismisses Stock, keeps the armed piece")
 	# Row 0 is the row army_band's own geometry fully covers at a tile's
 	# CENTER point (the point every click helper in this file targets):
-	# ARMY_BAND_H (78) exceeds one tile (~51) by more than the 6px gap
-	# between the board and the deck, verified by hand against the formula,
-	# not measured.
+	# ARMY_BAND_H (105, NO-180) plus ARMY_BAND_MARGIN (6) together exceed one
+	# tile (~51) by more than the 6px gap between the board and the deck,
+	# verified by hand against the formula, not measured.
 	_click(game._tile_px(Vector2i(0, 0)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.board.has(Vector2i(0, 0)),

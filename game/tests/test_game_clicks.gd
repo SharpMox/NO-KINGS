@@ -951,25 +951,51 @@ func _init() -> void:
 	check(clock_text_w <= HUD.clock_label.size.x + 0.5,
 		"the measured text width fits inside the Label's own rect (%s vs rect %s)"
 			% [clock_text_w, HUD.clock_label.size.x])
+	# NO-175: the Clock is now CENTRED in the middle band (not confined to
+	# a left column, since Gold moved out of the way) — the band runs from
+	# where the fixed-width LEFT column ends to where the Stock button
+	# begins. Containment against the Stock button's own live rect, not a
+	# re-derivation of build()'s formula, so this fails on a real overlap
+	# even if the two drift apart.
 	var clock_r: Rect2 = HUD.clock_label.get_global_rect()
-	var mid_left_x: float = (game.get_viewport_rect().size.x - HUD.COUNTER_W) / 2.0
-	check(clock_r.position.x >= HUD.HEADER_PAD_X - 0.5 and clock_r.end.x <= mid_left_x + 0.5,
-		"the Clock's rect never starts before the left gutter or reaches into the Gold column (%s, mid starts at %s)"
-			% [clock_r, mid_left_x])
+	var mid_left_edge: float = HUD.HEADER_PAD_X + HUD.COUNTER_W
+	check(clock_r.position.x >= mid_left_edge - 0.5 and clock_r.end.x <= sr.position.x + 0.5,
+		"NO-175: the Clock's rect stays past the left column (%s) and clear of the Stock button (%s)"
+			% [mid_left_edge, sr.position.x])
 	check(HUD.clock_label.size.y >= clock_font_res.get_height(clock_font_applied) - 0.5,
 		"the Clock line covers its own font's height")
-	var cr: Rect2 = HUD.clock_label.get_global_rect()
-	var gr: Rect2 = HUD.gold_label.get_global_rect()
-	var sr2: Rect2 = HUD.score_label.get_global_rect()
+	# NO-175, 3rd pass fix: these read the ZEROS labels, not the coloured-
+	# digit labels — score_label/gold_label are each their row's SECOND
+	# child, offset by their own zero-padding width, which only
+	# coincidentally matches between rows when Score and Gold happen to have
+	# the same digit count. The zeros label is each row's actual first/
+	# left-most child, so comparing ITS position is what genuinely tests
+	# "shares a left edge".
+	var gr: Rect2 = HUD.gold_zeros_label.get_global_rect()
+	var sr2: Rect2 = HUD.score_zeros_label.get_global_rect()
 	var wtr: Rect2 = HUD.wave_label.get_global_rect()
-	# NO-162: restacked again — LEFT is now just Score then Clock (Gold moved
-	# to the CENTRE column, in Wave/Turn's old bottom-flush spot; Wave/Turn
-	# moved to the RIGHT, under Stock+Menu).
-	check(sr2.position.y >= game.safe_top and sr2.end.y <= cr.position.y + 0.5
-			and cr.end.y <= game.hud_top + 0.5,
-		"Score, then Clock, both inside the Header and below the inset")
-	check(gr.position.y >= game.safe_top and gr.end.y <= game.hud_top + 0.5,
-		"Gold sits inside the Header too, in the centre column")
+	var trr: Rect2 = HUD.turn_label.get_global_rect()
+	# NO-175, 3rd pass (Max's revised mockup supersedes the 2nd pass, which
+	# stacked Turn/Wave into the left column): LEFT is now just Score, then
+	# Gold; Turn/Wave is a small centred line directly ABOVE the Clock, in
+	# the same middle band. Containment against the Clock's and Stock's own
+	# live rects, not a re-derivation of the centring formula, so these fail
+	# on a real overlap or an off-band regression even if the exact pixel
+	# math drifts.
+	check(sr2.position.y >= game.safe_top - 0.5 and sr2.end.y <= gr.position.y + 0.5,
+		"NO-175: Score sits above Gold in the left column")
+	check(gr.end.y <= game.hud_top + 0.5,
+		"NO-175: Gold stays inside the Header")
+	check(absf(sr2.position.x - gr.position.x) <= 0.5,
+		"NO-175: 'the numbers aligned' — Score and Gold's digits share a left edge (%s vs %s)"
+			% [sr2.position.x, gr.position.x])
+	check(is_equal_approx(wtr.position.y, trr.position.y) and wtr.position.x >= trr.position.x,
+		"NO-175: '0/8  ⚑ 1/50' — Turn and Wave share a line, Wave after Turn")
+	check(trr.end.y <= clock_r.position.y + 0.5,
+		"NO-175: Turn/Wave sits above the Clock, not overlapping it")
+	check(trr.position.x >= mid_left_edge - 0.5 and wtr.position.x <= sr.position.x + 0.5,
+		"NO-175: Turn/Wave stays inside the middle band — past the left column (%s), clear of Stock (%s)"
+			% [mid_left_edge, sr.position.x])
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
 	# NO-131: the enlarged NO-83 tap zone is gone — the Stock button is a
@@ -977,13 +1003,24 @@ func _init() -> void:
 	# height.
 	check(sr.size.y < HUD.HEADER_H - 0.5,
 		"the Stock button's rect no longer spans the Header's full height")
-	# NO-162: Stock anchors to the TOP now (was vertically centred) — the
-	# Wave/Turn stack sits directly under it, bottom-flush in the same
-	# column, so the two never overlap vertically.
-	check(is_equal_approx(sr.position.y, game.safe_top + HUD.HEADER_PAD_Y),
-		"...it sits flush to the top of the Header instead of centred")
-	check(wtr.position.y >= sr.end.y - 0.5,
-		"...and the Wave/Turn stack starts at or below where Stock ends (NO-162: 'underneath')")
+	# NO-175: "pause menu and stock buttons are now the same size" — they
+	# differed before (Stock was icon+padding, ☰ a smaller fixed square).
+	check(is_equal_approx(sr.size.x, mr.size.x) and is_equal_approx(sr.size.y, mr.size.y),
+		"NO-175: Stock and the pause button are the same size (%s vs %s)" % [sr.size, mr.size])
+	check(is_equal_approx(sr.position.y, mr.position.y),
+		"NO-175: Stock and the pause button sit on the same row (nothing shares their column any more)")
+	# NO-175, 3rd pass: "these should be exactly the same apart from their
+	# icon and badge" — they were size-matched last pass but not style-
+	# matched (Stock used _style_button's translucent-white tint, the ☰
+	# button was still styled through the "compact" loop meant for the two
+	# off-screen buttons, a solid dark grey). Both now go through the same
+	# _style_button call, so this compares their live styleboxes directly.
+	var stock_style := stock_btn.get_theme_stylebox("normal") as StyleBoxFlat
+	var menu_style := HUD.menu_button.get_theme_stylebox("normal") as StyleBoxFlat
+	check(stock_style != null and menu_style != null
+			and stock_style.bg_color.is_equal_approx(menu_style.bg_color),
+		"NO-175: Stock and the pause button share the same style — only the glyph and badge differ (%s vs %s)"
+			% [stock_style.bg_color if stock_style else null, menu_style.bg_color if menu_style else null])
 	check(sr.position.y >= game.safe_top - 0.5, "...never above the inset")
 	check(sr.end.y <= game.hud_top + 0.5, "...and it never reaches over the board")
 	check(is_equal_approx(sr.end.x, mr.position.x - HUD.HEADER_GAP),
@@ -1065,15 +1102,45 @@ func _init() -> void:
 	game.wave = 201
 	HUD.refresh()
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
+	# NO-175 regression, re-aimed for the 3rd pass (Turn/Wave now lives in
+	# the CENTRE band, not the left column — the original "flush left"
+	# framing no longer applies). The underlying concern survives: an EMPTY
+	# Turn must not distort where Wave lands. Since the whole pair is
+	# recentred every refresh() from its OWN visible width (build()'s
+	# comment), Wave alone should still land inside the legal middle band,
+	# not off past either edge.
+	await process_frame
+	var wr: Rect2 = HUD.wave_label.get_global_rect()
+	var band_left: float = HUD.HEADER_PAD_X + HUD.COUNTER_W
+	var band_right: float = game.get_viewport_rect().size.x - HUD.HEADER_PAD_X - HUD.HEADER_BTN * 2.0 - HUD.HEADER_GAP
+	check(wr.position.x >= band_left - 0.5 and wr.position.x <= band_right + 0.5,
+		"NO-175: Wave stays inside the middle band even when Turn is blank (%s, band %s-%s)"
+			% [wr.position.x, band_left, band_right])
 	# a long King name is cut with an ellipsis: the label never leaves its
-	# column, whatever the text. NO-162: that column now sits BELOW the Stock
-	# button (not beside it), so the invariant worth asserting is width (still
-	# COUNTER_W) plus no vertical reach back up into Stock's own rect.
+	# band, whatever the text. NO-175 fix, 2nd pass: turn_label's box is
+	# HARD-SET in build() and never resized by content (a plain Control, not
+	# a Container — see build()'s own comment), so `tl.size.x` can no longer
+	# regress to the 504px overflow a live capture caught (2026-09-20, root
+	# cause: text_overrun_behavior alone does nothing without clip_text —
+	# the box grew to fit the full un-ellipsised text). 3rd pass: the cap is
+	# now the CENTRE band's width, not COUNTER_W — the left column no longer
+	# holds Turn/Wave, so re-derive the same band-width formula build() uses
+	# (mid_left_edge is already in scope, above).
+	# Since the box is fixed BY CONSTRUCTION, a rect check on it would pass
+	# even if `clip_text` were removed (CLAUDE.md: "a geometry assertion on
+	# a Control's rect cannot see clipping") — so this asserts `clip_text`
+	# itself, the property that actually makes the ink respect that fixed
+	# box, plus the size/position invariants.
+	var band_right2: float = game.get_viewport_rect().size.x - HUD.HEADER_PAD_X - HUD.HEADER_BTN * 2.0 - HUD.HEADER_GAP
+	var centre_x2: float = game.get_viewport_rect().size.x / 2.0
+	var centre_w2: float = (minf(centre_x2 - mid_left_edge, band_right2 - centre_x2) - HUD.HEADER_GAP) * 2.0
 	HUD.turn_label.text = "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
-	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.position.y >= sr.end.y - 0.5,
-		"a long King name ellipsises inside the counters column (%s wide), below Stock" % tl.size.x)
+	check(HUD.turn_label.clip_text and tl.size.x <= centre_w2 + 0.5
+			and tl.end.y <= game.hud_top + 0.5,
+		"NO-175: a long King name stays capped to the centre band (clip_text on, %s wide, band %s), still inside the Header"
+			% [tl.size.x, centre_w2])
 	game.wave = wave_was
 	game.kings_defeated = kd_was
 	game.turns_since_wave = tsw_was

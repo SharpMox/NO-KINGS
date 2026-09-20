@@ -2077,13 +2077,26 @@ func _draw_linked_dots(origin: Vector2, line: Array, col: Color) -> void:
 ## the last reachable tile (a capture there keeps its ring on top). Sizing
 ## defaults to the NO-129 move/capture dimensions; Arrow Planning's decorative
 ## overlay (unrelated feature) passes its own, unchanged, smaller numbers.
+## NO-160: drawn as ONE polygon (shaft + head), not a separate `draw_line`
+## plus triangle. The old pair put the line's end 10px short of the tip while
+## the triangle's base sat `head_len` (14/20, always > 10) back from it — so
+## the line's last few pixels fell INSIDE the triangle and, both shapes
+## sharing the same semi-transparent `col`, that patch composited twice
+## (line-under-background, then triangle-over-that), reading visibly darker:
+## the shaft showed through the arrowhead. A single draw_colored_polygon call
+## composites against the background exactly once, everywhere.
 func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color,
 		width := ARROW_WIDTH, head_len := ARROW_HEAD_LEN, head_half := ARROW_HEAD_HALF) -> void:
 	var dir := (to_px - from_px).normalized()
-	draw_line(from_px + dir * (tile * 0.35), to_px - dir * 10.0, col, width)
 	var side := Vector2(-dir.y, dir.x)
-	draw_colored_polygon(PackedVector2Array([to_px,
-		to_px - dir * head_len + side * head_half, to_px - dir * head_len - side * head_half]), col)
+	var shaft_start := from_px + dir * (tile * 0.35)
+	var shaft_end := to_px - dir * head_len # where the arrowhead base sits
+	var half_w := width * 0.5
+	draw_colored_polygon(PackedVector2Array([
+		shaft_start - side * half_w, shaft_end - side * half_w,
+		shaft_end - side * head_half, to_px, shaft_end + side * head_half,
+		shaft_end + side * half_w, shaft_start + side * half_w,
+	]), col)
 
 
 ## Arrow Planning: drag draws a decorative arrow; redrawing the same one

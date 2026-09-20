@@ -127,6 +127,12 @@ const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
 ## rather than a second hand-picked constant that could drift from it.
 ## Captured (~154px avail) fits 2; Stock (~314px avail) fits 4.
 const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## NO-164: a fixed visible divider between Captured Stock and Stock — was
+## nothing (separation 0), relying only on incidental slack (NO-135) landing
+## near the boundary, which isn't always there. Comes out of Stock's own
+## width (cap_w is still the NO-84 fixed fraction), so the split point never
+## moves as pieces are captured or deployed, same as before.
+const STOCK_DRAWER_GUTTER := 6.0
 ## ----------------------------------------------------------------------------
 ## The first King's wave (data/kings.gd: "wave 50 -> king 1"; data/waves.gd row
 ## 50). The ⚑ Wave counter's denominator until that King falls (NO-82).
@@ -983,8 +989,16 @@ func build(game) -> void:
 	cap_scroll.add_child(captured_grid)
 	cap_col.add_child(cap_scroll)
 	stock_row.add_child(cap_col)
-	# RIGHT: Stock, the remaining two thirds.
-	var stock_w: float = vp.x - cap_w
+	# NO-164: the gutter — a fixed, always-visible divider, unlike the
+	# incidental slack NO-135 already routes here. IGNORE: purely decorative,
+	# never a target and never in the way of a drag reaching either scroller.
+	var gutter := ColorRect.new()
+	gutter.color = Color(1, 1, 1, 0.14)
+	gutter.custom_minimum_size = Vector2(STOCK_DRAWER_GUTTER, stock_h)
+	gutter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stock_row.add_child(gutter)
+	# RIGHT: Stock, the remaining two thirds minus the gutter just added.
+	var stock_w: float = vp.x - cap_w - STOCK_DRAWER_GUTTER
 	var stock_col := VBoxContainer.new()
 	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
 	var stock_scroll := ScrollContainer.new()
@@ -1891,7 +1905,16 @@ func _build_stack_button(st: Dictionary) -> Button:
 	var id: String = st.id
 	var cap: bool = st.cap
 	if g.textures.has(id): # piece icon instead of glyph text (round 3)
-		btn.icon = g.piece_tex(id) # Stock is always yours: the player token
+		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
+		# token says so without a label. A painted light/dark pair gets this
+		# for free from piece_tex's own owner param; the King's shared
+		# monochrome svg (mono_art) carries no side colour of its own — that
+		# only happens at board-draw time (game.gd's _draw_piece), which this
+		# Button icon bypasses entirely — so it's tinted the same
+		# COL_SIDE_ENEMY the board itself uses.
+		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
+		if cap and g.mono_art.has(id):
+			btn.modulate = g.COL_SIDE_ENEMY
 		btn.expand_icon = true
 		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
 		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
@@ -2016,8 +2039,11 @@ func _build_stack_button(st: Dictionary) -> Button:
 		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 	elif not cap and g.merge_highlights.has(id):
 		btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
-	elif cap:
-		btn.modulate = Color(1.0, 0.8, 0.8) # captured stock: warm tint
+	# NO-164: the old "captured stock: warm tint" wash is gone — the enemy
+	# (dark) sprite set above IS the distinguishing signal now, so a captured
+	# entry's modulate stays at whatever the icon block set (default WHITE,
+	# or COL_SIDE_ENEMY for the King's untinted mono svg) unless armed/merge
+	# already claimed it above.
 	if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
 		var mark := Label.new()
 		mark.text = "◆"
@@ -2056,3 +2082,4 @@ func _build_stack_button(st: Dictionary) -> Button:
 	# ever feels like it drifts, this line is the suspect.
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS
 	return btn
+const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon

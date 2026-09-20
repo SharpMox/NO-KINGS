@@ -452,12 +452,15 @@ func _init() -> void:
 		"(control) arming the STOCK stack DOES paint them — the check above is not vacuous")
 	check(game.merge_highlights.has("pawn"),
 		"(control) 'pawn' is a highlighted merge-partner id while that stack is armed")
+	# NO-164: the old warm-tint wash on Captured rows is gone — the enemy-red
+	# sprite itself is the signal now, so a captured pawn's modulate should
+	# sit at the plain default (WHITE), never the armed/merge-partner tints.
 	var cap_tint_ok := true
 	for row in _pool_rows(game, true):
-		if not (row as Button).modulate.is_equal_approx(Color(1.0, 0.8, 0.8)):
+		if not (row as Button).modulate.is_equal_approx(Color(1, 1, 1)):
 			cap_tint_ok = false
 	check(cap_tint_ok,
-		"and a captured pawn keeps its warm tint — never gold, never a merge partner")
+		"and a captured pawn stays untinted — never gold, never a merge partner")
 	var badges: Array = []
 	for row in _pool_rows(game, false):
 		for c in (row as Button).get_children():

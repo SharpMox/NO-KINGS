@@ -1064,9 +1064,16 @@ func build(game) -> void:
 	items_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
+	# NO-182: without an explicit width, a GridContainer shrinks to whatever
+	# it actually holds (fewer than `columns` entries in the only/last row
+	# makes it narrower still), leaving empty space at the drawer's right edge
+	# instead of the full 5-column standard NO-132 names. stock_grid already
+	# forces this (NO-135); items_grid/artefacts_grid never did.
+	items_grid.custom_minimum_size.x = Tuning.grid_row_w(items_grid.columns, INV_CELL_SEP)
 	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
+	artefacts_grid.custom_minimum_size.x = Tuning.grid_row_w(artefacts_grid.columns, INV_CELL_SEP) # NO-182
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()
@@ -1976,6 +1983,11 @@ func _stacks() -> Array:
 	# Stock grouping is by WHOLE entry (ADR-0002), so a piece carrying state
 	# stacks apart from plain copies of the same id.
 	#
+	# NO-182: Stock now reads MOST RECENTLY ACQUIRED FIRST too, matching
+	# Captured below ("the bottom becomes the top") — scan g.stock in reverse
+	# so a stack's first appearance (its Dictionary insertion order, which
+	# GDScript preserves) is the newest copy, not the oldest.
+	#
 	# CAPTURED NEVER STACKS (user ruling 2026-09-10): one row per captured
 	# piece, MOST RECENT CAPTURE FIRST. g.captured is append-ordered, so newest
 	# first is simply its reverse. A stack made sense while a captured pair
@@ -1983,7 +1995,8 @@ func _stacks() -> Array:
 	# piece, so a row is one piece and the count badge has nothing to count.
 	var out := []
 	var counts := {}
-	for e in g.stock:
+	for i in range(g.stock.size() - 1, -1, -1):
+		var e: Variant = g.stock[i]
 		counts[e] = counts.get(e, 0) + 1
 	for e in counts:
 		out.append({"entry": e, "id": (e if e is String else e.id),

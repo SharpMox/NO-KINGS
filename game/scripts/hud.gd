@@ -1406,10 +1406,12 @@ func update_clock(ms: float) -> void:
 			msdf = (f as FontFile).multichannel_signed_distance_field
 			fixed_sz = (f as FontFile).fixed_size
 		print(("NO162-frame text=%s readback_size=%s min_size=%s size=%s pos=%s " +
-				"theme_type_variation=%s font_class=%s oversampling=%s msdf=%s fixed_size=%s")
+				"theme_type_variation=%s font_class=%s oversampling=%s msdf=%s fixed_size=%s " +
+				"scale=%s pivot_offset=%s rotation=%s")
 			% [clock_label.text, clock_label.get_theme_font_size("font_size"),
 				clock_label.get_minimum_size(), clock_label.size, clock_label.position,
-				clock_label.theme_type_variation, f.get_class(), oversamp, msdf, fixed_sz])
+				clock_label.theme_type_variation, f.get_class(), oversamp, msdf, fixed_sz,
+				clock_label.scale, clock_label.pivot_offset, clock_label.rotation])
 	var whole_min: int = int(ms / 60000.0)
 	# NO-127: settle urgency FIRST. The 2-minute mark IS a minute boundary, so
 	# the instant the urgency loop claims `rotation` is the same instant

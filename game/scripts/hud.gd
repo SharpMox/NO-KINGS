@@ -378,6 +378,32 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
 
 
+## NO-165: a section heading inside the Inventory drawer (Items, Artefacts).
+static func _section_label(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	return l
+
+
+## NO-165: an unfilled slot, signifying room left against whatever actually
+## bounds the holding (ItemLogic.cap / ArtefactHooks.cap) — same
+## Tuning.OFFBOARD_ICON footprint as a real cell (NO-132: a row of
+## placeholders is still a row for the 5-column grid standard). Decorative
+## only: MOUSE_FILTER_IGNORE, not PASS — a plain Control with no gui_input at
+## all can never become a click target or grow a long-press, which is a
+## stronger guarantee than the real cells' deliberate PASS (NO-45) needs to
+## make for their own drag-scroll passthrough.
+static func _empty_slot() -> Control:
+	var slot := Panel.new()
+	slot.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	slot.add_theme_stylebox_override("panel",
+		_surface(Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.14), 6))
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return slot
+
+
 ## NO-119: the tooltip/long-press text for an Items or Artefacts grid cell —
 ## name on its own line, then the description. Shared so a cell's tap target
 ## (no name text any more) and the popup that names it can never say two
@@ -902,7 +928,11 @@ func build(game) -> void:
 	# rows): the drawers row under the board, the thumb row last.
 	deck.move_child(nav_row, 0)
 	deck.move_child(act_row, 1)
+	# NO-165: name the two sections — the drawer used to run straight from
+	# Items into Artefacts with nothing marking the seam.
+	inv_box.add_child(_section_label("Items"))
 	inv_box.add_child(items_grid)
+	inv_box.add_child(_section_label("Artefacts"))
 	inv_box.add_child(artefacts_grid)
 	var drawer_specs := [ # name, content, x, width, height
 		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
@@ -1690,17 +1720,9 @@ func _stacks() -> Array:
 ## _long_press_input for both kinds, instead of passive rows having their own
 ## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
 ## caller).
-## "no artefacts yet" still gates on the whole g.artefacts list, not just the
-## passive subset: holding only an activatable Artefact is not "nothing".
 func _rebuild_artefacts_grid() -> void:
 	for c in artefacts_grid.get_children():
 		c.queue_free()
-	if g.artefacts.is_empty():
-		var none := Label.new()
-		none.text = "no artefacts yet"
-		none.modulate = Color(1, 1, 1, 0.6)
-		artefacts_grid.add_child(none)
-		return
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
@@ -1715,6 +1737,15 @@ func _rebuild_artefacts_grid() -> void:
 	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
 	# scope to. The NO-120/121 hide_tip() guards this used to need are gone
 	# with it.
+	# NO-165: empty slots signify the CAP itself (ArtefactHooks.cap), not
+	# "one more grid cell" — a stacked cell already holds several copies
+	# (counts[key] above) behind its ×N badge, so the capacity actually spent
+	# is g.artefacts.size() (one per COPY, per that cap's own doc comment),
+	# never seen.size() (one per KIND). This also replaces the old "no
+	# artefacts yet" text for the zero-held case: a row of empty slots says
+	# the same thing and additionally states how many.
+	for i in ArtefactHooks.cap(g) - g.artefacts.size():
+		artefacts_grid.add_child(_empty_slot())
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -1856,6 +1887,11 @@ func _rebuild_items_grid() -> void:
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
 		items_grid.add_child(btn)
+	# NO-165: the remaining room, signified — ItemLogic.cap is the real bound
+	# (base 3, +3 per held Area 51 Parking Permit), so this is never a
+	# made-up number.
+	for i in ItemLogic.cap(g) - g.items.size():
+		items_grid.add_child(_empty_slot())
 
 
 ## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),
@@ -2083,3 +2119,5 @@ func _build_stack_button(st: Dictionary) -> Button:
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS
 	return btn
 const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
+const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity

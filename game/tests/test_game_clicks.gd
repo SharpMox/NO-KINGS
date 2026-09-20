@@ -2370,8 +2370,14 @@ func _init() -> void:
 	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Oak Island Wishing Well")
 	await process_frame
 	# NO-85: the Artefacts grid holds every held Artefact, activatable or not.
-	# This scenario holds exactly one, so the grid has exactly one cell.
-	check(game.hud.artefacts_grid.get_child_count() == 1,
+	# This scenario holds exactly one, so the grid has exactly one REAL cell
+	# (NO-165: plus empty-slot placeholders filling out the rest of the cap,
+	# counted separately below since they're Panels, not Buttons).
+	var real_cells := 0
+	for c in game.hud.artefacts_grid.get_children():
+		if c is Button:
+			real_cells += 1
+	check(real_cells == 1,
 		"the Artefacts grid shows ONE cell: the Artefact's, and no Army Ability chip")
 	var star_chips := 0
 	for c in game.hud.artefacts_grid.get_children():

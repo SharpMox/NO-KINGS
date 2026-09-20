@@ -209,7 +209,13 @@ func _init() -> void:
 		"item and artefact slots go SOLD")
 	check(game.actions_left == 0, "neither purchase touched actions_left (issue 64)")
 	game._refresh()
-	check(game.hud.items_grid.get_child_count() == game.items.size(),
+	# NO-165: items_grid also holds trailing empty-slot placeholders now
+	# (Panels, not Buttons) — count the real cells only.
+	var item_cells := 0
+	for c in game.hud.items_grid.get_children():
+		if c is Button:
+			item_cells += 1
+	check(item_cells == game.items.size(),
 		"bought items show in the Inventory drawer strip")
 	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
 			% (game.items.size() + game.artefacts.size()),

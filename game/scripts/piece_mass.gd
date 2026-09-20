@@ -1,7 +1,7 @@
 ## NO-157: one shared "mass of pieces" renderer for the Army Choice carousel
 ## (menu.gd's _show_armies) and the Reinforcements announcement (modals.gd's
 ## show_reinforce). Both screens want the same thing — every piece drawn
-## individually, fanned and jittered so it reads as a crowd, not a
+## individually, formed into tidy ranks so it reads as a crowd, not a
 ## de-duplicated icon with a "×N" badge — so it lives in ONE place instead of
 ## two. Replaces NO-146's _army_group_picture and NO-141's
 ## _reinforce_group_picture (both deleted): the same phrase produced two
@@ -15,9 +15,15 @@ const ICON := 40.0 # NO-146's own size for this card — small enough that
 	# card without cropping. Tuning.OFFBOARD_ICON (72px) is sized for the
 	# off-board strip's own row height, not a crowd of a dozen-plus
 	# overlapping tokens, and would force scrolling or clipping here.
-const CELL := ICON * 0.6 # grid pitch, well under ICON so neighbours overlap
-const JITTER_POS := 6.0 # px, each axis
-const JITTER_ROT := 0.3 # radians (~17°)
+const CELL := ICON * 0.6 # horizontal pitch, well under ICON so neighbours
+	# overlap — the "neatly packed" rank spacing, exact and un-jittered
+const JITTER_Y := 3.0 # px — Max, 2026-09-20: "barely not aligned
+	# horizontally" — a small per-piece vertical wobble so a rank's baseline
+	# waves slightly rather than ruling dead straight. Deliberately small:
+	# any more and it reads as a blob again, same failure as the old scatter.
+const JITTER_ROT := 0.3 # radians (~17°) — the "random tilt" Max asked to
+	# keep; X position is NOT jittered any more (see build()), so this is
+	# the only thing that stops a rank looking stamped from one mould.
 # Same value as game.gd's COL_SIDE_PLAYER (game.gd:91) — duplicated rather
 # than read off the `load()`'d script below: that call is verified working
 # for a static FUNCTION (hud.gd's own load("res://scripts/menu.gd") calls
@@ -29,9 +35,11 @@ const COL_SIDE_PLAYER := Color(0.72, 0.85, 1.25)
 
 ## Renders `ids` — the FULL list, duplicates included; three arriving pawns
 ## draw as three pawns, never "pawn ×3" — as a fixed-size Control: one
-## TextureRect per piece, placed on a loose grid and jittered in position and
-## rotation so it reads as a fanned mass rather than a grid. Player/light
-## side only — neither caller ever shows the enemy's art.
+## TextureRect per piece, formed into 1-3 tidy ranks (Max, 2026-09-20: "2 or 3
+## rows neatly packed with a random tilt, and barely not aligned
+## horizontally" — never a square grid/blob for a big army). The X pitch is
+## exact (no horizontal jitter); only a small per-piece Y offset and rotation
+## vary. Player/light side only — neither caller ever shows the enemy's art.
 ##
 ## Seeded from `hash(ids)`, not randomize(): the same army or reinforcement
 ## list draws identically every time, so a screenshot of it stays diffable
@@ -53,9 +61,20 @@ static func build(ids: Array) -> Control:
 	# of centred under the title/button above it (modals.gd:524 uses the
 	# same fix for its own piece-art TextureRect).
 	mass.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var cols := maxi(1, ceili(sqrt(float(ids.size()))))
-	var rows := maxi(1, ceili(float(ids.size()) / float(cols)))
-	var pad := JITTER_POS + ICON * 0.5
+	# Rows chosen from the count, never more than 3 (Max's ruling above): 1
+	# for a couple of pieces, 2 up to 8, 3 beyond that — Crown/Cult/Old
+	# Guard/Wild Hunt's 11-piece armies and Horde's 14 all land on 3 ranks,
+	# never a near-square blob. Columns fill out whatever rows leaves over.
+	var n := ids.size()
+	var rows := 1
+	if n > 8:
+		rows = 3
+	elif n > 2:
+		rows = 2
+	var cols := maxi(1, ceili(float(n) / float(rows)))
+	var pad := ICON * 0.5 + JITTER_Y # ICON/2 for the icon's own half-width,
+		# plus JITTER_Y as slack for its vertical wobble (and, incidentally,
+		# for the small bounding-box growth JITTER_ROT's tilt adds)
 	mass.custom_minimum_size = Vector2(
 		(cols - 1) * CELL + ICON + pad * 2.0,
 		(rows - 1) * CELL + ICON + pad * 2.0)
@@ -84,9 +103,11 @@ static func build(ids: Array) -> Control:
 			icon.modulate = COL_SIDE_PLAYER
 		var col := i % cols
 		var row := i / cols
+		# X is exact pitch, no jitter — "neatly packed" ranks. Y gets a small
+		# wobble and the icon a small tilt; that's the whole randomness budget.
 		icon.position = Vector2(
-			pad + col * CELL + rng.randf_range(-JITTER_POS, JITTER_POS),
-			pad + row * CELL + rng.randf_range(-JITTER_POS, JITTER_POS))
+			pad + col * CELL,
+			pad + row * CELL + rng.randf_range(-JITTER_Y, JITTER_Y))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		mass.add_child(icon)
 	return mass

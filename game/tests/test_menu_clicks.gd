@@ -372,13 +372,25 @@ func _init() -> void:
 	DirAccess.remove_absolute(GameScript.SCORES_PATH)
 	DirAccess.remove_absolute(GameScript.HISTORY_PATH)
 
-	# Guide: shared rules reference (identical copy lives in the in-game menu)
+	# Guide: NO-189 turned this into a hub of 7 entries (Rules + six catalog
+	# pages) — one navigation level deeper than before, matching the tier
+	# picker and TEST list's own "Back lands one level up" shape. The walk
+	# now goes one level further in and back out, rather than landing
+	# straight on the rules text the old flat panel showed immediately.
 	check(await _click_button(menu, "Guide"), "Guide button clickable")
 	await process_frame
-	check(_find_label(menu, "Objective") != null, "Guide panel shows its rules text")
-	check(await _click_button(menu, "← Back"), "Guide Back clickable")
+	check(_find_button(menu, "Rules") != null, "Guide hub offers Rules")
+	check(_find_button(menu, "Pieces") != null, "Guide hub offers Pieces")
+	check(_find_button(menu, "Indicators") != null, "Guide hub offers Indicators")
+	check(await _click_button(menu, "Rules"), "Rules button clickable")
 	await process_frame
-	check(_find_button(menu, "Play") != null, "Guide Back restores the main menu")
+	check(_find_label(menu, "Objective") != null, "Rules page shows its rules text")
+	check(await _click_button(menu, "← Back"), "Rules Back clickable")
+	await process_frame
+	check(_find_button(menu, "Rules") != null, "Rules Back restores the Guide hub, not the main menu")
+	check(await _click_button(menu, "← Back"), "Guide hub Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "Guide hub Back restores the main menu")
 
 	# About: credits/version. NO-147: folds into Settings.
 	check(await _click_button(menu, "Settings"), "Settings button clickable (About)")

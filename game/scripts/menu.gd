@@ -517,7 +517,7 @@ var about_center: CenterContainer
 ## as unbounded — the platform already reports this, so this panel just
 ## surfaces it. Read-only; never touches layout.
 var device_info_center: CenterContainer
-var guide_scroll: ScrollContainer
+var guide_scroll: Control # NO-189: a hub + sub-pages now, not a bare ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
 var login_note: Label # the login screen's status line
@@ -739,7 +739,7 @@ func _ready() -> void:
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart
-	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
+	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true, GameScript)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
 		Callable(), _on_logout)
 	# NO-147: About and TEST fold into Settings (eight main-menu entries down

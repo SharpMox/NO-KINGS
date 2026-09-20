@@ -66,8 +66,8 @@ var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value, same idiom as shop_expanded_index
 var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can assert on it
 ## NO-119: PIECES is a wrapping grid, not a fixed-width row, now that its
-## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 8 of
-## them (Shop.ROWS.piece) would overflow a single-row HBoxContainer well
+## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 10 of
+## them (Shop.ROWS.piece, NO-166) would overflow a single-row HBoxContainer well
 ## before it overflowed this column's width. Arithmetic, not taste: 5 x 72 +
 ## 4 x 4 = 376 fits the drawer's ~412px content width (draw_w 432 minus the
 ## 10px margins each side); 6 would need 452. NO-132 folds this into the
@@ -91,25 +91,28 @@ var shop_expanded_index := -1 # tapped tile, if any; exposed so probes can asser
 ## extra band is the vertical room NO-144 freed: PIECES used to become
 ## STOCK in Sell mode — the player's whole live Stock, unbounded (a real
 ## save once held 22, 5 rows at 5 columns, 376px). PIECES is Buy-only now,
-## capped at Shop.ROWS.piece (8, fewer at Tier 3+): always <=2 rows, ~152px.
+## capped at Shop.ROWS.piece (10 as of NO-166, fewer at Tier 3+): still
+## always <=2 rows (ceil(10/5)=2, same as the old ceil(8/5)=2), ~152px — no
+## height change from NO-166's 8->10.
 ## `lower` is root's only EXPAND_FILL child, so every byte PIECES no longer
 ## needs at its old worst case, `lower` keeps — up to ~224px more,
 ## guaranteed rather than best-case.
 ##
 ## The stacked layout's own worst case, from Shop.ROWS (base, before any
 ## Tier 3+ reduction — the max, never more): ARTEFACTS ceil(4/5)=1 row,
-## ITEMS ceil(4/5)=1 row, BOXES ceil(6/5)=2 rows (72*2+4=148px). Content
-## height per zone = its grid + a zone label + the label-to-grid 4px
+## ITEMS ceil(4/5)=1 row, BOXES ceil(5/5)=1 row (72px) — NO-166 dropped
+## BOXES 6->5, which drops it from 2 rows to 1 (was ceil(6/5)=2, 72*2+4=148px).
+## Content height per zone = its grid + a zone label + the label-to-grid 4px
 ## separation (_shop_sub_zone's own `wrap`); the label's own height isn't
 ## measured here (no Godot run from this seat — see the label-height note
 ## on _shop_zone_label), estimated ~16px from this file's other measured
-## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts
-## ARTEFACTS/ITEMS at ~92px each, BOXES at ~168px, plus 2 gaps at `lower`'s
-## own 8px separation between the 3 stacked zones: ~368px total — about
-## 28px MORE than the old side-by-side minimum (~340px, the taller of the
-## two old columns), comfortably inside the ~224px NO-144 freed. If a real
-## measurement ever puts a zone label taller than assumed here, recheck
-## against the ~224px margin before assuming it still fits.
+## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts all
+## three zones at ~92px each (was ARTEFACTS/ITEMS ~92px, BOXES ~168px pre
+## NO-166), plus 2 gaps at `lower`'s own 8px separation between the 3
+## stacked zones: ~292px total (was ~368px) — NO-166 frees a further ~76px
+## on top of the ~224px NO-144 already freed, comfortably inside it either
+## way. If a real measurement ever puts a zone label taller than assumed
+## here, recheck against the ~224px margin before assuming it still fits.
 const SHOP_SUBZONE_SEP := 4.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named

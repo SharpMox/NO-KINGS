@@ -18,7 +18,9 @@ const Armies := preload("res://scripts/armies.gd")
 ## see _extra_item_slots / _extra_artefact_slots, additive per held copy
 ## (slice 15 stacking rule) and read straight off g.artefacts, the same way
 ## Shop.buy already reads slot.kind with no hook indirection.
-const ROWS := {"box": 6, "artefact": 4, "item": 4, "piece": 8}
+## NO-166: piece 8->10, box 6->5 — a stocking-density pass, not a mechanics
+## change; artefact/item rows are untouched.
+const ROWS := {"box": 5, "artefact": 4, "item": 4, "piece": 10}
 ## 2 slots each (GDD Shop page); every Box's SIZE is rolled independently in
 ## roll() below (issue 47 — Score Box and the mixed Box are both gone).
 const BOX_THEMES := ["piece", "artefact", "item"]

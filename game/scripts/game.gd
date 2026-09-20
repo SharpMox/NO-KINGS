@@ -108,13 +108,25 @@ const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
 	# this. Both directions together (the existing crosshatch) mark a tile
 	# covered by more than one zone: direction COUNT is the overlap signal,
 	# not alpha-stacking, so single coverage and overlap stay distinguishable
-	# regardless of alpha tuning.
-const HATCH_ALPHA := 0.8 # NO-176: was 0.35 — that value was tuned (NO-122)
-	# as an accent layered ON TOP OF the flat wash above; now the hatch line
-	# is the tile's only fill, so it needs to read at a comparable weight on
-	# its own. NOT VERIFIED ON SCREEN — flag per NO-150's lesson.
-const HATCH_WIDTH := 2.0 # NO-176: named, was a bare 1.0 in draw_line;
-	# thickened to pair with HATCH_ALPHA above (also unverified on screen).
+	# regardless of alpha tuning. NO-184: _draw_hatch now phases its lines off
+	# board_px (board-space), not each tile's own rect — `tile` is computed
+	# per-viewport in _layout_board and is NOT always a multiple of this
+	# spacing, so a per-tile-local phase (the old behaviour) drifted out of
+	# alignment across a tile boundary on real device sizes even though it
+	# happened to line up at the desktop default (72, a multiple of 8).
+const HATCH_ALPHA := 0.6 # NO-184: was 0.8 (NO-176) — read nearly solid at
+	# that weight, over-correcting NO-176's own flag below. NOT VERIFIED ON
+	# SCREEN — flag per NO-150's lesson.
+const HATCH_WIDTH := 1.0 # NO-184: was 2.0 (NO-176) — thinner lines, paired
+	# with the alpha drop above so the hatch reads as a texture, not a wash.
+	# NOT VERIFIED ON SCREEN.
+const HATCH_BLUE_PHASE := HATCH_SPACING * 0.5 # NO-184: the reachable
+	# (move) zone's hatch is offset half a pitch from the red bomb/Item
+	# hatch's phase (0), so a tile covered by both interleaves the two
+	# colours instead of stacking them. Max's ruling: an offset, not a
+	# second hatch direction — direction COUNT already means "more than one
+	# zone" (see HATCH_SPACING above), so a blue `\` next to a red `/` would
+	# collide with that vocabulary on any blue+red overlap.
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
@@ -3368,10 +3380,25 @@ func _bomb_highlight_tiles() -> Array[Vector2i]:
 ## zone coverage, and `_draw_crosshatch` below calls it twice — this is the
 ## shared geometry, split out so a single-covered tile can get one family and
 ## a doubly-covered tile can get both.
-func _draw_hatch(r: Rect2, mirror: bool = false) -> void:
-	var col := Color(COL_CAPTURE, HATCH_ALPHA)
+## NO-184: `c`'s start used to be a bare `-s` — correct only because every
+## tile's phase then happened to line up (the desktop default `tile` (72) is
+## a multiple of HATCH_SPACING (8)); `tile` is recomputed per-viewport in
+## _layout_board and is not a multiple of 8 on most real sizes, so adjacent
+## tiles' lines landed at different phases and a diagonal run broke at every
+## tile boundary. `c` now starts at the smallest value >= -s that lines this
+## tile's pattern up with a GLOBAL grid anchored at `board_px` (phase 0) or
+## `board_px` shifted by `phase` — so every tile in a zone, of any size,
+## draws a continuation of the same board-wide lines. `phase` also carries
+## HATCH_BLUE_PHASE (see its comment) for the move-zone caller.
+func _draw_hatch(r: Rect2, col: Color, mirror: bool = false, phase: float = 0.0) -> void:
 	var s := r.size.x
-	var c := -s
+	var bx := r.position.x - board_px.x # this tile's board-space offset
+	var by := r.position.y - board_px.y
+	var c: float
+	if mirror: # "/" family: board-space invariant is (bx + by)
+		c = -s + fposmod(phase - (by + bx), HATCH_SPACING)
+	else: # "\" family: board-space invariant is (by - bx)
+		c = -s + fposmod(phase - (by - bx) + s, HATCH_SPACING)
 	while c <= s:
 		var a: Vector2 = Vector2(0, c) if c >= 0 else Vector2(-c, 0)
 		var b: Vector2 = Vector2(s - c, s) if c >= 0 else Vector2(s, s + c)
@@ -3386,9 +3413,9 @@ func _draw_hatch(r: Rect2, mirror: bool = false) -> void:
 ## it reads as a denser texture than the single-direction hatch
 ## `_draw_target_zone` uses for ordinary coverage — direction count is the
 ## overlap signal (see HATCH_ALPHA's comment), not stacked alpha.
-func _draw_crosshatch(r: Rect2) -> void:
-	_draw_hatch(r, false)
-	_draw_hatch(r, true)
+func _draw_crosshatch(r: Rect2, col: Color) -> void:
+	_draw_hatch(r, col, false)
+	_draw_hatch(r, col, true)
 
 
 ## Bomb blast: everything within 1 square of `at`, the bomb piece included.
@@ -4512,12 +4539,24 @@ func _draw() -> void:
 		# carries its element type at runtime regardless of which ternary
 		# branch is taken.
 	for d in legal_dests:
+		var d_rect := Rect2(_tile_px(d), Vector2(tile, tile))
 		if board.has(d): # capturable target: pink-red tile tint. NO-183: the
 			# ring that used to sit on top of it is gone — the tint plus the
-			# zone outline below already mark this tile red, and this was
-			# pure duplication of that signal.
-			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE_TILE_TINT, 0.3))
+			# zone outline below already mark this tile red, and NO-184 now
+			# gives the move tiles a matching hatch fill (see the `else`
+			# below), so the per-tile ring/dot layer was pure duplication.
+			draw_rect(d_rect, Color(COL_CAPTURE_TILE_TINT, 0.3))
 			capture_dests.append(d)
+		else: # NO-184: move destination — a hatch fill, parity with the red
+			# bomb/Item zone below (previously outline-only). Recon zones stay
+			# uniform COL_ENEMY like their outline and phase 0 (same family as
+			# a bomb/Item zone, so a double-red tile still reads as coverage,
+			# not an offset); the player's own zone gets HATCH_BLUE_PHASE so a
+			# coincident red bomb/Item hatch interleaves instead of stacking
+			# (Max's ruling — an offset, not a second direction).
+			_draw_hatch(d_rect,
+				Color(COL_ENEMY, HATCH_ALPHA) if recon else Color(COL_ZONE_OUTLINE_MOVE, HATCH_ALPHA),
+				false, 0.0 if recon else HATCH_BLUE_PHASE)
 	# NO-129: one outline around the whole reachable zone, so a spread of
 	# move/capture squares reads as a shape rather than each square drawn on
 	# its own — reused by NO-130's _draw_target_zone for the bomb blast
@@ -4554,11 +4593,10 @@ func _draw() -> void:
 	else:
 		# movement by shape: rides = arrows, bent rides / hop-riders = dots
 		# linked by a line (game-feel 2026-07-07). NO-183: a leap destination
-		# used to get its own dot here too — removed as a duplicate of the
-		# tile itself already reading as reachable (zone outline, and the
-		# hatch fill NO-184 adds); a bent/hop path keeps its linked dots
-		# because those trace the path's SHAPE, information a tile fill
-		# doesn't carry.
+		# used to get its own dot here too — removed as a duplicate now that
+		# NO-184 hatch-fills every move tile in legal_dests (see the loop
+		# above); a bent/hop path keeps its linked dots because those trace
+		# the path's SHAPE, information the zone hatch doesn't carry.
 		var col := Color(COL_ENEMY, MOVE_INDICATOR_ALPHA) if recon else Color(COL_MOVE, MOVE_INDICATOR_ALPHA)
 		for p in legal_paths:
 			match p.kind:
@@ -4643,12 +4681,13 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 		if not counts.has(pos):
 			unique.append(pos)
 		counts[pos] = counts.get(pos, 0) + 1
+	var hatch_col := Color(COL_CAPTURE, HATCH_ALPHA)
 	for pos in unique:
 		var r := Rect2(_tile_px(pos), Vector2(tile, tile))
 		if counts[pos] > 1: # overlap: the denser two-direction crosshatch
-			_draw_crosshatch(r)
+			_draw_crosshatch(r, hatch_col)
 		else: # NO-176: single coverage — one hatch direction, not a wash
-			_draw_hatch(r)
+			_draw_hatch(r, hatch_col)
 	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA))
 
 

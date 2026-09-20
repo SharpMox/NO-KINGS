@@ -116,6 +116,23 @@ const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 # beside the board grid without overpowering the move dots/arrows.
 const ZONE_OUTLINE_ALPHA := 0.9
 const ZONE_OUTLINE_WIDTH := 3.5
+# NO-161: board highlight palette. COL_MOVE/COL_CAPTURE stay as they were
+# (move dots/arrows, the capture ring) — these three are only for the zone
+# OUTLINE and the capture tile wash, which needed their own values:
+const COL_ZONE_OUTLINE_MOVE := Color(0.55, 0.75, 1.0) # lighter than COL_MOVE
+	# (0.3, 0.55, 0.95) so the outline itself reads as distinct from the move
+	# dots/arrows it wraps, not a repeat of the same blue
+const COL_ZONE_OUTLINE_OVERLAP := Color(0.62, 0.32, 0.88) # where a move-tile
+	# outline edge and a capture-tile outline edge fall on the identical
+	# boundary (two tiles of different kinds touching inside one reachable
+	# zone), drawn once in this colour. NOT relied on to emerge from
+	# stacking blue-then-red: both outline strokes sit at ZONE_OUTLINE_ALPHA
+	# 0.9, so the underlying layer would barely show through the top one —
+	# computed explicitly instead of hoped for (can't screenshot to check).
+const COL_CAPTURE_TILE_TINT := Color(0.92, 0.18, 0.4) # capture-target tile
+	# wash, pushed pinker than COL_CAPTURE (0.85, 0.15, 0.15) by raising
+	# blue — the ring and the new capture outline stay pure COL_CAPTURE so
+	# only the tile fill shifts, not every red thing on the tile
 const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
 const SELECT_RING_WIDTH := 3.0 # fixed (was 3.0-4.5 jitter)
 const SELECT_RING_ALPHA_MIN := 0.5
@@ -4409,18 +4426,28 @@ func _draw() -> void:
 			COL_MERGE, 3.0)
 	# recon (enemy) paths draw red; the player's draw blue (palette rule)
 	var half := Vector2(tile, tile) / 2
+	var capture_dests: Array[Vector2i] = [] # NO-161: legal_dests is drawn as
+		# one outline shape, but the tiles with an enemy piece on them need
+		# to be told apart from a plain move destination
 	for d in legal_dests:
-		if board.has(d): # capturable target: red tile tint + ring around the piece
-			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE, 0.3))
+		if board.has(d): # capturable target: pink-red tile tint + red ring around the piece
+			draw_rect(Rect2(_tile_px(d), Vector2(tile, tile)), Color(COL_CAPTURE_TILE_TINT, 0.3))
 			draw_arc(_tile_px(d) + half, tile * CAPTURE_RING_RADIUS, 0, TAU, 32,
 				Color(COL_CAPTURE, CAPTURE_RING_ALPHA), CAPTURE_RING_WIDTH) # NO-129: larger + semi-transparent
+			capture_dests.append(d)
 	# NO-129: one outline around the whole reachable zone, so a spread of
 	# move/capture squares reads as a shape rather than each square drawn on
 	# its own — reused by NO-130's _draw_target_zone for the bomb blast
-	# preview and an armed Item's zone.
+	# preview and an armed Item's zone. NO-161: capture tiles draw red
+	# instead of blue and a move/capture boundary reads purple (see
+	# _draw_zone_outline); recon (enemy) zones are left as one uniform
+	# COL_ENEMY shape — the ticket's blue-vs-red contrast doesn't apply to a
+	# zone that's already all red, and there's no third recon-only colour to
+	# reach for without inventing one nothing asked for.
 	if not legal_dests.is_empty():
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
-			else Color(COL_MOVE, ZONE_OUTLINE_ALPHA))
+				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
+			ZONE_OUTLINE_WIDTH, [] if recon else capture_dests)
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):
@@ -4529,17 +4556,40 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 ## a ride's corner-touching tiles read as one band too. Reusable: NO-130's
 ## `_draw_target_zone` calls this for both the bomb blast preview and an
 ## armed Item's zone.
-func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH) -> void:
+func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH,
+		captures: Array[Vector2i] = []) -> void:
+	# NO-161: `captures` is the subset of `tiles` whose outline should be red
+	# instead of `col`. An edge between two tiles that are BOTH in `tiles`
+	# but disagree on capture-ness (one is, one isn't) is a boundary inside
+	# the zone that neither a pure-blue nor a pure-red outline owns alone —
+	# drawn once in COL_ZONE_OUTLINE_OVERLAP. Empty by default, so the
+	# bomb-blast/Item-zone caller (already one uniform red shape) is
+	# unchanged: every `captures.has(...)` below is then always false.
+	var capture_col := Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA)
+	var overlap_col := Color(COL_ZONE_OUTLINE_OVERLAP, ZONE_OUTLINE_ALPHA)
 	for t in tiles:
 		var px := _tile_px(t)
-		if not tiles.has(Vector2i(t.x, t.y + 1)): # nothing above on screen
-			draw_line(px, px + Vector2(tile, 0), col, width)
-		if not tiles.has(Vector2i(t.x, t.y - 1)): # nothing below
-			draw_line(px + Vector2(0, tile), px + Vector2(tile, tile), col, width)
-		if not tiles.has(Vector2i(t.x - 1, t.y)): # nothing to the left
-			draw_line(px, px + Vector2(0, tile), col, width)
-		if not tiles.has(Vector2i(t.x + 1, t.y)): # nothing to the right
-			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), col, width)
+		var t_cap := captures.has(t)
+		var above := Vector2i(t.x, t.y + 1)
+		var below := Vector2i(t.x, t.y - 1)
+		var left := Vector2i(t.x - 1, t.y)
+		var right := Vector2i(t.x + 1, t.y)
+		if not tiles.has(above): # nothing above on screen
+			draw_line(px, px + Vector2(tile, 0), capture_col if t_cap else col, width)
+		elif captures.has(above) != t_cap:
+			draw_line(px, px + Vector2(tile, 0), overlap_col, width)
+		if not tiles.has(below): # nothing below
+			draw_line(px + Vector2(0, tile), px + Vector2(tile, tile), capture_col if t_cap else col, width)
+		elif captures.has(below) != t_cap:
+			draw_line(px + Vector2(0, tile), px + Vector2(tile, tile), overlap_col, width)
+		if not tiles.has(left): # nothing to the left
+			draw_line(px, px + Vector2(0, tile), capture_col if t_cap else col, width)
+		elif captures.has(left) != t_cap:
+			draw_line(px, px + Vector2(0, tile), overlap_col, width)
+		if not tiles.has(right): # nothing to the right
+			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), capture_col if t_cap else col, width)
+		elif captures.has(right) != t_cap:
+			draw_line(px + Vector2(tile, 0), px + Vector2(tile, tile), overlap_col, width)
 	# NO-150: a diagonal ride's tiles touch only at one corner each, so the
 	# four edge checks above box every tile separately — a staircase, not a
 	# band (raised at NO-129 review, deliberately left; Max asked for it
@@ -4554,6 +4604,7 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 	# unbroken line rather than a dashed approximation of one.
 	var half := Vector2(tile, tile) * 0.5
 	for t in tiles:
+		var t_cap := captures.has(t)
 		for d in [Vector2i(1, -1), Vector2i(1, 1)]: # NE + SE catches every
 			# diagonal pair exactly once: a tile's SW/NW touch is its
 			# neighbour's own NE/SE, checked from that neighbour instead.
@@ -4562,7 +4613,11 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 				continue
 			if tiles.has(Vector2i(t.x + d.x, t.y)) or tiles.has(Vector2i(t.x, t.y + d.y)):
 				continue # already joined by a real shared edge — no pinch
-			draw_line(_tile_px(t) + half, _tile_px(diag) + half, col, width)
+			var diag_cap := captures.has(diag)
+			var bridge_col: Color = overlap_col if diag_cap != t_cap \
+					else (capture_col if t_cap else col) # NO-161: same
+				# move/capture/overlap classification as the edges above
+			draw_line(_tile_px(t) + half, _tile_px(diag) + half, bridge_col, width)
 
 
 ## The animated ring around the selected piece — drawn by `_pulse`, a child

@@ -3,6 +3,7 @@ extends Control
 ## `--scenario N` skip the menu; `--screenshot <dir>` captures menu.png first.
 
 const GameScript := preload("res://scripts/game.gd")
+const Rules := preload("res://scripts/rules.gd") # NO-190: Rules.ENEMY, for the tier icons' side
 const BackGuard := preload("res://scripts/back_guard.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
@@ -494,12 +495,17 @@ var keyboard_height_override := -1
 var _test_sections: Array = [] # {rows, head, relabel} per section, in list order
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
 var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is nested inside now
-var rank_center: CenterContainer
+var rank_center: PanelContainer # NO-190: a background panel now, not a bare CenterContainer
 ## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
-## as a blue outline enclosing tiers 1..this one. Select-then-confirm: a tap
-## on the already-selected tier's button is what actually starts the run
+## as a blue outline enclosing tiers 1..this one. NO-190: Confirm is what
+## actually starts the run; a tier tap only ever selects
 ## (test_menu_clicks.gd reads this directly, same convention as _test_open).
 var _selected_tier := 0
+## NO-190: one Button per tier, in Tuning.TIERS order — index i is tier i.
+## The buttons carry no text any more (the "Tier N" label was removed), so
+## test_menu_clicks.gd can't find them by text; it reads this array directly
+## instead, same convention as _selected_tier above.
+var _tier_buttons: Array[Button] = []
 var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
@@ -511,7 +517,7 @@ var about_center: CenterContainer
 ## as unbounded — the platform already reports this, so this panel just
 ## surfaces it. Read-only; never touches layout.
 var device_info_center: CenterContainer
-var guide_scroll: ScrollContainer
+var guide_scroll: Control # NO-189: a hub + sub-pages now, not a bare ScrollContainer
 var settings_panel: CenterContainer
 var login_center: CenterContainer # issue 83, first run only
 var login_note: Label # the login screen's status line
@@ -733,7 +739,7 @@ func _ready() -> void:
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart
-	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true)
+	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true, GameScript)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
 		Callable(), _on_logout)
 	# NO-147: About and TEST fold into Settings (eight main-menu entries down
@@ -1152,15 +1158,40 @@ func _ready() -> void:
 
 	# tier select: chosen after the army, locked for the run
 	# (07-difficulty-ranks — Continue into endless keeps it)
-	rank_center = CenterContainer.new()
+	#
+	# NO-190: rank_center is now a PanelContainer, not a bare CenterContainer,
+	# so it can carry a background — the app's default clear colour ("soft
+	# grey") read as too light here. The colour is READ off the engine's own
+	# Button "normal" stylebox rather than a new literal (Max: "can use the
+	# button background gray"), which is already darker than that default —
+	# an inner CenterContainer does the centring PanelContainer itself
+	# doesn't do.
+	rank_center = PanelContainer.new()
 	rank_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	rank_center.visible = false
+	var rank_bg := StyleBoxFlat.new()
+	rank_bg.bg_color = (ThemeDB.get_default_theme().get_stylebox("normal", "Button") as StyleBoxFlat).bg_color
+	rank_center.add_theme_stylebox_override("panel", rank_bg)
 	add_child(rank_center)
+	var rank_middle := CenterContainer.new()
+	rank_center.add_child(rank_middle)
 	var rank_box := VBoxContainer.new()
 	rank_box.add_theme_constant_override("separation", 12)
-	rank_center.add_child(rank_box)
+	rank_middle.add_child(rank_box)
+	# issue 75 / NO-190: the seed field is now the FIRST control on the
+	# screen, above the title — still the same field (focus_mode, "" =
+	# random untouched), just moved. Its own label ("SEED — leave blank for
+	# random") is gone; the placeholder carries the hint instead.
+	seed_field = LineEdit.new()
+	seed_field.placeholder_text = "Enter seed"
+	seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	seed_field.custom_minimum_size = Vector2(240, 0)
+	# must NOT take focus on show — the windowed click probes drive real input,
+	# and a focused text field would swallow their keystrokes
+	seed_field.focus_mode = Control.FOCUS_CLICK
+	rank_box.add_child(seed_field)
 	var rank_pick := Label.new()
-	rank_pick.text = "Choose your difficulty"
+	rank_pick.text = "Difficulty Tiers"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
 	# NO-159: one row per tier, icon + a bordered description panel, the
@@ -1168,15 +1199,23 @@ func _ready() -> void:
 	# hand-written — see _tier_description() (untouched). The old font-26
 	# "Tier N" header is gone (Max: "the largest text on screen, carries the
 	# least information" — the icon and the description already say which
-	# tier this is); a small flat button with the SAME "Tier N" text stays as
-	# the tap target, so test_menu_clicks.gd's _find_button lookup is
-	# unchanged, but the PRESS is now select-then-confirm (this codebase's
-	# standard pattern for a committing action, e.g. NO-133's shop/box picks):
-	# a tap on a tier that ISN'T selected just selects it, redrawing the
-	# outline; a tap on the tier that IS already selected is what stages and
-	# starts the run. _selected_tier defaults to 0 (Tier 1), so Tier 1 alone
-	# is a single tap, matching the old immediate-launch feel for the
-	# baseline choice.
+	# tier this is).
+	#
+	# NO-190: the small flat button that used to carry the SAME "Tier N" text
+	# as the tap target now carries NO text — Max ruled the numbering itself
+	# should go, not just its old large header. It keeps its height (40px,
+	# this codebase's thumb-sized-row convention, e.g. the TEST list's
+	# section headers) so the row stays a real tap target with nothing to
+	# read. test_menu_clicks.gd can no longer find it by text, so it is
+	# collected into _tier_buttons (a member array, read directly by the
+	# test — the same convention _selected_tier already uses) instead.
+	#
+	# NO-190 also replaces select-then-confirm's second tap with an explicit
+	# Confirm button below the tier list: tapping a tier (selected or not)
+	# only ever selects it now; Confirm is the one and only way to stage and
+	# launch the run. Two things staged the same commit by one more tap each
+	# was judged more confusing than a single dedicated control, and it
+	# matches the "Confirm above Back" placement Max asked for.
 	#
 	# tier_panels holds ONE PanelContainer per tier — the outline surface,
 	# separate from the icon (Max was explicit the outline must not wrap the
@@ -1186,6 +1225,7 @@ func _ready() -> void:
 	# have it read as ONE box, not N stacked ones. Row breathing room comes
 	# from each panel's own content margins instead of container separation.
 	var tier_panels: Array[PanelContainer] = []
+	_tier_buttons = []
 	var tiers_box := VBoxContainer.new()
 	tiers_box.add_theme_constant_override("separation", 0)
 	rank_box.add_child(tiers_box)
@@ -1202,18 +1242,13 @@ func _ready() -> void:
 		var tier_col := VBoxContainer.new()
 		tier_col.add_theme_constant_override("separation", 2)
 		tier_panel.add_child(tier_col)
-		var tier_btn := _button(tier_col, tier_name, 13, func() -> void:
-			if _selected_tier == i:
-				GameScript.next_tier = tier_name
-				GameScript.next_seed = seed_field.text.strip_edges() # "" = random
-				GameScript.next_config = {}
-				GameScript.is_scenario = false
-				get_tree().change_scene_to_file("res://scenes/Game.tscn")
-			else:
-				_selected_tier = i
-				_update_tier_outline(tier_panels, i))
+		var tier_btn := _button(tier_col, "", 13, func() -> void:
+			_selected_tier = i
+			_update_tier_outline(tier_panels, i))
 		tier_btn.flat = true
 		tier_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		tier_btn.custom_minimum_size = Vector2(0, 40)
+		_tier_buttons.append(tier_btn)
 		var tier_desc := Label.new()
 		tier_desc.text = _tier_description(tier_name)
 		tier_desc.add_theme_font_size_override("font_size", 11)
@@ -1228,26 +1263,12 @@ func _ready() -> void:
 		tier_desc.custom_minimum_size.x = _text_width() - 100.0
 		tier_col.add_child(tier_desc)
 	_update_tier_outline(tier_panels, _selected_tier)
-	# issue 75: the seed field. NO-148 moves it to the BOTTOM, under the tiers,
-	# so it is still the final thing set before a run starts — its own
-	# behaviour (focus_mode, "" = random) is untouched, only its position moved.
-	var seed_row := VBoxContainer.new()
-	seed_row.add_theme_constant_override("separation", 2)
-	var seed_label := Label.new()
-	seed_label.text = "SEED — leave blank for random"
-	seed_label.add_theme_font_size_override("font_size", 11)
-	seed_label.modulate = Color(1, 1, 1, 0.55)
-	seed_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	seed_row.add_child(seed_label)
-	seed_field = LineEdit.new()
-	seed_field.placeholder_text = "any word or number"
-	seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	seed_field.custom_minimum_size = Vector2(240, 0)
-	# must NOT take focus on show — the windowed click probes drive real input,
-	# and a focused text field would swallow their keystrokes
-	seed_field.focus_mode = Control.FOCUS_CLICK
-	seed_row.add_child(seed_field)
-	rank_box.add_child(seed_row)
+	_button(rank_box, "Confirm", 20, func() -> void:
+		GameScript.next_tier = Tuning.TIERS[_selected_tier]
+		GameScript.next_seed = seed_field.text.strip_edges() # "" = random
+		GameScript.next_config = {}
+		GameScript.is_scenario = false
+		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
 	_button(rank_box, "← Back", 20, func() -> void:
 		rank_center.visible = false
 		army_center.visible = true)
@@ -1530,7 +1551,8 @@ func _tier_icon(tier_name: String) -> Control:
 	var wrap := CenterContainer.new()
 	wrap.custom_minimum_size = Vector2(70, 0)
 	var icon := TextureRect.new()
-	icon.texture = GameScript.load_piece_tex(TIER_PIECE_IDS[Tuning.tier_index(tier_name)])
+	# NO-190 (Max): red icons — the enemy/dark side of the pair, not a tint.
+	icon.texture = GameScript.load_piece_tex(TIER_PIECE_IDS[Tuning.tier_index(tier_name)], Rules.ENEMY)
 	icon.custom_minimum_size = Vector2(40, 40)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED

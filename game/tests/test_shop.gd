@@ -1,6 +1,6 @@
 extends SceneTree
-## The Shop: 22-slot randomized stock (6 typed boxes / 4 artefacts / 4 items /
-## 8 distinct base pieces), priced in gold, no Action cost on any interaction
+## The Shop: 23-slot randomized stock (5 typed boxes / 4 artefacts / 4 items /
+## 10 distinct base pieces — NO-166), priced in gold, no Action cost on any interaction
 ## (issue 64). Bought slots go SOLD. Restocks on two lanes (issue 64): every
 ## 5 Waves (Lane A, guaranteed), or Tuning.SHOP_LANE_B_SCORE Score since the
 ## last Lane-A restock (Lane B, which every Lane-A restock resets) — the old
@@ -54,14 +54,15 @@ func _init() -> void:
 	var kinds := {}
 	for slot in game.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(game.shop_stock.size() == 22, "a run boots with a rolled 22-slot shop")
-	check(kinds.get("box", 0) == 6 and kinds.get("artefact", 0) == 4
-			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 8,
-		"rows: 6 boxes / 4 artefacts / 4 items / 8 base pieces")
+	check(game.shop_stock.size() == 23, "a run boots with a rolled 23-slot shop (NO-166)")
+	check(kinds.get("box", 0) == 5 and kinds.get("artefact", 0) == 4
+			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 10,
+		"rows: 5 boxes / 4 artefacts / 4 items / 10 base pieces (NO-166)")
 
-	# boxes are typed, 2 of each theme (issue 47: 9 Boxes = 3 sizes x 3
-	# themes — Pieces/Artefacts/Items — Score Box and the mixed Box are gone),
-	# each slot's SIZE rolled independently
+	# boxes are typed (issue 47: 9 Boxes = 3 sizes x 3 themes — Pieces/
+	# Artefacts/Items — Score Box and the mixed Box are gone), the 5-slot row
+	# split 2/2/1 with the remainder off the last theme (NO-166: was an even
+	# 2/2/2 at 6), each slot's SIZE rolled independently
 	var box_types := {}
 	for slot in game.shop_stock:
 		if slot.kind == "box":
@@ -69,8 +70,8 @@ func _init() -> void:
 			check(slot.size in Box.SIZE_KEYS, "every Box slot carries a rolled size")
 			check(slot.contents.size() == Box.SIZES[slot.size].choices,
 				"a stocked Box's contents match its size's choice count")
-	check(box_types == {"piece": 2, "artefact": 2, "item": 2},
-		"the box row is typed 2 Piece / 2 Artefact / 2 Item")
+	check(box_types == {"piece": 2, "artefact": 2, "item": 1},
+		"the box row is typed 2 Piece / 2 Artefact / 1 Item (NO-166)")
 	check(Shop.display_name(game, {"kind": "box", "key": "item", "size": "small"}) == "Small Item Box",
 		"a typed box names its size and theme")
 
@@ -94,7 +95,7 @@ func _init() -> void:
 	check(pool.has("pawn") and pool.has("amazonrider"),
 		"the pool spans cheap to heavy chain roots")
 
-	# 8 distinct piece slots; 1/value weighting keeps heavies rare
+	# 10 distinct piece slots (NO-166); 1/value weighting keeps heavies rare
 	game.rng.seed = 7 # deterministic census
 	var dupes := 0
 	var pawn_n := 0
@@ -109,7 +110,7 @@ func _init() -> void:
 				seen[slot.key] = true
 				pawn_n += 1 if slot.key == "pawn" else 0
 				heavy_n += 1 if slot.key == "amazonrider" else 0
-	check(dupes == 0, "piece slots are always 8 distinct picks")
+	check(dupes == 0, "piece slots are always 10 distinct picks (NO-166)")
 	check(pawn_n > heavy_n * 2 and heavy_n > 0,
 		"1/value weighting: pawns common, amazonriders rare but possible (%d vs %d)"
 			% [pawn_n, heavy_n])
@@ -286,7 +287,7 @@ func _init() -> void:
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
 			return sl.sold).is_empty(),
 		"a restock clears every SOLD flag")
-	check(game.shop_stock.size() == 22, "a restock refills all 22 slots")
+	check(game.shop_stock.size() == 23, "a restock refills all 23 slots (NO-166)")
 	before = JSON.stringify(game.shop_stock)
 	game._queue_wave(6)
 	check(JSON.stringify(game.shop_stock) == before, "Wave 6 is not a Lane-A beat — no restock")

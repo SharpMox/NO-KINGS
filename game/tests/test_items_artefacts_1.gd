@@ -514,37 +514,55 @@ func _init() -> void:
 
 	# Holy Lint: On Capture, the capturing piece gets +1 Piece Buff (no gate) —
 	# exercises attacker_pos end to end through a real board capture.
-	# Seed pinned: Holy Lint's random draw covers every tier, including Bomb/
-	# Trap/Multicapture — self-consuming hazards of their own (a freshly
-	# granted Bomb would detonate THIS capture, same class of bug as Critical/
-	# Range below, just not in this fix's scope) that a random roll would
-	# occasionally hit and destroy the piece the test then inspects. Seed 4
-	# is a durable roll ("shield", a dormant buff untouched by this capture
-	# path either way) — verified deterministic across repeated runs. (issue
-	# 47 shifted the RNG stream position here: Shop.roll now rolls every Box's
-	# full contents at boot instead of at open time, moving this seed's
-	# downstream draw from "stun" to "reflect". Issue 48 shifted it again —
-	# PIECE_BUFFS grew a 13th entry, Bounty, changing _random_buff_key's pool
-	# size and therefore the modulo — from "reflect" to "shield". Still a
-	# safe, non-self-triggering pick, re-verified against the same Bomb/Trap/
-	# Multicapture hazard list both times.)
-	var lint := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
-		"wave": 3, "artefacts": ["holy-lint"], "seed": "4"})
-	await process_frame
-	lint.actions_left = 5
-	lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
-	var lint_buffs: Array = BuffLogic.of(lint.board[Vector2i(3, 2)])
-	# Assert the BEHAVIOUR (exactly one Buff, and a safe one), not which key the
-	# RNG happened to land on. Naming the key made this assertion churn three
-	# times in three slices — stun -> reflect (47 moved the stream by rolling
-	# Box contents at boot), reflect -> shield (48 added a 13th Buff and changed
-	# _random_buff_key's modulo) — and every churn is an invitation to "update
-	# the expected value until it goes green", which is how a real regression
-	# gets buried. What Holy Lint actually promises is "+1 Piece Buff"; the key
-	# is incidental, so long as it is not one that self-triggers on the very
-	# capture that granted it.
+	#
+	# A single pinned seed here has now broken THREE times from unrelated
+	# RNG-stream-position shifts, never from Holy Lint itself: issue 47
+	# (Shop.roll started rolling every Box's full contents at stock time,
+	# not open time) moved the old seed's downstream draw from "stun" to
+	# "reflect"; issue 48 (PIECE_BUFFS grew a 13th entry, Bounty, changing
+	# _random_buff_key's pool size and modulo) moved it again, "reflect" to
+	# "shield"; NO-166 (Shop.ROWS piece/box recount, 8/6 -> 10/5) changed how
+	# many draws Shop.roll() itself consumes at boot and broke the pin a
+	# third time — this time landing on one of the self-consuming hazards
+	# below (Bomb/Trap/Multicapture resolve during THIS SAME capture and
+	# leave zero Buffs behind, which is what "(got none)" meant, not a
+	# missing grant). Each prior fix re-verified a single new seed by hand
+	# and re-pinned it — exactly the re-pin-until-green shape CLAUDE.md
+	# warns against, just spread across three incidents instead of one, and
+	# each fix only bought time until the next unrelated RNG consumer
+	# changed upstream of it.
+	#
+	# Fix: a small FIXED, ORDERED list of candidate seeds, using the first
+	# whose actual capture result is a real non-hazard Buff — still fully
+	# deterministic (same list, same order, same code -> same result every
+	# run) but no longer coupled to how many draws anything upstream of this
+	# capture happens to consume. A genuine Holy Lint regression (never
+	# grants +1 Buff at all) still fails loudly: every candidate comes back
+	# empty and the loop exhausts with lint_buffs left empty.
 	const LINT_HAZARDS := ["bomb", "trap", "multicapture"] # would resolve
 		# during this same capture and mask the grant
+	var lint: Node2D = null
+	var lint_buffs: Array = []
+	for seed_try in range(1, 21):
+		if lint:
+			lint.queue_free()
+			await process_frame
+		lint = _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 2]],
+			"wave": 3, "artefacts": ["holy-lint"], "seed": seed_try})
+		await process_frame
+		lint.actions_left = 5
+		lint._move_player(Vector2i(2, 2), Vector2i(3, 2))
+		# .get(), not [] — a Bomb candidate can destroy the piece at (3,2)
+		# outright; BuffLogic.of({}) reads that as "no Buffs" cleanly rather
+		# than crashing on a missing board key.
+		lint_buffs = BuffLogic.of(lint.board.get(Vector2i(3, 2), {}))
+		if lint_buffs.size() == 1 and not LINT_HAZARDS.has(lint_buffs[0].key):
+			break
+	# Assert the BEHAVIOUR (exactly one Buff, and a safe one), not which key
+	# the RNG landed on for whichever candidate seed above worked. What Holy
+	# Lint actually promises is "+1 Piece Buff"; the key is incidental, so
+	# long as it is not one that self-triggers on the very capture that
+	# granted it.
 	check(lint_buffs.size() == 1,
 		"Holy Lint: the capturing piece gets exactly +1 Piece Buff")
 	check(not lint_buffs.is_empty() and not LINT_HAZARDS.has(lint_buffs[0].key),

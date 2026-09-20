@@ -495,6 +495,11 @@ var _test_sections: Array = [] # {rows, head, relabel} per section, in list orde
 var _test_open := -1 # index into _test_sections, or -1 for "all collapsed"
 var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is nested inside now
 var rank_center: CenterContainer
+## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
+## as a blue outline enclosing tiers 1..this one. Select-then-confirm: a tap
+## on the already-selected tier's button is what actually starts the run
+## (test_menu_clicks.gd reads this directly, same convention as _test_open).
+var _selected_tier := 0
 var seed_field: LineEdit # issue 75
 var scores_center: CenterContainer
 var history_scroll: ScrollContainer
@@ -557,6 +562,21 @@ static func _window_size_requested() -> bool:
 		int(ProjectSettings.get_setting("display/window/size/viewport_width", 480)),
 		int(ProjectSettings.get_setting("display/window/size/viewport_height", 800)))
 	return DisplayServer.window_get_size() != want
+
+
+## NO-158: fraction of the Army carousel's scroller width intentionally left
+## uncovered by the resting card, so the next Army's card edge peeks in — the
+## discoverability fix for "six Armies, looked like one" (NO-146's own
+## screenshot report). A peek at this exact spot was tried and reverted on an
+## abandoned branch (fix/army-carousel-affordance, never merged to main): those
+## cards were bare CenterContainers with no border or background, so a
+## narrower card just let the NEXT card's free-flowing autowrap text bleed
+## into the margin as stray glyph fragments — a lone "Y", a clipped "This T" —
+## reading as a text-rendering bug, not a hint that more content exists. NO-158
+## gives each card a bordered, backgrounded panel FIRST (see card_style in the
+## carousel build below), so what shows in the peek is a card edge, not raw
+## prose. 12-18% is the usual carousel peek range; 15% picked within it.
+const ARMY_PEEK_FRACTION := 0.15
 
 
 func _ready() -> void:
@@ -1044,18 +1064,34 @@ func _ready() -> void:
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", 0)
 	army_scroll.add_child(army_row)
-	# Card width = the scroller's own available width, so exactly one Army
-	# fills the screen per swipe rather than letting the next card peek in.
-	var card_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	# NO-158: card_w < the scroller's own width (ARMY_PEEK_FRACTION above),
+	# so the next Army's card edge peeks in at rest — a bordered/backgrounded
+	# panel now, not the bare CenterContainer a peek broke last time.
+	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	var card_w: float = scroll_w * (1.0 - ARMY_PEEK_FRACTION)
+	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
+	card_style.bg_color = Color(1, 1, 1, 0.06)
+	card_style.border_color = Color(1, 1, 1, 0.22)
+	card_style.set_border_width_all(2)
+	card_style.set_corner_radius_all(10)
+	card_style.content_margin_left = 10
+	card_style.content_margin_right = 10
+	card_style.content_margin_top = 14
+	card_style.content_margin_bottom = 14
+	var army_names: Array = Tuning.ARMIES.keys() # dot count/order/click-target follow this
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
-		var card := CenterContainer.new()
+		var card := PanelContainer.new() # NO-158: was a bare CenterContainer —
+			# see ARMY_PEEK_FRACTION for why the peek needed this border/bg
 		card.custom_minimum_size = Vector2(card_w, 0)
+		card.add_theme_stylebox_override("panel", card_style)
 		army_row.add_child(card)
+		var card_center := CenterContainer.new() # keeps the old vertical centring
+		card.add_child(card_center)
 		var card_box := VBoxContainer.new()
 		card_box.add_theme_constant_override("separation", 6)
-		card.add_child(card_box)
+		card_center.add_child(card_box)
 		var army_btn := _button(card_box, Armies.display_name(army_name), 20,
 			func() -> void:
 				GameScript.next_army = army_name
@@ -1081,6 +1117,35 @@ func _ready() -> void:
 		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
 		card_box.add_child(ability)
+	# NO-158: clickable page dots — one per Army, filled for the resting
+	# card, hollow for the rest; a tap scrolls straight to that card. Count
+	# and order come from army_names (Tuning.ARMIES), so a 7th Army needs no
+	# edit here. Godot's ScrollContainer has no page-snap, so the "current
+	# card" read in the value_changed listener below is an approximation —
+	# exact once a swipe settles, which is the only time this reads it.
+	var army_dots := HBoxContainer.new()
+	army_dots.alignment = BoxContainer.ALIGNMENT_CENTER
+	army_dots.add_theme_constant_override("separation", 8)
+	army_center.add_child(army_dots)
+	var dot_buttons: Array[Button] = []
+	for i in army_names.size():
+		var dot := Button.new()
+		dot.flat = true
+		dot.focus_mode = Control.FOCUS_NONE
+		dot.custom_minimum_size = Vector2(28, 28)
+		dot.add_theme_font_size_override("font_size", 16)
+		dot.text = "●" if i == 0 else "○"
+		dot.pressed.connect(func() -> void:
+			army_scroll.scroll_horizontal = int(i * card_w))
+		army_dots.add_child(dot)
+		dot_buttons.append(dot)
+	# Setting scroll_horizontal above fires this same signal (it just proxies
+	# the underlying HScrollBar's value), so a dot click updates the dots
+	# through the identical path a swipe does — one writer, not two.
+	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var idx := clampi(roundi(army_scroll.scroll_horizontal / card_w), 0, army_names.size() - 1)
+		for i in dot_buttons.size():
+			dot_buttons[i].text = "●" if i == idx else "○")
 	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
@@ -1098,35 +1163,71 @@ func _ready() -> void:
 	rank_pick.text = "Choose your difficulty"
 	rank_pick.add_theme_font_size_override("font_size", 28)
 	rank_box.add_child(rank_pick)
-	# NO-148: one row per tier, icon + description, description GENERATED from
-	# Tuning.TIER_HANDICAPS rather than hand-written — see _tier_description().
-	# The tier BUTTON keeps the bare "Tier N" text test_menu_clicks.gd clicks by
-	# (and the save's own next_tier value); the description is a separate Label
-	# beside it, never folded into the button's own text.
-	for tier_name in Tuning.TIERS:
+	# NO-159: one row per tier, icon + a bordered description panel, the
+	# description GENERATED from Tuning.TIER_HANDICAPS rather than
+	# hand-written — see _tier_description() (untouched). The old font-26
+	# "Tier N" header is gone (Max: "the largest text on screen, carries the
+	# least information" — the icon and the description already say which
+	# tier this is); a small flat button with the SAME "Tier N" text stays as
+	# the tap target, so test_menu_clicks.gd's _find_button lookup is
+	# unchanged, but the PRESS is now select-then-confirm (this codebase's
+	# standard pattern for a committing action, e.g. NO-133's shop/box picks):
+	# a tap on a tier that ISN'T selected just selects it, redrawing the
+	# outline; a tap on the tier that IS already selected is what stages and
+	# starts the run. _selected_tier defaults to 0 (Tier 1), so Tier 1 alone
+	# is a single tap, matching the old immediate-launch feel for the
+	# baseline choice.
+	#
+	# tier_panels holds ONE PanelContainer per tier — the outline surface,
+	# separate from the icon (Max was explicit the outline must not wrap the
+	# icons) — and tiers_box stacks the rows with ZERO separation, so
+	# adjoining panels touch with no gap: _update_tier_outline can then draw
+	# a border on only the outer edges of a contiguous i<=selected range and
+	# have it read as ONE box, not N stacked ones. Row breathing room comes
+	# from each panel's own content margins instead of container separation.
+	var tier_panels: Array[PanelContainer] = []
+	var tiers_box := VBoxContainer.new()
+	tiers_box.add_theme_constant_override("separation", 0)
+	rank_box.add_child(tiers_box)
+	for i in Tuning.TIERS.size():
+		var tier_name: String = Tuning.TIERS[i]
 		var tier_row := HBoxContainer.new()
 		tier_row.add_theme_constant_override("separation", 10)
-		rank_box.add_child(tier_row)
-		tier_row.add_child(_tier_icon(tier_name))
+		tiers_box.add_child(tier_row)
+		tier_row.add_child(_tier_icon(tier_name)) # outside tier_panel — never outlined
+		var tier_panel := PanelContainer.new()
+		tier_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tier_row.add_child(tier_panel)
+		tier_panels.append(tier_panel)
 		var tier_col := VBoxContainer.new()
 		tier_col.add_theme_constant_override("separation", 2)
-		tier_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tier_row.add_child(tier_col)
-		_button(tier_col, tier_name, 26, func() -> void:
-			GameScript.next_tier = tier_name
-			GameScript.next_seed = seed_field.text.strip_edges() # "" = random
-			GameScript.next_config = {}
-			GameScript.is_scenario = false
-			get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		tier_panel.add_child(tier_col)
+		var tier_btn := _button(tier_col, tier_name, 13, func() -> void:
+			if _selected_tier == i:
+				GameScript.next_tier = tier_name
+				GameScript.next_seed = seed_field.text.strip_edges() # "" = random
+				GameScript.next_config = {}
+				GameScript.is_scenario = false
+				get_tree().change_scene_to_file("res://scenes/Game.tscn")
+			else:
+				_selected_tier = i
+				_update_tier_outline(tier_panels, i))
+		tier_btn.flat = true
+		tier_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var tier_desc := Label.new()
 		tier_desc.text = _tier_description(tier_name)
 		tier_desc.add_theme_font_size_override("font_size", 11)
 		tier_desc.modulate = Color(1, 1, 1, 0.7)
 		tier_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		# icon column (70) + the row separation (10) — same "state an explicit
-		# minimum or autowrap collapses to zero" fix _wrap_account_text documents.
-		tier_desc.custom_minimum_size.x = _text_width() - 80.0
+		# icon column (70) + the row separation (10) + tier_panel's own left/
+		# right content margin (10*2, set in _update_tier_outline) — same
+		# "state an explicit minimum or autowrap collapses to zero" fix
+		# _wrap_account_text documents, widened by the panel's own margins so
+		# this row can't demand more width than the panel actually has to give
+		# it (that mismatch is what pushed the whole menu sideways there).
+		tier_desc.custom_minimum_size.x = _text_width() - 100.0
 		tier_col.add_child(tier_desc)
+	_update_tier_outline(tier_panels, _selected_tier)
 	# issue 75: the seed field. NO-148 moves it to the BOTTOM, under the tiers,
 	# so it is still the final thing set before a run starts — its own
 	# behaviour (focus_mode, "" = random) is untouched, only its position moved.
@@ -1451,6 +1552,34 @@ func _tier_description(tier_name: String) -> String:
 	if not lower_h.is_empty():
 		lines.append("Also: " + ", ".join(lower_h))
 	return "\n".join(lines)
+
+
+## NO-159: redraw the tier-selection outline. `panels[i]` is tier i's
+## description panel (tier_panels from the rank_center build); `selected` is
+## the highest tier whose description should read as enclosed. Every panel in
+## range i<=selected gets left/right borders, plus a top border only on the
+## FIRST (i==0) and a bottom border only on the LAST (i==selected) — since
+## adjoining panels touch with zero gap (tiers_box separation is 0), that
+## reads as one continuous box around tiers 1..selected, not a stack of
+## separate ones. Content margins are set unconditionally so toggling the
+## border never changes row height/layout, only what's drawn.
+const TIER_OUTLINE_COLOR := Color(0.35, 0.65, 1.0)
+const TIER_OUTLINE_WIDTH := 2
+
+func _update_tier_outline(panels: Array, selected: int) -> void:
+	for i in panels.size():
+		var sb := StyleBoxFlat.new()
+		sb.content_margin_left = 10
+		sb.content_margin_right = 10
+		sb.content_margin_top = 8
+		sb.content_margin_bottom = 8
+		if i <= selected:
+			sb.border_color = TIER_OUTLINE_COLOR
+			sb.border_width_left = TIER_OUTLINE_WIDTH
+			sb.border_width_right = TIER_OUTLINE_WIDTH
+			sb.border_width_top = TIER_OUTLINE_WIDTH if i == 0 else 0
+			sb.border_width_bottom = TIER_OUTLINE_WIDTH if i == selected else 0
+		panels[i].add_theme_stylebox_override("panel", sb)
 
 
 ## NO-55: how wide an account label may be. One number, read from the viewport

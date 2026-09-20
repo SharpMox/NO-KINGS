@@ -295,9 +295,20 @@ func _init() -> void:
 	await _click_button(menu, "Wild Hunt")
 	await process_frame
 	GameScript.next_tier = ""
+	# NO-159: the old font-26 "Tier N" header — which used to launch on one
+	# tap — is gone; the same-text button that replaces it is select-then-
+	# confirm now (menu.gd's _selected_tier), so staging the run needs TWO
+	# taps on "Tier 3": the first only SELECTS it, the second (now that it is
+	# already selected) confirms and launches. This is a stronger walk than
+	# the old single click, not a weaker one — it also proves the select step
+	# does not itself stage a run.
 	check(await _click_button(menu, "Tier 3"), "tier button clickable")
 	await process_frame
-	check(GameScript.next_tier == "Tier 3", "tier click stages the run's difficulty")
+	check(menu._selected_tier == 2, "first tap selects Tier 3 (0-based index)")
+	check(GameScript.next_tier == "", "selecting a tier does not stage a run yet")
+	check(await _click_button(menu, "Tier 3"), "re-tapping the selected tier confirms it")
+	await process_frame
+	check(GameScript.next_tier == "Tier 3", "second tap on the selected tier stages the run's difficulty")
 
 	# Scores opens the local high-score list (fresh menu again: the tier
 	# click above changed the scene). The tier click's change_scene_to_file

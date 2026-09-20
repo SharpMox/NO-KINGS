@@ -76,26 +76,35 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## phone means editing one place. Canvas px on the 480-wide viewport. Nothing
 ## here is measured at runtime: game.gd's board solve reads HEADER_H, and the
 ## notch inset (g.safe_top) is ADDED above it, never taken out of it.
-## NO-175 rebuilds the Header from a Figma mockup (layout intent, not a render
-## target): LEFT is three tight rows (Turn+Wave on one line, Score, Gold —
-## Wave/Turn move OFF the right column NO-162 parked them under); CENTRE is
-## the Clock, large and horizontally centred, beside the left column rather
-## than stacked under it; RIGHT is Stock and the ☰ button, now the SAME size.
-## LEFT needs Turn/Wave(~22, extrapolated from SCORE_FONT's measured 17->24
-## ratio — UNVERIFIED, not measured directly) + Score(24) + Gold(24, same
-## font as Score now) = ~70. RIGHT needs one row of HEADER_BTN(52). CENTRE
-## needs the Clock's ceiling height (50, CLOCK_FONT's pre-NO-125 measurement).
-## The largest is LEFT at ~70; HEADER_H grows to fit it plus slack in the same
-## proportion NO-162 used (74 -> 100, i.e. +26): ~70 -> 96. This happens to
-## reproduce NO-162's own board_tile_for() numbers exactly (49 no-notch / 44
-## on an iPhone-11-class 56px notch) — see build()'s NO-175 comment block for
-## the arithmetic — so the board does not change size, but that identity
-## wasn't targeted, only checked; verify the real get_height() figures still
-## land at or under it.
-const HEADER_H := 96.0
+## NO-175, 3rd pass — Max's revised mockup supersedes the 1st/2nd pass layout
+## below (a long left column with Turn/Wave on top): LEFT is now just TWO
+## rows, Score then Gold; CENTRE stacks a small Turn/Wave line directly above
+## the Clock, both horizontally centred as their own blocks; RIGHT is
+## unchanged, Stock and the ☰ button at the same size. "Slim the header to
+## the right two buttons' height" makes HEADER_BTN (52, below) the sizing
+## reference instead of the tallest column's content — HEADER_H is now
+## DERIVED from it (52 + HEADER_PAD_Y*2 = 56), not an independent number to
+## keep in sync. This genuinely shrinks the header (96 -> 56); board_tile_for
+## grows in response (49 -> 52 no-notch, 44 -> 48 on an iPhone-11-class 56px
+## notch — see build()'s own comment for the arithmetic). Squeezes the
+## Clock's vertical room hard, since it now shares the centre band's height
+## with the Turn/Wave line above it — CLOCK_FONT's ceiling (36, below) is
+## very unlikely to be reached now; expect something closer to CLOCK_FONT_MIN.
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
 const HEADER_PAD_Y := 2.0
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
+const STOCK_ICON := 44 ## the piece icon on the Stock button
+const STOCK_PAD := 4.0 ## padding around the Stock icon, both axes
+## NO-175: "pause menu and stock buttons are now the same size" — HEADER_BTN
+## is Stock's old footprint (icon + padding, unchanged: shrinking the piece
+## icon would hurt legibility), and the ☰ button grows to match it instead
+## of the other way round.
+const HEADER_BTN := STOCK_ICON + STOCK_PAD * 2.0
+## NO-175, 3rd pass: "slim down the header to the height of the right 2
+## buttons" — HEADER_BTN plus the same top/bottom breathing room every other
+## row in this Header uses (HEADER_PAD_Y), not an independently-tuned number
+## that could drift from what actually sizes the buttons.
+const HEADER_H := HEADER_BTN + HEADER_PAD_Y * 2.0
 const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to fit the old HEADER_H.
 ## Ceiling only: build() measures the real font and shrinks toward this if
 ## 36 doesn't fit the restacked left column's width (fix for the clipped
@@ -148,20 +157,17 @@ const CLOCK_FIT_HEADROOM := 0.8
 const CLOCK_POS_OFFSET_X := 20.0
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
-const COUNTER_W := 150.0 ## NO-175: the LEFT column's fixed width — a King's name ellipsises past it, same as Wave/Turn did before
+## NO-175, 3rd pass: the LEFT column now holds only Score/Gold (Turn/Wave
+## moved to the CENTRE band, above the Clock — see build()). Kept at its
+## established value, generous for two six-digit odometers; no longer bounds
+## a King name, which is capped by the centre band's own width now instead.
+const COUNTER_W := 150.0
 ## NO-175: was 15, sized for the old 34px button — coordinator feedback:
 ## "reads as a small mark floating in a large box" now that the button is
 ## HEADER_BTN(52). Scaled up toward the ratio Stock's icon fills its own
 ## button (44/52 ≈ 0.85; a text glyph doesn't need quite that much given the
 ## button's own left/right padding) — visual judgement call, re-check on capture.
 const MENU_FONT := 28
-const STOCK_ICON := 44 ## the piece icon on the Stock button
-const STOCK_PAD := 4.0 ## padding around the Stock icon, both axes
-## NO-175: "pause menu and stock buttons are now the same size" — HEADER_BTN
-## is Stock's old footprint (icon + padding, unchanged: shrinking the piece
-## icon would hurt legibility), and the ☰ button grows to match it instead
-## of the other way round.
-const HEADER_BTN := STOCK_ICON + STOCK_PAD * 2.0
 const STOCK_BADGE_FONT := 13
 const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the icon's centre
 const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
@@ -272,6 +278,7 @@ var gold_label := Label.new() # spendable currency (score is the metric)
 var gold_row := HBoxContainer.new() # NO-127: pulsed as one unit on a gain
 var wave_label := Label.new()
 var turn_label := Label.new()
+var turn_wave_row := Control.new() # NO-175, 3rd pass: centred above the Clock; refresh() re-centres it as content changes
 var pass_button := Button.new()
 var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
@@ -492,52 +499,13 @@ func build(game) -> void:
 	header_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header_bg)
 
-	# LEFT COLUMN (NO-175, Figma mockup — layout intent, not a render target):
-	# three tight rows, top-flush — Turn+Wave on one line, then the Score
-	# odometer, then the Gold odometer. Gold now shares Score's font size
-	# AND its odometer treatment (grey leading zeros, coloured significant
-	# digits); both rows are plain HBoxContainers with no leading symbol,
-	# stacked in the same VBox, so their zeros labels start at the same x
-	# and the digits share a left edge for free (NO-114's old SYMBOL_W trick
-	# only existed because the Score row used to lead with a ★).
-	# NO-175 fix, 2nd pass: turn_wave_row is a plain Control now, not an
-	# HBoxContainer — the first fix (toggling turn_label's EXPAND flag with
-	# king_wave) traded one Container-driven surprise for another: without
-	# `clip_text`, `text_overrun_behavior` does nothing (Godot only trims
-	# rendered ink when the Control's OWN size is smaller than its content —
-	# clip_text is what makes that possible; the ellipsis mode alone just
-	# lets the Label's minimum size grow to fit the FULL text). So a long
-	# King name's un-ellipsised natural width dragged turn_label, this row
-	# and `left` itself out to 500+px (coordinator capture, 2026-09-20) —
-	# and separately, a SHORT "N/M" counter still wasn't flush left, because
-	# a Container distributes width by FLAGS, not by what's on screen; two
-	# rounds of guessing at that mechanism were both wrong.
-	# Fully explicit instead, same lesson as the Clock (its own header
-	# comment): turn_label is hard-capped to COUNTER_W (clip_text + ellipsis
-	# ON always, so a long name is deterministically trimmed regardless of
-	# state), and Wave's own x is computed in refresh() from turn_label's
-	# ACTUAL measured text width — not inferred from a Container flag.
-	var counter_font := turn_label.get_theme_default_font()
-	var counter_h: float = counter_font.get_height(COUNTER_FONT)
-	var turn_wave_row := Control.new()
-	turn_wave_row.custom_minimum_size = Vector2(COUNTER_W, counter_h)
-	turn_wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	turn_label.add_theme_font_size_override("font_size", COUNTER_FONT)
-	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	turn_label.clip_text = true
-	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	turn_label.position = Vector2.ZERO
-	turn_label.size = Vector2(COUNTER_W, counter_h)
-	turn_label.custom_minimum_size = Vector2(COUNTER_W, counter_h)
-	turn_wave_row.add_child(turn_label)
-	wave_label.add_theme_font_size_override("font_size", COUNTER_FONT)
-	wave_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	wave_label.modulate = Color(1, 1, 1, 0.85)
-	wave_label.position = Vector2.ZERO # x is recomputed every refresh() from Turn's real width
-	wave_label.size = Vector2(COUNTER_W, counter_h)
-	turn_wave_row.add_child(wave_label)
-
+	# LEFT COLUMN (NO-175, 3rd pass — Max's revised mockup): Score, then
+	# Gold, TWO rows only — Turn/Wave moved to the CENTRE band, above the
+	# Clock (below). Tight, top-flush: both rows are plain HBoxContainers
+	# with no leading symbol, stacked in the same VBox, so their zeros
+	# labels start at the same x and the digits share a left edge for free
+	# (NO-114's old SYMBOL_W trick only existed because the Score row used
+	# to lead with a ★).
 	score_label.add_theme_font_size_override("font_size", SCORE_FONT)
 	score_label.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
 	# NO-126: the odometer look — greyed padding zeros before the coloured
@@ -571,22 +539,72 @@ func build(game) -> void:
 
 	var left := VBoxContainer.new()
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
-	left.custom_minimum_size = Vector2(COUNTER_W, 0) # fixed width: a King's name ellipsises inside it
+	left.custom_minimum_size = Vector2(COUNTER_W, 0)
 	left.add_theme_constant_override("separation", 0) # "tight" per the mockup
-	left.add_child(turn_wave_row)
 	left.add_child(score_row)
 	left.add_child(gold_row)
 	add_child(left)
 
-	# CENTRE: the Clock, large, horizontally centred in the Header, beside
-	# the left column rather than stacked under anything (NO-175). Kept
-	# fully explicit — no Container, alignment pinned, clip_text on — for
-	# the same reason NO-162's fix comment gives: a Container's own rect
-	# isn't where the text actually lands, and three earlier passes on this
-	# exact Label shipped a passing assertion over a visibly clipped clock
-	# because they trusted it. `_clock_text()` (game.gd) is
-	# "%02d:%02d.%03d", ALWAYS 9 characters, so this sample is the only
-	# case that exists.
+	# CENTRE (NO-175, 3rd pass): a small Turn/Wave line directly above the
+	# Clock, both horizontally centred as their own blocks in the same band
+	# between the LEFT column and the Stock button. The band's width is
+	# shared by both — the Clock's own fit loop AND Turn's hard ellipsis
+	# cap (a long King name) — computed once, here.
+	#
+	# At 480x800: mid_left_edge=160, mid_right_edge=360, centre=240 — the
+	# LEFT side is the binding constraint (80px vs 120px of clearance), so
+	# the band is symmetric around centre at 2*(80-HEADER_GAP)=148px, not
+	# the full 200px between the two edges.
+	var mid_left_edge: float = HEADER_PAD_X + COUNTER_W
+	var mid_right_edge: float = vp.x - HEADER_PAD_X - HEADER_BTN * 2.0 - HEADER_GAP
+	var centre_x: float = vp.x / 2.0
+	var half_budget: float = minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP
+	var centre_w: float = half_budget * 2.0
+
+	# Turn/Wave: same fully-explicit, hard-capped approach the last fix
+	# established (see its own history below), just capped to centre_w
+	# instead of COUNTER_W now that it lives in the centre band, not the
+	# left column. turn_wave_row has no meaningful width of its own — it's
+	# a grouping parent, positioned (and RE-positioned every refresh(),
+	# since the visible pair must stay centred as its content changes) the
+	# same way clock_label is: a direct HUD child, not Container-managed.
+	#
+	# 2nd-pass history, still the reason turn_label is built this way:
+	# `text_overrun_behavior` alone does nothing — Godot only trims
+	# rendered ink when the Control's own size is smaller than its
+	# content, and `clip_text` is what makes that possible. Without it, a
+	# long King name's un-ellipsised natural width dragged the whole row
+	# (and, in the 2nd pass, `left`) out to 500+px (coordinator capture,
+	# 2026-09-20).
+	var counter_font := turn_label.get_theme_default_font()
+	var counter_h: float = counter_font.get_height(COUNTER_FONT)
+	turn_wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	turn_wave_row.position = Vector2(centre_x, y0 + HEADER_PAD_Y) # x is a placeholder; refresh() centres it
+	turn_label.add_theme_font_size_override("font_size", COUNTER_FONT)
+	turn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	turn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	turn_label.clip_text = true
+	turn_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	turn_label.position = Vector2.ZERO
+	turn_label.size = Vector2(centre_w, counter_h)
+	turn_label.custom_minimum_size = Vector2(centre_w, counter_h)
+	turn_wave_row.add_child(turn_label)
+	wave_label.add_theme_font_size_override("font_size", COUNTER_FONT)
+	wave_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	wave_label.modulate = Color(1, 1, 1, 0.85)
+	wave_label.position = Vector2.ZERO # x is recomputed every refresh() from Turn's real width
+	wave_label.size = Vector2(centre_w, counter_h)
+	turn_wave_row.add_child(wave_label)
+	add_child(turn_wave_row)
+
+	# The Clock, large, directly under the Turn/Wave line, both centred in
+	# the same band. Kept fully explicit — no Container, alignment pinned,
+	# clip_text on — for the same reason NO-162's fix comment gives: a
+	# Container's own rect isn't where the text actually lands, and three
+	# earlier passes on this exact Label shipped a passing assertion over a
+	# visibly clipped clock because they trusted it. `_clock_text()`
+	# (game.gd) is "%02d:%02d.%03d", ALWAYS 9 characters, so this sample is
+	# the only case that exists.
 	#
 	# On-device glyph measurement (NO-162, six rounds) found two divergences
 	# between what this code computes and what actually renders, neither
@@ -601,9 +619,13 @@ func build(game) -> void:
 	# that 10 plus a safety margin, for the old "clear the left gutter"
 	# use).
 	#
-	# NO-175 CENTRES the clock instead of left-aligning it in a fixed
-	# column, so both facts have to be recombined for a purpose neither was
-	# built for — UNVERIFIED, flag for on-device re-measurement:
+	# NO-175, 3rd pass: the vertical budget changes AGAIN — the centre band
+	# now also holds the Turn/Wave line above the Clock, and the whole
+	# Header slimmed to HEADER_BTN's height (see HEADER_H's own comment),
+	# so the fit loop now shrinks for HEIGHT as well as width — it never
+	# needed to before, because the Clock used to have the Header's full
+	# height to itself. Expect a much smaller applied size than the 36pt
+	# ceiling.
 	#   raw_ink_offset_x = CLOCK_POS_OFFSET_X - HEADER_PAD_X (recovers the
 	#     raw ~10px offset from the old gutter-relative constant — the
 	#     safety margin baked into CLOCK_POS_OFFSET_X would bias a centred
@@ -611,22 +633,17 @@ func build(game) -> void:
 	#   ink_width_est = clock_w / CLOCK_FIT_HEADROOM (the same ~1.25x the
 	#     fit loop already assumes by targeting 80% of budget)
 	#   position.x = centre_x + raw_ink_offset_x - ink_width_est / 2.0
+	# UNVERIFIED — both constants need on-device re-measurement against
+	# this geometry, same as the last two passes.
 	var clock_sample := "00:00.000"
-	# The middle band: left edge is where the (fixed-width) left column
-	# ends, right edge is where the Stock button begins, HEADER_GAP clears
-	# both. At 480x800: mid_left_edge=160, mid_right_edge=360, centre=240 —
-	# the LEFT side is the binding constraint (80px vs 120px of clearance),
-	# so the budget is symmetric around centre at 2*(80-HEADER_GAP)=148px,
-	# not the full 200px band.
-	var mid_left_edge: float = HEADER_PAD_X + COUNTER_W
-	var mid_right_edge: float = vp.x - HEADER_PAD_X - HEADER_BTN * 2.0 - HEADER_GAP
-	var centre_x: float = vp.x / 2.0
-	var half_budget: float = minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP
-	var clock_target_w: float = half_budget * 2.0 * CLOCK_FIT_HEADROOM
+	var tw_gap := 2.0 # minimal — "remove empty space" (Max)
+	var clock_h_budget: float = (HEADER_H - HEADER_PAD_Y * 2.0) - counter_h - tw_gap
+	var clock_target_w: float = centre_w * CLOCK_FIT_HEADROOM
 	var clock_font := clock_label.get_theme_default_font()
 	var clock_size := CLOCK_FONT
 	while clock_size > CLOCK_FONT_MIN \
-			and clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > clock_target_w:
+			and (clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x > clock_target_w \
+				or clock_font.get_height(clock_size) > clock_h_budget):
 		clock_size -= 1
 	var clock_w: float = clock_font.get_string_size(clock_sample, HORIZONTAL_ALIGNMENT_LEFT, -1, clock_size).x
 	var clock_h: float = clock_font.get_height(clock_size)
@@ -637,17 +654,23 @@ func build(game) -> void:
 	var raw_ink_offset_x: float = CLOCK_POS_OFFSET_X - HEADER_PAD_X
 	var ink_width_est: float = clock_w / CLOCK_FIT_HEADROOM
 	clock_label.position = Vector2(centre_x + raw_ink_offset_x - ink_width_est / 2.0,
-		y0 + (HEADER_H - clock_h) / 2.0)
+		y0 + HEADER_PAD_Y + counter_h + tw_gap)
 	clock_label.size = Vector2(clock_w, clock_h)
 	clock_label.custom_minimum_size = Vector2(clock_w, clock_h)
 	add_child(clock_label)
 
-	# RIGHT: Stock and the ☰ button, side by side, the SAME size (NO-175 —
-	# they differed before: Stock was icon+padding, ☰ a smaller fixed
-	# square). HEADER_BTN is Stock's old footprint, kept as-is (shrinking
-	# the piece icon would hurt legibility); ☰ grows to match instead. Both
-	# are vertically centred in the Header now that nothing else shares
-	# their column (Wave/Turn moved into the LEFT column, above).
+	# RIGHT: Stock and the ☰ button, side by side, the SAME size AND the
+	# SAME style (NO-175). Size was already matched last pass (HEADER_BTN);
+	# the colour mismatch Max flagged was real — ☰ was styled through the
+	# shared "compact" StyleBoxFlat loop below (a solid dark grey,
+	# Color(0.22, 0.22, 0.26)), meant for the two OFF-SCREEN buttons in that
+	# loop, while Stock uses `_style_button` with a translucent white tint
+	# (Color(1, 1, 1, 0.08)) — two different styling calls, never unified.
+	# ☰ now uses the SAME `_style_button` call as Stock, so the only
+	# remaining differences are the glyph and Stock's count badge, exactly
+	# what Max asked for. Both are vertically centred in the Header now
+	# that nothing else shares their column (Wave/Turn moved into the
+	# CENTRE band, above).
 	king_ability_button.add_theme_font_size_override("font_size", 13)
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	king_ability_button.pressed.connect(func() -> void: king_ability_pressed.emit())
@@ -657,14 +680,10 @@ func build(game) -> void:
 	# NO-83: the ⚠ and Arrows buttons are NOT on screen. Their state, signals
 	# and handlers stay (refresh still writes their text) so nothing behind
 	# them is lost; they get a home again when the Deck is redesigned (NO-84+).
-
-	var header_btn_y: float = y0 + (HEADER_H - HEADER_BTN) / 2.0
-	menu_button.text = "☰"
-	menu_button.add_theme_font_size_override("font_size", MENU_FONT)
-	menu_button.position = Vector2(vp.x - HEADER_PAD_X - HEADER_BTN, header_btn_y)
-	menu_button.custom_minimum_size = Vector2(HEADER_BTN, HEADER_BTN) # NO-131/NO-175: square, matches Stock
-	# flat compact styling (2026-07-08); the two off-screen buttons keep theirs
-	for b: Button in [king_ability_button, arrow_button, menu_button]:
+	# flat compact styling (2026-07-08) for the two off-screen buttons only —
+	# ☰ moved OUT of this loop (NO-175, 3rd pass) so it can share Stock's
+	# own style instead.
+	for b: Button in [king_ability_button, arrow_button]:
 		var compact := StyleBoxFlat.new()
 		compact.bg_color = Color(0.22, 0.22, 0.26)
 		compact.set_corner_radius_all(4)
@@ -674,6 +693,13 @@ func build(game) -> void:
 		compact.content_margin_bottom = 1
 		for style in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(style, compact)
+
+	var header_btn_y: float = y0 + (HEADER_H - HEADER_BTN) / 2.0
+	menu_button.text = "☰"
+	menu_button.add_theme_font_size_override("font_size", MENU_FONT)
+	menu_button.position = Vector2(vp.x - HEADER_PAD_X - HEADER_BTN, header_btn_y)
+	menu_button.custom_minimum_size = Vector2(HEADER_BTN, HEADER_BTN) # NO-131/NO-175: square, matches Stock
+	_style_button(menu_button, Color(1, 1, 1, 0.08), Color(0, 0, 0, 0), 8, STOCK_PAD, STOCK_PAD) # NO-175: same call as Stock (this block's header comment)
 	menu_button.pressed.connect(func() -> void: toggle_menu(true))
 	add_child(menu_button)
 	# NO-60: the glyph stays put (content-sized, top-right corner) but its tap
@@ -1660,15 +1686,30 @@ func refresh() -> void:
 		turn_label.text = ""
 	else:
 		turn_label.text = "%d/%d" % [g.turns_since_wave, g._cadence()]
-	# NO-175: turn_wave_row is plain Controls, not an HBoxContainer (see
-	# build()'s comment) — Wave's x is placed right after Turn's ACTUAL
-	# rendered text width (measured, same technique the Clock uses), clamped
-	# to COUNTER_W since clip_text can visually trim Turn's ink narrower than
-	# its box. Turn itself never moves — it's pinned at x=0 in build().
+	# NO-175, 3rd pass: turn_wave_row now lives in the CENTRE band, above the
+	# Clock (see build()'s comment), so the PAIR has to stay centred as a
+	# block as its content changes — not just Wave placed after Turn inside
+	# a fixed-position row. Turn's own box is pinned at local x=0 (build()),
+	# clamped to centre_w for the King-name-ellipsis case; Wave's x follows
+	# Turn's ACTUAL rendered text width (measured, same technique the Clock
+	# uses); turn_wave_row's own x is then set so the visible pair (or Turn
+	# alone, while Wave is blank) is centred on centre_x — the same
+	# mid-band math build() uses for the Clock, recomputed here since it's
+	# not cached anywhere.
+	var vp: Vector2 = g.get_viewport_rect().size
+	var mid_left_edge: float = HEADER_PAD_X + COUNTER_W
+	var mid_right_edge: float = vp.x - HEADER_PAD_X - HEADER_BTN * 2.0 - HEADER_GAP
+	var centre_x: float = vp.x / 2.0
+	var centre_w: float = (minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP) * 2.0
 	var counter_font := turn_label.get_theme_default_font()
 	var turn_text_w: float = counter_font.get_string_size(
 		turn_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
-	wave_label.position.x = minf(turn_text_w, COUNTER_W) + 6.0 # 6 = the old row separation
+	var turn_visible_w: float = minf(turn_text_w, centre_w)
+	wave_label.position.x = turn_visible_w + 6.0 # 6 = the row's own gap
+	var wave_text_w: float = counter_font.get_string_size(
+		wave_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
+	var pair_w: float = turn_visible_w if wave_label.text.is_empty() else wave_label.position.x + wave_text_w
+	turn_wave_row.position.x = centre_x - pair_w / 2.0
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false

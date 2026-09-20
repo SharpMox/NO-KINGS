@@ -800,7 +800,11 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## value of 132, because the always-reserved power row is gone too.
 ## NO-163: the 6px gap between those two rows (hud.gd's `deck` separation) is
 ## closed, so the sum drops again, 98 -> 92.
-const DECK_ROWS := 92.0 ## drawers 32 + act 60, no gap (NO-163)
+## NO-181: that gap reopens, at HudScript.DECK_GAP (5) — the same constant
+## nav_row/act_row use for their own button gaps, so this sum can't drift
+## from what hud.gd actually builds (test_game_clicks.gd's NO-33 guard
+## computes the live deck's height and checks it against this constant).
+const DECK_ROWS := 32.0 + HudScript.DECK_GAP + 60.0 ## drawers 32 + DECK_GAP (hud.gd) + act 60
 const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept

@@ -3167,7 +3167,7 @@ func _item_stage_targets(it: Dictionary, a: Vector2i) -> Array[Vector2i]:
 func _item_target_tip(t: Vector2i) -> void:
 	if board.has(t):
 		hud.show_tip("item-target:%s" % str(t), BuffLogic.describe(board[t].id, board[t], defs),
-			Rect2(_tile_px(t), Vector2(self.tile, self.tile)))
+			Rect2(_tile_px(t), Vector2(self.tile, self.tile)), board[t].id) # NO-152: diagram
 	else:
 		hud.hide_tip()
 
@@ -3998,7 +3998,7 @@ func _artefact_target_click(tile: Vector2i) -> void:
 		if board.has(tile):
 			hud.show_tip("artefact-target:%s" % str(tile),
 				BuffLogic.describe(board[tile].id, board[tile], defs),
-				Rect2(_tile_px(tile), Vector2(self.tile, self.tile)))
+				Rect2(_tile_px(tile), Vector2(self.tile, self.tile)), board[tile].id) # NO-152: diagram
 		_refresh()
 		return
 	# NO-124: the second pick is now a complete, confirmable target — stage it
@@ -4496,7 +4496,7 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 				if screen == "tip":
 					hud.show_tip("board:%s" % str(at),
 						BuffLogic.describe(board[at].id, board[at], defs),
-						Rect2(_tile_px(at), Vector2(tile, tile)))
+						Rect2(_tile_px(at), Vector2(tile, tile)), board[at].id) # NO-152: diagram
 				else:
 					_show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
 	await _capture_and_quit(dir)

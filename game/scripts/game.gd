@@ -143,27 +143,42 @@ const ZONE_OUTLINE_ALPHA := 0.6 # NO-176: was 0.9 — Max flagged real board
 	# strokes still compositing on the same edge is the exact "third colour"
 	# this drop is meant to avoid, not just soften.
 const ZONE_OUTLINE_WIDTH := 3.5
+const ZONE_OUTLINE_OVERLAP_ALPHA := 0.9 # NO-183: the overlap boundary is a
+	# thin marker interrupting the larger blue/red outline shapes, not a
+	# shape of its own competing for the same "don't stack up and look
+	# weird" budget ZONE_OUTLINE_ALPHA (0.6) was tuned for — raised toward
+	# opaque so the purple (see COL_ZONE_OUTLINE_OVERLAP) reads at a glance.
 # NO-161: board highlight palette. COL_MOVE/COL_CAPTURE stay as they were
 # (move dots/arrows, the capture ring) — these three are only for the zone
 # OUTLINE and the capture tile wash, which needed their own values:
 const COL_ZONE_OUTLINE_MOVE := Color(0.55, 0.75, 1.0) # lighter than COL_MOVE
 	# (0.3, 0.55, 0.95) so the outline itself reads as distinct from the move
 	# dots/arrows it wraps, not a repeat of the same blue
-const COL_ZONE_OUTLINE_OVERLAP := Color(0.95, 0.8, 0.15) # where a move-tile
+const COL_ZONE_OUTLINE_OVERLAP := Color(0.75, 0.45, 1.0) # where a move-tile
 	# outline edge and a capture-tile outline edge fall on the identical
 	# boundary (two tiles of different kinds touching inside one reachable
 	# zone), drawn once in this colour. NOT relied on to emerge from
 	# stacking blue-then-red: both outline strokes sit at ZONE_OUTLINE_ALPHA
 	# 0.9, so the underlying layer would barely show through the top one —
 	# computed explicitly instead of hoped for (can't screenshot to check).
-	# NO-183: was a purple (0.62, 0.32, 0.88) sharing NO-177's aubergine dark
-	# square (#573F6E) hue family — flagged on that ticket as a predicted
-	# failure at ZONE_OUTLINE_ALPHA 0.6, never verified. Gold instead: it's
-	# purple's complement (strong contrast against the aubergine square by
-	# construction) and, pushed warmer/more saturated than COL_LIGHT's pale
-	# sage, reads against that square too. Distinct from COL_ARROW
-	# (0.95, 0.65, 0.15, more orange) so it doesn't collide with the
-	# decorative Arrow Planning overlay. NOT VERIFIED ON SCREEN.
+	# NO-183: Max asked for purple here explicitly ("I want purple outlines
+	# where blue and red stack") and his later complaint ("the purple
+	# outlines don't really show up") is that the mark was invisible, not a
+	# request for a different colour — purple stays; a same-hue-family
+	# stand-in (tried: gold, purple's complement) was reverted because it
+	# breaks the blue=move/red=capture/purple=both vocabulary and needs
+	# babysitting against COL_ARROW for no reason purple ever had. The old
+	# value (0.62, 0.32, 0.88) sat close in both HUE and VALUE to NO-177's
+	# aubergine dark square (#573F6E) — flagged as a predicted failure on
+	# that ticket, never verified until now. This is separated on VALUE
+	# instead: a much lighter, more saturated violet/lavender, so it stands
+	# off the dark aubergine square by brightness and off the pale sage
+	# square by saturation and hue, rather than trying to out-contrast
+	# aubergine on hue alone (purple-on-purple, however different the
+	# shade, is the fight NO-177 flagged in the first place). Paired with
+	# ZONE_OUTLINE_OVERLAP_ALPHA below (was folded into the shared
+	# ZONE_OUTLINE_ALPHA, 0.6 — a boundary marker can afford more than the
+	# large outline shapes it interrupts). NOT VERIFIED ON SCREEN.
 const COL_CAPTURE_TILE_TINT := Color(0.92, 0.18, 0.4) # capture-target tile
 	# wash, pushed pinker than COL_CAPTURE (0.85, 0.15, 0.15) by raising
 	# blue — the ring and the new capture outline stay pure COL_CAPTURE so
@@ -4512,10 +4527,10 @@ func _draw() -> void:
 					and merge_highlights.has(board[pos].id):
 				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 					COL_MERGE, 3.0)
-	# NO-176: explicit draw order — red over gold over blue (NO-183: the
-	# overlap colour, was purple). The reachable zone's own outline below
-	# (blue move edges, red capture edges, gold where the two meet inside
-	# the same zone — NO-161) is drawn FIRST, as the bottom layer; the
+	# NO-176: explicit draw order — red over purple over blue. The reachable
+	# zone's own outline below (blue move edges, red capture edges, purple
+	# where the two meet inside the same zone — NO-161) is drawn FIRST, as
+	# the bottom layer; the
 	# bomb-blast preview and armed-Item zone are pure red and are drawn
 	# AFTER, on top, so a red capture edge is never hidden beneath a blue
 	# move edge where the two zones' tiles coincide (the bomb highlight in
@@ -4561,7 +4576,7 @@ func _draw() -> void:
 	# move/capture squares reads as a shape rather than each square drawn on
 	# its own — reused by NO-130's _draw_target_zone for the bomb blast
 	# preview and an armed Item's zone. NO-161: capture tiles draw red
-	# instead of blue and a move/capture boundary reads gold (see
+	# instead of blue and a move/capture boundary reads purple (see
 	# _draw_zone_outline); recon (enemy) zones are left as one uniform
 	# COL_ENEMY shape — the ticket's blue-vs-red contrast doesn't apply to a
 	# zone that's already all red, and there's no third recon-only colour to
@@ -4708,7 +4723,7 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 	# bomb-blast/Item-zone caller (already one uniform red shape) is
 	# unchanged: every `captures.has(...)` below is then always false.
 	var capture_col := Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA)
-	var overlap_col := Color(COL_ZONE_OUTLINE_OVERLAP, ZONE_OUTLINE_ALPHA)
+	var overlap_col := Color(COL_ZONE_OUTLINE_OVERLAP, ZONE_OUTLINE_OVERLAP_ALPHA)
 	for t in tiles:
 		var px := _tile_px(t)
 		var t_cap := captures.has(t)

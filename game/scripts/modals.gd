@@ -510,15 +510,21 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var cells := 9 # covers the longest leap (Ying Long's 4)
 		var cell := 30
 		dia.custom_minimum_size = Vector2(cells, cells) * cell
+		# NO-171 (root cause, not an offset nudge): PieceDiagram.draw paints the
+		# chequer from dia's own (0,0), assuming its rect IS the cells*cell box.
+		# Without SHRINK_CENTER, a plain Control defaults to filling the VBox's
+		# full width — and the legend line below (or the King Ability desc
+		# labels, sized to near the full viewport width) was routinely wider
+		# than 270px, stretching `dia` to match and pinning the painted board
+		# to its new left edge instead of centring it. The "item"/"artefact"
+		# branch's own icon TextureRect below already carries this same flag;
+		# `dia` was simply the one node in this function that never got it.
+		dia.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		var dia_tex: Texture2D = g.piece_tex(id) if g.textures.has(id) else null
 		dia.draw.connect(func() -> void: PieceDiagram.draw(dia, g.defs, id, cells, cell, dia_tex))
 		box.add_child(dia)
 
-		var legend := Label.new()
-		legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
-		legend.add_theme_font_size_override("font_size", 13)
-		legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(legend)
+		_add_preview_legend() # NO-171: hidden by default behind a top-left button
 
 		var chain: Array = g._chain_of(id)
 		if chain.size() > 1:
@@ -533,7 +539,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 					row.add_child(arrow)
 				var tr := TextureRect.new()
 				tr.texture = g.piece_tex(chain[i]) if g.textures.has(chain[i]) else null
-				tr.custom_minimum_size = Vector2(48, 48)
+				tr.custom_minimum_size = Vector2(96, 96) # NO-171: 2x the old 48
 				tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 				if chain[i] != id:
 					tr.modulate = Color(1, 1, 1, 0.45) # current stage stands out
@@ -605,6 +611,57 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		preview_panel.visible = false
 		preview_closed.emit())
 	box.add_child(close)
+
+
+## NO-171: the move legend, hidden by default behind a small button at the
+## panel's top-left, opening a small floating panel above it. preview_panel
+## is a PanelContainer, which stretches EVERY direct child to its own full
+## content rect (Godot's documented behaviour, same reason `center` alone
+## fills it today) — so the button and legend panel are free-positioned
+## children of an `overlay` Control (a plain Control, not a Container) that
+## is ITSELF the one direct child added here, rather than being added to
+## preview_panel directly, where PanelContainer would override their
+## position every layout pass. `overlay` is added after `center`, so it
+## draws on top, and carries MOUSE_FILTER_IGNORE so an empty part of it
+## (everywhere except the button/legend) doesn't steal taps meant for the
+## diagram or the Sell/Close buttons underneath — same idiom as _slide_shop's
+## own IGNORE comment (a parent's IGNORE doesn't disable a child's own STOP).
+## Being a sibling of `center` rather than a child of `box` is also what
+## makes "the diagram stays anchored as it toggles" true: an in-flow legend,
+## even above a correctly-centred diagram, would still push the diagram down
+## the screen by its own height every time it opened.
+##
+## Fixed top-left position, not measured against the diagram's own rect —
+## this screen has no Godot run available to size against a real layout, so
+## the numbers here (12px margin, a 220px-wide legend panel) are a
+## reasonable guess; verify there's no overlap with the title in the tallest
+## case (Sell + a chain + King Abilities) on real hardware.
+func _add_preview_legend() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_panel.add_child(overlay)
+
+	var panel := PanelContainer.new()
+	panel.visible = false
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.05, 0.05, 0.07, 0.95)
+	panel.add_theme_stylebox_override("panel", bg)
+	panel.position = Vector2(12, 48)
+	panel.custom_minimum_size = Vector2(220, 0)
+	var legend := Label.new()
+	legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
+	legend.add_theme_font_size_override("font_size", 12)
+	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_child(legend)
+	overlay.add_child(panel)
+
+	var btn := Button.new()
+	btn.text = "?"
+	btn.tooltip_text = "Move legend"
+	btn.position = Vector2(12, 12)
+	btn.pressed.connect(func() -> void: panel.visible = not panel.visible)
+	overlay.add_child(btn) # after `panel`: draws on top if they ever overlap
 
 
 ## The Shop drawer: docked at the right edge, covering ~90% of the screen

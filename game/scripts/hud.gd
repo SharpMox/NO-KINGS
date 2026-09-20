@@ -978,7 +978,7 @@ func build(game) -> void:
 
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
-	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true)
+	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true, g)
 	# Logging out mid-run LEAVES the run: its save was just parked under the
 	# account that owns it, and staying in a live game whose save now belongs to
 	# nobody would write a fresh unowned one on the next autosave. Back to the

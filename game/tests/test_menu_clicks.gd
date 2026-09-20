@@ -68,14 +68,24 @@ func _click_button(menu: Node, text: String) -> bool:
 	var btn := _find_button(menu, text)
 	if btn == null or not btn.is_visible_in_tree():
 		return false
-	var p: Node = btn.get_parent()
+	return await _click_control(btn)
+
+
+## NO-190: the tier buttons carry no text any more, so they can't be found
+## by _find_button — the caller looks them up via menu._tier_buttons instead
+## and clicks the Control directly. Same scroll-into-view + click logic
+## _click_button uses, factored out so neither path can drift from the other.
+func _click_control(ctrl: Control) -> bool:
+	if ctrl == null or not ctrl.is_visible_in_tree():
+		return false
+	var p: Node = ctrl.get_parent()
 	while p: # bring buttons inside scroll lists into the viewport first
 		if p is ScrollContainer:
-			p.ensure_control_visible(btn)
+			p.ensure_control_visible(ctrl)
 			await process_frame
 			break
 		p = p.get_parent()
-	_click(btn.get_global_rect().get_center())
+	_click(ctrl.get_global_rect().get_center())
 	return true
 
 
@@ -287,31 +297,38 @@ func _init() -> void:
 	check(GameScript.next_army == "Wild Hunt", "army click stages its stock")
 
 	# tier select: shown after the army, locked for the run (07-difficulty-ranks)
-	check(_find_button(menu, "Tier 1") != null, "army click opens the tier select")
-	check(_find_button(menu, "Tier 5") != null, "tier select offers all 5 tiers")
+	# NO-190: the "Tier N" text is gone from the row buttons (Max), so
+	# _find_button can no longer locate them — the walk reads menu._tier_buttons
+	# directly instead (same convention test_menu_clicks already uses for
+	# _selected_tier), which is a stronger check than a text lookup: it proves
+	# the picker built exactly 5 tier rows, not just that some button somewhere
+	# says "Tier 5".
+	check(menu._tier_buttons.size() == 5, "army click opens the tier select, with all 5 tiers")
+	check(menu._tier_buttons[0].is_visible_in_tree(), "tier row is a real, visible tap target")
 	check(await _click_button(menu, "← Back"), "tier Back clickable")
 	await process_frame
 	check(_find_button(menu, "Wild Hunt") != null, "tier Back restores the army select")
 	await _click_button(menu, "Wild Hunt")
 	await process_frame
 	GameScript.next_tier = ""
-	# NO-159: the old font-26 "Tier N" header — which used to launch on one
-	# tap — is gone; the same-text button that replaces it is select-then-
-	# confirm now (menu.gd's _selected_tier), so staging the run needs TWO
-	# taps on "Tier 3": the first only SELECTS it, the second (now that it is
-	# already selected) confirms and launches. This is a stronger walk than
-	# the old single click, not a weaker one — it also proves the select step
-	# does not itself stage a run.
-	check(await _click_button(menu, "Tier 3"), "tier button clickable")
+	# NO-190: Confirm replaces the old select-then-confirm second tap. A tier
+	# tap now only ever selects — so tapping Tier 3 (index 2) twice must NOT
+	# stage a run any more; only Confirm does. That is a stronger walk than
+	# the old one, not weaker: it proves both that a tap never launches by
+	# itself AND that Confirm launches using whatever tier is selected.
+	check(await _click_control(menu._tier_buttons[2]), "tier button clickable")
 	await process_frame
-	check(menu._selected_tier == 2, "first tap selects Tier 3 (0-based index)")
+	check(menu._selected_tier == 2, "tap selects Tier 3 (0-based index)")
 	check(GameScript.next_tier == "", "selecting a tier does not stage a run yet")
-	check(await _click_button(menu, "Tier 3"), "re-tapping the selected tier confirms it")
+	check(await _click_control(menu._tier_buttons[2]), "re-tapping the selected tier is clickable")
 	await process_frame
-	check(GameScript.next_tier == "Tier 3", "second tap on the selected tier stages the run's difficulty")
+	check(GameScript.next_tier == "", "re-tapping a tier still does not stage a run — Confirm does")
+	check(await _click_button(menu, "Confirm"), "Confirm button clickable")
+	await process_frame
+	check(GameScript.next_tier == "Tier 3", "Confirm stages the run with the selected tier")
 
-	# Scores opens the local high-score list (fresh menu again: the tier
-	# click above changed the scene). The tier click's change_scene_to_file
+	# Scores opens the local high-score list (fresh menu again: the Confirm
+	# click above changed the scene). Its change_scene_to_file
 	# is deferred, so the Game it loaded is still root's current_scene here —
 	# free it too, or its full-rect HUD keeps intercepting clicks that land
 	# near the screen bottom (found via the Guide panel's Back, 05-menus).
@@ -355,13 +372,25 @@ func _init() -> void:
 	DirAccess.remove_absolute(GameScript.SCORES_PATH)
 	DirAccess.remove_absolute(GameScript.HISTORY_PATH)
 
-	# Guide: shared rules reference (identical copy lives in the in-game menu)
+	# Guide: NO-189 turned this into a hub of 7 entries (Rules + six catalog
+	# pages) — one navigation level deeper than before, matching the tier
+	# picker and TEST list's own "Back lands one level up" shape. The walk
+	# now goes one level further in and back out, rather than landing
+	# straight on the rules text the old flat panel showed immediately.
 	check(await _click_button(menu, "Guide"), "Guide button clickable")
 	await process_frame
-	check(_find_label(menu, "Objective") != null, "Guide panel shows its rules text")
-	check(await _click_button(menu, "← Back"), "Guide Back clickable")
+	check(_find_button(menu, "Rules") != null, "Guide hub offers Rules")
+	check(_find_button(menu, "Pieces") != null, "Guide hub offers Pieces")
+	check(_find_button(menu, "Indicators") != null, "Guide hub offers Indicators")
+	check(await _click_button(menu, "Rules"), "Rules button clickable")
 	await process_frame
-	check(_find_button(menu, "Play") != null, "Guide Back restores the main menu")
+	check(_find_label(menu, "Objective") != null, "Rules page shows its rules text")
+	check(await _click_button(menu, "← Back"), "Rules Back clickable")
+	await process_frame
+	check(_find_button(menu, "Rules") != null, "Rules Back restores the Guide hub, not the main menu")
+	check(await _click_button(menu, "← Back"), "Guide hub Back clickable")
+	await process_frame
+	check(_find_button(menu, "Play") != null, "Guide hub Back restores the main menu")
 
 	# About: credits/version. NO-147: folds into Settings.
 	check(await _click_button(menu, "Settings"), "Settings button clickable (About)")

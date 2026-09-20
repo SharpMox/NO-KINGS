@@ -3629,17 +3629,23 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 	if Kings.power_is(self, "purge"): # Stalin: The Purge — no Buffs are gained
 		_add_turn_fx("The Purge", Color(1.0, 0.5, 0.4))
 		return
-	var buff_cap := BuffLogic.cap(_artefact_count("abduction-probe")
-			+ (1 if Armies.communion(self) else 0)) # issue 68: Communion
-		# (The Cult) sums into the SAME cap() call, additive with Abduction
-		# Probe — "Communion + Abduction Probe = cap 4," never deduped
-	if BuffLogic.catalogued_count(piece) >= buff_cap:
+	if BuffLogic.catalogued_count(piece) >= buff_cap():
 		if pos.x >= 0:
 			_add_float(pos, "Buffs full", COL_MERGE)
 		return
 	BuffLogic.add(piece, key, turns)
 	if fire_hook:
 		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
+
+
+## The Piece Buff capacity in force: base + Abduction Probe copies +
+## Communion, additive and never deduped (issue 68: Communion — The Cult —
+## sums into the SAME cap() call as Abduction Probe, "Communion + Abduction
+## Probe = cap 4"). One definition — _apply_buff and merge inheritance
+## (NO-191) must never disagree on what the cap is.
+func buff_cap() -> int:
+	return BuffLogic.cap(_artefact_count("abduction-probe")
+			+ (1 if Armies.communion(self) else 0))
 
 
 ## Single choke point for a Piece Buff resolving off the board (artefact hook

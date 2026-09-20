@@ -7,6 +7,7 @@ const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd") # issue 98: MERGE_COST
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-191: inherited()
 
 
 ## The piece the current selection would merge FROM: an armed Stock stack
@@ -96,8 +97,11 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 	if g.autoplay:
 		return commit_merge(g, a, b)
 	g.pending_merge = [a, b]
+	var a_piece := _piece_state(g, a)
+	var b_piece := _piece_state(g, b)
+	var result_buffs := BuffLogic.inherited(a_piece, b_piece, g.buff_cap()) # NO-191
 	g.modals.show_merge_confirm(ids[0], ids[1], Rules.merge_result(ids, g.defs, g.fusions),
-		_piece_state(g, a), _piece_state(g, b)) # NO-185: buffs shown are about to be lost
+		a_piece, b_piece, result_buffs) # NO-191: the buffs the result will inherit
 
 
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
@@ -112,6 +116,12 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	if not pair_ok(g, ids[0], ids[1]):
 		return
 	var result := Rules.merge_result(ids, g.defs, g.fusions)
+	# NO-191: the union of both sources' catalogued Piece Buffs, capped —
+	# read BEFORE the erase loop below discards both sources for real, same
+	# reason consumed_states is snapshotted first. g.buff_cap() is the SAME
+	# cap _apply_buff enforces (base + Abduction Probe + Communion) — never
+	# a second computation of it (this repo's most-repeated bug shape).
+	var result_buffs := BuffLogic.inherited(_piece_state(g, a), _piece_state(g, b), g.buff_cap())
 	# issue 56: snapshot both consumed pieces' ADR-0002 Stock-shaped state
 	# BEFORE the erase loop below discards it for real — Zapruder's
 	# Director's Cut reads this back off the action_log entry to return both
@@ -139,10 +149,19 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	g._log_action("merge", {"pieces": consumed_states})
 	var stock_index := -1
 	if result_tile.x >= 0:
-		g.board[result_tile] = {"id": result, "owner": Rules.PLAYER}
+		var piece := {"id": result, "owner": Rules.PLAYER}
+		if not result_buffs.is_empty():
+			piece.buffs = result_buffs # NO-191
+		g.board[result_tile] = piece
 		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	else:
-		g.stock.append(result)
+		# ADR-0002: bare id when the result carries no state to preserve,
+		# same "duplicate, size()==1 means no extra state" idiom used
+		# elsewhere for a Stock entry (see game.gd's _capture_to_stock).
+		var entry := {"id": result}
+		if not result_buffs.is_empty():
+			entry.buffs = result_buffs # NO-191
+		g.stock.append(entry.id if entry.size() == 1 else entry)
 		stock_index = g.stock.size() - 1 # captured now — a handler appending its
 			# own Stock grant during on_rank_up (Bigfoot Toenail Clipping) must
 			# not shift which entry Holy Grail Coaster's stock case converts

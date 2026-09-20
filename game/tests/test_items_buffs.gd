@@ -564,6 +564,162 @@ func _init() -> void:
 	bc.queue_free()
 	await process_frame
 
+	# --- NO-191: a merge result inherits the UNION of both sources'
+	# catalogued Piece Buffs, capped, instead of silently discarding them.
+	# union: each source's own buff survives
+	var mu := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	mu.actions_left = 5
+	BuffLogic.add(mu.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(mu.board[Vector2i(3, 2)], "taunt")
+	MergeLogic.commit_merge(mu, Vector2i(2, 2), Vector2i(3, 2)) # Rank Up: pawn+pawn -> sergeant
+	var mu_result: Dictionary = mu.board[Vector2i(3, 2)]
+	check(BuffLogic.has(mu_result, "shield") and BuffLogic.has(mu_result, "taunt"),
+		"NO-191: a merge result inherits the union of both sources' Piece Buffs")
+	check(BuffLogic.catalogued_count(mu_result) == 2, "NO-191: union carries both, nothing extra")
+	mu.queue_free()
+	await process_frame
+
+	# dedupe: a shared key appears once, the permanent (no `turns`) copy
+	# outranking any timed one — buff_logic.gd: absence of `turns` waits forever
+	var md := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	md.actions_left = 5
+	BuffLogic.add(md.board[Vector2i(2, 2)], "aura") # no turns arg: permanent
+	BuffLogic.add(md.board[Vector2i(3, 2)], "aura", 3) # a timed copy
+	MergeLogic.commit_merge(md, Vector2i(2, 2), Vector2i(3, 2))
+	var md_buffs: Array = BuffLogic.of(md.board[Vector2i(3, 2)])
+	check(md_buffs.size() == 1 and md_buffs[0].key == "aura",
+		"NO-191: a buff both sources hold appears exactly once in the result")
+	check(not md_buffs[0].has("turns"),
+		"NO-191: the permanent copy outranks a timed copy of the same key")
+	md.queue_free()
+	await process_frame
+
+	# dedupe: between two timed copies of the same key, the longer one wins
+	var mt := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	mt.actions_left = 5
+	BuffLogic.add(mt.board[Vector2i(2, 2)], "aura", 1)
+	BuffLogic.add(mt.board[Vector2i(3, 2)], "aura", 4)
+	MergeLogic.commit_merge(mt, Vector2i(2, 2), Vector2i(3, 2))
+	check(BuffLogic.of(mt.board[Vector2i(3, 2)])[0].turns == 4,
+		"NO-191: between two timed copies of the same key, the longer turns value wins")
+	mt.queue_free()
+	await process_frame
+
+	# cap: sources jointly exceed BuffLogic.cap(0) == 2 — truncated to the
+	# deterministic first-N: a's buffs in order, then b's
+	var cap_g := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	cap_g.actions_left = 5
+	BuffLogic.add(cap_g.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cap_g.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cap_g.board[Vector2i(3, 2)], "taunt")
+	MergeLogic.commit_merge(cap_g, Vector2i(2, 2), Vector2i(3, 2))
+	var cap_keys: Array = BuffLogic.of(cap_g.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(cap_keys == ["shield", "critical"],
+		"NO-191: a union over cap truncates to the deterministic first-N, a's buffs before b's")
+	cap_g.queue_free()
+	await process_frame
+
+	# cap must agree with _apply_buff's game.gd:buff_cap() — base + Abduction
+	# Probe + Communion, additive (issue 68). A merge that computed its own
+	# cap independently once truncated a Cult player below what the rest of
+	# the game promises them (base 2 + probe 1 + Communion 1 = 4, not 3).
+	var cc := _boot({"army": "Cult", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
+	await process_frame
+	cc.actions_left = 5
+	# a minimal {"key":...} entry has no "name" — fine for BuffLogic, which
+	# never reads it, but commit_merge's trailing _refresh() rebuilds the
+	# Inventory drawer, and hud.gd's _build_artefact_cell reads entry.name
+	# for an unpainted icon's initials badge. Grant the real catalog entry,
+	# the same way test_shop.gd's artefact-purchase fixture does.
+	cc.artefacts.append(Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key == "abduction-probe")[0])
+	BuffLogic.add(cc.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cc.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cc.board[Vector2i(3, 2)], "taunt")
+	BuffLogic.add(cc.board[Vector2i(3, 2)], "bomb")
+	MergeLogic.commit_merge(cc, Vector2i(2, 2), Vector2i(3, 2))
+	var cc_keys: Array = BuffLogic.of(cc.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(cc_keys == ["shield", "critical", "taunt", "bomb"],
+		"NO-191: Cult + Abduction Probe raises the merge cap to 4, same as _apply_buff — nothing truncated")
+	cc.queue_free()
+	await process_frame
+
+	# army explicit (not the default): next_army is a GameScript STATIC var
+	# (game.gd:43), so cc's Cult boot above otherwise leaks into every later
+	# _boot() in this run that omits "army" — SaveConfig.apply falls back to
+	# cfg.get("army", g.next_army), i.e. whatever the LAST boot left it as.
+	var cn := _boot({"army": "Crown", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
+	await process_frame
+	cn.actions_left = 5
+	cn.artefacts.append(Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key == "abduction-probe")[0])
+	BuffLogic.add(cn.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(cn.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(cn.board[Vector2i(3, 2)], "taunt")
+	BuffLogic.add(cn.board[Vector2i(3, 2)], "bomb")
+	MergeLogic.commit_merge(cn, Vector2i(2, 2), Vector2i(3, 2))
+	var cn_keys: Array = BuffLogic.of(cn.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(cn_keys == ["shield", "critical", "taunt"],
+		"NO-191: the same merge without Cult caps at 3 (base 2 + probe 1 only) — matches _apply_buff exactly")
+	cn.queue_free()
+	await process_frame
+
+	# stunned (a debuff on the same list, not a catalogued Piece Buff) never
+	# transfers, even though the piece carrying it also has a real buff
+	var ms := _boot({"army": "Crown", "board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2],
+		["rook", 1, 7, 10]], "wave": 4, "gold": 100})
+	await process_frame
+	ms.actions_left = 5
+	BuffLogic.add(ms.board[Vector2i(2, 2)], "stunned", 2)
+	BuffLogic.add(ms.board[Vector2i(2, 2)], "critical")
+	MergeLogic.commit_merge(ms, Vector2i(2, 2), Vector2i(3, 2))
+	var ms_result: Dictionary = ms.board[Vector2i(3, 2)]
+	check(not BuffLogic.has(ms_result, "stunned"), "NO-191: stunned never transfers into a merge result")
+	check(BuffLogic.has(ms_result, "critical"),
+		"NO-191: a real catalogued buff from the same source still transfers alongside it")
+	ms.queue_free()
+	await process_frame
+
+	# Stock path (ADR-0002): a pool-only merge that inherits buffs appends a
+	# Dictionary, not the bare id — one that inherits none still appends a
+	# bare String (unrelated opaque state, e.g. peak_ranked, still discarded:
+	# see test_items.gd's "merging a stateful entry ... discards the state").
+	var msk := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+		"stock": [{"id": "pawn", "buffs": [{"key": "shield"}]}, "pawn"]})
+	await process_frame
+	msk.actions_left = 5
+	MergeLogic.commit_merge(msk, {"id": "pawn", "entry": msk.stock[0]},
+		{"id": "pawn", "entry": msk.stock[1]})
+	check(msk.stock.size() == 1 and msk.stock[0] is Dictionary
+			and msk.stock[0].id == "sergeant" and BuffLogic.has(msk.stock[0], "shield"),
+		"NO-191: a pool-only merge that inherits buffs appends a Stock Dictionary")
+	msk.queue_free()
+	await process_frame
+
+	var msn := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+		"stock": ["pawn", "pawn"]})
+	await process_frame
+	msn.actions_left = 5
+	MergeLogic.commit_merge(msn, {"id": "pawn", "entry": msn.stock[0]},
+		{"id": "pawn", "entry": msn.stock[1]})
+	check(msn.stock == ["sergeant"],
+		"NO-191: a pool-only merge that inherits no buffs still appends a bare String")
+	msn.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL BUFF CHECKS OK")

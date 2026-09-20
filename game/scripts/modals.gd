@@ -188,11 +188,13 @@ const MERGE_RESULT_SCALE := 1.7
 ## to fade in alongside it is gone, so that tween is gone too.
 ## `a_piece`/`b_piece` (NO-185): the two sources' buffs-bearing Dictionaries
 ## (merge_logic.gd's own `_piece_state`), {} when a source carries none.
-## Surfaced because commit_merge always builds a fresh
-## {"id": result, "owner": ...} — a merge silently discards both sources'
-## buffs, worth knowing before confirming.
+## `result_buffs` (NO-191): BuffLogic.inherited(a_piece, b_piece, cap) — the
+## union the result will actually carry, deduped and cap-truncated. Each
+## source column below only lists the buffs of ITS OWN that survive into
+## that set, so a buff the cap drops (or that loses a dedupe tie) is never
+## claimed to carry forward.
 func show_merge_confirm(a_id: String, b_id: String, result: String,
-		a_piece: Dictionary = {}, b_piece: Dictionary = {}) -> void:
+		a_piece: Dictionary = {}, b_piece: Dictionary = {}, result_buffs: Array = []) -> void:
 	if merge_panel:
 		merge_panel.queue_free()
 	merge_panel = PanelContainer.new()
@@ -233,9 +235,12 @@ func show_merge_confirm(a_id: String, b_id: String, result: String,
 	sources_row.add_theme_constant_override("separation", 10)
 	var a_tex := _merge_piece_tex(a_id, Tuning.OFFBOARD_ICON)
 	var b_tex := _merge_piece_tex(b_id, Tuning.OFFBOARD_ICON)
-	sources_row.add_child(_merge_source_col(a_id, a_tex, a_piece))
+	var kept_keys := {} # NO-191: which buff keys survive into result_buffs
+	for b in result_buffs:
+		kept_keys[b.key] = true
+	sources_row.add_child(_merge_source_col(a_id, a_tex, a_piece, kept_keys))
 	sources_row.add_child(_merge_glyph_label("+"))
-	sources_row.add_child(_merge_source_col(b_id, b_tex, b_piece))
+	sources_row.add_child(_merge_source_col(b_id, b_tex, b_piece, kept_keys))
 	box.add_child(sources_row)
 
 	# NO-187 (Max review): the shared commit/cancel shape (MODAL_CANCEL_GAP) —
@@ -294,11 +299,12 @@ func _merge_glyph_label(text: String) -> Label:
 ## pyramid's base. `tex` may be null (no art for `id`), same as every other
 ## icon here; the name label still shows either way.
 ##
-## NO-185: `piece`'s catalogued buff names, if any, on a third line — amber,
-## not the name's own dim grey, since a merge is about to discard them (see
-## show_merge_confirm's header). BuffLogic.glyph_of(key) != "" is the same
-## "is this catalogued" test describe()/glyphs_of() use to skip "stunned".
-func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {}) -> VBoxContainer:
+## NO-191: `piece`'s catalogued buffs that survive into the result (per
+## `kept_keys`, show_merge_confirm's result_buffs by key) on a third line —
+## green, since these carry forward now, not amber/lost. A buff the cap or a
+## dedupe tie drops is simply not listed, so the line never over-claims.
+func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {},
+		kept_keys: Dictionary = {}) -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_theme_constant_override("separation", 2)
@@ -312,13 +318,13 @@ func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {}) -> 
 	col.add_child(name)
 	var buff_names: PackedStringArray = []
 	for b in BuffLogic.of(piece):
-		if BuffLogic.glyph_of(b.key) != "":
+		if kept_keys.has(b.key):
 			buff_names.append(BuffLogic.name_of(b.key))
 	if not buff_names.is_empty():
 		var buffs_label := Label.new()
-		buffs_label.text = "loses: %s" % ", ".join(buff_names)
+		buffs_label.text = "carries forward: %s" % ", ".join(buff_names)
 		buffs_label.add_theme_font_size_override("font_size", 11)
-		buffs_label.modulate = Color(1, 0.8, 0.35, 0.9) # amber: about to be discarded
+		buffs_label.modulate = Color(0.55, 0.85, 0.6, 0.9) # green: inherited by the result
 		buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		buffs_label.custom_minimum_size = Vector2(110, 0)

@@ -1266,6 +1266,11 @@ func show_king_abilities() -> void:
 ## One name + description pair per active King Ability, or a "none yet" line.
 ## Shared by the ⚠ overlay and a King's info panel (NO-83), so the two can
 ## never list different things.
+##
+## NO-172: no longer names the tariff's level ("(mild)") — `t.tier` (Mild/
+## Moderate/Severe, king_abilities.gd) still exists in the catalog and still
+## drives on_charge's mild_blocked case-match (artefact_hooks.gd), just no
+## longer echoed here; the effect text (`t.description`) is untouched.
 func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) -> void:
 	if g.king_abilities_active.is_empty():
 		var none := Label.new()
@@ -1275,7 +1280,7 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 		box.add_child(none)
 	for t in g.king_abilities_active:
 		var name := Label.new()
-		name.text = "%s  (%s)" % [t.name, t.tier]
+		name.text = t.name
 		name.add_theme_font_size_override("font_size", name_size)
 		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 		box.add_child(name)

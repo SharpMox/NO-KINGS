@@ -570,19 +570,41 @@ static func _window_size_requested() -> bool:
 	return DisplayServer.window_get_size() != want
 
 
-## NO-158: fraction of the Army carousel's scroller width intentionally left
-## uncovered by the resting card, so the next Army's card edge peeks in — the
-## discoverability fix for "six Armies, looked like one" (NO-146's own
-## screenshot report). A peek at this exact spot was tried and reverted on an
-## abandoned branch (fix/army-carousel-affordance, never merged to main): those
-## cards were bare CenterContainers with no border or background, so a
-## narrower card just let the NEXT card's free-flowing autowrap text bleed
-## into the margin as stray glyph fragments — a lone "Y", a clipped "This T" —
-## reading as a text-rendering bug, not a hint that more content exists. NO-158
-## gives each card a bordered, backgrounded panel FIRST (see card_style in the
-## carousel build below), so what shows in the peek is a card edge, not raw
-## prose. 12-18% is the usual carousel peek range; 15% picked within it.
-const ARMY_PEEK_FRACTION := 0.15
+## NO-158/NO-179: the Army carousel card. NO-158 first gave each card a
+## bordered, backgrounded panel (see card_style in the carousel build below)
+## so a peeking neighbour reads as a card edge, not raw prose — that stays.
+## NO-179 replaced the peek itself: the old scheme sized the resting card to
+## nearly the whole scroller and let a sliver of the RAW, unscaled next card
+## bleed in at one edge (Max: "the card behind the main card is cropped for
+## no reason") — a crop of full-size content, not a preview of the card.
+## Every card now occupies the SAME slot width, ARMY_CARD_WIDTH_FRACTION of
+## the scroller, with a spacer on each end (see the carousel build) so the
+## resting card sits centred and a neighbour can peek in from either side,
+## not just the right; only a card's render SCALE differs by whether it is
+## resting (1.0) or not (ARMY_CARD_PEEK_SCALE), applied by the carousel
+## build's own `set_current`.
+##
+## The width fraction is content-driven, not aesthetic: Horde's Starting
+## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
+## measures ~238px wide at PieceMass's own ICON=52 constant, and needs to fit
+## inside the card with room either side — see the carousel build's own
+## comment for the arithmetic that sizes the peek scale so a peeking
+## neighbour is never cropped, only small.
+const ARMY_CARD_WIDTH_FRACTION := 0.72
+## NO-179 (Max: "longer playing card ratio... 2.5:3.5"): width:height of a
+## standard playing card. Card height is DERIVED from this and card_w, never
+## a second literal that has to be kept in sync by hand.
+const ARMY_CARD_RATIO := 2.5 / 3.5
+## NO-179: render scale for every card except the resting one. Bounded by
+## the carousel build's own arithmetic (see there) so a peeking card's whole
+## shape fits in the gap the resting card leaves either side of it — bigger
+## than that bound and the peek goes back to being cropped. At the 480px
+## portrait width this project targets (scroll_w = 400, card_w = 288) the
+## bound works out to ~0.14; 0.12 leaves ~5px of slack.
+const ARMY_CARD_PEEK_SCALE := 0.12
+## NO-179 (Max: "cards have currently no margin in between them, lets add
+## some"): gap between card slots — replaces the old separation:0.
+const ARMY_CARD_MARGIN := 16.0
 
 
 func _ready() -> void:
@@ -1068,13 +1090,16 @@ func _ready() -> void:
 	army_scroll.scroll_deadzone = 24
 	army_center.add_child(army_scroll)
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
-	army_row.add_theme_constant_override("separation", 0)
+	army_row.add_theme_constant_override("separation", int(ARMY_CARD_MARGIN)) # NO-179
 	army_scroll.add_child(army_row)
-	# NO-158: card_w < the scroller's own width (ARMY_PEEK_FRACTION above),
-	# so the next Army's card edge peeks in at rest — a bordered/backgrounded
-	# panel now, not the bare CenterContainer a peek broke last time.
+	# NO-179: every card is the same slot width now (see ARMY_CARD_WIDTH_
+	# FRACTION's own header) — only a card's render SCALE differs between
+	# resting (1.0) and peeking (ARMY_CARD_PEEK_SCALE), set below by
+	# set_current. Height is DERIVED from width via the named playing-
+	# card ratio, not a second literal.
 	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
-	var card_w: float = scroll_w * (1.0 - ARMY_PEEK_FRACTION)
+	var card_w: float = scroll_w * ARMY_CARD_WIDTH_FRACTION
+	var card_h: float = card_w / ARMY_CARD_RATIO
 	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
 	card_style.bg_color = Color(1, 1, 1, 0.06)
 	card_style.border_color = Color(1, 1, 1, 0.22)
@@ -1085,44 +1110,134 @@ func _ready() -> void:
 	card_style.content_margin_top = 14
 	card_style.content_margin_bottom = 14
 	var army_names: Array = Tuning.ARMIES.keys() # dot count/order/click-target follow this
+	# NO-179: a spacer at each end, sized so the RESTING card sits centred
+	# in the scroller with equal room either side for a neighbour to peek
+	# in — the old layout only ever peeked on the right, because the
+	# resting card sat flush against the scroller's own left edge.
+	#
+	# HBoxContainer puts ARMY_CARD_MARGIN between EVERY pair of children,
+	# including the spacer and the first card — so lead_w has to give up one
+	# margin's worth to keep the resting card centred at scroll_horizontal
+	# 0 (see the "sits centred" comment above): a bare (scroll_w-card_w)/2
+	# would land it ARMY_CARD_MARGIN too far right.
+	#
+	# What's left over between the resting card's edge and the next box is
+	# then lead_w itself (the margin already spent above), so the
+	# neighbour's scaled render (card_w * ARMY_CARD_PEEK_SCALE) has to fit
+	# inside THAT to show uncropped:
+	#   ARMY_CARD_PEEK_SCALE <= lead_w / card_w
+	# At scroll_w=400, card_w=288: lead_w=40, bound≈0.139 — ARMY_CARD_PEEK_
+	# SCALE=0.12 clears it with ~5px to spare.
+	var lead_w: float = (scroll_w - card_w) / 2.0 - ARMY_CARD_MARGIN
+	var lead_spacer := Control.new()
+	lead_spacer.custom_minimum_size = Vector2(lead_w, 0)
+	lead_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	army_row.add_child(lead_spacer)
+	# NO-179: name+description pair, decreasing visual weight (bigger head,
+	# smaller body) — shared by Power and Ability so the two read the same
+	# way. `custom_minimum_size.x` forces autowrap at the card's own text
+	# width rather than the label's natural (unbounded) one.
+	var add_pair := func(box: VBoxContainer, head: String, body: String, tint: Color) -> void:
+		var head_lbl := Label.new()
+		head_lbl.text = head
+		head_lbl.add_theme_font_size_override("font_size", 13)
+		head_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		head_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		head_lbl.custom_minimum_size.x = card_w - 40.0
+		head_lbl.modulate = tint
+		box.add_child(head_lbl)
+		var body_lbl := Label.new()
+		body_lbl.text = body
+		body_lbl.add_theme_font_size_override("font_size", 10)
+		body_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body_lbl.custom_minimum_size.x = card_w - 40.0
+		body_lbl.modulate = tint
+		box.add_child(body_lbl)
+	# NO-179: a small caption above a piece list, same treatment for
+	# Starting Pieces and Reinforcements.
+	var add_caption := func(box: VBoxContainer, text: String) -> void:
+		var lbl := Label.new()
+		lbl.text = text
+		lbl.add_theme_font_size_override("font_size", 10)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.modulate = Color(1, 1, 1, 0.5)
+		box.add_child(lbl)
+	var army_cards: Array[PanelContainer] = []
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
 		var card := PanelContainer.new() # NO-158: was a bare CenterContainer —
-			# see ARMY_PEEK_FRACTION for why the peek needed this border/bg
-		card.custom_minimum_size = Vector2(card_w, 0)
+			# see card_style for why the peek needed this border/bg
+		card.custom_minimum_size = Vector2(card_w, card_h)
 		card.add_theme_stylebox_override("panel", card_style)
 		army_row.add_child(card)
+		army_cards.append(card)
 		var card_center := CenterContainer.new() # keeps the old vertical centring
 		card.add_child(card_center)
 		var card_box := VBoxContainer.new()
 		card_box.add_theme_constant_override("separation", 6)
 		card_center.add_child(card_box)
-		var army_btn := _button(card_box, Armies.display_name(army_name), 20,
+		# ARMY NAME — the largest text on the card (Max: information
+		# hierarchy, name first).
+		var army_btn := _button(card_box, Armies.display_name(army_name), 22,
 			func() -> void:
 				GameScript.next_army = army_name
 				army_center.visible = false
 				rank_center.visible = true)
 		army_btn.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the carousel
-		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
 		var kit: Dictionary = Armies.entry(army_name)
-		var power := Label.new()
-		power.text = "%s\n%s" % [kit.power_name, kit.power_desc]
-		power.add_theme_font_size_override("font_size", 11)
-		power.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		power.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		power.custom_minimum_size.x = card_w - 40.0
-		power.modulate = Color(1, 1, 1, 0.7)
-		card_box.add_child(power)
-		var ability := Label.new()
-		ability.text = "%s\n%s" % [kit.ability_name, kit.ability_desc]
-		ability.add_theme_font_size_override("font_size", 11)
-		ability.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		ability.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		ability.custom_minimum_size.x = card_w - 40.0
-		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
-			# in-game Army Ability chip's own tint (hud.gd)
-		card_box.add_child(ability)
+		# NO-179: no Army in armies.gd's CATALOG carries a tagline field —
+		# reported in the branch, not invented here (CLAUDE.md: "leave it
+		# ... and write down why" rather than guess player-facing copy).
+		# Renders the instant the field exists, no further code change.
+		if kit.has("tagline"):
+			var tagline := Label.new()
+			tagline.text = str(kit.tagline)
+			tagline.add_theme_font_size_override("font_size", 12)
+			tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			tagline.custom_minimum_size.x = card_w - 40.0
+			tagline.modulate = Color(1, 1, 1, 0.7)
+			card_box.add_child(tagline)
+		add_pair.call(card_box, kit.power_name, kit.power_desc, Color(1, 1, 1, 0.75))
+		add_pair.call(card_box, kit.ability_name, kit.ability_desc,
+			Color(0.85, 0.8, 0.55)) # gold tint, matches the in-game Army
+			# Ability chip's own tint (hud.gd)
+		# NO-179: Starting Pieces — the actual Stock a run begins with,
+		# duplicates included, so the packed-crowd PieceMass treatment (one
+		# token per real piece) is the right renderer — same call this
+		# screen already made pre-NO-179.
+		add_caption.call(card_box, "Starting Pieces")
+		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
+		# NO-179: Reinforcements — the set of piece TYPES game.gd's
+		# _reinforce_ids() grants (deduped, doubled at the grant site — see
+		# that function's own header), not a second multiset of instances.
+		# A type list is different information from Starting Pieces'
+		# instance crowd, so it gets the compact row below rather than a
+		# second PieceMass call — see _reinforce_row's own header.
+		add_caption.call(card_box, "Reinforcements")
+		card_box.add_child(_reinforce_row(Tuning.ARMIES[army_name]))
+	var trail_spacer := Control.new()
+	trail_spacer.custom_minimum_size = Vector2(lead_w, 0)
+	trail_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	army_row.add_child(trail_spacer)
+	# NO-179: scales the resting card to full size and every other card
+	# down to ARMY_CARD_PEEK_SCALE, pivoted toward whichever edge faces the
+	# resting card — a peeking neighbour shrinks TOWARD the gap it shows
+	# through, not toward its own centre (a centre pivot pulls the shrunk
+	# card away from the viewport edge entirely, back to invisible; see
+	# ARMY_CARD_PEEK_SCALE's own arithmetic).
+	var set_current := func(idx: int) -> void:
+		for i in army_cards.size():
+			var c := army_cards[i]
+			if i == idx:
+				c.scale = Vector2.ONE
+				continue
+			c.scale = Vector2(ARMY_CARD_PEEK_SCALE, ARMY_CARD_PEEK_SCALE)
+			c.pivot_offset = Vector2(0, card_h / 2.0) if i > idx \
+				else Vector2(card_w, card_h / 2.0)
+	set_current.call(0)
 	# NO-158: clickable page dots — one per Army, filled for the resting
 	# card, hollow for the rest; a tap scrolls straight to that card. Count
 	# and order come from army_names (Tuning.ARMIES), so a 7th Army needs no
@@ -1142,16 +1257,17 @@ func _ready() -> void:
 		dot.add_theme_font_size_override("font_size", 16)
 		dot.text = "●" if i == 0 else "○"
 		dot.pressed.connect(func() -> void:
-			army_scroll.scroll_horizontal = int(i * card_w))
+			army_scroll.scroll_horizontal = int(i * (card_w + ARMY_CARD_MARGIN)))
 		army_dots.add_child(dot)
 		dot_buttons.append(dot)
 	# Setting scroll_horizontal above fires this same signal (it just proxies
 	# the underlying HScrollBar's value), so a dot click updates the dots
 	# through the identical path a swipe does — one writer, not two.
 	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
-		var idx := clampi(roundi(army_scroll.scroll_horizontal / card_w), 0, army_names.size() - 1)
+		var idx := clampi(roundi(army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
 		for i in dot_buttons.size():
-			dot_buttons[i].text = "●" if i == idx else "○")
+			dot_buttons[i].text = "●" if i == idx else "○"
+		set_current.call(idx))
 	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
@@ -1342,6 +1458,32 @@ func _show_tests() -> void:
 func _show_armies() -> void:
 	main_box.visible = false
 	army_center.visible = true
+
+
+## NO-179: one small icon per unique piece TYPE in `ids`, first-occurrence
+## order — the same set game.gd's _reinforce_ids() computes for the
+## Reinforcement grant (game.gd:2875: `Tuning.ARMIES[army]`, deduped), so
+## the card shows exactly what a Reinforcement pick will offer. Deliberately
+## NOT PieceMass.build(): that renderer draws one token per real piece
+## instance (duplicates included, packed into a crowd) — right for Starting
+## Pieces, wrong for a TYPE list, where "4 pawns" should read as one pawn
+## icon, not four.
+static func _reinforce_row(ids: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	var seen := {}
+	for id in ids:
+		if seen.has(id):
+			continue
+		seen[id] = true
+		var icon := TextureRect.new()
+		icon.texture = GameScript.load_piece_tex(id) # player side (the default)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(28, 28)
+		row.add_child(icon)
+	return row
 
 
 func _show_scores() -> void:

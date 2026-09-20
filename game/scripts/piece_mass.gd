@@ -112,12 +112,13 @@ static func build(ids: Array) -> Control:
 	# pawns -> rows=4 (from _choose_rows), cols=ceili(14/4)=4 -> mass width =
 	# (4-1)*31.2 + 52 + 2*38.62 + STAGGER(15.6) = 238.4px. The Army carousel
 	# card (menu.gd _show_armies) is `card_w = (viewport.x - 80) *
-	# (1 - ARMY_PEEK_FRACTION)` = 400 * 0.85 = 340px at the 480px portrait
-	# width this project targets — 238.4px fits with ~102px to spare (NO-157's
-	# own comment here compared against the pre-peek 400px instead of card_w;
-	# corrected for NO-178, still comfortably clear either way). Re-check this
-	# if ICON, JITTER_ROT or the pitch constants change again; it is not
-	# enforced in code.
+	# ARMY_CARD_WIDTH_FRACTION` = 400 * 0.72 = 288px at the 480px portrait
+	# width this project targets, minus the card's own 20px side padding
+	# (card_style's content_margin_left/right) = 268px usable — 238.4px
+	# fits with ~30px to spare (NO-179 narrowed the card from 340px to make
+	# room for an uncropped peek either side; re-checked then, still clear).
+	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
+	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(
 		(cols - 1) * CELL + ICON + pad * 2.0 + (STAGGER if rows > 1 else 0.0),
 		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)

@@ -227,6 +227,18 @@ static func lane_a_restock(g) -> void:
 	roll(g)
 
 
+## NO-167: waves remaining until the next guaranteed Lane-A restock — the
+## exact `n % SHOP_RESTOCK_WAVES == 0` test wave_logic.gd's queue() fires
+## lane_a_restock on above, read forward from g.wave (itself part of every
+## save, save_config.gd) rather than a second counter, so this can never
+## drift from the real trigger and a resumed run reads the true distance,
+## not a guess. 0 only for the instant between a restock firing and the
+## next queue() call (never actually observed by the UI, which reads this
+## while a wave is already in progress).
+static func waves_until_lane_a(g) -> int:
+	return Tuning.SHOP_RESTOCK_WAVES - (g.wave % Tuning.SHOP_RESTOCK_WAVES)
+
+
 ## Lane B: g.shop_lane_b_progress banks Score earned (via Economy.earn/
 ## earn_gold, the same two call sites the old threshold model used) since
 ## the last Lane-A restock, and restocks every Tuning.SHOP_LANE_B_SCORE,

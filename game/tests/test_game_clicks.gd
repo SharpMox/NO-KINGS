@@ -1973,6 +1973,13 @@ func _init() -> void:
 	var shows_sold: bool = await _click_button_in(game.modals.shop_panel, "SOLD")
 	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
 	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
+	# NO-167: Close now lives in the dock's own empty state (it replaced the
+	# "Tap a tile for details" hint), not the header — collapse the expanded
+	# tile first, same as a player would (tap it again, or tap outside/swipe,
+	# both of which also close the Shop directly).
+	_click(sold_tile.get_global_rect().get_center())
+	await process_frame
+	check(game.modals.shop_expanded_index == -1, "tapping the expanded tile again collapses it")
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	# NO-118: Close now animates the panel off-screen and only hides it when
 	# that tween finishes. Condition-based, same idiom as

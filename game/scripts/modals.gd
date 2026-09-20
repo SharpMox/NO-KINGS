@@ -616,24 +616,15 @@ func show_shop() -> void:
 	root.add_theme_constant_override("separation", 8)
 	margin.add_child(root)
 
+	# NO-167: Close moved to the bottom (replacing the detail dock's empty-
+	# state hint, _fill_shop_dock below) — the header now carries only the
+	# title, the optional Restock button, and Gold pinned to the far right.
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "SHOP"
 	title.add_theme_font_size_override("font_size", 22)
 	header.add_child(title)
-	var sub := Label.new()
-	# issue 64: buying is free of the Action cost. NO-143: dropped the "no
-	# Action cost" suffix — noise, since the absence of a cost doesn't need
-	# saying on every entry. NO-144: Sell/Convert moved off this label
-	# entirely — Sell is now the previewed thing's own menu (modals.gd
-	# show_preview), Convert the entry's own badge (hud.gd).
-	sub.text = "$%d" % g.gold
-	sub.add_theme_font_size_override("font_size", 12)
-	sub.modulate = Color(1, 1, 1, 0.75)
-	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	sub.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(sub)
 	if g._held("jet-fuel-vial"): # issue 52: only while held (user ruling — a
 		# Shop control, not part of the in-run Activate section)
 		var restock := Button.new()
@@ -642,11 +633,22 @@ func show_shop() -> void:
 		restock.disabled = not g._jet_fuel_restock_available()
 		restock.pressed.connect(func() -> void: shop_restock_pressed.emit())
 		header.add_child(restock)
-	var close := Button.new()
-	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 14)
-	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
-	header.add_child(close)
+	var gold_label := Label.new()
+	# issue 64: buying is free of the Action cost. NO-143: dropped the "no
+	# Action cost" suffix — noise, since the absence of a cost doesn't need
+	# saying on every entry. NO-144: Sell/Convert moved off this label
+	# entirely — Sell is now the previewed thing's own menu (modals.gd
+	# show_preview), Convert the entry's own badge (hud.gd). NO-167: moved to
+	# the header's far right, in HUD's own Gold green (hud.gd:453) rather
+	# than a dimmed sub-label — NO-151 is the wider ticket for a $ symbol on
+	# every player-facing currency, not touched here.
+	gold_label.text = "$%d" % g.gold
+	gold_label.add_theme_font_size_override("font_size", 14)
+	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
+	gold_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(gold_label)
 	root.add_child(header)
 
 	# issue 64: Lane B restock progress — Score banked toward the next
@@ -699,6 +701,34 @@ func show_shop() -> void:
 	lane_b_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	lane_b_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shop_lane_b_bar.add_child(lane_b_label)
+	# NO-167: Lane A (every Tuning.SHOP_RESTOCK_WAVES Waves, guaranteed) had no
+	# on-screen readout at all — this gauge only ever showed Lane B's Score
+	# progress. Shop.waves_until_lane_a(g) reads forward from g.wave, the same
+	# n % SHOP_RESTOCK_WAVES == 0 test wave_logic.gd actually fires the
+	# restock on, so this can't drift from it or from a resumed save. Same
+	# outline treatment as lane_b_label (must read over both the groove and
+	# the amber fill) and the same MOUSE_FILTER_IGNORE (must not steal a tap
+	# meant for the panel underneath), anchored to the right end instead of
+	# full-rect so the two labels don't overlap.
+	var lane_a_label := Label.new()
+	lane_a_label.text = "%dw" % Shop.waves_until_lane_a(g)
+	lane_a_label.tooltip_text = "Waves until the Shop's guaranteed restock (Lane A)"
+	lane_a_label.add_theme_font_size_override("font_size", restock_font_size)
+	lane_a_label.add_theme_color_override("font_color", Color.WHITE)
+	lane_a_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	lane_a_label.add_theme_constant_override("outline_size", 3)
+	lane_a_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lane_a_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Explicit pixel offsets off the CENTER_RIGHT anchor point, same idiom as
+	# _shop_tile's own price badge (PRESET_BOTTOM_RIGHT + offset_left/top)
+	# rather than relying on the Label's natural (unmeasured) minimum size.
+	lane_a_label.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	lane_a_label.offset_left = -30
+	lane_a_label.offset_right = -6
+	lane_a_label.offset_top = -restock_line_h / 2.0
+	lane_a_label.offset_bottom = restock_line_h / 2.0
+	lane_a_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shop_lane_b_bar.add_child(lane_a_label)
 	root.add_child(shop_lane_b_bar)
 
 	var pieces_band := VBoxContainer.new()
@@ -832,14 +862,17 @@ func _fill_shop_dock() -> void:
 	if shop_expanded_index >= 0 and shop_expanded_index < g.shop_stock.size():
 		_shop_dock.add_child(_shop_detail(shop_expanded_index))
 	else:
-		var hint := Label.new()
-		hint.text = "Tap a tile for details"
-		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		hint.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		hint.modulate = Color(1, 1, 1, 0.5)
-		hint.add_theme_font_size_override("font_size", 13)
-		_shop_dock.add_child(hint)
+		# NO-167: the empty-state "Tap a tile for details" hint is now the
+		# Shop's Close button (moved out of the header — see show_shop). An
+		# outside click and a rightward chrome swipe (_on_shop_chrome_input)
+		# both still close the Shop too, so collapsing an expanded tile (a tap
+		# away) is never the only way back to a visible Close.
+		var close := Button.new()
+		close.text = "Close"
+		close.add_theme_font_size_override("font_size", 16)
+		close.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
+		_shop_dock.add_child(close)
 
 
 ## font_size 12; its rendered height isn't measured anywhere in this file

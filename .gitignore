@@ -53,3 +53,6 @@ game/android/
 
 # written and removed by game/tests/run_all.sh around the touch-scroll probe
 game/override.cfg
+
+# Scratch: screenshots, build artefacts, session reports. Never committed.
+temp/

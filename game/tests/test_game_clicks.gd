@@ -2874,6 +2874,44 @@ func _init() -> void:
 	check(game.board.has(tile_c) and game.drawer_open == "",
 		"NO-84: stays closed after a drop when nothing is left to deploy or convert")
 
+	# --- NO-152: the targeting tip must never cover the floating Confirm/
+	# Cancel strip — item-confirm.png caught Blitz's tip drawn over a LOW
+	# target tile's Confirm, fully hiding it (Cancel partly). hud.gd's
+	# tip_panel and every one of its descendants already carry
+	# MOUSE_FILTER_IGNORE (the NO-118 pattern, checked by hand: nothing in
+	# the tip is left at the default STOP), so the click was never actually
+	# swallowed — this was a pure z-order/positioning bug. Assert the
+	# CONSEQUENCE of the press, not just that the button exists, so a
+	# regression that reintroduces a real swallow would still be caught.
+	game.queue_free()
+	await process_frame
+	GameScript.next_config = {"wave": 1,
+		"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 0]], "items": ["blitz"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	var blitz_target := Vector2i(4, 0) # y=0: the BOTTOM row on screen — _tile_px
+		# flips y (Tuning.BOARD_H - 1 - pos.y), so this is the lowest, tightest
+		# case against the floating strip, matching item-confirm.png
+	check(await _click_inventory(game, "Inventory 1"), "Inventory opens for Blitz")
+	await process_frame
+	check(await _click_grid_cell(game.hud.items_grid, "blitz"), "Blitz clickable")
+	await process_frame
+	_click(game._tile_px(blitz_target) + Vector2(game.tile, game.tile) / 2) # the low pawn
+	await process_frame
+	check(game.hud.tip_panel.visible and game.hud.multi_confirm_btn.visible,
+		"NO-152: the targeting tip and the floating Confirm both show for a low target")
+	var confirm_rect := game.hud.multi_confirm_btn.get_global_rect()
+	var tip_rect := game.hud.tip_panel.get_global_rect()
+	check(not tip_rect.intersects(confirm_rect),
+		"the tip's rect never overlaps Confirm's — Confirm stays fully visible")
+	_click(confirm_rect.get_center())
+	await process_frame
+	check(game.board.get(blitz_target, {}).get("blitz_free_move", false)
+			and not game.hud.multi_confirm_btn.visible,
+		"a click at Confirm's centre actually reaches it: Blitz resolves and the pending state clears")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

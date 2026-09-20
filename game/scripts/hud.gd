@@ -1691,6 +1691,17 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	tip_panel.reset_size()
 	var vp: Vector2 = g.get_viewport_rect().size
 	var box: Vector2 = tip_panel.size
+	# NO-152/NO-124: the floating Confirm/Cancel strip is the actionable
+	# control in a commit/cancel flow, the tip is only informational — ruling
+	# "the Confirm/Cancel buttons win", they must stay fully visible whenever
+	# they're on screen. So while either is up, the bottom bound tightens
+	# from the viewport edge to the strip's own top edge (multi_confirm_btn
+	# sits above multi_cancel_btn, so its position.y is that edge), which
+	# both trips the "flip above" check below for a low anchor and keeps the
+	# final clamp out of the strip.
+	var bottom_limit := vp.y - TIP_MARGIN
+	if multi_confirm_btn.visible or multi_cancel_btn.visible:
+		bottom_limit = minf(bottom_limit, multi_confirm_btn.position.y - TIP_MARGIN)
 	# BESIDE THE ROW MEANS UNDER IT, not to its right, and that is a measurement
 	# rather than a preference: an artefact row is ~245px wide in a 480px
 	# viewport and the panel is 260, so there is never room to its right, and
@@ -1699,7 +1710,7 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	# to its left edge, is adjacent and never hides it. Above instead when the
 	# row is near the bottom.
 	var y := anchor.end.y + 2.0
-	if y + box.y > vp.y - TIP_MARGIN:
+	if y + box.y > bottom_limit:
 		y = anchor.position.y - 2.0 - box.y
 	# THE CLAMP IS THE POINT. A popup anchored to a row near an edge of a
 	# 480-wide portrait screen is exactly the failure NO-55 was — a control
@@ -1708,7 +1719,7 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	# negative offset, which is the case a bare clamp() gets wrong.
 	tip_panel.position = Vector2(
 		maxf(TIP_MARGIN, minf(anchor.position.x, vp.x - box.x - TIP_MARGIN)),
-		maxf(TIP_MARGIN, minf(y, vp.y - box.y - TIP_MARGIN)))
+		maxf(TIP_MARGIN, minf(y, bottom_limit - box.y)))
 
 
 func hide_tip() -> void:

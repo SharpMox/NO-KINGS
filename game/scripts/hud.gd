@@ -103,22 +103,38 @@ const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to f
 ## so the search is free to find whatever the real font actually needs
 ## rather than being nudged back toward the value this ticket undid.
 const CLOCK_FONT_MIN := 12
-## NO-162, closing fix. Five rounds of on-device measurement (glyph-level
-## pixel segmentation of real captures, not property reads — every property
-## on the Label read correct: font size, LabelSettings, content scale,
-## transforms, outline, theme_type_variation, oversampling) found the
-## rendered Clock text rasterises roughly 26% WIDER than
-## `Font.get_string_size()` reports at the exact same applied size, and
-## starts left of where the Label's own box begins. No mechanism was found
-## for this after exhausting every property that could plausibly cause it —
-## see the follow-up issue "Label glyphs rasterise ~26% wider than
-## get_string_size reports" for the full measurement log. Fitting the font
-## to 100% of the available width therefore reliably overflows; this fits
-## it to only this fraction of that width instead, so the ~26% inflation
-## still lands inside the column. EMPIRICAL, not aesthetic — a future
-## cleanup that raises this back toward 1.0 "because the maths says it
-## fits" will reintroduce the clipped leading digit.
+## NO-162. Six rounds of on-device measurement (glyph-level pixel
+## segmentation of real captures, not property reads — every property on
+## the Label read correct: font size, LabelSettings, content scale,
+## transforms, outline, theme_type_variation, oversampling) found TWO
+## separate, unexplained divergences between what this code computes and
+## what actually renders. Neither was found a cause for after exhausting
+## every property that could plausibly explain it — see the follow-up
+## issue "Label glyphs rasterise ~26% wider than get_string_size reports,
+## with a constant left offset" for the full measurement log.
+## (1) WIDTH: the rendered glyphs rasterise ~26% wider than
+## `Font.get_string_size()` reports at the exact same applied size.
+## Fitting the font to 100% of the available width therefore reliably
+## overflows; this fits it to only a FRACTION of that width instead, so
+## the inflation still lands inside the column. EMPIRICAL, not aesthetic —
+## a future cleanup that raises this back toward 1.0 "because the maths
+## says it fits" will reintroduce the overflow.
+## (2) POSITION: independent of size — measured constant across two
+## different applied font sizes (33 and a smaller, headroom-fitted size),
+## the rendered ink's LEFT edge sat ~10 logical units left of
+## `clock_label.position.x`, not scaling with the text at all. This is
+## CLOCK_POS_OFFSET_X's reason to exist (below) — read that constant's own
+## comment, not this one, for the position fix.
 const CLOCK_FIT_HEADROOM := 0.8
+## NO-162. See CLOCK_FIT_HEADROOM's comment above for the measurement this
+## responds to: the rendered Clock's ink starts ~10 logical units LEFT of
+## `clock_label.position.x`, a constant offset that didn't move when the
+## font size did. This nudges the Label's placement right by that much (plus
+## margin) so the ink lands at or past HEADER_PAD_X instead of the box.
+## EMPIRICAL, not a layout preference — verified against on-device pixel
+## measurement, not derived from the arithmetic (the arithmetic says this
+## constant should be unnecessary, which is exactly why it's here).
+const CLOCK_POS_OFFSET_X := 20.0
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125)
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
@@ -535,8 +551,12 @@ func build(game) -> void:
 	# Both `size` (the actual rendered rect) and `custom_minimum_size` (what
 	# every other explicitly-positioned control in this file sets) are
 	# pinned to the same value, so there is no ambiguity about which one an
-	# unmanaged Label's rendering path actually reads.
-	clock_label.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y + score_h)
+	# unmanaged Label's rendering path actually reads. x carries
+	# CLOCK_POS_OFFSET_X on top of HEADER_PAD_X — see that constant's own
+	# comment: the rendered ink measured ~10 units left of this position,
+	# constant regardless of font size, so this shifts the BOX right rather
+	# than trying to explain the offset.
+	clock_label.position = Vector2(HEADER_PAD_X + CLOCK_POS_OFFSET_X, y0 + HEADER_PAD_Y + score_h)
 	clock_label.size = Vector2(clock_w, clock_h)
 	clock_label.custom_minimum_size = Vector2(clock_w, clock_h)
 	add_child(clock_label)

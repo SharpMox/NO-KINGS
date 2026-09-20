@@ -564,6 +564,113 @@ func _init() -> void:
 	bc.queue_free()
 	await process_frame
 
+	# --- NO-191: a merge result inherits the UNION of both sources'
+	# catalogued Piece Buffs, capped, instead of silently discarding them.
+	# union: each source's own buff survives
+	var mu := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	mu.actions_left = 5
+	BuffLogic.add(mu.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(mu.board[Vector2i(3, 2)], "taunt")
+	MergeLogic.commit_merge(mu, Vector2i(2, 2), Vector2i(3, 2)) # Rank Up: pawn+pawn -> sergeant
+	var mu_result: Dictionary = mu.board[Vector2i(3, 2)]
+	check(BuffLogic.has(mu_result, "shield") and BuffLogic.has(mu_result, "taunt"),
+		"NO-191: a merge result inherits the union of both sources' Piece Buffs")
+	check(BuffLogic.catalogued_count(mu_result) == 2, "NO-191: union carries both, nothing extra")
+	mu.queue_free()
+	await process_frame
+
+	# dedupe: a shared key appears once, the permanent (no `turns`) copy
+	# outranking any timed one — buff_logic.gd: absence of `turns` waits forever
+	var md := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	md.actions_left = 5
+	BuffLogic.add(md.board[Vector2i(2, 2)], "aura") # no turns arg: permanent
+	BuffLogic.add(md.board[Vector2i(3, 2)], "aura", 3) # a timed copy
+	MergeLogic.commit_merge(md, Vector2i(2, 2), Vector2i(3, 2))
+	var md_buffs: Array = BuffLogic.of(md.board[Vector2i(3, 2)])
+	check(md_buffs.size() == 1 and md_buffs[0].key == "aura",
+		"NO-191: a buff both sources hold appears exactly once in the result")
+	check(not md_buffs[0].has("turns"),
+		"NO-191: the permanent copy outranks a timed copy of the same key")
+	md.queue_free()
+	await process_frame
+
+	# dedupe: between two timed copies of the same key, the longer one wins
+	var mt := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	mt.actions_left = 5
+	BuffLogic.add(mt.board[Vector2i(2, 2)], "aura", 1)
+	BuffLogic.add(mt.board[Vector2i(3, 2)], "aura", 4)
+	MergeLogic.commit_merge(mt, Vector2i(2, 2), Vector2i(3, 2))
+	check(BuffLogic.of(mt.board[Vector2i(3, 2)])[0].turns == 4,
+		"NO-191: between two timed copies of the same key, the longer turns value wins")
+	mt.queue_free()
+	await process_frame
+
+	# cap: sources jointly exceed BuffLogic.cap(0) == 2 — truncated to the
+	# deterministic first-N: a's buffs in order, then b's
+	var mc := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	mc.actions_left = 5
+	BuffLogic.add(mc.board[Vector2i(2, 2)], "shield")
+	BuffLogic.add(mc.board[Vector2i(2, 2)], "critical")
+	BuffLogic.add(mc.board[Vector2i(3, 2)], "taunt")
+	MergeLogic.commit_merge(mc, Vector2i(2, 2), Vector2i(3, 2))
+	var mc_keys: Array = BuffLogic.of(mc.board[Vector2i(3, 2)]).map(
+		func(b: Dictionary) -> String: return b.key)
+	check(mc_keys == ["shield", "critical"],
+		"NO-191: a union over cap truncates to the deterministic first-N, a's buffs before b's")
+	mc.queue_free()
+	await process_frame
+
+	# stunned (a debuff on the same list, not a catalogued Piece Buff) never
+	# transfers, even though the piece carrying it also has a real buff
+	var ms := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100})
+	await process_frame
+	ms.actions_left = 5
+	BuffLogic.add(ms.board[Vector2i(2, 2)], "stunned", 2)
+	BuffLogic.add(ms.board[Vector2i(2, 2)], "critical")
+	MergeLogic.commit_merge(ms, Vector2i(2, 2), Vector2i(3, 2))
+	var ms_result: Dictionary = ms.board[Vector2i(3, 2)]
+	check(not BuffLogic.has(ms_result, "stunned"), "NO-191: stunned never transfers into a merge result")
+	check(BuffLogic.has(ms_result, "critical"),
+		"NO-191: a real catalogued buff from the same source still transfers alongside it")
+	ms.queue_free()
+	await process_frame
+
+	# Stock path (ADR-0002): a pool-only merge that inherits buffs appends a
+	# Dictionary, not the bare id — one that inherits none still appends a
+	# bare String (unrelated opaque state, e.g. peak_ranked, still discarded:
+	# see test_items.gd's "merging a stateful entry ... discards the state").
+	var msk := _boot({"board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+		"stock": [{"id": "pawn", "buffs": [{"key": "shield"}]}, "pawn"]})
+	await process_frame
+	msk.actions_left = 5
+	MergeLogic.commit_merge(msk, {"id": "pawn", "entry": msk.stock[0]},
+		{"id": "pawn", "entry": msk.stock[1]})
+	check(msk.stock.size() == 1 and msk.stock[0] is Dictionary
+			and msk.stock[0].id == "sergeant" and BuffLogic.has(msk.stock[0], "shield"),
+		"NO-191: a pool-only merge that inherits buffs appends a Stock Dictionary")
+	msk.queue_free()
+	await process_frame
+
+	var msn := _boot({"board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
+		"stock": ["pawn", "pawn"]})
+	await process_frame
+	msn.actions_left = 5
+	MergeLogic.commit_merge(msn, {"id": "pawn", "entry": msn.stock[0]},
+		{"id": "pawn", "entry": msn.stock[1]})
+	check(msn.stock == ["sergeant"],
+		"NO-191: a pool-only merge that inherits no buffs still appends a bare String")
+	msn.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL BUFF CHECKS OK")

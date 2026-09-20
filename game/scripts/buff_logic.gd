@@ -47,6 +47,38 @@ static func has(piece: Dictionary, key: String) -> bool:
 	return false
 
 
+## NO-191: a merge result's inherited Piece Buffs — the union of `a` and `b`'s
+## catalogued buffs (Items.PIECE_BUFFS; `stunned` is never catalogued, so it
+## never transfers), `a`'s in their existing order then `b`'s, a shared key
+## kept once (the stronger of the two copies, see _stronger), truncated to
+## `cap` (BuffLogic.cap(probes)). Deterministic — same inputs, same result.
+static func inherited(a: Dictionary, b: Dictionary, limit: int) -> Array:
+	var keys := {}
+	for pb in Items.PIECE_BUFFS:
+		keys[pb.key] = true
+	var out := []
+	var index := {} # key -> its position in out, for the dedupe merge
+	for piece in [a, b]:
+		for buff in of(piece):
+			if not keys.has(buff.key):
+				continue
+			if index.has(buff.key):
+				out[index[buff.key]] = _stronger(out[index[buff.key]], buff)
+			else:
+				index[buff.key] = out.size()
+				out.append(buff)
+	return out.slice(0, limit)
+
+
+## The buff that outlasts the other, for two copies of the same key: no
+## `turns` (dormant/permanent — never expires) beats any timed copy; between
+## two timed copies, the longer one.
+static func _stronger(x: Dictionary, y: Dictionary) -> Dictionary:
+	if not x.has("turns") or not y.has("turns"):
+		return x if not x.has("turns") else y
+	return x if int(x.turns) >= int(y.turns) else y
+
+
 ## `turns` marks a timed buff: it ticks down at the start of each player turn
 ## and is dropped at 0. Dormant buffs carry no `turns` and wait forever.
 static func add(piece: Dictionary, key: String, turns := 0) -> void:

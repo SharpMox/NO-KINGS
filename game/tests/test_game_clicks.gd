@@ -921,22 +921,29 @@ func _init() -> void:
 	var cr: Rect2 = HUD.clock_label.get_global_rect()
 	var gr: Rect2 = HUD.gold_label.get_global_rect()
 	var sr2: Rect2 = HUD.score_label.get_global_rect()
-	# NO-125: restacked to Score, Gold, Clock — the timer at the bottom.
-	check(sr2.position.y >= game.safe_top and sr2.end.y <= gr.position.y + 0.5
-			and gr.end.y <= cr.position.y + 0.5 and cr.end.y <= game.hud_top + 0.5,
-		"Score, then Gold, then Clock, all inside the Header and below the inset")
+	var wtr: Rect2 = HUD.wave_label.get_global_rect()
+	# NO-162: restacked again — LEFT is now just Score then Clock (Gold moved
+	# to the CENTRE column, in Wave/Turn's old bottom-flush spot; Wave/Turn
+	# moved to the RIGHT, under Stock+Menu).
+	check(sr2.position.y >= game.safe_top and sr2.end.y <= cr.position.y + 0.5
+			and cr.end.y <= game.hud_top + 0.5,
+		"Score, then Clock, both inside the Header and below the inset")
+	check(gr.position.y >= game.safe_top and gr.end.y <= game.hud_top + 0.5,
+		"Gold sits inside the Header too, in the centre column")
 	check(mr.position.y >= game.safe_top and mr.end.x <= game.get_viewport_rect().size.x,
 		"the menu button sits in the top-right corner, below the inset")
 	# NO-131: the enlarged NO-83 tap zone is gone — the Stock button is a
 	# regular button, sized to its own icon+padding, not the Header's full
-	# height. is_equal_approx would have PASSED by accident once NO-125
-	# shrank HEADER_H to 75 (close to the button's own content height), so
-	# this asserts strictly-smaller-than plus vertical centring, not just
-	# "not the exact HEADER_H value".
+	# height.
 	check(sr.size.y < HUD.HEADER_H - 0.5,
 		"the Stock button's rect no longer spans the Header's full height")
-	check(is_equal_approx(sr.get_center().y, game.safe_top + HUD.HEADER_H / 2.0),
-		"...it sits vertically centred in the Header instead")
+	# NO-162: Stock anchors to the TOP now (was vertically centred) — the
+	# Wave/Turn stack sits directly under it, bottom-flush in the same
+	# column, so the two never overlap vertically.
+	check(is_equal_approx(sr.position.y, game.safe_top + HUD.HEADER_PAD_Y),
+		"...it sits flush to the top of the Header instead of centred")
+	check(wtr.position.y >= sr.end.y - 0.5,
+		"...and the Wave/Turn stack starts at or below where Stock ends (NO-162: 'underneath')")
 	check(sr.position.y >= game.safe_top - 0.5, "...never above the inset")
 	check(sr.end.y <= game.hud_top + 0.5, "...and it never reaches over the board")
 	check(is_equal_approx(sr.end.x, mr.position.x - HUD.HEADER_GAP),
@@ -1019,12 +1026,14 @@ func _init() -> void:
 	HUD.refresh()
 	check(HUD.turn_label.text == "", "turn counter is blank after the last Wave (got %s)" % HUD.turn_label.text)
 	# a long King name is cut with an ellipsis: the label never leaves its
-	# column or reaches the Stock button, whatever the text
+	# column, whatever the text. NO-162: that column now sits BELOW the Stock
+	# button (not beside it), so the invariant worth asserting is width (still
+	# COUNTER_W) plus no vertical reach back up into Stock's own rect.
 	HUD.turn_label.text = "Maximilian ".repeat(6)
 	await process_frame
 	var tl: Rect2 = HUD.turn_label.get_global_rect()
-	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.end.x <= sr.position.x + 0.5,
-		"a long King name ellipsises inside the counters column (%s wide)" % tl.size.x)
+	check(tl.size.x <= HUD.COUNTER_W + 0.5 and tl.position.y >= sr.end.y - 0.5,
+		"a long King name ellipsises inside the counters column (%s wide), below Stock" % tl.size.x)
 	game.wave = wave_was
 	game.kings_defeated = kd_was
 	game.turns_since_wave = tsw_was

@@ -73,31 +73,29 @@ const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
 ## phone means editing one place. Canvas px on the 480-wide viewport. Nothing
 ## here is measured at runtime: game.gd's board solve reads HEADER_H, and the
 ## notch inset (g.safe_top) is ADDED above it, never taken out of it.
-## NO-125: hit the ticket's 75px target. Font.get_height() measured on Aux
-## (2026-09-19) showed the LEFT column's three stacked rows (Score, Gold,
-## Clock) don't fit 75 at the old CLOCK_FONT (36 -> 50px tall) — Score+Gold
-## alone are 48px, leaving only 23px for the Clock once HEADER_PAD_Y*2 is
-## paid, and 36 needs 50. 75/50 only clear that budget if either the Clock
-## shrinks or Score/Gold do; the ticket protects the Clock specifically, but
-## Score/Gold shrinking to fit was left open, so that's the lever pulled
-## here: CLOCK_FONT drops 36 -> 15 (get_height 22px). 16 (23px) lands
-## exactly on the 23px boundary with zero slack against rounding; 15 leaves
-## 1px, matching how tight this same column's fit already ran before this
-## ticket (SCORE_FONT's comment: 109 of 110, never landed on the exact
-## edge). 15 is legible — it's the same size the ⚑ Wave counter already
-## ships at (COUNTER_FONT) — but it costs the Clock its old visual
-## prominence as the biggest thing in the Header; it now reads at the same
-## size as the smallest counters instead of 2x their height.
-const HEADER_H := 75.0
+## NO-162: restacks the Header. Stock anchors to the top instead of centring
+## in HEADER_H; Wave/Turn move from the centre column to under the Stock+Menu
+## row (right side, bottom-flush); Gold takes Wave/Turn's old centre-column
+## slot (also bottom-flush); the Score's ★ is dropped, and Gold's $ moves
+## after its number. Moving Gold out drops the LEFT column to two rows
+## (Score, Clock) instead of NO-125's three — that's the room the Clock buys
+## back: CLOCK_FONT returns to its pre-NO-125 value (36, 50px tall per that
+## ticket's own Aux measurement). LEFT needs Score(24) + Clock(50) = 74; the
+## RIGHT column needs the same 74 (Stock's 52px button, top-flush, plus the
+## Wave/Turn stack's 44px, bottom-flush, at unchanged COUNTER_FONT). Both
+## columns share one HEADER_H, so it grows to fit the larger of the two plus
+## a few px of slack: 75 -> 100. UNVERIFIED — no Godot run; these are the
+## same get_height() figures NO-125 measured on Aux, not a fresh measurement.
+const HEADER_H := 100.0
 const HEADER_PAD_X := 10.0 ## gutter at the left and right edges
-const HEADER_PAD_Y := 2.0 ## NO-125: halved from 4 — the only slack left once HEADER_H is at its content floor
+const HEADER_PAD_Y := 2.0
 const HEADER_GAP := 6.0 ## between the counters column, the Stock button and the menu button
-const CLOCK_FONT := 15 ## NO-125: shrunk from 36 to fit 75 (see the HEADER_H note above) — was the largest text in the Header, now matches COUNTER_FONT
-const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125): 2 + 24 + 24 + 22 fits the 75, 1px to spare
+const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to fit the old HEADER_H
+const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125)
 const GOLD_FONT := 17
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
-const COUNTER_W := 150.0 ## width of the centre column; a King's name ellipsises past it
-const SYMBOL_W := 16.0 ## NO-114: fixed column for ★/$ so their digits align
+const COUNTER_W := 150.0 ## width of the Wave/Turn column and the Gold column; a King's name ellipsises past it
+const SYMBOL_W := 16.0 ## NO-114: fixed-width symbol column so a row's own digits don't jitter as its symbol's glyph width changes
 const MENU_FONT := 15
 const MENU_W := 34.0 ## the ☰ button's footprint in the corner
 const STOCK_ICON := 44 ## the piece icon on the Stock button
@@ -397,8 +395,9 @@ func build(game) -> void:
 	header_bg.size = Vector2(vp.x, g.hud_top)
 	header_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(header_bg)
-	# LEFT: Score, then Gold, then Clock at the bottom (NO-125 restack; was
-	# Clock/Score/Gold, NO-82 stories 4-5 — Max wants the timer last).
+	# LEFT: Score, then Clock underneath (NO-162: Gold moved out to the centre
+	# column, into the Wave/Turn counters' old spot — see the CENTRE/RIGHT
+	# comments below).
 	clock_label.add_theme_font_size_override("font_size", CLOCK_FONT)
 	# NO-125: the box follows the font's own metric instead of a hardcoded
 	# constant, so the next CLOCK_FONT change resizes it automatically rather
@@ -417,50 +416,60 @@ func build(game) -> void:
 	score_pts_label.add_theme_color_override("font_color", SCORE_ZERO_COLOR)
 	gold_label.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_label.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
-	# NO-114: ★ and $ are different glyph widths, so the bare symbol+number
-	# labels didn't line up their digits. A fixed-width symbol column fixes it
-	# without a monospace font.
-	var score_symbol := Label.new()
-	score_symbol.text = "★"
-	score_symbol.add_theme_font_size_override("font_size", SCORE_FONT)
-	score_symbol.add_theme_color_override("font_color", Color(0.95, 0.8, 0.25))
-	score_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
+	# NO-162: the ★ in front of the Score is gone — nothing else shares the
+	# LEFT column any more, so there is nothing left to align its digits
+	# against (NO-114's original reason for the fixed symbol column). Gold's
+	# $ moves AFTER its number instead of before it; SYMBOL_W still fixes its
+	# own column so the number's width never pushes the $ around.
 	var gold_symbol := Label.new()
 	gold_symbol.text = "$"
 	gold_symbol.add_theme_font_size_override("font_size", GOLD_FONT)
 	gold_symbol.add_theme_color_override("font_color", Color(0.35, 0.85, 0.4))
 	gold_symbol.custom_minimum_size = Vector2(SYMBOL_W, 0)
 	score_row.add_theme_constant_override("separation", 0)
-	# NO-126: zeros immediately after the symbol column — same x as the Gold
-	# row's value (NO-114's alignment), the odometer padding just rides ahead
-	# of the coloured digits instead of replacing them.
-	for l in [score_symbol, score_zeros_label, score_label, score_pts_label]:
+	for l in [score_zeros_label, score_label, score_pts_label]:
 		score_row.add_child(l)
-	gold_row.add_theme_constant_override("separation", 0)
-	for l in [gold_symbol, gold_label]:
+	gold_row.add_theme_constant_override("separation", 4) # NO-162: a gap now that $ trails the number
+	gold_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	for l in [gold_label, gold_symbol]:
 		gold_row.add_child(l)
 	var left := VBoxContainer.new()
 	left.position = Vector2(HEADER_PAD_X, y0 + HEADER_PAD_Y)
 	left.custom_minimum_size = Vector2(0, HEADER_H - HEADER_PAD_Y * 2.0)
 	left.add_theme_constant_override("separation", 0)
-	for l in [score_row, gold_row, clock_label]:
+	for l in [score_row, clock_label]:
 		left.add_child(l)
 	add_child(left)
-	# CENTRE, flush to the bottom: ⚑ Wave over turns. The column has a fixed
-	# width so a long King name is cut with an ellipsis rather than pushing into
-	# the Stock button (story 20).
+	# CENTRE, flush to the bottom (NO-162): Gold now lives here — exactly the
+	# spot the Wave/Turn counters used to occupy — because those counters
+	# moved to the right, under the Stock+Menu row (see RIGHT, below).
 	var mid := VBoxContainer.new()
 	mid.position = Vector2((vp.x - COUNTER_W) / 2.0, y0)
 	mid.custom_minimum_size = Vector2(COUNTER_W, HEADER_H - HEADER_PAD_Y)
 	mid.alignment = BoxContainer.ALIGNMENT_END
-	mid.add_theme_constant_override("separation", 0)
+	mid.add_child(gold_row)
+	add_child(mid)
+	# RIGHT, under the Stock+Menu row (NO-162; Wave/Turn used to be CENTRE):
+	# ⚑ Wave over turns, flush to the bottom of its own column exactly like
+	# Gold above — the two buttons occupy the TOP of the header, this stack
+	# the BOTTOM, so the two never have to share a measured height (CLAUDE.md
+	# layout traps: "Centring content in a span splits empty space into two
+	# gaps. Flush to one edge puts all the slack in one place"). Same fixed
+	# width as before so a long King name still ellipsises rather than
+	# pushing into the Stock button (story 20); right edge lines up with the
+	# Menu button's.
+	var right_counters := VBoxContainer.new()
+	right_counters.position = Vector2(vp.x - HEADER_PAD_X - COUNTER_W, y0)
+	right_counters.custom_minimum_size = Vector2(COUNTER_W, HEADER_H - HEADER_PAD_Y)
+	right_counters.alignment = BoxContainer.ALIGNMENT_END
+	right_counters.add_theme_constant_override("separation", 0)
 	for l: Label in [wave_label, turn_label]:
 		l.add_theme_font_size_override("font_size", COUNTER_FONT)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		mid.add_child(l)
+		right_counters.add_child(l)
 	wave_label.modulate = Color(1, 1, 1, 0.85)
-	add_child(mid)
+	add_child(right_counters)
 	# RIGHT: the menu in the corner, the Stock button just left of it.
 	king_ability_button.add_theme_font_size_override("font_size", 13)
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
@@ -528,8 +537,11 @@ func build(game) -> void:
 	# button with the usual HEADER_GAP, centred in the Header's height.
 	var stock_size := Vector2(STOCK_ICON, STOCK_ICON) + Vector2(stock_pad, stock_pad) * 2.0
 	stock_btn.custom_minimum_size = stock_size
+	# NO-162: anchored to the top (was vertically centred in HEADER_H) — the
+	# Wave/Turn stack now sits directly under it, bottom-flush in the same
+	# column (see RIGHT, above), so Stock has to own the TOP of that space.
 	stock_btn.position = Vector2(menu_button.position.x - HEADER_GAP - stock_size.x,
-		y0 + (HEADER_H - stock_size.y) / 2.0)
+		y0 + HEADER_PAD_Y)
 	add_child(stock_btn)
 	# the count badge, same idiom as a pool stack's: a corner label over the icon
 	stock_badge.add_theme_font_size_override("font_size", STOCK_BADGE_FONT)

@@ -1221,7 +1221,7 @@ func build(game) -> void:
 	# to strand its slack at the drawer's outer right edge. Captured Stock
 	# stays flush left (default placement, against the screen edge — already
 	# correct); force Stock's grid to its full row width (same guard as
-	# modals.gd's _piece_grid/_shop_sub_zone) and right-align that box in a
+	# modals.gd's _shop_zone) and right-align that box in a
 	# wrapper spanning the scroll viewport, so both sections' slack collects
 	# in one gap against the shared Captured/Stock boundary instead.
 	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_grid.columns, STOCK_DRAWER_CELL_SEP) # NO-135

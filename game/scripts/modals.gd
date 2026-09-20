@@ -68,68 +68,36 @@ var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
 	# vp.x - draw_w formula themselves
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value
-## NO-119: PIECES is a wrapping grid, not a fixed-width row, now that its
-## tiles are Tuning.OFFBOARD_ICON (72) rather than the old 46 — up to 10 of
-## them (Shop.ROWS.piece, NO-166) would overflow a single-row HBoxContainer well
-## before it overflowed this column's width. Arithmetic, not taste: 5 x 72 +
-## 4 x 4 = 376 fits the drawer's ~412px content width (draw_w 432 minus the
-## 10px margins each side); 6 would need 452. NO-132 folds this into the
-## site-wide standard — Tuning.OFFBOARD_GRID_COLS is the same 5, so the band
-## no longer carries its own agreeing constant.
+## Shop geometry history (NO-119/132/142/144/166/167): PIECES, ARTEFACTS,
+## ITEMS and BOXES were stacked full-width, one below another, all at
+## Tuning.OFFBOARD_GRID_COLS (5) — precisely so no zone read thinner than
+## PIECES (5 x 72 + 4 x 4 = 376, fits the drawer's ~412px content width;
+## draw_w 432 minus the 10px MarginContainer margins each side).
 ##
-## NO-132 gave the lower band's side-by-side ARTEFACTS/ITEMS and BOXES
-## columns 3 and 2 columns respectively (412px split 1.15/0.85 by stretch
-## ratio, less `lower`'s own 8px separation: ~232px and ~172px — grid_cols
-## floors at 76*cols-4, so 3 needs 224 and 2 needs 148). Neither reached the
-## 5-column standard, and NO-144 didn't move these numbers (Buy and the old
-## Sell mode shared this exact geometry) — closing the gap needed ~448px of
-## column budget against `lower`'s 404, 44px short, and no re-split of the
-## same 404px helped both sides — 3/3 for one side always cost the other
-## its 2.
+## NO-188 (Max review): partial reverse — the PIECES/ARTEFACTS/ITEMS/BOXES
+## labels are gone, and BOXES moves into its own single-OFFBOARD_ICON-wide
+## column on the right, computed in show_shop() as `left_cols`/`_shop_zone`.
+## Losing that width pays for itself in wrap: left content is
+## 412 - SHOP_BOXES_COL_SEP(8) - OFFBOARD_ICON(72) = 332px, and
+## Tuning.grid_cols(332, 4) = floor(336/76) = 4 columns (was 5) for
+## PIECES/ARTEFACTS/ITEMS. Shop.ROWS (base, before any Tier 3+ delta):
+## PIECES 10/4 = 3 rows (224px, was 2 rows/148px) · ARTEFACTS 4/4 = 1 row
+## (72px, unchanged) · ITEMS 4/4 = 1 row (72px, unchanged) · BOXES 5 rows in
+## its own column (5 x 72 + 4 x 4 = 376px). Left column total (3 zones + 2 x
+## 8px gaps) = 224+8+72+8+72 = 384px, comfortably above BOXES' 376px, so the
+## HBox's height is set by the left column.
 ##
-## NO-142: stacked instead — ARTEFACTS, ITEMS and BOXES each now get the
-## FULL 412px `lower` width, one below another, so all three hit
-## Tuning.OFFBOARD_GRID_COLS (5 x 72 + 4 x 4 = 376 <= 412; 6 needs 452),
-## matching PIECES above them and the site-wide standard. What pays for the
-## extra band is the vertical room NO-144 freed: PIECES used to become
-## STOCK in Sell mode — the player's whole live Stock, unbounded (a real
-## save once held 22, 5 rows at 5 columns, 376px). PIECES is Buy-only now,
-## capped at Shop.ROWS.piece (10 as of NO-166, fewer at Tier 3+): still
-## always <=2 rows (ceil(10/5)=2, same as the old ceil(8/5)=2), ~152px — no
-## height change from NO-166's 8->10.
-## `lower` is root's only EXPAND_FILL child, so every byte PIECES no longer
-## needs at its old worst case, `lower` keeps — up to ~224px more,
-## guaranteed rather than best-case.
-##
-## The stacked layout's own worst case, from Shop.ROWS (base, before any
-## Tier 3+ reduction — the max, never more): ARTEFACTS ceil(4/5)=1 row,
-## ITEMS ceil(4/5)=1 row, BOXES ceil(5/5)=1 row (72px) — NO-166 dropped
-## BOXES 6->5, which drops it from 2 rows to 1 (was ceil(6/5)=2, 72*2+4=148px).
-## Content height per zone = its grid + a zone label + the label-to-grid 4px
-## separation (_shop_sub_zone's own `wrap`); the label's own height isn't
-## measured here (no Godot run from this seat — see the label-height note
-## on _shop_zone_label), estimated ~16px from this file's other measured
-## font metrics (hud.gd's SCORE_FONT: 17px font, 24px tall). That puts all
-## three zones at ~92px each (was ARTEFACTS/ITEMS ~92px, BOXES ~168px pre
-## NO-166), plus 2 gaps at `lower`'s own 8px separation between the 3
-## stacked zones: ~292px total (was ~368px) — NO-166 frees a further ~76px
-## on top of the ~224px NO-144 already freed, comfortably inside it either
-## way. If a real measurement ever puts a zone label taller than assumed
-## here, recheck against the ~224px margin before assuming it still fits.
-##
-## NO-167 (Max review, second pass, 2026-09-20): the detail dock's own fixed
-## Vector2(0, 92) reservation is gone too — Buy moved into the tile's own
-## preview modal (show_preview), so the zone at the bottom of the Shop holds
-## only a permanent Close button now, not a dock sized for a name/icon/desc
-## row. A Button at font_size 16 isn't measured on a running Godot from this
-## seat either, but by the same ~1.3x-font-to-line-height ratio this file's
-## other estimates use (hud.gd's SCORE_FONT: 17px font, 24px tall) plus
-## Godot's default theme padding, ~44px is a reasonable estimate — freeing a
-## further ~48px, on top of the ~224px (NO-144) + ~76px (NO-166) already
-## freed: `lower`'s real margin is comfortably larger than the ~292px worst
-## case needs, nothing here currently spends the extra room, and nothing in
-## this ticket asked it to.
+## Compared to the OLD stacked total (each zone's grid + a ~16px label + 4px
+## label gap, PIECES separated from `lower` by root's own 8px): PIECES
+## (16+4+148=168) + 8 + 3 x (16+4+72=92) = 468px. The NEW 384px is SMALLER
+## despite PIECES wrapping to a 3rd row — losing 4 labels (~80px) more than
+## pays for the one extra PIECES row (~76px). No Godot run from this seat to
+## confirm the ~16px label-height estimate was ever exact; it no longer
+## matters, since labels are gone.
 const SHOP_SUBZONE_SEP := 4.0
+## NO-188: the gutter between the left column (PIECES/ARTEFACTS/ITEMS) and
+## the BOXES column on the right.
+const SHOP_BOXES_COL_SEP := 8.0
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
@@ -918,25 +886,29 @@ func show_shop() -> void:
 	shop_lane_b_bar.add_child(lane_a_label)
 	root.add_child(shop_lane_b_bar)
 
-	var pieces_band := VBoxContainer.new()
-	pieces_band.add_theme_constant_override("separation", 4)
-	# NO-142: ARTEFACTS, ITEMS and BOXES stacked full-width, not split into
-	# side-by-side columns — the drawer's 412px content width only fits 2
-	# columns of columns (3 and 2, see the SHOP_SUBZONE_SEP comment above);
-	# stacked, each one gets the whole width and reaches the site-wide 5.
-	var lower := VBoxContainer.new()
-	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lower.add_theme_constant_override("separation", 8)
-
 	var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
 	for i in g.shop_stock.size():
 		by_kind[g.shop_stock[i].kind].append(i)
-	pieces_band.add_child(_shop_zone_label("PIECES"))
-	pieces_band.add_child(_piece_grid(_shop_tile, by_kind.piece))
-	lower.add_child(_shop_sub_zone("ARTEFACTS", by_kind.artefact, Tuning.OFFBOARD_GRID_COLS))
-	lower.add_child(_shop_sub_zone("ITEMS", by_kind.item, Tuning.OFFBOARD_GRID_COLS))
-	lower.add_child(_shop_sub_zone("BOXES", by_kind.box, Tuning.OFFBOARD_GRID_COLS))
-	root.add_child(pieces_band)
+
+	# NO-188 (Max review): BOXES is its own single-column zone on the right;
+	# PIECES/ARTEFACTS/ITEMS share whatever width that leaves and wrap to
+	# extra rows to pay for it — see the arithmetic above SHOP_SUBZONE_SEP.
+	# 20.0 is the MarginContainer's left+right margin (10px each, set above).
+	var left_w := (draw_w - 20.0) - SHOP_BOXES_COL_SEP - Tuning.OFFBOARD_ICON
+	var left_cols := Tuning.grid_cols(left_w, SHOP_SUBZONE_SEP)
+
+	var lower := HBoxContainer.new()
+	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.add_theme_constant_override("separation", 8)
+	left.add_child(_shop_zone(by_kind.piece, left_cols))
+	left.add_child(_shop_zone(by_kind.artefact, left_cols))
+	left.add_child(_shop_zone(by_kind.item, left_cols))
+	lower.add_child(left)
+	lower.add_child(_shop_zone(by_kind.box, 1))
 	root.add_child(lower)
 
 	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone
@@ -1042,58 +1014,17 @@ func _on_shop_chrome_input(event: InputEvent) -> void:
 		close_shop()
 
 
-## font_size 12; its rendered height isn't measured anywhere in this file
-## (NO-142's vertical-fit estimate above assumes ~16px, by analogy with
-## hud.gd's own measured font metrics — never taken on a running Godot from
-## this seat).
-func _shop_zone_label(text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", 12)
-	l.modulate = Color(1, 1, 1, 0.6)
-	return l
-
-
-## NO-119: the Shop's PIECES band and the Box pick's own top band share this
-## centered, wrapping grid — Tuning.OFFBOARD_GRID_COLS wide, built from
-## whatever `tile_of` returns (_shop_tile or _box_tile) for each of `indices`
-## (an Array of slot/option indices, or a plain count). Kept separate from
-## _shop_sub_zone below: that one expands to fill a fixed-height column, this
-## one sits in a top band sized to its own content.
-##
-## NO-132: custom_minimum_size.x is forced to the FULL row's width (see
-## Tuning.grid_row_w) before the CenterContainer sees it, so fewer than
-## Tuning.OFFBOARD_GRID_COLS tiles still start at column 1 — a 3-piece row
-## sits at columns 1-3, not centered across the whole band.
-func _piece_grid(tile_of: Callable, indices) -> CenterContainer:
-	var center := CenterContainer.new()
-	var grid := GridContainer.new()
-	grid.columns = Tuning.OFFBOARD_GRID_COLS
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
-	grid.custom_minimum_size.x = Tuning.grid_row_w(Tuning.OFFBOARD_GRID_COLS, 4.0) # NO-132
-	for i in indices:
-		grid.add_child(tile_of.call(i))
-	center.add_child(grid)
-	return center
-
-
-## A labeled, centered grid of tiles that expands to fill its share of
-## `lower`'s height — one zone of the full-width stack (money-and-shop/04
-## kept the logic; shop-drawer-ui/08 and NO-142 are only the geometry, side
-## by side then stacked).
-##
-## NO-132: `cols` reserves the full row's width up front (Tuning.grid_row_w),
-## the same way _piece_grid does, so a short row aligns instead of centring
-## itself. NO-142: every caller now passes Tuning.OFFBOARD_GRID_COLS, now
-## that ARTEFACTS/ITEMS/BOXES all get the full drawer width — `cols` stays a
-## parameter rather than hardcoding the constant in here, same as
-## _piece_grid takes `tile_of` as a parameter rather than assuming its caller.
-func _shop_sub_zone(title_text: String, indices: Array, cols: int) -> VBoxContainer:
-	var wrap := VBoxContainer.new()
-	wrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wrap.add_theme_constant_override("separation", 4)
-	wrap.add_child(_shop_zone_label(title_text))
+## NO-188 (Max review): the one zone helper for PIECES/ARTEFACTS/ITEMS/BOXES
+## now that none of them carry a label — position (left column vs. the right
+## column) is what marks a zone, the same way the header/gold/Close already
+## go unlabelled. Replaces the old _piece_grid/_shop_sub_zone split (which
+## existed only to hang a label on three of the four). `cols` reserves the
+## full row's width up front (Tuning.grid_row_w) so a short row aligns
+## instead of centring itself (NO-132), and expands to fill its share of
+## whatever vertical space its parent gives it (NO-142's "never read
+## sparser") — `left`'s three-way split for the first three zones, or
+## `lower`'s own full height for the BOXES column (show_shop, NO-188).
+func _shop_zone(indices: Array, cols: int) -> CenterContainer:
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var grid := GridContainer.new()
@@ -1104,8 +1035,7 @@ func _shop_sub_zone(title_text: String, indices: Array, cols: int) -> VBoxContai
 	for i in indices:
 		grid.add_child(_shop_tile(i))
 	center.add_child(grid)
-	wrap.add_child(center)
-	return wrap
+	return center
 
 
 ## Icon for a slot. Artefacts and Boxes always resolve to a Texture2D now

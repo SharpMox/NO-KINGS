@@ -1949,17 +1949,22 @@ func _init() -> void:
 	check(tile != null, "an affordable piece tile exists")
 	_click(tile.get_global_rect().get_center())
 	await process_frame
-	check(game.modals.shop_expanded_index == tile_index, "tapping a tile expands it")
+	# NO-167 (Max review, second pass): a tile tap opens its own preview now,
+	# not an in-place dock — same "long press = the thing's own menu" shape
+	# NO-144 gave held Stock/Item/Artefact entries, mirrored here with Buy in
+	# Sell's place.
+	check(game.preview_open, "tapping a Shop tile opens its preview")
 	var sh_stock: int = game.stock.size()
 	var sh_gold: int = game.gold
 	var sh_acts: int = game.actions_left
-	check(await _click_button_in(game.modals.shop_panel, "Buy"),
-		"Buy clickable in the expanded tile")
+	check(await _click_button_in(game.preview_panel, "Buy"),
+		"Buy clickable in the tile's preview")
 	await process_frame
 	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
 			and game.actions_left == sh_acts,
 		"shop Buy adds the piece and debits gold, never an Action (issue 64)")
 	check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
+	check(not game.preview_open, "buying closes the preview, same as Close")
 	var sold_tile: Button = null
 	to_visit = [game.modals.shop_panel]
 	while not to_visit.is_empty():
@@ -1970,16 +1975,20 @@ func _init() -> void:
 		to_visit.append_array(n.get_children())
 	check(sold_tile != null and sold_tile.modulate.a < 0.9,
 		"the sold tile greys out and stays in place")
-	var shows_sold: bool = await _click_button_in(game.modals.shop_panel, "SOLD")
-	var still_shows_buy: bool = await _click_button_in(game.modals.shop_panel, "Buy")
-	check(shows_sold and not still_shows_buy, "the expanded detail now shows SOLD instead of Buy")
-	# NO-167: Close now lives in the dock's own empty state (it replaced the
-	# "Tap a tile for details" hint), not the header — collapse the expanded
-	# tile first, same as a player would (tap it again, or tap outside/swipe,
-	# both of which also close the Shop directly).
 	_click(sold_tile.get_global_rect().get_center())
 	await process_frame
-	check(game.modals.shop_expanded_index == -1, "tapping the expanded tile again collapses it")
+	check(game.preview_open, "the sold tile is still tappable to preview")
+	check(await _click_button_in(game.preview_panel, "SOLD"),
+		"the preview now shows SOLD instead of Buy")
+	check(await _click_button_in(game.preview_panel, "Close"),
+		"the preview's own Close is clickable")
+	await process_frame
+	check(not game.preview_open, "closing the preview leaves the Shop open behind it")
+	check(game.modals.shop_panel.visible, "...the Shop itself is untouched")
+	# NO-167 (Max review, second pass): Close is now PERMANENT at the bottom
+	# of the Shop — present whether or not a tile's preview is open, not an
+	# either/or with a detail zone (that either/or was the bug Max caught in
+	# the first review pass).
 	check(await _click_button_in(game.modals.shop_panel, "Close"), "shop Close clickable")
 	# NO-118: Close now animates the panel off-screen and only hides it when
 	# that tween finishes. Condition-based, same idiom as
@@ -2112,12 +2121,14 @@ func _init() -> void:
 	await process_frame
 	game.state = was_state
 
-	# All-Seeing Eye Contact Lens (issue 49): the Shop's box detail dock
-	# reveals contents only while holding it. A fresh boot so it's definitely
-	# held, then expand whichever Box slot rolled (preferring Huge — 7
-	# entries — when one shows up) and confirm the reveal Label carries the
-	# slot's exact contents WITHOUT breaking the Buy button underneath it —
-	# the concrete risk of a variable-length reveal in a fixed-height dock.
+	# All-Seeing Eye Contact Lens (issue 49): the Shop reveals a Box's
+	# contents only while holding it — NO-167 (second pass) moved this from
+	# the old detail dock into the tile's own preview modal. A fresh boot so
+	# it's definitely held, then preview whichever Box slot rolled
+	# (preferring Huge — 7 entries — when one shows up) and confirm the
+	# reveal Label carries the slot's exact contents WITHOUT breaking the
+	# Buy button underneath it — the concrete risk of a variable-length
+	# reveal in a panel that also has to fit a Buy button.
 	game.queue_free()
 	await process_frame
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
@@ -2137,7 +2148,7 @@ func _init() -> void:
 			box_slot_size = s.size
 			if s.size == "huge": # the worst case (7 entries) — stop as soon as it's found
 				break
-	check(box_slot_index >= 0, "(setup) a Box slot exists to expand")
+	check(box_slot_index >= 0, "(setup) a Box slot exists to preview")
 	var box_button: Button = null
 	to_visit = [game.modals.shop_panel]
 	while not to_visit.is_empty():
@@ -2149,8 +2160,9 @@ func _init() -> void:
 	check(box_button != null, "(setup) the Box tile is clickable")
 	_click(box_button.get_global_rect().get_center())
 	await process_frame
+	check(game.preview_open, "tapping the Box tile opens its preview")
 	var reveal_label: Label = null
-	to_visit = [game.modals.shop_panel]
+	to_visit = [game.preview_panel]
 	while not to_visit.is_empty():
 		var n: Node = to_visit.pop_back()
 		if n is Label and n.text.begins_with("Contains: "):
@@ -2160,7 +2172,7 @@ func _init() -> void:
 	var expect_reveal := "Contains: %s" % Box.contents_names(game.shop_stock[box_slot_index].contents)
 	check(reveal_label != null and reveal_label.text == expect_reveal,
 		"All-Seeing Eye Contact Lens: the %s Box's reveal Label shows its exact contents" % box_slot_size)
-	check(await _click_button_in(game.modals.shop_panel, "Buy"),
+	check(await _click_button_in(game.preview_panel, "Buy"),
 		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
 
 	# reinforcement shop: opens pending at turn start; NO-141 made the grant

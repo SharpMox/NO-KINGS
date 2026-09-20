@@ -4176,7 +4176,7 @@ func _open_bounty_pick() -> void:
 		var label := "%s %s Box" % [str(slot.size).capitalize(), str(slot.key).capitalize()]
 		if _artefact_count("all-seeing-eye-contact-lens") > 0: # X-ray (49):
 			# Bounty's 1-of-3 offer sees inside all three before choosing, same
-			# as a Shop Box slot — see modals.gd's _shop_detail for the Shop half.
+			# as a Shop Box slot — see modals.gd's show_preview for the Shop half.
 			label += " (%s)" % Box.contents_names(slot.contents)
 		choices.append({"label": label, "value": slot})
 	_open_choice_pick("✦ Bounty — choose a Box:", choices, "Forfeit (no box)",
@@ -4873,6 +4873,8 @@ func _connect_modals() -> void:
 			return
 		modals.show_shop() # rebuild: fresh SOLD + affordability state
 		_refresh())
+	modals.shop_tile_preview_requested.connect(func(index: int) -> void:
+		_show_shop_preview(index)) # NO-167 (Max review, second pass)
 	modals.restart_pressed.connect(func() -> void:
 		# Restart means a FRESH ROLL (user ruling 2026-09-04). next_config used
 		# to survive the reload, so a run entered via Continue restarted into
@@ -5030,6 +5032,17 @@ func _show_preview(id: String, king_id := "", entry: Variant = null) -> void:
 func _show_kind_preview(kind: String, id: String, entry: Variant) -> void:
 	preview_open = true
 	modals.show_preview(kind, id, "", entry)
+
+
+## NO-167 (Max review, second pass, 2026-09-20): a Shop tile's own preview —
+## same modal a held Stock/Item/Artefact entry gets above, with a Buy button
+## in Sell's place (modals.show_preview's shop_index). `entry` stays null: an
+## unowned Shop slot has no owned form to pass; kind/id read straight off the
+## slot, covering "piece"/"item"/"artefact"/"box" alike.
+func _show_shop_preview(index: int) -> void:
+	preview_open = true
+	var slot: Dictionary = shop_stock[index]
+	modals.show_preview(slot.kind, slot.key, "", null, index)
 
 
 ## Opening the tariff overlay deselects, like menus and drawers.

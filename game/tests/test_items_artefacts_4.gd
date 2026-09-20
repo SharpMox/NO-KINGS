@@ -631,7 +631,7 @@ func _init() -> void:
 		# rule as Nostradamus/Snowden's Rubik's Cube above — read directly
 		# in game.gd's _box_choose/_decline_box_pick,
 		# not dispatched through ArtefactHooks.run(). All-Seeing Eye Contact
-		# Lens is a pure display gate (modals.gd's _shop_detail, game.gd's
+		# Lens is a pure display gate (modals.gd's show_preview, game.gd's
 		# _open_bounty_pick), same standing-rule shape, no on_* hook to fire
 		# on at all — it never changes what a Box yields, only whether the
 		# UI shows it beforehand (issue 47 already rolls unconditionally).

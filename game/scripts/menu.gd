@@ -559,6 +559,21 @@ static func _window_size_requested() -> bool:
 	return DisplayServer.window_get_size() != want
 
 
+## NO-158: fraction of the Army carousel's scroller width intentionally left
+## uncovered by the resting card, so the next Army's card edge peeks in — the
+## discoverability fix for "six Armies, looked like one" (NO-146's own
+## screenshot report). A peek at this exact spot was tried and reverted on an
+## abandoned branch (fix/army-carousel-affordance, never merged to main): those
+## cards were bare CenterContainers with no border or background, so a
+## narrower card just let the NEXT card's free-flowing autowrap text bleed
+## into the margin as stray glyph fragments — a lone "Y", a clipped "This T" —
+## reading as a text-rendering bug, not a hint that more content exists. NO-158
+## gives each card a bordered, backgrounded panel FIRST (see card_style in the
+## carousel build below), so what shows in the peek is a card edge, not raw
+## prose. 12-18% is the usual carousel peek range; 15% picked within it.
+const ARMY_PEEK_FRACTION := 0.15
+
+
 func _ready() -> void:
 	# CLI bypasses/probes boot Game.tscn straight past this scene, so it also
 	# applies at its own _ready() — belt and suspenders, both are idempotent.
@@ -1044,18 +1059,34 @@ func _ready() -> void:
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", 0)
 	army_scroll.add_child(army_row)
-	# Card width = the scroller's own available width, so exactly one Army
-	# fills the screen per swipe rather than letting the next card peek in.
-	var card_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	# NO-158: card_w < the scroller's own width (ARMY_PEEK_FRACTION above),
+	# so the next Army's card edge peeks in at rest — a bordered/backgrounded
+	# panel now, not the bare CenterContainer a peek broke last time.
+	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	var card_w: float = scroll_w * (1.0 - ARMY_PEEK_FRACTION)
+	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
+	card_style.bg_color = Color(1, 1, 1, 0.06)
+	card_style.border_color = Color(1, 1, 1, 0.22)
+	card_style.set_border_width_all(2)
+	card_style.set_corner_radius_all(10)
+	card_style.content_margin_left = 10
+	card_style.content_margin_right = 10
+	card_style.content_margin_top = 14
+	card_style.content_margin_bottom = 14
+	var army_names: Array = Tuning.ARMIES.keys() # dot count/order/click-target follow this
 	for army_name in Tuning.ARMIES: # the id stays Tuning.ARMIES' key
 		# (load-bearing in the save's `army` field) — only the button's
 		# display text differs, via Armies.display_name
-		var card := CenterContainer.new()
+		var card := PanelContainer.new() # NO-158: was a bare CenterContainer —
+			# see ARMY_PEEK_FRACTION for why the peek needed this border/bg
 		card.custom_minimum_size = Vector2(card_w, 0)
+		card.add_theme_stylebox_override("panel", card_style)
 		army_row.add_child(card)
+		var card_center := CenterContainer.new() # keeps the old vertical centring
+		card.add_child(card_center)
 		var card_box := VBoxContainer.new()
 		card_box.add_theme_constant_override("separation", 6)
-		card.add_child(card_box)
+		card_center.add_child(card_box)
 		var army_btn := _button(card_box, Armies.display_name(army_name), 20,
 			func() -> void:
 				GameScript.next_army = army_name
@@ -1081,6 +1112,35 @@ func _ready() -> void:
 		ability.modulate = Color(0.85, 0.8, 0.55) # gold tint, matches the
 			# in-game Army Ability chip's own tint (hud.gd)
 		card_box.add_child(ability)
+	# NO-158: clickable page dots — one per Army, filled for the resting
+	# card, hollow for the rest; a tap scrolls straight to that card. Count
+	# and order come from army_names (Tuning.ARMIES), so a 7th Army needs no
+	# edit here. Godot's ScrollContainer has no page-snap, so the "current
+	# card" read in the value_changed listener below is an approximation —
+	# exact once a swipe settles, which is the only time this reads it.
+	var army_dots := HBoxContainer.new()
+	army_dots.alignment = BoxContainer.ALIGNMENT_CENTER
+	army_dots.add_theme_constant_override("separation", 8)
+	army_center.add_child(army_dots)
+	var dot_buttons: Array[Button] = []
+	for i in army_names.size():
+		var dot := Button.new()
+		dot.flat = true
+		dot.focus_mode = Control.FOCUS_NONE
+		dot.custom_minimum_size = Vector2(28, 28)
+		dot.add_theme_font_size_override("font_size", 16)
+		dot.text = "●" if i == 0 else "○"
+		dot.pressed.connect(func() -> void:
+			army_scroll.scroll_horizontal = int(i * card_w))
+		army_dots.add_child(dot)
+		dot_buttons.append(dot)
+	# Setting scroll_horizontal above fires this same signal (it just proxies
+	# the underlying HScrollBar's value), so a dot click updates the dots
+	# through the identical path a swipe does — one writer, not two.
+	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var idx := clampi(roundi(army_scroll.scroll_horizontal / card_w), 0, army_names.size() - 1)
+		for i in dot_buttons.size():
+			dot_buttons[i].text = "●" if i == idx else "○")
 	_button(army_center, "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)

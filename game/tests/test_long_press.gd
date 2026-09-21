@@ -30,6 +30,19 @@ const GameScript := preload("res://scripts/game.gd")
 ## constant, so this cannot pass because the two drifted together.
 const HOLD_S := 0.65
 
+## NO-192: the settle wait is bounded by WALL TIME, not a frame count. A frame
+## budget measures the host, and this assertion fails on Aux and passes on Main
+## with no recorded reason — PANEL_SLIDE_S is 0.18s, so 60 frames already looked
+## ample, which is exactly why the cause is still unknown. 3s is ~16x the slide:
+## a failure at this cap is a broken tween, not a slow machine. The detail string
+## on the check is the point of this change — the old assertion printed nothing,
+## so every failure had to be re-theorised from scratch.
+const SETTLE_CAP_MS := 3000
+## A tween's final frame can land a hair off its target; half a pixel cannot
+## change which control a click lands on, and exact Vector2 equality was the
+## other candidate cause of the failures above.
+const SETTLE_EPS_PX := 0.5
+
 var fails := 0
 var recording := false
 var foreign_motion := 0
@@ -98,11 +111,16 @@ func _long_press(at: Vector2) -> bool:
 func _await_drawer_settled(game: Node, key: String) -> void:
 	var panel: Control = game.hud.drawers[key]
 	var rest: Vector2 = game.hud.drawer_rest[key]
+	var t0 := Time.get_ticks_msec()
 	var polls := 0
-	while panel.position != rest and polls < 60:
+	while panel.position.distance_to(rest) > SETTLE_EPS_PX \
+			and Time.get_ticks_msec() - t0 < SETTLE_CAP_MS:
 		await process_frame
 		polls += 1
-	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
+	check(panel.position.distance_to(rest) <= SETTLE_EPS_PX,
+		"the %s drawer's slide settled before use" % key,
+		"pos=%s rest=%s polls=%d elapsed=%dms" % [
+			panel.position, rest, polls, Time.get_ticks_msec() - t0])
 
 
 func _boot_game() -> Node:
@@ -209,8 +227,10 @@ func _has_label_text(node: Node, text: String) -> bool:
 
 
 func _init() -> void:
-	create_timer(60.0).timeout.connect(func() -> void:
-		push_error("WATCHDOG: probe still running after 60s — force quit")
+	# NO-192: raised from 60s. Must stay below run_all.sh's TIMEOUT (600s) or
+	# the runner kills the process first and the tail of this probe's log is lost.
+	create_timer(180.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: probe still running after 180s — force quit")
 		quit(1))
 	if not DisplayServer.is_touchscreen_available():
 		push_error("FAIL: touch emulation is off — this probe needs game/override.cfg")

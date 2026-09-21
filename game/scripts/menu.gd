@@ -1711,6 +1711,11 @@ const TIER_PIECE_IDS := ["pawn", "rook", "bishop", "knight", "queen"]
 ## the description text beside it.
 func _tier_icon(tier_name: String) -> Control:
 	var wrap := CenterContainer.new()
+	# NO-212: top-align, not row-centered — the row's own height grows with
+	# its cumulative handicap text, and centering in that meant the icon
+	# drifted toward the middle of an ever-taller block instead of sitting
+	# beside the text it actually belongs to.
+	wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	wrap.custom_minimum_size = Vector2(70, 0)
 	var icon := TextureRect.new()
 	# NO-190 (Max): red icons — the enemy/dark side of the pair, not a tint.
@@ -1747,7 +1752,15 @@ func _tier_description(tier_name: String) -> String:
 ## reads as one continuous box around tiers 1..selected, not a stack of
 ## separate ones. Content margins are set unconditionally so toggling the
 ## border never changes row height/layout, only what's drawn.
+##
+## NO-212: every panel, selected or not, gets a full faint border of its own
+## (TIER_BORDER_COLOR) so its text block reads as one box beside its own
+## icon — before this, an unselected row had no border at all and the
+## description text ran on as one unbroken column. The selected range's
+## brighter, internally-joined TIER_OUTLINE_COLOR border still draws on top
+## of that, unchanged.
 const TIER_OUTLINE_COLOR := Color(0.35, 0.65, 1.0)
+const TIER_BORDER_COLOR := Color(1, 1, 1, 0.12)
 const TIER_OUTLINE_WIDTH := 2
 
 func _update_tier_outline(panels: Array, selected: int) -> void:
@@ -1758,10 +1771,13 @@ func _update_tier_outline(panels: Array, selected: int) -> void:
 		sb.content_margin_right = 10
 		sb.content_margin_top = 8
 		sb.content_margin_bottom = 8
+		sb.border_color = TIER_BORDER_COLOR
+		sb.border_width_left = TIER_OUTLINE_WIDTH
+		sb.border_width_right = TIER_OUTLINE_WIDTH
+		sb.border_width_top = TIER_OUTLINE_WIDTH
+		sb.border_width_bottom = TIER_OUTLINE_WIDTH
 		if i <= selected:
 			sb.border_color = TIER_OUTLINE_COLOR
-			sb.border_width_left = TIER_OUTLINE_WIDTH
-			sb.border_width_right = TIER_OUTLINE_WIDTH
 			sb.border_width_top = TIER_OUTLINE_WIDTH if i == 0 else 0
 			sb.border_width_bottom = TIER_OUTLINE_WIDTH if i == selected else 0
 		panels[i].add_theme_stylebox_override("panel", sb)

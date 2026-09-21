@@ -4606,9 +4606,27 @@ func _draw() -> void:
 	# zone that's already all red, and there's no third recon-only colour to
 	# reach for without inventing one nothing asked for.
 	if not legal_dests.is_empty():
+		var arrowed := {} # tiles a ride's own solid arrow will draw over —
+			# the NO-150 diagonal bridge below draws an identical colinear
+			# line the full length of a diagonal ride (straight rides never
+			# trigger it: consecutive axis-aligned tiles share a real edge,
+			# so the bridge loop's "already joined" check always skips them),
+			# and that line sits UNDER the translucent arrow, visible through
+			# it. Max: "diagonal arrows are still showing the arrow body
+			# visible underneath the arrow head, you did fix this for the
+			# arrows going straight" — the straight case was already clean
+			# for exactly this reason, nothing to do with _draw_move_arrow's
+			# own geometry (verified unchanged and correct by the same
+			# convexity argument piece_diagram.gd's port confirmed on
+			# screen).
+		if not (state == State.SETUP or legal_paths.is_empty()):
+			for p in legal_paths:
+				if p.kind == "ride" and not p.get("hop", false):
+					for t in p.line:
+						arrowed[t] = true
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
-			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests)
+			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests, arrowed)
 	_draw_target_zone(_bomb_highlight_tiles()) # NO-122/176 hatch, NO-130
 		# shared — drawn after the zone outline above (see NO-176 comment)
 	if item_active >= 0: # item targeting: same zone indicator as the bomb
@@ -4738,7 +4756,7 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 ## `_draw_target_zone` calls this for both the bomb blast preview and an
 ## armed Item's zone.
 func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH,
-		captures: Array[Vector2i] = []) -> void:
+		captures: Array[Vector2i] = [], no_bridge: Dictionary = {}) -> void:
 	# NO-161: `captures` is the subset of `tiles` whose outline should be red
 	# instead of `col`. An edge between two tiles that are BOTH in `tiles`
 	# but disagree on capture-ness (one is, one isn't) is a boundary inside
@@ -4800,6 +4818,11 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 				continue
 			if tiles.has(Vector2i(t.x + d.x, t.y)) or tiles.has(Vector2i(t.x, t.y + d.y)):
 				continue # already joined by a real shared edge — no pinch
+			if no_bridge.has(t) and no_bridge.has(diag):
+				continue # a ride's own solid arrow already draws this exact
+				# segment on top of the zone — this stroke would just
+				# duplicate it, underneath a translucent arrow it shows
+				# through (see the call site's comment)
 			var diag_cap := captures.has(diag)
 			var bridge_col: Color = overlap_col if diag_cap != t_cap \
 					else (capture_col if t_cap else col) # NO-161: same

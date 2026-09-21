@@ -360,15 +360,40 @@ func _init() -> void:
 	# says "Tier 5".
 	check(menu._tier_buttons.size() == 5, "army click opens the tier select, with all 5 tiers")
 	check(menu._tier_buttons[0].is_visible_in_tree(), "tier row is a real, visible tap target")
+	# NO-212: the tap button is now a full-panel overlay (a direct sibling of
+	# the description Label inside tier_panel, not a wrapper two levels up —
+	# see menu.gd), so the button's own parent IS the panel.
 	# fix/tier-bg-and-tip-centring: _update_tier_outline built a StyleBoxFlat
 	# and never set bg_color, so every tier row rendered Godot's default flat
 	# light grey. Assert the actual bg_color, not merely that a stylebox
 	# exists (a read-back of a value just written would pass even if the fix
 	# were reverted to a different, still-wrong colour).
-	var tier_panel := menu._tier_buttons[0].get_parent().get_parent() as PanelContainer
+	var tier_panel := menu._tier_buttons[0].get_parent() as PanelContainer
 	var tier_sb := tier_panel.get_theme_stylebox("panel") as StyleBoxFlat
 	check(tier_sb != null and tier_sb.bg_color == menu.NESTED_PANEL_TINT,
 		"tier panel background is the dark nested-panel tint, not Godot's default flat grey")
+	# NO-212: each row's description text must start level with its own
+	# icon (Max: "aligned to its red icon piece") — assert the LIVE rects
+	# after an idle frame, not a size-flag read-back (CLAUDE.md: "Assert the
+	# observable consequence, never the flag that was just written" — a
+	# previous attempt set SIZE_SHRINK_BEGIN on the icon alone and shipped
+	# with the text still displaced, which a flag check would have missed).
+	await process_frame
+	for i in menu._tier_buttons.size():
+		var panel := menu._tier_buttons[i].get_parent() as PanelContainer
+		var row := panel.get_parent() as HBoxContainer
+		var icon: Control = row.get_child(0).get_child(0) # icon wrap -> TextureRect
+		var desc: Label = null
+		for c in panel.get_children():
+			if c is Label:
+				desc = c
+				break
+		var icon_top := icon.get_global_rect().position.y
+		var desc_top := desc.get_global_rect().position.y
+		# tolerance covers the panel's own 8px top content margin (the
+		# icon sits outside the panel and has none) — not slack for drift.
+		check(absf(icon_top - desc_top) <= 10.0,
+			"tier %d description top aligns with its icon (icon %.1f, text %.1f)" % [i, icon_top, desc_top])
 	check(await _click_button(menu, "← Back"), "tier Back clickable")
 	await process_frame
 	check(_find_button(menu, "Wild Hunt") != null, "tier Back restores the army select")

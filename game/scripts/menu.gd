@@ -1325,10 +1325,10 @@ func _ready() -> void:
 	#
 	# NO-190: the small flat button that used to carry the SAME "Tier N" text
 	# as the tap target now carries NO text — Max ruled the numbering itself
-	# should go, not just its old large header. It keeps its height (40px,
-	# this codebase's thumb-sized-row convention, e.g. the TEST list's
-	# section headers) so the row stays a real tap target with nothing to
-	# read. test_menu_clicks.gd can no longer find it by text, so it is
+	# should go, not just its old large header. NO-212 turned it into a
+	# borderless overlay spanning the whole tier_panel (see the loop below)
+	# so the row stays a real, full-height tap target with nothing to read.
+	# test_menu_clicks.gd can no longer find it by text, so it is
 	# collected into _tier_buttons (a member array, read directly by the
 	# test — the same convention _selected_tier already uses) instead.
 	#
@@ -1361,16 +1361,6 @@ func _ready() -> void:
 		tier_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tier_row.add_child(tier_panel)
 		tier_panels.append(tier_panel)
-		var tier_col := VBoxContainer.new()
-		tier_col.add_theme_constant_override("separation", 2)
-		tier_panel.add_child(tier_col)
-		var tier_btn := _button(tier_col, "", 13, func() -> void:
-			_selected_tier = i
-			_update_tier_outline(tier_panels, i))
-		tier_btn.flat = true
-		tier_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		tier_btn.custom_minimum_size = Vector2(0, 40)
-		_tier_buttons.append(tier_btn)
 		var tier_desc := Label.new()
 		tier_desc.text = _tier_description(tier_name)
 		tier_desc.add_theme_font_size_override("font_size", 11)
@@ -1383,7 +1373,26 @@ func _ready() -> void:
 		# this row can't demand more width than the panel actually has to give
 		# it (that mismatch is what pushed the whole menu sideways there).
 		tier_desc.custom_minimum_size.x = _text_width() - 100.0
-		tier_col.add_child(tier_desc)
+		# NO-212: top-align, mirroring the icon's own SIZE_SHRINK_BEGIN
+		# (_tier_icon). tier_desc used to sit inside a VBoxContainer below a
+		# same-height invisible tap-target button stacked above it, so every
+		# row's text started a full button-height below its own icon. A
+		# PanelContainer fits each of its children to that child's own size
+		# flags, so adding the label straight into tier_panel and shrinking it
+		# to the top pins it to the panel's top content margin regardless of
+		# what else shares the panel — the tap target below no longer sits in
+		# this stack at all, so its height can't push the text down.
+		tier_desc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		tier_panel.add_child(tier_desc)
+		# The tap target is now a borderless overlay spanning the whole panel
+		# (PanelContainer fits every child to the same rect) instead of a slim
+		# strip stacked above the text — a bigger, full-row hit area, and one
+		# that can no longer dictate where the text sits.
+		var tier_btn := _button(tier_panel, "", 13, func() -> void:
+			_selected_tier = i
+			_update_tier_outline(tier_panels, i))
+		tier_btn.flat = true
+		_tier_buttons.append(tier_btn)
 	_update_tier_outline(tier_panels, _selected_tier)
 	_button(rank_box, "Confirm", 20, func() -> void:
 		GameScript.next_tier = Tuning.TIERS[_selected_tier]

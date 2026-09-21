@@ -1737,20 +1737,19 @@ func _tier_icon(tier_name: String) -> Control:
 	return wrap
 
 
-## NO-148 (Max, 2026-09-19): each tier's description states its OWN new
-## handicap(s) first, then every handicap every lower tier already added —
-## cumulative, with the new part identifiable. GENERATED from
-## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
-## hand-written, so retuning a threshold there moves this copy for free.
-## NO-211 (Max): plain lines, no "Also:" prefix and no parenthetical asides —
-## Tuning.TIER_HANDICAPS' own text is already plain, so this just lists it.
+## V2 (Max, 2026-09-21): each tier's description states ONLY what THAT tier
+## adds — supersedes NO-148's cumulative listing (every inherited handicap
+## repeated underneath), which read as the Queen/Tier-4 row re-printing four
+## lines it shared with the tiers below. The handicaps still STACK in
+## behaviour (every gate in tuning.gd is tier_index(tier) >= N) — this is
+## only what the screen prints. GENERATED from Tuning.TIER_HANDICAPS (via
+## new_handicaps), never hand-written, so retuning a threshold there moves
+## this copy for free.
 func _tier_description(tier_name: String) -> String:
 	var new_h := Tuning.new_handicaps(tier_name)
 	if new_h.is_empty():
 		return "No handicaps"
-	var lines := new_h.duplicate()
-	lines.append_array(Tuning.lower_handicaps(tier_name))
-	return "\n".join(lines)
+	return "\n".join(new_h)
 
 
 ## NO-159: redraw the tier-selection outline. `panels[i]` is tier i's

@@ -381,6 +381,10 @@ var tip_key := ""
 var stock_grid := GridContainer.new()
 var captured_grid := GridContainer.new()
 var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
+## NO-208: both drawers' own ScrollContainers, kept so _rebuild_stock_drawer
+## can reset their scroll position — built as locals inside build() otherwise.
+var stock_scroll := ScrollContainer.new()
+var cap_scroll := ScrollContainer.new()
 ## NO-85: Items, one scrolling grid (story 48) — replaces the item_box strip.
 var items_grid := GridContainer.new()
 ## NO-85: Artefacts, one scrolling grid (story 49) — replaces artefact_box
@@ -1334,14 +1338,25 @@ func build(game) -> void:
 	captured_hint.add_theme_font_size_override("font_size", 11)
 	captured_hint.visible = false
 	cap_col.add_child(captured_hint)
-	var cap_scroll := ScrollContainer.new()
 	cap_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
-	cap_scroll.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	var cap_view: Vector2 = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	cap_scroll.custom_minimum_size = cap_view
 	captured_grid.columns = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
 	captured_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
 	captured_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
-	cap_scroll.add_child(captured_grid)
+	# NO-208: bottom-anchors the grid — ALIGNMENT_END collects any slack (the
+	# section taller than the content) above the grid instead of below it, the
+	# same slack-collection idea as stock_align's horizontal ALIGNMENT_END
+	# below, one axis over. custom_minimum_size matches cap_scroll's own so
+	# the anchor has the full viewport height to push against; a plain
+	# ScrollContainer would otherwise size its child to the content alone
+	# (NO-135) and there'd be no slack to collect.
+	var cap_anchor := VBoxContainer.new()
+	cap_anchor.alignment = BoxContainer.ALIGNMENT_END
+	cap_anchor.custom_minimum_size = cap_view
+	cap_anchor.add_child(captured_grid)
+	cap_scroll.add_child(cap_anchor)
 	cap_col.add_child(cap_scroll)
 	stock_row.add_child(cap_col)
 	# NO-164: the gutter — a fixed, always-visible divider, unlike the
@@ -1356,10 +1371,10 @@ func build(game) -> void:
 	var stock_w: float = vp.x - cap_w - STOCK_DRAWER_GUTTER
 	var stock_col := VBoxContainer.new()
 	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
-	var stock_scroll := ScrollContainer.new()
 	stock_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
-	stock_scroll.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	var stock_view: Vector2 = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	stock_scroll.custom_minimum_size = stock_view
 	stock_grid.columns = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
 	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
 	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
@@ -1376,7 +1391,15 @@ func build(game) -> void:
 	stock_align.alignment = BoxContainer.ALIGNMENT_END
 	stock_align.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, 0)
 	stock_align.add_child(stock_grid)
-	stock_scroll.add_child(stock_align)
+	# NO-208: bottom-anchors the row vertically, same mechanism as cap_anchor
+	# above — stock_align already right-aligns stock_grid horizontally, this
+	# wraps it once more for the other axis rather than teaching an
+	# HBoxContainer two alignments at once.
+	var stock_anchor := VBoxContainer.new()
+	stock_anchor.alignment = BoxContainer.ALIGNMENT_END
+	stock_anchor.custom_minimum_size = stock_view
+	stock_anchor.add_child(stock_align)
+	stock_scroll.add_child(stock_anchor)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
 	# NO-145: stock_panel is a PanelContainer, which stretches its one child
@@ -2203,13 +2226,23 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	if marker_text != "":
 		var marker := Label.new()
 		marker.text = marker_text
-		marker.add_theme_font_size_override("font_size", 12)
+		# NO-209: was 12 with no alignment override — a Label's default
+		# alignment is top-left, so the glyph sat at the LEFT edge of the
+		# offset box below rather than centred in it, and the box's zero
+		# bottom/right offsets left it flush with the button's own edge,
+		# straddling the card's rounded corner. Centred + a 4px margin off
+		# both edges puts it cleanly on the icon; 14 reads better at this size.
+		marker.add_theme_font_size_override("font_size", 14)
 		marker.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 		marker.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		marker.add_theme_constant_override("outline_size", 4)
+		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		marker.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		marker.offset_left = -40
-		marker.offset_top = -16
+		marker.offset_left = -38
+		marker.offset_top = -22
+		marker.offset_right = -4
+		marker.offset_bottom = -4
 		btn.add_child(marker)
 	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
 		# the shared placeholder so two unpainted artefacts read apart at a
@@ -2358,6 +2391,22 @@ func _rebuild_stock_drawer() -> void:
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 		stock_grid.add_child(slot)
+	_scroll_stock_to_bottom() # NO-208
+
+
+## NO-208: default scroll position is the bottom, matching cap_anchor/
+## stock_anchor's bottom-anchoring above. Fire-and-forget (not awaited by the
+## caller) — _rebuild_stock_drawer's own synchronous work (grid contents,
+## captured_hint) is already done by the time this runs. Awaits a frame first:
+## CLAUDE.md — a freshly rebuilt control's size isn't final until the next
+## idle frame, so reading "the max scroll" (or here, setting scroll_vertical
+## before the grid's new row count has been laid out) would land on the STALE
+## range. ScrollContainer clamps scroll_vertical to whatever range is valid at
+## the time it's set, so a large constant is as good as reading the true max.
+func _scroll_stock_to_bottom() -> void:
+	await get_tree().process_frame
+	stock_scroll.scroll_vertical = 1 << 30
+	cap_scroll.scroll_vertical = 1 << 30
 
 
 ## One stack button (Stock or Captured entry) — everything from the icon down

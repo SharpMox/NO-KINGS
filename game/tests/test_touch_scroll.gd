@@ -477,6 +477,71 @@ func _init() -> void:
 			and cap_sc is ScrollContainer
 			and stock_sc != cap_sc,
 		"Stock and Captured Stock scroll in separate containers, independently")
+
+	# ---- NO-208: bottom anchor (content shorter than the section) and
+	# default scroll-to-the-bottom (content overflowing it) — live rects and
+	# the real scroll position, after idle frames settle, never a property
+	# read-back alone (CLAUDE.md).
+	#
+	# SHORT: the scenario's own Stock (2 stacks: pawn, knight) already fits
+	# without scrolling; give Captured Stock a single entry for the same
+	# reason. Bottom-anchored means the content's own bottom edge sits flush
+	# with the scroll viewport's bottom edge, not floating at the top with
+	# empty space below it.
+	game.captured = ["bishop"]
+	game.hud.refresh()
+	await process_frame
+	await process_frame
+	# NO-208 (name clash guard): a later block in this same _init still
+	# declares its own `cap_scroll` for the NO-145 swipe check — hence
+	# `no208_cap_scroll` here rather than shadowing it.
+	var no208_cap_scroll: ScrollContainer = game.hud.cap_scroll
+	var stock_scroll: ScrollContainer = game.hud.stock_scroll
+	var cap_grid_rect := game.hud.captured_grid.get_global_rect()
+	var cap_scroll_rect := no208_cap_scroll.get_global_rect()
+	check(absf((cap_grid_rect.position.y + cap_grid_rect.size.y)
+				- (cap_scroll_rect.position.y + cap_scroll_rect.size.y)) <= 2.0,
+		"NO-208: Captured Stock's short content is bottom-anchored, not floating at the top",
+		"grid bottom %s, viewport bottom %s" % [
+			cap_grid_rect.position.y + cap_grid_rect.size.y,
+			cap_scroll_rect.position.y + cap_scroll_rect.size.y])
+	var stock_align_node: Control = game.hud.stock_grid.get_parent() as Control
+	var stock_align_rect := stock_align_node.get_global_rect()
+	var stock_scroll_rect := stock_scroll.get_global_rect()
+	check(absf((stock_align_rect.position.y + stock_align_rect.size.y)
+				- (stock_scroll_rect.position.y + stock_scroll_rect.size.y)) <= 2.0,
+		"NO-208: Stock's short content is bottom-anchored, not floating at the top",
+		"grid bottom %s, viewport bottom %s" % [
+			stock_align_rect.position.y + stock_align_rect.size.y,
+			stock_scroll_rect.position.y + stock_scroll_rect.size.y])
+
+	# OVERFLOW: enough distinct Stock kinds (Stock stacks by kind, NO-84) and
+	# enough Captured entries (Captured never stacks) to exceed the drawer's
+	# fixed height.
+	game.stock = ["pawn", "berolina", "sergeant", "ferz", "wazir", "champion",
+		"bishop", "archbishop", "rook", "chancellor", "knight", "gnu", "buffalo",
+		"kirin", "alibaba", "bodyguard", "queen", "squirrel", "amazon", "gryphon",
+		"manticore", "godzilla", "banshee", "raven"]
+	game.captured = []
+	for i in 20:
+		game.captured.append("pawn")
+	game.hud.refresh()
+	await process_frame
+	await process_frame
+	await process_frame # _scroll_stock_to_bottom (hud.gd) awaits one more frame itself
+	var stock_bar := stock_scroll.get_v_scroll_bar()
+	var cap_bar := no208_cap_scroll.get_v_scroll_bar()
+	check(stock_bar.max_value - stock_bar.page > 0.0,
+		"NO-208 setup: enough Stock kinds to overflow the drawer")
+	check(cap_bar.max_value - cap_bar.page > 0.0,
+		"NO-208 setup: enough Captured entries to overflow the drawer")
+	check(absf(stock_scroll.scroll_vertical - (stock_bar.max_value - stock_bar.page)) <= 1.0,
+		"NO-208: Stock defaults to scrolled to the bottom once it overflows",
+		"scroll_vertical %s, max %s" % [stock_scroll.scroll_vertical, stock_bar.max_value - stock_bar.page])
+	check(absf(no208_cap_scroll.scroll_vertical - (cap_bar.max_value - cap_bar.page)) <= 1.0,
+		"NO-208: Captured Stock defaults to scrolled to the bottom once it overflows",
+		"scroll_vertical %s, max %s" % [no208_cap_scroll.scroll_vertical, cap_bar.max_value - cap_bar.page])
+
 	game.queue_free()
 	await process_frame
 
@@ -523,7 +588,14 @@ func _init() -> void:
 	# (cap_scroll, by STOCK_DRAWER_PAD) — never on a cell, which claims its
 	# own rect first (NO-45's PASS rows). Self-computed from the live rects,
 	# not a guessed pixel offset.
-	var cap_scroll: ScrollContainer = game.hud.captured_grid.get_parent() as ScrollContainer
+	# NO-208: captured_grid's direct parent is now cap_anchor (the
+	# bottom-anchoring wrapper), not the ScrollContainer itself — same
+	# ancestor-walk already used above for stock_grid/captured_grid.
+	var cap_scroll: ScrollContainer = null
+	var cap_walk: Node = game.hud.captured_grid.get_parent()
+	while cap_walk != null and not (cap_walk is ScrollContainer):
+		cap_walk = cap_walk.get_parent()
+	cap_scroll = cap_walk as ScrollContainer
 	check(cap_scroll != null, "NO-145: found the Captured Stock ScrollContainer")
 	var cap_col: Control = cap_scroll.get_parent() as Control
 	var stock_chrome := _chrome_point(cap_col, cap_scroll)

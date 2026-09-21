@@ -348,6 +348,20 @@ func _init() -> void:
 
 	check(game.state == game.State.PLAYER_TURN, "config boots into player turn")
 
+	# NO-154: army_band used to start OPEN on a scenario boot (only the fresh
+	# SETUP path collapsed it, game.gd) — it overlays the same rect a
+	# scenario's `board` config already has player pieces sitting on. Assert
+	# the RECT, not army_band_open: a property read-back "passes" even when
+	# it changed nothing observable (CLAUDE.md, "tests that pass for the
+	# wrong reason"). y=0/y=1 are the player's own back rows on screen
+	# (SPAWN_ROW convention — CLAUDE.md, "Layout traps the device taught").
+	var back_rows_top: float = game._tile_px(Vector2i(0, 1)).y
+	var back_rows_rect := Rect2(game.board_px.x, back_rows_top,
+		Tuning.BOARD_W * game.tile, game.tile * 2)
+	check(not game.hud.army_band.get_global_rect().intersects(back_rows_rect),
+		"army_band doesn't cover the board's back two rows on a scenario boot",
+		"band=%s rows=%s" % [game.hud.army_band.get_global_rect(), back_rows_rect])
+
 	# board click selects the queen and shows its moves
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame

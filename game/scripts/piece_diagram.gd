@@ -163,13 +163,20 @@ static func _draw_ray(dia: Control, cells: int, cell: int, dir: Array, max_range
 	var start := _center(c, cell, [0, 0])
 	var tip := _center(c, cell, last)
 	var fwd := (tip - start).normalized()
+	var side := Vector2(-fwd.y, fwd.x)
 	var line_start := start + fwd * cell * 0.42
 	var arrow_len := cell * 0.30
 	var arrow_w := cell * 0.16
-	var base := tip - fwd * arrow_len
-	var perp := Vector2(-fwd.y, fwd.x) * arrow_w
-	_capped_line(dia, line_start, base, COL_MOVE, 3.4)
-	dia.draw_colored_polygon(PackedVector2Array([tip, base + perp, base - perp]), COL_MOVE)
+	var base := tip - fwd * arrow_len # where the arrowhead base sits
+	# NO-183 pattern (game.gd _draw_move_arrow): shaft quad + head triangle
+	# share the `base` edge exactly, so no round cap bleeds under the head.
+	var half_w := 1.7 # was _capped_line's width/2 (3.4/2)
+	dia.draw_circle(line_start, half_w, COL_MOVE) # round cap, piece-side end only
+	dia.draw_colored_polygon(PackedVector2Array([
+		line_start - side * half_w, base - side * half_w,
+		base + side * half_w, line_start + side * half_w,
+	]), COL_MOVE)
+	dia.draw_colored_polygon(PackedVector2Array([tip, base + side * arrow_w, base - side * arrow_w]), COL_MOVE)
 
 
 ## A repeated-leap "rider" (Nightrider-style, e.g. Banshee's (1,2)): a dashed
@@ -239,10 +246,17 @@ static func _draw_bent(dia: Control, cells: int, cell: int, pivot: Array, dir: A
 		return
 	var end_c := _center(c, cell, last)
 	var slide_fwd := (end_c - pivot_c).normalized()
+	var side := Vector2(-slide_fwd.y, slide_fwd.x)
 	var arrow_len := cell * 0.28
 	var arrow_w := cell * 0.14
-	var base := end_c - slide_fwd * arrow_len
-	var perp := Vector2(-slide_fwd.y, slide_fwd.x) * arrow_w
-	_capped_line(dia, pivot_c, base, COL_MOVE, 2.8)
-	dia.draw_colored_polygon(PackedVector2Array([end_c, base + perp, base - perp]), COL_MOVE)
+	var base := end_c - slide_fwd * arrow_len # where the arrowhead base sits
+	# Only this ride-from-pivot segment ends in an arrowhead (the leap-to-pivot
+	# segment above ends in the plain pivot dot below), so it's the only one
+	# needing NO-183's shared-edge shaft+head — same pattern as _draw_ray.
+	var half_w := 1.4 # was _capped_line's width/2 (2.8/2)
+	dia.draw_colored_polygon(PackedVector2Array([
+		pivot_c - side * half_w, base - side * half_w,
+		base + side * half_w, pivot_c + side * half_w,
+	]), COL_MOVE)
+	dia.draw_colored_polygon(PackedVector2Array([end_c, base + side * arrow_w, base - side * arrow_w]), COL_MOVE)
 	dia.draw_circle(pivot_c, cell * 0.10, COL_MOVE)

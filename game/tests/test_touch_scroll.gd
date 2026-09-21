@@ -660,8 +660,10 @@ func _init() -> void:
 	check(game.shop_open(), "NO-145: leftward swipe on the empty board opens the Shop",
 		"classify_swipe=%s, wave=%d/%d unlock, shop_open()=%s"
 			% [shop_swipe_dir, game.wave, Tuning.SHOP_UNLOCK_WAVE, game.shop_open()])
+	var shop_t0 := Time.get_ticks_msec()
 	var shop_polls := 0
-	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
+	while game.modals.shop_panel.position.distance_to(game.modals.shop_rest) > SETTLE_EPS_PX \
+			and Time.get_ticks_msec() - shop_t0 < SETTLE_CAP_MS:
 		await process_frame
 		shop_polls += 1
 
@@ -687,13 +689,18 @@ func _init() -> void:
 	# later, modals.gd:766), the same async gap the OPEN side's own
 	# shop_polls loop above already waits out. Asserting shop_open() with no
 	# equivalent wait here would fail even when the close fired correctly.
+	# NO-192: bounded on wall-clock (SETTLE_CAP_MS), same reason as the
+	# drawer settles — a 60-frame budget on a slow host reads as the handler
+	# never having run, when the tween had simply not finished yet.
+	var shop_close_t0 := Time.get_ticks_msec()
 	var shop_close_polls := 0
-	while game.modals.shop_panel.visible and shop_close_polls < 60:
+	while game.modals.shop_panel.visible and Time.get_ticks_msec() - shop_close_t0 < SETTLE_CAP_MS:
 		await process_frame
 		shop_close_polls += 1
 	check(not game.shop_open(), "NO-145: reverse swipe on the Shop's own chrome closes it",
-		"shop_panel.visible=%s after %d settle polls (shop_closed fired=%s)"
-			% [game.modals.shop_panel.visible, shop_close_polls, shop_close_fired[0]])
+		"shop_panel.visible=%s after %d settle polls, elapsed=%dms (shop_closed fired=%s)"
+			% [game.modals.shop_panel.visible, shop_close_polls,
+				Time.get_ticks_msec() - shop_close_t0, shop_close_fired[0]])
 
 	# ---- regression: a swipe-SHAPED drag starting ON A CELL must never
 	# open/close anything — that press belongs to drag-scroll (NO-45's PASS

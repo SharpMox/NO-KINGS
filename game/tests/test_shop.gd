@@ -353,11 +353,11 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
-	# --- NO-210 (Max review): the BOXES column used to centre its grid inside
-	# shop_lower's full stretched row height, well below the left column's
-	# (PIECES/ARTEFACTS/ITEMS) top row. Both columns are now SHRINK_BEGIN
-	# (modals.gd, show_shop()) — real geometry, not a screenshot: their global
-	# top edges must land on the same Y. ---
+	# --- V4 (Max review 2026-09-21): "everything aligned to a big grid but
+	# split into sections" — PIECES (3 cols) + BOXES (1 col) share a top row,
+	# ARTEFACTS and ITEMS are each a full-width (5 col) row below, and every
+	# section's column edges must land on the same 5-column master grid
+	# (modals.gd, show_shop()/_shop_zone). Real geometry, not a screenshot. ---
 	# _open_shop() guards on wave < Tuning.SHOP_UNLOCK_WAVE (game.gd:5246) and
 	# returns before ever calling modals.show_shop() — "wave": 3 is below the
 	# unlock wave (5), so shop_lower was never built at all (still null from
@@ -370,16 +370,36 @@ func _init() -> void:
 	await process_frame
 	await process_frame # a freshly built Control's get_global_rect() lags a
 		# layout-sort frame (CLAUDE.md)
-	var shop_lower: HBoxContainer = geo.modals.shop_lower
-	var shop_lower_ok := shop_lower != null and shop_lower.get_child_count() == 2
-	check(shop_lower_ok, "precondition: shop_lower holds the left column + the BOXES column")
-	if shop_lower_ok: # guard the geometry read — a broken precondition must
+	var shop_lower: VBoxContainer = geo.modals.shop_lower
+	var shop_lower_ok := shop_lower != null and shop_lower.get_child_count() == 3
+	check(shop_lower_ok, "precondition: shop_lower holds PIECES+BOXES, ARTEFACTS, ITEMS")
+	if shop_lower_ok: # guard the geometry reads — a broken precondition must
 			# fail loudly above, not crash here on a null/short child list
-		var left_top: float = shop_lower.get_child(0).get_global_rect().position.y
-		var box_top: float = shop_lower.get_child(1).get_global_rect().position.y
-		check(absf(left_top - box_top) < 1.0,
-			"NO-210: the BOXES column's top is level with the left column's top (%.2f vs %.2f)"
-				% [left_top, box_top])
+		var top_row: HBoxContainer = shop_lower.get_child(0)
+		var artefact_zone: Control = shop_lower.get_child(1)
+		var item_zone: Control = shop_lower.get_child(2)
+		var top_row_ok := top_row != null and top_row.get_child_count() == 2
+		check(top_row_ok, "precondition: the top row holds the PIECES zone + the BOXES zone")
+		if top_row_ok:
+			var piece_zone: Control = top_row.get_child(0)
+			var box_zone: Control = top_row.get_child(1)
+			var piece_top: float = piece_zone.get_global_rect().position.y
+			var box_top: float = box_zone.get_global_rect().position.y
+			check(absf(piece_top - box_top) < 1.0,
+				"NO-210: the BOXES column's top is level with PIECES' top (%.2f vs %.2f)"
+					% [piece_top, box_top])
+			var piece_left: float = piece_zone.get_global_rect().position.x
+			var artefact_left: float = artefact_zone.get_global_rect().position.x
+			var item_left: float = item_zone.get_global_rect().position.x
+			check(absf(piece_left - artefact_left) < 1.0 and absf(piece_left - item_left) < 1.0,
+				"V4: PIECES' column-1 left edge matches ARTEFACTS'/ITEMS' (%.2f vs %.2f/%.2f)"
+					% [piece_left, artefact_left, item_left])
+			var box_right: float = box_zone.get_global_rect().end.x
+			var artefact_right: float = artefact_zone.get_global_rect().end.x
+			var item_right: float = item_zone.get_global_rect().end.x
+			check(absf(box_right - artefact_right) < 1.0 and absf(box_right - item_right) < 1.0,
+				"V4: BOXES' column-5 right edge matches ARTEFACTS'/ITEMS' (%.2f vs %.2f/%.2f)"
+					% [box_right, artefact_right, item_right])
 	geo.queue_free()
 	await process_frame
 

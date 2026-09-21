@@ -71,6 +71,14 @@ const LOGIN_TAGLINE := "Your progress follows your account."
 ## is none. Plain on purpose — presentation is Max's to rule on.
 const OFFLINE_REASON := "No internet connection"
 
+## NO-158's tint for a bordered panel nested inside another panel — a subtle
+## white overlay that reads as "one shade lighter than its parent" regardless
+## of what that parent's own colour is. Shared by the TEST list's row_style,
+## the Army carousel's card_style, and the tier rows (_update_tier_outline) —
+## one constant so the three can't quietly drift apart (CLAUDE.md: "bitten
+## five times by two constants that happen to agree").
+const NESTED_PANEL_TINT := Color(1, 1, 1, 0.06)
+
 ## Every mirrored save, as cloud key -> local file. The single place that
 ## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
 static func _SYNC_KEYS() -> Dictionary:
@@ -984,7 +992,7 @@ func _ready() -> void:
 	_test_sections = [] # {rows, head, relabel} per section — the accordion
 	_test_open = -1
 	var row_style := StyleBoxFlat.new()
-	row_style.bg_color = Color(1, 1, 1, 0.06)
+	row_style.bg_color = NESTED_PANEL_TINT
 	row_style.set_corner_radius_all(6)
 	row_style.content_margin_left = 10
 	row_style.content_margin_right = 10
@@ -1119,7 +1127,7 @@ func _ready() -> void:
 	var card_w: float = scroll_w * ARMY_CARD_WIDTH_FRACTION
 	var card_h: float = card_w / ARMY_CARD_RATIO
 	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
-	card_style.bg_color = Color(1, 1, 1, 0.06)
+	card_style.bg_color = NESTED_PANEL_TINT
 	card_style.border_color = Color(1, 1, 1, 0.22)
 	card_style.set_border_width_all(2)
 	card_style.set_corner_radius_all(10)
@@ -1744,6 +1752,7 @@ const TIER_OUTLINE_WIDTH := 2
 func _update_tier_outline(panels: Array, selected: int) -> void:
 	for i in panels.size():
 		var sb := StyleBoxFlat.new()
+		sb.bg_color = NESTED_PANEL_TINT
 		sb.content_margin_left = 10
 		sb.content_margin_right = 10
 		sb.content_margin_top = 8

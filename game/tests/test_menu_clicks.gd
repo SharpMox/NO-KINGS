@@ -360,6 +360,15 @@ func _init() -> void:
 	# says "Tier 5".
 	check(menu._tier_buttons.size() == 5, "army click opens the tier select, with all 5 tiers")
 	check(menu._tier_buttons[0].is_visible_in_tree(), "tier row is a real, visible tap target")
+	# fix/tier-bg-and-tip-centring: _update_tier_outline built a StyleBoxFlat
+	# and never set bg_color, so every tier row rendered Godot's default flat
+	# light grey. Assert the actual bg_color, not merely that a stylebox
+	# exists (a read-back of a value just written would pass even if the fix
+	# were reverted to a different, still-wrong colour).
+	var tier_panel := menu._tier_buttons[0].get_parent().get_parent() as PanelContainer
+	var tier_sb := tier_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	check(tier_sb != null and tier_sb.bg_color == menu.NESTED_PANEL_TINT,
+		"tier panel background is the dark nested-panel tint, not Godot's default flat grey")
 	check(await _click_button(menu, "← Back"), "tier Back clickable")
 	await process_frame
 	check(_find_button(menu, "Wild Hunt") != null, "tier Back restores the army select")

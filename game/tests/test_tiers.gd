@@ -126,7 +126,7 @@ func _init() -> void:
 	# stay grouped by type with the remainder taken off the last type ---
 	var s1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
-	check(s1.shop_stock.size() == 23, "Tier 1 Shop: unchanged 23 slots (NO-166)")
+	check(s1.shop_stock.size() == 27, "Tier 1 Shop: unchanged 27 slots (NO-201)")
 	s1.queue_free()
 	await process_frame
 
@@ -136,9 +136,9 @@ func _init() -> void:
 	var kinds := {}
 	for slot in s3.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(kinds.get("piece", 0) == 9 and kinds.get("artefact", 0) == 3
-			and kinds.get("item", 0) == 3 and kinds.get("box", 0) == 4,
-		"Tier 3+ Shop: 9 pieces / 3 artefacts / 3 items / 4 boxes (NO-166) (%s)" % str(kinds))
+	check(kinds.get("piece", 0) == 11 and kinds.get("artefact", 0) == 4
+			and kinds.get("item", 0) == 4 and kinds.get("box", 0) == 4,
+		"Tier 3+ Shop: 11 pieces / 4 artefacts / 4 items / 4 boxes (NO-201) (%s)" % str(kinds))
 	var box_types := {}
 	for slot in s3.shop_stock:
 		if slot.kind == "box":

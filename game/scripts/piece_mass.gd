@@ -21,19 +21,22 @@ const ICON := 52.0 # 40 * 1.3 — Max, 2026-09-20: chose bigger icons over
 	# for the off-board strip's own row height, not a crowd of a dozen-plus
 	# overlapping tokens, and would force scrolling or clipping here — see
 	# build()'s Horde-14 arithmetic below for the worst case at this size.
-const CELL := ICON * 0.42 # horizontal pitch, well under ICON so neighbours
+const CELL := ICON * 0.38 # horizontal pitch, well under ICON so neighbours
 	# overlap. A RATIO of ICON, not an independent number: the next size
 	# change is one constant (ICON), not two literals that happen to agree
-	# today. NO-203: tightened from 0.6 — Max: "the pieces are also too far
-	# from each horizontally, we want to pack them a bit more".
-const ROW_PITCH := ICON * 0.36 # NO-178: vertical pitch between rows — tighter
+	# today. NO-203: tightened from 0.6 to 0.42 — Max: "the pieces are also
+	# too far from each horizontally, we want to pack them a bit more". NO-210:
+	# tightened again to 0.38 — Max: "pack the row element a bit more
+	# horizontally" while giving ROW_PITCH (below) more room, since 0.36/0.42
+	# read as rows too close together.
+const ROW_PITCH := ICON * 0.42 # NO-178: vertical pitch between rows — tighter
 	# than CELL so rows pile into each other, not just sit stacked (the old
 	# row pitch equalled CELL, which read as ranks, not a crowd). NO-203:
-	# tightened again from 0.45 — Max: "we need the rows to be closer on the
-	# vertical axis so we can still visually see rows". 0.36 is the floor:
-	# checked by eye (see the report on NO-203) against 0.26, where the back
-	# rows' heads start merging into one cluster instead of readable rows;
-	# 0.36 keeps a visible margin above that before picking it.
+	# tightened from 0.45 to 0.36 — Max: "we need the rows to be closer on the
+	# vertical axis so we can still visually see rows" — then NO-210 backed
+	# it off to 0.42: Max, "rows are too close ... distance them vertically a
+	# little bit". Still above CELL, and well above the 0.26 floor checked by
+	# eye on NO-203 (where back rows' heads start merging into one cluster).
 const STAGGER := CELL * 0.5 # NO-178: alternate rows shift right by half a
 	# cell so pieces nest into the gaps of the row behind, instead of lining
 	# up into a visible grid.
@@ -114,20 +117,21 @@ static func build(ids: Array) -> Control:
 	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
 	var pad := ICON * 0.5 + JITTER_Y + rot_extra
 
-	# Worst case at ICON=52, checked by hand (NO-203, 2026-09-21): Horde's 14
+	# Worst case at ICON=52, checked by hand (NO-210, 2026-09-21 — re-derived
+	# after NO-210 moved CELL/ROW_PITCH off their NO-203 values): Horde's 14
 	# pawns -> rows=4 (from _choose_rows), cols=ceili(14/4)=4 -> mass width =
-	# (4-1)*21.84 + 52 + 2*38.62 + STAGGER(10.92) = 205.7px. The Army carousel
+	# (4-1)*19.76 + 52 + 2*38.62 + STAGGER(9.88) = 198.4px. The Army carousel
 	# card (menu.gd _show_armies) is `card_w = viewport.x *
 	# ARMY_CARD_WIDTH_FRACTION` = 480 * 7/12 = 280px at the 480px portrait
 	# width this project targets (NO-179 full-width follow-up: the fraction
 	# was re-derived from a new, uninset scroll_w so this 280px stayed the
 	# same), minus the card's own 20px side padding
-	# (card_style's content_margin_left/right) = 260px usable — 205.7px
-	# fits with ~54px to spare (NO-179 narrowed the card from 340px to 288px
-	# to make room for an uncropped peek either side; a follow-up narrowed it
-	# again to 280px to raise the peek scale — see ARMY_CARD_WIDTH_FRACTION's
-	# own header — still clear, and clears with more room than the NO-178
-	# pitch did).
+	# (card_style's content_margin_left/right) = 260px usable — 198.4px
+	# fits with ~61.6px to spare (NO-179 narrowed the card from 340px to
+	# 288px to make room for an uncropped peek either side; a follow-up
+	# narrowed it again to 280px to raise the peek scale — see
+	# ARMY_CARD_WIDTH_FRACTION's own header — still clear, and clears with
+	# more room than the NO-178 pitch did).
 	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
 	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(

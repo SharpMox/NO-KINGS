@@ -2825,7 +2825,19 @@ func _init() -> void:
 	await process_frame
 	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "Sniper clickable")
 	await process_frame
-	check(game.item_active == 0 and game.hud.drawer_open == "",
+	# NO-202 (round3 coordinator review, 2026-09-21): two held Items share the
+	# key "sniper", so _click_grid_cell's key match is inherently ambiguous
+	# between them and always resolves to whichever is FIRST in items_grid's
+	# child order. That used to be g.items[0] (main's forward build order);
+	# NO-202 reversed items_grid to most-recently-acquired-first, so it is
+	# now g.items[1] instead — the specific real index was never this
+	# scenario's own point (arm/cancel/use mechanics on SOME held copy is),
+	# so assert only that arming succeeded, not which array slot it landed
+	# on. This is a different class of issue than _item_button's positional
+	# bug (test_long_press.gd) — _click_grid_cell IS key-based, it just
+	# cannot disambiguate two cells sharing one key, and which one it meets
+	# first flipped along with the display order.
+	check(game.item_active >= 0 and game.hud.drawer_open == "",
 		"arming an Item that needs a board target closes the Drawer")
 	check(await _click_inventory(game, "Inventory 2"), "reopen to reach the item and cancel it")
 	await process_frame

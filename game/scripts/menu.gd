@@ -1727,14 +1727,14 @@ func _tier_icon(tier_name: String) -> Control:
 ## cumulative, with the new part identifiable. GENERATED from
 ## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
 ## hand-written, so retuning a threshold there moves this copy for free.
+## NO-211 (Max): plain lines, no "Also:" prefix and no parenthetical asides —
+## Tuning.TIER_HANDICAPS' own text is already plain, so this just lists it.
 func _tier_description(tier_name: String) -> String:
 	var new_h := Tuning.new_handicaps(tier_name)
 	if new_h.is_empty():
 		return "No handicaps"
 	var lines := new_h.duplicate()
-	var lower_h := Tuning.lower_handicaps(tier_name)
-	if not lower_h.is_empty():
-		lines.append("Also: " + ", ".join(lower_h))
+	lines.append_array(Tuning.lower_handicaps(tier_name))
 	return "\n".join(lines)
 
 

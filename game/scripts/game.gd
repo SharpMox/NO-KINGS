@@ -179,10 +179,6 @@ const COL_ZONE_OUTLINE_OVERLAP := Color(0.75, 0.45, 1.0) # where a move-tile
 	# ZONE_OUTLINE_OVERLAP_ALPHA below (was folded into the shared
 	# ZONE_OUTLINE_ALPHA, 0.6 — a boundary marker can afford more than the
 	# large outline shapes it interrupts). NOT VERIFIED ON SCREEN.
-const COL_CAPTURE_TILE_TINT := Color(0.92, 0.18, 0.4) # capture-target tile
-	# wash, pushed pinker than COL_CAPTURE (0.85, 0.15, 0.15) by raising
-	# blue — the ring and the new capture outline stay pure COL_CAPTURE so
-	# only the tile fill shifts, not every red thing on the tile
 const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
 const SELECT_RING_WIDTH := 5.0 # NO-183: was 3.0 — _draw_pulse was correctly
 	# wired (added as a child canvas item, signal-connected, queue_redraw'd
@@ -4580,12 +4576,15 @@ func _draw() -> void:
 		# branch is taken.
 	for d in legal_dests:
 		var d_rect := Rect2(_tile_px(d), Vector2(tile, tile))
-		if board.has(d): # capturable target: pink-red tile tint. NO-183: the
-			# ring that used to sit on top of it is gone — the tint plus the
-			# zone outline below already mark this tile red, and NO-184 now
-			# gives the move tiles a matching hatch fill (see the `else`
-			# below), so the per-tile ring/dot layer was pure duplication.
-			draw_rect(d_rect, Color(COL_CAPTURE_TILE_TINT, 0.3))
+		if board.has(d): # capturable target: red hatch, same family as the
+			# move hatch below (phase 0.0, "\" direction — matches the other
+			# COL_CAPTURE hatches, e.g. the bomb/Item zone, so a tile in both
+			# sets doesn't fight itself). Max overruled NO-183's flat tint
+			# ("capture squares don't seem to have the red hatch") — dropped it
+			# rather than layering hatch on top, so captures read as the red
+			# twin of the blue move hatch below, not a heavier, differently
+			# styled tile.
+			_draw_hatch(d_rect, Color(COL_CAPTURE, HATCH_ALPHA))
 			capture_dests.append(d)
 		else: # NO-184: move destination — a hatch fill, parity with the red
 			# bomb/Item zone below (previously outline-only). Recon zones stay

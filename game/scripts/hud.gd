@@ -917,7 +917,17 @@ func build(game) -> void:
 	# instead; see this var's own declaration for why that was wrong).
 	army_band_reopen.custom_minimum_size = Vector2(DECK_ICON_BTN, DECK_ICON_BTN)
 	army_band_reopen.add_theme_font_size_override("font_size", 15)
-	_style_button(army_band_reopen, Color(0.22, 0.22, 0.26), Color(0, 0, 0, 0), 16, 4, 4)
+	# NO-225: square, and green. The footprint (DECK_ICON_BTN, 32x32) was
+	# already square — the old radius 16 is exactly half of that, which
+	# rendered a full circle, not a square with soft corners. Radius 8 below
+	# matches menu_button/stock_btn (the row's other icon buttons, same
+	# _style_button call). Surface is pass_count's bright green
+	# (0.498, 0.878, 0.541, hud.gd:1012) scaled down in value (~x0.25) to a
+	# dark surface so it reads as green without the white glyph washing out;
+	# the glyph itself is recoloured to that same bright green so the pair
+	# reads as one family with the existing green text.
+	army_band_reopen.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
+	_style_button(army_band_reopen, Color(0.125, 0.220, 0.136), Color(0, 0, 0, 0), 8, 4, 4)
 	army_band_reopen.pressed.connect(func() -> void:
 		if army_band_open:
 			collapse_army_band()

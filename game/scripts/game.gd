@@ -183,13 +183,18 @@ const SELECTED_INSET := -6.0 # NO-199: the selected piece draws bigger than a
 	# normal token (the -6.0 at the board draw loop below) — the outline
 	# shader traces that SAME enlarged rect, shared here so it can't drift
 	# out of sync with the piece's actual drawn size.
-const SELECT_OUTLINE_WIDTH := 3.0 # px, how far the outline shader dilates past
+const SELECT_OUTLINE_WIDTH := 6.0 # px, how far the outline shader dilates past
 	# the token's own alpha silhouette — NO-199, replacing NO-183's ring (a
 	# flat circle, never the piece's own shape) with one that traces it.
-const SELECT_OUTLINE_RIM := 1.3 # px of SELECT_OUTLINE_WIDTH given to the outer,
-	# colour-coded rim; the rest nearer the piece is BUFF_BADGE_BG — the same
+	# Max, 2026-09-21: doubled from 3.0 — at 3px the outline was there but did
+	# not announce "selected" the way the ring it replaced did.
+const SELECT_OUTLINE_RIM := 3.0 # px of SELECT_OUTLINE_WIDTH given to the outer
+	# purple rim; the rest nearer the piece is BUFF_BADGE_BG — the same
 	# dark-fill/light-rim split NO-185 used for buff badges against these
 	# same four backgrounds (COL_LIGHT/COL_DARK tiles, light/dark tokens).
+const SELECT_OUTLINE_RIM_ALPHA := 0.8 # Max, 2026-09-21: "a transparent purple
+	# to contrast with the red and blue". Scales the pulse, so the rim breathes
+	# 0.56-0.80 rather than 0.70-1.00 — present without reading as a solid band.
 const SELECT_OUTLINE_ALPHA_MIN := 0.7 # NO-183's breathing range, reused as-is
 const SELECT_OUTLINE_ALPHA_RANGE := 0.3 # for the outline's pulse (0.7-1.0)
 
@@ -4928,13 +4933,17 @@ func _draw_pulse() -> void:
 	var p: Dictionary = board[selected]
 	if not textures.has(p.id):
 		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
-	var recon: bool = p.owner == Rules.ENEMY
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
 	var size := tile - SELECTED_INSET * 2
 	var mat: ShaderMaterial = _pulse.material
-	mat.set_shader_parameter("rim_color", Color(COL_CAPTURE if recon else COL_SELECT, pulse_a))
+	# Max, 2026-09-21: one purple for every selection, not blue/red by side —
+	# the rim has to read AGAINST the blue move zone and the red capture zone
+	# it sits inside, so it cannot be either of them. COL_ZONE_OUTLINE_OVERLAP
+	# is the purple this board already uses; reused rather than a second one.
+	mat.set_shader_parameter("rim_color",
+		Color(COL_ZONE_OUTLINE_OVERLAP, pulse_a * SELECT_OUTLINE_RIM_ALPHA))
 	mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, pulse_a))
 	mat.set_shader_parameter("fill_reach", (SELECT_OUTLINE_WIDTH - SELECT_OUTLINE_RIM) / size)
 	mat.set_shader_parameter("rim_reach", SELECT_OUTLINE_WIDTH / size)

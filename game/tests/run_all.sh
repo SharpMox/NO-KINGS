@@ -9,7 +9,10 @@
 set -u
 cd "$(dirname "$0")/.." || exit 1
 GODOT="${GODOT:-godot}"
-TIMEOUT="${TIMEOUT:-300}" # per-step cap: a crashed probe must not block forever
+# NO-192: 300 -> 600. test_scenarios is genuinely 190-250s on Main and
+# exceeded 300s on Aux (killed, exit 143); it passed at 600s. Per-step cap: a
+# crashed probe must not block forever, but a hung run is still bounded.
+TIMEOUT="${TIMEOUT:-600}"
 fails=""
 
 # Fresh worktrees have no .godot/ import cache, and Godot's on-demand import

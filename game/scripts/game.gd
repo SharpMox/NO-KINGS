@@ -4936,7 +4936,10 @@ func _draw_pulse() -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
-	var size := tile - SELECTED_INSET * 2
+	var size := tile - SELECTED_INSET * 2 # the TOKEN's own on-screen size. The
+		# shader's UV space always spans exactly this (see canvas_rect below),
+		# so reach stays in these units no matter how much extra canvas the
+		# draw call gives the dilation room to spill into.
 	var mat: ShaderMaterial = _pulse.material
 	# Max, 2026-09-21: one purple for every selection, not blue/red by side —
 	# the rim has to read AGAINST the blue move zone and the red capture zone
@@ -4947,8 +4950,28 @@ func _draw_pulse() -> void:
 	mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, pulse_a))
 	mat.set_shader_parameter("fill_reach", (SELECT_OUTLINE_WIDTH - SELECT_OUTLINE_RIM) / size)
 	mat.set_shader_parameter("rim_reach", SELECT_OUTLINE_WIDTH / size)
-	var rect := Rect2(_tile_px(selected) + Vector2(SELECTED_INSET, SELECTED_INSET), Vector2(size, size))
-	_pulse.draw_texture_rect(piece_tex(p.id, p.owner), rect, false)
+	# Max, 2026-09-21 (2nd pass): raising SELECT_OUTLINE_WIDTH to 6 made the
+	# dilated aura reach past the piece's own draw rect — clipped flat top and
+	# bottom. The shader dilates OUTWARD from the token's alpha in UV space,
+	# but a plain draw_texture_rect(tex, rect) maps UV[0,1] onto `rect`
+	# exactly, so anything the dilation pushes past that rect's edge was never
+	# drawn. Fix: grow the CANVAS by SELECT_OUTLINE_WIDTH on every side via
+	# draw_texture_rect_region with a matching padded src_rect (in TEXTURE
+	# pixels, at the token's own draw scale) and clamp_uv off. The four real
+	# texture corners still land on the same screen pixels as before — the
+	# silhouette neither moves nor rescales, only the margin around it grows —
+	# and that margin gets genuine UV values outside [0,1] for the dilation to
+	# spill into, which _alpha_at's existing out-of-bounds-is-transparent
+	# guard already handles correctly (it was written for UV overflow at the
+	# piece's own edge; this just gives it more of it to do the same thing).
+	var tex := piece_tex(p.id, p.owner)
+	var tex_size := tex.get_size()
+	var margin := tex_size * (SELECT_OUTLINE_WIDTH / size)
+	var canvas_rect := Rect2(
+		_tile_px(selected) + Vector2(SELECTED_INSET, SELECTED_INSET) - Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH),
+		Vector2(size, size) + Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH) * 2)
+	var src_rect := Rect2(-margin, tex_size + margin * 2)
+	_pulse.draw_texture_rect_region(tex, canvas_rect, src_rect, Color(1, 1, 1, 1), false, false)
 
 
 ## Token art for a piece; the player token unless a side is named.

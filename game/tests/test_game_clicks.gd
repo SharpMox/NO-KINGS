@@ -1321,6 +1321,32 @@ func _init() -> void:
 		"item strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s"
 			% [ICON_PX, str(odd_item)])
 
+	# NO-201-shaped fix, Max (3rd ask): the Items/Artefacts grids used to
+	# leave one dead column of empty space at the drawer's right edge —
+	# GridContainer never centres its own cells inside a wider rect, and
+	# items_grid/artefacts_grid were being stretched to their parent's full
+	# width by the default SIZE_FILL flag. Assert the live geometry, not the
+	# constants that produced it: whichever grid's rendered rect either
+	# matches its parent's usable width (a true fill) or is centred within it
+	# (equal gap on both sides) — never a gap on one side only. One more idle
+	# frame first: a freshly rebuilt GridContainer's rect isn't final until
+	# the container has sorted (CLAUDE.md).
+	await process_frame
+	var grids := {"items_grid": icon_game.hud.items_grid, "artefacts_grid": icon_game.hud.artefacts_grid}
+	for grid_name in grids:
+		var grid: Control = grids[grid_name]
+		var parent: Control = grid.get_parent()
+		var grid_rect := grid.get_global_rect()
+		var parent_rect := parent.get_global_rect()
+		var left_gap: float = grid_rect.position.x - parent_rect.position.x
+		var right_gap: float = parent_rect.end.x - grid_rect.end.x
+		check(absf(grid_rect.size.x - parent_rect.size.x) <= 1.0
+				or absf(left_gap - right_gap) <= 1.0,
+			"%s: no one-sided dead column — either fills its parent's width or is centred " %
+				grid_name +
+			"(left_gap=%.1f, right_gap=%.1f, grid_w=%.1f, parent_w=%.1f)" %
+				[left_gap, right_gap, grid_rect.size.x, parent_rect.size.x])
+
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
 	# drawer has to be OPEN for this container to hold anything at all.

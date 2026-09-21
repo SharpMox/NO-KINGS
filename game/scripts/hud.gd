@@ -1102,10 +1102,25 @@ func build(game) -> void:
 	# instead of the full 5-column standard NO-132 names. stock_grid already
 	# forces this (NO-135); items_grid/artefacts_grid never did.
 	items_grid.custom_minimum_size.x = Tuning.grid_row_w(items_grid.columns, INV_CELL_SEP)
+	# Max (3rd ask): "get rid of the empty space on the right". grid_cols()
+	# floors, so grid_row_w(columns, SEP) is (almost) always a few px short of
+	# the ScrollContainer's own width (472 vs. 462 at the 480px board) — the
+	# same shortfall NO-201 found in the Shop's PIECES/ARTEFACTS/ITEMS column.
+	# items_grid/artefacts_grid default to SIZE_FILL, so inv_box (a
+	# VBoxContainer) was stretching them to that full 472px anyway; a
+	# GridContainer never centres its own cells inside a wider rect, so the
+	# leftover sat as one dead column at the right edge. Filling it exactly
+	# would mean resizing Tuning.OFFBOARD_ICON, which every other grid in the
+	# app shares — out of scope (same call NO-201 made). SHRINK_CENTER instead
+	# gives the grid only its own custom_minimum_size width and centres that
+	# in inv_box, splitting the leftover evenly at both edges — same fix,
+	# same idiom this file already uses for tip_diagram above.
+	items_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
 	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	artefacts_grid.custom_minimum_size.x = Tuning.grid_row_w(artefacts_grid.columns, INV_CELL_SEP) # NO-182
+	artefacts_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER # see items_grid above
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()

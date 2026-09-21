@@ -211,15 +211,18 @@ uniform vec4 fill_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float fill_reach = 0.02; // UV fraction: dilation for the inner (dark) band
 uniform float rim_reach = 0.03;  // UV fraction: dilation for the outer (colour) band
 
-float _alpha_at(vec2 uv) {
+float _alpha_at(sampler2D tex, vec2 uv) {
 	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
 		return 0.0;
 	}
-	return texture(TEXTURE, uv).a;
+	return texture(tex, uv).a;
 }
 
 void fragment() {
-	if (_alpha_at(UV) > 0.5) {
+	// TEXTURE only exists inside fragment() — passed explicitly to the
+	// helper rather than referenced from it (that's what failed to compile:
+	// "Unknown identifier in expression: 'TEXTURE'").
+	if (_alpha_at(TEXTURE, UV) > 0.5) {
 		COLOR = vec4(0.0); // inside the token — the real piece draws itself here
 		return;
 	}
@@ -228,8 +231,8 @@ void fragment() {
 	for (int i = 0; i < 16; i++) {
 		float ang = float(i) * 0.39269908; // TAU / 16
 		vec2 dir = vec2(cos(ang), sin(ang));
-		fill_hit = max(fill_hit, _alpha_at(UV + dir * fill_reach));
-		rim_hit = max(rim_hit, _alpha_at(UV + dir * rim_reach));
+		fill_hit = max(fill_hit, _alpha_at(TEXTURE, UV + dir * fill_reach));
+		rim_hit = max(rim_hit, _alpha_at(TEXTURE, UV + dir * rim_reach));
 	}
 	if (fill_hit > 0.5) {
 		COLOR = fill_color;

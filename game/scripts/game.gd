@@ -1597,10 +1597,12 @@ func _run_enemy_actions() -> void:
 				lost_enemy += 1
 				_add_pop(act.from)
 				board[act.from] = board[act.to]
+				board[act.from].moved = true # NO-224: it relocated, whoever's piece it is
 				board.erase(act.to)
 			elif uap_dodge_to.x >= 0:
 				uap_used_this_wave = true
 				board[uap_dodge_to] = board[act.to]
+				board[uap_dodge_to].moved = true # NO-224
 				board.erase(act.to)
 				_add_float(uap_dodge_to, "Dodged!", COL_MERGE)
 			elif torpedo_fires:
@@ -1624,6 +1626,7 @@ func _run_enemy_actions() -> void:
 				_consume_buff(act.from, "bomb")
 			board.erase(act.to)
 			board[act.to] = board[act.from]
+			board[act.to].moved = true # NO-224
 			board.erase(act.from)
 			_detonate(act.to)
 			queue_redraw()
@@ -1668,6 +1671,7 @@ func _run_enemy_actions() -> void:
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
+		board[act.to].moved = true # NO-224: the initial double-step gates on this
 		board.erase(act.from)
 		queue_redraw()
 		if _back_row_breached():
@@ -2670,6 +2674,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			_lose_player_piece(from, "reflect")
 			_add_pop(from)
 			board[from] = board[to] # the defender counter-attacks into the tile
+			board[from].moved = true # NO-224
 			board.erase(to)
 		else:
 			_consume_buff(to, "shield")
@@ -2799,6 +2804,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 					captured.append(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
+			board[to].moved = true # NO-224
 			board.erase(from)
 			_detonate(to)
 			if blitz_free:
@@ -2860,6 +2866,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			Economy.tariff_cut(mover_value, Tuning.TARIFF_MOVE_PCT))
 	_add_slide(from, to)
 	board[to] = board[from]
+	board[to].moved = true # NO-224: the initial double-step gates on this
 	board.erase(from)
 	var final_pos := to
 	if return_to_start: # USS Eldridge Invisibility Paint — undo the slide
@@ -2920,9 +2927,13 @@ func _king_to_come() -> bool:
 
 ## Long-range = any non-leap move (ride or bent ride) — the Tariff on
 ## Long-Range covers every rider, not just bishop/rook (review 2026-07-03).
+## NO-224: the Pawn's initial double-step is a `ride` (it slides, so it can't
+## jump — same as mW2cF), but it's a 2-square lurch, not what this Tariff is
+## for; excluded, or every ordinary pawn move — single-step, diagonal capture
+## — would misfire as long-range once the piece definition carries any ride.
 func _is_long_range(id: String) -> bool:
 	for m in defs[id].moves:
-		if m.type != "leap":
+		if m.type != "leap" and not m.get("initial", false):
 			return true
 	return false
 

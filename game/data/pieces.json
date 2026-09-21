@@ -29,6 +29,18 @@
      ]
     ],
     "mode": "capture"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      0,
+      1
+     ]
+    ],
+    "range": 2,
+    "mode": "move",
+    "initial": true
    }
   ]
  },
@@ -62,6 +74,22 @@
      ]
     ],
     "mode": "capture"
+   },
+   {
+    "type": "ride",
+    "dirs": [
+     [
+      1,
+      1
+     ],
+     [
+      -1,
+      1
+     ]
+    ],
+    "range": 2,
+    "mode": "move",
+    "initial": true
    }
   ]
  },

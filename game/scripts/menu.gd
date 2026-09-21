@@ -1196,6 +1196,17 @@ func _ready() -> void:
 			# see card_style for why the peek needed this border/bg
 		card.custom_minimum_size = Vector2(card_w, card_h)
 		card.add_theme_stylebox_override("panel", card_style)
+		# NO-230: that NO-158 swap is what broke the carousel's touch-drag. A
+		# plain Container (CenterContainer, VBoxContainer, HBoxContainer -- every
+		# other layer in this stack) defaults its own mouse_filter to PASS, but
+		# PanelContainer overrides that default back to STOP (Godot docs,
+		# class_panelcontainer.html) -- so this card, alone among its ancestors,
+		# stopped a press dead regardless of army_btn's own PASS below:
+		# Viewport::_gui_call_input calls _gui_input on a STOP control then halts
+		# the climb right there, never reaching army_row, _army_row_wrap or
+		# army_scroll. PASS restores the transparent behaviour the old
+		# CenterContainer had for free.
+		card.mouse_filter = Control.MOUSE_FILTER_PASS
 		army_row.add_child(card)
 		var card_center := CenterContainer.new() # keeps the old vertical centring
 		card.add_child(card_center)

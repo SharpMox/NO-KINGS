@@ -23,6 +23,7 @@ const Account := preload("res://scripts/account.gd")
 const Drive := preload("res://scripts/drive.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Armies := preload("res://scripts/armies.gd")
 
 var fails := 0
 # A member, not a local: a GDScript lambda captures locals BY VALUE, so a
@@ -264,6 +265,65 @@ func _init() -> void:
 	_mouse(false, tap_at)
 	await process_frame
 	check(fired, "a tap still presses the row")
+
+	# ---- NO-230: Army Choice carousel drag -----------------------------------
+	# 2026-09-22 (Max: "Army Choice -> Cant seem to drag and slide the carousel
+	# around"). Regression from 943a870 (NO-158): the card went from a bare
+	# CenterContainer (Container's own mouse_filter default is PASS) to a
+	# PanelContainer, which overrides that default back to STOP — so a press
+	# starting anywhere on a card stopped there and never climbed to
+	# army_scroll, regardless of army_btn's own PASS. Same shape as the
+	# scenario-list checks above: the scroll offset must actually MOVE, and a
+	# plain tap must still select the Army — a fresh Menu, reached the real
+	# way (tap Play), not a direct call into _show_armies().
+	menu.queue_free()
+	await process_frame
+	menu = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	var play_btn := _find_button(menu, "Play")
+	check(play_btn != null, "NO-230: Play button visible")
+	_mouse(true, play_btn.get_global_rect().get_center())
+	_mouse(false, play_btn.get_global_rect().get_center())
+	await process_frame
+	await process_frame # _show_armies awaits one frame to size the wrap
+	check(menu.army_center.visible, "NO-230: Play opens the Army Choice screen")
+
+	var first_army: String = Tuning.ARMIES.keys()[0]
+	var army_btn := _find_button(menu, Armies.display_name(first_army))
+	check(army_btn != null, "NO-230: the first Army's card is on screen")
+	var army_scroll: ScrollContainer = menu._army_row_wrap.get_parent()
+
+	var army_before: float = army_scroll.scroll_horizontal
+	await _drag(army_btn.get_global_rect().get_center(), Vector2(-30, 0), 6)
+	check(army_scroll.scroll_horizontal != army_before,
+		"NO-230: dragging on a card scrolls the Army carousel (offset %s -> %s)"
+			% [army_before, army_scroll.scroll_horizontal])
+	check(menu.army_center.visible,
+		"NO-230: ...and the drag does not select an Army — stays on the carousel")
+
+	# A plain tap must still select the Army: the deadzone keeps a tap a tap,
+	# same pairing as the scenario-list "tap still presses the row" check.
+	army_scroll.scroll_horizontal = 0
+	await process_frame
+	army_btn = _find_button(menu, Armies.display_name(first_army))
+	check(army_btn != null, "NO-230: the first Army's card is back on screen to tap")
+	var army_tap_at := army_btn.get_global_rect().get_center()
+	_mouse(true, army_tap_at)
+	await process_frame
+	# NO-71's same re-assert: put the pointer back on the button before
+	# releasing, back to back with the release, so the real desktop cursor
+	# can't interleave a motion that cancels the press.
+	var army_tap_back := InputEventMouseMotion.new()
+	army_tap_back.position = army_tap_at
+	army_tap_back.global_position = army_tap_at
+	army_tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(army_tap_back)
+	_mouse(false, army_tap_at)
+	await process_frame
+	check(GameScript.next_army == first_army,
+		"NO-230: a tap on a card still selects that Army — PASS did not cost the press")
 
 	# --- the host-driven input harness (scripts/drive.gd) --------------------
 	# TWO THINGS ONLY A WINDOW CAN ASSERT, which is why they are here and not in

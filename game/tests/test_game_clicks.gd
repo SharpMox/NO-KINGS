@@ -1886,17 +1886,21 @@ func _init() -> void:
 	# The two pools still obey different rules (a Captured entry can never be
 	# deployed, issue 60, nor merged since 2026-09-10) — that is now which
 	# GRID an entry is in.
+	# V1: a button's direct parent is now its own row HBoxContainer, one level
+	# under stock_grid/captured_grid (the VBoxContainer of rows) — check the
+	# grandparent instead of the parent.
 	check(_pool_rows(game, true).all(func(b: Button) -> bool:
-				return b.get_parent() == game.hud.captured_grid)
+				return b.get_parent().get_parent() == game.hud.captured_grid)
 			and _pool_rows(game, false).all(func(b: Button) -> bool:
-				return b.get_parent() == game.hud.stock_grid),
+				return b.get_parent().get_parent() == game.hud.stock_grid),
 		"Captured Stock and Stock are separate grids, not a tinted tail of one strip")
 	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST in _stacks()'s own data order —
 	# but V1 (2026-09-21) fills the grid so _stacks()[0] (the newest, a
 	# bishop) lands in the BOTTOM-RIGHT cell, with the rest filling backward
-	# from there (hud.gd's _fill_grid_bottom_right). get_children() order —
-	# what _pool_rows walks — is the grid's ADD order, which is therefore the
-	# reverse of _stacks(): oldest capture first, newest last.
+	# from there (hud.gd's _fill_rows_bottom_right). pool_buttons()'s flatten
+	# (row-major: top row to bottom, left-to-right within a row) walks that
+	# same ADD order, which is therefore the reverse of _stacks(): oldest
+	# capture first, newest last.
 	check(game.captured == ["rook", "bishop", "bishop"],
 		"(sanity) the run captured a rook, then two bishops, in that order")
 	var cap_order: Array = []

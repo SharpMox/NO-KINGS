@@ -2203,13 +2203,23 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	if marker_text != "":
 		var marker := Label.new()
 		marker.text = marker_text
-		marker.add_theme_font_size_override("font_size", 12)
+		# NO-209: was 12 with no alignment override — a Label's default
+		# alignment is top-left, so the glyph sat at the LEFT edge of the
+		# offset box below rather than centred in it, and the box's zero
+		# bottom/right offsets left it flush with the button's own edge,
+		# straddling the card's rounded corner. Centred + a 4px margin off
+		# both edges puts it cleanly on the icon; 14 reads better at this size.
+		marker.add_theme_font_size_override("font_size", 14)
 		marker.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 		marker.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		marker.add_theme_constant_override("outline_size", 4)
+		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		marker.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		marker.offset_left = -40
-		marker.offset_top = -16
+		marker.offset_left = -38
+		marker.offset_top = -22
+		marker.offset_right = -4
+		marker.offset_bottom = -4
 		btn.add_child(marker)
 	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
 		# the shared placeholder so two unpainted artefacts read apart at a

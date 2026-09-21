@@ -1357,6 +1357,62 @@ func _init() -> void:
 	icon_game.queue_free()
 	await process_frame
 
+	# ---- NO-202: Inventory drawer shows most-recently-acquired first --------
+	# _rebuild_items_grid/_rebuild_artefacts_grid used to list oldest-first —
+	# the Stock drawer's own _stacks() was reversed for this by NO-182, these
+	# two never were. save_config.gd appends "items"/"artefacts" config
+	# entries in listed order, so g.items[0]/g.artefacts[0] are the OLDEST
+	# held, [1] the NEWEST — the display's first cell must be the newest.
+	var order_cfg := {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"items": ["blitz", "extraction"],
+		"artefacts": ["library-of-alexandria-matchbox", "oak-island-wishing-well"]}
+	GameScript.next_config = order_cfg
+	var order_game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(order_game)
+	await process_frame
+	await process_frame
+	check(await _click_inventory(order_game, "Inventory 4"),
+		"NO-202: (setup) Inventory opens with 2 Items + 2 Artefacts held")
+	await process_frame
+	check(order_game.items[0].key == "blitz" and order_game.items[1].key == "extraction",
+		"NO-202: (setup) g.items itself is untouched — still acquisition order")
+	check(order_game.artefacts[0].key == "library-of-alexandria-matchbox"
+			and order_game.artefacts[1].key == "oak-island-wishing-well",
+		"NO-202: (setup) g.artefacts itself is untouched — still acquisition order")
+
+	# Items: display flips, but a cell's meta "key" — and the REAL g.items
+	# index a click resolves to (item_pressed.emit(i) closes over the loop's
+	# own `i`, unchanged by NO-202) — must still point at what that cell
+	# shows, not at its on-screen position.
+	var item_children: Array = order_game.hud.items_grid.get_children()
+	check(item_children.size() >= 2, "(setup) two Item cells to check the order of")
+	check(item_children[0].get_meta("key") == "extraction"
+			and item_children[1].get_meta("key") == "blitz",
+		"NO-202: Items grid shows the newest (extraction) first, oldest (blitz) last")
+	var first_item_pos: Vector2 = (item_children[0] as Button).get_global_rect().get_center()
+	_click(first_item_pos)
+	await process_frame
+	check(order_game.item_active == 1,
+		"NO-202: clicking the newest-displayed (first) cell arms g.items[1] (extraction)'s"
+			+ " real index, not display position 0")
+
+	# Artefacts: same reversal, but a cell's tap closes over the artefact's
+	# own KEY string (hud.gd's artefact_activate_pressed.emit(key)), never an
+	# array index — so, unlike Items, there is no positional index for a
+	# reversed display to point at the wrong entry. Verified structurally via
+	# the same meta "key" convention _build_artefact_cell documents as its
+	# probe/test lookup.
+	check(await _click_inventory(order_game, "Inventory 4"),
+		"NO-202: Inventory reopens (the Item click above closed it)")
+	await process_frame
+	var art_children: Array = order_game.hud.artefacts_grid.get_children()
+	check(art_children.size() >= 2, "(setup) two Artefact cells to check the order of")
+	check(art_children[0].get_meta("key") == "oak-island-wishing-well"
+			and art_children[1].get_meta("key") == "library-of-alexandria-matchbox",
+		"NO-202: Artefacts grid shows the newest (Oak Island) first, oldest (Library) last")
+	order_game.queue_free()
+	await process_frame
+
 	# ---- NO-83: Donald Trump's info panel lists the Tariffs in force ---------
 	# The Header scenario boots him with three Tariffs. His Power draws on the
 	# King Ability catalogue (the only one that does), so his double-tap panel

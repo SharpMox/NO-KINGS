@@ -13,11 +13,13 @@
 ## next to, not the reference site. They land close to site.css's DARK
 ## theme anyway (--move-color #79a7ff / --capture-color #ff7878). The board
 ## squares are the one deliberate disagreement: they keep game.gd's own
-## COL_LIGHT/COL_DARK chequer (NO-177: pale sage green / muted aubergine,
-## exact hex from Max 2026-09-20, superseding the "NOKINGSBG palette" of
-## issue 70) instead of site.css's dark chequer (#4a4270/#241d3e) — this
-## diagram lives inside the live game and should read as the same board the
-## player is already looking at, not the reference site's.
+## COL_LIGHT/COL_DARK chequer (NO-177/NO-215: exact hex from Max) instead of
+## site.css's dark chequer (#4a4270/#241d3e) — this diagram lives inside the
+## live game and should read as the same board the player is already
+## looking at, not the reference site's. `draw()` reads COL_LIGHT/COL_DARK
+## straight off game.gd (loaded at runtime, see below) rather than keeping a
+## second literal copy, so the two chequers cannot drift again the way NO-215
+## found them (site.css's copy was updated on rename, this one wasn't).
 ##
 ## `hop`/`capture-hop` are NOT ported. board.js's move model has them, but
 ## rules.gd's does not — `game/data/pieces.json` has exactly three move
@@ -28,8 +30,6 @@
 ## full audit. Add them back the day a piece's move model actually needs
 ## them; the exact geometry is in the NO-139 ticket.
 
-const COL_LIGHT := Color("D0E6B3") # matches game.gd COL_LIGHT (NO-177)
-const COL_DARK := Color("573F6E")  # matches game.gd COL_DARK (NO-177)
 const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)  # matches game.gd COL_MOVE
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)   # matches game.gd COL_CAPTURE
 const COL_RIDER := Color("ffae5c") # site.css --rider-color (dark) — no game.gd equivalent yet
@@ -40,10 +40,17 @@ const COL_RIDER := Color("ffae5c") # site.css --rider-color (dark) — no game.g
 ## this script has no access to the Game node's `textures` dictionary.
 static func draw(dia: Control, defs: Dictionary, id: String, cells: int, cell: int, tex: Texture2D) -> void:
 	var c := cells / 2
+	# load() rather than preload(): game.gd preloads hud.gd and modals.gd
+	# (game.gd:31,689), and both of those preload this script — a preload()
+	# here would close that into a compile-time cycle back to game.gd. Same
+	# seam hud.gd already uses for menu.gd (hud.gd:1094); the const access
+	# below resolves through the same GDScript member lookup the codebase
+	# already relies on there for a static function call.
+	var Game: GDScript = load("res://scripts/game.gd")
 	for x in cells:
 		for y in cells:
 			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
-				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
+				Game.COL_LIGHT if (x + y) % 2 == 0 else Game.COL_DARK)
 	if tex != null:
 		dia.draw_texture_rect(tex,
 			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)

@@ -85,11 +85,11 @@ func _test_child_count() -> void:
 
 ## Horde's 14 pawns must still fit inside the Army carousel card (NO-179:
 ## menu.gd _show_armies: card_w = (viewport.x - 80) * ARMY_CARD_WIDTH_FRACTION
-## = 400 * 0.72 = 288px at the 480px portrait width this project targets —
+## = 400 * 0.70 = 280px at the 480px portrait width this project targets —
 ## card_w itself is what sized ARMY_CARD_WIDTH_FRACTION in the first place,
 ## see that constant's own header).
 func _test_horde_fits_carousel_card() -> void:
-	const CARD_W := 288.0
+	const CARD_W := 280.0
 	var mass := PieceMass.build(Tuning.ARMIES["Horde"])
 	check(mass.custom_minimum_size.x <= CARD_W,
 		"Horde-14 mass width (%.1f) fits the %spx carousel card"

@@ -77,7 +77,15 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## and the fan doesn't reshuffle on repaint (CLAUDE.md, NO-157). The seed is
 ## taken from `ids` before any internal reordering, so it stays a property of
 ## the input list, not of how this function happens to sort it.
-static func build(ids: Array) -> Control:
+##
+## `max_width`, NO-179 (Army card shrink): 0 (the default) means "render at
+## ICON, whatever width that takes" — modals.gd's show_reinforce never passes
+## it, so that caller is untouched. A caller that DOES pass a positive value
+## gets ICON scaled DOWN (never up) just far enough that the crowd's bounding
+## width fits it. CELL/ROW_PITCH/STAGGER/JITTER_Y are already ratios of ICON
+## (see the consts above), so scaling ICON alone scales the whole layout
+## together — no second size constant to keep in sync.
+static func build(ids: Array, max_width: float = 0.0) -> Control:
 	# load(), not preload(): game.gd owns `modals` as a preloaded child
 	# (game.gd:547 — `var modals := preload("res://scripts/modals.gd").new()`),
 	# and modals.gd is one of this script's two callers, so a top-level
@@ -99,29 +107,51 @@ static func build(ids: Array) -> Control:
 	var rows := _choose_rows(n)
 	var cols := maxi(1, ceili(float(n) / float(rows)))
 
-	# Padding: half the icon's own width/height, plus JITTER_Y's vertical
+	# pad(sz): half an icon's own width/height, plus its vertical jitter
 	# wobble, plus the bounding-box growth a square gains when rotated up to
-	# JITTER_ROT (a square of side ICON rotated by θ has half-extent
-	# (ICON/2)*(cos θ + sin θ), i.e. (cos θ + sin θ - 1) more than unrotated).
-	# Computed here, not as a const, because GDScript const initializers
-	# can't call cos()/sin() — this only runs once per build().
-	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
-	var pad := ICON * 0.5 + JITTER_Y + rot_extra
+	# JITTER_ROT (a square of side sz rotated by θ has half-extent
+	# (sz/2)*(cos θ + sin θ), i.e. (cos θ + sin θ - 1) more than unrotated).
+	# A function of icon size, not a const (GDScript const initializers can't
+	# call cos()/sin()), because `max_width` below needs it evaluated twice:
+	# once at ICON to size the scale-down, once at the chosen icon_size to
+	# lay pieces out.
+	var pad_for := func(sz: float) -> float:
+		var rot_extra: float = (sz * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
+		return sz * 0.5 + sz * (JITTER_Y / ICON) + rot_extra
+	var width_for := func(sz: float) -> float:
+		var cell: float = sz * (CELL / ICON)
+		var stagger: float = sz * (STAGGER / ICON)
+		return (cols - 1) * cell + sz + pad_for.call(sz) * 2.0 + (stagger if rows > 1 else 0.0)
 
-	# Worst case at ICON=52, checked by hand (NO-178, 2026-09-21): Horde's 14
-	# pawns -> rows=4 (from _choose_rows), cols=ceili(14/4)=4 -> mass width =
-	# (4-1)*31.2 + 52 + 2*38.62 + STAGGER(15.6) = 238.4px. The Army carousel
-	# card (menu.gd _show_armies) is `card_w = (viewport.x - 80) *
-	# ARMY_CARD_WIDTH_FRACTION` = 400 * 0.72 = 288px at the 480px portrait
-	# width this project targets, minus the card's own 20px side padding
-	# (card_style's content_margin_left/right) = 268px usable — 238.4px
-	# fits with ~30px to spare (NO-179 narrowed the card from 340px to make
-	# room for an uncropped peek either side; re-checked then, still clear).
-	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
+	# Icon size for THIS build: ICON, scaled DOWN (never up) just far enough
+	# that the crowd's bounding width fits max_width.
+	#
+	# Worst case at ICON=52, checked by hand (NO-178/NO-179, 2026-09-21):
+	# Horde's 14 pawns -> rows=4 (from _choose_rows), cols=ceili(14/4)=4 ->
+	# natural mass width = width_for(52) = 238.4px. The Army carousel card
+	# (menu.gd _show_armies) passes max_width = card_w - 20 (card_style's
+	# content_margin_left/right) = 210 - 20 = 190px at the 480px portrait
+	# width this project targets (card_w = 400 * ARMY_CARD_WIDTH_FRACTION =
+	# 400 * 0.525 = 210) — so Horde scales to icon_size = 52 * 190/238.4 ≈
+	# 41.4px (natural ICON=52 unaffected; modals.gd's show_reinforce never
+	# passes max_width, so that caller renders exactly as before). Re-check
+	# this if ICON, JITTER_ROT, the pitch constants, or
 	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
+	var icon_size := ICON
+	if max_width > 0.0:
+		var natural_w: float = width_for.call(ICON)
+		if natural_w > max_width:
+			icon_size = ICON * max_width / natural_w
+
+	var cell: float = icon_size * (CELL / ICON)
+	var row_pitch: float = icon_size * (ROW_PITCH / ICON)
+	var stagger: float = icon_size * (STAGGER / ICON)
+	var jitter_y: float = icon_size * (JITTER_Y / ICON)
+	var pad: float = pad_for.call(icon_size)
+
 	mass.custom_minimum_size = Vector2(
-		(cols - 1) * CELL + ICON + pad * 2.0 + (STAGGER if rows > 1 else 0.0),
-		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)
+		(cols - 1) * cell + icon_size + pad * 2.0 + (stagger if rows > 1 else 0.0),
+		(rows - 1) * row_pitch + icon_size + pad * 2.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(ids)
@@ -140,11 +170,11 @@ static func build(ids: Array) -> Control:
 		# later expand_mode change does not shrink it back down.
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.custom_minimum_size = Vector2(ICON, ICON)
-		icon.size = Vector2(ICON, ICON) # `mass` is a bare Control, not a
+		icon.custom_minimum_size = Vector2(icon_size, icon_size)
+		icon.size = Vector2(icon_size, icon_size) # `mass` is a bare Control, not a
 			# Container, so nothing else would size this child
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.pivot_offset = Vector2(ICON, ICON) * 0.5 # rotate AND scale
+		icon.pivot_offset = Vector2(icon_size, icon_size) * 0.5 # rotate AND scale
 			# around its own centre, not the top-left corner
 		if game_script.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
 			icon.modulate = COL_SIDE_PLAYER
@@ -155,8 +185,8 @@ static func build(ids: Array) -> Control:
 		# wobble and the icon a tilt; row also gets a mild depth scale (back
 		# rows a little smaller, front rows full size).
 		icon.position = Vector2(
-			pad + col * CELL + (STAGGER if row % 2 == 1 else 0.0),
-			pad + row * ROW_PITCH + rng.randf_range(-JITTER_Y, JITTER_Y))
+			pad + col * cell + (stagger if row % 2 == 1 else 0.0),
+			pad + row * row_pitch + rng.randf_range(-jitter_y, jitter_y))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		var depth: float = 1.0 if rows <= 1 \
 			else lerp(DEPTH_BACK_SCALE, 1.0, float(row) / float(rows - 1))

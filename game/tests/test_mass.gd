@@ -24,7 +24,7 @@ func _init() -> void:
 	_test_aspect()
 	_test_determinism()
 	_test_child_count()
-	_test_horde_fits_carousel_card()
+	_test_horde_scales_to_card_width()
 	_test_back_to_front_order()
 
 	print("---")
@@ -83,17 +83,36 @@ func _test_child_count() -> void:
 		"child count matches ids.size() including duplicates (%d)" % ids.size())
 
 
-## Horde's 14 pawns must still fit inside the Army carousel card (NO-179:
-## menu.gd _show_armies: card_w = (viewport.x - 80) * ARMY_CARD_WIDTH_FRACTION
-## = 400 * 0.72 = 288px at the 480px portrait width this project targets —
-## card_w itself is what sized ARMY_CARD_WIDTH_FRACTION in the first place,
-## see that constant's own header).
-func _test_horde_fits_carousel_card() -> void:
-	const CARD_W := 288.0
-	var mass := PieceMass.build(Tuning.ARMIES["Horde"])
-	check(mass.custom_minimum_size.x <= CARD_W,
-		"Horde-14 mass width (%.1f) fits the %spx carousel card"
-			% [mass.custom_minimum_size.x, CARD_W])
+## NO-179 shrink pass: the Army card no longer sizes ITSELF to Horde's crowd
+## (the old relationship — card_w = (viewport.x - 80) * ARMY_CARD_WIDTH_
+## FRACTION was picked so Horde's UNSCALED 238.4px mass would fit). Now the
+## card is sized by the peek, and PieceMass.build() takes a `max_width` and
+## scales its own crowd DOWN to whatever the card gives it — this asserts
+## both halves of that reversal.
+func _test_horde_scales_to_card_width() -> void:
+	# menu.gd _show_armies: card_w = (viewport.x - 80) * ARMY_CARD_WIDTH_
+	# FRACTION = 400 * 0.525 = 210px at the 480px portrait width this
+	# project targets, minus card_style's own 10+10px content margins = 190px
+	# interior — duplicated here rather than importing MenuScript, the same
+	# choice the pre-NO-179 version of this test made (see its own header,
+	# above): a geometry test shouldn't pull in menu.gd's full load chain
+	# (CloudSave, Leaderboard, Account, …) just for two constants.
+	const CARD_MAX_WIDTH := 190.0
+	var bounded := PieceMass.build(Tuning.ARMIES["Horde"], CARD_MAX_WIDTH)
+	check(bounded.custom_minimum_size.x <= CARD_MAX_WIDTH + 0.01, # float slop
+		"Horde-14 mass width (%.1f) fits the %spx carousel card interior when bounded"
+			% [bounded.custom_minimum_size.x, CARD_MAX_WIDTH])
+
+	# The unbounded call (max_width omitted) is what modals.gd's
+	# show_reinforce uses — it must render at ICON, exactly as it did before
+	# this parameter existed, so that caller is provably unaffected by the
+	# Army card's shrink. 238.4px is piece_mass.gd's own hand-checked
+	# Horde-14-at-ICON=52 worst case (see build()'s header comment).
+	const NATURAL_W := 238.44
+	var unbounded := PieceMass.build(Tuning.ARMIES["Horde"])
+	check(absf(unbounded.custom_minimum_size.x - NATURAL_W) < 0.1,
+		"unbounded build() is unaffected by max_width (got %.2f, expected ~%s)"
+			% [unbounded.custom_minimum_size.x, NATURAL_W])
 
 
 ## Pawns (value 10) sort to the back (drawn first); a rook (value 50) sorts

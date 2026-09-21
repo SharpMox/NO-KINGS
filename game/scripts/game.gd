@@ -780,19 +780,20 @@ func _ready() -> void:
 		_set_drawer("stock") # SETUP starts in the placement flow
 	else:
 		SaveConfig.apply(self, next_config)
-	# NO-128/NO-154 (coordinator review 2026-09-19, extended 2026-09-21): SETUP
-	# places every piece on the player's own back rows — exactly the rows
-	# army_band overlays while open — and a scenario's `board` config already
-	# has pieces sitting there too (data/scenarios.gd). Transparency (hud.gd)
-	# already lets a tap reach the board underneath either way, but the player
-	# still can't SEE a piece or tile the band is painted over. Start
-	# collapsed for both, the same way Stock starts open — the wedge still
-	# reopens it on request, same as it does for Inventory; this isn't a
-	# lock, just a better default for the boot states most likely to need the
-	# space. A real save restore (is_scenario false, config non-empty) is
-	# left alone — untouched by this branch, same as before.
-	if next_config.is_empty() or is_scenario:
-		hud.collapse_army_band()
+	# NO-128/NO-154 (coordinator review 2026-09-19, extended 2026-09-21): every
+	# boot places pieces on the player's own back rows — exactly the rows
+	# army_band overlays while open, whether from SETUP's placement flow, a
+	# scenario's `board` config, or a restored save (data/scenarios.gd,
+	# save_config.gd). army_band_open has no saved counterpart (grep of
+	# save_config.gd: none), no boot-time reader depends on it starting open
+	# (only army_band_reopen's press handler and set_drawer()'s Inventory
+	# exclusion ever write it, both user-driven), so there is no boot state
+	# that legitimately wants it open. Transparency (hud.gd) already lets a
+	# tap reach the board underneath either way, but the player still can't
+	# SEE a piece or tile the band is painted over. Unconditional: the wedge
+	# still reopens it on request, same as it does for Inventory; this isn't
+	# a lock, just the default every boot path should have started with.
+	hud.collapse_army_band()
 	if args.has("--artefacts"): # balance sweep (issue 20): force a starting
 		for key in args[args.find("--artefacts") + 1].split(","): # loadout, comma-separated keys, on top of whatever the boot path above granted
 			for t in Items.ARTEFACT_EFFECTS:

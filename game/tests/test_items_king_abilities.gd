@@ -138,14 +138,13 @@ func _init() -> void:
 	check(cj.gold == 510, "suppressed inflation taxes no gains")
 	cj._refresh()
 	check(cj.hud.king_ability_button.text.ends_with("·off"), "HUD marks tariffs suppressed")
-	# NO-128/NO-163: an active King ability must never go unreadable just
-	# because army_band is collapsed — the CLOSED glyph carries a warning.
-	# This scenario never collapses the band (it boots straight into a wave,
-	# not SETUP), so it stays OPEN — where king_ability_button itself (already
-	# asserted above) is the visible warning, and the single toggle just
-	# offers "Hide", same as it would with no ability active at all.
-	check(cj.hud.army_band_reopen.text == "ⓘ",
-		"the band-toggle offers Hide while open — the King Abilities button inside the band carries the warning")
+	# NO-128/NO-163/NO-154: army_band now starts COLLAPSED on every boot,
+	# scenario boots included — an active King ability must never go
+	# unreadable just because army_band is collapsed, so the CLOSED glyph
+	# carries the warning itself: king_ability_button (already asserted
+	# above) lives INSIDE the band and is hidden along with it.
+	check(cj.hud.army_band_reopen.text == "⚠",
+		"the band-toggle carries the King Abilities warning while collapsed, since king_ability_button inside the band is hidden")
 	WaveLogic.spawn(cj, 4)
 	Economy.earn(cj, 10)
 	check(cj.gold == 519, "next wave spawn ends the suppression (inflation resumes)")

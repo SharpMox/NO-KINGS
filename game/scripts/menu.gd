@@ -593,24 +593,26 @@ static func _window_size_requested() -> bool:
 ## resting (1.0) or not (ARMY_CARD_PEEK_SCALE), applied by the carousel
 ## build's own `set_current`.
 ##
-## The width fraction is content-driven, not aesthetic: Horde's Starting
-## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
-## measures ~238px wide at PieceMass's own ICON=52 constant, and needs to fit
-## inside the card with room either side — see the carousel build's own
-## comment for the arithmetic that sizes the peek scale so a peeking
-## neighbour is never cropped, only small.
-##
 ## NO-179 shipped 0.72 (card_w=288); Max then flagged the resulting peek
 ## (0.12) as "far too small... a detached thumbnail" and asked for something
-## "in the region of 0.8". That target is not reachable on this viewport: the
-## uncropped-peek bound (see the carousel build's own comment) tops out at
-## ~0.21 even at Horde's bare minimum card width (258px, zero slack) — a peek
-## anywhere near full size would need to show most of a SECOND full-width
-## card beside the resting one, which does not fit in a 400px scroller no
-## matter how ARMY_CARD_WIDTH_FRACTION and ARMY_CARD_PEEK_SCALE are tuned.
-## 0.70 (card_w=280) is the trade actually made here: narrow enough to raise
-## the peek bound a little over 288's, still ~22px clear of Horde's crowd.
-const ARMY_CARD_WIDTH_FRACTION := 0.70
+## "in the region of 0.8". At the time that target was unreachable: the
+## uncropped-peek bound (see the carousel build's own comment) topped out at
+## ~0.21 even at Horde's bare minimum card width, because the card's own
+## width floor was Horde's Starting Pieces crowd (PieceMass.build() of 14
+## pawns, unscaled, ~238px wide at PieceMass's own ICON=52 constant) — a
+## follow-up landed 0.70/0.14 as the best trade available under that
+## constraint.
+##
+## 2026-09-21 shrink pass: the crowd is no longer what floors the card.
+## PieceMass.build() gained an optional `max_width` (see that function's own
+## header) that scales its whole layout DOWN to fit whatever width it's
+## given, so the card can now be sized by the peek alone — Max: "shrink the
+## resting card" to make room for a bigger peek, this time to "about 0.35"
+## rather than 0.8 (0.8 is still unreachable: even a peek that shows nothing
+## but the resting card's own width still needs the resting card plus most
+## of a second one to fit in a 400px scroller). See the carousel build's own
+## comment for the arithmetic that sizes ARMY_CARD_PEEK_SCALE against this.
+const ARMY_CARD_WIDTH_FRACTION := 0.525
 ## NO-179 (Max: "longer playing card ratio... 2.5:3.5"): width:height of a
 ## standard playing card. Card height is DERIVED from this and card_w, never
 ## a second literal that has to be kept in sync by hand.
@@ -619,11 +621,11 @@ const ARMY_CARD_RATIO := 2.5 / 3.5
 ## the carousel build's own arithmetic (see there) so a peeking card's whole
 ## shape fits in the gap the resting card leaves either side of it — bigger
 ## than that bound and the peek goes back to being cropped. At the 480px
-## portrait width this project targets (scroll_w = 400, card_w = 280) the
-## bound works out to ~0.157; 0.14 leaves ~5px of slack (see
-## ARMY_CARD_WIDTH_FRACTION's own header for why this isn't the ~0.8 Max
-## asked for).
-const ARMY_CARD_PEEK_SCALE := 0.14
+## portrait width this project targets (scroll_w = 400, card_w = 210) the
+## bound works out to ~0.376; 0.35 leaves ~5.5px of slack — Max's own target,
+## "a peek of about 0.35" (2026-09-21 shrink pass), reads as a recognisable
+## card at roughly a third size rather than a stamp.
+const ARMY_CARD_PEEK_SCALE := 0.35
 ## NO-179 (Max: "cards have currently no margin in between them, lets add
 ## some"): gap between card slots — replaces the old separation:0.
 const ARMY_CARD_MARGIN := 16.0
@@ -1153,8 +1155,8 @@ func _ready() -> void:
 	# neighbour's scaled render (card_w * ARMY_CARD_PEEK_SCALE) has to fit
 	# inside THAT to show uncropped:
 	#   ARMY_CARD_PEEK_SCALE <= lead_w / card_w
-	# At scroll_w=400, card_w=280: lead_w=44, bound≈0.157 — ARMY_CARD_PEEK_
-	# SCALE=0.14 clears it with ~5px to spare.
+	# At scroll_w=400, card_w=210: lead_w=79, bound≈0.376 — ARMY_CARD_PEEK_
+	# SCALE=0.35 clears it with ~5.5px to spare.
 	var lead_w: float = (scroll_w - card_w) / 2.0 - ARMY_CARD_MARGIN
 	var lead_spacer := Control.new()
 	lead_spacer.custom_minimum_size = Vector2(lead_w, 0)
@@ -1235,8 +1237,14 @@ func _ready() -> void:
 		# duplicates included, so the packed-crowd PieceMass treatment (one
 		# token per real piece) is the right renderer — same call this
 		# screen already made pre-NO-179.
+		#
+		# max_width, NO-179 shrink pass: the card's own interior width (its
+		# content margins are subtracted, not assumed) — PieceMass scales its
+		# crowd down to fit rather than overflowing the card. Reinforcements'
+		# own call (modals.gd) passes no max_width and is unaffected.
 		add_caption.call(card_box, "Starting Pieces")
-		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
+		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name],
+			card_w - card_style.content_margin_left - card_style.content_margin_right)) # NO-157
 		# NO-179: Reinforcements — the set of piece TYPES game.gd's
 		# _reinforce_ids() grants (deduped, doubled at the grant site — see
 		# that function's own header), not a second multiset of instances.

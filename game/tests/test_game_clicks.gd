@@ -1891,15 +1891,20 @@ func _init() -> void:
 			and _pool_rows(game, false).all(func(b: Button) -> bool:
 				return b.get_parent() == game.hud.stock_grid),
 		"Captured Stock and Stock are separate grids, not a tinted tail of one strip")
-	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST: the bishops were captured after
-	# the rook, so they sit above it — the reverse of g.captured's own order.
+	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST in _stacks()'s own data order —
+	# but V1 (2026-09-21) fills the grid so _stacks()[0] (the newest, a
+	# bishop) lands in the BOTTOM-RIGHT cell, with the rest filling backward
+	# from there (hud.gd's _fill_grid_bottom_right). get_children() order —
+	# what _pool_rows walks — is the grid's ADD order, which is therefore the
+	# reverse of _stacks(): oldest capture first, newest last.
 	check(game.captured == ["rook", "bishop", "bishop"],
 		"(sanity) the run captured a rook, then two bishops, in that order")
 	var cap_order: Array = []
 	for row in _pool_rows(game, true):
 		cap_order.append(str((row as Button).get_meta("id")))
-	check(cap_order == ["bishop", "bishop", "rook"],
-		"the Captured section lists one row per piece, most recent first (%s)" % str(cap_order))
+	check(cap_order == ["rook", "bishop", "bishop"],
+		"the Captured section adds oldest-first, so the newest capture anchors the corner (%s)"
+			% str(cap_order))
 	# tapping the entry arms nothing, so the board stays unlit and a following
 	# Deploy-tile tap has nothing to place
 	var cap_row: Button = _pool_rows(game, true)[0]
@@ -1925,7 +1930,11 @@ func _init() -> void:
 		await process_frame
 	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
 		# tap on the same entry inside it opens the piece preview instead
-	cap_row = _pool_rows(game, true)[0]
+	# V1: [0] is no longer "the newest" (it's the oldest capture, the rook —
+	# see the fill-order comment above), and this check specifically wants a
+	# BISHOP row (the duplicate-held case) — filter by id instead of index.
+	cap_row = _pool_rows(game, true).filter(
+		func(b: Button) -> bool: return str(b.get_meta("id")) == "bishop")[0]
 	var convert_badge: Button = null
 	for c in cap_row.get_children():
 		if c is Button and (c as Button).text.begins_with("⇄"):

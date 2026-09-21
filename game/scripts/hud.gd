@@ -2366,13 +2366,15 @@ func _rebuild_stock_drawer() -> void:
 	for c in captured_grid.get_children():
 		c.queue_free()
 	var cap_count := 0
+	var stock_children: Array = []
+	var cap_children: Array = []
 	for st in _stacks():
 		var btn := _build_stack_button(st)
 		if st.cap:
 			cap_count += 1
-			captured_grid.add_child(btn)
+			cap_children.append(btn)
 		else:
-			stock_grid.add_child(btn)
+			stock_children.append(btn)
 	# story 37: the hint only while the column would otherwise be blank — an
 	# empty GridContainer has no size of its own to hang a message on.
 	captured_hint.visible = cap_count == 0
@@ -2390,8 +2392,48 @@ func _rebuild_stock_drawer() -> void:
 		slot.tooltip_text = "Put the piece back into stock"
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		stock_grid.add_child(slot)
+		stock_children.append(slot)
+	_fill_grid_bottom_right(stock_grid, stock_children)
+	_fill_grid_bottom_right(captured_grid, cap_children)
 	_scroll_stock_to_bottom() # NO-208
+
+
+## V1 (Max, 2026-09-21): a GridContainer fills left-to-right, top-to-bottom,
+## so a child added first lands top-left. Max wants the opposite corner:
+## `children[0]` (_stacks()'s newest-first order) in the BOTTOM-RIGHT cell,
+## with later entries filling leftward then upward once a row fills.
+##
+## Reversing the add order alone only lands children[0] in that corner when
+## children.size() is an exact multiple of columns — with a partial row the
+## leftover gap sits at the wrong end (e.g. 6 children / 4 cols: reversing
+## alone gives a full bottom row [3,2,1,0] but a TOP row starting at column 0
+## with [5,4,-,-], stranding the gap top-right instead of top-left). Padding
+## the FRONT with (cols - size % cols) % cols invisible, unclickable spacers
+## first forces the grid to fill exactly, so the last real child added —
+## children[0], since the rest are added in reverse — always lands in the
+## true last cell. For that same 6/4 example: pad = (4-6%4)%4 = 2, so add
+## order is [spacer, spacer, children[5], children[4], children[3],
+## children[2], children[1], children[0]], laying out as row0
+## [spacer, spacer, 5, 4] / row1 [3, 2, 1, 0] — 0 bottom-right, 1 to its
+## left, wrapping up to row0 once row1 is full.
+func _fill_grid_bottom_right(grid: GridContainer, children: Array) -> void:
+	var cols := grid.columns
+	if cols <= 0:
+		for c in children:
+			grid.add_child(c)
+		return
+	var pad := (cols - children.size() % cols) % cols
+	for i in pad:
+		var spacer := Control.new()
+		# same footprint as a real cell (NO-119's own OFFBOARD_ICON square) —
+		# a bare 0-size Control would starve its column's width whenever the
+		# padded row is the ONLY row (count <= cols), pulling the grid's
+		# visible width in below its neighbours.
+		spacer.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+		spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		grid.add_child(spacer)
+	for i in range(children.size() - 1, -1, -1):
+		grid.add_child(children[i])
 
 
 ## NO-208: default scroll position is the bottom, matching cap_anchor/

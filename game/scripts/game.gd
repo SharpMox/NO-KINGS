@@ -808,8 +808,9 @@ func _ready() -> void:
 		var line_up := Kings.roll_run(rng)
 		king_tier = line_up.tier
 		king_order = line_up.order
-		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
-		stock = Tuning.starting_stock(next_army, next_tier)
+		# NO-213: Stock-halving lever removed from the tier ladder — always
+		# the full army.
+		stock = Tuning.ARMIES[next_army].duplicate()
 		clock_ms = float(Tuning.clock_start_ms(next_tier)) # issue 78: 15 min,
 			# or 5 at Tier 3+. Set HERE, not at the var declaration — next_tier
 			# is only meaningful once the run actually starts.
@@ -1341,7 +1342,7 @@ func _begin_player_turn() -> void:
 		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.actions_per_turn(next_tier) # Tier 5: -1 (07-difficulty-ranks)
+	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
 	moved_this_turn.clear()
 	for pos in board: # Blitz's free move is scoped "this Turn" — never carries
 		board[pos].erase("blitz_free_move") # over. Cleared BEFORE on_turn_start

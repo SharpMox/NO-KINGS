@@ -1321,31 +1321,58 @@ func _init() -> void:
 		"item strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s"
 			% [ICON_PX, str(odd_item)])
 
-	# NO-201-shaped fix, Max (3rd ask): the Items/Artefacts grids used to
-	# leave one dead column of empty space at the drawer's right edge —
-	# GridContainer never centres its own cells inside a wider rect, and
-	# items_grid/artefacts_grid were being stretched to their parent's full
-	# width by the default SIZE_FILL flag. Assert the live geometry, not the
-	# constants that produced it: whichever grid's rendered rect either
-	# matches its parent's usable width (a true fill) or is centred within it
-	# (equal gap on both sides) — never a gap on one side only. One more idle
-	# frame first: a freshly rebuilt GridContainer's rect isn't final until
-	# the container has sorted (CLAUDE.md).
+	# NO-207, Max's 4th ask: the Items/Artefacts grids left one dead column of
+	# empty space at the drawer's right edge. The FIRST geometry assertion
+	# here (NO-201-shaped, landed a4c1150) compared grid.get_global_rect() to
+	# grid.get_parent() — but the parent (inv_box, a VBoxContainer) shrinks to
+	# its widest child, which custom_minimum_size.x (NO-182) already forces to
+	# equal the grid itself. That comparison is tautological: it passed
+	# against the live bug because the "parent" it measured never had any
+	# slack to begin with. The real usable width is the Inventory drawer's
+	# ScrollContainer (`sc`, hud.gd) — the actual chrome Max is looking at —
+	# and what Max sees is icon positions, not a container rect, so assert
+	# the leftmost/rightmost CELL edge (icon or empty-slot placeholder, both
+	# real rendered cells) against it directly. One more idle frame first: a
+	# freshly rebuilt GridContainer's rect isn't final until the container
+	# has sorted (CLAUDE.md).
 	await process_frame
+	var inv_panel: Control = icon_game.hud.drawers["inventory"]
+	var inv_sc: ScrollContainer = null
+	for c in inv_panel.get_children():
+		if c is ScrollContainer:
+			inv_sc = c
+			break
+	check(inv_sc != null, "(setup) the Inventory drawer's ScrollContainer is reachable")
+	var usable_rect: Rect2 = inv_sc.get_global_rect()
 	var grids := {"items_grid": icon_game.hud.items_grid, "artefacts_grid": icon_game.hud.artefacts_grid}
 	for grid_name in grids:
 		var grid: Control = grids[grid_name]
-		var parent: Control = grid.get_parent()
-		var grid_rect := grid.get_global_rect()
-		var parent_rect := parent.get_global_rect()
-		var left_gap: float = grid_rect.position.x - parent_rect.position.x
-		var right_gap: float = parent_rect.end.x - grid_rect.end.x
-		check(absf(grid_rect.size.x - parent_rect.size.x) <= 1.0
-				or absf(left_gap - right_gap) <= 1.0,
-			"%s: no one-sided dead column — either fills its parent's width or is centred " %
-				grid_name +
-			"(left_gap=%.1f, right_gap=%.1f, grid_w=%.1f, parent_w=%.1f)" %
-				[left_gap, right_gap, grid_rect.size.x, parent_rect.size.x])
+		var cells: Array = grid.get_children()
+		check(not cells.is_empty(), "(setup) %s actually holds cells to measure" % grid_name)
+		if cells.is_empty():
+			continue
+		var left_x: float = INF
+		var right_x: float = -INF
+		for cell in cells:
+			var r: Rect2 = (cell as Control).get_global_rect()
+			left_x = minf(left_x, r.position.x)
+			right_x = maxf(right_x, r.end.x)
+		var left_gap: float = left_x - usable_rect.position.x
+		check(absf(left_gap) <= 1.5,
+			"%s: cells sit flush against the drawer's left edge (left_gap=%.1f)" %
+				[grid_name, left_gap])
+		# The right edge only has to reach the usable width when a row is
+		# actually FULL (cells.size() >= columns) — a grid holding fewer
+		# entries than columns (items_grid's cap can be below the 5-column
+		# standard, e.g. ItemLogic.cap's base of 3) has nothing to put in the
+		# trailing columns; that is not the dead-column bug NO-207 fixed, and
+		# asserting edge-to-edge there would be wrong.
+		if cells.size() >= grid.columns:
+			var right_gap: float = usable_rect.end.x - right_x
+			check(absf(right_gap) <= 1.5,
+				"%s: a full row's cells reach the drawer's right edge, no dead column " %
+					grid_name +
+				"(right_gap=%.1f, usable_w=%.1f)" % [right_gap, usable_rect.size.x])
 
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the

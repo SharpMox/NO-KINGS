@@ -71,7 +71,11 @@ const LONG_PRESS_MS := 500
 ## Activate strip, +48 for issue 100's Army Power line) rather than
 ## re-deriving it, so nothing jumps on this PR alone.
 const INV_DRAWER_H := DRAWER_H * 3 + 118.0
-const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## Row spacing (vertical) for both grids, and the column-count/column-fit
+## base gap grid_cols() sizes off. The GAP BETWEEN CELLS (horizontal) is
+## wider than this in practice — NO-207 stretches it per row so the columns
+## span the full width with no leftover; see _inv_row_sep().
+const INV_CELL_SEP := 6
 ## NO-132: both grids are full width (472px avail: the drawer's 480 minus the
 ## ScrollContainer's 8px inset) — Tuning.grid_cols(472, 6) fits 6, capped at
 ## the OFFBOARD_GRID_COLS standard, so both land on 5 (set where the grids
@@ -513,6 +517,16 @@ static func _section_label(text: String) -> Label:
 	l.add_theme_font_size_override("font_size", 13)
 	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
 	return l
+
+
+## NO-207: the horizontal gap that makes `cols` Tuning.OFFBOARD_ICON cells
+## span `avail_w` exactly, edge to edge, instead of the fixed INV_CELL_SEP
+## leaving a shortfall (5-column standard, fixed icon size — see the call
+## site's comment). `cols` is always >= 1 (grid_cols() clamps it there).
+static func _inv_row_sep(avail_w: float, cols: int) -> float:
+	if cols <= 1:
+		return INV_CELL_SEP
+	return (avail_w - cols * Tuning.OFFBOARD_ICON) / (cols - 1)
 
 
 ## NO-165: an unfilled slot, signifying room left against whatever actually
@@ -1093,34 +1107,45 @@ func build(game) -> void:
 	# it stays visible and clickable over them. Inventory scrolls as ONE column
 	# (story 47): the Items grid, then the Artefacts grid — no separate
 	# Activate section any more (NO-85).
-	items_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
-	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	# NO-207 (Max's 4th ask on this): NO-201's SIZE_SHRINK_CENTER pass centred
+	# items_grid/artefacts_grid inside inv_box, but inv_box is a VBoxContainer
+	# that shrinks to its widest child — which, once custom_minimum_size.x
+	# was forced onto the grid (NO-182), IS the grid. There was never any
+	# slack inside inv_box to split; the dead column sat OUTSIDE it, between
+	# inv_box's right edge and `sc` (the ScrollContainer wrapping it), because
+	# `sc` leaves horizontal scrolling at its Godot default (AUTO, never
+	# turned off) and a ScrollContainer never stretches a child on an axis
+	# where it might need to scroll it — so `sc` gave inv_box only its own
+	# minimum width, not `sc`'s. SHRINK_CENTER changed nothing because its
+	# parent was already exactly its own size.
+	# Fix at the actual source instead: don't leave a shortfall to redistribute
+	# at all. grid_cols() floors AND clamps to the 5-column standard
+	# (OFFBOARD_GRID_COLS, tuning.gd), so 5 columns of fixed-size
+	# Tuning.OFFBOARD_ICON cells are narrower than the available width — here,
+	# 5*72 + 4*INV_CELL_SEP(6) = 384 against avail_w's 472, an 88px shortfall
+	# (close to one whole cell, matching what Max sees). Resizing
+	# OFFBOARD_ICON is out of scope (shared by Stock/Shop, NO-201's call);
+	# instead widen just the GAP between cells so `cols` of them span
+	# `avail_w` edge to edge — same standard column count, same icon size,
+	# genuinely no leftover. Row spacing (v_separation) is untouched, so rows
+	# don't grow taller. Both grids share one avail_w/columns/gap, so they
+	# always agree.
+	var inv_avail_w: float = vp.x - 8.0
+	items_grid.columns = Tuning.grid_cols(inv_avail_w, INV_CELL_SEP) # NO-132
+	var inv_h_sep: float = _inv_row_sep(inv_avail_w, items_grid.columns) # NO-207
+	items_grid.add_theme_constant_override("h_separation", inv_h_sep)
 	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	# NO-182: without an explicit width, a GridContainer shrinks to whatever
 	# it actually holds (fewer than `columns` entries in the only/last row
 	# makes it narrower still), leaving empty space at the drawer's right edge
 	# instead of the full 5-column standard NO-132 names. stock_grid already
 	# forces this (NO-135); items_grid/artefacts_grid never did.
-	items_grid.custom_minimum_size.x = Tuning.grid_row_w(items_grid.columns, INV_CELL_SEP)
-	# Max (3rd ask): "get rid of the empty space on the right". grid_cols()
-	# floors, so grid_row_w(columns, SEP) is (almost) always a few px short of
-	# the ScrollContainer's own width (472 vs. 462 at the 480px board) — the
-	# same shortfall NO-201 found in the Shop's PIECES/ARTEFACTS/ITEMS column.
-	# items_grid/artefacts_grid default to SIZE_FILL, so inv_box (a
-	# VBoxContainer) was stretching them to that full 472px anyway; a
-	# GridContainer never centres its own cells inside a wider rect, so the
-	# leftover sat as one dead column at the right edge. Filling it exactly
-	# would mean resizing Tuning.OFFBOARD_ICON, which every other grid in the
-	# app shares — out of scope (same call NO-201 made). SHRINK_CENTER instead
-	# gives the grid only its own custom_minimum_size width and centres that
-	# in inv_box, splitting the leftover evenly at both edges — same fix,
-	# same idiom this file already uses for tip_diagram above.
-	items_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
-	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	items_grid.custom_minimum_size.x = inv_avail_w # NO-207: fills exactly, by construction
+	artefacts_grid.columns = Tuning.grid_cols(inv_avail_w, INV_CELL_SEP) # NO-132
+	artefacts_grid.add_theme_constant_override("h_separation",
+			_inv_row_sep(inv_avail_w, artefacts_grid.columns)) # NO-207
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
-	artefacts_grid.custom_minimum_size.x = Tuning.grid_row_w(artefacts_grid.columns, INV_CELL_SEP) # NO-182
-	artefacts_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER # see items_grid above
+	artefacts_grid.custom_minimum_size.x = inv_avail_w # NO-182, NO-207
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()

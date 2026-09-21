@@ -1,6 +1,6 @@
 extends SceneTree
-## The Shop: 23-slot randomized stock (5 typed boxes / 4 artefacts / 4 items /
-## 10 distinct base pieces — NO-166), priced in gold, no Action cost on any interaction
+## The Shop: 27-slot randomized stock (5 typed boxes / 5 artefacts / 5 items /
+## 12 distinct base pieces — NO-201), priced in gold, no Action cost on any interaction
 ## (issue 64). Bought slots go SOLD. Restocks on two lanes (issue 64): every
 ## 5 Waves (Lane A, guaranteed), or Tuning.SHOP_LANE_B_SCORE Score since the
 ## last Lane-A restock (Lane B, which every Lane-A restock resets) — the old
@@ -54,10 +54,10 @@ func _init() -> void:
 	var kinds := {}
 	for slot in game.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(game.shop_stock.size() == 23, "a run boots with a rolled 23-slot shop (NO-166)")
-	check(kinds.get("box", 0) == 5 and kinds.get("artefact", 0) == 4
-			and kinds.get("item", 0) == 4 and kinds.get("piece", 0) == 10,
-		"rows: 5 boxes / 4 artefacts / 4 items / 10 base pieces (NO-166)")
+	check(game.shop_stock.size() == 27, "a run boots with a rolled 27-slot shop (NO-201)")
+	check(kinds.get("box", 0) == 5 and kinds.get("artefact", 0) == 5
+			and kinds.get("item", 0) == 5 and kinds.get("piece", 0) == 12,
+		"rows: 5 boxes / 5 artefacts / 5 items / 12 base pieces (NO-201)")
 
 	# boxes are typed (issue 47: 9 Boxes = 3 sizes x 3 themes — Pieces/
 	# Artefacts/Items — Score Box and the mixed Box are gone), the 5-slot row
@@ -95,7 +95,7 @@ func _init() -> void:
 	check(pool.has("pawn") and pool.has("amazonrider"),
 		"the pool spans cheap to heavy chain roots")
 
-	# 10 distinct piece slots (NO-166); 1/value weighting keeps heavies rare
+	# 12 distinct piece slots (NO-201); 1/value weighting keeps heavies rare
 	game.rng.seed = 7 # deterministic census
 	var dupes := 0
 	var pawn_n := 0
@@ -110,7 +110,7 @@ func _init() -> void:
 				seen[slot.key] = true
 				pawn_n += 1 if slot.key == "pawn" else 0
 				heavy_n += 1 if slot.key == "amazonrider" else 0
-	check(dupes == 0, "piece slots are always 10 distinct picks (NO-166)")
+	check(dupes == 0, "piece slots are always 12 distinct picks (NO-201)")
 	check(pawn_n > heavy_n * 2 and heavy_n > 0,
 		"1/value weighting: pawns common, amazonriders rare but possible (%d vs %d)"
 			% [pawn_n, heavy_n])
@@ -287,7 +287,7 @@ func _init() -> void:
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
 			return sl.sold).is_empty(),
 		"a restock clears every SOLD flag")
-	check(game.shop_stock.size() == 23, "a restock refills all 23 slots (NO-166)")
+	check(game.shop_stock.size() == 27, "a restock refills all 27 slots (NO-201)")
 	before = JSON.stringify(game.shop_stock)
 	game._queue_wave(6)
 	check(JSON.stringify(game.shop_stock) == before, "Wave 6 is not a Lane-A beat — no restock")
@@ -351,6 +351,56 @@ func _init() -> void:
 	check(game.clock_ms < clock0, "closing the Shop resumes the clock")
 
 	game.queue_free()
+	await process_frame
+
+	# --- V4 (Max review 2026-09-21): "everything aligned to a big grid but
+	# split into sections" — PIECES (3 cols) + BOXES (1 col) share a top row,
+	# ARTEFACTS and ITEMS are each a full-width (5 col) row below, and every
+	# section's column edges must land on the same 5-column master grid
+	# (modals.gd, show_shop()/_shop_zone). Real geometry, not a screenshot. ---
+	# _open_shop() guards on wave < Tuning.SHOP_UNLOCK_WAVE (game.gd:5246) and
+	# returns before ever calling modals.show_shop() — "wave": 3 is below the
+	# unlock wave (5), so shop_lower was never built at all (still null from
+	# its var declaration), not merely holding the wrong children. Match the
+	# other Shop fixtures in this file (e.g. line 51), which already boot at
+	# wave 5 for exactly this reason.
+	var geo: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5})
+	await process_frame
+	geo._open_shop()
+	await process_frame
+	await process_frame # a freshly built Control's get_global_rect() lags a
+		# layout-sort frame (CLAUDE.md)
+	var shop_lower: VBoxContainer = geo.modals.shop_lower
+	var shop_lower_ok := shop_lower != null and shop_lower.get_child_count() == 3
+	check(shop_lower_ok, "precondition: shop_lower holds PIECES+BOXES, ARTEFACTS, ITEMS")
+	if shop_lower_ok: # guard the geometry reads — a broken precondition must
+			# fail loudly above, not crash here on a null/short child list
+		var top_row: HBoxContainer = shop_lower.get_child(0)
+		var artefact_zone: Control = shop_lower.get_child(1)
+		var item_zone: Control = shop_lower.get_child(2)
+		var top_row_ok := top_row != null and top_row.get_child_count() == 2
+		check(top_row_ok, "precondition: the top row holds the PIECES zone + the BOXES zone")
+		if top_row_ok:
+			var piece_zone: Control = top_row.get_child(0)
+			var box_zone: Control = top_row.get_child(1)
+			var piece_top: float = piece_zone.get_global_rect().position.y
+			var box_top: float = box_zone.get_global_rect().position.y
+			check(absf(piece_top - box_top) < 1.0,
+				"NO-210: the BOXES column's top is level with PIECES' top (%.2f vs %.2f)"
+					% [piece_top, box_top])
+			var piece_left: float = piece_zone.get_global_rect().position.x
+			var artefact_left: float = artefact_zone.get_global_rect().position.x
+			var item_left: float = item_zone.get_global_rect().position.x
+			check(absf(piece_left - artefact_left) < 1.0 and absf(piece_left - item_left) < 1.0,
+				"V4: PIECES' column-1 left edge matches ARTEFACTS'/ITEMS' (%.2f vs %.2f/%.2f)"
+					% [piece_left, artefact_left, item_left])
+			var box_right: float = box_zone.get_global_rect().end.x
+			var artefact_right: float = artefact_zone.get_global_rect().end.x
+			var item_right: float = item_zone.get_global_rect().end.x
+			check(absf(box_right - artefact_right) < 1.0 and absf(box_right - item_right) < 1.0,
+				"V4: BOXES' column-5 right edge matches ARTEFACTS'/ITEMS' (%.2f vs %.2f/%.2f)"
+					% [box_right, artefact_right, item_right])
+	geo.queue_free()
 	await process_frame
 
 	# --- issue 18: Shop slot pass — base + modifiers, additive per copy ---

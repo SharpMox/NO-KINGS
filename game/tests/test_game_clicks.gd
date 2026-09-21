@@ -959,6 +959,35 @@ func _init() -> void:
 			< GameScript.board_tile_for(Vector2(480.0, 800.0), HUD.HEADER_H),
 		"NO-83: an iPhone 11 inset (56px) costs the board tile, not the Header")
 
+	# ---- NO-196/NO-197: deck-layout guards -----------------------------------
+	# Both measure real allocated geometry (get_global_rect()), never a constant,
+	# so they actually exercise the layout rather than restating it. A freshly
+	# laid-out Control's rect is not reliable until the next idle frame
+	# (CLAUDE.md, layout traps) — the deck was built at boot, several frames
+	# ago, but await one anyway rather than depend on that.
+	await process_frame
+	# NO-196: nav_row..act_row must read as ONE deliberate gap — the same
+	# DECK_GAP the deck's own buttons use for their own separation — not
+	# whatever int(tile) flooring happened to leave over (see hud.gd's build()).
+	var row_gap: float = HUD.act_row.get_global_rect().position.y \
+		- HUD.nav_row.get_global_rect().end.y
+	var button_gap: float = HUD.pass_button.get_global_rect().position.x \
+		- HUD.army_ability_button.get_global_rect().end.x
+	check(is_equal_approx(row_gap, button_gap),
+		"NO-196: the nav_row/act_row gap (%s) matches the Ability/PASS gap (%s)"
+			% [row_gap, button_gap])
+	# NO-197: nav_row must clear the board's own whose-turn outline — its outer
+	# ink sits BOARD_OUTLINE_INSET + BOARD_OUTLINE_WIDTH/2 past the tile grid
+	# (game.gd's _draw).
+	var half_w: float = GameScript.BOARD_OUTLINE_WIDTH / 2.0
+	var outline_outer := Rect2(
+		game.board_px - Vector2.ONE * (GameScript.BOARD_OUTLINE_INSET + half_w),
+		Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * game.tile
+			+ Vector2.ONE * (GameScript.BOARD_OUTLINE_INSET + half_w) * 2.0)
+	check(not outline_outer.intersects(HUD.nav_row.get_global_rect()),
+		"NO-197: nav_row (%s) clears the board outline's outer ink (%s)"
+			% [HUD.nav_row.get_global_rect(), outline_outer])
+
 	# ---- NO-83: THE HEADER --------------------------------------------------
 	var stock_btn: Button = HUD.drawer_buttons["stock"]
 	var sr: Rect2 = stock_btn.get_global_rect()
@@ -1292,6 +1321,59 @@ func _init() -> void:
 		"item strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s"
 			% [ICON_PX, str(odd_item)])
 
+	# NO-207, Max's 4th ask: the Items/Artefacts grids left one dead column of
+	# empty space at the drawer's right edge. The FIRST geometry assertion
+	# here (NO-201-shaped, landed a4c1150) compared grid.get_global_rect() to
+	# grid.get_parent() — but the parent (inv_box, a VBoxContainer) shrinks to
+	# its widest child, which custom_minimum_size.x (NO-182) already forces to
+	# equal the grid itself. That comparison is tautological: it passed
+	# against the live bug because the "parent" it measured never had any
+	# slack to begin with. The real usable width is the Inventory drawer's
+	# ScrollContainer (`sc`, hud.gd) — the actual chrome Max is looking at —
+	# and what Max sees is icon positions, not a container rect, so assert
+	# the leftmost/rightmost CELL edge (icon or empty-slot placeholder, both
+	# real rendered cells) against it directly. One more idle frame first: a
+	# freshly rebuilt GridContainer's rect isn't final until the container
+	# has sorted (CLAUDE.md).
+	await process_frame
+	var inv_panel: Control = icon_game.hud.drawers["inventory"]
+	var inv_sc: ScrollContainer = null
+	for c in inv_panel.get_children():
+		if c is ScrollContainer:
+			inv_sc = c
+			break
+	check(inv_sc != null, "(setup) the Inventory drawer's ScrollContainer is reachable")
+	var usable_rect: Rect2 = inv_sc.get_global_rect()
+	var grids := {"items_grid": icon_game.hud.items_grid, "artefacts_grid": icon_game.hud.artefacts_grid}
+	for grid_name in grids:
+		var grid: Control = grids[grid_name]
+		var cells: Array = grid.get_children()
+		check(not cells.is_empty(), "(setup) %s actually holds cells to measure" % grid_name)
+		if cells.is_empty():
+			continue
+		var left_x: float = INF
+		var right_x: float = -INF
+		for cell in cells:
+			var r: Rect2 = (cell as Control).get_global_rect()
+			left_x = minf(left_x, r.position.x)
+			right_x = maxf(right_x, r.end.x)
+		var left_gap: float = left_x - usable_rect.position.x
+		check(absf(left_gap) <= 1.5,
+			"%s: cells sit flush against the drawer's left edge (left_gap=%.1f)" %
+				[grid_name, left_gap])
+		# The right edge only has to reach the usable width when a row is
+		# actually FULL (cells.size() >= columns) — a grid holding fewer
+		# entries than columns (items_grid's cap can be below the 5-column
+		# standard, e.g. ItemLogic.cap's base of 3) has nothing to put in the
+		# trailing columns; that is not the dead-column bug NO-207 fixed, and
+		# asserting edge-to-edge there would be wrong.
+		if cells.size() >= grid.columns:
+			var right_gap: float = usable_rect.end.x - right_x
+			check(absf(right_gap) <= 1.5,
+				"%s: a full row's cells reach the drawer's right edge, no dead column " %
+					grid_name +
+				"(right_gap=%.1f, usable_w=%.1f)" % [right_gap, usable_rect.size.x])
+
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
 	# drawer has to be OPEN for this container to hold anything at all.
@@ -1326,6 +1408,62 @@ func _init() -> void:
 		"pool strip: the \"+\" take-back slot is OFFBOARD_ICON too (%d), not the pre-NO-36 46" % ICON_PX)
 
 	icon_game.queue_free()
+	await process_frame
+
+	# ---- NO-202: Inventory drawer shows most-recently-acquired first --------
+	# _rebuild_items_grid/_rebuild_artefacts_grid used to list oldest-first —
+	# the Stock drawer's own _stacks() was reversed for this by NO-182, these
+	# two never were. save_config.gd appends "items"/"artefacts" config
+	# entries in listed order, so g.items[0]/g.artefacts[0] are the OLDEST
+	# held, [1] the NEWEST — the display's first cell must be the newest.
+	var order_cfg := {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"items": ["blitz", "extraction"],
+		"artefacts": ["library-of-alexandria-matchbox", "oak-island-wishing-well"]}
+	GameScript.next_config = order_cfg
+	var order_game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(order_game)
+	await process_frame
+	await process_frame
+	check(await _click_inventory(order_game, "Inventory 4"),
+		"NO-202: (setup) Inventory opens with 2 Items + 2 Artefacts held")
+	await process_frame
+	check(order_game.items[0].key == "blitz" and order_game.items[1].key == "extraction",
+		"NO-202: (setup) g.items itself is untouched — still acquisition order")
+	check(order_game.artefacts[0].key == "library-of-alexandria-matchbox"
+			and order_game.artefacts[1].key == "oak-island-wishing-well",
+		"NO-202: (setup) g.artefacts itself is untouched — still acquisition order")
+
+	# Items: display flips, but a cell's meta "key" — and the REAL g.items
+	# index a click resolves to (item_pressed.emit(i) closes over the loop's
+	# own `i`, unchanged by NO-202) — must still point at what that cell
+	# shows, not at its on-screen position.
+	var item_children: Array = order_game.hud.items_grid.get_children()
+	check(item_children.size() >= 2, "(setup) two Item cells to check the order of")
+	check(item_children[0].get_meta("key") == "extraction"
+			and item_children[1].get_meta("key") == "blitz",
+		"NO-202: Items grid shows the newest (extraction) first, oldest (blitz) last")
+	var first_item_pos: Vector2 = (item_children[0] as Button).get_global_rect().get_center()
+	_click(first_item_pos)
+	await process_frame
+	check(order_game.item_active == 1,
+		"NO-202: clicking the newest-displayed (first) cell arms g.items[1] (extraction)'s"
+			+ " real index, not display position 0")
+
+	# Artefacts: same reversal, but a cell's tap closes over the artefact's
+	# own KEY string (hud.gd's artefact_activate_pressed.emit(key)), never an
+	# array index — so, unlike Items, there is no positional index for a
+	# reversed display to point at the wrong entry. Verified structurally via
+	# the same meta "key" convention _build_artefact_cell documents as its
+	# probe/test lookup.
+	check(await _click_inventory(order_game, "Inventory 4"),
+		"NO-202: Inventory reopens (the Item click above closed it)")
+	await process_frame
+	var art_children: Array = order_game.hud.artefacts_grid.get_children()
+	check(art_children.size() >= 2, "(setup) two Artefact cells to check the order of")
+	check(art_children[0].get_meta("key") == "oak-island-wishing-well"
+			and art_children[1].get_meta("key") == "library-of-alexandria-matchbox",
+		"NO-202: Artefacts grid shows the newest (Oak Island) first, oldest (Library) last")
+	order_game.queue_free()
 	await process_frame
 
 	# ---- NO-83: Donald Trump's info panel lists the Tariffs in force ---------
@@ -1434,8 +1572,15 @@ func _init() -> void:
 	var buff_btn := _first_option_button(game.modals.buff_panel)
 	check(buff_btn != null and "\n" in buff_btn.text,
 		"choice options describe themselves (two-line label), same as Box Pick")
-	_click(buff_btn.get_global_rect().get_center())
-	await process_frame
+	# coordinator review 2026-09-21 (round3 abort): a failed check() above is
+	# not licence to dereference the same null right after it — that is what
+	# turned one honest failure into a dead coroutine and hid every assertion
+	# past this point (CLAUDE.md: "a crash mid-coroutine silently skipping
+	# later assertions"). Gate the click on buff_btn actually resolving so a
+	# future regression here REPORTS instead of truncating the whole suite.
+	if buff_btn:
+		_click(buff_btn.get_global_rect().get_center())
+		await process_frame
 	check(not game.buff_pick_open and not game.item_targets.is_empty(),
 		"picking a choice closes the modal and resumes targeting (the continuation)")
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2) # NO-124: tap stages + shows Confirm
@@ -1748,20 +1893,29 @@ func _init() -> void:
 	# The two pools still obey different rules (a Captured entry can never be
 	# deployed, issue 60, nor merged since 2026-09-10) — that is now which
 	# GRID an entry is in.
+	# V1: a button's direct parent is now its own row HBoxContainer, one level
+	# under stock_grid/captured_grid (the VBoxContainer of rows) — check the
+	# grandparent instead of the parent.
 	check(_pool_rows(game, true).all(func(b: Button) -> bool:
-				return b.get_parent() == game.hud.captured_grid)
+				return b.get_parent().get_parent() == game.hud.captured_grid)
 			and _pool_rows(game, false).all(func(b: Button) -> bool:
-				return b.get_parent() == game.hud.stock_grid),
+				return b.get_parent().get_parent() == game.hud.stock_grid),
 		"Captured Stock and Stock are separate grids, not a tinted tail of one strip")
-	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST: the bishops were captured after
-	# the rook, so they sit above it — the reverse of g.captured's own order.
+	# ONE ROW PER PIECE, NEWEST CAPTURE FIRST in _stacks()'s own data order —
+	# but V1 (2026-09-21) fills the grid so _stacks()[0] (the newest, a
+	# bishop) lands in the BOTTOM-RIGHT cell, with the rest filling backward
+	# from there (hud.gd's _fill_rows_bottom_right). pool_buttons()'s flatten
+	# (row-major: top row to bottom, left-to-right within a row) walks that
+	# same ADD order, which is therefore the reverse of _stacks(): oldest
+	# capture first, newest last.
 	check(game.captured == ["rook", "bishop", "bishop"],
 		"(sanity) the run captured a rook, then two bishops, in that order")
 	var cap_order: Array = []
 	for row in _pool_rows(game, true):
 		cap_order.append(str((row as Button).get_meta("id")))
-	check(cap_order == ["bishop", "bishop", "rook"],
-		"the Captured section lists one row per piece, most recent first (%s)" % str(cap_order))
+	check(cap_order == ["rook", "bishop", "bishop"],
+		"the Captured section adds oldest-first, so the newest capture anchors the corner (%s)"
+			% str(cap_order))
 	# tapping the entry arms nothing, so the board stays unlit and a following
 	# Deploy-tile tap has nothing to place
 	var cap_row: Button = _pool_rows(game, true)[0]
@@ -1787,7 +1941,11 @@ func _init() -> void:
 		await process_frame
 	await create_timer(0.45).timeout # past the 400 ms double-tap window: a second
 		# tap on the same entry inside it opens the piece preview instead
-	cap_row = _pool_rows(game, true)[0]
+	# V1: [0] is no longer "the newest" (it's the oldest capture, the rook —
+	# see the fill-order comment above), and this check specifically wants a
+	# BISHOP row (the duplicate-held case) — filter by id instead of index.
+	cap_row = _pool_rows(game, true).filter(
+		func(b: Button) -> bool: return str(b.get_meta("id")) == "bishop")[0]
 	var convert_badge: Button = null
 	for c in cap_row.get_children():
 		if c is Button and (c as Button).text.begins_with("⇄"):
@@ -2655,9 +2813,26 @@ func _init() -> void:
 	# obstructed.
 	game.queue_free()
 	await process_frame
+	# NO-202 (round3 coordinator review, 2026-09-21): this used to hold TWO
+	# Snipers — same key, same cell text/icon — so every _click_grid_cell(...,
+	# "sniper") below was genuinely ambiguous between them: it always
+	# resolves to whichever cell is FIRST in items_grid's child order, which
+	# was g.items[0] under main's forward build order and is g.items[1] under
+	# NO-202's reversed one. That is not a case this scenario's own point
+	# (the Drawer reopen rule around using a targeted Item, stories 58-60)
+	# ever needed to be ambiguous about — _inventory_drawer_reopens()
+	# (game.gd) only ever checks `not items.is_empty()`, never an item's
+	# identity or kind, so the rule does not require two of a kind. Air
+	# Strike is the closest distinct substitute: same "target": "tile" shape,
+	# same _item_apply case (`"air_strike", "sniper": _destroy(b, true)`,
+	# game.gd) — its only difference is a WEAKER tile_valid condition
+	# (item_logic.gd: `enemy and not king`, no "attacked by a player piece"
+	# requirement), which the existing board (both the rook and the pawn are
+	# already attacked, per the comment above) satisfies for free. Every
+	# lookup below can now name the specific Item it means.
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 5, 5], ["pawn", 1, 7, 2]],
-		"items": ["sniper", "sniper"]}
+		"items": ["sniper", "air_strike"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2683,10 +2858,11 @@ func _init() -> void:
 	check(game.hud.multi_confirm_btn.visible, "NO-124: the tap stages AND shows Confirm")
 	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
 	await process_frame
-	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
-		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
+	check(game.items.size() == 1 and game.items[0].key == "air_strike"
+			and game.hud.drawer_open == "inventory",
+		"after use, the Drawer reopens because Air Strike is still usable (story 59)")
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
-	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "the remaining Sniper clickable")
+	check(await _click_grid_cell(game.hud.items_grid, "air_strike"), "the remaining Air Strike clickable")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
 	await process_frame
@@ -2949,6 +3125,18 @@ func _init() -> void:
 	var tip_rect: Rect2 = game.hud.tip_panel.get_global_rect()
 	check(not tip_rect.intersects(confirm_rect),
 		"the tip's rect never overlaps Confirm's — Confirm stays fully visible")
+	# NO-152 follow-up (Max: "center name and infos with diagram, slim the
+	# sides down to the diagram width"): the target tile above is the pawn from
+	# next_config's board, so diagram_id != "" and tip_diagram is showing —
+	# assert the geometry these changes actually produce, not the flags that
+	# were just written.
+	check(game.hud.tip_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER,
+		"NO-152: the tip's name/info text is centred, matching the diagram above it")
+	var tip_sb := game.hud.tip_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	var expected_w: float = game.hud.tip_diagram.custom_minimum_size.x \
+		+ tip_sb.content_margin_left + tip_sb.content_margin_right
+	check(absf(tip_rect.size.x - expected_w) <= 2.0,
+		"NO-152: the panel is slimmed to the diagram's own width (+ its fixed side margins), not the wider TIP_W")
 	_click(confirm_rect.get_center())
 	await process_frame
 	check(game.board.get(blitz_target, {}).get("blitz_free_move", false)
@@ -2974,6 +3162,11 @@ func _sell_button(node: Node) -> Button:
 
 
 func _first_option_button(node: Node) -> Button:
+	if node == null: # round3 abort (coordinator review 2026-09-21): the modal
+		# not being open is a real failure the caller's own check() already
+		# reports — this helper crashing on the null panel is what silently
+		# killed the whole suite instead, one call before the guard above.
+		return null
 	if node is Button and not node.text.begins_with("Skip"):
 		return node
 	for c in node.get_children():

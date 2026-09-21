@@ -71,7 +71,11 @@ const LONG_PRESS_MS := 500
 ## Activate strip, +48 for issue 100's Army Power line) rather than
 ## re-deriving it, so nothing jumps on this PR alone.
 const INV_DRAWER_H := DRAWER_H * 3 + 118.0
-const INV_CELL_SEP := 6 ## gap between cells, both axes, both grids
+## Row spacing (vertical) for both grids, and the column-count/column-fit
+## base gap grid_cols() sizes off. The GAP BETWEEN CELLS (horizontal) is
+## wider than this in practice — NO-207 stretches it per row so the columns
+## span the full width with no leftover; see _inv_row_sep().
+const INV_CELL_SEP := 6
 ## NO-132: both grids are full width (472px avail: the drawer's 480 minus the
 ## ScrollContainer's 8px inset) — Tuning.grid_cols(472, 6) fits 6, capped at
 ## the OFFBOARD_GRID_COLS standard, so both land on 5 (set where the grids
@@ -374,9 +378,24 @@ var tip_key := ""
 ## NO-84: Captured Stock (left third) and Stock (right two thirds) are two
 ## independent grids now, not one strip — each inside its own ScrollContainer
 ## so dragging one side never scrolls the other (story 36).
-var stock_grid := GridContainer.new()
-var captured_grid := GridContainer.new()
+## V1 (Max, 2026-09-21 correction): a plain GridContainer fills top-left
+## first, which can't express "item 0 bottom-right, filling right-to-left,
+## piling new rows upward" — a VBoxContainer of per-row HBoxContainers can
+## (see _rebuild_stock_drawer's own comment). Kept the `_grid` name: every
+## other reference to these two treats them as "the pool container", not as
+## anything GridContainer-specific.
+var stock_grid := VBoxContainer.new()
+var captured_grid := VBoxContainer.new()
+## How many entries fit per row — was `stock_grid.columns`/`captured_grid.
+## columns` before V1; a VBoxContainer has no such property, so the layout
+## step below stores it here instead, for _rebuild_stock_drawer to read.
+var stock_cols := 1
+var cap_cols := 1
 var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
+## NO-208: both drawers' own ScrollContainers, kept so _rebuild_stock_drawer
+## can reset their scroll position — built as locals inside build() otherwise.
+var stock_scroll := ScrollContainer.new()
+var cap_scroll := ScrollContainer.new()
 ## NO-85: Items, one scrolling grid (story 48) — replaces the item_box strip.
 var items_grid := GridContainer.new()
 ## NO-85: Artefacts, one scrolling grid (story 49) — replaces artefact_box
@@ -513,6 +532,16 @@ static func _section_label(text: String) -> Label:
 	l.add_theme_font_size_override("font_size", 13)
 	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
 	return l
+
+
+## NO-207: the horizontal gap that makes `cols` Tuning.OFFBOARD_ICON cells
+## span `avail_w` exactly, edge to edge, instead of the fixed INV_CELL_SEP
+## leaving a shortfall (5-column standard, fixed icon size — see the call
+## site's comment). `cols` is always >= 1 (grid_cols() clamps it there).
+static func _inv_row_sep(avail_w: float, cols: int) -> float:
+	if cols <= 1:
+		return INV_CELL_SEP
+	return (avail_w - cols * Tuning.OFFBOARD_ICON) / (cols - 1)
 
 
 ## NO-165: an unfilled slot, signifying room left against whatever actually
@@ -821,17 +850,34 @@ func build(game) -> void:
 	stock_btn.add_child(stock_armed)
 	drawer_buttons["stock"] = stock_btn
 	# ---- THE CONTROL DECK (design C, user pick 2026-09-05) ------------------
-	# Everything under the board lives in one column that starts where the board
-	# ends and runs to the bottom edge. That is what removes the dead band: the
-	# board is flush to the top strip, so all the leftover height arrives here in
-	# one piece, and the rows below expand into it rather than leaving a gap.
-	var deck_top: float = g.board_px.y + g.tile * Tuning.BOARD_H + 6.0
+	# Everything under the board lives in one column, bottom-anchored to the
+	# screen edge, at its own FIXED height — DECK_ROWS (game.gd), the same
+	# constant board_tile_for() already reserves when it solves the tile size.
+	# NO-196: it used to be "whatever's left after the board" (vp.y - a
+	# board-bottom-derived deck_top), which is not the same thing —
+	# board_tile_for() floors tile to an int, and the resulting residual (0 to
+	# just under BOARD_H px) landed as a SECOND, resolution-dependent gap
+	# between nav_row and act_row (act_row's own SIZE_EXPAND|SIZE_SHRINK_END
+	# absorbed it invisibly, on top of DECK_GAP). Sizing the deck to DECK_ROWS
+	# instead leaves nothing inside it for act_row to claim, so that gap is
+	# now always exactly DECK_GAP; any residual shows up ABOVE the deck, where
+	# ADR-0004 already says leftover height belongs (the board is the slack
+	# absorber, not the deck).
 	var deck := VBoxContainer.new()
-	deck_h = vp.y - deck_top
-	# NO-115: the deck runs flush to both screen edges and the bottom — it used
-	# to sit 4px in on each side and stop 6px short of the bottom, leaving a
-	# dead strip under the thumb row. act_row (its last child) claims that
-	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
+	deck_h = g.DECK_ROWS
+	# deck_top is therefore "screen bottom minus the deck's own fixed height",
+	# not board-derived any more — everything below that anchors "just above
+	# the deck" (army_band, the Inventory drawer, confirm_backdrop) already
+	# reads this same var, so they inherit the fix unchanged.
+	# NO-197: this also clears the deck of the board's own outline. board_tile_for()
+	# reserves DECK_MARGINS (12) between the board and DECK_ROWS, well past the
+	# outline's outer ink (BOARD_OUTLINE_INSET + BOARD_OUTLINE_WIDTH/2 = 5.5,
+	# game.gd) — bottom-anchoring the deck at a fixed height can only widen
+	# that gap, never shrink it below the ink. (Proof: with tile floored,
+	# deck_top - board_bottom = vp.y - DECK_ROWS - top - tile*BOARD_H >=
+	# vp.y - DECK_ROWS - top - (vp.y-top-DECK_MARGINS-DECK_ROWS) = DECK_MARGINS,
+	# for either branch of board_tile_for's min().)
+	var deck_top: float = vp.y - deck_h
 	deck.position = Vector2(0, deck_top)
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	# NO-163 closed this to 0 (was 6). NO-181 reopens it to DECK_GAP — the SAME
@@ -1001,10 +1047,11 @@ func build(game) -> void:
 	ability_col.add_child(army_ability_button)
 	act_row = HBoxContainer.new()
 	act_row.add_theme_constant_override("separation", DECK_GAP)
-	# NO-115: EXPAND claims the deck's now-unused trailing space (see deck's
-	# own comment above); SHRINK_END keeps act_row pinned at its own 60px
-	# minimum and docks it at the bottom of that space, flush to the screen.
-	act_row.size_flags_vertical = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
+	# NO-196: used to carry SIZE_EXPAND|SIZE_SHRINK_END to soak up the deck's
+	# leftover trailing space and still dock flush at the bottom. The deck no
+	# longer HAS leftover space (its own height is fixed to DECK_ROWS, above),
+	# so there's nothing left for EXPAND to claim — act_row is simply the
+	# deck's last child now, flush to the deck's own bottom edge by construction.
 	act_row.custom_minimum_size = Vector2(0, 60)
 	act_row.add_child(ability_col)
 	act_row.add_child(pass_button)
@@ -1075,19 +1122,45 @@ func build(game) -> void:
 	# it stays visible and clickable over them. Inventory scrolls as ONE column
 	# (story 47): the Items grid, then the Artefacts grid — no separate
 	# Activate section any more (NO-85).
-	items_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
-	items_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	# NO-207 (Max's 4th ask on this): NO-201's SIZE_SHRINK_CENTER pass centred
+	# items_grid/artefacts_grid inside inv_box, but inv_box is a VBoxContainer
+	# that shrinks to its widest child — which, once custom_minimum_size.x
+	# was forced onto the grid (NO-182), IS the grid. There was never any
+	# slack inside inv_box to split; the dead column sat OUTSIDE it, between
+	# inv_box's right edge and `sc` (the ScrollContainer wrapping it), because
+	# `sc` leaves horizontal scrolling at its Godot default (AUTO, never
+	# turned off) and a ScrollContainer never stretches a child on an axis
+	# where it might need to scroll it — so `sc` gave inv_box only its own
+	# minimum width, not `sc`'s. SHRINK_CENTER changed nothing because its
+	# parent was already exactly its own size.
+	# Fix at the actual source instead: don't leave a shortfall to redistribute
+	# at all. grid_cols() floors AND clamps to the 5-column standard
+	# (OFFBOARD_GRID_COLS, tuning.gd), so 5 columns of fixed-size
+	# Tuning.OFFBOARD_ICON cells are narrower than the available width — here,
+	# 5*72 + 4*INV_CELL_SEP(6) = 384 against avail_w's 472, an 88px shortfall
+	# (close to one whole cell, matching what Max sees). Resizing
+	# OFFBOARD_ICON is out of scope (shared by Stock/Shop, NO-201's call);
+	# instead widen just the GAP between cells so `cols` of them span
+	# `avail_w` edge to edge — same standard column count, same icon size,
+	# genuinely no leftover. Row spacing (v_separation) is untouched, so rows
+	# don't grow taller. Both grids share one avail_w/columns/gap, so they
+	# always agree.
+	var inv_avail_w: float = vp.x - 8.0
+	items_grid.columns = Tuning.grid_cols(inv_avail_w, INV_CELL_SEP) # NO-132
+	var inv_h_sep: float = _inv_row_sep(inv_avail_w, items_grid.columns) # NO-207
+	items_grid.add_theme_constant_override("h_separation", inv_h_sep)
 	items_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	# NO-182: without an explicit width, a GridContainer shrinks to whatever
 	# it actually holds (fewer than `columns` entries in the only/last row
 	# makes it narrower still), leaving empty space at the drawer's right edge
 	# instead of the full 5-column standard NO-132 names. stock_grid already
 	# forces this (NO-135); items_grid/artefacts_grid never did.
-	items_grid.custom_minimum_size.x = Tuning.grid_row_w(items_grid.columns, INV_CELL_SEP)
-	artefacts_grid.columns = Tuning.grid_cols(vp.x - 8.0, INV_CELL_SEP) # NO-132
-	artefacts_grid.add_theme_constant_override("h_separation", INV_CELL_SEP)
+	items_grid.custom_minimum_size.x = inv_avail_w # NO-207: fills exactly, by construction
+	artefacts_grid.columns = Tuning.grid_cols(inv_avail_w, INV_CELL_SEP) # NO-132
+	artefacts_grid.add_theme_constant_override("h_separation",
+			_inv_row_sep(inv_avail_w, artefacts_grid.columns)) # NO-207
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
-	artefacts_grid.custom_minimum_size.x = Tuning.grid_row_w(artefacts_grid.columns, INV_CELL_SEP) # NO-182
+	artefacts_grid.custom_minimum_size.x = inv_avail_w # NO-182, NO-207
 	army_power_label.add_theme_font_size_override("font_size", 13)
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()
@@ -1276,14 +1349,26 @@ func build(game) -> void:
 	captured_hint.add_theme_font_size_override("font_size", 11)
 	captured_hint.visible = false
 	cap_col.add_child(captured_hint)
-	var cap_scroll := ScrollContainer.new()
 	cap_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
-	cap_scroll.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
-	captured_grid.columns = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
-	captured_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
-	captured_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
-	cap_scroll.add_child(captured_grid)
+	var cap_view: Vector2 = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	cap_scroll.custom_minimum_size = cap_view
+	cap_cols = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
+	# V1: STOCK_DRAWER_CELL_SEP's OTHER axis (between buttons within a row)
+	# is set per-row, on each row's own HBoxContainer — _rebuild_stock_drawer.
+	captured_grid.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
+	# NO-208: bottom-anchors the grid — ALIGNMENT_END collects any slack (the
+	# section taller than the content) above the grid instead of below it, the
+	# same slack-collection idea as stock_align's horizontal ALIGNMENT_END
+	# below, one axis over. custom_minimum_size matches cap_scroll's own so
+	# the anchor has the full viewport height to push against; a plain
+	# ScrollContainer would otherwise size its child to the content alone
+	# (NO-135) and there'd be no slack to collect.
+	var cap_anchor := VBoxContainer.new()
+	cap_anchor.alignment = BoxContainer.ALIGNMENT_END
+	cap_anchor.custom_minimum_size = cap_view
+	cap_anchor.add_child(captured_grid)
+	cap_scroll.add_child(cap_anchor)
 	cap_col.add_child(cap_scroll)
 	stock_row.add_child(cap_col)
 	# NO-164: the gutter — a fixed, always-visible divider, unlike the
@@ -1298,13 +1383,12 @@ func build(game) -> void:
 	var stock_w: float = vp.x - cap_w - STOCK_DRAWER_GUTTER
 	var stock_col := VBoxContainer.new()
 	stock_col.custom_minimum_size = Vector2(stock_w, stock_h)
-	var stock_scroll := ScrollContainer.new()
 	stock_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
-	stock_scroll.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
-	stock_grid.columns = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
-	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
-	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
+	var stock_view: Vector2 = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
+	stock_scroll.custom_minimum_size = stock_view
+	stock_cols = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
+	stock_grid.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
 	# NO-135: a ScrollContainer always places its content flush at its own
 	# top-left, so grid_cols()'s floor-remainder (and a short last row) used
 	# to strand its slack at the drawer's outer right edge. Captured Stock
@@ -1312,13 +1396,25 @@ func build(game) -> void:
 	# correct); force Stock's grid to its full row width (same guard as
 	# modals.gd's _shop_zone) and right-align that box in a
 	# wrapper spanning the scroll viewport, so both sections' slack collects
-	# in one gap against the shared Captured/Stock boundary instead.
-	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_grid.columns, STOCK_DRAWER_CELL_SEP) # NO-135
+	# in one gap against the shared Captured/Stock boundary instead. Forcing
+	# the VBox's own width still works post-V1: a VBoxContainer's default-FILL
+	# children stretch to ITS width regardless of whether that width came
+	# from content or this override, which is what lets a short row's own
+	# ALIGNMENT_END (below) put its gap on the correct side.
+	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_cols, STOCK_DRAWER_CELL_SEP) # NO-135
 	var stock_align := HBoxContainer.new()
 	stock_align.alignment = BoxContainer.ALIGNMENT_END
 	stock_align.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, 0)
 	stock_align.add_child(stock_grid)
-	stock_scroll.add_child(stock_align)
+	# NO-208: bottom-anchors the row vertically, same mechanism as cap_anchor
+	# above — stock_align already right-aligns stock_grid horizontally, this
+	# wraps it once more for the other axis rather than teaching an
+	# HBoxContainer two alignments at once.
+	var stock_anchor := VBoxContainer.new()
+	stock_anchor.alignment = BoxContainer.ALIGNMENT_END
+	stock_anchor.custom_minimum_size = stock_view
+	stock_anchor.add_child(stock_align)
+	stock_scroll.add_child(stock_anchor)
 	stock_col.add_child(stock_scroll)
 	stock_row.add_child(stock_col)
 	# NO-145: stock_panel is a PanelContainer, which stretches its one child
@@ -1368,11 +1464,14 @@ func build(game) -> void:
 	tip_label = Label.new()
 	tip_label.add_theme_font_size_override("font_size", 13)
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# A fixed wrap width rather than a free one: without it a long description is
 	# laid out as a single line whose minimum width is the whole string, and the
 	# clamp below would then have nothing it could fit on screen. Same failure
-	# NO-55 was, arriving through a different control.
+	# NO-55 was, arriving through a different control. The real value is set per
+	# call in show_tip(), which knows whether a diagram is showing; this is just
+	# the pre-first-call default.
 	tip_label.custom_minimum_size = Vector2(minf(TIP_W, vp.x - TIP_MARGIN * 2), 0)
 	tip_box.add_child(tip_label)
 	tip_panel.add_child(tip_box)
@@ -1684,12 +1783,19 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	tip_diagram.visible = diagram_id != ""
 	tip_diagram.queue_redraw()
 	tip_panel.visible = true
+	var vp: Vector2 = g.get_viewport_rect().size
+	# NO-152 follow-up (Max: "center name and infos with diagram, slim the
+	# sides down to the diagram width"): with a diagram, the label wraps to
+	# the diagram's own width instead of the wider TIP_W, so the panel reads
+	# as one column instead of the diagram sitting inside a wider box. Every
+	# other caller (diagram_id == "") keeps the old TIP_W wrap width.
+	var wrap_w := tip_diagram.custom_minimum_size.x if diagram_id != "" else TIP_W
+	tip_label.custom_minimum_size = Vector2(minf(wrap_w, vp.x - TIP_MARGIN * 2), 0)
 	# The panel's size is not known until the container has sorted its children,
 	# and a position computed from a stale size is the whole bug this clamp
 	# exists to avoid. reset_size() forces it to its minimum NOW rather than
 	# next frame, so the arithmetic below runs on the real box.
 	tip_panel.reset_size()
-	var vp: Vector2 = g.get_viewport_rect().size
 	var box: Vector2 = tip_panel.size
 	# NO-152/NO-124: the floating Confirm/Cancel strip is the actionable
 	# control in a commit/cancel flow, the tip is only informational — ruling
@@ -1994,8 +2100,18 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 ## NO-84: every stack button across both grids, Stock first then Captured —
 ## the flat order _rebuild_stock_drawer used to hold as one strip. Used
 ## wherever code needs to sweep "every stack on screen" rather than one side.
+## V1: stock_grid/captured_grid are now a VBoxContainer of per-row
+## HBoxContainers, not a flat GridContainer of buttons — one level to
+## flatten through. Every row holds only Buttons (no placeholders, no
+## further nesting), so this keeps "pool_buttons() is buttons-only"
+## (test_game_clicks.gd's own comment on game.pool_box) true.
 func pool_buttons() -> Array:
-	return stock_grid.get_children() + captured_grid.get_children()
+	var out := []
+	for row in stock_grid.get_children():
+		out.append_array(row.get_children())
+	for row in captured_grid.get_children():
+		out.append_array(row.get_children())
+	return out
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
@@ -2074,7 +2190,13 @@ func _rebuild_artefacts_grid() -> void:
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
 	var seen := {}
-	for t in g.artefacts:
+	# NO-202: most recently acquired kind first, matching _stacks()'s Stock
+	# drawer — g.artefacts is append-ordered, so scan it in reverse rather
+	# than reversing the built grid (which would also flip the empty-slot
+	# padding below). Cells key off t.key, not an array index, so display
+	# order never disagrees with which artefact a tap resolves to.
+	for i in range(g.artefacts.size() - 1, -1, -1):
+		var t: Variant = g.artefacts[i]
 		if seen.has(t.key):
 			continue
 		seen[t.key] = true
@@ -2129,13 +2251,23 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 	if marker_text != "":
 		var marker := Label.new()
 		marker.text = marker_text
-		marker.add_theme_font_size_override("font_size", 12)
+		# NO-209: was 12 with no alignment override — a Label's default
+		# alignment is top-left, so the glyph sat at the LEFT edge of the
+		# offset box below rather than centred in it, and the box's zero
+		# bottom/right offsets left it flush with the button's own edge,
+		# straddling the card's rounded corner. Centred + a 4px margin off
+		# both edges puts it cleanly on the icon; 14 reads better at this size.
+		marker.add_theme_font_size_override("font_size", 14)
 		marker.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 		marker.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		marker.add_theme_constant_override("outline_size", 4)
+		marker.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		marker.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		marker.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		marker.offset_left = -40
-		marker.offset_top = -16
+		marker.offset_left = -38
+		marker.offset_top = -22
+		marker.offset_right = -4
+		marker.offset_bottom = -4
 		btn.add_child(marker)
 	if not g.artefact_icons.has(key): # NO-119: unpainted — badge initials over
 		# the shared placeholder so two unpainted artefacts read apart at a
@@ -2214,7 +2346,13 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 func _rebuild_items_grid() -> void:
 	for c in items_grid.get_children():
 		c.queue_free()
-	for i in g.items.size():
+	# NO-202: most recently acquired first, matching _stacks()'s Stock
+	# drawer — g.items is append-ordered, so scan it in reverse. `i` stays
+	# the real g.items index throughout (item_pressed.emit(i), the
+	# g.item_active comparison, the "item:%d" lp_key), only the loop's
+	# visitation order changes, so no click handler or save/load index is
+	# affected.
+	for i in range(g.items.size() - 1, -1, -1):
 		var btn := Button.new()
 		var has_icon: bool = g.item_icons.has(g.items[i].key)
 		# NO-119: no name text on the cell — the glyph fallback stands alone,
@@ -2253,13 +2391,15 @@ func _rebuild_stock_drawer() -> void:
 	for c in captured_grid.get_children():
 		c.queue_free()
 	var cap_count := 0
+	var stock_children: Array = []
+	var cap_children: Array = []
 	for st in _stacks():
 		var btn := _build_stack_button(st)
 		if st.cap:
 			cap_count += 1
-			captured_grid.add_child(btn)
+			cap_children.append(btn)
 		else:
-			stock_grid.add_child(btn)
+			stock_children.append(btn)
 	# story 37: the hint only while the column would otherwise be blank — an
 	# empty GridContainer has no size of its own to hang a message on.
 	captured_hint.visible = cap_count == 0
@@ -2277,7 +2417,70 @@ func _rebuild_stock_drawer() -> void:
 		slot.tooltip_text = "Put the piece back into stock"
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		stock_grid.add_child(slot)
+		stock_children.append(slot)
+	_fill_rows_bottom_right(stock_grid, stock_children, stock_cols)
+	_fill_rows_bottom_right(captured_grid, cap_children, cap_cols)
+	_scroll_stock_to_bottom() # NO-208
+
+
+## V1 (Max, 2026-09-21 correction): Max rejected an earlier padded-
+## GridContainer version of this ("Padding with empty cells is definitely not
+## what we want") in favour of a true reverse flow: "a reversed list where it
+## start from the bottom with first items stacking right to left, and then
+## the next items pile on the row above, and then scrolling that list up." A
+## single GridContainer can't express that — it always fills from the
+## top-left, so a short row lands bottom-right, the opposite corner from what
+## he wants. `grid` (stock_grid/captured_grid) is instead a VBoxContainer of
+## per-row HBoxContainers built fresh here.
+##
+## Indexing: `children[0]` is _stacks()'s newest entry. With `rows = ceil(n /
+## cols)`, row_idx 0 (built LAST, so it ends up at the BOTTOM of the
+## VBoxContainer) holds children[0 : cols]; row_idx 1 holds children[cols :
+## 2*cols] and sits above it; and so on up to the last row_idx built FIRST
+## (top). Any incomplete row is therefore always the last one filled —
+## row_idx = rows-1, the TOPMOST — never row 0, so there is nothing to pad:
+## the short row simply has fewer buttons, and each row's own
+## ALIGNMENT_END right-aligns its buttons, leaving that row's gap on the
+## LEFT for free (a VBoxContainer stretches every default-FILL child, i.e.
+## every row, to its own width, which a full row already establishes).
+## Within a row, the lowest index is added LAST so it lands rightmost
+## (children[0] itself, in row 0, ends up in the true bottom-right cell).
+##
+## Worked example, 6 children / 4 cols (the case that reveals a padding bug,
+## carried over from the earlier version since it's still the case worth
+## checking): rows=2. row_idx 1 (top, built first) = children[4:6] = [4, 5],
+## added in reverse (5 then 4) so row reads left-to-right as [5, 4], right-
+## aligned in a 4-wide row -> 2 blank cells on its LEFT. row_idx 0 (bottom,
+## built last) = children[0:4] = [0,1,2,3], added in reverse (3,2,1,0) so the
+## row reads [3, 2, 1, 0] — 0 bottom-right, 1 to its left, matching Max's
+## description exactly, with no spacer of any kind.
+func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) -> void:
+	cols = maxi(cols, 1)
+	var rows := ceili(float(children.size()) / float(cols))
+	for row_idx in range(rows - 1, -1, -1): # topmost row first, row 0 last
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_END # short row's gap lands on the left
+		row.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
+		var lo := row_idx * cols
+		var hi := mini(lo + cols, children.size())
+		for i in range(hi - 1, lo - 1, -1): # descending: lowest index added last = rightmost
+			row.add_child(children[i])
+		grid.add_child(row)
+
+
+## NO-208: default scroll position is the bottom, matching cap_anchor/
+## stock_anchor's bottom-anchoring above. Fire-and-forget (not awaited by the
+## caller) — _rebuild_stock_drawer's own synchronous work (grid contents,
+## captured_hint) is already done by the time this runs. Awaits a frame first:
+## CLAUDE.md — a freshly rebuilt control's size isn't final until the next
+## idle frame, so reading "the max scroll" (or here, setting scroll_vertical
+## before the grid's new row count has been laid out) would land on the STALE
+## range. ScrollContainer clamps scroll_vertical to whatever range is valid at
+## the time it's set, so a large constant is as good as reading the true max.
+func _scroll_stock_to_bottom() -> void:
+	await get_tree().process_frame
+	stock_scroll.scroll_vertical = 1 << 30
+	cap_scroll.scroll_vertical = 1 << 30
 
 
 ## One stack button (Stock or Captured entry) — everything from the icon down

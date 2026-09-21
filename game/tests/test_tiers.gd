@@ -11,6 +11,7 @@ const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Economy := preload("res://scripts/economy.gd")
 const Shop := preload("res://scripts/shop.gd")
+const MenuScript := preload("res://scripts/menu.gd")
 
 var fails := 0
 
@@ -53,39 +54,71 @@ func _init() -> void:
 			"%s: clock-never-pauses lever (Tier 2+)" % t)
 		check(Tuning.shop_row_delta(t) == (-1 if i >= 2 else 0),
 			"%s: Shop row delta (Tier 3+)" % t)
-		check(Tuning.actions_per_turn(t) == Tuning.ACTIONS_PER_TURN - (1 if i >= 4 else 0),
-			"%s: actions/turn (Tier 5 only)" % t)
+		check(Tuning.actions_per_turn(t) == Tuning.ACTIONS_PER_TURN - (1 if i >= 3 else 0),
+			"%s: actions/turn (NO-213: Tier 4+)" % t)
 		check(Tuning.enemy_actions_per_turn(t) == Tuning.ENEMY_ACTIONS_PER_TURN + (1 if i >= 4 else 0),
 			"%s: enemy actions/turn (issue 59 — Tier 5 only)" % t)
 	check(Tuning.tier_index("nonsense") == 0 and Tuning.tier_index("") == 0
 			and Tuning.tier_index("Officer") == 0,
 		"an unrecognized tier string (old save rank name, or unset) falls back to Tier 1")
 
-	# --- starting Stock: unchanged through Tier 3, halved-per-type (round up) at 4+ ---
-	for t in ["Tier 1", "Tier 2", "Tier 3"]:
-		check(Tuning.starting_stock("Crown", t) == Tuning.ARMIES["Crown"],
-			"%s: starting Stock is the full army" % t)
-	check(Tuning.starting_stock("Crown", "Tier 4").size() == 7
-			and Tuning.starting_stock("Crown", "Tier 4").count("pawn") == 4,
-		"Crown at Tier 4+: 4 pawn + rook + bishop + knight (7)")
-	var wild := Tuning.starting_stock("Wild Hunt", "Tier 5")
-	check(wild.size() == 6 and wild.count("pawn") == 4 and wild.count("kirin") == 1
-			and wild.count("knight") == 1,
-		"Wild Hunt at Tier 5: 4 pawn + 1 kirin + 1 knight (6)")
-	var og := Tuning.starting_stock("Old Guard", "Tier 4")
-	check(og.size() == 6 and og.count("ferz") == 2 and og.count("wazir") == 2
-			and og.count("knight") == 1 and og.count("alibaba") == 1,
-		"Old Guard at Tier 4+: 2 ferz + 2 wazir + 1 knight + 1 alibaba (6)")
+	# --- NO-211 (Max): plain handicap text — no "Also:" prefix on the
+	# cumulative lines, no parenthetical asides. ---
+	var menu_node: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu_node)
+	await process_frame
+	var menu := menu_node as MenuScript
+	for t in Tuning.TIERS:
+		var desc: String = menu._tier_description(t)
+		check(not desc.contains("Also:"), '%s: description has no "Also:" prefix' % t)
+		check(not desc.contains("("), "%s: description has no parenthetical aside" % t)
+	menu_node.queue_free()
+	await process_frame
 
-	# --- a fresh Tier 4 run actually boots with the halved stock ---
+	# --- NO-213: the Stock-halving lever is gone from the ladder entirely —
+	# starting Stock is always the full army, at every tier, not just through
+	# Tier 3 as before. ---
 	GameScript.next_army = "Crown"
-	GameScript.next_tier = "Tier 4"
+	GameScript.next_tier = "Tier 5" # the old halving threshold's own highest tier
 	var boot: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(boot)
 	await process_frame
-	check(boot.stock.size() == 7 and boot.stock.count("pawn") == 4,
-		"a fresh Tier 4 boot actually carries the halved Crown stock")
+	check(boot.stock.size() == Tuning.ARMIES["Crown"].size()
+			and boot.stock.count("pawn") == Tuning.ARMIES["Crown"].count("pawn"),
+		"NO-213: a fresh Tier 5 boot carries the FULL Crown stock — no halving left")
 	boot.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
+	# --- NO-213: -1 action/turn moved down to Tier 4 (Knight); enemy's +1
+	# action stays Tier 5 (Queen) only. A live boot proves both actually
+	# stack at Tier 5 — not just the pure Tuning math in the loop above. ---
+	# A raw instantiate() boots into SETUP (no board config -> _set_drawer
+	# ("stock") only) and never reaches _begin_player_turn(), so actions_left
+	# stays at its unset default of 0 regardless of tier — these two checks
+	# could never pass. _boot() with a board config carries no "state" key,
+	# so SaveConfig.apply() routes through g._begin_player_turn() (see its
+	# own comment: only a mid-turn save with a "state" key skips it), which
+	# is the real code path that reads next_tier into actions_left (line
+	# ~1345) — the live boot the comment above promises, not just Tuning math.
+	GameScript.next_tier = "Tier 4"
+	var knight := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(knight.actions_left == Tuning.ACTIONS_PER_TURN - 1,
+		"Tier 4 (Knight): actions/turn is one lower than base")
+	check(Economy.enemy_actions(knight) == Tuning.ENEMY_ACTIONS_PER_TURN,
+		"Tier 4 (Knight): enemy actions/turn is still unchanged")
+	knight.queue_free()
+	await process_frame
+
+	GameScript.next_tier = "Tier 5"
+	var queen := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(queen.actions_left == Tuning.ACTIONS_PER_TURN - 1,
+		"Tier 5 (Queen): still one action fewer — Knight's handicap is inherited")
+	check(Economy.enemy_actions(queen) == Tuning.ENEMY_ACTIONS_PER_TURN + 1,
+		"Tier 5 (Queen): AND enemy actions/turn is one higher — both stack")
+	queen.queue_free()
 	await process_frame
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 
@@ -93,7 +126,7 @@ func _init() -> void:
 	# stay grouped by type with the remainder taken off the last type ---
 	var s1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
-	check(s1.shop_stock.size() == 23, "Tier 1 Shop: unchanged 23 slots (NO-166)")
+	check(s1.shop_stock.size() == 27, "Tier 1 Shop: unchanged 27 slots (NO-201)")
 	s1.queue_free()
 	await process_frame
 
@@ -103,9 +136,9 @@ func _init() -> void:
 	var kinds := {}
 	for slot in s3.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(kinds.get("piece", 0) == 9 and kinds.get("artefact", 0) == 3
-			and kinds.get("item", 0) == 3 and kinds.get("box", 0) == 4,
-		"Tier 3+ Shop: 9 pieces / 3 artefacts / 3 items / 4 boxes (NO-166) (%s)" % str(kinds))
+	check(kinds.get("piece", 0) == 11 and kinds.get("artefact", 0) == 4
+			and kinds.get("item", 0) == 4 and kinds.get("box", 0) == 4,
+		"Tier 3+ Shop: 11 pieces / 4 artefacts / 4 items / 4 boxes (NO-201) (%s)" % str(kinds))
 	var box_types := {}
 	for slot in s3.shop_stock:
 		if slot.kind == "box":

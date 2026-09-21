@@ -314,7 +314,7 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Merge partner", board.COL_MERGE, "A piece the selection can merge or fuse with."],
 		["Reachable zone", board.COL_ZONE_OUTLINE_MOVE, "Outline around every square a selected piece can reach this turn."],
 		["Zone overlap", board.COL_ZONE_OUTLINE_OVERLAP, "Where a move zone and a capture zone reachable this turn share a boundary."],
-		["Capture zone tile", board.COL_CAPTURE_TILE_TINT, "A tile inside the selected piece's capture range."],
+		["Capture zone tile", board.COL_CAPTURE, "A tile inside the selected piece's capture range."],
 		["Placement", board.COL_PLACE, "A tile available during setup or relocation."],
 		["Arrow Planning", board.COL_ARROW, "A planned move marker, placed by the Arrow Planning item."],
 		["Your pieces", board.COL_PLAYER, "Your pieces and threats read blue — the game's palette rule."],

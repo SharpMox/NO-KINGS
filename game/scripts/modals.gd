@@ -69,6 +69,11 @@ var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
 	# vp.x - draw_w formula themselves
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value
+var shop_lower: VBoxContainer # V4 (Max review 2026-09-21): the master grid —
+	# PIECES+BOXES row, then ARTEFACTS, then ITEMS, all sharing one column
+	# grid (see the V4 note below `_shop_zone`) — exposed, same reasoning as
+	# shop_lane_b_bar above, so a probe can measure whether the content block
+	# is actually centred in the panel.
 ## Shop geometry history (NO-119/132/142/144/166/167): PIECES, ARTEFACTS,
 ## ITEMS and BOXES were stacked full-width, one below another, all at
 ## Tuning.OFFBOARD_GRID_COLS (5) — precisely so no zone read thinner than
@@ -95,10 +100,45 @@ var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 ## pays for the one extra PIECES row (~76px). No Godot run from this seat to
 ## confirm the ~16px label-height estimate was ever exact; it no longer
 ## matters, since labels are gone.
+##
+## NO-201 (Max review): `left_w`/`left_cols` above pick the WIDEST grid that
+## fits the 332px budget, but fixed OFFBOARD_ICON tiles can't be stretched to
+## consume it exactly — grid_cols floors, so left_cols=4 leaves a real 332 -
+## grid_row_w(4, SHOP_SUBZONE_SEP) = 32px remainder. `left` used to be
+## SIZE_EXPAND_FILL, so that remainder sat INSIDE the left column (the grid
+## centred within it), reading as a gap before BOXES rather than at either
+## edge. Stretching PIECES/ARTEFACTS/ITEMS to close it would resize every
+## icon off Tuning.OFFBOARD_ICON, which every other grid in the app (Stock,
+## Inventory, Box pick) shares — out of scope here. So `left` now sizes to
+## its own minimum (grid_row_w(left_cols, SEP), no stretch) and `shop_lower`
+## (the whole PIECES/ARTEFACTS/ITEMS + BOXES row) is SIZE_SHRINK_CENTER
+## instead of filling root's width: the 32px remainder moves out to the
+## panel's two edges, split evenly, rather than sitting as one asymmetric gap
+## next to BOXES.
+##
+## V4 (Max review 2026-09-21): "everything aligned to a big grid but split
+## into sections" — his mockup put PIECES 3 cols x 4 rows top-left, BOXES a
+## single column top-right, then ARTEFACTS and ITEMS each a full-width row
+## below. Rather than compute left_cols from the leftover width (NO-201
+## above), this locks PIECES to 3 columns and ARTEFACTS/ITEMS to
+## Tuning.OFFBOARD_GRID_COLS (5, the house grid NO-132 already standardises
+## on) so every section's column edges land on the same 5-column grid:
+## PIECES occupies columns 1-3, BOXES column 5, and SHOP_BOXES_COL_SEP (the
+## gap between PIECES and BOXES) is sized to exactly the width of the
+## unused column 4 plus its two flanking separators — the arithmetic that
+## makes it work out: 3 PIECES cols + 1 gap-as-column-4 + 1 BOXES col = 5,
+## the same total width ARTEFACTS/ITEMS reserve directly
+## (grid_row_w(5, SEP) = 376px either way). `shop_lower` stacks the
+## PIECES+BOXES row above ARTEFACTS above ITEMS in a VBox and is centred as
+## ONE block (still SIZE_SHRINK_CENTER, NO-201's reasoning unchanged) so the
+## shared alignment survives the centring. Supersedes left_cols/grid_cols()
+## here — Tuning.grid_cols is still what OFFBOARD_GRID_COLS documents itself
+## against, just not called from this file any more.
 const SHOP_SUBZONE_SEP := 4.0
-## NO-188: the gutter between the left column (PIECES/ARTEFACTS/ITEMS) and
-## the BOXES column on the right.
-const SHOP_BOXES_COL_SEP := 8.0
+## V4: the gap between the PIECES block (3 cols) and the BOXES column — one
+## full master-grid column's width (OFFBOARD_ICON) plus both separators that
+## would flank it, so PIECES+gap+BOXES totals exactly 5 master columns.
+const SHOP_BOXES_COL_SEP := Tuning.OFFBOARD_ICON + 2.0 * SHOP_SUBZONE_SEP
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
@@ -965,26 +1005,37 @@ func show_shop() -> void:
 	for i in g.shop_stock.size():
 		by_kind[g.shop_stock[i].kind].append(i)
 
-	# NO-188 (Max review): BOXES is its own single-column zone on the right;
-	# PIECES/ARTEFACTS/ITEMS share whatever width that leaves and wrap to
-	# extra rows to pay for it — see the arithmetic above SHOP_SUBZONE_SEP.
-	# 20.0 is the MarginContainer's left+right margin (10px each, set above).
-	var left_w := (draw_w - 20.0) - SHOP_BOXES_COL_SEP - Tuning.OFFBOARD_ICON
-	var left_cols := Tuning.grid_cols(left_w, SHOP_SUBZONE_SEP)
+	# V4 (Max review 2026-09-21): one master grid — PIECES (3 cols) and BOXES
+	# (1 col) share a top row, ARTEFACTS and ITEMS each get their own
+	# full-width row below at Tuning.OFFBOARD_GRID_COLS (5) — see the V4 note
+	# above SHOP_SUBZONE_SEP for the column-alignment arithmetic.
+	var piece_cols := 3
+	var master_cols: int = Tuning.OFFBOARD_GRID_COLS
 
-	var lower := HBoxContainer.new()
-	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lower.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+	shop_lower = VBoxContainer.new()
+	shop_lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# NO-201: shrink to the block's own minimum and centre it in root's width,
+	# rather than stretching to fill — unchanged by V4, now centring the
+	# whole 3-row block instead of just the PIECES+BOXES row.
+	shop_lower.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	shop_lower.add_theme_constant_override("separation", 8)
 
-	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_theme_constant_override("separation", 8)
-	left.add_child(_shop_zone(by_kind.piece, left_cols))
-	left.add_child(_shop_zone(by_kind.artefact, left_cols))
-	left.add_child(_shop_zone(by_kind.item, left_cols))
-	lower.add_child(left)
-	lower.add_child(_shop_zone(by_kind.box, 1))
-	root.add_child(lower)
+	# NO-210: PIECES and BOXES sit in an HBox whose cross-axis default is to
+	# fill+centre each child — SHRINK_BEGIN on both pins them to the row's
+	# top instead, unchanged by V4.
+	var top_row := HBoxContainer.new()
+	top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top_row.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+	var piece_zone := _shop_zone(by_kind.piece, piece_cols)
+	piece_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top_row.add_child(piece_zone)
+	var box_zone := _shop_zone(by_kind.box, 1)
+	box_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	top_row.add_child(box_zone)
+	shop_lower.add_child(top_row)
+	shop_lower.add_child(_shop_zone(by_kind.artefact, master_cols))
+	shop_lower.add_child(_shop_zone(by_kind.item, master_cols))
+	root.add_child(shop_lower)
 
 	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone
 	# entirely — its one real job, Buy, moved to the tile's own preview
@@ -1090,15 +1141,16 @@ func _on_shop_chrome_input(event: InputEvent) -> void:
 
 
 ## NO-188 (Max review): the one zone helper for PIECES/ARTEFACTS/ITEMS/BOXES
-## now that none of them carry a label — position (left column vs. the right
-## column) is what marks a zone, the same way the header/gold/Close already
-## go unlabelled. Replaces the old _piece_grid/_shop_sub_zone split (which
-## existed only to hang a label on three of the four). `cols` reserves the
-## full row's width up front (Tuning.grid_row_w) so a short row aligns
-## instead of centring itself (NO-132), and expands to fill its share of
-## whatever vertical space its parent gives it (NO-142's "never read
-## sparser") — `left`'s three-way split for the first three zones, or
-## `lower`'s own full height for the BOXES column (show_shop, NO-188).
+## now that none of them carry a label — position (top row vs. the two
+## full-width rows below, V4) is what marks a zone, the same way the
+## header/gold/Close already go unlabelled. Replaces the old
+## _piece_grid/_shop_sub_zone split (which existed only to hang a label on
+## three of the four). `cols` reserves the full row's width up front
+## (Tuning.grid_row_w) so a short row aligns instead of centring itself
+## (NO-132), and expands to fill its share of whatever vertical space its
+## parent gives it (NO-142's "never read sparser") — PIECES/BOXES split
+## `top_row`, ARTEFACTS/ITEMS each get their own row of `shop_lower`
+## (show_shop, V4).
 func _shop_zone(indices: Array, cols: int) -> CenterContainer:
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL

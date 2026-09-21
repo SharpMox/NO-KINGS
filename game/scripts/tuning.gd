@@ -419,15 +419,15 @@ const DEFAULT_ARMY := "Crown" # --autoplay / --screenshot skip the menu
 ## SHOP_ITEM_PRICE's own "Tactical" tier above, enough for one early buy.
 const ARMY_BASELINE_GOLD := SHOP_ITEM_PRICE["Tactical"] # 30
 
-# Difficulty tiers (07-difficulty-ranks, redesigned 2026-08-28 — user call):
-# 5 numbered tiers, picked pre-run, locked for the run (Continue into
-# endless keeps it), NOT a leaderboard weight — comfort only. Levers are
-# CUMULATIVE: each tier is the one below plus one more. Tier 1 is the
-# default and has no debuffs.
+# Difficulty tiers (07-difficulty-ranks, redesigned 2026-08-28 — user call;
+# ladder retuned 2026-09-21 — user call, NO-213): 5 numbered tiers, picked
+# pre-run, locked for the run (Continue into endless keeps it), NOT a
+# leaderboard weight — comfort only. Levers are CUMULATIVE: each tier is the
+# one below plus one more. Tier 1 is the default and has no debuffs.
 #   2: the Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)
-#   3: Shop stocks 1 fewer of each kind
-#   4: starting Stock halved per piece type, rounding up (singletons survive)
-#   5: -1 action per turn, enemy actions per turn 2 instead of 1 (issue 59)
+#   3: starting Clock drops from 15 minutes to 5; Shop stocks 1 fewer of each kind
+#   4: -1 action per turn
+#   5: enemy actions per turn 2 instead of 1 (issue 59)
 const TIERS := ["Tier 1", "Tier 2", "Tier 3", "Tier 4", "Tier 5"]
 const DEFAULT_TIER := TIERS[0]
 
@@ -447,53 +447,29 @@ static func clock_start_ms(tier: String) -> int:
 static func shop_row_delta(tier: String) -> int:
 	return -1 if tier_index(tier) >= 2 else 0
 
+## NO-213 (Max, 2026-09-21): the -1 action handicap moved down from Tier 5 to
+## Tier 4 — knight difficulty was reading as random without it, since the
+## Stock-halving lever it replaces (dropped below) gave no felt difficulty
+## signal of its own.
 static func actions_per_turn(tier: String) -> int:
-	return ACTIONS_PER_TURN - (1 if tier_index(tier) >= 4 else 0)
+	return ACTIONS_PER_TURN - (1 if tier_index(tier) >= 3 else 0)
 
 ## Issue 59: Tier 5 restores the GDD's 2 actions/turn (baseline stays 1, see
 ## ENEMY_ACTIONS_PER_TURN above for the fleet-sweep numbers on 2 as a global default).
 static func enemy_actions_per_turn(tier: String) -> int:
 	return ENEMY_ACTIONS_PER_TURN + (1 if tier_index(tier) >= 4 else 0)
 
-## Starting Stock: Tier 4+ halves each distinct piece type, rounding UP so
-## singletons survive — e.g. Crown's 8 pawns -> 4, its lone rook stays 1.
-static func starting_stock(army: String, tier: String) -> Array:
-	var base: Array = ARMIES[army]
-	if tier_index(tier) < 3:
-		return base.duplicate()
-	var counts := {}
-	for id in base:
-		counts[id] = counts.get(id, 0) + 1
-	var out := []
-	for id in base: # preserve first-occurrence order
-		if not counts.has(id):
-			continue
-		for i in ceili(counts[id] / 2.0):
-			out.append(id)
-		counts.erase(id)
-	return out
-
 
 ## NO-148: the handicaps above, as DATA — the single source rank_center's
 ## per-tier descriptions are generated from, keyed to the tier they first
 ## apply at (a TIERS index), so a retune here can't silently drift the copy
 ## a player reads.
-##
-## FINDING (2026-09-19): the prose summary at this section's top undercounts
-## Tier 3. issue 78 added clock_start_ms's cut at the SAME threshold as
-## shop_row_delta (tier_index >= 2) without folding it into that "each tier
-## is the one below plus one more" comment, so Tier 3 actually introduces TWO
-## handicaps, not one — test_tiers.gd already pins both thresholds
-## independently, so the code and the tests agree; only the prose was stale.
-## This list is generated from what the gating functions actually do; the
-## comment at the top of this section is not, and should be read as
-## superseded by it.
 const TIER_HANDICAPS := [
-	{"at": 1, "text": "The Clock never pauses (menu/win/Shop/drawers/preview all keep ticking)"},
+	{"at": 1, "text": "The Clock never pauses"},
 	{"at": 2, "text": "Starting Clock drops from 15 minutes to 5"},
 	{"at": 2, "text": "Shop stocks 1 fewer of each kind"},
-	{"at": 3, "text": "Starting Stock halved per piece type, rounding up (singletons survive)"},
-	{"at": 4, "text": "-1 action per turn, enemy actions per turn 2 instead of 1"},
+	{"at": 3, "text": "-1 action per turn"},
+	{"at": 4, "text": "Enemy takes 2 actions per turn instead of 1"},
 ]
 
 ## Handicaps newly introduced AT this tier — empty for Tier 1.
@@ -502,17 +478,5 @@ static func new_handicaps(tier: String) -> Array[String]:
 	var out: Array[String] = []
 	for h in TIER_HANDICAPS:
 		if h.at == idx:
-			out.append(h.text)
-	return out
-
-
-## Every handicap already active at a tier BELOW this one, in the order they
-## were introduced — what a tier's description lists underneath its own new
-## handicap(s) (NO-148: cumulative, with the new part identifiable).
-static func lower_handicaps(tier: String) -> Array[String]:
-	var idx := tier_index(tier)
-	var out: Array[String] = []
-	for h in TIER_HANDICAPS:
-		if h.at < idx:
 			out.append(h.text)
 	return out

@@ -71,6 +71,14 @@ const LOGIN_TAGLINE := "Your progress follows your account."
 ## is none. Plain on purpose — presentation is Max's to rule on.
 const OFFLINE_REASON := "No internet connection"
 
+## NO-158's tint for a bordered panel nested inside another panel — a subtle
+## white overlay that reads as "one shade lighter than its parent" regardless
+## of what that parent's own colour is. Shared by the TEST list's row_style,
+## the Army carousel's card_style, and the tier rows (_update_tier_outline) —
+## one constant so the three can't quietly drift apart (CLAUDE.md: "bitten
+## five times by two constants that happen to agree").
+const NESTED_PANEL_TINT := Color(1, 1, 1, 0.06)
+
 ## Every mirrored save, as cloud key -> local file. The single place that
 ## mapping lives: boot sync, and the post-sign-in re-sync, both walk this.
 static func _SYNC_KEYS() -> Dictionary:
@@ -591,8 +599,11 @@ static func _window_size_requested() -> bool:
 ##
 ## The width fraction is content-driven, not aesthetic: Horde's Starting
 ## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
-## measures ~238px wide at PieceMass's own ICON=52 constant, and needs to fit
-## inside the card with room either side. 280px clears that with ~22px to
+## measures ~218.2px wide at PieceMass's own ICON=52 constant (was ~198.4px
+## before V3 raised ROW_PITCH enough to drop PieceMass._choose_rows()'s own
+## pick for that count from 4 rows to 3 — fewer rows means more columns,
+## hence wider — see piece_mass.gd's own build() comment), and needs to fit
+## inside the card with room either side. 280px clears that with ~41.8px to
 ## spare and is the known-good absolute width already shipped. NO-179
 ## full-width follow-up: scroll_w changed (army_scroll lost its 40+40
 ## inset, see _show_armies) from 400 to the full 480px viewport, so the
@@ -984,7 +995,7 @@ func _ready() -> void:
 	_test_sections = [] # {rows, head, relabel} per section — the accordion
 	_test_open = -1
 	var row_style := StyleBoxFlat.new()
-	row_style.bg_color = Color(1, 1, 1, 0.06)
+	row_style.bg_color = NESTED_PANEL_TINT
 	row_style.set_corner_radius_all(6)
 	row_style.content_margin_left = 10
 	row_style.content_margin_right = 10
@@ -1119,7 +1130,7 @@ func _ready() -> void:
 	var card_w: float = scroll_w * ARMY_CARD_WIDTH_FRACTION
 	var card_h: float = card_w / ARMY_CARD_RATIO
 	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
-	card_style.bg_color = Color(1, 1, 1, 0.06)
+	card_style.bg_color = NESTED_PANEL_TINT
 	card_style.border_color = Color(1, 1, 1, 0.22)
 	card_style.set_border_width_all(2)
 	card_style.set_corner_radius_all(10)
@@ -1315,10 +1326,10 @@ func _ready() -> void:
 	#
 	# NO-190: the small flat button that used to carry the SAME "Tier N" text
 	# as the tap target now carries NO text — Max ruled the numbering itself
-	# should go, not just its old large header. It keeps its height (40px,
-	# this codebase's thumb-sized-row convention, e.g. the TEST list's
-	# section headers) so the row stays a real tap target with nothing to
-	# read. test_menu_clicks.gd can no longer find it by text, so it is
+	# should go, not just its old large header. NO-212 turned it into a
+	# borderless overlay spanning the whole tier_panel (see the loop below)
+	# so the row stays a real, full-height tap target with nothing to read.
+	# test_menu_clicks.gd can no longer find it by text, so it is
 	# collected into _tier_buttons (a member array, read directly by the
 	# test — the same convention _selected_tier already uses) instead.
 	#
@@ -1351,16 +1362,6 @@ func _ready() -> void:
 		tier_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tier_row.add_child(tier_panel)
 		tier_panels.append(tier_panel)
-		var tier_col := VBoxContainer.new()
-		tier_col.add_theme_constant_override("separation", 2)
-		tier_panel.add_child(tier_col)
-		var tier_btn := _button(tier_col, "", 13, func() -> void:
-			_selected_tier = i
-			_update_tier_outline(tier_panels, i))
-		tier_btn.flat = true
-		tier_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		tier_btn.custom_minimum_size = Vector2(0, 40)
-		_tier_buttons.append(tier_btn)
 		var tier_desc := Label.new()
 		tier_desc.text = _tier_description(tier_name)
 		tier_desc.add_theme_font_size_override("font_size", 11)
@@ -1373,7 +1374,26 @@ func _ready() -> void:
 		# this row can't demand more width than the panel actually has to give
 		# it (that mismatch is what pushed the whole menu sideways there).
 		tier_desc.custom_minimum_size.x = _text_width() - 100.0
-		tier_col.add_child(tier_desc)
+		# NO-212: top-align, mirroring the icon's own SIZE_SHRINK_BEGIN
+		# (_tier_icon). tier_desc used to sit inside a VBoxContainer below a
+		# same-height invisible tap-target button stacked above it, so every
+		# row's text started a full button-height below its own icon. A
+		# PanelContainer fits each of its children to that child's own size
+		# flags, so adding the label straight into tier_panel and shrinking it
+		# to the top pins it to the panel's top content margin regardless of
+		# what else shares the panel — the tap target below no longer sits in
+		# this stack at all, so its height can't push the text down.
+		tier_desc.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		tier_panel.add_child(tier_desc)
+		# The tap target is now a borderless overlay spanning the whole panel
+		# (PanelContainer fits every child to the same rect) instead of a slim
+		# strip stacked above the text — a bigger, full-row hit area, and one
+		# that can no longer dictate where the text sits.
+		var tier_btn := _button(tier_panel, "", 13, func() -> void:
+			_selected_tier = i
+			_update_tier_outline(tier_panels, i))
+		tier_btn.flat = true
+		_tier_buttons.append(tier_btn)
 	_update_tier_outline(tier_panels, _selected_tier)
 	_button(rank_box, "Confirm", 20, func() -> void:
 		GameScript.next_tier = Tuning.TIERS[_selected_tier]
@@ -1702,6 +1722,11 @@ const TIER_PIECE_IDS := ["pawn", "rook", "bishop", "knight", "queen"]
 ## the description text beside it.
 func _tier_icon(tier_name: String) -> Control:
 	var wrap := CenterContainer.new()
+	# NO-212: top-align, not row-centered — the row's own height grows with
+	# its cumulative handicap text, and centering in that meant the icon
+	# drifted toward the middle of an ever-taller block instead of sitting
+	# beside the text it actually belongs to.
+	wrap.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	wrap.custom_minimum_size = Vector2(70, 0)
 	var icon := TextureRect.new()
 	# NO-190 (Max): red icons — the enemy/dark side of the pair, not a tint.
@@ -1713,20 +1738,19 @@ func _tier_icon(tier_name: String) -> Control:
 	return wrap
 
 
-## NO-148 (Max, 2026-09-19): each tier's description states its OWN new
-## handicap(s) first, then every handicap every lower tier already added —
-## cumulative, with the new part identifiable. GENERATED from
-## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
-## hand-written, so retuning a threshold there moves this copy for free.
+## V2 (Max, 2026-09-21): each tier's description states ONLY what THAT tier
+## adds — supersedes NO-148's cumulative listing (every inherited handicap
+## repeated underneath), which read as the Queen/Tier-4 row re-printing four
+## lines it shared with the tiers below. The handicaps still STACK in
+## behaviour (every gate in tuning.gd is tier_index(tier) >= N) — this is
+## only what the screen prints. GENERATED from Tuning.TIER_HANDICAPS (via
+## new_handicaps), never hand-written, so retuning a threshold there moves
+## this copy for free.
 func _tier_description(tier_name: String) -> String:
 	var new_h := Tuning.new_handicaps(tier_name)
 	if new_h.is_empty():
 		return "No handicaps"
-	var lines := new_h.duplicate()
-	var lower_h := Tuning.lower_handicaps(tier_name)
-	if not lower_h.is_empty():
-		lines.append("Also: " + ", ".join(lower_h))
-	return "\n".join(lines)
+	return "\n".join(new_h)
 
 
 ## NO-159: redraw the tier-selection outline. `panels[i]` is tier i's
@@ -1738,20 +1762,32 @@ func _tier_description(tier_name: String) -> String:
 ## reads as one continuous box around tiers 1..selected, not a stack of
 ## separate ones. Content margins are set unconditionally so toggling the
 ## border never changes row height/layout, only what's drawn.
+##
+## NO-212: every panel, selected or not, gets a full faint border of its own
+## (TIER_BORDER_COLOR) so its text block reads as one box beside its own
+## icon — before this, an unselected row had no border at all and the
+## description text ran on as one unbroken column. The selected range's
+## brighter, internally-joined TIER_OUTLINE_COLOR border still draws on top
+## of that, unchanged.
 const TIER_OUTLINE_COLOR := Color(0.35, 0.65, 1.0)
+const TIER_BORDER_COLOR := Color(1, 1, 1, 0.12)
 const TIER_OUTLINE_WIDTH := 2
 
 func _update_tier_outline(panels: Array, selected: int) -> void:
 	for i in panels.size():
 		var sb := StyleBoxFlat.new()
+		sb.bg_color = NESTED_PANEL_TINT
 		sb.content_margin_left = 10
 		sb.content_margin_right = 10
 		sb.content_margin_top = 8
 		sb.content_margin_bottom = 8
+		sb.border_color = TIER_BORDER_COLOR
+		sb.border_width_left = TIER_OUTLINE_WIDTH
+		sb.border_width_right = TIER_OUTLINE_WIDTH
+		sb.border_width_top = TIER_OUTLINE_WIDTH
+		sb.border_width_bottom = TIER_OUTLINE_WIDTH
 		if i <= selected:
 			sb.border_color = TIER_OUTLINE_COLOR
-			sb.border_width_left = TIER_OUTLINE_WIDTH
-			sb.border_width_right = TIER_OUTLINE_WIDTH
 			sb.border_width_top = TIER_OUTLINE_WIDTH if i == 0 else 0
 			sb.border_width_bottom = TIER_OUTLINE_WIDTH if i == selected else 0
 		panels[i].add_theme_stylebox_override("panel", sb)

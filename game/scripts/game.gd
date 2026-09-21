@@ -83,10 +83,34 @@ static func load_history() -> Array:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(HISTORY_PATH))
 	return parsed if parsed is Array else []
 
-const COL_LIGHT := Color("D0E6B3") # NO-177: pale sage green, superseding the
-	# NOKINGSBG palette (issue 70) — exact hex from Max, 2026-09-20
-const COL_DARK := Color("573F6E") # NO-177: muted aubergine, superseding the
-	# NOKINGSBG palette (issue 70) — exact hex from Max, 2026-09-20
+## Y1/NO-216: two selectable board chequers, id -> {light, dark, label}. The
+## values are the single source of truth for the chequer — piece_diagram.gd
+## reads COL_LIGHT/COL_DARK off this class at runtime (see its NO-215
+## comment) rather than keeping its own copy, and settings.gd reads this
+## dict the same way to build its switcher, so a third theme is one new
+## entry here, nowhere else.
+const BOARD_THEMES := {
+	"sage": {"light": Color("DCF5B7"), "dark": Color("8763A8"), "label": "Sage"},
+		# NO-215: lighter, warmer sage — supersedes NO-177's D0E6B3/573F6E,
+		# exact hex from Max, 2026-09-21
+	"sand": {"light": Color("EAE0D0"), "dark": Color("8483B6"), "label": "Sand"},
+		# Y1/NO-216: warm off-white on muted blue-violet, exact hex from Max,
+		# 2026-09-21 — lower-contrast and cooler than Sage by design
+}
+const DEFAULT_BOARD_THEME := "sage"
+static var COL_LIGHT: Color = BOARD_THEMES[DEFAULT_BOARD_THEME].light
+static var COL_DARK: Color = BOARD_THEMES[DEFAULT_BOARD_THEME].dark
+
+
+## Switches the active chequer; callers still need queue_redraw() to see it
+## (static vars don't trigger one). Unknown ids fall back to the default
+## rather than erroring, since this only ever gets a value the player's own
+## settings toggle wrote.
+static func set_board_theme(theme_id: String) -> void:
+	var t: Dictionary = BOARD_THEMES.get(theme_id, BOARD_THEMES[DEFAULT_BOARD_THEME])
+	COL_LIGHT = t.light
+	COL_DARK = t.dark
+
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 # side shift for monochrome tokens only — the painted art carries its own colour
@@ -179,21 +203,78 @@ const COL_ZONE_OUTLINE_OVERLAP := Color(0.75, 0.45, 1.0) # where a move-tile
 	# ZONE_OUTLINE_OVERLAP_ALPHA below (was folded into the shared
 	# ZONE_OUTLINE_ALPHA, 0.6 — a boundary marker can afford more than the
 	# large outline shapes it interrupts). NOT VERIFIED ON SCREEN.
-const COL_CAPTURE_TILE_TINT := Color(0.92, 0.18, 0.4) # capture-target tile
-	# wash, pushed pinker than COL_CAPTURE (0.85, 0.15, 0.15) by raising
-	# blue — the ring and the new capture outline stay pure COL_CAPTURE so
-	# only the tile fill shifts, not every red thing on the tile
-const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
-const SELECT_RING_WIDTH := 5.0 # NO-183: was 3.0 — _draw_pulse was correctly
-	# wired (added as a child canvas item, signal-connected, queue_redraw'd
-	# every _process frame a piece is selected) but read as invisible: a
-	# 3px ring in the SAME hue as the full-tile COL_SELECT/COL_CAPTURE wash
-	# it sits on top of (line ~4451) barely separated from that wash at a
-	# glance. Widened and see ALPHA below — NOT VERIFIED ON SCREEN, same
-	# lesson as NO-150's "technically present" outline.
-const SELECT_RING_ALPHA_MIN := 0.7 # NO-183: was 0.5
-const SELECT_RING_ALPHA_RANGE := 0.3 # breathes 0.7-1.0; old pulse swung 0.45-0.85
-	# stacked with radius+width jitter, which read as flashing, not "clean"
+const SELECTED_INSET := -6.0 # NO-199: the selected piece draws bigger than a
+	# normal token (the -6.0 at the board draw loop below) — the outline
+	# shader traces that SAME enlarged rect, shared here so it can't drift
+	# out of sync with the piece's actual drawn size.
+const SELECT_OUTLINE_WIDTH := 6.0 # px, how far the outline shader dilates past
+	# the token's own alpha silhouette — NO-199, replacing NO-183's ring (a
+	# flat circle, never the piece's own shape) with one that traces it.
+	# Max, 2026-09-21: doubled from 3.0 — at 3px the outline was there but did
+	# not announce "selected" the way the ring it replaced did.
+const SELECT_OUTLINE_RIM := 3.0 # px of SELECT_OUTLINE_WIDTH given to the outer
+	# purple rim; the rest nearer the piece is BUFF_BADGE_BG — the same
+	# dark-fill/light-rim split NO-185 used for buff badges against these
+	# same four backgrounds (COL_LIGHT/COL_DARK tiles, light/dark tokens).
+const SELECT_OUTLINE_RIM_ALPHA := 0.8 # Max, 2026-09-21: "a transparent purple
+	# to contrast with the red and blue". Scales the pulse, so the rim breathes
+	# 0.56-0.80 rather than 0.70-1.00 — present without reading as a solid band.
+const SELECT_OUTLINE_ALPHA_MIN := 0.7 # NO-183's breathing range, reused as-is
+const SELECT_OUTLINE_ALPHA_RANGE := 0.3 # for the outline's pulse (0.7-1.0)
+
+## NO-199: traces the selected piece's own alpha silhouette instead of a flat
+## ring. Samples TEXTURE's alpha at two dilations around each transparent
+## pixel (16 directions — a distance-transform approximation, cheap here
+## since it only ever runs over the one selected token) and paints the
+## nearer band BUFF_BADGE_BG-dark, the further one COL_SELECT/COL_CAPTURE —
+## the same dark-fill/light-rim split NO-185 used for buff badges, so it
+## reads against COL_LIGHT and COL_DARK tiles alike. UV outside [0,1] reads
+## as transparent rather than clamping to the texture edge, so a piece whose
+## painted alpha touches its own 192x192 canvas (a few do) doesn't smear a
+## false band there. Works unchanged for the mono-SVG King path — it only
+## ever reads alpha, never the source colour.
+const SELECT_OUTLINE_SHADER := """
+shader_type canvas_item;
+uniform vec4 rim_color : source_color = vec4(1.0);
+uniform vec4 fill_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float fill_reach = 0.02; // UV fraction: dilation for the inner (dark) band
+uniform float rim_reach = 0.03;  // UV fraction: dilation for the outer (colour) band
+
+float _alpha_at(sampler2D tex, vec2 uv) {
+	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+		return 0.0;
+	}
+	return texture(tex, uv).a;
+}
+
+void fragment() {
+	// TEXTURE only exists inside fragment() — passed explicitly to the
+	// helper rather than referenced from it (that's what failed to compile:
+	// "Unknown identifier in expression: 'TEXTURE'"). No `return` in here —
+	// processor functions reject it outright ("Using 'return' in the
+	// 'fragment' processor function is incorrect") — so this falls through
+	// an if/else instead, COLOR assigned exactly once per branch.
+	if (_alpha_at(TEXTURE, UV) > 0.5) {
+		COLOR = vec4(0.0); // inside the token — the real piece draws itself here
+	} else {
+		float fill_hit = 0.0;
+		float rim_hit = 0.0;
+		for (int i = 0; i < 16; i++) {
+			float ang = float(i) * 0.39269908; // TAU / 16
+			vec2 dir = vec2(cos(ang), sin(ang));
+			fill_hit = max(fill_hit, _alpha_at(TEXTURE, UV + dir * fill_reach));
+			rim_hit = max(rim_hit, _alpha_at(TEXTURE, UV + dir * rim_reach));
+		}
+		if (fill_hit > 0.5) {
+			COLOR = fill_color;
+		} else if (rim_hit > 0.5) {
+			COLOR = rim_color;
+		} else {
+			COLOR = vec4(0.0);
+		}
+	}
+}
+"""
 const MOVE_INDICATOR_ALPHA := 0.55 # was 0.85 (recon) / 0.9 (player) baked in
 const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots) —
 	# NO-183: the leap dot itself is gone (see the legal_paths match below);
@@ -655,6 +736,7 @@ func _ready() -> void:
 	var settings_data := Settings.load_settings()
 	Settings.apply(settings_data)
 	animations_on = settings_data.get("animations_on", true)
+	set_board_theme(settings_data.get("board_theme", DEFAULT_BOARD_THEME))
 	var args := OS.get_cmdline_user_args()
 	var first_boot := not cli_bypass_used # NO-77: the launch bypass fires once
 	cli_bypass_used = true
@@ -687,6 +769,11 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_board)
 	add_child(_pulse)
 	_pulse.draw.connect(_draw_pulse)
+	var outline_shader := Shader.new()
+	outline_shader.code = SELECT_OUTLINE_SHADER
+	var outline_mat := ShaderMaterial.new()
+	outline_mat.shader = outline_shader
+	_pulse.material = outline_mat
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
@@ -746,8 +833,9 @@ func _ready() -> void:
 		var line_up := Kings.roll_run(rng)
 		king_tier = line_up.tier
 		king_order = line_up.order
-		# Tier 4+ halves each piece type, rounding up (07-difficulty-ranks)
-		stock = Tuning.starting_stock(next_army, next_tier)
+		# NO-213: Stock-halving lever removed from the tier ladder — always
+		# the full army.
+		stock = Tuning.ARMIES[next_army].duplicate()
 		clock_ms = float(Tuning.clock_start_ms(next_tier)) # issue 78: 15 min,
 			# or 5 at Tier 3+. Set HERE, not at the var declaration — next_tier
 			# is only meaningful once the run actually starts.
@@ -861,7 +949,13 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## from what hud.gd actually builds (test_game_clicks.gd's NO-33 guard
 ## computes the live deck's height and checks it against this constant).
 const DECK_ROWS := 32.0 + HudScript.DECK_GAP + 60.0 ## drawers 32 + DECK_GAP (hud.gd) + act 60
-const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
+## NO-196: used to split as "6 between board and deck, 6 under the deck" — but
+## the deck is now bottom-anchored at a FIXED height (hud.gd's build()), flush
+## to the screen edge with nothing padding it below, so there is no longer a
+## separate "under the deck" margin to spend. Both 6's now land in the one
+## gap between the board and the deck; the sum (and the tile solve below) is
+## unchanged, only where it's spent moved.
+const DECK_MARGINS := 12.0
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept
 ## as the relationship rather than the pair of numbers it produced on one screen.
@@ -871,6 +965,18 @@ const ICON_GAP := 7
 ## Header and get clipped. Just enough top margin for the outset + half the
 ## stroke width (4 + 1.5) to clear it — not a return to centring (2026-09-05).
 const BOARD_TOP_MARGIN := 6.0
+## NO-197: the whose-turn outline (_draw, below) sits this far OUTSIDE the tile
+## grid, stroked BOARD_OUTLINE_WIDTH wide and CENTRED on that inset edge — so its
+## outer ink reaches INSET + WIDTH/2 past the grid (4 + 1.5 = 5.5). Named so
+## test_game_clicks.gd's overlap guard can derive that 5.5 instead of repeating
+## it as a bare literal (CLAUDE.md: "two constants that happen to agree") —
+## hud.gd's old deck_top offset was a bare 6.0, half a px past this ink, which
+## read as overlap once anti-aliased. hud.gd no longer needs these two directly:
+## the deck is bottom-anchored at a fixed height now (NO-196), which leaves
+## DECK_MARGINS (12, below) — comfortably more than this 5.5 — as the board/deck
+## clearance regardless of tile size; see hud.gd's build() for the inequality.
+const BOARD_OUTLINE_INSET := 4.0
+const BOARD_OUTLINE_WIDTH := 3.0
 
 
 ## The one-way, closed-form solve (ADR-0004, amended by NO-83). With the strip
@@ -934,8 +1040,9 @@ func _layout_board() -> void:
 	# PULLED UP under the top strip rather than centred in the span (user ruling,
 	# 2026-09-05). Centring split the leftover height into a gap above AND below
 	# the board, and on a 9:20 phone that was ~130px of nothing in two places.
-	# Flush to the top puts every spare pixel in ONE place, under the board,
-	# where the deck expands to fill it.
+	# Flush to the top puts every spare pixel in ONE place, under the board —
+	# between the board and the deck (NO-196: the deck itself is a fixed
+	# height now, hud.gd's build(), so it no longer absorbs any of this).
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), top)
 	queue_redraw()
 
@@ -1260,7 +1367,7 @@ func _begin_player_turn() -> void:
 		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.actions_per_turn(next_tier) # Tier 5: -1 (07-difficulty-ranks)
+	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
 	moved_this_turn.clear()
 	for pos in board: # Blitz's free move is scoped "this Turn" — never carries
 		board[pos].erase("blitz_free_move") # over. Cleared BEFORE on_turn_start
@@ -4540,7 +4647,9 @@ func _draw() -> void:
 	elif state == State.ENEMY_TURN:
 		oc = Color(1.0, 0.42, 0.35)
 	var bsize := Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile
-	draw_rect(Rect2(board_px - Vector2(4, 4), bsize + Vector2(8, 8)), oc, false, 3.0)
+	draw_rect(Rect2(board_px - Vector2(BOARD_OUTLINE_INSET, BOARD_OUTLINE_INSET),
+		bsize + Vector2(BOARD_OUTLINE_INSET, BOARD_OUTLINE_INSET) * 2.0), oc, false,
+		BOARD_OUTLINE_WIDTH)
 	var recon: bool = selected.x >= 0 and board.has(selected) \
 			and board[selected].owner == Rules.ENEMY
 	if selected.x >= 0: # enemy recon selections tint red, own selections blue
@@ -4580,12 +4689,15 @@ func _draw() -> void:
 		# branch is taken.
 	for d in legal_dests:
 		var d_rect := Rect2(_tile_px(d), Vector2(tile, tile))
-		if board.has(d): # capturable target: pink-red tile tint. NO-183: the
-			# ring that used to sit on top of it is gone — the tint plus the
-			# zone outline below already mark this tile red, and NO-184 now
-			# gives the move tiles a matching hatch fill (see the `else`
-			# below), so the per-tile ring/dot layer was pure duplication.
-			draw_rect(d_rect, Color(COL_CAPTURE_TILE_TINT, 0.3))
+		if board.has(d): # capturable target: red hatch, same family as the
+			# move hatch below (phase 0.0, "\" direction — matches the other
+			# COL_CAPTURE hatches, e.g. the bomb/Item zone, so a tile in both
+			# sets doesn't fight itself). Max overruled NO-183's flat tint
+			# ("capture squares don't seem to have the red hatch") — dropped it
+			# rather than layering hatch on top, so captures read as the red
+			# twin of the blue move hatch below, not a heavier, differently
+			# styled tile.
+			_draw_hatch(d_rect, Color(COL_CAPTURE, HATCH_ALPHA))
 			capture_dests.append(d)
 		else: # NO-184: move destination — a hatch fill, parity with the red
 			# bomb/Item zone below (previously outline-only). Recon zones stay
@@ -4607,9 +4719,27 @@ func _draw() -> void:
 	# zone that's already all red, and there's no third recon-only colour to
 	# reach for without inventing one nothing asked for.
 	if not legal_dests.is_empty():
+		var arrowed := {} # tiles a ride's own solid arrow will draw over —
+			# the NO-150 diagonal bridge below draws an identical colinear
+			# line the full length of a diagonal ride (straight rides never
+			# trigger it: consecutive axis-aligned tiles share a real edge,
+			# so the bridge loop's "already joined" check always skips them),
+			# and that line sits UNDER the translucent arrow, visible through
+			# it. Max: "diagonal arrows are still showing the arrow body
+			# visible underneath the arrow head, you did fix this for the
+			# arrows going straight" — the straight case was already clean
+			# for exactly this reason, nothing to do with _draw_move_arrow's
+			# own geometry (verified unchanged and correct by the same
+			# convexity argument piece_diagram.gd's port confirmed on
+			# screen).
+		if not (state == State.SETUP or legal_paths.is_empty()):
+			for p in legal_paths:
+				if p.kind == "ride" and not p.get("hop", false):
+					for t in p.line:
+						arrowed[t] = true
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
-			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests)
+			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests, arrowed)
 	_draw_target_zone(_bomb_highlight_tiles()) # NO-122/176 hatch, NO-130
 		# shared — drawn after the zone outline above (see NO-176 comment)
 	if item_active >= 0: # item targeting: same zone indicator as the bomb
@@ -4665,7 +4795,7 @@ func _draw() -> void:
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
-		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
+		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
@@ -4739,7 +4869,7 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 ## `_draw_target_zone` calls this for both the bomb blast preview and an
 ## armed Item's zone.
 func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH,
-		captures: Array[Vector2i] = []) -> void:
+		captures: Array[Vector2i] = [], no_bridge: Dictionary = {}) -> void:
 	# NO-161: `captures` is the subset of `tiles` whose outline should be red
 	# instead of `col`. An edge between two tiles that are BOTH in `tiles`
 	# but disagree on capture-ness (one is, one isn't) is a boundary inside
@@ -4801,6 +4931,11 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 				continue
 			if tiles.has(Vector2i(t.x + d.x, t.y)) or tiles.has(Vector2i(t.x, t.y + d.y)):
 				continue # already joined by a real shared edge — no pinch
+			if no_bridge.has(t) and no_bridge.has(diag):
+				continue # a ride's own solid arrow already draws this exact
+				# segment on top of the zone — this stroke would just
+				# duplicate it, underneath a translucent arrow it shows
+				# through (see the call site's comment)
 			var diag_cap := captures.has(diag)
 			var bridge_col: Color = overlap_col if diag_cap != t_cap \
 					else (capture_col if t_cap else col) # NO-161: same
@@ -4808,29 +4943,61 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 			draw_line(_tile_px(t) + half, _tile_px(diag) + half, bridge_col, width)
 
 
-## The animated ring around the selected piece — drawn by `_pulse`, a child
-## canvas item that is the only thing redrawn per frame while something is
-## selected (the board itself only redraws on state changes). NO-129: radius
-## and width are now fixed (only alpha still breathes) — the old triple
-## jitter on radius+width+alpha together read as flashing, not a clean ring.
-## NO-183: confirmed IMPLEMENTED, not missing — `_pulse` is added as a child
-## in _ready (so it draws after, i.e. on top of, this node's own _draw and
-## every piece token), wired via `_pulse.draw.connect(_draw_pulse)`, and
-## `_process` calls `_pulse.queue_redraw()` every frame a piece is selected.
-## The likely reason it read as invisible: this ring is COL_SELECT/COL_CAPTURE
-## (see SELECT_RING_WIDTH's comment), the same hue as the full-tile wash
-## `_draw` already fills the selected tile with — a thin 3px ring on top of a
-## same-colour tile wash barely separated at a glance. See SELECT_RING_WIDTH.
+## The animated outline around the selected piece — drawn by `_pulse`, a
+## child canvas item that is the only thing redrawn per frame while
+## something is selected (the board itself only redraws on state changes).
+## NO-199: replaces NO-183's ring (a flat circle, never the piece's own
+## shape — Max: "the circle is not it") with SELECT_OUTLINE_SHADER tracing
+## the selected token's own alpha silhouette, at the SAME enlarged rect the
+## board draw loop already gives the selected piece (SELECTED_INSET). Colour
+## still distinguishes a recon (enemy) selection from your own, and the old
+## breathing alpha is kept — both bands fade together rather than dropping
+## the pulse silently.
 func _draw_pulse() -> void:
 	if selected.x < 0 or not board.has(selected):
 		return
-	var recon: bool = board[selected].owner == Rules.ENEMY
+	var p: Dictionary = board[selected]
+	if not textures.has(p.id):
+		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	var base := COL_CAPTURE if recon else COL_SELECT
-	var pc := Color(base, SELECT_RING_ALPHA_MIN + SELECT_RING_ALPHA_RANGE * pulse)
-	_pulse.draw_arc(_tile_px(selected) + Vector2(tile, tile) / 2,
-		tile * SELECT_RING_RADIUS, 0, TAU, 40, pc, SELECT_RING_WIDTH)
+	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
+	var size := tile - SELECTED_INSET * 2 # the TOKEN's own on-screen size. The
+		# shader's UV space always spans exactly this (see canvas_rect below),
+		# so reach stays in these units no matter how much extra canvas the
+		# draw call gives the dilation room to spill into.
+	var mat: ShaderMaterial = _pulse.material
+	# Max, 2026-09-21: one purple for every selection, not blue/red by side —
+	# the rim has to read AGAINST the blue move zone and the red capture zone
+	# it sits inside, so it cannot be either of them. COL_ZONE_OUTLINE_OVERLAP
+	# is the purple this board already uses; reused rather than a second one.
+	mat.set_shader_parameter("rim_color",
+		Color(COL_ZONE_OUTLINE_OVERLAP, pulse_a * SELECT_OUTLINE_RIM_ALPHA))
+	mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, pulse_a))
+	mat.set_shader_parameter("fill_reach", (SELECT_OUTLINE_WIDTH - SELECT_OUTLINE_RIM) / size)
+	mat.set_shader_parameter("rim_reach", SELECT_OUTLINE_WIDTH / size)
+	# Max, 2026-09-21 (2nd pass): raising SELECT_OUTLINE_WIDTH to 6 made the
+	# dilated aura reach past the piece's own draw rect — clipped flat top and
+	# bottom. The shader dilates OUTWARD from the token's alpha in UV space,
+	# but a plain draw_texture_rect(tex, rect) maps UV[0,1] onto `rect`
+	# exactly, so anything the dilation pushes past that rect's edge was never
+	# drawn. Fix: grow the CANVAS by SELECT_OUTLINE_WIDTH on every side via
+	# draw_texture_rect_region with a matching padded src_rect (in TEXTURE
+	# pixels, at the token's own draw scale) and clamp_uv off. The four real
+	# texture corners still land on the same screen pixels as before — the
+	# silhouette neither moves nor rescales, only the margin around it grows —
+	# and that margin gets genuine UV values outside [0,1] for the dilation to
+	# spill into, which _alpha_at's existing out-of-bounds-is-transparent
+	# guard already handles correctly (it was written for UV overflow at the
+	# piece's own edge; this just gives it more of it to do the same thing).
+	var tex := piece_tex(p.id, p.owner)
+	var tex_size := tex.get_size()
+	var margin := tex_size * (SELECT_OUTLINE_WIDTH / size)
+	var canvas_rect := Rect2(
+		_tile_px(selected) + Vector2(SELECTED_INSET, SELECTED_INSET) - Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH),
+		Vector2(size, size) + Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH) * 2)
+	var src_rect := Rect2(-margin, tex_size + margin * 2)
+	_pulse.draw_texture_rect_region(tex, canvas_rect, src_rect, Color(1, 1, 1, 1), false, false)
 
 
 ## Token art for a piece; the player token unless a side is named.
@@ -4992,7 +5159,9 @@ func _connect_hud() -> void:
 			placing_id = ""
 			_clear_selection())
 	hud.settings_changed.connect(func(data: Dictionary) -> void:
-		animations_on = data.get("animations_on", true)) # live — no restart needed
+		animations_on = data.get("animations_on", true) # live — no restart needed
+		set_board_theme(data.get("board_theme", DEFAULT_BOARD_THEME))
+		queue_redraw())
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.

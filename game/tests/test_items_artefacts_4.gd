@@ -341,7 +341,8 @@ func _init() -> void:
 	bt3.queue_free()
 	await process_frame
 
-	# --- 07-difficulty-ranks: Tier 5's -1 action/turn. The OLD Blitz refunded
+	# --- 07-difficulty-ranks: the -1 action/turn handicap, cumulative from
+	# Tier 4 on (NO-213), still applies at Tier 5. The OLD Blitz refunded
 	# its own action, so at 1 action/turn the first move alone spent the
 	# turn's only action and auto-passed before Blitz's target filter (a
 	# piece that already moved) was ever reachable — Blitz was functionally

@@ -13,11 +13,13 @@
 ## next to, not the reference site. They land close to site.css's DARK
 ## theme anyway (--move-color #79a7ff / --capture-color #ff7878). The board
 ## squares are the one deliberate disagreement: they keep game.gd's own
-## COL_LIGHT/COL_DARK chequer (NO-177: pale sage green / muted aubergine,
-## exact hex from Max 2026-09-20, superseding the "NOKINGSBG palette" of
-## issue 70) instead of site.css's dark chequer (#4a4270/#241d3e) — this
-## diagram lives inside the live game and should read as the same board the
-## player is already looking at, not the reference site's.
+## COL_LIGHT/COL_DARK chequer (NO-177/NO-215: exact hex from Max) instead of
+## site.css's dark chequer (#4a4270/#241d3e) — this diagram lives inside the
+## live game and should read as the same board the player is already
+## looking at, not the reference site's. `draw()` reads COL_LIGHT/COL_DARK
+## straight off game.gd (loaded at runtime, see below) rather than keeping a
+## second literal copy, so the two chequers cannot drift again the way NO-215
+## found them (site.css's copy was updated on rename, this one wasn't).
 ##
 ## `hop`/`capture-hop` are NOT ported. board.js's move model has them, but
 ## rules.gd's does not — `game/data/pieces.json` has exactly three move
@@ -28,8 +30,6 @@
 ## full audit. Add them back the day a piece's move model actually needs
 ## them; the exact geometry is in the NO-139 ticket.
 
-const COL_LIGHT := Color("D0E6B3") # matches game.gd COL_LIGHT (NO-177)
-const COL_DARK := Color("573F6E")  # matches game.gd COL_DARK (NO-177)
 const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)  # matches game.gd COL_MOVE
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)   # matches game.gd COL_CAPTURE
 const COL_RIDER := Color("ffae5c") # site.css --rider-color (dark) — no game.gd equivalent yet
@@ -40,10 +40,17 @@ const COL_RIDER := Color("ffae5c") # site.css --rider-color (dark) — no game.g
 ## this script has no access to the Game node's `textures` dictionary.
 static func draw(dia: Control, defs: Dictionary, id: String, cells: int, cell: int, tex: Texture2D) -> void:
 	var c := cells / 2
+	# load() rather than preload(): game.gd preloads hud.gd and modals.gd
+	# (game.gd:31,689), and both of those preload this script — a preload()
+	# here would close that into a compile-time cycle back to game.gd. Same
+	# seam hud.gd already uses for menu.gd (hud.gd:1094); the const access
+	# below resolves through the same GDScript member lookup the codebase
+	# already relies on there for a static function call.
+	var Game: GDScript = load("res://scripts/game.gd")
 	for x in cells:
 		for y in cells:
 			dia.draw_rect(Rect2(Vector2(x, y) * cell, Vector2(cell, cell)),
-				COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
+				Game.COL_LIGHT if (x + y) % 2 == 0 else Game.COL_DARK)
 	if tex != null:
 		dia.draw_texture_rect(tex,
 			Rect2(Vector2(c, c) * cell + Vector2(2, 2), Vector2(cell - 4, cell - 4)), false)
@@ -163,13 +170,20 @@ static func _draw_ray(dia: Control, cells: int, cell: int, dir: Array, max_range
 	var start := _center(c, cell, [0, 0])
 	var tip := _center(c, cell, last)
 	var fwd := (tip - start).normalized()
+	var side := Vector2(-fwd.y, fwd.x)
 	var line_start := start + fwd * cell * 0.42
 	var arrow_len := cell * 0.30
 	var arrow_w := cell * 0.16
-	var base := tip - fwd * arrow_len
-	var perp := Vector2(-fwd.y, fwd.x) * arrow_w
-	_capped_line(dia, line_start, base, COL_MOVE, 3.4)
-	dia.draw_colored_polygon(PackedVector2Array([tip, base + perp, base - perp]), COL_MOVE)
+	var base := tip - fwd * arrow_len # where the arrowhead base sits
+	# NO-183 pattern (game.gd _draw_move_arrow): shaft quad + head triangle
+	# share the `base` edge exactly, so no round cap bleeds under the head.
+	var half_w := 1.7 # was _capped_line's width/2 (3.4/2)
+	dia.draw_circle(line_start, half_w, COL_MOVE) # round cap, piece-side end only
+	dia.draw_colored_polygon(PackedVector2Array([
+		line_start - side * half_w, base - side * half_w,
+		base + side * half_w, line_start + side * half_w,
+	]), COL_MOVE)
+	dia.draw_colored_polygon(PackedVector2Array([tip, base + side * arrow_w, base - side * arrow_w]), COL_MOVE)
 
 
 ## A repeated-leap "rider" (Nightrider-style, e.g. Banshee's (1,2)): a dashed
@@ -239,10 +253,17 @@ static func _draw_bent(dia: Control, cells: int, cell: int, pivot: Array, dir: A
 		return
 	var end_c := _center(c, cell, last)
 	var slide_fwd := (end_c - pivot_c).normalized()
+	var side := Vector2(-slide_fwd.y, slide_fwd.x)
 	var arrow_len := cell * 0.28
 	var arrow_w := cell * 0.14
-	var base := end_c - slide_fwd * arrow_len
-	var perp := Vector2(-slide_fwd.y, slide_fwd.x) * arrow_w
-	_capped_line(dia, pivot_c, base, COL_MOVE, 2.8)
-	dia.draw_colored_polygon(PackedVector2Array([end_c, base + perp, base - perp]), COL_MOVE)
+	var base := end_c - slide_fwd * arrow_len # where the arrowhead base sits
+	# Only this ride-from-pivot segment ends in an arrowhead (the leap-to-pivot
+	# segment above ends in the plain pivot dot below), so it's the only one
+	# needing NO-183's shared-edge shaft+head — same pattern as _draw_ray.
+	var half_w := 1.4 # was _capped_line's width/2 (2.8/2)
+	dia.draw_colored_polygon(PackedVector2Array([
+		pivot_c - side * half_w, base - side * half_w,
+		base + side * half_w, pivot_c + side * half_w,
+	]), COL_MOVE)
+	dia.draw_colored_polygon(PackedVector2Array([end_c, base + side * arrow_w, base - side * arrow_w]), COL_MOVE)
 	dia.draw_circle(pivot_c, cell * 0.10, COL_MOVE)

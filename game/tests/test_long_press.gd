@@ -149,10 +149,18 @@ func _instrument(game: Node) -> void:
 						print("[DEBUG-lp-flake]   at %s:%d %s" % [f.source, f.line, f.function]))
 
 
+## NO-202: items_grid displays most-recently-acquired first (hud.gd's
+## _rebuild_items_grid), so a cell's grid POSITION no longer matches its
+## g.items ARRAY index — this used to return game.items[i]'s position-i
+## cell, which after NO-202 is a different item's button whenever more than
+## one item is held. Cells carry their key as meta (same convention
+## _artefact_cell below already uses), so look up by that instead — order-
+## independent, same as the product's own click handlers (item_pressed.emit
+## closes over the real index, never the display position).
 func _item_button(game: Node, key: String) -> Button:
-	for i in game.items.size():
-		if game.items[i].key == key:
-			return game.hud.items_grid.get_child(i)
+	for c in game.hud.items_grid.get_children():
+		if c is Button and c.get_meta("key", "") == key:
+			return c
 	return null
 
 
@@ -174,12 +182,18 @@ func _artefact_cell(game: Node, key: String) -> Button:
 ## the new one Godot just add_child()'d. Same trap test_game_clicks.gd's
 ## _pool_rows already documents ("a row held across one is a freed node")
 ## and already guards against the same way.
+## V1: grid's direct children are now per-row HBoxContainers, not buttons —
+## one level to recurse through. _rebuild_stock_drawer queue_free()s the OLD
+## ROW (not its buttons individually), so the same stale-frame guard now
+## checks the row, not the button inside it.
 func _stock_button(game: Node, id: String, cap: bool) -> Button:
 	var grid: Control = game.hud.captured_grid if cap else game.hud.stock_grid
-	for c in grid.get_children():
-		if c is Button and not c.is_queued_for_deletion() \
-				and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
-			return c
+	for row in grid.get_children():
+		if row.is_queued_for_deletion():
+			continue
+		for c in row.get_children():
+			if c is Button and c.get_meta("id", "") == id and c.get_meta("cap", false) == cap:
+				return c
 	return null
 
 

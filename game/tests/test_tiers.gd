@@ -93,9 +93,16 @@ func _init() -> void:
 	# --- NO-213: -1 action/turn moved down to Tier 4 (Knight); enemy's +1
 	# action stays Tier 5 (Queen) only. A live boot proves both actually
 	# stack at Tier 5 — not just the pure Tuning math in the loop above. ---
+	# A raw instantiate() boots into SETUP (no board config -> _set_drawer
+	# ("stock") only) and never reaches _begin_player_turn(), so actions_left
+	# stays at its unset default of 0 regardless of tier — these two checks
+	# could never pass. _boot() with a board config carries no "state" key,
+	# so SaveConfig.apply() routes through g._begin_player_turn() (see its
+	# own comment: only a mid-turn save with a "state" key skips it), which
+	# is the real code path that reads next_tier into actions_left (line
+	# ~1345) — the live boot the comment above promises, not just Tuning math.
 	GameScript.next_tier = "Tier 4"
-	var knight: Node2D = load("res://scenes/Game.tscn").instantiate()
-	root.add_child(knight)
+	var knight := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	check(knight.actions_left == Tuning.ACTIONS_PER_TURN - 1,
 		"Tier 4 (Knight): actions/turn is one lower than base")
@@ -105,8 +112,7 @@ func _init() -> void:
 	await process_frame
 
 	GameScript.next_tier = "Tier 5"
-	var queen: Node2D = load("res://scenes/Game.tscn").instantiate()
-	root.add_child(queen)
+	var queen := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
 	check(queen.actions_left == Tuning.ACTIONS_PER_TURN - 1,
 		"Tier 5 (Queen): still one action fewer — Knight's handicap is inherited")

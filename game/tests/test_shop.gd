@@ -358,20 +358,28 @@ func _init() -> void:
 	# (PIECES/ARTEFACTS/ITEMS) top row. Both columns are now SHRINK_BEGIN
 	# (modals.gd, show_shop()) — real geometry, not a screenshot: their global
 	# top edges must land on the same Y. ---
-	var geo: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	# _open_shop() guards on wave < Tuning.SHOP_UNLOCK_WAVE (game.gd:5246) and
+	# returns before ever calling modals.show_shop() — "wave": 3 is below the
+	# unlock wave (5), so shop_lower was never built at all (still null from
+	# its var declaration), not merely holding the wrong children. Match the
+	# other Shop fixtures in this file (e.g. line 51), which already boot at
+	# wave 5 for exactly this reason.
+	var geo: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5})
 	await process_frame
 	geo._open_shop()
 	await process_frame
 	await process_frame # a freshly built Control's get_global_rect() lags a
 		# layout-sort frame (CLAUDE.md)
 	var shop_lower: HBoxContainer = geo.modals.shop_lower
-	check(shop_lower != null and shop_lower.get_child_count() == 2,
-		"precondition: shop_lower holds the left column + the BOXES column")
-	var left_top: float = shop_lower.get_child(0).get_global_rect().position.y
-	var box_top: float = shop_lower.get_child(1).get_global_rect().position.y
-	check(absf(left_top - box_top) < 1.0,
-		"NO-210: the BOXES column's top is level with the left column's top (%.2f vs %.2f)"
-			% [left_top, box_top])
+	var shop_lower_ok := shop_lower != null and shop_lower.get_child_count() == 2
+	check(shop_lower_ok, "precondition: shop_lower holds the left column + the BOXES column")
+	if shop_lower_ok: # guard the geometry read — a broken precondition must
+			# fail loudly above, not crash here on a null/short child list
+		var left_top: float = shop_lower.get_child(0).get_global_rect().position.y
+		var box_top: float = shop_lower.get_child(1).get_global_rect().position.y
+		check(absf(left_top - box_top) < 1.0,
+			"NO-210: the BOXES column's top is level with the left column's top (%.2f vs %.2f)"
+				% [left_top, box_top])
 	geo.queue_free()
 	await process_frame
 

@@ -498,6 +498,12 @@ var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is n
 ## NO-179: the peek-scale setter built in _ready(), captured so _show_armies()
 ## can re-run it once the screen is actually shown — see that call site.
 var _army_set_current: Callable
+## NO-179 follow-up: wraps army_row so it can be vertically centred inside
+## army_scroll's REAL height — see _show_armies. A ScrollContainer always
+## places its single child flush at its own top-left (hud.gd NO-135), so
+## leaving army_row as that child directly collects all the dead space below
+## the card instead of splitting it above and below.
+var _army_row_wrap: CenterContainer
 var rank_center: PanelContainer # NO-190: a background panel now, not a bare CenterContainer
 ## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
 ## as a blue outline enclosing tiers 1..this one. NO-190: Confirm is what
@@ -593,7 +599,18 @@ static func _window_size_requested() -> bool:
 ## inside the card with room either side — see the carousel build's own
 ## comment for the arithmetic that sizes the peek scale so a peeking
 ## neighbour is never cropped, only small.
-const ARMY_CARD_WIDTH_FRACTION := 0.72
+##
+## NO-179 shipped 0.72 (card_w=288); Max then flagged the resulting peek
+## (0.12) as "far too small... a detached thumbnail" and asked for something
+## "in the region of 0.8". That target is not reachable on this viewport: the
+## uncropped-peek bound (see the carousel build's own comment) tops out at
+## ~0.21 even at Horde's bare minimum card width (258px, zero slack) — a peek
+## anywhere near full size would need to show most of a SECOND full-width
+## card beside the resting one, which does not fit in a 400px scroller no
+## matter how ARMY_CARD_WIDTH_FRACTION and ARMY_CARD_PEEK_SCALE are tuned.
+## 0.70 (card_w=280) is the trade actually made here: narrow enough to raise
+## the peek bound a little over 288's, still ~22px clear of Horde's crowd.
+const ARMY_CARD_WIDTH_FRACTION := 0.70
 ## NO-179 (Max: "longer playing card ratio... 2.5:3.5"): width:height of a
 ## standard playing card. Card height is DERIVED from this and card_w, never
 ## a second literal that has to be kept in sync by hand.
@@ -602,9 +619,11 @@ const ARMY_CARD_RATIO := 2.5 / 3.5
 ## the carousel build's own arithmetic (see there) so a peeking card's whole
 ## shape fits in the gap the resting card leaves either side of it — bigger
 ## than that bound and the peek goes back to being cropped. At the 480px
-## portrait width this project targets (scroll_w = 400, card_w = 288) the
-## bound works out to ~0.14; 0.12 leaves ~5px of slack.
-const ARMY_CARD_PEEK_SCALE := 0.12
+## portrait width this project targets (scroll_w = 400, card_w = 280) the
+## bound works out to ~0.157; 0.14 leaves ~5px of slack (see
+## ARMY_CARD_WIDTH_FRACTION's own header for why this isn't the ~0.8 Max
+## asked for).
+const ARMY_CARD_PEEK_SCALE := 0.14
 ## NO-179 (Max: "cards have currently no margin in between them, lets add
 ## some"): gap between card slots — replaces the old separation:0.
 const ARMY_CARD_MARGIN := 16.0
@@ -1094,7 +1113,12 @@ func _ready() -> void:
 	army_center.add_child(army_scroll)
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", int(ARMY_CARD_MARGIN)) # NO-179
-	army_scroll.add_child(army_row)
+	# NO-179 follow-up: army_row's real parent is now this wrap, not
+	# army_scroll directly — see _army_row_wrap's own header for why, and
+	# _show_armies for where its height is actually set.
+	_army_row_wrap = CenterContainer.new()
+	army_scroll.add_child(_army_row_wrap)
+	_army_row_wrap.add_child(army_row)
 	# NO-179: every card is the same slot width now (see ARMY_CARD_WIDTH_
 	# FRACTION's own header) — only a card's render SCALE differs between
 	# resting (1.0) and peeking (ARMY_CARD_PEEK_SCALE), set below by
@@ -1129,8 +1153,8 @@ func _ready() -> void:
 	# neighbour's scaled render (card_w * ARMY_CARD_PEEK_SCALE) has to fit
 	# inside THAT to show uncropped:
 	#   ARMY_CARD_PEEK_SCALE <= lead_w / card_w
-	# At scroll_w=400, card_w=288: lead_w=40, bound≈0.139 — ARMY_CARD_PEEK_
-	# SCALE=0.12 clears it with ~5px to spare.
+	# At scroll_w=400, card_w=280: lead_w=44, bound≈0.157 — ARMY_CARD_PEEK_
+	# SCALE=0.14 clears it with ~5px to spare.
 	var lead_w: float = (scroll_w - card_w) / 2.0 - ARMY_CARD_MARGIN
 	var lead_spacer := Control.new()
 	lead_spacer.custom_minimum_size = Vector2(lead_w, 0)
@@ -1479,6 +1503,17 @@ func _show_armies() -> void:
 	await get_tree().process_frame
 	if army_center.visible:
 		_army_set_current.call(0)
+		# NO-179 follow-up: army_scroll's own height isn't knowable at build
+		# time — it's whatever's left of army_center after the title and the
+		# dots/Back row, both font-sized, claim theirs — so read the real
+		# value now (same "wait a frame, then read" as the peek-scale reapply
+		# above) and give the wrap exactly that height. CenterContainer then
+		# centres army_row inside it, splitting the dead space (CLAUDE.md,
+		# "Layout traps": flush-to-one-edge is right when something can
+		# absorb the slack; here nothing does, so it was reading as a mistake)
+		# evenly above and below the card instead of stranding it all below.
+		var scroll: Control = _army_row_wrap.get_parent()
+		_army_row_wrap.custom_minimum_size.y = scroll.size.y
 
 
 ## NO-179: one small icon per unique piece TYPE in `ids`, first-occurrence

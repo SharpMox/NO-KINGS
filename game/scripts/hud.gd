@@ -2074,7 +2074,13 @@ func _rebuild_artefacts_grid() -> void:
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
 	var seen := {}
-	for t in g.artefacts:
+	# NO-202: most recently acquired kind first, matching _stacks()'s Stock
+	# drawer — g.artefacts is append-ordered, so scan it in reverse rather
+	# than reversing the built grid (which would also flip the empty-slot
+	# padding below). Cells key off t.key, not an array index, so display
+	# order never disagrees with which artefact a tap resolves to.
+	for i in range(g.artefacts.size() - 1, -1, -1):
+		var t: Variant = g.artefacts[i]
 		if seen.has(t.key):
 			continue
 		seen[t.key] = true
@@ -2214,7 +2220,13 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 func _rebuild_items_grid() -> void:
 	for c in items_grid.get_children():
 		c.queue_free()
-	for i in g.items.size():
+	# NO-202: most recently acquired first, matching _stacks()'s Stock
+	# drawer — g.items is append-ordered, so scan it in reverse. `i` stays
+	# the real g.items index throughout (item_pressed.emit(i), the
+	# g.item_active comparison, the "item:%d" lp_key), only the loop's
+	# visitation order changes, so no click handler or save/load index is
+	# affected.
+	for i in range(g.items.size() - 1, -1, -1):
 		var btn := Button.new()
 		var has_icon: bool = g.item_icons.has(g.items[i].key)
 		# NO-119: no name text on the cell — the glyph fallback stands alone,

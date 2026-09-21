@@ -2949,6 +2949,18 @@ func _init() -> void:
 	var tip_rect: Rect2 = game.hud.tip_panel.get_global_rect()
 	check(not tip_rect.intersects(confirm_rect),
 		"the tip's rect never overlaps Confirm's — Confirm stays fully visible")
+	# NO-152 follow-up (Max: "center name and infos with diagram, slim the
+	# sides down to the diagram width"): the target tile above is the pawn from
+	# next_config's board, so diagram_id != "" and tip_diagram is showing —
+	# assert the geometry these changes actually produce, not the flags that
+	# were just written.
+	check(game.hud.tip_label.horizontal_alignment == HORIZONTAL_ALIGNMENT_CENTER,
+		"NO-152: the tip's name/info text is centred, matching the diagram above it")
+	var tip_sb := game.hud.tip_panel.get_theme_stylebox("panel") as StyleBoxFlat
+	var expected_w: float = game.hud.tip_diagram.custom_minimum_size.x \
+		+ tip_sb.content_margin_left + tip_sb.content_margin_right
+	check(absf(tip_rect.size.x - expected_w) <= 2.0,
+		"NO-152: the panel is slimmed to the diagram's own width (+ its fixed side margins), not the wider TIP_W")
 	_click(confirm_rect.get_center())
 	await process_frame
 	check(game.board.get(blitz_target, {}).get("blitz_free_move", false)

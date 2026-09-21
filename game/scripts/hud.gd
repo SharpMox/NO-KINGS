@@ -1368,11 +1368,14 @@ func build(game) -> void:
 	tip_label = Label.new()
 	tip_label.add_theme_font_size_override("font_size", 13)
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# A fixed wrap width rather than a free one: without it a long description is
 	# laid out as a single line whose minimum width is the whole string, and the
 	# clamp below would then have nothing it could fit on screen. Same failure
-	# NO-55 was, arriving through a different control.
+	# NO-55 was, arriving through a different control. The real value is set per
+	# call in show_tip(), which knows whether a diagram is showing; this is just
+	# the pre-first-call default.
 	tip_label.custom_minimum_size = Vector2(minf(TIP_W, vp.x - TIP_MARGIN * 2), 0)
 	tip_box.add_child(tip_label)
 	tip_panel.add_child(tip_box)
@@ -1684,12 +1687,19 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	tip_diagram.visible = diagram_id != ""
 	tip_diagram.queue_redraw()
 	tip_panel.visible = true
+	var vp: Vector2 = g.get_viewport_rect().size
+	# NO-152 follow-up (Max: "center name and infos with diagram, slim the
+	# sides down to the diagram width"): with a diagram, the label wraps to
+	# the diagram's own width instead of the wider TIP_W, so the panel reads
+	# as one column instead of the diagram sitting inside a wider box. Every
+	# other caller (diagram_id == "") keeps the old TIP_W wrap width.
+	var wrap_w := tip_diagram.custom_minimum_size.x if diagram_id != "" else TIP_W
+	tip_label.custom_minimum_size = Vector2(minf(wrap_w, vp.x - TIP_MARGIN * 2), 0)
 	# The panel's size is not known until the container has sorted its children,
 	# and a position computed from a stale size is the whole bug this clamp
 	# exists to avoid. reset_size() forces it to its minimum NOW rather than
 	# next frame, so the arithmetic below runs on the real box.
 	tip_panel.reset_size()
-	var vp: Vector2 = g.get_viewport_rect().size
 	var box: Vector2 = tip_panel.size
 	# NO-152/NO-124: the floating Confirm/Cancel strip is the actionable
 	# control in a commit/cancel flow, the tip is only informational — ruling

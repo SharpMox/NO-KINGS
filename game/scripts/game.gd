@@ -179,17 +179,67 @@ const COL_ZONE_OUTLINE_OVERLAP := Color(0.75, 0.45, 1.0) # where a move-tile
 	# ZONE_OUTLINE_OVERLAP_ALPHA below (was folded into the shared
 	# ZONE_OUTLINE_ALPHA, 0.6 — a boundary marker can afford more than the
 	# large outline shapes it interrupts). NOT VERIFIED ON SCREEN.
-const SELECT_RING_RADIUS := 0.46 # tile fraction, fixed (was 0.46-0.495 jitter)
-const SELECT_RING_WIDTH := 5.0 # NO-183: was 3.0 — _draw_pulse was correctly
-	# wired (added as a child canvas item, signal-connected, queue_redraw'd
-	# every _process frame a piece is selected) but read as invisible: a
-	# 3px ring in the SAME hue as the full-tile COL_SELECT/COL_CAPTURE wash
-	# it sits on top of (line ~4451) barely separated from that wash at a
-	# glance. Widened and see ALPHA below — NOT VERIFIED ON SCREEN, same
-	# lesson as NO-150's "technically present" outline.
-const SELECT_RING_ALPHA_MIN := 0.7 # NO-183: was 0.5
-const SELECT_RING_ALPHA_RANGE := 0.3 # breathes 0.7-1.0; old pulse swung 0.45-0.85
-	# stacked with radius+width jitter, which read as flashing, not "clean"
+const SELECTED_INSET := -6.0 # NO-199: the selected piece draws bigger than a
+	# normal token (the -6.0 at the board draw loop below) — the outline
+	# shader traces that SAME enlarged rect, shared here so it can't drift
+	# out of sync with the piece's actual drawn size.
+const SELECT_OUTLINE_WIDTH := 3.0 # px, how far the outline shader dilates past
+	# the token's own alpha silhouette — NO-199, replacing NO-183's ring (a
+	# flat circle, never the piece's own shape) with one that traces it.
+const SELECT_OUTLINE_RIM := 1.3 # px of SELECT_OUTLINE_WIDTH given to the outer,
+	# colour-coded rim; the rest nearer the piece is BUFF_BADGE_BG — the same
+	# dark-fill/light-rim split NO-185 used for buff badges against these
+	# same four backgrounds (COL_LIGHT/COL_DARK tiles, light/dark tokens).
+const SELECT_OUTLINE_ALPHA_MIN := 0.7 # NO-183's breathing range, reused as-is
+const SELECT_OUTLINE_ALPHA_RANGE := 0.3 # for the outline's pulse (0.7-1.0)
+
+## NO-199: traces the selected piece's own alpha silhouette instead of a flat
+## ring. Samples TEXTURE's alpha at two dilations around each transparent
+## pixel (16 directions — a distance-transform approximation, cheap here
+## since it only ever runs over the one selected token) and paints the
+## nearer band BUFF_BADGE_BG-dark, the further one COL_SELECT/COL_CAPTURE —
+## the same dark-fill/light-rim split NO-185 used for buff badges, so it
+## reads against COL_LIGHT and COL_DARK tiles alike. UV outside [0,1] reads
+## as transparent rather than clamping to the texture edge, so a piece whose
+## painted alpha touches its own 192x192 canvas (a few do) doesn't smear a
+## false band there. Works unchanged for the mono-SVG King path — it only
+## ever reads alpha, never the source colour.
+const SELECT_OUTLINE_SHADER := """
+shader_type canvas_item;
+uniform vec4 rim_color : source_color = vec4(1.0);
+uniform vec4 fill_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float fill_reach = 0.02; // UV fraction: dilation for the inner (dark) band
+uniform float rim_reach = 0.03;  // UV fraction: dilation for the outer (colour) band
+
+float _alpha_at(vec2 uv) {
+	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+		return 0.0;
+	}
+	return texture(TEXTURE, uv).a;
+}
+
+void fragment() {
+	if (_alpha_at(UV) > 0.5) {
+		COLOR = vec4(0.0); // inside the token — the real piece draws itself here
+		return;
+	}
+	float fill_hit = 0.0;
+	float rim_hit = 0.0;
+	for (int i = 0; i < 16; i++) {
+		float ang = float(i) * 0.39269908; // TAU / 16
+		vec2 dir = vec2(cos(ang), sin(ang));
+		fill_hit = max(fill_hit, _alpha_at(UV + dir * fill_reach));
+		rim_hit = max(rim_hit, _alpha_at(UV + dir * rim_reach));
+	}
+	if (fill_hit > 0.5) {
+		COLOR = fill_color;
+	} else if (rim_hit > 0.5) {
+		COLOR = rim_color;
+	} else {
+		COLOR = vec4(0.0);
+	}
+}
+"""
 const MOVE_INDICATOR_ALPHA := 0.55 # was 0.85 (recon) / 0.9 (player) baked in
 const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots) —
 	# NO-183: the leap dot itself is gone (see the legal_paths match below);
@@ -683,6 +733,11 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_board)
 	add_child(_pulse)
 	_pulse.draw.connect(_draw_pulse)
+	var outline_shader := Shader.new()
+	outline_shader.code = SELECT_OUTLINE_SHADER
+	var outline_mat := ShaderMaterial.new()
+	outline_mat.shader = outline_shader
+	_pulse.material = outline_mat
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
@@ -4703,7 +4758,7 @@ func _draw() -> void:
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
 		# the selected piece draws bigger, with a pulsing outline (below)
-		_draw_piece(font, p, px, tint, -6.0 if pos == selected else -2.0)
+		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
 	for a in anims:
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
@@ -4851,29 +4906,34 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 			draw_line(_tile_px(t) + half, _tile_px(diag) + half, bridge_col, width)
 
 
-## The animated ring around the selected piece — drawn by `_pulse`, a child
-## canvas item that is the only thing redrawn per frame while something is
-## selected (the board itself only redraws on state changes). NO-129: radius
-## and width are now fixed (only alpha still breathes) — the old triple
-## jitter on radius+width+alpha together read as flashing, not a clean ring.
-## NO-183: confirmed IMPLEMENTED, not missing — `_pulse` is added as a child
-## in _ready (so it draws after, i.e. on top of, this node's own _draw and
-## every piece token), wired via `_pulse.draw.connect(_draw_pulse)`, and
-## `_process` calls `_pulse.queue_redraw()` every frame a piece is selected.
-## The likely reason it read as invisible: this ring is COL_SELECT/COL_CAPTURE
-## (see SELECT_RING_WIDTH's comment), the same hue as the full-tile wash
-## `_draw` already fills the selected tile with — a thin 3px ring on top of a
-## same-colour tile wash barely separated at a glance. See SELECT_RING_WIDTH.
+## The animated outline around the selected piece — drawn by `_pulse`, a
+## child canvas item that is the only thing redrawn per frame while
+## something is selected (the board itself only redraws on state changes).
+## NO-199: replaces NO-183's ring (a flat circle, never the piece's own
+## shape — Max: "the circle is not it") with SELECT_OUTLINE_SHADER tracing
+## the selected token's own alpha silhouette, at the SAME enlarged rect the
+## board draw loop already gives the selected piece (SELECTED_INSET). Colour
+## still distinguishes a recon (enemy) selection from your own, and the old
+## breathing alpha is kept — both bands fade together rather than dropping
+## the pulse silently.
 func _draw_pulse() -> void:
 	if selected.x < 0 or not board.has(selected):
 		return
-	var recon: bool = board[selected].owner == Rules.ENEMY
+	var p: Dictionary = board[selected]
+	if not textures.has(p.id):
+		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
+	var recon: bool = p.owner == Rules.ENEMY
 	var t := Time.get_ticks_msec() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
-	var base := COL_CAPTURE if recon else COL_SELECT
-	var pc := Color(base, SELECT_RING_ALPHA_MIN + SELECT_RING_ALPHA_RANGE * pulse)
-	_pulse.draw_arc(_tile_px(selected) + Vector2(tile, tile) / 2,
-		tile * SELECT_RING_RADIUS, 0, TAU, 40, pc, SELECT_RING_WIDTH)
+	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
+	var size := tile - SELECTED_INSET * 2
+	var mat: ShaderMaterial = _pulse.material
+	mat.set_shader_parameter("rim_color", Color(COL_CAPTURE if recon else COL_SELECT, pulse_a))
+	mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, pulse_a))
+	mat.set_shader_parameter("fill_reach", (SELECT_OUTLINE_WIDTH - SELECT_OUTLINE_RIM) / size)
+	mat.set_shader_parameter("rim_reach", SELECT_OUTLINE_WIDTH / size)
+	var rect := Rect2(_tile_px(selected) + Vector2(SELECTED_INSET, SELECTED_INSET), Vector2(size, size))
+	_pulse.draw_texture_rect(piece_tex(p.id, p.owner), rect, false)
 
 
 ## Token art for a piece; the player token unless a side is named.

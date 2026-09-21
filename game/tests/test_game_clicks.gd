@@ -1572,8 +1572,15 @@ func _init() -> void:
 	var buff_btn := _first_option_button(game.modals.buff_panel)
 	check(buff_btn != null and "\n" in buff_btn.text,
 		"choice options describe themselves (two-line label), same as Box Pick")
-	_click(buff_btn.get_global_rect().get_center())
-	await process_frame
+	# coordinator review 2026-09-21 (round3 abort): a failed check() above is
+	# not licence to dereference the same null right after it — that is what
+	# turned one honest failure into a dead coroutine and hid every assertion
+	# past this point (CLAUDE.md: "a crash mid-coroutine silently skipping
+	# later assertions"). Gate the click on buff_btn actually resolving so a
+	# future regression here REPORTS instead of truncating the whole suite.
+	if buff_btn:
+		_click(buff_btn.get_global_rect().get_center())
+		await process_frame
 	check(not game.buff_pick_open and not game.item_targets.is_empty(),
 		"picking a choice closes the modal and resumes targeting (the continuation)")
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2) # NO-124: tap stages + shows Confirm
@@ -3137,6 +3144,11 @@ func _sell_button(node: Node) -> Button:
 
 
 func _first_option_button(node: Node) -> Button:
+	if node == null: # round3 abort (coordinator review 2026-09-21): the modal
+		# not being open is a real failure the caller's own check() already
+		# reports — this helper crashing on the null panel is what silently
+		# killed the whole suite instead, one call before the guard above.
+		return null
 	if node is Button and not node.text.begins_with("Skip"):
 		return node
 	for c in node.get_children():

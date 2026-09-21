@@ -1521,15 +1521,33 @@ func _box_tile(index: int) -> Control:
 ## is always exactly full — no NO-132-style custom_minimum_size forcing
 ## needed (that trick is for a row narrower than a shared standard it must
 ## still align under; this grid has no such sibling to match).
+## NO-220 (Max): a GridContainer left-aligns a partial last row (Small's 3
+## options read as [2, 1] flush left) — he wants each row centred on its own,
+## so a row of 1 under a row of 2 reads as a triangle. A GridContainer can't
+## centre a partial row by itself, so this builds a VBoxContainer of
+## per-row HBoxContainers instead, each with ALIGNMENT_CENTER — the OPPOSITE
+## of hud.gd's stock/captured grids (NO-208/NO-209), which right-align their
+## short row on purpose (fills bottom-right). Different surfaces, different
+## intents — do not unify them. Every row's HBox is default-FILL, so the
+## VBoxContainer stretches each one to the widest row's width (same
+## mechanism _fill_rows_bottom_right relies on), which is what gives a
+## shorter row room to centre in.
 func _box_grid(count: int) -> CenterContainer:
 	var center := CenterContainer.new()
-	var grid := GridContainer.new()
-	grid.columns = _box_cols(count)
-	grid.add_theme_constant_override("h_separation", BOX_SEP)
-	grid.add_theme_constant_override("v_separation", BOX_SEP)
-	for i in count:
-		grid.add_child(_box_tile(i))
-	center.add_child(grid)
+	var cols := _box_cols(count)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", BOX_SEP)
+	var i := 0
+	while i < count:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", BOX_SEP)
+		var hi := mini(i + cols, count)
+		for j in range(i, hi):
+			row.add_child(_box_tile(j))
+		rows.add_child(row)
+		i = hi
+	center.add_child(rows)
 	return center
 
 

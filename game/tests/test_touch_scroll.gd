@@ -30,6 +30,19 @@ var fails := 0
 # file passed "a drag does not press the row" vacuously that way.
 var fired := false
 
+## NO-192: the settle wait is bounded by WALL TIME, not a frame count. A frame
+## budget measures the host, and this assertion fails on Aux and passes on Main
+## with no recorded reason — PANEL_SLIDE_S is 0.18s, so 60 frames already looked
+## ample, which is exactly why the cause is still unknown. 3s is ~16x the slide:
+## a failure at this cap is a broken tween, not a slow machine. The detail string
+## on the check is the point of this change — the old assertion printed nothing,
+## so every failure had to be re-theorised from scratch.
+const SETTLE_CAP_MS := 3000
+## A tween's final frame can land a hair off its target; half a pixel cannot
+## change which control a click lands on, and exact Vector2 equality was the
+## other candidate cause of the failures above.
+const SETTLE_EPS_PX := 0.5
+
 
 func _on_row_pressed() -> void:
 	fired = true
@@ -67,11 +80,16 @@ func _find_button(node: Node, text: String) -> Button:
 func _await_drawer_settled(game: Node, key: String) -> void:
 	var panel: Control = game.hud.drawers[key]
 	var rest: Vector2 = game.hud.drawer_rest[key]
+	var t0 := Time.get_ticks_msec()
 	var polls := 0
-	while panel.position != rest and polls < 60:
+	while panel.position.distance_to(rest) > SETTLE_EPS_PX \
+			and Time.get_ticks_msec() - t0 < SETTLE_CAP_MS:
 		await process_frame
 		polls += 1
-	check(panel.position == rest, "the %s drawer's slide settled before use" % key)
+	check(panel.position.distance_to(rest) <= SETTLE_EPS_PX,
+		"the %s drawer's slide settled before use" % key,
+		"pos=%s rest=%s polls=%d elapsed=%dms" % [
+			panel.position, rest, polls, Time.get_ticks_msec() - t0])
 
 
 ## NO-145: a point inside `container`'s own rect but OUTSIDE `content`'s —
@@ -144,8 +162,10 @@ func _drive(d: Node, dir: String, seq: int, cmds: Array) -> PackedStringArray:
 
 
 func _init() -> void:
-	create_timer(60.0).timeout.connect(func() -> void:
-		push_error("WATCHDOG: probe still running after 60s — force quit")
+	# NO-192: raised from 60s. Must stay below run_all.sh's TIMEOUT (600s) or
+	# the runner kills the process first and the tail of this probe's log is lost.
+	create_timer(180.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: probe still running after 180s — force quit")
 		quit(1))
 	if not DisplayServer.is_touchscreen_available():
 		push_error("FAIL: touch emulation is off — this probe needs game/override.cfg (see header)")
@@ -640,8 +660,10 @@ func _init() -> void:
 	check(game.shop_open(), "NO-145: leftward swipe on the empty board opens the Shop",
 		"classify_swipe=%s, wave=%d/%d unlock, shop_open()=%s"
 			% [shop_swipe_dir, game.wave, Tuning.SHOP_UNLOCK_WAVE, game.shop_open()])
+	var shop_t0 := Time.get_ticks_msec()
 	var shop_polls := 0
-	while game.modals.shop_panel.position != game.modals.shop_rest and shop_polls < 60:
+	while game.modals.shop_panel.position.distance_to(game.modals.shop_rest) > SETTLE_EPS_PX \
+			and Time.get_ticks_msec() - shop_t0 < SETTLE_CAP_MS:
 		await process_frame
 		shop_polls += 1
 
@@ -667,13 +689,18 @@ func _init() -> void:
 	# later, modals.gd:766), the same async gap the OPEN side's own
 	# shop_polls loop above already waits out. Asserting shop_open() with no
 	# equivalent wait here would fail even when the close fired correctly.
+	# NO-192: bounded on wall-clock (SETTLE_CAP_MS), same reason as the
+	# drawer settles — a 60-frame budget on a slow host reads as the handler
+	# never having run, when the tween had simply not finished yet.
+	var shop_close_t0 := Time.get_ticks_msec()
 	var shop_close_polls := 0
-	while game.modals.shop_panel.visible and shop_close_polls < 60:
+	while game.modals.shop_panel.visible and Time.get_ticks_msec() - shop_close_t0 < SETTLE_CAP_MS:
 		await process_frame
 		shop_close_polls += 1
 	check(not game.shop_open(), "NO-145: reverse swipe on the Shop's own chrome closes it",
-		"shop_panel.visible=%s after %d settle polls (shop_closed fired=%s)"
-			% [game.modals.shop_panel.visible, shop_close_polls, shop_close_fired[0]])
+		"shop_panel.visible=%s after %d settle polls, elapsed=%dms (shop_closed fired=%s)"
+			% [game.modals.shop_panel.visible, shop_close_polls,
+				Time.get_ticks_msec() - shop_close_t0, shop_close_fired[0]])
 
 	# ---- regression: a swipe-SHAPED drag starting ON A CELL must never
 	# open/close anything — that press belongs to drag-scroll (NO-45's PASS

@@ -117,8 +117,10 @@ func _init() -> void:
 	# Watchdog: a SCRIPT ERROR mid-run kills this coroutine and quit() below
 	# never fires, leaving the window open until a human closes it (user
 	# report 2026-07-12). Force-quit instead; normal runs finish long before.
-	create_timer(120.0).timeout.connect(func() -> void:
-		push_error("WATCHDOG: probe still running after 120s — force quit")
+	# NO-192: raised from 120s. Must stay below run_all.sh's TIMEOUT (600s) or
+	# the runner kills the process first and the tail of this probe's log is lost.
+	create_timer(240.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: probe still running after 240s — force quit")
 		quit(1))
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
 	# issue 83: an account must exist before the main menu is reachable at all.

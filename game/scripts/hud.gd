@@ -1350,6 +1350,23 @@ func build(game) -> void:
 	# LEFT: Captured Stock, a fixed fraction of the width — fixed so the split
 	# never moves as pieces are captured or deployed (story 38).
 	var cap_w: float = roundf(vp.x * STOCK_DRAWER_CAP_FRAC)
+	# NO-227: lighter background behind the whole Captured Stock column, same
+	# "panel inside a panel" idiom as menu.gd's NESTED_PANEL_TINT and the
+	# gutter just below (a white overlay at low alpha, so it lightens
+	# whatever the drawer's own bg_color is instead of a hardcoded opaque
+	# colour that would drift out of sync with it). cap_col is a
+	# VBoxContainer, which would force this into its vertical stack instead
+	# of painting behind it, so the tint sits on a plain Control wrapper one
+	# level up — the same bg/content split this file already uses for the
+	# Inventory drawer panel above (`panel`/`bg`/`sc`). IGNORE + added first
+	# so it never intercepts cap_scroll's drag-scroll (NO-45).
+	var cap_wrap := Control.new()
+	cap_wrap.custom_minimum_size = Vector2(cap_w, stock_h)
+	var cap_bg := ColorRect.new()
+	cap_bg.color = Color(1, 1, 1, 0.06)
+	cap_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cap_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap_wrap.add_child(cap_bg)
 	var cap_col := VBoxContainer.new()
 	cap_col.custom_minimum_size = Vector2(cap_w, stock_h)
 	captured_hint.text = "Captured pieces land here"
@@ -1380,7 +1397,8 @@ func build(game) -> void:
 	cap_anchor.add_child(captured_grid)
 	cap_scroll.add_child(cap_anchor)
 	cap_col.add_child(cap_scroll)
-	stock_row.add_child(cap_col)
+	cap_wrap.add_child(cap_col)
+	stock_row.add_child(cap_wrap)
 	# NO-164: the gutter — a fixed, always-visible divider, unlike the
 	# incidental slack NO-135 already routes here. IGNORE: purely decorative,
 	# never a target and never in the way of a drag reaching either scroller.

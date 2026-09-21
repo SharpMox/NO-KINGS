@@ -149,10 +149,18 @@ func _instrument(game: Node) -> void:
 						print("[DEBUG-lp-flake]   at %s:%d %s" % [f.source, f.line, f.function]))
 
 
+## NO-202: items_grid displays most-recently-acquired first (hud.gd's
+## _rebuild_items_grid), so a cell's grid POSITION no longer matches its
+## g.items ARRAY index — this used to return game.items[i]'s position-i
+## cell, which after NO-202 is a different item's button whenever more than
+## one item is held. Cells carry their key as meta (same convention
+## _artefact_cell below already uses), so look up by that instead — order-
+## independent, same as the product's own click handlers (item_pressed.emit
+## closes over the real index, never the display position).
 func _item_button(game: Node, key: String) -> Button:
-	for i in game.items.size():
-		if game.items[i].key == key:
-			return game.hud.items_grid.get_child(i)
+	for c in game.hud.items_grid.get_children():
+		if c is Button and c.get_meta("key", "") == key:
+			return c
 	return null
 
 

@@ -83,10 +83,34 @@ static func load_history() -> Array:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(HISTORY_PATH))
 	return parsed if parsed is Array else []
 
-const COL_LIGHT := Color("DCF5B7") # NO-215: lighter, warmer — supersedes
-	# NO-177's D0E6B3, exact hex from Max, 2026-09-21
-const COL_DARK := Color("8763A8") # NO-215: lighter, more saturated purple —
-	# supersedes NO-177's 573F6E, exact hex from Max, 2026-09-21
+## Y1/NO-216: two selectable board chequers, id -> {light, dark, label}. The
+## values are the single source of truth for the chequer — piece_diagram.gd
+## reads COL_LIGHT/COL_DARK off this class at runtime (see its NO-215
+## comment) rather than keeping its own copy, and settings.gd reads this
+## dict the same way to build its switcher, so a third theme is one new
+## entry here, nowhere else.
+const BOARD_THEMES := {
+	"sage": {"light": Color("DCF5B7"), "dark": Color("8763A8"), "label": "Sage"},
+		# NO-215: lighter, warmer sage — supersedes NO-177's D0E6B3/573F6E,
+		# exact hex from Max, 2026-09-21
+	"sand": {"light": Color("EAE0D0"), "dark": Color("8483B6"), "label": "Sand"},
+		# Y1/NO-216: warm off-white on muted blue-violet, exact hex from Max,
+		# 2026-09-21 — lower-contrast and cooler than Sage by design
+}
+const DEFAULT_BOARD_THEME := "sage"
+static var COL_LIGHT: Color = BOARD_THEMES[DEFAULT_BOARD_THEME].light
+static var COL_DARK: Color = BOARD_THEMES[DEFAULT_BOARD_THEME].dark
+
+
+## Switches the active chequer; callers still need queue_redraw() to see it
+## (static vars don't trigger one). Unknown ids fall back to the default
+## rather than erroring, since this only ever gets a value the player's own
+## settings toggle wrote.
+static func set_board_theme(theme_id: String) -> void:
+	var t: Dictionary = BOARD_THEMES.get(theme_id, BOARD_THEMES[DEFAULT_BOARD_THEME])
+	COL_LIGHT = t.light
+	COL_DARK = t.dark
+
 const COL_PLAYER := Color("1a3a6b")
 const COL_ENEMY := Color("8b1a1a")
 # side shift for monochrome tokens only — the painted art carries its own colour
@@ -712,6 +736,7 @@ func _ready() -> void:
 	var settings_data := Settings.load_settings()
 	Settings.apply(settings_data)
 	animations_on = settings_data.get("animations_on", true)
+	set_board_theme(settings_data.get("board_theme", DEFAULT_BOARD_THEME))
 	var args := OS.get_cmdline_user_args()
 	var first_boot := not cli_bypass_used # NO-77: the launch bypass fires once
 	cli_bypass_used = true
@@ -5134,7 +5159,9 @@ func _connect_hud() -> void:
 			placing_id = ""
 			_clear_selection())
 	hud.settings_changed.connect(func(data: Dictionary) -> void:
-		animations_on = data.get("animations_on", true)) # live — no restart needed
+		animations_on = data.get("animations_on", true) # live — no restart needed
+		set_board_theme(data.get("board_theme", DEFAULT_BOARD_THEME))
+		queue_redraw())
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.

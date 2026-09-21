@@ -6,7 +6,9 @@
 
 const Account := preload("res://scripts/account.gd")
 const SETTINGS_PATH := "user://settings.json"
-const DEFAULTS := {"sound_on": true, "animations_on": true, "crt_on": true}
+const DEFAULTS := {"sound_on": true, "animations_on": true, "crt_on": true,
+	"board_theme": "sage"} # Y1/NO-216 — id, not a colour; game.gd's BOARD_THEMES
+	# owns the values themselves
 
 
 static func load_settings() -> Dictionary:
@@ -128,6 +130,29 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		if on_change.is_valid():
 			on_change.call(data))
 	box.add_child(crt)
+
+	# Board colours (Y1/NO-216): cycles the board chequer. The theme ids and
+	# labels live in game.gd's BOARD_THEMES (load(), not preload() — game.gd
+	# preloads this script, so a preload back would close a compile cycle;
+	# same seam piece_diagram.gd uses for the same colours). A run's own
+	# board draw picks this up live via hud.gd's settings_changed signal —
+	# this panel only stores the choice and relabels itself.
+	var GameScript: GDScript = load("res://scripts/game.gd")
+	var theme_ids: Array = GameScript.BOARD_THEMES.keys()
+	var board := Button.new()
+	board.add_theme_font_size_override("font_size", 22)
+	var relabel_board := func() -> void:
+		var id: String = data.get("board_theme", GameScript.DEFAULT_BOARD_THEME)
+		board.text = "Board: %s" % GameScript.BOARD_THEMES.get(id, GameScript.BOARD_THEMES[GameScript.DEFAULT_BOARD_THEME]).label
+	relabel_board.call()
+	board.pressed.connect(func() -> void:
+		var id: String = data.get("board_theme", GameScript.DEFAULT_BOARD_THEME)
+		data.board_theme = theme_ids[(theme_ids.find(id) + 1) % theme_ids.size()]
+		save_settings(data)
+		relabel_board.call()
+		if on_change.is_valid():
+			on_change.call(data))
+	box.add_child(board)
 
 	# LOG OUT, with the confirm inline rather than as a modal. This panel is
 	# embedded in two different scenes and a modal would have to be built and

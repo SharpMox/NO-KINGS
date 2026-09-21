@@ -997,13 +997,24 @@ func show_shop() -> void:
 	shop_lower.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	shop_lower.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
 
+	# NO-210: shop_lower's row is stretched to root's full leftover height (so
+	# Close stays pinned at the bottom), and an HBoxContainer's cross-axis
+	# default is to fill+centre each child in that stretched height. Left
+	# uncorrected, the lone BOXES column (one CenterContainer covering the
+	# whole row) centred its 5-tile grid well below PIECES' top row instead of
+	# sitting level with it. SHRINK_BEGIN on both columns pins them to the
+	# row's top instead, without touching shop_lower's own stretch or its
+	# SIZE_SHRINK_CENTER horizontal centring (NO-201, above).
 	var left := VBoxContainer.new()
+	left.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	left.add_theme_constant_override("separation", 8)
 	left.add_child(_shop_zone(by_kind.piece, left_cols))
 	left.add_child(_shop_zone(by_kind.artefact, left_cols))
 	left.add_child(_shop_zone(by_kind.item, left_cols))
 	shop_lower.add_child(left)
-	shop_lower.add_child(_shop_zone(by_kind.box, 1))
+	var box_zone := _shop_zone(by_kind.box, 1)
+	box_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	shop_lower.add_child(box_zone)
 	root.add_child(shop_lower)
 
 	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone

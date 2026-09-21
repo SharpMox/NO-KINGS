@@ -353,6 +353,28 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
+	# --- NO-210 (Max review): the BOXES column used to centre its grid inside
+	# shop_lower's full stretched row height, well below the left column's
+	# (PIECES/ARTEFACTS/ITEMS) top row. Both columns are now SHRINK_BEGIN
+	# (modals.gd, show_shop()) — real geometry, not a screenshot: their global
+	# top edges must land on the same Y. ---
+	var geo: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	geo._open_shop()
+	await process_frame
+	await process_frame # a freshly built Control's get_global_rect() lags a
+		# layout-sort frame (CLAUDE.md)
+	var shop_lower: HBoxContainer = geo.modals.shop_lower
+	check(shop_lower != null and shop_lower.get_child_count() == 2,
+		"precondition: shop_lower holds the left column + the BOXES column")
+	var left_top: float = shop_lower.get_child(0).get_global_rect().position.y
+	var box_top: float = shop_lower.get_child(1).get_global_rect().position.y
+	check(absf(left_top - box_top) < 1.0,
+		"NO-210: the BOXES column's top is level with the left column's top (%.2f vs %.2f)"
+			% [left_top, box_top])
+	geo.queue_free()
+	await process_frame
+
 	# --- issue 18: Shop slot pass — base + modifiers, additive per copy ---
 	var slots: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["chocolate-key-cake", "chocolate-key-cake",

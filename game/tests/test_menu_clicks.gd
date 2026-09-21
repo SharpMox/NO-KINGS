@@ -312,7 +312,10 @@ func _init() -> void:
 		var neighbour: PanelContainer = cards[1]
 		check(is_equal_approx(neighbour.scale.x, MenuScript.ARMY_CARD_PEEK_SCALE),
 			"a non-resting card is scaled to ARMY_CARD_PEEK_SCALE on first render")
-		var scroll_w: float = menu.get_viewport_rect().size.x - 80.0
+		# `menu` is typed Node here (matches _click_button's own signature), so
+		# get_window() — a real Node method — reads the width instead of
+		# get_viewport_rect(), which only exists on CanvasItem.
+		var scroll_w: float = menu.get_window().size.x - 80.0
 		var card_w: float = scroll_w * MenuScript.ARMY_CARD_WIDTH_FRACTION
 		var lead_w: float = (scroll_w - card_w) / 2.0 - MenuScript.ARMY_CARD_MARGIN
 		check(neighbour.size.x * neighbour.scale.x <= lead_w + 1.0, # +1 for float slop

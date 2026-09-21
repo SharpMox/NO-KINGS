@@ -2902,8 +2902,8 @@ func _init() -> void:
 	await process_frame
 	check(game.hud.tip_panel.visible and game.hud.multi_confirm_btn.visible,
 		"NO-152: the targeting tip and the floating Confirm both show for a low target")
-	var confirm_rect := game.hud.multi_confirm_btn.get_global_rect()
-	var tip_rect := game.hud.tip_panel.get_global_rect()
+	var confirm_rect: Rect2 = game.hud.multi_confirm_btn.get_global_rect()
+	var tip_rect: Rect2 = game.hud.tip_panel.get_global_rect()
 	check(not tip_rect.intersects(confirm_rect),
 		"the tip's rect never overlaps Confirm's — Confirm stays fully visible")
 	_click(confirm_rect.get_center())

@@ -497,7 +497,7 @@ func _init() -> void:
 	# `no208_cap_scroll` here rather than shadowing it.
 	var no208_cap_scroll: ScrollContainer = game.hud.cap_scroll
 	var stock_scroll: ScrollContainer = game.hud.stock_scroll
-	var cap_grid_rect := game.hud.captured_grid.get_global_rect()
+	var cap_grid_rect: Rect2 = game.hud.captured_grid.get_global_rect()
 	var cap_scroll_rect := no208_cap_scroll.get_global_rect()
 	check(absf((cap_grid_rect.position.y + cap_grid_rect.size.y)
 				- (cap_scroll_rect.position.y + cap_scroll_rect.size.y)) <= 2.0,

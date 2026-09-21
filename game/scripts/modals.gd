@@ -69,6 +69,9 @@ var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
 	# vp.x - draw_w formula themselves
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value
+var shop_lower: HBoxContainer # NO-201: the PIECES/ARTEFACTS/ITEMS + BOXES
+	# row — exposed, same reasoning as shop_lane_b_bar above, so a probe can
+	# measure whether the content block is actually centred in the panel.
 ## Shop geometry history (NO-119/132/142/144/166/167): PIECES, ARTEFACTS,
 ## ITEMS and BOXES were stacked full-width, one below another, all at
 ## Tuning.OFFBOARD_GRID_COLS (5) — precisely so no zone read thinner than
@@ -95,6 +98,21 @@ var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 ## pays for the one extra PIECES row (~76px). No Godot run from this seat to
 ## confirm the ~16px label-height estimate was ever exact; it no longer
 ## matters, since labels are gone.
+##
+## NO-201 (Max review): `left_w`/`left_cols` above pick the WIDEST grid that
+## fits the 332px budget, but fixed OFFBOARD_ICON tiles can't be stretched to
+## consume it exactly — grid_cols floors, so left_cols=4 leaves a real 332 -
+## grid_row_w(4, SHOP_SUBZONE_SEP) = 32px remainder. `left` used to be
+## SIZE_EXPAND_FILL, so that remainder sat INSIDE the left column (the grid
+## centred within it), reading as a gap before BOXES rather than at either
+## edge. Stretching PIECES/ARTEFACTS/ITEMS to close it would resize every
+## icon off Tuning.OFFBOARD_ICON, which every other grid in the app (Stock,
+## Inventory, Box pick) shares — out of scope here. So `left` now sizes to
+## its own minimum (grid_row_w(left_cols, SEP), no stretch) and `shop_lower`
+## (the whole PIECES/ARTEFACTS/ITEMS + BOXES row) is SIZE_SHRINK_CENTER
+## instead of filling root's width: the 32px remainder moves out to the
+## panel's two edges, split evenly, rather than sitting as one asymmetric gap
+## next to BOXES.
 const SHOP_SUBZONE_SEP := 4.0
 ## NO-188: the gutter between the left column (PIECES/ARTEFACTS/ITEMS) and
 ## the BOXES column on the right.
@@ -972,19 +990,21 @@ func show_shop() -> void:
 	var left_w := (draw_w - 20.0) - SHOP_BOXES_COL_SEP - Tuning.OFFBOARD_ICON
 	var left_cols := Tuning.grid_cols(left_w, SHOP_SUBZONE_SEP)
 
-	var lower := HBoxContainer.new()
-	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lower.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+	shop_lower = HBoxContainer.new()
+	shop_lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# NO-201: shrink to the row's own minimum and centre it in root's width,
+	# rather than stretching to fill — see the NO-201 note above.
+	shop_lower.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	shop_lower.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
 
 	var left := VBoxContainer.new()
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_theme_constant_override("separation", 8)
 	left.add_child(_shop_zone(by_kind.piece, left_cols))
 	left.add_child(_shop_zone(by_kind.artefact, left_cols))
 	left.add_child(_shop_zone(by_kind.item, left_cols))
-	lower.add_child(left)
-	lower.add_child(_shop_zone(by_kind.box, 1))
-	root.add_child(lower)
+	shop_lower.add_child(left)
+	shop_lower.add_child(_shop_zone(by_kind.box, 1))
+	root.add_child(shop_lower)
 
 	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone
 	# entirely — its one real job, Buy, moved to the tile's own preview

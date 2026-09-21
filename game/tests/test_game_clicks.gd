@@ -348,6 +348,49 @@ func _init() -> void:
 
 	check(game.state == game.State.PLAYER_TURN, "config boots into player turn")
 
+	# NO-154: army_band used to start OPEN on a scenario boot (only the fresh
+	# SETUP path collapsed it, game.gd) — it overlays the same rect a
+	# scenario's `board` config already has player pieces sitting on. Assert
+	# the RECT, not army_band_open: a property read-back "passes" even when
+	# it changed nothing observable (CLAUDE.md, "tests that pass for the
+	# wrong reason"). y=0/y=1 are the player's own back rows on screen
+	# (SPAWN_ROW convention — CLAUDE.md, "Layout traps the device taught").
+	var back_rows_top: float = game._tile_px(Vector2i(0, 1)).y
+	var back_rows_rect := Rect2(game.board_px.x, back_rows_top,
+		Tuning.BOARD_W * game.tile, game.tile * 2)
+	check(not game.hud.army_band.get_global_rect().intersects(back_rows_rect),
+		"army_band doesn't cover the board's back two rows on a scenario boot",
+		"band=%s rows=%s" % [game.hud.army_band.get_global_rect(), back_rows_rect])
+
+	# NO-154 (second fixture): the case with a real player behind it — a
+	# genuine Continue (menu.gd:723, `next_config = _continue_save`) boots
+	# with is_scenario FALSE and a config carrying "state" (every real save
+	# has one — SaveConfig.to_config always writes it). That "state" key is
+	# also what keeps this boot off save_config.gd's `_begin_player_turn()`
+	# path (it takes `_resume_turn()` instead — see save_config.gd's own
+	# comment on the `cfg.has("state")` branch), so it can't fire
+	# `_autosave()` and touch the real on-disk save the way a bare
+	# non-scenario config would.
+	var cont_game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	GameScript.next_config = {
+		"state": GameScript.State.PLAYER_TURN, "actions_left": 1, "wave": 3,
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
+	}
+	GameScript.is_scenario = false
+	root.add_child(cont_game)
+	await process_frame
+	await process_frame
+	GameScript.is_scenario = true # restore before anything else in this suite boots
+	check(cont_game.state == cont_game.State.PLAYER_TURN,
+		"Continue-shaped config boots into player turn")
+	var cont_back_rows_rect := Rect2(cont_game.board_px.x,
+		cont_game._tile_px(Vector2i(0, 1)).y, Tuning.BOARD_W * cont_game.tile, cont_game.tile * 2)
+	check(not cont_game.hud.army_band.get_global_rect().intersects(cont_back_rows_rect),
+		"army_band doesn't cover the board's back two rows on a Continue-shaped boot (is_scenario false)",
+		"band=%s rows=%s" % [cont_game.hud.army_band.get_global_rect(), cont_back_rows_rect])
+	cont_game.queue_free()
+	await process_frame
+
 	# board click selects the queen and shows its moves
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame

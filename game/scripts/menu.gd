@@ -592,9 +592,12 @@ static func _window_size_requested() -> bool:
 ## The width fraction is content-driven, not aesthetic: Horde's Starting
 ## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
 ## measures ~238px wide at PieceMass's own ICON=52 constant, and needs to fit
-## inside the card with room either side. 0.70 (card_w=280) clears that with
-## ~22px to spare and is the known-good width already shipped.
-const ARMY_CARD_WIDTH_FRACTION := 0.70
+## inside the card with room either side. 280px clears that with ~22px to
+## spare and is the known-good absolute width already shipped. NO-179
+## full-width follow-up: scroll_w changed (army_scroll lost its 40+40
+## inset, see _show_armies) from 400 to the full 480px viewport, so the
+## fraction is re-derived to hold card_w at that same 280px: 280/480 = 7/12.
+const ARMY_CARD_WIDTH_FRACTION := 7.0 / 12.0
 ## NO-179 (Max: "longer playing card ratio... 2.5:3.5"): width:height of a
 ## standard playing card. Card height is DERIVED from this and card_w, never
 ## a second literal that has to be kept in sync by hand.
@@ -1066,17 +1069,28 @@ func _ready() -> void:
 	# the list sideways" — and the two are not the same container.
 	army_center = VBoxContainer.new()
 	army_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	army_center.offset_left = 40
 	army_center.offset_top = 30
-	army_center.offset_right = -40
 	army_center.offset_bottom = -30
 	army_center.visible = false
 	add_child(army_center)
+	# NO-179 full-width follow-up (Max: a dead strip sat between the peeking
+	# card and the screen edge): army_center no longer carries its own
+	# left/right inset, so army_scroll below — added straight to army_center
+	# with no wrapper — spans the FULL viewport and a peeking neighbour runs
+	# to the screen edge. The title, dots and Back button are not part of
+	# that ask, so each gets its own 40px MarginContainer, reproducing
+	# army_center's old inset exactly for everything except the carousel.
+	var pad_side := func() -> MarginContainer:
+		var m := MarginContainer.new()
+		m.add_theme_constant_override("margin_left", 40)
+		m.add_theme_constant_override("margin_right", 40)
+		army_center.add_child(m)
+		return m
 	var pick := Label.new()
 	pick.text = "Choose your Army" # issue 67: replaces the Army pick
 	pick.add_theme_font_size_override("font_size", 22)
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	army_center.add_child(pick)
+	pad_side.call().add_child(pick)
 	var army_scroll := ScrollContainer.new() # the carousel strip itself
 	army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
@@ -1098,7 +1112,10 @@ func _ready() -> void:
 	# FRACTION's own header), rendered at full scale always — no per-card
 	# scaling. Height is DERIVED from width via the named playing-card
 	# ratio, not a second literal.
-	var scroll_w: float = get_viewport_rect().size.x - 80.0 # the 40+40 offsets above
+	# NO-179 full-width follow-up: army_scroll carries no inset any more (see
+	# army_center above), so scroll_w is the full viewport, not the old
+	# viewport-minus-80.
+	var scroll_w: float = get_viewport_rect().size.x
 	var card_w: float = scroll_w * ARMY_CARD_WIDTH_FRACTION
 	var card_h: float = card_w / ARMY_CARD_RATIO
 	var card_style := StyleBoxFlat.new() # same bg tint as the TEST list's row_style
@@ -1121,8 +1138,11 @@ func _ready() -> void:
 	# including the spacer and the first card — so lead_w has to give up one
 	# margin's worth to keep the resting card centred at scroll_horizontal
 	# 0: a bare (scroll_w-card_w)/2 would land it ARMY_CARD_MARGIN too far
-	# right. At scroll_w=400, card_w=280: lead_w=44 — the width of the
-	# neighbour's slice visible on each side of the resting card.
+	# right. At scroll_w=480, card_w=280: lead_w=84 — the width of the
+	# neighbour's slice visible on each side of the resting card. NO-179
+	# full-width follow-up: that slice now runs flush to the screen edge,
+	# since army_scroll itself is full width (no 40px container inset for
+	# it to fall short of any more).
 	var lead_w: float = (scroll_w - card_w) / 2.0 - ARMY_CARD_MARGIN
 	var lead_spacer := Control.new()
 	lead_spacer.custom_minimum_size = Vector2(lead_w, 0)
@@ -1224,7 +1244,7 @@ func _ready() -> void:
 	var army_dots := HBoxContainer.new()
 	army_dots.alignment = BoxContainer.ALIGNMENT_CENTER
 	army_dots.add_theme_constant_override("separation", 8)
-	army_center.add_child(army_dots)
+	pad_side.call().add_child(army_dots)
 	var dot_buttons: Array[Button] = []
 	for i in army_names.size():
 		var dot := Button.new()
@@ -1244,7 +1264,7 @@ func _ready() -> void:
 		var idx := clampi(roundi(army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
 		for i in dot_buttons.size():
 			dot_buttons[i].text = "●" if i == idx else "○")
-	_button(army_center, "← Back", 20, func() -> void:
+	_button(pad_side.call(), "← Back", 20, func() -> void:
 		army_center.visible = false
 		main_box.visible = true)
 

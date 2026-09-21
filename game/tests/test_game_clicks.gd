@@ -355,12 +355,17 @@ func _init() -> void:
 	# it changed nothing observable (CLAUDE.md, "tests that pass for the
 	# wrong reason"). y=0/y=1 are the player's own back rows on screen
 	# (SPAWN_ROW convention — CLAUDE.md, "Layout traps the device taught").
+	# UPDATE: asserting the rect alone can never fail-or-pass on this fix —
+	# collapse_army_band() only sets `visible = false`, and a hidden Control
+	# keeps its rect unchanged. The pair below asserts the intent (hidden)
+	# and the consequence (not occluding, gated on visibility) separately.
 	var back_rows_top: float = game._tile_px(Vector2i(0, 1)).y
 	var back_rows_rect := Rect2(game.board_px.x, back_rows_top,
 		Tuning.BOARD_W * game.tile, game.tile * 2)
-	check(not game.hud.army_band.get_global_rect().intersects(back_rows_rect),
+	check(not game.hud.army_band.visible, "army_band starts collapsed on a scenario boot")
+	check(not (game.hud.army_band.visible and game.hud.army_band.get_global_rect().intersects(back_rows_rect)),
 		"army_band doesn't cover the board's back two rows on a scenario boot",
-		"band=%s rows=%s" % [game.hud.army_band.get_global_rect(), back_rows_rect])
+		"visible=%s band=%s rows=%s" % [game.hud.army_band.visible, game.hud.army_band.get_global_rect(), back_rows_rect])
 
 	# NO-154 (second fixture): the case with a real player behind it — a
 	# genuine Continue (menu.gd:723, `next_config = _continue_save`) boots
@@ -385,9 +390,10 @@ func _init() -> void:
 		"Continue-shaped config boots into player turn")
 	var cont_back_rows_rect := Rect2(cont_game.board_px.x,
 		cont_game._tile_px(Vector2i(0, 1)).y, Tuning.BOARD_W * cont_game.tile, cont_game.tile * 2)
-	check(not cont_game.hud.army_band.get_global_rect().intersects(cont_back_rows_rect),
+	check(not cont_game.hud.army_band.visible, "army_band starts collapsed on a Continue-shaped boot")
+	check(not (cont_game.hud.army_band.visible and cont_game.hud.army_band.get_global_rect().intersects(cont_back_rows_rect)),
 		"army_band doesn't cover the board's back two rows on a Continue-shaped boot (is_scenario false)",
-		"band=%s rows=%s" % [cont_game.hud.army_band.get_global_rect(), cont_back_rows_rect])
+		"visible=%s band=%s rows=%s" % [cont_game.hud.army_band.visible, cont_game.hud.army_band.get_global_rect(), cont_back_rows_rect])
 	cont_game.queue_free()
 	await process_frame
 

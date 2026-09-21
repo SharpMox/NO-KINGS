@@ -599,9 +599,10 @@ static func _window_size_requested() -> bool:
 ##
 ## The width fraction is content-driven, not aesthetic: Horde's Starting
 ## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
-## measures ~238px wide at PieceMass's own ICON=52 constant, and needs to fit
-## inside the card with room either side. 280px clears that with ~22px to
-## spare and is the known-good absolute width already shipped. NO-179
+## measures ~205.7px wide at PieceMass's own ICON=52 constant (was ~238px
+## before NO-203 tightened CELL/ROW_PITCH), and needs to fit inside the card
+## with room either side. 280px clears that with ~54px to spare and is the
+## known-good absolute width already shipped. NO-179
 ## full-width follow-up: scroll_w changed (army_scroll lost its 40+40
 ## inset, see _show_armies) from 400 to the full 480px viewport, so the
 ## fraction is re-derived to hold card_w at that same 280px: 280/480 = 7/12.

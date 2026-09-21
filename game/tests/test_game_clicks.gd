@@ -2813,9 +2813,26 @@ func _init() -> void:
 	# obstructed.
 	game.queue_free()
 	await process_frame
+	# NO-202 (round3 coordinator review, 2026-09-21): this used to hold TWO
+	# Snipers — same key, same cell text/icon — so every _click_grid_cell(...,
+	# "sniper") below was genuinely ambiguous between them: it always
+	# resolves to whichever cell is FIRST in items_grid's child order, which
+	# was g.items[0] under main's forward build order and is g.items[1] under
+	# NO-202's reversed one. That is not a case this scenario's own point
+	# (the Drawer reopen rule around using a targeted Item, stories 58-60)
+	# ever needed to be ambiguous about — _inventory_drawer_reopens()
+	# (game.gd) only ever checks `not items.is_empty()`, never an item's
+	# identity or kind, so the rule does not require two of a kind. Air
+	# Strike is the closest distinct substitute: same "target": "tile" shape,
+	# same _item_apply case (`"air_strike", "sniper": _destroy(b, true)`,
+	# game.gd) — its only difference is a WEAKER tile_valid condition
+	# (item_logic.gd: `enemy and not king`, no "attacked by a player piece"
+	# requirement), which the existing board (both the rook and the pawn are
+	# already attacked, per the comment above) satisfies for free. Every
+	# lookup below can now name the specific Item it means.
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 5, 5], ["pawn", 1, 7, 2]],
-		"items": ["sniper", "sniper"]}
+		"items": ["sniper", "air_strike"]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2825,19 +2842,7 @@ func _init() -> void:
 	await process_frame
 	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "Sniper clickable")
 	await process_frame
-	# NO-202 (round3 coordinator review, 2026-09-21): two held Items share the
-	# key "sniper", so _click_grid_cell's key match is inherently ambiguous
-	# between them and always resolves to whichever is FIRST in items_grid's
-	# child order. That used to be g.items[0] (main's forward build order);
-	# NO-202 reversed items_grid to most-recently-acquired-first, so it is
-	# now g.items[1] instead — the specific real index was never this
-	# scenario's own point (arm/cancel/use mechanics on SOME held copy is),
-	# so assert only that arming succeeded, not which array slot it landed
-	# on. This is a different class of issue than _item_button's positional
-	# bug (test_long_press.gd) — _click_grid_cell IS key-based, it just
-	# cannot disambiguate two cells sharing one key, and which one it meets
-	# first flipped along with the display order.
-	check(game.item_active >= 0 and game.hud.drawer_open == "",
+	check(game.item_active == 0 and game.hud.drawer_open == "",
 		"arming an Item that needs a board target closes the Drawer")
 	check(await _click_inventory(game, "Inventory 2"), "reopen to reach the item and cancel it")
 	await process_frame
@@ -2853,10 +2858,11 @@ func _init() -> void:
 	check(game.hud.multi_confirm_btn.visible, "NO-124: the tap stages AND shows Confirm")
 	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
 	await process_frame
-	check(game.items.size() == 1 and game.hud.drawer_open == "inventory",
-		"after use, the Drawer reopens because the second Sniper is still usable (story 59)")
+	check(game.items.size() == 1 and game.items[0].key == "air_strike"
+			and game.hud.drawer_open == "inventory",
+		"after use, the Drawer reopens because Air Strike is still usable (story 59)")
 	await _await_drawer_settled(game, "inventory") # NO-118: auto-reopen, own settle wait
-	check(await _click_grid_cell(game.hud.items_grid, "sniper"), "the remaining Sniper clickable")
+	check(await _click_grid_cell(game.hud.items_grid, "air_strike"), "the remaining Air Strike clickable")
 	await process_frame
 	_click(game._tile_px(Vector2i(7, 2)) + Vector2(game.tile, game.tile) / 2) # the second enemy: the pawn
 	await process_frame

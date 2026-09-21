@@ -378,8 +378,19 @@ var tip_key := ""
 ## NO-84: Captured Stock (left third) and Stock (right two thirds) are two
 ## independent grids now, not one strip — each inside its own ScrollContainer
 ## so dragging one side never scrolls the other (story 36).
-var stock_grid := GridContainer.new()
-var captured_grid := GridContainer.new()
+## V1 (Max, 2026-09-21 correction): a plain GridContainer fills top-left
+## first, which can't express "item 0 bottom-right, filling right-to-left,
+## piling new rows upward" — a VBoxContainer of per-row HBoxContainers can
+## (see _rebuild_stock_drawer's own comment). Kept the `_grid` name: every
+## other reference to these two treats them as "the pool container", not as
+## anything GridContainer-specific.
+var stock_grid := VBoxContainer.new()
+var captured_grid := VBoxContainer.new()
+## How many entries fit per row — was `stock_grid.columns`/`captured_grid.
+## columns` before V1; a VBoxContainer has no such property, so the layout
+## step below stores it here instead, for _rebuild_stock_drawer to read.
+var stock_cols := 1
+var cap_cols := 1
 var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
 ## NO-208: both drawers' own ScrollContainers, kept so _rebuild_stock_drawer
 ## can reset their scroll position — built as locals inside build() otherwise.
@@ -1342,9 +1353,10 @@ func build(game) -> void:
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	var cap_view: Vector2 = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
 	cap_scroll.custom_minimum_size = cap_view
-	captured_grid.columns = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
-	captured_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
-	captured_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
+	cap_cols = Tuning.grid_cols(cap_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
+	# V1: STOCK_DRAWER_CELL_SEP's OTHER axis (between buttons within a row)
+	# is set per-row, on each row's own HBoxContainer — _rebuild_stock_drawer.
+	captured_grid.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
 	# NO-208: bottom-anchors the grid — ALIGNMENT_END collects any slack (the
 	# section taller than the content) above the grid instead of below it, the
 	# same slack-collection idea as stock_align's horizontal ALIGNMENT_END
@@ -1375,9 +1387,8 @@ func build(game) -> void:
 	stock_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	var stock_view: Vector2 = Vector2(stock_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
 	stock_scroll.custom_minimum_size = stock_view
-	stock_grid.columns = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
-	stock_grid.add_theme_constant_override("h_separation", STOCK_DRAWER_CELL_SEP)
-	stock_grid.add_theme_constant_override("v_separation", STOCK_DRAWER_CELL_SEP)
+	stock_cols = Tuning.grid_cols(stock_w - STOCK_DRAWER_PAD, STOCK_DRAWER_CELL_SEP) # NO-132
+	stock_grid.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
 	# NO-135: a ScrollContainer always places its content flush at its own
 	# top-left, so grid_cols()'s floor-remainder (and a short last row) used
 	# to strand its slack at the drawer's outer right edge. Captured Stock
@@ -1385,8 +1396,12 @@ func build(game) -> void:
 	# correct); force Stock's grid to its full row width (same guard as
 	# modals.gd's _shop_zone) and right-align that box in a
 	# wrapper spanning the scroll viewport, so both sections' slack collects
-	# in one gap against the shared Captured/Stock boundary instead.
-	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_grid.columns, STOCK_DRAWER_CELL_SEP) # NO-135
+	# in one gap against the shared Captured/Stock boundary instead. Forcing
+	# the VBox's own width still works post-V1: a VBoxContainer's default-FILL
+	# children stretch to ITS width regardless of whether that width came
+	# from content or this override, which is what lets a short row's own
+	# ALIGNMENT_END (below) put its gap on the correct side.
+	stock_grid.custom_minimum_size.x = Tuning.grid_row_w(stock_cols, STOCK_DRAWER_CELL_SEP) # NO-135
 	var stock_align := HBoxContainer.new()
 	stock_align.alignment = BoxContainer.ALIGNMENT_END
 	stock_align.custom_minimum_size = Vector2(stock_w - STOCK_DRAWER_PAD, 0)
@@ -2085,8 +2100,18 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 ## NO-84: every stack button across both grids, Stock first then Captured —
 ## the flat order _rebuild_stock_drawer used to hold as one strip. Used
 ## wherever code needs to sweep "every stack on screen" rather than one side.
+## V1: stock_grid/captured_grid are now a VBoxContainer of per-row
+## HBoxContainers, not a flat GridContainer of buttons — one level to
+## flatten through. Every row holds only Buttons (no placeholders, no
+## further nesting), so this keeps "pool_buttons() is buttons-only"
+## (test_game_clicks.gd's own comment on game.pool_box) true.
 func pool_buttons() -> Array:
-	return stock_grid.get_children() + captured_grid.get_children()
+	var out := []
+	for row in stock_grid.get_children():
+		out.append_array(row.get_children())
+	for row in captured_grid.get_children():
+		out.append_array(row.get_children())
+	return out
 
 
 ## The pool-strip stack button under a screen point (drag drop target).
@@ -2366,13 +2391,15 @@ func _rebuild_stock_drawer() -> void:
 	for c in captured_grid.get_children():
 		c.queue_free()
 	var cap_count := 0
+	var stock_children: Array = []
+	var cap_children: Array = []
 	for st in _stacks():
 		var btn := _build_stack_button(st)
 		if st.cap:
 			cap_count += 1
-			captured_grid.add_child(btn)
+			cap_children.append(btn)
 		else:
-			stock_grid.add_child(btn)
+			stock_children.append(btn)
 	# story 37: the hint only while the column would otherwise be blank — an
 	# empty GridContainer has no size of its own to hang a message on.
 	captured_hint.visible = cap_count == 0
@@ -2390,8 +2417,55 @@ func _rebuild_stock_drawer() -> void:
 		slot.tooltip_text = "Put the piece back into stock"
 		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
 		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		stock_grid.add_child(slot)
+		stock_children.append(slot)
+	_fill_rows_bottom_right(stock_grid, stock_children, stock_cols)
+	_fill_rows_bottom_right(captured_grid, cap_children, cap_cols)
 	_scroll_stock_to_bottom() # NO-208
+
+
+## V1 (Max, 2026-09-21 correction): Max rejected an earlier padded-
+## GridContainer version of this ("Padding with empty cells is definitely not
+## what we want") in favour of a true reverse flow: "a reversed list where it
+## start from the bottom with first items stacking right to left, and then
+## the next items pile on the row above, and then scrolling that list up." A
+## single GridContainer can't express that — it always fills from the
+## top-left, so a short row lands bottom-right, the opposite corner from what
+## he wants. `grid` (stock_grid/captured_grid) is instead a VBoxContainer of
+## per-row HBoxContainers built fresh here.
+##
+## Indexing: `children[0]` is _stacks()'s newest entry. With `rows = ceil(n /
+## cols)`, row_idx 0 (built LAST, so it ends up at the BOTTOM of the
+## VBoxContainer) holds children[0 : cols]; row_idx 1 holds children[cols :
+## 2*cols] and sits above it; and so on up to the last row_idx built FIRST
+## (top). Any incomplete row is therefore always the last one filled —
+## row_idx = rows-1, the TOPMOST — never row 0, so there is nothing to pad:
+## the short row simply has fewer buttons, and each row's own
+## ALIGNMENT_END right-aligns its buttons, leaving that row's gap on the
+## LEFT for free (a VBoxContainer stretches every default-FILL child, i.e.
+## every row, to its own width, which a full row already establishes).
+## Within a row, the lowest index is added LAST so it lands rightmost
+## (children[0] itself, in row 0, ends up in the true bottom-right cell).
+##
+## Worked example, 6 children / 4 cols (the case that reveals a padding bug,
+## carried over from the earlier version since it's still the case worth
+## checking): rows=2. row_idx 1 (top, built first) = children[4:6] = [4, 5],
+## added in reverse (5 then 4) so row reads left-to-right as [5, 4], right-
+## aligned in a 4-wide row -> 2 blank cells on its LEFT. row_idx 0 (bottom,
+## built last) = children[0:4] = [0,1,2,3], added in reverse (3,2,1,0) so the
+## row reads [3, 2, 1, 0] — 0 bottom-right, 1 to its left, matching Max's
+## description exactly, with no spacer of any kind.
+func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) -> void:
+	cols = maxi(cols, 1)
+	var rows := ceili(float(children.size()) / float(cols))
+	for row_idx in range(rows - 1, -1, -1): # topmost row first, row 0 last
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_END # short row's gap lands on the left
+		row.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
+		var lo := row_idx * cols
+		var hi := mini(lo + cols, children.size())
+		for i in range(hi - 1, lo - 1, -1): # descending: lowest index added last = rightmost
+			row.add_child(children[i])
+		grid.add_child(row)
 
 
 ## NO-208: default scroll position is the bottom, matching cap_anchor/

@@ -599,11 +599,12 @@ static func _window_size_requested() -> bool:
 ##
 ## The width fraction is content-driven, not aesthetic: Horde's Starting
 ## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
-## measures ~198.4px wide at PieceMass's own ICON=52 constant (was ~238px
-## before NO-203 tightened CELL/ROW_PITCH, then ~205.7px before NO-210
-## tightened CELL further), and needs to fit inside the card with room
-## either side. 280px clears that with ~61.6px to spare and is the
-## known-good absolute width already shipped. NO-179
+## measures ~218.2px wide at PieceMass's own ICON=52 constant (was ~198.4px
+## before V3 raised ROW_PITCH enough to drop PieceMass._choose_rows()'s own
+## pick for that count from 4 rows to 3 — fewer rows means more columns,
+## hence wider — see piece_mass.gd's own build() comment), and needs to fit
+## inside the card with room either side. 280px clears that with ~41.8px to
+## spare and is the known-good absolute width already shipped. NO-179
 ## full-width follow-up: scroll_w changed (army_scroll lost its 40+40
 ## inset, see _show_armies) from 400 to the full 480px viewport, so the
 ## fraction is re-derived to hold card_w at that same 280px: 280/480 = 7/12.
@@ -1737,20 +1738,19 @@ func _tier_icon(tier_name: String) -> Control:
 	return wrap
 
 
-## NO-148 (Max, 2026-09-19): each tier's description states its OWN new
-## handicap(s) first, then every handicap every lower tier already added —
-## cumulative, with the new part identifiable. GENERATED from
-## Tuning.TIER_HANDICAPS (via new_handicaps/lower_handicaps), never
-## hand-written, so retuning a threshold there moves this copy for free.
-## NO-211 (Max): plain lines, no "Also:" prefix and no parenthetical asides —
-## Tuning.TIER_HANDICAPS' own text is already plain, so this just lists it.
+## V2 (Max, 2026-09-21): each tier's description states ONLY what THAT tier
+## adds — supersedes NO-148's cumulative listing (every inherited handicap
+## repeated underneath), which read as the Queen/Tier-4 row re-printing four
+## lines it shared with the tiers below. The handicaps still STACK in
+## behaviour (every gate in tuning.gd is tier_index(tier) >= N) — this is
+## only what the screen prints. GENERATED from Tuning.TIER_HANDICAPS (via
+## new_handicaps), never hand-written, so retuning a threshold there moves
+## this copy for free.
 func _tier_description(tier_name: String) -> String:
 	var new_h := Tuning.new_handicaps(tier_name)
 	if new_h.is_empty():
 		return "No handicaps"
-	var lines := new_h.duplicate()
-	lines.append_array(Tuning.lower_handicaps(tier_name))
-	return "\n".join(lines)
+	return "\n".join(new_h)
 
 
 ## NO-159: redraw the tier-selection outline. `panels[i]` is tier i's

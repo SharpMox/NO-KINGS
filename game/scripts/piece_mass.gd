@@ -29,14 +29,22 @@ const CELL := ICON * 0.38 # horizontal pitch, well under ICON so neighbours
 	# tightened again to 0.38 — Max: "pack the row element a bit more
 	# horizontally" while giving ROW_PITCH (below) more room, since 0.36/0.42
 	# read as rows too close together.
-const ROW_PITCH := ICON * 0.42 # NO-178: vertical pitch between rows — tighter
-	# than CELL so rows pile into each other, not just sit stacked (the old
-	# row pitch equalled CELL, which read as ranks, not a crowd). NO-203:
+const ROW_PITCH := ICON * 0.54 # NO-178: vertical pitch between rows. NO-203:
 	# tightened from 0.45 to 0.36 — Max: "we need the rows to be closer on the
-	# vertical axis so we can still visually see rows" — then NO-210 backed
-	# it off to 0.42: Max, "rows are too close ... distance them vertically a
-	# little bit". Still above CELL, and well above the 0.26 floor checked by
-	# eye on NO-203 (where back rows' heads start merging into one cluster).
+	# vertical axis so we can still visually see rows" — then NO-210 backed it
+	# off to 0.42: Max, "rows are too close ... distance them vertically a
+	# little bit". V3 (2026-09-21): still too tight — "bottom rows cover a bit
+	# too much of the rows above it" — raised again to 0.54. Checked with a
+	# Python/PIL mockup of build()'s exact maths against the real pawn PNG
+	# (Horde-14, the worst case): 0.42-0.46 keeps _choose_rows() at 4 rows for
+	# Horde-14 and heads sit right under the row in front's shoulders; 0.50 is
+	# where _choose_rows() itself opens up to 3 rows for that count (stable
+	# through at least 0.74, so this isn't a knife-edge pick) and the gap
+	# becomes visible; by 0.65 the rows start reading as separate stripes with
+	# a visible dark band between them, and by 0.85 they fully split into 3
+	# flat ranks — the exact "not a crowd" failure this renderer exists to
+	# avoid. 0.54 sits in the middle of the 0.50-0.65 window: past the
+	# 4-row-to-3-row jump with real margin, short of where stripes start.
 const STAGGER := CELL * 0.5 # NO-178: alternate rows shift right by half a
 	# cell so pieces nest into the gaps of the row behind, instead of lining
 	# up into a visible grid.
@@ -117,21 +125,17 @@ static func build(ids: Array) -> Control:
 	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
 	var pad := ICON * 0.5 + JITTER_Y + rot_extra
 
-	# Worst case at ICON=52, checked by hand (NO-210, 2026-09-21 — re-derived
-	# after NO-210 moved CELL/ROW_PITCH off their NO-203 values): Horde's 14
-	# pawns -> rows=4 (from _choose_rows), cols=ceili(14/4)=4 -> mass width =
-	# (4-1)*19.76 + 52 + 2*38.62 + STAGGER(9.88) = 198.4px. The Army carousel
-	# card (menu.gd _show_armies) is `card_w = viewport.x *
-	# ARMY_CARD_WIDTH_FRACTION` = 480 * 7/12 = 280px at the 480px portrait
-	# width this project targets (NO-179 full-width follow-up: the fraction
-	# was re-derived from a new, uninset scroll_w so this 280px stayed the
-	# same), minus the card's own 20px side padding
-	# (card_style's content_margin_left/right) = 260px usable — 198.4px
-	# fits with ~61.6px to spare (NO-179 narrowed the card from 340px to
-	# 288px to make room for an uncropped peek either side; a follow-up
-	# narrowed it again to 280px to raise the peek scale — see
-	# ARMY_CARD_WIDTH_FRACTION's own header — still clear, and clears with
-	# more room than the NO-178 pitch did).
+	# Worst case at ICON=52, checked by hand (V3, 2026-09-21 — re-derived after
+	# V3 raised ROW_PITCH to 0.54*ICON, which moves _choose_rows()'s own pick
+	# for Horde's 14 pawns from 4 rows down to 3): rows=3, cols=ceili(14/3)=5
+	# -> mass width = (5-1)*19.76 + 52 + 2*38.62 + STAGGER(9.88) = 218.2px —
+	# wider than the old 4-row layout's 198.4px, since fewer rows means more
+	# columns. The Army carousel card (menu.gd _show_armies) is `card_w =
+	# viewport.x * ARMY_CARD_WIDTH_FRACTION` = 480 * 7/12 = 280px at the 480px
+	# portrait width this project targets, minus the card's own 20px side
+	# padding (card_style's content_margin_left/right) = 260px usable —
+	# 218.2px fits with ~41.8px to spare (down from ~61.6px before V3, still
+	# clear).
 	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
 	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(

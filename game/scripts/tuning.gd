@@ -480,15 +480,3 @@ static func new_handicaps(tier: String) -> Array[String]:
 		if h.at == idx:
 			out.append(h.text)
 	return out
-
-
-## Every handicap already active at a tier BELOW this one, in the order they
-## were introduced — what a tier's description lists underneath its own new
-## handicap(s) (NO-148: cumulative, with the new part identifiable).
-static func lower_handicaps(tier: String) -> Array[String]:
-	var idx := tier_index(tier)
-	var out: Array[String] = []
-	for h in TIER_HANDICAPS:
-		if h.at < idx:
-			out.append(h.text)
-	return out

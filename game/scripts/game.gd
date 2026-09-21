@@ -221,25 +221,28 @@ float _alpha_at(sampler2D tex, vec2 uv) {
 void fragment() {
 	// TEXTURE only exists inside fragment() — passed explicitly to the
 	// helper rather than referenced from it (that's what failed to compile:
-	// "Unknown identifier in expression: 'TEXTURE'").
+	// "Unknown identifier in expression: 'TEXTURE'"). No `return` in here —
+	// processor functions reject it outright ("Using 'return' in the
+	// 'fragment' processor function is incorrect") — so this falls through
+	// an if/else instead, COLOR assigned exactly once per branch.
 	if (_alpha_at(TEXTURE, UV) > 0.5) {
 		COLOR = vec4(0.0); // inside the token — the real piece draws itself here
-		return;
-	}
-	float fill_hit = 0.0;
-	float rim_hit = 0.0;
-	for (int i = 0; i < 16; i++) {
-		float ang = float(i) * 0.39269908; // TAU / 16
-		vec2 dir = vec2(cos(ang), sin(ang));
-		fill_hit = max(fill_hit, _alpha_at(TEXTURE, UV + dir * fill_reach));
-		rim_hit = max(rim_hit, _alpha_at(TEXTURE, UV + dir * rim_reach));
-	}
-	if (fill_hit > 0.5) {
-		COLOR = fill_color;
-	} else if (rim_hit > 0.5) {
-		COLOR = rim_color;
 	} else {
-		COLOR = vec4(0.0);
+		float fill_hit = 0.0;
+		float rim_hit = 0.0;
+		for (int i = 0; i < 16; i++) {
+			float ang = float(i) * 0.39269908; // TAU / 16
+			vec2 dir = vec2(cos(ang), sin(ang));
+			fill_hit = max(fill_hit, _alpha_at(TEXTURE, UV + dir * fill_reach));
+			rim_hit = max(rim_hit, _alpha_at(TEXTURE, UV + dir * rim_reach));
+		}
+		if (fill_hit > 0.5) {
+			COLOR = fill_color;
+		} else if (rim_hit > 0.5) {
+			COLOR = rim_color;
+		} else {
+			COLOR = vec4(0.0);
+		}
 	}
 }
 """

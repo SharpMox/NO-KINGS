@@ -959,6 +959,35 @@ func _init() -> void:
 			< GameScript.board_tile_for(Vector2(480.0, 800.0), HUD.HEADER_H),
 		"NO-83: an iPhone 11 inset (56px) costs the board tile, not the Header")
 
+	# ---- NO-196/NO-197: deck-layout guards -----------------------------------
+	# Both measure real allocated geometry (get_global_rect()), never a constant,
+	# so they actually exercise the layout rather than restating it. A freshly
+	# laid-out Control's rect is not reliable until the next idle frame
+	# (CLAUDE.md, layout traps) — the deck was built at boot, several frames
+	# ago, but await one anyway rather than depend on that.
+	await process_frame
+	# NO-196: nav_row..act_row must read as ONE deliberate gap — the same
+	# DECK_GAP the deck's own buttons use for their own separation — not
+	# whatever int(tile) flooring happened to leave over (see hud.gd's build()).
+	var row_gap: float = HUD.act_row.get_global_rect().position.y \
+		- HUD.nav_row.get_global_rect().end.y
+	var button_gap: float = HUD.pass_button.get_global_rect().position.x \
+		- HUD.army_ability_button.get_global_rect().end.x
+	check(is_equal_approx(row_gap, button_gap),
+		"NO-196: the nav_row/act_row gap (%s) matches the Ability/PASS gap (%s)"
+			% [row_gap, button_gap])
+	# NO-197: nav_row must clear the board's own whose-turn outline — its outer
+	# ink sits BOARD_OUTLINE_INSET + BOARD_OUTLINE_WIDTH/2 past the tile grid
+	# (game.gd's _draw).
+	var half_w: float = GameScript.BOARD_OUTLINE_WIDTH / 2.0
+	var outline_outer := Rect2(
+		game.board_px - Vector2.ONE * (GameScript.BOARD_OUTLINE_INSET + half_w),
+		Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * game.tile
+			+ Vector2.ONE * (GameScript.BOARD_OUTLINE_INSET + half_w) * 2.0)
+	check(not outline_outer.intersects(HUD.nav_row.get_global_rect()),
+		"NO-197: nav_row (%s) clears the board outline's outer ink (%s)"
+			% [HUD.nav_row.get_global_rect(), outline_outer])
+
 	# ---- NO-83: THE HEADER --------------------------------------------------
 	var stock_btn: Button = HUD.drawer_buttons["stock"]
 	var sr: Rect2 = stock_btn.get_global_rect()

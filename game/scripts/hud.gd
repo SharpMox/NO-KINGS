@@ -821,17 +821,34 @@ func build(game) -> void:
 	stock_btn.add_child(stock_armed)
 	drawer_buttons["stock"] = stock_btn
 	# ---- THE CONTROL DECK (design C, user pick 2026-09-05) ------------------
-	# Everything under the board lives in one column that starts where the board
-	# ends and runs to the bottom edge. That is what removes the dead band: the
-	# board is flush to the top strip, so all the leftover height arrives here in
-	# one piece, and the rows below expand into it rather than leaving a gap.
-	var deck_top: float = g.board_px.y + g.tile * Tuning.BOARD_H + 6.0
+	# Everything under the board lives in one column, bottom-anchored to the
+	# screen edge, at its own FIXED height — DECK_ROWS (game.gd), the same
+	# constant board_tile_for() already reserves when it solves the tile size.
+	# NO-196: it used to be "whatever's left after the board" (vp.y - a
+	# board-bottom-derived deck_top), which is not the same thing —
+	# board_tile_for() floors tile to an int, and the resulting residual (0 to
+	# just under BOARD_H px) landed as a SECOND, resolution-dependent gap
+	# between nav_row and act_row (act_row's own SIZE_EXPAND|SIZE_SHRINK_END
+	# absorbed it invisibly, on top of DECK_GAP). Sizing the deck to DECK_ROWS
+	# instead leaves nothing inside it for act_row to claim, so that gap is
+	# now always exactly DECK_GAP; any residual shows up ABOVE the deck, where
+	# ADR-0004 already says leftover height belongs (the board is the slack
+	# absorber, not the deck).
 	var deck := VBoxContainer.new()
-	deck_h = vp.y - deck_top
-	# NO-115: the deck runs flush to both screen edges and the bottom — it used
-	# to sit 4px in on each side and stop 6px short of the bottom, leaving a
-	# dead strip under the thumb row. act_row (its last child) claims that
-	# freed 6px via EXPAND|SHRINK_END below, so its own height doesn't move.
+	deck_h = g.DECK_ROWS
+	# deck_top is therefore "screen bottom minus the deck's own fixed height",
+	# not board-derived any more — everything below that anchors "just above
+	# the deck" (army_band, the Inventory drawer, confirm_backdrop) already
+	# reads this same var, so they inherit the fix unchanged.
+	# NO-197: this also clears the deck of the board's own outline. board_tile_for()
+	# reserves DECK_MARGINS (12) between the board and DECK_ROWS, well past the
+	# outline's outer ink (BOARD_OUTLINE_INSET + BOARD_OUTLINE_WIDTH/2 = 5.5,
+	# game.gd) — bottom-anchoring the deck at a fixed height can only widen
+	# that gap, never shrink it below the ink. (Proof: with tile floored,
+	# deck_top - board_bottom = vp.y - DECK_ROWS - top - tile*BOARD_H >=
+	# vp.y - DECK_ROWS - top - (vp.y-top-DECK_MARGINS-DECK_ROWS) = DECK_MARGINS,
+	# for either branch of board_tile_for's min().)
+	var deck_top: float = vp.y - deck_h
 	deck.position = Vector2(0, deck_top)
 	deck.custom_minimum_size = Vector2(vp.x, deck_h)
 	# NO-163 closed this to 0 (was 6). NO-181 reopens it to DECK_GAP — the SAME
@@ -1001,10 +1018,11 @@ func build(game) -> void:
 	ability_col.add_child(army_ability_button)
 	act_row = HBoxContainer.new()
 	act_row.add_theme_constant_override("separation", DECK_GAP)
-	# NO-115: EXPAND claims the deck's now-unused trailing space (see deck's
-	# own comment above); SHRINK_END keeps act_row pinned at its own 60px
-	# minimum and docks it at the bottom of that space, flush to the screen.
-	act_row.size_flags_vertical = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
+	# NO-196: used to carry SIZE_EXPAND|SIZE_SHRINK_END to soak up the deck's
+	# leftover trailing space and still dock flush at the bottom. The deck no
+	# longer HAS leftover space (its own height is fixed to DECK_ROWS, above),
+	# so there's nothing left for EXPAND to claim — act_row is simply the
+	# deck's last child now, flush to the deck's own bottom edge by construction.
 	act_row.custom_minimum_size = Vector2(0, 60)
 	act_row.add_child(ability_col)
 	act_row.add_child(pass_button)

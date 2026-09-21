@@ -857,7 +857,13 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## from what hud.gd actually builds (test_game_clicks.gd's NO-33 guard
 ## computes the live deck's height and checks it against this constant).
 const DECK_ROWS := 32.0 + HudScript.DECK_GAP + 60.0 ## drawers 32 + DECK_GAP (hud.gd) + act 60
-const DECK_MARGINS := 12.0 ## 6 between board and deck, 6 under the deck
+## NO-196: used to split as "6 between board and deck, 6 under the deck" — but
+## the deck is now bottom-anchored at a FIXED height (hud.gd's build()), flush
+## to the screen edge with nothing padding it below, so there is no longer a
+## separate "under the deck" margin to spend. Both 6's now land in the one
+## gap between the board and the deck; the sum (and the tile solve below) is
+## unchanged, only where it's spent moved.
+const DECK_MARGINS := 12.0
 ## ICON sits this far under the board tile, so the deck always reads as smaller
 ## than the board. Design C picked 52 against a 59px tile; this is that gap, kept
 ## as the relationship rather than the pair of numbers it produced on one screen.
@@ -867,6 +873,18 @@ const ICON_GAP := 7
 ## Header and get clipped. Just enough top margin for the outset + half the
 ## stroke width (4 + 1.5) to clear it — not a return to centring (2026-09-05).
 const BOARD_TOP_MARGIN := 6.0
+## NO-197: the whose-turn outline (_draw, below) sits this far OUTSIDE the tile
+## grid, stroked BOARD_OUTLINE_WIDTH wide and CENTRED on that inset edge — so its
+## outer ink reaches INSET + WIDTH/2 past the grid (4 + 1.5 = 5.5). Named so
+## test_game_clicks.gd's overlap guard can derive that 5.5 instead of repeating
+## it as a bare literal (CLAUDE.md: "two constants that happen to agree") —
+## hud.gd's old deck_top offset was a bare 6.0, half a px past this ink, which
+## read as overlap once anti-aliased. hud.gd no longer needs these two directly:
+## the deck is bottom-anchored at a fixed height now (NO-196), which leaves
+## DECK_MARGINS (12, below) — comfortably more than this 5.5 — as the board/deck
+## clearance regardless of tile size; see hud.gd's build() for the inequality.
+const BOARD_OUTLINE_INSET := 4.0
+const BOARD_OUTLINE_WIDTH := 3.0
 
 
 ## The one-way, closed-form solve (ADR-0004, amended by NO-83). With the strip
@@ -930,8 +948,9 @@ func _layout_board() -> void:
 	# PULLED UP under the top strip rather than centred in the span (user ruling,
 	# 2026-09-05). Centring split the leftover height into a gap above AND below
 	# the board, and on a 9:20 phone that was ~130px of nothing in two places.
-	# Flush to the top puts every spare pixel in ONE place, under the board,
-	# where the deck expands to fill it.
+	# Flush to the top puts every spare pixel in ONE place, under the board —
+	# between the board and the deck (NO-196: the deck itself is a fixed
+	# height now, hud.gd's build(), so it no longer absorbs any of this).
 	board_px = Vector2(roundf((vp.x - tile * Tuning.BOARD_W) / 2.0), top)
 	queue_redraw()
 
@@ -4536,7 +4555,9 @@ func _draw() -> void:
 	elif state == State.ENEMY_TURN:
 		oc = Color(1.0, 0.42, 0.35)
 	var bsize := Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile
-	draw_rect(Rect2(board_px - Vector2(4, 4), bsize + Vector2(8, 8)), oc, false, 3.0)
+	draw_rect(Rect2(board_px - Vector2(BOARD_OUTLINE_INSET, BOARD_OUTLINE_INSET),
+		bsize + Vector2(BOARD_OUTLINE_INSET, BOARD_OUTLINE_INSET) * 2.0), oc, false,
+		BOARD_OUTLINE_WIDTH)
 	var recon: bool = selected.x >= 0 and board.has(selected) \
 			and board[selected].owner == Rules.ENEMY
 	if selected.x >= 0: # enemy recon selections tint red, own selections blue

@@ -55,6 +55,18 @@ func _army_cards(node: Node) -> Array[PanelContainer]:
 	return out
 
 
+## The carousel's own ScrollContainer (army_scroll in menu.gd), not exposed
+## as a member — found the same way _army_cards finds its PanelContainers.
+func _find_scroll(node: Node) -> ScrollContainer:
+	if node is ScrollContainer:
+		return node
+	for c in node.get_children():
+		var found := _find_scroll(c)
+		if found != null:
+			return found
+	return null
+
+
 func _find_button(node: Node, text: String) -> Button:
 	# visible-first: "← Back" exists in both the TEST and army submenus
 	if node is Button and node.text == text and node.is_visible_in_tree():
@@ -298,28 +310,37 @@ func _init() -> void:
 	check(_find_button(menu, "The Muster") != null, "Play opens the army select") # issue
 		# 67: "Crown" is still the save id (Tuning.ARMIES key) — the BUTTON now
 		# shows the Army's display name, "The Muster" ("The Levy" was vetoed)
-	# NO-179: the peek scale must apply on the FIRST render, not only after a
-	# scroll re-runs set_current — army-crown-peek.png caught a resting card
-	# 0 with its right-hand neighbour at full, uncropped size. Geometry, not
-	# a flag: assert the actual scale and that the scaled card fits the gap
-	# beside the resting card, mirroring the arithmetic set_current's own
-	# header documents (lead_w = (scroll_w - card_w) / 2 - ARMY_CARD_MARGIN).
+	# NO-179 (Max: "just make a normal carousel with out changing any
+	# dimensions of the other cards"): every card renders at the SAME size,
+	# full scale, always — no per-card scaling. A neighbour simply extends
+	# past the scroller's own viewport edge. Geometry, not a flag: assert
+	# equal sizes/scale, then scroll to a middle Army and assert both
+	# neighbours are genuinely PARTIALLY on screen (part inside the
+	# viewport, part cropped by it), while the resting card is fully clear.
 	await process_frame # menu.gd's _show_armies awaits one frame for the
-		# deferred container sort before re-applying the scale; give it one.
+		# deferred container sort before reading real geometry; give it one.
 	var cards := _army_cards(menu.army_center)
-	check(cards.size() > 1, "the carousel built more than one card")
-	if cards.size() > 1:
-		var neighbour: PanelContainer = cards[1]
-		check(is_equal_approx(neighbour.scale.x, MenuScript.ARMY_CARD_PEEK_SCALE),
-			"a non-resting card is scaled to ARMY_CARD_PEEK_SCALE on first render")
-		# `menu` is typed Node here (matches _click_button's own signature), so
-		# get_window() — a real Node method — reads the width instead of
-		# get_viewport_rect(), which only exists on CanvasItem.
-		var scroll_w: float = menu.get_window().size.x - 80.0
-		var card_w: float = scroll_w * MenuScript.ARMY_CARD_WIDTH_FRACTION
-		var lead_w: float = (scroll_w - card_w) / 2.0 - MenuScript.ARMY_CARD_MARGIN
-		check(neighbour.size.x * neighbour.scale.x <= lead_w + 1.0, # +1 for float slop
-			"the scaled neighbour's on-screen width fits the visible gap, uncropped")
+	check(cards.size() > 2, "the carousel built more than two cards")
+	if cards.size() > 2:
+		for c in cards:
+			check(c.size.is_equal_approx(cards[0].size), "every card is the same size")
+			check(c.scale.is_equal_approx(Vector2.ONE), "no card is scaled")
+		var scroll := _find_scroll(menu.army_center)
+		# Same scroll target the page dots use (menu.gd: dot.pressed) — land
+		# on Army 1 so it has a real neighbour on both sides.
+		var card_w: float = cards[0].size.x
+		scroll.scroll_horizontal = int(card_w + MenuScript.ARMY_CARD_MARGIN)
+		await process_frame
+		var viewport: Rect2 = scroll.get_global_rect()
+		var prev_overlap: Rect2 = viewport.intersection(cards[0].get_global_rect())
+		var next_overlap: Rect2 = viewport.intersection(cards[2].get_global_rect())
+		check(prev_overlap.size.x > 0.0 and prev_overlap.size.x < cards[0].size.x,
+			"the previous Army's card peeks in on the left, partially cropped")
+		check(next_overlap.size.x > 0.0 and next_overlap.size.x < cards[2].size.x,
+			"the next Army's card peeks in on the right, partially cropped")
+		var resting_overlap: Rect2 = viewport.intersection(cards[1].get_global_rect())
+		check(is_equal_approx(resting_overlap.size.x, cards[1].size.x),
+			"the resting card is fully visible, uncropped")
 	check(await _click_button(menu, "← Back"), "army Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "army Back restores the main menu")

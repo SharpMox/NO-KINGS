@@ -20,7 +20,10 @@ const Armies := preload("res://scripts/armies.gd")
 ## Shop.buy already reads slot.kind with no hook indirection.
 ## NO-166: piece 8->10, box 6->5 — a stocking-density pass, not a mechanics
 ## change; artefact/item rows are untouched.
-const ROWS := {"box": 5, "artefact": 4, "item": 4, "piece": 10}
+## NO-201 (Max, 2026-09-21): piece 10->12, artefact/item 4->5 -- matches the
+## V4 mockup's grid (modals.gd show_shop: PIECES 3 cols x 4 rows, ARTEFACTS/
+## ITEMS each a full Tuning.OFFBOARD_GRID_COLS(5)-wide row). Box stays 5.
+const ROWS := {"box": 5, "artefact": 5, "item": 5, "piece": 12}
 ## 2 slots each (GDD Shop page); every Box's SIZE is rolled independently in
 ## roll() below (issue 47 — Score Box and the mixed Box are both gone).
 const BOX_THEMES := ["piece", "artefact", "item"]

@@ -315,8 +315,12 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   `_screenshot_and_quit` places the stock at random and passes once — an in-run board, not
   a chosen state. For a chosen state, add `--scenario N` plus `--select X,Y[;X,Y]` (one or
   two real taps via `_on_tile_clicked` — a second pair completes a move/capture/merge the
-  first started), `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`), `--open-shop
-  [--sell]`, `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
+  first started), `--arm-item KEY [--anchor X,Y]` (`_use_item`/`_item_click`), `--open-shop`
+  (NO-193: there is **no `--sell`** — this doc described one for weeks and `game.gd` has
+  never had any handling for it, so passing it is silently ignored. Nor should there be:
+  NO-144 removed the Shop's Sell page and Max ruled 2026-09-22 that "you cant sell from
+  the shop that makes no sense". Selling lives outside the Shop, so there is no Shop-sell
+  state to capture), `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
   ("pause"/"king-abilities"/"tip"/"preview" — panels no board tap opens on its own) — for
   capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives all of
   them (NO-122, extended for the 2026-09-19 screenshot pass). Four more traps, found

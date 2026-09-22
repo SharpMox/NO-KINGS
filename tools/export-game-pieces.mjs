@@ -40,20 +40,26 @@ const VALUES = {
 // (dots→leap/both, rays→ride, rings→leap/move-only, xs→leap/capture-only) except
 // where diagram squares differ from move semantics:
 const OVERRIDES = {
-  // mfWcfFimfnD: MVP drops the initial double-step (and en passant with it).
+  // mfWcfFimfnD: NO-224 restores the initial double-step as a range-2 ride
+  // (it slides, so it can't jump — same mW2cF precedent as arrow-pawn below).
+  // `initial: true` gates it to a piece that hasn't moved yet (rules.gd).
+  // En passant (the notation's other "i") is a separate ticket (NO-232).
   pawn: [
     { type: "leap", dirs: [[0, 1]], mode: "move" },
     { type: "leap", dirs: [[1, 1], [-1, 1]], mode: "capture" },
+    { type: "ride", dirs: [[0, 1]], range: 2, mode: "move", initial: true },
   ],
   // mW2cF: the W2 step slides (can't jump), so it's a range-2 ride, not leaps.
   "arrow-pawn": [
     { type: "ride", dirs: [[1, 0], [-1, 0], [0, 1], [0, -1]], range: 2, mode: "move" },
     { type: "leap", dirs: [[1, 1], [-1, 1], [1, -1], [-1, -1]], mode: "capture" },
   ],
-  // mfFcfWimfnA: the Pawn's mirror; drop the double-step like the pawn's.
+  // mfFcfWimfnA: the Pawn's mirror; same NO-224 double-step restoration,
+  // along its own move direction (forward-diagonal) instead of orthogonal.
   berolina: [
     { type: "leap", dirs: [[1, 1], [-1, 1]], mode: "move" },
     { type: "leap", dirs: [[0, 1]], mode: "capture" },
+    { type: "ride", dirs: [[1, 1], [-1, 1]], range: 2, mode: "move", initial: true },
   ],
   // mF2cW: the Void Archer's F2 slides diagonally (can't jump).
   "inv-arrow-pawn": [

@@ -53,6 +53,19 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 1], ["knight", 0, 3, 1], ["arrow-pawn", 0, 1, 0], ["kirin", 0, 4, 0]]}},
 		{"name": "Captures & highlights", "cfg": {
 			"board": [["queen", 0, 2, 2], ["knight", 0, 4, 2], ["pawn", 1, 2, 5], ["bishop", 1, 3, 4], ["rook", 1, 5, 3]]}},
+		# NO-224: the Pawn's initial two-square move. Four pawns side by side —
+		# unmoved (double-step available), already moved (single only), an
+		# unmoved one BLOCKED by a piece on the intervening square (mW2cF
+		# precedent: it slides, doesn't jump) — plus an unmoved enemy pawn
+		# with nothing else on the board, so the greedy AI's own best-advance
+		# pick exercises the double-step on its turn.
+		{"name": "Pawn double-step (NO-224)", "cfg": {
+			"board": [
+				["pawn", 0, 1, 1],
+				["pawn", 0, 3, 1, {"moved": true}],
+				["pawn", 0, 5, 1], ["pawn", 0, 5, 2],
+				["pawn", 1, 6, 10],
+			]}},
 		{"name": "Waves & cadence", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1]], "wave": 1, "stock": ["pawn", "pawn"]}},
 		{"name": "Spawn overflow: full top row (friendly capture + spillover)", "cfg": {

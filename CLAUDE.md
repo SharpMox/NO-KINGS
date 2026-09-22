@@ -321,9 +321,9 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   NO-144 removed the Shop's Sell page and Max ruled 2026-09-22 that "you cant sell from
   the shop that makes no sense". Selling lives outside the Shop, so there is no Shop-sell
   state to capture), `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
-  ("pause"/"king-abilities"/"tip"/"preview" — panels no board tap opens on its own) — for
-  capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives all of
-  them (NO-122, extended for the 2026-09-19 screenshot pass).
+  ("pause"/"king-abilities"/"banner"/"tip"/"preview" — panels no board tap opens on its own)
+  — for capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives
+  all of them (NO-122, extended for the 2026-09-19 screenshot pass).
   **SETUP's placement zone cannot be captured at all, from either direction** (found
   2026-09-22 while verifying NO-214, and it is a dead end worth knowing before you spend
   an hour on it): no scenario sets `"state": 0`, and `save_config.gd:292` defaults `state`
@@ -331,10 +331,36 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   SETUP. A genuine fresh boot does reach SETUP, but there `is_scenario` is false, which
   gates the whole `--select`/`--screenshot` path off. Reaching it needs a scenario that
   sets `"state": 0` — nothing more clever exists today.
-  **The wave/turn banner is unreachable too**: it is only drawn during a transition by
-  `_add_turn_fx`, lasts ~1.1s, and no flag holds it on screen — so NO-219's italic, its
-  stripes and its full-width span are all unverified. NO-234 covers the test scenes that
-  would fix that. Four more traps, found
+  **The wave/turn banner is reachable now (NO-234).** It used to be a dead end: drawn
+  only during a transition by `_add_turn_fx`, lasting ~1.1s with no flag holding it on
+  screen, so NO-219's italic, its stripes and its full-width span went unverified.
+  `--show-screen banner` (paired with a scenario named "Banner: frozen (NO-234)" in
+  `game/data/scenarios.gd`) now pins one on screen: it builds the anim dict directly at
+  `t=0.5` rather than calling `_add_turn_fx`, since that function bails when `autoplay`
+  is set or the local Settings file has `animations_on` off — either of which would
+  otherwise make the capture silently produce nothing, the same trap as (1) below.
+  A second scenario, "Banner: looping (NO-234)", boots straight into a playable turn with
+  one player piece (so Pass never trips starvation) and the default wave (all waves done,
+  so nothing else interrupts) — it's for the in-app TEST menu, not the CLI: PASS
+  repeatedly and ENEMY TURN / YOUR TURN fire back to back.
+  **`--scenario N` is a positional index into `Scenarios.all()` = `_hand_written() + `
+  four generated batches, so it moves whenever ANY scenario lands anywhere above it in
+  `_hand_written()` — appending is safe, inserting into the middle (as NO-233 did, right
+  after "En passant (NO-232)") shifts every hand-written AND every generated index below
+  it by however many entries were added. Nothing in the repo pins a generated index today
+  on purpose, but a ticket or PR body that quotes one goes stale the moment a scenario PR
+  merges (NO-214's mentions scenario 301, already suspect). **Never hardcode the number in
+  a doc or a command someone will run later** — count entries in the live tree right
+  before using it (`grep -c '{"name":' game/data/scenarios.gd` PLUS a separate count of
+  `_chain(...)` calls, which build entries without writing `{"name":` themselves — a
+  plain `{"name":` grep alone undercounts by exactly that many), or, more reliably, drive
+  the in-app TEST menu / scenario picker by NAME and read off its index there. As of this
+  writing (pre-NO-233) the two above land at 97 and 98; treat that as an illustration, not
+  a fact to copy into a future command:
+  ```sh
+  tools/godot-lock.sh godot --path game -- --scenario <N> --screenshot /tmp/shot-banner --show-screen banner
+  ```
+  Four more traps, found
   2026-09-19/20 and each silent: (1) without `--scenario N`, `is_scenario` gates the whole
   debug-capture path (`game.gd:720-726`) — `--select`/`--arm-item`/`--open-shop`/
   `--open-drawer`/`--show-screen` all fall through to the plain default-board capture, no

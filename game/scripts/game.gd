@@ -312,6 +312,7 @@ const BUFF_BADGE_GLYPH_COL := Color.WHITE
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
 var board_px := Vector2(24, 120)
+var viewport_w := 480.0 ## last-laid-out viewport width (NO-219: the banner spans this, not the board)
 
 var defs: Dictionary
 var fusions: Dictionary # unordered pair "a+b" -> result id
@@ -1034,6 +1035,7 @@ func initials_of(display_name: String) -> String:
 
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
+	viewport_w = vp.x
 	safe_top = safe_top_px(vp)
 	hud_top = safe_top + HudScript.HEADER_H
 	var top := hud_top + BOARD_TOP_MARGIN
@@ -1320,6 +1322,17 @@ func _process(delta: float) -> void:
 
 # --- turn flow ---
 
+# Banner look (NO-219, 2026-09-22, Max's instruction): bold italic text plus a
+# decorative stripe above and below the band. Tunable here without reading
+# _draw. variation_embolden's documented range is -2..2 (0 = normal weight);
+# variation_transform's skew is radians, negative leans the glyph tops right
+# for a conventional italic slant.
+const BANNER_FONT_EMBOLDEN := 0.9
+const BANNER_ITALIC_SKEW := -0.22
+const BANNER_STRIPE_H := 3.0
+
+var _banner_font: FontVariation ## built once on first use, never per-frame in _draw
+
 ## The wave/turn banner's on-screen rect at animation time `t`, for stack `slot`.
 ##
 ## Extracted from _draw so the geometry is testable, and CLAMPED to the board
@@ -1336,12 +1349,21 @@ func _process(delta: float) -> void:
 ## It now emerges from the board's own left edge: the right edge sweeps across
 ## while the left stays pinned, so nothing is ever drawn outside the board. The
 ## settled state (slide == 1) is byte-identical to before.
+##
+## REVERSED 2026-09-22 (NO-219, Max's instruction: "Banner -> fullscreen
+## width"). The clamp above is deliberately re-based on the viewport instead
+## of removed: bw is now viewport_w and the pinned edge is the screen edge
+## (x=0) rather than board_px.x, so the sweep is still bounded by construction
+## -- there is just nothing left of the board to clamp against, because the
+## target extent IS the screen now. Do not restore the board-width clamp this
+## comment used to describe; that was NO-26's fix for a defect this ticket
+## intentionally reverses.
 func _banner_rect(t: float, slot: int) -> Rect2:
-	var bw: float = Tuning.BOARD_W * tile
+	var bw: float = viewport_w
 	var by: float = board_px.y + tile * 3.0 + slot * 52.0
 	var slide: float = ease(minf(t * 4.0, 1.0), 0.3)
-	var right: float = board_px.x + slide * bw
-	return Rect2(Vector2(board_px.x, by), Vector2(maxf(0.0, right - board_px.x), 44))
+	var right: float = slide * bw
+	return Rect2(Vector2(0.0, by), Vector2(maxf(0.0, right), 44))
 
 
 ## Turn/wave transition feedback: board-outline glow + a wiping banner
@@ -4818,7 +4840,16 @@ func _draw() -> void:
 				continue # not emerged yet
 			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
 			draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
-			draw_string(font, Vector2(br.position.x, br.position.y + 31), a.text,
+			# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
+			# with the band rather than them appearing instantly at full width.
+			draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+			draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+			if _banner_font == null: # cached once, never rebuilt per-frame
+				_banner_font = FontVariation.new()
+				_banner_font.base_font = font
+				_banner_font.variation_embolden = BANNER_FONT_EMBOLDEN
+				_banner_font.variation_transform = Transform2D(0.0, Vector2.ONE, BANNER_ITALIC_SKEW, Vector2.ZERO)
+			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),

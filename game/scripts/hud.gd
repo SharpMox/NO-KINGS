@@ -1329,9 +1329,10 @@ func build(game) -> void:
 		# that `sc`/cells don't; gui_input reports exactly that leftover
 		# "chrome", the surface a reverse-close swipe must start on.
 		panel.gui_input.connect(_on_chrome_swipe_input.bind(spec[0]))
-		# NO-118: Inventory slides in from the LEFT — off-screen is its own
-		# width to the left of rest, not a move of where it rests.
-		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
+		# NO-226: Inventory slides in from the BOTTOM — off-screen is its own
+		# full height below rest, so the panel's top sits exactly on the
+		# viewport's bottom edge before sliding up to rest.
+		drawer_hidden[spec[0]] = panel.position + Vector2(0, full_h)
 	# ---- THE STOCK DRAWER (NO-84) --------------------------------------------
 	# Opens downward from the Header's bottom edge, next to the button that
 	# opens it (story 31) — everything else in this file opens above the deck,

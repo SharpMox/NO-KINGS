@@ -5281,6 +5281,7 @@ func _connect_hud() -> void:
 		_show_kind_preview("item", items[index].key, items[index])) # NO-144
 	hud.artefact_preview_requested.connect(func(key: String) -> void:
 		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
+	hud.inv_sell_pressed.connect(_on_inv_sell_pressed) # NO-223
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
@@ -5517,6 +5518,34 @@ func _convert_captured(entry: Variant) -> bool:
 		# bare-id-or-stateful-Dictionary shape, so the entry moves across as-is
 	Economy.spend_gold(self, cost)
 	return true
+
+
+## NO-223: hud.gd's own Sell badge on an Item/Artefact Inventory cell — a
+## second entry point onto the exact same _sell() above (never a second sell
+## implementation). Confirmation weight is the one judgement call this slice
+## makes: an Item is a consumable, sold with no confirmation, same as the
+## Item Box's own Sell button (_box_sell above) has always done; an Artefact
+## is passive and permanent, so selling one ends a held effect for good —
+## closer to a one-way decision — and gets a Confirm/Cancel step first, the
+## same _open_choice_pick seam Jet Fuel Vial's Restock confirm already uses.
+## `kind` is only ever "item"/"artefact" — hud.gd never fires this for "piece"
+## (Stock selling stays behind the preview modal's long press).
+func _on_inv_sell_pressed(kind: String, entry: Variant) -> void:
+	if kind != "artefact":
+		_sell_and_refresh(kind, entry)
+		return
+	if not Shop.can_sell(self, "artefact", entry): # re-check: state may have
+		# shifted between the badge press and the confirm below
+		return
+	var payout: int = Shop.sell_payout(self, "artefact", entry)
+	_open_choice_pick("Sell %s for $%d? The effect ends." % [str(entry.get("name", "")), payout],
+		[{"label": "Sell", "value": true}], "Cancel",
+		func(_v) -> void: _sell_and_refresh("artefact", entry), Callable())
+
+
+func _sell_and_refresh(kind: String, entry: Variant) -> void:
+	_sell(kind, entry)
+	_refresh()
 
 
 func _show_win_screen() -> void:

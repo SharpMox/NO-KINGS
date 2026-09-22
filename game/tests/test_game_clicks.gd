@@ -2478,6 +2478,77 @@ func _init() -> void:
 	check(game.board.has(deploy_target) and game.board[deploy_target].id == "pawn",
 		"(control) and the very same Deploy-tile tap deploys a STOCK piece")
 
+	# NO-223: the Inventory drawer's own Sell badge — a direct affordance on
+	# each Item/Artefact cell (hud.gd's inv_sell_pressed), alongside the
+	# preview modal's Sell button tested above. Items sell immediately, same
+	# as the Item Box's own no-confirm Sell button (_box_sell); selling an
+	# Artefact confirms first — it ends a permanent, passive effect, closer
+	# to a one-way decision than spending a consumable.
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500, "items": ["blitz"], "artefacts": ["agartha-welcome-mat"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+
+	check(await _click_inventory(game, "Inventory 2"),
+		"Inventory opens with one held Item and one held Artefact")
+
+	var item_cell: Button = null
+	for c in game.hud.items_grid.get_children():
+		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "blitz":
+			item_cell = c
+	var item_sell_badge: Button = null
+	for c in item_cell.get_children():
+		if c is Button and (c as Button).text.begins_with("$"):
+			item_sell_badge = c
+	var item_payout: int = Shop.sell_payout(game, "item", game.items[0])
+	check(item_sell_badge != null and item_sell_badge.is_visible_in_tree()
+			and item_sell_badge.text == "$%d" % item_payout and not item_sell_badge.disabled,
+		"the Item cell carries its own Sell badge, priced and live")
+	var gold_before_item_sell: int = game.gold
+	_click(item_sell_badge.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(game.items.is_empty() and game.gold == gold_before_item_sell + item_payout
+			and not game.buff_pick_open,
+		"tapping the Item's Sell badge sells it immediately with no confirm")
+
+	var art_cell: Button = null
+	for c in game.hud.artefacts_grid.get_children():
+		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "agartha-welcome-mat":
+			art_cell = c
+	var art_sell_badge: Button = null
+	for c in art_cell.get_children():
+		if c is Button and (c as Button).text.begins_with("$"):
+			art_sell_badge = c
+	var art_entry: Variant = game._artefact_entry("agartha-welcome-mat")
+	var art_payout: int = Shop.sell_payout(game, "artefact", art_entry)
+	check(art_sell_badge != null and art_sell_badge.is_visible_in_tree()
+			and art_sell_badge.text == "$%d" % art_payout and not art_sell_badge.disabled,
+		"the Artefact cell carries its own Sell badge too")
+	var gold_before_art_sell: int = game.gold
+	_click(art_sell_badge.get_global_rect().get_center())
+	await process_frame
+	check(game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art_sell,
+		"tapping the Artefact's Sell badge opens a confirm first — nothing sold yet")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel is offered")
+	await process_frame
+	check(not game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art_sell,
+		"Cancel keeps the Artefact held and pays nothing")
+
+	_click(art_sell_badge.get_global_rect().get_center())
+	await process_frame
+	check(game.buff_pick_open, "the Sell badge opens the confirm again")
+	check(await _click_button_in(game.modals.buff_panel, "Sell"), "Sell confirms the sale")
+	await process_frame
+	check(game.artefacts.is_empty() and game.gold == gold_before_art_sell + art_payout
+			and not game.buff_pick_open,
+		"confirming sells the Artefact, pays Gold through Economy, and closes the confirm")
+
 	# Jet Fuel Vial (issue 52): a Shop-only control, restock button appears
 	# only while it's held — confirm-gated, same as every untargeted
 	# activation (user ruling).

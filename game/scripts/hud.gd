@@ -248,6 +248,12 @@ signal item_preview_requested(index: int) # NO-144: an Item cell's long
 signal artefact_activate_pressed(key: String) # issue 52: an Activate chip pressed
 signal artefact_preview_requested(key: String) # NO-144: same as
 	# item_preview_requested above, for a held Artefact
+signal inv_sell_pressed(kind: String, entry: Variant) # NO-223: the Inventory
+	# drawer's own Sell badge on an Item/Artefact cell ("item"/"artefact") —
+	# a second, direct entry point alongside the long-press preview's Sell
+	# button (item_preview_requested/artefact_preview_requested above), both
+	# landing on the same _sell() in game.gd. Never fired for "piece" — Stock
+	# selling stays behind the preview's long press, same as before.
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal promote_pressed(id: String)
 signal convert_pressed(entry: Variant) # the ⇄ badge on a Captured entry (2026-09-06)
@@ -2369,6 +2375,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		artefact_activate_pressed.emit(key),
 		func() -> void: artefact_preview_requested.emit(key)) # NO-144
 	btn.set_meta("key", key) # lookup for probes/tests
+	btn.add_child(_build_sell_badge("artefact", entry)) # NO-223
 	return btn
 
 
@@ -2403,6 +2410,33 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
+## NO-223: the Inventory drawer's own Sell badge — top-left corner pill on
+## an Item/Artefact cell, priced and disabled exactly like the Stock/Captured
+## grid's own ⇄ Convert badge (_build_stack_button above), reading the same
+## Shop.sell_payout/can_sell the preview modal's Sell button already uses.
+## Emits inv_sell_pressed; game.gd decides whether the sale needs confirming.
+func _build_sell_badge(kind: String, entry: Variant) -> Button:
+	var payout: int = Shop.sell_payout(g, kind, entry)
+	var sell := Button.new()
+	sell.text = "$%d" % payout
+	sell.add_theme_font_size_override("font_size", 11)
+	sell.add_theme_color_override("font_color", Color(1, 0.9, 0.85))
+	sell.disabled = not Shop.can_sell(g, kind, entry)
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = Color(0.75, 0.25, 0.2) # sell = red-ish, distinct from Convert's blue
+	pill.set_corner_radius_all(9)
+	for style in ["normal", "hover", "pressed", "disabled"]:
+		sell.add_theme_stylebox_override(style, pill)
+	sell.tooltip_text = "Sell for $%d" % payout
+	sell.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	sell.offset_left = 2
+	sell.offset_right = 30
+	sell.offset_top = 2
+	sell.offset_bottom = 18
+	sell.pressed.connect(func() -> void: inv_sell_pressed.emit(kind, entry))
+	return sell
+
+
 func _rebuild_items_grid() -> void:
 	for c in items_grid.get_children():
 		c.queue_free()
@@ -2431,6 +2465,7 @@ func _rebuild_items_grid() -> void:
 		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
+		btn.add_child(_build_sell_badge("item", g.items[i])) # NO-223
 		items_grid.add_child(btn)
 	# NO-165: the remaining room, signified — ItemLogic.cap is the real bound
 	# (base 3, +3 per held Area 51 Parking Permit), so this is never a

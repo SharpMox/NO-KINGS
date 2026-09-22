@@ -66,6 +66,18 @@ static func _hand_written() -> Array:
 				["pawn", 0, 5, 1], ["pawn", 0, 5, 2],
 				["pawn", 1, 6, 10],
 			]}},
+		# NO-232: en passant, turn-scoped (Max's ruling — softened from
+		# chess's "next move" to "next TURN"). The lone enemy pawn's single
+		# step (3,10)->(3,9) walks straight into the player pawn's ordinary
+		# diagonal capture — _move_value prices that at -10 and _pick drops
+		# it outright — so the double-step (3,10)->(3,8), which lands out of
+		# that range, is the AI's only surviving candidate and its own first
+		# turn exercises it, same as NO-224's own sandbox relies on the
+		# greedy AI for. From there the player pawn's ordinary diagonal
+		# capture already reaches the skip square (3,9): select (2,8),
+		# then tap (3,9) to capture en passant.
+		{"name": "En passant (NO-232)", "cfg": {
+			"board": [["pawn", 0, 2, 8], ["pawn", 1, 3, 10]]}},
 		{"name": "Waves & cadence", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1]], "wave": 1, "stock": ["pawn", "pawn"]}},
 		{"name": "Spawn overflow: full top row (friendly capture + spillover)", "cfg": {

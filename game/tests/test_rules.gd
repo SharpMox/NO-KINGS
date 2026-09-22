@@ -243,8 +243,7 @@ func _init() -> void:
 	}
 	act = Rules.ai_action(b, defs)
 	check(not act.is_empty() and act.to == Vector2i(3, 5),
-		"AI takes the safe double-step instead of holding (NO-224)",
-		"act=%s" % [act])
+		"AI takes the safe double-step instead of holding (NO-224) — act=%s" % [act])
 
 	# --- protect the King (GDD Rule 2) ---
 	# Not in check (the knight's leap set is [(1,9),(1,5),(2,8),(2,6)], never

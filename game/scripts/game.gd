@@ -4810,14 +4810,35 @@ func _draw() -> void:
 			# own geometry (verified unchanged and correct by the same
 			# convexity argument piece_diagram.gd's port confirmed on
 			# screen).
+		var bridge_ok := {} # NO-214: tile -> {neighbour: true} for pairs the
+			# NO-150 bridge below is ALLOWED to draw -- only two tiles that are
+			# literally consecutive stops on the same ride's own `line`
+			# (Rules.move_paths), never any two tiles that merely happen to touch
+			# at a corner. A knight's leap destinations, or an item's scattered
+			# picks, can corner-touch with nothing between them; a diagonal
+			# ride's tiles corner-touch BECAUSE they're one path.
+			# _draw_zone_outline can't tell those apart from `tiles` alone, so
+			# the allow-list is built here, where the path is known.
 		if not (state == State.SETUP or legal_paths.is_empty()):
 			for p in legal_paths:
 				if p.kind == "ride" and not p.get("hop", false):
 					for t in p.line:
 						arrowed[t] = true
+					for i in range(p.line.size() - 1):
+						var pa: Vector2i = p.line[i]
+						var pb: Vector2i = p.line[i + 1]
+						if absi(pa.x - pb.x) == 1 and absi(pa.y - pb.y) == 1: # diagonal
+							# step only -- a straight ride's consecutive tiles
+							# already share a real edge and need no entry here
+							if not bridge_ok.has(pa):
+								bridge_ok[pa] = {}
+							bridge_ok[pa][pb] = true
+							if not bridge_ok.has(pb):
+								bridge_ok[pb] = {}
+							bridge_ok[pb][pa] = true
 		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
 				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
-			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests, arrowed)
+			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests, arrowed, bridge_ok)
 	_draw_target_zone(_bomb_highlight_tiles()) # NO-122/176 hatch, NO-130
 		# shared — drawn after the zone outline above (see NO-176 comment)
 	if item_active >= 0: # item targeting: same zone indicator as the bomb
@@ -4955,8 +4976,13 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 ## a ride's corner-touching tiles read as one band too. Reusable: NO-130's
 ## `_draw_target_zone` calls this for both the bomb blast preview and an
 ## armed Item's zone.
+## NO-214: the bridge is a property of a PATH, not of any two tiles that
+## happen to touch at a corner -- `bridge_ok` (built by the caller, from the
+## same ride `line` data the arrows use) is the allow-list of pairs that may
+## bridge. A caller with no path info (the bomb/Item zone, SETUP placement)
+## passes none, so its corner touches never wrongly imply a connection.
 func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLINE_WIDTH,
-		captures: Array[Vector2i] = [], no_bridge: Dictionary = {}) -> void:
+		captures: Array[Vector2i] = [], no_bridge: Dictionary = {}, bridge_ok: Dictionary = {}) -> void:
 	# NO-161: `captures` is the subset of `tiles` whose outline should be red
 	# instead of `col`. An edge between two tiles that are BOTH in `tiles`
 	# but disagree on capture-ness (one is, one isn't) is a boundary inside
@@ -5023,6 +5049,9 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 				# segment on top of the zone — this stroke would just
 				# duplicate it, underneath a translucent arrow it shows
 				# through (see the call site's comment)
+			if not (bridge_ok.has(t) and bridge_ok[t].has(diag)):
+				continue # NO-214: no allow-listed path connects this corner pair --
+				# two tiles merely touching is not evidence they're on one path
 			var diag_cap := captures.has(diag)
 			var bridge_col: Color = overlap_col if diag_cap != t_cap \
 					else (capture_col if t_cap else col) # NO-161: same

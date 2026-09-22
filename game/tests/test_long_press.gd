@@ -186,7 +186,7 @@ func _item_button(game: Node, key: String) -> Button:
 ## lookup does not depend on grid order.
 func _artefact_cell(game: Node, key: String) -> Button:
 	for c in game.hud.artefacts_grid.get_children():
-		if c is Button and c.get_meta("key", "") == key:
+		if c is Button and not c.is_queued_for_deletion() and c.get_meta("key", "") == key:
 			return c
 	return null
 

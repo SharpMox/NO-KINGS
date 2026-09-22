@@ -1847,6 +1847,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if g.turn_action_count == 0:
 				g.actions_left += 1
 				g.actions_max += 1
+				_note(g, key, "Action refunded", g.BANNER_GAIN)
 		["5g-microchips", "on_turn_start"]:
 			var allies: int = g._player_pieces().size()
 			var enemies: int = g.board.size() - allies
@@ -2085,10 +2086,12 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.tier == "Tactical" and g.dihydrogen_free_wave != g.wave:
 				g.dihydrogen_free_wave = g.wave
 				ctx.cancel = true
+				_note(g, key, "Item not consumed", g.BANNER_GAIN)
 		["wardenclyffe-aaa-batteries", "on_item_consume"]:
 			if g.wardenclyffe_free_wave != g.wave:
 				g.wardenclyffe_free_wave = g.wave
 				ctx.cancel = true
+				_note(g, key, "Item not consumed", g.BANNER_GAIN)
 		["33rd-degree-fidelity-card", "on_item_consume"]:
 			if ctx.tier == "Tactical":
 				g.item_use_tactical_count += 1
@@ -2375,6 +2378,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# --- issue 26: free-deploy (Hitler's Argentinian Passport) ---
 		["hitler-s-argentinian-passport", "on_deploy"]:
 			ctx.skip_action = true
+			_note(g, key, "deploy costs no Action", g.BANNER_GAIN)
 
 		# --- issue 26: "5-Wave Milestone" grants (Ark's Bunkbed, Trojan Horse
 		# Assembly Manual) — per-artefact cadence, see silk-road-coupon's
@@ -2430,6 +2434,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# economy.gd/shop.gd's spend_gold) ---
 		["zero-point-energy-drink", "on_gold_zero"]:
 			g.actions_left += 2
+			_note(g, key, "+2 Actions at $0", g.BANNER_GAIN)
 
 		# --- issue 31: capture-context effects ---
 		["curtain-rods-bag-rifle-shaped", "on_score_change"]:
@@ -2485,6 +2490,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.first and ctx.kind == "item":
 				g.actions_left += 1
 				g.actions_max += 1
+				_note(g, key, "+1 Action", g.BANNER_GAIN)
 
 		# --- issue 35: Clock-gain choke point + run-long Turn counter ---
 		["black-knight-morse-code", "on_score_change"]:

@@ -272,6 +272,7 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 		# _move_player), same ordering first_capture_extra relies on.
 		g.actions_left += 1
 		g.actions_max += 1
+		g._add_turn_fx("Wild Hunt: Action refunded", g.BANNER_GAIN)
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
 	g.run_capture_count += 1

@@ -3578,6 +3578,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
 		actions_left -= it.get("action_cost", 1) # data-driven (Blitz: 0)
+	elif it.get("action_cost", 1) > 0:
+		_add_turn_fx("Nuclear Football Menu: Item costs no Action", BANNER_GAIN)
 	_log_action("item", {"item": it}) # issue 56: Zapruder's Item-return reads this back
 	match it.key:
 		"blitz": # Notion 2026-08-28 rework: costs 0 actions itself; the target's
@@ -4085,6 +4087,7 @@ func _artefact_confirmed(key: String) -> void:
 			Economy.spend_gold(self, 50)
 			actions_left += 1
 			actions_max += 1 # mid-turn grant, same shape as first_capture_extra
+			_add_turn_fx("FIFA Complimentary Yacht: +1 Action for $50", BANNER_GAIN)
 		"moscovium-glow-stick":
 			moscovium_active = true
 			_consume_artefact(key)

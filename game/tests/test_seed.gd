@@ -52,6 +52,7 @@ func _stream(seed_text: String, draws: int) -> Array:
 ## to_config() writes comes from g.rng draws, turn/wave counters, or board
 ## state, all of which the seed (and the fixed step count) fully determine.
 func _fingerprint(cfg: Dictionary, steps: int) -> Dictionary:
+	GameScript.reset_boot_defaults() # NO-194: this is the file's boot funnel, called 3x per run
 	GameScript.next_config = cfg
 	GameScript.is_scenario = true
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()

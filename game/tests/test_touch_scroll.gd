@@ -162,6 +162,10 @@ func _drive(d: Node, dir: String, seq: int, cmds: Array) -> PackedStringArray:
 	return FileAccess.get_file_as_string(dir.path_join("ack.txt")).split("\n", false)
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	# NO-192: raised from 60s. Must stay below run_all.sh's TIMEOUT (600s) or
 	# the runner kills the process first and the tail of this probe's log is lost.
@@ -372,6 +376,7 @@ func _init() -> void:
 	# deadzone buys.
 	menu.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		# NO ITEMS HERE, deliberately. Adding six put the inventory drawer's
@@ -464,6 +469,7 @@ func _init() -> void:
 	# Button flipped to PASS that stopped firing would be a silent regression.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
 		"items": ["blitz", "sniper", "air_strike", "demote", "promote", "invert"],
@@ -633,6 +639,7 @@ func _init() -> void:
 	# hardware — see tuning.gd for the full diagnosis. This is the one
 	# surface that passed first try. Close gestures are UNCHANGED: reverse-
 	# swipe on each panel's own chrome.
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		# NO-145 (hardware round 3): wave 5, not 3 — this block also swipes the
@@ -767,6 +774,7 @@ func _init() -> void:
 	# rows) or a Stock deploy-drag, never the swipe recogniser.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["27-club-punch-card", "tinfoil-hat", "area-51-parking-permit",

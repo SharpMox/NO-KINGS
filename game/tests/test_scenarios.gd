@@ -35,6 +35,10 @@ func _init() -> void:
 		if not cfg.has("seed"):
 			cfg = cfg.duplicate()
 			cfg.seed = DEFAULT_SEED
+		# NO-194: this loop body IS the boot funnel (no separate _boot() here) —
+		# reset next_army every iteration, since most scenarios omit "army" and
+		# would otherwise inherit whichever scenario ran before them.
+		GameScript.reset_boot_defaults()
 		GameScript.next_config = cfg
 		GameScript.is_scenario = true
 		var game: Node2D = load("res://scenes/Game.tscn").instantiate()

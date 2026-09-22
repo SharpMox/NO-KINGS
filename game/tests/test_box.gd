@@ -41,6 +41,7 @@ func _sell_buttons(node: Node) -> Array:
 
 
 func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	if seed_it and not cfg.has("seed"):
 		cfg = cfg.duplicate()
 		cfg.seed = DEFAULT_SEED

@@ -57,6 +57,19 @@ static var next_seed: String = ""
 static var cli_bypass_used := false
 
 
+## NO-194: next_army is read by SaveConfig.apply's own fallback (`cfg.get(
+## "army", g.next_army)`) — correct in production, where the menu sets it
+## fresh before every scene load and a scenario reload is meant to carry the
+## player's current pick forward. But one headless test process boots dozens
+## of Game instances without ever going through the menu, so a fixture that
+## omits "army" silently inherits whatever a DIFFERENT, earlier fixture left
+## behind (NO-191). Test `_boot()` helpers call this first, mirroring how
+## they already pin a DEFAULT_SEED: every fixture deterministic by default,
+## not just the ones caught contaminating another.
+static func reset_boot_defaults() -> void:
+	next_army = Tuning.DEFAULT_ARMY
+
+
 ## Any string -> a stable seed. Digits are used as-is so "12345" behaves like
 ## the number a player expects; anything else is hashed, so words work too.
 static func seed_of(text: String) -> int:

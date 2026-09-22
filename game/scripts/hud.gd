@@ -1920,14 +1920,23 @@ func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on
 		var token := Time.get_ticks_usec()
 		btn.set_meta("lp_token", token)
 		btn.set_meta("lp_from", e.global_position)
+		# NO-156: bind btn's instance id, not btn itself — hud.refresh() frees
+		# and rebuilds grid cells constantly, and this timer routinely outlives
+		# its cell. Capturing the Node directly means Godot prints "Lambda
+		# capture at index 0 was freed. Passed 'null' instead" the instant the
+		# signal fires on a freed btn, BEFORE is_instance_valid ever runs — the
+		# guard stopped the crash but not the noise. An int is copied by value,
+		# so there is nothing left for Godot to null out.
+		var btn_id := btn.get_instance_id()
 		get_tree().create_timer(LONG_PRESS_MS / 1000.0).timeout.connect(func() -> void:
-			if is_instance_valid(btn) and btn.get_meta("lp_token", 0) == token:
-				btn.remove_meta("lp_token")
-				btn.set_meta("lp_fired", true)
+			var b := instance_from_id(btn_id) as Button
+			if is_instance_valid(b) and b.get_meta("lp_token", 0) == token:
+				b.remove_meta("lp_token")
+				b.set_meta("lp_fired", true)
 				if on_fire.is_valid():
 					on_fire.call()
 				else:
-					show_tip(key, desc, btn.get_global_rect()))
+					show_tip(key, desc, b.get_global_rect()))
 	elif e is InputEventMouseMotion and btn.has_meta("lp_token") \
 			and e.global_position.distance_to(btn.get_meta("lp_from")) > DRAWER_SCROLL_DEADZONE:
 		btn.remove_meta("lp_token")

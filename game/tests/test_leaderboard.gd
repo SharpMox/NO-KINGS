@@ -28,6 +28,7 @@ func _e(score: int, wave: int) -> Dictionary:
 
 
 func _boot(cfg: Dictionary) -> Node2D:
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	if not cfg.has("seed"):
 		cfg = cfg.duplicate()
 		cfg.seed = 1

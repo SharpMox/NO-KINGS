@@ -124,6 +124,7 @@ func _await_drawer_settled(game: Node, key: String) -> void:
 
 
 func _boot_game() -> Node:
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
 		"items": ["sniper", "blitz"],
@@ -186,7 +187,7 @@ func _item_button(game: Node, key: String) -> Button:
 ## lookup does not depend on grid order.
 func _artefact_cell(game: Node, key: String) -> Button:
 	for c in game.hud.artefacts_grid.get_children():
-		if c is Button and c.get_meta("key", "") == key:
+		if c is Button and not c.is_queued_for_deletion() and c.get_meta("key", "") == key:
 			return c
 	return null
 

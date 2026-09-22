@@ -343,6 +343,10 @@ func _await_player_turn(game: Node2D) -> void:
 		await create_timer(0.1).timeout
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	# Watchdog: a SCRIPT ERROR mid-run kills this coroutine and quit() below
 	# never fires, leaving the window open until a human closes it (user
@@ -355,6 +359,7 @@ func _init() -> void:
 		push_error("WATCHDOG: probe still running after 240s — force quit")
 		quit(1))
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
 		"stock": ["pawn", "pawn"],   # the merge pair: Captured Stock cannot
@@ -404,6 +409,7 @@ func _init() -> void:
 	# `_autosave()` and touch the real on-disk save the way a bare
 	# non-scenario config would.
 	var cont_game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"state": GameScript.State.PLAYER_TURN, "actions_left": 1, "wave": 3,
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
@@ -695,6 +701,7 @@ func _init() -> void:
 	# wave-50 King capture opens the win screen; Continue resumes the run
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 50,
 		"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 10]]}
 	GameScript.is_scenario = true # keep the probe off the real save file
@@ -721,6 +728,7 @@ func _init() -> void:
 	# reward and closes the panel once every pick (native + extra) is taken.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 5, # issue 101: the Shop is locked before
 		# Tuning.SHOP_UNLOCK_WAVE, and _buy_a_box drives the real Shop button
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500}
@@ -783,6 +791,7 @@ func _init() -> void:
 	# TOP of a Box's own native picks, so this Box needs (native + 1) clicks.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["nostradamus-mad-libs"]}
@@ -817,6 +826,7 @@ func _init() -> void:
 	# and it disappears once the budget is spent.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["snowden-s-rubik-s-cube"]}
@@ -844,6 +854,7 @@ func _init() -> void:
 	# picking a choice resumes targeting exactly like before the migration.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -1339,6 +1350,7 @@ func _init() -> void:
 	game = null
 	icon_game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"items": ["buff_box"], "stock": ["pawn", "rook"]}
 	icon_game = load("res://scenes/Game.tscn").instantiate()
@@ -1465,6 +1477,7 @@ func _init() -> void:
 	var order_cfg := {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"items": ["blitz", "extraction"],
 		"artefacts": ["library-of-alexandria-matchbox", "oak-island-wishing-well"]}
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = order_cfg
 	var order_game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(order_game)
@@ -1522,6 +1535,7 @@ func _init() -> void:
 		if str(s.name).begins_with("Header: King Wave"):
 			trump_cfg = s.cfg
 	check(not trump_cfg.is_empty(), "(setup) the Header King Wave scenario exists")
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = trump_cfg.duplicate(true)
 	var trump_game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(trump_game)
@@ -1556,6 +1570,7 @@ func _init() -> void:
 	trump_game.queue_free()
 	await process_frame
 
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -1642,6 +1657,7 @@ func _init() -> void:
 	# from the pool strip onto a zone tile (game-feel pass 2026-07-06)
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {} # fresh run -> SETUP placement phase
 	GameScript.next_army = "Crown"
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -1874,6 +1890,7 @@ func _init() -> void:
 	# the only state in play here is what this block itself creates.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {} # fresh run -> SETUP placement phase
 	GameScript.next_army = "Crown"
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -1925,6 +1942,7 @@ func _init() -> void:
 	# badge's corner to ▲ and merge instead of converting.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3, "gold": 100,
 		"captured": ["rook", "bishop", "bishop"], # captured oldest -> newest
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
@@ -2020,6 +2038,7 @@ func _init() -> void:
 	# shapes with the selection, or arrows keep drawing from _tile_px(-1,-1)
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"king_abilities": ["move_cost"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2038,6 +2057,7 @@ func _init() -> void:
 	# usable from it (money-and-shop/03)
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "items": ["blitz"], "artefacts": ["library-of-alexandria-matchbox"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2105,6 +2125,7 @@ func _init() -> void:
 	# affordance immediately (no re-tap needed to reach it).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4],
 		["pawn", 1, 5, 5], ["rook", 1, 7, 10]], "wave": 3, "items": ["drone_strike"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2134,6 +2155,7 @@ func _init() -> void:
 	# behind it).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
 		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2188,6 +2210,7 @@ func _init() -> void:
 	# commit — neither reset behind Cancel goes near it).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
 		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"], "gold": 100}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2233,6 +2256,7 @@ func _init() -> void:
 	# Close dismisses (money-and-shop/04, shop-drawer-ui/08)
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2253,6 +2277,7 @@ func _init() -> void:
 	# ...and the locked half of the same ruling, on its own boot one Wave short
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2271,6 +2296,7 @@ func _init() -> void:
 	# against, and leaving it would fail them on state, not on behaviour.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2386,6 +2412,7 @@ func _init() -> void:
 	# at all: convert first, then sell from Stock like anything else.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2456,6 +2483,7 @@ func _init() -> void:
 	# activation (user ruling).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 100, "artefacts": ["jet-fuel-vial"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2507,6 +2535,7 @@ func _init() -> void:
 	# reveal in a panel that also has to fit a Buy button.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2556,6 +2585,7 @@ func _init() -> void:
 	# into an announcement — no Buy button any more, Dismiss hands the turn back
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 11, "score": 100, "pending_reinforce": true,
 		"king_abilities": ["move_cost"]} # the tariff section below reuses this boot
@@ -2663,6 +2693,7 @@ func _init() -> void:
 	# draw, clear-one (redraw), Clear-all, lifetime clears at turn end
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
@@ -2752,6 +2783,7 @@ func _init() -> void:
 	# probe exists.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1, "gold": 100, "score": 0,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["oak-island-wishing-well"]}
@@ -2812,6 +2844,7 @@ func _init() -> void:
 	# reopening Inventory to reach the chip.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["bovine-tractor-beam"]}
@@ -2884,6 +2917,7 @@ func _init() -> void:
 	# requirement), which the existing board (both the rook and the pawn are
 	# already attacked, per the comment above) satisfies for free. Every
 	# lookup below can now name the specific Item it means.
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 5, 5], ["pawn", 1, 7, 2]],
 		"items": ["sniper", "air_strike"]}
@@ -2931,6 +2965,7 @@ func _init() -> void:
 	# Counter-Intel on the spot (1 click, one short of that floor).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"items": ["counter_intel"], "king_abilities": ["move_cost"]}
@@ -2960,6 +2995,7 @@ func _init() -> void:
 	# applies) — its cancel/commit both happen through the Stock drawer.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Old Guard", "wave": 1, "gold": 0,
 		"board": [["pawn", 0, 2, 0], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -2989,6 +3025,7 @@ func _init() -> void:
 	# The Muster's Call the Banners: targeted at a Stock entry.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Crown", "wave": 1,
 		"stock": ["pawn"], "board": [["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -3029,6 +3066,7 @@ func _init() -> void:
 	# back to the board, tap-the-chip-again cancels.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Syndicate", "wave": 1, "gold": 1000,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -3058,6 +3096,7 @@ func _init() -> void:
 	# as Shield Wall/Oak Island above.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Horde", "wave": 5,
 		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -3087,6 +3126,7 @@ func _init() -> void:
 	# and untouched).
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3, "gold": 100, "stock": ["pawn", "pawn"],
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
 	game = load("res://scenes/Game.tscn").instantiate()
@@ -3158,6 +3198,7 @@ func _init() -> void:
 	# regression that reintroduces a real swallow would still be caught.
 	game.queue_free()
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 0]], "items": ["blitz"]}
 	game = load("res://scenes/Game.tscn").instantiate()

@@ -113,6 +113,10 @@ func _click_control(ctrl: Control) -> bool:
 	return true
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	# Watchdog: a SCRIPT ERROR mid-run kills this coroutine and quit() below
 	# never fires, leaving the window open until a human closes it (user
@@ -282,6 +286,7 @@ func _init() -> void:
 	# still the visible panel from the Back above, so TEST is reachable again.
 	await _click_button(menu, "TEST")
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {}
 	# `deepest` rather than a named scenario: it is inside the section opened
 	# above, so this also proves the expanded state SURVIVES Back-and-reopen —
@@ -715,6 +720,7 @@ func _init() -> void:
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}})
 	root.get_node("PlayGamesBridge").snapshot_loaded.emit("run")
 	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {}
 	check(await _click_button(late, "Continue"),
 		"NO-88: Continue that appeared after the restore landed is clickable")
@@ -727,6 +733,7 @@ func _init() -> void:
 		current_scene = null
 	await process_frame
 	DirAccess.remove_absolute(GameScript.SAVE_PATH)
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {}
 	MemoryBackend.reset()
 	CloudSave.backend = prev_backend

@@ -49,6 +49,10 @@ func _menu() -> Node:
 	return m
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	create_timer(120.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: menu-continue suite still running after 120s")
@@ -90,6 +94,7 @@ func _init() -> void:
 	var btn := _find_button(late, "Continue")
 	check(btn != null, "THE DEFECT: Continue appears once the restore lands, no relaunch")
 	if btn != null:
+		GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 		GameScript.next_config = {}
 		btn.pressed.emit()
 		check(int(GameScript.next_config.get("wave", 0)) == 2,
@@ -103,6 +108,7 @@ func _init() -> void:
 		await process_frame
 
 	DirAccess.remove_absolute(GameScript.SAVE_PATH)
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {}
 	Memory.reset()
 	SyncQueue.clear()

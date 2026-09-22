@@ -584,6 +584,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# against Kings while still working against Tariffs.
 			if not ctx.get("gain_immune", false):
 				ctx.amount *= 0.5
+				bite(g, "$ gain halved")
 
 
 ## Branch-style Powers: read at the site rather than dispatched, because each

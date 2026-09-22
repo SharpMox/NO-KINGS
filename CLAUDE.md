@@ -463,6 +463,27 @@ comes back.
   nothing — the success condition. A green suite whose new diagnostic never printed
   because `check()` only emits `detail` on failure. Four times in one session. Before
   believing a signal, ask what it would look like if the opposite were true.
+- **AN OCCURRENCE COUNT IS NOT AN EXECUTION COUNT.** This is the principle under several
+  of the traps above, and it is the one worth carrying. Grepping the SOURCE tells you how
+  many times something is written, never how many times it runs:
+  - `test_scenarios.gd` has ONE textual `next_config =` — inside a loop sweeping every TEST
+    scenario, so it is ~90 boots. A grep counting one hit reported the suite's LARGEST
+    contamination surface as its smallest, and NO-194 nearly shipped leaving it unfixed.
+  - `grep -c "slide settled"` on a run log returned 0 — not because the assertion passed,
+    but because `run_all.sh:66` deletes a passing suite's output. Absent text, zero
+    information.
+  - `--show-screen` reads as fully present in `game.gd` while being gated off upstream by
+    `is_scenario`, so two different values produced byte-identical captures.
+  In each case the text was a poor proxy for what actually ran, and only a REACHABILITY
+  argument settled it — can this code be reached, how many times, and what would prove it.
+  CLAUDE.md already rates reachability above a rate comparison; rate it above a grep count
+  too.
+- **A fix to ambient noise is only verifiable if a baseline was recorded first.** NO-156's
+  freed-lambda spam was provably removed because those lines had been COUNTED in earlier
+  runs — five in game-clicks alone, present in every run since 2026-09-18 — so a later run
+  showing zero meant something. Had it been quietly fixed before anyone counted, zero would
+  just be zero. When you notice recurring noise nobody owns, record the count in the ticket
+  before touching it; that number is what makes the fix falsifiable.
 
 ### Layout traps the device taught
 

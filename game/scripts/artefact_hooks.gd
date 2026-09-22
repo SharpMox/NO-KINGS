@@ -1889,9 +1889,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
+				_note(g, key, "Shop −50% this wave")
 		["john-titor-s-crypto-wallet", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave): # see silk-road-coupon's case above
 				g.gold += int(g.clock_ms / 1000.0 / 5.0)
+				_note(g, key, "+$%d from the Clock" % int(g.clock_ms / 1000.0 / 5.0), g.BANNER_GAIN)
 
 		# --- issue 18: Buff-tag triggers, all through BuffLogic.add ---
 		["crop-circle-plank", "on_wave_clear"]:
@@ -2341,9 +2343,11 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if g.salvation_charged:
 				g.salvation_charged = false
 				ctx.cancel = true
+				_note(g, key, "King Ability cancelled", g.BANNER_GAIN)
 		["salvation-gift-card", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave): # same cadence as Silk Road Coupon (issue 18)
 				g.salvation_charged = true
+				_note(g, key, "recharged")
 
 		# --- issue 26: spawn roster modifiers (on_wave_roster, WaveLogic.queue) ---
 		["haarp-volume-knob", "on_wave_roster"]:
@@ -2530,6 +2534,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 						candidates.append(i)
 				if not candidates.is_empty():
 					g.shop_stock[candidates[g.rng.randi() % candidates.size()]].free_slot = true
+					_note(g, key, "one Shop slot is free this wave")
 		["mar-a-lago-toilet-papers", "on_price"]:
 			# "+10%" off the immutable base, same additive contract as every
 			# other on_price handler. The free slot's price is forced to 0

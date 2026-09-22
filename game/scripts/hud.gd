@@ -923,10 +923,10 @@ func build(game) -> void:
 	# matches menu_button/stock_btn (the row's other icon buttons, same
 	# _style_button call). Surface is pass_count's bright green
 	# (0.498, 0.878, 0.541, hud.gd:1012) scaled down in value (~x0.25) to a
-	# dark surface so it reads as green without the white glyph washing out;
-	# the glyph itself is recoloured to that same bright green so the pair
-	# reads as one family with the existing green text.
-	army_band_reopen.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
+	# dark surface so it reads as green without the white glyph washing out.
+	# NO-225: the glyph's own font_color is set (and kept in sync per state)
+	# by _update_band_toggle below, not here — a static override here would
+	# be a second source of truth immediately clobbered by that call.
 	_style_button(army_band_reopen, Color(0.125, 0.220, 0.136), Color(0, 0, 0, 0), 8, 4, 4)
 	army_band_reopen.pressed.connect(func() -> void:
 		if army_band_open:
@@ -1329,9 +1329,10 @@ func build(game) -> void:
 		# that `sc`/cells don't; gui_input reports exactly that leftover
 		# "chrome", the surface a reverse-close swipe must start on.
 		panel.gui_input.connect(_on_chrome_swipe_input.bind(spec[0]))
-		# NO-118: Inventory slides in from the LEFT — off-screen is its own
-		# width to the left of rest, not a move of where it rests.
-		drawer_hidden[spec[0]] = panel.position - Vector2(spec[3], 0)
+		# NO-226: Inventory slides in from the BOTTOM — off-screen is its own
+		# full height below rest, so the panel's top sits exactly on the
+		# viewport's bottom edge before sliding up to rest.
+		drawer_hidden[spec[0]] = panel.position + Vector2(0, full_h)
 	# ---- THE STOCK DRAWER (NO-84) --------------------------------------------
 	# Opens downward from the Header's bottom edge, next to the button that
 	# opens it (story 31) — everything else in this file opens above the deck,
@@ -1345,6 +1346,17 @@ func build(game) -> void:
 	stock_panel.custom_minimum_size = Vector2(vp.x, stock_h)
 	stock_panel.clip_contents = true # NO-84: never paints over the board below it
 	stock_panel.visible = false
+	# NO-228: the Header's controls are added earlier as direct children of
+	# `self` (lines ~581-890), so by plain tree order stock_panel — added
+	# later — paints OVER them while sliding through the Header's y-range.
+	# z_index (not move_child/move_to_front) pins it behind: it only changes
+	# CanvasItem paint order, never sibling index, so it cannot reproduce the
+	# NO-180 incident (a move_to_front there reordered the deck's children and
+	# silently dropped the drawers row) and it cannot touch the tree-order-
+	# dependent gui_input/MOUSE_FILTER_STOP chrome-swipe detection those
+	# drawers rely on (NO-118/NO-145) — Godot's GUI input picking is unaffected
+	# by z_index.
+	stock_panel.z_index = -1
 	var stock_row := HBoxContainer.new()
 	stock_row.add_theme_constant_override("separation", 0)
 	# LEFT: Captured Stock, a fixed fraction of the width — fixed so the split
@@ -1460,7 +1472,9 @@ func build(game) -> void:
 	add_child(stock_panel)
 	drawer_rest["stock"] = stock_panel.position
 	# NO-118: Stock slides in from the TOP — off-screen is its own height
-	# above rest, tucked behind the Header.
+	# above rest, into the Header's y-range. NO-228's z_index (set above) is
+	# what actually keeps it tucked BEHIND the Header while sliding through
+	# that range — this offset alone only positioned it there.
 	drawer_hidden["stock"] = stock_panel.position - Vector2(0, stock_h)
 	# NO-59: the description popup. ONE instance, owned by the HUD rather than by
 	# a row, because hud.refresh() frees and rebuilds every strip child — a panel
@@ -1709,7 +1723,7 @@ func collapse_army_band() -> void:
 ## dropping it would lose the one place an active-while-collapsed King
 ## Ability is visible without opening the band.
 func _update_band_toggle() -> void:
-	var warn: bool = g != null and not g.king_abilities_active.is_empty()
+	var warn: bool = g != null and not g.king_abilities_active.is_empty() and not army_band_open
 	if army_band_open:
 		army_band_reopen.text = "ⓘ"
 		army_band_reopen.tooltip_text = "Hide"
@@ -1717,6 +1731,15 @@ func _update_band_toggle() -> void:
 		army_band_reopen.text = "⚠" if warn else "ⓘ"
 		army_band_reopen.tooltip_text = "King Abilities in force — tap to show" \
 			if warn else "Show Army Power"
+	# NO-225 gave this button a permanent green font_color override, which the
+	# ⚠ glyph (no override of its own) silently inherited — an alert that
+	# looks identical to the resting state has lost its job. Set the colour
+	# per state here instead, following the same `warn` (glyph is only ever
+	# ⚠ when warn is true): the established green otherwise, Tuning.COL_GOLD
+	# (this project's attention colour, also score/gold) when warning, for a
+	# clear hue shift against the dark green surface.
+	army_band_reopen.add_theme_color_override("font_color",
+		Tuning.COL_GOLD if warn else Color(0.498, 0.878, 0.541))
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.

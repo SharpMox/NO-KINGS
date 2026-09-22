@@ -358,6 +358,9 @@ var king_power_abilities: Array = [] # keys in force from the King's Power (esca
 ## issue 92: the King whose Power is in force, or "". Distinct from the board
 ## King: the Power is live through segment 1, before the King has arrived.
 var king_power_id := ""
+## Banner pass 2026-09-22: has the bespoke Power's first-bite banner shown
+## this wave (Kings.bite)? Transient — re-armed by Kings.apply_power, not saved.
+var king_power_bitten := false
 ## issue 93: Total Mobilisation adds an enemy Action for the REST of the wave,
 ## so it compounds with the turns still to come rather than being a one-off.
 var king_extra_actions := 0
@@ -2699,6 +2702,7 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 				entry.id = base
 			else:
 				entry = base
+			Kings.bite(self, "%s arrives as %s" % [defs[pid].name, defs[base].name])
 	var id: String = entry if entry is String else entry.id
 	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
 	stock.erase(entry)
@@ -2720,6 +2724,9 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 			# The tariff surcharge above (Economy.charge) is a different
 			# mechanism and stays live either way.
 			Economy.spend_gold(self, Economy.deploy_cost(self))
+			if Kings.power_is(self, "wall"): # Qin Shi Huang — from the ACTION
+				# path, never on_place_cost (a query hook, runs on every redraw)
+				Kings.bite(self, "deploy cost doubled")
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -3745,6 +3752,7 @@ func _kamikaze_after_capture(at: Vector2i) -> void:
 		var n: Vector2i = at + d
 		if board.has(n) and board[n].owner == Rules.PLAYER:
 			_add_float(n, "Kamikaze!", COL_CAPTURE)
+			Kings.bite(self, "%s destroyed beside the capture" % defs[board[n].id].name)
 			_destroy(n)
 			return
 

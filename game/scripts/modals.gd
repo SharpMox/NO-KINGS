@@ -686,6 +686,14 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			box.add_child(row)
 
 		var kit: Dictionary = Kings.kit_of(king_id)
+		if kit.has("power_key"): # a bespoke Power (banner pass 2026-09-22):
+			# not in the King Ability catalog, so it is listed from the kit
+			var phead := Label.new()
+			phead.text = "King Power — all wave"
+			phead.add_theme_font_size_override("font_size", 15)
+			phead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(phead)
+			_add_power_row(box, str(kit.power_name), str(kit.power_desc), 14, 12)
 		if kit.has("power_catalog_key") or kit.has("power_catalog_escalation"):
 			var head := Label.new()
 			head.text = "%s — King Abilities in force" % str(kit.get("power_name", ""))
@@ -1379,26 +1387,39 @@ func show_king_abilities() -> void:
 ## Moderate/Severe, king_abilities.gd) still exists in the catalog and still
 ## drives on_charge's mild_blocked case-match (artefact_hooks.gd), just no
 ## longer echoed here; the effect text (`t.description`) is untouched.
+##
+## Banner pass 2026-09-22: a bespoke King Power (Kings.bespoke_power — one
+## with a `power_key`, dispatched in kings.gd rather than drawn from the
+## catalog) is listed FIRST, from its kit. It is in force for the whole wave
+## and was previously visible only in its 1.1s wave-start banner.
 func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) -> void:
-	if g.king_abilities_active.is_empty():
+	var power: Dictionary = Kings.bespoke_power(g)
+	if not power.is_empty():
+		_add_power_row(box, str(power.power_name), str(power.power_desc), name_size, desc_size)
+	if g.king_abilities_active.is_empty() and power.is_empty():
 		var none := Label.new()
 		none.text = "none yet — they land every 10th wave"
 		none.modulate = Color(1, 1, 1, 0.6)
 		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(none)
 	for t in g.king_abilities_active:
-		var name := Label.new()
-		name.text = t.name
-		name.add_theme_font_size_override("font_size", name_size)
-		name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
-		box.add_child(name)
-		var desc := Label.new()
-		desc.text = t.description
-		desc.add_theme_font_size_override("font_size", desc_size)
-		desc.modulate = Color(1, 1, 1, 0.75)
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
-		box.add_child(desc)
+		_add_power_row(box, str(t.name), str(t.description), name_size, desc_size)
+
+
+func _add_power_row(box: VBoxContainer, name_text: String, desc_text: String,
+		name_size: int, desc_size: int) -> void:
+	var name := Label.new()
+	name.text = name_text
+	name.add_theme_font_size_override("font_size", name_size)
+	name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
+	box.add_child(name)
+	var desc := Label.new()
+	desc.text = desc_text
+	desc.add_theme_font_size_override("font_size", desc_size)
+	desc.modulate = Color(1, 1, 1, 0.75)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
+	box.add_child(desc)
 
 
 # --- box pick ---

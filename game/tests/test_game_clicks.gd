@@ -775,6 +775,15 @@ func _init() -> void:
 	_click(sell_btn.get_global_rect().get_center())
 	await process_frame
 	await process_frame
+	# NO-223: every sell path confirms now, including the Box's own Sell row
+	# (Max, 2026-09-22: "yes align boxes too"). Nothing is sold until the
+	# confirm is answered — the sibling assertion in test_box.gd:222 pins that
+	# directly. Answering it here rather than asserting the old immediate sale.
+	check(game.items.size() == items_before,
+		"NO-38/NO-223: the Box's Sell confirms first — nothing sold yet")
+	game._choice_picked(true) # the confirm's own Sell button
+	await process_frame
+	await process_frame
 	check(game.items.size() == items_before - 1 and game.gold > gold_before_sale,
 		"NO-38: clicking Sell frees one slot and pays the sell price")
 	check(game.box_open and _sell_button(game.box_panel) == null,

@@ -2350,11 +2350,19 @@ func _init() -> void:
 	# _await_drawer_settled above, rather than a fixed timer: poll the exact
 	# thing the check below asserts, bounded, so a broken tween fails loudly
 	# instead of the wait silently outrunning or undershooting the animation.
+	# NO-192 follow-up: bounded on WALL TIME, not a frame count. This loop was
+	# missed when the settle waits were converted (it is an inline close wait,
+	# not one of the _await_drawer_settled copies) and it was the one assertion
+	# still failing on the slower Aux box afterwards — same cause, same fix.
+	var shop_close_t0 := Time.get_ticks_msec()
 	var shop_close_polls := 0
-	while game.modals.shop_panel.visible and shop_close_polls < 60:
+	while game.modals.shop_panel.visible \
+			and Time.get_ticks_msec() - shop_close_t0 < SETTLE_CAP_MS:
 		await process_frame
 		shop_close_polls += 1
-	check(not game.modals.shop_panel.visible, "the shop drawer closes")
+	check(not game.modals.shop_panel.visible, "the shop drawer closes",
+		"visible=%s after %d polls, elapsed=%dms" % [game.modals.shop_panel.visible,
+			shop_close_polls, Time.get_ticks_msec() - shop_close_t0])
 
 	# Selling (NO-144): moved off the Shop entirely and onto the previewed
 	# thing's own menu — long-pressing a Stock entry (here: the same signal a

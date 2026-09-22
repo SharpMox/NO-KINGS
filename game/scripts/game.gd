@@ -129,10 +129,11 @@ const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
 const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
 	# direction fills a target-zone tile with ordinary (single) coverage —
 	# NO-176 replaced the old flat Color(COL_CAPTURE, 0.22) rect wash with
-	# this. Both directions together (the existing crosshatch) mark a tile
-	# covered by more than one zone: direction COUNT is the overlap signal,
-	# not alpha-stacking, so single coverage and overlap stay distinguishable
-	# regardless of alpha tuning. NO-184: _draw_hatch now phases its lines off
+	# this. NO-222: overlap used to draw both directions (a denser
+	# "crosshatch") as its own overlap signal; Max read that as confusing
+	# double hatching rather than legible density, so overlap now draws the
+	# same single direction as ordinary coverage — see _draw_target_zone's
+	# header. NO-184: _draw_hatch now phases its lines off
 	# board_px (board-space), not each tile's own rect — `tile` is computed
 	# per-viewport in _layout_board and is NOT always a multiple of this
 	# spacing, so a per-tile-local phase (the old behaviour) drifted out of
@@ -3517,10 +3518,9 @@ func _bomb_highlight_tiles() -> Array[Vector2i]:
 ## HATCH_SPACING. `r` is always square (board tiles are); closed-form (no
 ## clipping library): for offset c in [-s, s], the "\" line enters/exits
 ## whichever pair of edges admits it, and its mirror across the vertical axis
-## is the "/" line. `_draw_target_zone` calls this once for ordinary (single)
-## zone coverage, and `_draw_crosshatch` below calls it twice — this is the
-## shared geometry, split out so a single-covered tile can get one family and
-## a doubly-covered tile can get both.
+## is the "/" line. `_draw_target_zone` calls this once per zone tile (NO-222:
+## used to call it twice for an overlap tile, via the since-deleted
+## `_draw_crosshatch` — see NO-130's header on `_draw_target_zone`).
 ## NO-184: `c`'s start used to be a bare `-s` — correct only because every
 ## tile's phase then happened to line up (the desktop default `tile` (72) is
 ## a multiple of HATCH_SPACING (8)); `tile` is recomputed per-viewport in
@@ -3548,15 +3548,6 @@ func _draw_hatch(r: Rect2, col: Color, mirror: bool = false, phase: float = 0.0)
 		else:
 			draw_line(r.position + a, r.position + b, col, HATCH_WIDTH)
 		c += HATCH_SPACING
-
-
-## NO-122: both hatch families over a tile covered by more than one zone, so
-## it reads as a denser texture than the single-direction hatch
-## `_draw_target_zone` uses for ordinary coverage — direction count is the
-## overlap signal (see HATCH_ALPHA's comment), not stacked alpha.
-func _draw_crosshatch(r: Rect2, col: Color) -> void:
-	_draw_hatch(r, col, false)
-	_draw_hatch(r, col, true)
 
 
 ## Bomb blast: everything within 1 square of `at`, the bomb piece included.
@@ -4836,28 +4827,28 @@ func _draw() -> void:
 
 
 ## NO-130: "this is what the thing you are holding will affect" — a
-## COL_CAPTURE HATCH per tile (NO-176: was a flat wash), a denser CROSSHATCH
-## where more than one zone covers the same tile (NO-122), and the perimeter
-## outline below (NO-129) so a spread reads as one shape. Shared by the bomb
-## blast preview and an armed Item's target zone: one indicator, one meaning,
-## one place to change it.
+## COL_CAPTURE HATCH per tile (NO-176: was a flat wash), plus the perimeter
+## outline below (NO-129) so a spread reads as one shape. NO-222: overlapping
+## zones used to get a denser two-direction CROSSHATCH (NO-122) as an overlap
+## signal; Max read that as confusing double cross-hatching rather than
+## legible density, so overlap now hatches identically to single coverage —
+## same colour, one texture, one zone. Shared by the bomb blast preview and
+## an armed Item's target zone: one indicator, one meaning, one place to
+## change it.
 func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 	if tiles.is_empty():
 		return
-	var counts := {} # tile -> how many zones cover it
-	var unique: Array[Vector2i] = [] # deduped, so an overlap tile's own
-		# perimeter edges aren't drawn (and alpha-stacked) twice below
+	var seen := {} # tile -> true, so an overlap tile's own perimeter edges
+		# aren't drawn (and alpha-stacked) twice below
+	var unique: Array[Vector2i] = []
 	for pos in tiles:
-		if not counts.has(pos):
+		if not seen.has(pos):
+			seen[pos] = true
 			unique.append(pos)
-		counts[pos] = counts.get(pos, 0) + 1
 	var hatch_col := Color(COL_CAPTURE, HATCH_ALPHA)
 	for pos in unique:
 		var r := Rect2(_tile_px(pos), Vector2(tile, tile))
-		if counts[pos] > 1: # overlap: the denser two-direction crosshatch
-			_draw_crosshatch(r, hatch_col)
-		else: # NO-176: single coverage — one hatch direction, not a wash
-			_draw_hatch(r, hatch_col)
+		_draw_hatch(r, hatch_col) # NO-176: single hatch direction, not a wash
 	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA))
 
 

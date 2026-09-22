@@ -45,8 +45,19 @@ signal shop_restock_pressed # issue 52: Jet Fuel Vial's Restock button
 signal box_sell_pressed(entry: Dictionary) # NO-38: sell a held Item from inside an Item Box
 signal sell_pressed(kind: String, entry: Variant) # NO-144: from the preview
 	# modal's Sell button — "piece" (Stock only, never Captured), "item",
-	# "artefact". Captured -> Stock conversion isn't here: it lives on the
-	# entry itself (hud.gd's own ⇄ badge, convert_pressed).
+	# "artefact". game.gd routes every one of these through the shared
+	# confirm seam (_confirm_sell, NO-223, 2026-09-22 ruling) rather than
+	# selling straight off this signal.
+signal use_pressed(kind: String, entry: Variant) # NO-223: the preview modal's
+	# own Use button — only ever "item" today (an Artefact's Activate stays a
+	# plain tap on its cell, not duplicated into this menu; a Captured Stock
+	# entry has Convert instead, below). game.gd resolves the live g.items
+	# index from `entry` and calls the same _use_item a tap does.
+signal convert_pressed(entry: Variant) # NO-223 (2026-09-22 ruling): Captured
+	# -> Stock conversion, moved off the ⇄ badge (which is now information
+	# only, hud.gd's _build_stack_button) and into this preview modal's own
+	# menu, alongside Sell/Use — same "long-press = the thing's own menu"
+	# idiom NO-144 already established.
 signal reinforce_done_pressed
 signal preview_closed
 signal choice_chosen(value)
@@ -563,12 +574,23 @@ func show_win_screen() -> void:
 ## stack — the diagram/chain/King-Ability sections below are piece-only),
 ## "item" or "artefact" (icon + name + description, no diagram). `entry` is
 ## the live g.stock/g.items/g.artefacts element Shop.can_sell/sell_payout
-## read — null for anything not sellable from here (a board tile, a Captured
-## Stock entry: Convert and Sell are not the same thing, and Convert stays on
-## the entry itself, hud.gd's own ⇄ badge). The Sell button is built only
-## when `entry` is given, and disabled (never omitted) when Shop.can_sell
-## says no for a dynamic reason (not the player's turn, the starvation
-## softlock) — same convention as the Shop's own Buy/Convert buttons.
+## read — null for a board tile, the one thing never sellable from here.
+## The Sell button is built only when `entry` is given, and disabled (never
+## omitted) when Shop.can_sell says no for a dynamic reason (not the
+## player's turn, the starvation softlock) — same convention as the Shop's
+## own Buy button.
+##
+## NO-223 (2026-09-22 ruling): `cap` — true for a Captured Stock stack.
+## Convert and Sell are not the same thing: a Captured entry gets a Convert
+## button instead of Sell (never both), reflecting what's actually permitted
+## rather than a disabled Sell nobody can use (the 2026-09-19 ruling still
+## stands — Captured sells only after converting to Stock). `entry` used to
+## be nulled for a Captured stack specifically so this Sell-button block
+## never fired for one; it no longer is (game.gd's _show_preview passes it
+## through unconditionally now), because Convert needs it too. An Item also
+## gets a Use button beside Sell — the same action a plain tap already fires
+## (`_use_item`), just reachable from this menu too; an Artefact does not
+## (its Activate stays a plain tap on the cell, never duplicated in here).
 ##
 ## NO-167 (Max review, second pass, 2026-09-20): `shop_index` mirrors `entry`
 ## in the opposite direction — a Shop tile is unowned, so there is no `entry`
@@ -586,7 +608,7 @@ func show_win_screen() -> void:
 ## a Shop slot (never owned, so never buffed) and ignored for "item"/
 ## "artefact"/"box".
 func show_preview(kind: String, id: String, king_id := "", entry: Variant = null,
-		shop_index := -1, piece: Dictionary = {}) -> void:
+		shop_index := -1, piece: Dictionary = {}, cap := false) -> void:
 	for c in preview_panel.get_children():
 		c.queue_free()
 	# Raised for the same reason every other panel is. preview_panel and
@@ -763,16 +785,43 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		box.add_child(buy)
 
 	if entry != null:
-		var sell := Button.new()
-		sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
-		sell.disabled = not Shop.can_sell(g, kind, entry)
-		sell.add_theme_font_size_override("font_size", 18)
-		sell.pressed.connect(func() -> void:
-			preview_panel.visible = false
-			preview_closed.emit() # same reset Close does — sale must not
-				# leave preview_open stuck true (it deadens board input)
-			sell_pressed.emit(kind, entry))
-		box.add_child(sell)
+		if kind == "piece" and cap:
+			# NO-223 (2026-09-22 ruling): a Captured entry gets Convert here
+			# instead of Sell — the ⇄ badge that used to do this is display
+			# only now (hud.gd's _build_stack_button).
+			var convert := Button.new()
+			convert.text = "Convert (-$%d)" % Shop.convert_price(g, entry)
+			convert.disabled = not Shop.can_convert(g, entry)
+			convert.add_theme_font_size_override("font_size", 18)
+			convert.pressed.connect(func() -> void:
+				preview_panel.visible = false
+				preview_closed.emit()
+				convert_pressed.emit(entry))
+			box.add_child(convert)
+		else:
+			if kind == "item":
+				# NO-223: the same action a plain tap on the cell already
+				# fires (_use_item) — offered here too, alongside Sell. Never
+				# shown for "artefact" (Activate stays a plain tap, not
+				# duplicated into this menu) or "piece" (no Use concept).
+				var use := Button.new()
+				use.text = "Use"
+				use.add_theme_font_size_override("font_size", 18)
+				use.pressed.connect(func() -> void:
+					preview_panel.visible = false
+					preview_closed.emit()
+					use_pressed.emit(kind, entry))
+				box.add_child(use)
+			var sell := Button.new()
+			sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
+			sell.disabled = not Shop.can_sell(g, kind, entry)
+			sell.add_theme_font_size_override("font_size", 18)
+			sell.pressed.connect(func() -> void:
+				preview_panel.visible = false
+				preview_closed.emit() # same reset Close does — sale must not
+					# leave preview_open stuck true (it deadens board input)
+				sell_pressed.emit(kind, entry))
+			box.add_child(sell)
 
 	var close := Button.new()
 	close.text = "Close"

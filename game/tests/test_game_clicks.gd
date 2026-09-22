@@ -775,6 +775,15 @@ func _init() -> void:
 	_click(sell_btn.get_global_rect().get_center())
 	await process_frame
 	await process_frame
+	# NO-223: every sell path confirms now, including the Box's own Sell row
+	# (Max, 2026-09-22: "yes align boxes too"). Nothing is sold until the
+	# confirm is answered — the sibling assertion in test_box.gd:222 pins that
+	# directly. Answering it here rather than asserting the old immediate sale.
+	check(game.items.size() == items_before,
+		"NO-38/NO-223: the Box's Sell confirms first — nothing sold yet")
+	game._choice_picked(true) # the confirm's own Sell button
+	await process_frame
+	await process_frame
 	check(game.items.size() == items_before - 1 and game.gold > gold_before_sale,
 		"NO-38: clicking Sell frees one slot and pays the sell price")
 	check(game.box_open and _sell_button(game.box_panel) == null,
@@ -2018,13 +2027,26 @@ func _init() -> void:
 	check(convert_badge != null and convert_badge.is_visible_in_tree()
 			and convert_badge.text == "⇄$%d" % badge_cost and not convert_badge.disabled,
 		"a captured entry shows its Convert badge with no arming step, priced and live at Wave 3")
+	# NO-223 (2026-09-22 ruling, extended from the Sell badge): the ⇄ badge is
+	# information only now — it takes no input, so clicking it does nothing.
+	# Convert itself moved into the long-press preview's own menu.
 	var gold_before_convert: int = game.gold
 	_click(convert_badge.get_global_rect().get_center())
 	await process_frame
 	await process_frame
+	check(game.captured == ["rook", "bishop", "bishop"] and game.gold == gold_before_convert,
+		"NO-223: the Convert badge is information only — clicking it does nothing")
+	game.hud.stack_preview_requested.emit("bishop", true, "bishop") # the same
+		# signal a real long press fires — see the Stock-sell block below
+	await process_frame
+	check(game.preview_open, "long-pressing a Captured entry opens its preview")
+	check(await _click_button_in(game.preview_panel, "Convert (-$%d)" % badge_cost),
+		"the preview's own Convert button is clickable")
+	await process_frame
 	check(game.captured == ["rook", "bishop"] and game.stock == ["bishop"]
 			and game.gold == gold_before_convert - badge_cost,
 		"Convert works with a DUPLICATE held: one bishop moves to Stock, priced, nothing merges")
+	check(not game.preview_open, "converting closes the preview, same as Sell does")
 	_click(game._tile_px(Vector2i(5, 6)) + Vector2(game.tile, game.tile) / 2) # close drawer
 	await process_frame
 	_click(game._tile_px(Vector2i(2, 2)) + Vector2(game.tile, game.tile) / 2)
@@ -2406,10 +2428,12 @@ func _init() -> void:
 	# Selling (NO-144): moved off the Shop entirely and onto the previewed
 	# thing's own menu — long-pressing a Stock entry (here: the same signal a
 	# real long press fires, hud.stack_preview_requested) opens its preview
-	# with a Sell button in it. Convert stays exactly where it already was
-	# (hud's own ⇄ badge on the Captured entry — tested separately above),
-	# and per NO-144's own ruling a Captured entry's preview offers no Sell
-	# at all: convert first, then sell from Stock like anything else.
+	# with a Sell button in it. NO-223 (2026-09-22 ruling): every sell path
+	# confirms now, this one included, and a Captured entry's preview offers
+	# Convert in Sell's place (moved off the ⇄ badge, which is information
+	# only now — tested separately above) rather than no action at all: per
+	# NO-144's own ruling it still offers no Sell — convert first, then sell
+	# from Stock like anything else.
 	game.queue_free()
 	await process_frame
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
@@ -2429,24 +2453,32 @@ func _init() -> void:
 	check(await _click_button_in(game.preview_panel, "Sell (+$5)"),
 		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
+	check(game.buff_pick_open and game.stock.size() == sell_stock_before and game.gold == sell_gold_before,
+		"NO-223: Sell confirms first — nothing sold yet")
+	check(await _click_button_in(game.modals.buff_panel, "Sell"), "the confirm's own Sell button is clickable")
+	await process_frame
 	check(game.stock.size() == sell_stock_before - 1 and game.gold == sell_gold_before + 5
-			and game.actions_left == sell_acts_before,
-		"selling the Stock piece removes it, pays Gold, and costs no Action (issue 64)")
+			and game.actions_left == sell_acts_before and not game.buff_pick_open,
+		"confirming sells the Stock piece, pays Gold, and costs no Action (issue 64)")
 	check(not game.preview_open, "selling closes the preview, same as Close")
 
 	game.hud.stack_preview_requested.emit("pawn", true, game.captured[0])
 	await process_frame
 	check(game.preview_open, "long-pressing a Captured entry opens its preview too")
 	var cap_preview_has_sell := false
+	var cap_preview_has_convert := false
 	var to_visit_pv: Array = [game.preview_panel]
 	while not to_visit_pv.is_empty():
 		var n: Node = to_visit_pv.pop_back()
 		if n is Button and (n as Button).text.begins_with("Sell"):
 			cap_preview_has_sell = true
-			break
+		if n is Button and (n as Button).text.begins_with("Convert"):
+			cap_preview_has_convert = true
 		to_visit_pv.append_array(n.get_children())
 	check(not cap_preview_has_sell,
 		"a Captured entry's preview offers no Sell — Convert first, then sell from Stock")
+	check(cap_preview_has_convert,
+		"NO-223: ...and offers Convert instead, moved off the ⇄ badge (information only now)")
 	check(await _click_button_in(game.preview_panel, "Close"), "Close dismisses it")
 	await process_frame
 
@@ -2477,6 +2509,180 @@ func _init() -> void:
 	game._on_tile_clicked(deploy_target)
 	check(game.board.has(deploy_target) and game.board[deploy_target].id == "pawn",
 		"(control) and the very same Deploy-tile tap deploys a STOCK piece")
+
+	# NO-223 (2026-09-22 ruling): the Inventory drawer's own Sell badge on an
+	# Item/Artefact cell is INFORMATION ONLY — price and affordability, no
+	# input of its own (badges "should just be information, whatever they do
+	# should be accessed with a long press"). Selling (and, for an Item,
+	# Using) lives in the long-press preview's own menu instead: Use + Sell
+	# for an Item, Sell only for an Artefact (Activate stays a plain tap,
+	# never duplicated in here). Every Sell confirms first, including this
+	# one (an Item wasn't originally going to, but Max ruled it in line with
+	# the rest once the badge itself became always-visible chrome).
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500, "items": ["blitz"], "artefacts": ["agartha-welcome-mat"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+
+	check(await _click_inventory(game, "Inventory 2"),
+		"Inventory opens with one held Item and one held Artefact")
+
+	var item_cell: Button = null
+	for c in game.hud.items_grid.get_children():
+		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "blitz":
+			item_cell = c
+	var item_sell_badge: Button = null
+	for c in item_cell.get_children():
+		if c is Button and (c as Button).text.begins_with("$"):
+			item_sell_badge = c
+	var item_payout: int = Shop.sell_payout(game, "item", game.items[0])
+	check(item_sell_badge != null and item_sell_badge.is_visible_in_tree()
+			and item_sell_badge.text == "$%d" % item_payout and not item_sell_badge.disabled
+			and item_sell_badge.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the Item cell carries its own Sell badge, priced and live — but non-interactive")
+	var gold_before_item: int = game.gold
+	_click(item_sell_badge.get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(game.items.size() == 1 and game.gold == gold_before_item and not game.buff_pick_open
+			and game.item_active == 0,
+		"NO-223: the Item's badge is information only — the click falls through to the cell, which arms the Item instead of selling it")
+	# Disarm (a second tap on the Item cancels targeting) so the preview's Use
+	# below starts from a clean state instead of hitting the cancel branch.
+	game._use_item(0)
+	await process_frame
+	check(game.item_active == -1 and game.item_targets.is_empty(),
+		"(setup) tapping the armed Item again disarms it")
+
+	# Use, from the long-press preview: Blitz targets a tile ("target":
+	# "tile"), so Use arms board targeting rather than resolving on the spot
+	# — the same _use_item a plain tap on the cell already fires.
+	game.hud.item_preview_requested.emit(0)
+	await process_frame
+	check(game.preview_open, "long-pressing the Item opens its preview")
+	check(await _click_button_in(game.preview_panel, "Use"),
+		"the preview's own Use button is clickable")
+	await process_frame
+	check(game.item_active == 0 and not game.preview_open,
+		"Use arms Blitz's board targeting rather than resolving it immediately")
+	check(not game.item_targets.is_empty(), "(setup) Blitz has a legal target tile")
+	if not game.item_targets.is_empty():
+		game._item_click(game.item_targets[0]) # stage a full target, same as a real board tap
+		check(game.item_pending_tile == game.item_targets[0] and game.hud.multi_confirm_btn.visible,
+			"(setup) staging a target raises the floating Confirm affordance")
+
+		# Change 3 (2026-09-22 ruling — "selling mid target isn't an issue if we
+		# handle the sell well by cancelling everything the targeting was doing
+		# and coming back to a normal state"): selling the Item currently driving
+		# that targeting cancels it first instead of being blocked.
+		game.hud.item_preview_requested.emit(0)
+		await process_frame
+		check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % item_payout),
+			"the Sell button is still offered while the Item is armed and staged")
+		await process_frame
+		check(game.buff_pick_open and game.item_active == 0 and game.item_pending_tile == game.item_targets[0],
+			"the confirm opens first — targeting is untouched until Sell is actually confirmed")
+		check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")
+		await process_frame
+		check(game.items.is_empty() and game.gold == gold_before_item + item_payout,
+			"the Item is gone and Gold paid")
+		check(game.item_active == -1 and game.item_targets.is_empty()
+				and game.item_pending_tile == Vector2i(-1, -1)
+				and not game.hud.multi_confirm_btn.visible and not game.hud.multi_cancel_btn.visible,
+			"and the targeting it was driving is fully cancelled — no armed item, no staged tile, no floating Confirm/Cancel left over")
+		check(game.hud.drawer_open == "inventory" and game.state == game.State.PLAYER_TURN,
+			"story 58: cancelling targeting reopens the Inventory Drawer — the board is back to a normal interactive state, not just a flag flipped")
+
+	var art_cell: Button = null
+	for c in game.hud.artefacts_grid.get_children():
+		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "agartha-welcome-mat":
+			art_cell = c
+	var art_sell_badge: Button = null
+	for c in art_cell.get_children():
+		if c is Button and (c as Button).text.begins_with("$"):
+			art_sell_badge = c
+	var art_entry: Variant = game._artefact_entry("agartha-welcome-mat")
+	var art_payout: int = Shop.sell_payout(game, "artefact", art_entry)
+	check(art_sell_badge != null and art_sell_badge.is_visible_in_tree()
+			and art_sell_badge.text == "$%d" % art_payout and not art_sell_badge.disabled
+			and art_sell_badge.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the Artefact cell carries its own Sell badge too — also non-interactive")
+	var gold_before_art: int = game.gold
+	_click(art_sell_badge.get_global_rect().get_center())
+	await process_frame
+	check(game.artefacts.size() == 1 and game.gold == gold_before_art and not game.buff_pick_open,
+		"NO-223: clicking the Artefact's badge does nothing either")
+
+	game.hud.artefact_preview_requested.emit("agartha-welcome-mat")
+	await process_frame
+	check(game.preview_open, "long-pressing the Artefact opens its preview")
+	var art_preview_has_use := false
+	var to_visit_art: Array = [game.preview_panel]
+	while not to_visit_art.is_empty():
+		var n: Node = to_visit_art.pop_back()
+		if n is Button and (n as Button).text == "Use":
+			art_preview_has_use = true
+		to_visit_art.append_array(n.get_children())
+	check(not art_preview_has_use,
+		"NO-223: an Artefact's menu offers no Use — Activate stays a plain tap, never duplicated in here")
+	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout),
+		"the Sell button in the Artefact's preview is clickable")
+	await process_frame
+	check(game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art,
+		"tapping Sell opens a confirm first — nothing sold yet")
+	check(await _click_button_in(game.modals.buff_panel, "Cancel"), "Cancel is offered")
+	await process_frame
+	check(not game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art,
+		"Cancel keeps the Artefact held and pays nothing")
+
+	game.hud.artefact_preview_requested.emit("agartha-welcome-mat")
+	await process_frame
+	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout), "Sell again")
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Sell"), "Sell confirms the sale")
+	await process_frame
+	check(game.artefacts.is_empty() and game.gold == gold_before_art + art_payout
+			and not game.buff_pick_open,
+		"confirming sells the Artefact, pays Gold through Economy, and closes the confirm")
+
+	# Change 3, Artefact case: the same cancel-then-sell shape while an
+	# activatable Artefact (Bovine Tractor Beam) is mid-targeting.
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults()
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": 500, "artefacts": ["bovine-tractor-beam"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game._begin_artefact_targeting("bovine-tractor-beam")
+	check(game.artefact_targeting_key == "bovine-tractor-beam",
+		"(setup) Bovine Tractor Beam is armed and targeting")
+	var bovine_entry: Variant = game._artefact_entry("bovine-tractor-beam")
+	var bovine_payout: int = Shop.sell_payout(game, "artefact", bovine_entry)
+	var gold_before_bovine: int = game.gold
+	game.hud.artefact_preview_requested.emit("bovine-tractor-beam")
+	await process_frame
+	check(game.preview_open, "the preview opens even while the Artefact is mid-targeting")
+	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % bovine_payout),
+		"Sell is offered while targeting is live")
+	await process_frame
+	check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")
+	await process_frame
+	check(game.artefacts.is_empty() and game.gold == gold_before_bovine + bovine_payout,
+		"the Artefact is gone and Gold paid")
+	check(game.artefact_targeting_key == "" and game.artefact_targets.is_empty()
+			and game.artefact_pending_tile == Vector2i(-1, -1)
+			and not game.hud.multi_confirm_btn.visible and not game.hud.multi_cancel_btn.visible,
+		"and its targeting is fully cancelled too — no staged pick, no floating Confirm/Cancel left over")
+	check(game.hud.drawer_open == "inventory",
+		"story 58: cancelling targeting reopens the Inventory Drawer here too")
 
 	# Jet Fuel Vial (issue 52): a Shop-only control, restock button appears
 	# only while it's held — confirm-gated, same as every untargeted

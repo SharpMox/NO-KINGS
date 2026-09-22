@@ -334,19 +334,33 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   **The wave/turn banner is reachable now (NO-234).** It used to be a dead end: drawn
   only during a transition by `_add_turn_fx`, lasting ~1.1s with no flag holding it on
   screen, so NO-219's italic, its stripes and its full-width span went unverified.
-  `--show-screen banner` (paired with `--scenario 97`, "Banner: frozen (NO-234)" in
+  `--show-screen banner` (paired with a scenario named "Banner: frozen (NO-234)" in
   `game/data/scenarios.gd`) now pins one on screen: it builds the anim dict directly at
   `t=0.5` rather than calling `_add_turn_fx`, since that function bails when `autoplay`
   is set or the local Settings file has `animations_on` off — either of which would
   otherwise make the capture silently produce nothing, the same trap as (1) below.
+  A second scenario, "Banner: looping (NO-234)", boots straight into a playable turn with
+  one player piece (so Pass never trips starvation) and the default wave (all waves done,
+  so nothing else interrupts) — it's for the in-app TEST menu, not the CLI: PASS
+  repeatedly and ENEMY TURN / YOUR TURN fire back to back.
+  **`--scenario N` is a positional index into `Scenarios.all()` = `_hand_written() + `
+  four generated batches, so it moves whenever ANY scenario lands anywhere above it in
+  `_hand_written()` — appending is safe, inserting into the middle (as NO-233 did, right
+  after "En passant (NO-232)") shifts every hand-written AND every generated index below
+  it by however many entries were added. Nothing in the repo pins a generated index today
+  on purpose, but a ticket or PR body that quotes one goes stale the moment a scenario PR
+  merges (NO-214's mentions scenario 301, already suspect). **Never hardcode the number in
+  a doc or a command someone will run later** — count entries in the live tree right
+  before using it (`grep -c '{"name":' game/data/scenarios.gd` PLUS a separate count of
+  `_chain(...)` calls, which build entries without writing `{"name":` themselves — a
+  plain `{"name":` grep alone undercounts by exactly that many), or, more reliably, drive
+  the in-app TEST menu / scenario picker by NAME and read off its index there. As of this
+  writing (pre-NO-233) the two above land at 97 and 98; treat that as an illustration, not
+  a fact to copy into a future command:
   ```sh
-  tools/godot-lock.sh godot --path game -- --scenario 97 --screenshot /tmp/shot-banner --show-screen banner
+  tools/godot-lock.sh godot --path game -- --scenario <N> --screenshot /tmp/shot-banner --show-screen banner
   ```
-  For watching the animation itself rather than a frozen frame, `--scenario 98`, "Banner:
-  looping (NO-234)", boots straight into a playable turn with one player piece (so Pass
-  never trips starvation) and the default wave (all waves done, so nothing else
-  interrupts) — it's for the in-app TEST menu, not the CLI: PASS repeatedly and ENEMY TURN
-  / YOUR TURN fire back to back. Four more traps, found
+  Four more traps, found
   2026-09-19/20 and each silent: (1) without `--scenario N`, `is_scenario` gates the whole
   debug-capture path (`game.gd:720-726`) — `--select`/`--arm-item`/`--open-shop`/
   `--open-drawer`/`--show-screen` all fall through to the plain default-board capture, no

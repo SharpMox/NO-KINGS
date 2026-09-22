@@ -1570,7 +1570,8 @@ func _autosave() -> void:
 
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
-	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
+	# The ENEMY TURN banner fires BELOW, after the skip check — it used to
+	# fire here, so a Surprise Attack / Y2K turn was announced as a normal one.
 	enemy_double_steps.clear() # NO-232: same expiry as player_double_steps,
 		# mirrored for the enemy — see that field's own comment
 	if hud.drawer_open != "": # full board while the enemy plays
@@ -1611,11 +1612,16 @@ func _enemy_turn() -> void:
 		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1
+		_add_turn_fx("ENEMY TURN — skipped (Surprise Attack)", Color(1.0, 0.42, 0.35))
 	else:
+		# One dispatch of on_enemy_turn_start per turn: Y2K Patch disarms
+		# itself inside it, so the count is read once here and handed down.
+		var enemy_ctx := Economy.enemy_turn_ctx(self)
+		_add_turn_fx(_enemy_turn_text(enemy_ctx), Color(1.0, 0.42, 0.35))
 		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
 		await _wait_while_backgrounded() # 06: no enemy turn resolves while backgrounded
-		await _run_enemy_actions()
+		await _run_enemy_actions(enemy_ctx.actions)
 	if state != State.GAME_OVER:
 		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
@@ -1635,8 +1641,25 @@ func _wait_while_backgrounded() -> void:
 		await get_tree().process_frame
 
 
-func _run_enemy_actions() -> void:
-	var actions := Economy.enemy_actions(self)
+## "ENEMY TURN", varied by what on_enemy_turn_start did to the action count:
+## "— skipped (Y2K Patch Floppy Disk)" at 0, "×2" at 2, "×2 (Xerxes)" when a
+## Power or Ability added one. `ctx.notes` is filled by the handlers.
+func _enemy_turn_text(ctx: Dictionary) -> String:
+	var notes: Array = ctx.get("notes", [])
+	var suffix := "" if notes.is_empty() else " (%s)" % ", ".join(notes)
+	if ctx.actions <= 0:
+		return "ENEMY TURN — skipped" + suffix
+	if ctx.actions == 1:
+		return "ENEMY TURN" + suffix
+	return "ENEMY TURN ×%d%s" % [ctx.actions, suffix]
+
+
+## `actions` < 0 reads the count itself (tests and the direct callers);
+## _enemy_turn passes the count it already dispatched for, so Y2K Patch's
+## one-shot disarm is never consumed twice in one turn.
+func _run_enemy_actions(actions: int = -1) -> void:
+	if actions < 0:
+		actions = Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232

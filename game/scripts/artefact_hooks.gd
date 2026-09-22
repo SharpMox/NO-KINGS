@@ -2584,6 +2584,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if g.y2k_armed:
 				g.y2k_armed = false
 				ctx.actions = 0
+				ctx.get("notes", []).append(artefact_name(key))
 
 		["pandemic-toilet-paper-pallet", "on_purchase"]:
 			g.pallet_purchase_count += 1

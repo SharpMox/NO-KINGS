@@ -521,6 +521,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 	# shadowed whichever Power also answers this hook.
 	if hook == "on_enemy_turn_start" and g.king_extra_actions > 0:
 		ctx.actions += g.king_extra_actions
+		ctx.get("notes", []).append("Total Mobilisation +%d" % g.king_extra_actions)
 	var kit := kit_of(g.king_power_id)
 	match [str(kit.get("power_key", "")), hook]:
 		["host", "on_enemy_turn_start"]:
@@ -528,6 +529,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# composes with the tier's own enemy-action count rather than
 			# replacing it (issue 59).
 			ctx.actions += 1
+			ctx.get("notes", []).append("%s +1" % kit.power_name)
 		["wall", "on_place_cost"]:
 			# Qin Shi Huang: the wall is sealed. Doubled rather than blocked —
 			# blocking deploys outright can strand a player into the resource

@@ -398,5 +398,13 @@ static func deploy_cost(g) -> int:
 
 ## Enemy actions this turn — 2 at Tier 5, 1 at Tiers 1-4 (issue 59), plus King Powers.
 static func enemy_actions(g) -> int:
+	return enemy_turn_ctx(g).actions
+
+
+## The whole on_enemy_turn_start ctx: `actions` plus `notes`, the names of
+## whatever changed the count (Y2K Patch, Xerxes, Total Mobilisation) for the
+## ENEMY TURN banner (game.gd _enemy_turn_text). Dispatch ONCE per turn —
+## Y2K Patch disarms itself in here.
+static func enemy_turn_ctx(g) -> Dictionary:
 	return ArtefactHooks.run(g, "on_enemy_turn_start",
-		{"actions": Tuning.enemy_actions_per_turn(g.next_tier)}).actions
+		{"actions": Tuning.enemy_actions_per_turn(g.next_tier), "notes": []})

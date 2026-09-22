@@ -1854,7 +1854,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				# 35: signed — can net a loss when outnumbered, same call either way
 		["terracotta-draft-card", "on_wave_clear"]:
 			var mix: Array = Tuning.ARMIES.get(g.next_army, Tuning.ARMIES[Tuning.DEFAULT_ARMY])
-			g.stock.append(mix[g.rng.randi() % mix.size()]) # bare id: a fresh
+			_grant_stock(g, key, mix[g.rng.randi() % mix.size()]) # bare id: a fresh
 				# piece carries no board state, so ADR-0002's plain-String form
 				# applies (a Dictionary would only be needed for a piece pulled
 				# off the board with state attached, e.g. Extraction)
@@ -2052,7 +2052,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				grant_item(g, _random_item_of_tier(g.rng, "Tactical"))
 		["backmasked-vinyl", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
-				g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
+				_grant_stock(g, key, ItemLogic.chain_base(g.defs, ctx.id))
 		["tutankhamun-s-death-thong", "on_piece_lost"]:
 			if not ctx.uncounted and ctx.reason == "captured" and ctx.attacker_pos.x >= 0:
 				g._apply_buff(g.board[ctx.attacker_pos], "slow", _buff_turns("slow"), ctx.attacker_pos)
@@ -2116,7 +2116,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				_grant_buff_to(g, piece)                      # Pillow's pattern)
 				g.stock[ctx.stock_index] = piece
 		["bigfoot-toenail-clipping", "on_rank_up"]:
-			g.stock.append(ItemLogic.chain_base(g.defs, ctx.id))
+			_grant_stock(g, key, ItemLogic.chain_base(g.defs, ctx.id))
 
 		# --- issue 19: chain-lookup off the existing on_capture/on_wave_clear hooks ---
 		["cia-heart-attack-gun", "on_capture"]:
@@ -2155,6 +2155,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 						g.stock[idx] = g.defs[e].next
 					else:
 						e.id = g.defs[e.id].next
+					_note(g, key, "Stock piece promoted to %s" % g.defs[g.stock[idx] if g.stock[idx] is String else g.stock[idx].id].name)
 
 		# --- issue 19: board-half reads (Tuning.BOARD_H, owner-agnostic) ---
 		["dyatlov-geiger-counter", "on_score_change"]:
@@ -2219,7 +2220,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# --- issue 19: capture conversion, the cheap wave-clear half ---
 		["stockholm-syndrome-pamphlet", "on_wave_clear"]:
 			if not g.captured.is_empty():
-				g.stock.append(g.captured.pop_front())
+				_grant_stock(g, key, g.captured.pop_front())
 
 		# --- issue 24: combat & positioning ---
 		["uss-eldridge-invisibility-paint", "on_capture"]:
@@ -2383,7 +2384,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				g.arks_bunkbed_used = false # the new Milestone recharges it
 		["ark-s-bunkbed", "on_purchase"]:
 			if ctx.kind == "piece" and not g.arks_bunkbed_used:
-				g.stock.append(ctx.key)
+				_grant_stock(g, key, ctx.key)
 				g.arks_bunkbed_used = true
 		["trojan-horse-assembly-manual", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave) and not g.box_open: # don't clobber an open Box Pick
@@ -2403,10 +2404,10 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		# game.gd's _lose_player_piece / WaveLogic.queue) ---
 		["jon-burrows-fake-id", "on_wave_clear"]:
 			if not g.wave_lost_ids.is_empty():
-				g.stock.append(g.wave_lost_ids[0])
+				_grant_stock(g, key, g.wave_lost_ids[0])
 		["walt-s-cryonic-capsule", "on_wave_clear"]:
 			if not g.wave_lost_ids.is_empty():
-				g.stock.append(g.wave_lost_ids[-1])
+				_grant_stock(g, key, g.wave_lost_ids[-1])
 
 		# --- issue 26: Score-gain streak (27 Club Punch Card); -50 Gold on
 		# loss, same issue-16 ruling as Social Credit Report Card (Score is

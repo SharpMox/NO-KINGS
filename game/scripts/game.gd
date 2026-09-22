@@ -2903,8 +2903,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 						# else can overwrite g.last_capture_ctx again
 					_capture_to_stock(board[also])
 				else:
-					if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-						captured.append(board[also].id)
+					_bank_capture(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
 				board.erase(also)
@@ -2950,8 +2949,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-					captured.append(victim.id) # the capture itself still resolved
+				_bank_capture(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
 			board[to].moved = true # NO-224
@@ -2976,8 +2974,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-					captured.append(victim.id)
+				_bank_capture(victim.id)
 			if blitz_free:
 				moving_piece.erase("blitz_free_move")
 			else:
@@ -3027,6 +3024,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		board.erase(to)
 		_add_slide(to, from)
 		final_pos = from
+		_add_turn_fx("USS Eldridge Invisibility Paint: returned to start", BANNER_EFFECT)
 	elif move_to_backrow and to.y != 0: # Royal Fiat (Undamaged) — forced retreat
 		var dest := _first_empty_backrow_tile()
 		if dest.x >= 0:
@@ -3034,6 +3032,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			board.erase(to)
 			_add_slide(to, dest)
 			final_pos = dest
+			_add_turn_fx("Royal Fiat (Undamaged): retreated to the back row", BANNER_EFFECT)
 	if blitz_free:
 		moving_piece.erase("blitz_free_move")
 	elif hounds_free_turn and not did_capture: # Loose the Hounds (67): moves
@@ -3935,6 +3934,17 @@ func _capture_to_stock(victim: Dictionary) -> void:
 	var e: Dictionary = victim.duplicate()
 	e.erase("owner")
 	stock.append(e.id if e.size() == 1 else e)
+	_add_turn_fx("Zeta Reticuli Souvenir Map: capture sent to Stock", BANNER_EFFECT)
+
+
+## A capture's Captured Stock entry — or, under Nebuchadnezzar II's Power
+## (issue 92: The Babylonian Exile), nothing, with the first deportation of
+## the wave bannered. Was three inline `if not Kings.deports_captures` sites.
+func _bank_capture(id: String) -> void:
+	if Kings.deports_captures(self):
+		Kings.bite(self, "%s deported" % defs[id].name)
+	else:
+		captured.append(id)
 
 
 ## Held copies of one artefact key — Numbers Station Sudoku / Bohemian Grove

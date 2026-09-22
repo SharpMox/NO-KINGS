@@ -49,6 +49,10 @@ func _menu() -> Node:
 	return m
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	create_timer(120.0).timeout.connect(func() -> void:
 		push_error("WATCHDOG: menu-continue suite still running after 120s")

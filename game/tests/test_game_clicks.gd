@@ -343,6 +343,10 @@ func _await_player_turn(game: Node2D) -> void:
 		await create_timer(0.1).timeout
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	# Watchdog: a SCRIPT ERROR mid-run kills this coroutine and quit() below
 	# never fires, leaving the window open until a human closes it (user

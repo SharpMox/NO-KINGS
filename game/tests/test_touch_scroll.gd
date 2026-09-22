@@ -162,6 +162,10 @@ func _drive(d: Node, dir: String, seq: int, cmds: Array) -> PackedStringArray:
 	return FileAccess.get_file_as_string(dir.path_join("ack.txt")).split("\n", false)
 
 
+## NO-194: this file has no shared _boot() helper — every fixture below sets
+## GameScript.next_config directly, so each boot calls reset_boot_defaults()
+## right before it, rather than inheriting a reset from one funnel. Not an
+## oversight; see game.gd's reset_boot_defaults() doc comment.
 func _init() -> void:
 	# NO-192: raised from 60s. Must stay below run_all.sh's TIMEOUT (600s) or
 	# the runner kills the process first and the tail of this probe's log is lost.

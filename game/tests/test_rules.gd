@@ -85,8 +85,16 @@ func _init() -> void:
 	# geometry, not a piece-id check: the Void Pawn's orthogonal-forward
 	# capture (mfFcfWimfnA) never reaches a diagonal skip square
 	var b_void := {Vector2i(1, 2): piece("berolina", Rules.PLAYER), Vector2i(2, 2): piece("pawn", Rules.ENEMY)}
-	check(not Rules.moves_for(b_void, Vector2i(1, 2), defs, "", [ep_offer]).has(Vector2i(2, 3)),
-		"a Void Pawn beside the same double-step cannot take it en passant")
+	# NB: (2,3) IS in the Void Pawn's destination list — mfF means it MOVES
+	# forward-diagonally, so the skip square is an ordinary move square for it.
+	# Asserting the destination is absent would therefore fail whatever en
+	# passant did. What the ruling actually forbids is the CAPTURE, so assert
+	# that stepping there takes nothing: no ep_victim tag, and the enemy pawn
+	# still on the board afterwards.
+	var void_legal := Rules.legal_moves(b_void, Rules.PLAYER, defs, true, [], [ep_offer])
+	var void_step: Array = void_legal.filter(func(m: Dictionary) -> bool: return m.to == Vector2i(2, 3))
+	check(not void_step.is_empty() and not void_step[0].has("ep_victim"),
+		"a Void Pawn may step onto the skip square but captures nothing there")
 	check(Rules.en_passant_victim(b_void, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(-1, -1),
 		"en_passant_victim agrees: no capture for the Void Pawn")
 	# invalidated: the recorded pawn moved again (or was replaced) since

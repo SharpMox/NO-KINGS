@@ -23,6 +23,10 @@ func check(cond: bool, label: String) -> void:
 ## Fixtures are deterministic by default (slice 36: a flaky suite makes every
 ## green claim unfalsifiable).
 const DEFAULT_SEED := 1
+## Cap on any single wait-for-turn. Generous — a real turn resolves in well
+## under a second even on the slow Intel box — so hitting it means the turn
+## is never coming, not that the machine is loaded.
+const TURN_WAIT_CAP_MS := 10000
 
 
 func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
@@ -36,12 +40,30 @@ func _boot(cfg: Dictionary, seed_it: bool = true) -> Node2D:
 	return game
 
 
-func _wait_for_player_turn(g: Node2D) -> void:
-	while g.state != GameScript.State.PLAYER_TURN:
+## BOUNDED. An unbounded version of this hung the whole suite on its first run
+## (exit 143, killed by run_all.sh's outer timeout) and reported nothing about
+## where it stalled. A turn that never arrives is a real failure — a side with
+## no legal action, or a game-over state — so cap it and say so, rather than
+## spinning until something external kills the process.
+func _wait_for_player_turn(g: Node2D, label: String = "") -> void:
+	var t0 := Time.get_ticks_msec()
+	while g.state != GameScript.State.PLAYER_TURN \
+			and Time.get_ticks_msec() - t0 < TURN_WAIT_CAP_MS:
 		await create_timer(0.1).timeout
+	check(g.state == GameScript.State.PLAYER_TURN,
+		"player turn arrives%s" % ("" if label == "" else " (" + label + ")") \
+			+ " — state=%d after %dms" % [g.state, Time.get_ticks_msec() - t0])
 
 
 func _init() -> void:
+	# Watchdog. This suite hung on its first run and only run_all.sh's outer
+	# timeout stopped it (exit 143), which reports nothing about where. Every
+	# other live-node probe in this directory carries one for exactly that
+	# reason; this file was added to run_all.sh without it. Kept under
+	# run_all.sh's own TIMEOUT so the runner's log survives the quit.
+	create_timer(120.0).timeout.connect(func() -> void:
+		push_error("WATCHDOG: test_en_passant still running after 120s — force quit")
+		quit(1))
 	# --- the offer is available throughout the opponent's whole next turn,
 	# and the captured pawn leaves the board and lands wherever an ordinary
 	# capture sends it (Captured Stock + Score) — same path, not a second one ---

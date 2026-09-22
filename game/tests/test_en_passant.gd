@@ -128,7 +128,14 @@ func _init() -> void:
 	# --- the enemy AI performing one (rules.gd generates it for both sides;
 	# this exercises it through the real turn machinery, not just ai_action
 	# in isolation — see test_rules.gd for that) ---
-	var d: Node2D = _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 1, 4]], "gold": 100})
+	# The spare player pawn at (7,0) is load-bearing: without it the enemy's en
+	# passant takes the player's ONLY piece, the game ends, and the wait below
+	# is for a PLAYER_TURN that can never arrive. That is what hung this suite
+	# on its first run — en passant SUCCEEDING, not failing. (7,0) is far from
+	# the enemy's single pawn at (1,4) and unreachable by it, so it cannot
+	# out-compete the capture the AI is meant to choose here.
+	var d: Node2D = _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 7, 0], ["pawn", 1, 1, 4]],
+		"gold": 100})
 	await process_frame
 	await process_frame
 	d._move_player(Vector2i(2, 2), Vector2i(2, 4)) # double-step, action 1 of 2 — leaves it offered

@@ -923,10 +923,10 @@ func build(game) -> void:
 	# matches menu_button/stock_btn (the row's other icon buttons, same
 	# _style_button call). Surface is pass_count's bright green
 	# (0.498, 0.878, 0.541, hud.gd:1012) scaled down in value (~x0.25) to a
-	# dark surface so it reads as green without the white glyph washing out;
-	# the glyph itself is recoloured to that same bright green so the pair
-	# reads as one family with the existing green text.
-	army_band_reopen.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
+	# dark surface so it reads as green without the white glyph washing out.
+	# NO-225: the glyph's own font_color is set (and kept in sync per state)
+	# by _update_band_toggle below, not here — a static override here would
+	# be a second source of truth immediately clobbered by that call.
 	_style_button(army_band_reopen, Color(0.125, 0.220, 0.136), Color(0, 0, 0, 0), 8, 4, 4)
 	army_band_reopen.pressed.connect(func() -> void:
 		if army_band_open:
@@ -1723,7 +1723,7 @@ func collapse_army_band() -> void:
 ## dropping it would lose the one place an active-while-collapsed King
 ## Ability is visible without opening the band.
 func _update_band_toggle() -> void:
-	var warn: bool = g != null and not g.king_abilities_active.is_empty()
+	var warn: bool = g != null and not g.king_abilities_active.is_empty() and not army_band_open
 	if army_band_open:
 		army_band_reopen.text = "ⓘ"
 		army_band_reopen.tooltip_text = "Hide"
@@ -1731,6 +1731,15 @@ func _update_band_toggle() -> void:
 		army_band_reopen.text = "⚠" if warn else "ⓘ"
 		army_band_reopen.tooltip_text = "King Abilities in force — tap to show" \
 			if warn else "Show Army Power"
+	# NO-225 gave this button a permanent green font_color override, which the
+	# ⚠ glyph (no override of its own) silently inherited — an alert that
+	# looks identical to the resting state has lost its job. Set the colour
+	# per state here instead, following the same `warn` (glyph is only ever
+	# ⚠ when warn is true): the established green otherwise, Tuning.COL_GOLD
+	# (this project's attention colour, also score/gold) when warning, for a
+	# clear hue shift against the dark green surface.
+	army_band_reopen.add_theme_color_override("font_color",
+		Tuning.COL_GOLD if warn else Color(0.498, 0.878, 0.541))
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.

@@ -1346,6 +1346,17 @@ func build(game) -> void:
 	stock_panel.custom_minimum_size = Vector2(vp.x, stock_h)
 	stock_panel.clip_contents = true # NO-84: never paints over the board below it
 	stock_panel.visible = false
+	# NO-228: the Header's controls are added earlier as direct children of
+	# `self` (lines ~581-890), so by plain tree order stock_panel — added
+	# later — paints OVER them while sliding through the Header's y-range.
+	# z_index (not move_child/move_to_front) pins it behind: it only changes
+	# CanvasItem paint order, never sibling index, so it cannot reproduce the
+	# NO-180 incident (a move_to_front there reordered the deck's children and
+	# silently dropped the drawers row) and it cannot touch the tree-order-
+	# dependent gui_input/MOUSE_FILTER_STOP chrome-swipe detection those
+	# drawers rely on (NO-118/NO-145) — Godot's GUI input picking is unaffected
+	# by z_index.
+	stock_panel.z_index = -1
 	var stock_row := HBoxContainer.new()
 	stock_row.add_theme_constant_override("separation", 0)
 	# LEFT: Captured Stock, a fixed fraction of the width — fixed so the split
@@ -1461,7 +1472,9 @@ func build(game) -> void:
 	add_child(stock_panel)
 	drawer_rest["stock"] = stock_panel.position
 	# NO-118: Stock slides in from the TOP — off-screen is its own height
-	# above rest, tucked behind the Header.
+	# above rest, into the Header's y-range. NO-228's z_index (set above) is
+	# what actually keeps it tucked BEHIND the Header while sliding through
+	# that range — this offset alone only positioned it there.
 	drawer_hidden["stock"] = stock_panel.position - Vector2(0, stock_h)
 	# NO-59: the description popup. ONE instance, owned by the HUD rather than by
 	# a row, because hud.refresh() frees and rebuilds every strip child — a panel

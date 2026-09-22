@@ -253,7 +253,14 @@ static func reflects_capture(victim: Dictionary) -> bool:
 ## Multicapture (ruled 2026-08-28): the capture also takes ONE enemy standing
 ## beside the piece just captured. Picks the most valuable neighbour so the
 ## trigger needs no extra targeting step. Returns (-1,-1) when nothing adjoins.
-static func multicapture_target(board: Dictionary, at: Vector2i, owner: int, defs: Dictionary) -> Vector2i:
+## `at` is where the just-captured piece stood — for an en passant capture
+## that's the victim's real square, not the landing square the attacker lands
+## on, so NO-233's caller passes its own `ep_victim`. `exclude` (NO-233) keeps
+## that same call from re-picking the primary victim: en passant's landing
+## square is adjacent to the victim's real square, and still holds the
+## primary victim's (teleported) piece data at this point in the capture.
+static func multicapture_target(board: Dictionary, at: Vector2i, owner: int, defs: Dictionary,
+		exclude: Vector2i = Vector2i(-1, -1)) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	var best_value := -1
 	for dx in range(-1, 2):
@@ -261,7 +268,7 @@ static func multicapture_target(board: Dictionary, at: Vector2i, owner: int, def
 			if dx == 0 and dy == 0:
 				continue
 			var pos := at + Vector2i(dx, dy)
-			if not board.has(pos) or board[pos].owner == owner:
+			if pos == exclude or not board.has(pos) or board[pos].owner == owner:
 				continue
 			if board[pos].id == "king": # boss piece is never collateral
 				continue

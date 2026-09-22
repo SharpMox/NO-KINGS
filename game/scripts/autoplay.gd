@@ -55,11 +55,11 @@ static func step(g) -> void:
 				return
 		if try_merge(g):
 			return
-		var moves := Rules.legal_moves(g.board, Rules.PLAYER, g.defs)
+		var moves := Rules.legal_moves(g.board, Rules.PLAYER, g.defs, true, [], g.enemy_double_steps) # NO-232
 		moves = moves.filter(func(m: Dictionary) -> bool: return not g.moved_this_turn.has(m.from))
 		if not moves.is_empty():
 			# greedy: prefer captures so runs go deep enough to exercise waves/merges
-			var caps := moves.filter(func(m: Dictionary) -> bool: return g.board.has(m.to))
+			var caps := moves.filter(func(m: Dictionary) -> bool: return g.board.has(m.to) or m.has("ep_victim"))
 			var pick: Array[Dictionary] = caps if not caps.is_empty() else moves
 			var m: Dictionary = pick[g.rng.randi() % pick.size()]
 			g._move_player(m.from, m.to)

@@ -28,7 +28,13 @@ static func in_bounds(p: Vector2i) -> bool:
 ## Pseudo-legal destinations for the piece at `from`. `mode_filter` narrows to
 ## squares reachable as a move ("move") or capture ("capture") — used by
 ## is_attacked, which only cares about capture coverage.
-static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_filter: String = "") -> Array[Vector2i]:
+##
+## `ep_offers` (NO-232): the OPPONENT's double-steps from their last turn —
+## {pawn, skip, id} entries, game.gd's to thread the correct side in (same
+## `denied` precedent as legal_moves: rules.gd stays pure, no g access).
+## Defaults to none, so every existing call site is unaffected.
+static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_filter: String = "",
+		ep_offers: Array = []) -> Array[Vector2i]:
 	var piece: Dictionary = board[from]
 	var mirror := -1 if piece.owner == ENEMY else 1
 	var out: Array[Vector2i] = []
@@ -75,6 +81,10 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 		for at in range_halo(board, from, out):
 			if not out.has(at):
 				out.append(at)
+	if mode_filter != "move": # NO-232: en passant is always a capture
+		for offer in ep_offers:
+			if not out.has(offer.skip) and en_passant_victim(board, from, offer.skip, [offer], defs).x >= 0:
+				out.append(offer.skip)
 	return out
 
 
@@ -102,8 +112,8 @@ static func range_halo(board: Dictionary, from: Vector2i, dests: Array[Vector2i]
 ## Display-annotated variant of moves_for — same legality, grouped by shape so
 ## the board can draw leaps as dots, rides as arrows, and bent rides as linked
 ## dots. Kept structurally parallel to moves_for; test_rules asserts the
-## flattened destination set matches exactly.
-static func move_paths(board: Dictionary, from: Vector2i, defs: Dictionary) -> Array[Dictionary]:
+## flattened destination set matches exactly. `ep_offers`: see moves_for.
+static func move_paths(board: Dictionary, from: Vector2i, defs: Dictionary, ep_offers: Array = []) -> Array[Dictionary]:
 	var piece: Dictionary = board[from]
 	var def: Dictionary = defs[piece.id]
 	var mirror := -1 if piece.owner == ENEMY else 1
@@ -155,6 +165,9 @@ static func move_paths(board: Dictionary, from: Vector2i, defs: Dictionary) -> A
 					# the Valkyrie) hops down the line rather than sliding
 					out.append({"kind": "ride", "line": line,
 						"hop": absi(step.x) > 1 or absi(step.y) > 1})
+	for offer in ep_offers: # NO-232: mirrors moves_for's own ep pass, for display
+		if en_passant_victim(board, from, offer.skip, [offer], defs).x >= 0:
+			out.append({"kind": "leap", "to": offer.skip})
 	return out
 
 
@@ -176,6 +189,54 @@ static func _add_dest(board: Dictionary, _from: Vector2i, to: Vector2i, owner: i
 			out.append(to)
 	elif mode != "capture":
 		out.append(to)
+
+
+## NO-232 (en passant). Max's ruling: soften chess's "next MOVE" expiry (this
+## game's actions_per_turn makes "next move" ambiguous) into "next TURN" —
+## each side remembers the double-steps it made last turn; the record is
+## captured elsewhere in `offers` and overwritten at the owning side's next
+## turn boundary (game.gd). `from` may capture onto the empty `to` (a skip
+## square) when: `to` matches a still-live offer, the double-stepped pawn is
+## still standing where it landed (a same-turn second move invalidates the
+## offer without any extra bookkeeping — `board.has(offer.pawn)` or the id
+## check below simply fails), and `from`'s own ordinary CAPTURE geometry would
+## already reach `to` if an enemy stood there — geometry, not a piece-id
+## check, so the Pawn's diagonal-forward capture qualifies and the Void
+## Pawn's orthogonal-forward capture (mfFcfWimfnA) does not, and any future
+## piece needs no ruling of its own. Returns the pawn's square to remove, or
+## Vector2i(-1,-1) if `to` is no valid en passant capture for this piece.
+static func en_passant_victim(board: Dictionary, from: Vector2i, to: Vector2i,
+		offers: Array, defs: Dictionary) -> Vector2i:
+	if board.has(to) or not board.has(from):
+		return Vector2i(-1, -1) # en passant only ever lands on an empty square
+	for offer in offers:
+		if offer.skip != to:
+			continue
+		if not board.has(offer.pawn) or board[offer.pawn].id != offer.id:
+			continue # NO-232: the pawn must still be standing where it landed
+		var probe := board.duplicate()
+		probe[to] = board[offer.pawn] # imagine the pawn standing on the skip square
+		if moves_for(probe, from, defs, "capture").has(to):
+			return offer.pawn
+	return Vector2i(-1, -1)
+
+
+## The skip square if `from` -> `to` is a fresh initial double-step for
+## `piece` (an 'initial'-flagged move def, ridden exactly 2 steps along its
+## own direction) — Vector2i(-1,-1) otherwise. Geometry-only, like
+## en_passant_victim above: covers the Pawn's straight double-step and the
+## Void Pawn's diagonal one with no piece-id check, and any future piece with
+## its own 'initial' move for free.
+static func double_step_skip(piece: Dictionary, from: Vector2i, to: Vector2i, defs: Dictionary) -> Vector2i:
+	var mirror := -1 if piece.owner == ENEMY else 1
+	for m in defs[piece.id].moves:
+		if not m.get("initial", false):
+			continue
+		for dir in m.dirs:
+			var step := Vector2i(int(dir[0]), int(dir[1]) * mirror)
+			if to == from + step * 2:
+				return from + step
+	return Vector2i(-1, -1)
 
 
 static func find_king(board: Dictionary, owner: int) -> Vector2i:
@@ -212,16 +273,23 @@ static func is_attacked(board: Dictionary, target: Vector2i, by_owner: int, defs
 ## is untouched and free to leave; moving to ANOTHER denied square (e.g.
 ## sideways along the same row) is still denied — "cannot move onto" reads as
 ## about the destination, not the piece's starting side.
+## `ep_offers` (NO-232): see moves_for. A move dict carries `ep_victim` when
+## `to` is an en passant capture — the square to remove, distinct from `to`
+## itself (an ordinary capture's victim IS `to`; callers that read `m.to` for
+## the captured square must check for this key first, see game.gd).
 static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict := true,
-		denied: Array[Vector2i] = []) -> Array[Dictionary]:
+		denied: Array[Vector2i] = [], ep_offers: Array = []) -> Array[Dictionary]:
 	var king := find_king(board, owner)
 	var out: Array[Dictionary] = []
 	for pos in board:
 		if board[pos].owner != owner:
 			continue
-		for to in moves_for(board, pos, defs):
+		for to in moves_for(board, pos, defs, "", ep_offers):
 			if denied.has(to):
 				continue
+			var ep_victim := Vector2i(-1, -1)
+			if not board.has(to): # an ordinary capture can never also be en passant
+				ep_victim = en_passant_victim(board, pos, to, ep_offers, defs)
 			if king.x >= 0 and (strict or pos == king):
 				# shallow: the sim only re-keys piece references, and is_attacked
 				# never mutates a piece. ponytail: the cost of this branch is the
@@ -231,19 +299,26 @@ static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict 
 				var sim := board.duplicate()
 				sim[to] = sim[pos]
 				sim.erase(pos)
+				if ep_victim.x >= 0:
+					sim.erase(ep_victim) # NO-232: the captured pawn is gone too —
+						# keeps this self-check sim honest for the rare en-passant-
+						# discovered-check case (removing it exposes a pin)
 				var king_after := to if pos == king else king
 				if is_attacked(sim, king_after, 1 - owner, defs):
 					continue
-			out.append({"from": pos, "to": to})
+			var m := {"from": pos, "to": to}
+			if ep_victim.x >= 0:
+				m.ep_victim = ep_victim
+			out.append(m)
 	return out
 
 
 static func is_checkmate(board: Dictionary, owner: int, defs: Dictionary,
-		denied: Array[Vector2i] = []) -> bool:
+		denied: Array[Vector2i] = [], ep_offers: Array = []) -> bool:
 	var king := find_king(board, owner)
 	if king.x < 0 or not is_attacked(board, king, 1 - owner, defs):
 		return false
-	return legal_moves(board, owner, defs, true, denied).is_empty()
+	return legal_moves(board, owner, defs, true, denied, ep_offers).is_empty()
 
 
 ## Merge result for exactly 2 selected piece ids, or "" if invalid.
@@ -314,13 +389,16 @@ const TAUNT_PRIORITY := 1000
 ## `denied` (issue 51): forwarded straight into legal_moves — see its header.
 ## ai_action calls the same legal_moves the player's own moves come from,
 ## so this one parameter binds the AI too; there is no second move
-## generator to keep in sync.
-static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = []) -> Dictionary:
+## generator to keep in sync. `ep_offers` (NO-232): same — the PLAYER's
+## double-steps from their last turn, threaded through so the AI sees and can
+## take an en passant capture like any other.
+static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = [],
+		ep_offers: Array = []) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
 	# full legality only when in check (must not miss a resolving move);
 	# otherwise the fast path — king moves stay safety-checked, pins ignored
-	var moves := legal_moves(board, ENEMY, defs, in_check, denied)
+	var moves := legal_moves(board, ENEMY, defs, in_check, denied, ep_offers)
 	moves = moves.filter(func(m: Dictionary) -> bool: # Stun: this piece sits it out
 		return not BuffLogic.has(board[m.from], "stunned"))
 	if moves.is_empty():
@@ -341,8 +419,10 @@ static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2
 			var defend := _defend_king(board, moves, king, threats, defs)
 			if not defend.is_empty():
 				return defend
-	# a capture worth taking beats any advance (GDD: best trade > advance)
-	var captures := moves.filter(func(m: Dictionary) -> bool: return board.has(m.to))
+	# a capture worth taking beats any advance (GDD: best trade > advance).
+	# NO-232: an en passant capture lands on an empty `to`, so it needs its
+	# own check alongside board.has(m.to) — see legal_moves' ep_victim key.
+	var captures := moves.filter(func(m: Dictionary) -> bool: return board.has(m.to) or m.has("ep_victim"))
 	var cap := _pick(board, captures, defs, false)
 	if not cap.is_empty():
 		return cap
@@ -355,7 +435,7 @@ static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2
 	var commit := near >= Tuning.BACKROW_COMMIT_COUNT
 	var quiet: Array[Dictionary] = []
 	for m in moves:
-		if board[m.from].id == "king" or board.has(m.to):
+		if board[m.from].id == "king" or board.has(m.to) or m.has("ep_victim"):
 			continue # the King never advances voluntarily; losing captures were rejected above
 		if not commit and m.to.y == 0:
 			continue # hold at row 1 until the swarm is big enough
@@ -388,9 +468,11 @@ static func _pick(board: Dictionary, moves: Array[Dictionary], defs: Dictionary,
 static func _move_value(board: Dictionary, m: Dictionary, defs: Dictionary, origin_risk: Dictionary) -> int:
 	var mover: Dictionary = board[m.from]
 	var v := 0
-	if board.has(m.to):
-		v += int(defs[board[m.to].id].value)
-		if BuffLogic.has(board[m.to], "taunt"):
+	var victim_pos: Vector2i = m.get("ep_victim", m.to) # NO-232: an en passant
+		# capture's victim is not standing on the landing square
+	if board.has(victim_pos):
+		v += int(defs[board[victim_pos].id].value)
+		if BuffLogic.has(board[victim_pos], "taunt"):
 			v += TAUNT_PRIORITY
 	if not origin_risk.has(m.from):
 		origin_risk[m.from] = _exposure(board, m.from, defs)
@@ -398,6 +480,8 @@ static func _move_value(board: Dictionary, m: Dictionary, defs: Dictionary, orig
 	var sim := board.duplicate() # shallow: only the keys move (see legal_moves)
 	sim[m.to] = mover
 	sim.erase(m.from)
+	if m.has("ep_victim"):
+		sim.erase(m.ep_victim)
 	return v - _exposure(sim, m.to, defs)
 
 

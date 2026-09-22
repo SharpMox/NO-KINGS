@@ -302,6 +302,17 @@ static func _resume_turn(g, cfg: Dictionary) -> void:
 	g.moved_this_turn.clear()
 	for t in cfg.get("moved_this_turn", []):
 		g.moved_this_turn.append(Vector2i(int(t[0]), int(t[1])))
+	# NO-232: additive — a pre-NO-232 save has neither array, restores empty,
+	# and simply offers no en passant, which is exactly right for a save
+	# written before double-steps were ever recorded.
+	g.player_double_steps.clear()
+	for e in cfg.get("player_double_steps", []):
+		g.player_double_steps.append({"pawn": Vector2i(int(e.pawn[0]), int(e.pawn[1])),
+			"skip": Vector2i(int(e.skip[0]), int(e.skip[1])), "id": str(e.id)})
+	g.enemy_double_steps.clear()
+	for e in cfg.get("enemy_double_steps", []):
+		g.enemy_double_steps.append({"pawn": Vector2i(int(e.pawn[0]), int(e.pawn[1])),
+			"skip": Vector2i(int(e.skip[0]), int(e.skip[1])), "id": str(e.id)})
 	g.oak_island_used_this_turn = bool(cfg.get("oak_island_used_this_turn", false))
 	g.moscovium_active = bool(cfg.get("moscovium_active", false))
 	g.hounds_free_turn = bool(cfg.get("hounds_free_turn", false))
@@ -363,6 +374,12 @@ static func to_config(g) -> Dictionary:
 	var moved_out := []
 	for t in g.moved_this_turn: # Array[Vector2i] is not JSON-safe
 		moved_out.append([t.x, t.y])
+	var pds_out := [] # NO-232: Vector2i fields are not JSON-safe
+	for e in g.player_double_steps:
+		pds_out.append({"pawn": [e.pawn.x, e.pawn.y], "skip": [e.skip.x, e.skip.y], "id": e.id})
+	var eds_out := []
+	for e in g.enemy_double_steps:
+		eds_out.append({"pawn": [e.pawn.x, e.pawn.y], "skip": [e.skip.x, e.skip.y], "id": e.id})
 	return Account.stamp({
 		"save_version": SAVE_VERSION,
 		# --- the TURN IN PROGRESS. All additive: a save written before this
@@ -373,6 +390,7 @@ static func to_config(g) -> Dictionary:
 		"actions_max": g.actions_max, "turn_action_count": g.turn_action_count,
 		"turn_capture_count": g.turn_capture_count,
 		"action_log": g.action_log.duplicate(true), "moved_this_turn": moved_out,
+		"player_double_steps": pds_out, "enemy_double_steps": eds_out, # NO-232
 		# An open BOX PICK, re-opened on resume (user ruling 2026-09-09: come back
 		# to the same choice). The offer is persisted rather than regenerated —
 		# it was rolled once at Shop-stock time, and re-rolling it could hand back

@@ -497,6 +497,17 @@ var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
+# NO-232 (en passant). Softened from chess's "next move" expiry (ambiguous
+# here — actions_per_turn varies) to "next TURN", per Max's ruling: each side
+# remembers the double-steps it made LAST turn as {pawn, skip, id} entries.
+# player_double_steps is offered to the ENEMY for the immediately following
+# ENEMY_TURN, then cleared at the top of the NEXT _begin_player_turn — by
+# then that ENEMY_TURN has already ended, so the window has genuinely closed.
+# enemy_double_steps mirrors it, cleared at the top of the NEXT _enemy_turn.
+# Same "rules.gd stays pure, game.gd computes and passes it in" precedent as
+# _enemy_denied_tiles (Winchester Salt Lined Doors) — see its own comment.
+var player_double_steps: Array[Dictionary] = []
+var enemy_double_steps: Array[Dictionary] = []
 var drag_from := Vector2i(-1, -1) # board drag in progress; ghost follows the mouse
 var drag_moved := false # the pointer left the origin tile (tap vs aborted drag)
 var drag_reselect := false # the pressed piece was already selected (re-click)
@@ -1224,7 +1235,7 @@ func _has_legal_action() -> bool:
 	# (elsewhere in this file), so a piece that already moved doesn't count
 	# here even though the engine calls its move geometrically legal. Same
 	# filter autoplay.gd's own step() already applies for the same reason.
-	for m in Rules.legal_moves(board, Rules.PLAYER, defs):
+	for m in Rules.legal_moves(board, Rules.PLAYER, defs, true, [], enemy_double_steps):
 		if not moved_this_turn.has(m.from):
 			return true
 	if not stock.is_empty() and not _deploy_tiles().is_empty():
@@ -1369,6 +1380,9 @@ func _begin_player_turn() -> void:
 	state = State.PLAYER_TURN
 	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
 	moved_this_turn.clear()
+	player_double_steps.clear() # NO-232: this turn's en passant window closed
+		# with the enemy turn that just ended — starts empty again for
+		# whatever the player does this turn (see the field's own comment)
 	for pos in board: # Blitz's free move is scoped "this Turn" — never carries
 		board[pos].erase("blitz_free_move") # over. Cleared BEFORE on_turn_start
 		# dispatches (issue 54) so Pegasus Free Trial's own on_turn_start grant,
@@ -1477,6 +1491,8 @@ func _autosave() -> void:
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
 	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
+	enemy_double_steps.clear() # NO-232: same expiry as player_double_steps,
+		# mirrored for the enemy — see that field's own comment
 	if hud.drawer_open != "": # full board while the enemy plays
 		_set_drawer("")
 	_clear_selection()
@@ -1543,7 +1559,7 @@ func _run_enemy_actions() -> void:
 	var actions := Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
-		var act := Rules.ai_action(board, defs, _enemy_denied_tiles())
+		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232
 		# issue 91: the King Ability COSTS THE KING AN ACTION, out of the same
 		# budget the attacks come from — the tradeoff the player plays around.
 		# 2026-09-06: WHEN to spend it is an AI decision, not a turn-start
@@ -1555,7 +1571,7 @@ func _run_enemy_actions() -> void:
 		if Kings.ability_useful(self):
 			var king := Rules.find_king(board, Rules.ENEMY)
 			var in_check: bool = king.x >= 0 and Rules.is_attacked(board, king, Rules.PLAYER, defs)
-			var capturing: bool = not act.is_empty() and board.has(act.to)
+			var capturing: bool = not act.is_empty() and (board.has(act.to) or act.has("ep_victim")) # NO-232
 			if not in_check and not capturing and Kings.fire_ability(self):
 				continue # this Action went to the Ability; the next re-reads the board
 		if act.is_empty():
@@ -1563,6 +1579,11 @@ func _run_enemy_actions() -> void:
 		if not autoplay and animations_on:
 			await get_tree().create_timer(0.35).timeout
 		await _wait_while_backgrounded()
+		if act.has("ep_victim"): # NO-232: teleport the victim onto the landing
+			# square before anything below reads the board — same trick and
+			# same reason as _move_player's own en passant handling.
+			board[act.to] = board[act.ep_victim]
+			board.erase(act.ep_victim)
 		# Cheyenne Mountain Doorbell (issue 51): a player piece on the back
 		# row cannot be captured — same repel shape as Shield/Reflect (the
 		# attempt is spent, nothing moves) but no Buff is involved, so there
@@ -1673,6 +1694,9 @@ func _run_enemy_actions() -> void:
 		board[act.to] = board[act.from]
 		board[act.to].moved = true # NO-224: the initial double-step gates on this
 		board.erase(act.from)
+		var skip := Rules.double_step_skip(board[act.to], act.from, act.to, defs) # NO-232
+		if skip.x >= 0:
+			enemy_double_steps.append({"pawn": act.to, "skip": skip, "id": board[act.to].id})
 		queue_redraw()
 		if _back_row_breached():
 			return _game_over(false, "Back-row breach")
@@ -1797,6 +1821,12 @@ func _player_pieces() -> Array[Vector2i]:
 		if board[pos].owner == Rules.PLAYER:
 			out.append(pos)
 	return out
+
+
+## NO-232: the en passant offers a piece OF `owner` may capture — the
+## OPPOSITE side's own double-steps from their last turn.
+func _ep_offers_for(owner: int) -> Array:
+	return enemy_double_steps if owner == Rules.PLAYER else player_double_steps
 
 
 ## Structural "is this Artefact held" read, for the handful of standing rules
@@ -2465,8 +2495,9 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			drag_from = Vector2i(-1, -1)
 			selected = board_lp_prev_selected
 			if selected.x >= 0 and board.has(selected):
-				legal_dests = Rules.moves_for(board, selected, defs)
-				legal_paths = Rules.move_paths(board, selected, defs)
+				var ep := _ep_offers_for(board[selected].owner) # NO-232
+				legal_dests = Rules.moves_for(board, selected, defs, "", ep)
+				legal_paths = Rules.move_paths(board, selected, defs, ep)
 			else:
 				selected = Vector2i(-1, -1)
 				legal_dests.clear()
@@ -2532,8 +2563,8 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and not moved_this_turn.has(tile) \
 			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs)
-		legal_paths = Rules.move_paths(board, tile, defs)
+		legal_dests = Rules.moves_for(board, tile, defs, "", enemy_double_steps) # NO-232
+		legal_paths = Rules.move_paths(board, tile, defs, enemy_double_steps)
 		_refresh()
 	elif board.has(tile) and board[tile].owner == Rules.ENEMY:
 		if tile == selected: # re-click on a recon selection: dismiss it
@@ -2542,8 +2573,8 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			return
 		# read-only recon: show where the enemy can move and what it threatens
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs)
-		legal_paths = Rules.move_paths(board, tile, defs)
+		legal_dests = Rules.moves_for(board, tile, defs, "", player_double_steps) # NO-232
+		legal_paths = Rules.move_paths(board, tile, defs, player_double_steps)
 		_refresh()
 	else:
 		_clear_selection()
@@ -2662,6 +2693,15 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# up front, so every actions_left -= 1 below can consume it.
 	var moving_piece: Dictionary = board[from]
 	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
+	# NO-232: an en passant capture lands on an EMPTY square with the actual
+	# victim standing elsewhere — teleport it onto `to` BEFORE anything below
+	# reads the board, so every capture branch (repel/reflect/bomb/trap/
+	# plain) runs completely unmodified, exactly as if it had been standing
+	# there all along. No second, divergent capture implementation.
+	var ep_victim := Rules.en_passant_victim(board, from, to, enemy_double_steps, defs)
+	if ep_victim.x >= 0:
+		board[to] = board[ep_victim]
+		board.erase(ep_victim)
 	var did_capture := board.has(to) # action-log kind (issue 30): "move" vs "capture"
 	fx_at = _tile_px(to) + Vector2(tile, tile) / 2 # popups at the action tile
 	if board.has(to) and BuffLogic.repels_capture(board[to]):
@@ -2868,6 +2908,9 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	board[to] = board[from]
 	board[to].moved = true # NO-224: the initial double-step gates on this
 	board.erase(from)
+	var skip := Rules.double_step_skip(board[to], from, to, defs) # NO-232
+	if skip.x >= 0:
+		player_double_steps.append({"pawn": to, "skip": skip, "id": board[to].id})
 	var final_pos := to
 	if return_to_start: # USS Eldridge Invisibility Paint — undo the slide
 		board[from] = board[to]
@@ -2900,7 +2943,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# (Tactical Reposition/Decoy Swap/Rapid Deployment, all resolved
 		# elsewhere in game.gd's _item_apply) never reaches this line
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
-	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs, _enemy_denied_tiles())):
+	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
+			_enemy_denied_tiles(), player_double_steps)): # NO-232
 		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
@@ -3479,7 +3523,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			var tmp: Dictionary = board[a]
 			board[a] = board[b]
 			board[b] = tmp
-	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs, _enemy_denied_tiles()):
+	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
+			_enemy_denied_tiles(), player_double_steps): # NO-232
 		if _king_down():
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):

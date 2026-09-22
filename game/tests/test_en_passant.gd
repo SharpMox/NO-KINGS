@@ -147,6 +147,46 @@ func _init() -> void:
 	d.queue_free()
 	await process_frame
 
+	# --- NO-233: Multicapture reads "beside the piece just captured" as the
+	# victim's REAL square, not the (empty) landing square — the two only
+	# differ for en passant. Knight at (3,1) is adjacent to the pawn's real
+	# square (3,2) but NOT to the landing square (3,3), so it proves which
+	# square the search actually used.
+	var f: Node2D = _boot({"board": [
+		["pawn", 0, 2, 2, {"buffs": [{"key": "multicapture"}]}],
+		["pawn", 1, 3, 2], ["knight", 1, 3, 1]], "gold": 100})
+	await process_frame
+	await process_frame
+	f.enemy_double_steps = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	f._move_player(Vector2i(2, 2), Vector2i(3, 3)) # capture en passant onto the skip square
+	check(not f.board.has(Vector2i(3, 2)), "the en passant victim actually left the board")
+	check(f.board.has(Vector2i(3, 3)) and f.board[Vector2i(3, 3)].owner == Rules.PLAYER,
+		"the attacker lands on the empty skip square")
+	check(not f.board.has(Vector2i(3, 1)),
+		"Multicapture took the knight beside the victim's REAL square, not the landing square")
+	check(f.captured.has("pawn") and f.captured.has("knight"),
+		"both the en passant victim and Multicapture's second victim land in Captured Stock")
+	f.queue_free()
+	await process_frame
+
+	# --- NO-233: Exhibit 399 shares the same "beside the piece just captured"
+	# geometry, driven independently through the on_capture hook rather than
+	# the buff system. Same board, no Multicapture buff this time.
+	var h: Node2D = _boot({"board": [
+		["pawn", 0, 2, 2], ["pawn", 1, 3, 2], ["knight", 1, 3, 1]],
+		"artefacts": ["exhibit-399"], "gold": 100})
+	await process_frame
+	await process_frame
+	h.enemy_double_steps = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	h._move_player(Vector2i(2, 2), Vector2i(3, 3))
+	check(not h.board.has(Vector2i(3, 2)), "the en passant victim actually left the board")
+	check(not h.board.has(Vector2i(3, 1)),
+		"Exhibit 399 destroyed the knight beside the victim's REAL square, not the landing square")
+	check(not h.captured.has("knight"),
+		"Exhibit 399 destroys outright — no Captured Stock, unlike the en passant capture itself")
+	h.queue_free()
+	await process_frame
+
 	# --- save round-trip: additive field, JSON-safe Vector2i encoding ---
 	var e: Node2D = _boot({"board": [["pawn", 0, 2, 2], ["pawn", 1, 3, 4]], "gold": 100})
 	await process_frame

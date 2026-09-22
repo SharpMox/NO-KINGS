@@ -2812,9 +2812,16 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		if BuffLogic.has(victim, "stun"): # cuts both ways
 			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
 			_add_float(from, "Stunned!", COL_MERGE)
+		# NO-233: Multicapture and Exhibit 399 both search "beside the piece
+		# just captured" — for an ordinary capture that's `to` (attacker and
+		# victim share a tile), but for en passant the victim's real square is
+		# `ep_victim`, one tile off the empty landing square `to`. `to` is
+		# excluded below since it still holds the (teleported) primary
+		# victim's data at this point.
+		var mc_center := ep_victim if ep_victim.x >= 0 else to
 		if BuffLogic.has(board[from], "multicapture"):
 			# one extra enemy beside the piece just taken (ruled 2026-08-28)
-			var also := BuffLogic.multicapture_target(board, to, Rules.PLAYER, defs)
+			var also := BuffLogic.multicapture_target(board, mc_center, Rules.PLAYER, defs, to)
 			_consume_buff(from, "multicapture")
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
@@ -2837,7 +2844,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			var near: Array[Vector2i] = []
 			for dx in [-1, 0, 1]:
 				for dy in [-1, 0, 1]:
-					var at: Vector2i = to + Vector2i(dx, dy)
+					var at: Vector2i = mc_center + Vector2i(dx, dy) # NO-233
 					if at != to and board.has(at) and board[at].owner == Rules.ENEMY \
 							and board[at].id != "king":
 						near.append(at)

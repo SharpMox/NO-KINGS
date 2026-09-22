@@ -78,6 +78,16 @@ static func _hand_written() -> Array:
 		# then tap (3,9) to capture en passant.
 		{"name": "En passant (NO-232)", "cfg": {
 			"board": [["pawn", 0, 2, 8], ["pawn", 1, 3, 10]]}},
+		# NO-233: same AI double-step setup as the sandbox above — capture
+		# en passant the same way (select (2,8), tap (3,9)) — plus a knight
+		# and a bishop beside the victim's REAL square (3,8), NOT the empty
+		# landing square (3,9). Multicapture and Exhibit 399 both search
+		# "beside the piece just captured" from that real square, so one
+		# extra piece goes to each.
+		{"name": "En passant + Multicapture + Exhibit 399 (NO-233)", "cfg": {
+			"board": [["pawn", 0, 2, 8, {"buffs": [{"key": "multicapture"}]}],
+				["pawn", 1, 3, 10], ["knight", 1, 3, 7], ["bishop", 1, 2, 7]],
+			"artefacts": ["exhibit-399"]}},
 		{"name": "Waves & cadence", "cfg": {
 			"board": [["queen", 0, 2, 1], ["rook", 0, 3, 1]], "wave": 1, "stock": ["pawn", "pawn"]}},
 		{"name": "Spawn overflow: full top row (friendly capture + spillover)", "cfg": {

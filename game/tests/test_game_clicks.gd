@@ -1025,9 +1025,22 @@ func _init() -> void:
 	var stock_btn: Button = HUD.drawer_buttons["stock"]
 	var sr: Rect2 = stock_btn.get_global_rect()
 	var mr: Rect2 = HUD.menu_button.get_global_rect()
-	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H)
-			and is_equal_approx(game.board_px.y, game.hud_top + GameScript.BOARD_TOP_MARGIN),
-		"the Header is the inset plus HEADER_H, and the board starts BOARD_TOP_MARGIN under it (NO-116)")
+	check(is_equal_approx(game.hud_top, game.safe_top + HUD.HEADER_H),
+		"the Header is the safe-area inset plus HEADER_H (NO-116)")
+	# NO-229: assert the REQUIREMENT, not the formula. The old form here was
+	# `board_px.y == hud_top + BOARD_TOP_MARGIN`, which restates _layout_board's
+	# own arithmetic with the same constant — it passes for 6.0, for 15.5, and
+	# for any wrong value typed next, while reading as proof the layout is
+	# right. What Max actually asked for (2026-09-22) is clearance between the
+	# Header and the OUTLINE, which is drawn BOARD_OUTLINE_INSET outside the
+	# board rect and stroked BOARD_OUTLINE_WIDTH wide CENTRED on that edge — so
+	# the outline's top edge is board_px.y - inset - half the stroke. Lowering
+	# BOARD_TOP_MARGIN now fails this; before, nothing could.
+	var outline_top: float = game.board_px.y - GameScript.BOARD_OUTLINE_INSET \
+		- GameScript.BOARD_OUTLINE_WIDTH * 0.5
+	check(outline_top - game.hud_top >= 10.0,
+		"the board outline clears the Header by at least 10px (NO-229) — clearance=%.1f" \
+			% (outline_top - game.hud_top))
 	# NO-162 fix, 3rd pass. The first two attempts on this bug (font-fit
 	# search, then suspecting the clock-pulse tween) each shipped with an
 	# assertion that PASSED while a real device still showed the leading

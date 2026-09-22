@@ -977,7 +977,16 @@ const ICON_GAP := 7
 ## (drawn 4px OUTSET from the board, 3px wide) had its top edge land under the
 ## Header and get clipped. Just enough top margin for the outset + half the
 ## stroke width (4 + 1.5) to clear it — not a return to centring (2026-09-05).
-const BOARD_TOP_MARGIN := 6.0
+##
+## NO-229 (Max, 2026-09-22: "add a 10 px margin from the top so the board
+## outline isnt stuck to the header"). NO-116's 6.0 cleared the outline by
+## exactly 0.5px — clipping fixed, but visually still flush, which is what he
+## is seeing. The number that matters is the gap to the OUTLINE's top edge, not
+## to the board rect, so it is derived rather than set directly:
+##   10.0 wanted gap + 4.0 outline outset + 1.5 half stroke = 15.5
+## Still not centring — the board stays pulled up under the top strip with all
+## the slack below it (2026-09-05 ruling, _layout_board's own header).
+const BOARD_TOP_MARGIN := 15.5
 ## NO-197: the whose-turn outline (_draw, below) sits this far OUTSIDE the tile
 ## grid, stroked BOARD_OUTLINE_WIDTH wide and CENTRED on that inset edge — so its
 ## outer ink reaches INSET + WIDTH/2 past the grid (4 + 1.5 = 5.5). Named so

@@ -463,6 +463,18 @@ comes back.
   nothing — the success condition. A green suite whose new diagnostic never printed
   because `check()` only emits `detail` on failure. Four times in one session. Before
   believing a signal, ask what it would look like if the opposite were true.
+- **A TEST THAT PASSES BEFORE THE CHANGE IS NOT EVIDENCE ABOUT THE CHANGE.** The same
+  disease as an assertion that agrees with the code rather than the screen, one level up —
+  at the acceptance-criterion level, where it is harder to spot because the criterion
+  *sounds* like a real check. Worked example, 2026-09-22: a proposed guard against suites
+  dying silently came with the acceptance test "introduce a deliberate parse error and
+  confirm `run_all.sh` reports it FAILED". That test passes on unmodified `main` —
+  `run_all.sh:61` is `if [ "$code" -ne 0 ] || … grep -q "SCRIPT ERROR"`, an **OR**, so a
+  parse error is caught by the grep whatever the exit status (see `FAIL: test_rules
+  (exit 0)` in that day's log). A reviewer could have wired the guard into the wrong
+  branch, run the test, seen FAILED and shipped something that guarded nothing.
+  **Pair every acceptance test with its before state**: it must fail before the change and
+  pass after. If it passes both times it is measuring something that was already there.
 - **AN OCCURRENCE COUNT IS NOT AN EXECUTION COUNT.** This is the principle under several
   of the traps above, and it is the one worth carrying. Grepping the SOURCE tells you how
   many times something is written, never how many times it runs:

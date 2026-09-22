@@ -4666,7 +4666,11 @@ func _screenshot_and_quit(dir: String) -> void:
 ## "pause" (hud.toggle_menu), "king-abilities" (_show_king_abilities),
 ## "box" (_open_box_pick on a fresh Box.random_slot — a real Box normally
 ## takes a Shop purchase or a Bounty capture to reach, neither of which
-## --select's two-tap budget can drive), and "tip"/"preview" [`--anchor X,Y`]
+## --select's two-tap budget can drive), "banner" (NO-234: pins the turn/wave
+## banner at t=0.5 — fully wiped in, fully opaque, see _banner_rect — instead
+## of calling _add_turn_fx, since that bails when autoplay is on or the local
+## Settings file has animations off, either of which would otherwise make
+## this capture silently produce nothing), and "tip"/"preview" [`--anchor X,Y`]
 ## (the long-press description tooltip / the piece-or-King preview modal, for
 ## the board tile at the anchor) — screenshot capture for a screenshot task
 ## (2026-09-19), one flag rather than a fourth board-tap-shaped one for each.
@@ -4703,6 +4707,11 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			_show_king_abilities()
 		elif screen == "box":
 			_open_box_pick(Box.random_slot(self))
+		elif screen == "banner": # NO-234: hand-built, not _add_turn_fx — see
+			# the header comment above for why
+			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN",
+				"color": Color(0.45, 0.7, 1.0), "slot": 0})
+			queue_redraw()
 		elif (screen == "tip" or screen == "preview") and args.has("--anchor"):
 			var xy := args[args.find("--anchor") + 1].split(",")
 			var at := Vector2i(int(xy[0]), int(xy[1]))

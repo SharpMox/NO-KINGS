@@ -585,4 +585,19 @@ static func _hand_written() -> Array:
 		{"name": "Enemy AI: holds a pawn rather than feed it, advances the knight", "cfg": {
 			"board": [["pawn", 0, 2, 5], ["pawn", 1, 3, 7], ["knight", 1, 6, 10]],
 			"stock": ["pawn"]}},
+		# --- debug: turn/wave banner (NO-234) ---
+		# Frozen: paired with `--show-screen banner`, which pins the banner
+		# mid-animation (fully wiped in, fully opaque) so --screenshot can
+		# capture NO-219's fullscreen italic/bold banner — see game.gd's
+		# _debug_state_screenshot, "banner" branch. Board content only needs
+		# to look like a real board; the banner itself is hardcoded there.
+		{"name": "Banner: frozen (NO-234)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["rook", 1, 4, 9]]}},
+		# Looping: for the in-app TEST menu, not the CLI. PASS repeatedly to
+		# fire ENEMY TURN / YOUR TURN back to back and watch the wipe/stripes
+		# animate. Default wave (all waves done) keeps spawns from interrupting
+		# it; the one player piece keeps _player_pieces() non-empty so Pass
+		# never trips the starvation loss condition.
+		{"name": "Banner: looping (NO-234)", "cfg": {
+			"board": [["queen", 0, 2, 1], ["pawn", 1, 4, 9]]}},
 	]

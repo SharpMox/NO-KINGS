@@ -2549,8 +2549,15 @@ func _init() -> void:
 	_click(item_sell_badge.get_global_rect().get_center())
 	await process_frame
 	await process_frame
-	check(game.items.size() == 1 and game.gold == gold_before_item and not game.buff_pick_open,
-		"NO-223: clicking the Item's badge does nothing — it's information only")
+	check(game.items.size() == 1 and game.gold == gold_before_item and not game.buff_pick_open
+			and game.item_active == 0,
+		"NO-223: the Item's badge is information only — the click falls through to the cell, which arms the Item instead of selling it")
+	# Disarm (a second tap on the Item cancels targeting) so the preview's Use
+	# below starts from a clean state instead of hitting the cancel branch.
+	game._use_item(0)
+	await process_frame
+	check(game.item_active == -1 and game.item_targets.is_empty(),
+		"(setup) tapping the armed Item again disarms it")
 
 	# Use, from the long-press preview: Blitz targets a tile ("target":
 	# "tile"), so Use arms board targeting rather than resolving on the spot
@@ -2564,31 +2571,32 @@ func _init() -> void:
 	check(game.item_active == 0 and not game.preview_open,
 		"Use arms Blitz's board targeting rather than resolving it immediately")
 	check(not game.item_targets.is_empty(), "(setup) Blitz has a legal target tile")
-	game._item_click(game.item_targets[0]) # stage a full target, same as a real board tap
-	check(game.item_pending_tile == game.item_targets[0] and game.hud.multi_confirm_btn.visible,
-		"(setup) staging a target raises the floating Confirm affordance")
+	if not game.item_targets.is_empty():
+		game._item_click(game.item_targets[0]) # stage a full target, same as a real board tap
+		check(game.item_pending_tile == game.item_targets[0] and game.hud.multi_confirm_btn.visible,
+			"(setup) staging a target raises the floating Confirm affordance")
 
-	# Change 3 (2026-09-22 ruling — "selling mid target isn't an issue if we
-	# handle the sell well by cancelling everything the targeting was doing
-	# and coming back to a normal state"): selling the Item currently driving
-	# that targeting cancels it first instead of being blocked.
-	game.hud.item_preview_requested.emit(0)
-	await process_frame
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % item_payout),
-		"the Sell button is still offered while the Item is armed and staged")
-	await process_frame
-	check(game.buff_pick_open and game.item_active == 0 and game.item_pending_tile == game.item_targets[0],
-		"the confirm opens first — targeting is untouched until Sell is actually confirmed")
-	check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")
-	await process_frame
-	check(game.items.is_empty() and game.gold == gold_before_item + item_payout,
-		"the Item is gone and Gold paid")
-	check(game.item_active == -1 and game.item_targets.is_empty()
-			and game.item_pending_tile == Vector2i(-1, -1)
-			and not game.hud.multi_confirm_btn.visible and not game.hud.multi_cancel_btn.visible,
-		"and the targeting it was driving is fully cancelled — no armed item, no staged tile, no floating Confirm/Cancel left over")
-	check(game.hud.drawer_open == "inventory" and game.state == game.State.PLAYER_TURN,
-		"story 58: cancelling targeting reopens the Inventory Drawer — the board is back to a normal interactive state, not just a flag flipped")
+		# Change 3 (2026-09-22 ruling — "selling mid target isn't an issue if we
+		# handle the sell well by cancelling everything the targeting was doing
+		# and coming back to a normal state"): selling the Item currently driving
+		# that targeting cancels it first instead of being blocked.
+		game.hud.item_preview_requested.emit(0)
+		await process_frame
+		check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % item_payout),
+			"the Sell button is still offered while the Item is armed and staged")
+		await process_frame
+		check(game.buff_pick_open and game.item_active == 0 and game.item_pending_tile == game.item_targets[0],
+			"the confirm opens first — targeting is untouched until Sell is actually confirmed")
+		check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")
+		await process_frame
+		check(game.items.is_empty() and game.gold == gold_before_item + item_payout,
+			"the Item is gone and Gold paid")
+		check(game.item_active == -1 and game.item_targets.is_empty()
+				and game.item_pending_tile == Vector2i(-1, -1)
+				and not game.hud.multi_confirm_btn.visible and not game.hud.multi_cancel_btn.visible,
+			"and the targeting it was driving is fully cancelled — no armed item, no staged tile, no floating Confirm/Cancel left over")
+		check(game.hud.drawer_open == "inventory" and game.state == game.State.PLAYER_TURN,
+			"story 58: cancelling targeting reopens the Inventory Drawer — the board is back to a normal interactive state, not just a flag flipped")
 
 	var art_cell: Button = null
 	for c in game.hud.artefacts_grid.get_children():

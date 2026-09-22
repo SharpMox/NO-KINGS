@@ -66,6 +66,66 @@ func _init() -> void:
 	check(not berolina_moves.has(Vector2i(4, 4)) and not berolina_moves.has(Vector2i(0, 4)),
 		"a Void Pawn that has already moved loses its double-step")
 
+	# --- NO-232: en passant, geometry-only (Max's ruling). An enemy pawn just
+	# double-stepped (2,4)->(2,2), skip square (2,3); a player pawn beside it
+	# at (1,2) already reaches (2,3) on its ordinary diagonal capture. ---
+	var ep_offer := {"pawn": Vector2i(2, 2), "skip": Vector2i(2, 3), "id": "pawn"}
+	b = {Vector2i(1, 2): piece("pawn", Rules.PLAYER), Vector2i(2, 2): piece("pawn", Rules.ENEMY)}
+	check(Rules.moves_for(b, Vector2i(1, 2), defs, "", [ep_offer]).has(Vector2i(2, 3)),
+		"a pawn's diagonal capture geometry reaches the en passant skip square")
+	check(Rules.en_passant_victim(b, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(2, 2),
+		"en_passant_victim names the double-stepped pawn's own square, not the skip square")
+	check(Rules.move_paths(b, Vector2i(1, 2), defs, [ep_offer]).any(
+			func(p: Dictionary) -> bool: return p.kind == "leap" and p.to == Vector2i(2, 3)),
+		"move_paths lists the en passant capture too, for the board's own arrow/dot")
+	var ep_legal := Rules.legal_moves(b, Rules.PLAYER, defs, true, [], [ep_offer])
+	var ep_move: Dictionary = ep_legal.filter(func(m: Dictionary) -> bool: return m.to == Vector2i(2, 3))[0]
+	check(ep_move.get("ep_victim", Vector2i(-1, -1)) == Vector2i(2, 2),
+		"legal_moves tags the move with which square to remove")
+	# geometry, not a piece-id check: the Void Pawn's orthogonal-forward
+	# capture (mfFcfWimfnA) never reaches a diagonal skip square
+	var b_void := {Vector2i(1, 2): piece("berolina", Rules.PLAYER), Vector2i(2, 2): piece("pawn", Rules.ENEMY)}
+	# NB: (2,3) IS in the Void Pawn's destination list — mfF means it MOVES
+	# forward-diagonally, so the skip square is an ordinary move square for it.
+	# Asserting the destination is absent would therefore fail whatever en
+	# passant did. What the ruling actually forbids is the CAPTURE, so assert
+	# that stepping there takes nothing: no ep_victim tag, and the enemy pawn
+	# still on the board afterwards.
+	var void_legal := Rules.legal_moves(b_void, Rules.PLAYER, defs, true, [], [ep_offer])
+	var void_step: Array = void_legal.filter(func(m: Dictionary) -> bool: return m.to == Vector2i(2, 3))
+	check(not void_step.is_empty() and not void_step[0].has("ep_victim"),
+		"a Void Pawn may step onto the skip square but captures nothing there")
+	check(Rules.en_passant_victim(b_void, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(-1, -1),
+		"en_passant_victim agrees: no capture for the Void Pawn")
+	# invalidated: the recorded pawn moved again (or was replaced) since
+	var b_moved_away := {Vector2i(1, 2): piece("pawn", Rules.PLAYER)} # (2,2) now empty
+	check(Rules.en_passant_victim(b_moved_away, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(-1, -1),
+		"a pawn that moved again this turn invalidates the offer")
+	var b_replaced := {Vector2i(1, 2): piece("pawn", Rules.PLAYER), Vector2i(2, 2): piece("rook", Rules.ENEMY)}
+	check(Rules.en_passant_victim(b_replaced, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(-1, -1),
+		"a different piece now standing on that square is not the recorded pawn")
+	# a real piece already on the skip square: an ordinary capture, not en passant
+	var b_occupied := {Vector2i(1, 2): piece("pawn", Rules.PLAYER), Vector2i(2, 2): piece("pawn", Rules.ENEMY),
+		Vector2i(2, 3): piece("knight", Rules.ENEMY)}
+	check(Rules.en_passant_victim(b_occupied, Vector2i(1, 2), Vector2i(2, 3), [ep_offer], defs) == Vector2i(-1, -1),
+		"en passant only ever lands on an empty square")
+	# rules.gd generates it for BOTH sides — same offer/geometry mechanism,
+	# mirrored: an enemy pawn takes a player pawn's double-step via ai_action
+	var ep_offer_enemy := {"pawn": Vector2i(2, 5), "skip": Vector2i(2, 4), "id": "pawn"}
+	var b_ai := {Vector2i(1, 5): piece("pawn", Rules.ENEMY), Vector2i(2, 5): piece("pawn", Rules.PLAYER)}
+	var ai_act := Rules.ai_action(b_ai, defs, [], [ep_offer_enemy])
+	check(ai_act.get("from", Vector2i(-1, -1)) == Vector2i(1, 5) \
+			and ai_act.get("to", Vector2i(-1, -1)) == Vector2i(2, 4) \
+			and ai_act.get("ep_victim", Vector2i(-1, -1)) == Vector2i(2, 5),
+		"ai_action takes an available en passant capture, mirrored for the enemy")
+	# double_step_skip: the geometry NO-232 records from, both pawn shapes
+	check(Rules.double_step_skip(piece("pawn", Rules.PLAYER), Vector2i(2, 1), Vector2i(2, 3), defs) == Vector2i(2, 2),
+		"double_step_skip finds the Pawn's own midpoint")
+	check(Rules.double_step_skip(piece("berolina", Rules.PLAYER), Vector2i(2, 1), Vector2i(4, 3), defs) == Vector2i(3, 2),
+		"double_step_skip finds the Void Pawn's own (diagonal) midpoint")
+	check(Rules.double_step_skip(piece("pawn", Rules.PLAYER), Vector2i(2, 1), Vector2i(2, 2), defs) == Vector2i(-1, -1),
+		"double_step_skip is -1,-1 for an ordinary single-square move")
+
 	# --- move-gen: knight leaps over blockers ---
 	b = {Vector2i(0, 0): piece("knight", Rules.PLAYER), Vector2i(0, 1): piece("pawn", Rules.PLAYER)}
 	var knight_moves := Rules.moves_for(b, Vector2i(0, 0), defs)

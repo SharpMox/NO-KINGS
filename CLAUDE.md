@@ -418,6 +418,36 @@ comes back.
   early and reported a phantom failure, same day. Wrap a direct run yourself and size the
   timeout to the suite — 300s minimum for `test_scenarios.gd`, matching `run_all.sh`'s own
   default (`TIMEOUT="${TIMEOUT:-300}"`, line 12).
+- **A PARSE ERROR exits 0 and runs zero assertions.** The file never loads, so nothing
+  fails — the process just ends. `run_all.sh` catches it only because `run()` greps the
+  output for `SCRIPT ERROR` *separately from the exit code* (`run_all.sh:61`); by exit
+  status alone a suite that cannot parse is indistinguishable from one that passed. Hit
+  twice on 2026-09-21/22: `test_touch_scroll.gd` had been loading nothing since NO-208
+  merged (a `:=` that could not infer its type from an untyped `hud` member), and
+  `test_rules.gd` broke the same way minutes later. **`check()`'s signature differs
+  between suites** — NO-113 added the optional `detail` argument to the WINDOWED probes
+  only; `test_rules.gd` still takes `(cond, label)`, and a third argument there is a parse
+  error. Check the file you are editing.
+- **Grepping the top-level log for an assertion label proves nothing.** `run_all.sh:66`
+  deletes a suite's output when it passes (`echo "ok: $name"; rm -f "$outfile"`), so
+  `/tmp/<run>.log` holds only per-SUITE lines. A grep for an assertion's text returns 0
+  whether it passed, was renamed, or never ran — and `grep -c "^ok:"` on that file counts
+  suites, not assertions. Use the suite's EXIT CODE: `quit(1 if fails > 0 else 0)`
+  (`test_game_clicks.gd:3182`) means one failed `check()` makes it non-zero. That is a
+  reachability argument, which CLAUDE.md already rates above a count.
+- **A hang can mean the feature WORKED.** `test_en_passant.gd` hung on its first run and
+  the obvious read was that en passant was broken. It was not: the enemy's en passant took
+  the player's only piece, the game reached `GAME_OVER`, and the suite waited for a
+  `PLAYER_TURN` that could never arrive. **Never write a bare `while <cond>: await` in a
+  test** — cap it on wall clock and fail with the state you were stuck in. The unbounded
+  version gave a SIGTERM and an empty log; the bounded one printed `state=3 after 10020ms`
+  and named the cause in one line. A new live-node suite also needs its own watchdog, like
+  every other probe here, or nothing inside it can end a hang.
+- **The recurring shape: the signal meant the opposite of its surface reading.** A "clean
+  exit" that was a watchdog kill. A job reporting exit 1 because its final `grep -c` found
+  nothing — the success condition. A green suite whose new diagnostic never printed
+  because `check()` only emits `detail` on failure. Four times in one session. Before
+  believing a signal, ask what it would look like if the opposite were true.
 
 ### Layout traps the device taught
 

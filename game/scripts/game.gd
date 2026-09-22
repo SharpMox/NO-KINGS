@@ -472,7 +472,19 @@ var score := 0:
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
-var gold := 0 # per-run spend currency; score stays the up-only metric
+var gold := 0: # per-run spend currency; score stays the up-only metric
+	set(value): # banner visibility pass (2026-09-22): every Gold LOSS pops a
+		# red "-N" beside the Gold label, mirroring the score setter above —
+		# gains already pulse the row (hud.gd refresh); losses had no channel
+		# at all. Gains deliberately don't pop: drop `value < gold` for
+		# `value != gold` to mirror Score fully.
+		if value < gold and is_node_ready() and not autoplay and animations_on:
+			anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": "%d" % (value - gold),
+				"at_px": fx_at if fx_at != Vector2.ZERO
+					else Vector2(hud.gold_label.get_global_rect().end) + Vector2(6, 0),
+				"color": Color(0.95, 0.3, 0.25)})
+			queue_redraw()
+		gold = value
 var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
 var shop_restocks := 0 # total restocks banked so far, either lane — display
 	# only; issue 64 replaced the old score-threshold gate that used to drive
@@ -1401,17 +1413,40 @@ func _banner_rect(t: float, slot: int) -> Rect2:
 
 ## Turn/wave transition feedback: board-outline glow + a wiping banner
 ## (game-feel pass 2026-07-06). Stacked banners offset so they never overlap.
-func _add_turn_fx(text: String, color: Color) -> void:
+## COALESCING (banner visibility pass, 2026-09-22): the same `cause` fired
+## more than once in one frame is ONE banner with a count — three annexed
+## pieces read "Annexed ×3", never three stacked bands holding the screen.
+## "Same frame" is `t == 0.0`: _process advances every anim each frame, so a
+## banner still at 0.0 was queued this frame. `cause` defaults to the text;
+## pass it explicitly when the text carries a per-call number that should
+## not split the count. This is the one place every banner site inherits
+## the policy from — tune it here, never per site.
+func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
 	if autoplay or not animations_on:
 		return
+	if cause == "":
+		cause = text
 	var slot := 0
 	for a in anims:
 		if a.kind == "banner":
+			if a.t == 0.0 and a.get("cause", "") == cause:
+				a.count += 1
+				a.text = "%s ×%d" % [a.base_text, a.count]
+				return
 			slot += 1
 	anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": color})
 	anims.append({"kind": "banner", "t": 0.0, "dur": 1.1, "text": text,
-		"color": color, "slot": slot})
+		"base_text": text, "cause": cause, "count": 1, "color": color, "slot": slot})
 	queue_redraw()
+
+
+## Banner colours for the visibility pass — one constant per category so the
+## policy ("losses red, refunds green, King Powers orange, artefact effects
+## gold") can be retuned without touching a call site.
+const BANNER_LOSS := Color(0.95, 0.35, 0.3)
+const BANNER_GAIN := Color(0.45, 0.85, 0.5)
+const BANNER_POWER := Color(1.0, 0.55, 0.4)
+const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
 
 
 func _begin_player_turn() -> void:

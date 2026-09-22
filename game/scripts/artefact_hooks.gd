@@ -1400,6 +1400,40 @@ static func _milestone5_hit(wave: int, acquired_wave: int) -> bool:
 	return wave >= acquired_wave and (wave - acquired_wave) % 5 == 4
 
 
+## Banner visibility pass (Max, 2026-09-22: "banners for everything that is
+## missing visibility for now, we will refine later"). ONE call shape for
+## every artefact effect that used to resolve silently — "<Artefact name>:
+## <what happened>" — so the policy (colour, wording, which effects speak)
+## is retuned here and in game.gd's _add_turn_fx, never per site. `key` is
+## the dispatch key already in scope in every _dispatch arm. Same-frame
+## repeats (a per-piece loop, two held copies) coalesce into one "×N" banner
+## inside _add_turn_fx.
+static func _note(g, key: String, what: String, color: Color = Color.TRANSPARENT) -> void:
+	g._add_turn_fx("%s: %s" % [artefact_name(key), what],
+		g.BANNER_EFFECT if color == Color.TRANSPARENT else color)
+
+
+static func artefact_name(key: String) -> String:
+	for e in Items.ARTEFACT_CATALOG:
+		if e.key == key:
+			return str(e.name)
+	return key
+
+
+## A handler's flat Gold debit, floored at 0 and bannered as a loss. Was ~8
+## bare `g.gold = maxi(g.gold - N, 0)` writes with no channel to the player.
+static func _debit(g, key: String, amount: int) -> void:
+	g.gold = maxi(g.gold - amount, 0)
+	_note(g, key, "−$%d" % amount, g.BANNER_LOSS)
+
+
+## A handler's Stock grant, bannered with the piece it added.
+static func _grant_stock(g, key: String, entry: Variant) -> void:
+	g.stock.append(entry)
+	var id: String = entry if entry is String else entry.id
+	_note(g, key, "+1 %s to Stock" % g.defs[id].name)
+
+
 ## Catalog rarity for an artefact key ("Common"/"Uncommon"/"Rare"/"Legendary"),
 ## "" for an unrecognized key — e.g. an old save still holding one of the 7
 ## game-native keys issue 69 removed, before save_config.gd's migration
@@ -1752,7 +1786,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if ctx.clean:
 				g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 			else: # issue 16 ruling: the -10 Score penalty debits Gold instead
-				g.gold = maxi(g.gold - 10, 0)
+				_debit(g, key, 10)
 		["qanon-profile-picture", "on_wave_clear"]:
 			if ctx.clean:
 				g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
@@ -1784,6 +1818,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 		["rapture-insurance-policy", "on_game_over"]:
 			g.score += g.gold * 200 # issue 57: x10, same reasoning — a flat
 				# Score-per-Gold conversion rate, direct write bypasses earn
+			_note(g, key, "$%d converted to Score" % g.gold)
 			g.gold = 0
 
 		# --- issue 17: Action/Time/Piece batch ---
@@ -1864,8 +1899,9 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				for i in mini(2, pool.size()):
 					var idx: int = g.rng.randi() % pool.size()
 					_grant_buff(g, pool[idx])
+					_note(g, key, "Piece Buff granted")
 					pool.remove_at(idx)
-				g.gold = maxi(g.gold - 10, 0)
+				_debit(g, key, 10)
 		["mk-ultra-sugar-cube", "on_deploy"]:
 			# Tactical-only per its own catalog text (issue 42 considered
 			# widening all 3 "Tactical Piece Buff" granters to the full pool
@@ -1885,27 +1921,32 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# above (Common rarity, once-per-Wave is still frequent).
 			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
 				ctx.grant_buffs.append("Tactical")
+				_note(g, key, "Tactical Piece Buff on capture")
 		["holy-lint", "on_capture"]:
 			if ctx.attacker_pos.x >= 0:
 				ctx.grant_buffs.append("")
+				_note(g, key, "Piece Buff on capture")
 		["scientology-e-meter", "on_wave_clear"]:
 			# "the piece" — Wave clear has no single trigger piece, so this
 			# reads it as a random ally (same reading as Xenu OT III below).
-			g.gold = maxi(g.gold - 5, 0)
+			_debit(g, key, 5)
 			var se_pool := _player_positions(g)
 			if not se_pool.is_empty():
 				_grant_buff(g, se_pool[g.rng.randi() % se_pool.size()])
+				_note(g, key, "Piece Buff granted")
 		["xenu-ot-iii-season-pass", "on_wave_clear"]:
-			g.gold = maxi(g.gold - 15, 0)
+			_debit(g, key, 15)
 			var xe_pool := _player_positions(g)
 			for i in 3: # 3 independent random-ally picks; may repeat a piece
 				if xe_pool.is_empty():
 					break
 				_grant_buff(g, xe_pool[g.rng.randi() % xe_pool.size()])
+				_note(g, key, "Piece Buff granted")
 		["sugar-free-chemtrail-can", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave):
 				for pos in _player_positions(g):
 					_grant_buff(g, pos)
+					_note(g, key, "Piece Buff granted")
 		["sleeper-agent-pillow", "on_purchase"]:
 			# the piece landed as a plain id string at the end of g.stock
 			# (Shop.buy, just before this hook runs) — replace it with a
@@ -1917,13 +1958,15 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 				var piece := {"id": ctx.key}
 				_grant_buff_to(g, piece, "Tactical")
 				g.stock[g.stock.size() - 1] = piece
+				_note(g, key, "bought piece carries a Tactical Piece Buff")
 
 		# --- issue 18: Item-tag triggers ---
 		["frame-25", "on_wave_clear"]:
 			var tac_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 				return it.tier == "Tactical")
 			grant_item(g, tac_pool[g.rng.randi() % tac_pool.size()])
-			g.gold = maxi(g.gold - 10, 0)
+			_note(g, key, "+1 Tactical Item")
+			_debit(g, key, 10)
 		["manna-vending-machine", "on_wave_clear"]:
 			# issue 58 redesign: was a flat "+2 Items" grant, which issue 53's
 			# base Item cap of 3 made partly/wholly wasted at a full inventory.
@@ -1987,7 +2030,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			g.gold += 2 * g._player_pieces().size()
 		["satoshi-s-private-key", "on_piece_lost"]:
 			if not ctx.uncounted:
-				g.gold = maxi(g.gold - 2, 0)
+				_debit(g, key, 2)
 		["lusitania-hardtack-crate", "on_piece_lost"]:
 			if not ctx.uncounted and not BuffLogic.of(g.board[ctx.pos]).is_empty():
 				g.gold += 150
@@ -2377,7 +2420,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			if not ctx.uncounted: # issue 53: a masked loss is not "a loss" for
 				# this penalty either — same guard as every other listener here
 				g.club27_streak = 0
-				g.gold = maxi(g.gold - 50, 0)
+				_debit(g, key, 50)
 		["27-club-punch-card", "on_score_change"]:
 			if g.club27_streak > 0:
 				ctx.amount += ctx.base * 0.05 * float(g.club27_streak)

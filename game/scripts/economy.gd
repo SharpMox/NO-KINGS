@@ -73,6 +73,7 @@ static func charge(g, key: String, amount: int = Tuning.KING_ABILITY_ACTION_COST
 		var charged_amount := roundi(ctx.amount) # issue 22: Ark Grounding Cable scales this
 		spend_gold(g, charged_amount) # issue 26: floor + on_gold_zero (Zero-Point Energy Drink)
 		g.tariff_charges[key] = g.tariff_charges.get(key, 0) + charged_amount # NO-109: per-tariff attribution
+		g._add_turn_fx("%s −$%d" % [ability_name(key), charged_amount], g.BANNER_LOSS, key)
 		ArtefactHooks.run(g, "on_king_ability_charge", {"key": key, "amount": charged_amount})
 
 
@@ -128,10 +129,11 @@ static func earn(g, amount: int, reason: String = "") -> void:
 		# conversion, layered on top.
 		score_amount *= 3
 		gold_gain *= 3
-	g.score += score_amount
-	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
 	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
-	g.score += score_bonus_amount
+	g.score += score_amount + score_bonus_amount # ONE write: the score setter
+		# pops per assignment, and two writes showed two "+N" for one event
+		# (Tungsten-Filled Gold Bar / Popemobile Piggy Bank)
+	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
 	Shop.add_score_progress(g, score_amount + score_bonus_amount) # issue 64
 		# Lane B: banks toward the next Score-driven restock (Lane A, every 5
 		# Waves, is independent of this and lives in wave_logic.gd instead)
@@ -335,6 +337,16 @@ static func activate_king_ability_by_key(g, key: String) -> void:
 	for t in KingAbilities.ABILITIES:
 		if t.key == key:
 			return apply_king_ability(g, t)
+
+
+## Catalog display name for a King Ability key — the one name every banner
+## uses (the charge banner above, kings.gd's escalation banner), never the
+## raw key.
+static func ability_name(key: String) -> String:
+	for t in KingAbilities.ABILITIES:
+		if t.key == key:
+			return str(t.name)
+	return key.replace("_", " ")
 
 
 ## Single choke point for every Tariff taking effect (oneoff or persistent) —

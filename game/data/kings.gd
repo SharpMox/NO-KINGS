@@ -538,11 +538,13 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# Shop restocks are Score-gated, and zeroing Score for a whole wave
 			# would quietly close the Shop too, which is Kim Jong Un's Power.
 			ctx.amount *= 0.5
+			bite(g, "Score gain halved")
 		["totalwar", "on_piece_lost"]:
 			# Hitler: every loss is also a material cost. Routed through
 			# ctx.gold_bonus, never g.gold — the header's rule, so Economy
 			# applies it exactly once.
 			ctx.gold_bonus = ctx.get("gold_bonus", 0) - 10
+			g._add_turn_fx("%s −$10" % kit.power_name, g.BANNER_LOSS)
 		["nomerge", "on_merge_check"]:
 			# Genghis Khan: nothing is consolidated. Same lever as Regulation,
 			# but total rather than pawn-only.

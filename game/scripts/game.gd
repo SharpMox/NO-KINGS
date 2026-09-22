@@ -4628,11 +4628,17 @@ func _box_reroll() -> void:
 
 ## NO-38 (user ruling 2026-09-08): sell a held Item from inside an open Item
 ## Box, then re-render the Box so its sell row reflects the room just made.
-## Routes through _sell, so Insider Rates, Denver Bunker and the sell tally all
-## see it as the sale it is; the Box itself stays open and untouched.
+## Routes through _confirm_sell (NO-223, 2026-09-22 ruling: every sell path
+## confirms, this one included — it was the one deliberately left un-
+## confirmed at first, and Max then ruled it in line with the rest), which
+## itself routes through _sell, so Insider Rates, Denver Bunker and the sell
+## tally all see it as the sale it is; the Box itself stays open and
+## untouched, and only re-renders once the sale actually happens (the same
+## Confirm/Cancel modal used everywhere else layers on top of the open Box
+## panel, same shape as Jet Fuel Vial's Restock confirm layering on the open
+## Shop panel — nothing about the Box needs to close or hide for it).
 func _box_sell(entry: Dictionary) -> void:
-	if _sell("item", entry):
-		modals.show_box(box_offer)
+	_confirm_sell("item", entry, func() -> void: modals.show_box(box_offer))
 
 
 func _box_close() -> void:
@@ -5275,13 +5281,15 @@ func _connect_hud() -> void:
 	hud.stack_pressed.connect(_on_stack_pressed)
 	hud.stack_drag_started.connect(_on_stack_drag_start)
 	hud.stack_preview_requested.connect(func(id: String, cap: bool, entry: Variant) -> void:
-		_show_preview(id, "", entry if not cap else null, # NO-138/NO-144
-			entry if entry is Dictionary else {})) # NO-185: buffs
+		_show_preview(id, "", entry, # NO-138/NO-144/NO-223: entry travels
+			# through for a Captured stack too now (cap tells show_preview to
+			# offer Convert instead of Sell) — it used to be nulled here
+			# specifically to suppress Sell for one, which Convert now needs.
+			entry if entry is Dictionary else {}, cap)) # NO-185: buffs
 	hud.item_preview_requested.connect(func(index: int) -> void:
 		_show_kind_preview("item", items[index].key, items[index])) # NO-144
 	hud.artefact_preview_requested.connect(func(key: String) -> void:
 		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
-	hud.inv_sell_pressed.connect(_on_inv_sell_pressed) # NO-223
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
@@ -5289,9 +5297,6 @@ func _connect_hud() -> void:
 	hud.army_ability_pressed.connect(_activate_army_ability)
 	hud.promote_pressed.connect(func(id: String) -> void:
 		MergeLogic.do_merge(self, {"id": id}, {"id": id}))
-	hud.convert_pressed.connect(func(entry: Variant) -> void:
-		if _convert_captured(entry): # same rules as the Shop's Convert button
-			_refresh())
 	hud.return_to_stock_pressed.connect(func() -> void:
 		if selected.x >= 0 and board.has(selected):
 			_setup_to_stock(selected))
@@ -5397,9 +5402,19 @@ func _connect_modals() -> void:
 		get_tree().reload_current_scene())
 	modals.shop_closed.connect(func() -> void: _refresh())
 	modals.shop_restock_pressed.connect(_jet_fuel_restock_pressed)
-	modals.sell_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-144
-		_sell(kind, entry)
-		_refresh())
+	modals.sell_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-144:
+		# every sell path confirms now (2026-09-22 ruling) — routes through
+		# the same seam Box's own Sell button uses (_box_sell above).
+		_confirm_sell(kind, entry, _refresh))
+	modals.use_pressed.connect(func(kind: String, entry: Variant) -> void: # NO-223
+		if kind == "item":
+			var idx: int = items.find(entry)
+			if idx >= 0:
+				_use_item(idx))
+	modals.convert_pressed.connect(func(entry: Variant) -> void: # NO-223: moved
+		# off the ⇄ badge (now information only) and into this menu
+		if _convert_captured(entry): # same rules as the Shop's Convert button
+			_refresh())
 	modals.reinforce_done_pressed.connect(func() -> void:
 		pending_reinforce = false
 		_refresh())
@@ -5520,32 +5535,62 @@ func _convert_captured(entry: Variant) -> bool:
 	return true
 
 
-## NO-223: hud.gd's own Sell badge on an Item/Artefact Inventory cell — a
-## second entry point onto the exact same _sell() above (never a second sell
-## implementation). Confirmation weight is the one judgement call this slice
-## makes: an Item is a consumable, sold with no confirmation, same as the
-## Item Box's own Sell button (_box_sell above) has always done; an Artefact
-## is passive and permanent, so selling one ends a held effect for good —
-## closer to a one-way decision — and gets a Confirm/Cancel step first, the
-## same _open_choice_pick seam Jet Fuel Vial's Restock confirm already uses.
-## `kind` is only ever "item"/"artefact" — hud.gd never fires this for "piece"
-## (Stock selling stays behind the preview modal's long press).
-func _on_inv_sell_pressed(kind: String, entry: Variant) -> void:
-	if kind != "artefact":
-		_sell_and_refresh(kind, entry)
-		return
-	if not Shop.can_sell(self, "artefact", entry): # re-check: state may have
-		# shifted between the badge press and the confirm below
-		return
-	var payout: int = Shop.sell_payout(self, "artefact", entry)
-	_open_choice_pick("Sell %s for $%d? The effect ends." % [str(entry.get("name", "")), payout],
-		[{"label": "Sell", "value": true}], "Cancel",
-		func(_v) -> void: _sell_and_refresh("artefact", entry), Callable())
+## NO-223 (2026-09-22 ruling): the one confirm seam every sell path in the
+## game routes through — the long-press preview's own Sell button
+## (modals.gd show_preview, "piece"/"item"/"artefact") and the Item Box's own
+## Sell button (_box_sell above) both call this, never a second confirm
+## mechanism, so the wording and the shape match wherever a player sells
+## something. `after` runs once the sale actually happens (never on Cancel)
+## — Box needs to re-render its own offer, every other caller just needs
+## _refresh(). Before selling, cancels any targeting THIS `entry` is
+## currently driving (an armed Item, a mid-targeting Artefact) rather than
+## refusing the sale — see _cancel_targeting_for_sale below.
+func _confirm_sell(kind: String, entry: Variant, after: Callable) -> void:
+	if not Shop.can_sell(self, kind, entry): # state may have shifted since
+		return                                 # the button/menu was drawn
+	var payout: int = Shop.sell_payout(self, kind, entry)
+	var name: String
+	if kind == "piece" or kind == "captured": # ADR-0002 shape (bare id String
+		# or a stateful Dictionary carrying one) — same read Shop._sell_base does
+		var id: String = entry if entry is String else entry.id
+		name = str(defs[id].name)
+	else:
+		name = str(entry.name)
+	var msg := "Sell %s for $%d?" % [name, payout]
+	if kind == "artefact": # passive and permanent — spell out what's lost
+		msg += " The effect ends."
+	_open_choice_pick(msg, [{"label": "Sell", "value": true}], "Cancel",
+		func(_v) -> void: _sell_confirmed(kind, entry, after), Callable())
 
 
-func _sell_and_refresh(kind: String, entry: Variant) -> void:
-	_sell(kind, entry)
-	_refresh()
+## The confirm's own Confirm handler, split out of _confirm_sell above so the
+## lambda passed to _open_choice_pick stays one line (a multi-statement
+## lambda mixed with _open_choice_pick's trailing on_cancelled argument is a
+## GDScript parse hazard, not just a style preference).
+func _sell_confirmed(kind: String, entry: Variant, after: Callable) -> void:
+	_cancel_targeting_for_sale(kind, entry)
+	if _sell(kind, entry):
+		after.call()
+
+
+## NO-223 (Max ruling 2026-09-22): "selling mid target isn't an issue if we
+## handle the sell well by cancelling everything the targeting was doing and
+## coming back to a normal state" — a big interaction stays and gets bounded,
+## never blocked (the standing 2026-08-30 ruling). Reuses
+## _confirm_target_cancelled, the floating Cancel affordance's own entry
+## point, rather than a second teardown — it already resets item_active/
+## artefact_targeting_key and their staged picks (_item_reset/
+## _artefact_targeting_reset) AND reopens the Inventory Drawer (story 58),
+## so nothing about "back to a normal state" needs reinventing here. Only
+## fires when `entry` is the SPECIFIC thing driving targeting right now — a
+## different held Item/Artefact being armed must not be disturbed by
+## selling something else.
+func _cancel_targeting_for_sale(kind: String, entry: Variant) -> void:
+	var driving: bool = (kind == "item" and item_active >= 0 and items[item_active] == entry) \
+			or (kind == "artefact" and artefact_targeting_key != "" \
+				and entry is Dictionary and entry.key == artefact_targeting_key)
+	if driving:
+		_confirm_target_cancelled()
 
 
 func _show_win_screen() -> void:
@@ -5554,20 +5599,24 @@ func _show_win_screen() -> void:
 
 
 ## `entry` (NO-144): the live Stock element behind this preview, when it's
-## one — a board tile or a Captured Stock entry pass none, so Sell is never
-## offered for either (Sell is Stock-only; Captured has Convert instead).
-## `piece` (NO-185): the buffs-bearing Dictionary to list in the modal —
-## board[at] for a board tile, or `entry` itself for a Stock/Captured stack
-## (ADR-0002: a stateful entry IS a piece Dictionary with `buffs`). Kept
-## separate from `entry` because a board tile has buffs but no Sell entry.
-func _show_preview(id: String, king_id := "", entry: Variant = null, piece: Dictionary = {}) -> void:
+## one — a board tile passes none, so neither Sell nor Convert is ever
+## offered for one. `cap` (NO-223): true for a Captured Stock stack — tells
+## modals.show_preview to offer Convert instead of Sell for this `entry`
+## (Sell is Stock-only; Captured converts first). `piece` (NO-185): the
+## buffs-bearing Dictionary to list in the modal — board[at] for a board
+## tile, or `entry` itself for a Stock/Captured stack (ADR-0002: a stateful
+## entry IS a piece Dictionary with `buffs`). Kept separate from `entry`
+## because a board tile has buffs but no Sell/Convert entry.
+func _show_preview(id: String, king_id := "", entry: Variant = null, piece: Dictionary = {}, cap := false) -> void:
 	preview_open = true
-	modals.show_preview("piece", id, king_id, entry, -1, piece)
+	modals.show_preview("piece", id, king_id, entry, -1, piece, cap)
 
 
 ## NO-144: an Item/Artefact's own long-press menu — same preview modal a
 ## piece gets, minus the movement diagram, plus Sell when `entry` (the live
-## g.items/g.artefacts element) is sellable.
+## g.items/g.artefacts element) is sellable, and (NO-223) Use too for an
+## Item — never for an Artefact, whose Activate stays a plain tap on the
+## cell rather than being duplicated into this menu.
 func _show_kind_preview(kind: String, id: String, entry: Variant) -> void:
 	preview_open = true
 	modals.show_preview(kind, id, "", entry)

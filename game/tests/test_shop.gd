@@ -682,10 +682,12 @@ func _init() -> void:
 	wash.queue_free()
 	await process_frame
 
-	# --- NO-144: the full UI round-trip through the modal/hud signals (same
+	# --- NO-144/NO-223: the full UI round-trip through the modal signals (same
 	# wiring shop_buy_pressed already exercises elsewhere in this file) — Sell
-	# moved off the Shop and onto the preview modal's own signal; Convert
-	# still goes through hud's own badge signal, unchanged by this slice.
+	# moved off the Shop and onto the preview modal's own signal, and now
+	# confirms first (2026-09-22 ruling) rather than selling straight off the
+	# signal; Convert moved off hud's own ⇄ badge (information only now) and
+	# onto this same modal, alongside Sell — no confirm of its own.
 	var ui := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 1000})
 	await process_frame
@@ -695,11 +697,15 @@ func _init() -> void:
 	ui.captured.append("pawn")
 	var ui_stock_before: int = ui.stock.size()
 	ui.modals.sell_pressed.emit("piece", ui.stock[0])
-	check(ui.stock.size() == ui_stock_before - 1, "sell_pressed sells through the same wiring shop_buy_pressed uses")
+	check(ui.buff_pick_open and ui.stock.size() == ui_stock_before,
+		"sell_pressed confirms first — nothing sold yet")
+	ui._choice_picked(true) # the confirm's own Sell button
+	check(ui.stock.size() == ui_stock_before - 1 and not ui.buff_pick_open,
+		"...then sells through the same wiring shop_buy_pressed uses")
 	var ui_captured_before: int = ui.captured.size()
-	ui.hud.convert_pressed.emit(ui.captured[0])
+	ui.modals.convert_pressed.emit(ui.captured[0])
 	check(ui.captured.size() == ui_captured_before - 1 and ui.stock.has("pawn"),
-		"hud's own Convert badge signal converts through the same wiring")
+		"the preview modal's own Convert signal converts through the same wiring, no confirm")
 	ui.queue_free()
 	await process_frame
 

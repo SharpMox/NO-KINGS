@@ -217,7 +217,12 @@ func _init() -> void:
 	var gold_before: int = full.gold
 	var want_gold: int = Shop.sell_payout(full, "item", full.items[0])
 	full._box_sell(full.items[0])
-	check(full.items.size() == 2 and full.gold == gold_before + want_gold,
+	# NO-223 (2026-09-22 ruling): every sell path confirms now, the Box's own
+	# Sell button included — nothing is sold until the confirm is answered.
+	check(full.buff_pick_open and full.items.size() == 3,
+		"NO-223: selling from the Box confirms first — nothing sold yet")
+	full._choice_picked(true) # the confirm's own Sell button
+	check(full.items.size() == 2 and full.gold == gold_before + want_gold and not full.buff_pick_open,
 		"NO-38: selling from the Box frees the slot and pays the sell price")
 	check(full.box_open and _sell_buttons(full.box_panel).is_empty(),
 		"NO-38: the Box stays open and the sell row is gone once there is room")

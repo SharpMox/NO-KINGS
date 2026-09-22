@@ -1915,6 +1915,7 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 			# default" (Ruling 1, _random_buff_key above) was ever meant to
 			# cover — see .scratch/gdd-gaps/issues/42's Outcome.
 			_grant_buff(g, ctx.pos, "Tactical")
+			_note(g, key, "Tactical Piece Buff on deploy")
 		["obedience-flavored-tap-water", "on_capture"]:
 			# Doesn't grant here — game.gd's _move_player applies it AFTER this
 			# capture's own critical/range consumption (ruled 2026-08-28, see
@@ -2716,3 +2717,4 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 					and ["bishop", "dragon-horse", "archbishop"].has(ctx.attacker_id):
 				g._apply_buff(g.board[ctx.attacker_pos], "shield",
 					_buff_turns("shield"), ctx.attacker_pos)
+				_note(g, key, "Shield on capture")

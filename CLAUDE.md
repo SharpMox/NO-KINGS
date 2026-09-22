@@ -323,7 +323,18 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   state to capture), `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
   ("pause"/"king-abilities"/"tip"/"preview" — panels no board tap opens on its own) — for
   capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives all of
-  them (NO-122, extended for the 2026-09-19 screenshot pass). Four more traps, found
+  them (NO-122, extended for the 2026-09-19 screenshot pass).
+  **SETUP's placement zone cannot be captured at all, from either direction** (found
+  2026-09-22 while verifying NO-214, and it is a dead end worth knowing before you spend
+  an hour on it): no scenario sets `"state": 0`, and `save_config.gd:292` defaults `state`
+  to `PLAYER_TURN` when the key is absent, so every `--scenario` boots straight past
+  SETUP. A genuine fresh boot does reach SETUP, but there `is_scenario` is false, which
+  gates the whole `--select`/`--screenshot` path off. Reaching it needs a scenario that
+  sets `"state": 0` — nothing more clever exists today.
+  **The wave/turn banner is unreachable too**: it is only drawn during a transition by
+  `_add_turn_fx`, lasts ~1.1s, and no flag holds it on screen — so NO-219's italic, its
+  stripes and its full-width span are all unverified. NO-234 covers the test scenes that
+  would fix that. Four more traps, found
   2026-09-19/20 and each silent: (1) without `--scenario N`, `is_scenario` gates the whole
   debug-capture path (`game.gd:720-726`) — `--select`/`--arm-item`/`--open-shop`/
   `--open-drawer`/`--show-screen` all fall through to the plain default-board capture, no

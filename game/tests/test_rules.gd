@@ -27,19 +27,44 @@ func _init() -> void:
 	check(fus.size() == 36, "full fusion table loads")
 
 	# --- move-gen: pawn asymmetry + enemy mirroring ---
+	# NO-224: an unmoved pawn also gets the initial double-step.
 	var b := {Vector2i(2, 2): piece("pawn", Rules.PLAYER)}
-	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(2, 3)],
-		"player pawn moves one square up, no double-step")
+	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(2, 3), Vector2i(2, 4)],
+		"unmoved player pawn moves one OR two squares up (initial double-step)")
 	b = {Vector2i(2, 2): piece("pawn", Rules.ENEMY)}
-	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(2, 1)],
-		"enemy pawn is mirrored (moves down)")
+	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(2, 1), Vector2i(2, 0)],
+		"enemy pawn is mirrored (moves down), double-step included")
 	b = {
 		Vector2i(2, 2): piece("pawn", Rules.PLAYER),
 		Vector2i(2, 3): piece("pawn", Rules.ENEMY),
 		Vector2i(3, 3): piece("pawn", Rules.ENEMY),
 	}
 	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(3, 3)],
-		"pawn: blocked forward, captures diagonally only")
+		"pawn: blocked forward (incl. double-step), captures diagonally only")
+	# NO-224: `moved` flag gates the double-step off after a piece's first move.
+	b = {Vector2i(2, 2): piece("pawn", Rules.PLAYER)}
+	b[Vector2i(2, 2)].moved = true
+	check(Rules.moves_for(b, Vector2i(2, 2), defs) == [Vector2i(2, 3)],
+		"a pawn that has already moved loses the double-step")
+	# NO-224: the double-step is a slide, not a jump — a piece on the
+	# intervening square (not the far square) blocks it, same as mW2cF above.
+	b = {
+		Vector2i(2, 2): piece("pawn", Rules.PLAYER),
+		Vector2i(2, 3): piece("pawn", Rules.PLAYER),
+	}
+	check(Rules.moves_for(b, Vector2i(2, 2), defs).is_empty(),
+		"double-step blocked by a piece on the intervening square")
+	# The Void Pawn's mirror (mfFcfWimfnA): double-step along its own
+	# move direction (forward-diagonal), same initial gating.
+	b = {Vector2i(2, 2): piece("berolina", Rules.PLAYER)}
+	var berolina_moves := Rules.moves_for(b, Vector2i(2, 2), defs)
+	check(berolina_moves.has(Vector2i(3, 3)) and berolina_moves.has(Vector2i(4, 4)) \
+		and berolina_moves.has(Vector2i(1, 3)) and berolina_moves.has(Vector2i(0, 4)),
+		"unmoved Void Pawn gets the diagonal double-step both ways")
+	b[Vector2i(2, 2)].moved = true
+	berolina_moves = Rules.moves_for(b, Vector2i(2, 2), defs)
+	check(not berolina_moves.has(Vector2i(4, 4)) and not berolina_moves.has(Vector2i(0, 4)),
+		"a Void Pawn that has already moved loses its double-step")
 
 	# --- move-gen: knight leaps over blockers ---
 	b = {Vector2i(0, 0): piece("knight", Rules.PLAYER), Vector2i(0, 1): piece("pawn", Rules.PLAYER)}
@@ -150,6 +175,14 @@ func _init() -> void:
 	b = {Vector2i(2, 5): piece("knight", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
 	check(act.to.y < 5, "AI advances toward player back row when no captures")
+	# NO-224: an unmoved enemy pawn alone on the board has nothing to weigh
+	# the double-step against (both advances are worth the same, v == 0), and
+	# _pick prefers the deeper destination — proving ai_action can reach and
+	# select the double-step, not just that legal_moves offers it.
+	b = {Vector2i(2, 9): piece("pawn", Rules.ENEMY)}
+	act = Rules.ai_action(b, defs)
+	check(act.from == Vector2i(2, 9) and act.to == Vector2i(2, 7),
+		"AI takes the initial double-step when it's the deeper of two equal advances")
 	# King never advances voluntarily.
 	b = {Vector2i(2, 7): piece("king", Rules.ENEMY), Vector2i(4, 5): piece("rook", Rules.ENEMY)}
 	act = Rules.ai_action(b, defs)
@@ -179,19 +212,38 @@ func _init() -> void:
 	# The only advance for the pawn is onto a square a player pawn covers; the
 	# knight has a safe advance — the knight moves, the pawn is not fed.
 	b = {
-		Vector2i(3, 7): piece("pawn", Rules.ENEMY),
+		# NO-224: `moved` so this pawn has no initial double-step. Without it the
+		# pawn could reach (3,5), which (2,5) does NOT cover — a player pawn
+		# captures to (1,6)/(3,6) — so "the only advance is a covered square"
+		# would be false and the AI would rightly advance it. Passing THROUGH
+		# the covered (3,6) is legal; only the landing square counts.
+		Vector2i(3, 7): {"id": "pawn", "owner": Rules.ENEMY, "moved": true},
 		Vector2i(6, 10): piece("knight", Rules.ENEMY),
 		Vector2i(2, 5): piece("pawn", Rules.PLAYER), # covers (3,6)
 	}
 	act = Rules.ai_action(b, defs)
 	check(act.from == Vector2i(6, 10), "AI advances the piece that can advance safely, not into a pawn")
 	# With nothing but a losing move available, the enemy holds its action.
+	# NO-224: `moved` for the same reason as the fixture above — an unmoved
+	# pawn has a SAFE double-step to (3,5) here, so it would (correctly) take
+	# it rather than hold, and this assertion would be testing nothing.
+	b = {
+		Vector2i(3, 7): {"id": "pawn", "owner": Rules.ENEMY, "moved": true},
+		Vector2i(2, 5): piece("pawn", Rules.PLAYER),
+	}
+	act = Rules.ai_action(b, defs)
+	check(act.is_empty(), "AI holds rather than feed its last piece into a capture")
+	# NO-224, the same board with the pawn UNMOVED: the double-step clears the
+	# covered square entirely and lands safe, so holding would now be the wrong
+	# call. This is the positive half of the two fixtures above — they pin the
+	# single-step behaviour, this pins that the AI actually uses the new move.
 	b = {
 		Vector2i(3, 7): piece("pawn", Rules.ENEMY),
 		Vector2i(2, 5): piece("pawn", Rules.PLAYER),
 	}
 	act = Rules.ai_action(b, defs)
-	check(act.is_empty(), "AI holds rather than feed its last piece into a capture")
+	check(not act.is_empty() and act.to == Vector2i(3, 5),
+		"AI takes the safe double-step instead of holding (NO-224) — act=%s" % [act])
 
 	# --- protect the King (GDD Rule 2) ---
 	# Not in check (the knight's leap set is [(1,9),(1,5),(2,8),(2,6)], never

@@ -312,6 +312,7 @@ const BUFF_BADGE_GLYPH_COL := Color.WHITE
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
 var board_px := Vector2(24, 120)
+var viewport_w := 480.0 ## last-laid-out viewport width (NO-219: the banner spans this, not the board)
 
 var defs: Dictionary
 var fusions: Dictionary # unordered pair "a+b" -> result id
@@ -1034,6 +1035,7 @@ func initials_of(display_name: String) -> String:
 
 func _layout_board() -> void:
 	var vp := get_viewport_rect().size
+	viewport_w = vp.x
 	safe_top = safe_top_px(vp)
 	hud_top = safe_top + HudScript.HEADER_H
 	var top := hud_top + BOARD_TOP_MARGIN
@@ -1320,6 +1322,17 @@ func _process(delta: float) -> void:
 
 # --- turn flow ---
 
+# Banner look (NO-219, 2026-09-22, Max's instruction): bold italic text plus a
+# decorative stripe above and below the band. Tunable here without reading
+# _draw. variation_embolden's documented range is -2..2 (0 = normal weight);
+# variation_transform's skew is radians, negative leans the glyph tops right
+# for a conventional italic slant.
+const BANNER_FONT_EMBOLDEN := 0.9
+const BANNER_ITALIC_SKEW := -0.22
+const BANNER_STRIPE_H := 3.0
+
+var _banner_font: FontVariation ## built once on first use, never per-frame in _draw
+
 ## The wave/turn banner's on-screen rect at animation time `t`, for stack `slot`.
 ##
 ## Extracted from _draw so the geometry is testable, and CLAMPED to the board
@@ -1336,12 +1349,21 @@ func _process(delta: float) -> void:
 ## It now emerges from the board's own left edge: the right edge sweeps across
 ## while the left stays pinned, so nothing is ever drawn outside the board. The
 ## settled state (slide == 1) is byte-identical to before.
+##
+## REVERSED 2026-09-22 (NO-219, Max's instruction: "Banner -> fullscreen
+## width"). The clamp above is deliberately re-based on the viewport instead
+## of removed: bw is now viewport_w and the pinned edge is the screen edge
+## (x=0) rather than board_px.x, so the sweep is still bounded by construction
+## -- there is just nothing left of the board to clamp against, because the
+## target extent IS the screen now. Do not restore the board-width clamp this
+## comment used to describe; that was NO-26's fix for a defect this ticket
+## intentionally reverses.
 func _banner_rect(t: float, slot: int) -> Rect2:
-	var bw: float = Tuning.BOARD_W * tile
+	var bw: float = viewport_w
 	var by: float = board_px.y + tile * 3.0 + slot * 52.0
 	var slide: float = ease(minf(t * 4.0, 1.0), 0.3)
-	var right: float = board_px.x + slide * bw
-	return Rect2(Vector2(board_px.x, by), Vector2(maxf(0.0, right - board_px.x), 44))
+	var right: float = slide * bw
+	return Rect2(Vector2(0.0, by), Vector2(maxf(0.0, right), 44))
 
 
 ## Turn/wave transition feedback: board-outline glow + a wiping banner
@@ -1598,10 +1620,12 @@ func _run_enemy_actions() -> void:
 				lost_enemy += 1
 				_add_pop(act.from)
 				board[act.from] = board[act.to]
+				board[act.from].moved = true # NO-224: it relocated, whoever's piece it is
 				board.erase(act.to)
 			elif uap_dodge_to.x >= 0:
 				uap_used_this_wave = true
 				board[uap_dodge_to] = board[act.to]
+				board[uap_dodge_to].moved = true # NO-224
 				board.erase(act.to)
 				_add_float(uap_dodge_to, "Dodged!", COL_MERGE)
 			elif torpedo_fires:
@@ -1625,6 +1649,7 @@ func _run_enemy_actions() -> void:
 				_consume_buff(act.from, "bomb")
 			board.erase(act.to)
 			board[act.to] = board[act.from]
+			board[act.to].moved = true # NO-224
 			board.erase(act.from)
 			_detonate(act.to)
 			queue_redraw()
@@ -1669,6 +1694,7 @@ func _run_enemy_actions() -> void:
 			_add_pop(act.to)
 		_add_slide(act.from, act.to)
 		board[act.to] = board[act.from]
+		board[act.to].moved = true # NO-224: the initial double-step gates on this
 		board.erase(act.from)
 		queue_redraw()
 		if _back_row_breached():
@@ -2671,6 +2697,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			_lose_player_piece(from, "reflect")
 			_add_pop(from)
 			board[from] = board[to] # the defender counter-attacks into the tile
+			board[from].moved = true # NO-224
 			board.erase(to)
 		else:
 			_consume_buff(to, "shield")
@@ -2800,6 +2827,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 					captured.append(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
+			board[to].moved = true # NO-224
 			board.erase(from)
 			_detonate(to)
 			if blitz_free:
@@ -2861,6 +2889,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			Economy.tariff_cut(mover_value, Tuning.TARIFF_MOVE_PCT))
 	_add_slide(from, to)
 	board[to] = board[from]
+	board[to].moved = true # NO-224: the initial double-step gates on this
 	board.erase(from)
 	var final_pos := to
 	if return_to_start: # USS Eldridge Invisibility Paint — undo the slide
@@ -2921,9 +2950,13 @@ func _king_to_come() -> bool:
 
 ## Long-range = any non-leap move (ride or bent ride) — the Tariff on
 ## Long-Range covers every rider, not just bishop/rook (review 2026-07-03).
+## NO-224: the Pawn's initial double-step is a `ride` (it slides, so it can't
+## jump — same as mW2cF), but it's a 2-square lurch, not what this Tariff is
+## for; excluded, or every ordinary pawn move — single-step, diagonal capture
+## — would misfire as long-range once the piece definition carries any ride.
 func _is_long_range(id: String) -> bool:
 	for m in defs[id].moves:
-		if m.type != "leap":
+		if m.type != "leap" and not m.get("initial", false):
 			return true
 	return false
 
@@ -4807,7 +4840,16 @@ func _draw() -> void:
 				continue # not emerged yet
 			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
 			draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
-			draw_string(font, Vector2(br.position.x, br.position.y + 31), a.text,
+			# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
+			# with the band rather than them appearing instantly at full width.
+			draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+			draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+			if _banner_font == null: # cached once, never rebuilt per-frame
+				_banner_font = FontVariation.new()
+				_banner_font.base_font = font
+				_banner_font.variation_embolden = BANNER_FONT_EMBOLDEN
+				_banner_font.variation_transform = Transform2D(0.0, Vector2.ONE, BANNER_ITALIC_SKEW, Vector2.ZERO)
+			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 26, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),

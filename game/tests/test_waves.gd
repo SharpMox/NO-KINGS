@@ -212,14 +212,14 @@ func _init() -> void:
 	blk.queue_free()
 	await process_frame
 
-	# ---- NO-26: the WAVE banner never draws outside the board ---------------
-	# Reported from the iPad audit as "starts at the LEFT SCREEN EDGE, outside the
-	# board, and stops roughly 60 percent of the way across". The banner was never
-	# mis-SIZED: its width has always been the board width and its settled
-	# position has always been correct. It ENTERED from outside the board, with
-	# nothing clipping it -- invisible on a phone, where the board is nearly full
-	# width and the overflow falls off-screen, and plainly visible on a tablet,
-	# where the board is centred inside wide margins.
+	# ---- NO-26/NO-219: the WAVE banner never draws outside its target extent -
+	# NO-26 originally clamped the banner to the BOARD, because the un-clamped
+	# draw ran off-screen on a phone and started at the left screen edge on a
+	# tablet. NO-219 (2026-09-22, Max's instruction: "Banner -> fullscreen
+	# width") deliberately reverses that: the banner's target extent is now the
+	# full VIEWPORT, not the board. The clamp itself is preserved, just re-based
+	# -- so this sweep still exists, checking against viewport bounds [0, vw]
+	# instead of the board's [board_l, board_r].
 	#
 	# Swept across the whole entrance rather than sampled at rest, because the
 	# defect only exists mid-animation and a t == 1 check would pass either way.
@@ -238,23 +238,22 @@ func _init() -> void:
 		# coupled the tile to ICON.
 		bg.tile = bg.board_tile_for(Vector2(vw, vh), bg.hud_top)
 		bg.board_px = Vector2(roundf((vw - bg.tile * Tuning.BOARD_W) / 2.0), bg.hud_top)
-		var board_l: float = bg.board_px.x
-		var board_r: float = bg.board_px.x + Tuning.BOARD_W * bg.tile
+		bg.viewport_w = vw # NO-219: _banner_rect reads this, not a live get_viewport_rect()
 		var escaped: Array = []
 		var t := 0.0
 		while t <= 1.0001:
 			var br: Rect2 = bg._banner_rect(t, 0)
-			if br.size.x > 0.0 and (br.position.x < board_l - 0.5 or br.end.x > board_r + 0.5):
+			if br.size.x > 0.0 and (br.position.x < -0.5 or br.end.x > vw + 0.5):
 				escaped.append([t, br.position.x, br.end.x])
 			t += 0.02
 		check(escaped.is_empty(),
-			"banner stays inside the board [%.0f, %.0f] for the whole entrance on %s, escaped at: %s"
-				% [board_l, board_r, vp[2], str(escaped.slice(0, 3))])
-		# and the settled banner still spans the board exactly — the clamp must not
-		# have quietly shrunk the thing it was bounding
+			"banner stays inside the viewport [0, %.0f] for the whole entrance on %s, escaped at: %s"
+				% [vw, vp[2], str(escaped.slice(0, 3))])
+		# and the settled banner still spans the full viewport exactly — the
+		# clamp must not have quietly shrunk the thing it was bounding
 		var settled: Rect2 = bg._banner_rect(1.0, 0)
-		check(absf(settled.position.x - board_l) < 0.5 and absf(settled.end.x - board_r) < 0.5,
-			"and at rest it spans the board exactly on %s (%.0f..%.0f)"
+		check(absf(settled.position.x - 0.0) < 0.5 and absf(settled.end.x - vw) < 0.5,
+			"and at rest it spans the viewport exactly on %s (%.0f..%.0f)"
 				% [vp[2], settled.position.x, settled.end.x])
 	bg.queue_free()
 	await process_frame

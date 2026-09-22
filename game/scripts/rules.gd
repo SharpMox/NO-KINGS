@@ -34,6 +34,8 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 	var out: Array[Vector2i] = []
 	# Slow/Smog swap the move set for the Pawn's (ruling 2026-08-28)
 	for m in BuffLogic.moves_of(board, from, defs):
+		if m.get("initial", false) and piece.get("moved", false):
+			continue # NO-224: the double-step only exists before a piece's first move
 		if mode_filter != "" and m.mode != "both" and m.mode != mode_filter:
 			continue
 		if m.type == "bent": # one step to the pivot, then ride outward from it
@@ -107,6 +109,8 @@ static func move_paths(board: Dictionary, from: Vector2i, defs: Dictionary) -> A
 	var mirror := -1 if piece.owner == ENEMY else 1
 	var out: Array[Dictionary] = []
 	for m in def.moves:
+		if m.get("initial", false) and piece.get("moved", false):
+			continue # NO-224: mirrors moves_for's gate, for the display path
 		if m.type == "bent": # one step to the pivot, then ride outward from it
 			var pivot := from + Vector2i(int(m.pivot[0]), int(m.pivot[1]) * mirror)
 			if not in_bounds(pivot):

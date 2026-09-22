@@ -90,6 +90,7 @@ func _init() -> void:
 	var btn := _find_button(late, "Continue")
 	check(btn != null, "THE DEFECT: Continue appears once the restore lands, no relaunch")
 	if btn != null:
+		GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 		GameScript.next_config = {}
 		btn.pressed.emit()
 		check(int(GameScript.next_config.get("wave", 0)) == 2,
@@ -103,6 +104,7 @@ func _init() -> void:
 		await process_frame
 
 	DirAccess.remove_absolute(GameScript.SAVE_PATH)
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {}
 	Memory.reset()
 	SyncQueue.clear()

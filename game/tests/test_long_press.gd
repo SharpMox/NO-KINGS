@@ -124,6 +124,7 @@ func _await_drawer_settled(game: Node, key: String) -> void:
 
 
 func _boot_game() -> Node:
+	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
 		"board": [["queen", 0, 2, 1], ["pawn", 0, 3, 1], ["pawn", 1, 2, 6]],
 		"items": ["sniper", "blitz"],

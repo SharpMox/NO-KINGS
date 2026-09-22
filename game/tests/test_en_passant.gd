@@ -157,7 +157,8 @@ func _init() -> void:
 		["pawn", 1, 3, 2], ["knight", 1, 3, 1]], "gold": 100})
 	await process_frame
 	await process_frame
-	f.enemy_double_steps = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	var f_offer: Array[Dictionary] = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	f.enemy_double_steps = f_offer # typed at the source — enemy_double_steps is Array[Dictionary]
 	f._move_player(Vector2i(2, 2), Vector2i(3, 3)) # capture en passant onto the skip square
 	check(not f.board.has(Vector2i(3, 2)), "the en passant victim actually left the board")
 	check(f.board.has(Vector2i(3, 3)) and f.board[Vector2i(3, 3)].owner == Rules.PLAYER,
@@ -177,7 +178,8 @@ func _init() -> void:
 		"artefacts": ["exhibit-399"], "gold": 100})
 	await process_frame
 	await process_frame
-	h.enemy_double_steps = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	var h_offer: Array[Dictionary] = [{"pawn": Vector2i(3, 2), "skip": Vector2i(3, 3), "id": "pawn"}]
+	h.enemy_double_steps = h_offer # typed at the source — enemy_double_steps is Array[Dictionary]
 	h._move_player(Vector2i(2, 2), Vector2i(3, 3))
 	check(not h.board.has(Vector2i(3, 2)), "the en passant victim actually left the board")
 	check(not h.board.has(Vector2i(3, 1)),

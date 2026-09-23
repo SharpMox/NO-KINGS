@@ -130,6 +130,15 @@ And one goes the other way, game -> site:
 
   **Not Playwright.** The old `/tmp/node_modules` install is broken and will not
   survive; `agent-browser` is on PATH and needs no project dependency.
+
+  **One shared daemon.** `agent-browser` runs a single daemon by default, and concurrent
+  agents cross-talk silently — found in NO-151's reference-site check, where four
+  different viewport/theme combinations returned byte-identical screenshots and stale
+  `innerWidth`. Pass `--session <unique-id>` on every call to isolate.
+
+  **Viewport only applies on the first `open`.** `agent-browser open <url> --viewport WxH`
+  sets the size only on a session's first navigation; a later `open` silently keeps the
+  old size. Use `set viewport` before re-checking at another breakpoint.
 - **Match the surrounding page.** Styles/scripts are inline per page — keep edits in the
   same idiom and density as the file you're touching.
 

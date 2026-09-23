@@ -317,7 +317,8 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 ## the RING off-centre. Shift by this fraction of the mark size so the ring,
 ## not the box, sits on the disc's centre (measured from a capture, NO-100).
 const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
-const INV_MARK_DISC_RATIO := 0.45 # the mark's layout box: radius = _inv_mark_size() * this (no disc is drawn — Max, 2026-09-24)
+const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
+const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
@@ -5292,6 +5293,7 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var mark_size := _inv_mark_size()
 		var c := _inv_mark_centre(px)
 		var r := mark_size * INV_MARK_DISC_RATIO
+		draw_circle(c, r, INV_MARK_DISC_COL)
 		# draw_string's y is the BASELINE: drop it by half of (ascent - descent)
 		# so the glyph's box is centred on the disc, not sitting on its middle
 		var baseline := c.y + (font.get_ascent(mark_size) - font.get_descent(mark_size)) / 2.0

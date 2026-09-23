@@ -207,6 +207,7 @@ signal multi_cancel_pressed # NO-137: the Cancel button underneath it — same
 	# entry-point shape as multi_confirm_pressed, but resets targeting instead
 	# of committing it (see multi_cancel_btn's own declaration below)
 signal item_pressed(index: int)
+signal item_drag_started(index: int) # NO-236: press on an Item cell (a drag onto the board may follow)
 signal item_preview_requested(index: int) # NO-144: an Item cell's long
 	# press — same "own menu" preview pieces get (stack_preview_requested
 	# above), so Sell has somewhere to live for a held Item too
@@ -2551,6 +2552,7 @@ func _rebuild_items_grid() -> void:
 		_wire_grid_button(btn, has_icon, "item:%d" % i, desc, func() -> void:
 			item_pressed.emit(i),
 			func() -> void: item_preview_requested.emit(i)) # NO-144
+		btn.button_down.connect(func() -> void: item_drag_started.emit(i)) # NO-236
 		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses

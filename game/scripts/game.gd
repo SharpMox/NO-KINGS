@@ -137,6 +137,8 @@ const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)
 const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
+const COL_DROP_OK := Color(0.3, 0.9, 0.4, 0.35) # NO-236: the hovered tile would take the drop
+const COL_DROP_BAD := Color(0.95, 0.3, 0.3, 0.35) # NO-236: ...would refuse it
 const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
 	# outside the blue/red side palette — decorative, not player or enemy state
 const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
@@ -175,6 +177,7 @@ const ARRIVE_TIME := 0.35 # NO-243: enemy drop-in
 const ARRIVE_KING_TIME := 0.5
 const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
 const MERGE_TIME := 0.5 # NO-243: inputs pull together, result fades in
+const SNAP_BACK_TIME := 0.15 # NO-236: a refused drop slides home (a legal one settles in ANIM_TIME)
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -614,6 +617,13 @@ var armed_entry: Variant = "" # the exact Stock entry behind placing_id /
 var preview_open := false
 var placing_id := ""  # stock piece id being placed, "" = none
 var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
+# NO-236: drags from the Stock and Inventory drawers. A drag is "live" only
+# once the pointer travels past DRAWER_SCROLL_DEADZONE from its press, so a
+# tap or a long press on the cell never shows a ghost or a drop preview.
+var item_drag := -1 # items index mid-drag from the Inventory grid
+var drag_live := false
+var drag_press_px := Vector2.ZERO # where that drag was pressed: a refused drop slides back here
+var _last_press_px := Vector2.ZERO # every left press, seen in _input before the GUI takes it
 var merge_highlights := {} # ids that complete a merge with the current selection
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
@@ -2327,6 +2337,8 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	pool_drag_id = id
 	armed_entry = entry
 	drawer_autoclosed = ""
+	drag_live = false
+	drag_press_px = _last_press_px
 	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
@@ -2337,12 +2349,95 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	queue_redraw()
 
 
+## NO-236: press-drag an Item cell onto a board tile = select it + target that
+## tile (the same _use_item/_item_click a tap-then-tap runs), leaving the
+## floating Confirm to commit. Only Items with a board target drag; an
+## untargeted one, or a Buff Box whose buff is still unpicked, has nothing to
+## drop onto and keeps its plain tap.
+func _on_item_drag_start(index: int) -> void:
+	if state != State.PLAYER_TURN or box_open or buff_pick_open or win_open \
+			or game_menu_open or preview_open or Kings.power_is(self, "noitems"):
+		return
+	var it: Dictionary = items[index]
+	if it.target == "" or (it.key == "buff_box" and pending_buff == ""):
+		return
+	item_drag = index
+	drawer_autoclosed = ""
+	drag_live = false
+	drag_press_px = _last_press_px
+
+
+## Would releasing the drag in progress on `t` act? The preview's green/red
+## tint (NO-236) — mirrors the release branches: the board drag's in
+## _unhandled_input, the Stock/Item drags' in _input.
+func drop_legal(t: Vector2i) -> bool:
+	if t.x < 0:
+		return false
+	var partner: bool = state == State.PLAYER_TURN and board.has(t) \
+		and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id)
+	if drag_from.x >= 0:
+		return t != drag_from and (legal_dests.has(t) or (partner and board.has(drag_from)))
+	if pool_drag_id != "":
+		return partner or _pool_placeable(t)
+	if item_drag >= 0:
+		var it: Dictionary = items[item_drag]
+		if it.target == "area": # any tile anchors an area (_item_click)
+			return true
+		var targets: Array[Vector2i] = item_targets if item_active == item_drag \
+			else _item_stage_targets(it, Vector2i(-1, -1))
+		return targets.has(t)
+	return false
+
+
+## An empty tile a dragged Stock piece may deploy onto right now.
+func _pool_placeable(t: Vector2i) -> bool:
+	if t.x < 0 or board.has(t):
+		return false
+	if state == State.SETUP:
+		return t.y < Tuning.PLAYER_ZONE_ROWS
+	return state == State.PLAYER_TURN and actions_left > 0 and _deploy_tiles().has(t)
+
+
+## True when `px` lies inside the open drawer — a drop there must never reach
+## the board tiles hidden beneath it (2026-07-08).
+func _drawer_covers(px: Vector2) -> bool:
+	return hud.drawer_open != "" and (hud.drawers[hud.drawer_open] as Control) \
+		.get_global_rect().has_point(px)
+
+
+## NO-236: a drop settles into `to` from where the finger let go — retargets
+## the slide the commit already queued (a move), or queues one (a deploy, a
+## setup relocation, a refused board drag sliding home).
+func _slide_from_px(px: Vector2, to: Vector2i, dur := ANIM_TIME) -> void:
+	if autoplay or not animations_on or not board.has(to) or board[to].owner != Rules.PLAYER:
+		return # (a capture that failed leaves the enemy on `to`: nothing of ours landed)
+	var from_px := px - Vector2(tile, tile) / 2
+	for a in anims:
+		if a.kind == "move" and a.to == to:
+			a.from_px = from_px
+			a.t = 0.0
+			return
+	anims.append({"kind": "move", "to": to, "from_px": from_px, "to_px": _tile_px(to),
+		"t": 0.0, "dur": dur})
+	queue_redraw()
+
+
+## NO-236: a refused Stock/Item drop flies back to the cell it came from.
+func _snap_back_ghost(tex: Texture2D, from: Vector2) -> void:
+	if autoplay or not animations_on or tex == null or not drag_live:
+		return
+	anims.append({"kind": "ghost", "tex": tex, "from_px": from, "to_px": drag_press_px,
+		"t": 0.0, "dur": SNAP_BACK_TIME})
+	queue_redraw()
+
+
 ## Buttons capture the click, so the drag's release lands here, not in
 ## _unhandled_input.
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_MOUSE_EXIT and pool_drag_id != "":
+	if what == NOTIFICATION_WM_MOUSE_EXIT and (pool_drag_id != "" or item_drag >= 0):
 		# the cursor left the window mid-drag: cancel and restore the drawer
 		pool_drag_id = ""
+		item_drag = -1
 		if drawer_autoclosed != "":
 			_set_drawer.call_deferred(drawer_autoclosed)
 			drawer_autoclosed = ""
@@ -2414,13 +2509,36 @@ func _notification(what: int) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if pool_drag_id == "":
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+			and event.pressed:
+		_last_press_px = event.position # NO-236: a drawer drag's start point
+	if pool_drag_id == "" and item_drag < 0:
 		return
 	if event is InputEventMouseMotion:
+		if event.position.distance_to(drag_press_px) > HudScript.DRAWER_SCROLL_DEADZONE:
+			drag_live = true
 		if hud.drawer_open != "" and not \
 				(hud.drawers[hud.drawer_open] as Control).get_global_rect().has_point(event.position):
 			drawer_autoclosed = hud.drawer_open # reopen if this drag cancels
 			_set_drawer("") # dragged out toward the board: give it back
+		queue_redraw()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+			and not event.pressed and item_drag >= 0:
+		var t := _tile_at(event.position)
+		var ok := not _drawer_covers(event.position) and drop_legal(t)
+		var index := item_drag
+		item_drag = -1
+		if ok: # NO-236: the drop is the select + target taps; Confirm still commits
+			drawer_autoclosed = ""
+			if item_active != index:
+				_use_item(index)
+			if item_active == index:
+				_item_click(t)
+			return
+		_snap_back_ghost(item_icons.get(items[index].key), event.position)
+		if drawer_autoclosed != "": # the drag closed it, nothing happened: give it back
+			_set_drawer.call_deferred(drawer_autoclosed)
+			drawer_autoclosed = ""
 		queue_redraw()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
 			and not event.pressed:
@@ -2431,8 +2549,7 @@ func _input(event: InputEvent) -> void:
 		# a release inside the open drawer must never hit the board tiles
 		# hidden beneath it — that reads as a misinput (2026-07-08). Dragging
 		# out closes the drawer, so real board drops arrive uncovered.
-		var covered: bool = hud.drawer_open != "" and (hud.drawers[hud.drawer_open] as Control) \
-				.get_global_rect().has_point(event.position)
+		var covered := _drawer_covers(event.position)
 		# drop on a friendly partner piece: merge into its tile
 		if not covered and state == State.PLAYER_TURN and t.x >= 0 and board.has(t) \
 				and board[t].owner == Rules.PLAYER and merge_highlights.has(board[t].id):
@@ -2452,13 +2569,10 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return MergeLogic.do_merge(self, {"id": id, "entry": entry},
 				{"id": target.get_meta("id"), "entry": target.get_meta("entry")})
-		var placeable: bool = not covered and t.x >= 0 and not board.has(t) \
-			and (t.y < Tuning.PLAYER_ZONE_ROWS if state == State.SETUP
-				else _deploy_tiles().has(t))
-		if placeable and (state == State.SETUP
-				or (state == State.PLAYER_TURN and actions_left > 0)):
+		if not covered and _pool_placeable(t):
 			drawer_autoclosed = ""
 			_place(entry, t)
+			_slide_from_px(event.position, t) # NO-236: settles in from the finger
 			# NO-84 story 41/42/43: a successful drag-drop deploy reopens
 			# the Stock Drawer only if there is still something to do in
 			# it. SETUP already reopens it unconditionally (_place's own
@@ -2467,6 +2581,7 @@ func _input(event: InputEvent) -> void:
 			if state == State.PLAYER_TURN and _stock_drawer_reopens():
 				_set_drawer("stock")
 		else: # dropped elsewhere (incl. back on the button = plain tap)
+			_snap_back_ghost(piece_tex(id) if textures.has(id) else null, event.position) # NO-236
 			if drawer_autoclosed != "": # the drag closed it, nothing happened:
 				_set_drawer.call_deferred(drawer_autoclosed) # give it back
 				drawer_autoclosed = ""
@@ -2607,6 +2722,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						_setup_relocate(from, t)
 					else:
 						_move_player(from, t)
+					_slide_from_px(event.position, t) # NO-236: settles in from the finger
 				elif state == State.PLAYER_TURN and t.x >= 0 and t != from \
 						and board.has(t) and board[t].owner == Rules.PLAYER \
 						and board.has(from) and merge_highlights.has(board[t].id):
@@ -2623,6 +2739,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_clear_selection()
 					_refresh()
 				else: # release in place = fresh select; elsewhere = cancel ghost
+					if t != from: # NO-236: a refused drop slides home
+						_slide_from_px(event.position, from, SNAP_BACK_TIME)
 					queue_redraw()
 
 
@@ -3426,6 +3544,9 @@ func _use_item(index: int) -> void:
 		return
 	if state != State.PLAYER_TURN or box_open:
 		return
+	if item_drag >= 0:
+		return # NO-236: the drag-out closing the drawer fires a spurious tap
+			# (same as _on_stack_pressed's guard); the drop does the arming
 	if item_active == index: # tap again to cancel targeting
 		_item_reset()
 		if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
@@ -5266,16 +5387,14 @@ func _draw() -> void:
 			_draw_arrive(font, a)
 		elif a.kind == "merge" and board.has(a.to):
 			_draw_merge(font, a)
+		elif a.kind == "ghost": # NO-236: a refused Stock/Item drop flying home
+			draw_texture_rect(a.tex, Rect2(a.from_px.lerp(a.to_px, ease(a.t, 0.4)) - half,
+				Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
 	for a in anims: # after the slides, so a dying piece shows over the attacker
 		# moving onto its tile (banners draw on _banner_layer, above)
 		if a.kind == "die":
 			_draw_die(font, a)
-	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
-		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
-			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
-	if pool_drag_id != "" and textures.has(pool_drag_id): # stock drag ghost
-		draw_texture_rect(piece_tex(pool_drag_id),
-			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
+	_draw_drag_preview()
 	# Arrow Planning: drawn last so the decorative overlay always sits on top;
 	# arrows persist independent of arrow_mode (toggling off just stops adding
 	# more) and are cleared at turn end (scratchpad, never saved)
@@ -5285,6 +5404,35 @@ func _draw() -> void:
 		var arrow_cur := _tile_at(get_global_mouse_position())
 		if arrow_cur.x >= 0 and arrow_cur != arrow_from:
 			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW, 3.0, 14.0, 8.0)
+
+
+## NO-236: the ghost of whatever is being dragged. Over a board tile it snaps
+## there, half-transparent, on a green (the drop would act — drop_legal) or
+## red tint; anywhere else it follows the finger, as it always did. A drawer
+## drag shows nothing until it is live (past the deadzone), so a tap or a long
+## press on the cell never flashes a ghost.
+func _draw_drag_preview() -> void:
+	var tex: Texture2D = null
+	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
+		tex = piece_tex(board[drag_from].id, board[drag_from].owner)
+	elif not drag_live:
+		return
+	elif pool_drag_id != "" and textures.has(pool_drag_id):
+		tex = piece_tex(pool_drag_id)
+	elif item_drag >= 0:
+		tex = item_icons.get(items[item_drag].key)
+	else:
+		return
+	var mouse := get_global_mouse_position()
+	var hover := _tile_at(mouse)
+	var at := mouse - Vector2(tile, tile) / 2
+	var alpha := 0.85
+	if hover.x >= 0 and hover != drag_from and not _drawer_covers(mouse):
+		at = _tile_px(hover)
+		alpha = 0.55
+		draw_rect(Rect2(at, Vector2(tile, tile)), COL_DROP_OK if drop_legal(hover) else COL_DROP_BAD)
+	if tex != null:
+		draw_texture_rect(tex, Rect2(at, Vector2(tile, tile)), false, Color(1, 1, 1, alpha))
 
 
 ## NO-130: "this is what the thing you are holding will affect" — a
@@ -5639,6 +5787,7 @@ func _connect_hud() -> void:
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
 	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
+	hud.item_drag_started.connect(_on_item_drag_start)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)
 	hud.promote_pressed.connect(func(id: String) -> void:

@@ -790,7 +790,6 @@ const Tuning := preload("res://scripts/tuning.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Economy := preload("res://scripts/economy.gd") # issue 35: clock-grant
 const Box := preload("res://scripts/box.gd")
-const Shop := preload("res://scripts/shop.gd") # NO-244: grant()'s unique check
 	# handlers below call Economy.add_clock so the Clock gets the same choke
 	# point as Score/Gold — a real cycle (economy.gd preloads this file back),
 	# which Godot 4 resolves fine for static-func calls (verified empirically;
@@ -1473,8 +1472,19 @@ static func has_room(g) -> bool:
 ## same "capacity refuses" ruling as ItemLogic.grant. Callers stamp
 ## acquired_wave/rarity on `entry` themselves before calling this, same as
 ## every existing artefacts.append() site already did. Returns whether it landed.
+## Artefacts that don't stack (Max, NO-244: Abduction Probe). Lives here,
+## not in shop.gd, because grant() needs it and this file can't preload
+## shop.gd (a direct cycle fails to parse); Shop.is_unique_held delegates.
+const UNIQUE_ARTEFACTS := ["abduction-probe"]
+
+
+static func is_unique_held(g, key: String) -> bool:
+	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
+		func(t: Dictionary) -> bool: return t.key == key)
+
+
 static func grant(g, entry: Dictionary) -> bool:
-	if not has_room(g) or Shop.is_unique_held(g, entry.key): # NO-244: never a 2nd probe
+	if not has_room(g) or is_unique_held(g, entry.key): # NO-244: never a 2nd probe
 		return false
 	g.artefacts.append(entry)
 	return true

@@ -133,12 +133,9 @@ static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
 ## offered again while a copy is held. Every artefact offer reads this: the
 ## Shop's normal and hidden rolls and the Cult's starting pair (all through
 ## _sample_weighted_artefacts) and the Artefact Box (box.gd roll_options).
-const UNIQUE_ARTEFACTS := ["abduction-probe"]
-
-
+## The list itself lives in artefact_hooks.gd (its grant() refuses a dupe too).
 static func is_unique_held(g, key: String) -> bool:
-	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
-		func(t: Dictionary) -> bool: return t.key == key)
+	return ArtefactHooks.is_unique_held(g, key)
 
 
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King

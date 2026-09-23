@@ -158,7 +158,7 @@
 var ARTEFACTS = [
   // ── Common ──────────────────────────────────────────────────────
   { name: "27 Club Punch Card", rarity: "Common", type: "Passive", bonus: ["Score"], status: "KEEP", implemented: true,
-    effect: "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50 (issue 16: Score is up-only, so this penalty debits $ instead)",
+    effect: "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50",
     conspiracy: "The 27 Club", url: "https://en.wikipedia.org/wiki/27_Club",
     summary: "Brian Jones, Hendrix, Joplin, Morrison, Cobain, Winehouse — all dead at exactly 27, and the coincidence hardened into a curse with a members-only door. The hot streak of fame, with a hard stop printed on the card." },
   { name: "Tinfoil Hat", rarity: "Common", type: "Passive", bonus: ["Score"], status: "KEEP", implemented: true,
@@ -218,7 +218,7 @@ var ARTEFACTS = [
     conspiracy: "Storm Area 51", url: "https://en.wikipedia.org/wiki/Storm_Area_51",
     summary: "2019: two million people RSVP'd to raid Area 51 because 'they can't stop all of us', Naruto-running below the radar. The Air Force issued a formal warning to a meme. About 150 showed up; nobody breached the gate." },
   { name: "Social Credit Report Card", rarity: "Common", type: "Trigger", bonus: ["Score"], status: "KEEP", implemented: true,
-    effect: "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10 (issue 16: Score is up-only, so this penalty debits $ instead)",
+    effect: "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10",
     conspiracy: "The social credit system", url: "https://en.wikipedia.org/wiki/Social_Credit_System",
     summary: "China's patchwork of blacklists and behavioral scoring, retold in the West as one unified number that rates every citizen's life. The reality is messier; the nightmare version is the one everyone knows." },
   { name: "MK-Ultra Sugar Cube", rarity: "Common", type: "Trigger", bonus: ["Buff"], status: "KEEP", implemented: true,

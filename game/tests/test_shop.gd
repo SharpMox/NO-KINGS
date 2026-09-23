@@ -271,8 +271,8 @@ func _init() -> void:
 	early.artefacts.pop_back() # a bare probe entry, not a real grant
 	early.modals.shop_panel.visible = false
 	early._queue_wave(Tuning.SHOP_UNLOCK_WAVE)
-	check(early.shop_stock.size() == 27 and early.shop_lane_b_progress == 0,
-		"the first restock Wave stocks it (27 slots) and wipes the banked Lane B")
+	check(early.shop_stock.size() == 28 and early.shop_lane_b_progress == 0,
+		"the first restock Wave stocks it (28 slots, NO-241 Ad Box) and wipes the banked Lane B")
 	early._open_shop()
 	check(early.modals.shop_empty_label == null and early.modals.shop_lower != null,
 		"a stocked Shop shows its grid, not the empty line")

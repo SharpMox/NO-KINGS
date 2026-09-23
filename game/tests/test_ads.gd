@@ -6,6 +6,7 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Ads := preload("res://scripts/ads.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -174,10 +175,34 @@ func _init() -> void:
 		check(JSON.stringify(b.box_offer) == JSON.stringify(contents),
 			"the Box reveals its stock-time roll, exactly as a bought Box")
 		check(not Shop.can_buy(b, b.shop_stock[ai]), "once per restock: a SOLD Ad Box is not buyable")
+		var gold_before: int = b.gold
+		b._on_box_skipped() # Max, 2026-09-24: an ad buys items, never free Gold
+		check(not b.box_open and b.gold == gold_before, "skipping the Ad Box pays no Gold")
 		Shop.roll(b) # a restock
 		var fresh: Array = b.shop_stock.filter(func(sl: Dictionary) -> bool: return sl.get("ad", false))
 		check(fresh.size() == 1 and not fresh[0].sold, "a restock refills the Ad Box")
 	b.queue_free()
+	await process_frame
+
+	# --- ...while skipping a Gold Box still pays its size's skip Gold ---
+	var gb := _boot(base)
+	await process_frame
+	var gi := -1
+	for i in gb.shop_stock.size():
+		if gb.shop_stock[i].kind == "box" and not gb.shop_stock[i].get("ad", false):
+			gi = i
+			break
+	if gi >= 0:
+		gb.gold = 1000
+		var gslot: Dictionary = gb.shop_stock[gi]
+		gb.modals.shop_buy_pressed.emit(gi)
+		check(gb.box_open and not Ads.is_open(), "(setup) a Gold Box opens straight away, no ad")
+		var after_buy: int = gb.gold
+		gb._on_box_skipped()
+		check(gb.gold == after_buy + Tuning.box_skip_gold(gslot.size),
+			"skipping a Gold Box still pays its size's skip Gold")
+	check(gi >= 0, "(setup) the Shop stocks a Gold Box")
+	gb.queue_free()
 	await process_frame
 
 	print("---")

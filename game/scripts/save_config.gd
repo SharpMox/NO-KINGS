@@ -337,6 +337,7 @@ static func _resume_turn(g, cfg: Dictionary) -> void:
 		g.box_picks_left = int(cfg.get("box_picks_left", 0))
 		g.box_rerolls_left = int(cfg.get("box_rerolls_left", 0))
 		g.box_black_book_pending = bool(cfg.get("box_black_book_pending", false))
+		g.box_from_ad = bool(cfg.get("box_from_ad", false)) # NO-241, additive
 		g.modals.show_box(g.box_offer)
 	if g.pending_reinforce and not g.autoplay:
 		# NO-141: display only — the grant already happened when the screen
@@ -407,6 +408,7 @@ static func to_config(g) -> Dictionary:
 		"box_only_kind": g.box_only_kind, "box_size": g.box_size,
 		"box_picks_left": g.box_picks_left, "box_rerolls_left": g.box_rerolls_left,
 		"box_black_book_pending": g.box_black_book_pending,
+		"box_from_ad": g.box_from_ad, # NO-241: its Skip pays no Gold
 		"oak_island_used_this_turn": g.oak_island_used_this_turn,
 		"moscovium_active": g.moscovium_active,
 		"hounds_free_turn": g.hounds_free_turn,

@@ -653,6 +653,8 @@ var box_rerolls_left := 0 # Bible Gag Reel Scroll + Snowden's Rubik's Cube:
 var box_only_kind := "" # the current Box's theme ("piece"/"artefact"/"item",
 	# issue 47 — every Box is typed), pinned for its life so a Reroll re-rolls
 	# the same theme
+var box_from_ad := false # NO-241: the open Box is the Shop's Ad Box, whose
+	# Skip pays no Gold (Max, 2026-09-24: ads give items, never free Gold)
 var box_size := "" # the current Box's size ("small"/"big"/"huge"), pinned
 	# the same way — a Reroll keeps the same choice/pick shape too
 var box_black_book_pending := false # Epstein's Black Book (49): true once
@@ -4939,6 +4941,7 @@ func _open_box_pick(slot: Dictionary) -> void:
 	box_open = true
 	box_only_kind = slot.key
 	box_size = slot.size
+	box_from_ad = slot.get("ad", false)
 	var native_picks: int = Box.SIZES[slot.size].picks # Huge grants 2 (issue 47)
 	box_picks_left = (native_picks - 1) + _artefact_count("nostradamus-mad-libs")
 	box_rerolls_left = _artefact_count("snowden-s-rubik-s-cube") # issue 58: Bible
@@ -6101,6 +6104,9 @@ func _on_box_skipped() -> void:
 ## A Huge Box declining all 7 pays for all 7 — intended, not a bug (issue 49).
 ## Stacks additively per held copy, same convention as every other artefact.
 func _decline_box_pick() -> void:
+	if box_from_ad:
+		return # NO-241 (Max, 2026-09-24): no skip Gold, no Cicada Gold — an ad
+			# buys the Box's contents, never free Gold
 	# NO-23 (user rulings 2026-09-07): the consolation is the Box's own price,
 	# so declining a Huge Box is worth four times declining a Small one — and it
 	# is paid in GOLD ONLY. earn_gold, never earn(): earn() grants both

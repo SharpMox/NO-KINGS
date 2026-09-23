@@ -358,6 +358,9 @@ var king_power_abilities: Array = [] # keys in force from the King's Power (esca
 ## issue 92: the King whose Power is in force, or "". Distinct from the board
 ## King: the Power is live through segment 1, before the King has arrived.
 var king_power_id := ""
+## Banner pass 2026-09-22: has the bespoke Power's first-bite banner shown
+## this wave (Kings.bite)? Transient — re-armed by Kings.apply_power, not saved.
+var king_power_bitten := false
 ## issue 93: Total Mobilisation adds an enemy Action for the REST of the wave,
 ## so it compounds with the turns still to come rather than being a one-off.
 var king_extra_actions := 0
@@ -472,7 +475,19 @@ var score := 0:
 				"color": Color(0.3, 0.85, 0.35) if d > 0 else Color(0.95, 0.3, 0.25)})
 			queue_redraw()
 		score = value
-var gold := 0 # per-run spend currency; score stays the up-only metric
+var gold := 0: # per-run spend currency; score stays the up-only metric
+	set(value): # banner visibility pass (2026-09-22): every Gold LOSS pops a
+		# red "-N" beside the Gold label, mirroring the score setter above —
+		# gains already pulse the row (hud.gd refresh); losses had no channel
+		# at all. Gains deliberately don't pop: drop `value < gold` for
+		# `value != gold` to mirror Score fully.
+		if value < gold and is_node_ready() and not autoplay and animations_on:
+			anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": "%d" % (value - gold),
+				"at_px": fx_at if fx_at != Vector2.ZERO
+					else Vector2(hud.gold_label.get_global_rect().end) + Vector2(6, 0),
+				"color": Color(0.95, 0.3, 0.25)})
+			queue_redraw()
+		gold = value
 var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
 var shop_restocks := 0 # total restocks banked so far, either lane — display
 	# only; issue 64 replaced the old score-threshold gate that used to drive
@@ -1401,17 +1416,40 @@ func _banner_rect(t: float, slot: int) -> Rect2:
 
 ## Turn/wave transition feedback: board-outline glow + a wiping banner
 ## (game-feel pass 2026-07-06). Stacked banners offset so they never overlap.
-func _add_turn_fx(text: String, color: Color) -> void:
+## COALESCING (banner visibility pass, 2026-09-22): the same `cause` fired
+## more than once in one frame is ONE banner with a count — three annexed
+## pieces read "Annexed ×3", never three stacked bands holding the screen.
+## "Same frame" is `t == 0.0`: _process advances every anim each frame, so a
+## banner still at 0.0 was queued this frame. `cause` defaults to the text;
+## pass it explicitly when the text carries a per-call number that should
+## not split the count. This is the one place every banner site inherits
+## the policy from — tune it here, never per site.
+func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
 	if autoplay or not animations_on:
 		return
+	if cause == "":
+		cause = text
 	var slot := 0
 	for a in anims:
 		if a.kind == "banner":
+			if a.t == 0.0 and a.get("cause", "") == cause:
+				a.count += 1
+				a.text = "%s ×%d" % [a.base_text, a.count]
+				return
 			slot += 1
 	anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": color})
 	anims.append({"kind": "banner", "t": 0.0, "dur": 1.1, "text": text,
-		"color": color, "slot": slot})
+		"base_text": text, "cause": cause, "count": 1, "color": color, "slot": slot})
 	queue_redraw()
+
+
+## Banner colours for the visibility pass — one constant per category so the
+## policy ("losses red, refunds green, King Powers orange, artefact effects
+## gold") can be retuned without touching a call site.
+const BANNER_LOSS := Color(0.95, 0.35, 0.3)
+const BANNER_GAIN := Color(0.45, 0.85, 0.5)
+const BANNER_POWER := Color(1.0, 0.55, 0.4)
+const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
 
 
 func _begin_player_turn() -> void:
@@ -1535,7 +1573,8 @@ func _autosave() -> void:
 
 func _enemy_turn() -> void:
 	state = State.ENEMY_TURN
-	_add_turn_fx("ENEMY TURN", Color(1.0, 0.42, 0.35))
+	# The ENEMY TURN banner fires BELOW, after the skip check — it used to
+	# fire here, so a Surprise Attack / Y2K turn was announced as a normal one.
 	enemy_double_steps.clear() # NO-232: same expiry as player_double_steps,
 		# mirrored for the enemy — see that field's own comment
 	if hud.drawer_open != "": # full board while the enemy plays
@@ -1576,11 +1615,16 @@ func _enemy_turn() -> void:
 		WaveLogic.queue(self, wave + 1)
 	if skip_enemy_turns > 0: # Surprise Attack: the enemy sits this one out
 		skip_enemy_turns -= 1
+		_add_turn_fx("ENEMY TURN — skipped (Surprise Attack)", Color(1.0, 0.42, 0.35))
 	else:
+		# One dispatch of on_enemy_turn_start per turn: Y2K Patch disarms
+		# itself inside it, so the count is read once here and handed down.
+		var enemy_ctx := Economy.enemy_turn_ctx(self)
+		_add_turn_fx(_enemy_turn_text(enemy_ctx), Color(1.0, 0.42, 0.35))
 		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
 		await _wait_while_backgrounded() # 06: no enemy turn resolves while backgrounded
-		await _run_enemy_actions()
+		await _run_enemy_actions(enemy_ctx.actions)
 	if state != State.GAME_OVER:
 		if not autoplay and animations_on:
 			await get_tree().create_timer(Tuning.ENEMY_TURN_PAUSE).timeout
@@ -1600,8 +1644,25 @@ func _wait_while_backgrounded() -> void:
 		await get_tree().process_frame
 
 
-func _run_enemy_actions() -> void:
-	var actions := Economy.enemy_actions(self)
+## "ENEMY TURN", varied by what on_enemy_turn_start did to the action count:
+## "— skipped (Y2K Patch Floppy Disk)" at 0, "×2" at 2, "×2 (Xerxes)" when a
+## Power or Ability added one. `ctx.notes` is filled by the handlers.
+func _enemy_turn_text(ctx: Dictionary) -> String:
+	var notes: Array = ctx.get("notes", [])
+	var suffix := "" if notes.is_empty() else " (%s)" % ", ".join(notes)
+	if ctx.actions <= 0:
+		return "ENEMY TURN — skipped" + suffix
+	if ctx.actions == 1:
+		return "ENEMY TURN" + suffix
+	return "ENEMY TURN ×%d%s" % [ctx.actions, suffix]
+
+
+## `actions` < 0 reads the count itself (tests and the direct callers);
+## _enemy_turn passes the count it already dispatched for, so Y2K Patch's
+## one-shot disarm is never consumed twice in one turn.
+func _run_enemy_actions(actions: int = -1) -> void:
+	if actions < 0:
+		actions = Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
 		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232
@@ -2641,6 +2702,7 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 				entry.id = base
 			else:
 				entry = base
+			Kings.bite(self, "%s arrives as %s" % [defs[pid].name, defs[base].name])
 	var id: String = entry if entry is String else entry.id
 	fx_at = _tile_px(tile) + Vector2(self.tile, self.tile) / 2
 	stock.erase(entry)
@@ -2662,6 +2724,9 @@ func _place(entry: Variant, tile: Vector2i) -> void:
 			# The tariff surcharge above (Economy.charge) is a different
 			# mechanism and stays live either way.
 			Economy.spend_gold(self, Economy.deploy_cost(self))
+			if Kings.power_is(self, "wall"): # Qin Shi Huang — from the ACTION
+				# path, never on_place_cost (a query hook, runs on every redraw)
+				Kings.bite(self, "deploy cost doubled")
 		if actions_left == 0 or _board_cleared(): # last action spent placing
 			return _on_pass()
 	elif state == State.SETUP and not stock.is_empty() and hud.drawer_open != "stock":
@@ -2845,8 +2910,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 						# else can overwrite g.last_capture_ctx again
 					_capture_to_stock(board[also])
 				else:
-					if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-						captured.append(board[also].id)
+					_bank_capture(board[also].id)
 				lost_enemy += 1
 				_add_pop(also)
 				board.erase(also)
@@ -2892,8 +2956,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-					captured.append(victim.id) # the capture itself still resolved
+				_bank_capture(victim.id) # the capture itself still resolved
 			board.erase(to)
 			board[to] = board[from] # the attacker lands, then the blast
 			board[to].moved = true # NO-224
@@ -2918,8 +2981,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if to_stock: # issue 55
 				_capture_to_stock(victim)
 			else:
-				if not Kings.deports_captures(self): # issue 92: The Babylonian Exile
-					captured.append(victim.id)
+				_bank_capture(victim.id)
 			if blitz_free:
 				moving_piece.erase("blitz_free_move")
 			else:
@@ -2969,6 +3031,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		board.erase(to)
 		_add_slide(to, from)
 		final_pos = from
+		_add_turn_fx("USS Eldridge Invisibility Paint: returned to start", BANNER_EFFECT)
 	elif move_to_backrow and to.y != 0: # Royal Fiat (Undamaged) — forced retreat
 		var dest := _first_empty_backrow_tile()
 		if dest.x >= 0:
@@ -2976,6 +3039,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			board.erase(to)
 			_add_slide(to, dest)
 			final_pos = dest
+			_add_turn_fx("Royal Fiat (Undamaged): retreated to the back row", BANNER_EFFECT)
 	if blitz_free:
 		moving_piece.erase("blitz_free_move")
 	elif hounds_free_turn and not did_capture: # Loose the Hounds (67): moves
@@ -3514,6 +3578,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 	# while the Clock is under 60s. Single call site, so no hook needed.
 	if not (clock_ms < 60000.0 and _held("nuclear-football-menu")):
 		actions_left -= it.get("action_cost", 1) # data-driven (Blitz: 0)
+	elif it.get("action_cost", 1) > 0:
+		_add_turn_fx("Nuclear Football Menu: Item costs no Action", BANNER_GAIN)
 	_log_action("item", {"item": it}) # issue 56: Zapruder's Item-return reads this back
 	match it.key:
 		"blitz": # Notion 2026-08-28 rework: costs 0 actions itself; the target's
@@ -3688,6 +3754,7 @@ func _kamikaze_after_capture(at: Vector2i) -> void:
 		var n: Vector2i = at + d
 		if board.has(n) and board[n].owner == Rules.PLAYER:
 			_add_float(n, "Kamikaze!", COL_CAPTURE)
+			Kings.bite(self, "%s destroyed beside the capture" % defs[board[n].id].name)
 			_destroy(n)
 			return
 
@@ -3877,6 +3944,17 @@ func _capture_to_stock(victim: Dictionary) -> void:
 	var e: Dictionary = victim.duplicate()
 	e.erase("owner")
 	stock.append(e.id if e.size() == 1 else e)
+	_add_turn_fx("Zeta Reticuli Souvenir Map: capture sent to Stock", BANNER_EFFECT)
+
+
+## A capture's Captured Stock entry — or, under Nebuchadnezzar II's Power
+## (issue 92: The Babylonian Exile), nothing, with the first deportation of
+## the wave bannered. Was three inline `if not Kings.deports_captures` sites.
+func _bank_capture(id: String) -> void:
+	if Kings.deports_captures(self):
+		Kings.bite(self, "%s deported" % defs[id].name)
+	else:
+		captured.append(id)
 
 
 ## Held copies of one artefact key — Numbers Station Sudoku / Bohemian Grove
@@ -4009,6 +4087,7 @@ func _artefact_confirmed(key: String) -> void:
 			Economy.spend_gold(self, 50)
 			actions_left += 1
 			actions_max += 1 # mid-turn grant, same shape as first_capture_extra
+			_add_turn_fx("FIFA Complimentary Yacht: +1 Action for $50", BANNER_GAIN)
 		"moscovium-glow-stick":
 			moscovium_active = true
 			_consume_artefact(key)

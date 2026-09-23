@@ -369,10 +369,34 @@ static func apply_power(g, king_id: String) -> void:
 		_economy().activate_king_ability_by_key(g, key)
 		g.king_power_abilities = [key]
 	g.king_power_id = king_id
+	g.king_power_bitten = false # first-bite banner re-armed for this wave
 	# an escalating Power seeds its first Tariff through the same path that
 	# stacks the rest, so "what is in force at turn 0" has one definition
 	stack_power_if_due(g)
-	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], Color(1.0, 0.55, 0.4))
+	g._add_turn_fx("%s: %s" % [name_of(king_id), kit.power_name], g.BANNER_POWER)
+	g._add_turn_fx(str(kit.power_desc), g.BANNER_POWER) # what it DOES —
+		# stacked under the name; shown nowhere else for a bespoke Power
+
+
+## The active bespoke Power's kit, or {} — a Power with a `power_key`, i.e.
+## one that lives in power_hook/the branch reads below rather than in the
+## King Ability catalog. hud.gd's ⚠ button and modals.gd's King Abilities
+## rows read this so a whole-wave condition stays visible after its banner.
+static func bespoke_power(g) -> Dictionary:
+	if g.king_power_id == "":
+		return {}
+	var kit := kit_of(g.king_power_id)
+	return kit if kit.has("power_key") else {}
+
+
+## First-bite banner: the first time a bespoke Power actually changes
+## something this wave ("why did that just happen"), once per wave. Every
+## site that applies a Power calls this; the once-per-wave gate lives here.
+static func bite(g, what: String) -> void:
+	if g.king_power_bitten:
+		return
+	g.king_power_bitten = true
+	g._add_turn_fx("%s: %s" % [kit_of(g.king_power_id).get("power_name", ""), what], g.BANNER_POWER)
 
 
 ## Bring the next Tariff of an escalating Power into force, if enough turns have
@@ -397,7 +421,9 @@ static func stack_power_if_due(g) -> void:
 		var key: String = str(esc[g.king_power_abilities.size()])
 		_economy().activate_king_ability_by_key(g, key)
 		g.king_power_abilities.append(key)
-		g._add_turn_fx("TARIFF: %s" % key.replace("_", " "), Color(1.0, 0.55, 0.4))
+		# No banner here: activate_king_ability_by_key -> apply_king_ability
+		# already banners the catalog name ("TARIFF ON MOVE"). The raw-key
+		# "TARIFF: move cost" this used to add on top was a duplicate.
 
 
 ## Spend the King's once-per-Wave Ability. Returns true when it fired, so the
@@ -521,6 +547,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 	# shadowed whichever Power also answers this hook.
 	if hook == "on_enemy_turn_start" and g.king_extra_actions > 0:
 		ctx.actions += g.king_extra_actions
+		ctx.get("notes", []).append("Total Mobilisation +%d" % g.king_extra_actions)
 	var kit := kit_of(g.king_power_id)
 	match [str(kit.get("power_key", "")), hook]:
 		["host", "on_enemy_turn_start"]:
@@ -528,6 +555,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# composes with the tier's own enemy-action count rather than
 			# replacing it (issue 59).
 			ctx.actions += 1
+			ctx.get("notes", []).append("%s +1" % kit.power_name)
 		["wall", "on_place_cost"]:
 			# Qin Shi Huang: the wall is sealed. Doubled rather than blocked —
 			# blocking deploys outright can strand a player into the resource
@@ -538,11 +566,13 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# Shop restocks are Score-gated, and zeroing Score for a whole wave
 			# would quietly close the Shop too, which is Kim Jong Un's Power.
 			ctx.amount *= 0.5
+			bite(g, "Score gain halved")
 		["totalwar", "on_piece_lost"]:
 			# Hitler: every loss is also a material cost. Routed through
 			# ctx.gold_bonus, never g.gold — the header's rule, so Economy
 			# applies it exactly once.
 			ctx.gold_bonus = ctx.get("gold_bonus", 0) - 10
+			g._add_turn_fx("%s −$10" % kit.power_name, g.BANNER_LOSS)
 		["nomerge", "on_merge_check"]:
 			# Genghis Khan: nothing is consolidated. Same lever as Regulation,
 			# but total rather than pawn-only.
@@ -554,6 +584,7 @@ static func power_hook(g, hook: String, ctx: Dictionary) -> void:
 			# against Kings while still working against Tariffs.
 			if not ctx.get("gain_immune", false):
 				ctx.amount *= 0.5
+				bite(g, "$ gain halved")
 
 
 ## Branch-style Powers: read at the site rather than dispatched, because each

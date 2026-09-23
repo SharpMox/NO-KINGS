@@ -17,6 +17,7 @@ const Armies := preload("res://scripts/armies.gd")
 const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
 const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
+const Kings := preload("res://data/kings.gd") # banner pass: bespoke Power in the ⚠ button
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-152: the targeting tip's diagram
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
@@ -1664,7 +1665,8 @@ func collapse_army_band() -> void:
 ## dropping it would lose the one place an active-while-collapsed King
 ## Ability is visible without opening the band.
 func _update_band_toggle() -> void:
-	var warn: bool = g != null and not g.king_abilities_active.is_empty() and not army_band_open
+	var warn: bool = g != null and not army_band_open \
+		and (not g.king_abilities_active.is_empty() or not Kings.bespoke_power(g).is_empty())
 	if army_band_open:
 		army_band_reopen.text = "ⓘ"
 		army_band_reopen.tooltip_text = "Hide"
@@ -1989,12 +1991,17 @@ func refresh() -> void:
 	stock_badge.text = str(g._pool().size())
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
-	king_ability_button.text = "⚠%d" % g.king_abilities_active.size() \
+	# Banner pass 2026-09-22: a bespoke King Power (Kings.bespoke_power) counts
+	# as one ability in force — it is live all wave and had no persistent
+	# indicator before this.
+	var abilities_in_force: int = g.king_abilities_active.size() \
+		+ (0 if Kings.bespoke_power(g).is_empty() else 1)
+	king_ability_button.text = "⚠%d" % abilities_in_force \
 		+ ("·off" if g.king_abilities_suppressed else "")
 	# NO-128: shown in army_band only while an ability is active — the button
 	# lived off-screen (built, never parented) before this; now it's parented
 	# but hidden the rest of the time.
-	king_ability_button.visible = not g.king_abilities_active.is_empty()
+	king_ability_button.visible = abilities_in_force > 0
 	# NO-128 (coordinator review 2026-09-19): an active King ability must
 	# never go invisible just because the band is collapsed — that's exactly
 	# the thing a player must not lose track of. The CLOSED glyph carries its

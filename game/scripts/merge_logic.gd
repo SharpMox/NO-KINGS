@@ -8,6 +8,7 @@ const Tuning := preload("res://scripts/tuning.gd") # issue 98: MERGE_COST
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-191: inherited()
+const Kings := preload("res://data/kings.gd") # banner pass: Genghis Khan's first bite
 
 
 ## The piece the current selection would merge FROM: an armed Stock stack
@@ -93,6 +94,9 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 	for ref in [a, b]:
 		ids.append(g.board[ref].id if ref is Vector2i else ref.id)
 	if not pair_ok(g, ids[0], ids[1]):
+		if Kings.power_is(g, "nomerge"): # Genghis Khan — the attempt is the
+			# ACTION path; on_merge_check itself is a query hook (highlights)
+			Kings.bite(g, "merge blocked")
 		return
 	if g.autoplay:
 		return commit_merge(g, a, b)

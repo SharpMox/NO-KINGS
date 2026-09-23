@@ -117,7 +117,9 @@ func _init() -> void:
 	bx._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
 		"contents": Box.roll_options(bx, "item", "small")})
 	check(bx.box_open, "(setup) a Box pick is open")
-	var offer_before := JSON.stringify(bx.box_offer)
+	# JSON-normalised: the save turns an int payload field (Blitz's
+	# action_cost 0) into 0.0, a representation change, not a re-roll
+	var offer_before := JSON.stringify(JSON.parse_string(JSON.stringify(bx.box_offer)))
 	var bx_saved := _round_trip(bx)
 	bx.queue_free()
 	await process_frame

@@ -29,6 +29,7 @@ const Kings := preload("res://data/kings.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
 const HudScript := preload("res://scripts/hud.gd") # HEADER_H feeds the board solve (NO-83)
+const Ads := preload("res://scripts/ads.gd") # NO-241: the one rewarded-ad seam
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -662,6 +663,8 @@ var box_rerolls_left := 0 # Bible Gag Reel Scroll + Snowden's Rubik's Cube:
 var box_only_kind := "" # the current Box's theme ("piece"/"artefact"/"item",
 	# issue 47 — every Box is typed), pinned for its life so a Reroll re-rolls
 	# the same theme
+var box_from_ad := false # NO-241: the open Box is the Shop's Ad Box, whose
+	# Skip pays no Gold (Max, 2026-09-24: ads give items, never free Gold)
 var box_size := "" # the current Box's size ("small"/"big"/"huge"), pinned
 	# the same way — a Reroll keeps the same choice/pick shape too
 var box_black_book_pending := false # Epstein's Black Book (49): true once
@@ -767,6 +770,15 @@ var rng := RandomNumberGenerator.new()
 ## only — a gold total cannot attribute a charge, which is why a balance
 ## question about tariffs could not be answered at all. Not saved.
 var tariff_charges := {}
+
+## NO-241: the once-per-run ad retry. `wave_snapshot` is SaveConfig.to_config
+## taken at the first turn start of each wave (_take_wave_snapshot) — the
+## checkpoint an accepted retry reloads. Both saved with the run.
+## `ad_retry_enabled` is off for scenario boots (set in _ready); a test that
+## drives the retry turns it back on.
+var wave_snapshot := {}
+var ad_retry_used := false
+var ad_retry_enabled := true
 
 var autoplay := false
 var autoplay_exit := false # quit-on-game-over: CLI --autoplay runs only, so the
@@ -931,6 +943,7 @@ func _ready() -> void:
 	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
+	ad_retry_enabled = not is_scenario # NO-241: never offered in scenarios
 	if next_config.is_empty():
 		# issue 89: roll the King line-up here, from the run RNG (seeded just
 		# above), so the same seed always meets the same four Kings in the same
@@ -1398,7 +1411,7 @@ func _process(delta: float) -> void:
 		# it is not a difficulty lever.
 		var tier_pauses := not Tuning.clock_never_pauses(next_tier) \
 				and (game_menu_open or shop_open() or drawer_open != "" or preview_open
-				or modals.pause_modal_open())
+				or modals.pause_modal_open() or Ads.is_open())
 		# `win_open` is NOT on that tier-gated list, and must not be: the victory
 		# screen is not a pause. The run is already won at wave 50 and there is
 		# nothing left to be decisive about, so the difficulty lever has nothing
@@ -1565,6 +1578,8 @@ func _begin_player_turn() -> void:
 	# it stays exactly as forgiving as it was and never ends a run early.
 	if _player_pieces().is_empty() and stock.is_empty() and captured.is_empty():
 		return _game_over(false, "Resource starvation")
+	if turns_since_wave == 0: # NO-241: the first turn start of a wave (queue()
+		_take_wave_snapshot() # zeroes it; every turn end adds 1) — the retry point
 	_autosave() # at every turn start
 	_refresh()
 	if pending_reinforce: # saved BEFORE consuming: a resumed run reopens it
@@ -1629,6 +1644,12 @@ func _autosave() -> void:
 	# through a new door.
 	if state == State.GAME_OVER:
 		return
+	_write_save(SaveConfig.to_config(self))
+
+
+## The write half of _autosave, shared with the ad retry (NO-241), which saves
+## its restored checkpoint from a GAME_OVER state _autosave refuses.
+func _write_save(cfg: Dictionary) -> void:
 	# Null-checked because this runs EVERY TURN on a phone, where storage
 	# genuinely fills up. Dereferencing a failed open would crash the run at the
 	# top of a turn — losing far more than the save it was trying to write. The
@@ -1639,7 +1660,7 @@ func _autosave() -> void:
 		push_error("save: could not write %s (error %d) — this turn is not saved"
 			% [SAVE_PATH, FileAccess.get_open_error()])
 		return
-	f.store_string(JSON.stringify(SaveConfig.to_config(self)))
+	f.store_string(JSON.stringify(cfg))
 	f = null # close before the mirror reads the file back through its own handle
 	CloudSave.sync_file("run", SAVE_PATH) # mirror to the platform backend (12)
 
@@ -2266,23 +2287,13 @@ func _telemetry_csv(result: String, reason: String) -> String:
 
 
 func _game_over(won: bool, reason: String) -> void:
+	if not won and _offer_ad_retry(reason):
+		return # NO-241: held open until the player accepts or declines
 	state = State.GAME_OVER
 	ArtefactHooks.run(self, "on_game_over") # before record_score: e.g. Rapture
 		# Insurance Policy converts Gold to Score, and the converted total is
 		# what gets ranked (issue 16)
-	if not is_scenario:
-		if FileAccess.file_exists(SAVE_PATH):
-			DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
-		# ...and the CLOUD has to be told, or deleting the local file achieves
-		# nothing. cloud_save.resolve() treats "no local file" as the new-device
-		# restore case and takes the cloud copy wholesale — so the next boot's
-		# sync would pull the finished run straight back and offer to Continue a
-		# game that is already over, every launch, for every player.
-		#
-		# A null payload is the tombstone: resolve() returns null for it, and
-		# sync_file() bails before writing, so the deletion sticks instead of
-		# being undone. (issue 86)
-		CloudSave.push("run", null)
+	_delete_run_save()
 	var rank := 0 # scenario/bot runs stay off the local leaderboard
 	if not is_scenario and not autoplay:
 		rank = Economy.record_score(self)
@@ -2303,6 +2314,98 @@ func _game_over(won: bool, reason: String) -> void:
 			get_tree().quit(0)
 
 
+
+
+## The run ended (or hangs on the NO-241 retry offer): nothing to resume.
+func _delete_run_save() -> void:
+	if is_scenario:
+		return
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(SAVE_PATH) # the run ended; nothing to resume
+	# ...and the CLOUD has to be told, or deleting the local file achieves
+	# nothing. cloud_save.resolve() treats "no local file" as the new-device
+	# restore case and takes the cloud copy wholesale — so the next boot's
+	# sync would pull the finished run straight back and offer to Continue a
+	# game that is already over, every launch, for every player.
+	#
+	# A null payload is the tombstone: resolve() returns null for it, and
+	# sync_file() bails before writing, so the deletion sticks instead of
+	# being undone. (issue 86)
+	CloudSave.push("run", null)
+
+
+## NO-241 (Max, 2026-09-24): the first loss of a run offers one retry, paid for
+## with an ad, from the wave-start checkpoint (_take_wave_snapshot). Marked used
+## the moment it is OFFERED, so a Decline — or a second loss after a retry —
+## falls through to the normal game over. Returns true while the offer is up;
+## _game_over has done nothing yet at that point (no save deleted, no score
+## recorded), so either answer starts from a clean slate.
+func _offer_ad_retry(reason: String) -> bool:
+	if ad_retry_used or not ad_retry_enabled or autoplay or wave_snapshot.is_empty():
+		return false
+	ad_retry_used = true
+	state = State.GAME_OVER # the Clock and board input stop while it asks
+	_delete_run_save() # quitting on the offer must not resume the pre-death
+		# save; Accept writes the checkpoint back (_retry_from_wave_snapshot)
+	_open_choice_pick("Watch an ad to retry\nfrom the last completed wave?",
+		[{"label": "Accept", "value": true}], "Decline",
+		_accept_ad_retry, _game_over.bind(false, reason))
+	return true
+
+
+func _accept_ad_retry(_value: Variant) -> void:
+	Ads.show_rewarded(_retry_from_wave_snapshot)
+
+
+## The checkpoint goes back in through the same door Continue uses
+## (next_config -> SaveConfig.apply on the reloaded scene), so nothing is
+## restored by hand. Saved first: a quit before the next turn start must
+## resume the retried run, not the pre-death save with the retry unspent.
+func _retry_from_wave_snapshot() -> void:
+	var cfg: Dictionary = wave_snapshot.duplicate(true)
+	cfg.ad_retry_used = true
+	next_config = cfg
+	if not (autoplay or is_scenario):
+		_write_save(cfg)
+	get_tree().reload_current_scene()
+
+
+## NO-241: the retry checkpoint — the run as a save, at the first turn start of
+## a wave. Its own previous checkpoint is cleared first so snapshots never nest.
+func _take_wave_snapshot() -> void:
+	wave_snapshot = {}
+	wave_snapshot = SaveConfig.to_config(self).duplicate(true)
+
+
+## A Shop Buy — shop_buy_pressed, and the Ad Box's ad reward (NO-241).
+func _shop_buy(index: int) -> void:
+	# BEFORE Shop.buy, which takes the gold. _open_box_pick refuses to
+	# clobber a Box that is already open, so buying one here while another
+	# was open would otherwise charge the player and show them nothing.
+	# (The Box now renders above the Shop, so this should be unreachable —
+	# it is the guard that makes that a safety property rather than a
+	# coincidence of draw order.)
+	if box_open:
+		return
+	if not Shop.buy(self, index):
+		return
+	if shop_stock[index].kind == "box": # the roll modal IS the grant
+		if modals.shop_panel:
+			modals.shop_panel.visible = false
+		return _open_box_pick(shop_stock[index]) # reveals its stock-time roll
+	# An artefact's on_purchase can open a Box of its own — SETI's Red
+	# Marker does. Rebuilding the Shop here would raise a fresh, opaque
+	# shop_panel back on top of that Box, and every further Buy would then
+	# hit the box_open guard and do nothing on a Shop that still looks live.
+	# Step aside and let the Box have the screen, exactly as the box branch
+	# above does.
+	if box_open:
+		if modals.shop_panel:
+			modals.shop_panel.visible = false
+		_refresh()
+		return
+	modals.show_shop() # rebuild: fresh SOLD + affordability state
+	_refresh()
 
 
 func _end_shot() -> void:
@@ -2600,7 +2703,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if preview_open or game_menu_open:
+	if preview_open or game_menu_open or Ads.is_open():
 		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
@@ -4963,6 +5066,7 @@ func _open_box_pick(slot: Dictionary) -> void:
 	box_open = true
 	box_only_kind = slot.key
 	box_size = slot.size
+	box_from_ad = slot.get("ad", false)
 	var native_picks: int = Box.SIZES[slot.size].picks # Huge grants 2 (issue 47)
 	box_picks_left = (native_picks - 1) + _artefact_count("nostradamus-mad-libs")
 	box_rerolls_left = _artefact_count("snowden-s-rubik-s-cube") # issue 58: Bible
@@ -5870,33 +5974,11 @@ func _connect_modals() -> void:
 		win_open = false
 		_game_over(true, "Wave-%d King checkmated" % wave))
 	modals.shop_buy_pressed.connect(func(index: int) -> void:
-		# BEFORE Shop.buy, which takes the gold. _open_box_pick refuses to
-		# clobber a Box that is already open, so buying one here while another
-		# was open would otherwise charge the player and show them nothing.
-		# (The Box now renders above the Shop, so this should be unreachable —
-		# it is the guard that makes that a safety property rather than a
-		# coincidence of draw order.)
-		if box_open:
+		if shop_stock[index].get("ad", false): # NO-241: the Ad Box — the ad
+			if Shop.can_buy(self, shop_stock[index]) and not box_open: # first,
+				Ads.show_rewarded(_shop_buy.bind(index)) # the Box after
 			return
-		if not Shop.buy(self, index):
-			return
-		if shop_stock[index].kind == "box": # the roll modal IS the grant
-			if modals.shop_panel:
-				modals.shop_panel.visible = false
-			return _open_box_pick(shop_stock[index]) # reveals its stock-time roll
-		# An artefact's on_purchase can open a Box of its own — SETI's Red
-		# Marker does. Rebuilding the Shop here would raise a fresh, opaque
-		# shop_panel back on top of that Box, and every further Buy would then
-		# hit the box_open guard and do nothing on a Shop that still looks live.
-		# Step aside and let the Box have the screen, exactly as the box branch
-		# above does.
-		if box_open:
-			if modals.shop_panel:
-				modals.shop_panel.visible = false
-			_refresh()
-			return
-		modals.show_shop() # rebuild: fresh SOLD + affordability state
-		_refresh())
+		_shop_buy(index))
 	modals.shop_tile_preview_requested.connect(func(index: int) -> void:
 		_show_shop_preview(index)) # NO-167 (Max review, second pass)
 	modals.restart_pressed.connect(func() -> void:
@@ -6177,6 +6259,9 @@ func _on_box_skipped() -> void:
 ## A Huge Box declining all 7 pays for all 7 — intended, not a bug (issue 49).
 ## Stacks additively per held copy, same convention as every other artefact.
 func _decline_box_pick() -> void:
+	if box_from_ad:
+		return # NO-241 (Max, 2026-09-24): no skip Gold, no Cicada Gold — an ad
+			# buys the Box's contents, never free Gold
 	# NO-23 (user rulings 2026-09-07): the consolation is the Box's own price,
 	# so declining a Huge Box is worth four times declining a Small one — and it
 	# is paid in GOLD ONLY. earn_gold, never earn(): earn() grants both

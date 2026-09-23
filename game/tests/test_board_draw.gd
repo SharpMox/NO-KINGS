@@ -78,7 +78,7 @@ func _init() -> void:
 	check(Rect2(px, Vector2(t, t)).encloses(Rect2(c - Vector2(r, r), Vector2(r, r) * 2)),
 		"inversion mark's disc (r=%.1f) lies inside its tile (%.1f)" % [r, t])
 	check(game.INV_MARK_GLYPH_COL == Color.WHITE, "inversion glyph is white, not the side colour")
-	check(game.INV_MARK_DISC_COL == Color(0.19, 0.08, 0.27, 0.9), "inversion disc is dark purple")
+	check(game.INV_MARK_DISC_COL == Color(0, 0, 0, 0.72), "inversion disc is dark, 72% alpha")
 
 	game.queue_free()
 	await process_frame

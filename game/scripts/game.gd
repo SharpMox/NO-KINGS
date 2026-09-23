@@ -316,8 +316,8 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 ## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
 ## the RING off-centre. Shift by this fraction of the mark size so the ring,
 ## not the box, sits on the disc's centre (measured from a capture, NO-100).
-const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, 0.0)
-const INV_MARK_DISC_COL := Color(0.19, 0.08, 0.27, 0.9) # dark purple (Max, NO-100)
+const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.06)
+const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a

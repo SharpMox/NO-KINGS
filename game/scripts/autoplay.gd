@@ -295,10 +295,10 @@ static func reinforce(g) -> void:
 ##
 ##   * only when Gold is genuinely short, so a sale reads as "I need this to
 ##     afford something", not as a routine income stream;
-##   * only from CAPTURED Stock, and only a spare. Captured pieces are the one
-##     safe thing to liquidate: they are not deployable without paying
-##     convert_price first, so selling one cannot cost board presence the way
-##     selling from Stock can;
+##   * only a spare CAPTURED piece. Captured pieces are the one safe thing to
+##     liquidate: they are not deployable without paying convert_price first,
+##     so selling one cannot cost board presence the way selling from Stock
+##     can;
 ##   * Shop.can_sell's own starvation-softlock guard is the backstop, never the
 ##     strategy — a bot that relied on it would be selling right up to the edge
 ##     of a softlock every run and calling that a measurement.
@@ -308,14 +308,11 @@ static func reinforce(g) -> void:
 ## they do for a player. Costs no Action (issue 64), like the Shop and
 ## conversion beside it.
 ##
-## NO-144: the player's own Sell path moved off the Shop and onto the
-## preview modal, and dropped Captured Stock as a direct target (Convert
-## first, then sell from Stock) — this bot strategy still sells Captured
-## Stock directly via Shop.can_sell/g._sell("captured", ...), unchanged.
-## Left alone deliberately: it's a separately measured, tuned balance
-## strategy (see the "MEASURED 2026-09-07" note below), not the Shop UI this
-## ticket touched, and retuning it wasn't asked for — flagged for a call on
-## whether the bot should now be limited to what the UI can still reach.
+## NO-153 (Max, 2026-09-23): held to the player's rules. Since NO-144 a player
+## can only sell FROM STOCK, so a Captured piece is Converted first
+## (g._convert_captured, the preview modal's Convert) and then sold as a
+## "piece" (g._sell, the Sell button) — two steps, each at its own price. Only
+## the path changed; when and what to sell did not.
 static func try_sell(g) -> bool:
 	if g.gold >= SELL_GOLD_FLOOR:
 		return false
@@ -333,7 +330,15 @@ static func try_sell(g) -> bool:
 	# So: only with Stock already healthy, and only from a genuine surplus.
 	if g.stock.size() < LOW_STOCK or g.captured.size() < SELL_CAPTURED_SURPLUS:
 		return false
-	for entry in g.captured:
-		if Shop.can_sell(g, "captured", entry):
-			return g._sell("captured", entry)
+	for entry in g.captured.duplicate():
+		# NO-153: only when the two steps together gain Gold — the point of the
+		# sale. Tuning.CONVERT_RATE > SELL_RATE (even with Insider Rates' +25%),
+		# so today this never passes and the bot keeps its Captured Stock.
+		if Shop.sell_payout(g, "piece", entry) <= Shop.convert_price(g, entry):
+			continue
+		# Checked BEFORE converting, so the bot never converts a piece it then
+		# cannot sell: the post-sale state is the same either way.
+		if Shop.can_convert(g, entry) and not Shop.sell_softlocks(g, "captured", entry) \
+				and g._convert_captured(entry):
+			return g._sell("piece", entry)
 	return false

@@ -779,6 +779,35 @@ func _init() -> void:
 	bot.queue_free()
 	await process_frame
 
+	# --- NO-237: Stock/Captured stacks KEEP their buttons across a rebuild
+	# (hud.gd's _rebuild_stock_drawer used to free and rebuild every one, so
+	# nothing on screen had an identity a slide could animate). A stack still
+	# there keeps its exact Button, re-dressed with its new count; a stack that
+	# is gone has no button left in either grid.
+	var re: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"stock": ["pawn", "knight"], "captured": ["rook"]})
+	await process_frame
+	var find := func(id: String, cap: bool) -> Button:
+		for b in re.hud.pool_buttons():
+			if b.has_meta("id") and b.get_meta("id") == id and bool(b.get_meta("cap")) == cap:
+				return b
+		return null
+	var knight_btn: Button = find.call("knight", false)
+	var rook_btn: Button = find.call("rook", true)
+	check(knight_btn != null and rook_btn != null and find.call("pawn", false) != null,
+		"NO-237 fixture: pawn and knight stacks in Stock, a rook in Captured")
+	re.stock.erase("pawn")
+	re.stock.append("knight")
+	re._refresh()
+	check(find.call("knight", false) == knight_btn,
+		"NO-237: the knight stack keeps its button across a rebuild")
+	check(knight_btn.get_children().any(func(c: Node) -> bool: return c is Label and c.text == "2"),
+		"NO-237: and the kept button shows the stack's new count")
+	check(find.call("rook", true) == rook_btn, "NO-237: a Captured row keeps its button too")
+	check(find.call("pawn", false) == null, "NO-237: the gone pawn stack's button is out of the grid")
+	re.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL SHOP CHECKS OK")

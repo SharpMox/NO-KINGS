@@ -134,8 +134,8 @@ func _init() -> void:
 					func(it: Dictionary) -> bool: return it.key == slot.key)[0].tier]
 			"artefact":
 				want = Tuning.SHOP_ARTEFACT_PRICE[Shop.rarity_of(slot)]
-			_:
-				want = Tuning.SHOP_BOX_PRICE[slot.size]
+			_: # the Ad Box costs an ad, not Gold (NO-241)
+				want = 0 if slot.get("ad", false) else Tuning.SHOP_BOX_PRICE[slot.size]
 		priced_ok = priced_ok and Shop.price(game, slot) == want
 	check(priced_ok, "every slot prices by its row's rule (artefact: by rarity, box: by size)")
 	check(Tuning.SHOP_BOX_PRICE == {"small": 50, "big": 100, "huge": 200},

@@ -46,6 +46,7 @@ func _press_ad_close() -> void:
 
 
 func _init() -> void:
+	await process_frame # Engine.get_main_loop() is still null inside _init
 	# --- the seam: the placeholder's Close grants the reward ---
 	var rewarded := [0]
 	Ads.show_rewarded(func() -> void: rewarded[0] += 1)

@@ -55,6 +55,9 @@ static var next_seed: String = ""
 ## scenario, and Play re-applied it. Set by the first Game._ready, read by
 ## menu.gd before it forwards and by the arg checks below.
 static var cli_bypass_used := false
+## THROWAWAY (probe/no-100-inv-mark): which inversion-mark rendering variant
+## --inv-mark selects. "" is the shipped default.
+static var inv_mark_variant := ""
 
 
 ## NO-194: next_army is read by SaveConfig.apply's own fallback (`cfg.get(
@@ -800,6 +803,8 @@ func _ready() -> void:
 		next_tier = args[args.find("--tier") + 1]
 	if args.has("--seed"): # issue 75: reproduce a run exactly
 		next_seed = args[args.find("--seed") + 1]
+	if args.has("--inv-mark"): # THROWAWAY probe/no-100-inv-mark
+		inv_mark_variant = args[args.find("--inv-mark") + 1]
 	_layout_board()
 	# NO-57: the platform can settle the notch/cutout inset a frame or two
 	# after boot, or change it outright (rotation, split-screen) — recompute
@@ -867,6 +872,14 @@ func _ready() -> void:
 	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
+	if first_boot and args.has("--scenario-name"): # THROWAWAY probe/no-100-inv-mark:
+		# scenario indices are positional/fragile (CLAUDE.md), so look up by name.
+		var wanted_name: String = args[args.find("--scenario-name") + 1]
+		for s in Scenarios.all():
+			if s.name == wanted_name:
+				next_config = s.cfg
+				is_scenario = true
+				break
 	if next_config.is_empty():
 		# issue 89: roll the King line-up here, from the run RNG (seeded just
 		# above), so the same seed always meets the same four Kings in the same
@@ -5281,8 +5294,20 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		draw_string(font, px + Vector2(0, tile * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, tile, size, col)
 	if _is_inversion_marked(p.id): # NO-101: over the token, corner only, never hides the piece
 		var side_col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
+		# THROWAWAY (probe/no-100-inv-mark): --inv-mark selects a rendering
+		# variant for NO-100 (the mark is too faint over busy piece art).
 		var mark_size := _inv_mark_size()
-		draw_string(font, _inv_mark_px(px, mark_size), INV_MARK_GLYPH,
+		if inv_mark_variant == "big" or inv_mark_variant == "disc-big":
+			mark_size = maxi(18, int(tile * 0.72))
+		var mark_pos := _inv_mark_px(px, mark_size)
+		if inv_mark_variant == "disc" or inv_mark_variant == "disc-big":
+			var disc_r: float = mark_size * 0.55
+			var disc_center := mark_pos + Vector2(mark_size * 0.45, -mark_size * 0.35)
+			draw_circle(disc_center, disc_r, Color(0, 0, 0, 0.72))
+		if inv_mark_variant == "outline":
+			draw_string_outline(font, mark_pos, INV_MARK_GLYPH,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, mark_size, 4, Color(0, 0, 0, 0.9))
+		draw_string(font, mark_pos, INV_MARK_GLYPH,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, mark_size, side_col)
 	var buff_glyphs := BuffLogic.glyphs_of(p)
 	if not buff_glyphs.is_empty(): # NO-185: bottom edge — NO-101's mark owns the top-right corner

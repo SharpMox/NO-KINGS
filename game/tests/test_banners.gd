@@ -15,6 +15,8 @@ const Economy := preload("res://scripts/economy.gd")
 const WaveLogic := preload("res://scripts/wave_logic.gd")
 const Kings := preload("res://data/kings.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Shop := preload("res://scripts/shop.gd")
+const SaveConfig := preload("res://scripts/save_config.gd")
 
 var fails := 0
 
@@ -48,6 +50,10 @@ func _banners(g) -> Array:
 
 func _has_banner(g, text: String) -> bool:
 	return _banners(g).any(func(a: Dictionary) -> bool: return a.text == text)
+
+
+func _restock_banners(g) -> Array:
+	return _banners(g).filter(func(a: Dictionary) -> bool: return a.cause == "shop_restock")
 
 
 func _init() -> void:
@@ -161,6 +167,41 @@ func _init() -> void:
 	gl._refresh()
 	check(not gl.hud.king_ability_button.visible, "no Power, no Tariff: the ⚠ button hides again")
 	gl.queue_free()
+	await process_frame
+
+	# --- NO-238: Shop restock banner ----------------------------------------
+	var sh := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 9})
+	await process_frame
+	sh.anims.clear()
+	WaveLogic.queue(sh, 10) # Lane A
+	check(_restock_banners(sh).size() == 1 and _has_banner(sh, "SHOP RESTOCKED"),
+		"Lane A restock: exactly one SHOP RESTOCKED banner (%d)" % _restock_banners(sh).size())
+	sh.anims.clear()
+	Shop.add_score_progress(sh, Tuning.SHOP_LANE_B_SCORE * 2) # crosses twice, rolls once
+	check(_restock_banners(sh).size() == 1 and _has_banner(sh, "SHOP RESTOCKED"),
+		"Lane B restock: exactly one SHOP RESTOCKED banner (%d)" % _restock_banners(sh).size())
+	sh.anims.clear()
+	Shop.roll(sh) # run setup / the player's own Jet Fuel restock
+	check(_restock_banners(sh).is_empty(), "a bare Shop.roll (setup, Jet Fuel) is not bannered")
+	var saved: Dictionary = SaveConfig.to_config(sh)
+	sh.queue_free()
+	await process_frame
+
+	var rs := _boot(saved) # save restore
+	await process_frame
+	check(_restock_banners(rs).is_empty(), "a save restore banners no restock")
+	rs.queue_free()
+	await process_frame
+
+	var op := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 4})
+	await process_frame
+	op.anims.clear()
+	Shop.add_score_progress(op, Tuning.SHOP_LANE_B_SCORE) # before the unlock
+	check(_restock_banners(op).is_empty(), "no restock banner while the Shop is still locked")
+	WaveLogic.queue(op, Tuning.SHOP_UNLOCK_WAVE)
+	check(_restock_banners(op).size() == 1 and _has_banner(op, "SHOP OPEN"),
+		"the unlock Wave's restock reads SHOP OPEN")
+	op.queue_free()
 	await process_frame
 
 	print("---")

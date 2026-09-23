@@ -309,7 +309,20 @@ const ARROW_HEAD_HALF := 11.0 # was 8.0
 # mark's first size (tile * 0.3) it rendered as an unreadable speck; that
 # was a SIZE bug, not missing glyph coverage (U+21BA renders no bigger from
 # the same fallback) — fixed by sizing the mark for legibility below.
+# NO-100 (Max's ruling 2026-09-24): the glyph is WHITE on a dark disc centred
+# on the tile, superseding NO-101's side-coloured corner glyph.
 const INV_MARK_GLYPH := "⟲"
+const INV_MARK_GLYPH_COL := Color.WHITE
+## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
+## the RING off-centre. Shift by this fraction of the mark size so the ring,
+## not the box, sits on the disc's centre (measured from a capture, NO-100).
+## The ⟲ is drawn this much larger than the size the disc is built from, so it
+## fills more of its disc (Max, NO-100).
+const INV_MARK_GLYPH_SCALE := 1.25
+const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
+const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
+const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
+const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
 # light ring behind each glyph, rather than a flat colour matched to the
@@ -5279,13 +5292,20 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var glyph: String = defs[p.id].glyph
 		var size := 40 if glyph.length() <= 1 else 22
 		draw_string(font, px + Vector2(0, tile * 0.68), glyph, HORIZONTAL_ALIGNMENT_CENTER, tile, size, col)
-	if _is_inversion_marked(p.id): # NO-101: over the token, corner only, never hides the piece
-		var side_col := COL_PLAYER if p.owner == Rules.PLAYER else COL_ENEMY
+	if _is_inversion_marked(p.id): # NO-100: centred over the piece, white on a dark disc
 		var mark_size := _inv_mark_size()
-		draw_string(font, _inv_mark_px(px, mark_size), INV_MARK_GLYPH,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, mark_size, side_col)
+		var c := _inv_mark_centre(px)
+		var r := mark_size * INV_MARK_DISC_RATIO
+		draw_circle(c, r, INV_MARK_DISC_COL)
+		# draw_string's y is the BASELINE: drop it by half of (ascent - descent)
+		# so the glyph's box is centred on the disc, not sitting on its middle
+		var glyph_size := int(mark_size * INV_MARK_GLYPH_SCALE)
+		var baseline := c.y + (font.get_ascent(glyph_size) - font.get_descent(glyph_size)) / 2.0
+		var nudge := INV_MARK_GLYPH_NUDGE * glyph_size
+		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
+			HORIZONTAL_ALIGNMENT_CENTER, r * 2, glyph_size, INV_MARK_GLYPH_COL)
 	var buff_glyphs := BuffLogic.glyphs_of(p)
-	if not buff_glyphs.is_empty(): # NO-185: bottom edge — NO-101's mark owns the top-right corner
+	if not buff_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
 		_draw_buff_badges(font, px, buff_glyphs)
 
 
@@ -5320,20 +5340,20 @@ func _is_inversion_marked(id: String) -> bool:
 ## NO-101's inversion glyph, sized off the tile so it reads at any board
 ## scale (a fixed pixel size measured unreadable — a few px of ink — at the
 ## mobile tile size). Floor keeps it legible if the board ever shrinks
-## further; the glyph itself is small within its own font metrics, so 56% of
-## the tile lands it clearly short of covering the piece.
+## further; the glyph itself is small within its own font metrics, hence 56%
+## of the tile. NO-100 kept this size for the centred disc (radius = size *
+## INV_MARK_DISC_RATIO, ~0.25 tile), which sits over the piece by design.
 func _inv_mark_size() -> int:
 	return maxi(18, int(tile * 0.56))
 
 
-## Where NO-101's inversion glyph sits on a tile, from the tile's top-left
-## pixel — pinned to the top-right corner and scaled with `size` so it never
-## drifts off-tile as `_inv_mark_size` changes. `draw_string`'s y is the
-## BASELINE, not the glyph's top: it must sit far enough down for the
-## glyph's ascent (~0.8 * size) to still land inside this tile and not the
-## one above it — measured wrong once already (NO-101).
-func _inv_mark_px(px: Vector2, size: int) -> Vector2:
-	return px + Vector2(tile - size * 0.9, size * 0.92)
+## The centre of the inversion mark's disc (and glyph), from the tile's
+## top-left pixel: the tile's own centre, over the piece art — Max's ruling
+## (NO-100, 2026-09-24), superseding NO-101's "corner only, never hides the
+## piece". Shared by `_draw_piece` and tests/test_board_draw.gd so the probe
+## can never diverge from where the draw call actually puts the mark.
+func _inv_mark_centre(px: Vector2) -> Vector2:
+	return px + Vector2(tile, tile) / 2.0 + Vector2(0, tile * INV_MARK_DROP)
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

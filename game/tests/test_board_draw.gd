@@ -10,7 +10,9 @@ extends SceneTree
 ## board, so this runs against pieces the game's own setup path actually
 ## placed. Calls `_is_inversion_marked`, the exact predicate `_draw_piece`
 ## gates the glyph draw on (game.gd), so the check can never drift from what
-## gets drawn. A true pixel check needs a window — game.gd's own
+## gets drawn. NO-100: also pins the mark's placement — centred on the tile
+## via `_inv_mark_centre`, disc inside the tile, glyph white. A true pixel
+## check needs a window — game.gd's own
 ## `_screenshot_and_quit` is commented "windowed run required" — so this is
 ## the headless ceiling; NO-101's PR carries a windowed screenshot as the
 ## visual proof.
@@ -62,6 +64,21 @@ func _init() -> void:
 	for id in COUNTERPARTS:
 		check(ids_on_board.has(id), "scenario board carries %s" % id)
 		check(not game._is_inversion_marked(id), "%s (non-inverted) is NOT marked" % id)
+
+	# NO-100 (Max's ruling 2026-09-24): the mark is a white glyph on a dark
+	# disc centred on the tile — no longer NO-101's side-coloured top-right
+	# corner glyph. `_inv_mark_centre` is the exact helper `_draw_piece` places
+	# the disc and glyph with, so this can't drift from the draw.
+	var px := Vector2(37, 53) # an arbitrary tile origin, not (0, 0)
+	var t: float = game.tile
+	var c: Vector2 = game._inv_mark_centre(px)
+	check(c.is_equal_approx(px + Vector2(t, t) / 2.0),
+		"inversion mark is centred on the tile (%s vs tile centre %s)" % [c, px + Vector2(t, t) / 2.0])
+	var r: float = game._inv_mark_size() * game.INV_MARK_DISC_RATIO
+	check(Rect2(px, Vector2(t, t)).encloses(Rect2(c - Vector2(r, r), Vector2(r, r) * 2)),
+		"inversion mark's disc (r=%.1f) lies inside its tile (%.1f)" % [r, t])
+	check(game.INV_MARK_GLYPH_COL == Color.WHITE, "inversion glyph is white, not the side colour")
+	check(game.INV_MARK_DISC_COL == Color(0, 0, 0, 0.72), "inversion disc is dark, 72% alpha")
 
 	game.queue_free()
 	await process_frame

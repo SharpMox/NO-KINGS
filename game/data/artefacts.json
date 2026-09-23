@@ -142,7 +142,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +$3",
+  "effect": "On capturing the highest-value enemy piece on the Board: +1500 Score and +$3",
   "conspiracy": "The hidden giant skeletons",
   "implemented": true
  },
@@ -191,7 +191,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10",
+  "effect": "On clearing a Wave: +1000 Score if you lost no piece that Wave, otherwise -$10",
   "conspiracy": "The social credit system",
   "implemented": true
  },
@@ -289,7 +289,7 @@
    "Score",
    "Time"
   ],
-  "effect": "On acquiring an Artefact: +150 Score and +5s Clock",
+  "effect": "On acquiring an Artefact: +1500 Score and +5s Clock",
   "conspiracy": "Pyramidology",
   "implemented": true
  },
@@ -326,7 +326,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On Wave start: +100 Score, +$10, and -3s Clock",
+  "effect": "On Wave start: +1000 Score, +$10, and -3s Clock",
   "conspiracy": "The advance-fee scam",
   "implemented": true
  },
@@ -522,7 +522,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +$10",
+  "effect": "On capturing a higher-value piece with a lower-value piece: +1000 Score and +$10",
   "conspiracy": "The Sphinx's nose",
   "implemented": true
  },
@@ -546,7 +546,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On Wave clear: +500 Score if you captured nothing that Wave",
+  "effect": "On Wave clear: +5000 Score if you captured nothing that Wave",
   "conspiracy": "The Bielefeld Conspiracy",
   "implemented": true
  },
@@ -632,7 +632,7 @@
    "Score",
    "Shop"
   ],
-  "effect": "Whenever you buy in the Shop: +5 Score per $ spent",
+  "effect": "Whenever you buy in the Shop: +50 Score per $ spent",
   "conspiracy": "Putin's Palace",
   "implemented": true
  },
@@ -731,7 +731,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On clearing a Wave without losing a piece: +200 Score and +$20",
+  "effect": "On clearing a Wave without losing a piece: +2000 Score and +$20",
   "conspiracy": "QAnon",
   "implemented": true
  },
@@ -1061,7 +1061,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On using your last held Item: +100 Score and +$50",
+  "effect": "On using your last held Item: +1000 Score and +$50",
   "conspiracy": "The 18½-minute gap",
   "implemented": true
  },
@@ -1086,7 +1086,7 @@
    "Score",
    "Time"
   ],
-  "effect": "Whenever a King Ability charges you: +150 Score and +5s Clock",
+  "effect": "Whenever a King Ability charges you: +1500 Score and +5s Clock",
   "conspiracy": "The Tunguska event",
   "implemented": true
  },
@@ -1123,7 +1123,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On losing a piece carrying a Piece Buff: +$150 and +150 Score",
+  "effect": "On losing a piece carrying a Piece Buff: +$150 and +1500 Score",
   "conspiracy": "The Lusitania",
   "implemented": true
  },
@@ -1208,7 +1208,7 @@
    "Score",
    "Time"
   ],
-  "effect": "On Decisive Item use: +200 Score and +10s Clock",
+  "effect": "On Decisive Item use: +2000 Score and +10s Clock",
   "conspiracy": "Dead Hand",
   "implemented": true
  },
@@ -1221,7 +1221,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Whenever a \"Capture\" Artefact triggers: +$2 and +20 Score",
+  "effect": "Whenever a \"Capture\" Artefact triggers: +$2 and +200 Score",
   "conspiracy": "The Illuminati card game",
   "implemented": true
  },
@@ -1440,7 +1440,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "On Capture: +$1 and +10 Score per piece in your Stock",
+  "effect": "On Capture: +$1 and +100 Score per piece in your Stock",
   "conspiracy": "The burning of the Library of Alexandria",
   "implemented": true
  },
@@ -1670,7 +1670,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Once per Turn: you may pay $25 for +400 Score",
+  "effect": "Once per Turn: you may pay $25 for +4000 Score",
   "conspiracy": "The Oak Island money pit",
   "implemented": true
  },
@@ -1731,7 +1731,7 @@
    "Score",
    "Gold"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +$15",
+  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +2000 Score and +$15",
   "conspiracy": "HAARP",
   "implemented": true
  },
@@ -1915,7 +1915,7 @@
    "Gold",
    "Time"
   ],
-  "effect": "At every Turn end: +$10, +10 Score, +1s Clock; Shop prices +50%",
+  "effect": "At every Turn end: +$10, +100 Score, +1s Clock; Shop prices +50%",
   "conspiracy": "Shrinkflation",
   "implemented": true
  },
@@ -1975,7 +1975,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On Game Over Screen: convert all your $ into Score at 20x rate",
+  "effect": "On Game Over Screen: convert all your $ into Score at 200x rate",
   "conspiracy": "The Rapture Index",
   "implemented": true
  },

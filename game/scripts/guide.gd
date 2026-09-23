@@ -90,7 +90,7 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 		["Rules", func(box: VBoxContainer) -> void: _fill_rules(box)],
 		["Pieces", func(box: VBoxContainer) -> void: _fill_pieces(box, board)],
 		["Promotions", func(box: VBoxContainer) -> void: _fill_promotions(box, board)],
-		["Fusions", func(box: VBoxContainer) -> void: _fill_fusions(box)],
+		["Fusions", func(box: VBoxContainer) -> void: _fill_fusions(box, board)],
 		["Artefacts", func(box: VBoxContainer) -> void: _fill_artefacts(box)],
 		["Items", func(box: VBoxContainer) -> void: _fill_items(box)],
 		["Indicators", func(box: VBoxContainer) -> void: _fill_indicators(box, board)],
@@ -236,20 +236,41 @@ static func _fill_promotions(box: VBoxContainer, board) -> void:
 
 
 ## NO-189: one line per fusion, "A + B → Result" — see the header comment
-## for why additive/synergistic aren't split here.
-static func _fill_fusions(box: VBoxContainer) -> void:
+## for why additive/synergistic aren't split here. NO-242: each line leads
+## with the three pieces' own 32 px tokens (the same board.load_piece_tex
+## Promotions uses), and lines sort by result name rather than internal key.
+static func _fill_fusions(box: VBoxContainer, board) -> void:
 	var defs := Rules.load_pieces()
 	var fusions := Rules.load_fusions()
 	var keys := fusions.keys()
-	keys.sort()
+	keys.sort_custom(func(a, b) -> bool:
+		var na: String = defs[fusions[a]].name
+		var nb: String = defs[fusions[b]].name
+		return na < nb if na != nb else a < b)
 	for k in keys:
 		var parts: PackedStringArray = k.split("+")
 		var out: String = fusions[k]
-		var row := Label.new()
-		row.text = "%s + %s → %s" % [defs[parts[0]].name, defs[parts[1]].name, defs[out].name]
-		row.add_theme_font_size_override("font_size", 14)
-		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 4)
 		box.add_child(row)
+		for part in [parts[0], "+", parts[1], "→", out]:
+			if part == "+" or part == "→":
+				var sym := Label.new()
+				sym.text = part
+				row.add_child(sym)
+				continue
+			var tr := TextureRect.new()
+			tr.texture = board.load_piece_tex(part)
+			tr.custom_minimum_size = Vector2(32, 32)
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			row.add_child(tr)
+		var names := Label.new()
+		names.text = "%s + %s → %s" % [defs[parts[0]].name, defs[parts[1]].name, defs[out].name]
+		names.add_theme_font_size_override("font_size", 14)
+		names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		names.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.add_child(names)
 
 
 ## NO-189: name + description straight from Items.ARTEFACT_EFFECTS — the
@@ -302,43 +323,48 @@ static func _item_tex(key: String) -> Texture2D:
 
 
 ## NO-189: the ONE Guide page with no data file — the board's own visual
-## language. Every colour is read off `board`'s own COL_* constants
+## language. Every colour and alpha is read off `board`'s own constants
 ## (game.gd, "Palette rule 2026-07-07" and NO-161/NO-176), never restated as
-## a new literal, so this page cannot drift out of sync with NO-183/184
-## (in flight as this ships, both changing the hatch and the indicators).
+## a new literal, so this page cannot drift out of sync with the board.
+## NO-242: each swatch is a mini tile (a COL_LIGHT square) carrying the mark
+## the board draws there — hatch, fill, ring, outline, dot or arrow — at the
+## board's own alpha, not a flat colour square. The old "Capture zone tile"
+## row repeated Capture's COL_CAPTURE for the same red hatch (game.gd's
+## legal_dests loop draws a capture destination exactly once); it is gone.
+## The red zone the board does draw separately — the bomb blast / armed Item
+## zone (_draw_target_zone: red hatch inside a red outline) — replaces the
+## old text-only "Target-zone hatch" row, whose "crossed hatching" copy
+## NO-222 made stale (overlap now hatches in one direction, HATCH_SPACING).
 static func _fill_indicators(box: VBoxContainer, board) -> void:
+	var hatch_a: float = board.HATCH_ALPHA
 	var rows := [
-		["Move", board.COL_MOVE, "A square the selected piece can move to."],
-		["Capture", board.COL_CAPTURE, "An enemy piece the selected piece can capture."],
-		["Selected", board.COL_SELECT, "The piece currently selected."],
-		["Merge partner", board.COL_MERGE, "A piece the selection can merge or fuse with."],
-		["Reachable zone", board.COL_ZONE_OUTLINE_MOVE, "Outline around every square a selected piece can reach this turn."],
-		["Zone overlap", board.COL_ZONE_OUTLINE_OVERLAP, "Where a move zone and a capture zone reachable this turn share a boundary."],
-		["Capture zone tile", board.COL_CAPTURE, "A tile inside the selected piece's capture range."],
-		["Placement", board.COL_PLACE, "A tile available during setup or relocation."],
-		["Arrow Planning", board.COL_ARROW, "A planned move marker, placed by the Arrow Planning item."],
-		["Your pieces", board.COL_PLAYER, "Your pieces and threats read blue — the game's palette rule."],
-		["Enemy pieces", board.COL_ENEMY, "Enemy pieces and threats read red — the game's palette rule."],
+		["Move", "hatch", Color(board.COL_ZONE_OUTLINE_MOVE, hatch_a), "A square the selected piece can move to."],
+		["Capture", "hatch", Color(board.COL_CAPTURE, hatch_a), "An enemy piece the selected piece can capture."],
+		["Selected", "fill", board.COL_SELECT, "The piece currently selected."],
+		["Merge partner", "ring", board.COL_MERGE, "A piece the selection can merge or fuse with."],
+		["Reachable zone", "outline", Color(board.COL_ZONE_OUTLINE_MOVE, board.ZONE_OUTLINE_ALPHA), "Outline around every square a selected piece can reach this turn."],
+		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
+		["Blast / Item zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Red hatching inside a red outline: the tiles a bomb blast or an armed Item will hit."],
+		["Placement", "dot", board.COL_PLACE, "A tile available during setup or relocation."],
+		["Arrow Planning", "arrow", board.COL_ARROW, "A planned move marker, placed by the Arrow Planning item."],
+		["Your pieces", "fill", board.COL_PLAYER, "Your pieces and threats read blue — the game's palette rule."],
+		["Enemy pieces", "fill", board.COL_ENEMY, "Enemy pieces and threats read red — the game's palette rule."],
 	]
 	for r in rows:
-		_swatch_row(box, r[0], r[1], r[2])
-	# NO-176 / NO-101: two conventions that aren't a single flat colour, so
-	# they get a text-only row instead of a swatch.
-	_row(box, null, "Target-zone hatch",
-		"A single hatch direction marks a tile covered by one reachable zone; crossed hatching marks a tile where two zones overlap.")
+		_swatch_row(box, board, r[0], r[1], r[2], r[3])
+	# NO-101: a glyph, not a colour — stays a text-only row.
 	_row(box, null, "%s Inverted" % board.INV_MARK_GLYPH,
 		"Marks a piece currently using its inverted move pattern.")
 
 
-static func _swatch_row(parent: Container, title: String, color: Color, desc: String) -> void:
+static func _swatch_row(parent: Container, board, title: String, mark: String, color: Color, desc: String) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	parent.add_child(row)
-	var sw := ColorRect.new()
-	# floor the alpha so a low-alpha board colour (e.g. COL_MOVE's 0.8, or
-	# COL_PLACE's 0.6) still reads as a solid swatch here
-	sw.color = Color(color.r, color.g, color.b, maxf(color.a, 0.9))
-	sw.custom_minimum_size = Vector2(20, 20)
+	var sw := Control.new()
+	sw.custom_minimum_size = Vector2(28, 28)
+	sw.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	sw.draw.connect(func() -> void: _draw_mini_tile(sw, board, mark, color))
 	row.add_child(sw)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -349,10 +375,45 @@ static func _swatch_row(parent: Container, title: String, color: Color, desc: St
 	col.add_child(name_l)
 	var desc_l := Label.new()
 	desc_l.text = desc
-	desc_l.add_theme_font_size_override("font_size", 11)
+	desc_l.add_theme_font_size_override("font_size", 13)
 	desc_l.modulate = Color(1, 1, 1, 0.7)
 	desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(desc_l)
+
+
+## One board tile in miniature, carrying `mark` the way game.gd's _draw does:
+## "hatch" (_draw_hatch's diagonal lines at HATCH_SPACING / HATCH_WIDTH),
+## "fill" (draw_rect), "ring" (the merge draw_arc at 0.46 of a tile),
+## "outline" (a zone edge), "zone" (hatch + outline, _draw_target_zone),
+## "dot" (the COL_PLACE circle), "arrow" (a move arrow).
+static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void:
+	var s := c.size.x
+	# COL_LIGHT is a static var (the board theme) — read off the class the way
+	# piece_diagram.gd does, since `board` may be a live Game instance
+	var game: GDScript = load("res://scripts/game.gd")
+	c.draw_rect(Rect2(Vector2.ZERO, c.size), game.COL_LIGHT)
+	if mark == "hatch" or mark == "zone":
+		var step: float = board.HATCH_SPACING
+		var o := -s + step * 0.5
+		while o < s:
+			c.draw_line(Vector2(maxf(0.0, -o), maxf(0.0, o)),
+				Vector2(minf(s, s - o), minf(s, s + o)), col, board.HATCH_WIDTH)
+			o += step
+	match mark:
+		"fill":
+			c.draw_rect(Rect2(Vector2.ZERO, c.size), col)
+		"ring":
+			c.draw_arc(c.size / 2, s * 0.46, 0, TAU, 24, col, 2.0)
+		"outline", "zone":
+			c.draw_rect(Rect2(Vector2.ONE * 1.5, c.size - Vector2.ONE * 3.0),
+				Color(col, board.ZONE_OUTLINE_ALPHA) if mark == "zone" else col, false, 3.0)
+		"dot":
+			c.draw_circle(c.size / 2, s * 0.16, col)
+		"arrow":
+			var tip := Vector2(s * 0.8, s * 0.2)
+			c.draw_line(Vector2(s * 0.2, s * 0.8), tip, col, 2.0)
+			c.draw_line(tip, tip + Vector2(-s * 0.3, 0), col, 2.0)
+			c.draw_line(tip, tip + Vector2(0, s * 0.3), col, 2.0)
 
 
 ## Shared list row: an optional icon, a name (optionally coloured), and an
@@ -383,7 +444,7 @@ static func _row(parent: Container, icon: Texture2D, title: String, desc: String
 	if desc != "":
 		var desc_l := Label.new()
 		desc_l.text = desc
-		desc_l.add_theme_font_size_override("font_size", 11)
+		desc_l.add_theme_font_size_override("font_size", 13)
 		desc_l.modulate = Color(1, 1, 1, 0.75)
 		desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		col.add_child(desc_l)

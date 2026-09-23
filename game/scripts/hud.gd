@@ -286,6 +286,7 @@ var _drawer_saved_filters := {}
 ## counter (Score/Gold/Clock) — same kill-first idiom as _drawer_tweens, so a
 ## second trigger before the first finishes replaces it instead of racing it.
 var _gain_tweens := {}
+var _roll_tweens := {} # NO-243 probe variant A: key -> the counter's roll Tween
 ## NO-127: last value refresh()/update_clock() actually RENDERED, so a gain
 ## animation is driven by the value changing, never by refresh() itself
 ## running (refresh() runs on nearly every state change). Paired with an
@@ -1571,6 +1572,56 @@ func _pulse_gain(node: Control, key: String) -> void:
 	_gain_tweens[key] = tw
 
 
+func _set_odometer(zeros: Label, lbl: Label, value: int) -> void:
+	var digits := str(value)
+	zeros.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
+	lbl.text = digits
+
+
+func _roll_odometer(x: float, zeros: Label, lbl: Label) -> void: # tween_method target
+	_set_odometer(zeros, lbl, roundi(x))
+
+
+## NO-243 probe, case 4. Returns true while variant A's roll owns the label
+## text (refresh() must not snap it). A: digits count old -> new over 0.4 s.
+## B: value snaps, the row flashes gold and a "+N" fades out beside it.
+func _counter_variant(key: String, zeros: Label, lbl: Label, row: Control,
+		from_v: int, to_v: int, seen: bool) -> bool:
+	var v: String = g.anim_v()
+	if v == "" or not seen or g.autoplay or not g.animations_on:
+		return false
+	if to_v != from_v:
+		if v == "A":
+			if _roll_tweens.get(key):
+				(_roll_tweens[key] as Tween).kill()
+			var tw := create_tween()
+			tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+			tw.tween_method(_roll_odometer.bind(zeros, lbl), float(from_v), float(to_v), 0.4)
+			_roll_tweens[key] = tw
+			return true
+		if v == "B" and to_v > from_v:
+			_flash_delta(row, to_v - from_v)
+	var running: Tween = _roll_tweens.get(key)
+	return running != null and running.is_running()
+
+
+func _flash_delta(row: Control, d: int) -> void:
+	row.modulate = Color(1.9, 1.6, 0.5) # over-bright gold, eased back to white
+	var tw := create_tween()
+	tw.tween_property(row, "modulate", Color.WHITE, 0.45)
+	var lab := Label.new()
+	lab.text = "+%d" % d
+	lab.add_theme_font_size_override("font_size", 20)
+	lab.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+	add_child(lab) # CanvasLayer child: position is canvas-global
+	var r := row.get_global_rect()
+	lab.position = Vector2(r.end.x + 6.0, r.position.y)
+	var fade := create_tween()
+	fade.tween_interval(0.15)
+	fade.tween_property(lab, "modulate:a", 0.0, 0.35)
+	fade.tween_callback(lab.queue_free)
+
+
 ## NO-127: minute-rollover cue on the Clock — grows then shakes back level.
 ## One-shot; shares `_gain_tweens`'s "clock" slot with `_pulse_gain` (kill-
 ## first idiom) since both animate the same Label. Suppressed once the
@@ -1899,13 +1950,14 @@ func refresh() -> void:
 	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
 	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`
 	# is just str(g.score), whatever length that is, and the padding floors at 0.
-	var digits := str(g.score)
-	score_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
-	score_label.text = digits
 	# NO-175: Gold is the same odometer as Score now (was a plain "%d").
-	var gold_digits := str(g.gold)
-	gold_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - gold_digits.length()))
-	gold_label.text = gold_digits
+	# NO-243 probe: a variant may own the digits while it animates.
+	if not _counter_variant("score", score_zeros_label, score_label, score_row,
+			_score_shown, g.score, _score_seen):
+		_set_odometer(score_zeros_label, score_label, g.score)
+	if not _counter_variant("gold", gold_zeros_label, gold_label, gold_row,
+			_gold_shown, g.gold, _gold_seen):
+		_set_odometer(gold_zeros_label, gold_label, g.gold)
 	# NO-127: gain pulses, driven off the value CHANGING (refresh() itself
 	# runs on nearly every state change, which is not the same thing — see
 	# _pulse_gain's header). The first observation establishes the baseline

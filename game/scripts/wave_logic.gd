@@ -163,6 +163,7 @@ static func spawn_pending(g) -> void:
 		# an enemy displaced by a King arrival is simply absorbed: it is not a
 		# player capture, so it must not score, pay Gold or fire on_capture
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}
+		g._add_arrive(spot) # NO-243 probe: no-op unless --anim-variant is set
 		if entry.has("king_id"):
 			g.board[spot].king_id = entry.king_id
 		elif is_king_wave(g.wave):

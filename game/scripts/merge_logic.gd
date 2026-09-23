@@ -132,8 +132,10 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	# pieces to Stock later, when they no longer exist anywhere else to read.
 	var consumed_states := []
 	var result_tile := Vector2i(-1, -1)
+	var fx_sources := [] # NO-243 probe: board inputs, for the merge variant anim
 	for ref in [a, b]:
 		if ref is Vector2i:
+			fx_sources.append({"px": g._tile_px(ref), "piece": g.board[ref].duplicate(true)})
 			result_tile = ref # later selections win
 			var state: Dictionary = g.board[ref].duplicate()
 			state.erase("owner")
@@ -157,6 +159,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 		if not result_buffs.is_empty():
 			piece.buffs = result_buffs # NO-191
 		g.board[result_tile] = piece
+		g._add_merge_fx(fx_sources, result_tile) # NO-243 probe: no-op without --anim-variant
 		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	else:
 		# ADR-0002: bare id when the result carries no state to preserve,

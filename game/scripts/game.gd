@@ -38,6 +38,10 @@ enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 static var next_config := {}
 ## TEST-menu / CLI scenario runs never autosave over the real run.
 static var is_scenario := false
+## NO-243 probe (throwaway branch): "" = shipping behaviour, "A"/"B" = the two
+## proposals per animation case. Set by `--anim-variant A|B`; hud.gd reads it
+## through anim_v(). Every variant path is still gated on autoplay/animations_on.
+static var anim_variant := ""
 ## Starting stock for a fresh run (menu's army select sets it; saves carry
 ## their stock in next_config instead, so this only matters when empty).
 static var next_army: String = Tuning.DEFAULT_ARMY
@@ -496,7 +500,8 @@ var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
 	set(value): # every gain/loss anywhere pops floating feedback (round 4);
 		# popups anchor to the piece/effect that caused them (game-feel pass)
-		if value != score and is_node_ready() and not autoplay and animations_on:
+		if value != score and is_node_ready() and not autoplay and animations_on \
+				and not (anim_variant == "B" and fx_at == Vector2.ZERO): # NO-243 B: hud.gd draws the +N
 			var d := value - score
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
@@ -818,6 +823,8 @@ func _ready() -> void:
 	# The hard-edged text that shipped in its place was removed 2026-09-06 at
 	# the user's ask; the CRT overlay (scripts/crt_overlay.gd) is the one
 	# look-changer, and it only shades/warps the finished frame.
+	if args.has("--anim-variant"): # NO-243 probe
+		anim_variant = args[args.find("--anim-variant") + 1].to_upper()
 	if args.has("--screenshot"): # fired once the scenario (if any) is booted, below
 		screenshot_dir = args[args.find("--screenshot") + 1]
 	if args.has("--clock"): # debug: short clock to reach the end screen fast
@@ -897,6 +904,9 @@ func _ready() -> void:
 	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
+	if first_boot and args.has("--anim-demo"): # NO-243 probe: fixed board for recording
+		next_config = ANIM_DEMO_CFG.duplicate(true)
+		is_scenario = true
 	if next_config.is_empty():
 		# issue 89: roll the King line-up here, from the run RNG (seeded just
 		# above), so the same seed always meets the same four Kings in the same
@@ -971,6 +981,8 @@ func _ready() -> void:
 		print("SCENARIO OK")
 		get_tree().quit()
 	_refresh()
+	if first_boot and args.has("--anim-demo"):
+		_run_anim_demo(args[args.find("--anim-demo") + 1])
 	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
 		if is_scenario and (args.has("--select") or args.has("--arm-item")
 				or args.has("--open-shop") or args.has("--open-drawer")
@@ -1884,7 +1896,208 @@ func _add_float(at: Vector2i, text: String, color: Color) -> void:
 func _add_pop(at: Vector2i) -> void:
 	if autoplay or not animations_on:
 		return
-	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0})
+	var ring_dur := ANIM_TIME
+	if anim_variant != "" and board.has(at): # NO-243: the victim is still on
+		# the board at every _add_pop call site, so snapshot it and let it die
+		# on screen instead of vanishing under the ring
+		var dur := 0.3 if anim_variant == "A" else 0.4
+		if anim_variant == "B":
+			ring_dur = dur # B: the ring plays WITH the burst, not after it
+		anims.append({"kind": "die", "px": _tile_px(at), "piece": board[at].duplicate(true),
+			"t": 0.0, "dur": dur})
+	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0,
+		"dur": ring_dur})
+
+
+## NO-243 probe: hud.gd reads the variant through this (a static var is not
+## reliably reachable through an untyped instance reference).
+func anim_v() -> String:
+	return anim_variant
+
+
+## NO-243 case 1: a spawned enemy/King appears (wave_logic.spawn_pending).
+## The piece is hidden from the plain board loop while this anim owns the
+## tile. Staggered 60 ms per arrival already queued and not yet started.
+func _add_arrive(at: Vector2i) -> void:
+	if autoplay or not animations_on or anim_variant == "" or not board.has(at):
+		return
+	var king: bool = board[at].id == "king"
+	var dur := 0.5 if king else 0.35
+	var queued := 0
+	for a in anims:
+		if a.kind == "arrive" and a.t <= 0.0:
+			queued += 1
+	anims.append({"kind": "arrive", "to": at, "t": -0.06 * queued / dur, "dur": dur, "king": king})
+	if king: # reuse the turn-switch board-edge glow
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": Color(1.0, 0.8, 0.3)})
+	queue_redraw()
+
+
+## NO-243 case 3: a merge / promotion result landed on `to`. `sources` is
+## [{px, piece}] for the board-tile inputs (a Stock input has no tile).
+func _add_merge_fx(sources: Array, to: Vector2i) -> void:
+	if autoplay or not animations_on or anim_variant == "" or not board.has(to):
+		return
+	anims.append({"kind": "merge", "to": to, "sources": sources, "t": 0.0,
+		"dur": 0.35 if anim_variant == "A" else 0.5})
+	queue_redraw()
+
+
+## Draws `p` scaled/rotated about the centre of the tile whose top-left is
+## `px` (plus `offset`) — the one transform seam every NO-243 variant uses.
+func _draw_piece_xf(font: Font, p: Dictionary, px: Vector2, scl: Vector2, rot: float,
+		tint: Color, offset := Vector2.ZERO) -> void:
+	var half := Vector2(tile, tile) / 2
+	draw_set_transform(px + half + offset, rot, scl)
+	_draw_piece(font, p, -half, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## NO-243: the variant anims ("arrive", "die", "merge").
+func _draw_variant_anim(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	if t < 0.0:
+		return # staggered, not started yet
+	var v: String = anim_variant
+	match a.kind:
+		"arrive":
+			var p: Dictionary = board[a.to]
+			var px := _tile_px(a.to)
+			var k: float = 1.6 if a.king else 1.0 # King: bigger everything
+			if v == "A": # drop in from above, squash on landing
+				var fall := 0.7
+				if t < fall:
+					var u := t / fall
+					var y: float = -tile * 2.5 * k * (1.0 - u * u) # accelerating fall
+					_draw_piece_xf(font, p, px, Vector2.ONE, 0.0,
+						Color(1, 1, 1, minf(1.0, u * 3.0)), Vector2(0, y))
+				else:
+					var u := (t - fall) / (1.0 - fall)
+					var sq: float = 0.22 * k * sin(PI * u) # squash then settle
+					_draw_piece_xf(font, p, px, Vector2(1.0 + sq, 1.0 - sq), 0.0, Color.WHITE,
+						Vector2(0, tile * sq * 0.5)) # keeps the base on the tile floor
+			else: # B: fade + scale up from 0, brief outline flash
+				var s := 1.0 - pow(1.0 - t, 3.0)
+				if a.king: # overshoot to 1.25, settle back to 1
+					s = 1.25 * (1.0 - pow(1.0 - t / 0.6, 3.0)) if t < 0.6 						else 1.25 - 0.25 * (t - 0.6) / 0.4
+				_draw_piece_xf(font, p, px, Vector2(s, s), 0.0, Color(1, 1, 1, minf(1.0, t * 2.0)))
+				var flash := 1.0 - absf(t - 0.7) / 0.3
+				if flash > 0.0:
+					draw_rect(Rect2(px, Vector2(tile, tile)).grow(2.0 * k),
+						Color(1, 1, 1, flash), false, 3.0 * k)
+		"die":
+			var p: Dictionary = a.piece
+			if v == "A": # shrink to 0 with a slight spin, fading
+				var s := 1.0 - t * t
+				_draw_piece_xf(font, p, a.px, Vector2(s, s), t * 1.2, Color(1, 1, 1, 1.0 - t))
+			else: # B: white flash, then a burst of squares
+				var pop_at := 0.3
+				if t < pop_at:
+					var s := 1.0 + 0.15 * t / pop_at
+					_draw_piece_xf(font, p, a.px, Vector2(s, s), 0.0, Color(4, 4, 4, 1)) # >1 = white-out
+				else:
+					var u := (t - pop_at) / (1.0 - pop_at)
+					var c: Vector2 = a.px + Vector2(tile, tile) / 2
+					var side: Color = COL_SIDE_ENEMY if p.owner == Rules.ENEMY else COL_SIDE_PLAYER
+					for i in 10:
+						var ang := TAU * i / 10.0 + 0.4 * (i % 3)
+						var dist: float = tile * (0.2 + 0.75 * (1.0 - pow(1.0 - u, 2.0))) * (0.8 + 0.1 * (i % 4))
+						var sz: float = tile * 0.14 * (1.0 - u)
+						var chip: Color = Color.WHITE if i % 2 == 0 else side
+						chip.a = 1.0 - u
+						draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2,
+							Vector2(sz, sz)), chip)
+		"merge":
+			var p: Dictionary = board[a.to]
+			var px := _tile_px(a.to)
+			if v == "A": # pop: 1 -> 1.25 -> 1, plus a merge-colour ring
+				var s := 1.0 + 0.25 * sin(PI * minf(t / 0.8, 1.0))
+				_draw_piece_xf(font, p, px, Vector2(s, s), 0.0, Color.WHITE)
+				draw_arc(px + Vector2(tile, tile) / 2, tile * (0.3 + 0.35 * t), 0, TAU, 32,
+					Color(COL_MERGE, 1.0 - t), 4.0)
+			else: # B: inputs slide together, the result fades in with a glow
+				var join := 0.5
+				if t < join:
+					var u := ease(t / join, 2.0) # accelerate into each other
+					for src in a.sources:
+						var sp: Vector2 = src.px
+						var s := 1.0 - 0.35 * u
+						_draw_piece_xf(font, src.piece, sp.lerp(px, u), Vector2(s, s), 0.0,
+							Color(1, 1, 1, 1.0 - 0.3 * u))
+				else:
+					var u := (t - join) / (1.0 - join)
+					for r in 3: # soft glow: stacked translucent outlines
+						draw_rect(Rect2(px, Vector2(tile, tile)).grow(4.0 + r * 5.0 * (0.5 + u)),
+							Color(COL_MERGE, 0.3 * (1.0 - u)), false, 5.0)
+					var s := 0.8 + 0.2 * u
+					_draw_piece_xf(font, p, px, Vector2(s, s), 0.0, Color(1, 1, 1, u))
+
+
+## NO-243 probe: `--anim-demo <arrive|capture|merge|score>` boots this fixed
+## board (as a scenario, so it never autosaves) and _run_anim_demo fires the
+## case 4 times, 1.5 s apart, then quits — sized for a Movie Maker recording.
+## The enemy pawn in the corner keeps _board_cleared() false, so a merge's
+## own _refresh/_on_pass path never ends the turn.
+const ANIM_DEMO_CFG := {"board": [["rook", 0, 1, 0], ["queen", 0, 4, 0], ["knight", 0, 6, 0],
+	["pawn", 1, 0, 9]], "wave": 2, "clock_s": 3600.0, "gold": 9999, "score": 1200,
+	"actions_left": 99, "actions_max": 99, "seed": "243"} # seed: same spawn tiles every run
+const ANIM_DEMO_FROM := Vector2i(3, 3)
+const ANIM_DEMO_TO := Vector2i(3, 7)
+const ANIM_DEMO_MERGE_A := Vector2i(1, 5)
+const ANIM_DEMO_MERGE_B := Vector2i(5, 5)
+
+
+func _run_anim_demo(kind: String) -> void:
+	await get_tree().create_timer(1.0).timeout
+	for i in 4:
+		_anim_demo_setup(kind, i)
+		await get_tree().create_timer(0.5).timeout
+		_anim_demo_fire(kind, i)
+		await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(0.5).timeout
+	get_tree().quit()
+
+
+func _anim_demo_setup(kind: String, i: int) -> void:
+	match kind:
+		"arrive":
+			for pos in board.keys():
+				if board[pos].owner == Rules.ENEMY:
+					board.erase(pos)
+		"capture":
+			board[ANIM_DEMO_FROM] = {"id": "queen", "owner": Rules.PLAYER}
+			board[ANIM_DEMO_TO] = {"id": ["rook", "bishop", "knight", "pawn"][i], "owner": Rules.ENEMY}
+		"merge":
+			board[ANIM_DEMO_MERGE_A] = {"id": "pawn", "owner": Rules.PLAYER}
+			board[ANIM_DEMO_MERGE_B] = {"id": "pawn", "owner": Rules.PLAYER}
+			actions_left = 99
+			gold = 9999
+	_refresh()
+	queue_redraw()
+
+
+func _anim_demo_fire(kind: String, i: int) -> void:
+	match kind:
+		"arrive": # through the real spawn path; the last two fires are a King
+			if i < 2:
+				for pid in ["pawn", "knight", "rook"]:
+					pending_spawn.append({"id": pid})
+			else:
+				pending_spawn.push_front({"id": "king", "king_id": "nero"})
+			WaveLogic.spawn_pending(self)
+		"capture": # the seam every capture uses: ring (+ death), slide, overwrite
+			_add_pop(ANIM_DEMO_TO)
+			_add_slide(ANIM_DEMO_FROM, ANIM_DEMO_TO)
+			board[ANIM_DEMO_TO] = board[ANIM_DEMO_FROM]
+			board.erase(ANIM_DEMO_FROM)
+		"merge": # the real commit; a same-id merge is a promotion (pawn -> next)
+			MergeLogic.commit_merge(self, ANIM_DEMO_MERGE_A, ANIM_DEMO_MERGE_B)
+		"score":
+			fx_at = Vector2.ZERO # anchor any popup to the HUD counter
+			score += [150, 400, 1250, 75][i]
+			gold += [25, 60, 10, 120][i]
+	_refresh()
+	queue_redraw()
 
 
 ## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;
@@ -5032,7 +5245,7 @@ func _draw() -> void:
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
-		if a.kind == "move":
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge": # NO-243: the anim draws it
 			sliding[a.to] = a
 	for pos in board:
 		if sliding.has(pos):
@@ -5077,6 +5290,10 @@ func _draw() -> void:
 				_banner_font.variation_transform = Transform2D(0.0, Vector2.ONE, BANNER_ITALIC_SKEW, Vector2.ZERO)
 			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 26, Color(a.color, alpha))
+	for a in anims: # NO-243: after the loop above so a dying piece shows over the
+		# attacker sliding onto its tile (it may also cross a banner — probe only)
+		if a.kind == "die" or ((a.kind == "arrive" or a.kind == "merge") and board.has(a.to)):
+			_draw_variant_anim(font, a)
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))

@@ -4737,6 +4737,12 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 func _capture_and_quit(dir: String) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
+	# NO-174: a run starts at 15:00.000, so the first tick crosses a minute
+	# and the Clock's minute-shake (scale 1.35, ~0.35 s) is mid-tween two
+	# frames in. Captures taken there measured a 26%-wide, off-centre Clock
+	# that never existed at rest. Let one-shot tweens finish first.
+	await get_tree().create_timer(0.6).timeout
+	await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing
 	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))
 	get_tree().quit()

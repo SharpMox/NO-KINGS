@@ -130,59 +130,60 @@ func _init() -> void:
 		test_btn.pressed.emit()
 	await process_frame
 	check(menu.test_filter != null, "precondition: the TEST list has its search box")
-	check(menu.test_filter.text == "", "precondition: the search box starts EMPTY")
+	if menu.test_filter != null:
+		check(menu.test_filter.text == "", "precondition: the search box starts EMPTY")
 
-	# An empty LineEdit's `.text` is "", so `tap_text`/`probe` had nothing to
-	# find it by until _text_of() fell back to `placeholder_text` for that
-	# case (drive.gd) — on a real screen this is the only way a host reaches
-	# this field at all, since it holds no text before someone types into it.
-	ack = await _send(d, 3, ["tap_text search scenarios"])
-	check(ack.size() >= 2 and ack[1].begins_with("ok tap_text"),
-		"tap_text finds the EMPTY search box by its placeholder text (%s)"
-			% (ack[1] if ack.size() > 1 else "-"))
+		# An empty LineEdit's `.text` is "", so `tap_text`/`probe` had nothing to
+		# find it by until _text_of() fell back to `placeholder_text` for that
+		# case (drive.gd) — on a real screen this is the only way a host reaches
+		# this field at all, since it holds no text before someone types into it.
+		ack = await _send(d, 3, ["tap_text search scenarios"])
+		check(ack.size() >= 2 and ack[1].begins_with("ok tap_text"),
+			"tap_text finds the EMPTY search box by its placeholder text (%s)"
+				% (ack[1] if ack.size() > 1 else "-"))
 
-	# Godot headless drops GUI PICKING, so the tap above cannot actually move
-	# focus (that half is the windowed probes' job, same note as
-	# tests/test_drive.gd). grab_focus() stands in for "the tap landed" so
-	# `type` below has something real to prove.
-	menu.test_filter.grab_focus()
-	await process_frame
+		# Godot headless drops GUI PICKING, so the tap above cannot actually move
+		# focus (that half is the windowed probes' job, same note as
+		# tests/test_drive.gd). grab_focus() stands in for "the tap landed" so
+		# `type` below has something real to prove.
+		menu.test_filter.grab_focus()
+		await process_frame
 
-	# a scenario name buried in a COLLAPSED section — same target NO-58's own
-	# probe uses, chosen from the data rather than hardcoded so a rename cannot
-	# rot this suite
-	var buried: Button = null
-	for sec_dict in menu._test_sections:
-		if sec_dict.head.text.begins_with("▾"):
-			continue # open already; the point is a name nothing shows yet
-		for r: Button in sec_dict.rows:
-			if not r.visible:
-				buried = r
-				break
-		if buried != null:
-			break
-	check(buried != null, "precondition: found a scenario inside a collapsed section")
-	if buried != null:
-		var buried_name: String = str(buried.get_meta("scenario_name"))
-
-		ack = await _send(d, 4, ["type " + buried_name])
-		check(ack.size() >= 2 and ack[1].begins_with("ok type"),
-			"typing into a focused LineEdit reports ok (%s)" % (ack[1] if ack.size() > 1 else "-"))
-		check(menu.test_filter.text == buried_name,
-			"the LineEdit's OWN text matches what was typed, character by character (got '%s')"
-				% menu.test_filter.text)
-		check(buried.visible,
-			"...and the filter it drove shows the match (%s)" % buried_name)
-		var still_up := 0
+		# a scenario name buried in a COLLAPSED section — same target NO-58's own
+		# probe uses, chosen from the data rather than hardcoded so a rename cannot
+		# rot this suite
+		var buried: Button = null
 		for sec_dict in menu._test_sections:
+			if sec_dict.head.text.begins_with("▾"):
+				continue # open already; the point is a name nothing shows yet
 			for r: Button in sec_dict.rows:
-				if r.visible:
-					still_up += 1
-		check(still_up < 20,
-			"...and hides everything that does not match (%d rows left)" % still_up)
+				if not r.visible:
+					buried = r
+					break
+			if buried != null:
+				break
+		check(buried != null, "precondition: found a scenario inside a collapsed section")
+		if buried != null:
+			var buried_name: String = str(buried.get_meta("scenario_name"))
 
-	menu.test_filter.text = ""
-	menu._apply_test_filter()
+			ack = await _send(d, 4, ["type " + buried_name])
+			check(ack.size() >= 2 and ack[1].begins_with("ok type"),
+				"typing into a focused LineEdit reports ok (%s)" % (ack[1] if ack.size() > 1 else "-"))
+			check(menu.test_filter.text == buried_name,
+				"the LineEdit's OWN text matches what was typed, character by character (got '%s')"
+					% menu.test_filter.text)
+			check(buried.visible,
+				"...and the filter it drove shows the match (%s)" % buried_name)
+			var still_up := 0
+			for sec_dict in menu._test_sections:
+				for r: Button in sec_dict.rows:
+					if r.visible:
+						still_up += 1
+			check(still_up < 20,
+				"...and hides everything that does not match (%d rows left)" % still_up)
+
+		menu.test_filter.text = ""
+		menu._apply_test_filter()
 	m.queue_free()
 	d.queue_free()
 	await process_frame

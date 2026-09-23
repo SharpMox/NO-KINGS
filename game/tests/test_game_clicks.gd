@@ -745,11 +745,14 @@ func _init() -> void:
 		var box_described := false
 		for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all,
 			# select-then-confirm each one (NO-133): tap the tile, then its Pick button
-			_click(_first_option_tile(game.box_panel).get_global_rect().get_center())
+			var pick_tile := _first_option_tile(game.box_panel)
+			if pick_tile != null:
+				_click(pick_tile.get_global_rect().get_center())
 			await process_frame
 			var pick_btn := _box_pick_button(game.box_panel)
 			box_described = box_described or pick_btn != null
-			_click(pick_btn.get_global_rect().get_center())
+			if pick_btn != null:
+				_click(pick_btn.get_global_rect().get_center())
 			await process_frame
 		check(box_described, "selecting a box tile reveals its description and a Pick confirm (NO-133)")
 		check(not game.box_open, "picking every offered option closes the box")
@@ -788,9 +791,13 @@ func _init() -> void:
 			"NO-38: clicking Sell frees one slot and pays the sell price")
 		check(game.box_open and _sell_button(game.box_panel) == null,
 			"NO-38: the Box survives the sale and the Sell row is gone")
-		_click(_first_option_tile(game.box_panel).get_global_rect().get_center()) # NO-133: select...
+		var after_sale_tile := _first_option_tile(game.box_panel)
+		if after_sale_tile != null:
+			_click(after_sale_tile.get_global_rect().get_center()) # NO-133: select...
 		await process_frame
-		_click(_box_pick_button(game.box_panel).get_global_rect().get_center()) # ...then confirm
+		var after_sale_pick := _box_pick_button(game.box_panel)
+		if after_sale_pick != null:
+			_click(after_sale_pick.get_global_rect().get_center()) # ...then confirm
 		await process_frame
 		check(not game.box_open and game.items.size() == items_before,
 			"NO-38: the pick then lands and closes the Box")
@@ -2540,9 +2547,10 @@ func _init() -> void:
 		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "blitz":
 			item_cell = c
 	var item_sell_badge: Button = null
-	for c in item_cell.get_children():
-		if c is Button and (c as Button).text.begins_with("$"):
-			item_sell_badge = c
+	if check(item_cell != null, "(setup) the Blitz Item cell is in the Inventory grid"):
+		for c in item_cell.get_children():
+			if c is Button and (c as Button).text.begins_with("$"):
+				item_sell_badge = c
 	var item_payout: int = Shop.sell_payout(game, "item", game.items[0])
 	check(item_sell_badge != null and item_sell_badge.is_visible_in_tree()
 			and item_sell_badge.text == "$%d" % item_payout and not item_sell_badge.disabled
@@ -2607,9 +2615,10 @@ func _init() -> void:
 		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "agartha-welcome-mat":
 			art_cell = c
 	var art_sell_badge: Button = null
-	for c in art_cell.get_children():
-		if c is Button and (c as Button).text.begins_with("$"):
-			art_sell_badge = c
+	if check(art_cell != null, "(setup) the Agartha Welcome Mat Artefact cell is in the Inventory grid"):
+		for c in art_cell.get_children():
+			if c is Button and (c as Button).text.begins_with("$"):
+				art_sell_badge = c
 	var art_entry: Variant = game._artefact_entry("agartha-welcome-mat")
 	var art_payout: int = Shop.sell_payout(game, "artefact", art_entry)
 	check(art_sell_badge != null and art_sell_badge.is_visible_in_tree()

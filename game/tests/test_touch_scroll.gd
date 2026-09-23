@@ -205,13 +205,14 @@ func _init() -> void:
 	for c in scroll.get_child(0).get_children():
 		if c is Button and c.text.begins_with("▸"):
 			headers.append(c)
-	var last_head: Button = headers[headers.size() - 1]
-	_mouse(true, last_head.get_global_rect().get_center())
-	_mouse(false, last_head.get_global_rect().get_center())
-	await process_frame
-	await process_frame
-	check(scroll.get_v_scroll_bar().max_value > scroll.size.y,
-		"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
+	if check(not headers.is_empty(), "(setup) the TEST list has section headers"):
+		var last_head: Button = headers[headers.size() - 1]
+		_mouse(true, last_head.get_global_rect().get_center())
+		_mouse(false, last_head.get_global_rect().get_center())
+		await process_frame
+		await process_frame
+		check(scroll.get_v_scroll_bar().max_value > scroll.size.y,
+			"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
 	var row: Button = null
 	for c in scroll.get_child(0).get_children():
 		# "Device info" is a fixed row beside Back, not a scenario — same
@@ -498,7 +499,8 @@ func _init() -> void:
 	if item_btn != null:
 		var item_fired := [false]
 		game.hud.item_pressed.connect(func(_i: int) -> void: item_fired[0] = true)
-		inv_sc.ensure_control_visible(item_btn)
+		if check(inv_sc != null, "(setup) the inventory drawer has a ScrollContainer to reveal the item in"):
+			inv_sc.ensure_control_visible(item_btn)
 		await process_frame
 		await process_frame
 		var p := item_btn.get_global_rect().get_center()

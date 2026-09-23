@@ -790,6 +790,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Economy := preload("res://scripts/economy.gd") # issue 35: clock-grant
 const Box := preload("res://scripts/box.gd")
+const Shop := preload("res://scripts/shop.gd") # NO-244: grant()'s unique check
 	# handlers below call Economy.add_clock so the Clock gets the same choke
 	# point as Score/Gold — a real cycle (economy.gd preloads this file back),
 	# which Godot 4 resolves fine for static-func calls (verified empirically;
@@ -1473,7 +1474,7 @@ static func has_room(g) -> bool:
 ## acquired_wave/rarity on `entry` themselves before calling this, same as
 ## every existing artefacts.append() site already did. Returns whether it landed.
 static func grant(g, entry: Dictionary) -> bool:
-	if not has_room(g):
+	if not has_room(g) or Shop.is_unique_held(g, entry.key): # NO-244: never a 2nd probe
 		return false
 	g.artefacts.append(entry)
 	return true

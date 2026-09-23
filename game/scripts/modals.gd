@@ -1707,6 +1707,8 @@ func _box_pick_btn(opt: Dictionary) -> Button:
 	pick.text = "Pick"
 	pick.set_meta("box_pick", true)
 	pick.add_theme_font_size_override("font_size", 15)
+	pick.disabled = opt.kind == "artefact" and Shop.is_unique_held(g, opt.payload.key) # NO-244:
+		# an offer rolled before the first probe was taken
 	pick.pressed.connect(func() -> void: box_chosen.emit(opt))
 	return pick
 

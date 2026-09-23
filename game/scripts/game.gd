@@ -4673,6 +4673,15 @@ func _box_options(theme: String, size: String) -> Array:
 
 
 func _box_choose(opt: Dictionary) -> void:
+	if opt.kind == "artefact" and Shop.is_unique_held(self, opt.payload.key):
+		# NO-244: an offer rolled before the first probe landed — drop it,
+		# keep the pick, the rest of the offer stays pickable
+		box_offer.erase(opt)
+		if box_offer.is_empty():
+			return _box_close()
+		if autoplay:
+			return _box_choose(box_offer[rng.randi() % box_offer.size()])
+		return modals.show_box(box_offer)
 	fx_at = get_viewport_rect().size / 2.0
 	match opt.kind:
 		"piece":

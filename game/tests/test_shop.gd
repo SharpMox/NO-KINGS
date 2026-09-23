@@ -16,6 +16,7 @@ const Box := preload("res://scripts/box.gd")
 const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Rules := preload("res://scripts/rules.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
@@ -463,6 +464,41 @@ func _init() -> void:
 	check(not probe_offered,
 		"NO-244: 60 seeded Shop rolls + huge Artefact Boxes never offer a 2nd Abduction Probe")
 	un.queue_free()
+	await process_frame
+
+	# --- NO-244 gap: stock rolled BEFORE the first probe landed still holds one.
+	# can_buy refuses it, buy() leaves artefacts unchanged, and a pre-rolled
+	# Artefact Box's probe option is unpickable while the rest still work.
+	var stale: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 9999})
+	await process_frame
+	stale.shop_stock = [{"kind": "artefact", "key": "abduction-probe", "sold": false}]
+	check(Shop.can_buy(stale, stale.shop_stock[0]),
+		"NO-244 control: with no probe held, a stocked probe is buyable")
+	stale.artefacts.append(probe_entry.duplicate())
+	check(not Shop.can_buy(stale, stale.shop_stock[0]),
+		"NO-244: a pre-rolled Shop probe is unbuyable once one is held")
+	var gold_before: int = stale.gold
+	check(not Shop.buy(stale, 0) and stale.artefacts.size() == 1 and stale.gold == gold_before
+			and not stale.shop_stock[0].sold,
+		"NO-244: buying the pre-rolled probe changes nothing")
+	check(not ArtefactHooks.grant(stale, probe_entry.duplicate()) and stale.artefacts.size() == 1,
+		"NO-244: ArtefactHooks.grant refuses a 2nd probe")
+	var other: Dictionary = Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key != "abduction-probe")[0]
+	var probe_opt := {"kind": "artefact", "name": probe_entry.name,
+		"description": "", "payload": probe_entry}
+	var other_opt := {"kind": "artefact", "name": other.name,
+		"description": "", "payload": other}
+	stale._open_box_pick({"kind": "box", "key": "artefact", "size": "small", "sold": false,
+		"contents": [probe_opt, other_opt]})
+	stale._box_choose(stale.box_offer[0])
+	check(stale.artefacts.size() == 1 and stale.box_open and stale.box_offer.size() == 1,
+		"NO-244: picking a pre-rolled Box probe grants nothing and keeps the pick")
+	stale._box_choose(stale.box_offer[0])
+	check(stale.artefacts.size() == 2 and stale.artefacts[1].key == other.key and not stale.box_open,
+		"NO-244: the Box's other option still picks normally")
+	stale.queue_free()
 	await process_frame
 
 	# --- issue 18: Shop price modifiers, same held copy stacks additively

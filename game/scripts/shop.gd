@@ -300,6 +300,8 @@ static func can_buy(g, slot: Dictionary) -> bool:
 				# capacity to hold — a Box still sells fine even at capacity
 				# (it might not roll one; _box_choose's own grant refuses that
 				# pick if it does)
+			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) # NO-244:
+				# stock rolled before the first probe was bought still holds a copy
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold

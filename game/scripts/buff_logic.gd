@@ -161,7 +161,7 @@ const PIECE_BUFF_GLYPHS := {
 	"taunt": "‼",         # U+203C double exclamation — forces the enemy's aim
 	"stun": "⊘",          # U+2298 circled slash — captor loses its next turns
 	"bomb": "✴",          # U+2734 eight-point star — destroys on contact
-	"trap": "⌖",          # U+2316 position indicator — punishes the captor
+	"trap": "◎",          # U+25CE bullseye — punishes the captor (NO-244: ⌖ drew too faint)
 	"range": "➤",         # U+27A4 arrowhead — extends capture reach
 	"reflect": "↩",       # U+21A9 hooked arrow — bounces the attack back
 	"slow": "⧗",          # U+29D7 black hourglass — moves like a Pawn, briefly (NO-244: ⏳ drew as colour emoji)

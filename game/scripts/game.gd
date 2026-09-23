@@ -343,10 +343,14 @@ const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
 ## side (+ = right/down). Measured by eye from captures of every buff; the
 ## inversion mark's ⟲ has its own tuning (INV_MARK_GLYPH_*) and isn't here.
 const BUFF_GLYPH_TUNE := {
-	"⨯": [0.0, -0.22, 1.7],  # multicapture: tiny and low
-	"↩": [0.0, 0.2, 1.0],    # reflect: sits high
-	"≋": [0.0, -0.1, 1.0],   # smog: sits low
+	"⨯": [0.0, -0.12, 1.7],  # multicapture: tiny and low
+	"↩": [0.0, 0.3, 1.0],    # reflect: sits high
+	"≋": [0.0, 0.0, 1.0],    # smog
 }
+## NO-244: every buff glyph sits a little low in its square through the
+## fallback font's metrics — lift them all by this fraction of the half side
+## before the per-glyph tune above.
+const BUFF_GLYPH_LIFT := -0.1
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
@@ -5348,7 +5352,7 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 		var tune: Array = BUFF_GLYPH_TUNE.get(glyphs[i], [0.0, 0.0, 1.0])
 		var gsize := int(size * tune[2])
 		var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
-		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + tune[1] * half), glyphs[i],
+		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyphs[i],
 			HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, BUFF_BADGE_ACCENT)
 
 

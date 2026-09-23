@@ -176,6 +176,9 @@ const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
 ## rather than a second hand-picked constant that could drift from it.
 ## Captured (~154px avail) fits 2; Stock (~314px avail) fits 4.
 const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
+const STACK_SLIDE_S := 0.18 ## NO-237: a kept stack sliding to its new cell
+const STACK_POP_IN_S := 0.15 ## NO-237: a new stack scaling/fading in
+const STACK_FADE_OUT_S := 0.12 ## NO-237: a gone stack fading out
 ## NO-164: a fixed visible divider between Captured Stock and Stock — was
 ## nothing (separation 0), relying only on incidental slack (NO-135) landing
 ## near the boundary, which isn't always there. Comes out of Stock's own
@@ -347,6 +350,10 @@ var tip_key := ""
 ## anything GridContainer-specific.
 var stock_grid := VBoxContainer.new()
 var captured_grid := VBoxContainer.new()
+## NO-237: the button showing each stack, keyed by _stack_keys — kept across
+## _rebuild_stock_drawer so a stack can slide rather than be rebuilt.
+var _stack_btns := {}
+var _stack_anim_gen := 0 ## NO-237: only the latest rebuild's FLIP pass runs
 ## How many entries fit per row — was `stock_grid.columns`/`captured_grid.
 ## columns` before V1; a VBoxContainer has no such property, so the layout
 ## step below stores it here instead, for _rebuild_stock_drawer to read.
@@ -2427,21 +2434,42 @@ func _rebuild_items_grid() -> void:
 ## rules (Captured can convert but never deploy or merge, issue 60/2026-09-10)
 ## but that is now which GRID an entry is in, not a tint plus a tooltip a
 ## phone can't show anyway.
+##
+## NO-237: stack buttons are KEPT across rebuilds (_stack_btns, one per
+## stack) instead of freed and rebuilt, so a stack that only moved slides to
+## its new cell, a new one pops in, and a gone one fades out (_animate_stacks).
 func _rebuild_stock_drawer() -> void:
-	for c in stock_grid.get_children():
-		c.queue_free()
-	for c in captured_grid.get_children():
-		c.queue_free()
+	var animate: bool = not g.autoplay and g.animations_on \
+			and DisplayServer.get_name() != "headless" \
+			and drawers.has("stock") and (drawers["stock"] as Control).is_visible_in_tree()
+	var stacks := _stacks()
+	var keys := _stack_keys(stacks)
+	var live := {} # key -> Button, this rebuild's
+	var old_pos := {} # kept Button -> position before this rebuild (_stack_origin-relative)
+	var fresh: Array = []
 	var cap_count := 0
 	var stock_children: Array = []
 	var cap_children: Array = []
-	for st in _stacks():
-		var btn := _build_stack_button(st)
+	for i in stacks.size():
+		var st: Dictionary = stacks[i]
+		var btn: Button = _stack_btns.get(keys[i])
+		if btn == null:
+			btn = _build_stack_button(st)
+			fresh.append(btn)
+		else:
+			if animate and btn.is_inside_tree():
+				old_pos[btn] = btn.global_position - _stack_origin(btn)
+			_build_stack_button(st, btn)
+		live[keys[i]] = btn
 		if st.cap:
 			cap_count += 1
 			cap_children.append(btn)
 		else:
 			stock_children.append(btn)
+	for k in _stack_btns:
+		if not live.has(k):
+			_drop_stack_button(_stack_btns[k], animate)
+	_stack_btns = live
 	# story 37: the hint only while the column would otherwise be blank — an
 	# empty GridContainer has no size of its own to hang a message on.
 	captured_hint.visible = cap_count == 0
@@ -2463,6 +2491,104 @@ func _rebuild_stock_drawer() -> void:
 	_fill_rows_bottom_right(stock_grid, stock_children, stock_cols)
 	_fill_rows_bottom_right(captured_grid, cap_children, cap_cols)
 	_scroll_stock_to_bottom() # NO-208
+	if animate and not (old_pos.is_empty() and fresh.is_empty()):
+		_animate_stacks(old_pos, fresh)
+
+
+## NO-237: one identity per stack. A Stock stack is its whole entry (ADR-0002
+## — _stacks() groups by it); a Captured row is one piece, and two captured
+## copies of one entry are told apart by how many older copies precede them,
+## so a fresh capture of a piece already held gets the NEW key (numbering from
+## the oldest) and the rows already on screen keep theirs.
+func _stack_keys(stacks: Array) -> Array:
+	var keys := []
+	keys.resize(stacks.size())
+	var seen := {}
+	for i in range(stacks.size() - 1, -1, -1): # captured rows are newest-first
+		var st: Dictionary = stacks[i]
+		var k: String = ("c|" if st.cap else "s|") + var_to_str(st.entry)
+		if st.cap:
+			var n: int = seen.get(k, 0)
+			seen[k] = n + 1
+			k += "|%d" % n
+		keys[i] = k
+	return keys
+
+
+## NO-237: a stack that is gone. Detached from its row at once, so no
+## pool_buttons()/stack_button_at lookup ever finds it again; when animating,
+## it fades out where it stood (reparented onto this layer, input-dead) and
+## then frees.
+func _drop_stack_button(btn: Button, animate: bool) -> void:
+	var shown: bool = animate and btn.is_inside_tree()
+	var at: Vector2 = btn.global_position if shown else Vector2.ZERO
+	if btn.get_parent():
+		btn.get_parent().remove_child(btn)
+	if not shown:
+		btn.queue_free()
+		return
+	btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in btn.get_children():
+		if c is Control:
+			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(btn)
+	btn.global_position = at
+	var tw := create_tween()
+	tw.tween_property(btn, "modulate:a", 0.0, STACK_FADE_OUT_S)
+	tw.tween_callback(btn.queue_free)
+
+
+## NO-237: where a stack's scroll area is. Positions for the slide are taken
+## relative to it, not raw global ones: the drawer itself may be mid-slide
+## (NO-118) between the rebuild and the frame, and that motion is not the
+## stack's.
+func _stack_origin(btn: Button) -> Vector2:
+	return (cap_scroll if btn.get_meta("cap") else stock_scroll).global_position
+
+
+## NO-237: FLIP. Runs just before the frame draws — after the deferred
+## container sort has placed every row, before anything is shown — so a kept
+## button is put back at its old spot and tweened to its new one, and a new
+## one scales/fades in, with no frame of the final layout showing first.
+## Only the latest rebuild's pass runs (`_stack_anim_gen`). Nothing here
+## touches input: a sliding button is clickable wherever it is drawn.
+## The tweens move `position` inside a container, so any re-sort mid-tween
+## (the next rebuild) snaps it home — that rebuild then starts its own slide
+## from wherever the button was.
+func _animate_stacks(old_pos: Dictionary, fresh: Array) -> void:
+	_stack_anim_gen += 1
+	var gen := _stack_anim_gen
+	await RenderingServer.frame_pre_draw
+	if gen != _stack_anim_gen:
+		return
+	for btn in old_pos:
+		if not is_instance_valid(btn) or not btn.is_inside_tree():
+			continue
+		if btn.has_meta("flip_tw"):
+			(btn.get_meta("flip_tw") as Tween).kill()
+			btn.remove_meta("flip_tw")
+		var home: Vector2 = btn.position
+		var from: Vector2 = old_pos[btn] + _stack_origin(btn)
+		if from.distance_to(btn.global_position) < 0.5:
+			continue
+		btn.global_position = from
+		var tw := create_tween().bind_node(btn)
+		tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(btn, "position", home, STACK_SLIDE_S)
+		btn.set_meta("flip_tw", tw)
+	for btn in fresh:
+		if not is_instance_valid(btn) or not btn.is_inside_tree():
+			continue
+		# scale/self_modulate, not modulate: modulate carries the armed/merge
+		# tint (and game.gd's drag-start merge highlight writes it directly).
+		# 0.4, not 0: a zero scale is a singular transform to GUI picking.
+		btn.pivot_offset = btn.size / 2.0
+		btn.scale = Vector2(0.4, 0.4)
+		btn.self_modulate.a = 0.0
+		var tw := create_tween().bind_node(btn).set_parallel()
+		tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(btn, "scale", Vector2.ONE, STACK_POP_IN_S)
+		tw.tween_property(btn, "self_modulate:a", 1.0, STACK_POP_IN_S)
 
 
 ## V1 (Max, 2026-09-21 correction): Max rejected an earlier padded-
@@ -2496,18 +2622,49 @@ func _rebuild_stock_drawer() -> void:
 ## built last) = children[0:4] = [0,1,2,3], added in reverse (3,2,1,0) so the
 ## row reads [3, 2, 1, 0] — 0 bottom-right, 1 to its left, matching Max's
 ## description exactly, with no spacer of any kind.
+##
+## NO-237: rows are REUSED, not rebuilt — extra rows come off the top, missing
+## ones are added on top — and a child is only reparented when its row
+## changes, so a kept button stays in the tree (and keeps any press in
+## progress) whenever it can. Anything left in a row that `children` no
+## longer lists (the last rebuild's "+" slot) is removed and freed; a gone
+## stack's button was already detached by _drop_stack_button.
 func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) -> void:
 	cols = maxi(cols, 1)
 	var rows := ceili(float(children.size()) / float(cols))
-	for row_idx in range(rows - 1, -1, -1): # topmost row first, row 0 last
+	while grid.get_child_count() > rows:
+		var extra := grid.get_child(0)
+		for c in extra.get_children(): # kept buttons are re-placed below
+			extra.remove_child(c)
+			if not children.has(c):
+				c.queue_free()
+		grid.remove_child(extra)
+		extra.queue_free()
+	while grid.get_child_count() < rows:
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_END # short row's gap lands on the left
 		row.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
+		grid.add_child(row)
+		grid.move_child(row, 0) # new rows go on top; row 0 stays the bottom child
+	for row_idx in rows:
+		var row: HBoxContainer = grid.get_child(rows - 1 - row_idx) # row 0 is the bottom child
 		var lo := row_idx * cols
 		var hi := mini(lo + cols, children.size())
+		var at := 0
 		for i in range(hi - 1, lo - 1, -1): # descending: lowest index added last = rightmost
-			row.add_child(children[i])
-		grid.add_child(row)
+			var c: Control = children[i]
+			if c.get_parent() != row:
+				if c.get_parent():
+					c.get_parent().remove_child(c)
+				row.add_child(c)
+			row.move_child(c, at)
+			at += 1
+	for row in grid.get_children():
+		for c in row.get_children():
+			if not children.has(c):
+				row.remove_child(c)
+				c.queue_free()
+		row.queue_sort() # re-lay kept buttons even if nothing in this row moved (NO-237 FLIP)
 
 
 ## NO-208: default scroll position is the bottom, matching cap_anchor/
@@ -2528,31 +2685,28 @@ func _scroll_stock_to_bottom() -> void:
 ## One stack button (Stock or Captured entry) — everything from the icon down
 ## to its drag/tap wiring. Split out of _rebuild_stock_drawer so that
 ## function only decides which grid an entry lands in.
-func _build_stack_button(st: Dictionary) -> Button:
-	var btn := Button.new()
+##
+## NO-237: pass `btn` to re-dress a button that already shows this stack —
+## _rebuild_stock_drawer keeps one button per stack so it can slide instead
+## of being rebuilt. What never changes for a stack (icon, id/cap, the input
+## wiring) is set once, on creation; everything that can change (count,
+## entry, tint, badges, prices) is redone on every call. The handlers read
+## entry/count from meta, not from `st`, so a kept button never emits a stale
+## count.
+func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	var id: String = st.id
 	var cap: bool = st.cap
-	if g.textures.has(id): # piece icon instead of glyph text (round 3)
-		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
-		# token says so without a label. A painted light/dark pair gets this
-		# for free from piece_tex's own owner param; the King's shared
-		# monochrome svg (mono_art) carries no side colour of its own — that
-		# only happens at board-draw time (game.gd's _draw_piece), which this
-		# Button icon bypasses entirely — so it's tinted the same
-		# COL_SIDE_ENEMY the board itself uses.
-		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
-		if cap and g.mono_art.has(id):
-			btn.modulate = g.COL_SIDE_ENEMY
-		btn.expand_icon = true
-		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
-		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
-		# tile (that relationship — "so a piece reads the same wherever it
-		# is" — is what NO-119 explicitly overrides for icons outside the
-		# board).
-		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	if btn == null:
+		btn = _new_stack_button(id, cap)
 	else:
-		btn.text = g.defs[id].glyph
-		btn.add_theme_font_size_override("font_size", 22)
+		for c in btn.get_children(): # last dressing's badges
+			btn.remove_child(c)
+			c.queue_free()
+	btn.set_meta("entry", st.entry)
+	btn.set_meta("count", st.count)
+	# NO-164: see _new_stack_button — the King's mono svg carries no side colour.
+	btn.modulate = g.COL_SIDE_ENEMY if cap and g.textures.has(id) and g.mono_art.has(id) \
+			else Color.WHITE
 	# `not cap` is load-bearing, not decoration: placing_id is only ever a
 	# STOCK id now (game.gd), so without it a captured row holding the same
 	# piece id as the armed Stock stack would light up armed too.
@@ -2690,9 +2844,34 @@ func _build_stack_button(st: Dictionary) -> Button:
 		mark.offset_left = -14
 		mark.offset_top = -14
 		btn.add_child(mark)
+	return btn
+
+
+## NO-237: the parts of a stack button that never change for its stack —
+## created once, then kept across rebuilds (see _build_stack_button).
+func _new_stack_button(id: String, cap: bool) -> Button:
+	var btn := Button.new()
+	if g.textures.has(id): # piece icon instead of glyph text (round 3)
+		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
+		# token says so without a label. A painted light/dark pair gets this
+		# for free from piece_tex's own owner param; the King's shared
+		# monochrome svg (mono_art) carries no side colour of its own — that
+		# only happens at board-draw time (game.gd's _draw_piece), which this
+		# Button icon bypasses entirely — so it's tinted the same
+		# COL_SIDE_ENEMY the board itself uses.
+		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
+		btn.expand_icon = true
+		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
+		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
+		# tile (that relationship — "so a piece reads the same wherever it
+		# is" — is what NO-119 explicitly overrides for icons outside the
+		# board).
+		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	else:
+		btn.text = g.defs[id].glyph
+		btn.add_theme_font_size_override("font_size", 22)
 	btn.set_meta("id", id) # drop-target lookup for drag merges
 	btn.set_meta("cap", cap)
-	btn.set_meta("entry", st.entry)
 	# NO-138: long-press opens the same preview modal a double-tap does
 	# (game.gd's _show_preview, via stack_preview_requested — this cell has a
 	# piece id, not a description to show, so on_fire bypasses show_tip
@@ -2702,11 +2881,11 @@ func _build_stack_button(st: Dictionary) -> Button:
 		if btn.has_meta("lp_fired"): # NO-72's swallow, same as every other long-press cell
 			btn.remove_meta("lp_fired")
 			return
-		stack_pressed.emit(st.entry, cap, st.count))
+		stack_pressed.emit(btn.get_meta("entry"), cap, btn.get_meta("count")))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
 		_long_press_input(btn, "", "", e, func() -> void:
-			stack_preview_requested.emit(id, cap, st.entry)))
-	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
+			stack_preview_requested.emit(id, cap, btn.get_meta("entry"))))
+	btn.button_down.connect(func() -> void: stack_drag_started.emit(btn.get_meta("entry"), cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down
 	# arms a deploy — so a press now also reaches the ScrollContainer and can

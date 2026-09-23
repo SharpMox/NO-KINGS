@@ -18,6 +18,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const Rules := preload("res://scripts/rules.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const AutoplayBot := preload("res://scripts/autoplay.gd")
 
 var fails := 0
 
@@ -726,6 +727,24 @@ func _init() -> void:
 	check(conv.stock.has("rook") and not conv.captured.has("rook"),
 		"the piece moves Captured -> Stock")
 	conv.queue_free()
+	await process_frame
+
+	# --- NO-153: the bot sells Captured Stock the way a player must — convert,
+	# then sell from Stock — never in one step. CONVERT_RATE > SELL_RATE makes
+	# that round trip lose Gold, so a bot short of Gold holding a Captured
+	# surplus (try_sell's own trigger) and able to afford the convert must
+	# leave it alone. Before NO-153 this fixture sold a pawn directly.
+	var bot: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 5, "gold": AutoplayBot.SELL_GOLD_FLOOR - 1,
+		"stock": ["pawn", "pawn", "pawn"],
+		"captured": ["pawn", "pawn", "pawn", "pawn", "pawn", "pawn"]})
+	var bot_gold: int = bot.gold
+	check(bot_gold < AutoplayBot.SELL_GOLD_FLOOR and Shop.can_convert(bot, "pawn"),
+		"NO-153 fixture: try_sell's trigger holds and the conversion is affordable")
+	check(not AutoplayBot.try_sell(bot) and bot.captured.size() == 6 \
+			and bot.stock.size() == 3 and bot.gold == bot_gold,
+		"NO-153: the bot never sells Captured Stock directly, nor converts-then-sells at a loss")
+	bot.queue_free()
 	await process_frame
 
 	print("---")

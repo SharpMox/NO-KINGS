@@ -3523,7 +3523,7 @@ func _init() -> void:
 		await process_frame
 	check(game.pool_drag_id != "" and not game.drop_legal(bad_tile) and game.drop_legal(good_tile),
 		"NO-236: mid Stock drag, drop_legal is red on a non-deploy tile and green on a deploy tile",
-		"drag=%s bad=%s good=%s" % [game.pool_drag_id, game.drop_legal(bad_tile), game.drop_legal(good_tile)])
+		"drag=%s bad=%s good=%s preview=%s state=%d" % [game.pool_drag_id, game.drop_legal(bad_tile), game.drop_legal(good_tile), game.preview_open, game.state])
 	_release(game._tile_px(bad_tile) + half_tile)
 	await process_frame
 	await process_frame
@@ -3553,7 +3553,7 @@ func _init() -> void:
 	check(game.drag_from == queen and legal_dest.x >= 0 and game.drop_legal(legal_dest)
 			and not game.drop_legal(refused) and not game.drop_legal(queen),
 		"NO-236: mid board drag, drop_legal is green on a legal destination, red elsewhere and on home",
-		"drag_from=%s dest=%s refused=%s" % [game.drag_from, legal_dest, refused])
+		"drag_from=%s dest=%s refused=%s preview=%s" % [game.drag_from, legal_dest, refused, game.preview_open])
 	_release(to_refused.position)
 	await process_frame
 	check(game.board.has(queen) and game.board[queen].id == "queen" and not game.board.has(refused)
@@ -3578,7 +3578,7 @@ func _init() -> void:
 		await process_frame
 	check(game.item_drag >= 0 and game.drop_legal(queen) and not game.drop_legal(refused),
 		"NO-236: mid Item drag, drop_legal is green on a valid target and red on an empty tile",
-		"item_drag=%d" % game.item_drag)
+		"item_drag=%d preview=%s" % [game.item_drag, game.preview_open])
 	_release(game._tile_px(queen) + half_tile)
 	await process_frame
 	await process_frame

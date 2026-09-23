@@ -2515,8 +2515,9 @@ func _input(event: InputEvent) -> void:
 	if pool_drag_id == "" and item_drag < 0:
 		return
 	if event is InputEventMouseMotion:
-		if event.position.distance_to(drag_press_px) > HudScript.DRAWER_SCROLL_DEADZONE:
+		if not drag_live and event.position.distance_to(drag_press_px) > HudScript.DRAWER_SCROLL_DEADZONE:
 			drag_live = true
+			hud.cancel_long_presses()
 		if hud.drawer_open != "" and not \
 				(hud.drawers[hud.drawer_open] as Control).get_global_rect().has_point(event.position):
 			drawer_autoclosed = hud.drawer_open # reopen if this drag cancels

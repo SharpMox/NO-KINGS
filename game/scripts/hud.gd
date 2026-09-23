@@ -2256,6 +2256,16 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 ## flatten through. Every row holds only Buttons (no placeholders, no
 ## further nesting), so this keeps "pool_buttons() is buttons-only"
 ## (test_game_clicks.gd's own comment on game.pool_box) true.
+## NO-236: a drawer drag that goes live drops every pending long press. The
+## motion that carries the finger out of the drawer closes it (game.gd _input),
+## so the cell never sees the motion that would cancel its own hold, and the
+## piece/Item preview popped up 500 ms after a drag-deploy — then swallowed
+## every board press behind preview_open.
+func cancel_long_presses() -> void:
+	for b in pool_buttons() + items_grid.get_children():
+		b.remove_meta("lp_token")
+
+
 func pool_buttons() -> Array:
 	var out := []
 	for row in stock_grid.get_children():

@@ -2031,15 +2031,6 @@ func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on
 
 
 func refresh() -> void:
-	# issue 101: the Shop button STAYS but is disabled before the unlock Wave
-	# (user ruling) — a hidden button reads as "this game has no Shop", a
-	# greyed one reads as "not yet". It carries the Wave, because a disabled
-	# control with no reason is the failure the ruling was one step away from.
-	var shop_locked: bool = g.wave < Tuning.SHOP_UNLOCK_WAVE
-	shop_button.disabled = shop_locked
-	shop_button.text = "Shop (W%d)" % Tuning.SHOP_UNLOCK_WAVE if shop_locked else "Shop"
-	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
-		if shop_locked else ""
 	update_clock(g.clock_ms) # NO-127: routes through the shared seam (see its header)
 	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
 	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`

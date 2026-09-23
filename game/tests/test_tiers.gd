@@ -128,7 +128,7 @@ func _init() -> void:
 	var s1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
 	Shop.roll(s1) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
-	check(s1.shop_stock.size() == 27, "Tier 1 Shop: unchanged 27 slots (NO-201)")
+	check(s1.shop_stock.size() == 28, "Tier 1 Shop: unchanged 28 slots (NO-201, + the NO-241 Ad Box)")
 	s1.queue_free()
 	await process_frame
 
@@ -140,11 +140,11 @@ func _init() -> void:
 	for slot in s3.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
 	check(kinds.get("piece", 0) == 11 and kinds.get("artefact", 0) == 4
-			and kinds.get("item", 0) == 4 and kinds.get("box", 0) == 4,
-		"Tier 3+ Shop: 11 pieces / 4 artefacts / 4 items / 4 boxes (NO-201) (%s)" % str(kinds))
+			and kinds.get("item", 0) == 4 and kinds.get("box", 0) == 5,
+		"Tier 3+ Shop: 11 pieces / 4 artefacts / 4 items / 4 boxes + the Ad Box, never cut (NO-201, NO-241) (%s)" % str(kinds))
 	var box_types := {}
 	for slot in s3.shop_stock:
-		if slot.kind == "box":
+		if slot.kind == "box" and not slot.get("ad", false): # NO-241: own roll
 			box_types[slot.key] = box_types.get(slot.key, 0) + 1
 	check(box_types.get("piece", 0) == 2 and box_types.get("artefact", 0) == 1
 			and box_types.get("item", 0) == 1,

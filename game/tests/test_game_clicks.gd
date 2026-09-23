@@ -2775,7 +2775,7 @@ func _init() -> void:
 	var box_slot_size := ""
 	for idx in game.shop_stock.size():
 		var s: Dictionary = game.shop_stock[idx]
-		if s.kind == "box" and (box_slot_index == -1 or s.size == "huge"):
+		if s.kind == "box" and not s.get("ad", false) and (box_slot_index == -1 or s.size == "huge"): # a Gold Box: its Buy reads "Buy" (NO-241)
 			box_slot_index = idx
 			box_slot_size = s.size
 			if s.size == "huge": # the worst case (7 entries) — stop as soon as it's found
@@ -3557,7 +3557,7 @@ func _buy_a_box(game: Node2D) -> bool:
 		if n is Button and n.has_meta("shop_index"):
 			var idx: int = n.get_meta("shop_index")
 			var slot: Dictionary = game.shop_stock[idx]
-			if slot.kind == "box" and ShopScript.can_buy(game, slot):
+			if slot.kind == "box" and not slot.get("ad", false) and ShopScript.can_buy(game, slot): # NO-241: not the Ad Box
 				tile = n
 				tile_index = idx
 				break

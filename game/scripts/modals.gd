@@ -148,10 +148,6 @@ var shop_empty_label: Label # NO-240: "Restocks at wave N", shown instead of
 ## here — Tuning.grid_cols is still what OFFBOARD_GRID_COLS documents itself
 ## against, just not called from this file any more.
 const SHOP_SUBZONE_SEP := 4.0
-## V4: the gap between the PIECES block (3 cols) and the BOXES column — one
-## full master-grid column's width (OFFBOARD_ICON) plus both separators that
-## would flank it, so PIECES+gap+BOXES totals exactly 5 master columns.
-const SHOP_BOXES_COL_SEP := Tuning.OFFBOARD_ICON + 2.0 * SHOP_SUBZONE_SEP
 var king_ability_panel: PanelContainer # tariff detail overlay
 var buff_panel: PanelContainer # generic choice-pick modal (issue 41); named
 	# for its first caller, the Buff Box sub-pick — never renamed, since it's
@@ -712,7 +708,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		# off `entry`, an owned g.items/g.artefacts element, same as before.
 		var slot: Dictionary = g.shop_stock[shop_index] if shop_index >= 0 else {}
 		var title := Label.new()
-		title.text = ("%s — $%d" % [Shop.display_name(g, slot), Shop.price(g, slot)]) \
+		title.text = ("%s — %s" % [Shop.display_name(g, slot), Shop.price_text(g, slot)]) \
 			if shop_index >= 0 else str(entry.name)
 		title.add_theme_font_size_override("font_size", 26)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -784,7 +780,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 	if shop_index >= 0:
 		var slot: Dictionary = g.shop_stock[shop_index]
 		var buy := Button.new()
-		buy.text = "SOLD" if slot.sold else "Buy"
+		buy.text = "SOLD" if slot.sold else ("Watch ad" if slot.get("ad", false) else "Buy")
 		buy.disabled = not Shop.can_buy(g, slot)
 		buy.add_theme_font_size_override("font_size", 18)
 		buy.pressed.connect(func() -> void:
@@ -1097,13 +1093,17 @@ func show_shop() -> void:
 		# NO-210: PIECES and BOXES sit in an HBox whose cross-axis default is to
 		# fill+centre each child — SHRINK_BEGIN on both pins them to the row's
 		# top instead, unchanged by V4.
+		# NO-241: 6 Boxes (5 Gold + the Ad Box) no longer fit one column beside
+		# PIECES' 4 rows, so BOXES takes master columns 4-5 (2 cols x 3 rows,
+		# shorter than PIECES) — the unused column 4 SHOP_BOXES_COL_SEP used to
+		# stand in for. The 5-column alignment is unchanged: 3 + 2 = 5.
 		var top_row := HBoxContainer.new()
 		top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-		top_row.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+		top_row.add_theme_constant_override("separation", SHOP_SUBZONE_SEP)
 		var piece_zone := _shop_zone(by_kind.piece, piece_cols)
 		piece_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		top_row.add_child(piece_zone)
-		var box_zone := _shop_zone(by_kind.box, 1)
+		var box_zone := _shop_zone(by_kind.box, 2)
 		box_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		top_row.add_child(box_zone)
 		shop_lower.add_child(top_row)
@@ -1311,7 +1311,7 @@ func _shop_tile(index: int) -> Button:
 	if slot.sold:
 		btn.modulate = Color(1, 1, 1, 0.4) # greys out, stays in place — never removed
 	var price := Label.new()
-	price.text = "$%d" % Shop.price(g, slot)
+	price.text = Shop.price_text(g, slot) # NO-241: "Watch ad" on the Ad Box
 	price.add_theme_font_size_override("font_size", 10)
 	price.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
@@ -1319,6 +1319,8 @@ func _shop_tile(index: int) -> Button:
 	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	price.offset_left = -28
 	price.offset_top = -14
+	price.grow_horizontal = Control.GROW_DIRECTION_BEGIN # a wider label
+		# ("Watch ad") grows leftward into the tile, never past its right edge
 	btn.add_child(price)
 	# NO-167 (Max review, second pass): a tap opens the tile's own preview
 	# instead of expanding an in-place dock — see show_preview's shop_index

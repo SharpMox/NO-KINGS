@@ -82,6 +82,18 @@ static func roll(g) -> void:
 
 	for id in sample_pieces(g, rows.piece):
 		slots.append({"kind": "piece", "key": id, "sold": false})
+	# NO-241: the Ad Box — one extra Box slot per restock, paid for by watching
+	# an ad instead of Gold. Rolled exactly like a Gold Box slot (size uniform
+	# over Box.SIZE_KEYS, contents rolled now and stored), except its theme,
+	# which the Gold slots take from a fixed 2/2/1 split: a single slot has no
+	# split to take a share of, so it rolls one of BOX_THEMES uniformly.
+	# Appended LAST, after every other roll, so a seed's Gold slots and every
+	# earlier draw stay exactly what they were before this slot existed. Not
+	# cut by the Tier 3+ row delta — there is only ever one.
+	var ad_theme: String = BOX_THEMES[g.rng.randi() % BOX_THEMES.size()]
+	var ad_size: String = Box.SIZE_KEYS[g.rng.randi() % Box.SIZE_KEYS.size()]
+	slots.append({"kind": "box", "key": ad_theme, "size": ad_size, "sold": false,
+		"contents": Box.roll_options(g, ad_theme, ad_size), "ad": true})
 	g.shop_stock = slots
 
 
@@ -159,6 +171,8 @@ static func base_piece_pool(defs: Dictionary) -> Array:
 ## Visa) is baked into `base` first, ahead of the hook: it's the slot's own
 ## structural price, not a held-artefact modifier on every artefact's price.
 static func price(g, slot: Dictionary) -> int:
+	if slot.get("ad", false):
+		return 0 # NO-241: the Ad Box costs an ad, never Gold
 	var base: float
 	var tier := ""
 	match slot.kind:
@@ -206,6 +220,12 @@ static func price(g, slot: Dictionary) -> int:
 		# sell_payout() below share this constant.
 		amount *= 0.75
 	return maxi(roundi(amount), 0)
+
+
+## NO-241: what a slot's price badge and Buy button read — "Watch ad" for the
+## Ad Box, the Gold price for everything else.
+static func price_text(g, slot: Dictionary) -> String:
+	return "Watch ad" if slot.get("ad", false) else "$%d" % price(g, slot)
 
 
 ## "" for non-artefact slots and the 7 core artefacts that predate the

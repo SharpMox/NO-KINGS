@@ -1,6 +1,6 @@
 extends SceneTree
-## The Shop: 27-slot randomized stock (5 typed boxes / 5 artefacts / 5 items /
-## 12 distinct base pieces — NO-201), priced in gold, no Action cost on any interaction
+## The Shop: 28-slot randomized stock (5 typed boxes + the Ad Box / 5 artefacts / 5 items /
+## 12 distinct base pieces — NO-201, NO-241), priced in gold, no Action cost on any interaction
 ## (issue 64). Bought slots go SOLD. Restocks on two lanes (issue 64): every
 ## 5 Waves (Lane A, guaranteed), or Tuning.SHOP_LANE_B_SCORE Score since the
 ## last Lane-A restock (Lane B, which every Lane-A restock resets) — the old
@@ -57,10 +57,13 @@ func _init() -> void:
 	var kinds := {}
 	for slot in game.shop_stock:
 		kinds[slot.kind] = kinds.get(slot.kind, 0) + 1
-	check(game.shop_stock.size() == 27, "a run boots with a rolled 27-slot shop (NO-201)")
-	check(kinds.get("box", 0) == 5 and kinds.get("artefact", 0) == 5
+	check(game.shop_stock.size() == 28, "a run boots with a rolled 28-slot shop (NO-201 + the NO-241 Ad Box)")
+	check(kinds.get("box", 0) == 6 and kinds.get("artefact", 0) == 5
 			and kinds.get("item", 0) == 5 and kinds.get("piece", 0) == 12,
-		"rows: 5 boxes / 5 artefacts / 5 items / 12 base pieces (NO-201)")
+		"rows: 5 boxes + 1 Ad Box / 5 artefacts / 5 items / 12 base pieces (NO-201, NO-241)")
+	var ad_slots: Array = game.shop_stock.filter(func(sl: Dictionary) -> bool: return sl.get("ad", false))
+	check(ad_slots.size() == 1 and ad_slots[0].kind == "box" and game.shop_stock.back() == ad_slots[0],
+		"NO-241: exactly one Ad Box, rolled last")
 
 	# boxes are typed (issue 47: 9 Boxes = 3 sizes x 3 themes — Pieces/
 	# Artefacts/Items — Score Box and the mixed Box are gone), the 5-slot row
@@ -68,7 +71,7 @@ func _init() -> void:
 	# 2/2/2 at 6), each slot's SIZE rolled independently
 	var box_types := {}
 	for slot in game.shop_stock:
-		if slot.kind == "box":
+		if slot.kind == "box" and not slot.get("ad", false): # NO-241: the Ad Box's theme is its own roll
 			box_types[slot.key] = box_types.get(slot.key, 0) + 1
 			check(slot.size in Box.SIZE_KEYS, "every Box slot carries a rolled size")
 			check(slot.contents.size() == Box.SIZES[slot.size].choices,
@@ -198,7 +201,8 @@ func _init() -> void:
 				if ti < 0 or slot_count_modifiers.has(game.shop_stock[ti].key):
 					ti = i
 			"box":
-				bi = i
+				if not game.shop_stock[i].get("ad", false): # a Gold Box (NO-241)
+					bi = i
 	var items_n: int = game.items.size()
 	Shop.buy(game, ii)
 	check(game.items.size() == items_n + 1
@@ -308,7 +312,7 @@ func _init() -> void:
 	check(game.shop_stock.filter(func(sl: Dictionary) -> bool:
 			return sl.sold).is_empty(),
 		"a restock clears every SOLD flag")
-	check(game.shop_stock.size() == 27, "a restock refills all 27 slots (NO-201)")
+	check(game.shop_stock.size() == 28, "a restock refills all 28 slots (NO-201, NO-241)")
 	before = JSON.stringify(game.shop_stock)
 	game._queue_wave(6)
 	check(JSON.stringify(game.shop_stock) == before, "Wave 6 is not a Lane-A beat — no restock")

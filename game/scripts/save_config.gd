@@ -282,6 +282,12 @@ static func apply(g, cfg: Dictionary) -> void:
 	# double-count the Turn it was saved on.
 	g.turn_number = int(cfg.get("turn_number", g.turn_number))
 	g.ecdysis_copy_key = str(cfg.get("ecdysis_copy_key", "")) # issue 55, additive
+	# NO-241: the once-per-run ad retry and the wave-start checkpoint it
+	# restores. Both additive: an older save offered no retry yet (false) and
+	# took no checkpoint ({} — the retry is simply not offered until the next
+	# wave start takes one).
+	g.ad_retry_used = bool(cfg.get("ad_retry_used", false))
+	g.wave_snapshot = (cfg.get("wave_snapshot", {}) as Dictionary).duplicate(true)
 
 
 ## Restore a turn already in progress, doing ONLY what _begin_player_turn() does
@@ -457,4 +463,7 @@ static func to_config(g) -> Dictionary:
 		"king_abilities_off": g.king_abilities_suppressed,
 		"seed": str(g.rng.seed), "rng_state": str(g.rng.state),
 		"ecdysis_copy_key": g.ecdysis_copy_key,
+		"ad_retry_used": g.ad_retry_used, # NO-241
+		"wave_snapshot": g.wave_snapshot, # NO-241: taken with its own
+			# wave_snapshot cleared (game.gd), so it never nests deeper than one
 	})

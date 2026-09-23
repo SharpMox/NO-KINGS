@@ -313,8 +313,12 @@ const ARROW_HEAD_HALF := 11.0 # was 8.0
 # on the tile, superseding NO-101's side-coloured corner glyph.
 const INV_MARK_GLYPH := "⟲"
 const INV_MARK_GLYPH_COL := Color.WHITE
-const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
-const INV_MARK_DISC_RATIO := 0.55 # disc radius = _inv_mark_size() * this
+## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
+## the RING off-centre. Shift by this fraction of the mark size so the ring,
+## not the box, sits on the disc's centre (measured from a capture, NO-100).
+const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, 0.0)
+const INV_MARK_DISC_COL := Color(0.19, 0.08, 0.27, 0.9) # dark purple (Max, NO-100)
+const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
 # light ring behind each glyph, rather than a flat colour matched to the
@@ -5292,7 +5296,8 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		# draw_string's y is the BASELINE: drop it by half of (ascent - descent)
 		# so the glyph's box is centred on the disc, not sitting on its middle
 		var baseline := c.y + (font.get_ascent(mark_size) - font.get_descent(mark_size)) / 2.0
-		draw_string(font, Vector2(c.x - r, baseline), INV_MARK_GLYPH,
+		var nudge := INV_MARK_GLYPH_NUDGE * mark_size
+		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
 			HORIZONTAL_ALIGNMENT_CENTER, r * 2, mark_size, INV_MARK_GLYPH_COL)
 	var buff_glyphs := BuffLogic.glyphs_of(p)
 	if not buff_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
@@ -5332,7 +5337,7 @@ func _is_inversion_marked(id: String) -> bool:
 ## mobile tile size). Floor keeps it legible if the board ever shrinks
 ## further; the glyph itself is small within its own font metrics, hence 56%
 ## of the tile. NO-100 kept this size for the centred disc (radius = size *
-## INV_MARK_DISC_RATIO, ~0.31 tile), which sits over the piece by design.
+## INV_MARK_DISC_RATIO, ~0.25 tile), which sits over the piece by design.
 func _inv_mark_size() -> int:
 	return maxi(18, int(tile * 0.56))
 

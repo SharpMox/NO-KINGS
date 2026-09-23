@@ -316,9 +316,10 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 ## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
 ## the RING off-centre. Shift by this fraction of the mark size so the ring,
 ## not the box, sits on the disc's centre (measured from a capture, NO-100).
-const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.06)
+const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
+const INV_MARK_DROP := 0.12 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
 # light ring behind each glyph, rather than a flat colour matched to the
@@ -5348,7 +5349,7 @@ func _inv_mark_size() -> int:
 ## piece". Shared by `_draw_piece` and tests/test_board_draw.gd so the probe
 ## can never diverge from where the draw call actually puts the mark.
 func _inv_mark_centre(px: Vector2) -> Vector2:
-	return px + Vector2(tile, tile) / 2.0
+	return px + Vector2(tile, tile) / 2.0 + Vector2(0, tile * INV_MARK_DROP)
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

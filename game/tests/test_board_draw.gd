@@ -72,8 +72,9 @@ func _init() -> void:
 	var px := Vector2(37, 53) # an arbitrary tile origin, not (0, 0)
 	var t: float = game.tile
 	var c: Vector2 = game._inv_mark_centre(px)
-	check(c.is_equal_approx(px + Vector2(t, t) / 2.0),
-		"inversion mark is centred on the tile (%s vs tile centre %s)" % [c, px + Vector2(t, t) / 2.0])
+	var want := px + Vector2(t, t) / 2.0 + Vector2(0, t * game.INV_MARK_DROP)
+	check(c.is_equal_approx(want) and game.INV_MARK_DROP > 0.0,
+		"inversion mark is centred horizontally, dropped below the piece's face (%s vs %s)" % [c, want])
 	var r: float = game._inv_mark_size() * game.INV_MARK_DISC_RATIO
 	check(Rect2(px, Vector2(t, t)).encloses(Rect2(c - Vector2(r, r), Vector2(r, r) * 2)),
 		"inversion mark's disc (r=%.1f) lies inside its tile (%.1f)" % [r, t])

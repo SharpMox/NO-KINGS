@@ -133,12 +133,9 @@ static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
 ## offered again while a copy is held. Every artefact offer reads this: the
 ## Shop's normal and hidden rolls and the Cult's starting pair (all through
 ## _sample_weighted_artefacts) and the Artefact Box (box.gd roll_options).
-const UNIQUE_ARTEFACTS := ["abduction-probe"]
-
-
+## The list itself lives in artefact_hooks.gd (its grant() refuses a dupe too).
 static func is_unique_held(g, key: String) -> bool:
-	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
-		func(t: Dictionary) -> bool: return t.key == key)
+	return ArtefactHooks.is_unique_held(g, key)
 
 
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King
@@ -261,10 +258,16 @@ static func waves_until_lane_a(g) -> int:
 ## above) zeroes it. A single gain crossing several multiples banks them all
 ## but rolls once (issue 57's "leap crosses several thresholds" contract,
 ## preserved from the old maybe_restock).
+##
+## NO-240: before the first restock (Tuning.SHOP_UNLOCK_WAVE) progress still
+## banks but never rolls — the Shop stays empty until Lane A's first fire,
+## which zeroes whatever banked here anyway.
 static func add_score_progress(g, amount: int) -> void:
 	if amount <= 0:
 		return
 	g.shop_lane_b_progress += amount
+	if g.wave < Tuning.SHOP_UNLOCK_WAVE:
+		return
 	var crossed := false
 	while g.shop_lane_b_progress >= Tuning.SHOP_LANE_B_SCORE:
 		g.shop_lane_b_progress -= Tuning.SHOP_LANE_B_SCORE
@@ -278,12 +281,11 @@ static func add_score_progress(g, amount: int) -> void:
 ## the unlock, hence "SHOP OPEN"), so it is the one place that banners it.
 ## roll() itself stays silent: its other callers are run setup and the
 ## player's own Jet Fuel restock, neither of which is news, and a save restore
-## never rolls at all. No banner before the unlock — a Lane-B restock of a
-## Shop the player cannot open yet is nothing they can act on.
+## never rolls at all. Never reached before the first restock Wave (NO-240:
+## add_score_progress holds Lane B until then), so there is no pre-unlock banner.
 static func _restock(g, text: String) -> void:
 	roll(g)
-	if g.wave >= Tuning.SHOP_UNLOCK_WAVE:
-		g._add_turn_fx(text, g.BANNER_GAIN, "shop_restock")
+	g._add_turn_fx(text, g.BANNER_GAIN, "shop_restock")
 
 
 ## Purchasable right now: player's turn and the gold to spare, not sold.
@@ -292,26 +294,20 @@ static func _restock(g, text: String) -> void:
 ## here should require one either.
 const PURCHASABLE := ["piece", "item", "artefact", "box"]
 
-## issue 101 gates the PANEL, not this. The Wave gate deliberately does NOT
-## live here: `can_buy` is the mechanics layer, and seven suites drive it
-## directly at low Waves to test shop behaviour that has nothing to do with the
-## unlock. A player can only reach a purchase through the panel, so gating the
-## panel is behaviourally complete for them.
-##
-## The one thing that CAN bypass it is autoplay, which buys through buy()
-## without opening the modal — so the bot carries the same Wave check itself
-## (autoplay.gd's try_shop). The bot must never be able to do what a player
-## cannot, or the issue-103 measurements stop describing the real game.
+## No Wave gate here (NO-240): before the first restock the stock is simply
+## empty, so there is nothing to buy — for the player and autoplay alike.
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
 			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
 			and (slot.kind != "item" or ItemLogic.has_room(g)) \
+			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) \
 			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue
 				# 53/60: never sell an Item or Artefact slot the player has no
 				# capacity to hold — a Box still sells fine even at capacity
 				# (it might not roll one; _box_choose's own grant refuses that
-				# pick if it does)
+				# pick if it does). NO-244: nor a unique Artefact already held —
+				# stock rolled before the first probe was bought still holds one
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold

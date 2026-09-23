@@ -997,7 +997,9 @@ func _ready() -> void:
 					inst.acquired_wave = wave
 					inst.rarity = ArtefactHooks.rarity_of(key)
 					artefacts.append(inst)
-	if shop_stock.is_empty(): # fresh run, or a save from before the shop
+	# fresh run, or a save from before the shop. NO-240: not before the first
+	# restock Wave — the Shop opens empty until then (Tuning.SHOP_UNLOCK_WAVE).
+	if shop_stock.is_empty() and wave >= Tuning.SHOP_UNLOCK_WAVE:
 		Shop.roll(self)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
 		await get_tree().process_frame
@@ -4993,6 +4995,15 @@ func _box_options(theme: String, size: String) -> Array:
 
 
 func _box_choose(opt: Dictionary) -> void:
+	if opt.kind == "artefact" and Shop.is_unique_held(self, opt.payload.key):
+		# NO-244: an offer rolled before the first probe landed — drop it,
+		# keep the pick, the rest of the offer stays pickable
+		box_offer.erase(opt)
+		if box_offer.is_empty():
+			return _box_close()
+		if autoplay:
+			return _box_choose(box_offer[rng.randi() % box_offer.size()])
+		return modals.show_box(box_offer)
 	fx_at = get_viewport_rect().size / 2.0
 	match opt.kind:
 		"piece":
@@ -5922,21 +5933,13 @@ func _connect_modals() -> void:
 	modals.preview_closed.connect(func() -> void: preview_open = false)
 
 
-## Shop entry: player's turn only, never over another modal.
+## Shop entry: never over another modal.
 ##
-## LOCKED BEFORE Tuning.SHOP_UNLOCK_WAVE (issue 101, user ruling 2026-09-01).
-## This file previously said "always openable, in any state — the GDD makes the
-## Shop the one surface the player can reach at will"; that is no longer true
-## and the comment is rewritten rather than left contradicting the code. From
-## the unlock Wave on, the old rule resumes: openable in any state, with buying
-## still turn-gated by Shop.can_buy, so outside your turn it is a readable
-## catalog with dead Buy buttons.
+## NO-240 (Max, 2026-09-24) reverses issue 101's Wave lock: openable from Wave
+## 1, in any state, with buying turn-gated by Shop.can_buy (outside your turn
+## it is a readable catalog with dead Buy buttons). Before its first restock
+## (Tuning.SHOP_UNLOCK_WAVE) the stock is empty and the panel says so.
 func _open_shop() -> void:
-	if wave < Tuning.SHOP_UNLOCK_WAVE:
-		_add_turn_fx("The Shop opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE,
-			Color(1.0, 0.8, 0.4)) # says WHEN, not just "no" — a refusal with
-			# no reason reads as a bug (issue 101's own acceptance)
-		return
 	if Kings.power_is(self, "juche"): # Kim Jong Un: Juche — the Shop is closed
 		_add_turn_fx("Juche: the Shop is closed", Color(1.0, 0.5, 0.4))
 		return
@@ -5962,7 +5965,9 @@ func shop_open() -> bool:
 ## panel (_open_shop()) can no longer re-arm this; only a Wave clear can.
 func _jet_fuel_restock_available() -> bool:
 	return _held("jet-fuel-vial") and not jet_fuel_used_this_wave \
-			and state == State.PLAYER_TURN and gold >= 20
+			and state == State.PLAYER_TURN and gold >= 20 \
+			and wave >= Tuning.SHOP_UNLOCK_WAVE # NO-240: the Shop stays empty
+				# until its first restock — no early roll by any route
 
 
 func _jet_fuel_restock_pressed() -> void:

@@ -771,6 +771,7 @@ func _init() -> void:
 	# time either way (see the handler's own comment).
 	var ys := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 99999, "artefacts": ["deep-state-yearbook", "library-of-alexandria-matchbox"]})
+	Shop.roll(ys) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	ys.actions_left = 5
 	var ys_idx := -1
@@ -789,6 +790,7 @@ func _init() -> void:
 
 	var yself := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 99999})
+	Shop.roll(yself) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	yself.actions_left = 5
 	yself.shop_stock[0] = {"kind": "artefact", "key": "deep-state-yearbook", "sold": false}
@@ -821,6 +823,7 @@ func _init() -> void:
 		"wave": 3, "gold": 99999,
 		"artefacts": ["deep-state-yearbook", "library-of-alexandria-matchbox",
 			"library-of-alexandria-matchbox", "library-of-alexandria-matchbox"]})
+	Shop.roll(loop) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	loop.actions_left = 5
 	check(loop.artefacts.size() == 4, "(sanity) 4 Artefacts held, 1 slot free under the cap of 5")
@@ -848,6 +851,7 @@ func _init() -> void:
 	# both back at 50%: no Gold gain, bounded by the Item cap of 3 regardless.
 	var mao := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 99999, "artefacts": ["mao-s-loyalty-badge"]})
+	Shop.roll(mao) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	mao.actions_left = 5
 	mao.shop_stock[0] = {"kind": "item", "key": "blitz", "sold": false} # Blitz is Tactical

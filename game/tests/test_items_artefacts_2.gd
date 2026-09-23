@@ -128,6 +128,7 @@ func _init() -> void:
 	# — the piece isn't on the board yet, so this rides stock as a Dictionary
 	var sleeper := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["sleeper-agent-pillow"], "gold": 9999})
+	Shop.roll(sleeper) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	sleeper.state = sleeper.State.PLAYER_TURN
 	sleeper.actions_left = 5
@@ -496,6 +497,7 @@ func _init() -> void:
 	var cheap := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 9999, "score": 0,
 		"artefacts": ["casino-invisible-clock", "2012-doomsday-party-hat", "fort-knox-iou"]})
+	Shop.roll(cheap) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	var clock_cheap1: float = cheap.clock_ms
 	for i in cheap.shop_stock.size():

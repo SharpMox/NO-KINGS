@@ -338,7 +338,7 @@ const BUFF_GLYPH_RATIO := 1.6 # glyph size = badge half-width * this (NO-244)
 const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
 const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
 const BUFF_BADGE_ACCENT := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
-const BUFF_BADGE_PURPLE := Color(0.26, 0.11, 0.36, 0.95)
+const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
@@ -5327,7 +5327,7 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	var size := int(half * BUFF_GLYPH_RATIO)
 	var baseline := (font.get_ascent(size) - font.get_descent(size)) / 2.0
 	var box := StyleBoxFlat.new()
-	box.bg_color = BUFF_BADGE_PURPLE
+	box.bg_color = BUFF_BADGE_FILL
 	box.border_color = BUFF_BADGE_ACCENT
 	box.set_border_width_all(1)
 	box.set_corner_radius_all(int(half * 0.45))

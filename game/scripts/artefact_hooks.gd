@@ -1279,11 +1279,13 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 	var n_bilderberg: int = counts.get("bilderberg-hotel-slippers", 0)
 	if n_bilderberg > 0 and fired.size() >= 2:
 		g.gold += 15 * n_bilderberg
+		feed(g, "bilderberg-hotel-slippers", 0, 15 * n_bilderberg) # NO-239
 
 	var n_nwo: int = counts.get("illuminati-nwo-booster-pack", 0)
 	if n_nwo > 0 and hook == "on_capture" and not fired.is_empty():
 		g.gold += 2 * n_nwo * fired.size()
 		g.score += 200 * n_nwo * fired.size() # issue 57: x10, direct write bypasses Economy.earn
+		feed(g, "illuminati-nwo-booster-pack", 200 * n_nwo * fired.size(), 2 * n_nwo * fired.size()) # NO-239
 
 	var n_mona: int = counts.get("100-genuine-original-mona-lisa", 0)
 	if n_mona > 0 and not g.mona_lisa_turn_done and not fired.is_empty():
@@ -1408,9 +1410,22 @@ static func _milestone5_hit(wave: int, acquired_wave: int) -> bool:
 ## the dispatch key already in scope in every _dispatch arm. Same-frame
 ## repeats (a per-piece loop, two held copies) coalesce into one "×N" banner
 ## inside _add_turn_fx.
+## NO-239: a per-trigger note is minor, so it goes to the kill feed now; a
+## LOSS (#541) and anything not an Artefact (a Tariff) keep the full banner.
 static func _note(g, key: String, what: String, color: Color = Color.TRANSPARENT) -> void:
+	if color != g.BANNER_LOSS and artefact_name(key) != key:
+		feed(g, key, 0, 0, what)
+		return
 	g._add_turn_fx("%s: %s" % [artefact_name(key), what],
 		g.BANNER_EFFECT if color == Color.TRANSPARENT else color)
+
+
+## NO-239: one kill-feed line for an Artefact — its painted icon, or a ✦
+## glyph before its name when it has none. Same-frame posts for one key merge.
+static func feed(g, key: String, score: int, gold: int, note := "") -> void:
+	var icon: Texture2D = g.artefact_icons.get(key)
+	g.hud.feed_gain(key, artefact_name(key) if icon else "✦ " + artefact_name(key),
+		score, gold, note, icon, g.BANNER_EFFECT)
 
 
 static func artefact_name(key: String) -> String:
@@ -1468,12 +1483,23 @@ static func has_room(g) -> bool:
 	return g.artefacts.size() < cap(g)
 
 
+## Artefacts that don't stack (Max, NO-244: Abduction Probe). Lives here,
+## beside grant(), which refuses a held duplicate, so this file needs no
+## shop.gd preload; Shop.is_unique_held delegates here.
+const UNIQUE_ARTEFACTS := ["abduction-probe"]
+
+
+static func is_unique_held(g, key: String) -> bool:
+	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
+		func(t: Dictionary) -> bool: return t.key == key)
+
+
 ## Grant one Artefact entry if there's room; refuses (drops it) when full —
 ## same "capacity refuses" ruling as ItemLogic.grant. Callers stamp
 ## acquired_wave/rarity on `entry` themselves before calling this, same as
 ## every existing artefacts.append() site already did. Returns whether it landed.
 static func grant(g, entry: Dictionary) -> bool:
-	if not has_room(g):
+	if not has_room(g) or is_unique_held(g, entry.key): # NO-244: never a 2nd probe
 		return false
 	g.artefacts.append(entry)
 	return true
@@ -1652,7 +1678,20 @@ static func _on_enemy_half(pos: Vector2i) -> bool:
 ## fired on the wrong beat for any copy not acquired on wave 1). Covered by
 ## test_items.gd ("Max Headroom Mask echoes John Titor's Crypto Wallet on
 ## THAT copy's own beat, not the wave-1 default").
+##
+## NO-239: a passive that pays Score/Gold straight onto g (a direct write, not
+## through Economy.earn) posts the net gain to the kill feed as that Artefact.
+## ponytail: diffs g around the handler; a handler that ever calls
+## Economy.earn itself would post that gain twice (none does today).
 static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int = 1) -> void:
+	var s0: int = g.score
+	var g0: int = g.gold
+	_apply(g, key, hook, ctx, acquired_wave)
+	if (g.score > s0 or g.gold > g0) and artefact_name(key) != key:
+		feed(g, key, g.score - s0, g.gold - g0)
+
+
+static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int) -> void:
 	match [key, hook]:
 		# --- issue 16: percentage Score/Gold gain modifiers ---
 		["tinfoil-hat", "on_score_change"]:

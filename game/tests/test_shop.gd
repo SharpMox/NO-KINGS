@@ -16,6 +16,7 @@ const Box := preload("res://scripts/box.gd")
 const Economy := preload("res://scripts/economy.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Rules := preload("res://scripts/rules.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
@@ -243,17 +244,35 @@ func _init() -> void:
 	check(game.box_offer == stocked_contents,
 		"opening reveals EXACTLY the contents rolled at stock time, not a fresh roll")
 
-	# --- issue 101: the Shop is locked before Tuning.SHOP_UNLOCK_WAVE --------
-	var locked: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500})
-	locked._open_shop()
-	check(locked.modals.shop_panel == null or not locked.modals.shop_panel.visible,
-		"the Shop does not open the Wave before it unlocks")
-	locked.wave = Tuning.SHOP_UNLOCK_WAVE
-	locked._open_shop()
-	check(locked.modals.shop_panel != null and locked.modals.shop_panel.visible,
-		"and opens on the unlock Wave itself")
-	locked.queue_free()
+	# --- NO-240: the Shop opens from Wave 1, EMPTY until its first restock ---
+	var early: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 500})
+	await process_frame
+	check(early.shop_stock.is_empty(), "a Wave-1 run boots with an empty Shop (no setup roll)")
+	check(not early.hud.shop_button.disabled and early.hud.shop_button.text == "Shop",
+		"the Shop button is enabled on Wave 1")
+	early._open_shop()
+	check(early.shop_open(), "the Shop opens on Wave 1")
+	check(early.modals.shop_lower == null, "an empty Shop builds no slot grid (zero buyable slots)")
+	check(early.modals.shop_empty_label != null and early.modals.shop_empty_label.text
+			== "Restocks at wave %d" % Tuning.SHOP_UNLOCK_WAVE,
+		"the empty Shop says when it restocks")
+	Shop.add_score_progress(early, Tuning.SHOP_LANE_B_SCORE * 2)
+	check(early.shop_stock.is_empty() and early.shop_restocks == 0
+			and early.shop_lane_b_progress == Tuning.SHOP_LANE_B_SCORE * 2,
+		"pre-unlock Lane B banks progress but never rolls")
+	early.artefacts.append({"key": "jet-fuel-vial"})
+	early.state = early.State.PLAYER_TURN
+	check(not early._jet_fuel_restock_available(), "Jet Fuel can't stock the Shop early")
+	early.artefacts.pop_back() # a bare probe entry, not a real grant
+	early.modals.shop_panel.visible = false
+	early._queue_wave(Tuning.SHOP_UNLOCK_WAVE)
+	check(early.shop_stock.size() == 27 and early.shop_lane_b_progress == 0,
+		"the first restock Wave stocks it (27 slots) and wipes the banked Lane B")
+	early._open_shop()
+	check(early.modals.shop_empty_label == null and early.modals.shop_lower != null,
+		"a stocked Shop shows its grid, not the empty line")
+	early.queue_free()
 	await process_frame
 
 	var stock_n2: int = game.stock.size()
@@ -409,6 +428,7 @@ func _init() -> void:
 	var slots: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["chocolate-key-cake", "chocolate-key-cake",
 			"alleged-weather-balloon", "sub-antarctic-visa"]})
+	Shop.roll(slots) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 
 	check(Shop._extra_item_slots(slots) == {"total": 5, "tactical": 1},
@@ -463,6 +483,41 @@ func _init() -> void:
 	check(not probe_offered,
 		"NO-244: 60 seeded Shop rolls + huge Artefact Boxes never offer a 2nd Abduction Probe")
 	un.queue_free()
+	await process_frame
+
+	# --- NO-244 gap: stock rolled BEFORE the first probe landed still holds one.
+	# can_buy refuses it, buy() leaves artefacts unchanged, and a pre-rolled
+	# Artefact Box's probe option is unpickable while the rest still work.
+	var stale: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 9999})
+	await process_frame
+	stale.shop_stock = [{"kind": "artefact", "key": "abduction-probe", "sold": false}]
+	check(Shop.can_buy(stale, stale.shop_stock[0]),
+		"NO-244 control: with no probe held, a stocked probe is buyable")
+	stale.artefacts.append(probe_entry.duplicate())
+	check(not Shop.can_buy(stale, stale.shop_stock[0]),
+		"NO-244: a pre-rolled Shop probe is unbuyable once one is held")
+	var gold_before: int = stale.gold
+	check(not Shop.buy(stale, 0) and stale.artefacts.size() == 1 and stale.gold == gold_before
+			and not stale.shop_stock[0].sold,
+		"NO-244: buying the pre-rolled probe changes nothing")
+	check(not ArtefactHooks.grant(stale, probe_entry.duplicate()) and stale.artefacts.size() == 1,
+		"NO-244: ArtefactHooks.grant refuses a 2nd probe")
+	var other: Dictionary = Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key != "abduction-probe")[0]
+	var probe_opt := {"kind": "artefact", "name": probe_entry.name,
+		"description": "", "payload": probe_entry}
+	var other_opt := {"kind": "artefact", "name": other.name,
+		"description": "", "payload": other}
+	stale._open_box_pick({"kind": "box", "key": "artefact", "size": "small", "sold": false,
+		"contents": [probe_opt, other_opt]})
+	stale._box_choose(stale.box_offer[0])
+	check(stale.artefacts.size() == 1 and stale.box_open and stale.box_offer.size() == 1,
+		"NO-244: picking a pre-rolled Box probe grants nothing and keeps the pick")
+	stale._box_choose(stale.box_offer[0])
+	check(stale.artefacts.size() == 2 and stale.artefacts[1].key == other.key and not stale.box_open,
+		"NO-244: the Box's other option still picks normally")
+	stale.queue_free()
 	await process_frame
 
 	# --- issue 18: Shop price modifiers, same held copy stacks additively
@@ -777,6 +832,35 @@ func _init() -> void:
 			and bot.stock.size() == 3 and bot.gold == bot_gold,
 		"NO-153: the bot never sells Captured Stock directly, nor converts-then-sells at a loss")
 	bot.queue_free()
+	await process_frame
+
+	# --- NO-237: Stock/Captured stacks KEEP their buttons across a rebuild
+	# (hud.gd's _rebuild_stock_drawer used to free and rebuild every one, so
+	# nothing on screen had an identity a slide could animate). A stack still
+	# there keeps its exact Button, re-dressed with its new count; a stack that
+	# is gone has no button left in either grid.
+	var re: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"stock": ["pawn", "knight"], "captured": ["rook"]})
+	await process_frame
+	var find := func(id: String, cap: bool) -> Button:
+		for b in re.hud.pool_buttons():
+			if b.has_meta("id") and b.get_meta("id") == id and bool(b.get_meta("cap")) == cap:
+				return b
+		return null
+	var knight_btn: Button = find.call("knight", false)
+	var rook_btn: Button = find.call("rook", true)
+	check(knight_btn != null and rook_btn != null and find.call("pawn", false) != null,
+		"NO-237 fixture: pawn and knight stacks in Stock, a rook in Captured")
+	re.stock.erase("pawn")
+	re.stock.append("knight")
+	re._refresh()
+	check(find.call("knight", false) == knight_btn,
+		"NO-237: the knight stack keeps its button across a rebuild")
+	check(knight_btn.get_children().any(func(c: Node) -> bool: return c is Label and c.text == "2"),
+		"NO-237: and the kept button shows the stack's new count")
+	check(find.call("rook", true) == rook_btn, "NO-237: a Captured row keeps its button too")
+	check(find.call("pawn", false) == null, "NO-237: the gone pawn stack's button is out of the grid")
+	re.queue_free()
 	await process_frame
 
 	print("---")

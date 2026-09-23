@@ -176,6 +176,9 @@ const STOCK_DRAWER_PAD := 6.0 ## inner margin around each column's scroll area
 ## rather than a second hand-picked constant that could drift from it.
 ## Captured (~154px avail) fits 2; Stock (~314px avail) fits 4.
 const STOCK_DRAWER_CELL_SEP := 6 ## gap between cells, both axes, both grids
+const STACK_SLIDE_S := 0.18 ## NO-237: a kept stack sliding to its new cell
+const STACK_POP_IN_S := 0.15 ## NO-237: a new stack scaling/fading in
+const STACK_FADE_OUT_S := 0.12 ## NO-237: a gone stack fading out
 ## NO-164: a fixed visible divider between Captured Stock and Stock — was
 ## nothing (separation 0), relying only on incidental slack (NO-135) landing
 ## near the boundary, which isn't always there. Comes out of Stock's own
@@ -286,6 +289,7 @@ var _drawer_saved_filters := {}
 ## counter (Score/Gold/Clock) — same kill-first idiom as _drawer_tweens, so a
 ## second trigger before the first finishes replaces it instead of racing it.
 var _gain_tweens := {}
+var _roll_tweens := {} ## NO-243: key -> the counter's count-up Tween
 ## NO-127: last value refresh()/update_clock() actually RENDERED, so a gain
 ## animation is driven by the value changing, never by refresh() itself
 ## running (refresh() runs on nearly every state change). Paired with an
@@ -347,6 +351,10 @@ var tip_key := ""
 ## anything GridContainer-specific.
 var stock_grid := VBoxContainer.new()
 var captured_grid := VBoxContainer.new()
+## NO-237: the button showing each stack, keyed by _stack_keys — kept across
+## _rebuild_stock_drawer so a stack can slide rather than be rebuilt.
+var _stack_btns := {}
+var _stack_anim_gen := 0 ## NO-237: only the latest rebuild's FLIP pass runs
 ## How many entries fit per row — was `stock_grid.columns`/`captured_grid.
 ## columns` before V1; a VBoxContainer has no such property, so the layout
 ## step below stores it here instead, for _rebuild_stock_drawer to read.
@@ -1460,6 +1468,11 @@ func build(game) -> void:
 	tip_box.add_child(tip_label)
 	tip_panel.add_child(tip_box)
 	add_child(tip_panel)
+	# NO-239: the kill feed, just under the Header, anchored left.
+	feed.position = Vector2(HEADER_PAD_X, g.hud_top + 4.0)
+	feed.add_theme_constant_override("separation", 3)
+	feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(feed)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
 	# the button bar and the bar had to be raised above it; design C opens the
 	# drawers above the deck instead, so there is nothing to out-rank. Worse, the
@@ -1569,6 +1582,138 @@ func _pulse_gain(node: Control, key: String) -> void:
 	tw.tween_property(node, "scale", Vector2(1.1, 0.94), 0.07)
 	tw.tween_property(node, "scale", Vector2.ONE, 0.08)
 	_gain_tweens[key] = tw
+
+
+func _set_odometer(zeros: Label, lbl: Label, value: int) -> void:
+	var digits := str(value)
+	zeros.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
+	lbl.text = digits
+
+
+func _roll_odometer(x: float, zeros: Label, lbl: Label) -> void: # tween_method target
+	_set_odometer(zeros, lbl, roundi(x))
+
+
+## NO-243 (variant A): a counter's digits count from the value on screen to
+## the new one over COUNT_UP_S instead of snapping. Snaps when animations are
+## off, in autoplay, and on the first observation (a save restore is not a
+## gain). A refresh() that lands mid-roll with no new value leaves the roll
+## alone; a new value restarts it from whatever the digits read right now.
+const COUNT_UP_S := 0.4
+func _roll_counter(key: String, zeros: Label, lbl: Label, from_v: int, to_v: int, seen: bool) -> void:
+	var running: Tween = _roll_tweens.get(key)
+	if running and running.is_valid() and running.is_running():
+		if to_v == from_v:
+			return
+		running.kill()
+	if to_v == from_v or not seen or g.autoplay or not g.animations_on:
+		_set_odometer(zeros, lbl, to_v)
+		return
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_method(_roll_odometer.bind(zeros, lbl), float(lbl.text.to_int()), float(to_v), COUNT_UP_S)
+	_roll_tweens[key] = tw
+
+
+# --- NO-239: the kill feed ---------------------------------------------------
+# Small single-line pills just under the Header, newest on top, FEED_MAX
+# visible; each lives FEED_LIFE_S then fades. Gains and artefact notes go
+# through feed_gain(), which coalesces same-cause posts until the end of the
+# frame; post() is the raw one-line API. Silent in autoplay.
+const FEED_MAX := 4
+const FEED_LIFE_S := 3.0
+const FEED_FADE_S := 0.3
+const FEED_FONT := preload("res://assets/fonts/PixelOperator.ttf")
+const FEED_FONT_SIZE := 16 # the font's 16 px grid: stays crisp
+const FEED_TEXT := Color(0.92, 0.94, 0.9)
+var feed := VBoxContainer.new()
+var _feed_font: FontFile
+var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, icon, color}
+
+
+func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
+	if g.autoplay:
+		return
+	if _feed_font == null: # hard pixel edges, like the banner font (game.gd)
+		_feed_font = FEED_FONT
+		_feed_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		_feed_font.hinting = TextServer.HINTING_NONE
+		_feed_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+		var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ✦ ★ −: not in Pixel Operator
+		_feed_font.fallbacks = fallbacks
+	var pill := PanelContainer.new()
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.6)
+	sb.set_corner_radius_all(6)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 8
+	sb.content_margin_top = 1
+	sb.content_margin_bottom = 1
+	pill.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.add_child(row)
+	if icon:
+		var tr := TextureRect.new()
+		tr.texture = icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(16, 16)
+		row.add_child(tr)
+	var lab := Label.new()
+	lab.text = text
+	lab.add_theme_font_override("font", _feed_font)
+	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
+	lab.add_theme_color_override("font_color", color)
+	row.add_child(lab)
+	feed.add_child(pill)
+	feed.move_child(pill, 0) # newest on top
+	while feed.get_child_count() > FEED_MAX:
+		var old: Node = feed.get_child(feed.get_child_count() - 1)
+		feed.remove_child(old)
+		old.queue_free()
+	var tw := pill.create_tween() # bound to the pill: dies with it if pushed out
+	tw.tween_interval(FEED_LIFE_S)
+	if g.animations_on:
+		tw.tween_property(pill, "modulate:a", 0.0, FEED_FADE_S)
+	tw.tween_callback(pill.queue_free)
+
+
+## Queue a gain (and/or an artefact note) under `cause`. Everything posted
+## under one cause before the frame ends becomes ONE line:
+## "+150 · +$15 · captured Knight", "[icon] Tinfoil Hat: Piece Buff granted ×2".
+func feed_gain(cause: String, label: String, score := 0, gold := 0, note := "",
+		icon: Texture2D = null, color := FEED_TEXT) -> void:
+	if g.autoplay:
+		return
+	if _feed_pending.is_empty():
+		_flush_feed.call_deferred()
+	var e: Dictionary = _feed_pending.get_or_add(cause,
+		{"label": label, "score": 0, "gold": 0, "notes": {}, "icon": icon, "color": color})
+	e.score += maxi(score, 0)
+	e.gold += maxi(gold, 0)
+	if note != "":
+		e.notes[note] = e.notes.get(note, 0) + 1
+
+
+func _flush_feed() -> void:
+	for cause in _feed_pending:
+		var e: Dictionary = _feed_pending[cause]
+		var parts := PackedStringArray()
+		if e.score > 0:
+			parts.append("+%d" % e.score)
+		if e.gold > 0:
+			parts.append("+$%d" % e.gold)
+		var notes := PackedStringArray()
+		for n in e.notes:
+			notes.append(n if e.notes[n] == 1 else "%s ×%d" % [n, e.notes[n]])
+		if parts.is_empty() and notes.is_empty():
+			continue # a zero gain: nothing to say
+		parts.append(e.label if notes.is_empty() else "%s: %s" % [e.label, ", ".join(notes)])
+		post(" · ".join(parts), e.icon, e.color)
+	_feed_pending.clear()
 
 
 ## NO-127: minute-rollover cue on the Clock — grows then shakes back level.
@@ -1886,26 +2031,14 @@ func _long_press_input(btn: Button, key: String, desc: String, e: InputEvent, on
 
 
 func refresh() -> void:
-	# issue 101: the Shop button STAYS but is disabled before the unlock Wave
-	# (user ruling) — a hidden button reads as "this game has no Shop", a
-	# greyed one reads as "not yet". It carries the Wave, because a disabled
-	# control with no reason is the failure the ruling was one step away from.
-	var shop_locked: bool = g.wave < Tuning.SHOP_UNLOCK_WAVE
-	shop_button.disabled = shop_locked
-	shop_button.text = "Shop (W%d)" % Tuning.SHOP_UNLOCK_WAVE if shop_locked else "Shop"
-	shop_button.tooltip_text = "Opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE \
-		if shop_locked else ""
 	update_clock(g.clock_ms) # NO-127: routes through the shared seam (see its header)
 	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
 	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`
 	# is just str(g.score), whatever length that is, and the padding floors at 0.
-	var digits := str(g.score)
-	score_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
-	score_label.text = digits
 	# NO-175: Gold is the same odometer as Score now (was a plain "%d").
-	var gold_digits := str(g.gold)
-	gold_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - gold_digits.length()))
-	gold_label.text = gold_digits
+	# NO-243: both count up to a new value instead of snapping (_roll_counter).
+	_roll_counter("score", score_zeros_label, score_label, _score_shown, g.score, _score_seen)
+	_roll_counter("gold", gold_zeros_label, gold_label, _gold_shown, g.gold, _gold_seen)
 	# NO-127: gain pulses, driven off the value CHANGING (refresh() itself
 	# runs on nearly every state change, which is not the same thing — see
 	# _pulse_gain's header). The first observation establishes the baseline
@@ -2427,21 +2560,42 @@ func _rebuild_items_grid() -> void:
 ## rules (Captured can convert but never deploy or merge, issue 60/2026-09-10)
 ## but that is now which GRID an entry is in, not a tint plus a tooltip a
 ## phone can't show anyway.
+##
+## NO-237: stack buttons are KEPT across rebuilds (_stack_btns, one per
+## stack) instead of freed and rebuilt, so a stack that only moved slides to
+## its new cell, a new one pops in, and a gone one fades out (_animate_stacks).
 func _rebuild_stock_drawer() -> void:
-	for c in stock_grid.get_children():
-		c.queue_free()
-	for c in captured_grid.get_children():
-		c.queue_free()
+	var animate: bool = not g.autoplay and g.animations_on \
+			and DisplayServer.get_name() != "headless" \
+			and drawers.has("stock") and (drawers["stock"] as Control).is_visible_in_tree()
+	var stacks := _stacks()
+	var keys := _stack_keys(stacks)
+	var live := {} # key -> Button, this rebuild's
+	var old_pos := {} # kept Button -> position before this rebuild (_stack_origin-relative)
+	var fresh: Array = []
 	var cap_count := 0
 	var stock_children: Array = []
 	var cap_children: Array = []
-	for st in _stacks():
-		var btn := _build_stack_button(st)
+	for i in stacks.size():
+		var st: Dictionary = stacks[i]
+		var btn: Button = _stack_btns.get(keys[i])
+		if btn == null:
+			btn = _build_stack_button(st)
+			fresh.append(btn)
+		else:
+			if animate and btn.is_inside_tree():
+				old_pos[btn] = btn.global_position - _stack_origin(btn)
+			_build_stack_button(st, btn)
+		live[keys[i]] = btn
 		if st.cap:
 			cap_count += 1
 			cap_children.append(btn)
 		else:
 			stock_children.append(btn)
+	for k in _stack_btns:
+		if not live.has(k):
+			_drop_stack_button(_stack_btns[k], animate)
+	_stack_btns = live
 	# story 37: the hint only while the column would otherwise be blank — an
 	# empty GridContainer has no size of its own to hang a message on.
 	captured_hint.visible = cap_count == 0
@@ -2463,6 +2617,104 @@ func _rebuild_stock_drawer() -> void:
 	_fill_rows_bottom_right(stock_grid, stock_children, stock_cols)
 	_fill_rows_bottom_right(captured_grid, cap_children, cap_cols)
 	_scroll_stock_to_bottom() # NO-208
+	if animate and not (old_pos.is_empty() and fresh.is_empty()):
+		_animate_stacks(old_pos, fresh)
+
+
+## NO-237: one identity per stack. A Stock stack is its whole entry (ADR-0002
+## — _stacks() groups by it); a Captured row is one piece, and two captured
+## copies of one entry are told apart by how many older copies precede them,
+## so a fresh capture of a piece already held gets the NEW key (numbering from
+## the oldest) and the rows already on screen keep theirs.
+func _stack_keys(stacks: Array) -> Array:
+	var keys := []
+	keys.resize(stacks.size())
+	var seen := {}
+	for i in range(stacks.size() - 1, -1, -1): # captured rows are newest-first
+		var st: Dictionary = stacks[i]
+		var k: String = ("c|" if st.cap else "s|") + var_to_str(st.entry)
+		if st.cap:
+			var n: int = seen.get(k, 0)
+			seen[k] = n + 1
+			k += "|%d" % n
+		keys[i] = k
+	return keys
+
+
+## NO-237: a stack that is gone. Detached from its row at once, so no
+## pool_buttons()/stack_button_at lookup ever finds it again; when animating,
+## it fades out where it stood (reparented onto this layer, input-dead) and
+## then frees.
+func _drop_stack_button(btn: Button, animate: bool) -> void:
+	var shown: bool = animate and btn.is_inside_tree()
+	var at: Vector2 = btn.global_position if shown else Vector2.ZERO
+	if btn.get_parent():
+		btn.get_parent().remove_child(btn)
+	if not shown:
+		btn.queue_free()
+		return
+	btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in btn.get_children():
+		if c is Control:
+			c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(btn)
+	btn.global_position = at
+	var tw := create_tween()
+	tw.tween_property(btn, "modulate:a", 0.0, STACK_FADE_OUT_S)
+	tw.tween_callback(btn.queue_free)
+
+
+## NO-237: where a stack's scroll area is. Positions for the slide are taken
+## relative to it, not raw global ones: the drawer itself may be mid-slide
+## (NO-118) between the rebuild and the frame, and that motion is not the
+## stack's.
+func _stack_origin(btn: Button) -> Vector2:
+	return (cap_scroll if btn.get_meta("cap") else stock_scroll).global_position
+
+
+## NO-237: FLIP. Runs just before the frame draws — after the deferred
+## container sort has placed every row, before anything is shown — so a kept
+## button is put back at its old spot and tweened to its new one, and a new
+## one scales/fades in, with no frame of the final layout showing first.
+## Only the latest rebuild's pass runs (`_stack_anim_gen`). Nothing here
+## touches input: a sliding button is clickable wherever it is drawn.
+## The tweens move `position` inside a container, so any re-sort mid-tween
+## (the next rebuild) snaps it home — that rebuild then starts its own slide
+## from wherever the button was.
+func _animate_stacks(old_pos: Dictionary, fresh: Array) -> void:
+	_stack_anim_gen += 1
+	var gen := _stack_anim_gen
+	await RenderingServer.frame_pre_draw
+	if gen != _stack_anim_gen:
+		return
+	for btn in old_pos:
+		if not is_instance_valid(btn) or not btn.is_inside_tree():
+			continue
+		if btn.has_meta("flip_tw"):
+			(btn.get_meta("flip_tw") as Tween).kill()
+			btn.remove_meta("flip_tw")
+		var home: Vector2 = btn.position
+		var from: Vector2 = old_pos[btn] + _stack_origin(btn)
+		if from.distance_to(btn.global_position) < 0.5:
+			continue
+		btn.global_position = from
+		var tw := create_tween().bind_node(btn)
+		tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(btn, "position", home, STACK_SLIDE_S)
+		btn.set_meta("flip_tw", tw)
+	for btn in fresh:
+		if not is_instance_valid(btn) or not btn.is_inside_tree():
+			continue
+		# scale/self_modulate, not modulate: modulate carries the armed/merge
+		# tint (and game.gd's drag-start merge highlight writes it directly).
+		# 0.4, not 0: a zero scale is a singular transform to GUI picking.
+		btn.pivot_offset = btn.size / 2.0
+		btn.scale = Vector2(0.4, 0.4)
+		btn.self_modulate.a = 0.0
+		var tw := create_tween().bind_node(btn).set_parallel()
+		tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.tween_property(btn, "scale", Vector2.ONE, STACK_POP_IN_S)
+		tw.tween_property(btn, "self_modulate:a", 1.0, STACK_POP_IN_S)
 
 
 ## V1 (Max, 2026-09-21 correction): Max rejected an earlier padded-
@@ -2496,18 +2748,49 @@ func _rebuild_stock_drawer() -> void:
 ## built last) = children[0:4] = [0,1,2,3], added in reverse (3,2,1,0) so the
 ## row reads [3, 2, 1, 0] — 0 bottom-right, 1 to its left, matching Max's
 ## description exactly, with no spacer of any kind.
+##
+## NO-237: rows are REUSED, not rebuilt — extra rows come off the top, missing
+## ones are added on top — and a child is only reparented when its row
+## changes, so a kept button stays in the tree (and keeps any press in
+## progress) whenever it can. Anything left in a row that `children` no
+## longer lists (the last rebuild's "+" slot) is removed and freed; a gone
+## stack's button was already detached by _drop_stack_button.
 func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) -> void:
 	cols = maxi(cols, 1)
 	var rows := ceili(float(children.size()) / float(cols))
-	for row_idx in range(rows - 1, -1, -1): # topmost row first, row 0 last
+	while grid.get_child_count() > rows:
+		var extra := grid.get_child(0)
+		for c in extra.get_children(): # kept buttons are re-placed below
+			extra.remove_child(c)
+			if not children.has(c):
+				c.queue_free()
+		grid.remove_child(extra)
+		extra.queue_free()
+	while grid.get_child_count() < rows:
 		var row := HBoxContainer.new()
 		row.alignment = BoxContainer.ALIGNMENT_END # short row's gap lands on the left
 		row.add_theme_constant_override("separation", STOCK_DRAWER_CELL_SEP)
+		grid.add_child(row)
+		grid.move_child(row, 0) # new rows go on top; row 0 stays the bottom child
+	for row_idx in rows:
+		var row: HBoxContainer = grid.get_child(rows - 1 - row_idx) # row 0 is the bottom child
 		var lo := row_idx * cols
 		var hi := mini(lo + cols, children.size())
+		var at := 0
 		for i in range(hi - 1, lo - 1, -1): # descending: lowest index added last = rightmost
-			row.add_child(children[i])
-		grid.add_child(row)
+			var c: Control = children[i]
+			if c.get_parent() != row:
+				if c.get_parent():
+					c.get_parent().remove_child(c)
+				row.add_child(c)
+			row.move_child(c, at)
+			at += 1
+	for row in grid.get_children():
+		for c in row.get_children():
+			if not children.has(c):
+				row.remove_child(c)
+				c.queue_free()
+		row.queue_sort() # re-lay kept buttons even if nothing in this row moved (NO-237 FLIP)
 
 
 ## NO-208: default scroll position is the bottom, matching cap_anchor/
@@ -2528,31 +2811,28 @@ func _scroll_stock_to_bottom() -> void:
 ## One stack button (Stock or Captured entry) — everything from the icon down
 ## to its drag/tap wiring. Split out of _rebuild_stock_drawer so that
 ## function only decides which grid an entry lands in.
-func _build_stack_button(st: Dictionary) -> Button:
-	var btn := Button.new()
+##
+## NO-237: pass `btn` to re-dress a button that already shows this stack —
+## _rebuild_stock_drawer keeps one button per stack so it can slide instead
+## of being rebuilt. What never changes for a stack (icon, id/cap, the input
+## wiring) is set once, on creation; everything that can change (count,
+## entry, tint, badges, prices) is redone on every call. The handlers read
+## entry/count from meta, not from `st`, so a kept button never emits a stale
+## count.
+func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	var id: String = st.id
 	var cap: bool = st.cap
-	if g.textures.has(id): # piece icon instead of glyph text (round 3)
-		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
-		# token says so without a label. A painted light/dark pair gets this
-		# for free from piece_tex's own owner param; the King's shared
-		# monochrome svg (mono_art) carries no side colour of its own — that
-		# only happens at board-draw time (game.gd's _draw_piece), which this
-		# Button icon bypasses entirely — so it's tinted the same
-		# COL_SIDE_ENEMY the board itself uses.
-		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
-		if cap and g.mono_art.has(id):
-			btn.modulate = g.COL_SIDE_ENEMY
-		btn.expand_icon = true
-		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
-		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
-		# tile (that relationship — "so a piece reads the same wherever it
-		# is" — is what NO-119 explicitly overrides for icons outside the
-		# board).
-		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	if btn == null:
+		btn = _new_stack_button(id, cap)
 	else:
-		btn.text = g.defs[id].glyph
-		btn.add_theme_font_size_override("font_size", 22)
+		for c in btn.get_children(): # last dressing's badges
+			btn.remove_child(c)
+			c.queue_free()
+	btn.set_meta("entry", st.entry)
+	btn.set_meta("count", st.count)
+	# NO-164: see _new_stack_button — the King's mono svg carries no side colour.
+	btn.modulate = g.COL_SIDE_ENEMY if cap and g.textures.has(id) and g.mono_art.has(id) \
+			else Color.WHITE
 	# `not cap` is load-bearing, not decoration: placing_id is only ever a
 	# STOCK id now (game.gd), so without it a captured row holding the same
 	# piece id as the armed Stock stack would light up armed too.
@@ -2690,9 +2970,34 @@ func _build_stack_button(st: Dictionary) -> Button:
 		mark.offset_left = -14
 		mark.offset_top = -14
 		btn.add_child(mark)
+	return btn
+
+
+## NO-237: the parts of a stack button that never change for its stack —
+## created once, then kept across rebuilds (see _build_stack_button).
+func _new_stack_button(id: String, cap: bool) -> Button:
+	var btn := Button.new()
+	if g.textures.has(id): # piece icon instead of glyph text (round 3)
+		# NO-164: a Captured entry was taken FROM the enemy — its enemy (dark)
+		# token says so without a label. A painted light/dark pair gets this
+		# for free from piece_tex's own owner param; the King's shared
+		# monochrome svg (mono_art) carries no side colour of its own — that
+		# only happens at board-draw time (game.gd's _draw_piece), which this
+		# Button icon bypasses entirely — so it's tinted the same
+		# COL_SIDE_ENEMY the board itself uses.
+		btn.icon = g.piece_tex(id, Rules.ENEMY if cap else Rules.PLAYER)
+		btn.expand_icon = true
+		# NO-119: every off-board icon (Shop, Inventory, Stock, Captured) is
+		# now a flat Tuning.OFFBOARD_ICON square, no longer tied to the board
+		# tile (that relationship — "so a piece reads the same wherever it
+		# is" — is what NO-119 explicitly overrides for icons outside the
+		# board).
+		btn.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
+	else:
+		btn.text = g.defs[id].glyph
+		btn.add_theme_font_size_override("font_size", 22)
 	btn.set_meta("id", id) # drop-target lookup for drag merges
 	btn.set_meta("cap", cap)
-	btn.set_meta("entry", st.entry)
 	# NO-138: long-press opens the same preview modal a double-tap does
 	# (game.gd's _show_preview, via stack_preview_requested — this cell has a
 	# piece id, not a description to show, so on_fire bypasses show_tip
@@ -2702,11 +3007,11 @@ func _build_stack_button(st: Dictionary) -> Button:
 		if btn.has_meta("lp_fired"): # NO-72's swallow, same as every other long-press cell
 			btn.remove_meta("lp_fired")
 			return
-		stack_pressed.emit(st.entry, cap, st.count))
+		stack_pressed.emit(btn.get_meta("entry"), cap, btn.get_meta("count")))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
 		_long_press_input(btn, "", "", e, func() -> void:
-			stack_preview_requested.emit(id, cap, st.entry)))
-	btn.button_down.connect(func() -> void: stack_drag_started.emit(st.entry, cap))
+			stack_preview_requested.emit(id, cap, btn.get_meta("entry"))))
+	btn.button_down.connect(func() -> void: stack_drag_started.emit(btn.get_meta("entry"), cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down
 	# arms a deploy — so a press now also reaches the ScrollContainer and can

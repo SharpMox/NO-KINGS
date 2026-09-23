@@ -235,6 +235,7 @@ func _init() -> void:
 	# Capstone Polish: +150 Score / +5s Clock on acquiring an Artefact
 	var capstone := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 9999, "score": 0, "artefacts": ["capstone-polish"]})
+	Shop.roll(capstone) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	var capstone_clock0: float = capstone.clock_ms
 	for i in capstone.shop_stock.size():

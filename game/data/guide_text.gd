@@ -30,7 +30,8 @@ const TEXT := (
 	"price.\n\n" +
 
 	"Shop & Boxes\n" +
-	"Opens on wave 5; restocks every 5 waves and each 5,000 Score between. " +
+	"The Shop opens empty; it first restocks on wave 5, then every 5 waves " +
+	"and each 5,000 Score between. " +
 	"Boxes offer 3, 5 or 7 choices: keep one (Huge: two) or skip for " +
 	"Gold.\n\n" +
 

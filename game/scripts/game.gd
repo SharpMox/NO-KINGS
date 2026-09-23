@@ -166,6 +166,15 @@ const HATCH_BLUE_PHASE := HATCH_SPACING * 0.5 # NO-184: the reachable
 	# zone" (see HATCH_SPACING above), so a blue `\` next to a red `/` would
 	# collide with that vocabulary on any blue+red overlap.
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
+const DIE_TIME := 0.4 # NO-243: captured piece's flash + burst (and its ring)
+const DIE_FLASH_TIME := 0.12 # ...of which the white flash
+## NO-243: paints whatever _flash_layer draws as a pure-white silhouette.
+## modulate > 1 cannot do this: it only multiplies, so dark outlines stay dark.
+const FLASH_SHADER := "shader_type canvas_item; void fragment() { COLOR = vec4(1.0, 1.0, 1.0, texture(TEXTURE, UV).a * COLOR.a); }"
+const ARRIVE_TIME := 0.35 # NO-243: enemy drop-in
+const ARRIVE_KING_TIME := 0.5
+const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
+const MERGE_TIME := 0.5 # NO-243: inputs pull together, result fades in
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -494,9 +503,11 @@ var ecdysis_copy_key := "" # issue 55: Ecdysis Sheddings — the last OTHER
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
-	set(value): # every gain/loss anywhere pops floating feedback (round 4);
-		# popups anchor to the piece/effect that caused them (game-feel pass)
-		if value != score and is_node_ready() and not autoplay and animations_on:
+	set(value): # every loss pops floating feedback (round 4); popups anchor
+		# to the piece/effect that caused them (game-feel pass). NO-239: gains
+		# no longer pop a "+N" — the kill feed (hud.feed_gain) says "+N · why"
+		# and the counter rolls up (NO-243). `value != score` restores them.
+		if value < score and is_node_ready() and not autoplay and animations_on:
 			var d := value - score
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
@@ -607,6 +618,11 @@ var merge_highlights := {} # ids that complete a merge with the current selectio
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
 	# per-frame pulse never rebuilds the board's draw list (review pass 2)
+## NO-243: the capture flash needs FLASH_SHADER, and a material is per canvas
+## item, so it gets its own child. Children draw over the board, so the
+## banners move to a child of their own, added after it, to stay on top.
+var _flash_layer := Node2D.new()
+var _banner_layer := Node2D.new()
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 ## NO-17: artefact key -> Texture2D. Only the painted ones are in here; read it
@@ -845,6 +861,14 @@ func _ready() -> void:
 	var outline_mat := ShaderMaterial.new()
 	outline_mat.shader = outline_shader
 	_pulse.material = outline_mat
+	var flash_mat := ShaderMaterial.new()
+	flash_mat.shader = Shader.new()
+	flash_mat.shader.code = FLASH_SHADER
+	_flash_layer.material = flash_mat
+	add_child(_flash_layer)
+	_flash_layer.draw.connect(_draw_flash)
+	add_child(_banner_layer)
+	_banner_layer.draw.connect(_draw_banners)
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
@@ -963,7 +987,9 @@ func _ready() -> void:
 					inst.acquired_wave = wave
 					inst.rarity = ArtefactHooks.rarity_of(key)
 					artefacts.append(inst)
-	if shop_stock.is_empty(): # fresh run, or a save from before the shop
+	# fresh run, or a save from before the shop. NO-240: not before the first
+	# restock Wave — the Shop opens empty until then (Tuning.SHOP_UNLOCK_WAVE).
+	if shop_stock.is_empty() and wave >= Tuning.SHOP_UNLOCK_WAVE:
 		Shop.roll(self)
 	if args.has("--scenario-check"): # boots, runs one frame, exits — CI probe
 		await get_tree().process_frame
@@ -1275,7 +1301,7 @@ func _on_pass() -> void:
 			early_clear_awarded = true
 			var early := maxi(_cadence() - turns_since_wave, 0)
 			if early > 0:
-				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear")
+				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear", "cleared early")
 				Economy.add_clock(self, early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN, "early_clear")
 				_add_turn_fx("CLEARED EARLY  +%d ★ · +%ds" % [
 					early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
@@ -1883,10 +1909,177 @@ func _add_float(at: Vector2i, text: String, color: Color) -> void:
 		"at_px": _tile_px(at) + Vector2(tile, tile) / 2, "color": color})
 
 
+## A capture: the ring, plus (NO-243) the victim flashing white and bursting.
+## Every call site runs while the victim is still on `at`, so it is snapshotted
+## here and dies on screen instead of vanishing under the ring.
 func _add_pop(at: Vector2i) -> void:
 	if autoplay or not animations_on:
 		return
-	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0})
+	var ring_dur := ANIM_TIME
+	if board.has(at):
+		ring_dur = DIE_TIME # the ring plays alongside the burst
+		anims.append({"kind": "die", "px": _tile_px(at), "piece": board[at].duplicate(true),
+			"t": 0.0, "dur": DIE_TIME})
+	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0,
+		"dur": ring_dur})
+
+
+## NO-243: a spawned enemy drops onto `at` (wave_logic.spawn_pending). The
+## board loop skips the tile while this anim owns it. Arrivals in the same
+## batch are staggered ARRIVE_STAGGER apart; a King also lights the board edge.
+func _add_arrive(at: Vector2i) -> void:
+	if autoplay or not animations_on or not board.has(at):
+		return
+	var king: bool = board[at].id == "king"
+	var dur := ARRIVE_KING_TIME if king else ARRIVE_TIME
+	var waiting := 0
+	for a in anims:
+		if a.kind == "arrive" and a.t <= 0.0:
+			waiting += 1
+	anims.append({"kind": "arrive", "to": at, "t": -ARRIVE_STAGGER * waiting / dur,
+		"dur": dur, "king": king})
+	if king:
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": Color(1.0, 0.8, 0.3)})
+	queue_redraw()
+
+
+## NO-243: a merge result landed on `to` (merge_logic.commit_merge). `sources`
+## is [{px, piece}] for the board-tile inputs; a Stock input has no tile and
+## so no slide.
+func _add_merge_fx(sources: Array, to: Vector2i) -> void:
+	if autoplay or not animations_on or not board.has(to):
+		return
+	anims.append({"kind": "merge", "to": to, "sources": sources, "t": 0.0, "dur": MERGE_TIME})
+	queue_redraw()
+
+
+## Draws `p` scaled about the centre of the tile whose top-left is `px`, moved
+## by `offset`.
+func _draw_piece_xf(font: Font, p: Dictionary, px: Vector2, scl: Vector2, tint: Color,
+		offset := Vector2.ZERO) -> void:
+	var half := Vector2(tile, tile) / 2
+	draw_set_transform(px + half + offset, 0.0, scl)
+	_draw_piece(font, p, -half, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## NO-243: enemy drop-in with a squash on landing. The King falls from higher
+## and squashes harder.
+func _draw_arrive(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	if t < 0.0:
+		return # staggered, not started yet
+	var p: Dictionary = board[a.to]
+	var px := _tile_px(a.to)
+	var k := 1.0
+	if a.king:
+		k = 1.6
+	var fall := 0.7 # share of the anim spent falling; the rest is the squash
+	if t < fall:
+		var u := t / fall
+		var y := -tile * 2.5 * k * (1.0 - u * u) # accelerating fall
+		_draw_piece_xf(font, p, px, Vector2.ONE, Color(1, 1, 1, minf(1.0, u * 3.0)), Vector2(0, y))
+	else:
+		var sq := 0.22 * k * sin(PI * (t - fall) / (1.0 - fall))
+		# the offset keeps the piece's base on the tile floor while it squashes
+		_draw_piece_xf(font, p, px, Vector2(1.0 + sq, 1.0 - sq), Color.WHITE,
+			Vector2(0, tile * sq * 0.5))
+
+
+## NO-243: the captured piece flashes white (its silhouette, drawn over it by
+## _draw_flash) for DIE_FLASH_TIME, then bursts into small squares.
+func _draw_die(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	var p: Dictionary = a.piece
+	var px: Vector2 = a.px
+	var flash := DIE_FLASH_TIME / DIE_TIME
+	if t < flash:
+		var fs := 1.0 + 0.15 * t / flash
+		_draw_piece_xf(font, p, px, Vector2(fs, fs), Color.WHITE)
+		return
+	var u := (t - flash) / (1.0 - flash)
+	var c := px + Vector2(tile, tile) / 2
+	var side := COL_SIDE_PLAYER
+	if p.owner == Rules.ENEMY:
+		side = COL_SIDE_ENEMY
+	var sz := tile * 0.14 * (1.0 - u)
+	for i in 10:
+		var ang := TAU * i / 10.0 + 0.4 * (i % 3)
+		var dist := tile * (0.2 + 0.75 * (1.0 - pow(1.0 - u, 2.0))) * (0.8 + 0.1 * (i % 4))
+		var chip := Color.WHITE
+		if i % 2 == 1:
+			chip = side
+		chip.a = 1.0 - u
+		draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2, Vector2(sz, sz)), chip)
+
+
+## Turn/wave strips: wipe in, hold, fade out. Drawn on _banner_layer so they
+## sit above every other board layer (NO-243).
+func _draw_banners() -> void:
+	for a in anims:
+		if a.kind != "banner":
+			continue
+		var br := _banner_rect(a.t, a.get("slot", 0))
+		if br.size.x <= 0.0:
+			continue # not emerged yet
+		var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
+		_banner_layer.draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
+		# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
+		# with the band rather than them appearing instantly at full width.
+		_banner_layer.draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+		_banner_layer.draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+		if _banner_font == null: # set up once, never per-frame
+			_banner_font = BANNER_FONT
+			# hard pixel edges: no smoothing, hinting or sub-pixel offsets
+			_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+			_banner_font.hinting = TextServer.HINTING_NONE
+			_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+			var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ★ and − (see BANNER_FONT)
+			_banner_font.fallbacks = fallbacks
+		# baseline +31: the 18 px caps sit centred in the 44 px band
+		_banner_layer.draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
+			HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
+
+
+## NO-243: the white silhouette over each dying piece during its flash, on
+## _flash_layer (FLASH_SHADER), at _draw_die's rect and scale. A glyph-fallback
+## piece has no texture, so it has no silhouette.
+func _draw_flash() -> void:
+	var flash := DIE_FLASH_TIME / DIE_TIME
+	for a in anims:
+		if a.kind != "die" or a.t >= flash or not textures.has(a.piece.id):
+			continue
+		var u: float = a.t / flash
+		var s := 1.0 + 0.15 * u
+		var half := Vector2(tile, tile) / 2
+		var px: Vector2 = a.px
+		_flash_layer.draw_set_transform(px + half, 0.0, Vector2(s, s))
+		_flash_layer.draw_texture_rect(piece_tex(a.piece.id, a.piece.owner),
+			Rect2(-half - Vector2(2, 2), Vector2(tile + 4, tile + 4)), false, # _draw_piece's rect
+			Color(1, 1, 1, 1.0 - 0.5 * u))
+	_flash_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## NO-243: the board inputs slide into the target tile and shrink, then the
+## result fades in and grows 0.8 -> 1 inside a fading cyan glow.
+func _draw_merge(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	var px := _tile_px(a.to)
+	var join := 0.5
+	if t < join:
+		var ju := ease(t / join, 2.0) # accelerate into each other
+		var js := 1.0 - 0.35 * ju
+		for src in a.sources:
+			var from: Vector2 = src.px
+			_draw_piece_xf(font, src.piece, from.lerp(px, ju), Vector2(js, js),
+				Color(1, 1, 1, 1.0 - 0.3 * ju))
+		return
+	var u := (t - join) / (1.0 - join)
+	for r in 3: # soft glow: stacked translucent outlines
+		draw_rect(Rect2(px, Vector2(tile, tile)).grow(4.0 + r * 5.0 * (0.5 + u)),
+			Color(COL_MERGE, 0.3 * (1.0 - u)), false, 5.0)
+	var s := 0.8 + 0.2 * u
+	_draw_piece_xf(font, board[a.to], px, Vector2(s, s), Color(1, 1, 1, u))
 
 
 ## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;
@@ -2890,7 +3083,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# on_score_change/on_gold_change handlers below can scope to this one
 		# call by reason alone (see artefact_hooks.gd's header).
 		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
-		Economy.earn(self, capture_pts, earn_reason)
+		Economy.earn(self, capture_pts, earn_reason, "captured %s" % defs[victim.id].name)
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
@@ -2936,7 +3129,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed, from, also))
+					board[from].id, attacker_buffed, from, also), "",
+					"captured %s" % defs[board[also].id].name)
 				if last_capture_ctx.get("to_stock", false): # this call's OWN
 						# ctx (issue 55) — read immediately, before anything
 						# else can overwrite g.last_capture_ctx again
@@ -3140,7 +3334,7 @@ func _king_down(defeated_id := "") -> bool:
 				return false
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
-	Economy.earn(self, Tuning.WIN_SCORE_BONUS)
+	Economy.earn(self, Tuning.WIN_SCORE_BONUS, "", "King checkmated")
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
 		if defeated_id == "":
@@ -3855,7 +4049,8 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 			# all (_sell erases straight from g.stock and calls
 			# Economy.earn_gold on its own) — the "no 150% money printer"
 			# safety catch the issue calls out.
-			Economy.earn_gold(self, defs[ctx.id].value, "army_hold_the_line")
+			Economy.earn_gold(self, defs[ctx.id].value, "army_hold_the_line",
+				"Hold the Line: %s refunded" % defs[ctx.id].name)
 	return ctx
 
 
@@ -4675,6 +4870,15 @@ func _box_options(theme: String, size: String) -> Array:
 
 
 func _box_choose(opt: Dictionary) -> void:
+	if opt.kind == "artefact" and Shop.is_unique_held(self, opt.payload.key):
+		# NO-244: an offer rolled before the first probe landed — drop it,
+		# keep the pick, the rest of the offer stays pickable
+		box_offer.erase(opt)
+		if box_offer.is_empty():
+			return _box_close()
+		if autoplay:
+			return _box_choose(box_offer[rng.randi() % box_offer.size()])
+		return modals.show_box(box_offer)
 	fx_at = get_viewport_rect().size / 2.0
 	match opt.kind:
 		"piece":
@@ -4868,6 +5072,8 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 # --- rendering ---
 
 func _draw() -> void:
+	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
+	_banner_layer.queue_redraw()
 	var font := ThemeDB.fallback_font
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:
@@ -5039,7 +5245,7 @@ func _draw() -> void:
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
-		if a.kind == "move":
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge": # the anim draws it
 			sliding[a.to] = a
 	for pos in board:
 		if sliding.has(pos):
@@ -5067,27 +5273,14 @@ func _draw() -> void:
 			draw_rect(Rect2(board_px - Vector2(grow, grow),
 				Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile + Vector2(grow, grow) * 2),
 				Color(a.color, 1.0 - a.t), false, 5.0)
-		elif a.kind == "banner": # turn/wave strip: wipes in, holds, fades out
-			var br := _banner_rect(a.t, a.get("slot", 0))
-			if br.size.x <= 0.0:
-				continue # not emerged yet
-			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
-			draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
-			# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
-			# with the band rather than them appearing instantly at full width.
-			draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-			draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-			if _banner_font == null: # set up once, never per-frame
-				_banner_font = BANNER_FONT
-				# hard pixel edges: no smoothing, hinting or sub-pixel offsets
-				_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-				_banner_font.hinting = TextServer.HINTING_NONE
-				_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-				var fallbacks: Array[Font] = [font] # ★ and − (see BANNER_FONT)
-				_banner_font.fallbacks = fallbacks
-			# baseline +31: the 18 px caps sit centred in the 44 px band
-			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
-				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
+		elif a.kind == "arrive" and board.has(a.to):
+			_draw_arrive(font, a)
+		elif a.kind == "merge" and board.has(a.to):
+			_draw_merge(font, a)
+	for a in anims: # after the slides, so a dying piece shows over the attacker
+		# moving onto its tile (banners draw on _banner_layer, above)
+		if a.kind == "die":
+			_draw_die(font, a)
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
@@ -5585,21 +5778,13 @@ func _connect_modals() -> void:
 	modals.preview_closed.connect(func() -> void: preview_open = false)
 
 
-## Shop entry: player's turn only, never over another modal.
+## Shop entry: never over another modal.
 ##
-## LOCKED BEFORE Tuning.SHOP_UNLOCK_WAVE (issue 101, user ruling 2026-09-01).
-## This file previously said "always openable, in any state — the GDD makes the
-## Shop the one surface the player can reach at will"; that is no longer true
-## and the comment is rewritten rather than left contradicting the code. From
-## the unlock Wave on, the old rule resumes: openable in any state, with buying
-## still turn-gated by Shop.can_buy, so outside your turn it is a readable
-## catalog with dead Buy buttons.
+## NO-240 (Max, 2026-09-24) reverses issue 101's Wave lock: openable from Wave
+## 1, in any state, with buying turn-gated by Shop.can_buy (outside your turn
+## it is a readable catalog with dead Buy buttons). Before its first restock
+## (Tuning.SHOP_UNLOCK_WAVE) the stock is empty and the panel says so.
 func _open_shop() -> void:
-	if wave < Tuning.SHOP_UNLOCK_WAVE:
-		_add_turn_fx("The Shop opens on Wave %d" % Tuning.SHOP_UNLOCK_WAVE,
-			Color(1.0, 0.8, 0.4)) # says WHEN, not just "no" — a refusal with
-			# no reason reads as a bug (issue 101's own acceptance)
-		return
 	if Kings.power_is(self, "juche"): # Kim Jong Un: Juche — the Shop is closed
 		_add_turn_fx("Juche: the Shop is closed", Color(1.0, 0.5, 0.4))
 		return
@@ -5625,7 +5810,9 @@ func shop_open() -> bool:
 ## panel (_open_shop()) can no longer re-arm this; only a Wave clear can.
 func _jet_fuel_restock_available() -> bool:
 	return _held("jet-fuel-vial") and not jet_fuel_used_this_wave \
-			and state == State.PLAYER_TURN and gold >= 20
+			and state == State.PLAYER_TURN and gold >= 20 \
+			and wave >= Tuning.SHOP_UNLOCK_WAVE # NO-240: the Shop stays empty
+				# until its first restock — no early roll by any route
 
 
 func _jet_fuel_restock_pressed() -> void:
@@ -5667,12 +5854,17 @@ func _sell(kind: String, entry: Variant) -> bool:
 		# sell-payout bonus lives here, never in Shop.sell_price() itself —
 		# _convert_captured below keeps calling sell_price() at the flat rate
 	tally("sell") # issue 103
+	var sold: String # NO-239: the kill feed's "sold Rook"
+	match kind:
+		"item": sold = str(entry.name)
+		"artefact": sold = ArtefactHooks.artefact_name(entry.key)
+		_: sold = str(defs[entry if entry is String else entry.id].name) # piece/captured, ADR-0002
 	match kind:
 		"piece": stock.erase(entry)
 		"captured": captured.erase(entry)
 		"item": items.erase(entry)
 		_: artefacts.erase(entry) # "artefact"
-	Economy.earn_gold(self, amount, "sell") # AFTER the erase above — Denver
+	Economy.earn_gold(self, amount, "sell", "sold " + sold) # AFTER the erase above — Denver
 		# Bunker Timeshare's own on_gold_change check must see the POST-sale
 		# Item count, so selling the Item that empties the last slot doesn't
 		# also collect that Item-cap bonus on its own way out
@@ -5836,10 +6028,11 @@ func _decline_box_pick() -> void:
 	# currencies, and declining a Box must not move the leaderboard.
 	# box_size is pinned when the Box opens; the helper falls back to Small for
 	# a Box that somehow carries no size, which pays rather than paying nothing.
-	Economy.earn_gold(self, Tuning.box_skip_gold(box_size), "box_skip")
+	Economy.earn_gold(self, Tuning.box_skip_gold(box_size), "box_skip", "Box skipped")
 	var n := _artefact_count("cicada-rejection-letter")
 	if n > 0:
 		var value := 0
 		for opt in box_offer:
 			value += Box.content_value(self, opt)
 		gold += value * n
+		ArtefactHooks.feed(self, "cicada-rejection-letter", 0, value * n) # NO-239

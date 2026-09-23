@@ -326,16 +326,11 @@ const COL_GOLD := Color(0.35, 0.85, 0.4)   # NO-151: the currency green, shared 
 # backbone, Lane B rewards scoring above average.
 const SHOP_RESTOCK_WAVES := 5
 
-## issue 101 (user ruling 2026-09-01): the Shop is CLOSED before this Wave —
-## the panel does not open and nothing can be bought. Deliberately equal to
-## SHOP_RESTOCK_WAVES so the unlock lands exactly on the first Lane A restock:
-## the first Shop a player ever sees is a freshly stocked one, and the unlock
-## and the auto-open are the same event rather than two.
-##
-## This REVERSES the previous "always openable" property (game.gd's _open_shop
-## header), which was GDD-sourced. The cost is real and was called out when the
-## ruling was made: the Shop is the only surface that shows Item and Artefact
-## descriptions, so the first four Waves are now played without a reference.
+## The Shop's first restock Wave. NO-240 (Max, 2026-09-24) replaced issue
+## 101's lock: the Shop OPENS from Wave 1 but is EMPTY ("Restocks at wave N")
+## until this Wave's Lane A restock — no setup roll, Lane B banks without
+## rolling, Jet Fuel can't restock it. Equal to SHOP_RESTOCK_WAVES, so the first
+## stock is the first Lane A beat, bannered "SHOP OPEN" and auto-opened.
 const SHOP_UNLOCK_WAVE := 5
 
 ## Lane B: the bonus restock gauge. Score banked since the last Lane-A restock,

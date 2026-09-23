@@ -126,6 +126,7 @@ func _init() -> void:
 	# --- Shop rows: unchanged through Tier 2, -1/kind at Tier 3+, box slots
 	# stay grouped by type with the remainder taken off the last type ---
 	var s1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	Shop.roll(s1) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	check(s1.shop_stock.size() == 27, "Tier 1 Shop: unchanged 27 slots (NO-201)")
 	s1.queue_free()
@@ -133,6 +134,7 @@ func _init() -> void:
 
 	GameScript.next_tier = "Tier 3"
 	var s3 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	Shop.roll(s3) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 	var kinds := {}
 	for slot in s3.shop_stock:

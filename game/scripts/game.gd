@@ -503,9 +503,11 @@ var ecdysis_copy_key := "" # issue 55: Ecdysis Sheddings — the last OTHER
 var pending_spawn: Array = [] # piece ids waiting for open top-row tiles
 var fx_at := Vector2.ZERO # where the next score popup lands; ZERO = HUD label
 var score := 0:
-	set(value): # every gain/loss anywhere pops floating feedback (round 4);
-		# popups anchor to the piece/effect that caused them (game-feel pass)
-		if value != score and is_node_ready() and not autoplay and animations_on:
+	set(value): # every loss pops floating feedback (round 4); popups anchor
+		# to the piece/effect that caused them (game-feel pass). NO-239: gains
+		# no longer pop a "+N" — the kill feed (hud.feed_gain) says "+N · why"
+		# and the counter rolls up (NO-243). `value != score` restores them.
+		if value < score and is_node_ready() and not autoplay and animations_on:
 			var d := value - score
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2,
 				"text": ("+%d" if d > 0 else "%d") % d,
@@ -1297,7 +1299,7 @@ func _on_pass() -> void:
 			early_clear_awarded = true
 			var early := maxi(_cadence() - turns_since_wave, 0)
 			if early > 0:
-				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear")
+				Economy.earn(self, early * Tuning.EARLY_CLEAR_SCORE_PER_TURN, "early_clear", "cleared early")
 				Economy.add_clock(self, early * Tuning.EARLY_CLEAR_CLOCK_MS_PER_TURN, "early_clear")
 				_add_turn_fx("CLEARED EARLY  +%d ★ · +%ds" % [
 					early * Tuning.EARLY_CLEAR_SCORE_PER_TURN,
@@ -3079,7 +3081,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# on_score_change/on_gold_change handlers below can scope to this one
 		# call by reason alone (see artefact_hooks.gd's header).
 		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
-		Economy.earn(self, capture_pts, earn_reason)
+		Economy.earn(self, capture_pts, earn_reason, "captured %s" % defs[victim.id].name)
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
@@ -3125,7 +3127,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			if also.x >= 0:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed, from, also))
+					board[from].id, attacker_buffed, from, also), "",
+					"captured %s" % defs[board[also].id].name)
 				if last_capture_ctx.get("to_stock", false): # this call's OWN
 						# ctx (issue 55) — read immediately, before anything
 						# else can overwrite g.last_capture_ctx again
@@ -3329,7 +3332,7 @@ func _king_down(defeated_id := "") -> bool:
 				return false
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
-	Economy.earn(self, Tuning.WIN_SCORE_BONUS)
+	Economy.earn(self, Tuning.WIN_SCORE_BONUS, "", "King checkmated")
 	var k := Rules.find_king(board, Rules.ENEMY)
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
 		if defeated_id == "":
@@ -4044,7 +4047,8 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 			# all (_sell erases straight from g.stock and calls
 			# Economy.earn_gold on its own) — the "no 150% money printer"
 			# safety catch the issue calls out.
-			Economy.earn_gold(self, defs[ctx.id].value, "army_hold_the_line")
+			Economy.earn_gold(self, defs[ctx.id].value, "army_hold_the_line",
+				"Hold the Line: %s refunded" % defs[ctx.id].name)
 	return ctx
 
 
@@ -5854,12 +5858,17 @@ func _sell(kind: String, entry: Variant) -> bool:
 		# sell-payout bonus lives here, never in Shop.sell_price() itself —
 		# _convert_captured below keeps calling sell_price() at the flat rate
 	tally("sell") # issue 103
+	var sold: String # NO-239: the kill feed's "sold Rook"
+	match kind:
+		"item": sold = str(entry.name)
+		"artefact": sold = ArtefactHooks.artefact_name(entry.key)
+		_: sold = str(defs[entry if entry is String else entry.id].name) # piece/captured, ADR-0002
 	match kind:
 		"piece": stock.erase(entry)
 		"captured": captured.erase(entry)
 		"item": items.erase(entry)
 		_: artefacts.erase(entry) # "artefact"
-	Economy.earn_gold(self, amount, "sell") # AFTER the erase above — Denver
+	Economy.earn_gold(self, amount, "sell", "sold " + sold) # AFTER the erase above — Denver
 		# Bunker Timeshare's own on_gold_change check must see the POST-sale
 		# Item count, so selling the Item that empties the last slot doesn't
 		# also collect that Item-cap bonus on its own way out
@@ -6023,10 +6032,11 @@ func _decline_box_pick() -> void:
 	# currencies, and declining a Box must not move the leaderboard.
 	# box_size is pinned when the Box opens; the helper falls back to Small for
 	# a Box that somehow carries no size, which pays rather than paying nothing.
-	Economy.earn_gold(self, Tuning.box_skip_gold(box_size), "box_skip")
+	Economy.earn_gold(self, Tuning.box_skip_gold(box_size), "box_skip", "Box skipped")
 	var n := _artefact_count("cicada-rejection-letter")
 	if n > 0:
 		var value := 0
 		for opt in box_offer:
 			value += Box.content_value(self, opt)
 		gold += value * n
+		ArtefactHooks.feed(self, "cicada-rejection-letter", 0, value * n) # NO-239

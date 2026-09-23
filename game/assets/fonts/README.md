@@ -2,7 +2,7 @@
 
 ## Pixel Operator (NO-219: wave/turn/event banners)
 
-- `PixelOperator-Bold.ttf` draws the banners. `PixelOperator.ttf` (regular) is not used yet.
+- `PixelOperator-Bold.ttf` draws the banners. `PixelOperator.ttf` (regular, 16 px) draws the kill feed (NO-239, hud.gd).
 - Author: Jayvee Enaguas (HarvettFox96), version 2018.10.04-1.
 - Source: https://www.dafont.com/pixel-operator.font (archive: https://dl.dafont.com/dl/?f=pixel_operator)
 - License: CC0 1.0 (public domain dedication). The full text is in `PixelOperator-LICENSE.txt`,

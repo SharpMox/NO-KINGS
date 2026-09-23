@@ -7,8 +7,10 @@ extends SceneTree
 ##   - The ENEMY TURN banner names a skipped / doubled turn instead of
 ##     announcing it as a normal one (it used to fire before the skip check).
 ## Plus the Gold-loss popup, the bespoke King Power's persistent ⚠ state and
-## the once-per-wave first-bite gate. NO-243: a capture, a spawn and a merge
-## queue their board anims (die / arrive / merge) only with animations on.
+## the once-per-wave first-bite gate. NO-239/NO-243: the kill feed (one line
+## per capture, same-frame coalescing, 4 visible, expiry) and the Score roll-up.
+## NO-243: a capture, a spawn and a merge queue their board anims
+## (die / arrive / merge) only with animations on.
 ## Run headless:  godot --headless --path game -s tests/test_banners.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -60,6 +62,23 @@ func _kind(g, kind: String) -> Array:
 
 func _restock_banners(g) -> Array:
 	return _banners(g).filter(func(a: Dictionary) -> bool: return a.cause == "shop_restock")
+
+
+## The feed's live lines, top first (a pushed-out pill is removed at once; an
+## expired one is queue_free'd, so skip those).
+func _feed_texts(g) -> Array:
+	var out := []
+	for pill in g.hud.feed.get_children():
+		if not pill.is_queued_for_deletion():
+			out.append((pill.get_child(0).get_child(-1) as Label).text)
+	return out
+
+
+func _clear_feed(g) -> void:
+	g.hud._feed_pending.clear()
+	for pill in g.hud.feed.get_children():
+		g.hud.feed.remove_child(pill)
+		pill.queue_free()
 
 
 func _init() -> void:
@@ -208,6 +227,56 @@ func _init() -> void:
 	check(_restock_banners(op).size() == 1 and _has_banner(op, "SHOP OPEN"),
 		"the unlock Wave's restock reads SHOP OPEN")
 	op.queue_free()
+	await process_frame
+
+	# --- NO-239: the kill feed ----------------------------------------------
+	var kf := _boot({"board": [["queen", 0, 2, 2], ["knight", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	await process_frame # boot-time posts flushed
+	_clear_feed(kf)
+	kf.anims.clear()
+	kf._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	kf.hud._flush_feed()
+	var lines := _feed_texts(kf)
+	check(lines.size() == 1 and lines[0].begins_with("+") and lines[0].ends_with("captured Knight"),
+		"a capture posts ONE feed line naming the victim (%s)" % [lines])
+	check(not kf.anims.any(func(a: Dictionary) -> bool: return a.kind == "text" and a.text.begins_with("+")),
+		"...and no '+N' Score popup any more (the feed replaced it)")
+
+	_clear_feed(kf)
+	Economy.earn(kf, 10, "", "test gain")
+	Economy.earn(kf, 10, "", "test gain")
+	kf.hud._flush_feed()
+	lines = _feed_texts(kf)
+	check(lines == ["+%d · +$20 · test gain" % (20 * Economy.SCORE_MULTIPLIER)],
+		"two same-reason gains in one frame coalesce into one line (%s)" % [lines])
+
+	_clear_feed(kf)
+	for i in 6:
+		kf.hud.post("e%d" % i)
+	lines = _feed_texts(kf)
+	check(lines == ["e5", "e4", "e3", "e2"], ">4 entries: only 4 kept, newest on top (%s)" % [lines])
+
+	await create_timer(kf.hud.FEED_LIFE_S + kf.hud.FEED_FADE_S + 0.3).timeout
+	await process_frame
+	check(_feed_texts(kf).is_empty(), "entries expire after ~%.1f s" % kf.hud.FEED_LIFE_S)
+
+	# --- NO-243: the Score counter rolls up to the exact value -------------
+	var before: int = kf.score
+	kf.score += 1234
+	kf._refresh()
+	if kf.animations_on:
+		check(kf.hud.score_label.text != str(kf.score), "the counter does not snap while animations are on")
+	await create_timer(kf.hud.COUNT_UP_S + 0.2).timeout
+	check(kf.score == before + 1234 and kf.hud.score_label.text == str(kf.score),
+		"the Score counter lands on the exact final value (%s)" % kf.hud.score_label.text)
+
+	kf.autoplay = true
+	_clear_feed(kf)
+	kf.hud.post("bot")
+	check(_feed_texts(kf).is_empty(), "autoplay posts nothing to the feed")
+	kf.autoplay = false
+	kf.queue_free()
 	await process_frame
 
 	# --- NO-243: board anims queue with animations on, never with them off,

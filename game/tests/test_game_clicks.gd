@@ -3465,6 +3465,140 @@ func _init() -> void:
 			and not game.hud.multi_confirm_btn.visible,
 		"a click at Confirm's centre actually reaches it: Blitz resolves and the pending state clears")
 
+	# --- NO-236: drag and drop. A Stock drag deploys exactly like the tap
+	# flow (same _place: 1 Action + the deploy Gold); a refused drop changes
+	# nothing; drop_legal — the preview's green/red — agrees with what the
+	# drop then does; an Item dragged onto a target arms and stages it, and
+	# Confirm is still what commits it.
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults() # NO-194
+	GameScript.next_config = {"wave": 3, "gold": 200, "stock": ["pawn", "pawn", "pawn"],
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]], "items": ["blitz"]}
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.actions_left = 10 # several deploys below must never auto-pass the turn
+	var half_tile := Vector2(game.tile, game.tile) / 2
+	# CONTROL: the tap flow's price, in this same state
+	check(await _click_stock(game), "NO-236: Stock opens")
+	await process_frame
+	var gold0: int = game.gold
+	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
+	await process_frame
+	var tap_tile := Vector2i(1, 1) # a neighbour of the queen: a deploy tile
+	_click(game._tile_px(tap_tile) + half_tile)
+	await process_frame
+	var tap_gold: int = gold0 - game.gold
+	check(game.board.has(tap_tile) and game.actions_left == 9,
+		"NO-236 control: a tap deploy lands and spends 1 Action",
+		"placed=%s actions=%d" % [game.board.has(tap_tile), game.actions_left])
+	# the drag, onto another deploy tile
+	if game.hud.drawer_open != "stock":
+		await _click_stock(game)
+	await process_frame
+	var gold1: int = game.gold
+	var drag_tile := Vector2i(3, 1)
+	await _drag_drop(root, _pool_rows(game, false)[0], game._tile_px(drag_tile) + half_tile)
+	await process_frame
+	check(game.board.has(drag_tile) and game.actions_left == 8 and gold1 - game.gold == tap_gold,
+		"NO-236: a Stock->board drag deploys and charges exactly like the tap",
+		"placed=%s actions=%d drag_gold=%d tap_gold=%d" % [game.board.has(drag_tile),
+			game.actions_left, gold1 - game.gold, tap_gold])
+	# a refused Stock drop: the preview says so mid-drag, and nothing changes
+	var bad_tile := Vector2i(-1, -1)
+	for ty in range(Tuning.BOARD_H - 1, -1, -1):
+		for tx in range(Tuning.BOARD_W):
+			var cand := Vector2i(tx, ty)
+			if bad_tile.x < 0 and not game.board.has(cand) and not game._deploy_tiles().has(cand):
+				bad_tile = cand
+	var good_tile := Vector2i(1, 3) # still a free neighbour of the queen
+	check(bad_tile.x >= 0 and not game.board.has(good_tile) and game._deploy_tiles().has(good_tile),
+		"NO-236: the fixture has a refused and an accepted deploy tile")
+	await _await_drawer_settled(game, "stock") # the drop above reopened it
+	var snap := [game.gold, game.actions_left, game.stock.size(), game.board.size()]
+	var row: Button = _pool_rows(game, false)[0]
+	_press(row.get_global_rect().get_center())
+	await process_frame
+	for p: Vector2 in [Vector2(10, 10000), game._tile_px(bad_tile) + half_tile]:
+		var mv := InputEventMouseMotion.new()
+		mv.position = p
+		mv.global_position = p
+		root.push_input(mv)
+		await process_frame
+	check(game.pool_drag_id != "" and not game.drop_legal(bad_tile) and game.drop_legal(good_tile),
+		"NO-236: mid Stock drag, drop_legal is red on a non-deploy tile and green on a deploy tile",
+		"drag=%s bad=%s good=%s preview=%s state=%d" % [game.pool_drag_id, game.drop_legal(bad_tile), game.drop_legal(good_tile), game.preview_open, game.state])
+	_release(game._tile_px(bad_tile) + half_tile)
+	await process_frame
+	await process_frame
+	check([game.gold, game.actions_left, game.stock.size(), game.board.size()] == snap,
+		"NO-236: a refused Stock drop leaves Gold, Actions, Stock and the board unchanged",
+		"before=%s after=%s" % [snap, [game.gold, game.actions_left, game.stock.size(), game.board.size()]])
+	# a board drag: drop_legal follows legal_dests; a refused drop moves nothing
+	game._set_drawer("")
+	for i in 20:
+		await process_frame # the close slide (PANEL_SLIDE_S) — clickability drops at once
+	var queen := Vector2i(2, 2)
+	_press(game._tile_px(queen) + half_tile)
+	await process_frame
+	var legal_dest: Vector2i = game.legal_dests[0] if not game.legal_dests.is_empty() else Vector2i(-1, -1)
+	var refused := Vector2i(-1, -1)
+	for ty in range(Tuning.BOARD_H):
+		for tx in range(Tuning.BOARD_W):
+			var cand := Vector2i(tx, ty)
+			if refused.x < 0 and cand != queen and not game.board.has(cand) \
+					and not game.legal_dests.has(cand):
+				refused = cand
+	var to_refused := InputEventMouseMotion.new()
+	to_refused.position = game._tile_px(refused) + half_tile
+	to_refused.global_position = to_refused.position
+	root.push_input(to_refused)
+	await process_frame
+	check(game.drag_from == queen and legal_dest.x >= 0 and game.drop_legal(legal_dest)
+			and not game.drop_legal(refused) and not game.drop_legal(queen),
+		"NO-236: mid board drag, drop_legal is green on a legal destination, red elsewhere and on home",
+		"drag_from=%s dest=%s refused=%s preview=%s" % [game.drag_from, legal_dest, refused, game.preview_open])
+	_release(to_refused.position)
+	await process_frame
+	check(game.board.has(queen) and game.board[queen].id == "queen" and not game.board.has(refused)
+			and game.actions_left == 8,
+		"NO-236: a refused board drop leaves the piece home and spends nothing")
+	# an Item dragged onto its target: armed + staged, Confirm still required
+	var items_before: int = game.items.size()
+	check(await _click_inventory(game, "Inventory %d" % items_before), "NO-236: Inventory opens")
+	await process_frame
+	var cell: Button = null
+	for c in game.hud.items_grid.get_children():
+		if c is Button and not c.is_queued_for_deletion() and c.get_meta("key", "") == "blitz":
+			cell = c
+	check(cell != null, "NO-236: the Blitz cell exists")
+	_press(cell.get_global_rect().get_center())
+	await process_frame
+	for p: Vector2 in [Vector2(10, 10000), game._tile_px(queen) + half_tile]:
+		var mv := InputEventMouseMotion.new()
+		mv.position = p
+		mv.global_position = p
+		root.push_input(mv)
+		await process_frame
+	check(game.item_drag >= 0 and game.drop_legal(queen) and not game.drop_legal(refused),
+		"NO-236: mid Item drag, drop_legal is green on a valid target and red on an empty tile",
+		"item_drag=%d preview=%s" % [game.item_drag, game.preview_open])
+	_release(game._tile_px(queen) + half_tile)
+	await process_frame
+	await process_frame
+	check(game.item_active >= 0 and game.item_pending_tile == queen
+			and game.hud.multi_confirm_btn.visible and game.items.size() == items_before
+			and not game.board[queen].get("blitz_free_move", false),
+		"NO-236: dropping an Item on a target arms and stages it — nothing spent before Confirm",
+		"active=%d pending=%s confirm=%s items=%d" % [game.item_active, game.item_pending_tile,
+			game.hud.multi_confirm_btn.visible, game.items.size()])
+	_click(game.hud.multi_confirm_btn.get_global_rect().get_center())
+	await process_frame
+	check(game.board[queen].get("blitz_free_move", false) and game.items.size() == items_before - 1,
+		"NO-236: Confirm commits the dragged Item")
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")

@@ -1,8 +1,13 @@
 #!/bin/sh
-# NO-KINGS non-regression suite — run after EVERY feature or code change.
+# NO-KINGS non-regression suite. When to run what (repo CLAUDE.md, 2026-09-24):
+# design iteration / docs-only — no suite; PR ready with a UI change — --only
+# the suites covering it; rules/economy/autoplay change — full run before merge;
+# before merge — ONE full run on the combined batch of ready PRs, not per PR.
 #
 #   game/tests/run_all.sh              # full: windowed click probes + headless
 #   game/tests/run_all.sh --headless   # skip the windowed probes (CI / no GUI)
+#   game/tests/run_all.sh --only board_draw,game-clicks   # just these (run names;
+#                                      # bare <t> = test_<t>); unknown name -> exit 2
 #
 # Order matters (repo CLAUDE.md): the click probes run FIRST — Godot headless
 # drops GUI picking, and the CLI bypasses once green-lit a dead main menu.
@@ -14,6 +19,51 @@ GODOT="${GODOT:-godot}"
 # crashed probe must not block forever, but a hung run is still bounded.
 TIMEOUT="${TIMEOUT:-600}"
 fails=""
+ran=0
+
+WINDOWED="menu-clicks game-clicks game-clicks-notch touch-scroll long-press"
+HEADLESS_TESTS="rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
+	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
+	box combos scenarios background tiers intro seed account sync leaderboard drive drive_type back_button \
+	menu_continue menu_keyboard sign_in board_draw bomb_highlight mass en_passant banners"
+
+headless=""
+only=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--headless) headless=1 ;;
+		--only) only="${2:-}"; [ -n "$only" ] || { echo "--only needs a comma-list"; exit 2; }; shift ;;
+		*) echo "unknown argument: $1"; exit 2 ;;
+	esac
+	shift
+done
+
+# --only: normalise to ",name,name," so want() is one case match. A name that
+# matches no suite exits 2 — a filter that runs nothing must never say ALL GREEN.
+if [ -n "$only" ]; then
+	known=" $WINDOWED test_launch_bypass autoplay"
+	for t in $HEADLESS_TESTS; do known="$known test_$t"; done
+	known="$known "
+	norm=","; unknown=""
+	for n in $(printf '%s' "$only" | tr ',' ' '); do
+		case "$known" in
+			*" $n "*) norm="$norm$n," ;;
+			*" test_$n "*) norm="${norm}test_$n," ;;
+			*) unknown="$unknown $n" ;;
+		esac
+	done
+	if [ -n "$unknown" ]; then
+		echo "unknown suite(s):$unknown"
+		echo "known:$known"
+		exit 2
+	fi
+	only="$norm"
+fi
+want() {
+	[ -z "$only" ] && return 0
+	case "$only" in *",$1,"*) return 0 ;; esac
+	return 1
+}
 
 # Fresh worktrees have no .godot/ import cache, and Godot's on-demand import
 # races with the first suite's resource loads — intermittently "Failed
@@ -50,7 +100,7 @@ fi
 # steal. Detect that plainly instead of retrying — a retry that hides a
 # real intermittent bug is worse than the flake.
 other_godot=""
-if [ "${1:-}" != "--headless" ]; then
+if [ -z "$headless" ]; then
 	# Match the process NAME, not the command line: -f matched any process whose
 	# args merely mention Godot, so `GODOT=~/Applications/Godot.app/...` in a
 	# wrapper's own command line tripped this warning with no Godot running.
@@ -63,6 +113,7 @@ fi
 
 run() {
 	name="$1"; shift
+	ran=$((ran + 1))
 	outfile=$(mktemp)
 	"$GODOT" --path . "$@" >"$outfile" 2>&1 &
 	pid=$!
@@ -84,12 +135,12 @@ run() {
 	fi
 }
 
-if [ "${1:-}" != "--headless" ]; then
-	run menu-clicks -s tests/test_menu_clicks.gd
-	run game-clicks -s tests/test_game_clicks.gd
+if [ -z "$headless" ]; then
+	want menu-clicks && run menu-clicks -s tests/test_menu_clicks.gd
+	want game-clicks && run game-clicks -s tests/test_game_clicks.gd
 	# NO-57: same probe, with a notch inset — the Header must still lay out
 	# below it, not just on the un-notched 0px case above.
-	run game-clicks-notch -s tests/test_game_clicks.gd -- --safe-top 56
+	want game-clicks-notch && run game-clicks-notch -s tests/test_game_clicks.gd -- --safe-top 56
 	# Touch-drag probe. ScrollContainer only drag-scrolls when the DisplayServer
 	# reports a touchscreen, which a desktop does only under this project
 	# setting — and Input has no runtime setter for it, so it goes through
@@ -97,11 +148,14 @@ if [ "${1:-}" != "--headless" ]; then
 	# the run ends: left behind, every later mouse click would also be a touch.
 	printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > override.cfg
 	trap 'rm -f override.cfg' EXIT
-	run touch-scroll -s tests/test_touch_scroll.gd
-	run long-press -s tests/test_long_press.gd # NO-72: same override, same reason
+	want touch-scroll && run touch-scroll -s tests/test_touch_scroll.gd
+	want long-press && run long-press -s tests/test_long_press.gd # NO-72: same override, same reason
 	rm -f override.cfg
 else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
+	for n in $WINDOWED; do
+		[ -n "$only" ] && want "$n" && echo "skipped: $n (in --only, but --headless)"
+	done
 fi
 
 # NOTE: tests/repro_no45.gd is GONE (NO-45 is fixed). It was deliberately red
@@ -109,20 +163,20 @@ fi
 # entry expected to be red teaches everyone to ignore red. Now that it is green
 # the same checks live in tests/test_touch_scroll.gd above, which is the one
 # suite this script already wraps in the touch-emulation override.
-for t in rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
-	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
-	box combos scenarios background tiers intro seed account sync leaderboard drive drive_type back_button \
-	menu_continue menu_keyboard sign_in board_draw bomb_highlight mass en_passant banners; do
-	run "test_$t" --headless -s "tests/test_$t.gd"
+for t in $HEADLESS_TESTS; do
+	want "test_$t" && run "test_$t" --headless -s "tests/test_$t.gd"
 done
 
 # NO-77: needs the real flag on the command line, so it sits outside the loop.
-run test_launch_bypass --headless -s tests/test_launch_bypass.gd -- --scenario 0
+want test_launch_bypass && run test_launch_bypass --headless -s tests/test_launch_bypass.gd -- --scenario 0
 
-run autoplay --headless -- --autoplay
+want autoplay && run autoplay --headless -- --autoplay
 
 echo "---"
-if [ -z "$fails" ]; then
+if [ "$ran" -eq 0 ]; then
+	echo "FAILED: no suite ran (--only matched only skipped suites)"
+	exit 2
+elif [ -z "$fails" ]; then
 	echo "ALL GREEN"
 else
 	echo "FAILED:$fails"

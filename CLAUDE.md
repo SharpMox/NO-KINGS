@@ -389,9 +389,20 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   ```sh
   tools/godot-lock.sh godot --path game -- --scenario 1 --screenshot /tmp/shot-a --show-screen preview --anchor x,y
   ```
-- **Non-regression suite after every change:** `game/tests/run_all.sh` — click probes
-  first, then the headless suites, `tests/test_scenarios.gd` (boots + bot-plays every
-  TEST scenario), and a full autoplay run. It must be ALL GREEN before a commit.
+- **Non-regression suite:** `game/tests/run_all.sh` — click probes first, then the
+  headless suites, `tests/test_scenarios.gd` (boots + bot-plays every TEST scenario), and
+  a full autoplay run. `--only a,b` runs just the named suites (`run` names; `board_draw`
+  = `test_board_draw`); an unknown name exits 2. When to run what (Max, 2026-09-24):
+  - **Design iteration** (Max judging visuals): capture only — no suite.
+  - **Docs-only change:** no suite, or the one directly related test.
+  - **PR ready, UI/visual change:** `run_all.sh --only <suites covering the touched area>`,
+    e.g. `--only board_draw,game-clicks` for a board-drawing change. ALL GREEN.
+  - **Rules / economy / autoplay change:** full `run_all.sh` before merge — the blast
+    radius is the whole game.
+  - **Before merge: ONE full run on the combined batch**, not one per PR. On Aux, a local
+    detached octopus merge of `main` + the ready PRs in merge order (nothing pushed), full
+    `run_all.sh`, ALL GREEN; then merge in that order and confirm `main`'s tree equals the
+    tested tree (`git rev-parse <tested>^{tree} origin/main^{tree}`).
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
 - **Suite runs go to Aux by default.** The probes are windowed, so a run on Main takes over
@@ -404,6 +415,7 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   (`GODOT="${GODOT:-godot}"`), so nothing in the repo needed to change.
   ```sh
   ssh aux 'cd ~/NO-KINGS && GODOT=$HOME/bin/godot tools/godot-lock.sh game/tests/run_all.sh'
+  ssh aux 'cd ~/NO-KINGS && GODOT=$HOME/bin/godot tools/godot-lock.sh game/tests/run_all.sh --only board_draw,game-clicks'
   ```
   Sync Aux's checkout before a run — nothing else keeps it current, and a stale checkout
   verifies stale code. The Godot lock and `user://` are per-machine, so an Aux run is safe

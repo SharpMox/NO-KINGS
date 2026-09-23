@@ -133,12 +133,9 @@ static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
 ## offered again while a copy is held. Every artefact offer reads this: the
 ## Shop's normal and hidden rolls and the Cult's starting pair (all through
 ## _sample_weighted_artefacts) and the Artefact Box (box.gd roll_options).
-const UNIQUE_ARTEFACTS := ["abduction-probe"]
-
-
+## The list itself lives in artefact_hooks.gd (its grant() refuses a dupe too).
 static func is_unique_held(g, key: String) -> bool:
-	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
-		func(t: Dictionary) -> bool: return t.key == key)
+	return ArtefactHooks.is_unique_held(g, key)
 
 
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King
@@ -304,11 +301,13 @@ static func can_buy(g, slot: Dictionary) -> bool:
 			and g.state == g.State.PLAYER_TURN \
 			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
 			and (slot.kind != "item" or ItemLogic.has_room(g)) \
+			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) \
 			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue
 				# 53/60: never sell an Item or Artefact slot the player has no
 				# capacity to hold — a Box still sells fine even at capacity
 				# (it might not roll one; _box_choose's own grant refuses that
-				# pick if it does)
+				# pick if it does). NO-244: nor a unique Artefact already held —
+				# stock rolled before the first probe was bought still holds one
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold

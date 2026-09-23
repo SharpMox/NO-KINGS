@@ -207,6 +207,7 @@ signal multi_cancel_pressed # NO-137: the Cancel button underneath it — same
 	# entry-point shape as multi_confirm_pressed, but resets targeting instead
 	# of committing it (see multi_cancel_btn's own declaration below)
 signal item_pressed(index: int)
+signal item_drag_started(index: int) # NO-236: press on an Item cell (a drag onto the board may follow)
 signal item_preview_requested(index: int) # NO-144: an Item cell's long
 	# press — same "own menu" preview pieces get (stack_preview_requested
 	# above), so Sell has somewhere to live for a held Item too
@@ -2246,6 +2247,16 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 ## flatten through. Every row holds only Buttons (no placeholders, no
 ## further nesting), so this keeps "pool_buttons() is buttons-only"
 ## (test_game_clicks.gd's own comment on game.pool_box) true.
+## NO-236: a drawer drag that goes live drops every pending long press. The
+## motion that carries the finger out of the drawer closes it (game.gd _input),
+## so the cell never sees the motion that would cancel its own hold, and the
+## piece/Item preview popped up 500 ms after a drag-deploy — then swallowed
+## every board press behind preview_open.
+func cancel_long_presses() -> void:
+	for b in pool_buttons() + items_grid.get_children():
+		b.remove_meta("lp_token")
+
+
 func pool_buttons() -> Array:
 	var out := []
 	for row in stock_grid.get_children():
@@ -2542,6 +2553,7 @@ func _rebuild_items_grid() -> void:
 		_wire_grid_button(btn, has_icon, "item:%d" % i, desc, func() -> void:
 			item_pressed.emit(i),
 			func() -> void: item_preview_requested.emit(i)) # NO-144
+		btn.button_down.connect(func() -> void: item_drag_started.emit(i)) # NO-236
 		btn.set_meta("key", g.items[i].key) # NO-119: no name text left to find
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses

@@ -1205,7 +1205,12 @@ func _clear_selection() -> void:
 
 
 func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
-	if pool_drag_id != "":
+	# NO-236: nor the release that ENDS a live drag. Dragging out makes the
+	# drawer's cells MOUSE_FILTER_IGNORE, so the button never sees the finger
+	# leave it; a drop that reopens the drawer then hands it the release,
+	# which it reads as a tap — arming the stack again, or, inside 400 ms of
+	# an earlier tap, opening the double-tap preview.
+	if pool_drag_id != "" or drag_live:
 		# mid-drag: hiding the drawer (drag-out close) force-releases the held
 		# button, which fires a spurious tap inside the visibility cascade and
 		# corrupts the strip rebuild (found 2026-07-08). Real taps clear the
@@ -2512,6 +2517,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
 			and event.pressed:
 		_last_press_px = event.position # NO-236: a drawer drag's start point
+		drag_live = false
 	if pool_drag_id == "" and item_drag < 0:
 		return
 	if event is InputEventMouseMotion:
@@ -3545,9 +3551,6 @@ func _use_item(index: int) -> void:
 		return
 	if state != State.PLAYER_TURN or box_open:
 		return
-	if item_drag >= 0:
-		return # NO-236: the drag-out closing the drawer fires a spurious tap
-			# (same as _on_stack_pressed's guard); the drop does the arming
 	if item_active == index: # tap again to cancel targeting
 		_item_reset()
 		if hud.drawer_open != "inventory": # NO-85 story 58: cancel always reopens
@@ -5787,7 +5790,9 @@ func _connect_hud() -> void:
 		_show_kind_preview("artefact", key, _artefact_entry(key))) # NO-144
 	hud.multi_confirm_pressed.connect(_confirm_target_pressed)
 	hud.multi_cancel_pressed.connect(_confirm_target_cancelled)
-	hud.item_pressed.connect(_use_item, CONNECT_DEFERRED)
+	hud.item_pressed.connect(func(index: int) -> void:
+		if item_drag < 0 and not drag_live: # NO-236: see _on_stack_pressed's guard
+			_use_item(index), CONNECT_DEFERRED)
 	hud.item_drag_started.connect(_on_item_drag_start)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)

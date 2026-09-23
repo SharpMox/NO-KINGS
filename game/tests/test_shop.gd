@@ -244,17 +244,35 @@ func _init() -> void:
 	check(game.box_offer == stocked_contents,
 		"opening reveals EXACTLY the contents rolled at stock time, not a fresh roll")
 
-	# --- issue 101: the Shop is locked before Tuning.SHOP_UNLOCK_WAVE --------
-	var locked: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500})
-	locked._open_shop()
-	check(locked.modals.shop_panel == null or not locked.modals.shop_panel.visible,
-		"the Shop does not open the Wave before it unlocks")
-	locked.wave = Tuning.SHOP_UNLOCK_WAVE
-	locked._open_shop()
-	check(locked.modals.shop_panel != null and locked.modals.shop_panel.visible,
-		"and opens on the unlock Wave itself")
-	locked.queue_free()
+	# --- NO-240: the Shop opens from Wave 1, EMPTY until its first restock ---
+	var early: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 1, "gold": 500})
+	await process_frame
+	check(early.shop_stock.is_empty(), "a Wave-1 run boots with an empty Shop (no setup roll)")
+	check(not early.hud.shop_button.disabled and early.hud.shop_button.text == "Shop",
+		"the Shop button is enabled on Wave 1")
+	early._open_shop()
+	check(early.shop_open(), "the Shop opens on Wave 1")
+	check(early.modals.shop_lower == null, "an empty Shop builds no slot grid (zero buyable slots)")
+	check(early.modals.shop_empty_label != null and early.modals.shop_empty_label.text
+			== "Restocks at wave %d" % Tuning.SHOP_UNLOCK_WAVE,
+		"the empty Shop says when it restocks")
+	Shop.add_score_progress(early, Tuning.SHOP_LANE_B_SCORE * 2)
+	check(early.shop_stock.is_empty() and early.shop_restocks == 0
+			and early.shop_lane_b_progress == Tuning.SHOP_LANE_B_SCORE * 2,
+		"pre-unlock Lane B banks progress but never rolls")
+	early.artefacts.append({"key": "jet-fuel-vial"})
+	early.state = early.State.PLAYER_TURN
+	check(not early._jet_fuel_restock_available(), "Jet Fuel can't stock the Shop early")
+	early.artefacts.pop_back() # a bare probe entry, not a real grant
+	early.modals.shop_panel.visible = false
+	early._queue_wave(Tuning.SHOP_UNLOCK_WAVE)
+	check(early.shop_stock.size() == 27 and early.shop_lane_b_progress == 0,
+		"the first restock Wave stocks it (27 slots) and wipes the banked Lane B")
+	early._open_shop()
+	check(early.modals.shop_empty_label == null and early.modals.shop_lower != null,
+		"a stocked Shop shows its grid, not the empty line")
+	early.queue_free()
 	await process_frame
 
 	var stock_n2: int = game.stock.size()
@@ -410,6 +428,7 @@ func _init() -> void:
 	var slots: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["chocolate-key-cake", "chocolate-key-cake",
 			"alleged-weather-balloon", "sub-antarctic-visa"]})
+	Shop.roll(slots) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
 	await process_frame
 
 	check(Shop._extra_item_slots(slots) == {"total": 5, "tactical": 1},

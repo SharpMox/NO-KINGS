@@ -2298,32 +2298,38 @@ func _init() -> void:
 	await process_frame
 	check(game.modals.shop_panel != null and game.modals.shop_panel.visible,
 		"the shop drawer opens")
-	# issue 101: before the unlock Wave the button STAYS and is DISABLED (user
-	# ruling — a hidden button reads as "this game has no Shop"), and it names
-	# the Wave, because a greyed control with no reason is the failure the
-	# ruling was one step away from.
 	check(not game.hud.shop_button.disabled and game.hud.shop_button.text == "Shop",
-		"the Shop button is live and unlabelled from the unlock Wave on")
+		"the Shop button is live and unlabelled")
 
-	# ...and the locked half of the same ruling, on its own boot one Wave short
+	# NO-240: the Shop opens from Wave 1 (issue 101's lock is gone), EMPTY until
+	# its first restock -- a real click on its own Wave-1 boot.
 	game.queue_free()
 	await process_frame
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": Tuning.SHOP_UNLOCK_WAVE - 1, "gold": 500}
+		"wave": 1, "gold": 500}
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(game.hud.shop_button.disabled,
-		"the Shop button is DISABLED the Wave before it unlocks")
-	check("%d" % Tuning.SHOP_UNLOCK_WAVE in game.hud.shop_button.text,
-		"and says which Wave it opens on (%s)" % game.hud.shop_button.text)
-	check(not await _click_button_in(game.hud, "Shop"),
-		"a disabled Shop button is not the plain \"Shop\" control any more")
+	check(not game.hud.shop_button.disabled and game.hud.shop_button.text == "Shop",
+		"NO-240: the Shop button is enabled on Wave 1")
+	check(await _click_shop(game) and game.shop_open(), "NO-240: clicking it opens the Shop on Wave 1")
+	await process_frame
+	var early_tiles := 0
+	var to_scan: Array = [game.modals.shop_panel]
+	while not to_scan.is_empty():
+		var n: Node = to_scan.pop_back()
+		if n.has_meta("shop_index"):
+			early_tiles += 1
+		to_scan.append_array(n.get_children())
+	check(early_tiles == 0 and game.shop_stock.is_empty(), "NO-240: the Wave-1 Shop has no slots",
+		"tiles=%d stock=%d" % [early_tiles, game.shop_stock.size()])
+	check(_has_label_text(game.modals.shop_panel, "Restocks at wave %d" % Tuning.SHOP_UNLOCK_WAVE),
+		"NO-240: the empty Shop says when it restocks")
 
-	# restore what the checks below expect: an unlocked run with the Shop drawer
-	# OPEN. The locked-state boot above consumed the instance they were written
+	# restore what the checks below expect: a stocked run with the Shop drawer
+	# OPEN. The Wave-1 boot above consumed the instance they were written
 	# against, and leaving it would fail them on state, not on behaviour.
 	game.queue_free()
 	await process_frame
@@ -2334,7 +2340,7 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	check(await _click_shop(game), "Shop reopens after the locked-state check")
+	check(await _click_shop(game), "Shop reopens after the empty-state check")
 	await process_frame
 
 	# issue 64: the Lane B restock progress bar — a real Control built by

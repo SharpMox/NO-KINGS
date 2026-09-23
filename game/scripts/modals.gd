@@ -84,7 +84,9 @@ var shop_lower: VBoxContainer # V4 (Max review 2026-09-21): the master grid —
 	# PIECES+BOXES row, then ARTEFACTS, then ITEMS, all sharing one column
 	# grid (see the V4 note below `_shop_zone`) — exposed, same reasoning as
 	# shop_lane_b_bar above, so a probe can measure whether the content block
-	# is actually centred in the panel.
+	# is actually centred in the panel. null while the Shop is empty (NO-240).
+var shop_empty_label: Label # NO-240: "Restocks at wave N", shown instead of
+	# shop_lower while g.shop_stock is empty (before the first restock)
 ## Shop geometry history (NO-119/132/142/144/166/167): PIECES, ARTEFACTS,
 ## ITEMS and BOXES were stacked full-width, one below another, all at
 ## Tuning.OFFBOARD_GRID_COLS (5) — precisely so no zone read thinner than
@@ -1058,41 +1060,56 @@ func show_shop() -> void:
 	shop_lane_b_bar.add_child(lane_a_label)
 	root.add_child(shop_lane_b_bar)
 
-	var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
-	for i in g.shop_stock.size():
-		by_kind[g.shop_stock[i].kind].append(i)
+	# NO-240 (Max, 2026-09-24): the Shop opens from Wave 1 but holds nothing
+	# until its first restock (Tuning.SHOP_UNLOCK_WAVE). An empty grid of
+	# section headers would read as "sold out"; one line says when it fills.
+	shop_empty_label = null
+	shop_lower = null
+	if g.shop_stock.is_empty():
+		shop_empty_label = Label.new()
+		shop_empty_label.text = "Restocks at wave %d" % Tuning.SHOP_UNLOCK_WAVE
+		shop_empty_label.add_theme_font_size_override("font_size", 18)
+		shop_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		shop_empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		shop_empty_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		shop_empty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		root.add_child(shop_empty_label)
+	else:
+		var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
+		for i in g.shop_stock.size():
+			by_kind[g.shop_stock[i].kind].append(i)
 
-	# V4 (Max review 2026-09-21): one master grid — PIECES (3 cols) and BOXES
-	# (1 col) share a top row, ARTEFACTS and ITEMS each get their own
-	# full-width row below at Tuning.OFFBOARD_GRID_COLS (5) — see the V4 note
-	# above SHOP_SUBZONE_SEP for the column-alignment arithmetic.
-	var piece_cols := 3
-	var master_cols: int = Tuning.OFFBOARD_GRID_COLS
+		# V4 (Max review 2026-09-21): one master grid — PIECES (3 cols) and BOXES
+		# (1 col) share a top row, ARTEFACTS and ITEMS each get their own
+		# full-width row below at Tuning.OFFBOARD_GRID_COLS (5) — see the V4 note
+		# above SHOP_SUBZONE_SEP for the column-alignment arithmetic.
+		var piece_cols := 3
+		var master_cols: int = Tuning.OFFBOARD_GRID_COLS
 
-	shop_lower = VBoxContainer.new()
-	shop_lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	# NO-201: shrink to the block's own minimum and centre it in root's width,
-	# rather than stretching to fill — unchanged by V4, now centring the
-	# whole 3-row block instead of just the PIECES+BOXES row.
-	shop_lower.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	shop_lower.add_theme_constant_override("separation", 8)
+		shop_lower = VBoxContainer.new()
+		shop_lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		# NO-201: shrink to the block's own minimum and centre it in root's width,
+		# rather than stretching to fill — unchanged by V4, now centring the
+		# whole 3-row block instead of just the PIECES+BOXES row.
+		shop_lower.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		shop_lower.add_theme_constant_override("separation", 8)
 
-	# NO-210: PIECES and BOXES sit in an HBox whose cross-axis default is to
-	# fill+centre each child — SHRINK_BEGIN on both pins them to the row's
-	# top instead, unchanged by V4.
-	var top_row := HBoxContainer.new()
-	top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top_row.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
-	var piece_zone := _shop_zone(by_kind.piece, piece_cols)
-	piece_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top_row.add_child(piece_zone)
-	var box_zone := _shop_zone(by_kind.box, 1)
-	box_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	top_row.add_child(box_zone)
-	shop_lower.add_child(top_row)
-	shop_lower.add_child(_shop_zone(by_kind.artefact, master_cols))
-	shop_lower.add_child(_shop_zone(by_kind.item, master_cols))
-	root.add_child(shop_lower)
+		# NO-210: PIECES and BOXES sit in an HBox whose cross-axis default is to
+		# fill+centre each child — SHRINK_BEGIN on both pins them to the row's
+		# top instead, unchanged by V4.
+		var top_row := HBoxContainer.new()
+		top_row.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top_row.add_theme_constant_override("separation", SHOP_BOXES_COL_SEP)
+		var piece_zone := _shop_zone(by_kind.piece, piece_cols)
+		piece_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top_row.add_child(piece_zone)
+		var box_zone := _shop_zone(by_kind.box, 1)
+		box_zone.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		top_row.add_child(box_zone)
+		shop_lower.add_child(top_row)
+		shop_lower.add_child(_shop_zone(by_kind.artefact, master_cols))
+		shop_lower.add_child(_shop_zone(by_kind.item, master_cols))
+		root.add_child(shop_lower)
 
 	# NO-167 (Max review 2026-09-20, second pass): the detail dock is gone
 	# entirely — its one real job, Buy, moved to the tile's own preview

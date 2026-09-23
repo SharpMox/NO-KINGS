@@ -334,6 +334,7 @@ const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below cen
 const BUFF_BADGE_RING := Color(1, 1, 1, 0.92)
 const BUFF_BADGE_BG := Color(0.05, 0.05, 0.08, 0.9)
 const BUFF_BADGE_GLYPH_COL := Color.WHITE
+const BUFF_GLYPH_RATIO := 1.6 # glyph size = disc radius * this (NO-244)
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
@@ -5315,17 +5316,20 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 ## is a rare stacked-artefact case; shrinking the radius keeps any count
 ## legible rather than capping the row and losing information.
 func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
+	# NO-244 (Max, 2026-09-24): styled like NO-100's inversion mark — a black
+	# disc with a large white glyph, low on the tile, clear of the piece's face.
+	# One buff gets the mark's own disc size; two or three shrink to sit side by side.
 	var n := glyphs.size()
-	var r: float = tile * (0.16 if n <= 2 else 0.13)
-	var gap := r * 2.2
-	var start_x := px.x + tile / 2.0 - gap * (n - 1) / 2.0
-	var y := px.y + tile - r * 1.2
+	var r: float = _inv_mark_size() * INV_MARK_DISC_RATIO * (1.0 if n <= 1 else (0.8 if n == 2 else 0.64))
+	var gap := r * 2.1
+	var c0 := _inv_mark_centre(px)
+	var size := int(r * BUFF_GLYPH_RATIO)
+	var baseline := (font.get_ascent(size) - font.get_descent(size)) / 2.0
 	for i in n:
-		var c := Vector2(start_x + gap * i, y)
-		draw_circle(c, r, BUFF_BADGE_RING)
-		draw_circle(c, r - 1.5, BUFF_BADGE_BG)
-		draw_string(font, Vector2(c.x - r, c.y + r * 0.5), glyphs[i],
-			HORIZONTAL_ALIGNMENT_CENTER, r * 2, int(r * 1.4), BUFF_BADGE_GLYPH_COL)
+		var c := Vector2(c0.x - gap * (n - 1) / 2.0 + gap * i, c0.y)
+		draw_circle(c, r, INV_MARK_DISC_COL)
+		draw_string(font, Vector2(c.x - r, c.y + baseline), glyphs[i],
+			HORIZONTAL_ALIGNMENT_CENTER, r * 2, size, BUFF_BADGE_GLYPH_COL)
 
 
 ## NO-101: true for exactly the four literal inv- ids, never the ten

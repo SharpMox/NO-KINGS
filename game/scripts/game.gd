@@ -319,7 +319,7 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
-const INV_MARK_DROP := 0.12 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
+const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
 
 # NO-185: Piece Buff badges (BuffLogic.PIECE_BUFF_GLYPHS) — a dark disc with a
 # light ring behind each glyph, rather than a flat colour matched to the

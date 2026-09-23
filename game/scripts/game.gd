@@ -1400,16 +1400,18 @@ func _process(delta: float) -> void:
 
 # --- turn flow ---
 
-# Banner look (NO-219, 2026-09-22, Max's instruction): bold italic text plus a
-# decorative stripe above and below the band. Tunable here without reading
-# _draw. variation_embolden's documented range is -2..2 (0 = normal weight);
-# variation_transform's skew is radians, negative leans the glyph tops right
-# for a conventional italic slant.
-const BANNER_FONT_EMBOLDEN := 0.9
-const BANNER_ITALIC_SKEW := -0.22
+# Banner look (NO-219, Max's instructions): a decorative stripe above and below
+# the band, text in the Pixel Operator Bold pixel font with no italic slant
+# (2026-09-23; this replaced a skewed, emboldened default font). The font is
+# drawn on a 16 px grid, so BANNER_FONT_SIZE stays a whole multiple of 16 or
+# its pixels smear: 32 is closest to the old 26 in apparent size (18 px caps
+# against Open Sans's ~18.5). Pixel Operator has no ★ or −, so the default
+# font is its fallback for those. Source, license: assets/fonts/README.md.
+const BANNER_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
+const BANNER_FONT_SIZE := 32
 const BANNER_STRIPE_H := 3.0
 
-var _banner_font: FontVariation ## built once on first use, never per-frame in _draw
+var _banner_font: FontFile ## set up once on first use, never per-frame in _draw
 
 ## The wave/turn banner's on-screen rect at animation time `t`, for stack `slot`.
 ##
@@ -4838,21 +4840,26 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 						Rect2(_tile_px(at), Vector2(tile, tile)), board[at].id) # NO-152: diagram
 				else:
 					_show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
-	await _capture_and_quit(dir)
+	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
+	# settle wait below would let it finish before the shot, so skip it here.
+	var pinned_banner := args.has("--show-screen") \
+			and args[args.find("--show-screen") + 1] == "banner"
+	await _capture_and_quit(dir, not pinned_banner)
 
 
 ## Shared tail for the two debug screenshot paths above (NO-122): wait for
 ## the frame just drawn to land, save it, quit. One copy so the two paths
 ## can't drift apart on how a capture actually happens.
-func _capture_and_quit(dir: String) -> void:
+func _capture_and_quit(dir: String, settle := true) -> void:
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	# NO-174: a run starts at 15:00.000, so the first tick crosses a minute
 	# and the Clock's minute-shake (scale 1.35, ~0.35 s) is mid-tween two
 	# frames in. Captures taken there measured a 26%-wide, off-centre Clock
 	# that never existed at rest. Let one-shot tweens finish first.
-	await get_tree().create_timer(0.6).timeout
-	await RenderingServer.frame_post_draw
+	if settle:
+		await get_tree().create_timer(0.6).timeout
+		await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing
 	get_viewport().get_texture().get_image().save_png(dir.path_join("game.png"))
 	get_tree().quit()
@@ -5070,13 +5077,17 @@ func _draw() -> void:
 			# with the band rather than them appearing instantly at full width.
 			draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
 			draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-			if _banner_font == null: # cached once, never rebuilt per-frame
-				_banner_font = FontVariation.new()
-				_banner_font.base_font = font
-				_banner_font.variation_embolden = BANNER_FONT_EMBOLDEN
-				_banner_font.variation_transform = Transform2D(0.0, Vector2.ONE, BANNER_ITALIC_SKEW, Vector2.ZERO)
+			if _banner_font == null: # set up once, never per-frame
+				_banner_font = BANNER_FONT
+				# hard pixel edges: no smoothing, hinting or sub-pixel offsets
+				_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+				_banner_font.hinting = TextServer.HINTING_NONE
+				_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+				var fallbacks: Array[Font] = [font] # ★ and − (see BANNER_FONT)
+				_banner_font.fallbacks = fallbacks
+			# baseline +31: the 18 px caps sit centred in the 44 px band
 			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
-				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, 26, Color(a.color, alpha))
+				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))

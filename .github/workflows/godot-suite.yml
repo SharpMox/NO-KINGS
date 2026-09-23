@@ -61,6 +61,33 @@ jobs:
           echo "suite wall time: $(( $(date +%s) - start ))s (exit $code)" | tee -a suite.log
           exit $code
 
+      # Prototype-only evidence, not gating: proves the windowed probes really
+      # exercise GUI picking under Xvfb (negative control: the same probe run
+      # --headless must FAIL), times each windowed probe, and tries the
+      # --screenshot seam (needs frame_post_draw, i.e. a real render).
+      - name: Diagnostics (not gating)
+        if: always()
+        continue-on-error: true
+        working-directory: game
+        env:
+          GODOT: /home/runner/godot/godot
+          XVFB: xvfb-run -a -s "-screen 0 1280x1024x24"
+        run: |
+          mkdir -p /tmp/diag
+          probe() { name=$1; shift; t=$(date +%s); code=0
+            eval "$XVFB" '"$GODOT" --path . "$@"' > /tmp/diag/$name.log 2>&1 || code=$?
+            echo "$name: exit $code in $(( $(date +%s) - t ))s"; }
+          probe menu-clicks -s tests/test_menu_clicks.gd
+          grep -m2 -E "OpenGL API|Godot Engine" /tmp/diag/menu-clicks.log || true
+          probe game-clicks -s tests/test_game_clicks.gd
+          code=0; t=$(date +%s)
+          timeout 300 "$GODOT" --headless --path . -s tests/test_menu_clicks.gd > /tmp/diag/menu-clicks-headless.log 2>&1 || code=$?
+          echo "NEGATIVE CONTROL menu-clicks --headless: exit $code in $(( $(date +%s) - t ))s (expected non-zero)"
+          grep -m5 -i "fail" /tmp/diag/menu-clicks-headless.log || true
+          code=0; t=$(date +%s)
+          eval "$XVFB" 'timeout 180 "$GODOT" --path . -- --screenshot /tmp/diag/shot' > /tmp/diag/screenshot.log 2>&1 || code=$?
+          echo "screenshot seam: exit $code in $(( $(date +%s) - t ))s"; ls -la /tmp/diag/shot 2>/dev/null || true
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,4 +96,5 @@ jobs:
           path: |
             suite.log
             /tmp/tmp.*
+            /tmp/diag/
           if-no-files-found: ignore

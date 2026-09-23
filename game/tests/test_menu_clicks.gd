@@ -179,20 +179,21 @@ func _init() -> void:
 	check(showing == 0, "every section starts collapsed (%d rows showing)" % showing)
 
 	# open the LAST section and reach its LAST entry — the deepest thing here
-	var last_head: Button = headers[headers.size() - 1]
-	check(await _click_button(menu, last_head.text), "a section header is clickable")
-	await process_frame
-	check(last_head.text.begins_with("▾"), "the opened header reads as expanded")
 	var deepest := ""
-	for sec_child in menu.test_scroll.get_child(0).get_children():
-		if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
-				and sec_child.text != "Device info" \
-				and not sec_child.text.begins_with("▸") \
-				and not sec_child.text.begins_with("▾"):
-			deepest = sec_child.text
-	check(deepest != "", "opening a section reveals its scenario buttons")
-	check(_find_button(menu, deepest) != null,
-		"the LAST scenario of the LAST section is reachable, not clipped (%s)" % deepest)
+	if not headers.is_empty():
+		var last_head: Button = headers[headers.size() - 1]
+		check(await _click_button(menu, last_head.text), "a section header is clickable")
+		await process_frame
+		check(last_head.text.begins_with("▾"), "the opened header reads as expanded")
+		for sec_child in menu.test_scroll.get_child(0).get_children():
+			if sec_child is Button and sec_child.visible and sec_child.text != "← Back" \
+					and sec_child.text != "Device info" \
+					and not sec_child.text.begins_with("▸") \
+					and not sec_child.text.begins_with("▾"):
+				deepest = sec_child.text
+		check(deepest != "", "opening a section reveals its scenario buttons")
+		check(_find_button(menu, deepest) != null,
+			"the LAST scenario of the LAST section is reachable, not clipped (%s)" % deepest)
 
 	# ---- NO-58: the search box -----------------------------------------------
 	# The complaint: the hand-written scenarios — the ones that exist FOR hand
@@ -225,21 +226,22 @@ func _init() -> void:
 		if buried != null:
 			break
 	check(buried != null, "found a scenario inside a collapsed section")
-	var buried_name: String = str(buried.get_meta("scenario_name"))
-	menu.test_filter.text = buried_name
-	menu._apply_test_filter()
-	await process_frame
-	check(buried.visible,
-		"typing its name reveals a scenario WITHOUT opening its section (%s)" % buried_name)
-	# ...and the rest of the list is gone, which is what makes it findable.
-	var still_up := 0
-	for sec_dict in menu._test_sections:
-		for r: Button in sec_dict.rows:
-			if r.visible:
-				still_up += 1
-	check(still_up < 20, "and the other 380-odd are filtered out (%d left)" % still_up)
-	check("of" in menu.test_head.text,
-		"the heading counts the matches rather than the catalog (%s)" % menu.test_head.text)
+	if buried != null:
+		var buried_name: String = str(buried.get_meta("scenario_name"))
+		menu.test_filter.text = buried_name
+		menu._apply_test_filter()
+		await process_frame
+		check(buried.visible,
+			"typing its name reveals a scenario WITHOUT opening its section (%s)" % buried_name)
+		# ...and the rest of the list is gone, which is what makes it findable.
+		var still_up := 0
+		for sec_dict in menu._test_sections:
+			for r: Button in sec_dict.rows:
+				if r.visible:
+					still_up += 1
+		check(still_up < 20, "and the other 380-odd are filtered out (%d left)" % still_up)
+		check("of" in menu.test_head.text,
+			"the heading counts the matches rather than the catalog (%s)" % menu.test_head.text)
 
 	# MATCH THE FULL NAME, NOT THE ROW LABEL. _test_row_text strips the section
 	# prefix, so "Artefacts: Tinfoil Hat" renders as "Tinfoil Hat" — searching
@@ -270,7 +272,8 @@ func _init() -> void:
 	menu.test_filter.text = ""
 	menu._apply_test_filter()
 	await process_frame
-	check(not buried.visible, "clearing the box collapses the list again")
+	if buried != null:
+		check(not buried.visible, "clearing the box collapses the list again")
 	check(_find_button(menu, deepest) != null,
 		"...and the section that was open before the search is still open")
 
@@ -366,19 +369,20 @@ func _init() -> void:
 	# the picker built exactly 5 tier rows, not just that some button somewhere
 	# says "Tier 5".
 	check(menu._tier_buttons.size() == 5, "army click opens the tier select, with all 5 tiers")
-	check(menu._tier_buttons[0].is_visible_in_tree(), "tier row is a real, visible tap target")
-	# NO-212: the tap button is now a full-panel overlay (a direct sibling of
-	# the description Label inside tier_panel, not a wrapper two levels up —
-	# see menu.gd), so the button's own parent IS the panel.
-	# fix/tier-bg-and-tip-centring: _update_tier_outline built a StyleBoxFlat
-	# and never set bg_color, so every tier row rendered Godot's default flat
-	# light grey. Assert the actual bg_color, not merely that a stylebox
-	# exists (a read-back of a value just written would pass even if the fix
-	# were reverted to a different, still-wrong colour).
-	var tier_panel := menu._tier_buttons[0].get_parent() as PanelContainer
-	var tier_sb := tier_panel.get_theme_stylebox("panel") as StyleBoxFlat
-	check(tier_sb != null and tier_sb.bg_color == menu.NESTED_PANEL_TINT,
-		"tier panel background is the dark nested-panel tint, not Godot's default flat grey")
+	if menu._tier_buttons.size() == 5:
+		check(menu._tier_buttons[0].is_visible_in_tree(), "tier row is a real, visible tap target")
+		# NO-212: the tap button is now a full-panel overlay (a direct sibling of
+		# the description Label inside tier_panel, not a wrapper two levels up —
+		# see menu.gd), so the button's own parent IS the panel.
+		# fix/tier-bg-and-tip-centring: _update_tier_outline built a StyleBoxFlat
+		# and never set bg_color, so every tier row rendered Godot's default flat
+		# light grey. Assert the actual bg_color, not merely that a stylebox
+		# exists (a read-back of a value just written would pass even if the fix
+		# were reverted to a different, still-wrong colour).
+		var tier_panel := menu._tier_buttons[0].get_parent() as PanelContainer
+		var tier_sb := tier_panel.get_theme_stylebox("panel") as StyleBoxFlat
+		check(tier_sb != null and tier_sb.bg_color == menu.NESTED_PANEL_TINT,
+			"tier panel background is the dark nested-panel tint, not Godot's default flat grey")
 	# NO-212: each row's description text must start level with its own
 	# icon (Max: "aligned to its red icon piece") — assert the LIVE rects
 	# after an idle frame, not a size-flag read-back (CLAUDE.md: "Assert the
@@ -412,16 +416,17 @@ func _init() -> void:
 	# stage a run any more; only Confirm does. That is a stronger walk than
 	# the old one, not weaker: it proves both that a tap never launches by
 	# itself AND that Confirm launches using whatever tier is selected.
-	check(await _click_control(menu._tier_buttons[2]), "tier button clickable")
-	await process_frame
-	check(menu._selected_tier == 2, "tap selects Tier 3 (0-based index)")
-	check(GameScript.next_tier == "", "selecting a tier does not stage a run yet")
-	check(await _click_control(menu._tier_buttons[2]), "re-tapping the selected tier is clickable")
-	await process_frame
-	check(GameScript.next_tier == "", "re-tapping a tier still does not stage a run — Confirm does")
-	check(await _click_button(menu, "Confirm"), "Confirm button clickable")
-	await process_frame
-	check(GameScript.next_tier == "Tier 3", "Confirm stages the run with the selected tier")
+	if menu._tier_buttons.size() == 5:
+		check(await _click_control(menu._tier_buttons[2]), "tier button clickable")
+		await process_frame
+		check(menu._selected_tier == 2, "tap selects Tier 3 (0-based index)")
+		check(GameScript.next_tier == "", "selecting a tier does not stage a run yet")
+		check(await _click_control(menu._tier_buttons[2]), "re-tapping the selected tier is clickable")
+		await process_frame
+		check(GameScript.next_tier == "", "re-tapping a tier still does not stage a run — Confirm does")
+		check(await _click_button(menu, "Confirm"), "Confirm button clickable")
+		await process_frame
+		check(GameScript.next_tier == "Tier 3", "Confirm stages the run with the selected tier")
 
 	# Scores opens the local high-score list (fresh menu again: the Confirm
 	# click above changed the scene). Its change_scene_to_file
@@ -801,7 +806,7 @@ func _init() -> void:
 	# button that never ungreys is worse than the old behaviour.
 	Connectivity.override = true
 	await create_timer(1.5).timeout
-	check(not door.disabled, "back online: the door re-enables by itself, via the poll")
+	check(door != null and not door.disabled, "back online: the door re-enables by itself, via the poll")
 	check(_find_label(off, MenuScript.OFFLINE_REASON) == null, "...and the reason goes away")
 	check(await _click_button(off, "← Back"), "scores Back clickable")
 	await process_frame

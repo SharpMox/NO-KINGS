@@ -120,12 +120,14 @@ func _init() -> void:
 	# NO-147: TEST now nests inside Settings — open it first.
 	var settings_btn := _find_button(m, "Settings")
 	check(settings_btn != null, "precondition: the Settings button exists")
-	settings_btn.pressed.emit()
+	if settings_btn != null:
+		settings_btn.pressed.emit()
 	await process_frame
 
 	var test_btn := _find_button(m, "TEST")
 	check(test_btn != null, "precondition: the TEST button exists")
-	test_btn.pressed.emit()
+	if test_btn != null:
+		test_btn.pressed.emit()
 	await process_frame
 	check(menu.test_filter != null, "precondition: the TEST list has its search box")
 	check(menu.test_filter.text == "", "precondition: the search box starts EMPTY")
@@ -160,23 +162,24 @@ func _init() -> void:
 		if buried != null:
 			break
 	check(buried != null, "precondition: found a scenario inside a collapsed section")
-	var buried_name: String = str(buried.get_meta("scenario_name"))
+	if buried != null:
+		var buried_name: String = str(buried.get_meta("scenario_name"))
 
-	ack = await _send(d, 4, ["type " + buried_name])
-	check(ack.size() >= 2 and ack[1].begins_with("ok type"),
-		"typing into a focused LineEdit reports ok (%s)" % (ack[1] if ack.size() > 1 else "-"))
-	check(menu.test_filter.text == buried_name,
-		"the LineEdit's OWN text matches what was typed, character by character (got '%s')"
-			% menu.test_filter.text)
-	check(buried.visible,
-		"...and the filter it drove shows the match (%s)" % buried_name)
-	var still_up := 0
-	for sec_dict in menu._test_sections:
-		for r: Button in sec_dict.rows:
-			if r.visible:
-				still_up += 1
-	check(still_up < 20,
-		"...and hides everything that does not match (%d rows left)" % still_up)
+		ack = await _send(d, 4, ["type " + buried_name])
+		check(ack.size() >= 2 and ack[1].begins_with("ok type"),
+			"typing into a focused LineEdit reports ok (%s)" % (ack[1] if ack.size() > 1 else "-"))
+		check(menu.test_filter.text == buried_name,
+			"the LineEdit's OWN text matches what was typed, character by character (got '%s')"
+				% menu.test_filter.text)
+		check(buried.visible,
+			"...and the filter it drove shows the match (%s)" % buried_name)
+		var still_up := 0
+		for sec_dict in menu._test_sections:
+			for r: Button in sec_dict.rows:
+				if r.visible:
+					still_up += 1
+		check(still_up < 20,
+			"...and hides everything that does not match (%d rows left)" % still_up)
 
 	menu.test_filter.text = ""
 	menu._apply_test_filter()

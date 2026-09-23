@@ -336,6 +336,7 @@ const BUFF_BADGE_BG := Color(0.05, 0.05, 0.08, 0.9)
 const BUFF_BADGE_GLYPH_COL := Color.WHITE
 const BUFF_GLYPH_RATIO := 1.6 # glyph size = badge half-width * this (NO-244)
 const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
+const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
 const BUFF_BADGE_LIME := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
 const BUFF_BADGE_PURPLE := Color(0.26, 0.11, 0.36, 0.95)
 
@@ -5326,7 +5327,7 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	var n := glyphs.size()
 	var half: float = _inv_mark_size() * INV_MARK_DISC_RATIO * BUFF_BADGE_SCALE
 	var gap := half * 2.2
-	var c0 := _inv_mark_centre(px)
+	var c0 := _inv_mark_centre(px) + Vector2(0, tile * BUFF_BADGE_EXTRA_DROP)
 	var size := int(half * BUFF_GLYPH_RATIO)
 	var baseline := (font.get_ascent(size) - font.get_descent(size)) / 2.0
 	var box := StyleBoxFlat.new()

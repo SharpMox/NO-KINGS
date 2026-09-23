@@ -1468,13 +1468,9 @@ static func has_room(g) -> bool:
 	return g.artefacts.size() < cap(g)
 
 
-## Grant one Artefact entry if there's room; refuses (drops it) when full —
-## same "capacity refuses" ruling as ItemLogic.grant. Callers stamp
-## acquired_wave/rarity on `entry` themselves before calling this, same as
-## every existing artefacts.append() site already did. Returns whether it landed.
 ## Artefacts that don't stack (Max, NO-244: Abduction Probe). Lives here,
-## not in shop.gd, because grant() needs it and this file can't preload
-## shop.gd (a direct cycle fails to parse); Shop.is_unique_held delegates.
+## beside grant(), which refuses a held duplicate, so this file needs no
+## shop.gd preload; Shop.is_unique_held delegates here.
 const UNIQUE_ARTEFACTS := ["abduction-probe"]
 
 
@@ -1483,6 +1479,10 @@ static func is_unique_held(g, key: String) -> bool:
 		func(t: Dictionary) -> bool: return t.key == key)
 
 
+## Grant one Artefact entry if there's room; refuses (drops it) when full —
+## same "capacity refuses" ruling as ItemLogic.grant. Callers stamp
+## acquired_wave/rarity on `entry` themselves before calling this, same as
+## every existing artefacts.append() site already did. Returns whether it landed.
 static func grant(g, entry: Dictionary) -> bool:
 	if not has_room(g) or is_unique_held(g, entry.key): # NO-244: never a 2nd probe
 		return false

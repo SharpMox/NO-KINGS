@@ -339,6 +339,14 @@ const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
 const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
 const BUFF_BADGE_ACCENT := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
 const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
+## NO-244: glyph -> [dx, dy, scale], dx/dy as a fraction of the badge's half
+## side (+ = right/down). Measured by eye from captures of every buff; the
+## inversion mark's ⟲ has its own tuning (INV_MARK_GLYPH_*) and isn't here.
+const BUFF_GLYPH_TUNE := {
+	"⨯": [0.0, -0.22, 1.7],  # multicapture: tiny and low
+	"↩": [0.0, 0.2, 1.0],    # reflect: sits high
+	"≋": [0.0, -0.1, 1.0],   # smog: sits low
+}
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
@@ -5325,7 +5333,6 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	# glyph, every badge the same size whatever the count.
 	var half := _buff_badge_half()
 	var size := int(half * BUFF_GLYPH_RATIO)
-	var baseline := (font.get_ascent(size) - font.get_descent(size)) / 2.0
 	var box := StyleBoxFlat.new()
 	box.bg_color = BUFF_BADGE_FILL
 	box.border_color = BUFF_BADGE_ACCENT
@@ -5335,8 +5342,14 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	for i in centres.size():
 		var c: Vector2 = centres[i]
 		draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
-		draw_string(font, Vector2(c.x - half, c.y + baseline), glyphs[i],
-			HORIZONTAL_ALIGNMENT_CENTER, half * 2, size, BUFF_BADGE_ACCENT)
+		# Per-glyph optical correction: the symbols come from an OS fallback
+		# font whose ink sits differently in its box, so centring by font
+		# metrics alone leaves some off-centre or undersized.
+		var tune: Array = BUFF_GLYPH_TUNE.get(glyphs[i], [0.0, 0.0, 1.0])
+		var gsize := int(size * tune[2])
+		var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
+		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + tune[1] * half), glyphs[i],
+			HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, BUFF_BADGE_ACCENT)
 
 
 ## Half the side of one buff badge (NO-244: fixed, the two-buff size).

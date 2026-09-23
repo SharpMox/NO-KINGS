@@ -289,6 +289,7 @@ var _drawer_saved_filters := {}
 ## counter (Score/Gold/Clock) — same kill-first idiom as _drawer_tweens, so a
 ## second trigger before the first finishes replaces it instead of racing it.
 var _gain_tweens := {}
+var _roll_tweens := {} ## NO-243: key -> the counter's count-up Tween
 ## NO-127: last value refresh()/update_clock() actually RENDERED, so a gain
 ## animation is driven by the value changing, never by refresh() itself
 ## running (refresh() runs on nearly every state change). Paired with an
@@ -1467,6 +1468,11 @@ func build(game) -> void:
 	tip_box.add_child(tip_label)
 	tip_panel.add_child(tip_box)
 	add_child(tip_panel)
+	# NO-239: the kill feed, just under the Header, anchored left.
+	feed.position = Vector2(HEADER_PAD_X, g.hud_top + 4.0)
+	feed.add_theme_constant_override("separation", 3)
+	feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(feed)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
 	# the button bar and the bar had to be raised above it; design C opens the
 	# drawers above the deck instead, so there is nothing to out-rank. Worse, the
@@ -1576,6 +1582,138 @@ func _pulse_gain(node: Control, key: String) -> void:
 	tw.tween_property(node, "scale", Vector2(1.1, 0.94), 0.07)
 	tw.tween_property(node, "scale", Vector2.ONE, 0.08)
 	_gain_tweens[key] = tw
+
+
+func _set_odometer(zeros: Label, lbl: Label, value: int) -> void:
+	var digits := str(value)
+	zeros.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
+	lbl.text = digits
+
+
+func _roll_odometer(x: float, zeros: Label, lbl: Label) -> void: # tween_method target
+	_set_odometer(zeros, lbl, roundi(x))
+
+
+## NO-243 (variant A): a counter's digits count from the value on screen to
+## the new one over COUNT_UP_S instead of snapping. Snaps when animations are
+## off, in autoplay, and on the first observation (a save restore is not a
+## gain). A refresh() that lands mid-roll with no new value leaves the roll
+## alone; a new value restarts it from whatever the digits read right now.
+const COUNT_UP_S := 0.4
+func _roll_counter(key: String, zeros: Label, lbl: Label, from_v: int, to_v: int, seen: bool) -> void:
+	var running: Tween = _roll_tweens.get(key)
+	if running and running.is_valid() and running.is_running():
+		if to_v == from_v:
+			return
+		running.kill()
+	if to_v == from_v or not seen or g.autoplay or not g.animations_on:
+		_set_odometer(zeros, lbl, to_v)
+		return
+	var tw := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_method(_roll_odometer.bind(zeros, lbl), float(lbl.text.to_int()), float(to_v), COUNT_UP_S)
+	_roll_tweens[key] = tw
+
+
+# --- NO-239: the kill feed ---------------------------------------------------
+# Small single-line pills just under the Header, newest on top, FEED_MAX
+# visible; each lives FEED_LIFE_S then fades. Gains and artefact notes go
+# through feed_gain(), which coalesces same-cause posts until the end of the
+# frame; post() is the raw one-line API. Silent in autoplay.
+const FEED_MAX := 4
+const FEED_LIFE_S := 3.0
+const FEED_FADE_S := 0.3
+const FEED_FONT := preload("res://assets/fonts/PixelOperator.ttf")
+const FEED_FONT_SIZE := 16 # the font's 16 px grid: stays crisp
+const FEED_TEXT := Color(0.92, 0.94, 0.9)
+var feed := VBoxContainer.new()
+var _feed_font: FontFile
+var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, icon, color}
+
+
+func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
+	if g.autoplay:
+		return
+	if _feed_font == null: # hard pixel edges, like the banner font (game.gd)
+		_feed_font = FEED_FONT
+		_feed_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		_feed_font.hinting = TextServer.HINTING_NONE
+		_feed_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+		var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ✦ ★ −: not in Pixel Operator
+		_feed_font.fallbacks = fallbacks
+	var pill := PanelContainer.new()
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.6)
+	sb.set_corner_radius_all(6)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 8
+	sb.content_margin_top = 1
+	sb.content_margin_bottom = 1
+	pill.add_theme_stylebox_override("panel", sb)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.add_child(row)
+	if icon:
+		var tr := TextureRect.new()
+		tr.texture = icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(16, 16)
+		row.add_child(tr)
+	var lab := Label.new()
+	lab.text = text
+	lab.add_theme_font_override("font", _feed_font)
+	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
+	lab.add_theme_color_override("font_color", color)
+	row.add_child(lab)
+	feed.add_child(pill)
+	feed.move_child(pill, 0) # newest on top
+	while feed.get_child_count() > FEED_MAX:
+		var old: Node = feed.get_child(feed.get_child_count() - 1)
+		feed.remove_child(old)
+		old.queue_free()
+	var tw := pill.create_tween() # bound to the pill: dies with it if pushed out
+	tw.tween_interval(FEED_LIFE_S)
+	if g.animations_on:
+		tw.tween_property(pill, "modulate:a", 0.0, FEED_FADE_S)
+	tw.tween_callback(pill.queue_free)
+
+
+## Queue a gain (and/or an artefact note) under `cause`. Everything posted
+## under one cause before the frame ends becomes ONE line:
+## "+150 · +$15 · captured Knight", "[icon] Tinfoil Hat: Piece Buff granted ×2".
+func feed_gain(cause: String, label: String, score := 0, gold := 0, note := "",
+		icon: Texture2D = null, color := FEED_TEXT) -> void:
+	if g.autoplay:
+		return
+	if _feed_pending.is_empty():
+		_flush_feed.call_deferred()
+	var e: Dictionary = _feed_pending.get_or_add(cause,
+		{"label": label, "score": 0, "gold": 0, "notes": {}, "icon": icon, "color": color})
+	e.score += maxi(score, 0)
+	e.gold += maxi(gold, 0)
+	if note != "":
+		e.notes[note] = e.notes.get(note, 0) + 1
+
+
+func _flush_feed() -> void:
+	for cause in _feed_pending:
+		var e: Dictionary = _feed_pending[cause]
+		var parts := PackedStringArray()
+		if e.score > 0:
+			parts.append("+%d" % e.score)
+		if e.gold > 0:
+			parts.append("+$%d" % e.gold)
+		var notes := PackedStringArray()
+		for n in e.notes:
+			notes.append(n if e.notes[n] == 1 else "%s ×%d" % [n, e.notes[n]])
+		if parts.is_empty() and notes.is_empty():
+			continue # a zero gain: nothing to say
+		parts.append(e.label if notes.is_empty() else "%s: %s" % [e.label, ", ".join(notes)])
+		post(" · ".join(parts), e.icon, e.color)
+	_feed_pending.clear()
 
 
 ## NO-127: minute-rollover cue on the Clock — grows then shakes back level.
@@ -1906,13 +2044,10 @@ func refresh() -> void:
 	# NO-126: odometer — grey zero padding up to SCORE_DIGITS, then the score's
 	# own digits, coloured. Growing past SCORE_DIGITS is never cut: `digits`
 	# is just str(g.score), whatever length that is, and the padding floors at 0.
-	var digits := str(g.score)
-	score_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - digits.length()))
-	score_label.text = digits
 	# NO-175: Gold is the same odometer as Score now (was a plain "%d").
-	var gold_digits := str(g.gold)
-	gold_zeros_label.text = "0".repeat(maxi(0, SCORE_DIGITS - gold_digits.length()))
-	gold_label.text = gold_digits
+	# NO-243: both count up to a new value instead of snapping (_roll_counter).
+	_roll_counter("score", score_zeros_label, score_label, _score_shown, g.score, _score_seen)
+	_roll_counter("gold", gold_zeros_label, gold_label, _gold_shown, g.gold, _gold_seen)
 	# NO-127: gain pulses, driven off the value CHANGING (refresh() itself
 	# runs on nearly every state change, which is not the same thing — see
 	# _pulse_gain's header). The first observation establishes the baseline

@@ -134,46 +134,6 @@ const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to f
 ## so the search is free to find whatever the real font actually needs
 ## rather than being nudged back toward the value this ticket undid.
 const CLOCK_FONT_MIN := 12
-## NO-162. Six rounds of on-device measurement (glyph-level pixel
-## segmentation of real captures, not property reads — every property on
-## the Label read correct: font size, LabelSettings, content scale,
-## transforms, outline, theme_type_variation, oversampling) found TWO
-## separate, unexplained divergences between what this code computes and
-## what actually renders. Neither was found a cause for after exhausting
-## every property that could plausibly explain it — see the follow-up
-## issue "Label glyphs rasterise ~26% wider than get_string_size reports,
-## with a constant left offset" for the full measurement log.
-## (1) WIDTH: the rendered glyphs rasterise ~26% wider than
-## `Font.get_string_size()` reports at the exact same applied size.
-## Fitting the font to 100% of the available width therefore reliably
-## overflows; this fits it to only a FRACTION of that width instead, so
-## the inflation still lands inside the column. EMPIRICAL, not aesthetic —
-## a future cleanup that raises this back toward 1.0 "because the maths
-## says it fits" will reintroduce the overflow.
-## (2) POSITION: independent of size — measured constant across two
-## different applied font sizes (33 and a smaller, headroom-fitted size),
-## the rendered ink's LEFT edge sat ~10 logical units left of
-## `clock_label.position.x`, not scaling with the text at all. This is
-## CLOCK_POS_OFFSET_X's reason to exist (below) — read that constant's own
-## comment, not this one, for the position fix.
-## NO-175: the Clock is now CENTRED, not left-aligned in a fixed column —
-## build() derives a centring formula from these same two measured facts
-## (see its own comment), rather than the "just clear the left edge" use
-## this constant and CLOCK_FIT_HEADROOM were tuned for. Neither value is
-## changed; both are still read, just recombined for the new geometry.
-## UNVERIFIED under centring — flag for on-device re-measurement.
-const CLOCK_FIT_HEADROOM := 0.8
-## NO-162. See CLOCK_FIT_HEADROOM's comment above for the measurement this
-## responds to: the rendered Clock's ink starts ~10 logical units LEFT of
-## `clock_label.position.x`, a constant offset that didn't move when the
-## font size did. This nudges the Label's placement right by that much (plus
-## margin) so the ink lands at or past HEADER_PAD_X instead of the box.
-## EMPIRICAL, not a layout preference — verified against on-device pixel
-## measurement, not derived from the arithmetic (the arithmetic says this
-## constant should be unnecessary, which is exactly why it's here).
-## NO-175: see CLOCK_FIT_HEADROOM's comment above — this is now read via
-## build()'s centring formula, not applied as a left-edge nudge.
-const CLOCK_POS_OFFSET_X := 20.0
 const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
 const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
 ## NO-175, 3rd pass: the LEFT column now holds only Score/Gold (Turn/Wave
@@ -692,18 +652,10 @@ func build(game) -> void:
 	# (game.gd) is "%02d:%02d.%03d", ALWAYS 9 characters, so this sample is
 	# the only case that exists.
 	#
-	# On-device glyph measurement (NO-162, six rounds) found two divergences
-	# between what this code computes and what actually renders, neither
-	# explained after ruling out every Label property that could plausibly
-	# cause it (font size, LabelSettings, content scale, transforms,
-	# outline, theme_type_variation, oversampling — see the follow-up issue
-	# "Label glyphs rasterise ~26% wider than get_string_size reports"): the
-	# ink rasterises ~26% wider than get_string_size() reports
-	# (CLOCK_FIT_HEADROOM absorbs it by fitting to a FRACTION of the
-	# budget), and the ink's LEFT edge sits a constant ~10 units left of
-	# clock_label.position.x, whatever the font size (CLOCK_POS_OFFSET_X is
-	# that 10 plus a safety margin, for the old "clear the left gutter"
-	# use).
+	# NO-162's "glyphs ~26% wider than get_string_size, ~10 units left of
+	# position.x" measurements were captures taken mid minute-shake (scale
+	# 1.35 around the centre pivot) — see NO-174. At rest the Label box is
+	# exact, so this fits to the full centre band and centres plainly.
 	#
 	# NO-175, 3rd pass: the vertical budget changes AGAIN — the centre band
 	# now also holds the Turn/Wave line above the Clock, and the whole
@@ -712,19 +664,10 @@ func build(game) -> void:
 	# needed to before, because the Clock used to have the Header's full
 	# height to itself. Expect a much smaller applied size than the 36pt
 	# ceiling.
-	#   raw_ink_offset_x = CLOCK_POS_OFFSET_X - HEADER_PAD_X (recovers the
-	#     raw ~10px offset from the old gutter-relative constant — the
-	#     safety margin baked into CLOCK_POS_OFFSET_X would bias a centred
-	#     target off-centre rather than just clearing an edge)
-	#   ink_width_est = clock_w / CLOCK_FIT_HEADROOM (the same ~1.25x the
-	#     fit loop already assumes by targeting 80% of budget)
-	#   position.x = centre_x + raw_ink_offset_x - ink_width_est / 2.0
-	# UNVERIFIED — both constants need on-device re-measurement against
-	# this geometry, same as the last two passes.
 	var clock_sample := "00:00.000"
 	var tw_gap := 2.0 # minimal — "remove empty space" (Max)
 	var clock_h_budget: float = (HEADER_H - HEADER_PAD_Y * 2.0) - counter_h - tw_gap
-	var clock_target_w: float = centre_w * CLOCK_FIT_HEADROOM
+	var clock_target_w: float = centre_w
 	var clock_font := clock_label.get_theme_default_font()
 	var clock_size := CLOCK_FONT
 	while clock_size > CLOCK_FONT_MIN \
@@ -737,9 +680,7 @@ func build(game) -> void:
 	clock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	clock_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	clock_label.clip_text = true
-	var raw_ink_offset_x: float = CLOCK_POS_OFFSET_X - HEADER_PAD_X
-	var ink_width_est: float = clock_w / CLOCK_FIT_HEADROOM
-	clock_label.position = Vector2(centre_x + raw_ink_offset_x - ink_width_est / 2.0,
+	clock_label.position = Vector2(centre_x - clock_w / 2.0,
 		y0 + HEADER_PAD_Y + counter_h + tw_gap)
 	clock_label.size = Vector2(clock_w, clock_h)
 	clock_label.custom_minimum_size = Vector2(clock_w, clock_h)

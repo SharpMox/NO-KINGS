@@ -186,15 +186,15 @@ func _init() -> void:
 
 	# NO-147: TEST now nests inside Settings — open it first.
 	var settings_btn := _find_button(menu, "Settings")
-	check(settings_btn != null, "Settings button visible")
-	_mouse(true, settings_btn.get_global_rect().get_center())
-	_mouse(false, settings_btn.get_global_rect().get_center())
+	if check(settings_btn != null, "Settings button visible"):
+		_mouse(true, settings_btn.get_global_rect().get_center())
+		_mouse(false, settings_btn.get_global_rect().get_center())
 	await process_frame
 
 	var test_btn := _find_button(menu, "TEST")
-	check(test_btn != null, "TEST button visible")
-	_mouse(true, test_btn.get_global_rect().get_center())
-	_mouse(false, test_btn.get_global_rect().get_center())
+	if check(test_btn != null, "TEST button visible"):
+		_mouse(true, test_btn.get_global_rect().get_center())
+		_mouse(false, test_btn.get_global_rect().get_center())
 	await process_frame
 	var scroll: ScrollContainer = menu.test_scroll
 	check(scroll.visible, "TEST opens the scenario list")
@@ -205,13 +205,14 @@ func _init() -> void:
 	for c in scroll.get_child(0).get_children():
 		if c is Button and c.text.begins_with("▸"):
 			headers.append(c)
-	var last_head: Button = headers[headers.size() - 1]
-	_mouse(true, last_head.get_global_rect().get_center())
-	_mouse(false, last_head.get_global_rect().get_center())
-	await process_frame
-	await process_frame
-	check(scroll.get_v_scroll_bar().max_value > scroll.size.y,
-		"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
+	if check(not headers.is_empty(), "(setup) the TEST list has section headers"):
+		var last_head: Button = headers[headers.size() - 1]
+		_mouse(true, last_head.get_global_rect().get_center())
+		_mouse(false, last_head.get_global_rect().get_center())
+		await process_frame
+		await process_frame
+		check(scroll.get_v_scroll_bar().max_value > scroll.size.y,
+			"the open section overflows the list (%d > %d)" % [scroll.get_v_scroll_bar().max_value, scroll.size.y])
 	var row: Button = null
 	for c in scroll.get_child(0).get_children():
 		# "Device info" is a fixed row beside Back, not a scenario — same
@@ -222,15 +223,15 @@ func _init() -> void:
 			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
 				row = c
 				break
-	check(row != null, "a scenario row is on screen to drag on")
-	fired = false
-	row.pressed.connect(_on_row_pressed)
+	if check(row != null, "a scenario row is on screen to drag on"):
+		fired = false
+		row.pressed.connect(_on_row_pressed)
 
-	var before: float = scroll.scroll_vertical
-	await _drag(row.get_global_rect().get_center(), Vector2(0, -30), 6)
-	check(scroll.scroll_vertical > before,
-		"dragging up on a row scrolls the list (offset %d -> %d)" % [before, scroll.scroll_vertical])
-	check(not fired, "a drag does not press the row it started on")
+		var before: float = scroll.scroll_vertical
+		await _drag(row.get_global_rect().get_center(), Vector2(0, -30), 6)
+		check(scroll.scroll_vertical > before,
+			"dragging up on a row scrolls the list (offset %d -> %d)" % [before, scroll.scroll_vertical])
+		check(not fired, "a drag does not press the row it started on")
 
 	# A plain tap must still press the row (the deadzone keeps taps as taps).
 	# The list is still decelerating after the drag; wait for it to stop, then
@@ -252,23 +253,23 @@ func _init() -> void:
 			if r.position.y > scroll.global_position.y + 40 and r.end.y < scroll.global_position.y + scroll.size.y - 40:
 				row = c
 				break
-	check(row != null, "a scenario row is on screen to tap")
-	row.pressed.connect(_on_row_pressed)
-	var tap_at := row.get_global_rect().get_center()
-	_mouse(true, tap_at)
-	await process_frame
-	# NO-71: same race as the item tap further down, which carries the full
-	# explanation — a real desktop-cursor motion landing in this frame cancels
-	# the Button's press. Re-assert the finger's position, back to back with the
-	# release.
-	var tap_back := InputEventMouseMotion.new()
-	tap_back.position = tap_at
-	tap_back.global_position = tap_at
-	tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
-	root.push_input(tap_back)
-	_mouse(false, tap_at)
-	await process_frame
-	check(fired, "a tap still presses the row")
+	if check(row != null, "a scenario row is on screen to tap"):
+		row.pressed.connect(_on_row_pressed)
+		var tap_at := row.get_global_rect().get_center()
+		_mouse(true, tap_at)
+		await process_frame
+		# NO-71: same race as the item tap further down, which carries the full
+		# explanation — a real desktop-cursor motion landing in this frame cancels
+		# the Button's press. Re-assert the finger's position, back to back with the
+		# release.
+		var tap_back := InputEventMouseMotion.new()
+		tap_back.position = tap_at
+		tap_back.global_position = tap_at
+		tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(tap_back)
+		_mouse(false, tap_at)
+		await process_frame
+		check(fired, "a tap still presses the row")
 
 	# ---- NO-230: Army Choice carousel drag -----------------------------------
 	# 2026-09-22 (Max: "Army Choice -> Cant seem to drag and slide the carousel
@@ -287,9 +288,9 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	var play_btn := _find_button(menu, "Play")
-	check(play_btn != null, "NO-230: Play button visible")
-	_mouse(true, play_btn.get_global_rect().get_center())
-	_mouse(false, play_btn.get_global_rect().get_center())
+	if check(play_btn != null, "NO-230: Play button visible"):
+		_mouse(true, play_btn.get_global_rect().get_center())
+		_mouse(false, play_btn.get_global_rect().get_center())
 	await process_frame
 	await process_frame # _show_armies awaits one frame to size the wrap
 	check(menu.army_center.visible, "NO-230: Play opens the Army Choice screen")
@@ -299,35 +300,36 @@ func _init() -> void:
 	check(army_btn != null, "NO-230: the first Army's card is on screen")
 	var army_scroll: ScrollContainer = menu._army_row_wrap.get_parent()
 
-	var army_before: float = army_scroll.scroll_horizontal
-	await _drag(army_btn.get_global_rect().get_center(), Vector2(-30, 0), 6)
-	check(army_scroll.scroll_horizontal != army_before,
-		"NO-230: dragging on a card scrolls the Army carousel (offset %s -> %s)"
-			% [army_before, army_scroll.scroll_horizontal])
-	check(menu.army_center.visible,
-		"NO-230: ...and the drag does not select an Army — stays on the carousel")
+	if army_btn != null:
+		var army_before: float = army_scroll.scroll_horizontal
+		await _drag(army_btn.get_global_rect().get_center(), Vector2(-30, 0), 6)
+		check(army_scroll.scroll_horizontal != army_before,
+			"NO-230: dragging on a card scrolls the Army carousel (offset %s -> %s)"
+				% [army_before, army_scroll.scroll_horizontal])
+		check(menu.army_center.visible,
+			"NO-230: ...and the drag does not select an Army — stays on the carousel")
 
 	# A plain tap must still select the Army: the deadzone keeps a tap a tap,
 	# same pairing as the scenario-list "tap still presses the row" check.
 	army_scroll.scroll_horizontal = 0
 	await process_frame
 	army_btn = _find_button(menu, Armies.display_name(first_army))
-	check(army_btn != null, "NO-230: the first Army's card is back on screen to tap")
-	var army_tap_at := army_btn.get_global_rect().get_center()
-	_mouse(true, army_tap_at)
-	await process_frame
-	# NO-71's same re-assert: put the pointer back on the button before
-	# releasing, back to back with the release, so the real desktop cursor
-	# can't interleave a motion that cancels the press.
-	var army_tap_back := InputEventMouseMotion.new()
-	army_tap_back.position = army_tap_at
-	army_tap_back.global_position = army_tap_at
-	army_tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
-	root.push_input(army_tap_back)
-	_mouse(false, army_tap_at)
-	await process_frame
-	check(GameScript.next_army == first_army,
-		"NO-230: a tap on a card still selects that Army — PASS did not cost the press")
+	if check(army_btn != null, "NO-230: the first Army's card is back on screen to tap"):
+		var army_tap_at := army_btn.get_global_rect().get_center()
+		_mouse(true, army_tap_at)
+		await process_frame
+		# NO-71's same re-assert: put the pointer back on the button before
+		# releasing, back to back with the release, so the real desktop cursor
+		# can't interleave a motion that cancels the press.
+		var army_tap_back := InputEventMouseMotion.new()
+		army_tap_back.position = army_tap_at
+		army_tap_back.global_position = army_tap_at
+		army_tap_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(army_tap_back)
+		_mouse(false, army_tap_at)
+		await process_frame
+		check(GameScript.next_army == first_army,
+			"NO-230: a tap on a card still selects that Army — PASS did not cost the press")
 
 	# --- the host-driven input harness (scripts/drive.gd) --------------------
 	# TWO THINGS ONLY A WINDOW CAN ASSERT, which is why they are here and not in
@@ -421,27 +423,27 @@ func _init() -> void:
 	for c in (game.hud.drawers["inventory"] as Control).get_children():
 		if c is ScrollContainer:
 			inv_sc = c
-	check(inv_sc != null, "the inventory drawer has a ScrollContainer")
-	check(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y > 100.0,
-		"...with real scroll range (%dpx) — a drawer that cannot scroll proves nothing"
-			% int(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y))
-	# START THE DRAG ON AN ARTEFACT ROW. That is the whole point: those rows are
-	# the ones that carried MOUSE_FILTER_STOP "so the tooltip shows", and a drag
-	# that began on blank drawer space would have scrolled even with the bug —
-	# which is exactly how a device test on 2026-09-10 reported "the drawer
-	# scrolls fine" against a scenario holding no artefacts at all.
-	var art_row: Control = game.hud.artefacts_grid.get_child(0)
-	var inv_before: int = inv_sc.scroll_vertical
-	await _drag(art_row.get_global_rect().get_center(), Vector2(0, -30), 6)
-	check(inv_sc.scroll_vertical != inv_before,
-		"a drag STARTING ON an artefact row scrolls the inventory drawer (%d -> %d)"
-			% [inv_before, inv_sc.scroll_vertical])
-	# that drag must NOT also have popped a description — a scroll is not a tap.
-	check(not game.hud.tip_panel.visible,
-		"...and the drag does NOT pop a description")
+	if check(inv_sc != null, "the inventory drawer has a ScrollContainer"):
+		check(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y > 100.0,
+			"...with real scroll range (%dpx) — a drawer that cannot scroll proves nothing"
+				% int(inv_sc.get_v_scroll_bar().max_value - inv_sc.size.y))
+		# START THE DRAG ON AN ARTEFACT ROW. That is the whole point: those rows are
+		# the ones that carried MOUSE_FILTER_STOP "so the tooltip shows", and a drag
+		# that began on blank drawer space would have scrolled even with the bug —
+		# which is exactly how a device test on 2026-09-10 reported "the drawer
+		# scrolls fine" against a scenario holding no artefacts at all.
+		var art_row: Control = game.hud.artefacts_grid.get_child(0)
+		var inv_before: int = inv_sc.scroll_vertical
+		await _drag(art_row.get_global_rect().get_center(), Vector2(0, -30), 6)
+		check(inv_sc.scroll_vertical != inv_before,
+			"a drag STARTING ON an artefact row scrolls the inventory drawer (%d -> %d)"
+				% [inv_before, inv_sc.scroll_vertical])
+		# that drag must NOT also have popped a description — a scroll is not a tap.
+		check(not game.hud.tip_panel.visible,
+			"...and the drag does NOT pop a description")
 
-	# NO-65 fix, structural: nothing in this drawer paints outside it any more.
-	check(inv_sc.clip_contents, "the Inventory Drawer's ScrollContainer clips its contents")
+		# NO-65 fix, structural: nothing in this drawer paints outside it any more.
+		check(inv_sc.clip_contents, "the Inventory Drawer's ScrollContainer clips its contents")
 
 	# --- NO-85 story 53: a plain TAP on a passive Artefact cell does nothing —
 	# no description (that moved to long-press, tested in test_long_press.gd),
@@ -450,7 +452,8 @@ func _init() -> void:
 	# file's job is the drag/scroll gesture, not the hold timing.
 	# The drag above scrolled child(0) out of the drawer's visible area —
 	# scroll back to top first, or the tap lands outside the drawer instead.
-	inv_sc.scroll_vertical = 0
+	if inv_sc != null:
+		inv_sc.scroll_vertical = 0
 	await process_frame
 	var art_cell: Control = game.hud.artefacts_grid.get_child(0)
 	var art_tap_at: Vector2 = art_cell.get_global_rect().get_center()
@@ -496,7 +499,8 @@ func _init() -> void:
 	if item_btn != null:
 		var item_fired := [false]
 		game.hud.item_pressed.connect(func(_i: int) -> void: item_fired[0] = true)
-		inv_sc.ensure_control_visible(item_btn)
+		if check(inv_sc != null, "(setup) the inventory drawer has a ScrollContainer to reveal the item in"):
+			inv_sc.ensure_control_visible(item_btn)
 		await process_frame
 		await process_frame
 		var p := item_btn.get_global_rect().get_center()
@@ -683,11 +687,11 @@ func _init() -> void:
 	while cap_walk != null and not (cap_walk is ScrollContainer):
 		cap_walk = cap_walk.get_parent()
 	cap_scroll = cap_walk as ScrollContainer
-	check(cap_scroll != null, "NO-145: found the Captured Stock ScrollContainer")
-	var cap_col: Control = cap_scroll.get_parent() as Control
-	var stock_chrome := _chrome_point(cap_col, cap_scroll)
-	await _drag(stock_chrome, Vector2(0, -15), 6) # 90px up
-	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Stock's own chrome closes it")
+	if check(cap_scroll != null, "NO-145: found the Captured Stock ScrollContainer"):
+		var cap_col: Control = cap_scroll.get_parent() as Control
+		var stock_chrome := _chrome_point(cap_col, cap_scroll)
+		await _drag(stock_chrome, Vector2(0, -15), 6) # 90px up
+		check(game.hud.drawer_open == "", "NO-145: reverse swipe on Stock's own chrome closes it")
 
 	# Swipe UP on the SAME empty board tile opens Inventory (Max: "swipe up
 	# opens Inventory") — nothing changed about the board between gestures.
@@ -703,10 +707,10 @@ func _init() -> void:
 	for c in inv_panel.get_children():
 		if c is ScrollContainer:
 			inv_sc2 = c
-	check(inv_sc2 != null, "NO-145: found the Inventory drawer's ScrollContainer")
-	var inv_chrome := _chrome_point(inv_panel, inv_sc2)
-	await _drag(inv_chrome, Vector2(0, 15), 6)
-	check(game.hud.drawer_open == "", "NO-145: reverse swipe on Inventory's own chrome closes it")
+	if check(inv_sc2 != null, "NO-145: found the Inventory drawer's ScrollContainer"):
+		var inv_chrome := _chrome_point(inv_panel, inv_sc2)
+		await _drag(inv_chrome, Vector2(0, 15), 6)
+		check(game.hud.drawer_open == "", "NO-145: reverse swipe on Inventory's own chrome closes it")
 
 	# Leftward swipe on the empty board tile opens the Shop (it slides in
 	# from the right) — no edge-proximity requirement any more (coordinator

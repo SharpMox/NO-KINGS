@@ -270,10 +270,11 @@ func _init() -> void:
 	check(not banners.army_targeting, "targeting resolves after the Stock tap")
 	var ferz_copies: Array = banners.stock.filter(func(e) -> bool: return e is Dictionary and e.id == "ferz")
 	check(ferz_copies.size() == 2, "Call the Banners: the target Stock entry now appears twice")
-	ferz_copies[0].buffs.append({"key": "critical"}) # mutate one copy...
-	check(ferz_copies[1].buffs.size() == 1,
-		"Call the Banners: the duplicate is an INDEPENDENT copy (.duplicate(true)), " +
-		"not the same Dictionary reference twice — mutating one doesn't mutate the other")
+	if ferz_copies.size() == 2:
+		ferz_copies[0].buffs.append({"key": "critical"}) # mutate one copy...
+		check(ferz_copies[1].buffs.size() == 1,
+			"Call the Banners: the duplicate is an INDEPENDENT copy (.duplicate(true)), " +
+			"not the same Dictionary reference twice — mutating one doesn't mutate the other")
 	check(banners.actions_left == 1 and banners.army_ability_used_this_wave,
 		"Call the Banners spends its 1 Action (2 -> 1) and the once-per-Wave flag")
 	banners.queue_free()

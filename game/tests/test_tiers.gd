@@ -187,7 +187,8 @@ func _init() -> void:
 	var before_tar: float = c1.clock_ms
 	await create_timer(0.2).timeout
 	check(c1.clock_ms == before_tar, "Tier 1: the tariff overlay pauses the Clock")
-	c1.king_ability_panel.visible = false
+	if c1.king_ability_panel != null:
+		c1.king_ability_panel.visible = false
 	# ids only feed the confirm's label — this exercises the panel, not merge rules
 	c1.modals.show_merge_confirm("pawn", "pawn", "knight")
 	var before_merge: float = c1.clock_ms

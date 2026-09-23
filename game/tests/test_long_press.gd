@@ -253,27 +253,27 @@ func _init() -> void:
 	# this cell no longer takes.
 	var game: Node = await _boot_game()
 	var sniper := _item_button(game, "sniper")
-	check(sniper != null, "the inventory drawer has the Sniper item")
 	var clean := false
-	for attempt in 3:
-		game.hud.hide_tip()
-		if await _long_press(sniper.get_global_rect().get_center()):
-			clean = true
-			break
-		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
-	check(clean, "a long press completed without real cursor motion")
-	check(game.preview_open, "a long press on an item opens its preview modal")
-	check(_has_label_text(game.preview_panel, game.items[0].name),
-		"a long press on an item shows its description")
-	check(_has_label_text(game.preview_panel, game.items[0].description),
-		"...and it is that item's description")
-	var item_tr: Rect2 = game.preview_panel.get_global_rect()
-	var item_vp: Vector2 = root.get_visible_rect().size
-	# visible first: a hidden panel sits at (0,0) and would pass the bounds check
-	check(game.preview_panel.visible and item_tr.position.x >= 0.0 and item_tr.position.y >= 0.0
-			and item_tr.end.x <= item_vp.x and item_tr.end.y <= item_vp.y,
-		"...and the item's popup is visible and fully on screen (%s in %s)" % [item_tr, item_vp])
-	check(game.item_active == -1, "...and does NOT arm the item")
+	if check(sniper != null, "the inventory drawer has the Sniper item"):
+		for attempt in 3:
+			game.hud.hide_tip()
+			if await _long_press(sniper.get_global_rect().get_center()):
+				clean = true
+				break
+			print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+		check(clean, "a long press completed without real cursor motion")
+		check(game.preview_open, "a long press on an item opens its preview modal")
+		check(_has_label_text(game.preview_panel, game.items[0].name),
+			"a long press on an item shows its description")
+		check(_has_label_text(game.preview_panel, game.items[0].description),
+			"...and it is that item's description")
+		var item_tr: Rect2 = game.preview_panel.get_global_rect()
+		var item_vp: Vector2 = root.get_visible_rect().size
+		# visible first: a hidden panel sits at (0,0) and would pass the bounds check
+		check(game.preview_panel.visible and item_tr.position.x >= 0.0 and item_tr.position.y >= 0.0
+				and item_tr.end.x <= item_vp.x and item_tr.end.y <= item_vp.y,
+			"...and the item's popup is visible and fully on screen (%s in %s)" % [item_tr, item_vp])
+		check(game.item_active == -1, "...and does NOT arm the item")
 	game.queue_free()
 	await process_frame
 
@@ -285,27 +285,27 @@ func _init() -> void:
 	# assertions here either.
 	game = await _boot_game()
 	var chip: Button = _artefact_cell(game, "moscovium-glow-stick")
-	check(chip != null and not chip.disabled, "the Artefacts grid has a live ✹ cell")
-	clean = false
-	for attempt in 3:
-		game.hud.hide_tip()
-		if await _long_press(chip.get_global_rect().get_center()):
-			clean = true
-			break
-		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
-	check(clean, "a long press on the cell completed without real cursor motion")
-	check(game.preview_open, "a long press on a ✹ Artefact cell opens its preview modal")
-	check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").name),
-		"a long press on a ✹ Artefact cell shows its description")
-	check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").description),
-		"...and it is the ✹ artefact's description")
-	check(not game.buff_pick_open, "...and does NOT open the activation confirm")
-	var tr: Rect2 = game.preview_panel.get_global_rect()
-	var vp: Vector2 = root.get_visible_rect().size
-	# visible first: a hidden panel sits at (0,0) and would pass the bounds check
-	check(game.preview_panel.visible and tr.position.x >= 0.0 and tr.position.y >= 0.0
-			and tr.end.x <= vp.x and tr.end.y <= vp.y,
-		"...and the ✹ artefact's popup is visible and fully on screen (%s in %s)" % [tr, vp])
+	if check(chip != null and not chip.disabled, "the Artefacts grid has a live ✹ cell"):
+		clean = false
+		for attempt in 3:
+			game.hud.hide_tip()
+			if await _long_press(chip.get_global_rect().get_center()):
+				clean = true
+				break
+			print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+		check(clean, "a long press on the cell completed without real cursor motion")
+		check(game.preview_open, "a long press on a ✹ Artefact cell opens its preview modal")
+		check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").name),
+			"a long press on a ✹ Artefact cell shows its description")
+		check(_has_label_text(game.preview_panel, game._artefact_entry("moscovium-glow-stick").description),
+			"...and it is the ✹ artefact's description")
+		check(not game.buff_pick_open, "...and does NOT open the activation confirm")
+		var tr: Rect2 = game.preview_panel.get_global_rect()
+		var vp: Vector2 = root.get_visible_rect().size
+		# visible first: a hidden panel sits at (0,0) and would pass the bounds check
+		check(game.preview_panel.visible and tr.position.x >= 0.0 and tr.position.y >= 0.0
+				and tr.end.x <= vp.x and tr.end.y <= vp.y,
+			"...and the ✹ artefact's popup is visible and fully on screen (%s in %s)" % [tr, vp])
 	game.queue_free()
 	await process_frame
 
@@ -315,31 +315,31 @@ func _init() -> void:
 	# check that long-press still reaches a permanently-greyed cell.
 	game = await _boot_game()
 	var passive := _artefact_cell(game, "tinfoil-hat")
-	check(passive != null and passive.disabled, "the Artefacts grid has a passive (always-disabled) cell")
-	game.hud.hide_tip()
-	var pat: Vector2 = passive.get_global_rect().get_center()
-	_mouse(true, pat)
-	await process_frame
-	_release_at(pat)
-	await process_frame
-	check(not game.hud.tip_panel.visible, "a short tap on a passive Artefact cell shows no description")
-	check(not game.buff_pick_open, "...and does nothing else either")
-	clean = false
-	for attempt in 3:
+	if check(passive != null and passive.disabled, "the Artefacts grid has a passive (always-disabled) cell"):
 		game.hud.hide_tip()
-		if await _long_press(pat):
-			clean = true
-			break
-		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
-	check(clean, "a long press on the passive cell completed without real cursor motion")
-	# NO-144: preview modal, not show_tip — same swap as the Item and ✹
-	# Artefact blocks above (see the Item block's comment); a disabled cell
-	# still reaches _wire_grid_button's on_long_press unconditionally.
-	check(game.preview_open, "a long press on a passive Artefact cell opens its preview modal")
-	check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").name),
-		"a long press on a passive Artefact cell shows its description")
-	check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").description),
-		"...and it is the passive artefact's description")
+		var pat: Vector2 = passive.get_global_rect().get_center()
+		_mouse(true, pat)
+		await process_frame
+		_release_at(pat)
+		await process_frame
+		check(not game.hud.tip_panel.visible, "a short tap on a passive Artefact cell shows no description")
+		check(not game.buff_pick_open, "...and does nothing else either")
+		clean = false
+		for attempt in 3:
+			game.hud.hide_tip()
+			if await _long_press(pat):
+				clean = true
+				break
+			print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+		check(clean, "a long press on the passive cell completed without real cursor motion")
+		# NO-144: preview modal, not show_tip — same swap as the Item and ✹
+		# Artefact blocks above (see the Item block's comment); a disabled cell
+		# still reaches _wire_grid_button's on_long_press unconditionally.
+		check(game.preview_open, "a long press on a passive Artefact cell opens its preview modal")
+		check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").name),
+			"a long press on a passive Artefact cell shows its description")
+		check(_has_label_text(game.preview_panel, game._artefact_entry("tinfoil-hat").description),
+			"...and it is the passive artefact's description")
 	game.queue_free()
 	await process_frame
 
@@ -493,19 +493,19 @@ func _init() -> void:
 	game._set_drawer("stock")
 	await _await_drawer_settled(game, "stock") # NO-118
 	var pawn_btn := _stock_button(game, "pawn", false)
-	check(pawn_btn != null, "the Stock drawer has the pawn stack _boot_game() placed")
-	clean = false
-	for attempt in 3:
-		game.hud.hide_tip()
-		if await _long_press(pawn_btn.get_global_rect().get_center()):
-			clean = true
-			break
-		print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
-	check(clean, "a long press on the Stock cell completed without real cursor motion")
-	check(game.preview_open, "a long press on a Stock cell opens its preview modal")
-	check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
-		"...and it shows the Stock piece's name")
-	check(game.placing_id == "", "...and does NOT arm it for deploy")
+	if check(pawn_btn != null, "the Stock drawer has the pawn stack _boot_game() placed"):
+		clean = false
+		for attempt in 3:
+			game.hud.hide_tip()
+			if await _long_press(pawn_btn.get_global_rect().get_center()):
+				clean = true
+				break
+			print("   (attempt %d contaminated by real cursor motion — retrying)" % attempt)
+		check(clean, "a long press on the Stock cell completed without real cursor motion")
+		check(game.preview_open, "a long press on a Stock cell opens its preview modal")
+		check(_has_label_text(game.preview_panel, game.defs["pawn"].name),
+			"...and it shows the Stock piece's name")
+		check(game.placing_id == "", "...and does NOT arm it for deploy")
 	game.queue_free()
 	await process_frame
 

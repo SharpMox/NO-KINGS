@@ -736,25 +736,28 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	await _buy_a_box(game)
-	check(game.box_open, "buying a Box opens the roll modal")
-	var opt_tile := _first_option_tile(game.box_panel)
-	check(opt_tile != null, "box options render as a tile grid (NO-133)")
-	var loot_before: int = game.items.size() + game.artefacts.size() + game.stock.size()
-	var native_picks: int = Box.SIZES[game.box_size].picks
-	var box_described := false
-	for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all,
-		# select-then-confirm each one (NO-133): tap the tile, then its Pick button
-		_click(_first_option_tile(game.box_panel).get_global_rect().get_center())
-		await process_frame
-		var pick_btn := _box_pick_button(game.box_panel)
-		box_described = box_described or pick_btn != null
-		_click(pick_btn.get_global_rect().get_center())
-		await process_frame
-	check(box_described, "selecting a box tile reveals its description and a Pick confirm (NO-133)")
-	check(not game.box_open, "picking every offered option closes the box")
-	check(game.items.size() + game.artefacts.size() + game.stock.size() > loot_before,
-		"the picked reward is applied")
+	if await _buy_a_box(game):
+		check(game.box_open, "buying a Box opens the roll modal")
+		var opt_tile := _first_option_tile(game.box_panel)
+		check(opt_tile != null, "box options render as a tile grid (NO-133)")
+		var loot_before: int = game.items.size() + game.artefacts.size() + game.stock.size()
+		var native_picks: int = Box.SIZES[game.box_size].picks
+		var box_described := false
+		for i in native_picks: # Huge grants 2 native picks (issue 47) — take them all,
+			# select-then-confirm each one (NO-133): tap the tile, then its Pick button
+			var pick_tile := _first_option_tile(game.box_panel)
+			if pick_tile != null:
+				_click(pick_tile.get_global_rect().get_center())
+			await process_frame
+			var pick_btn := _box_pick_button(game.box_panel)
+			box_described = box_described or pick_btn != null
+			if pick_btn != null:
+				_click(pick_btn.get_global_rect().get_center())
+			await process_frame
+		check(box_described, "selecting a box tile reveals its description and a Pick confirm (NO-133)")
+		check(not game.box_open, "picking every offered option closes the box")
+		check(game.items.size() + game.artefacts.size() + game.stock.size() > loot_before,
+			"the picked reward is applied")
 
 	# NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
 	# Item Box — the row is only there at capacity, one click sells one Item and
@@ -768,32 +771,36 @@ func _init() -> void:
 		"contents": Box.roll_options(game, "item", "small")})
 	await process_frame
 	var sell_btn := _sell_button(game.box_panel)
-	check(game.box_open and sell_btn != null,
-		"NO-38: an Item Box at a full inventory shows a Sell row")
-	var items_before: int = game.items.size()
-	var gold_before_sale: int = game.gold
-	_click(sell_btn.get_global_rect().get_center())
-	await process_frame
-	await process_frame
-	# NO-223: every sell path confirms now, including the Box's own Sell row
-	# (Max, 2026-09-22: "yes align boxes too"). Nothing is sold until the
-	# confirm is answered — the sibling assertion in test_box.gd:222 pins that
-	# directly. Answering it here rather than asserting the old immediate sale.
-	check(game.items.size() == items_before,
-		"NO-38/NO-223: the Box's Sell confirms first — nothing sold yet")
-	game._choice_picked(true) # the confirm's own Sell button
-	await process_frame
-	await process_frame
-	check(game.items.size() == items_before - 1 and game.gold > gold_before_sale,
-		"NO-38: clicking Sell frees one slot and pays the sell price")
-	check(game.box_open and _sell_button(game.box_panel) == null,
-		"NO-38: the Box survives the sale and the Sell row is gone")
-	_click(_first_option_tile(game.box_panel).get_global_rect().get_center()) # NO-133: select...
-	await process_frame
-	_click(_box_pick_button(game.box_panel).get_global_rect().get_center()) # ...then confirm
-	await process_frame
-	check(not game.box_open and game.items.size() == items_before,
-		"NO-38: the pick then lands and closes the Box")
+	if check(game.box_open and sell_btn != null,
+			"NO-38: an Item Box at a full inventory shows a Sell row"):
+		var items_before: int = game.items.size()
+		var gold_before_sale: int = game.gold
+		_click(sell_btn.get_global_rect().get_center())
+		await process_frame
+		await process_frame
+		# NO-223: every sell path confirms now, including the Box's own Sell row
+		# (Max, 2026-09-22: "yes align boxes too"). Nothing is sold until the
+		# confirm is answered — the sibling assertion in test_box.gd:222 pins that
+		# directly. Answering it here rather than asserting the old immediate sale.
+		check(game.items.size() == items_before,
+			"NO-38/NO-223: the Box's Sell confirms first — nothing sold yet")
+		game._choice_picked(true) # the confirm's own Sell button
+		await process_frame
+		await process_frame
+		check(game.items.size() == items_before - 1 and game.gold > gold_before_sale,
+			"NO-38: clicking Sell frees one slot and pays the sell price")
+		check(game.box_open and _sell_button(game.box_panel) == null,
+			"NO-38: the Box survives the sale and the Sell row is gone")
+		var after_sale_tile := _first_option_tile(game.box_panel)
+		if after_sale_tile != null:
+			_click(after_sale_tile.get_global_rect().get_center()) # NO-133: select...
+		await process_frame
+		var after_sale_pick := _box_pick_button(game.box_panel)
+		if after_sale_pick != null:
+			_click(after_sale_pick.get_global_rect().get_center()) # ...then confirm
+		await process_frame
+		check(not game.box_open and game.items.size() == items_before,
+			"NO-38: the pick then lands and closes the Box")
 
 	# Nostradamus Mad Libs (issue 46/47): the extra pick reopens the box
 	# modal with what's left of the offer instead of closing it — stacks on
@@ -808,26 +815,28 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	await _buy_a_box(game)
-	check(game.box_open, "(setup) buying the Box opens the roll modal")
-	var mad_libs_total: int = Box.SIZES[game.box_size].picks + 1 # +1 Nostradamus copy
-	var mad_libs_picks := 0
-	while game.box_open:
-		var mad_libs_opt := _first_option_tile(game.box_panel)
-		check(mad_libs_opt != null, "an option is offered (pick %d)" % (mad_libs_picks + 1))
-		_click(mad_libs_opt.get_global_rect().get_center()) # NO-133: select...
-		await process_frame
-		var mad_libs_pick_btn := _box_pick_button(game.box_panel)
-		check(mad_libs_pick_btn != null,
-			"selecting reveals a Pick confirm (pick %d)" % (mad_libs_picks + 1))
-		_click(mad_libs_pick_btn.get_global_rect().get_center()) # ...then confirm
-		await process_frame
-		mad_libs_picks += 1
-		if mad_libs_picks < mad_libs_total:
-			check(game.box_open,
-				"Nostradamus Mad Libs: pick %d of %d keeps the box open" % [mad_libs_picks, mad_libs_total])
-	check(mad_libs_picks == mad_libs_total,
-		"Nostradamus Mad Libs: native picks + 1 extra = %d total picks taken" % mad_libs_total)
+	if await _buy_a_box(game):
+		check(game.box_open, "(setup) buying the Box opens the roll modal")
+		var mad_libs_total: int = Box.SIZES[game.box_size].picks + 1 # +1 Nostradamus copy
+		var mad_libs_picks := 0
+		while game.box_open:
+			var mad_libs_opt := _first_option_tile(game.box_panel)
+			if not check(mad_libs_opt != null, "an option is offered (pick %d)" % (mad_libs_picks + 1)):
+				break # the box stays open with nothing to click — without this the loop never ends
+			_click(mad_libs_opt.get_global_rect().get_center()) # NO-133: select...
+			await process_frame
+			var mad_libs_pick_btn := _box_pick_button(game.box_panel)
+			if not check(mad_libs_pick_btn != null,
+					"selecting reveals a Pick confirm (pick %d)" % (mad_libs_picks + 1)):
+				break
+			_click(mad_libs_pick_btn.get_global_rect().get_center()) # ...then confirm
+			await process_frame
+			mad_libs_picks += 1
+			if mad_libs_picks < mad_libs_total:
+				check(game.box_open,
+					"Nostradamus Mad Libs: pick %d of %d keeps the box open" % [mad_libs_picks, mad_libs_total])
+		check(mad_libs_picks == mad_libs_total,
+			"Nostradamus Mad Libs: native picks + 1 extra = %d total picks taken" % mad_libs_total)
 
 	# Snowden's Rubik's Cube / Bible Gag Reel Scroll (issue 46, functionally
 	# identical): a Reroll button appears on the box modal while the budget
@@ -843,20 +852,20 @@ func _init() -> void:
 	root.add_child(game)
 	await process_frame
 	await process_frame
-	await _buy_a_box(game)
-	check(game.box_open, "(setup) buying the Box opens the roll modal")
-	var reroll_btn := _button_prefix(game.box_panel, "Reroll")
-	check(reroll_btn != null, "Snowden's Rubik's Cube: a Reroll button appears on the box modal")
-	var gold_before_reroll: int = game.gold
-	_click(reroll_btn.get_global_rect().get_center())
-	await process_frame
-	check(game.box_open, "rerolling keeps the box open")
-	check(game.gold == gold_before_reroll,
-		"rerolling doesn't spend Gold here (opening/rerolling a Box never charges — the Tariff " +
-		"on Box Pick was deleted entirely in issue 65; the under-any-Tariff-state proof lives " +
-		"in test_items_artefacts_3.gd, with a full Mild-tier Tariff load held to make it observable)")
-	check(_button_prefix(game.box_panel, "Reroll") == null,
-		"the reroll budget is spent — no Reroll button on the fresh offer")
+	if await _buy_a_box(game):
+		check(game.box_open, "(setup) buying the Box opens the roll modal")
+		var reroll_btn := _button_prefix(game.box_panel, "Reroll")
+		if check(reroll_btn != null, "Snowden's Rubik's Cube: a Reroll button appears on the box modal"):
+			var gold_before_reroll: int = game.gold
+			_click(reroll_btn.get_global_rect().get_center())
+			await process_frame
+			check(game.box_open, "rerolling keeps the box open")
+			check(game.gold == gold_before_reroll,
+				"rerolling doesn't spend Gold here (opening/rerolling a Box never charges — the Tariff " +
+				"on Box Pick was deleted entirely in issue 65; the under-any-Tariff-state proof lives " +
+				"in test_items_artefacts_3.gd, with a full Mild-tier Tariff load held to make it observable)")
+			check(_button_prefix(game.box_panel, "Reroll") == null,
+				"the reroll budget is spent — no Reroll button on the fresh offer")
 
 	# Buff Box sub-pick, riding the generic choice-modal seam (issue 41):
 	# opening it blocks board input, Cancel leaves the item unspent, and
@@ -1409,37 +1418,37 @@ func _init() -> void:
 		if c is ScrollContainer:
 			inv_sc = c
 			break
-	check(inv_sc != null, "(setup) the Inventory drawer's ScrollContainer is reachable")
-	var usable_rect: Rect2 = inv_sc.get_global_rect()
-	var grids := {"items_grid": icon_game.hud.items_grid, "artefacts_grid": icon_game.hud.artefacts_grid}
-	for grid_name in grids:
-		var grid: Control = grids[grid_name]
-		var cells: Array = grid.get_children()
-		check(not cells.is_empty(), "(setup) %s actually holds cells to measure" % grid_name)
-		if cells.is_empty():
-			continue
-		var left_x: float = INF
-		var right_x: float = -INF
-		for cell in cells:
-			var r: Rect2 = (cell as Control).get_global_rect()
-			left_x = minf(left_x, r.position.x)
-			right_x = maxf(right_x, r.end.x)
-		var left_gap: float = left_x - usable_rect.position.x
-		check(absf(left_gap) <= 1.5,
-			"%s: cells sit flush against the drawer's left edge (left_gap=%.1f)" %
-				[grid_name, left_gap])
-		# The right edge only has to reach the usable width when a row is
-		# actually FULL (cells.size() >= columns) — a grid holding fewer
-		# entries than columns (items_grid's cap can be below the 5-column
-		# standard, e.g. ItemLogic.cap's base of 3) has nothing to put in the
-		# trailing columns; that is not the dead-column bug NO-207 fixed, and
-		# asserting edge-to-edge there would be wrong.
-		if cells.size() >= grid.columns:
-			var right_gap: float = usable_rect.end.x - right_x
-			check(absf(right_gap) <= 1.5,
-				"%s: a full row's cells reach the drawer's right edge, no dead column " %
-					grid_name +
-				"(right_gap=%.1f, usable_w=%.1f)" % [right_gap, usable_rect.size.x])
+	if check(inv_sc != null, "(setup) the Inventory drawer's ScrollContainer is reachable"):
+		var usable_rect: Rect2 = inv_sc.get_global_rect()
+		var grids := {"items_grid": icon_game.hud.items_grid, "artefacts_grid": icon_game.hud.artefacts_grid}
+		for grid_name in grids:
+			var grid: Control = grids[grid_name]
+			var cells: Array = grid.get_children()
+			check(not cells.is_empty(), "(setup) %s actually holds cells to measure" % grid_name)
+			if cells.is_empty():
+				continue
+			var left_x: float = INF
+			var right_x: float = -INF
+			for cell in cells:
+				var r: Rect2 = (cell as Control).get_global_rect()
+				left_x = minf(left_x, r.position.x)
+				right_x = maxf(right_x, r.end.x)
+			var left_gap: float = left_x - usable_rect.position.x
+			check(absf(left_gap) <= 1.5,
+				"%s: cells sit flush against the drawer's left edge (left_gap=%.1f)" %
+					[grid_name, left_gap])
+			# The right edge only has to reach the usable width when a row is
+			# actually FULL (cells.size() >= columns) — a grid holding fewer
+			# entries than columns (items_grid's cap can be below the 5-column
+			# standard, e.g. ItemLogic.cap's base of 3) has nothing to put in the
+			# trailing columns; that is not the dead-column bug NO-207 fixed, and
+			# asserting edge-to-edge there would be wrong.
+			if cells.size() >= grid.columns:
+				var right_gap: float = usable_rect.end.x - right_x
+				check(absf(right_gap) <= 1.5,
+					"%s: a full row's cells reach the drawer's right edge, no dead column " %
+						grid_name +
+					"(right_gap=%.1f, usable_w=%.1f)" % [right_gap, usable_rect.size.x])
 
 	# 3. the pool strip, in the Stock drawer. _rebuild_pool_strip returns early
 	# while that drawer is closed ("stock drawer closed: no targets"), so the
@@ -2362,25 +2371,25 @@ func _init() -> void:
 				tile_index = idx
 				break
 		to_visit.append_array(n.get_children())
-	check(tile != null, "an affordable piece tile exists")
-	_click(tile.get_global_rect().get_center())
-	await process_frame
-	# NO-167 (Max review, second pass): a tile tap opens its own preview now,
-	# not an in-place dock — same "long press = the thing's own menu" shape
-	# NO-144 gave held Stock/Item/Artefact entries, mirrored here with Buy in
-	# Sell's place.
-	check(game.preview_open, "tapping a Shop tile opens its preview")
-	var sh_stock: int = game.stock.size()
-	var sh_gold: int = game.gold
-	var sh_acts: int = game.actions_left
-	check(await _click_button_in(game.preview_panel, "Buy"),
-		"Buy clickable in the tile's preview")
-	await process_frame
-	check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
-			and game.actions_left == sh_acts,
-		"shop Buy adds the piece and debits gold, never an Action (issue 64)")
-	check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
-	check(not game.preview_open, "buying closes the preview, same as Close")
+	if check(tile != null, "an affordable piece tile exists"):
+		_click(tile.get_global_rect().get_center())
+		await process_frame
+		# NO-167 (Max review, second pass): a tile tap opens its own preview now,
+		# not an in-place dock — same "long press = the thing's own menu" shape
+		# NO-144 gave held Stock/Item/Artefact entries, mirrored here with Buy in
+		# Sell's place.
+		check(game.preview_open, "tapping a Shop tile opens its preview")
+		var sh_stock: int = game.stock.size()
+		var sh_gold: int = game.gold
+		var sh_acts: int = game.actions_left
+		check(await _click_button_in(game.preview_panel, "Buy"),
+			"Buy clickable in the tile's preview")
+		await process_frame
+		check(game.stock.size() == sh_stock + 1 and game.gold < sh_gold
+				and game.actions_left == sh_acts,
+			"shop Buy adds the piece and debits gold, never an Action (issue 64)")
+		check(game.shop_stock[tile_index].sold, "the bought slot is marked sold")
+		check(not game.preview_open, "buying closes the preview, same as Close")
 	var sold_tile: Button = null
 	to_visit = [game.modals.shop_panel]
 	while not to_visit.is_empty():
@@ -2391,15 +2400,16 @@ func _init() -> void:
 		to_visit.append_array(n.get_children())
 	check(sold_tile != null and sold_tile.modulate.a < 0.9,
 		"the sold tile greys out and stays in place")
-	_click(sold_tile.get_global_rect().get_center())
-	await process_frame
-	check(game.preview_open, "the sold tile is still tappable to preview")
-	check(await _click_button_in(game.preview_panel, "SOLD"),
-		"the preview now shows SOLD instead of Buy")
-	check(await _click_button_in(game.preview_panel, "Close"),
-		"the preview's own Close is clickable")
-	await process_frame
-	check(not game.preview_open, "closing the preview leaves the Shop open behind it")
+	if sold_tile != null:
+		_click(sold_tile.get_global_rect().get_center())
+		await process_frame
+		check(game.preview_open, "the sold tile is still tappable to preview")
+		check(await _click_button_in(game.preview_panel, "SOLD"),
+			"the preview now shows SOLD instead of Buy")
+		check(await _click_button_in(game.preview_panel, "Close"),
+			"the preview's own Close is clickable")
+		await process_frame
+		check(not game.preview_open, "closing the preview leaves the Shop open behind it")
 	check(game.modals.shop_panel.visible, "...the Shop itself is untouched")
 	# NO-167 (Max review, second pass): Close is now PERMANENT at the bottom
 	# of the Shop — present whether or not a tile's preview is open, not an
@@ -2537,27 +2547,29 @@ func _init() -> void:
 		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "blitz":
 			item_cell = c
 	var item_sell_badge: Button = null
-	for c in item_cell.get_children():
-		if c is Button and (c as Button).text.begins_with("$"):
-			item_sell_badge = c
+	if check(item_cell != null, "(setup) the Blitz Item cell is in the Inventory grid"):
+		for c in item_cell.get_children():
+			if c is Button and (c as Button).text.begins_with("$"):
+				item_sell_badge = c
 	var item_payout: int = Shop.sell_payout(game, "item", game.items[0])
 	check(item_sell_badge != null and item_sell_badge.is_visible_in_tree()
 			and item_sell_badge.text == "$%d" % item_payout and not item_sell_badge.disabled
 			and item_sell_badge.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"the Item cell carries its own Sell badge, priced and live — but non-interactive")
 	var gold_before_item: int = game.gold
-	_click(item_sell_badge.get_global_rect().get_center())
-	await process_frame
-	await process_frame
-	check(game.items.size() == 1 and game.gold == gold_before_item and not game.buff_pick_open
-			and game.item_active == 0,
-		"NO-223: the Item's badge is information only — the click falls through to the cell, which arms the Item instead of selling it")
-	# Disarm (a second tap on the Item cancels targeting) so the preview's Use
-	# below starts from a clean state instead of hitting the cancel branch.
-	game._use_item(0)
-	await process_frame
-	check(game.item_active == -1 and game.item_targets.is_empty(),
-		"(setup) tapping the armed Item again disarms it")
+	if item_sell_badge != null:
+		_click(item_sell_badge.get_global_rect().get_center())
+		await process_frame
+		await process_frame
+		check(game.items.size() == 1 and game.gold == gold_before_item and not game.buff_pick_open
+				and game.item_active == 0,
+			"NO-223: the Item's badge is information only — the click falls through to the cell, which arms the Item instead of selling it")
+		# Disarm (a second tap on the Item cancels targeting) so the preview's Use
+		# below starts from a clean state instead of hitting the cancel branch.
+		game._use_item(0)
+		await process_frame
+		check(game.item_active == -1 and game.item_targets.is_empty(),
+			"(setup) tapping the armed Item again disarms it")
 
 	# Use, from the long-press preview: Blitz targets a tile ("target":
 	# "tile"), so Use arms board targeting rather than resolving on the spot
@@ -2603,9 +2615,10 @@ func _init() -> void:
 		if c is Button and c.has_meta("key") and str(c.get_meta("key")) == "agartha-welcome-mat":
 			art_cell = c
 	var art_sell_badge: Button = null
-	for c in art_cell.get_children():
-		if c is Button and (c as Button).text.begins_with("$"):
-			art_sell_badge = c
+	if check(art_cell != null, "(setup) the Agartha Welcome Mat Artefact cell is in the Inventory grid"):
+		for c in art_cell.get_children():
+			if c is Button and (c as Button).text.begins_with("$"):
+				art_sell_badge = c
 	var art_entry: Variant = game._artefact_entry("agartha-welcome-mat")
 	var art_payout: int = Shop.sell_payout(game, "artefact", art_entry)
 	check(art_sell_badge != null and art_sell_badge.is_visible_in_tree()
@@ -2613,10 +2626,11 @@ func _init() -> void:
 			and art_sell_badge.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"the Artefact cell carries its own Sell badge too — also non-interactive")
 	var gold_before_art: int = game.gold
-	_click(art_sell_badge.get_global_rect().get_center())
-	await process_frame
-	check(game.artefacts.size() == 1 and game.gold == gold_before_art and not game.buff_pick_open,
-		"NO-223: clicking the Artefact's badge does nothing either")
+	if art_sell_badge != null:
+		_click(art_sell_badge.get_global_rect().get_center())
+		await process_frame
+		check(game.artefacts.size() == 1 and game.gold == gold_before_art and not game.buff_pick_open,
+			"NO-223: clicking the Artefact's badge does nothing either")
 
 	game.hud.artefact_preview_requested.emit("agartha-welcome-mat")
 	await process_frame
@@ -2716,10 +2730,11 @@ func _init() -> void:
 	var restock_btn: Button = _button_prefix(game.modals.shop_panel, "Restock")
 	check(restock_btn != null and restock_btn.disabled,
 		"the Restock button greys out once used this Wave — visibly unavailable, not silently inert")
-	_click(restock_btn.get_global_rect().get_center()) # Godot doesn't fire
-		# `pressed` on a disabled Button — this must be a genuine no-op
-	await process_frame
-	check(not game.buff_pick_open, "clicking the disabled Restock button opens nothing")
+	if restock_btn != null:
+		_click(restock_btn.get_global_rect().get_center()) # Godot doesn't fire
+			# `pressed` on a disabled Button — this must be a genuine no-op
+		await process_frame
+		check(not game.buff_pick_open, "clicking the disabled Restock button opens nothing")
 
 	# the Shop is reachable in any state, not just your turn (GDD Shop page)
 	var was_state: int = game.state
@@ -2768,23 +2783,23 @@ func _init() -> void:
 			box_button = n
 			break
 		to_visit.append_array(n.get_children())
-	check(box_button != null, "(setup) the Box tile is clickable")
-	_click(box_button.get_global_rect().get_center())
-	await process_frame
-	check(game.preview_open, "tapping the Box tile opens its preview")
-	var reveal_label: Label = null
-	to_visit = [game.preview_panel]
-	while not to_visit.is_empty():
-		var n: Node = to_visit.pop_back()
-		if n is Label and n.text.begins_with("Contains: "):
-			reveal_label = n
-			break
-		to_visit.append_array(n.get_children())
-	var expect_reveal := "Contains: %s" % Box.contents_names(game.shop_stock[box_slot_index].contents)
-	check(reveal_label != null and reveal_label.text == expect_reveal,
-		"All-Seeing Eye Contact Lens: the %s Box's reveal Label shows its exact contents" % box_slot_size)
-	check(await _click_button_in(game.preview_panel, "Buy"),
-		"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
+	if check(box_button != null, "(setup) the Box tile is clickable"):
+		_click(box_button.get_global_rect().get_center())
+		await process_frame
+		check(game.preview_open, "tapping the Box tile opens its preview")
+		var reveal_label: Label = null
+		to_visit = [game.preview_panel]
+		while not to_visit.is_empty():
+			var n: Node = to_visit.pop_back()
+			if n is Label and n.text.begins_with("Contains: "):
+				reveal_label = n
+				break
+			to_visit.append_array(n.get_children())
+		var expect_reveal := "Contains: %s" % Box.contents_names(game.shop_stock[box_slot_index].contents)
+		check(reveal_label != null and reveal_label.text == expect_reveal,
+			"All-Seeing Eye Contact Lens: the %s Box's reveal Label shows its exact contents" % box_slot_size)
+		check(await _click_button_in(game.preview_panel, "Buy"),
+			"...and the Buy button underneath it is still clickable, even at Huge's 7-entry worst case")
 
 	# reinforcement shop: opens pending at turn start; NO-141 made the grant
 	# automatic (in Stock by the time the panel shows) and turned the panel
@@ -3524,7 +3539,8 @@ func _button_prefix(node: Node, prefix: String) -> Button:
 ## expands in place — it opens its own preview (game.preview_panel), same as
 ## every other Shop tile since the detail dock was deleted.
 ## Assumes the Shop is closed and the player's turn is active on entry.
-func _buy_a_box(game: Node2D) -> void:
+## Returns false when no Box could be bought, so callers skip what needs one.
+func _buy_a_box(game: Node2D) -> bool:
 	check(await _click_shop(game), "Shop button clickable")
 	await process_frame
 	var tile: Button = null
@@ -3540,10 +3556,12 @@ func _buy_a_box(game: Node2D) -> void:
 				tile_index = idx
 				break
 		to_visit.append_array(n.get_children())
-	check(tile != null, "(setup) an affordable Box tile exists")
+	if not check(tile != null, "(setup) an affordable Box tile exists"):
+		return false
 	_click(tile.get_global_rect().get_center())
 	await process_frame
 	check(game.preview_open, "(setup) tapping the Box tile opens its preview")
-	check(await _click_button_in(game.preview_panel, "Buy"),
+	var bought := check(await _click_button_in(game.preview_panel, "Buy"),
 		"(setup) Buy clickable in the Box tile's preview")
 	await process_frame
+	return bought

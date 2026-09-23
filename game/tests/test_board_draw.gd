@@ -81,6 +81,27 @@ func _init() -> void:
 	check(game.INV_MARK_GLYPH_COL == Color.WHITE, "inversion glyph is white, not the side colour")
 	check(game.INV_MARK_DISC_COL == Color(0, 0, 0, 0.72), "inversion disc is dark, 72% alpha")
 
+	# NO-244 (Max, 2026-09-24): up to 4 buff badges, 2 per row — the 4th must
+	# not overlap the 3rd. `_buff_badge_centres` is the helper
+	# `_draw_buff_badges` places them with, so this can't drift from the draw.
+	var half: float = game._buff_badge_half()
+	var tile_rect := Rect2(px, Vector2(t, t))
+	for n in range(1, 5):
+		var centres: Array[Vector2] = game._buff_badge_centres(px, n)
+		var inside := centres.size() == n
+		for ctr in centres:
+			inside = inside and tile_rect.encloses(Rect2(ctr - Vector2(half, half), Vector2(half, half) * 2))
+		check(inside, "%d buff badge(s): %d centres, every badge inside its tile (%s)" % [n, n, centres])
+	var four: Array[Vector2] = game._buff_badge_centres(px, 4)
+	var apart := true
+	for i in 4:
+		for j in range(i + 1, 4):
+			apart = apart and (absf(four[i].x - four[j].x) >= half * 2 or absf(four[i].y - four[j].y) >= half * 2)
+	check(apart, "4 buff badges: 4 distinct centres, no two badges overlap (%s)" % [four])
+	var three: Array[Vector2] = game._buff_badge_centres(px, 3)
+	check(is_equal_approx(three[2].x, (three[0].x + three[1].x) / 2.0) and three[2].y < three[0].y,
+		"3 buff badges: the third sits centred above the bottom pair")
+
 	game.queue_free()
 	await process_frame
 

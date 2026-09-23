@@ -1718,7 +1718,7 @@
   "bonus": [
    "Buff"
   ],
-  "effect": "+1 Piece Buff capacity",
+  "effect": "+1 Piece Buff capacity (does not stack)",
   "conspiracy": "Abduction implants",
   "implemented": true
  },

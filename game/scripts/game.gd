@@ -334,6 +334,23 @@ const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below cen
 const BUFF_BADGE_RING := Color(1, 1, 1, 0.92)
 const BUFF_BADGE_BG := Color(0.05, 0.05, 0.08, 0.9)
 const BUFF_BADGE_GLYPH_COL := Color.WHITE
+const BUFF_GLYPH_RATIO := 1.6 # glyph size = badge half-width * this (NO-244)
+const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
+const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
+const BUFF_BADGE_ACCENT := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
+const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
+## NO-244: glyph -> [dx, dy, scale], dx/dy as a fraction of the badge's half
+## side (+ = right/down). Measured by eye from captures of every buff; the
+## inversion mark's ⟲ has its own tuning (INV_MARK_GLYPH_*) and isn't here.
+const BUFF_GLYPH_TUNE := {
+	"⨯": [0.0, -0.12, 1.7],  # multicapture: tiny and low
+	"↩": [0.0, 0.3, 1.0],    # reflect: sits high
+	"≋": [0.0, 0.0, 1.0],    # smog
+}
+## NO-244: every buff glyph sits a little low in its square through the
+## fallback font's metrics — lift them all by this fraction of the half side
+## before the per-glyph tune above.
+const BUFF_GLYPH_LIFT := -0.1
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits
 var tile := 72
@@ -3904,7 +3921,7 @@ func _consume_item(index: int, it: Dictionary) -> void:
 ## Debuffs riding the same buffs list (`stunned`) are NOT Piece Buffs and
 ## call BuffLogic.add directly — they must never reach this choke point.
 ## Issue 53 (user ruling): a piece already at Piece Buff capacity (base 2,
-## Abduction Probe +1/copy) REFUSES the grant — no buff lands, on_buff_apply
+## Abduction Probe +1, non-stacking) REFUSES the grant — no buff lands, on_buff_apply
 ## never fires (there's nothing to react to), and every caller here already
 ## treats this as fire-and-forget, so a refusal is a clean no-op for THEM.
 ## "Fails cleanly and visibly" is the floating label every other buff-landing
@@ -3926,13 +3943,14 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
 
 
-## The Piece Buff capacity in force: base + Abduction Probe copies +
-## Communion, additive and never deduped (issue 68: Communion — The Cult —
-## sums into the SAME cap() call as Abduction Probe, "Communion + Abduction
-## Probe = cap 4"). One definition — _apply_buff and merge inheritance
-## (NO-191) must never disagree on what the cap is.
+## The Piece Buff capacity in force: base + Abduction Probe + Communion,
+## additive (issue 68: Communion — The Cult — sums into the SAME cap() call
+## as Abduction Probe, "Communion + Abduction Probe = cap 4"). The probe
+## itself does not stack: extra copies add nothing (Max, NO-244), so the
+## ceiling is 2 + 1 + 1 = 4. One definition — _apply_buff and merge
+## inheritance (NO-191) must never disagree on what the cap is.
 func buff_cap() -> int:
-	return BuffLogic.cap(_artefact_count("abduction-probe")
+	return BuffLogic.cap(mini(_artefact_count("abduction-probe"), 1)
 			+ (1 if Armies.communion(self) else 0))
 
 
@@ -5309,23 +5327,53 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		_draw_buff_badges(font, px, buff_glyphs)
 
 
-## NO-185: a row of small badges along the tile's bottom edge, one per
-## catalogued buff `p` carries (BuffLogic.glyphs_of) — capacity is base 2
-## (Tuning.PIECE_BUFF_CAP_BASE) +1 per held Abduction Probe, so more than 2-3
-## is a rare stacked-artefact case; shrinking the radius keeps any count
-## legible rather than capping the row and losing information.
+## NO-185: one small badge per catalogued buff `p` carries
+## (BuffLogic.glyphs_of), low on the tile. Capacity is base 2
+## (Tuning.PIECE_BUFF_CAP_BASE) + Abduction Probe (+1, non-stacking) + the
+## Cult's Communion (+1), so at most 4 badges — _buff_badge_centres lays out
+## exactly that many.
 func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
-	var n := glyphs.size()
-	var r: float = tile * (0.16 if n <= 2 else 0.13)
-	var gap := r * 2.2
-	var start_x := px.x + tile / 2.0 - gap * (n - 1) / 2.0
-	var y := px.y + tile - r * 1.2
+	# NO-244 (Max, 2026-09-24): purple rounded squares, amber outline and amber
+	# glyph, every badge the same size whatever the count.
+	var half := _buff_badge_half()
+	var size := int(half * BUFF_GLYPH_RATIO)
+	var box := StyleBoxFlat.new()
+	box.bg_color = BUFF_BADGE_FILL
+	box.border_color = BUFF_BADGE_ACCENT
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(int(half * 0.45))
+	var centres := _buff_badge_centres(px, glyphs.size())
+	for i in centres.size():
+		var c: Vector2 = centres[i]
+		draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
+		# Per-glyph optical correction: the symbols come from an OS fallback
+		# font whose ink sits differently in its box, so centring by font
+		# metrics alone leaves some off-centre or undersized.
+		var tune: Array = BUFF_GLYPH_TUNE.get(glyphs[i], [0.0, 0.0, 1.0])
+		var gsize := int(size * tune[2])
+		var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
+		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyphs[i],
+			HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, BUFF_BADGE_ACCENT)
+
+
+## Half the side of one buff badge (NO-244: fixed, the two-buff size).
+func _buff_badge_half() -> float:
+	return _inv_mark_size() * INV_MARK_DISC_RATIO * BUFF_BADGE_SCALE
+
+
+## Centres of `n` buff badges on the tile at `px` (NO-244, Max 2026-09-24):
+## badges 0-1 are the bottom row, 2-3 a second row directly above at the
+## same gap; each row is centred on its own count, so 3 buffs = a pair with
+## one centred above, 4 = a 2x2. Shared by _draw_buff_badges and
+## tests/test_board_draw.gd so the probe can't diverge from the draw.
+func _buff_badge_centres(px: Vector2, n: int) -> Array[Vector2]:
+	var gap := _buff_badge_half() * 2.2
+	var c0 := _inv_mark_centre(px) + Vector2(0, tile * BUFF_BADGE_EXTRA_DROP)
+	var out: Array[Vector2] = []
 	for i in n:
-		var c := Vector2(start_x + gap * i, y)
-		draw_circle(c, r, BUFF_BADGE_RING)
-		draw_circle(c, r - 1.5, BUFF_BADGE_BG)
-		draw_string(font, Vector2(c.x - r, c.y + r * 0.5), glyphs[i],
-			HORIZONTAL_ALIGNMENT_CENTER, r * 2, int(r * 1.4), BUFF_BADGE_GLYPH_COL)
+		var row_n := mini(n - (i / 2) * 2, 2) # badges in this badge's row
+		out.append(Vector2(c0.x - gap * (row_n - 1) / 2.0 + gap * (i % 2), c0.y - gap * (i / 2)))
+	return out
 
 
 ## NO-101: true for exactly the four literal inv- ids, never the ten

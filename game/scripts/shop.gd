@@ -129,6 +129,18 @@ static func _sample_biased_artefacts(g, n: int, exclude: Array) -> Array:
 	return _sample_weighted_artefacts(pool, n, g)
 
 
+## Artefacts that don't stack (Max, NO-244: Abduction Probe) — never
+## offered again while a copy is held. Every artefact offer reads this: the
+## Shop's normal and hidden rolls and the Cult's starting pair (all through
+## _sample_weighted_artefacts) and the Artefact Box (box.gd roll_options).
+const UNIQUE_ARTEFACTS := ["abduction-probe"]
+
+
+static func is_unique_held(g, key: String) -> bool:
+	return UNIQUE_ARTEFACTS.has(key) and g.artefacts.any(
+		func(t: Dictionary) -> bool: return t.key == key)
+
+
 ## Base pieces: merge-chain roots (nothing merges into them), minus the King
 ## and the inversion pieces — inversions are a mechanic outcome, not a product.
 static func base_piece_pool(defs: Dictionary) -> Array:
@@ -481,7 +493,7 @@ static func _sample(pool: Array, n: int, rng: RandomNumberGenerator) -> Array:
 ## n distinct artefact keys, weighted by rarity (issue 20 — shares
 ## Tuning.weighted_artefact_pick with box.gd's single-pick roll).
 static func _sample_weighted_artefacts(entries: Array, n: int, g) -> Array:
-	var open := entries.duplicate()
+	var open := entries.filter(func(t: Dictionary) -> bool: return not is_unique_held(g, t.key))
 	var out := []
 	for i in mini(n, open.size()):
 		out.append(open.pop_at(Tuning.weighted_artefact_pick(open, g.rng)).key)

@@ -104,8 +104,8 @@ const ITEM_CAP_BASE := 3          # issue 53 (user ruling): held Items were
                                    # Permit raises it, +3 per copy (item_logic.gd)
 const PIECE_BUFF_CAP_BASE := 2    # issue 53 (user ruling): a board piece's
                                    # buffs Array was unbounded before this —
-                                   # Abduction Probe raises it, +1 per copy
-                                   # (buff_logic.gd)
+                                   # Abduction Probe raises it +1, non-stacking
+                                   # (Max, NO-244; game.gd buff_cap)
 const ARTEFACT_CAP_BASE := 5      # issue 60 (user ruling): a third base-game
                                    # cap, same shape as the two above — held
                                    # Artefacts were unbounded before this.

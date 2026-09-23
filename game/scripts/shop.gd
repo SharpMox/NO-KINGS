@@ -304,13 +304,13 @@ static func can_buy(g, slot: Dictionary) -> bool:
 			and g.state == g.State.PLAYER_TURN \
 			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
 			and (slot.kind != "item" or ItemLogic.has_room(g)) \
+			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) \
 			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue
 				# 53/60: never sell an Item or Artefact slot the player has no
 				# capacity to hold — a Box still sells fine even at capacity
 				# (it might not roll one; _box_choose's own grant refuses that
-				# pick if it does)
-			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) # NO-244:
-				# stock rolled before the first probe was bought still holds a copy
+				# pick if it does). NO-244: nor a unique Artefact already held —
+				# stock rolled before the first probe was bought still holds one
 
 
 ## Agartha Welcome Mat (issue 26): Shop purchases only may dip up to 100 Gold

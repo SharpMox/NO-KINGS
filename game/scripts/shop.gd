@@ -239,7 +239,7 @@ static func display_name(g, slot: Dictionary) -> String:
 static func lane_a_restock(g) -> void:
 	g.shop_lane_b_progress = 0
 	g.shop_restocks += 1
-	roll(g)
+	_restock(g, "SHOP OPEN" if g.wave == Tuning.SHOP_UNLOCK_WAVE else "SHOP RESTOCKED")
 
 
 ## NO-167: waves remaining until the next guaranteed Lane-A restock — the
@@ -271,7 +271,19 @@ static func add_score_progress(g, amount: int) -> void:
 		g.shop_restocks += 1
 		crossed = true
 	if crossed:
-		roll(g)
+		_restock(g, "SHOP RESTOCKED")
+
+
+## NO-238: the one place a restock HAPPENS (both lanes; the first Lane-A fire is
+## the unlock, hence "SHOP OPEN"), so it is the one place that banners it.
+## roll() itself stays silent: its other callers are run setup and the
+## player's own Jet Fuel restock, neither of which is news, and a save restore
+## never rolls at all. No banner before the unlock — a Lane-B restock of a
+## Shop the player cannot open yet is nothing they can act on.
+static func _restock(g, text: String) -> void:
+	roll(g)
+	if g.wave >= Tuning.SHOP_UNLOCK_WAVE:
+		g._add_turn_fx(text, g.BANNER_GAIN, "shop_restock")
 
 
 ## Purchasable right now: player's turn and the gold to spare, not sold.

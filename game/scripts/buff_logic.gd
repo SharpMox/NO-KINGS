@@ -155,16 +155,16 @@ static func name_of(key: String) -> String:
 ## Every glyph is unique; none doubles up on another buff or on an unrelated
 ## on-screen glyph (✦/✹/⚠/→ already mean other things elsewhere in the HUD).
 const PIECE_BUFF_GLYPHS := {
-	"shield": "⛨",       # U+26E8 cross-on-shield — blocks the next capture
-	"critical": "⚡",      # U+26A1 high voltage — next capture scores double
-	"multicapture": "⚔", # U+2694 crossed swords — takes a second victim too
+	"shield": "✚",       # U+271A heavy Greek cross — blocks the next capture (NO-244: ⛨ is missing from the font)
+	"critical": "↯",      # U+21AF downwards zigzag arrow — next capture scores double (NO-244: ⚡ drew as colour emoji)
+	"multicapture": "⨯", # U+2A2F vector cross product — takes a second victim too (NO-244: ⚔ drew thin)
 	"taunt": "‼",         # U+203C double exclamation — forces the enemy's aim
 	"stun": "⊘",          # U+2298 circled slash — captor loses its next turns
 	"bomb": "✴",          # U+2734 eight-point star — destroys on contact
 	"trap": "⌖",          # U+2316 position indicator — punishes the captor
 	"range": "➤",         # U+27A4 arrowhead — extends capture reach
 	"reflect": "↩",       # U+21A9 hooked arrow — bounces the attack back
-	"slow": "⏳",          # U+23F3 hourglass — moves like a Pawn, briefly
+	"slow": "⧗",          # U+29D7 black hourglass — moves like a Pawn, briefly (NO-244: ⏳ drew as colour emoji)
 	"aura": "✳",          # U+2733 eight-spoked asterisk — radiates to allies
 	"smog": "≋",          # U+224B triple tilde — radiates to enemies
 	"piece_bounty": "⚑",  # U+2691 black flag — marks a reward on capture

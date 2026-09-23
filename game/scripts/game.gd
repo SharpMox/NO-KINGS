@@ -5332,7 +5332,7 @@ func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	var box := StyleBoxFlat.new()
 	box.bg_color = BUFF_BADGE_PURPLE
 	box.border_color = BUFF_BADGE_LIME
-	box.set_border_width_all(2)
+	box.set_border_width_all(1)
 	box.set_corner_radius_all(int(half * 0.45))
 	for i in n:
 		var c: Vector2

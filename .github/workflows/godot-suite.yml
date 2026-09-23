@@ -55,9 +55,12 @@ jobs:
           GODOT: /home/runner/godot/godot
         run: |
           start=$(date +%s)
+          set -o pipefail # else `| tee` hides run_all.sh's exit code and a FAILED suite passes
           code=0
           xvfb-run -a -s "-screen 0 1280x1024x24" game/tests/run_all.sh 2>&1 | tee suite.log || code=$?
           echo "suite wall time: $(( $(date +%s) - start ))s (exit $code)" | tee -a suite.log
+          # belt and braces: the verdict line itself, not just an exit code
+          grep -q "^ALL GREEN" suite.log || code=${code/#0/1}
           exit $code
 
       - name: Upload logs

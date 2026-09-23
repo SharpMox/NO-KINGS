@@ -7,7 +7,8 @@ extends SceneTree
 ##   - The ENEMY TURN banner names a skipped / doubled turn instead of
 ##     announcing it as a normal one (it used to fire before the skip check).
 ## Plus the Gold-loss popup, the bespoke King Power's persistent ⚠ state and
-## the once-per-wave first-bite gate.
+## the once-per-wave first-bite gate. NO-243: a capture, a spawn and a merge
+## queue their board anims (die / arrive / merge) only with animations on.
 ## Run headless:  godot --headless --path game -s tests/test_banners.gd
 
 const GameScript := preload("res://scripts/game.gd")
@@ -17,6 +18,7 @@ const Kings := preload("res://data/kings.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
+const MergeLogic := preload("res://scripts/merge_logic.gd")
 
 var fails := 0
 
@@ -50,6 +52,10 @@ func _banners(g) -> Array:
 
 func _has_banner(g, text: String) -> bool:
 	return _banners(g).any(func(a: Dictionary) -> bool: return a.text == text)
+
+
+func _kind(g, kind: String) -> Array:
+	return g.anims.filter(func(a: Dictionary) -> bool: return a.kind == kind)
 
 
 func _restock_banners(g) -> Array:
@@ -203,6 +209,56 @@ func _init() -> void:
 		"the unlock Wave's restock reads SHOP OPEN")
 	op.queue_free()
 	await process_frame
+
+	# --- NO-243: board anims queue with animations on, never with them off,
+	# and the board state never waits on them --------------------------------
+	for on in [true, false]:
+		var bd := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3], ["pawn", 0, 4, 2],
+			["pawn", 0, 5, 2], ["pawn", 0, 6, 2], ["rook", 1, 7, 8]],
+			"wave": 4, "stock": ["pawn"], "gold": 300})
+		await process_frame
+		bd.animations_on = on
+		bd.actions_left = 5
+		var tag := "anims %s: " % ("on" if on else "off")
+
+		bd.anims.clear()
+		bd._move_player(Vector2i(2, 2), Vector2i(2, 3))
+		check(bd.board[Vector2i(2, 3)].id == "queen", tag + "a capture updates the board at once")
+		var dies := _kind(bd, "die")
+		check(dies.size() == (1 if on else 0), tag + "a capture queues %d die anim(s) (%d)"
+			% [1 if on else 0, dies.size()])
+		if on:
+			check(dies[0].piece.id == "pawn", "...snapshotting the victim, not the attacker")
+
+		bd.anims.clear()
+		bd.pending_spawn.append({"id": "pawn"})
+		bd.pending_spawn.append({"id": "knight"})
+		WaveLogic.spawn_pending(bd)
+		var arrives := _kind(bd, "arrive")
+		check(arrives.size() == (2 if on else 0), tag + "2 spawns queue %d arrive anims (%d)"
+			% [2 if on else 0, arrives.size()])
+		if on:
+			check(arrives[1].t < arrives[0].t, "...the second staggered after the first")
+			check(bd.board.has(arrives[0].to) and bd.board.has(arrives[1].to),
+				"...with both enemies already on the board")
+
+		bd.anims.clear()
+		bd.state = bd.State.PLAYER_TURN
+		MergeLogic.commit_merge(bd, Vector2i(4, 2), Vector2i(5, 2))
+		check(bd.board.has(Vector2i(5, 2)) and not bd.board.has(Vector2i(4, 2)),
+			tag + "a merge updates the board at once")
+		var merges := _kind(bd, "merge")
+		check(merges.size() == (1 if on else 0), tag + "a board merge queues %d merge anim(s) (%d)"
+			% [1 if on else 0, merges.size()])
+		if on:
+			check(merges[0].sources.size() == 2, "...sliding both board inputs")
+			bd.anims.clear()
+			MergeLogic.commit_merge(bd, {"id": "pawn", "cap": false, "entry": "pawn"}, Vector2i(6, 2))
+			merges = _kind(bd, "merge")
+			check(merges.size() == 1 and merges[0].sources.size() == 1,
+				"a Stock + board merge slides only the board input")
+		bd.queue_free()
+		await process_frame
 
 	print("---")
 	if fails == 0:

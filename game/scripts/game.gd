@@ -166,6 +166,11 @@ const HATCH_BLUE_PHASE := HATCH_SPACING * 0.5 # NO-184: the reachable
 	# zone" (see HATCH_SPACING above), so a blue `\` next to a red `/` would
 	# collide with that vocabulary on any blue+red overlap.
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
+const DIE_TIME := 0.4 # NO-243: captured piece's flash + burst (and its ring)
+const ARRIVE_TIME := 0.35 # NO-243: enemy drop-in
+const ARRIVE_KING_TIME := 0.5
+const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
+const MERGE_TIME := 0.5 # NO-243: inputs pull together, result fades in
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -1883,10 +1888,135 @@ func _add_float(at: Vector2i, text: String, color: Color) -> void:
 		"at_px": _tile_px(at) + Vector2(tile, tile) / 2, "color": color})
 
 
+## A capture: the ring, plus (NO-243) the victim flashing white and bursting.
+## Every call site runs while the victim is still on `at`, so it is snapshotted
+## here and dies on screen instead of vanishing under the ring.
 func _add_pop(at: Vector2i) -> void:
 	if autoplay or not animations_on:
 		return
-	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0})
+	var ring_dur := ANIM_TIME
+	if board.has(at):
+		ring_dur = DIE_TIME # the ring plays alongside the burst
+		anims.append({"kind": "die", "px": _tile_px(at), "piece": board[at].duplicate(true),
+			"t": 0.0, "dur": DIE_TIME})
+	anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2, "t": 0.0,
+		"dur": ring_dur})
+
+
+## NO-243: a spawned enemy drops onto `at` (wave_logic.spawn_pending). The
+## board loop skips the tile while this anim owns it. Arrivals in the same
+## batch are staggered ARRIVE_STAGGER apart; a King also lights the board edge.
+func _add_arrive(at: Vector2i) -> void:
+	if autoplay or not animations_on or not board.has(at):
+		return
+	var king: bool = board[at].id == "king"
+	var dur := ARRIVE_KING_TIME if king else ARRIVE_TIME
+	var waiting := 0
+	for a in anims:
+		if a.kind == "arrive" and a.t <= 0.0:
+			waiting += 1
+	anims.append({"kind": "arrive", "to": at, "t": -ARRIVE_STAGGER * waiting / dur,
+		"dur": dur, "king": king})
+	if king:
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": Color(1.0, 0.8, 0.3)})
+	queue_redraw()
+
+
+## NO-243: a merge result landed on `to` (merge_logic.commit_merge). `sources`
+## is [{px, piece}] for the board-tile inputs; a Stock input has no tile and
+## so no slide.
+func _add_merge_fx(sources: Array, to: Vector2i) -> void:
+	if autoplay or not animations_on or not board.has(to):
+		return
+	anims.append({"kind": "merge", "to": to, "sources": sources, "t": 0.0, "dur": MERGE_TIME})
+	queue_redraw()
+
+
+## Draws `p` scaled about the centre of the tile whose top-left is `px`, moved
+## by `offset`.
+func _draw_piece_xf(font: Font, p: Dictionary, px: Vector2, scl: Vector2, tint: Color,
+		offset := Vector2.ZERO) -> void:
+	var half := Vector2(tile, tile) / 2
+	draw_set_transform(px + half + offset, 0.0, scl)
+	_draw_piece(font, p, -half, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## NO-243: enemy drop-in with a squash on landing. The King falls from higher
+## and squashes harder.
+func _draw_arrive(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	if t < 0.0:
+		return # staggered, not started yet
+	var p: Dictionary = board[a.to]
+	var px := _tile_px(a.to)
+	var k := 1.0
+	if a.king:
+		k = 1.6
+	var fall := 0.7 # share of the anim spent falling; the rest is the squash
+	if t < fall:
+		var u := t / fall
+		var y := -tile * 2.5 * k * (1.0 - u * u) # accelerating fall
+		_draw_piece_xf(font, p, px, Vector2.ONE, Color(1, 1, 1, minf(1.0, u * 3.0)), Vector2(0, y))
+	else:
+		var sq := 0.22 * k * sin(PI * (t - fall) / (1.0 - fall))
+		# the offset keeps the piece's base on the tile floor while it squashes
+		_draw_piece_xf(font, p, px, Vector2(1.0 + sq, 1.0 - sq), Color.WHITE,
+			Vector2(0, tile * sq * 0.5))
+
+
+## NO-243: the captured piece flashes white for 0.12 s, then bursts into small
+## squares. modulate > 1 only brightens (dark outlines stay dark, and the
+## result clamps), so the flash also lays a white wash over the piece, which
+## renders white under every renderer.
+func _draw_die(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	var p: Dictionary = a.piece
+	var px: Vector2 = a.px
+	var flash := 0.12 / DIE_TIME
+	if t < flash:
+		var fu := t / flash
+		var fs := 1.0 + 0.15 * fu
+		_draw_piece_xf(font, p, px, Vector2(fs, fs), Color(3, 3, 3))
+		var wash := Rect2(px, Vector2(tile, tile)).grow(-tile * 0.12)
+		draw_rect(wash, Color(1, 1, 1, 0.85 * (1.0 - 0.5 * fu)))
+		return
+	var u := (t - flash) / (1.0 - flash)
+	var c := px + Vector2(tile, tile) / 2
+	var side := COL_SIDE_PLAYER
+	if p.owner == Rules.ENEMY:
+		side = COL_SIDE_ENEMY
+	var sz := tile * 0.14 * (1.0 - u)
+	for i in 10:
+		var ang := TAU * i / 10.0 + 0.4 * (i % 3)
+		var dist := tile * (0.2 + 0.75 * (1.0 - pow(1.0 - u, 2.0))) * (0.8 + 0.1 * (i % 4))
+		var chip := Color.WHITE
+		if i % 2 == 1:
+			chip = side
+		chip.a = 1.0 - u
+		draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2, Vector2(sz, sz)), chip)
+
+
+## NO-243: the board inputs slide into the target tile and shrink, then the
+## result fades in and grows 0.8 -> 1 inside a fading cyan glow.
+func _draw_merge(font: Font, a: Dictionary) -> void:
+	var t: float = a.t
+	var px := _tile_px(a.to)
+	var join := 0.5
+	if t < join:
+		var ju := ease(t / join, 2.0) # accelerate into each other
+		var js := 1.0 - 0.35 * ju
+		for src in a.sources:
+			var from: Vector2 = src.px
+			_draw_piece_xf(font, src.piece, from.lerp(px, ju), Vector2(js, js),
+				Color(1, 1, 1, 1.0 - 0.3 * ju))
+		return
+	var u := (t - join) / (1.0 - join)
+	for r in 3: # soft glow: stacked translucent outlines
+		draw_rect(Rect2(px, Vector2(tile, tile)).grow(4.0 + r * 5.0 * (0.5 + u)),
+			Color(COL_MERGE, 0.3 * (1.0 - u)), false, 5.0)
+	var s := 0.8 + 0.2 * u
+	_draw_piece_xf(font, board[a.to], px, Vector2(s, s), Color(1, 1, 1, u))
 
 
 ## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;
@@ -5039,7 +5169,7 @@ func _draw() -> void:
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
-		if a.kind == "move":
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge": # the anim draws it
 			sliding[a.to] = a
 	for pos in board:
 		if sliding.has(pos):
@@ -5067,7 +5197,16 @@ func _draw() -> void:
 			draw_rect(Rect2(board_px - Vector2(grow, grow),
 				Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile + Vector2(grow, grow) * 2),
 				Color(a.color, 1.0 - a.t), false, 5.0)
-		elif a.kind == "banner": # turn/wave strip: wipes in, holds, fades out
+		elif a.kind == "arrive" and board.has(a.to):
+			_draw_arrive(font, a)
+		elif a.kind == "merge" and board.has(a.to):
+			_draw_merge(font, a)
+	for a in anims: # after the slides, so a dying piece shows over the attacker
+		# moving onto its tile; before the banners, which stay on top
+		if a.kind == "die":
+			_draw_die(font, a)
+	for a in anims:
+		if a.kind == "banner": # turn/wave strip: wipes in, holds, fades out
 			var br := _banner_rect(a.t, a.get("slot", 0))
 			if br.size.x <= 0.0:
 				continue # not emerged yet

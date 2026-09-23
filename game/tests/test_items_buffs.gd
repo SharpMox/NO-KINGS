@@ -562,6 +562,11 @@ func _init() -> void:
 	bc._apply_buff(bc.board[bp], "taunt", 0, bp)
 	check(BuffLogic.has(bc.board[bp], "taunt"),
 		"Abduction Probe raises the cap (+1, to 3) — the 3rd Piece Buff now lands")
+	bc.artefacts.append({"key": "abduction-probe"}) # NO-244: a second copy adds nothing
+	check(bc.buff_cap() == 3, "NO-244: two Abduction Probes held -> cap 3, not 4 (the probe doesn't stack)")
+	bc._apply_buff(bc.board[bp], "range", 0, bp)
+	check(BuffLogic.catalogued_count(bc.board[bp]) == 3,
+		"NO-244: a 4th Piece Buff is refused with two probes held")
 	bc.queue_free()
 	await process_frame
 

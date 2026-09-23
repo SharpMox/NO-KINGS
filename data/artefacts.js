@@ -730,7 +730,7 @@ var ARTEFACTS = [
     conspiracy: "The Illuminati", url: "https://en.wikipedia.org/wiki/Illuminati",
     summary: "A real Bavarian society of Enlightenment radicals, founded 1776, banned 1785 — nine years of existence, two and a half centuries of afterlife as the master explanation for everything. The seal never expired." },
   { name: "Abduction Probe", rarity: "Rare", type: "Passive", bonus: ["Buff"], status: "KEEP", implemented: true,
-    effect: "+1 Piece Buff capacity",
+    effect: "+1 Piece Buff capacity (does not stack)",
     conspiracy: "Abduction implants", url: "https://en.wikipedia.org/wiki/Alien_abduction",
     summary: "Abductees report small objects left under the skin — tracking devices, the lore says. The removed specimens that reach laboratories assay as ordinary terrestrial metal and glass, which the lore was ready for: of course they do." },
   { name: "HAARP Volume Knob", rarity: "Rare", type: "Passive", bonus: ["Score","Gold"], status: "KEEP", implemented: true,

@@ -67,7 +67,7 @@ static func roll_options(g, theme: String, size: String) -> Array:
 			var taken := {}
 			for i in choices:
 				var pool: Array = Items.ARTEFACT_EFFECTS.filter(func(e: Dictionary) -> bool:
-					return not taken.has(e.name))
+					return not taken.has(e.name) and not Shop.is_unique_held(g, e.key))
 				var e: Dictionary = pool[Tuning.weighted_artefact_pick(pool, g.rng)]
 				taken[e.name] = true
 				out.append({"kind": "artefact", "name": e.name,

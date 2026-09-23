@@ -17,10 +17,10 @@ static func of(piece: Dictionary) -> Array:
 	return piece.get("buffs", [])
 
 
-## Piece Buff capacity (issue 53, user ruling) — base 2, +1 per held
-## Abduction Probe, additive per copy. `probes` is the held-copy count;
-## callers read it off g.artefacts (this module stays g-free like the rest
-## of it — see the header).
+## Piece Buff capacity (issue 53, user ruling) — base 2 plus `probes`, the
+## bonus slots: Abduction Probe (+1, never per copy — Max, NO-244) and
+## Communion (+1). Callers read them off g (game.gd buff_cap; this module
+## stays g-free like the rest of it — see the header).
 static func cap(probes: int) -> int:
 	return Tuning.PIECE_BUFF_CAP_BASE + probes
 

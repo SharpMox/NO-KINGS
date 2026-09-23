@@ -433,6 +433,38 @@ func _init() -> void:
 	slots.queue_free()
 	await process_frame
 
+	# --- NO-244 (Max, 2026-09-24): Abduction Probe doesn't stack, so once one
+	# is held no artefact offer rolls a second — the Shop's normal and hidden
+	# (Sub-Antarctic Visa) slots, Artefact Box contents, and a Box rolled alone.
+	var probe_entry: Dictionary = Items.ARTEFACT_EFFECTS.filter(
+		func(t: Dictionary) -> bool: return t.key == "abduction-probe")[0]
+	var un: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["sub-antarctic-visa"]})
+	await process_frame
+	check(Shop._sample_weighted_artefacts([probe_entry], 1, un) == ["abduction-probe"],
+		"NO-244 control: with no probe held, the probe is still offered")
+	un.artefacts.append(probe_entry.duplicate())
+	check(Shop._sample_weighted_artefacts([probe_entry], 1, un).is_empty(),
+		"NO-244: with a probe held, the Shop's artefact sampler never offers a second")
+	var probe_offered := false
+	for s in 60:
+		un.rng.seed = 1000 + s
+		Shop.roll(un)
+		for sl in un.shop_stock:
+			if sl.kind == "artefact" and sl.key == "abduction-probe":
+				probe_offered = true
+			if sl.kind == "box":
+				for o in sl.contents:
+					if o.kind == "artefact" and o.payload.key == "abduction-probe":
+						probe_offered = true
+		for o in Box.roll_options(un, "artefact", "huge"):
+			if o.payload.key == "abduction-probe":
+				probe_offered = true
+	check(not probe_offered,
+		"NO-244: 60 seeded Shop rolls + huge Artefact Boxes never offer a 2nd Abduction Probe")
+	un.queue_free()
+	await process_frame
+
 	# --- issue 18: Shop price modifiers, same held copy stacks additively
 	# off the immutable base as two Denazification Visas hit 0, not -25%^2
 	var denaz: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],

@@ -167,6 +167,10 @@ const HATCH_BLUE_PHASE := HATCH_SPACING * 0.5 # NO-184: the reachable
 	# collide with that vocabulary on any blue+red overlap.
 const ANIM_TIME := 0.12 # seconds per move slide / capture pop
 const DIE_TIME := 0.4 # NO-243: captured piece's flash + burst (and its ring)
+const DIE_FLASH_TIME := 0.12 # ...of which the white flash
+## NO-243: paints whatever _flash_layer draws as a pure-white silhouette.
+## modulate > 1 cannot do this: it only multiplies, so dark outlines stay dark.
+const FLASH_SHADER := "shader_type canvas_item; void fragment() { COLOR = vec4(1.0, 1.0, 1.0, texture(TEXTURE, UV).a * COLOR.a); }"
 const ARRIVE_TIME := 0.35 # NO-243: enemy drop-in
 const ARRIVE_KING_TIME := 0.5
 const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
@@ -612,6 +616,11 @@ var merge_highlights := {} # ids that complete a merge with the current selectio
 var anims: Array = [] # {kind: "move"|"pop", t, ...} rendered by _draw
 var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
 	# per-frame pulse never rebuilds the board's draw list (review pass 2)
+## NO-243: the capture flash needs FLASH_SHADER, and a material is per canvas
+## item, so it gets its own child. Children draw over the board, so the
+## banners move to a child of their own, added after it, to stay on top.
+var _flash_layer := Node2D.new()
+var _banner_layer := Node2D.new()
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 ## NO-17: artefact key -> Texture2D. Only the painted ones are in here; read it
@@ -850,6 +859,14 @@ func _ready() -> void:
 	var outline_mat := ShaderMaterial.new()
 	outline_mat.shader = outline_shader
 	_pulse.material = outline_mat
+	var flash_mat := ShaderMaterial.new()
+	flash_mat.shader = Shader.new()
+	flash_mat.shader.code = FLASH_SHADER
+	_flash_layer.material = flash_mat
+	add_child(_flash_layer)
+	_flash_layer.draw.connect(_draw_flash)
+	add_child(_banner_layer)
+	_banner_layer.draw.connect(_draw_banners)
 	defs = Rules.load_pieces()
 	fusions = Rules.load_fusions()
 	for id in defs:
@@ -1965,21 +1982,16 @@ func _draw_arrive(font: Font, a: Dictionary) -> void:
 			Vector2(0, tile * sq * 0.5))
 
 
-## NO-243: the captured piece flashes white for 0.12 s, then bursts into small
-## squares. modulate > 1 only brightens (dark outlines stay dark, and the
-## result clamps), so the flash also lays a white wash over the piece, which
-## renders white under every renderer.
+## NO-243: the captured piece flashes white (its silhouette, drawn over it by
+## _draw_flash) for DIE_FLASH_TIME, then bursts into small squares.
 func _draw_die(font: Font, a: Dictionary) -> void:
 	var t: float = a.t
 	var p: Dictionary = a.piece
 	var px: Vector2 = a.px
-	var flash := 0.12 / DIE_TIME
+	var flash := DIE_FLASH_TIME / DIE_TIME
 	if t < flash:
-		var fu := t / flash
-		var fs := 1.0 + 0.15 * fu
-		_draw_piece_xf(font, p, px, Vector2(fs, fs), Color(3, 3, 3))
-		var wash := Rect2(px, Vector2(tile, tile)).grow(-tile * 0.12)
-		draw_rect(wash, Color(1, 1, 1, 0.85 * (1.0 - 0.5 * fu)))
+		var fs := 1.0 + 0.15 * t / flash
+		_draw_piece_xf(font, p, px, Vector2(fs, fs), Color.WHITE)
 		return
 	var u := (t - flash) / (1.0 - flash)
 	var c := px + Vector2(tile, tile) / 2
@@ -1995,6 +2007,53 @@ func _draw_die(font: Font, a: Dictionary) -> void:
 			chip = side
 		chip.a = 1.0 - u
 		draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2, Vector2(sz, sz)), chip)
+
+
+## Turn/wave strips: wipe in, hold, fade out. Drawn on _banner_layer so they
+## sit above every other board layer (NO-243).
+func _draw_banners() -> void:
+	for a in anims:
+		if a.kind != "banner":
+			continue
+		var br := _banner_rect(a.t, a.get("slot", 0))
+		if br.size.x <= 0.0:
+			continue # not emerged yet
+		var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
+		_banner_layer.draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
+		# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
+		# with the band rather than them appearing instantly at full width.
+		_banner_layer.draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+		_banner_layer.draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+		if _banner_font == null: # set up once, never per-frame
+			_banner_font = BANNER_FONT
+			# hard pixel edges: no smoothing, hinting or sub-pixel offsets
+			_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+			_banner_font.hinting = TextServer.HINTING_NONE
+			_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+			var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ★ and − (see BANNER_FONT)
+			_banner_font.fallbacks = fallbacks
+		# baseline +31: the 18 px caps sit centred in the 44 px band
+		_banner_layer.draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
+			HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
+
+
+## NO-243: the white silhouette over each dying piece during its flash, on
+## _flash_layer (FLASH_SHADER), at _draw_die's rect and scale. A glyph-fallback
+## piece has no texture, so it has no silhouette.
+func _draw_flash() -> void:
+	var flash := DIE_FLASH_TIME / DIE_TIME
+	for a in anims:
+		if a.kind != "die" or a.t >= flash or not textures.has(a.piece.id):
+			continue
+		var u: float = a.t / flash
+		var s := 1.0 + 0.15 * u
+		var half := Vector2(tile, tile) / 2
+		var px: Vector2 = a.px
+		_flash_layer.draw_set_transform(px + half, 0.0, Vector2(s, s))
+		_flash_layer.draw_texture_rect(piece_tex(a.piece.id, a.piece.owner),
+			Rect2(-half - Vector2(2, 2), Vector2(tile + 4, tile + 4)), false, # _draw_piece's rect
+			Color(1, 1, 1, 1.0 - 0.5 * u))
+	_flash_layer.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## NO-243: the board inputs slide into the target tile and shrink, then the
@@ -4998,6 +5057,8 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 # --- rendering ---
 
 func _draw() -> void:
+	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
+	_banner_layer.queue_redraw()
 	var font := ThemeDB.fallback_font
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:
@@ -5202,31 +5263,9 @@ func _draw() -> void:
 		elif a.kind == "merge" and board.has(a.to):
 			_draw_merge(font, a)
 	for a in anims: # after the slides, so a dying piece shows over the attacker
-		# moving onto its tile; before the banners, which stay on top
+		# moving onto its tile (banners draw on _banner_layer, above)
 		if a.kind == "die":
 			_draw_die(font, a)
-	for a in anims:
-		if a.kind == "banner": # turn/wave strip: wipes in, holds, fades out
-			var br := _banner_rect(a.t, a.get("slot", 0))
-			if br.size.x <= 0.0:
-				continue # not emerged yet
-			var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
-			draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
-			# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
-			# with the band rather than them appearing instantly at full width.
-			draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-			draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-			if _banner_font == null: # set up once, never per-frame
-				_banner_font = BANNER_FONT
-				# hard pixel edges: no smoothing, hinting or sub-pixel offsets
-				_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-				_banner_font.hinting = TextServer.HINTING_NONE
-				_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-				var fallbacks: Array[Font] = [font] # ★ and − (see BANNER_FONT)
-				_banner_font.fallbacks = fallbacks
-			# baseline +31: the 18 px caps sit centred in the 44 px band
-			draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
-				HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
 	if drag_from.x >= 0 and board.has(drag_from) and textures.has(board[drag_from].id):
 		draw_texture_rect(piece_tex(board[drag_from].id, board[drag_from].owner),
 			Rect2(get_global_mouse_position() - Vector2(tile, tile) * 0.5, Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))

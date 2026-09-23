@@ -1,0 +1,72 @@
+name: godot-suite
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-suite-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GODOT_VERSION: 4.7-stable
+      GODOT_ASSET: Godot_v4.7-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v6
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          base=https://github.com/godotengine/godot/releases/download/$GODOT_VERSION
+          curl -fsSL -o godot.zip "$base/$GODOT_ASSET.zip"
+          curl -fsSL -o SHA512-SUMS.txt "$base/SHA512-SUMS.txt"
+          echo "$(grep " $GODOT_ASSET.zip\$" SHA512-SUMS.txt | cut -d' ' -f1)  godot.zip" | sha512sum -c -
+          unzip -q godot.zip && rm godot.zip SHA512-SUMS.txt
+          mv "$GODOT_ASSET" godot && chmod +x godot
+
+      - name: Install Xvfb + Mesa (llvmpipe)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            xvfb xauth libgl1 libgl1-mesa-dri libegl1 libglx-mesa0 \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 libxkbcommon0 libxkbcommon-x11-0 \
+            libfontconfig1
+
+      - name: Run suite (xvfb)
+        env:
+          GODOT: /home/runner/godot/godot
+        run: |
+          start=$(date +%s)
+          code=0
+          xvfb-run -a -s "-screen 0 1280x1024x24" game/tests/run_all.sh 2>&1 | tee suite.log || code=$?
+          echo "suite wall time: $(( $(date +%s) - start ))s (exit $code)" | tee -a suite.log
+          exit $code
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: suite-logs
+          retention-days: 14
+          path: |
+            suite.log
+            /tmp/tmp.*
+          if-no-files-found: ignore

@@ -28,6 +28,23 @@ if ! "$GODOT" --headless --path . --import >"$import_log" 2>&1; then
 fi
 rm -f "$import_log"
 
+# Every tracked script needs its committed .uid sidecar. Godot writes one on
+# import, but since 2026-09-19 scripts are written on a machine that never runs
+# Godot, so the sidecar only appears on the machine that runs this suite —
+# which never commits. List what's missing with the value Godot just generated,
+# so whoever reads this can commit those exact lines.
+missing_uids=""
+for f in $(git ls-files '*.gd' | grep -v '^addons/'); do
+	git ls-files --error-unmatch "$f.uid" >/dev/null 2>&1 || missing_uids="$missing_uids $f.uid"
+done
+if [ -n "$missing_uids" ]; then
+	fails="$fails uid-sidecars"
+	echo "FAIL: uid-sidecars — scripts with no committed .uid; commit these as-is (game/<path>):"
+	for u in $missing_uids; do
+		echo "  $u: $(cat "$u" 2>/dev/null || echo '(not generated)')"
+	done
+fi
+
 # The windowed click probes (menu-clicks/game-clicks) grab real window focus
 # and OS-level click routing, which another running Godot instance can
 # steal. Detect that plainly instead of retrying — a retry that hides a

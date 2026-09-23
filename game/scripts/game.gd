@@ -336,7 +336,7 @@ const BUFF_BADGE_BG := Color(0.05, 0.05, 0.08, 0.9)
 const BUFF_BADGE_GLYPH_COL := Color.WHITE
 const BUFF_GLYPH_RATIO := 1.6 # glyph size = badge half-width * this (NO-244)
 const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
-const BUFF_BADGE_LIME := Color(0.72, 0.95, 0.22)
+const BUFF_BADGE_LIME := Color(0.953, 0.886, 0.675) # the Army ability button's text yellow (hud.gd; Max, NO-244)
 const BUFF_BADGE_PURPLE := Color(0.26, 0.11, 0.36, 0.95)
 
 # board layout, computed from the viewport in _ready so any BOARD_W/H fits

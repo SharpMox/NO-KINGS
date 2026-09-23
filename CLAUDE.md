@@ -405,10 +405,13 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
     tested tree (`git rev-parse <tested>^{tree} origin/main^{tree}`).
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
-- **Suite runs go to Aux by default.** The probes are windowed, so a run on Main takes over
-  Max's screen. Dispatch `game/tests/run_all.sh` to the Aux session and verify the result
-  here. Main runs it when Max asks for it on Main. Aux runs **Godot
-  4.7.stable.official.5b4e0cb0f** — the same build string as Main, at `~/bin/godot`
+- **The full suite runs in GitHub Actions on every PR and on push to `main`**
+  (`.github/workflows/godot-suite.yml`, job `suite`). A PR merges only once that check is
+  green — check with `gh pr checks <n>`. This is the merge gate; it replaces dispatching
+  `run_all.sh` to Aux for that purpose. Aux stays in use for: visual captures Max judges
+  by eye, windowed/device work, and reproducing a CI failure interactively. The tiered
+  policy above (`--only` while iterating) still applies for local/Aux runs. Aux runs
+  **Godot 4.7.stable.official.5b4e0cb0f** — the same build string as Main, at `~/bin/godot`
   (symlinked to `~/Applications/Godot.app/Contents/MacOS/Godot`). `GODOT=` is mandatory:
   Aux's non-interactive ssh shell reads no profile, so `PATH` is just the system default
   and a bare `godot` is not found; `run_all.sh` already reads a `GODOT` override

@@ -7,7 +7,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50 (issue 16: Score is up-only, so this penalty debits $ instead)",
+  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50",
   "conspiracy": "The 27 Club",
   "implemented": true
  },
@@ -191,7 +191,7 @@
   "bonus": [
    "Score"
   ],
-  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10 (issue 16: Score is up-only, so this penalty debits $ instead)",
+  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10",
   "conspiracy": "The social credit system",
   "implemented": true
  },

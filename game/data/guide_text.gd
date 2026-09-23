@@ -1,42 +1,48 @@
 ## In-game rules reference. One copy so the Main Menu's Guide and the
 ## in-game menu's Guide (scripts/guide.gd, 05-menus-and-settings) can never
 ## drift out of sync with each other.
+##
+## NO-242: every sentence was checked against the code on 2026-09-23 (the PR
+## lists the source line behind each). When a rule changes, change it here.
 
 const TEXT := (
 	"Objective\n" +
-	"Survive waves of enemy pieces and checkmate the recurring King before " +
-	"your clock runs out. Reaching wave 50 opens a win screen — Continue " +
-	"for endless play, or End Run to lock in your score.\n\n" +
+	"Checkmate the wave-50 King to win; Continue for Endless. You lose if " +
+	"the Clock runs out, enemies fill your back row, or you run out of " +
+	"pieces.\n\n" +
 
-	"Board & Setup\n" +
-	"The board is 8x12. Your two back rows are your placement zone: drop " +
-	"your starting army there before the first wave, then during the run.\n\n" +
+	"Board\n" +
+	"8x12. Place your Starting Stock free on your two back rows, then " +
+	"PASS. Later deploys cost 20 Gold, onto those rows or beside your " +
+	"pieces.\n\n" +
 
-	"Turns & Actions\n" +
-	"Each of your turns gives you 2 actions. Moving, capturing, placing a " +
-	"piece, merging/fusing, and using an item each cost 1 action — mix and " +
-	"match. PASS ends your turn early and banks a clock bonus.\n\n" +
+	"Turns\n" +
+	"2 Actions a turn (1 from Tier 4): move, capture, deploy, merge or " +
+	"use an Item. Each piece moves once. PASS ends the turn.\n\n" +
 
 	"Merging\n" +
-	"Two pieces of the same kind combine into their next promotion. Drag " +
-	"one stack onto another (in Stock or Inventory) or onto a matching " +
-	"piece on the board, then confirm.\n\n" +
+	"Drag or tap a piece onto a highlighted twin to promote, or a partner " +
+	"to fuse. 1 Action + 15 Gold.\n\n" +
 
-	"Stock, Inventory & Shop\n" +
-	"Captured enemies and unplaced pieces sit in Stock; items and " +
-	"artefacts sit in Inventory. The Shop sells pieces, items, artefacts, " +
-	"and boxes for $, and restocks as your score climbs.\n\n" +
+	"Stock\n" +
+	"Captures go to Captured Stock: long-press to Convert them into Stock " +
+	"for Gold. Long-press anything in Stock or Inventory to Sell for half " +
+	"price.\n\n" +
 
-	"King Abilities\n" +
-	"Every 10th wave applies a King Ability — an economic penalty (extra " +
-	"$ cost on an action type, a barred piece, etc.) that lasts until " +
-	"the run ends.\n\n" +
+	"Shop & Boxes\n" +
+	"Opens on wave 5; restocks every 5 waves and each 5,000 Score between. " +
+	"Boxes offer 3, 5 or 7 choices: keep one (Huge: two) or skip for " +
+	"Gold.\n\n" +
+
+	"Army\n" +
+	"Power: always on. Ability: 1 Action, once per wave. Waves 11, 21, " +
+	"31 and on bring Reinforcements: two of each starting piece and 2 minutes.\n\n" +
 
 	"Kings\n" +
-	"A King boss appears periodically. Checkmating one refills your clock " +
-	"and scores a bonus — the wave-50 King is the run's win condition.\n\n" +
+	"Kings lead waves 50, 100, 150 and 200, usually after 15 turns of " +
+	"buffed enemies. Each King's Power lasts its wave.\n\n" +
 
 	"Clock\n" +
-	"The run plays against a countdown clock. Finishing a turn, clearing " +
-	"the board early, and checkmating Kings all add time back."
+	"15 minutes (5 from Tier 3). Each turn adds 5 seconds; early clears, " +
+	"Kings after wave 50 and Continue add more."
 )

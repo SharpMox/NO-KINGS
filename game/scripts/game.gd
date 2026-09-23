@@ -316,6 +316,9 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 ## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
 ## the RING off-centre. Shift by this fraction of the mark size so the ring,
 ## not the box, sits on the disc's centre (measured from a capture, NO-100).
+## The ⟲ is drawn this much larger than the size the disc is built from, so it
+## fills more of its disc (Max, NO-100).
+const INV_MARK_GLYPH_SCALE := 1.25
 const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
@@ -5296,10 +5299,11 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		draw_circle(c, r, INV_MARK_DISC_COL)
 		# draw_string's y is the BASELINE: drop it by half of (ascent - descent)
 		# so the glyph's box is centred on the disc, not sitting on its middle
-		var baseline := c.y + (font.get_ascent(mark_size) - font.get_descent(mark_size)) / 2.0
-		var nudge := INV_MARK_GLYPH_NUDGE * mark_size
+		var glyph_size := int(mark_size * INV_MARK_GLYPH_SCALE)
+		var baseline := c.y + (font.get_ascent(glyph_size) - font.get_descent(glyph_size)) / 2.0
+		var nudge := INV_MARK_GLYPH_NUDGE * glyph_size
 		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
-			HORIZONTAL_ALIGNMENT_CENTER, r * 2, mark_size, INV_MARK_GLYPH_COL)
+			HORIZONTAL_ALIGNMENT_CENTER, r * 2, glyph_size, INV_MARK_GLYPH_COL)
 	var buff_glyphs := BuffLogic.glyphs_of(p)
 	if not buff_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
 		_draw_buff_badges(font, px, buff_glyphs)

@@ -68,7 +68,8 @@ var _player: VideoStreamPlayer
 ## Pulled out of _ready so tests/test_intro.gd can exercise it without a
 ## real CLI invocation.
 static func should_bypass(args: PackedStringArray) -> bool:
-	return args.has("--autoplay") or args.has("--scenario") or args.has("--screenshot")
+	return args.has("--autoplay") or args.has("--scenario") or args.has("--screenshot") \
+		or args.has("--anim-demo") # NO-243 demo (throwaway branch)
 
 
 ## NO `--drive` IN should_bypass ABOVE, deliberately: the driver has to be able

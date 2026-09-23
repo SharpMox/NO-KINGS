@@ -919,6 +919,9 @@ func _ready() -> void:
 	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
 		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
 		is_scenario = true
+	if first_boot and args.has("--anim-demo"): # NO-243 demo: fixed board for recording
+		next_config = ANIM_DEMO_CFG.duplicate(true)
+		is_scenario = true
 	if next_config.is_empty():
 		# issue 89: roll the King line-up here, from the run RNG (seeded just
 		# above), so the same seed always meets the same four Kings in the same
@@ -993,6 +996,8 @@ func _ready() -> void:
 		print("SCENARIO OK")
 		get_tree().quit()
 	_refresh()
+	if first_boot and args.has("--anim-demo"):
+		_run_anim_demo(args[args.find("--anim-demo") + 1])
 	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
 		if is_scenario and (args.has("--select") or args.has("--arm-item")
 				or args.has("--open-shop") or args.has("--open-drawer")
@@ -2076,6 +2081,69 @@ func _draw_merge(font: Font, a: Dictionary) -> void:
 			Color(COL_MERGE, 0.3 * (1.0 - u)), false, 5.0)
 	var s := 0.8 + 0.2 * u
 	_draw_piece_xf(font, board[a.to], px, Vector2(s, s), Color(1, 1, 1, u))
+
+
+## NO-243 demo (throwaway branch): `--anim-demo <arrive|capture|merge>` boots
+## this fixed board (as a scenario, so it never autosaves) and _run_anim_demo
+## fires the case 4 times, 1.5 s apart, then quits — sized for a Movie Maker
+## recording. The enemy pawn in the corner keeps _board_cleared() false, so a
+## merge's own _refresh/_on_pass path never ends the turn.
+const ANIM_DEMO_CFG := {"board": [["rook", 0, 1, 0], ["queen", 0, 4, 0], ["knight", 0, 6, 0],
+	["pawn", 1, 0, 9]], "wave": 2, "clock_s": 3600.0, "gold": 9999, "score": 1200,
+	"actions_left": 99, "actions_max": 99, "seed": "243"} # seed: same spawn tiles every run
+const ANIM_DEMO_FROM := Vector2i(3, 3)
+const ANIM_DEMO_TO := Vector2i(3, 7)
+const ANIM_DEMO_MERGE_A := Vector2i(1, 5)
+const ANIM_DEMO_MERGE_B := Vector2i(5, 5)
+
+
+func _run_anim_demo(kind: String) -> void:
+	await get_tree().create_timer(1.0).timeout
+	for i in 4:
+		_anim_demo_setup(kind, i)
+		await get_tree().create_timer(0.5).timeout
+		_anim_demo_fire(kind, i)
+		await get_tree().create_timer(1.0).timeout
+	await get_tree().create_timer(0.5).timeout
+	get_tree().quit()
+
+
+func _anim_demo_setup(kind: String, i: int) -> void:
+	match kind:
+		"arrive":
+			for pos in board.keys():
+				if board[pos].owner == Rules.ENEMY:
+					board.erase(pos)
+		"capture":
+			board[ANIM_DEMO_FROM] = {"id": "queen", "owner": Rules.PLAYER}
+			board[ANIM_DEMO_TO] = {"id": ["rook", "bishop", "knight", "pawn"][i], "owner": Rules.ENEMY}
+		"merge":
+			board[ANIM_DEMO_MERGE_A] = {"id": "pawn", "owner": Rules.PLAYER}
+			board[ANIM_DEMO_MERGE_B] = {"id": "pawn", "owner": Rules.PLAYER}
+			actions_left = 99
+			gold = 9999
+	_refresh()
+	queue_redraw()
+
+
+func _anim_demo_fire(kind: String, i: int) -> void:
+	match kind:
+		"arrive": # through the real spawn path; the last two fires are a King
+			if i < 2:
+				for pid in ["pawn", "knight", "rook"]:
+					pending_spawn.append({"id": pid})
+			else:
+				pending_spawn.push_front({"id": "king", "king_id": "nero"})
+			WaveLogic.spawn_pending(self)
+		"capture": # the seam every capture uses: ring + death, slide, overwrite
+			_add_pop(ANIM_DEMO_TO)
+			_add_slide(ANIM_DEMO_FROM, ANIM_DEMO_TO)
+			board[ANIM_DEMO_TO] = board[ANIM_DEMO_FROM]
+			board.erase(ANIM_DEMO_FROM)
+		"merge": # the real commit; a same-id merge is a promotion (pawn -> next)
+			MergeLogic.commit_merge(self, ANIM_DEMO_MERGE_A, ANIM_DEMO_MERGE_B)
+	_refresh()
+	queue_redraw()
 
 
 ## Loss only when EVERY back-row tile holds an enemy (playtest rule 2026-07-02;

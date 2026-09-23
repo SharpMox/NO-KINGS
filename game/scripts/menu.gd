@@ -641,7 +641,7 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	# NO-77: once only — the args outlive the first Game, this scene does not.
 	if not GameScript.cli_bypass_used \
-			and (args.has("--autoplay") or args.has("--scenario")):
+			and (args.has("--autoplay") or args.has("--scenario") or args.has("--anim-demo")):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
 		return
 	# issue 84: send anything queued while offline BEFORE pulling the mirror.

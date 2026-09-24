@@ -12,7 +12,8 @@ Extraction strips board-only fields (position, owner) and stores whatever
 state is left; placement merges it back onto the new board piece; **Stock
 never interprets the state** — no buff schema, no enumerated kinds. HUD stacks
 group by whole-entry equality, so each distinct state combination gets its own
-stack. Merging discards input state (the result is a new piece). Old saves
+stack (superseded 2026-09-24, NO-100 review: the HUD no longer stacks — one
+cell per entry). Merging discards input state (the result is a new piece). Old saves
 (bare-string stocks) stay valid with no migration.
 
 Rejected: a typed `{"id", "buff": bool}` schema — it encodes exactly one buff

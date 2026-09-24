@@ -653,7 +653,7 @@ func _init() -> void:
 			break
 	check(target.x >= 0, "(sanity) an open, EMPTY Deploy tile exists")
 	# tap path: the tap itself must arm nothing and light nothing
-	cap._on_stack_pressed("pawn", true, 1)
+	cap._on_stack_pressed("pawn", true)
 	check(cap._deploy_highlight_tiles().is_empty(),
 		"tapping a captured entry paints no deploy targets on the board")
 	cap._on_tile_clicked(target)
@@ -672,7 +672,7 @@ func _init() -> void:
 		"and releasing over a Deploy tile places nothing")
 	# CONTROL: the SAME two calls on the Stock pawn DO light the board, so the
 	# two empty-highlight checks above are not passing vacuously.
-	cap._on_stack_pressed("pawn", false, 1)
+	cap._on_stack_pressed("pawn", false)
 	check(not cap._deploy_highlight_tiles().is_empty(),
 		"(control) arming a STOCK entry does light the deploy targets")
 	cap.placing_id = ""
@@ -683,26 +683,34 @@ func _init() -> void:
 	# NO MERGE from Captured Stock: a captured piece is never offered as a
 	# partner, and tapping one while a real partner is armed does nothing —
 	# that tap is exactly what used to merge instead of converting.
-	cap.stock.append("pawn") # two Stock pawns: a genuine, affordable pair
-	cap.captured.append("pawn") # ... and two captured pawns beside them
+	cap.board[target] = {"id": "pawn", "owner": Rules.PLAYER} # a board partner
+	cap.captured.append("pawn") # ... and two captured pawns beside it
 	check(MergeLogic.pair_ok(cap, "pawn", "pawn"),
 		"(control) pawn+pawn IS a legal pair, so the refusals below are about the POOL")
 	cap.placing_id = "pawn"
 	cap.armed_entry = cap.stock[0]
 	cap._refresh()
 	check(cap.merge_highlights.has("pawn"),
-		"(control) the armed Stock pawn has a Stock partner, so 'pawn' IS a highlighted id")
+		"(control) the armed Stock pawn has a board partner, so 'pawn' IS a highlighted id")
 	cap.pool_click_key = "" # clear of the double-tap window: this is a first tap
-	cap._on_stack_pressed("pawn", true, 2)
+	cap._on_stack_pressed("pawn", true)
 	check(cap.pending_merge.is_empty() and cap.captured == ["pawn", "pawn"]
-			and cap.stock == ["pawn", "pawn"],
+			and cap.stock == ["pawn"],
 		"tapping a captured entry with a partner armed merges nothing — no confirm, no consumption")
-	cap.stock.clear()
-	cap.stock.append("pawn") # ONE Stock pawn, two captured ones
+	cap.board.erase(target)
 	cap.placing_id = "pawn"
 	cap.armed_entry = "pawn"
 	check(not MergeLogic.partner_ids(cap).has("pawn"),
 		"and two captured pawns do not make 'pawn' a partner for the single Stock pawn")
+	# NO-100 review (2026-09-24): merges happen on the board only — a second
+	# STOCK pawn is no partner for the armed one either, and a pool-only
+	# do_merge is refused outright.
+	cap.stock.append("pawn")
+	check(not MergeLogic.partner_ids(cap).has("pawn"),
+		"two Stock pawns are not partners: Stock never merges with Stock")
+	MergeLogic.do_merge(cap, {"id": "pawn", "entry": "pawn"}, {"id": "pawn", "entry": "pawn"})
+	check(cap.pending_merge.is_empty() and cap.stock == ["pawn", "pawn"],
+		"a Stock+Stock do_merge asks nothing and consumes nothing")
 	cap.placing_id = ""
 	cap.queue_free()
 	await process_frame
@@ -838,32 +846,35 @@ func _init() -> void:
 	bot.queue_free()
 	await process_frame
 
-	# --- NO-237: Stock/Captured stacks KEEP their buttons across a rebuild
+	# --- NO-237: Stock/Captured cells KEEP their buttons across a rebuild
 	# (hud.gd's _rebuild_stock_drawer used to free and rebuild every one, so
-	# nothing on screen had an identity a slide could animate). A stack still
-	# there keeps its exact Button, re-dressed with its new count; a stack that
-	# is gone has no button left in either grid.
+	# nothing on screen had an identity a slide could animate). A cell still
+	# there keeps its exact Button; a piece that is gone has no button left in
+	# either grid. NO-100 review: one cell per piece, no count badge.
 	var re: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"stock": ["pawn", "knight"], "captured": ["rook"]})
 	await process_frame
+	var find_all := func(id: String, cap: bool) -> Array:
+		return re.hud.pool_buttons().filter(func(b: Button) -> bool:
+			return b.has_meta("id") and b.get_meta("id") == id and bool(b.get_meta("cap")) == cap)
 	var find := func(id: String, cap: bool) -> Button:
-		for b in re.hud.pool_buttons():
-			if b.has_meta("id") and b.get_meta("id") == id and bool(b.get_meta("cap")) == cap:
-				return b
-		return null
+		var all: Array = find_all.call(id, cap)
+		return all[0] if not all.is_empty() else null
 	var knight_btn: Button = find.call("knight", false)
 	var rook_btn: Button = find.call("rook", true)
 	check(knight_btn != null and rook_btn != null and find.call("pawn", false) != null,
-		"NO-237 fixture: pawn and knight stacks in Stock, a rook in Captured")
+		"NO-237 fixture: a pawn and a knight in Stock, a rook in Captured")
 	re.stock.erase("pawn")
 	re.stock.append("knight")
 	re._refresh()
-	check(find.call("knight", false) == knight_btn,
-		"NO-237: the knight stack keeps its button across a rebuild")
-	check(knight_btn.get_children().any(func(c: Node) -> bool: return c is Label and c.text == "2"),
-		"NO-237: and the kept button shows the stack's new count")
+	var knights: Array = find_all.call("knight", false)
+	check(knights.size() == 2 and knights.has(knight_btn),
+		"NO-237: a second knight is a second cell, and the first keeps its button")
+	check(not knights.any(func(b: Button) -> bool:
+			return b.get_children().any(func(c: Node) -> bool: return c is Label and c.text.is_valid_int())),
+		"NO-100 review: no count badge on any Stock cell")
 	check(find.call("rook", true) == rook_btn, "NO-237: a Captured row keeps its button too")
-	check(find.call("pawn", false) == null, "NO-237: the gone pawn stack's button is out of the grid")
+	check(find.call("pawn", false) == null, "NO-237: the gone pawn's button is out of the grid")
 	re.queue_free()
 	await process_frame
 

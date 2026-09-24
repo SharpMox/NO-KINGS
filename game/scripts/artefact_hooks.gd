@@ -188,10 +188,10 @@
 ## - on_rank_up fires from two choke points: merge_logic.gd's commit_merge,
 ##   when the merged pair is a same-id promotion-chain step rather than a
 ##   Fusion of two different pieces (ids[0] == ids[1]), and game.gd's
-##   "promote" Item. ctx = {pos, old_id, id}; `pos.x < 0` means the result
-##   landed in Stock, not the board (a pool-only merge) — Holy Grail Coaster
-##   branches on that to convert the bare Stock id into a buff-carrying
-##   Dictionary, Sleeper Agent Pillow's same pattern (issue 18).
+##   "promote" Item. ctx = {pos, old_id, id}; `pos` is always a board tile —
+##   every merge lands on the board since the NO-100 review (2026-09-24)
+##   removed Stock-only merges, and with them the Stock landing Holy Grail
+##   Coaster used to branch on.
 ## - on_king_ability_apply (economy.gd apply_king_ability, ctx = {key, tier}) and
 ##   on_king_ability_charge (economy.gd charge, fired right after on_charge leaves
 ##   ctx.charged true — issue 13 landed on_charge concurrently, so this rides
@@ -1159,19 +1159,13 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	if hook == "on_turn_start":
 		g.dejavu_score_turn_done = false
 		g.dejavu_gold_turn_done = false
-	if hook == "on_rank_up" and ctx.pos.x >= 0: # issue 42: peak-rank stamp,
+	if hook == "on_rank_up": # issue 42: peak-rank stamp,
 		# the single choke point every on_rank_up dispatch already passes
 		# through (merge_logic.gd commit_merge, game.gd "promote" Item, and
 		# this file's own mrna-firmware-update/alien-rocket-toy in-place
 		# promotions) — a piece is Ranked by definition right after a rank-up,
 		# so stamp unconditionally, independent of any artefact being held.
-		# Skipped for a Stock landing (ctx.pos.x < 0): a fresh Stock entry is
-		# a bare id String there (merge_logic.gd, ADR-0002 — "Merging discards
-		# input state"), nothing to stamp a field onto until some other
-		# handler (Holy Grail Coaster's own branch) converts it to a
-		# Dictionary — same limitation buffs/the capture ledger already
-		# accept for that path, not a new gap. See _demoted() below for the
-		# read side (Dark Market Light Bulb).
+		# See _demoted() below for the read side (Dark Market Light Bulb).
 		g.board[ctx.pos].peak_ranked = true
 	if hook == "on_purchase" and ctx.get("kind", "") == "artefact" \
 			and ctx.key != "ecdysis-sheddings": # issue 55: Ecdysis Sheddings'
@@ -2150,15 +2144,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		["witness-protection-mustache", "on_rank_up"]:
 			Economy.add_clock(g, 20000, "witness-protection-mustache")
 		["holy-grail-coaster", "on_rank_up"]:
-			if ctx.pos.x >= 0:
-				_grant_buff(g, ctx.pos)
-			elif ctx.stock_index >= 0: # landed in Stock: promote the bare id at
-				# the exact index the merge placed it — NOT g.stock.size() - 1,
-				# which a same-call handler appending its own grant (Bigfoot
-				# Toenail Clipping) would otherwise shift out from under this
-				var piece := {"id": g.stock[ctx.stock_index]} # (Sleeper Agent
-				_grant_buff_to(g, piece)                      # Pillow's pattern)
-				g.stock[ctx.stock_index] = piece
+			_grant_buff(g, ctx.pos)
 		["bigfoot-toenail-clipping", "on_rank_up"]:
 			_grant_stock(g, key, ItemLogic.chain_base(g.defs, ctx.id))
 
@@ -2321,7 +2307,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					if next_id != null:
 						g.board[ctx.pos].id = next_id
 						run(g, "on_rank_up",
-							{"pos": ctx.pos, "old_id": old_id, "id": next_id, "stock_index": -1})
+							{"pos": ctx.pos, "old_id": old_id, "id": next_id})
 
 		# --- issue 23: demotion/buff-removal immunity (game.gd "demote"/"radar_jamming") ---
 		["antikythera-warranty-card", "on_demote"]:
@@ -2356,7 +2342,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					var old_id: String = rocket_piece.id
 					rocket_piece.id = g.defs[old_id].next
 					run(g, "on_rank_up", {"pos": ctx.attacker_pos,
-						"old_id": old_id, "id": rocket_piece.id, "stock_index": -1})
+						"old_id": old_id, "id": rocket_piece.id})
 		["zodiac-crossword-puzzle", "on_wave_clear"]:
 			var best := Vector2i(-1, -1)
 			var best_n := 0

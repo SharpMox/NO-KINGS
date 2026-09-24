@@ -699,31 +699,18 @@ func _init() -> void:
 	ms.queue_free()
 	await process_frame
 
-	# Stock path (ADR-0002): a pool-only merge that inherits buffs appends a
-	# Dictionary, not the bare id — one that inherits none still appends a
-	# bare String (unrelated opaque state, e.g. peak_ranked, still discarded:
-	# see test_items.gd's "merging a stateful entry ... discards the state").
-	var msk := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
-		"stock": [{"id": "pawn", "buffs": [{"key": "shield"}]}, "pawn"]})
+	# A buffed Stock entry (ADR-0002) merged onto a board partner: its buffs
+	# ride onto the board result like a board source's do. Every merge lands
+	# on the board since the NO-100 review (2026-09-24).
+	var msk := _boot({"army": "Crown", "board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 4, "gold": 100, "stock": [{"id": "pawn", "buffs": [{"key": "shield"}]}]})
 	await process_frame
 	msk.actions_left = 5
-	MergeLogic.commit_merge(msk, {"id": "pawn", "entry": msk.stock[0]},
-		{"id": "pawn", "entry": msk.stock[1]})
-	check(msk.stock.size() == 1 and msk.stock[0] is Dictionary
-			and msk.stock[0].id == "sergeant" and BuffLogic.has(msk.stock[0], "shield"),
-		"NO-191: a pool-only merge that inherits buffs appends a Stock Dictionary")
+	MergeLogic.commit_merge(msk, {"id": "pawn", "entry": msk.stock[0]}, Vector2i(2, 2))
+	check(msk.stock.is_empty() and msk.board[Vector2i(2, 2)].id == "sergeant"
+			and BuffLogic.has(msk.board[Vector2i(2, 2)], "shield"),
+		"NO-191: a buffed Stock entry merged onto the board hands its buffs to the result")
 	msk.queue_free()
-	await process_frame
-
-	var msn := _boot({"army": "Crown", "board": [["rook", 1, 7, 10]], "wave": 4, "gold": 100,
-		"stock": ["pawn", "pawn"]})
-	await process_frame
-	msn.actions_left = 5
-	MergeLogic.commit_merge(msn, {"id": "pawn", "entry": msn.stock[0]},
-		{"id": "pawn", "entry": msn.stock[1]})
-	check(msn.stock == ["sergeant"],
-		"NO-191: a pool-only merge that inherits no buffs still appends a bare String")
-	msn.queue_free()
 	await process_frame
 
 	print("---")

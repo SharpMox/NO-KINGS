@@ -39,7 +39,7 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | `ad` | the AD placeholder overlay | `--scenario-name "Movement & drag" --screenshot /tmp/cap/ad --show-screen ad` |
 | `win` | wave-50 win screen (Continue / End Run) | `--scenario-name "Win screen: wave 50 (capture King)" --screenshot /tmp/cap/win --show-screen win` |
 | `setup` | SETUP placement zone: empty board, full Army Stock, Stock drawer open | `--scenario-name "Movement & drag" --screenshot /tmp/cap/setup --show-screen setup` |
-| `stock-return` | the Stock drawer's "+" return slot (SETUP, one placed piece selected) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
+| `stock-return` | SETUP, a placed piece mid-drag over the open Stock drawer: its first empty slot highlighted as the drop target, the Army's Stock one cell per piece | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
 | `feed` | kill feed with three lines: a capture gain, a sale, an Artefact trigger | `--scenario-name "Movement & drag" --screenshot /tmp/cap/feed --show-screen feed` |
 | `pick` | the shared choice modal, as a Sell confirm | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/pick --show-screen pick` |
 
@@ -96,5 +96,5 @@ ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --p
 | 8 | Guide detail panel | `--screenshot /tmp/cap/guide-<page>-<index> --show-screen guide:<page>:<index>` (menu.png) |
 | 9 | King Ability chip | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/kchip --show-screen board` |
 | 9 | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
-| 10 | Promote badge | `--scenario-name "Combo Army: Crown — free merges against a Stock full of pairs" --screenshot /tmp/cap/promote --open-drawer stock` |
-| 10 | "+" return slot | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
+| 10 | Stock drawer, one cell per piece (no stacks, no Promote badge) | `--scenario-name "Combo Army: Crown — free merges, Stock pieces onto board partners" --screenshot /tmp/cap/stock --open-drawer stock` |
+| 10 | Stock return drop preview | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |

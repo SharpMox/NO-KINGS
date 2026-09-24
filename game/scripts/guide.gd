@@ -253,7 +253,7 @@ static func _fill_pieces(box: VBoxContainer, board, detail: DetailPanel) -> void
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.add_child(_icon(board.load_piece_tex(id), 40))
-		row.add_child(_label(defs[id].name, 17, true))
+		row.add_child(_label("%s · %d" % [defs[id].name, int(defs[id].value)], 17, true))
 		_tap_row(box, row, func() -> void: detail.open(_piece_detail(id, board, detail)))
 
 

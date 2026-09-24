@@ -28,6 +28,7 @@
 var PIECES_CODEX = [
     {
       id: 'pawn',
+      value: 10,
       family: 'pawn-like',
       name: 'Pawn',
       original_name: 'Pawn',
@@ -45,6 +46,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'berolina',
+      value: 10,
       family: 'pawn-like',
       name: 'Void Pawn',
       original_name: 'Berolina Pawn',
@@ -62,6 +64,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'sergeant',
+      value: 20,
       family: 'pawn-like',
       name: 'Ranger',
       original_name: 'Sergeant',
@@ -79,6 +82,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'inv-sergeant',
+      value: 20,
       family: 'pawn-like',
       name: 'Void Ranger',
       original_name: 'Void Ranger',
@@ -96,6 +100,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'arrow-pawn',
+      value: 30,
       family: 'pawn-like',
       name: 'Archer',
       original_name: 'Arrow Pawn',
@@ -113,6 +118,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'inv-arrow-pawn',
+      value: 30,
       family: 'pawn-like',
       name: 'Void Archer',
       original_name: 'Void Archer',
@@ -130,6 +136,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'ferz',
+      value: 20,
       family: 'leapers',
       name: 'Seer',
       original_name: 'Ferz',
@@ -146,6 +153,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'elephant-modern',
+      value: 30,
       family: 'leapers',
       name: 'Mystic',
       original_name: 'Elephant (Modern)',
@@ -165,6 +173,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'high-priestess',
+      value: 50,
       family: 'leapers',
       name: 'Shaman',
       original_name: 'High Priestess',
@@ -185,6 +194,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'wazir',
+      value: 20,
       family: 'leapers',
       name: 'Mage',
       original_name: 'Wazir',
@@ -201,6 +211,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'war-machine',
+      value: 30,
       family: 'leapers',
       name: 'Sorcerer',
       original_name: 'War Machine',
@@ -220,6 +231,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'champion',
+      value: 50,
       family: 'leapers',
       name: 'Archmage',
       original_name: 'Champion',
@@ -240,6 +252,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'bishop',
+      value: 30,
       family: 'sliders',
       name: 'Bishop',
       original_name: 'Bishop',
@@ -256,6 +269,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'dragon-horse',
+      value: 50,
       family: 'compounds',
       name: 'Cardinal',
       original_name: 'Dragon Horse',
@@ -273,6 +287,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'archbishop',
+      value: 70,
       family: 'compounds',
       name: 'Archbishop',
       original_name: 'Archbishop',
@@ -293,6 +308,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'rook',
+      value: 50,
       family: 'sliders',
       name: 'Rook',
       original_name: 'Rook',
@@ -309,6 +325,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'dragon-king',
+      value: 70,
       family: 'compounds',
       name: 'Drakehold',
       original_name: 'Dragon King',
@@ -326,6 +343,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'chancellor',
+      value: 80,
       family: 'compounds',
       name: 'Dragonlord',
       original_name: 'Chancellor',
@@ -343,6 +361,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'knight',
+      value: 30,
       family: 'leapers',
       name: 'Knight',
       original_name: 'Knight',
@@ -359,6 +378,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'gnu',
+      value: 50,
       family: 'leapers',
       name: 'Pegasus',
       original_name: 'Gnu',
@@ -378,6 +398,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'buffalo',
+      value: 70,
       family: 'leapers',
       name: 'Hippogriff',
       original_name: 'Buffalo',
@@ -398,6 +419,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'kirin',
+      value: 30,
       family: 'leapers',
       name: 'Long Ma',
       original_name: 'Kirin',
@@ -417,6 +439,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'kirin-plus',
+      value: 50,
       family: 'leapers',
       name: 'Qi Lin',
       original_name: 'Qi Lin',
@@ -437,6 +460,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'inv-kirin-plus',
+      value: 50,
       family: 'leapers',
       name: 'Void Qi Lin',
       original_name: 'Void Qi Lin',
@@ -457,6 +481,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'kirin-plus-plus',
+      value: 80,
       family: 'leapers',
       name: 'Ying Long',
       original_name: 'Ying Long',
@@ -480,6 +505,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'inv-kirin-plus-plus',
+      value: 80,
       family: 'leapers',
       name: 'Void Ying Long',
       original_name: 'Void Ying Long',
@@ -502,6 +528,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'alibaba',
+      value: 20,
       family: 'leapers',
       name: 'Duchess',
       original_name: 'Alibaba',
@@ -521,6 +548,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'bodyguard',
+      value: 50,
       family: 'sliders',
       name: 'Princess',
       original_name: 'Bodyguard',
@@ -537,6 +565,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'queen',
+      value: 90,
       family: 'sliders',
       name: 'Queen',
       original_name: 'Queen',
@@ -553,6 +582,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'squirrel',
+      value: 50,
       family: 'leapers',
       name: 'Faerie',
       original_name: 'Squirrel',
@@ -573,6 +603,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'crown-princess',
+      value: 80,
       family: 'compounds',
       name: 'Praetor',
       original_name: 'Crown Princess',
@@ -593,6 +624,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'amazon',
+      value: 120,
       family: 'compounds',
       name: 'Consul',
       original_name: 'Amazon',
@@ -610,6 +642,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'gryphon',
+      value: 60,
       family: 'others',
       name: 'Quetzalcoatl',
       original_name: 'Gryphon',
@@ -633,6 +666,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'manticore',
+      value: 60,
       family: 'others',
       name: 'Kraken',
       original_name: 'Manticore',
@@ -656,6 +690,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'godzilla',
+      value: 110,
       family: 'others',
       name: 'Leviathan',
       original_name: 'Godzilla',
@@ -687,6 +722,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'banshee',
+      value: 80,
       family: 'compounds',
       name: 'Djinn',
       original_name: 'Banshee',
@@ -711,6 +747,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'raven',
+      value: 90,
       family: 'compounds',
       name: 'Lich',
       original_name: 'Raven',
@@ -735,6 +772,7 @@ var PIECES_CODEX = [
     },
     {
       id: 'amazonrider',
+      value: 140,
       family: 'compounds',
       name: 'Valkyrie',
       original_name: 'Amazonrider',

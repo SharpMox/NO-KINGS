@@ -490,6 +490,9 @@
     const betza = piece.betza
       ? `<span class="betza-chip"><span class="betza-chip-label">Betza</span>${piece.betza}</span>`
       : '';
+    const value = piece.value != null
+      ? `<span class="betza-chip"><span class="betza-chip-label">Value</span>${piece.value}</span>`
+      : '';
     const badges = (piece.behaviors || []).map(b =>
       `<span class="badge badge-${b}">${b.replace(/-/g, ' ')}</span>`
     ).join('');
@@ -515,6 +518,7 @@
         <div class="card-board">${renderBoard(piece)}</div>
         <div class="card-meta">
           ${betza}
+          ${value}
         </div>
         <p class="card-desc">${piece.description}</p>
         ${badges ? `<div class="behavior-badges">${badges}</div>` : ''}

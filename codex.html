@@ -463,7 +463,7 @@ function recordHTML(p){
   return `
     <span class="mono-lb">${esc(p.family)}${p.origin==='Invented' ? ' &#183; new' : ''}</span>
     <h2>${esc(p.name)}</h2>
-    ${p.betza ? `<span class="betza-pill">${esc(p.betza)}</span>` : ''}
+    ${p.betza || p.value != null ? `<span class="betza-pill">${[p.betza, p.value != null ? `Value ${p.value}` : null].filter(Boolean).map(esc).join(' &#183; ')}</span>` : ''}
     ${renderBoard(p)}
     <p class="bench-desc">${esc(p.description_codex || p.description)}</p>
     ${(p.behaviors||[]).length ? `<div class="bench-tags">${p.behaviors.map(b=>`<span class="bench-tag">${esc(b.replace(/-/g,' '))}</span>`).join('')}</div>` : ''}`;

@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Check site piece values against game/data/pieces.json
+        run: node tools/check-piece-values.mjs
+
       - name: Cache Godot binary
         id: cache-godot
         uses: actions/cache@v6

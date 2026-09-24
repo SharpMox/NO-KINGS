@@ -35,7 +35,7 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | `banner` | the pinned turn banner (NO-234) | `--scenario-name "Banner: frozen (NO-234)" --screenshot /tmp/cap/banner --show-screen banner` |
 | `tip` / `preview` | long-press tip / preview for the tile at `--anchor` | `--scenario-name "Movement & drag" --screenshot /tmp/cap/preview --show-screen preview --anchor 2,1` |
 | `gameover` | loss screen ("Clock out"), no ad-retry offer | `--scenario-name "Loss: clock-out (10s)" --screenshot /tmp/cap/gameover --show-screen gameover` |
-| `gameover-retry` | NO-241 "Watch an ad to retry" prompt, forced on | `--scenario-name "Loss: clock-out (10s)" --screenshot /tmp/cap/retry --show-screen gameover-retry` |
+| `gameover-retry` | NO-241/NO-100 "Retry wave N?" prompt, forced on | `--scenario-name "Loss: clock-out (10s)" --screenshot /tmp/cap/retry --show-screen gameover-retry` |
 | `ad` | the AD placeholder overlay | `--scenario-name "Movement & drag" --screenshot /tmp/cap/ad --show-screen ad` |
 | `win` | wave-50 win screen (Continue / End Run) | `--scenario-name "Win screen: wave 50 (capture King)" --screenshot /tmp/cap/win --show-screen win` |
 | `setup` | SETUP placement zone: empty board, full Army Stock, Stock drawer open | `--scenario-name "Movement & drag" --screenshot /tmp/cap/setup --show-screen setup` |

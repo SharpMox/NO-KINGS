@@ -2432,6 +2432,8 @@ func _end_shot() -> void:
 func _on_win_continue() -> void:
 	win_open = false
 	overlay.visible = false
+	_banner_layer.visible = true # hidden under the win screen (modals._end_of_run_on_top)
+	hud.feed.visible = true
 	Economy.add_clock(self, Tuning.CONTINUE_CLOCK_REFILL_MS, "continue") # one-time endless bonus
 	if actions_left == 0 and state == State.PLAYER_TURN:
 		return _on_pass() # the checkmate spent the last action — resume the flow

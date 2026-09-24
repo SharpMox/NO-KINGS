@@ -527,6 +527,14 @@ func _end_of_run_on_top() -> void:
 		# true would leave the run believing it is still paused by a menu the
 		# player can no longer see.
 		g.game_menu_open = false
+	# NO-100: the overlay is a translucent dim, so the kill feed under it
+	# and the banner layer (the world, below the HUD) showed through it —
+	# the capture that ends a full clear also restocks the Shop, and its
+	# "SHOP RESTOCKED" banner read behind VICTORY. Hidden, not cleared:
+	# _on_win_continue shows both again for the endless run.
+	if g.hud != null:
+		g.hud.feed.visible = false
+	g._banner_layer.visible = false
 
 
 func show_win_screen() -> void:
@@ -540,7 +548,11 @@ func show_win_screen() -> void:
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
 	box.add_child(_overlay_label("VICTORY", 32))
-	var fallen: String = Kings.name_of(g.king_ids_defeated.back()) if not g.king_ids_defeated.is_empty() else "King"
+	# The King who just fell, else (the --show-screen capture, which opens this
+	# without a fall) the King still on the board — never a bare "King" when
+	# the run knows his name.
+	var fallen: String = Kings.name_of(g.king_ids_defeated.back()) \
+			if not g.king_ids_defeated.is_empty() else g._king_name()
 	box.add_child(_overlay_label("The wave-%d King, %s, has fallen" % [g.wave, fallen], 18))
 	var preview := 1 # GDD "ranking preview": where the score would land now
 	for e in g.load_scores():

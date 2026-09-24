@@ -1287,6 +1287,10 @@ func _shop_icon_is_placeholder(slot: Dictionary) -> bool:
 			return slot.kind != "piece" and slot.kind != "item" # box
 
 
+## NO-256: height of the price strip under a Shop tile's art (a 16 px line + 2).
+const PRICE_STRIP := 18.0
+
+
 ## One icon tile with a price badge; sold tiles grey out but keep their slot
 ## meta.shop_index (index into g.shop_stock) exists for the click probes.
 func _shop_tile(index: int) -> Button:
@@ -1329,18 +1333,22 @@ func _shop_tile(index: int) -> Button:
 	price.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 3)
-	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	# NO-256: 16 px text, kept 3 px off the tile's right edge (the last tile's
-	# right edge is the panel's); "Watch ad" wraps to two lines instead of
-	# running into the edge, growing up into the tile.
-	price.offset_left = -44
-	price.offset_right = -3
-	price.offset_top = -17
-	price.offset_bottom = -1
-	price.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	price.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	price.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# NO-256: the price gets its own strip BELOW the art, inside the tile: the
+	# tile's content area gives up PRICE_STRIP px at the bottom (so the
+	# expand_icon art shrinks above it), and the price sits centred on one
+	# line in that strip — never over the art, never past the tile's edge.
+	# "Watch ad" is ~51 px at 16 px, inside the 72 px tile.
+	for style in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var sb: StyleBox = btn.get_theme_stylebox(style).duplicate()
+		sb.content_margin_bottom = PRICE_STRIP
+		btn.add_theme_stylebox_override(style, sb)
+	price.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	price.offset_top = -PRICE_STRIP
+	price.offset_bottom = 0
+	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	price.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	price.clip_text = true
+	price.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(price)
 	# NO-167 (Max review, second pass): a tap opens the tile's own preview
 	# instead of expanding an in-place dock — see show_preview's shop_index

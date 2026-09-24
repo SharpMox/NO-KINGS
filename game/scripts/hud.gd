@@ -2549,7 +2549,7 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 
 ## NO-223 (2026-09-22 ruling: "badges are too small... they should just be
 ## information, whatever they do should be accessed with a long press") —
-## the Inventory drawer's own Sell badge, top-left corner pill on an
+## the Inventory drawer's own Sell badge, top-right corner pill on an
 ## Item/Artefact cell, priced and greyed exactly like the Stock/Captured
 ## grid's own ⇄ Convert badge (_build_stack_button above). INFORMATION ONLY:
 ## it takes no input of its own (MOUSE_FILTER_IGNORE) — Sell itself lives in
@@ -2571,15 +2571,17 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	for style in ["normal", "hover", "pressed", "disabled"]:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
-	sell.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	# NO-256: a 16 px price outgrows the old 28x16 box; pin the top-left corner
-	# inside the cell and let the pill grow right/down into it, never off it.
-	sell.grow_horizontal = Control.GROW_DIRECTION_END
+	# NO-256: top-RIGHT, 4 px inside the cell (the ⇄ Convert badge's corner;
+	# bottom-right holds the Artefact ✹/×N marker), growing left and down into
+	# it. At the old top-left the 16 px pill met the screen's left edge on the
+	# first column (Aux, 2026-09-25).
+	sell.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	sell.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	sell.grow_vertical = Control.GROW_DIRECTION_END
-	sell.offset_left = 3
-	sell.offset_right = 3
-	sell.offset_top = 3
-	sell.offset_bottom = 3
+	sell.offset_left = -4
+	sell.offset_right = -4
+	sell.offset_top = 4
+	sell.offset_bottom = 4
 	return sell
 
 

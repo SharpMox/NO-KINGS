@@ -1927,7 +1927,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			# _milestone5_hit's header above.
 			if _milestone5_hit(g.wave, acquired_wave):
 				g.silk_road_active = true # reset false at the top of every WaveLogic.queue()
-				_note(g, key, "Shop −50% this wave")
+				_note(g, key, "Shop −50%")
 		["john-titor-s-crypto-wallet", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave): # see silk-road-coupon's case above
 				g.gold += int(g.clock_ms / 1000.0 / 5.0)
@@ -1940,7 +1940,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				for i in mini(2, pool.size()):
 					var idx: int = g.rng.randi() % pool.size()
 					_grant_buff(g, pool[idx])
-					_note(g, key, "Piece Buff granted")
+					_note(g, key, "Buff")
 					pool.remove_at(idx)
 				_debit(g, key, 10)
 		["mk-ultra-sugar-cube", "on_deploy"]:
@@ -1953,7 +1953,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			# default" (Ruling 1, _random_buff_key above) was ever meant to
 			# cover — see .scratch/gdd-gaps/issues/42's Outcome.
 			_grant_buff(g, ctx.pos, "Tactical")
-			_note(g, key, "Tactical Piece Buff on deploy")
+			_note(g, key, "Buff")
 		["obedience-flavored-tap-water", "on_capture"]:
 			# Doesn't grant here — game.gd's _move_player applies it AFTER this
 			# capture's own critical/range consumption (ruled 2026-08-28, see
@@ -1963,11 +1963,11 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			# above (Common rarity, once-per-Wave is still frequent).
 			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
 				ctx.grant_buffs.append("Tactical")
-				_note(g, key, "Tactical Piece Buff on capture")
+				_note(g, key, "Buff")
 		["holy-lint", "on_capture"]:
 			if ctx.attacker_pos.x >= 0:
 				ctx.grant_buffs.append("")
-				_note(g, key, "Piece Buff on capture")
+				_note(g, key, "Buff")
 		["scientology-e-meter", "on_wave_clear"]:
 			# "the piece" — Wave clear has no single trigger piece, so this
 			# reads it as a random ally (same reading as Xenu OT III below).
@@ -1975,7 +1975,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			var se_pool := _player_positions(g)
 			if not se_pool.is_empty():
 				_grant_buff(g, se_pool[g.rng.randi() % se_pool.size()])
-				_note(g, key, "Piece Buff granted")
+				_note(g, key, "Buff")
 		["xenu-ot-iii-season-pass", "on_wave_clear"]:
 			_debit(g, key, 15)
 			var xe_pool := _player_positions(g)
@@ -1983,12 +1983,12 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				if xe_pool.is_empty():
 					break
 				_grant_buff(g, xe_pool[g.rng.randi() % xe_pool.size()])
-				_note(g, key, "Piece Buff granted")
+				_note(g, key, "Buff")
 		["sugar-free-chemtrail-can", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave):
 				for pos in _player_positions(g):
 					_grant_buff(g, pos)
-					_note(g, key, "Piece Buff granted")
+					_note(g, key, "Buff")
 		["sleeper-agent-pillow", "on_purchase"]:
 			# the piece landed as a plain id string at the end of g.stock
 			# (Shop.buy, just before this hook runs) — replace it with a
@@ -2000,14 +2000,14 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				var piece := {"id": ctx.key}
 				_grant_buff_to(g, piece, "Tactical")
 				g.stock[g.stock.size() - 1] = piece
-				_note(g, key, "bought piece carries a Tactical Piece Buff")
+				_note(g, key, "Buff")
 
 		# --- issue 18: Item-tag triggers ---
 		["frame-25", "on_wave_clear"]:
 			var tac_pool: Array = Items.ITEMS.filter(func(it: Dictionary) -> bool:
 				return it.tier == "Tactical")
 			grant_item(g, tac_pool[g.rng.randi() % tac_pool.size()])
-			_note(g, key, "+1 Tactical Item")
+			_note(g, key, "+1 Item")
 			_debit(g, key, 10)
 		["manna-vending-machine", "on_wave_clear"]:
 			# issue 58 redesign: was a flat "+2 Items" grant, which issue 53's
@@ -2573,7 +2573,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 						candidates.append(i)
 				if not candidates.is_empty():
 					g.shop_stock[candidates[g.rng.randi() % candidates.size()]].free_slot = true
-					_note(g, key, "one Shop slot is free this wave")
+					_note(g, key, "Free slot")
 		["mar-a-lago-toilet-papers", "on_price"]:
 			# "+10%" off the immutable base, same additive contract as every
 			# other on_price handler. The free slot's price is forced to 0
@@ -2755,4 +2755,4 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					and ["bishop", "dragon-horse", "archbishop"].has(ctx.attacker_id):
 				g._apply_buff(g.board[ctx.attacker_pos], "shield",
 					_buff_turns("shield"), ctx.attacker_pos)
-				_note(g, key, "Shield on capture")
+				_note(g, key, "Shield")

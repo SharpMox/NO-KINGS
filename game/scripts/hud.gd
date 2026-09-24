@@ -1698,7 +1698,7 @@ func _feed_fit(text: String, max_w: float) -> String:
 
 ## Queue a gain (and/or an artefact note) under `cause`. Everything posted
 ## under one cause before the frame ends becomes ONE line:
-## "Sold Rook +$25", "27 Club Punch Card: Piece Buff granted ×2".
+## "Sold Rook +$25", "27 Club Punch Card: Buff ×2".
 func feed_gain(cause: String, label: String, score := 0, gold := 0, note := "",
 		color := FEED_TEXT) -> void:
 	if g.autoplay:

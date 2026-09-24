@@ -5358,7 +5358,7 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			# trigger — text only, no icons (#569 round 2)
 			hud.feed_capture("Knight", 150, 15)
 			hud.feed_gain("sell", "Sold Rook", 0, 25)
-			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Piece Buff granted")
+			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Buff")
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")

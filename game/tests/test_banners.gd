@@ -280,9 +280,9 @@ func _init() -> void:
 
 	# #569 round 2: an Artefact trigger is text only, no icon and no ✦
 	_clear_feed(kf)
-	ArtefactHooks.feed(kf, "27-club-punch-card", 0, 0, "Piece Buff granted")
+	ArtefactHooks.feed(kf, "27-club-punch-card", 0, 0, "Buff")
 	kf.hud._flush_feed()
-	check(_feed_texts(kf) == ["27 Club Punch Card: Piece Buff granted"],
+	check(_feed_texts(kf) == ["27 Club Punch Card: Buff"],
 		"an Artefact trigger posts text only (%s)" % [_feed_texts(kf)])
 
 	_clear_feed(kf)

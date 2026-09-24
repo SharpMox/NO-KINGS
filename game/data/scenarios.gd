@@ -11,6 +11,8 @@
 ##   clock_s: float seconds (default = normal budget)
 ##   score: int
 
+const Tuning := preload("res://scripts/tuning.gd")
+
 const ZONE_PAWNS := [["pawn", 0, 1, 0], ["pawn", 0, 4, 0]]
 
 ## issue 79: the 180 generated per-Artefact sandboxes are appended by all(),
@@ -612,14 +614,14 @@ static func _hand_written() -> Array:
 		{"name": "Banner: looping (NO-234)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 4, 9]]}},
 		# --- debug: capture paths (tools/capture.md) ---
-		# Something of every sellable kind, a full Item inventory (3/3, so an
-		# Item Box shows its Sell row) and Gold for a Convert. Backs
+		# Something of every sellable kind, a full Item inventory (exactly the
+		# base cap, so an Item Box shows its Sell row) and Gold for a Convert. Backs
 		# `--show-screen pick` and every `--ui-demo` flow (scripts/ui_demo.gd
 		# boots it BY NAME — rename both together).
 		{"name": "Capture: selling sandbox", "cfg": {
 			"board": [["queen", 0, 3, 2], ["pawn", 0, 1, 0], ["rook", 1, 4, 9]],
 			"stock": ["rook", "knight", "pawn", "pawn"], "captured": ["bishop"],
-			"items": ["blitz", "sniper", "promote"],
+			"items": ["blitz", "sniper", "promote"].slice(0, Tuning.ITEM_CAP_BASE),
 			"artefacts": ["jet-fuel-vial", "deep-state-yearbook"],
 			"gold": 500, "score": 1000}},
 	]

@@ -11,6 +11,7 @@ const Scenarios := preload("res://data/scenarios.gd")
 const UiDemo := preload("res://scripts/ui_demo.gd")
 const Ads := preload("res://scripts/ads.gd")
 const Guide := preload("res://scripts/guide.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
 
 var fails := 0
 
@@ -113,7 +114,8 @@ func _init() -> void:
 	# --- --ui-demo flows, through the real preview + confirm ----------------
 	for flow in UiDemo.FLOWS:
 		var game := await _boot(UiDemo.SCENARIO)
-		check(game.items.size() == 3, "(setup) the sandbox holds a full inventory, 3 Items")
+		check(game.items.size() == ItemLogic.cap(game),
+			"(setup) the sandbox holds a full inventory, %d Items (the cap)" % ItemLogic.cap(game))
 		var stock_n: int = game.stock.size()
 		var cap_n: int = game.captured.size()
 		var items_n: int = game.items.size()
@@ -135,7 +137,8 @@ func _init() -> void:
 					"ui-demo sell-artefact: one Artefact sold")
 			"box-sell":
 				check(game.items.size() == items_n and not game.box_open,
-					"ui-demo box-sell: sold one Item inside the Box, then picked one")
+					"ui-demo box-sell: sold one Item inside the Box, then picked one (items %d -> %d, box_open %s, picks_left %d, offer %d)"
+					% [items_n, game.items.size(), game.box_open, game.box_picks_left, game.box_offer.size()])
 		await _free(game)
 
 	# --- guide:<page> ---------------------------------------------------------

@@ -69,7 +69,7 @@ tools/godot-lock.sh godot --path game --write-movie /tmp/cap/sell-stock.avi --fi
 | `convert` | Stock drawer → long-press Captured Bishop → Convert → long-press it in Stock → Sell → confirm |
 | `sell-item` | Inventory drawer → long-press Blitz → preview (Use / Sell) → Sell → confirm |
 | `sell-artefact` | Inventory drawer → long-press Jet Fuel Vial → preview → Sell → confirm |
-| `box-sell` | small Item Box on a full inventory (3/3) → Sell row → confirm → select an offer → Pick |
+| `box-sell` | small Item Box on a full inventory (at the Item cap) → Sell row → confirm → select an offer → Pick |
 
 On Aux, record one at a time:
 

@@ -132,6 +132,9 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	var hub_back := Button.new()
 	hub_back.text = "← Back"
 	hub_back.add_theme_font_size_override("font_size", 20)
+	# hub_box is otherwise LEFT-aligned (its catalog-page buttons), but Back
+	# is isolated below its own gap and reads better centred under the list.
+	hub_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	hub_back.pressed.connect(func() -> void:
 		root.visible = false
 		on_back.call())
@@ -252,6 +255,9 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	var back := Button.new()
 	back.text = "← Back"
 	back.add_theme_font_size_override("font_size", 18)
+	# box is otherwise LEFT-aligned (the catalog rows above), but Back is
+	# isolated below its own gap and reads better centred under the list.
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(func() -> void:
 		scroll.visible = false
 		hub_scroll.visible = true)

@@ -82,6 +82,17 @@ func _find_button(node: Node, text: String) -> Button:
 	return null
 
 
+## NO-263: every visible match, in tree order — used where more than one
+## control legitimately shares a label (a Guide page's top AND bottom Back).
+func _find_buttons(node: Node, text: String) -> Array[Button]:
+	var out: Array[Button] = []
+	if node is Button and node.text == text and node.is_visible_in_tree():
+		out.append(node)
+	for c in node.get_children():
+		out.append_array(_find_buttons(c, text))
+	return out
+
+
 func _click(at: Vector2) -> void:
 	for pressed in [true, false]:
 		var ev := InputEventMouseButton.new()
@@ -564,6 +575,52 @@ func _init() -> void:
 	await process_frame
 	check(_find_button(menu, "Rules") != null, "a second Back leaves the page for the Guide hub")
 	BackGuard._reset()
+
+	# NO-263: every Guide sub-page carries a second Back in its header row
+	# (long lists push the bottom one below the fold), wired to the SAME
+	# handler as the bottom one. Walk all 7 and prove both exist and the top
+	# one does what the bottom one does.
+	for page_name in ["Rules", "Pieces", "Promotions", "Fusions", "Artefacts", "Items", "Indicators"]:
+		check(await _click_button(menu, page_name), "%s button clickable (NO-263 sweep)" % page_name)
+		await process_frame
+		var backs := _find_buttons(menu, "← Back")
+		check(backs.size() == 2, "%s shows a top AND a bottom Back (%d found)" % [page_name, backs.size()])
+		if backs.size() == 2:
+			# tree order: the header row is built before the page content and
+			# its own bottom Back, so backs[0] is the TOP button.
+			check(await _click_control(backs[0]), "%s top Back is clickable" % page_name)
+			await process_frame
+			check(_find_button(menu, page_name) != null,
+				"%s top Back returns to the Guide hub, same as the bottom one" % page_name)
+
+	# The detail-panel ordering (#567) for the new top Back: the slide-over
+	# sheet (anchor_left 0.15) is added to `root` AFTER every page, so it
+	# draws — and picks input — above both the page's top and bottom Back the
+	# same way it already covers the bottom one; neither is a reachable tap
+	# target while the panel is open (a real finger can't hit a control the
+	# sheet is drawn over). So "the panel closes first" is proven the same
+	# way it already was above: Escape/Android-Back reach GuideRoot.go_back()
+	# regardless of which Back button exists, and that path is untouched by
+	# NO-263 — re-prove it once more here, now that Pieces carries two Backs.
+	check(await _click_button(menu, "Pieces"), "Pieces button clickable (top-Back-vs-panel)")
+	await process_frame
+	var prows2 := Guide.row_buttons(guide)
+	check(await _click_control(prows2[0]), "a Pieces row reopens the panel (top-Back-vs-panel)")
+	await create_timer(0.35).timeout
+	check(panel.is_open(), "the panel is open before Escape")
+	var esc2 := InputEventKey.new()
+	esc2.keycode = KEY_ESCAPE
+	esc2.pressed = true
+	root.push_input(esc2)
+	await create_timer(0.35).timeout
+	check(not panel.is_open() and prows2[0].is_visible_in_tree(),
+		"NO-263: Escape still closes the panel before leaving a two-Back page")
+	check(_find_buttons(menu, "← Back").size() == 2,
+		"...and both Backs are reachable again once the panel is closed")
+	check(await _click_button(menu, "← Back"), "Pieces top Back leaves the page for the Guide hub")
+	await process_frame
+	check(_find_button(menu, "Rules") != null, "...and lands on the Guide hub, not the main menu")
+
 	check(await _click_button(menu, "← Back"), "Guide hub Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "Guide hub Back restores the main menu")

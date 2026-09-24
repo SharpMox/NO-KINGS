@@ -19,10 +19,13 @@
 ## reaches this page with no separate update (CLAUDE.md: "read from the
 ## data, never copy it").
 ##
-## Pieces carries no description text: game/data/pieces.json has no prose
-## field, and modals.gd's own live "piece" preview shows a name + movement
-## diagram with no description line either (show_preview, kind == "piece")
-## — this page follows the same convention, not a gap.
+## NO-242 (Max's ruling 2026-09-24): the catalog pages are master-detail —
+## compact tappable rows, and a slide-over detail panel (DetailPanel, bottom
+## of this file) with the full entry. Pieces carries no description text:
+## game/data/pieces.json has no prose field, and modals.gd's own live
+## "piece" preview shows a name + movement diagram with no description line
+## either — the piece detail reuses that diagram, large, plus what the data
+## does carry (value, promotion chain, Void twin, fusions).
 ##
 ## Fusions shows one flat list, not additive/synergistic sections:
 ## game/data/fusions.json (built by tools/export-game-pieces.mjs) already
@@ -53,6 +56,11 @@ const Rules := preload("res://scripts/rules.gd")
 const Items := preload("res://data/items.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
+const Settings := preload("res://scripts/settings.gd")
+
+## Marks a tappable list row's Button (NO-242), so `row_buttons()` can find them.
+const ROW_META := "guide_row"
 
 
 ## Builds a full-rect, initially-hidden Guide panel as a child of `layer` and
@@ -60,7 +68,7 @@ const PieceDiagram := preload("res://scripts/piece_diagram.gd")
 ## own Back button is pressed (hides the panel itself). `board` supplies the
 ## piece-texture loader and board palette — see the header comment above.
 static func build(layer: Node, on_back: Callable, board) -> Control:
-	var root := Control.new()
+	var root := GuideRoot.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.visible = false
 	layer.add_child(root)
@@ -78,6 +86,7 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	hub_scroll.offset_right = -30
 	hub_scroll.offset_bottom = -30
 	root.add_child(hub_scroll)
+	root.hub_scroll = hub_scroll
 	var hub_box := VBoxContainer.new()
 	hub_box.add_theme_constant_override("separation", 10)
 	hub_scroll.add_child(hub_box)
@@ -86,19 +95,26 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	hub_head.add_theme_font_size_override("font_size", 28)
 	hub_box.add_child(hub_head)
 
+	# NO-242: the slide-over detail panel, shared by every catalog page. Built
+	# before the pages so their rows can close over it, added to `root` after
+	# them so it draws on top.
+	var detail := DetailPanel.new()
+	root.detail = detail
+
 	var pages := [
 		["Rules", func(box: VBoxContainer) -> void: _fill_rules(box)],
-		["Pieces", func(box: VBoxContainer) -> void: _fill_pieces(box, board)],
-		["Promotions", func(box: VBoxContainer) -> void: _fill_promotions(box, board)],
-		["Fusions", func(box: VBoxContainer) -> void: _fill_fusions(box, board)],
-		["Artefacts", func(box: VBoxContainer) -> void: _fill_artefacts(box)],
-		["Items", func(box: VBoxContainer) -> void: _fill_items(box)],
+		["Pieces", func(box: VBoxContainer) -> void: _fill_pieces(box, board, detail)],
+		["Promotions", func(box: VBoxContainer) -> void: _fill_promotions(box, board, detail)],
+		["Fusions", func(box: VBoxContainer) -> void: _fill_fusions(box, board, detail)],
+		["Artefacts", func(box: VBoxContainer) -> void: _fill_artefacts(box, detail)],
+		["Items", func(box: VBoxContainer) -> void: _fill_items(box, detail)],
 		["Indicators", func(box: VBoxContainer) -> void: _fill_indicators(box, board)],
 	]
 	for entry in pages:
 		var title: String = entry[0]
 		var fill: Callable = entry[1]
 		var page := _page(root, hub_scroll, title, fill)
+		root.pages.append(page)
 		var btn := Button.new()
 		btn.text = title
 		btn.add_theme_font_size_override("font_size", 22)
@@ -115,6 +131,7 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 		on_back.call())
 	hub_box.add_child(hub_back)
 
+	root.add_child(detail)
 	return root
 
 
@@ -130,6 +147,50 @@ static func open_page(root: Control, page: String) -> bool:
 	return false
 
 
+## Debug capture: `spec` is what follows "guide:" — "<page>" opens the page,
+## "<page>:<index>" also opens the detail panel on that page's row <index>
+## (0-based, list order), instantly so the screenshot never lands mid-slide.
+static func show_screen(root: Control, spec: String) -> bool:
+	var parts := spec.split(":")
+	if not open_page(root, parts[0]):
+		return false
+	if parts.size() < 2:
+		return true
+	var list := row_buttons(root)
+	var i := int(parts[1])
+	if not parts[1].is_valid_int() or i < 0 or i >= list.size():
+		return false
+	var detail: DetailPanel = (root as GuideRoot).detail
+	detail.instant = true
+	list[i].pressed.emit()
+	detail.instant = false
+	return true
+
+
+## The tappable rows of whichever sub-page is showing, in list order.
+static func row_buttons(root: Control) -> Array[Button]:
+	var out: Array[Button] = []
+	for page in (root as GuideRoot).pages:
+		if page.visible:
+			for b in page.find_children("*", "Button", true, false):
+				if b.has_meta(ROW_META):
+					out.append(b)
+	return out
+
+
+## The detail panel (NO-242): `.is_open()`, and its content for probes.
+static func detail_panel(root: Control) -> Control:
+	return (root as GuideRoot).detail
+
+
+## Back / Escape inside the Guide, one level up: the detail panel first, then
+## an open sub-page back to the hub. False at the hub itself, so the caller's
+## own Back handling (close the Guide) takes over — same "Back lands where the
+## on-screen ← does" shape as menu.gd's tier picker and TEST list.
+static func go_back(root: Control) -> bool:
+	return (root as GuideRoot).go_back()
+
+
 ## One sub-page's shell: header + whatever `fill_rows` appends + a Back
 ## button that returns to `hub_scroll`. Every catalog page below is just a
 ## `fill_rows` callable plugged into this.
@@ -137,6 +198,10 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# NO-242: rows are PASS buttons (_tap_row) so a drag that starts on one
+	# still scrolls; past this deadzone the press becomes a scroll, not a tap
+	# — the TEST list's own recipe (menu.gd, tests/test_touch_scroll.gd).
+	scroll.scroll_deadzone = 24
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_left = 30
 	scroll.offset_top = 30
@@ -171,38 +236,25 @@ static func _fill_rules(box: VBoxContainer) -> void:
 	box.add_child(body)
 
 
-## NO-189: name + a compact movement diagram per row — piece_diagram.gd is
-## the SAME renderer + move model (rules.gd's leap/ride/bent) the live board
-## itself reads, so this can never disagree with what a piece actually does
-## in a run. A diagram at this size already reads as "one line", so there is
-## no separate list-then-modal step. Player-side art (the default owner) —
-## unlike NO-190's difficulty-tier icons, Max ruled those red/enemy
-## specifically; no such ruling exists for this roster reference.
+## NO-242 (was NO-189's name + tiny-diagram rows): one compact row per piece
+## — token + name — and the full picture lives in the detail panel
+## (_piece_detail). Player-side art (the default owner) — unlike NO-190's
+## difficulty-tier icons, Max ruled those red/enemy specifically; no such
+## ruling exists for this roster reference.
 ## Excludes "king": tools/export-game-pieces.mjs's own comment calls it a
 ## boss ENTITY, not a roster piece (no Family, no fusions, never
 ## obtainable) — the reference site's codex lists 38, not 39, for the
 ## same reason.
-static func _fill_pieces(box: VBoxContainer, board) -> void:
+static func _fill_pieces(box: VBoxContainer, board, detail: DetailPanel) -> void:
 	var defs := Rules.load_pieces()
-	var cells := 9 # matches modals.gd's own show_preview diagram (covers the longest leap)
-	var cell := 8
-	for id in defs:
+	for id: String in defs:
 		if id == "king":
 			continue
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		box.add_child(row)
-		var name_l := Label.new()
-		name_l.text = defs[id].name
-		name_l.add_theme_font_size_override("font_size", 15)
-		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		row.add_child(name_l)
-		var dia := Control.new()
-		dia.custom_minimum_size = Vector2(cells, cells) * cell
-		var tex: Texture2D = board.load_piece_tex(id)
-		dia.draw.connect(func() -> void: PieceDiagram.draw(dia, defs, id, cells, cell, tex))
-		row.add_child(dia)
+		row.add_theme_constant_override("separation", 12)
+		row.add_child(_icon(board.load_piece_tex(id), 40))
+		row.add_child(_label(defs[id].name, 17, true))
+		_tap_row(box, row, func() -> void: detail.open(_piece_detail(id, board, detail)))
 
 
 ## NO-189: the 8 Families, derived from pieces.json's own `next` chain
@@ -211,47 +263,39 @@ static func _fill_pieces(box: VBoxContainer, board) -> void:
 ## with none is just a piece with no promotion at all (22 of the 38, e.g.
 ## Berolina). Row title = the base piece's own name, exactly matching
 ## promotions.js's own `title` field (also just the base's name, e.g.
-## "Pawn") — nothing here is invented copy.
-static func _fill_promotions(box: VBoxContainer, board) -> void:
+## "Pawn") — nothing here is invented copy. NO-242: a tap opens the chain's
+## RESULT (its top piece); that panel shows the whole chain again, each
+## stage tappable.
+static func _fill_promotions(box: VBoxContainer, board, detail: DetailPanel) -> void:
 	var defs := Rules.load_pieces()
 	var is_target := {}
 	for id in defs:
 		var nxt = defs[id].get("next")
 		if nxt:
 			is_target[nxt] = true
-	for id in defs:
+	for id: String in defs:
 		if id == "king" or is_target.has(id) or not defs[id].get("next"):
 			continue
-		var chain := [id]
-		var cur = id
-		while defs[cur].get("next"):
-			cur = defs[cur].next
-			chain.append(cur)
+		var chain := _chain(defs, id)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		box.add_child(row)
-		var title_l := Label.new()
-		title_l.text = defs[id].name
-		title_l.add_theme_font_size_override("font_size", 15)
+		var title_l := _label(defs[id].name, 16)
 		title_l.custom_minimum_size.x = 100
 		row.add_child(title_l)
 		for i in chain.size():
 			if i > 0:
-				var arrow := Label.new()
-				arrow.text = "→"
-				row.add_child(arrow)
-			var tr := TextureRect.new()
-			tr.texture = board.load_piece_tex(chain[i])
-			tr.custom_minimum_size = Vector2(32, 32)
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			row.add_child(tr)
+				row.add_child(_label("→", 16))
+			row.add_child(_icon(board.load_piece_tex(chain[i]), 36))
+		var top: String = chain[-1]
+		_tap_row(box, row, func() -> void: detail.open(_piece_detail(top, board, detail)))
 
 
 ## NO-189: one line per fusion, "A + B → Result" — see the header comment
-## for why additive/synergistic aren't split here. NO-242: each line leads
-## with the three pieces' own 32 px tokens (the same board.load_piece_tex
-## Promotions uses), and lines sort by result name rather than internal key.
-static func _fill_fusions(box: VBoxContainer, board) -> void:
+## for why additive/synergistic aren't split here. Each line leads with the
+## three pieces' own tokens (the same board.load_piece_tex Promotions uses),
+## and lines sort by result name rather than internal key. NO-242: a tap
+## opens the result piece's panel.
+static func _fill_fusions(box: VBoxContainer, board, detail: DetailPanel) -> void:
 	var defs := Rules.load_pieces()
 	var fusions := Rules.load_fusions()
 	var keys := fusions.keys()
@@ -264,35 +308,37 @@ static func _fill_fusions(box: VBoxContainer, board) -> void:
 		var out: String = fusions[k]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 4)
-		box.add_child(row)
 		for part in [parts[0], "+", parts[1], "→", out]:
 			if part == "+" or part == "→":
-				var sym := Label.new()
-				sym.text = part
-				row.add_child(sym)
-				continue
-			var tr := TextureRect.new()
-			tr.texture = board.load_piece_tex(part)
-			tr.custom_minimum_size = Vector2(32, 32)
-			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			row.add_child(tr)
-		var names := Label.new()
-		names.text = "%s + %s → %s" % [defs[parts[0]].name, defs[parts[1]].name, defs[out].name]
-		names.add_theme_font_size_override("font_size", 14)
+				row.add_child(_label(part, 15))
+			else:
+				row.add_child(_icon(board.load_piece_tex(part), 32))
+		var names := _label("%s + %s → %s" % [defs[parts[0]].name, defs[parts[1]].name, defs[out].name], 15, true)
 		names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		names.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		names.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.add_child(names)
+		_tap_row(box, row, func() -> void: detail.open(_piece_detail(out, board, detail)))
 
 
-## NO-189: name + description straight from Items.ARTEFACT_EFFECTS — the
-## same rollable/sellable pool the Shop draws from (game/data/artefacts.json,
+## NO-242: icon + name + a rarity dot per row (was NO-189's 180-row wall of
+## name + full effect text). The data is Items.ARTEFACT_EFFECTS — the same
+## rollable/sellable pool the Shop draws from (game/data/artefacts.json,
 ## GDD-synced), so this can never show an artefact the game itself wouldn't
-## grant. Rarity colours the name, reusing Tuning.ARTEFACT_RARITY_COLOR, the
-## exact palette modals.gd's own preview already draws rarity in.
-static func _fill_artefacts(box: VBoxContainer) -> void:
+## grant — and the dot reuses Tuning.ARTEFACT_RARITY_COLOR, the palette
+## modals.gd's own preview draws rarity in.
+static func _fill_artefacts(box: VBoxContainer, detail: DetailPanel) -> void:
 	for a in Items.ARTEFACT_EFFECTS:
-		_row(box, _artefact_tex(a.key), a.name, a.description, Tuning.ARTEFACT_RARITY_COLOR[a.rarity])
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.add_child(_icon(_artefact_tex(a.key), 36))
+		row.add_child(_label(a.name, 16, true))
+		var col: Color = Tuning.ARTEFACT_RARITY_COLOR.get(a.rarity, Color.WHITE)
+		var dot := Control.new()
+		dot.custom_minimum_size = Vector2(14, 14)
+		dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		dot.draw.connect(func() -> void: dot.draw_circle(dot.size / 2, 6, col))
+		row.add_child(dot)
+		var key: String = a.key
+		_tap_row(box, row, func() -> void: detail.open(_artefact_detail(key)))
 
 
 ## Mirrors game.gd's own artefact_tex() path convention (assets/artefacts/
@@ -311,22 +357,34 @@ static func _artefact_tex(key: String) -> Texture2D:
 ## 13 entries) — the Buff Box item grants from PIECE_BUFFS specifically,
 ## carrying the dormant/timed distinction the Notion Piece Buffs DB draws.
 ## Shown as two headed sections on one page rather than merged, since that
-## split already exists in the data, not invented for this page.
-static func _fill_items(box: VBoxContainer) -> void:
-	var head := Label.new()
-	head.text = "Items"
-	head.add_theme_font_size_override("font_size", 18)
-	head.modulate = Color(1, 1, 1, 0.8)
-	box.add_child(head)
-	for it in Items.ITEMS:
-		_row(box, _item_tex(it.key), "%s — %s" % [it.name, it.tier], it.description)
-	var head2 := Label.new()
-	head2.text = "Piece Buffs"
-	head2.add_theme_font_size_override("font_size", 18)
-	head2.modulate = Color(1, 1, 1, 0.8)
-	box.add_child(head2)
-	for b in Items.PIECE_BUFFS:
-		_row(box, _item_tex(b.key), "%s — %s" % [b.name, b.tier], b.description)
+## split already exists in the data, not invented for this page. NO-242:
+## rows are icon + name + tier; the tiers are explained once, in a note
+## under the page title, with the Shop prices read off Tuning.
+static func _fill_items(box: VBoxContainer, detail: DetailPanel) -> void:
+	var note := _label(_tier_note(), 14)
+	note.modulate = Color(1, 1, 1, 0.75)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(note)
+	for section in [["Items", Items.ITEMS, false], ["Piece Buffs", Items.PIECE_BUFFS, true]]:
+		var head := _label(section[0], 18)
+		head.modulate = Color(1, 1, 1, 0.8)
+		box.add_child(head)
+		for it: Dictionary in section[1]:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 12)
+			row.add_child(_icon(_item_tex(it.key), 36))
+			row.add_child(_label(it.name, 16, true))
+			var tier := _label(it.tier, 14)
+			tier.modulate = Color(1, 1, 1, 0.7)
+			row.add_child(tier)
+			var is_buff: bool = section[2]
+			_tap_row(box, row, func() -> void: detail.open(_item_detail(it, is_buff)))
+
+
+static func _tier_note() -> String:
+	var p: Dictionary = Tuning.SHOP_ITEM_PRICE
+	return ("Tiers, weakest to strongest: Tactical, Strategic, Decisive. " +
+		"In the Shop an Item costs $%d / $%d / $%d by tier.") % [p.Tactical, p.Strategic, p.Decisive]
 
 
 static func _item_tex(key: String) -> Texture2D:
@@ -460,3 +518,450 @@ static func _row(parent: Container, icon: Texture2D, title: String, desc: String
 		desc_l.modulate = Color(1, 1, 1, 0.75)
 		desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		col.add_child(desc_l)
+
+
+# --- NO-242: detail panel content ---------------------------------------------
+
+## What an Item's `target` field (items.gd header) asks of the player.
+const _TARGET_TEXT := {
+	"": "No target: it takes effect as soon as you use it.",
+	"tile": "Targets one tile on the board.",
+	"pair": "Targets a piece first, then a second tile.",
+	"multi": "Targets any number of your pieces.",
+	"area": "Targets an area of tiles.",
+}
+
+
+## A piece's detail: the in-game long-press preview's own movement diagram
+## (PieceDiagram.draw + its LEGEND, modals.gd show_preview kind == "piece")
+## drawn as large as the panel allows, then its value, promotion chain (every
+## stage tappable, the current one highlighted the way the preview does),
+## Void twin, and fusions — all read off pieces.json / fusions.json.
+static func _piece_detail(id: String, board, detail: DetailPanel) -> Control:
+	var defs := Rules.load_pieces()
+	var box := _detail_box()
+	box.add_child(_title(defs[id].name))
+
+	var cells := 9 # covers the longest leap (Ying Long's 4) — same as the preview
+	var w: float = detail.size.x if detail.size.x > 0 else 480.0
+	var cell := int(clampf(w * 0.85 - 48, 180, 360)) / cells
+	var dia := Control.new()
+	dia.custom_minimum_size = Vector2(cells, cells) * cell
+	dia.size_flags_horizontal = Control.SIZE_SHRINK_CENTER # see modals.gd NO-171
+	var tex: Texture2D = board.load_piece_tex(id)
+	dia.draw.connect(func() -> void: PieceDiagram.draw(dia, defs, id, cells, cell, tex))
+	box.add_child(dia)
+	var legend := _body(PieceDiagram.LEGEND, 14)
+	legend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	legend.modulate = Color(1, 1, 1, 0.7)
+	box.add_child(legend)
+	var value := _body("Value: %d" % int(defs[id].value), 17)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(value)
+
+	box.add_child(_section("Promotion"))
+	var chain := _chain(defs, id)
+	if chain.size() > 1:
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 6)
+		for i in chain.size():
+			if i > 0:
+				row.add_child(_label("→", 20))
+			var b := _piece_button(chain[i], board, detail)
+			if chain[i] != id:
+				b.modulate = Color(1, 1, 1, 0.45) # current stage stands out
+			row.add_child(b)
+		box.add_child(row)
+		box.add_child(_body(" → ".join(PackedStringArray(chain.map(
+			func(c: String) -> String: return defs[c].name)))))
+	else:
+		box.add_child(_body("Does not promote."))
+
+	var twin := _void_twin(defs, id)
+	if twin != "":
+		var is_void: bool = defs[id].name.begins_with("Void ")
+		box.add_child(_section("Void form of" if is_void else "Void form"))
+		_link_row(box, twin, board, detail, defs[twin].name, [twin])
+
+	var fusions := Rules.load_fusions()
+	var sources: Array = []
+	box.add_child(_section("Fuses into"))
+	var fuses := false
+	for k: String in fusions:
+		var parts := k.split("+")
+		var out: String = fusions[k]
+		if out == id:
+			sources.append(parts)
+		if not parts.has(id):
+			continue
+		fuses = true
+		var other: String = parts[1] if parts[0] == id else parts[0]
+		_link_row(box, out, board, detail,
+			"+ %s → %s" % [defs[other].name, defs[out].name], [other, out])
+	if not fuses:
+		box.add_child(_body("Does not fuse."))
+	if not sources.is_empty():
+		box.add_child(_section("Made by fusing"))
+		for parts in sources:
+			_link_row(box, "", board, detail,
+				"%s + %s" % [defs[parts[0]].name, defs[parts[1]].name], [parts[0], parts[1]])
+	return box
+
+
+## The whole promotion chain `id` sits in, base first (game.gd _chain_of's
+## shape, off ItemLogic.chain_base so the menu needs no live Game).
+static func _chain(defs: Dictionary, id: String) -> Array:
+	var chain := [ItemLogic.chain_base(defs, id)]
+	while defs[chain[-1]].next != null:
+		chain.append(defs[chain[-1]].next)
+	return chain
+
+
+## A piece's Void counterpart, read off the names pieces.json already pairs
+## ("Ranger" / "Void Ranger", "Pawn" / "Void Pawn") — "" if it has none.
+static func _void_twin(defs: Dictionary, id: String) -> String:
+	var n: String = defs[id].name
+	var want := n.trim_prefix("Void ") if n.begins_with("Void ") else "Void " + n
+	for k: String in defs:
+		if defs[k].name == want:
+			return k
+	return ""
+
+
+static func _artefact_detail(key: String) -> Control:
+	var e: Dictionary = {}
+	for c: Dictionary in Items.ARTEFACT_CATALOG:
+		if c.key == key:
+			e = c
+			break
+	var box := _detail_box()
+	box.add_child(_center(_icon(_artefact_tex(key), 128)))
+	box.add_child(_title(e.name))
+	var rarity: String = e.get("rarity", "")
+	var bits := [rarity, str(e.get("type", ""))].filter(func(s: String) -> bool: return s != "")
+	var kind := _body(" · ".join(PackedStringArray(bits)), 16)
+	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	kind.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR.get(rarity, Color.WHITE))
+	box.add_child(kind)
+	box.add_child(_body(e.effect, 17))
+	var bonus: Array = e.get("bonus", [])
+	if not bonus.is_empty():
+		box.add_child(_fact("Boosts: " + ", ".join(PackedStringArray(bonus))))
+	if str(e.get("conspiracy", "")) != "":
+		box.add_child(_fact("Conspiracy: " + str(e.conspiracy)))
+	return box
+
+
+static func _item_detail(it: Dictionary, is_buff: bool) -> Control:
+	var box := _detail_box()
+	var tex := _item_tex(it.key)
+	if tex != null:
+		box.add_child(_center(_icon(tex, 96)))
+	box.add_child(_title(it.name))
+	var tier := _body("%s %s" % [it.tier, "Piece Buff" if is_buff else "Item"], 16)
+	tier.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tier.modulate = Color(1, 1, 1, 0.8)
+	box.add_child(tier)
+	box.add_child(_body(it.description, 17))
+	if is_buff:
+		box.add_child(_fact("Rides on a single piece; the Buff Box Item applies one."))
+		if it.get("model") == "timed":
+			var n := int(it.get("turns", 1))
+			box.add_child(_fact("Timed: active from the moment it is applied, for %d player turn%s."
+				% [n, "" if n == 1 else "s"]))
+		else:
+			box.add_child(_fact("Dormant: waits on its piece until its trigger fires, then it is used up."))
+	else:
+		box.add_child(_fact(_TARGET_TEXT.get(it.get("target", ""), "")))
+		var cost := int(it.get("action_cost", 1))
+		box.add_child(_fact("Using it costs no Action." if cost == 0
+			else "Using it costs %d Action%s." % [cost, "" if cost == 1 else "s"]))
+	box.add_child(_fact(_tier_note()))
+	return box
+
+
+# --- NO-242: small builders ----------------------------------------------------
+
+## One tappable list row: `content` laid out as usual, with a transparent
+## Button stretched over it (a PanelContainer fits every child to its rect,
+## and the content alone sets the height). The Button PASSes so a drag that
+## starts on a row still scrolls the page (see _page's scroll_deadzone).
+static func _tap_row(parent: Container, content: Control, on_tap: Callable) -> Button:
+	var row := PanelContainer.new()
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.05)
+	bg.set_corner_radius_all(6)
+	row.add_theme_stylebox_override("panel", bg)
+	row.custom_minimum_size.y = 52
+	row.mouse_filter = Control.MOUSE_FILTER_PASS
+	parent.add_child(row)
+	var pad := MarginContainer.new()
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_" + side, 10)
+	for side in ["top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + side, 6)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pad.add_child(content)
+	row.add_child(pad)
+	var btn := Button.new()
+	for state in ["normal", "hover", "focus", "disabled"]:
+		btn.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	var pressed := StyleBoxFlat.new()
+	pressed.bg_color = Color(1, 1, 1, 0.12)
+	pressed.set_corner_radius_all(6)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_stylebox_override("hover_pressed", pressed)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_PASS
+	btn.set_meta(ROW_META, true)
+	btn.pressed.connect(on_tap)
+	row.add_child(btn)
+	return btn
+
+
+## A row of piece tokens + text inside the detail panel; tapping it swaps the
+## panel to `target` ("" = not tappable).
+static func _link_row(box: VBoxContainer, target: String, board, detail: DetailPanel,
+		text: String, icon_ids: Array) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	for pid: String in icon_ids:
+		row.add_child(_icon(board.load_piece_tex(pid), 32))
+	var l := _label(text, 15, true)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(l)
+	if target == "":
+		box.add_child(row)
+	else:
+		_tap_row(box, row, func() -> void: detail.open(_piece_detail(target, board, detail)))
+
+
+static func _piece_button(id: String, board, detail: DetailPanel) -> Button:
+	var b := Button.new()
+	b.icon = board.load_piece_tex(id)
+	b.expand_icon = true
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(56, 56)
+	b.pressed.connect(func() -> void: detail.open(_piece_detail(id, board, detail)))
+	return b
+
+
+static func _detail_box() -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", 12)
+	return box
+
+
+static func _label(text: String, size: int, expand := false) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if expand:
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+static func _title(text: String) -> Label:
+	var l := _label(text, 26)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+static func _body(text: String, size := 16) -> Label:
+	var l := _label(text, size)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return l
+
+
+static func _fact(text: String) -> Label:
+	var l := _body(text, 15)
+	l.modulate = Color(1, 1, 1, 0.75)
+	return l
+
+
+static func _section(text: String) -> Label:
+	var l := _label(text, 18)
+	l.modulate = Color(1, 1, 1, 0.8)
+	return l
+
+
+static func _icon(tex: Texture2D, px: int) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.texture = tex
+	tr.custom_minimum_size = Vector2(px, px)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
+
+
+static func _center(c: Control) -> Control:
+	c.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	return c
+
+
+# --- NO-242: the Guide's root and its slide-over detail panel -----------------
+
+## The Guide's root: remembers the hub, the pages and the detail panel so
+## Back / Escape can step up one level (`go_back`).
+class GuideRoot extends Control:
+	var hub_scroll: Control
+	var pages: Array[Control] = []
+	var detail: DetailPanel
+
+	func go_back() -> bool:
+		if detail.is_open():
+			detail.close()
+			return true
+		for page in pages:
+			if page.visible:
+				page.visible = false
+				hub_scroll.visible = true
+				return true
+		return false
+
+	# Escape on desktop does what Android's Back does inside the Guide. Only
+	# consumed when there was a level to step up from.
+	func _input(event: InputEvent) -> void:
+		if event is InputEventKey and event.pressed and not event.echo \
+				and event.keycode == KEY_ESCAPE and is_visible_in_tree() and go_back():
+			get_viewport().set_input_as_handled()
+
+
+## One reusable slide-over: slides in from the right over ~85% of the Guide,
+## the list still showing (dimmed) on the left. `open(content)` shows any
+## built Control, swapping it in place if the panel is already open. Closes
+## on a tap on the dimmed strip, a swipe right on the panel, or its "←".
+## Slides only while Settings' animations_on is set; instant otherwise.
+class DetailPanel extends Control:
+	const SLIDE_SEC := 0.2
+	## Debug capture: open without the slide, so a screenshot lands settled.
+	var instant := false
+	var _open := false
+	var _shade := ColorRect.new()
+	var _sheet := PanelContainer.new()
+	var _scroll := ScrollContainer.new()
+	var _holder := MarginContainer.new()
+	var _press_at := Vector2.INF
+	var _tween: Tween
+
+	func _init() -> void:
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		visible = false
+		_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_shade.color = Color(0, 0, 0, 0.6)
+		_shade.gui_input.connect(_on_shade_input)
+		add_child(_shade)
+		_sheet.anchor_left = 0.15
+		_sheet.anchor_right = 1.0
+		_sheet.anchor_bottom = 1.0
+		var bg := StyleBoxFlat.new()
+		bg.bg_color = Color(0.1, 0.1, 0.13, 0.98)
+		bg.content_margin_left = 16
+		bg.content_margin_right = 16
+		bg.content_margin_top = 12
+		bg.content_margin_bottom = 12
+		_sheet.add_theme_stylebox_override("panel", bg)
+		add_child(_sheet)
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 8)
+		_sheet.add_child(col)
+		var back_btn := Button.new()
+		back_btn.text = "←"
+		back_btn.add_theme_font_size_override("font_size", 24)
+		back_btn.custom_minimum_size = Vector2(56, 44)
+		back_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		back_btn.pressed.connect(close)
+		col.add_child(back_btn)
+		_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+		_scroll.scroll_deadzone = 24
+		col.add_child(_scroll)
+		_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_scroll.add_child(_holder)
+
+	func is_open() -> bool:
+		return _open
+
+	# a tap on the dimmed strip (the list peeking out on the left) closes
+	func _on_shade_input(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed:
+			close()
+
+	## What the panel is showing (null before the first open).
+	func content() -> Control:
+		return _holder.get_child(0) if _holder.get_child_count() > 0 else null
+
+	func open(c: Control) -> void:
+		for old in _holder.get_children():
+			_holder.remove_child(old)
+			old.queue_free()
+		_holder.add_child(c)
+		_scroll.scroll_vertical = 0
+		if _open:
+			return # already showing: swap the content, no second slide
+		_open = true
+		if _tween:
+			_tween.kill()
+		if not _animate():
+			visible = true
+			_place(0.0, 1.0)
+			return
+		if not visible: # else it was mid-close: turn around from where it is
+			_place(size.x, 0.0)
+		visible = true
+		_slide(0.0, 1.0, Tween.EASE_OUT)
+
+	func close() -> void:
+		if not _open:
+			return
+		_open = false
+		if _tween:
+			_tween.kill()
+		if not _animate():
+			visible = false
+			return
+		_slide(size.x, 0.0, Tween.EASE_IN)
+		_tween.chain().tween_callback(hide)
+
+	func _animate() -> bool:
+		return not instant and bool(Settings.load_settings().get("animations_on", true))
+
+	func _place(x: float, shade_a: float) -> void:
+		_sheet.offset_left = x
+		_sheet.offset_right = x
+		_shade.modulate.a = shade_a
+
+	func _slide(x: float, shade_a: float, how: Tween.EaseType) -> void:
+		_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(how)
+		_tween.tween_property(_sheet, "offset_left", x, SLIDE_SEC)
+		_tween.tween_property(_sheet, "offset_right", x, SLIDE_SEC)
+		_tween.tween_property(_shade, "modulate:a", shade_a, SLIDE_SEC)
+
+	# Swipe right on the panel closes it. Read in _input, ahead of the GUI, so
+	# the panel's own ScrollContainer taking the drag cannot hide it.
+	func _input(e: InputEvent) -> void:
+		if not _open or not is_visible_in_tree() or not (e is InputEventMouseButton) \
+				or e.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if e.pressed:
+			_press_at = e.position if _sheet.get_global_rect().has_point(e.position) else Vector2.INF
+			return
+		if _press_at == Vector2.INF:
+			return
+		var d: Vector2 = e.position - _press_at
+		_press_at = Vector2.INF
+		if d.x > 60 and d.x > absf(d.y) * 1.5:
+			close()
+			get_viewport().set_input_as_handled()

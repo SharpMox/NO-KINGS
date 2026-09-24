@@ -887,7 +887,7 @@ func _add_preview_legend() -> void:
 	panel.position = Vector2(12, 48)
 	panel.custom_minimum_size = Vector2(220, 0)
 	var legend := Label.new()
-	legend.text = "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
+	legend.text = PieceDiagram.LEGEND
 	legend.add_theme_font_size_override("font_size", 12)
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(legend)

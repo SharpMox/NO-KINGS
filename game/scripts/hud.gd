@@ -225,6 +225,13 @@ signal arrow_toggle_pressed
 signal arrow_clear_pressed
 
 
+## NO-242: hardware Back while the pause menu's Guide shows — one level up
+## inside it (detail panel, then sub-page). False at the Guide hub or with
+## no Guide showing, so game.gd falls through to closing the pause menu.
+func guide_back() -> bool:
+	return guide_panel != null and guide_panel.is_visible_in_tree() and Guide.go_back(guide_panel)
+
+
 ## Open or close the in-game menu. Shared by the ☰ button, Resume, and Android's
 ## hardware Back (game.gd's NOTIFICATION_WM_GO_BACK_REQUEST) so the three cannot
 ## drift apart — the emit in particular, which is what keeps game.gd's
@@ -468,6 +475,7 @@ var act_row: HBoxContainer
 ## beside them; NO-180 moved it to their LEFT, square, as an icon button.
 var nav_row: HBoxContainer
 var game_menu := PanelContainer.new() # in-game menu (pauses the clock)
+var guide_panel: Control # the pause menu's Guide (NO-242: Back steps inside it)
 
 
 ## Deck surface styling, one place. The colours are the design-C prototype's
@@ -1042,6 +1050,7 @@ func build(game) -> void:
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
 	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true, g)
+	guide_panel = guide_scroll
 	# Logging out mid-run LEAVES the run: its save was just parked under the
 	# account that owns it, and staying in a live game whose save now belongs to
 	# nobody would write a fresh unowned one on the next autosave. Back to the

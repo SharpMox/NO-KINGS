@@ -51,6 +51,7 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 |---|---|
 | Guide hub | `--screenshot /tmp/cap/guide --show-screen guide` |
 | Guide sub-page | `--screenshot /tmp/cap/guide-rules --show-screen guide:rules` (pages: `rules`, `pieces`, `promotions`, `fusions`, `artefacts`, `items`, `indicators`) |
+| Guide detail panel | `--screenshot /tmp/cap/guide-pieces-0 --show-screen guide:pieces:0` — the page with its slide-over detail open on row `<index>` (0-based, list order), settled. Pages with rows: `pieces`, `promotions`, `fusions`, `artefacts`, `items` |
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)
@@ -91,6 +92,7 @@ ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --p
 | 7 | Ad-retry prompt | `--scenario-name "Loss: clock-out (10s)" --screenshot /tmp/cap/retry --show-screen gameover-retry` |
 | 7 | AD overlay | `--scenario-name "Movement & drag" --screenshot /tmp/cap/ad --show-screen ad` |
 | 8 | Guide sub-pages | `--screenshot /tmp/cap/guide-<page> --show-screen guide:<page>` (menu.png) |
+| 8 | Guide detail panel | `--screenshot /tmp/cap/guide-<page>-<index> --show-screen guide:<page>:<index>` (menu.png) |
 | 9 | King Ability chip | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/kchip --show-screen board` |
 | 9 | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | 10 | Promote badge | `--scenario-name "Combo Army: Crown — free merges against a Stock full of pairs" --screenshot /tmp/cap/promote --open-drawer stock` |

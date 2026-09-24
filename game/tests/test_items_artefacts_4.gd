@@ -97,7 +97,7 @@ func _init() -> void:
 	check(headroom.score == 2000 and headroom.gold == 128, # issue 57: Score x10 (Nigerian Prince's
 			# direct-write +100/+1000), Gold untouched
 		"Max Headroom Mask: doubles a Wave Artefact's trigger on both Wave clear " +
-		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +10/+100 twice, 108+20=128 Gold, 200 Score)")
+		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +10/+1000 twice, 108+20=128 Gold, 2000 Score)")
 	headroom.queue_free()
 	await process_frame
 
@@ -171,7 +171,7 @@ func _init() -> void:
 	var nwo_base: int = nwo.defs.pawn.value
 	var nwo_pts := Economy.capture_score(nwo, "pawn")
 	check(nwo_pts == nwo_base * 2 and nwo.gold == 2 and nwo.score == 200, # issue 57: x10
-		"Illuminati: NWO Booster Pack: +2 Gold/+20 Score when one Capture Artefact triggers (Voynich Dictionary)")
+		"Illuminati: NWO Booster Pack: +2 Gold/+200 Score when one Capture Artefact triggers (Voynich Dictionary)")
 	nwo.queue_free()
 	await process_frame
 
@@ -243,7 +243,7 @@ func _init() -> void:
 			Shop.buy(capstone, i)
 			break
 	check(capstone.score == 1500 and capstone.clock_ms == capstone_clock0 + 5000, # issue 57: x10
-		"Capstone Polish: +150 Score and +5s Clock on acquiring an Artefact")
+		"Capstone Polish: +1500 Score and +5s Clock on acquiring an Artefact")
 	capstone.queue_free()
 	await process_frame
 
@@ -514,7 +514,7 @@ func _init() -> void:
 	crb.actions_left = 5
 	crb._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this Wave
 	check(crb.score == 200 and crb.gold == 0, # issue 57: Score x10, Gold untouched
-		"Curtain Rods Bag: first Capture each Wave doubles Score (10 -> 20) and pays no Gold")
+		"Curtain Rods Bag: first Capture each Wave doubles Score (100 -> 200) and pays no Gold")
 	crb._move_player(Vector2i(2, 3), Vector2i(2, 4)) # second Capture this Wave
 	check(crb.score == 300 and crb.gold == 10, # issue 57: Score x10, Gold untouched
 		"Curtain Rods Bag: the second Capture the same Wave pays normally")
@@ -1225,8 +1225,8 @@ func _init() -> void:
 		"Oak Island Wishing Well: available (held, affordable, not used this Turn)")
 	oak._artefact_confirmed("oak-island-wishing-well")
 	check(oak.gold == 475 and oak.score == 4000, # issue 57: Score x10 (400 -> 4000), Gold untouched
-		"Oak Island Wishing Well: confirmed activation pays 25 Gold for +400 Score (earn() " +
-		"also grants the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+		"Oak Island Wishing Well: confirmed activation pays 25 Gold for +4000 Score (earn() " +
+		"also grants the matching Gold off the 400 base, same as every other reward routed through it: 100 - 25 + 400 = 475)")
 	check(not oak._artefact_activation_available("oak-island-wishing-well"),
 		"Oak Island Wishing Well: unavailable again — once per Turn already spent")
 	oak._begin_player_turn() # next Turn: the once-per-Turn charge recharges
@@ -1265,7 +1265,7 @@ func _init() -> void:
 		"Moscovium Glow Stick: activation consumes the Artefact and flags the triple-gain window")
 	Economy.earn(glow, 100)
 	check(glow.score == 3000 and glow.gold == 300, # issue 57: Score x10, Gold untouched
-		"Moscovium Glow Stick: Score and Gold gains are tripled while active (100 -> 300 each)")
+		"Moscovium Glow Stick: Score and Gold gains are tripled while active (Score 1000 -> 3000, Gold 100 -> 300)")
 	glow._begin_player_turn() # next Turn: "until end of Turn" expires
 	check(not glow.moscovium_active, "Moscovium Glow Stick: the window ends at the next Turn")
 	Economy.earn(glow, 100)

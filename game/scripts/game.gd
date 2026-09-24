@@ -1431,8 +1431,8 @@ func _process(delta: float) -> void:
 # (2026-09-23; this replaced a skewed, emboldened default font). The font is
 # drawn on a 16 px grid, so BANNER_FONT_SIZE stays a whole multiple of 16 or
 # its pixels smear: 32 is closest to the old 26 in apparent size (18 px caps
-# against Open Sans's ~18.5). Pixel Operator has no ★ or −, so the default
-# font is its fallback for those. Source, license: assets/fonts/README.md.
+# against Open Sans's ~18.5). Pixel Operator has no ★ or −; they come from the OS
+# system font fallback (NO-256). Source, license: assets/fonts/README.md.
 const BANNER_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
 const BANNER_FONT_SIZE := 32
 const BANNER_STRIPE_H := 3.0
@@ -2042,8 +2042,9 @@ func _draw_banners() -> void:
 			_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 			_banner_font.hinting = TextServer.HINTING_NONE
 			_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-			var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ★ and − (see BANNER_FONT)
-			_banner_font.fallbacks = fallbacks
+			# NO-256: no fallbacks here any more — this FontFile is the project Theme's
+			# Bold face too, and a fallback set on it mid-run changed every Control's
+			# line height. ★ and − come from the OS system font fallback.
 		# baseline +31: the 18 px caps sit centred in the 44 px band
 		_banner_layer.draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 			HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
@@ -5348,7 +5349,7 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 ## Theme's font like every Control. Board SYMBOLS (piece-glyph fallback,
 ## inversion mark, buff glyphs) stay on ThemeDB.fallback_font in _draw.
 func text_font() -> Font:
-	return ThemeDB.get_project_theme().default_font
+	return Tuning.ui_font()
 
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board

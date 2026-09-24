@@ -1,27 +1,35 @@
 extends SceneTree
-## NO-256 (a): the project Theme — Pixel Operator is every Control's default
-## font, with a fallback chain for the symbols it lacks, and the two places that
-## measured text with ThemeDB.fallback_font directly now use the theme's font.
+## NO-256: the project Theme — Pixel Operator is every Control's font, Bold for
+## buttons/titles/headings (Max, ruling 7), on the size ramp 16 meta / 20 body /
+## 24 buttons + Header / Bold 32 titles / Bold 48 hero; symbols Pixel Operator
+## lacks come from the OS system font fallback; code that measures text outside
+## a Control goes through Tuning.ui_font(), which survives a missing Theme.
 ## Run headless:  godot --headless --path game -s tests/test_theme.gd
 
 const GameScript := preload("res://scripts/game.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 const PO := preload("res://assets/fonts/PixelOperator.ttf")
 const PO_BOLD := preload("res://assets/fonts/PixelOperator-Bold.ttf")
-const OPEN_SANS := preload("res://assets/fonts/OpenSans_SemiBold.woff2")
 const THEME_PATH := "res://assets/ui_theme.tres"
 
 ## Every non-ASCII symbol the UI draws that Pixel Operator has no glyph for
-## (NO-256 audit, fact 3; checked against the TTFs with fontTools).
+## (NO-256 audit, fact 3; checked against the TTFs with fontTools). None of
+## them is in any font the project ships: they render through the OS system
+## font fallback (allow_system_fallback), as 20 of them already did before
+## NO-256. The engine's Open Sans has only − and θ, and chaining it in made
+## every Pixel Operator line 1.36 em tall instead of 1.0 (Font.get_height is
+## the max over the chain), which broke the Header — so it is not chained.
 const GLYPHS := ["←", "→", "✦", "☰", "⚠", "−", "⇄", "★", "⚑", "ⓘ", "◆", "✕",
 	"θ", "⟲", "⧖", "♟", "▴", "●", "∩", "⚔", "○", "▾"]
-## The part of GLYPHS Open Sans SemiBold (bundled; the same file the engine
-## embeds as ThemeDB.fallback_font) carries itself. The rest have no glyph in
-## any font the project ships or the engine embeds: they render through the OS
-## system fallback, as they did before this change. If this set changes, the
-## chain changed — re-check the list.
-const IN_OPEN_SANS := ["−", "θ"]
 ## Non-ASCII the UI uses that Pixel Operator DOES have (audit fact 3).
 const IN_PO := ["—", "·", "…", "×", "é", "à", "–", "°"]
+## role -> [base type, font, size]
+const RAMP := {
+	"": ["Label", PO, 20], "Meta": ["Label", PO, 16], "Header": ["Label", PO, 24],
+	"Heading": ["Label", PO_BOLD, 20], "Title": ["Label", PO_BOLD, 32], "Hero": ["Label", PO_BOLD, 48],
+	"Button": ["Button", PO_BOLD, 24], "SmallButton": ["Button", PO_BOLD, 16],
+	"BigButton": ["Button", PO_BOLD, 32], "Pill": ["Button", PO, 16],
+}
 
 var fails := 0
 
@@ -34,21 +42,12 @@ func check(cond: bool, label: String) -> void:
 		print("ok: " + label)
 
 
-func _chain_has(font: Font, ch: String) -> bool:
-	return font.has_char(ch.unicode_at(0)) # Font.has_char walks font.fallbacks too
-
-
 func _init() -> void:
-	# Before the first frame — before any autoload joins — so this proves the
-	# fallback holds from load, not from a runtime hook that a -s suite's first
-	# HUD build can outrun (that race grew the Header's Turn/Wave line in CI).
-	var theme := ThemeDB.get_project_theme()
-	var regular = theme.default_font if theme else null # untyped: .base_font is FontVariation-only
-	check(regular is FontVariation and regular.base_font == PO,
-		"the Theme's default font is a FontVariation over Pixel Operator Regular")
-	check(regular is FontVariation and regular.fallbacks.size() == 1
-			and regular.fallbacks[0] == OPEN_SANS,
-		"it falls back to the bundled Open Sans SemiBold from load, before any autoload runs")
+	# --- Tuning.ui_font(): never null, even with no project Theme (cold import) ---
+	check(Tuning.font_of(null) == ThemeDB.fallback_font and Tuning.font_of(null) != null,
+		"with no project Theme, Tuning.font_of falls back to ThemeDB.fallback_font")
+	check(Tuning.font_of(Theme.new()) == ThemeDB.fallback_font,
+		"a Theme with no default font also falls back")
 	await process_frame # autoloads (UiFonts) join the root after the first frame
 
 	# --- wiring ---
@@ -56,69 +55,49 @@ func _init() -> void:
 		"gui/theme/custom points at the project Theme")
 	check(ProjectSettings.get_setting("gui/theme/custom_font", "") == "",
 		"gui/theme/custom_font stays unset (it would replace ThemeDB.fallback_font)")
+	var theme := ThemeDB.get_project_theme()
 	check(theme != null and theme.resource_path == THEME_PATH, "the project Theme loaded")
-	check(ThemeDB.fallback_font != PO and ThemeDB.fallback_font != regular,
+	check(Tuning.ui_font() == PO, "Tuning.ui_font() is the Theme's Pixel Operator Regular")
+	check(ThemeDB.fallback_font != PO and ThemeDB.fallback_font != PO_BOLD,
 		"ThemeDB.fallback_font is still the engine default, not Pixel Operator")
-	var bold = theme.get_font("font", "Title")
-	check(bold is FontVariation and bold.base_font == PO_BOLD
-			and bold.fallbacks.size() == 1 and bold.fallbacks[0] == OPEN_SANS,
-		"Title/Hero use a FontVariation over Pixel Operator Bold, same fallback")
 
-	# --- what a Control actually resolves (not just what the .tres says) ---
-	var label := Label.new()
-	root.add_child(label)
-	check(label.get_theme_font("font") == regular, "a plain Label resolves Pixel Operator Regular")
-	check(label.get_theme_font_size("font_size") == 20, "a plain Label resolves size 20 (Max, ruling 1)")
-	var button := Button.new()
-	root.add_child(button)
-	check(button.get_theme_font("font") == regular, "a plain Button resolves Pixel Operator Regular")
-	check(button.get_theme_font_size("font_size") == 24, "a plain Button resolves size 24")
-	var ramp := {"Header": [regular, 24], "Title": [bold, 32], "Hero": [bold, 48]}
-	for v: String in ramp:
-		var l := Label.new()
-		l.theme_type_variation = StringName(v)
-		root.add_child(l)
-		check(l.get_theme_font("font") == ramp[v][0] and l.get_theme_font_size("font_size") == ramp[v][1],
-			"theme_type_variation %s resolves its face at %d" % [v, ramp[v][1]])
-		l.queue_free()
-	var sized := Label.new()
-	sized.add_theme_font_size_override("font_size", 13)
-	root.add_child(sized)
-	check(sized.get_theme_font("font") == regular and sized.get_theme_font_size("font_size") == 13,
-		"a per-site size override keeps its size and still gets Pixel Operator")
+	# --- the ramp, as a Control actually resolves it ---
+	for role: String in RAMP:
+		var spec: Array = RAMP[role]
+		var c: Control = Label.new() if spec[0] == "Label" else Button.new()
+		if role != "" and role != "Button":
+			c.theme_type_variation = StringName(role)
+		root.add_child(c)
+		check(c.get_theme_font("font") == spec[1] and c.get_theme_font_size("font_size") == spec[2],
+			"%s resolves %s %d" % [role if role != "" else "a plain Label",
+				(spec[1] as FontFile).resource_path.get_file(), spec[2]])
+		c.queue_free()
 
-	# --- fallback chain: Pixel Operator -> Open Sans SemiBold -> OS ---
-	# TODO(NO-256, pending Max's ruling on AA-off vs AA-on for UI text): the
-	# UiFonts autoload is in the tree but the faces still read antialiasing=1
-	# here (CI run 36063501655: aa=1/1, UiFonts node=true). Re-instate as a
-	# check once Max rules; if AA-off stands, the .ttf.import files (AA None)
-	# are the deterministic route, not the runtime hook.
-	print("PENDING: Pixel Operator AA at boot = %d/%d (awaiting Max's AA ruling)"
-		% [PO.antialiasing, PO_BOLD.antialiasing])
-	check(PO.allow_system_fallback and PO_BOLD.allow_system_fallback and OPEN_SANS.allow_system_fallback,
-		"every font in the chain ends in the OS system fallback")
+	# --- fallback: none chained, the OS fills the symbols in ---
 	var ts := TextServerManager.get_primary_interface()
 	for f: FontFile in [PO, PO_BOLD]:
 		var n := f.resource_path.get_file()
-		var po_own := ""
+		check(f.fallbacks.is_empty(), "%s chains no fallback font (line height stays 1.0 em)" % n)
+		check(f.allow_system_fallback, "%s falls back to the OS system fonts" % n)
+		# 1.0 em, give or take TextServer's rounding (CI: 21 at 20 px); Open Sans is ~27
+		check(f.get_height(20) <= 21.0 and f.get_height(20) < ThemeDB.fallback_font.get_height(20) - 4.0,
+			"%s's line is ~1 em (20 px -> %s, Open Sans %s)" % [n, f.get_height(20), ThemeDB.fallback_font.get_height(20)])
+		var own := ""
 		for ch: String in GLYPHS:
 			if ts.font_has_char(f.get_rids()[0], ch.unicode_at(0)):
-				po_own += ch
-		check(po_own == "", "%s itself has none of the audit's symbols (got '%s')" % [n, po_own])
-	for font: Font in [regular, bold]:
-		var chain := ""
+				own += ch
+		check(own == "", "%s itself has none of the audit's symbols (got '%s')" % [n, own])
 		var missing := ""
-		for ch: String in GLYPHS:
-			if _chain_has(font, ch):
-				chain += ch
 		for ch: String in IN_PO:
-			if not _chain_has(font, ch):
+			if not f.has_char(ch.unicode_at(0)):
 				missing += ch
-		var n: String = (font as FontVariation).base_font.resource_path.get_file()
-		check(chain == "".join(IN_OPEN_SANS),
-			"%s chain covers exactly %s; the other %d are OS-fallback (got '%s')"
-				% [n, "".join(IN_OPEN_SANS), GLYPHS.size() - IN_OPEN_SANS.size(), chain])
 		check(missing == "", "%s has its own — · … × é à – ° (missing '%s')" % [n, missing])
+	# TODO(NO-256, pending Max's ruling on AA-off vs AA-on for UI text): the
+	# UiFonts autoload is in the tree but the faces still read antialiasing=1
+	# (CI run 36063501655). Re-instate as a check once Max rules; if AA-off
+	# stands, the .ttf.import files (AA None) are the deterministic route.
+	print("PENDING: Pixel Operator AA at boot = %d/%d (awaiting Max's AA ruling)"
+		% [PO.antialiasing, PO_BOLD.antialiasing])
 
 	# --- the two measure sites use the theme font, not ThemeDB.fallback_font ---
 	GameScript.reset_boot_defaults()
@@ -127,17 +106,16 @@ func _init() -> void:
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
-	check(game.text_font() == regular, "board popups (game.gd text_font) draw in the theme's font")
+	check(game.text_font() == PO, "board popups (game.gd text_font) draw in the theme's font")
 	game._open_shop()
 	await process_frame
 	var bar: ProgressBar = game.modals.shop_lane_b_bar
 	check(bar != null, "precondition: the Shop built its Lane B bar")
 	if bar:
-		# Numerically equal to Open Sans's height: Font.get_height is the max
-		# over the chain, and Open Sans (1.36 em) is taller than Pixel Operator.
-		var want: float = regular.get_height(12) + 4
+		var want: float = PO.get_height(16) + 4
 		check(is_equal_approx(bar.custom_minimum_size.y, want),
-			"the Lane B bar is sized off the theme font (%s, want %s)" % [bar.custom_minimum_size.y, want])
+			"the Lane B bar is sized off the theme font (%s, want %s; Open Sans would give %s)"
+				% [bar.custom_minimum_size.y, want, ThemeDB.fallback_font.get_height(16) + 4])
 
 	game.queue_free()
 	await process_frame

@@ -20,16 +20,19 @@
 ## Project Theme (NO-256)
 
 - `assets/ui_theme.tres` (wired by `gui/theme/custom`) makes `PixelOperator.ttf` every Control's
-  default font at 20 px; Buttons 24; type variations `Header` 24, `Title` Bold 32, `Hero` Bold 48.
-- The Theme's fonts are FontVariations over each Pixel Operator face, falling back to
-  `OpenSans_SemiBold.woff2`, then the OS system font fallback. That woff2 is the same file Godot
-  embeds as its default font (`thirdparty/fonts/` in the 4.7 source, SIL OFL 1.1, text in
-  `OpenSans-LICENSE.txt`). It's bundled because a `.tres` cannot reference the engine's built-in
-  font, and a fallback attached at runtime arrived too late for the first HUD build. Of the UI's
-  symbols Open Sans only has `−` and `θ`; `← → ★ ⚠ ☰ …` come from the OS, as before the Theme.
-- A fallback raises the line height: `Font.get_height` is the max over the chain, so a Pixel
-  Operator line is as tall as Open Sans (1.36 em), not 1.0 em.
+  font. Ramp: `Meta` 16, body 20 (the default), `Header` 24, Buttons **Bold** 24, `Heading` Bold
+  20, `Title` Bold 32, `Hero` Bold 48; button variations `SmallButton` Bold 16, `BigButton` Bold
+  32, `Pill` Regular 16 (prices on cell badges). Bold for every button, title, heading and section
+  label; Regular for body, stats and small meta (Max, 2026-09-25).
+- Set a role with `theme_type_variation = &"Title"` etc., not `add_theme_font_size_override`.
+- No fallback font is chained. Symbols Pixel Operator lacks (`← → ★ − ⚠ ☰ ⇄ ⚑ …`, the list is in
+  `tests/test_theme.gd`) come from the OS system font fallback, as most already did. Chaining the
+  engine's Open Sans would make every line 1.36 em tall instead of 1.0 em (`Font.get_height` is
+  the max over the chain). A line holding such a symbol can still be taller than the font: size
+  boxes from a shaped sample (`get_string_size(...).y`), as the Header's Turn/Wave line does.
+- Code that measures text outside a Control uses `Tuning.ui_font()`, which falls back to
+  `ThemeDB.fallback_font` when the Theme failed to load (a cold import cache).
 - `scripts/ui_fonts.gd` (autoload) turns antialiasing off on both faces at boot.
-- The `.ttf.import` / `.woff2.import` files are not committed yet. Godot writes them on import,
-  with defaults. Commit the two Pixel Operator ones from a Godot machine with Antialiasing None,
-  Hinting None, Subpixel Positioning Disabled.
+- The `.ttf.import` files are not committed yet. Godot writes them on import, with defaults.
+  Commit them from a Godot machine with Antialiasing None, Hinting None, Subpixel Positioning
+  Disabled.

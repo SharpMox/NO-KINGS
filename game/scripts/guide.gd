@@ -92,7 +92,7 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	hub_scroll.add_child(hub_box)
 	var hub_head := Label.new()
 	hub_head.text = "Guide"
-	hub_head.add_theme_font_size_override("font_size", 28)
+	hub_head.theme_type_variation = &"Title"
 	hub_box.add_child(hub_head)
 
 	# NO-242: the slide-over detail panel, shared by every catalog page. Built
@@ -117,7 +117,6 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 		root.pages.append(page)
 		var btn := Button.new()
 		btn.text = title
-		btn.add_theme_font_size_override("font_size", 22)
 		btn.pressed.connect(func() -> void:
 			hub_scroll.visible = false
 			page.visible = true)
@@ -131,7 +130,6 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	hub_box.add_child(hub_back_gap)
 	var hub_back := Button.new()
 	hub_back.text = "← Back"
-	hub_back.add_theme_font_size_override("font_size", 20)
 	# hub_box is otherwise LEFT-aligned (its catalog-page buttons), but Back
 	# is isolated below its own gap and reads better centred under the list.
 	hub_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -244,7 +242,7 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	scroll.add_child(box)
 	var head := Label.new()
 	head.text = title
-	head.add_theme_font_size_override("font_size", 24)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 	fill_rows.call(box)
 	# Max ruling 2026-09-24 (isolated dismiss): same shape as the hub's own
@@ -254,7 +252,6 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	box.add_child(back_gap)
 	var back := Button.new()
 	back.text = "← Back"
-	back.add_theme_font_size_override("font_size", 18)
 	# box is otherwise LEFT-aligned (the catalog rows above), but Back is
 	# isolated below its own gap and reads better centred under the list.
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -268,7 +265,6 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 static func _fill_rules(box: VBoxContainer) -> void:
 	var body := Label.new()
 	body.text = GuideText.TEXT
-	body.add_theme_font_size_override("font_size", 15)
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(body)
 
@@ -477,11 +473,11 @@ static func _swatch_row(parent: Container, board, title: String, mark: String, c
 	row.add_child(col)
 	var name_l := Label.new()
 	name_l.text = title
-	name_l.add_theme_font_size_override("font_size", 14)
+	name_l.theme_type_variation = &"Heading"
 	col.add_child(name_l)
 	var desc_l := Label.new()
 	desc_l.text = desc
-	desc_l.add_theme_font_size_override("font_size", 13)
+	desc_l.theme_type_variation = &"Meta"
 	desc_l.modulate = Color(1, 1, 1, 0.7)
 	desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(desc_l)
@@ -538,14 +534,14 @@ static func _row(parent: Container, icon: Texture2D, title: String, desc: String
 	row.add_child(col)
 	var name_l := Label.new()
 	name_l.text = title
-	name_l.add_theme_font_size_override("font_size", 14)
+	name_l.theme_type_variation = &"Heading"
 	name_l.add_theme_color_override("font_color", title_color)
 	name_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(name_l)
 	if desc != "":
 		var desc_l := Label.new()
 		desc_l.text = desc
-		desc_l.add_theme_font_size_override("font_size", 13)
+		desc_l.theme_type_variation = &"Meta"
 		desc_l.modulate = Color(1, 1, 1, 0.75)
 		desc_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		col.add_child(desc_l)
@@ -790,7 +786,13 @@ static func _detail_box() -> VBoxContainer:
 static func _label(text: String, size: int, expand := false) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	# NO-256: `size` picks a theme role; 15-16 is body (the theme default 20).
+	if size >= 24:
+		l.theme_type_variation = &"Title"
+	elif size >= 17:
+		l.theme_type_variation = &"Heading"
+	elif size <= 14:
+		l.theme_type_variation = &"Meta"
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	if expand:
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -909,7 +911,6 @@ class DetailPanel extends Control:
 		_sheet.add_child(col)
 		var back_btn := Button.new()
 		back_btn.text = "←"
-		back_btn.add_theme_font_size_override("font_size", 24)
 		back_btn.custom_minimum_size = Vector2(56, 44)
 		back_btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		back_btn.pressed.connect(close)

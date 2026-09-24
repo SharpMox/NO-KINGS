@@ -4,12 +4,9 @@ extends Node
 ## that also replaces ThemeDB.fallback_font, so the banner/feed fallback would
 ## point at Pixel Operator itself and ★ − ✦ would vanish.
 ##
-## The glyph fallback lives in the Theme itself, not here: a FontVariation over
-## each Pixel Operator face, falling back to assets/fonts/OpenSans_SemiBold.woff2
-## (the very file Godot embeds as ThemeDB.fallback_font), then the OS system font
-## fallback. Static, so it holds from the first frame — a runtime fallback
-## arrived after a -s test's first HUD build and grew the lines under it
-## (Font.get_height is the max over the whole chain).
+## No fallback font is chained: symbols Pixel Operator lacks come from the OS
+## system font fallback. Chaining the engine's Open Sans made every Pixel
+## Operator line 1.36 em tall (Font.get_height is the max over the chain).
 ##
 ## This autoload only turns antialiasing off, which is Pixel Operator's own look
 ## (banners, feed). game.gd/hud.gd set it lazily on these SAME shared resources,

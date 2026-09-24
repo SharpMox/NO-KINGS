@@ -92,12 +92,13 @@ func _init() -> void:
 	Settings.apply({"sound_on": true, "crt_on": true})
 	var probe_label := Label.new()
 	root.add_child(probe_label)
-	check(probe_label.get_theme_font("font") == ThemeDB.get_project_theme().default_font and po.antialiasing == aa_before,
+	check(probe_label.get_theme_font("font") == po and po.antialiasing == aa_before,
 		"a Label RESOLVES the Theme's Pixel Operator, untouched by apply()")
 	var probe_button := Button.new()
 	root.add_child(probe_button)
-	check(probe_button.get_theme_font("font") == ThemeDB.get_project_theme().default_font and po.antialiasing == aa_before,
-		"a Button RESOLVES the Theme's Pixel Operator, untouched by apply()")
+	check(probe_button.get_theme_font("font") == load("res://assets/fonts/PixelOperator-Bold.ttf")
+			and po.antialiasing == aa_before,
+		"a Button RESOLVES the Theme's Pixel Operator Bold (Max, ruling 7), untouched by apply()")
 	probe_label.queue_free()
 	probe_button.queue_free()
 

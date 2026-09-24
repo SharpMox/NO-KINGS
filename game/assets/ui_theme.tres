@@ -1,26 +1,30 @@
-[gd_resource type="Theme" load_steps=6 format=3]
+[gd_resource type="Theme" load_steps=3 format=3]
 
 [ext_resource type="FontFile" path="res://assets/fonts/PixelOperator.ttf" id="1_regular"]
 [ext_resource type="FontFile" path="res://assets/fonts/PixelOperator-Bold.ttf" id="2_bold"]
-[ext_resource type="FontFile" path="res://assets/fonts/OpenSans_SemiBold.woff2" id="3_fallback"]
-
-[sub_resource type="FontVariation" id="FontVariation_regular"]
-base_font = ExtResource("1_regular")
-fallbacks = Array[Font]([ExtResource("3_fallback")])
-
-[sub_resource type="FontVariation" id="FontVariation_bold"]
-base_font = ExtResource("2_bold")
-fallbacks = Array[Font]([ExtResource("3_fallback")])
 
 [resource]
-default_font = SubResource("FontVariation_regular")
+default_font = ExtResource("1_regular")
 default_font_size = 20
 Button/font_sizes/font_size = 24
+Button/fonts/font = ExtResource("2_bold")
+BigButton/base_type = &"Button"
+BigButton/font_sizes/font_size = 32
+SmallButton/base_type = &"Button"
+SmallButton/font_sizes/font_size = 16
+Pill/base_type = &"Button"
+Pill/font_sizes/font_size = 16
+Pill/fonts/font = ExtResource("1_regular")
+Meta/base_type = &"Label"
+Meta/font_sizes/font_size = 16
 Header/base_type = &"Label"
 Header/font_sizes/font_size = 24
+Heading/base_type = &"Label"
+Heading/font_sizes/font_size = 20
+Heading/fonts/font = ExtResource("2_bold")
 Title/base_type = &"Label"
 Title/font_sizes/font_size = 32
-Title/fonts/font = SubResource("FontVariation_bold")
+Title/fonts/font = ExtResource("2_bold")
 Hero/base_type = &"Label"
 Hero/font_sizes/font_size = 48
-Hero/fonts/font = SubResource("FontVariation_bold")
+Hero/fonts/font = ExtResource("2_bold")

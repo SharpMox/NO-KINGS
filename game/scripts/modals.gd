@@ -260,7 +260,7 @@ func show_merge_confirm(a_id: String, b_id: String, result: String,
 
 	var result_name := Label.new()
 	result_name.text = g.defs[result].name
-	result_name.add_theme_font_size_override("font_size", 24)
+	result_name.theme_type_variation = &"Title"
 	# Godot has no bold font asset in this project (audited: no other Label
 	# here sets add_theme_font_override) — "bold" is approximated the same
 	# way the rest of this file contrasts emphasis, size + full opacity
@@ -298,10 +298,8 @@ func show_merge_confirm(a_id: String, b_id: String, result: String,
 	# so the two can't be mis-tapped into each other.
 	var yes := Button.new()
 	yes.text = "Merge"
-	yes.add_theme_font_size_override("font_size", 22)
 	var no := Button.new()
 	no.text = "Cancel"
-	no.add_theme_font_size_override("font_size", 22)
 	yes.pressed.connect(func() -> void:
 		yes.disabled = true # a second tap mid-animation must not re-fire the commit
 		no.disabled = true
@@ -340,7 +338,6 @@ func _merge_piece_tex(id: String, size: float) -> TextureRect:
 func _merge_glyph_label(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 20)
 	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	return l
 
@@ -362,7 +359,7 @@ func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {},
 		col.add_child(tex)
 	var name := Label.new()
 	name.text = g.defs[id].name
-	name.add_theme_font_size_override("font_size", 12)
+	name.theme_type_variation = &"Meta"
 	name.modulate = Color(1, 1, 1, 0.65) # discreet — the result's own name above carries the emphasis
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(name)
@@ -373,7 +370,7 @@ func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {},
 	if not buff_names.is_empty():
 		var buffs_label := Label.new()
 		buffs_label.text = "carries forward: %s" % ", ".join(buff_names)
-		buffs_label.add_theme_font_size_override("font_size", 11)
+		buffs_label.theme_type_variation = &"Meta"
 		buffs_label.modulate = Color(0.55, 0.85, 0.6, 0.9) # green: inherited by the result
 		buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -450,10 +447,10 @@ func pause_modal_open() -> bool:
 
 ## Width-capped, wrapping, centered label — end/win screens must never
 ## overflow the 480px design width (fixed 2026-07-07).
-func _overlay_label(text: String, size: int) -> Label:
+func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme role, not a px size
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
+	l.theme_type_variation = variation
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 48, 0)
@@ -470,8 +467,8 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", 32))
-	box.add_child(_overlay_label(reason, 18))
+	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", &"Hero"))
+	box.add_child(_overlay_label(reason))
 	var stats := "Score %d · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
 		% [g.score, g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	if not g.king_ids_defeated.is_empty():
@@ -479,7 +476,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 		stats += "\nDefeated: %s" % ", ".join(names)
 	if rank > 0:
 		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
-	box.add_child(_overlay_label(stats, 19))
+	box.add_child(_overlay_label(stats))
 	# issue 75: show the seed so a good run can be replayed or shared. The BUILD
 	# is shown beside it deliberately — a seed only reproduces within the build
 	# it was rolled in, because any content change that shifts how many rolls
@@ -488,10 +485,9 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	# working after a patch looks like a bug rather than the expected behaviour.
 	if g.next_seed != "":
 		box.add_child(_overlay_label("seed  %s   ·   build %s"
-			% [g.next_seed, ProjectSettings.get_setting("application/config/version", "dev")], 12))
+			% [g.next_seed, ProjectSettings.get_setting("application/config/version", "dev")], &"Meta"))
 	var restart := Button.new()
 	restart.text = "Restart"
-	restart.add_theme_font_size_override("font_size", 26)
 	restart.pressed.connect(func() -> void: restart_pressed.emit())
 	box.add_child(restart)
 	var menu := Button.new()
@@ -548,24 +544,23 @@ func show_win_screen() -> void:
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY", 32))
+	box.add_child(_overlay_label("VICTORY", &"Hero"))
 	# The King who just fell, else (the --show-screen capture, which opens this
 	# without a fall) the King still on the board — never a bare "King" when
 	# the run knows his name.
 	var fallen: String = Kings.name_of(g.king_ids_defeated.back()) \
 			if not g.king_ids_defeated.is_empty() else g._king_name()
-	box.add_child(_overlay_label("The wave-%d King, %s, has fallen" % [g.wave, fallen], 18))
+	box.add_child(_overlay_label("The wave-%d King, %s, has fallen" % [g.wave, fallen]))
 	var preview := 1 # GDD "ranking preview": where the score would land now
 	for e in g.load_scores():
 		if int(e.score) >= g.score:
 			preview += 1
 	box.add_child(_overlay_label(
 		"Score %d · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy], 19))
-	box.add_child(_overlay_label("Continue into endless waves?", 20))
+		% [g.score, preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]))
+	box.add_child(_overlay_label("Continue into endless waves?"))
 	var cont := Button.new()
 	cont.text = "Continue"
-	cont.add_theme_font_size_override("font_size", 26)
 	cont.pressed.connect(func() -> void: win_continue_pressed.emit())
 	box.add_child(cont)
 	var end := Button.new()
@@ -638,7 +633,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var title := Label.new()
 		title.text = ("%s — $%d" % [g.defs[id].name, Shop.price(g, g.shop_stock[shop_index])]) \
 			if shop_index >= 0 else g.defs[id].name
-		title.add_theme_font_size_override("font_size", 30)
+		title.theme_type_variation = &"Title"
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(title)
 
@@ -669,7 +664,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		if buff_lines.size() > 1:
 			var buffs_label := Label.new()
 			buffs_label.text = "\n".join(buff_lines.slice(1))
-			buffs_label.add_theme_font_size_override("font_size", 14)
+			buffs_label.theme_type_variation = &"Meta"
 			buffs_label.modulate = Color(1, 1, 1, 0.85)
 			buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -701,17 +696,17 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			# not in the King Ability catalog, so it is listed from the kit
 			var phead := Label.new()
 			phead.text = "King Power — all wave"
-			phead.add_theme_font_size_override("font_size", 15)
+			phead.theme_type_variation = &"Heading"
 			phead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(phead)
-			_add_power_row(box, str(kit.power_name), str(kit.power_desc), 14, 12)
+			_add_power_row(box, str(kit.power_name), str(kit.power_desc))
 		if kit.has("power_catalog_key") or kit.has("power_catalog_escalation"):
 			var head := Label.new()
 			head.text = "%s — King Abilities in force" % str(kit.get("power_name", ""))
-			head.add_theme_font_size_override("font_size", 15)
+			head.theme_type_variation = &"Heading"
 			head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(head)
-			_add_king_ability_rows(box, 14, 12)
+			_add_king_ability_rows(box)
 	else: # "item" / "artefact" / "box" (NO-167: box is new — a Shop-only
 		# kind, never previously owned or previewed) — icon, name,
 		# description; no movement diagram. shop_index >= 0 reads off the
@@ -723,7 +718,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var title := Label.new()
 		title.text = ("%s — %s" % [Shop.display_name(g, slot), Shop.price_text(g, slot)]) \
 			if shop_index >= 0 else str(entry.name)
-		title.add_theme_font_size_override("font_size", 26)
+		title.theme_type_variation = &"Title"
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(title)
@@ -759,7 +754,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		if rarity != "":
 			var rlabel := Label.new()
 			rlabel.text = rarity
-			rlabel.add_theme_font_size_override("font_size", 13)
+			rlabel.theme_type_variation = &"Meta"
 			rlabel.add_theme_color_override("font_color", Tuning.ARTEFACT_RARITY_COLOR[rarity])
 			rlabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			box.add_child(rlabel)
@@ -768,7 +763,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		if desc_text != "":
 			var desc := Label.new()
 			desc.text = desc_text
-			desc.add_theme_font_size_override("font_size", 15)
 			desc.modulate = Color(1, 1, 1, 0.8)
 			desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -784,7 +778,7 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 				and g._artefact_count("all-seeing-eye-contact-lens") > 0:
 			var reveal := Label.new()
 			reveal.text = "Contains: %s" % Box.contents_names(slot.contents)
-			reveal.add_theme_font_size_override("font_size", 12)
+			reveal.theme_type_variation = &"Meta"
 			reveal.modulate = Color(1, 1, 1, 0.65)
 			reveal.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			reveal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -795,7 +789,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		var buy := Button.new()
 		buy.text = "SOLD" if slot.sold else ("Watch ad" if slot.get("ad", false) else "Buy")
 		buy.disabled = not Shop.can_buy(g, slot)
-		buy.add_theme_font_size_override("font_size", 18)
 		buy.pressed.connect(func() -> void:
 			preview_panel.visible = false
 			preview_closed.emit() # same reset Close does — buying must not
@@ -811,7 +804,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			var convert := Button.new()
 			convert.text = "Convert (-$%d)" % Shop.convert_price(g, entry)
 			convert.disabled = not Shop.can_convert(g, entry)
-			convert.add_theme_font_size_override("font_size", 18)
 			convert.pressed.connect(func() -> void:
 				preview_panel.visible = false
 				preview_closed.emit()
@@ -825,7 +817,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 				# duplicated into this menu) or "piece" (no Use concept).
 				var use := Button.new()
 				use.text = "Use"
-				use.add_theme_font_size_override("font_size", 18)
 				use.pressed.connect(func() -> void:
 					preview_panel.visible = false
 					preview_closed.emit()
@@ -834,7 +825,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			var sell := Button.new()
 			sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
 			sell.disabled = not Shop.can_sell(g, kind, entry)
-			sell.add_theme_font_size_override("font_size", 18)
 			sell.pressed.connect(func() -> void:
 				preview_panel.visible = false
 				preview_closed.emit() # same reset Close does — sale must not
@@ -844,7 +834,6 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 
 	var close := Button.new()
 	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
 	close.pressed.connect(func() -> void:
 		preview_panel.visible = false
 		preview_closed.emit())
@@ -896,7 +885,7 @@ func _add_preview_legend() -> void:
 	panel.custom_minimum_size = Vector2(220, 0)
 	var legend := Label.new()
 	legend.text = PieceDiagram.LEGEND
-	legend.add_theme_font_size_override("font_size", 12)
+	legend.theme_type_variation = &"Meta"
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_child(legend)
 	overlay.add_child(panel)
@@ -968,13 +957,13 @@ func show_shop() -> void:
 	header.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "SHOP"
-	title.add_theme_font_size_override("font_size", 22)
+	title.theme_type_variation = &"Title"
 	header.add_child(title)
 	if g._held("jet-fuel-vial"): # issue 52: only while held (user ruling — a
 		# Shop control, not part of the in-run Activate section)
 		var restock := Button.new()
 		restock.text = "Restock ($20)"
-		restock.add_theme_font_size_override("font_size", 13)
+		restock.theme_type_variation = &"Meta"
 		restock.disabled = not g._jet_fuel_restock_available()
 		restock.pressed.connect(func() -> void: shop_restock_pressed.emit())
 		header.add_child(restock)
@@ -988,7 +977,7 @@ func show_shop() -> void:
 	# than a dimmed sub-label — NO-151 is the wider ticket for a $ symbol on
 	# every player-facing currency, not touched here.
 	gold_label.text = "$%d" % g.gold
-	gold_label.add_theme_font_size_override("font_size", 14)
+	gold_label.theme_type_variation = &"Meta"
 	gold_label.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	gold_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1009,8 +998,8 @@ func show_shop() -> void:
 	# (the project Theme's font, NO-256, since the bar isn't in the tree yet to
 	# ask its own theme) plus 4px breathing room (2 top, 2 bottom), not a
 	# guessed round number.
-	var restock_font_size := 12
-	var restock_line_h := ThemeDB.get_project_theme().default_font.get_height(restock_font_size)
+	var restock_font_size := 16 # NO-256: the ramp's small-meta size
+	var restock_line_h := Tuning.ui_font().get_height(restock_font_size)
 	shop_lane_b_bar.custom_minimum_size = Vector2(0, restock_line_h + 4)
 	# NO-143: reads as a gauge — a sunken groove behind a rounded fill in
 	# Score's own colour (hud.gd:357) — rather than the bare default bar.
@@ -1084,7 +1073,6 @@ func show_shop() -> void:
 	if g.shop_stock.is_empty():
 		shop_empty_label = Label.new()
 		shop_empty_label.text = "Restocks at wave %d" % Tuning.SHOP_UNLOCK_WAVE
-		shop_empty_label.add_theme_font_size_override("font_size", 18)
 		shop_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		shop_empty_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		shop_empty_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1145,7 +1133,6 @@ func show_shop() -> void:
 	root.add_child(close_gap)
 	var close := Button.new()
 	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 16)
 	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
 	root.add_child(_centered(close))
 
@@ -1318,7 +1305,7 @@ func _shop_tile(index: int) -> Button:
 			# _build_artefact_cell.
 			var init_badge := Label.new()
 			init_badge.text = g.initials_of(Shop.display_name(g, slot))
-			init_badge.add_theme_font_size_override("font_size", 13)
+			init_badge.theme_type_variation = &"Meta"
 			init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
 			init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 			init_badge.add_theme_constant_override("outline_size", 4)
@@ -1338,7 +1325,7 @@ func _shop_tile(index: int) -> Button:
 		btn.modulate = Color(1, 1, 1, 0.4) # greys out, stays in place — never removed
 	var price := Label.new()
 	price.text = Shop.price_text(g, slot) # NO-241: "Watch ad" on the Ad Box
-	price.add_theme_font_size_override("font_size", 10)
+	price.theme_type_variation = &"Meta"
 	price.add_theme_color_override("font_color", Tuning.COL_GOLD)
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 3)
@@ -1377,13 +1364,12 @@ func show_reinforce(ids: Array) -> void:
 	center.add_child(box)
 	var title := Label.new()
 	title.text = "REINFORCEMENTS ARRIVED"
-	title.add_theme_font_size_override("font_size", 26)
+	title.theme_type_variation = &"Title"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	box.add_child(PieceMass.build(ids)) # NO-157
 	var dismiss := Button.new()
 	dismiss.text = "Dismiss"
-	dismiss.add_theme_font_size_override("font_size", 22)
 	dismiss.pressed.connect(func() -> void:
 		reinforce_panel.visible = false
 		reinforce_done_pressed.emit())
@@ -1411,13 +1397,12 @@ func show_king_abilities() -> void:
 	center.add_child(box)
 	var title := Label.new()
 	title.text = "Active King Abilities"
-	title.add_theme_font_size_override("font_size", 26)
+	title.theme_type_variation = &"Title"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	_add_king_ability_rows(box, 17, 13)
+	_add_king_ability_rows(box)
 	var close := Button.new()
 	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
 	close.pressed.connect(func() -> void:
 		king_ability_panel.visible = false
 		# NO-100: restore what opening the panel hid, below (same pattern as
@@ -1451,10 +1436,10 @@ func show_king_abilities() -> void:
 ## with a `power_key`, dispatched in kings.gd rather than drawn from the
 ## catalog) is listed FIRST, from its kit. It is in force for the whole wave
 ## and was previously visible only in its 1.1s wave-start banner.
-func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) -> void:
+func _add_king_ability_rows(box: VBoxContainer) -> void:
 	var power: Dictionary = Kings.bespoke_power(g)
 	if not power.is_empty():
-		_add_power_row(box, str(power.power_name), str(power.power_desc), name_size, desc_size)
+		_add_power_row(box, str(power.power_name), str(power.power_desc))
 	if g.king_abilities_active.is_empty() and power.is_empty():
 		var none := Label.new()
 		none.text = "none yet — they land every 10th wave"
@@ -1462,19 +1447,17 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(none)
 	for t in g.king_abilities_active:
-		_add_power_row(box, str(t.name), Economy.ability_desc(g, str(t.key)), name_size, desc_size)
+		_add_power_row(box, str(t.name), Economy.ability_desc(g, str(t.key)))
 
 
-func _add_power_row(box: VBoxContainer, name_text: String, desc_text: String,
-		name_size: int, desc_size: int) -> void:
+func _add_power_row(box: VBoxContainer, name_text: String, desc_text: String) -> void:
 	var name := Label.new()
 	name.text = name_text
-	name.add_theme_font_size_override("font_size", name_size)
+	name.theme_type_variation = &"Heading"
 	name.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	box.add_child(name)
 	var desc := Label.new()
 	desc.text = desc_text
-	desc.add_theme_font_size_override("font_size", desc_size)
 	desc.modulate = Color(1, 1, 1, 0.75)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(g.get_viewport_rect().size.x - 96, 0)
@@ -1508,7 +1491,7 @@ func _add_power_row(box: VBoxContainer, name_text: String, desc_text: String,
 const BOX_ICON := 100.0
 const BOX_COLS := 4 # ceiling — see _box_cols
 const BOX_SEP := 8.0
-const BOX_NAME_FONT_SIZE := 10 # "very small" — matches this file's smallest
+const BOX_NAME_FONT_SIZE := 16 # NO-256: was 10 (~7 px on screen); the ramp's small-meta size # "very small" — matches this file's smallest
 	# existing label, the Shop tile's own price badge (_shop_tile)
 
 ## NO-186: columns that read `count` options as exactly two rows —
@@ -1561,13 +1544,12 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	center.add_child(box)
 	var head := Label.new()
 	head.text = header
-	head.add_theme_font_size_override("font_size", 22)
+	head.theme_type_variation = &"Heading"
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(head)
 	for o in offers:
 		var btn := Button.new()
 		btn.text = str(o.label)
-		btn.add_theme_font_size_override("font_size", 16)
 		btn.custom_minimum_size = Vector2(420, 0)
 		var value = o.value
 		btn.pressed.connect(func() -> void: choice_chosen.emit(value))
@@ -1746,7 +1728,7 @@ func _box_detail(opt: Dictionary) -> Control:
 				% [opt.name, (" · %s" % rarity) if rarity != "" else ""]
 	var name := Label.new()
 	name.text = header
-	name.add_theme_font_size_override("font_size", 14)
+	name.theme_type_variation = &"Heading"
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if opt.kind == "artefact": # issue 20: rarity legibility
 		var rarity: String = str(opt.payload.get("rarity", ""))
@@ -1755,7 +1737,6 @@ func _box_detail(opt: Dictionary) -> Control:
 	info.add_child(name)
 	var desc := Label.new()
 	desc.text = opt.description
-	desc.add_theme_font_size_override("font_size", 12)
 	desc.modulate = Color(1, 1, 1, 0.8)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(desc)
@@ -1771,7 +1752,6 @@ func _box_pick_btn(opt: Dictionary) -> Button:
 	var pick := Button.new()
 	pick.text = "Pick"
 	pick.set_meta("box_pick", true)
-	pick.add_theme_font_size_override("font_size", 15)
 	pick.disabled = opt.kind == "artefact" and Shop.is_unique_held(g, opt.payload.key) # NO-244:
 		# an offer rolled before the first probe was taken
 	pick.pressed.connect(func() -> void: box_chosen.emit(opt))
@@ -1820,7 +1800,6 @@ func show_box(options: Array) -> void:
 		for it in g.items:
 			var sell := Button.new()
 			sell.text = "Sell %s (+$%d)" % [it.name, Shop.sell_payout(g, "item", it)]
-			sell.add_theme_font_size_override("font_size", 16)
 			sell.custom_minimum_size = Vector2(420, 0)
 			sell.pressed.connect(func() -> void: box_sell_pressed.emit(it))
 			box.add_child(sell)
@@ -1836,7 +1815,7 @@ func show_box(options: Array) -> void:
 	# never a literal.
 	var pick_label := Label.new()
 	pick_label.text = "PICK %d" % picks
-	pick_label.add_theme_font_size_override("font_size", 20)
+	pick_label.theme_type_variation = &"Title"
 	pick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(pick_label)
 	# NO-186 (Max review): Skip pushed MODAL_CANCEL_GAP below PICK N — the

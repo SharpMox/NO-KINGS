@@ -77,15 +77,17 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	layer.add_child(center)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 16)
+	# NO-256: every toggle fills this width, so "Animations: Reduced" in Bold 24
+	# keeps clear air to its edges (Aux: at 22 it nearly touched them).
+	box.custom_minimum_size.x = 340
 	center.add_child(box)
 	var head := Label.new()
 	head.text = "Settings"
-	head.add_theme_font_size_override("font_size", 28)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 
 	var data := load_settings()
 	var sound := Button.new()
-	sound.add_theme_font_size_override("font_size", 22)
 	var relabel := func() -> void:
 		sound.text = "Sound: On" if data.sound_on else "Sound: Off"
 	relabel.call()
@@ -103,7 +105,6 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	# (including box-pick capture pops), floating text, banners, outlines;
 	# see game.gd's `animations_on` gate on the `anims` queue.
 	var anim := Button.new()
-	anim.add_theme_font_size_override("font_size", 22)
 	var relabel_anim := func() -> void:
 		anim.text = "Animations: On" if data.animations_on else "Animations: Reduced"
 	relabel_anim.call()
@@ -118,7 +119,6 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	# CRT TV look (2026-09-06): the whole-screen overlay, opt-out. apply() is
 	# what flips the autoload, so the change is immediate on both menus.
 	var crt := Button.new()
-	crt.add_theme_font_size_override("font_size", 22)
 	var relabel_crt := func() -> void:
 		crt.text = "CRT: On" if data.get("crt_on", true) else "CRT: Off"
 	relabel_crt.call()
@@ -140,7 +140,6 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	var GameScript: GDScript = load("res://scripts/game.gd")
 	var theme_ids: Array = GameScript.BOARD_THEMES.keys()
 	var board := Button.new()
-	board.add_theme_font_size_override("font_size", 22)
 	var relabel_board := func() -> void:
 		var id: String = data.get("board_theme", GameScript.DEFAULT_BOARD_THEME)
 		board.text = "Board: %s" % GameScript.BOARD_THEMES.get(id, GameScript.BOARD_THEMES[GameScript.DEFAULT_BOARD_THEME]).label
@@ -162,7 +161,6 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	if on_logout.is_valid() and Account.signed_in():
 		var logout_btn := Button.new()
 		logout_btn.text = "Log out"
-		logout_btn.add_theme_font_size_override("font_size", 22)
 		box.add_child(logout_btn)
 
 		var confirm_box := VBoxContainer.new()
@@ -170,7 +168,7 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		confirm_box.visible = false
 		box.add_child(confirm_box)
 		var warn := Label.new()
-		warn.add_theme_font_size_override("font_size", 13)
+		warn.theme_type_variation = &"Meta"
 		warn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		# Says what actually happens, because the honest answer is reassuring:
 		# nothing is deleted here and nothing is lost.
@@ -183,11 +181,9 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		confirm_box.add_child(warn)
 		var yes := Button.new()
 		yes.text = "Log out"
-		yes.add_theme_font_size_override("font_size", 20)
 		confirm_box.add_child(yes)
 		var no := Button.new()
 		no.text = "Cancel"
-		no.add_theme_font_size_override("font_size", 20)
 		confirm_box.add_child(no)
 
 		logout_btn.pressed.connect(func() -> void:
@@ -212,7 +208,6 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	box.add_child(back_gap)
 	var back := Button.new()
 	back.text = "← Back"
-	back.add_theme_font_size_override("font_size", 20)
 	back.pressed.connect(func() -> void:
 		center.visible = false
 		on_back.call())

@@ -155,6 +155,10 @@ func _notification(what: int) -> void:
 		history_scroll.visible = false
 		scores_center.visible = true
 		return
+	# NO-242: inside the Guide, Back steps up one level (detail panel, then
+	# sub-page) before the generic jump below closes the Guide itself.
+	if is_instance_valid(guide_scroll) and guide_scroll.visible and Guide.go_back(guide_scroll):
+		return
 	var panels: Array[Control] = [army_center, scores_center,
 		guide_scroll, settings_panel, device_info_center]
 	for p in panels:
@@ -1466,12 +1470,13 @@ func _ready() -> void:
 					# sign-in required either way, just the panel showing
 					main_box.visible = false
 					login_center.visible = true
-				var screen: # tools/capture.md: "guide:<page>", a Guide sub-page
+				var screen: # tools/capture.md: "guide:<page>[:<row>]", a Guide
+					# sub-page, optionally with its detail panel open on <row>
 					if screen.begins_with("guide:"):
 						main_box.visible = false
 						guide_scroll.visible = true
-						if not Guide.open_page(guide_scroll, screen.trim_prefix("guide:")):
-							printerr("--show-screen %s: no such Guide page" % screen)
+						if not Guide.show_screen(guide_scroll, screen.trim_prefix("guide:")):
+							printerr("--show-screen %s: no such Guide page or row" % screen)
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing

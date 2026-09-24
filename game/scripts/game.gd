@@ -2624,7 +2624,7 @@ func _notification(what: int) -> void:
 			# Main Menu button sitting right there. The run is already over and
 			# already scored, so nothing is lost by taking it.
 			get_tree().change_scene_to_file("res://scenes/Menu.tscn")
-		else:
+		elif not (game_menu_open and hud.guide_back()): # NO-242: Guide first
 			hud.toggle_menu(not game_menu_open)
 
 

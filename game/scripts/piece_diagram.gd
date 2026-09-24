@@ -33,6 +33,9 @@
 const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)  # matches game.gd COL_MOVE
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)   # matches game.gd COL_CAPTURE
 const COL_RIDER := Color("ffae5c") # site.css --rider-color (dark) — no game.gd equivalent yet
+## The key to every mark `draw` paints — one copy, shown by modals.gd's
+## long-press preview and the Guide's piece detail (NO-242) alike.
+const LEGEND := "● move + capture      ○ move only      ✕ capture only      ➜ slide      ⇢ rider"
 
 
 ## Draws the full diagram: chequer, piece glyph, every move shape for `id`.

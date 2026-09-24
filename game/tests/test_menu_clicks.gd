@@ -14,6 +14,10 @@ const CloudSave := preload("res://scripts/cloud_save.gd")
 const Connectivity := preload("res://scripts/connectivity.gd")
 const GlobalBoard := preload("res://scripts/global_board.gd")
 const PlayBridge := preload("res://scripts/cloud/play_games_bridge.gd")
+const Guide := preload("res://scripts/guide.gd")
+const BackGuard := preload("res://scripts/back_guard.gd")
+const Items := preload("res://data/items.gd")
+const Rules := preload("res://scripts/rules.gd")
 
 
 ## NO-64: a platform board that exists, so the Scores door is built on desktop.
@@ -489,6 +493,77 @@ func _init() -> void:
 	check(await _click_button(menu, "← Back"), "Rules Back clickable")
 	await process_frame
 	check(_find_button(menu, "Rules") != null, "Rules Back restores the Guide hub, not the main menu")
+
+	# NO-242: catalog pages are tappable rows + a slide-over detail panel.
+	# The waits cover its 0.2 s slide (animations_on defaults true): until it
+	# settles, the dimmed strip it lays over the list still takes clicks.
+	var guide: Control = menu.guide_scroll
+	var panel = Guide.detail_panel(guide)
+	var defs := Rules.load_pieces()
+	check(await _click_button(menu, "Pieces"), "Pieces button clickable")
+	await process_frame
+	var prows := Guide.row_buttons(guide)
+	check(prows.size() == defs.size() - 1, "Pieces lists every roster piece but the King (%d rows)" % prows.size())
+	check(await _click_control(prows[0]), "a Pieces row is clickable")
+	await create_timer(0.35).timeout
+	check(panel.is_open() and _find_label(panel, defs.pawn.name) != null,
+		"tapping the first Pieces row opens the panel on that piece (%s)" % defs.pawn.name)
+	check(_find_label(panel, "Value: %d" % int(defs.pawn.value)) != null, "the piece panel shows its value")
+	prows[1].pressed.emit() # a second row while open swaps the content in place
+	await process_frame
+	check(panel.is_open() and _find_label(panel, defs[defs.keys()[1]].name) != null,
+		"opening another row while the panel is open swaps its content")
+	check(await _click_button(menu, "←"), "the panel's ← is clickable")
+	await create_timer(0.35).timeout
+	check(not panel.is_open() and not panel.visible and prows[0].is_visible_in_tree(),
+		"← closes the panel and leaves the Pieces page showing")
+	# swipe right on the panel closes it too
+	check(await _click_control(prows[0]), "a Pieces row reopens the panel")
+	await create_timer(0.35).timeout
+	var mid: Vector2 = (panel.get_child(1) as Control).get_global_rect().get_center()
+	for step in [[true, mid], [false, mid + Vector2(160, 0)]]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = step[0]
+		ev.position = step[1]
+		ev.global_position = step[1]
+		root.push_input(ev)
+		await process_frame
+	await create_timer(0.35).timeout
+	check(not panel.is_open() and prows[0].is_visible_in_tree(), "a swipe right closes the panel")
+	# Escape: the panel first, then the page
+	check(await _click_control(prows[0]), "a Pieces row reopens the panel (Escape)")
+	await create_timer(0.35).timeout
+	for i in 2:
+		var esc := InputEventKey.new()
+		esc.keycode = KEY_ESCAPE
+		esc.pressed = true
+		root.push_input(esc)
+		await create_timer(0.35).timeout
+		if i == 0:
+			check(not panel.is_open() and prows[0].is_visible_in_tree(),
+				"Escape closes the panel before leaving the page")
+	check(_find_button(menu, "Rules") != null, "a second Escape leaves the page for the Guide hub")
+	# Artefacts: one row per catalog entry (was a 180-row wall of text)
+	check(await _click_button(menu, "Artefacts"), "Artefacts button clickable")
+	await process_frame
+	var arows := Guide.row_buttons(guide)
+	check(arows.size() == Items.ARTEFACT_EFFECTS.size(),
+		"Artefacts rows == catalog size (%d / %d)" % [arows.size(), Items.ARTEFACT_EFFECTS.size()])
+	check(await _click_control(arows[0]), "an Artefacts row is clickable")
+	await create_timer(0.35).timeout
+	check(panel.is_open() and _find_label(panel, Items.ARTEFACT_EFFECTS[0].description) != null,
+		"an Artefacts row opens its full effect text")
+	# Android Back: the panel first, then the page, then (below) the hub
+	BackGuard._reset()
+	root.propagate_notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	await create_timer(0.35).timeout
+	check(not panel.is_open() and arows[0].is_visible_in_tree(), "Back closes the panel before leaving the page")
+	BackGuard._reset()
+	root.propagate_notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+	await process_frame
+	check(_find_button(menu, "Rules") != null, "a second Back leaves the page for the Guide hub")
+	BackGuard._reset()
 	check(await _click_button(menu, "← Back"), "Guide hub Back clickable")
 	await process_frame
 	check(_find_button(menu, "Play") != null, "Guide hub Back restores the main menu")

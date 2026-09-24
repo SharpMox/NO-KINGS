@@ -457,7 +457,7 @@ const DECK_GAP := 5.0
 ## Inventory/Shop pair — nav_row's own natural row height (32, live-checked
 ## by test_game_clicks.gd against DECK_ROWS), reused so the button reads as
 ## sized-to-its-row rather than an odd size dropped into it.
-const DECK_ICON_BTN := 32.0
+const DECK_ICON_BTN := 33.0 # NO-256: 32 -> 33, the Bold 24 Inventory/Shop row (see game.gd DECK_ROWS)
 ## Height of the control deck. Drawers open ABOVE it rather than covering it:
 ## the deck is the persistent surface in design C, and a drawer that buries PASS
 ## and the Ability takes the two most-pressed controls away exactly when the

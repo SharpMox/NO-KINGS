@@ -1071,7 +1071,11 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## nav_row/act_row use for their own button gaps, so this sum can't drift
 ## from what hud.gd actually builds (test_game_clicks.gd's NO-33 guard
 ## computes the live deck's height and checks it against this constant).
-const DECK_ROWS := 32.0 + HudScript.DECK_GAP + 60.0 ## drawers 32 + DECK_GAP (hud.gd) + act 60
+## NO-256: the drawers row is 33, not 32 — Inventory/Shop are Pixel Operator
+## Bold 24 now (a 25 px line + the button's 8 px of padding; Open Sans 17 was 24).
+## Left at 32, the deck overran its reserved strip by 1 px and sat on the board's
+## bottom row.
+const DECK_ROWS := HudScript.DECK_ICON_BTN + HudScript.DECK_GAP + 60.0 ## drawers 33 + DECK_GAP (hud.gd) + act 60
 ## NO-196: used to split as "6 between board and deck, 6 under the deck" — but
 ## the deck is now bottom-anchored at a FIXED height (hud.gd's build()), flush
 ## to the screen edge with nothing padding it below, so there is no longer a

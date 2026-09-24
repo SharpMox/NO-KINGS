@@ -1546,10 +1546,16 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	head.text = header
 	head.theme_type_variation = &"Heading"
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# NO-256: wrap at the column width. At Bold 20/24 an unwrapped header or
+	# "name\ndescription" option ran past 480, the full-rect panel grew to fit
+	# it, and the whole column (Cancel included) slid off the right edge.
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.custom_minimum_size = Vector2(420, 0)
 	box.add_child(head)
 	for o in offers:
 		var btn := Button.new()
 		btn.text = str(o.label)
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.custom_minimum_size = Vector2(420, 0)
 		var value = o.value
 		btn.pressed.connect(func() -> void: choice_chosen.emit(value))

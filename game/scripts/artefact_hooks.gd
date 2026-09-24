@@ -1421,9 +1421,10 @@ static func _note(g, key: String, what: String, color: Color = Color.TRANSPARENT
 
 
 ## NO-239: one kill-feed line for an Artefact, text only (Max, round 2: no
-## Artefact icons in the feed). Same-frame posts for one key merge.
+## Artefact icons in the feed at all — #569 dropped the icon param
+## entirely). Same-frame posts for one key merge.
 static func feed(g, key: String, score: int, gold: int, note := "") -> void:
-	g.hud.feed_gain(key, artefact_name(key), score, gold, note, null, g.BANNER_EFFECT)
+	g.hud.feed_gain(key, artefact_name(key), score, gold, note, g.BANNER_EFFECT)
 
 
 static func artefact_name(key: String) -> String:

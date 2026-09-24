@@ -109,11 +109,13 @@ static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
 ## `gold_ctx.score_bonus`) is scaled, right before it lands on g.score —
 ## mathematically identical to scaling every percentage handler's own
 ## literal, since `(base + base*pct) * k == (base*k) + (base*k)*pct`.
-## NO-239: `label` is what the kill feed says the gain was for ("captured
-## Knight"); "" falls back to the artefact named by `reason`. `icon` is the
-## piece token the line shows (the victim, the piece sold), or null.
+## NO-239: `label` is what the kill feed says the gain was for ("Sold Rook");
+## "" falls back to the artefact named by `reason`. #569 round 2: `post_feed`
+## false skips the automatic feed line — game.gd's capture call sites use
+## this to combine a main capture and a Multicapture extra into one
+## "Took Knight"/"Took N" line via hud.feed_capture() instead of two.
 static func earn(g, amount: int, reason: String = "", label: String = "",
-		icon: Texture2D = null) -> void:
+		post_feed: bool = true) -> void:
 	var score_ctx := ArtefactHooks.run(g, "on_score_change",
 		{"base": float(amount), "amount": float(amount), "reason": reason, "gold_bonus": 0.0})
 	var score_amount := roundi(score_ctx.amount) * SCORE_MULTIPLIER
@@ -138,7 +140,8 @@ static func earn(g, amount: int, reason: String = "", label: String = "",
 		# pops per assignment, and two writes showed two "+N" for one event
 		# (Tungsten-Filled Gold Bar / Popemobile Piggy Bank)
 	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
-	_feed(g, reason, label, score_amount + score_bonus_amount, gold_gain + roundi(score_ctx.gold_bonus), icon)
+	if post_feed:
+		_feed(g, reason, label, score_amount + score_bonus_amount, gold_gain + roundi(score_ctx.gold_bonus))
 	Shop.add_score_progress(g, score_amount + score_bonus_amount) # issue 64
 		# Lane B: banks toward the next Score-driven restock (Lane A, every 5
 		# Waves, is independent of this and lives in wave_logic.gd instead)
@@ -165,7 +168,7 @@ static func gain(g, amount: int) -> int:
 ## while Items are full" must see the POST-sale Item count, so selling the
 ## Item that fills the last slot correctly does NOT get its own bonus.
 static func earn_gold(g, amount: int, reason: String = "", label: String = "",
-		icon: Texture2D = null) -> void:
+		post_feed: bool = true) -> void:
 	var gold_amount := gain(g, amount)
 	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
 		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
@@ -176,7 +179,8 @@ static func earn_gold(g, amount: int, reason: String = "", label: String = "",
 	g.gold += gold_gain
 	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
 	g.score += score_bonus_amount
-	_feed(g, reason, label, score_bonus_amount, gold_gain, icon)
+	if post_feed:
+		_feed(g, reason, label, score_bonus_amount, gold_gain)
 	Shop.add_score_progress(g, score_bonus_amount) # issue 64 Lane B: harmless
 		# no-op unless a converter artefact's score_bonus just crossed it
 
@@ -185,11 +189,10 @@ static func earn_gold(g, amount: int, reason: String = "", label: String = "",
 ## frame (hud.feed_gain coalesces), so this is the feed's one choke point for
 ## gains with a game reason. Artefacts' own direct writes post from
 ## artefact_hooks.gd (_dispatch) instead.
-static func _feed(g, reason: String, label: String, score: int, gold: int,
-		icon: Texture2D = null) -> void:
+static func _feed(g, reason: String, label: String, score: int, gold: int) -> void:
 	if label == "":
 		label = ArtefactHooks.artefact_name(reason) if reason != "" else "Score"
-	g.hud.feed_gain(label, label, score, gold, "", icon)
+	g.hud.feed_gain(label, label, score, gold, "")
 
 
 ## Clock choke point (issue 35), mirroring earn()/gain(): every direct

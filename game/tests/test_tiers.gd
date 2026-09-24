@@ -223,10 +223,6 @@ func _init() -> void:
 		func(): cancelled[0] = true)
 	check(c1.buff_pick_open and c1.modals.buff_panel != null,
 		"issue 41: opening the generic seam sets the shared flag and shows the panel")
-	var arrow_before: bool = c1.arrow_mode
-	c1._on_arrow_toggle()
-	check(c1.arrow_mode == arrow_before,
-		"issue 41: the generic seam blocks input at the same guard sites as the Buff Box")
 	var before_choice: float = c1.clock_ms
 	await create_timer(0.2).timeout
 	check(c1.clock_ms < before_choice,

@@ -436,7 +436,6 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
 		["Blast / Item zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Red hatching inside a red outline: the tiles a bomb blast or an armed Item will hit."],
 		["Placement", "dot", board.COL_PLACE, "A tile available during setup or relocation."],
-		["Arrow Planning", "arrow", board.COL_ARROW, "A planned move marker, placed by the Arrow Planning item."],
 		["Your pieces", "fill", board.COL_PLAYER, "Your pieces and threats read blue — the game's palette rule."],
 		["Enemy pieces", "fill", board.COL_ENEMY, "Enemy pieces and threats read red — the game's palette rule."],
 	]
@@ -475,7 +474,7 @@ static func _swatch_row(parent: Container, board, title: String, mark: String, c
 ## "hatch" (_draw_hatch's diagonal lines at HATCH_SPACING / HATCH_WIDTH),
 ## "fill" (draw_rect), "ring" (the merge draw_arc at 0.46 of a tile),
 ## "outline" (a zone edge), "zone" (hatch + outline, _draw_target_zone),
-## "dot" (the COL_PLACE circle), "arrow" (a move arrow).
+## "dot" (the COL_PLACE circle).
 static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void:
 	var s := c.size.x
 	# COL_LIGHT is a static var (the board theme) — read off the class the way
@@ -499,11 +498,6 @@ static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void
 				Color(col, board.ZONE_OUTLINE_ALPHA) if mark == "zone" else col, false, 3.0)
 		"dot":
 			c.draw_circle(c.size / 2, s * 0.16, col)
-		"arrow":
-			var tip := Vector2(s * 0.8, s * 0.2)
-			c.draw_line(Vector2(s * 0.2, s * 0.8), tip, col, 2.0)
-			c.draw_line(tip, tip + Vector2(-s * 0.3, 0), col, 2.0)
-			c.draw_line(tip, tip + Vector2(0, s * 0.3), col, 2.0)
 
 
 ## Shared list row: an optional icon, a name (optionally coloured), and an

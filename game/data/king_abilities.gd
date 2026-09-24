@@ -25,23 +25,36 @@
 ## kind: "action" (gold cost when the action happens) · "persistent" (rule
 ## modifier while it is held) · "oneoff" (applies instantly).
 
+## NO-100 (Max review): descriptions are terse and state the real amount —
+## "Sell Rook +$25" style — instead of the old vague "extra $". Economy.
+## ability_desc() is what the overlay and the King info panel actually
+## render (NO-100: hides banners/feed too), never the "description" field
+## below directly — for move/capture/item/long-range (percentage-of-a-
+## variable-base: see Tuning.TARIFF_*_PCT) and inflation (the one that
+## stacks) it builds the text from the live Tuning constant / held count
+## instead, so the % shown can never go stale the way a hardcoded one would.
+## The "description" text below for those five is unreachable through the
+## normal render path; kept as catalog documentation only. deploy_cost/
+## fuse_cost/pass_cost ARE flat (their base is a Tuning constant, not a piece
+## value), so their dollar figure is genuinely constant and ability_desc
+## reads it straight from here.
 const ABILITIES: Array = [
 	{"key": "move_cost", "name": "Tariff on Move", "tier": "Mild", "kind": "action",
-		"description": "Each piece move costs extra $."},
+		"description": "Moves: 10% of piece value"},
 	{"key": "ability_cost", "name": "Tariff on Item", "tier": "Mild", "kind": "action",
-		"description": "Acquiring or activating an Item costs extra $."},
+		"description": "Items: +60% price"},
 	{"key": "capture_cost", "name": "Tariff on Capture", "tier": "Mild", "kind": "action",
-		"description": "Each capture costs extra $."},
+		"description": "Captures: 10% of piece value"},
 	{"key": "pass_cost", "name": "Tariff on Pass", "tier": "Mild", "kind": "action",
-		"description": "Ending your turn costs extra $."},
+		"description": "Pass costs $10"},
 	{"key": "long_range_cost", "name": "Tariff on Long-Range", "tier": "Mild", "kind": "action",
-		"description": "Moving a Bishop or Rook costs extra $ per square."},
+		"description": "Bishop/Rook: +3% per square"},
 	{"key": "inflation", "name": "Tariff on $ Gain", "tier": "Mild", "kind": "persistent",
-		"description": "$ gains reduced 10% (stacks)."},
+		"description": "Gold gains −10% (stacks)"},
 	{"key": "deploy_cost", "name": "Tariff on Deploy", "tier": "Moderate", "kind": "action",
-		"description": "Placing a piece costs extra $."},
+		"description": "Deploy costs $12"},
 	{"key": "fuse_cost", "name": "Tariff on Fuse", "tier": "Moderate", "kind": "action",
-		"description": "Each merge costs extra $."},
+		"description": "Merge costs $9"},
 	{"key": "jd_vance", "name": "Diplomatic Visit – JD Vance", "tier": "Severe", "kind": "oneoff",
-		"description": "Your highest-value piece is destroyed."},
+		"description": "Destroys best piece"},
 ]

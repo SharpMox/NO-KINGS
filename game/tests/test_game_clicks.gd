@@ -1570,8 +1570,8 @@ func _init() -> void:
 			and _has_label_text(trump_game.preview_panel, "Tariff on $ Gain")
 			and _has_label_text(trump_game.preview_panel, "Tariff on Capture"),
 		"...listing each Tariff in force by name")
-	check(_has_label_text(trump_game.preview_panel, "Each piece move costs extra $."),
-		"...with its description")
+	check(_has_label_text(trump_game.preview_panel, "Moves: 10% of piece value"),
+		"...with its description (NO-100: real amount, not \"extra $\")")
 	check(not _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
 		"(setup) the fourth Tariff is not in force yet")
 	check(await _click_button_in(trump_game.preview_panel, "Close"), "Close clickable")
@@ -2850,9 +2850,13 @@ func _init() -> void:
 	# the ⚠ button is off screen (NO-83) but its state and handler stay: the
 	# text still counts, and its signal still opens the detail overlay
 	check(game.hud.king_ability_button.text == "⚠1", "the ⚠ button still counts the Tariff in force")
+	check(game.hud.feed.visible and game._banner_layer.visible,
+		"(setup) the kill feed and banner layer are visible before the overlay opens")
 	game.hud.king_ability_pressed.emit()
 	await process_frame
 	check(game.king_ability_panel != null and game.king_ability_panel.visible, "tariff overlay opens")
+	check(not game.hud.feed.visible and not game._banner_layer.visible,
+		"NO-100: opening the overlay hides the kill feed and banner layer that show through its dim")
 
 	# NO-5: the three ad-hoc panels are PanelContainers on a CanvasLayer, and
 	# Container defaults to MOUSE_FILTER_PASS with no MOUSE_FILTER_STOP
@@ -2905,6 +2909,8 @@ func _init() -> void:
 	check(await _click_button_in(game.king_ability_panel, "Close"), "tariff Close clickable")
 	await process_frame
 	check(not game.king_ability_panel.visible, "tariff overlay closes")
+	check(game.hud.feed.visible and game._banner_layer.visible,
+		"NO-100: closing the overlay restores the kill feed and banner layer")
 
 	# CONTROL for the NO-5 assertion above: the very same click, with no panel
 	# up, MUST select the queen. Without this the "selects nothing" assertion is

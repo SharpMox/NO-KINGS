@@ -1934,10 +1934,16 @@ func _init() -> void:
 	await process_frame
 	var live_stack: Button = game.pool_box.filter(func(b: Node) -> bool:
 		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())[0]
+	# The last pawn-stack tap (the Header-drop arming above) is only ~410-450 ms
+	# old on CI, so this tap straddled game.gd's 400 ms double-tap window: under
+	# it, the tap opened the piece preview instead of arming, and the 4 checks
+	# below failed together. Not a double-tap: clear the key, as above.
+	game.pool_click_key = ""
 	_click(live_stack.get_global_rect().get_center())
 	await process_frame
 	await process_frame
-	check(game.placing_id != "", "setup: tapping a stack arms placement")
+	check(game.placing_id != "", "setup: tapping a stack arms placement",
+		"preview_open=%s drawer=%s" % [game.preview_open, game.drawer_open])
 	check(game.placing_id != "" and game.textures.has(game.placing_id) \
 			and game.stock_armed.get_parent() == game.drawer_buttons["stock"]
 			and game.drawer_buttons["stock"].get_parent() == game.hud

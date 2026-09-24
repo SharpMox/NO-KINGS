@@ -215,8 +215,8 @@ func _init() -> void:
 	ex.queue_free()
 	await process_frame
 
-	# --- extraction: piece state rides along opaquely; stateful copies stack
-	# apart; placement restores; merging discards (ADR-0002)
+	# --- extraction: piece state rides along opaquely; every copy is its own
+	# Stock cell; placement restores; merging discards (ADR-0002)
 	var ez := _boot({"board": [["knight", 0, 2, 2, "buff"], ["knight", 0, 4, 2],
 		["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
@@ -230,7 +230,7 @@ func _init() -> void:
 	var stateful := {"id": "knight", "buff": true}
 	check(ez.stock.has(stateful) and ez.stock.has("knight"),
 		"state rides into Stock; the plain copy stays a bare id")
-	check(ez.hud._stacks().size() == 2, "a stateful copy stacks apart from plain ones")
+	check(ez.hud._stacks().size() == 2, "each copy is its own Stock cell, stateful or not")
 	ez._place(stateful, Vector2i(3, 6))
 	check(ez.board[Vector2i(3, 6)].get("buff", false), "placement restores the state")
 	check(not ez.stock.has(stateful) and ez.stock.has("knight"),
@@ -240,14 +240,16 @@ func _init() -> void:
 
 	# --- merge: a stateful entry is a normal merge input — consumed exactly,
 	# state discarded, result is the plain next piece
-	var em := _boot({"board": [["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"], "gold": 300})
+	var em := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"stock": ["pawn"], "gold": 300})
 	await process_frame
 	em.stock.append({"id": "pawn", "buff": true})
 	em.actions_left = 3
 	MergeLogic.commit_merge(em,
-		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}},
-		{"id": "pawn", "cap": false, "entry": "pawn"})
-	check(em.stock == ["sergeant"], "merging a stateful entry consumes it and discards the state")
+		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}}, Vector2i(2, 2))
+	check(em.stock == ["pawn"] and em.board[Vector2i(2, 2)].id == "sergeant"
+			and not em.board[Vector2i(2, 2)].has("buff"),
+		"merging a stateful entry onto the board consumes it and discards the state")
 	em.queue_free()
 	await process_frame
 

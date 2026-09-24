@@ -87,14 +87,13 @@ func _init() -> void:
 	await process_frame
 
 	# --- Power: Close Ranks (The Muster) — merges cost no Action ---
-	var muster_merge := _boot({"army": "Crown", "wave": 1, "stock": ["pawn", "pawn"],
-		"board": [["rook", 1, 7, 10]], "gold": 300})
+	var muster_merge := _boot({"army": "Crown", "wave": 1, "stock": ["pawn"],
+		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 300})
 	await process_frame
 	muster_merge.actions_left = 0 # already spent — a free merge must still work
 	var actions_before: int = muster_merge.actions_left
-	var pair := [{"id": "pawn", "cap": false, "entry": "pawn"}, {"id": "pawn", "cap": false, "entry": "pawn"}]
-	MergeLogic.commit_merge(muster_merge, pair[0], pair[1])
-	check(muster_merge.stock.size() == 1 and muster_merge.stock[0] == "sergeant",
+	MergeLogic.commit_merge(muster_merge, {"id": "pawn", "cap": false, "entry": "pawn"}, Vector2i(2, 2))
+	check(muster_merge.stock.is_empty() and muster_merge.board[Vector2i(2, 2)].id == "sergeant",
 		"Close Ranks: the merge landed (2 pawns -> 1 sergeant) despite 0 actions_left going in")
 	check(muster_merge.actions_left == actions_before,
 		"Close Ranks: merging spent no Action (actions_left unchanged: %d -> %d)"
@@ -105,14 +104,13 @@ func _init() -> void:
 	await process_frame
 
 	# A non-Muster Army still pays for merges (sanity: the Power is scoped, not global)
-	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn", "pawn"],
+	var crown_merge := _boot({"army": "Old Guard", "wave": 1, "stock": ["pawn"],
 		"gold": Tuning.MERGE_COST, # issue 98: exactly the merge's price, so the
 			# Action assertion below is unchanged and nothing is left over
-		"board": [["rook", 1, 7, 10]]})
+		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]})
 	await process_frame
 	var before_actions: int = crown_merge.actions_left
-	MergeLogic.commit_merge(crown_merge,
-		{"id": "pawn", "cap": false, "entry": "pawn"}, {"id": "pawn", "cap": false, "entry": "pawn"})
+	MergeLogic.commit_merge(crown_merge, {"id": "pawn", "cap": false, "entry": "pawn"}, Vector2i(2, 2))
 	check(crown_merge.actions_left == before_actions - 1,
 		"(sanity) Old Guard has no Close Ranks — merging still costs its Action")
 	crown_merge.queue_free()

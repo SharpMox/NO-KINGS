@@ -41,7 +41,7 @@ _Avoid_: "debuff", "curse"
 What Counter-Intel does (grilled 2026-07-17): action and persistent tariffs stop applying for the rest of the current wave, ending when the next wave spawns. Replaces the deleted turn-counted version (`counter_intel_turns`).
 
 **Stock entry**:
-One element of the player's Stock: a bare piece id, or `{id + opaque piece state}` for a piece returned from the board carrying state (e.g. a future buff). Stock never interprets the state — see ADR-0002. Distinct-state copies stack separately in the HUD.
+One element of the player's Stock: a bare piece id, or `{id + opaque piece state}` for a piece returned from the board carrying state (e.g. a future buff). Stock never interprets the state — see ADR-0002. The Stock Drawer shows one cell per entry: nothing stacks, and Stock pieces never merge with each other — every merge happens on the board (NO-100 review, 2026-09-24).
 _Avoid_: "inventory" (that's the Items/Artefacts drawer), "pool"
 
 **Destruction**:
@@ -63,7 +63,7 @@ _Avoid_: "conflict", "negative synergy".
 ### In-run HUD
 
 **Header**:
-The band above the board (NO-82/83): the platform's notch inset plus 2.5× the strip it replaced, its background running up behind the notch. Left: Clock (half the Header tall), Score, Gold. Bottom centre: the ⚑ Wave counter over the ⏳ turn counter. Right: the menu button in the corner and the Stock button just left of it (piece icon, count badge, armed marker; tap area the Header's full height, never over the board or the menu). Dragging a board piece onto its Stock button returns it to Stock. Spacing lives in one block in `hud.gd` (HEADER TUNING).
+The band above the board (NO-82/83): the platform's notch inset plus 2.5× the strip it replaced, its background running up behind the notch. Left: Clock (half the Header tall), Score, Gold. Bottom centre: the ⚑ Wave counter over the ⏳ turn counter. Right: the menu button in the corner and the Stock button just left of it (piece icon, count badge, armed marker; tap area the Header's full height, never over the board or the menu). During SETUP, dragging a placed piece onto the Stock button or the open Stock Drawer returns it to Stock, into the Drawer's first empty slot. Spacing lives in one block in `hud.gd` (HEADER TUNING).
 _Avoid_: "top bar", "top strip"
 
 **Deck**:

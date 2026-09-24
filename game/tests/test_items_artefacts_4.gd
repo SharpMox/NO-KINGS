@@ -775,17 +775,16 @@ func _init() -> void:
 	# fires a new on_fuse hook, the only new call site this slice adds, for
 	# every merge (Rank Up here; a Fusion of two different pieces goes
 	# through the exact same call site).
-	var sor := _boot({"board": [["rook", 1, 7, 10]], "wave": 3,
-		"artefacts": ["spare-organ-receipt"], "stock": ["pawn", "pawn"],
+	var sor := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["spare-organ-receipt"], "stock": ["pawn"],
 		"gold": Tuning.MERGE_COST}) # issue 98: merging costs Gold now, so start
 			# with exactly its price — the +10 payout assertion below is
 			# unchanged, because MERGE_COST in and MERGE_COST out cancel
 	await process_frame
 	sor.actions_left = 3
-	MergeLogic.commit_merge(sor,
-		{"id": "pawn", "cap": false, "entry": "pawn"},
-		{"id": "pawn", "cap": false, "entry": "pawn"})
-	check(sor.stock == ["sergeant"], "(setup) the merge itself still resolves to a Sergeant")
+	MergeLogic.commit_merge(sor, {"id": "pawn", "cap": false, "entry": "pawn"}, Vector2i(2, 2))
+	check(sor.stock.is_empty() and sor.board[Vector2i(2, 2)].id == "sergeant",
+		"(setup) the merge itself still resolves to a Sergeant")
 	check(sor.gold == 10,
 		"Spare Organ Receipt: 50% of both consumed Pawns' value (10+10) combined = 10 Gold")
 	sor.queue_free()
@@ -1420,20 +1419,20 @@ func _init() -> void:
 	# Merge: BOTH consumed pieces return to Stock, state intact (ADR-0002) —
 	# on top of the merge result the player already kept (user ruling: the
 	# duplication is accepted, bounded by once-per-Wave on a Legendary).
-	var zap_merge := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
-		"wave": 1, "stock": ["pawn"], "artefacts": ["zapruder-s-director-s-cut"], "gold": 300})
+	var zap_merge := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 2], ["pawn", 1, 7, 10]],
+		"wave": 1, "artefacts": ["zapruder-s-director-s-cut"], "gold": 300})
 	await process_frame
 	zap_merge.stock.append({"id": "pawn", "buff": true})
 	zap_merge.actions_left = 5
 	MergeLogic.commit_merge(zap_merge,
-		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}},
-		{"id": "pawn", "cap": false, "entry": "pawn"})
-	check(zap_merge.stock == ["sergeant"], "setup: the merge consumed both pawns, leaving only the result")
+		{"id": "pawn", "cap": false, "entry": {"id": "pawn", "buff": true}}, Vector2i(4, 2))
+	check(zap_merge.stock.is_empty() and zap_merge.board[Vector2i(4, 2)].id == "sergeant",
+		"setup: the merge consumed both pawns, leaving only the result on the board")
 	check(zap_merge._artefact_activation_available("zapruder-s-director-s-cut"),
 		"Zapruder's Director's Cut: available after a Merge")
 	zap_merge._artefact_confirmed("zapruder-s-director-s-cut")
-	check(zap_merge.stock.size() == 3 and zap_merge.stock.has("sergeant") \
-			and zap_merge.stock.has("pawn") and zap_merge.stock.has({"id": "pawn", "buff": true}),
+	check(zap_merge.stock.size() == 2 and zap_merge.board[Vector2i(4, 2)].id == "sergeant" \
+			and zap_merge.stock.has({"id": "pawn", "buff": true}),
 		"Zapruder's Director's Cut: both consumed pieces return to Stock (one with its state intact), " +
 		"alongside the merge result the player already kept")
 	zap_merge.queue_free()

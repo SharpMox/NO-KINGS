@@ -246,14 +246,14 @@ static func try_activate_army_ability(g) -> bool:
 
 
 ## Execute one available pair merge (promotion or fusion). Returns true if merged.
+## A Stock piece onto a board partner: two Stock pieces never merge (NO-100
+## review, 2026-09-24), and this keeps the bot spending Stock as it always did.
 static func try_merge(g) -> bool:
-	# Stock only: Captured Stock cannot merge (2026-09-10), it converts or sells
-	var units := []
-	for e in g.stock:
-		units.append({"id": (e if e is String else e.id), "entry": e})
-	for i in units.size():
-		for j in range(i + 1, units.size()):
-			if MergeLogic.pair_ok(g, units[i].id, units[j].id):
+	# Stock, never Captured: Captured Stock cannot merge (2026-09-10)
+	for pos in g._player_pieces():
+		for e in g.stock:
+			var unit := {"id": (e if e is String else e.id), "entry": e}
+			if MergeLogic.pair_ok(g, g.board[pos].id, unit.id):
 				# issue 98: do_merge now REFUSES when the Gold is short, and
 				# this function used to report success on "found a legal pair"
 				# rather than on "the merge happened". With a pair in hand and
@@ -262,7 +262,7 @@ static func try_merge(g) -> bool:
 				# wave 2. Check the payment before claiming the turn's action.
 				if not MergeLogic.can_afford_merge(g):
 					return false # fall through to moves/captures instead
-				MergeLogic.do_merge(g, units[i], units[j])
+				MergeLogic.do_merge(g, unit, pos) # lands on the board piece
 				return true
 	return false
 

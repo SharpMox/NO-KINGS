@@ -378,9 +378,10 @@ func _init() -> void:
 
 	# --- issue 19: on_rank_up (Witness Protection Mustache, Holy Grail
 	# Coaster, Bigfoot Toenail Clipping) — merge_logic.gd's commit_merge, a
-	# same-id merge (Rank Up), both board- and Stock-landing cases
+	# same-id merge (Rank Up). Every merge lands on the board: the Stock
+	# landing went with Stock-only merges (NO-100 review, 2026-09-24).
 	var rankup := _boot({"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
-		"wave": 4, "stock": ["pawn", "pawn"],
+		"wave": 4,
 		"artefacts": ["witness-protection-mustache", "holy-grail-coaster", "bigfoot-toenail-clipping"], "gold": 300})
 	await process_frame
 	var clock_rankup: float = rankup.clock_ms
@@ -389,15 +390,6 @@ func _init() -> void:
 	check(BuffLogic.of(rankup.board[Vector2i(3, 2)]).size() == 1,
 		"Holy Grail Coaster: +1 Piece Buff to the Ranked piece (board landing)")
 	check(rankup.stock.has("pawn"), "Bigfoot Toenail Clipping: a copy of the base-chain piece joins Stock")
-	MergeLogic.commit_merge(rankup, # pool-only merge (both refs from Stock): lands in Stock, not the board
-		{"id": "pawn", "cap": false, "entry": "pawn"}, {"id": "pawn", "cap": false, "entry": "pawn"})
-	var converted: Variant = null # Bigfoot Toenail Clipping's own Stock grant (a bare
-		# String) can land anywhere in the Array — find the Dictionary instead
-	for stock_entry in rankup.stock:
-		if stock_entry is Dictionary:
-			converted = stock_entry
-	check(converted != null and BuffLogic.of(converted).size() == 1,
-		"Holy Grail Coaster: the Stock-landing case converts the bare id into a Buff-carrying Dictionary")
 	rankup.queue_free()
 	await process_frame
 

@@ -1330,10 +1330,17 @@ func _shop_tile(index: int) -> Button:
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 3)
 	price.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	price.offset_left = -28
-	price.offset_top = -14
-	price.grow_horizontal = Control.GROW_DIRECTION_BEGIN # a wider label
-		# ("Watch ad") grows leftward into the tile, never past its right edge
+	# NO-256: 16 px text, kept 3 px off the tile's right edge (the last tile's
+	# right edge is the panel's); "Watch ad" wraps to two lines instead of
+	# running into the edge, growing up into the tile.
+	price.offset_left = -44
+	price.offset_right = -3
+	price.offset_top = -17
+	price.offset_bottom = -1
+	price.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	price.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	price.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	btn.add_child(price)
 	# NO-167 (Max review, second pass): a tap opens the tile's own preview
 	# instead of expanding an in-place dock — see show_preview's shop_index
@@ -1544,7 +1551,7 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	center.add_child(box)
 	var head := Label.new()
 	head.text = header
-	head.theme_type_variation = &"Heading"
+	head.theme_type_variation = &"Title" # Bold 32: the popup's title, never smaller than its buttons
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# NO-256: wrap at the column width. At Bold 20/24 an unwrapped header or
 	# "name\ndescription" option ran past 480, the full-rect panel grew to fit

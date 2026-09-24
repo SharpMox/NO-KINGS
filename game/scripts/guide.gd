@@ -130,9 +130,8 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	hub_box.add_child(hub_back_gap)
 	var hub_back := Button.new()
 	hub_back.text = "← Back"
-	# hub_box is otherwise LEFT-aligned (its catalog-page buttons), but Back
-	# is isolated below its own gap and reads better centred under the list.
-	hub_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# NO-256: full width like the catalog-page buttons above it (their default
+	# SIZE_FILL), so it lines up with the list; its text centres itself.
 	hub_back.pressed.connect(func() -> void:
 		root.visible = false
 		on_back.call())

@@ -27,7 +27,7 @@ const IN_PO := ["—", "·", "…", "×", "é", "à", "–", "°"]
 const RAMP := {
 	"": ["Label", PO, 20], "Meta": ["Label", PO, 16], "Header": ["Label", PO, 24],
 	"Heading": ["Label", PO_BOLD, 20], "Title": ["Label", PO_BOLD, 32], "Hero": ["Label", PO_BOLD, 48],
-	"Button": ["Button", PO_BOLD, 24], "SmallButton": ["Button", PO_BOLD, 16],
+	"Button": ["Button", PO_BOLD, 24], "CompactButton": ["Button", PO_BOLD, 20], "SmallButton": ["Button", PO_BOLD, 16],
 	"BigButton": ["Button", PO_BOLD, 32], "Pill": ["Button", PO, 16],
 }
 

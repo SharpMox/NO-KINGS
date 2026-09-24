@@ -1197,7 +1197,7 @@ func _ready() -> void:
 	var add_caption := func(box: VBoxContainer, text: String) -> void:
 		var lbl := Label.new()
 		lbl.text = text
-		lbl.theme_type_variation = &"Meta"
+		lbl.theme_type_variation = &"Heading" # NO-256: a caption heads its list, like the card's other heads
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.modulate = Color(1, 1, 1, 0.5)
 		box.add_child(lbl)

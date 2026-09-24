@@ -136,7 +136,7 @@ const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to f
 ## rather than being nudged back toward the value this ticket undid.
 const CLOCK_FONT_MIN := 12
 const SCORE_FONT := 24 ## NO-256: Pixel Operator 24 is 24px tall, the height Open Sans 17 had. a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
-const COUNTER_FONT := 16 ## NO-256: the ramp's small-meta size. the ⚑ Wave and turn counters
+const COUNTER_FONT := 20 ## NO-256: body size — Turn/Wave and the King's name (Aux: 16 read small). The Clock's fitter takes what is left. the ⚑ Wave and turn counters
 ## NO-175, 3rd pass: the LEFT column now holds only Score/Gold (Turn/Wave
 ## moved to the CENTRE band, above the Clock — see build()). Kept at its
 ## established value, generous for two six-digit odometers; no longer bounds
@@ -963,7 +963,10 @@ func build(game) -> void:
 	pass_button.add_child(pass_box)
 	# the ABILITY sits beside PASS on the last row: the two most-pressed controls,
 	# lowest on the screen, inside the thumb arc (design C)
-	army_ability_button.theme_type_variation = &"SmallButton"
+	# NO-256: Bold 20, wrapping in its own column — "★ Call the Banners  ·  next wave"
+	# at the Button default 24 would push PASS off the row.
+	army_ability_button.theme_type_variation = &"CompactButton"
+	army_ability_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_style_button(army_ability_button, Color(0.231, 0.208, 0.141),
 		Color(0.427, 0.373, 0.180), 8, 11, 6)
 	army_ability_button.add_theme_color_override("font_color", Color(0.953, 0.886, 0.675))
@@ -2569,10 +2572,14 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
 	sell.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	sell.offset_left = 2
-	sell.offset_right = 30
-	sell.offset_top = 2
-	sell.offset_bottom = 18
+	# NO-256: a 16 px price outgrows the old 28x16 box; pin the top-left corner
+	# inside the cell and let the pill grow right/down into it, never off it.
+	sell.grow_horizontal = Control.GROW_DIRECTION_END
+	sell.grow_vertical = Control.GROW_DIRECTION_END
+	sell.offset_left = 3
+	sell.offset_right = 3
+	sell.offset_top = 3
+	sell.offset_bottom = 3
 	return sell
 
 

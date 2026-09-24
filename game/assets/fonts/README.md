@@ -21,7 +21,7 @@
 
 - `assets/ui_theme.tres` (wired by `gui/theme/custom`) makes `PixelOperator.ttf` every Control's
   font. Ramp: `Meta` 16, body 20 (the default), `Header` 24, Buttons **Bold** 24, `Heading` Bold
-  20, `Title` Bold 32, `Hero` Bold 48; button variations `SmallButton` Bold 16, `BigButton` Bold
+  20, `Title` Bold 32, `Hero` Bold 48; button variations `CompactButton` Bold 20, `SmallButton` Bold 16, `BigButton` Bold
   32, `Pill` Regular 16 (prices on cell badges). Bold for every button, title, heading and section
   label; Regular for body, stats and small meta (Max, 2026-09-25).
 - Set a role with `theme_type_variation = &"Title"` etc., not `add_theme_font_size_override`.

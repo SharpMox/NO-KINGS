@@ -52,6 +52,7 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 | Guide hub | `--screenshot /tmp/cap/guide --show-screen guide` |
 | Guide sub-page | `--screenshot /tmp/cap/guide-rules --show-screen guide:rules` (pages: `rules`, `pieces`, `promotions`, `fusions`, `artefacts`, `items`, `indicators`) |
 | Guide detail panel | `--screenshot /tmp/cap/guide-pieces-0 --show-screen guide:pieces:0` — the page with its slide-over detail open on row `<index>` (0-based, list order), settled. Pages with rows: `pieces`, `promotions`, `fusions`, `artefacts`, `items` |
+| Guide list, scrolled to a row | `--screenshot /tmp/cap/guide-pieces-row --show-screen guide:pieces:row:25` — no detail panel, just the list scrolled so row `<index>` (0-based, list order) sits at the top (the default view only shows the top of the list) |
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)

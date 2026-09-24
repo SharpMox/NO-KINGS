@@ -6,6 +6,7 @@
 var PIECES_ENCYCLOPEDIA = [
     {
       id: 'king',
+      value: 40,
       family: 'leapers',
       name: 'King',
       aliases: [],
@@ -20,6 +21,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'queen',
+      value: 90,
       family: 'sliders',
       name: 'Queen',
       aliases: [],
@@ -34,6 +36,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'rook',
+      value: 50,
       family: 'sliders',
       name: 'Rook',
       aliases: ['Castle'],
@@ -48,6 +51,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'bishop',
+      value: 30,
       family: 'sliders',
       name: 'Bishop',
       aliases: [],
@@ -62,6 +66,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'knight',
+      value: 30,
       family: 'leapers',
       name: 'Knight',
       aliases: ['Horse'],
@@ -76,6 +81,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'pawn',
+      value: 10,
       family: 'pawn-like',
       name: 'Pawn',
       aliases: [],
@@ -91,6 +97,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'amazon',
+      value: 120,
       family: 'compounds',
       name: 'Amazon',
       aliases: ['Angel', 'Commander', 'Wyvern'],
@@ -106,6 +113,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'archbishop',
+      value: 70,
       family: 'compounds',
       name: 'Archbishop',
       aliases: ['Princess', 'Cardinal', 'Janus'],
@@ -121,6 +129,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'chancellor',
+      value: 80,
       family: 'compounds',
       name: 'Chancellor',
       aliases: ['Marshall', 'Marshal', 'Empress', 'Concubine'],
@@ -136,6 +145,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'wazir',
+      value: 20,
       family: 'leapers',
       name: 'Wazir',
       aliases: ['Vizir', 'Wezir'],
@@ -150,6 +160,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'ferz',
+      value: 20,
       family: 'leapers',
       name: 'Ferz',
       aliases: ['Fers', 'Counsellor', 'Mantri'],
@@ -303,6 +314,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'berolina',
+      value: 10,
       family: 'pawn-like',
       name: 'Berolina Pawn',
       aliases: ['Berlin Pawn'],
@@ -318,6 +330,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'dragon-king',
+      value: 70,
       family: 'compounds',
       name: 'Dragon King',
       aliases: ['Promoted Rook', 'Ryūō'],
@@ -333,6 +346,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'dragon-horse',
+      value: 50,
       family: 'compounds',
       name: 'Dragon Horse',
       aliases: ['Promoted Bishop', 'Ryūma'],
@@ -553,6 +567,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'buffalo',
+      value: 70,
       family: 'leapers',
       name: 'Buffalo',
       aliases: [],
@@ -777,6 +792,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'amazonrider',
+      value: 140,
       family: 'compounds',
       name: 'Amazonrider',
       aliases: [],
@@ -799,6 +815,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'banshee',
+      value: 80,
       family: 'compounds',
       name: 'Banshee',
       aliases: [],
@@ -867,6 +884,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'gryphon',
+      value: 60,
       family: 'others',
       name: 'Gryphon',
       aliases: ['Aanca', 'Eagle (Grant Acedrex)'],
@@ -926,6 +944,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'godzilla',
+      value: 110,
       family: 'others',
       name: 'Godzilla',
       aliases: [],
@@ -955,6 +974,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'manticore',
+      value: 60,
       family: 'others',
       name: 'Manticore',
       aliases: ['Anchorite', 'Acromantula', 'Rhinoceros', 'Spider', 'Unicorn'],
@@ -1134,6 +1154,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'high-priestess',
+      value: 50,
       family: 'leapers',
       name: 'High Priestess',
       aliases: [],
@@ -1186,6 +1207,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'arrow-pawn',
+      value: 30,
       family: 'pawn-like',
       name: 'Arrow Pawn',
       aliases: ['Persson Pawn'],
@@ -1290,6 +1312,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'sergeant',
+      value: 20,
       family: 'pawn-like',
       name: 'Sergeant',
       aliases: [],
@@ -1319,6 +1342,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'alibaba',
+      value: 20,
       family: 'leapers',
       name: 'Alibaba',
       aliases: [],
@@ -1410,6 +1434,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'gnu',
+      value: 50,
       family: 'leapers',
       name: 'Gnu',
       aliases: ['Unicorn'],
@@ -1427,6 +1452,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'squirrel',
+      value: 50,
       family: 'leapers',
       name: 'Squirrel',
       aliases: [],
@@ -1445,6 +1471,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'war-machine',
+      value: 30,
       family: 'leapers',
       name: 'War Machine',
       aliases: [],
@@ -1479,6 +1506,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'kirin',
+      value: 30,
       family: 'leapers',
       name: 'Kirin',
       aliases: [],
@@ -1496,6 +1524,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'elephant-modern',
+      value: 30,
       family: 'leapers',
       name: 'Elephant (Modern)',
       aliases: ['Modern Elephant'],
@@ -1513,6 +1542,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'champion',
+      value: 50,
       family: 'leapers',
       name: 'Champion',
       aliases: [],
@@ -1561,6 +1591,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'raven',
+      value: 90,
       family: 'compounds',
       name: 'Raven',
       aliases: ['Waran'],
@@ -1583,6 +1614,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'crown-princess',
+      value: 80,
       family: 'compounds',
       name: 'Crown Princess',
       aliases: ['Popess'],
@@ -1631,6 +1663,7 @@ var PIECES_ENCYCLOPEDIA = [
     },
     {
       id: 'bodyguard',
+      value: 50,
       family: 'sliders',
       name: 'Bodyguard',
       aliases: ['Hia'],

@@ -1475,7 +1475,7 @@ func _ready() -> void:
 					if screen.begins_with("guide:"):
 						main_box.visible = false
 						guide_scroll.visible = true
-						if not Guide.show_screen(guide_scroll, screen.trim_prefix("guide:")):
+						if not await Guide.show_screen(guide_scroll, screen.trim_prefix("guide:")):
 							printerr("--show-screen %s: no such Guide page or row" % screen)
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw

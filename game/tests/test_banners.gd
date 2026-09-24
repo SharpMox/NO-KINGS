@@ -229,6 +229,31 @@ func _init() -> void:
 	op.queue_free()
 	await process_frame
 
+	# #552: a Juche Wave closes the Shop, so its Lane-A restock rolls unbannered
+	# — the Power is applied after the roll, and the banner must read the NEW
+	# Wave's Power, not the previous one's.
+	var ju := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 49})
+	await process_frame
+	ju.king_order = ["kim_jong_un"] # Wave 50 is the first King Wave (ordinal 0)
+	var restocks_before: int = ju.shop_restocks
+	ju.anims.clear()
+	WaveLogic.queue(ju, 50) # Lane A, on Kim Jong Un's Wave
+	check(Kings.power_is(ju, "juche"), "Wave 50 carries Juche")
+	check(ju.shop_restocks == restocks_before + 1, "...the Lane-A restock still rolls")
+	check(_restock_banners(ju).is_empty(), "...but a Juche Wave banners no restock (%d)" % _restock_banners(ju).size())
+	ju.anims.clear()
+	Shop.add_score_progress(ju, Tuning.SHOP_LANE_B_SCORE) # Lane B, same Wave
+	check(_restock_banners(ju).is_empty(), "...nor a Lane-B restock during it")
+	ju.king_order = ["kim_jong_un", "napoleon"]
+	for w in range(51, 100): # to the next King Wave, a Lane-A beat after Juche
+		WaveLogic.queue(ju, w)
+	ju.anims.clear()
+	WaveLogic.queue(ju, 100)
+	check(not Kings.power_is(ju, "juche") and _has_banner(ju, "SHOP RESTOCKED"),
+		"the next Wave's restock banners again once Juche has ended")
+	ju.queue_free()
+	await process_frame
+
 	# --- NO-239: the kill feed ----------------------------------------------
 	var kf := _boot({"board": [["queen", 0, 2, 2], ["knight", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame

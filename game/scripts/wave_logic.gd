@@ -66,6 +66,8 @@ static func queue(g, n: int) -> void:
 	# ruling 6 makes it live for both segments, so the 15 turns before the King
 	# lands already carry that King's identity.
 	Kings.apply_power(g, king.get("id", "") if not king.is_empty() else "")
+	if n % Tuning.SHOP_RESTOCK_WAVES == 0: # #552: after the Power, so a Juche
+		Shop.lane_a_banner(g) # Wave's closed Shop is not bannered as restocked
 	for id in roster:
 		var entry := {"id": id}
 		if id == "king":

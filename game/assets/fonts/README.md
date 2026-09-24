@@ -16,3 +16,20 @@
   crisp there anyway.
 - It has no glyph for `★` (U+2605) or `−` (U+2212). Both appear in banner text, so the banner
   font lists the default theme font as a fallback (game.gd).
+
+## Project Theme (NO-256)
+
+- `assets/ui_theme.tres` (wired by `gui/theme/custom`) makes `PixelOperator.ttf` every Control's
+  default font at 20 px; Buttons 24; type variations `Header` 24, `Title` Bold 32, `Hero` Bold 48.
+- The Theme's fonts are FontVariations over each Pixel Operator face, falling back to
+  `OpenSans_SemiBold.woff2`, then the OS system font fallback. That woff2 is the same file Godot
+  embeds as its default font (`thirdparty/fonts/` in the 4.7 source, SIL OFL 1.1, text in
+  `OpenSans-LICENSE.txt`). It's bundled because a `.tres` cannot reference the engine's built-in
+  font, and a fallback attached at runtime arrived too late for the first HUD build. Of the UI's
+  symbols Open Sans only has `−` and `θ`; `← → ★ ⚠ ☰ …` come from the OS, as before the Theme.
+- A fallback raises the line height: `Font.get_height` is the max over the chain, so a Pixel
+  Operator line is as tall as Open Sans (1.36 em), not 1.0 em.
+- `scripts/ui_fonts.gd` (autoload) turns antialiasing off on both faces at boot.
+- The `.ttf.import` / `.woff2.import` files are not committed yet. Godot writes them on import,
+  with defaults. Commit the two Pixel Operator ones from a Godot machine with Antialiasing None,
+  Hinting None, Subpixel Positioning Disabled.

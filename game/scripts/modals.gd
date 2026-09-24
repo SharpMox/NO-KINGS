@@ -1006,11 +1006,11 @@ func show_shop() -> void:
 	shop_lane_b_bar.show_percentage = false
 	# NO-143 (Max, 2026-09-20): the label moves INSIDE the bar, so the bar has
 	# to be tall enough to hold it — sized off the label's own font metrics
-	# (ThemeDB.fallback_font, since the bar isn't in the tree yet to ask its
-	# own theme) plus 4px breathing room (2 top, 2 bottom), not a guessed
-	# round number.
+	# (the project Theme's font, NO-256, since the bar isn't in the tree yet to
+	# ask its own theme) plus 4px breathing room (2 top, 2 bottom), not a
+	# guessed round number.
 	var restock_font_size := 12
-	var restock_line_h := ThemeDB.fallback_font.get_height(restock_font_size)
+	var restock_line_h := ThemeDB.get_project_theme().default_font.get_height(restock_font_size)
 	shop_lane_b_bar.custom_minimum_size = Vector2(0, restock_line_h + 4)
 	# NO-143: reads as a gauge — a sunken groove behind a rounded fill in
 	# Score's own colour (hud.gd:357) — rather than the bare default bar.

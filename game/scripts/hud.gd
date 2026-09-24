@@ -2112,6 +2112,12 @@ func refresh() -> void:
 	var mid_right_edge: float = vp.x - HEADER_PAD_Y - HEADER_BTN * 2.0 - HEADER_GAP
 	var centre_x: float = vp.x / 2.0
 	var centre_w: float = (minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP) * 2.0
+	# NO-256: re-pin the boxes to the current text. A Label outside a Container
+	# only ever GROWS to its minimum size and never shrinks back, so one tall
+	# line (a glyph the OS fallback font draws, e.g. ⚑ or a King name) left
+	# the box taller than counter_h for good and it overlapped the Clock.
+	turn_label.size.y = 0.0
+	wave_label.size.y = 0.0
 	var counter_font := turn_label.get_theme_default_font()
 	var turn_text_w: float = counter_font.get_string_size(
 		turn_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x

@@ -5344,6 +5344,12 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 
 # --- rendering ---
 
+## NO-256: board WORDS (the float-up Score/Gold popups) draw in the project
+## Theme's font like every Control. Board SYMBOLS (piece-glyph fallback,
+## inversion mark, buff glyphs) stay on ThemeDB.fallback_font in _draw.
+func text_font() -> Font:
+	return ThemeDB.get_project_theme().default_font
+
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
 	_banner_layer.queue_redraw()
@@ -5538,7 +5544,7 @@ func _draw() -> void:
 		elif a.kind == "pop":
 			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
-			draw_string(font, a.at_px + Vector2(0, -20.0 * a.t), a.text,
+			draw_string(text_font(), a.at_px + Vector2(0, -20.0 * a.t), a.text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
 		elif a.kind == "outline": # turn-switch glow expanding off the border
 			var grow: float = 4.0 + 12.0 * a.t

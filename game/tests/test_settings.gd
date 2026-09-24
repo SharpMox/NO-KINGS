@@ -82,22 +82,22 @@ func _init() -> void:
 	check(not AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")),
 		"apply() unmutes the Master bus when sound is on")
 
-	# issue 74's hard-edged text was removed 2026-09-06 (user: "remove the
-	# pixelated filter"): apply() must leave the fonts a live control resolves
-	# antialiased. Same assert-what-resolves shape as before, inverted.
-	Settings.apply({"sound_on": true})
+	# issue 74's hard-edged text filter was removed 2026-09-06 (user: "remove the
+	# pixelated filter"): apply() must not touch the fonts a live control
+	# resolves. NO-256 (a): those are now the project Theme's Pixel Operator,
+	# drawn AA-off by design like the banners and feed (ui_fonts.gd), so the
+	# check is that apply() leaves them exactly as the Theme set them.
+	var po: FontFile = load("res://assets/fonts/PixelOperator.ttf")
+	var aa_before := po.antialiasing
+	Settings.apply({"sound_on": true, "crt_on": true})
 	var probe_label := Label.new()
 	root.add_child(probe_label)
-	var label_font := probe_label.get_theme_font("font")
-	check(label_font is FontFile and label_font.antialiasing
-			!= TextServer.FONT_ANTIALIASING_NONE,
-		"a Label RESOLVES an antialiased font (no pixelated text)")
+	check(probe_label.get_theme_font("font") == ThemeDB.get_project_theme().default_font and po.antialiasing == aa_before,
+		"a Label RESOLVES the Theme's Pixel Operator, untouched by apply()")
 	var probe_button := Button.new()
 	root.add_child(probe_button)
-	var button_font := probe_button.get_theme_font("font")
-	check(button_font is FontFile and button_font.antialiasing
-			!= TextServer.FONT_ANTIALIASING_NONE,
-		"a Button RESOLVES an antialiased font (no pixelated text)")
+	check(probe_button.get_theme_font("font") == ThemeDB.get_project_theme().default_font and po.antialiasing == aa_before,
+		"a Button RESOLVES the Theme's Pixel Operator, untouched by apply()")
 	probe_label.queue_free()
 	probe_button.queue_free()
 

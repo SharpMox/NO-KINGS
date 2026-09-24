@@ -1390,9 +1390,10 @@ func _init() -> void:
 	zap_item.queue_free()
 	await process_frame
 
-	# Item return refused at a full inventory (issue 53's cap of 3) — the
-	# once-per-Wave charge is still spent, same "spent either way" precedent
-	# as every other full-inventory grant (e.g. _box_choose's ItemLogic.grant).
+	# Item return refused at a full inventory (issue 53's cap, base 2 as of
+	# 2026-09-24) — the once-per-Wave charge is still spent, same "spent
+	# either way" precedent as every other full-inventory grant (e.g.
+	# _box_choose's ItemLogic.grant).
 	var zap_full := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 7, 10]],
 		"wave": 1, "artefacts": ["zapruder-s-director-s-cut"]})
 	await process_frame
@@ -1401,14 +1402,15 @@ func _init() -> void:
 		"target": "", "description": ""})
 	zap_full._use_item(0) # the Item Zapruder will try (and fail) to return
 	zap_full._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
-	for i in 3: # refill to the cap with something else, as if drawn meanwhile
+	for i in Tuning.ITEM_CAP_BASE: # refill to the cap with something else, as if drawn meanwhile
 		zap_full.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical",
 			"target": "tile", "action_cost": 0, "description": ""})
-	check(zap_full.items.size() == 3, "setup: inventory refilled to the cap (3) after the Item was used")
+	check(zap_full.items.size() == Tuning.ITEM_CAP_BASE,
+		"setup: inventory refilled to the cap (%d) after the Item was used" % Tuning.ITEM_CAP_BASE)
 	check(zap_full._artefact_activation_available("zapruder-s-director-s-cut"),
 		"Zapruder's Director's Cut: still available — availability doesn't check the cap")
 	zap_full._artefact_confirmed("zapruder-s-director-s-cut")
-	check(zap_full.items.size() == 3 and zap_full.items.all(func(it: Dictionary) -> bool: return it.key == "blitz"),
+	check(zap_full.items.size() == Tuning.ITEM_CAP_BASE and zap_full.items.all(func(it: Dictionary) -> bool: return it.key == "blitz"),
 		"Zapruder's Director's Cut: the return is refused at a full inventory")
 	check(not zap_full._artefact_activation_available("zapruder-s-director-s-cut"),
 		"Zapruder's Director's Cut: the once-per-Wave charge is spent either way")

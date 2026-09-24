@@ -15,6 +15,7 @@ const ItemLogic := preload("res://scripts/item_logic.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Shop := preload("res://scripts/shop.gd")
 const Economy := preload("res://scripts/economy.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -266,24 +267,25 @@ func _init() -> void:
 	dm.queue_free()
 	await process_frame
 
-	# --- Item held capacity (issue 53, user ruling): base 3, unbounded before
-	# this. ItemLogic.grant() is the single choke point every acquisition path
-	# (Box pick, Artefact grant, Yalta's own pick, Shop purchase) now routes
-	# new Items through — a full inventory REFUSES the grant (drops it), the
-	# simpler of the two options and the one that matches "capacity".
+	# --- Item held capacity (issue 53, user ruling; base lowered 3 -> 2 on
+	# 2026-09-24): unbounded before issue 53. ItemLogic.grant() is the single
+	# choke point every acquisition path (Box pick, Artefact grant, Yalta's
+	# own pick, Shop purchase) now routes new Items through — a full
+	# inventory REFUSES the grant (drops it), the simpler of the two options
+	# and the one that matches "capacity".
 	var ic := _boot({"board": [["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
-	for i in 3:
+	for i in Tuning.ITEM_CAP_BASE:
 		check(ItemLogic.grant(ic, _item("blitz", "tile")),
-			"Item %d/3 lands under the base cap" % (i + 1))
-	check(ic.items.size() == 3, "base Item capacity is 3")
+			"Item %d/%d lands under the base cap" % [i + 1, Tuning.ITEM_CAP_BASE])
+	check(ic.items.size() == Tuning.ITEM_CAP_BASE, "base Item capacity is %d" % Tuning.ITEM_CAP_BASE)
 	check(not ItemLogic.grant(ic, _item("blitz", "tile")),
-		"a 4th Item is refused at the base cap — the cap genuinely binds")
-	check(ic.items.size() == 3, "the refused grant did not land")
+		"one more Item is refused at the base cap — the cap genuinely binds")
+	check(ic.items.size() == Tuning.ITEM_CAP_BASE, "the refused grant did not land")
 	ic.artefacts.append({"key": "area-51-parking-permit"})
 	check(ItemLogic.grant(ic, _item("blitz", "tile")),
-		"Area 51 Parking Permit raises the cap (+3, to 6) — the 4th now lands")
-	check(ic.items.size() == 4, "the Item actually landed")
+		"Area 51 Parking Permit raises the cap (+3) — the next Item now lands")
+	check(ic.items.size() == Tuning.ITEM_CAP_BASE + 1, "the Item actually landed")
 	ic.queue_free()
 	await process_frame
 
@@ -292,7 +294,7 @@ func _init() -> void:
 	await process_frame
 	sh.state = sh.State.PLAYER_TURN
 	sh.actions_left = 2
-	for i in 3:
+	for i in Tuning.ITEM_CAP_BASE:
 		sh.items.append(_item("blitz", "tile")) # at the base cap already
 	var item_slot := {"kind": "item", "key": "blitz", "sold": false}
 	sh.shop_stock = [item_slot]
@@ -362,8 +364,8 @@ func _init() -> void:
 	db.gold = 0
 	Economy.earn(db, 100)
 	check(db.gold == 100, "Item slots not full: no bonus")
-	for i in 2:
-		db.items.append(_item("blitz", "tile")) # fills 2/3 of the base cap
+	for i in Tuning.ITEM_CAP_BASE - 1:
+		db.items.append(_item("blitz", "tile")) # fills to one below the base cap
 	db.items.append({"key": "blitz", "name": "Blitz", "tier": "Tactical", "target": "tile",
 		"description": ""}) # a real-tier catalog shape — this is the one sold below
 	db.gold = 0
@@ -374,10 +376,11 @@ func _init() -> void:
 	# the bonus (the erase in _sell() happens BEFORE the Gold-gain dispatch).
 	db.state = db.State.PLAYER_TURN
 	db.actions_left = 5
-	var sell_price: int = Shop.sell_price(db, "item", db.items[2])
+	var sell_target: Dictionary = db.items.back()
+	var sell_price: int = Shop.sell_price(db, "item", sell_target)
 	var db_gold_before: int = db.gold
-	db._sell("item", db.items[2])
-	check(db.items.size() == 2 and db.gold == db_gold_before + sell_price,
+	db._sell("item", sell_target)
+	check(db.items.size() == Tuning.ITEM_CAP_BASE - 1 and db.gold == db_gold_before + sell_price,
 		"Item slots no longer full: selling the Item that empties the last slot pays the plain sell price, no +30%")
 	db.queue_free()
 	await process_frame

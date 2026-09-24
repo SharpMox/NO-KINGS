@@ -18,6 +18,7 @@ extends Node
 
 const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
+const Economy := preload("res://scripts/economy.gd")
 const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
@@ -1404,10 +1405,24 @@ func show_king_abilities() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void: king_ability_panel.visible = false)
+	close.pressed.connect(func() -> void:
+		king_ability_panel.visible = false
+		# NO-100: restore what opening the panel hid, below (same pattern as
+		# _end_of_run_on_top/_offer_ad_retry).
+		if g.hud != null:
+			g.hud.feed.visible = true
+		g._banner_layer.visible = true)
 	box.add_child(close)
 	g.hud.add_child(king_ability_panel)
 	king_ability_panel.move_to_front()
+	# NO-100: the panel is a translucent dim, so the kill feed and the banner
+	# layer (the world, below the HUD) showed through it — same issue
+	# _end_of_run_on_top/_offer_ad_retry already fixed for the end-of-run and
+	# ad-retry panels. Hidden, not cleared: the Close handler above restores
+	# both.
+	if g.hud != null:
+		g.hud.feed.visible = false
+	g._banner_layer.visible = false
 
 
 ## One name + description pair per active King Ability, or a "none yet" line.
@@ -1434,7 +1449,7 @@ func _add_king_ability_rows(box: VBoxContainer, name_size: int, desc_size: int) 
 		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(none)
 	for t in g.king_abilities_active:
-		_add_power_row(box, str(t.name), str(t.description), name_size, desc_size)
+		_add_power_row(box, str(t.name), Economy.ability_desc(g, str(t.key)), name_size, desc_size)
 
 
 func _add_power_row(box: VBoxContainer, name_text: String, desc_text: String,

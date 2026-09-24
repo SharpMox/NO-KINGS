@@ -371,6 +371,29 @@ static func ability_name(key: String) -> String:
 	return key.replace("_", " ")
 
 
+## Terse, real-amount description for a King Ability — what the ⚠ overlay and
+## the King info panel both render (modals.gd's _add_king_ability_rows is the
+## one call site both share, NO-83/NO-100), so the two can never show
+## different text. Static catalog text (king_abilities.gd) for every key
+## except "inflation": N held copies compound multiplicatively (on_gold_gain
+## does `ctx.amount *= 0.9` per copy — artefact_hooks.gd), so the live total
+## cut is 1 - 0.9^N, not the flat 10% the catalog states for a single copy.
+static func ability_desc(g, key: String) -> String:
+	if key == "inflation":
+		var held := 0
+		for t in g.king_abilities_active:
+			if t.get("key", "") == "inflation":
+				held += 1
+		if held <= 1:
+			return "Gold gains −10% (stacks)"
+		var pct := roundi((1.0 - pow(0.9, held)) * 100.0)
+		return "Gold gains −%d%% (%d stacks)" % [pct, held]
+	for t in KingAbilities.ABILITIES:
+		if t.key == key:
+			return str(t.description)
+	return ""
+
+
 ## Single choke point for every Tariff taking effect (oneoff or persistent) —
 ## "whenever a new Tariff is applied" (artefact hook 19) fires here, once,
 ## regardless of which of the two activate_* callers led here. `cancel`

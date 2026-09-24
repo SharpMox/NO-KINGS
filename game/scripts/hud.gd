@@ -1460,7 +1460,7 @@ func build(game) -> void:
 	add_child(tip_panel)
 	# NO-239: the kill feed, just under the Header, anchored left.
 	feed.position = Vector2(HEADER_PAD_X, g.hud_top + 4.0)
-	feed.add_theme_constant_override("separation", 3)
+	feed.add_theme_constant_override("separation", 4)
 	feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(feed)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
@@ -1609,20 +1609,33 @@ func _roll_counter(key: String, zeros: Label, lbl: Label, from_v: int, to_v: int
 # visible; each lives FEED_LIFE_S then fades. Gains and artefact notes go
 # through feed_gain(), which coalesces same-cause posts until the end of the
 # frame; post() is the raw one-line API. Silent in autoplay.
+# #569 round 2 (Max): text only, no piece/Artefact icons at all — the icon
+# plumbing #569 round 1 added (optional Texture2D args on Economy.earn/
+# earn_gold, hud.feed_gain/post, and the piece_tex() calls that fed them) is
+# gone. Every line is now "<label> [+N] [+$M]" with no "·" separators — see
+# each call site (economy.gd's _feed, artefact_hooks.gd's feed, game.gd's
+# capture/sell/refund sites) for the exact wording per NO-239's kind.
 const FEED_MAX := 4
 const FEED_LIFE_S := 3.0
 const FEED_FADE_S := 0.3
 const FEED_FONT := preload("res://assets/fonts/PixelOperator.ttf")
-const FEED_FONT_SIZE := 16 # the font's 16 px grid: stays crisp
+## Max ruled 32 too big (2026-09-24): 24. The regular weight is drawn on a
+## 16 px grid (100 of its 1600 units per pixel), so neither 24 nor 32 lands on
+## a whole font pixel — moot anyway, since the game window is stretched at a
+## non-integer scale (~1.9x) on device, so no CSS-pixel size stays crisp.
+const FEED_FONT_SIZE := 24
 const FEED_TEXT := Color(0.92, 0.94, 0.9)
-const FEED_PAD_L := 6 # pill content margins, also subtracted by _feed_fit
+## Pill content margins, also subtracted by _feed_fit. Scaled from the 32 px
+## values (8, 10) by 24/32 — the icon-to-text gap they scaled alongside is
+## gone now that the feed carries no icon.
+const FEED_PAD_L := 6
 const FEED_PAD_R := 8
 var feed := VBoxContainer.new()
 var _feed_font: FontFile
-var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, icon, color}
+var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, color}
 
 
-func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
+func post(text: String, color := FEED_TEXT) -> void:
 	if g.autoplay:
 		return
 	if _feed_font == null: # hard pixel edges, like the banner font (game.gd)
@@ -1637,25 +1650,17 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0.6)
-	sb.set_corner_radius_all(6)
+	sb.set_corner_radius_all(8)
 	sb.content_margin_left = FEED_PAD_L
 	sb.content_margin_right = FEED_PAD_R
-	sb.content_margin_top = 1
-	sb.content_margin_bottom = 1
+	sb.content_margin_top = 0 # the line box already has the font's
+	sb.content_margin_bottom = 0 # ascent/descent air above and below
 	pill.add_theme_stylebox_override("panel", sb)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pill.add_child(row)
-	if icon:
-		var tr := TextureRect.new()
-		tr.texture = icon
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.custom_minimum_size = Vector2(16, 16)
-		row.add_child(tr)
 	var lab := Label.new()
-	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R - (20.0 if icon else 0.0))
+	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R)
 	lab.add_theme_font_override("font", _feed_font)
 	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
 	lab.add_theme_color_override("font_color", color)
@@ -1679,52 +1684,69 @@ func feed_max_w() -> float:
 
 
 ## #558: `text` cut with "…" to fit `max_w` at the feed font. Only the tail is
-## cut, and never into the leading "+N · +$M · " amounts — the reason goes first.
+## cut, and never into the leading label — the reason goes first.
 func _feed_fit(text: String, max_w: float) -> String:
 	var width := func(t: String) -> float:
 		return ceilf(_feed_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, FEED_FONT_SIZE).x)
 	if width.call(text) <= max_w:
 		return text
-	var m := RegEx.create_from_string("^(\\+\\$?\\d+ · )+").search(text)
-	var keep: int = m.get_end() if m else 0
 	var n := text.length() - 1
-	while n > keep and width.call(text.left(n) + "…") > max_w:
+	while n > 0 and width.call(text.left(n) + "…") > max_w:
 		n -= 1
 	return text.left(n).strip_edges(false, true) + "…"
 
 
 ## Queue a gain (and/or an artefact note) under `cause`. Everything posted
 ## under one cause before the frame ends becomes ONE line:
-## "+150 · +$15 · captured Knight", "[icon] Tinfoil Hat: Piece Buff granted ×2".
+## "Sold Rook +$25", "27 Club Punch Card: Buff ×2".
 func feed_gain(cause: String, label: String, score := 0, gold := 0, note := "",
-		icon: Texture2D = null, color := FEED_TEXT) -> void:
+		color := FEED_TEXT) -> void:
 	if g.autoplay:
 		return
 	if _feed_pending.is_empty():
 		_flush_feed.call_deferred()
 	var e: Dictionary = _feed_pending.get_or_add(cause,
-		{"label": label, "score": 0, "gold": 0, "notes": {}, "icon": icon, "color": color})
+		{"label": label, "score": 0, "gold": 0, "notes": {}, "color": color})
 	e.score += maxi(score, 0)
 	e.gold += maxi(gold, 0)
 	if note != "":
 		e.notes[note] = e.notes.get(note, 0) + 1
 
 
+## #569 round 2: a capture posts "Took <Piece>", or "Took <N>" once a
+## same-frame Multicapture extra makes it more than one victim — coalesced
+## under the shared "capture" cause exactly like feed_gain, just with the
+## label computed from how many victims actually landed rather than fixed at
+## the first call. game.gd calls this once per victim (main capture, then the
+## Multicapture extra if one fires), each with that victim's own net
+## score/gold delta.
+func feed_capture(piece_name: String, score := 0, gold := 0) -> void:
+	if g.autoplay:
+		return
+	if _feed_pending.is_empty():
+		_flush_feed.call_deferred()
+	var e: Dictionary = _feed_pending.get_or_add("capture",
+		{"label": "", "score": 0, "gold": 0, "notes": {}, "color": FEED_TEXT, "names": []})
+	e.names.append(piece_name)
+	e.label = "Took %s" % piece_name if e.names.size() == 1 else "Took %d" % e.names.size()
+	e.score += maxi(score, 0)
+	e.gold += maxi(gold, 0)
+
+
 func _flush_feed() -> void:
 	for cause in _feed_pending:
 		var e: Dictionary = _feed_pending[cause]
-		var parts := PackedStringArray()
-		if e.score > 0:
-			parts.append("+%d" % e.score)
-		if e.gold > 0:
-			parts.append("+$%d" % e.gold)
 		var notes := PackedStringArray()
 		for n in e.notes:
 			notes.append(n if e.notes[n] == 1 else "%s ×%d" % [n, e.notes[n]])
-		if parts.is_empty() and notes.is_empty():
+		if e.score <= 0 and e.gold <= 0 and notes.is_empty():
 			continue # a zero gain: nothing to say
-		parts.append(e.label if notes.is_empty() else "%s: %s" % [e.label, ", ".join(notes)])
-		post(" · ".join(parts), e.icon, e.color)
+		var line: String = e.label if notes.is_empty() else "%s: %s" % [e.label, ", ".join(notes)]
+		if e.score > 0:
+			line += " +%d" % e.score
+		if e.gold > 0:
+			line += " +$%d" % e.gold
+		post(line, e.color)
 	_feed_pending.clear()
 
 

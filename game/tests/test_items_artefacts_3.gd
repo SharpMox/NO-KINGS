@@ -848,7 +848,7 @@ func _init() -> void:
 
 	# --- issue 60: Mao's Loyalty Badge's free-Item loop is break-even at
 	# best (60-selling.md) — buy one Tactical Item, get a second free, sell
-	# both back at 50%: no Gold gain, bounded by the Item cap of 3 regardless.
+	# both back at 50%: no Gold gain, bounded by the Item cap regardless.
 	var mao := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 99999, "artefacts": ["mao-s-loyalty-badge"]})
 	Shop.roll(mao) # NO-240: a pre-Wave-5 boot no longer stocks the Shop

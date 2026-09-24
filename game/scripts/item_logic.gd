@@ -14,8 +14,9 @@ static func chain_base(defs: Dictionary, id: String) -> String:
 	return id
 
 
-## Held Item capacity (issue 53, user ruling) — base 3, +3 per held Area 51
-## Parking Permit, additive per copy (the header's stacking rule). A
+## Held Item capacity (issue 53, user ruling) — base 2 (2026-09-24, was 3),
+## +3 per held Area 51 Parking Permit, additive per copy (the header's
+## stacking rule). A
 ## structural read off g.artefacts, not a hook — same pattern as
 ## Shop._extra_item_slots/_credit (shop.gd), Box's own standing-rule reads.
 static func cap(g) -> int:

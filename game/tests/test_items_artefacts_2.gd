@@ -517,8 +517,8 @@ func _init() -> void:
 
 	# --- NO-23 (user ruling 2026-09-08): the wave-clear half opens a Small Item
 	# Box instead of granting an Item outright. A direct grant is refused at the
-	# base cap of 3 (issue 53) and was silently dropped; the Manna Vending
-	# Machine took the same treatment in issue 58, and NO-38's sell row is what
+	# base cap (issue 53; 2026-09-24: 3 -> 2) and was silently dropped; the
+	# Manna Vending Machine took the same treatment in issue 58, and NO-38's sell row is what
 	# makes a full inventory a choice rather than a wasted pick.
 	var knox := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 5, "artefacts": ["fort-knox-iou"]})

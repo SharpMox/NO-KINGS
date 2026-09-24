@@ -99,9 +99,10 @@ static func grid_row_w(cols: int, sep: float) -> float:
 ## carried a bare 50 with a comment apologising for it (NO-37).
 const HISTORY_CAP := 50
 
-const ITEM_CAP_BASE := 3          # issue 53 (user ruling): held Items were
+const ITEM_CAP_BASE := 2          # issue 53 (user ruling): held Items were
                                    # unbounded before this — Area 51 Parking
                                    # Permit raises it, +3 per copy (item_logic.gd)
+                                   # 2026-09-24: Max lowered 3 → 2
 const PIECE_BUFF_CAP_BASE := 2    # issue 53 (user ruling): a board piece's
                                    # buffs Array was unbounded before this —
                                    # Abduction Probe raises it +1, non-stacking

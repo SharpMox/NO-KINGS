@@ -52,7 +52,7 @@ static func all() -> Array:
 			var cfg := {
 				"board": board,
 				"stock": ["pawn", "pawn", "rook"], # deploy cost: Qin Shi Huang doubles it
-				"items": ["blitz", "promote", "air_strike"], # the Item cap; Nero burns them
+				"items": ["blitz", "promote"], # the Item cap (2026-09-24: 2); Nero burns them
 				"gold": 300, "score": 500,
 				"king_power_id": k.id,
 				"seed": abs(hash(k.id)),

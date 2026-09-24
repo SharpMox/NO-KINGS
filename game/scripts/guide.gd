@@ -434,7 +434,7 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Merge partner", "ring", board.COL_MERGE, "A piece the selection can merge or fuse with."],
 		["Reachable zone", "outline", Color(board.COL_ZONE_OUTLINE_MOVE, board.ZONE_OUTLINE_ALPHA), "Outline around every square a selected piece can reach this turn."],
 		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
-		["Blast / Item zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Red hatching inside a red outline: the tiles a bomb blast or an armed Item will hit."],
+		["Blast zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Tiles a bomb or armed Item will hit."],
 		["Placement", "dot", board.COL_PLACE, "A tile available during setup or relocation."],
 		["Your pieces", "fill", board.COL_PLAYER, "Your pieces and threats read blue — the game's palette rule."],
 		["Enemy pieces", "fill", board.COL_ENEMY, "Enemy pieces and threats read red — the game's palette rule."],

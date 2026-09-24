@@ -343,7 +343,8 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   **SETUP cannot be a scenario**: `test_scenarios` requires every scenario to boot into
   `PLAYER_TURN`, and `save_config.gd` defaults `state` to it. `--show-screen setup` reaches
   SETUP from a scenario boot instead (`_debug_enter_setup`: the Army's Stock, empty board,
-  Stock drawer open), and `stock-return` adds one placed, selected piece for the "+" slot.
+  Stock drawer open), and `stock-return` adds one placed piece mid-drag over the drawer,
+  its first empty slot highlighted as the return drop target.
   **The wave/turn banner is reachable now (NO-234).** It used to be a dead end: drawn
   only during a transition by `_add_turn_fx`, lasting ~1.1s with no flag holding it on
   screen, so NO-219's italic, its stripes and its full-width span went unverified.

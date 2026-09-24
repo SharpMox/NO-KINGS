@@ -1229,7 +1229,7 @@ func _clear_selection() -> void:
 	_pulse.queue_redraw()
 
 
-func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
+func _on_stack_pressed(entry: Variant, cap: bool) -> void:
 	# NO-236: nor the release that ENDS a live drag. Dragging out makes the
 	# drawer's cells MOUSE_FILTER_IGNORE, so the button never sees the finger
 	# leave it; a drop that reopens the drawer then hands it the release,
@@ -1269,16 +1269,12 @@ func _on_stack_pressed(entry: Variant, cap: bool, count: int) -> void:
 	# captured entry now.
 	if cap:
 		return
-	# tapping a partner of the current selection completes the merge; a
-	# same-stack pair goes through drag instead (tap-again means deselect)
+	# tapping a partner of the selected BOARD piece completes the merge, on
+	# that piece's tile. Two Stock pieces never merge (Max, NO-100 review
+	# 2026-09-24: "we can only merge on the board, not in the Stock").
 	var same_stack: bool = placing_id != "" and armed_entry == entry
-	if not same_stack and merge_highlights.has(id):
-		var unit := {"id": id, "entry": entry}
-		if placing_id != "":
-			return MergeLogic.do_merge(self,
-				{"id": placing_id, "entry": armed_entry}, unit)
-		if selected.x >= 0:
-			return MergeLogic.do_merge(self, selected, unit)
+	if placing_id == "" and selected.x >= 0 and merge_highlights.has(id):
+		return MergeLogic.do_merge(self, selected, {"id": id, "entry": entry})
 	# select / deselect the stack: arms merging and Stock placement
 	if same_stack:
 		placing_id = ""
@@ -2472,13 +2468,10 @@ func _on_stack_drag_start(entry: Variant, cap: bool) -> void:
 	drawer_autoclosed = ""
 	drag_live = false
 	drag_press_px = _last_press_px
-	# highlight drop targets WITHOUT rebuilding the strip — a rebuild would
+	# board partners only, and WITHOUT rebuilding the strip — a rebuild would
 	# free the pressed button and its release-tap (pressed) would never fire,
 	# breaking tap-to-place (found 2026-07-07)
 	merge_highlights = MergeLogic.partner_ids(self)
-	for c in hud.pool_buttons():
-		if c is Button and c.has_meta("id") and merge_highlights.has(c.get_meta("id")):
-			c.modulate = Color(0.8, 1.1, 1.4)
 	queue_redraw()
 
 
@@ -2646,6 +2639,22 @@ func _input(event: InputEvent) -> void:
 			and event.pressed:
 		_last_press_px = event.position # NO-236: a drawer drag's start point
 		drag_live = false
+		# SETUP: with a placed piece selected, a tap anywhere in the open Stock
+		# drawer takes it back — here, ahead of the drawer's own cells, so a
+		# tap on a Stock piece returns rather than arms (NO-100 review).
+		if state == State.SETUP and selected.x >= 0 and board.has(selected) \
+				and hud.drawer_open == "stock" and (hud.drawers["stock"] as Control) \
+					.get_global_rect().has_point(event.position):
+			get_viewport().set_input_as_handled()
+			return _setup_to_stock(selected)
+	if drag_from.x >= 0 and event is InputEventMouseMotion:
+		# a SETUP board drag over the Stock zone previews the cell it would
+		# return to. Here, not in _unhandled_input: the drawer's own Controls
+		# take the motion over them before it gets there.
+		hud.show_stock_drop(piece_tex(board[drag_from].id)
+			if state == State.SETUP and board.has(drag_from) and hud.in_stock_zone(event.position)
+			else null)
+		queue_redraw()
 	if pool_drag_id == "" and item_drag < 0:
 		return
 	if event is InputEventMouseMotion:
@@ -2691,19 +2700,6 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			drawer_autoclosed = ""
 			return MergeLogic.do_merge(self, {"id": id, "entry": entry}, t)
-		# drop on a DIFFERENT partner Stock stack in the strip: pool merge.
-		# Dropping back on the same stack is a plain tap (arms placement) —
-		# same-stack promotion goes through the ▲ badge instead (2026-07-07).
-		# A CAPTURED stack is never a drop target (2026-09-10): merging into one
-		# would consume it, and its only exits now are convert and sell.
-		var target := hud.stack_button_at(event.position)
-		if state == State.PLAYER_TURN and target != null \
-				and not target.get_meta("cap") \
-				and merge_highlights.has(target.get_meta("id")) \
-				and target.get_meta("id") != id:
-			get_viewport().set_input_as_handled()
-			return MergeLogic.do_merge(self, {"id": id, "entry": entry},
-				{"id": target.get_meta("id"), "entry": target.get_meta("entry")})
 		if not covered and _pool_placeable(t):
 			drawer_autoclosed = ""
 			_place(entry, t)
@@ -2760,9 +2756,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			# not the start of an open-swipe on the same gesture).
 			_swipe_from = event.position
 			_swipe_eligible = _swipe_open_may_begin(at)
-			# any press outside an open drawer closes it to reveal the board
+			# any press outside an open drawer closes it to reveal the board —
+			# except a SETUP press on a placed piece, which keeps Stock open
+			# as the place to drag or tap it back into (NO-100 review)
 			if hud.drawer_open != "" and not (hud.drawers[hud.drawer_open] as Control) \
-					.get_global_rect().has_point(event.position):
+					.get_global_rect().has_point(event.position) \
+					and not (state == State.SETUP and hud.drawer_open == "stock"
+						and board.has(at) and board[at].owner == Rules.PLAYER):
 				_set_drawer("")
 			# NO-118: same "outside closes it" trigger as the drawer above,
 			# but this one CONSUMES the press instead of falling through —
@@ -2852,7 +2852,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				var t := _tile_at(event.position)
 				var from := drag_from
 				drag_from = Vector2i(-1, -1)
-				if t != from and legal_dests.has(t):
+				hud.show_stock_drop(null)
+				if state == State.SETUP and hud.in_stock_zone(event.position):
+					_setup_to_stock(from) # dropped on the Stock drawer or button
+				elif t != from and legal_dests.has(t):
 					if state == State.SETUP:
 						_setup_relocate(from, t)
 					else:
@@ -2862,12 +2865,6 @@ func _unhandled_input(event: InputEvent) -> void:
 						and board.has(t) and board[t].owner == Rules.PLAYER \
 						and board.has(from) and merge_highlights.has(board[t].id):
 					MergeLogic.do_merge(self, from, t) # dragged onto a partner: merge onto its tile
-				elif state == State.SETUP and t.x < 0 and (
-						(hud.drawer_open == "stock" and (hud.drawers["stock"] as Control)
-							.get_global_rect().has_point(event.position))
-						or (hud.drawer_buttons["stock"] as Control)
-							.get_global_rect().has_point(event.position)):
-					_setup_to_stock(from) # dropped on the drawer or Stock button
 				elif t == from and (drag_moved or drag_reselect):
 					# dragged away and dropped back home (no action taken), or a
 					# completed re-click on an already-selected piece: deselect
@@ -3260,8 +3257,12 @@ func _setup_relocate(from: Vector2i, to: Vector2i) -> void:
 	_refresh()
 
 
+## SETUP-only: a placed piece back into Stock, as its OLDEST entry, so it
+## lands in the drawer's first empty slot (the cell hud.show_stock_drop
+## previewed) rather than pushing every cell along. Placing in SETUP is free,
+## so nothing is refunded.
 func _setup_to_stock(from: Vector2i) -> void:
-	stock.append(board[from].id)
+	stock.insert(0, board[from].id)
 	board.erase(from)
 	_clear_selection()
 	_refresh()
@@ -4113,7 +4114,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			var old_id: String = board[b].id
 			board[b].id = defs[board[b].id].next
 			ArtefactHooks.run(self, "on_rank_up",
-				{"pos": b, "old_id": old_id, "id": board[b].id, "stock_index": -1})
+				{"pos": b, "old_id": old_id, "id": board[b].id})
 		"invert":
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
@@ -5347,13 +5348,23 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 		"setup":
 			_debug_enter_setup()
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
-		"stock-return": # the "+" slot: SETUP, a placed piece selected, Stock open
+		"stock-return": # SETUP, a placed piece mid-drag over the open Stock
+			# drawer: the first empty slot previews where it would return to.
+			# The drag is set up directly (drag_from + the preview _input
+			# draws on motion) — a capture has no finger to move.
 			_debug_enter_setup()
 			var open := _setup_open_tiles()
 			var spot: Vector2i = open[int(open.size() / 2.0)]
 			_place(stock[0], spot)
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
-			_on_tile_clicked(spot) # SETUP's own select tap; the drawer stays open
+			_on_tile_clicked(spot) # SETUP's own select tap
+			drag_from = spot
+			drag_moved = true
+			await get_tree().process_frame # the rebuild's own scroll-to-bottom first
+			var over: Vector2 = (hud.drawers["stock"] as Control).get_global_rect().get_center()
+			Input.warp_mouse(over) # the finger, over the drawer
+			hud.show_stock_drop(piece_tex(board[spot].id))
+			queue_redraw()
 		"feed": # one line of each NO-239 kind: a capture, a sale, an Artefact
 			# trigger — text only, no icons (#569 round 2)
 			hud.feed_capture("Knight", 150, 15)
@@ -6012,11 +6023,6 @@ func _connect_hud() -> void:
 	hud.item_drag_started.connect(_on_item_drag_start)
 	hud.artefact_activate_pressed.connect(_activate_artefact)
 	hud.army_ability_pressed.connect(_activate_army_ability)
-	hud.promote_pressed.connect(func(id: String) -> void:
-		MergeLogic.do_merge(self, {"id": id}, {"id": id}))
-	hud.return_to_stock_pressed.connect(func() -> void:
-		if selected.x >= 0 and board.has(selected):
-			_setup_to_stock(selected))
 	hud.shop_pressed.connect(_open_shop)
 	hud.drawer_changed.connect(_after_drawer_change)
 	hud.arrow_toggle_pressed.connect(_on_arrow_toggle)

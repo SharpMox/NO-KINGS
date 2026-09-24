@@ -217,11 +217,15 @@ static func _hand_written() -> Array:
 			"king_order": ["donald_trump", "benjamin_netanyahu", "vladimir_putin", "kim_jong_un"],
 			"score": 1000}},
 		# --- merging ---
-		{"name": "Merge: promotion pair (pool)", "cfg": {
-			"board": ZONE_PAWNS, "captured": ["pawn", "pawn", "rook", "rook"], "gold": 300}},
+		# NO-100 review (2026-09-24): merges happen on the board only, so each
+		# Stock piece here has a board partner; Captured never merges.
+		{"name": "Merge: a Stock pawn onto a board pawn", "cfg": {
+			"board": ZONE_PAWNS, "stock": ["pawn", "pawn"],
+			"captured": ["pawn", "pawn", "rook", "rook"], "gold": 300}},
 		{"name": "Merge: fusions (bishop+rook, knight+rook, ...)", "cfg": {
-			"board": ZONE_PAWNS, "captured": ["rook", "rook", "bishop", "knight", "kirin"],
-			"stock": ["alibaba", "wazir"], "gold": 300}},
+			"board": ZONE_PAWNS + [["rook", 0, 2, 1], ["wazir", 0, 5, 1]],
+			"captured": ["rook", "rook", "bishop", "knight", "kirin"],
+			"stock": ["alibaba", "bishop", "knight"], "gold": 300}},
 		{"name": "Merge: on the board", "cfg": {
 			"board": ZONE_PAWNS + [["ferz", 0, 2, 1], ["ferz", 0, 3, 1], ["bishop", 0, 4, 1], ["rook", 0, 5, 1]], "gold": 300}},
 		_chain("Pawn chain", "pawn", "sergeant"),
@@ -519,7 +523,7 @@ static func _hand_written() -> Array:
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
 			"artefacts": ["tape-eraser-magnet"], "items": ["blitz"],
 			"wave": 9, "gold": 300, "score": 1000}},
-		{"name": "Combo: Captured Stock merges and converts, but cannot deploy", "cfg": {
+		{"name": "Combo: Captured Stock converts, but cannot deploy or merge", "cfg": {
 			"board": ZONE_PAWNS + [["queen", 0, 3, 2]],
 			"captured": ["rook", "rook", "knight", "pawn"], "stock": ["pawn"],
 			"wave": 9, "gold": 400, "score": 1000}},
@@ -546,11 +550,14 @@ static func _hand_written() -> Array:
 		# Army Power / Artefact overlaps: one board per Army, each on the
 		# resource its Power touches, so a doubled-up effect is visible rather
 		# than inferred from two separate readings
-		{"name": "Combo Army: Crown — free merges against a Stock full of pairs", "cfg": {
+		{"name": "Combo Army: Crown — free merges, Stock pieces onto board partners", "cfg": {
 			# NO-100: one enemy on the board. With none, the first turn start
 			# saw a cleared board and queued wave 10 — a Shop restock Wave,
 			# which opens the Shop over the Stock drawer this capture is for.
-			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2], ["pawn", 1, 6, 10]],
+			# Close Ranks waives the merge's Action; every Stock piece has a
+			# board partner, since merges happen on the board only.
+			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2], ["pawn", 1, 6, 10],
+				["rook", 0, 2, 1], ["knight", 0, 5, 1], ["bishop", 0, 6, 1]],
 			"stock": ["rook", "rook", "knight", "knight", "bishop", "bishop"],
 			"wave": 9, "gold": 400, "score": 1000}},
 		{"name": "Combo Army: Wild Hunt — first-capture refund with multiple targets", "cfg": {

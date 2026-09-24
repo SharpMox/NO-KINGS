@@ -573,7 +573,7 @@ func _init() -> void:
 	# the real scroll position, after idle frames settle, never a property
 	# read-back alone (CLAUDE.md).
 	#
-	# SHORT: the scenario's own Stock (2 stacks: pawn, knight) already fits
+	# SHORT: the scenario's own Stock (a pawn and a knight) already fits
 	# without scrolling; give Captured Stock a single entry for the same
 	# reason. Bottom-anchored means the content's own bottom edge sits flush
 	# with the scroll viewport's bottom edge, not floating at the top with
@@ -605,7 +605,7 @@ func _init() -> void:
 			stock_align_rect.position.y + stock_align_rect.size.y,
 			stock_scroll_rect.position.y + stock_scroll_rect.size.y])
 
-	# OVERFLOW: enough distinct Stock kinds (Stock stacks by kind, NO-84) and
+	# OVERFLOW: enough Stock pieces (one cell each, NO-100 review) and
 	# enough Captured entries (Captured never stacks) to exceed the drawer's
 	# fixed height.
 	game.stock = ["pawn", "berolina", "sergeant", "ferz", "wazir", "champion",

@@ -361,9 +361,12 @@ func _init() -> void:
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH) # clean slate for the Sound toggle probe
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
-		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]],
-		"stock": ["pawn", "pawn"],   # the merge pair: Captured Stock cannot
-		"captured": ["pawn", "pawn"], # merge since 2026-09-10, Stock still can
+		# the merge pair is a Stock pawn and the board pawn at (5, 1): merges
+		# happen on the board only (NO-100 review, 2026-09-24), and Captured
+		# Stock cannot merge at all since 2026-09-10
+		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4], ["pawn", 0, 5, 1]],
+		"stock": ["pawn", "pawn"],
+		"captured": ["pawn", "pawn"],
 		"gold": 300, # issue 98: merging costs Gold, and this probe merges
 	}
 	# Hygiene fix, not the flake's cause (see _await_player_turn): every other
@@ -485,15 +488,15 @@ func _init() -> void:
 	# carries no merge control and never lights up as a merge partner, even
 	# though the armed Stock stack below holds the very same piece id; and
 	# press-dragging one paints NO deploy targets on a board it can never be
-	# placed on. Deployable Stock is untouched, which the ▲ merge at the end
-	# of the block is here to prove.
+	# placed on. Deployable Stock is untouched, which the merge onto a board
+	# pawn at the end of the block is here to prove.
 	check(await _click_stock(game), "Stock button opens the drawer")
 	await process_frame
 	check(game.drawer_open == "stock"
 			and (game.hud.drawers["stock"] as Control).is_visible_in_tree(),
 		"stock drawer is open and shows the pool strip")
-	check(_pool_rows(game, false).size() == 1,
-		"2 Stock pawns still show as ONE stack — Stock stacking is unchanged")
+	check(_pool_rows(game, false).size() == 2,
+		"2 Stock pawns show as two cells — nothing stacks (NO-100 review)")
 	var cap_rows: Array = _pool_rows(game, true)
 	check(cap_rows.size() == 2, "2 captured pawns are listed individually, NOT stacked")
 	# One control per captured entry and it is the ⇄ Convert badge: no ▲ merge,
@@ -543,25 +546,28 @@ func _init() -> void:
 			cap_tint_ok = false
 	check(cap_tint_ok,
 		"and a captured pawn stays untinted — never gold, never a merge partner")
+	# NO-100 review (2026-09-24): no Promote badge — an armed Stock cell whose
+	# twin sits right beside it carries no Button at all, and that twin is no
+	# merge partner (merges happen on the board only).
+	var armed_cells: Array = _pool_rows(game, false).filter(func(b: Button) -> bool:
+		return b.modulate.is_equal_approx(Color(0.55, 0.95, 1.5)))
+	check(armed_cells.size() == 1, "exactly one Stock cell wears the armed tint, the one tapped")
 	var badges: Array = []
 	for row in _pool_rows(game, false):
 		for c in (row as Button).get_children():
-			if c is Button and (c as Button).text.begins_with("▲"):
-				badges.append(c)
-	check(badges.size() == 1, "the armed STOCK stack shows the ▲ promote button")
-	# issue 97/98: the badge carries the merge's PRICE, on the control that
-	# starts the merge. Close Ranks does not make it free — that Power waives
-	# the Action only (merge_logic.can_afford_merge), so the Gold always shows.
-	check((badges[0] as Button).text == "▲$%d" % Tuning.MERGE_COST,
-		"and the ▲ badge shows what the merge costs (%s)" % (badges[0] as Button).text)
-	_click((badges[0] as Button).get_global_rect().get_center())
+			if c is Button:
+				badges.append((c as Button).text)
+	check(badges.is_empty(), "an armed Stock cell shows no Promote badge (%s)" % str(badges))
+	# ...the merge goes onto the BOARD partner instead: tap its tile
+	_click(game._tile_px(Vector2i(5, 1)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
-	check(game.pending_merge.size() == 2, "the ▲ badge asks for merge confirmation")
+	check(game.pending_merge.size() == 2, "tapping the board partner asks for merge confirmation")
 	check(game.stock.size() == 2, "nothing merges before confirmation")
 	check(await _click_button_in(game.hud, "Merge"), "confirm button clickable")
 	await process_frame
-	check(game.stock == ["sergeant"] and game.captured == ["pawn", "pawn"],
-		"confirming promotes the STOCK pawn pair and leaves Captured Stock untouched")
+	check(game.stock == ["pawn"] and game.board[Vector2i(5, 1)].id == "sergeant"
+			and game.captured == ["pawn", "pawn"],
+		"confirming promotes on the board pawn's tile and leaves Captured Stock untouched")
 
 	# NO-140 hardware fix (coordinator diagnosis): merge_panel stays `visible`
 	# for the MERGE_ANIM_S outro tween, and a visible full-rect panel at the
@@ -1467,21 +1473,11 @@ func _init() -> void:
 	check(odd_pool.is_empty(),
 		"pool strip: every icon is exactly OFFBOARD_ICON x OFFBOARD_ICON (%d), found: %s" % [ICON_PX, str(odd_pool)])
 
-	# The pool strip grows a "+" take-back slot, but ONLY in SETUP with a board
-	# piece selected -- which is why it kept a hardcoded 46 long after every
-	# stack button beside it moved onto the shared constant. Force that state
-	# rather than leave the one control the pin cannot otherwise reach untested.
-	icon_game.state = icon_game.State.SETUP
-	icon_game.selected = Vector2i(2, 2)
-	icon_game.hud.refresh()
-	await process_frame
-	var plus_slot: Button = null
-	for c in icon_game.hud.pool_buttons():
-		if c is Button and (c as Button).text == "+":
-			plus_slot = c
-	check(plus_slot != null, "(setup) the take-back \"+\" slot is present in SETUP with a selection")
-	check(plus_slot != null and plus_slot.custom_minimum_size == Vector2(ICON_PX, ICON_PX),
-		"pool strip: the \"+\" take-back slot is OFFBOARD_ICON too (%d), not the pre-NO-36 46" % ICON_PX)
+	# Stock's empty slots (the return drop target, NO-100 review) are cells
+	# of the same grid: the same OFFBOARD_ICON square as every piece beside them.
+	var empty_slot: Control = icon_game.hud.stock_drop_cell()
+	check(empty_slot != null and empty_slot.custom_minimum_size == Vector2(ICON_PX, ICON_PX),
+		"pool strip: the first empty Stock slot is OFFBOARD_ICON too (%d)" % ICON_PX)
 
 	icon_game.queue_free()
 	await process_frame
@@ -1842,12 +1838,68 @@ func _init() -> void:
 	check(game.board.has(Vector2i(2, 1)) and not game.board.has(target),
 		"setup: tap-tap relocates a placed piece freely")
 
-	# selecting a placed piece offers an empty stock slot to put it back
-	_click(game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2)
+	# NO-100 review (2026-09-24): the whole Stock zone is the return target —
+	# no "+" slot. (1) a drag over it previews the first empty slot, (2) the
+	# drop returns the piece INTO that slot, (3) a tap in the open drawer with
+	# a placed piece selected returns it too.
+	var ret_px: Vector2 = game._tile_px(Vector2i(2, 1)) + Vector2(game.tile, game.tile) / 2
+	var ret_id: String = game.board[Vector2i(2, 1)].id
+	check(await _click_stock(game), "(setup) the Stock drawer opens for the return drag")
+	check(not game.pool_box.any(func(b: Node) -> bool: return b is Button and b.text == "+"),
+		"setup: no \"+\" slot in the Stock drawer")
+	var drawer_mid: Vector2 = (game.hud.drawers["stock"] as Control).get_global_rect().get_center()
+	_press(ret_px)
 	await process_frame
-	var slots: Array = game.pool_box.filter(func(b: Node) -> bool:
-		return b is Button and b.text == "+" and not b.is_queued_for_deletion())
-	check(not slots.is_empty(), "setup: selecting a placed piece shows the put-back slot")
+	check(game.drawer_open == "stock" and game.selected == Vector2i(2, 1),
+		"setup: pressing a placed piece keeps the Stock drawer open")
+	var ret_motion := InputEventMouseMotion.new()
+	ret_motion.position = drawer_mid
+	ret_motion.global_position = drawer_mid
+	ret_motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(ret_motion)
+	await process_frame
+	var slot_i: int = _pool_rows(game, false).size() # cells before it = its index
+	var hl: Panel = game.hud._drop_hl
+	check(game.hud.stock_drop_cell() != null and is_instance_valid(hl)
+			and hl.get_parent() == game.hud.stock_drop_cell() and hl.is_visible_in_tree(),
+		"setup: dragging a placed piece over the Stock drawer highlights the first empty slot")
+	_release(drawer_mid)
+	await process_frame
+	await process_frame
+	var stock_cells: Array = game.hud._stacks().filter(func(st: Dictionary) -> bool: return not st.cap)
+	check(not game.board.has(Vector2i(2, 1)) and game.stock.size() == stock_before
+			and stock_cells.size() > slot_i and stock_cells[slot_i].id == ret_id,
+		"setup: the drop returns the piece into the previewed slot (cell %d = %s)"
+			% [slot_i, stock_cells[slot_i].id if stock_cells.size() > slot_i else "none"])
+	check(not is_instance_valid(game.hud._drop_hl) or not game.hud._drop_hl.is_visible_in_tree(),
+		"setup: the drop preview is gone once the drag ends")
+	# put it back on the board: arm a Stock cell, tap the zone tile
+	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
+	await process_frame
+	_click(ret_px)
+	await process_frame
+	await _await_drawer_settled(game, "stock")
+	check(game.board.has(Vector2i(2, 1)) and game.drawer_open == "stock",
+		"(setup) placed again, the Stock drawer reopened for the placement flow")
+	ret_id = game.board[Vector2i(2, 1)].id
+	_click(ret_px) # select it: the drawer stays open
+	await process_frame
+	check(game.selected == Vector2i(2, 1) and game.drawer_open == "stock",
+		"(setup) the placed piece is selected with the Stock drawer open")
+	# tap ON a Stock cell, the least likely spot: it must return, not arm
+	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
+	await process_frame
+	await process_frame
+	check(not game.board.has(Vector2i(2, 1)) and game.stock.size() == stock_before
+			and game.stock[0] == ret_id and game.placing_id == "",
+		"setup: with a placed piece selected, a tap anywhere in the Stock drawer returns it")
+	game.pool_click_key = "" # the arming tap above is <400 ms old: not a double-tap
+	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
+	await process_frame
+	_click(ret_px)
+	await process_frame
+	await _await_drawer_settled(game, "stock")
+	check(game.board.has(Vector2i(2, 1)), "(setup) placed again for the Header drop")
 
 	# and dragging a placed piece onto the Header's Stock button takes it back
 	# (NO-83: drawer_buttons["stock"] IS the Header button — the Deck has none)
@@ -1874,6 +1926,9 @@ func _init() -> void:
 	await process_frame
 	check(not game.board.has(Vector2i(2, 1)) and game.stock.size() == stock_before,
 		"setup: drop on the Header's Stock button returns the piece to stock")
+	if game.drawer_open != "":
+		game._set_drawer("") # as the flow below expects: closed
+		await process_frame
 
 	# tap-to-place regression (2026-07-07): strip rebuilds on press/release used
 	# to free the button before its arming tap fired
@@ -2513,13 +2568,13 @@ func _init() -> void:
 			deploy_target = t
 			break
 	check(deploy_target.x >= 0, "(sanity) an open Deploy tile exists")
-	game._on_stack_pressed("pawn", true, 1)
+	game._on_stack_pressed("pawn", true)
 	check(game._deploy_highlight_tiles().is_empty(),
 		"tapping a Captured entry paints no deploy targets")
 	game._on_tile_clicked(deploy_target)
 	check(not game.board.has(deploy_target) and game.captured == ["pawn"],
 		"and a Deploy-tile tap after it deploys nothing")
-	game._on_stack_pressed("pawn", false, 1) # the Stock pawn, same two calls
+	game._on_stack_pressed("pawn", false) # the Stock pawn, same two calls
 	check(not game._deploy_highlight_tiles().is_empty(),
 		"(control) the Stock entry DOES arm and light the board")
 	game._on_tile_clicked(deploy_target)

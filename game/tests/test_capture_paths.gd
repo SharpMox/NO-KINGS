@@ -115,9 +115,12 @@ func _init() -> void:
 					and not game.stock.is_empty() and game.hud.drawer_open == "stock",
 					"setup: SETUP, empty board, full Stock, Stock drawer open")
 			"stock-return":
-				check(game.state == GameScript.State.SETUP and game.selected.x >= 0
-					and game.hud.drawer_open == "stock" and _has_button(game.hud.stock_grid, "+"),
-					"stock-return: the \"+\" return slot is in the open Stock drawer")
+				var cell: Control = game.hud.stock_drop_cell()
+				check(game.state == GameScript.State.SETUP and game.drag_from.x >= 0
+					and game.hud.drawer_open == "stock" and cell != null
+					and is_instance_valid(game.hud._drop_hl) and game.hud._drop_hl.get_parent() == cell
+					and not _has_button(game.hud.stock_grid, "+"),
+					"stock-return: mid-drag, the first empty Stock slot is highlighted, no \"+\" slot")
 			"feed":
 				check(game.hud.feed.get_child_count() >= 3, "feed: three kill-feed lines posted")
 			"pick":
@@ -128,7 +131,7 @@ func _init() -> void:
 	# --- --open-drawer stock on the Promote-badge scenario (NO-100) ----------
 	# It captured the Shop: an enemy-free board made the first turn queue wave
 	# 10, a restock Wave, and that opens the Shop over the drawer.
-	var crown := await _boot("Combo Army: Crown — free merges against a Stock full of pairs")
+	var crown := await _boot("Combo Army: Crown — free merges, Stock pieces onto board partners")
 	check(crown.wave == 9 and not crown.shop_open(),
 		"promote capture: boots on wave 9 with the Shop closed (wave %d)" % crown.wave)
 	crown._set_drawer("stock")

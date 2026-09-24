@@ -192,7 +192,7 @@ const WIN_WAVE := 50
 
 signal pass_pressed
 signal king_ability_pressed
-signal stack_pressed(entry: Variant, cap: bool, count: int) # entry: ADR-0002
+signal stack_pressed(entry: Variant, cap: bool) # entry: ADR-0002
 signal stack_drag_started(entry: Variant, cap: bool)
 signal stack_preview_requested(id: String, cap: bool, entry: Variant) # NO-138:
 	# a Stock/Captured cell's long press — game.gd owns _show_preview, hud.gd
@@ -215,8 +215,6 @@ signal artefact_activate_pressed(key: String) # issue 52: an Activate chip press
 signal artefact_preview_requested(key: String) # NO-144: same as
 	# item_preview_requested above, for a held Artefact
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
-signal promote_pressed(id: String)
-signal return_to_stock_pressed
 signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
@@ -363,6 +361,9 @@ var captured_grid := VBoxContainer.new()
 ## _rebuild_stock_drawer so a stack can slide rather than be rebuilt.
 var _stack_btns := {}
 var _stack_anim_gen := 0 ## NO-237: only the latest rebuild's FLIP pass runs
+var _armed_key := "" ## the _stack_keys key of the cell last pressed (the armed one)
+var _stock_slots: Array = [] ## Stock's empty slots, this rebuild's, in fill order
+var _drop_hl: Panel = null ## show_stock_drop's highlight, parented to its cell
 ## How many entries fit per row — was `stock_grid.columns`/`captured_grid.
 ## columns` before V1; a VBoxContainer has no such property, so the layout
 ## step below stores it here instead, for _rebuild_stock_drawer to read.
@@ -2279,7 +2280,8 @@ func _pool_affordable(cap: bool, entry: Variant) -> bool:
 ## HBoxContainers, not a flat GridContainer of buttons — one level to
 ## flatten through. Every row holds only Buttons (no placeholders, no
 ## further nesting), so this keeps "pool_buttons() is buttons-only"
-## (test_game_clicks.gd's own comment on game.pool_box) true.
+## (test_game_clicks.gd's own comment on game.pool_box) true — Stock's empty
+## slots (Panels) are skipped for exactly that reason.
 ## NO-236: a drawer drag that goes live drops every pending long press. The
 ## motion that carries the finger out of the drawer closes it (game.gd _input),
 ## so the cell never sees the motion that would cancel its own hold, and the
@@ -2292,22 +2294,58 @@ func cancel_long_presses() -> void:
 
 func pool_buttons() -> Array:
 	var out := []
-	for row in stock_grid.get_children():
-		out.append_array(row.get_children())
-	for row in captured_grid.get_children():
-		out.append_array(row.get_children())
+	for row in stock_grid.get_children() + captured_grid.get_children():
+		for c in row.get_children():
+			if c is Button:
+				out.append(c)
 	return out
 
 
-## The pool-strip stack button under a screen point (drag drop target).
-func stack_button_at(screen: Vector2) -> Button:
-	if not (drawers["stock"] as Control).is_visible_in_tree(): # closed: no targets
-		return null
-	for c in pool_buttons():
-		if c is Button and not c.is_queued_for_deletion() and c.has_meta("id") \
-				and (c as Button).get_global_rect().has_point(screen):
-			return c
-	return null
+## The Stock zone: the open Stock drawer, or the Header's Stock button. A
+## board piece dropped there in SETUP goes back to Stock (game.gd).
+func in_stock_zone(screen: Vector2) -> bool:
+	return (drawer_open == "stock" and (drawers["stock"] as Control).get_global_rect().has_point(screen)) \
+		or (drawer_buttons["stock"] as Control).get_global_rect().has_point(screen)
+
+
+## The cell a piece returned to Stock lands in: the first empty slot
+## (_rebuild_stock_drawer always leaves one). Null before the first rebuild.
+func stock_drop_cell() -> Control:
+	return _stock_slots[0] if not _stock_slots.is_empty() else null
+
+
+## NO-236's board drop preview, carried into the Stock drawer: `tex` (the
+## dragged piece) shows half-transparent in the cell it would land in, on the
+## same COL_DROP_OK tint a legal board tile gets. null clears it. The board's
+## own ghost is drawn by game.gd under this layer, so the drawer needs its own.
+func show_stock_drop(tex: Texture2D) -> void:
+	var cell := stock_drop_cell()
+	if tex == null or cell == null:
+		if is_instance_valid(_drop_hl):
+			_drop_hl.queue_free()
+		_drop_hl = null
+		return
+	if not is_instance_valid(_drop_hl):
+		_drop_hl = Panel.new()
+		var tint := StyleBoxFlat.new()
+		tint.bg_color = g.COL_DROP_OK
+		tint.set_corner_radius_all(6)
+		_drop_hl.add_theme_stylebox_override("panel", tint)
+		_drop_hl.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_drop_hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var ghost := TextureRect.new()
+		ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ghost.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ghost.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ghost.modulate.a = 0.55
+		ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_drop_hl.add_child(ghost)
+	(_drop_hl.get_child(0) as TextureRect).texture = tex
+	if _drop_hl.get_parent() != cell:
+		if _drop_hl.get_parent():
+			_drop_hl.get_parent().remove_child(_drop_hl)
+		cell.add_child(_drop_hl)
+		stock_scroll.ensure_control_visible(cell)
 
 
 ## The armed stack piece rides on the Stock button styled like a selection:
@@ -2329,32 +2367,18 @@ func _draw_stock_armed() -> void:
 
 
 func _stacks() -> Array:
-	# pool grouped for display/selection: Stock stacks first, then Captured.
-	# Stock grouping is by WHOLE entry (ADR-0002), so a piece carrying state
-	# stacks apart from plain copies of the same id.
-	#
-	# NO-182: Stock now reads MOST RECENTLY ACQUIRED FIRST too, matching
-	# Captured below ("the bottom becomes the top") — scan g.stock in reverse
-	# so a stack's first appearance (its Dictionary insertion order, which
-	# GDScript preserves) is the newest copy, not the oldest.
-	#
-	# CAPTURED NEVER STACKS (user ruling 2026-09-10): one row per captured
-	# piece, MOST RECENT CAPTURE FIRST. g.captured is append-ordered, so newest
-	# first is simply its reverse. A stack made sense while a captured pair
-	# could merge; with convert and sell the only exits, every action is on ONE
-	# piece, so a row is one piece and the count badge has nothing to count.
+	# One cell per piece, Stock first, then Captured, each MOST RECENTLY
+	# ACQUIRED FIRST (NO-182: scan in reverse). Nothing groups any more (Max,
+	# NO-100 review 2026-09-24: "let's stop stacking altogether") — 7 Pawns
+	# are 7 cells. Captured never grouped (user ruling 2026-09-10); Stock
+	# followed once Stock merges were removed, which left a stack's count
+	# nothing to be for.
 	var out := []
-	var counts := {}
-	for i in range(g.stock.size() - 1, -1, -1):
-		var e: Variant = g.stock[i]
-		counts[e] = counts.get(e, 0) + 1
-	for e in counts:
-		out.append({"entry": e, "id": (e if e is String else e.id),
-			"cap": false, "count": counts[e]})
-	for i in range(g.captured.size() - 1, -1, -1):
-		var e: Variant = g.captured[i]
-		out.append({"entry": e, "id": (e if e is String else e.id),
-			"cap": true, "count": 1})
+	for cap in [false, true]:
+		var pool: Array = g.captured if cap else g.stock
+		for i in range(pool.size() - 1, -1, -1):
+			var e: Variant = pool[i]
+			out.append({"entry": e, "id": (e if e is String else e.id), "cap": cap})
 	return out
 
 
@@ -2606,15 +2630,28 @@ func _rebuild_items_grid() -> void:
 ## but that is now which GRID an entry is in, not a tint plus a tooltip a
 ## phone can't show anyway.
 ##
-## NO-237: stack buttons are KEPT across rebuilds (_stack_btns, one per
-## stack) instead of freed and rebuilt, so a stack that only moved slides to
-## its new cell, a new one pops in, and a gone one fades out (_animate_stacks).
+## NO-237: cell buttons are KEPT across rebuilds (_stack_btns, one per
+## piece) instead of freed and rebuilt, so a cell that only moved slides to
+## its new place, a new one pops in, and a gone one fades out (_animate_stacks).
+##
+## Stock's cells are followed by empty slots up to the end of the top row, at
+## least one: a board piece returned in SETUP lands in the first of them
+## (game.gd _setup_to_stock), which is the cell show_stock_drop highlights.
 func _rebuild_stock_drawer() -> void:
 	var animate: bool = not g.autoplay and g.animations_on \
 			and DisplayServer.get_name() != "headless" \
 			and drawers.has("stock") and (drawers["stock"] as Control).is_visible_in_tree()
 	var stacks := _stacks()
 	var keys := _stack_keys(stacks)
+	# The armed cell: every copy of a piece has the same entry, so the one the
+	# player pressed (_armed_key) is told apart by its key; armed from
+	# anywhere else, the newest copy wears it.
+	var armed_i := -1
+	for i in stacks.size():
+		if not stacks[i].cap and g.placing_id == stacks[i].id \
+				and g.armed_entry == stacks[i].entry \
+				and (armed_i < 0 or keys[i] == _armed_key):
+			armed_i = i
 	var live := {} # key -> Button, this rebuild's
 	var old_pos := {} # kept Button -> position before this rebuild (_stack_origin-relative)
 	var fresh: Array = []
@@ -2622,6 +2659,7 @@ func _rebuild_stock_drawer() -> void:
 	var cap_children: Array = []
 	for i in stacks.size():
 		var st: Dictionary = stacks[i]
+		st.armed = i == armed_i
 		var btn: Button = _stack_btns.get(keys[i])
 		if btn == null:
 			btn = _build_stack_button(st)
@@ -2631,6 +2669,7 @@ func _rebuild_stock_drawer() -> void:
 				old_pos[btn] = btn.global_position - _stack_origin(btn)
 			_build_stack_button(st, btn)
 		live[keys[i]] = btn
+		btn.set_meta("key", keys[i])
 		if st.cap:
 			cap_children.append(btn)
 		else:
@@ -2639,21 +2678,10 @@ func _rebuild_stock_drawer() -> void:
 		if not live.has(k):
 			_drop_stack_button(_stack_btns[k], animate)
 	_stack_btns = live
-	if g.state == g.State.SETUP and g.selected.x >= 0:
-		# empty slot: tap it (or drop the dragged piece on the strip) to take
-		# the selected board piece back into stock — lives with Stock, the
-		# side it returns pieces to.
-		var slot := Button.new()
-		slot.text = "+"
-		# NO-119: every stack button beside it in this same container is
-		# Tuning.OFFBOARD_ICON — keep this one square with them.
-		slot.custom_minimum_size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON)
-		slot.add_theme_font_size_override("font_size", 22)
-		slot.modulate = Color(0.55, 0.75, 1.0, 0.85) # placement blue, dimmed
-		slot.tooltip_text = "Put the piece back into stock"
-		slot.pressed.connect(func() -> void: return_to_stock_pressed.emit())
-		slot.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
-		stock_children.append(slot)
+	_stock_slots.clear()
+	for i in maxi(stock_cols, 1) - stock_children.size() % maxi(stock_cols, 1):
+		_stock_slots.append(_empty_slot())
+	stock_children.append_array(_stock_slots)
 	_fill_rows_bottom_right(stock_grid, stock_children, stock_cols)
 	_fill_rows_bottom_right(captured_grid, cap_children, cap_cols)
 	_scroll_stock_to_bottom() # NO-208
@@ -2661,28 +2689,25 @@ func _rebuild_stock_drawer() -> void:
 		_animate_stacks(old_pos, fresh)
 
 
-## NO-237: one identity per stack. A Stock stack is its whole entry (ADR-0002
-## — _stacks() groups by it); a Captured row is one piece, and two captured
-## copies of one entry are told apart by how many older copies precede them,
-## so a fresh capture of a piece already held gets the NEW key (numbering from
-## the oldest) and the rows already on screen keep theirs.
+## NO-237: one identity per cell. Copies of one entry are told apart by how
+## many older copies precede them, so a fresh copy of a piece already held
+## gets the NEW key (numbering from the oldest) and the cells already on
+## screen keep theirs.
 func _stack_keys(stacks: Array) -> Array:
 	var keys := []
 	keys.resize(stacks.size())
 	var seen := {}
-	for i in range(stacks.size() - 1, -1, -1): # captured rows are newest-first
+	for i in range(stacks.size() - 1, -1, -1): # cells are newest-first
 		var st: Dictionary = stacks[i]
 		var k: String = ("c|" if st.cap else "s|") + var_to_str(st.entry)
-		if st.cap:
-			var n: int = seen.get(k, 0)
-			seen[k] = n + 1
-			k += "|%d" % n
-		keys[i] = k
+		var n: int = seen.get(k, 0)
+		seen[k] = n + 1
+		keys[i] = k + "|%d" % n
 	return keys
 
 
 ## NO-237: a stack that is gone. Detached from its row at once, so no
-## pool_buttons()/stack_button_at lookup ever finds it again; when animating,
+## pool_buttons() lookup ever finds it again; when animating,
 ## it fades out where it stood (reparented onto this layer, input-dead) and
 ## then frees.
 func _drop_stack_button(btn: Button, animate: bool) -> void:
@@ -2793,7 +2818,7 @@ func _animate_stacks(old_pos: Dictionary, fresh: Array) -> void:
 ## ones are added on top — and a child is only reparented when its row
 ## changes, so a kept button stays in the tree (and keeps any press in
 ## progress) whenever it can. Anything left in a row that `children` no
-## longer lists (the last rebuild's "+" slot) is removed and freed; a gone
+## longer lists (the last rebuild's empty slots) is removed and freed; a gone
 ## stack's button was already detached by _drop_stack_button.
 func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) -> void:
 	cols = maxi(cols, 1)
@@ -2869,48 +2894,24 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 			btn.remove_child(c)
 			c.queue_free()
 	btn.set_meta("entry", st.entry)
-	btn.set_meta("count", st.count)
 	# NO-164: see _new_stack_button — the King's mono svg carries no side colour.
 	btn.modulate = g.COL_SIDE_ENEMY if cap and g.textures.has(id) and g.mono_art.has(id) \
 			else Color.WHITE
-	# `not cap` is load-bearing, not decoration: placing_id is only ever a
-	# STOCK id now (game.gd), so without it a captured row holding the same
-	# piece id as the armed Stock stack would light up armed too.
-	var armed: bool = not cap and g.placing_id == id and g.armed_entry == st.entry
-	var show_promote: bool = armed \
-			and st.count >= 2 and MergeLogic.pair_ok(g, id, id) \
-			and g.state == g.State.PLAYER_TURN and g.actions_left > 0
+	# _rebuild_stock_drawer picks the ONE armed cell: copies share an entry,
+	# and Captured never arms (placing_id is only ever a Stock id).
+	var armed: bool = st.armed
 	# 2026-09-06: Captured -> Stock conversion on the entry itself. It lived
 	# only in the Shop's Sell mode — four taps deep, and unreachable before
 	# SHOP_UNLOCK_WAVE since issue 101 locks the panel — so early captures
 	# could not be converted at all.
 	#
 	# 2026-09-10: ALWAYS SHOWN, on every captured entry. It used to appear
-	# only on an armed stack and only when ▲ promote did not claim the
+	# only on an armed stack and only when a merge badge did not claim the
 	# corner first — so holding two of a piece hid Convert behind the merge
 	# it lost the corner to, which is exactly the "tap to convert tries to
 	# merge instead" the user reported. Merge is gone from Captured Stock
 	# and arming it does nothing, so the badge has no reason to hide.
 	var show_convert: bool = cap
-	if st.count > 1:
-		# corner badge keeps the icon full-size (no inline text); it yields
-		# the top-right corner to the ▲ promote button when that shows
-		var badge := Label.new()
-		badge.text = str(st.count)
-		badge.add_theme_font_size_override("font_size", 11)
-		badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
-		badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
-		badge.add_theme_constant_override("outline_size", 4)
-		if show_promote:
-			badge.set_anchors_preset(Control.PRESET_TOP_LEFT)
-			badge.offset_left = 3
-			badge.offset_right = 16
-			badge.offset_bottom = 12
-		else:
-			badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-			badge.offset_left = -16
-			badge.offset_bottom = 12
-		btn.add_child(badge)
 	# issue 97: the price of acting on this entry, on the entry itself —
 	# deploy cost for a Stock piece, conversion cost for a Captured one.
 	# BOTH the base and the effective number when they differ, because
@@ -2938,30 +2939,6 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	price.offset_top = -13
 	btn.add_child(price)
-	if show_promote:
-		# round ▲ badge floating over the stack's top-right corner: it
-		# overhangs the drawer's top edge and pokes out a little to the
-		# right of the icon (the stock scroll doesn't clip)
-		var promote := Button.new()
-		# issue 97: the merge's price, on the control that starts it.
-		# Free under Close Ranks? No — that Power waives the ACTION only
-		# (merge_logic.can_afford_merge), so the Gold shows regardless.
-		promote.text = "▲$%d" % Tuning.MERGE_COST
-		promote.add_theme_font_size_override("font_size", 11)
-		promote.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0)) # NO-151: NOT COL_GOLD — green on the blue pill is ~1.6:1
-		var round := StyleBoxFlat.new()
-		round.bg_color = Color(0.3, 0.6, 1.0) # player blue
-		round.set_corner_radius_all(9)
-		for style in ["normal", "hover", "pressed"]:
-			promote.add_theme_stylebox_override(style, round)
-		promote.tooltip_text = "Promote: merge two into one"
-		promote.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		promote.offset_left = -14
-		promote.offset_right = 4
-		promote.offset_top = -9
-		promote.offset_bottom = 9
-		promote.pressed.connect(func() -> void: promote_pressed.emit(id))
-		btn.add_child(promote)
 	if show_convert:
 		# NO-223 (2026-09-22 ruling, extended from the new Sell badge to this
 		# pre-existing one — "badges are too small... whatever they do should
@@ -2980,7 +2957,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		convert.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to convert
 		var pill := StyleBoxFlat.new()
-		pill.bg_color = Color(0.3, 0.6, 1.0) # player blue, same as ▲
+		pill.bg_color = Color(0.3, 0.6, 1.0) # player blue
 		pill.set_corner_radius_all(9)
 		for style in ["normal", "hover", "pressed", "disabled"]:
 			convert.add_theme_stylebox_override(style, pill)
@@ -2994,8 +2971,10 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
 	if armed:
 		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-	elif not cap and g.merge_highlights.has(id):
-		btn.modulate = Color(0.8, 1.1, 1.4) # completes a merge — tap or drop
+	elif not cap and g.placing_id == "" and g.merge_highlights.has(id):
+		# completes a merge with the selected BOARD piece, on its tile — a
+		# Stock origin's partners are board pieces only (MergeLogic.partner_ids)
+		btn.modulate = Color(0.8, 1.1, 1.4)
 	# NO-164: the old "captured stock: warm tint" wash is gone — the enemy
 	# (dark) sprite set above IS the distinguishing signal now, so a captured
 	# entry's modulate stays at whatever the icon block set (default WHITE,
@@ -3047,11 +3026,14 @@ func _new_stack_button(id: String, cap: bool) -> Button:
 		if btn.has_meta("lp_fired"): # NO-72's swallow, same as every other long-press cell
 			btn.remove_meta("lp_fired")
 			return
-		stack_pressed.emit(btn.get_meta("entry"), cap, btn.get_meta("count")))
+		_armed_key = btn.get_meta("key")
+		stack_pressed.emit(btn.get_meta("entry"), cap))
 	btn.gui_input.connect(func(e: InputEvent) -> void:
 		_long_press_input(btn, "", "", e, func() -> void:
 			stack_preview_requested.emit(id, cap, btn.get_meta("entry"))))
-	btn.button_down.connect(func() -> void: stack_drag_started.emit(btn.get_meta("entry"), cap))
+	btn.button_down.connect(func() -> void:
+		_armed_key = btn.get_meta("key")
+		stack_drag_started.emit(btn.get_meta("entry"), cap))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down
 	# arms a deploy — so a press now also reaches the ScrollContainer and can

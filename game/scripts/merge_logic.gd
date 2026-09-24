@@ -47,8 +47,12 @@ static func can_afford_merge(g) -> bool:
 
 
 ## Ids that complete a merge with the current selection — drives the gold
-## highlights on pool stacks and board pieces. Empty outside the player turn,
+## highlights on Stock cells and board pieces. Empty outside the player turn,
 ## with no selection, or with no action left to pay for the merge.
+##
+## Every merge happens ON THE BOARD (Max, NO-100 review 2026-09-24: "we can
+## only merge on the board, not in the Stock"): a Stock origin's partners are
+## board pieces only; a board origin's are board pieces and Stock pieces.
 static func partner_ids(g) -> Dictionary:
 	var out := {}
 	var origin := origin_id(g)
@@ -58,15 +62,19 @@ static func partner_ids(g) -> Dictionary:
 		return out
 	# STOCK ONLY, never g._pool(): a captured piece cannot merge (2026-09-10),
 	# so highlighting it as a partner would offer an action that is refused.
-	var all: Array = g.stock.duplicate()
+	var on_board: bool = g.pool_drag_id == "" and g.placing_id == ""
+	var all: Array = []
+	if on_board:
+		for e in g.stock:
+			all.append(e if e is String else e.id)
 	for pos in g._player_pieces():
 		all.append(g.board[pos].id)
 	var counts := {}
 	for id in all:
 		counts[id] = counts.get(id, 0) + 1
 	for id in all:
-		if id == origin and counts[id] < 2:
-			continue # a self-pair needs a second copy
+		if on_board and id == origin and counts[id] < 2:
+			continue # a self-pair needs a second copy besides the origin itself
 		if pair_ok(g, origin, id):
 			out[id] = true
 	return out
@@ -87,6 +95,8 @@ static func _piece_state(g, ref: Variant) -> Dictionary:
 ## the result piece (the bot skips straight to the commit). Cancel keeps the
 ## origin selected so another partner can be picked.
 static func do_merge(g, a: Variant, b: Variant) -> void:
+	if not (a is Vector2i or b is Vector2i):
+		return # two Stock pieces: merges happen on the board only (NO-100 review)
 	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)) \
 			or not can_afford_merge(g):
 		return
@@ -109,7 +119,8 @@ static func do_merge(g, a: Variant, b: Variant) -> void:
 
 
 ## The result lands on the LATER board tile (grilled 2026-07-02: drop/tap
-## target wins); pool-only merges go to Stock.
+## target wins). At least one side is always a board tile: two Stock pieces
+## never merge (NO-100 review, 2026-09-24).
 static func commit_merge(g, a: Variant, b: Variant) -> void:
 	if g.state != g.State.PLAYER_TURN or (g.actions_left <= 0 and not Armies.merge_free(g)) \
 			or not can_afford_merge(g):
@@ -141,7 +152,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 			state.erase("owner")
 			consumed_states.append(state.id if state.size() == 1 else state)
 			g.board.erase(ref)
-		else: # a unit from a Stock stack: remove one copy by value — the exact
+		else: # a unit from Stock: remove one copy by value — the exact
 			# entry, so a stateful copy is consumed and its state discarded
 			# (ADR-0002). `ref.entry` (or the bare id, same fallback the erase
 			# below uses) is already Stock-shaped — no owner field to strip.
@@ -153,33 +164,15 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	Economy.spend_gold(g, Tuning.MERGE_COST) # issue 98: Close Ranks waives the
 		# Action, never the Gold — see can_afford_merge's header
 	g._log_action("merge", {"pieces": consumed_states})
-	var stock_index := -1
-	if result_tile.x >= 0:
-		var piece := {"id": result, "owner": Rules.PLAYER}
-		if not result_buffs.is_empty():
-			piece.buffs = result_buffs # NO-191
-		g.board[result_tile] = piece
-		g._add_merge_fx(fx_sources, result_tile) # NO-243: visual only
-		g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
-	else:
-		# ADR-0002: bare id when the result carries no state to preserve,
-		# same "duplicate, size()==1 means no extra state" idiom used
-		# elsewhere for a Stock entry (see game.gd's _capture_to_stock).
-		var entry := {"id": result}
-		if not result_buffs.is_empty():
-			entry.buffs = result_buffs # NO-191
-		g.stock.append(entry.id if entry.size() == 1 else entry)
-		stock_index = g.stock.size() - 1 # captured now — a handler appending its
-			# own Stock grant during on_rank_up (Bigfoot Toenail Clipping) must
-			# not shift which entry Holy Grail Coaster's stock case converts
-		g.fx_at = Vector2((g.hud.drawers["stock"] as Control).get_global_rect().get_center())
+	var piece := {"id": result, "owner": Rules.PLAYER}
+	if not result_buffs.is_empty():
+		piece.buffs = result_buffs # NO-191
+	g.board[result_tile] = piece
+	g._add_merge_fx(fx_sources, result_tile) # NO-243: visual only
+	g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	if ids[0] == ids[1]: # a same-id merge advances the promotion chain — a Rank
 		# Up, distinct from a Fusion of two different pieces (artefact hook 19).
-		# result_tile.x < 0 means the result landed in Stock, not the board —
-		# handlers that grant something onto the piece itself branch on that,
-		# reading `stock_index` rather than "the last Stock entry" (see above).
-		ArtefactHooks.run(g, "on_rank_up",
-			{"pos": result_tile, "old_id": ids[0], "id": result, "stock_index": stock_index})
+		ArtefactHooks.run(g, "on_rank_up", {"pos": result_tile, "old_id": ids[0], "id": result})
 	# Spare Organ Receipt (issue 53): every merge consumes exactly two pieces —
 	# fires for a Rank Up too, not just a Fusion of two different pieces;
 	# "a Fuse consumes two pieces" draws no distinction and both ids are

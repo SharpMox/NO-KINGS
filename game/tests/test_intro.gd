@@ -47,6 +47,8 @@ func _init() -> void:
 	check(Intro.should_bypass(["--autoplay"]), "bypasses on --autoplay")
 	check(Intro.should_bypass(["--scenario", "0"]), "bypasses on --scenario")
 	check(Intro.should_bypass(["--screenshot", "/tmp"]), "bypasses on --screenshot")
+	check(Intro.should_bypass(["--scenario-name", "Movement & drag"]), "bypasses on --scenario-name")
+	check(Intro.should_bypass(["--ui-demo", "sell-stock"]), "bypasses on --ui-demo")
 	check(not Intro.should_bypass([]), "plays for a real launch (no bypass args)")
 	check(not Intro.should_bypass(["--army", "Cult"]), "an unrelated flag doesn't bypass it")
 

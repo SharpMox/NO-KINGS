@@ -30,6 +30,7 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Armies := preload("res://scripts/armies.gd")
 const HudScript := preload("res://scripts/hud.gd") # HEADER_H feeds the board solve (NO-83)
 const Ads := preload("res://scripts/ads.gd") # NO-241: the one rewarded-ad seam
+const UiDemo := preload("res://scripts/ui_demo.gd") # debug: --ui-demo videos
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -940,8 +941,15 @@ func _ready() -> void:
 	add_child(modals)
 	modals.build(self)
 	_connect_modals()
-	if first_boot and args.has("--scenario"): # headless/CLI scenario boot, by index
-		next_config = Scenarios.all()[int(args[args.find("--scenario") + 1])].cfg
+	if first_boot and (args.has("--scenario") or args.has("--scenario-name")
+			or args.has("--ui-demo")): # headless/CLI scenario boot, by index or name
+		var index := _cli_scenario_index(args)
+		if index < 0: # never fall back to a default board: that capture looks
+			# plausible and shows the wrong thing (CLAUDE.md, screenshot seam)
+			printerr("UNKNOWN SCENARIO: no scenario has that --scenario-name")
+			get_tree().quit(2)
+			return
+		next_config = Scenarios.all()[index].cfg
 		is_scenario = true
 	ad_retry_enabled = not is_scenario # NO-241: never offered in scenarios
 	if next_config.is_empty():
@@ -1020,6 +1028,8 @@ func _ready() -> void:
 		print("SCENARIO OK")
 		get_tree().quit()
 	_refresh()
+	if first_boot and args.has("--ui-demo"): # tools/capture.md: a scripted video
+		UiDemo.run(self, args[args.find("--ui-demo") + 1])
 	if screenshot_dir != "" and not autoplay: # with --autoplay, the end screen is captured instead
 		if is_scenario and (args.has("--select") or args.has("--arm-item")
 				or args.has("--open-shop") or args.has("--open-drawer")
@@ -5192,6 +5202,17 @@ func _box_close() -> void:
 	_refresh()
 
 
+## The scenario a CLI boot asked for: `--scenario N` by index, else
+## `--scenario-name NAME`, else `--ui-demo`'s own sandbox. -1 if no scenario
+## has that name.
+static func _cli_scenario_index(args: PackedStringArray) -> int:
+	if args.has("--scenario"):
+		return int(args[args.find("--scenario") + 1])
+	if args.has("--scenario-name"):
+		return Scenarios.find(args[args.find("--scenario-name") + 1])
+	return Scenarios.find(UiDemo.SCENARIO)
+
+
 ## Debug: place the army, spawn wave 1, save a PNG of the board, quit.
 ## Used by the agent for visual verification (windowed run required).
 func _screenshot_and_quit(dir: String) -> void:
@@ -5225,6 +5246,7 @@ func _screenshot_and_quit(dir: String) -> void:
 ## (the long-press description tooltip / the piece-or-King preview modal, for
 ## the board tile at the anchor) — screenshot capture for a screenshot task
 ## (2026-09-19), one flag rather than a fourth board-tap-shaped one for each.
+## Every screen name, old and new, is dispatched by _debug_show_screen below.
 ## Used by the agent for visual verification (windowed run required — see
 ## game/CLAUDE.md, "screenshot seam").
 func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
@@ -5251,19 +5273,37 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		_set_drawer(args[args.find("--open-drawer") + 1])
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
 	elif args.has("--show-screen"):
-		var screen := args[args.find("--show-screen") + 1]
-		if screen == "pause":
+		await _debug_show_screen(args[args.find("--show-screen") + 1], args)
+	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
+	# settle wait below would let it finish before the shot, so skip it here.
+	var pinned_banner := args.has("--show-screen") \
+			and args[args.find("--show-screen") + 1] == "banner"
+	await _capture_and_quit(dir, not pinned_banner)
+
+
+## `--show-screen NAME`'s states (tools/capture.md lists them all). Split out
+## of _debug_state_screenshot so tests/test_capture_paths.gd can drive every
+## branch headless: the capture needs a window, the state does not. Each
+## branch calls the function the real trigger calls; only the trigger itself
+## (a lost run, a long press, a Shop purchase) is skipped.
+func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
+	match screen:
+		"board": # the scenario exactly as booted (a bare --screenshot would
+			pass # place the Stock and Pass first, see _screenshot_and_quit)
+		"pause":
 			hud.toggle_menu(true)
-		elif screen == "king-abilities":
+		"king-abilities":
 			_show_king_abilities()
-		elif screen == "box":
+		"box":
 			_open_box_pick(Box.random_slot(self))
-		elif screen == "banner": # NO-234: hand-built, not _add_turn_fx — see
-			# the header comment above for why
+		"banner": # NO-234: hand-built, not _add_turn_fx — see
+			# _debug_state_screenshot's header for why
 			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN",
 				"color": Color(0.45, 0.7, 1.0), "slot": 0})
 			queue_redraw()
-		elif (screen == "tip" or screen == "preview") and args.has("--anchor"):
+		"tip", "preview":
+			if not args.has("--anchor"):
+				return
 			var xy := args[args.find("--anchor") + 1].split(",")
 			var at := Vector2i(int(xy[0]), int(xy[1]))
 			if board.has(at):
@@ -5273,11 +5313,52 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 						Rect2(_tile_px(at), Vector2(tile, tile)), board[at].id) # NO-152: diagram
 				else:
 					_show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
-	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
-	# settle wait below would let it finish before the shot, so skip it here.
-	var pinned_banner := args.has("--show-screen") \
-			and args[args.find("--show-screen") + 1] == "banner"
-	await _capture_and_quit(dir, not pinned_banner)
+		"gameover": # the loss screen; a scenario never offers the ad retry
+			_game_over(false, "Clock out")
+		"gameover-retry": # NO-241's offer, forced on; it needs a checkpoint
+			ad_retry_enabled = true
+			_take_wave_snapshot()
+			_game_over(false, "Clock out")
+		"ad":
+			Ads.show_rewarded(func() -> void: pass)
+		"win":
+			_show_win_screen()
+		"setup":
+			_debug_enter_setup()
+			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
+		"stock-return": # the "+" slot: SETUP, a placed piece selected, Stock open
+			_debug_enter_setup()
+			var open := _setup_open_tiles()
+			var spot: Vector2i = open[int(open.size() / 2.0)]
+			_place(stock[0], spot)
+			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
+			_on_tile_clicked(spot) # SETUP's own select tap; the drawer stays open
+		"feed": # one line of each NO-239 kind: a capture gain, a sale, an Artefact
+			hud.feed_gain("capture", "captured Knight", 150, 15)
+			hud.feed_gain("sell", "sold Rook", 0, 25)
+			var key: String = artefact_icons.keys()[0] if not artefact_icons.is_empty() \
+				else str(Items.ARTEFACT_EFFECTS[0].key)
+			ArtefactHooks.feed(self, key, 0, 0, "Piece Buff granted")
+		"pick": # the shared choice modal, as every Sell confirm opens it
+			if stock.is_empty():
+				printerr("--show-screen pick: this scenario has no Stock to sell")
+			else:
+				_confirm_sell("piece", stock[0], _refresh)
+		_:
+			printerr("--show-screen %s: no such game screen" % screen)
+
+
+## A fresh run's opening state, from a scenario boot: the Army's full Stock,
+## an empty board, SETUP, the Stock drawer open — what _ready's fresh-run
+## branch leaves before the first Pass. No scenario can start here itself:
+## test_scenarios requires every one to boot into PLAYER_TURN.
+func _debug_enter_setup() -> void:
+	board.clear()
+	stock = Tuning.ARMIES[next_army].duplicate()
+	state = State.SETUP
+	_clear_selection()
+	if hud.drawer_open != "stock": # _set_drawer toggles
+		_set_drawer("stock")
 
 
 ## Shared tail for the two debug screenshot paths above (NO-122): wait for

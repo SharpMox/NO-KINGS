@@ -118,6 +118,18 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 	return root
 
 
+## Debug capture (tools/capture.md, `--show-screen guide:<page>`): open the
+## sub-page whose hub button reads `page` (any case — "rules", "pieces",
+## "promotions", "fusions", "artefacts", "items", "indicators") by pressing
+## that button. False if no hub button matches.
+static func open_page(root: Control, page: String) -> bool:
+	for b in root.find_children("*", "Button", true, false):
+		if (b as Button).text.to_lower() == page.to_lower():
+			(b as Button).pressed.emit()
+			return true
+	return false
+
+
 ## One sub-page's shell: header + whatever `fill_rows` appends + a Back
 ## button that returns to `hub_scroll`. Every catalog page below is just a
 ## `fill_rows` callable plugged into this.

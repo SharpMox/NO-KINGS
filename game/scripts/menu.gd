@@ -641,7 +641,8 @@ func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	# NO-77: once only — the args outlive the first Game, this scene does not.
 	if not GameScript.cli_bypass_used \
-			and (args.has("--autoplay") or args.has("--scenario")):
+			and (args.has("--autoplay") or args.has("--scenario")
+				or args.has("--scenario-name") or args.has("--ui-demo")):
 		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
 		return
 	# issue 84: send anything queued while offline BEFORE pulling the mirror.
@@ -1465,6 +1466,12 @@ func _ready() -> void:
 					# sign-in required either way, just the panel showing
 					main_box.visible = false
 					login_center.visible = true
+				var screen: # tools/capture.md: "guide:<page>", a Guide sub-page
+					if screen.begins_with("guide:"):
+						main_box.visible = false
+						guide_scroll.visible = true
+						if not Guide.open_page(guide_scroll, screen.trim_prefix("guide:")):
+							printerr("--show-screen %s: no such Guide page" % screen)
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing

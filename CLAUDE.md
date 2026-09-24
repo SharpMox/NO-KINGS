@@ -330,16 +330,20 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
   NO-144 removed the Shop's Sell page and Max ruled 2026-09-22 that "you cant sell from
   the shop that makes no sense". Selling lives outside the Shop, so there is no Shop-sell
   state to capture), `--open-drawer NAME` (NO-119), or `--show-screen NAME [--anchor X,Y]`
-  ("pause"/"king-abilities"/"banner"/"tip"/"preview" — panels no board tap opens on its own)
-  — for capturing a state the default boot doesn't reach. `_debug_state_screenshot` drives
-  all of them (NO-122, extended for the 2026-09-19 screenshot pass).
-  **SETUP's placement zone cannot be captured at all, from either direction** (found
-  2026-09-22 while verifying NO-214, and it is a dead end worth knowing before you spend
-  an hour on it): no scenario sets `"state": 0`, and `save_config.gd:292` defaults `state`
-  to `PLAYER_TURN` when the key is absent, so every `--scenario` boots straight past
-  SETUP. A genuine fresh boot does reach SETUP, but there `is_scenario` is false, which
-  gates the whole `--select`/`--screenshot` path off. Reaching it needs a scenario that
-  sets `"state": 0` — nothing more clever exists today.
+  ("board"/"pause"/"king-abilities"/"box"/"banner"/"tip"/"preview"/"gameover"/
+  "gameover-retry"/"ad"/"win"/"setup"/"stock-return"/"feed"/"pick" — panels no board tap
+  opens on its own) — for capturing a state the default boot doesn't reach.
+  `_debug_state_screenshot` drives all of them, through `_debug_show_screen` (NO-122,
+  extended for the 2026-09-19 screenshot pass and again for NO-100's never-reviewed
+  screens). The Menu takes `--show-screen` too, without a scenario (`menu.png`), including
+  `guide:<page>` for each Guide sub-page. **`tools/capture.md` is the command reference**:
+  every screen, `--scenario-name "<name>"` (boot a scenario by name, since indices shift),
+  and `--ui-demo <flow>` (Movie Maker videos of the selling flows). All of it is debug-only,
+  behind CLI flags; `tests/test_capture_paths.gd` drives every state headless.
+  **SETUP cannot be a scenario**: `test_scenarios` requires every scenario to boot into
+  `PLAYER_TURN`, and `save_config.gd` defaults `state` to it. `--show-screen setup` reaches
+  SETUP from a scenario boot instead (`_debug_enter_setup`: the Army's Stock, empty board,
+  Stock drawer open), and `stock-return` adds one placed, selected piece for the "+" slot.
   **The wave/turn banner is reachable now (NO-234).** It used to be a dead end: drawn
   only during a transition by `_add_turn_fx`, lasting ~1.1s with no flag holding it on
   screen, so NO-219's italic, its stripes and its full-width span went unverified.

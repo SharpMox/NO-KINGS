@@ -21,6 +21,8 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Rules := preload("res://scripts/rules.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -263,7 +265,7 @@ func _init() -> void:
 	kf._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	kf.hud._flush_feed()
 	var lines := _feed_texts(kf)
-	check(lines.size() == 1 and lines[0].begins_with("+") and lines[0].ends_with("captured Knight"),
+	check(lines.size() == 1 and lines[0].begins_with("Took Knight +"),
 		"a capture posts ONE feed line naming the victim (%s)" % [lines])
 	check(not kf.anims.any(func(a: Dictionary) -> bool: return a.kind == "text" and a.text.begins_with("+")),
 		"...and no '+N' Score popup any more (the feed replaced it)")
@@ -273,8 +275,15 @@ func _init() -> void:
 	Economy.earn(kf, 10, "", "test gain")
 	kf.hud._flush_feed()
 	lines = _feed_texts(kf)
-	check(lines == ["+%d · +$20 · test gain" % (20 * Economy.SCORE_MULTIPLIER)],
+	check(lines == ["test gain +%d +$20" % (20 * Economy.SCORE_MULTIPLIER)],
 		"two same-reason gains in one frame coalesce into one line (%s)" % [lines])
+
+	# #569 round 2: an Artefact trigger is text only, no icon and no ✦
+	_clear_feed(kf)
+	ArtefactHooks.feed(kf, "27-club-punch-card", 0, 0, "Buff")
+	kf.hud._flush_feed()
+	check(_feed_texts(kf) == ["27 Club Punch Card: Buff"],
+		"an Artefact trigger posts text only (%s)" % [_feed_texts(kf)])
 
 	_clear_feed(kf)
 	for i in 6:
@@ -282,21 +291,22 @@ func _init() -> void:
 	lines = _feed_texts(kf)
 	check(lines == ["e5", "e4", "e3", "e2"], ">4 entries: only 4 kept, newest on top (%s)" % [lines])
 
-	# #558: a line wider than the screen is cut with "…", amounts kept whole
+	# #558: a line wider than the screen is cut with "…"
 	_clear_feed(kf)
-	var long_reason := "captured an extraordinarily long-named piece ".repeat(8)
-	kf.hud.post("+999 · +$99 · " + long_reason)
+	var long_reason := "Took an extraordinarily long-named piece ".repeat(8)
+	kf.hud.post(long_reason + "+999 +$99")
 	await process_frame # let the pill's container lay it out
 	await process_frame
 	var pill: Control = kf.hud.feed.get_child(0)
 	var fit: String = _feed_texts(kf)[0]
 	check(pill.size.x <= kf.hud.feed_max_w(),
 		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
-	check(fit.begins_with("+999 · +$99 · ") and fit.ends_with("…") and fit.length() < long_reason.length(),
-		"...its reason truncated with '…', the amounts intact (%s)" % fit)
+	check(fit.ends_with("…") and fit.length() < (long_reason + "+999 +$99").length(),
+		"...cut with '…' (%s)" % fit)
+	check(kf.hud.FEED_FONT_SIZE == 24, "the feed font is 24 px (Max: 32 too big)")
 	_clear_feed(kf)
-	kf.hud.post("+5 · short")
-	check(_feed_texts(kf) == ["+5 · short"], "a line that fits is left alone")
+	kf.hud.post("short")
+	check(_feed_texts(kf) == ["short"], "a line that fits is left alone")
 
 	await create_timer(kf.hud.FEED_LIFE_S + kf.hud.FEED_FADE_S + 0.3).timeout
 	await process_frame

@@ -112,7 +112,11 @@ static func _press(g, root: Node, want: String, pause: float) -> bool:
 		await _wait(g, pause * 0.5)
 		btn.pressed.emit()
 		return true
-	printerr("UI-DEMO: no live %s button under %s" % [want, root.name])
+	var seen := PackedStringArray()
+	for b in root.find_children("*", "Button", true, false):
+		seen.append("%s%s" % [(b as Button).text, "" if (b as Button).is_visible_in_tree() else " (hidden)"])
+	printerr("UI-DEMO: no live %s button under %s; buttons: %s; items %d, box_open %s" \
+		% [want, root.name, ", ".join(seen), g.items.size(), g.box_open])
 	return false
 
 

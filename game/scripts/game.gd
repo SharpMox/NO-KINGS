@@ -2357,8 +2357,8 @@ func _offer_ad_retry(reason: String) -> bool:
 	state = State.GAME_OVER # the Clock and board input stop while it asks
 	_delete_run_save() # quitting on the offer must not resume the pre-death
 		# save; Accept writes the checkpoint back (_retry_from_wave_snapshot)
-	_open_choice_pick("Watch an ad to retry\nfrom the last completed wave?",
-		[{"label": "Accept", "value": true}], "Decline",
+	_open_choice_pick("Retry wave %d?" % wave_snapshot.get("wave", wave),
+		[{"label": "Watch ad", "value": true}], "Give up",
 		_accept_ad_retry, _game_over.bind(false, reason))
 	# NO-100/NO-241: same hiding modals._end_of_run_on_top does for the win/
 	# game-over screens — the kill feed and the banner layer (world, below

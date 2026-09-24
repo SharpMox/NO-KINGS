@@ -6243,7 +6243,7 @@ func _confirm_sell(kind: String, entry: Variant, after: Callable) -> void:
 		name = str(defs[id].name)
 	else:
 		name = str(entry.name)
-	var msg := "Sell %s for $%d?" % [name, payout]
+	var msg := "Sell %s +$%d" % [name, payout] # NO-100: statement, not a question
 	if kind == "artefact": # passive and permanent — spell out what's lost
 		msg += " The effect ends."
 	_open_choice_pick(msg, [{"label": "Sell", "value": true}], "Cancel",

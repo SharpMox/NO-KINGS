@@ -104,7 +104,7 @@ func _init() -> void:
 	Economy.earn(tungsten, 100)
 	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
 	check(tungsten.score == 1200, # issue 57: x10 (+100 base, +20 20%-of-Gold Score bonus, both x10'd)
-		"Tungsten-Filled Gold Bar: +100 base, +20 (20% of the Gold) Score")
+		"Tungsten-Filled Gold Bar: +1000 base, +200 (20% of the Gold) Score")
 	tungsten.queue_free()
 	await process_frame
 
@@ -120,7 +120,7 @@ func _init() -> void:
 	Economy.earn(tungsten_pope, 100)
 	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
 	check(tungsten_pope.score == (100 + 20 + 50) * 10, # issue 57: x10
-		"Tungsten (+20, 20%) and Popemobile (+50, 50%) add on top of the +100 base — the correct sum, not doubled")
+		"Tungsten (+200, 20%) and Popemobile (+500, 50%) add on top of the +1000 base — the correct sum, not doubled")
 	tungsten_pope.queue_free()
 	await process_frame
 
@@ -159,7 +159,7 @@ func _init() -> void:
 		"wave": 3, "artefacts": ["social-credit-report-card"], "gold": 100, "score": 500})
 	await process_frame
 	WaveLogic.queue(social, social.wave + 1) # clean: no pieces lost since wave start
-	check(social.score == 1500, "Social Credit Report Card: +100 Score on a clean Wave clear") # issue 57:
+	check(social.score == 1500, "Social Credit Report Card: +1000 Score on a clean Wave clear") # issue 57:
 		# x10 on the GAIN (100 -> 1000), starting score was a preset 500: 500 + 1000 = 1500
 	check(social.gold == 100, "Social Credit Report Card: no Gold change on a clean clear")
 	social.lost_player += 1 # a piece falls during the next wave

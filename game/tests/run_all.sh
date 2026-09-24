@@ -121,12 +121,23 @@ run() {
 	# caller reading us through a pipe blocks until it expires (up to TIMEOUT).
 	( sleep "$TIMEOUT"; kill "$pid" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
 	watchdog=$!
+	# A script that fails to parse leaves Godot idle rather than exiting, so
+	# without this the suite burns the whole TIMEOUT (x every suite: ~40 min in
+	# CI). Poll the log; on the first "Parse Error", kill Godot and fail now.
+	parse_error=""
+	while kill -0 "$pid" 2>/dev/null; do
+		if grep -q "Parse Error" "$outfile"; then
+			parse_error=1; kill "$pid" 2>/dev/null; break
+		fi
+		sleep 1
+	done
 	wait "$pid"
 	code=$?
+	[ -n "$parse_error" ] && [ "$code" -eq 0 ] && code=1
 	kill "$watchdog" 2>/dev/null
 	wait "$watchdog" 2>/dev/null
 	out=$(cat "$outfile")
-	if [ "$code" -ne 0 ] || printf '%s' "$out" | grep -q "SCRIPT ERROR"; then
+	if [ "$code" -ne 0 ] || printf '%s' "$out" | grep -q "SCRIPT ERROR\|Parse Error"; then
 		fails="$fails $name"
 		echo "FAIL: $name (exit $code) — full log kept at $outfile"
 		printf '%s\n' "$out" | grep -i "FAIL\|ERROR" | head -6

@@ -206,28 +206,30 @@ func _init() -> void:
 
 	# --- NO-38 (user ruling 2026-09-08): a full inventory sells from INSIDE the
 	# Box, so an Item pick is never spent for nothing ---
+	var full_item_keys: Array = ["blitz", "sniper", "promote"].slice(0, Tuning.ITEM_CAP_BASE)
 	var full: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3,
-		"items": ["blitz", "sniper", "promote"], "gold": 100})
+		"items": full_item_keys, "gold": 100})
 	await process_frame
-	check(full.items.size() == ItemLogic.cap(full), "(setup) held Items at the base cap of 3")
+	check(full.items.size() == ItemLogic.cap(full),
+		"(setup) held Items at the base cap (%d)" % Tuning.ITEM_CAP_BASE)
 	full._open_box_pick({"kind": "box", "key": "item", "size": "small", "sold": false,
 		"contents": Box.roll_options(full, "item", "small")})
-	check(full.box_open and _sell_buttons(full.box_panel).size() == 3,
+	check(full.box_open and _sell_buttons(full.box_panel).size() == Tuning.ITEM_CAP_BASE,
 		"NO-38: an Item Box at a full inventory lists every held Item with a Sell button")
 	var gold_before: int = full.gold
 	var want_gold: int = Shop.sell_payout(full, "item", full.items[0])
 	full._box_sell(full.items[0])
 	# NO-223 (2026-09-22 ruling): every sell path confirms now, the Box's own
 	# Sell button included — nothing is sold until the confirm is answered.
-	check(full.buff_pick_open and full.items.size() == 3,
+	check(full.buff_pick_open and full.items.size() == Tuning.ITEM_CAP_BASE,
 		"NO-223: selling from the Box confirms first — nothing sold yet")
 	full._choice_picked(true) # the confirm's own Sell button
-	check(full.items.size() == 2 and full.gold == gold_before + want_gold and not full.buff_pick_open,
+	check(full.items.size() == Tuning.ITEM_CAP_BASE - 1 and full.gold == gold_before + want_gold and not full.buff_pick_open,
 		"NO-38: selling from the Box frees the slot and pays the sell price")
 	check(full.box_open and _sell_buttons(full.box_panel).is_empty(),
 		"NO-38: the Box stays open and the sell row is gone once there is room")
 	full._box_choose(full.box_offer[0])
-	check(full.items.size() == 3 and not full.box_open,
+	check(full.items.size() == Tuning.ITEM_CAP_BASE and not full.box_open,
 		"NO-38: the pick then lands and the Box closes")
 	full.queue_free()
 	await process_frame

@@ -260,11 +260,11 @@ static func _hand_written() -> Array:
 			"stock": ["pawn", "pawn"], "score": 500, "wave": 1}},
 		# NO-23: capture the rook to clear the wave. Under 10 Gold, Fort Knox
 		# IOU opens a Small Item Box; the inventory is already at the base cap
-		# of 3, so NO-38's sell row is what makes the pick land — sell one,
+		# (2), so NO-38's sell row is what makes the pick land — sell one,
 		# then pick one. Before NO-23 this grant was silently dropped.
 		{"name": "NO-23: Fort Knox IOU opens a Small Item Box at a full inventory", "cfg": {
 			"board": [["queen", 0, 2, 2], ["rook", 1, 2, 6]],
-			"items": ["blitz", "sniper", "promote"], "gold": 5,
+			"items": ["blitz", "sniper"], "gold": 5,
 			"artefacts": ["fort-knox-iou"], "wave": 3}},
 		{"name": "Piece Buffs (Buff Box: pick, target, Shield/Critical)", "cfg": {
 			"board": [["queen", 0, 2, 1, {"buffs": [{"key": "critical"}]}],
@@ -471,9 +471,9 @@ static func _hand_written() -> Array:
 		# an interaction rather than a trigger: every one settles something this
 		# backlog has actually argued about, so it can be re-settled in seconds
 		# instead of by reading dispatch code.
-		{"name": "Combo: does an Item grant refuse cleanly at the cap of 3?", "cfg": {
+		{"name": "Combo: does an Item grant refuse cleanly at the cap of 2?", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
-			"items": ["blitz", "shield", "promote"], "wave": 9, "gold": 400, "score": 1000}},
+			"items": ["blitz", "shield"], "wave": 9, "gold": 400, "score": 1000}},
 		{"name": "Combo: does the Shop refuse to sell a 6th Artefact?", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 6]],
 			"artefacts": ["jet-fuel-vial", "denver-bunker-timeshare", "tape-eraser-magnet",
@@ -505,10 +505,10 @@ static func _hand_written() -> Array:
 		{"name": "Combo: does selling an Item switch Denver Bunker's +30% off?", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
 			"artefacts": ["denver-bunker-timeshare"],
-			"items": ["blitz", "shield", "promote"], "wave": 9, "gold": 300, "score": 1000}},
+			"items": ["blitz", "shield"], "wave": 9, "gold": 300, "score": 1000}},
 		{"name": "Combo: NO-38 — sell from inside an Item Box at a full inventory", "cfg": {
 			"board": [["queen", 0, 3, 3], ["knight", 0, 1, 3]],
-			"items": ["blitz", "sniper", "promote"], "wave": 3, "gold": 2000}},
+			"items": ["blitz", "sniper"], "wave": 3, "gold": 2000}},
 		{"name": "Combo: Tape Eraser Magnet — selling is not using, so it must not fire", "cfg": {
 			"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 5]],
 			"artefacts": ["tape-eraser-magnet"], "items": ["blitz"],
@@ -569,10 +569,10 @@ static func _hand_written() -> Array:
 			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2]],
 			"stock": ["rook", "rook"], "artefacts": ["jet-fuel-vial"],
 			"wave": 9, "gold": 400, "score": 1000}},
-		{"name": "Combo: all three caps full at once (Items 3, Buffs 2, Artefacts 5)", "cfg": {
+		{"name": "Combo: all three caps full at once (Items 2, Buffs 2, Artefacts 5)", "cfg": {
 			"board": [["bishop", 0, 2, 2], ["archbishop", 0, 5, 2],
 				["pawn", 1, 3, 3], ["pawn", 1, 4, 3]],
-			"items": ["blitz", "shield", "promote"],
+			"items": ["blitz", "shield"],
 			"artefacts": ["bible-gag-reel-scroll", "jet-fuel-vial", "deep-state-yearbook",
 				"tape-eraser-magnet", "denver-bunker-timeshare"],
 			"wave": 9, "gold": 900, "score": 2000, "stock": ["pawn"]}},

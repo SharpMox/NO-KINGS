@@ -763,7 +763,7 @@ func _init() -> void:
 	# Item Box — the row is only there at capacity, one click sells one Item and
 	# pays, the Box survives it, and the pick then lands.
 	game.items.clear()
-	for key in ["blitz", "sniper", "promote"]:
+	for key in ["blitz", "sniper", "promote"].slice(0, Tuning.ITEM_CAP_BASE):
 		for it in Items.ITEMS:
 			if it.key == key:
 				game.items.append(it)
@@ -1440,7 +1440,7 @@ func _init() -> void:
 			# The right edge only has to reach the usable width when a row is
 			# actually FULL (cells.size() >= columns) — a grid holding fewer
 			# entries than columns (items_grid's cap can be below the 5-column
-			# standard, e.g. ItemLogic.cap's base of 3) has nothing to put in the
+			# standard, e.g. ItemLogic.cap's base of 2) has nothing to put in the
 			# trailing columns; that is not the dead-column bug NO-207 fixed, and
 			# asserting edge-to-edge there would be wrong.
 			if cells.size() >= grid.columns:

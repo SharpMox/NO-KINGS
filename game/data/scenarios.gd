@@ -46,6 +46,17 @@ static func all() -> Array:
 		+ StagedCombos.all()
 
 
+## Index of the scenario called `scenario_name` in all(), or -1. The CLI's
+## `--scenario-name` resolves through here, because `--scenario N` shifts
+## whenever a scenario is inserted above N (tools/capture.md).
+static func find(scenario_name: String) -> int:
+	var list := all()
+	for i in list.size():
+		if list[i].name == scenario_name:
+			return i
+	return -1
+
+
 static func _hand_written() -> Array:
 	return [
 		# --- core interactions ---
@@ -600,4 +611,15 @@ static func _hand_written() -> Array:
 		# never trips the starvation loss condition.
 		{"name": "Banner: looping (NO-234)", "cfg": {
 			"board": [["queen", 0, 2, 1], ["pawn", 1, 4, 9]]}},
+		# --- debug: capture paths (tools/capture.md) ---
+		# Something of every sellable kind, a full Item inventory (3/3, so an
+		# Item Box shows its Sell row) and Gold for a Convert. Backs
+		# `--show-screen pick` and every `--ui-demo` flow (scripts/ui_demo.gd
+		# boots it BY NAME — rename both together).
+		{"name": "Capture: selling sandbox", "cfg": {
+			"board": [["queen", 0, 3, 2], ["pawn", 0, 1, 0], ["rook", 1, 4, 9]],
+			"stock": ["rook", "knight", "pawn", "pawn"], "captured": ["bishop"],
+			"items": ["blitz", "shield", "promote"],
+			"artefacts": ["jet-fuel-vial", "deep-state-yearbook"],
+			"gold": 500, "score": 1000}},
 	]

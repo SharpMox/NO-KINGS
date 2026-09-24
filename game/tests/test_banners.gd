@@ -282,6 +282,22 @@ func _init() -> void:
 	lines = _feed_texts(kf)
 	check(lines == ["e5", "e4", "e3", "e2"], ">4 entries: only 4 kept, newest on top (%s)" % [lines])
 
+	# #558: a line wider than the screen is cut with "…", amounts kept whole
+	_clear_feed(kf)
+	var long_reason := "captured an extraordinarily long-named piece ".repeat(8)
+	kf.hud.post("+999 · +$99 · " + long_reason)
+	await process_frame # let the pill's container lay it out
+	await process_frame
+	var pill: Control = kf.hud.feed.get_child(0)
+	var fit: String = _feed_texts(kf)[0]
+	check(pill.size.x <= kf.hud.feed_max_w(),
+		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
+	check(fit.begins_with("+999 · +$99 · ") and fit.ends_with("…") and fit.length() < long_reason.length(),
+		"...its reason truncated with '…', the amounts intact (%s)" % fit)
+	_clear_feed(kf)
+	kf.hud.post("+5 · short")
+	check(_feed_texts(kf) == ["+5 · short"], "a line that fits is left alone")
+
 	await create_timer(kf.hud.FEED_LIFE_S + kf.hud.FEED_FADE_S + 0.3).timeout
 	await process_frame
 	check(_feed_texts(kf).is_empty(), "entries expire after ~%.1f s" % kf.hud.FEED_LIFE_S)

@@ -1626,6 +1626,8 @@ const FEED_FADE_S := 0.3
 const FEED_FONT := preload("res://assets/fonts/PixelOperator.ttf")
 const FEED_FONT_SIZE := 16 # the font's 16 px grid: stays crisp
 const FEED_TEXT := Color(0.92, 0.94, 0.9)
+const FEED_PAD_L := 6 # pill content margins, also subtracted by _feed_fit
+const FEED_PAD_R := 8
 var feed := VBoxContainer.new()
 var _feed_font: FontFile
 var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, icon, color}
@@ -1647,8 +1649,8 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0.6)
 	sb.set_corner_radius_all(6)
-	sb.content_margin_left = 6
-	sb.content_margin_right = 8
+	sb.content_margin_left = FEED_PAD_L
+	sb.content_margin_right = FEED_PAD_R
 	sb.content_margin_top = 1
 	sb.content_margin_bottom = 1
 	pill.add_theme_stylebox_override("panel", sb)
@@ -1664,7 +1666,7 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 		tr.custom_minimum_size = Vector2(16, 16)
 		row.add_child(tr)
 	var lab := Label.new()
-	lab.text = text
+	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R - (20.0 if icon else 0.0))
 	lab.add_theme_font_override("font", _feed_font)
 	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
 	lab.add_theme_color_override("font_color", color)
@@ -1680,6 +1682,26 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 	if g.animations_on:
 		tw.tween_property(pill, "modulate:a", 0.0, FEED_FADE_S)
 	tw.tween_callback(pill.queue_free)
+
+
+## #558: the widest a pill may be — the screen less HEADER_PAD_X each side.
+func feed_max_w() -> float:
+	return g.get_viewport_rect().size.x - HEADER_PAD_X * 2
+
+
+## #558: `text` cut with "…" to fit `max_w` at the feed font. Only the tail is
+## cut, and never into the leading "+N · +$M · " amounts — the reason goes first.
+func _feed_fit(text: String, max_w: float) -> String:
+	var width := func(t: String) -> float:
+		return ceilf(_feed_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, FEED_FONT_SIZE).x)
+	if width.call(text) <= max_w:
+		return text
+	var m := RegEx.create_from_string("^(\\+\\$?\\d+ · )+").search(text)
+	var keep: int = m.get_end() if m else 0
+	var n := text.length() - 1
+	while n > keep and width.call(text.left(n) + "…") > max_w:
+		n -= 1
+	return text.left(n).strip_edges(false, true) + "…"
 
 
 ## Queue a gain (and/or an artefact note) under `cause`. Everything posted

@@ -2360,6 +2360,17 @@ func _offer_ad_retry(reason: String) -> bool:
 	_open_choice_pick("Watch an ad to retry\nfrom the last completed wave?",
 		[{"label": "Accept", "value": true}], "Decline",
 		_accept_ad_retry, _game_over.bind(false, reason))
+	# NO-100/NO-241: same hiding modals._end_of_run_on_top does for the win/
+	# game-over screens — the kill feed and the banner layer (world, below
+	# the HUD) showed through this prompt's own translucent panel too, since
+	# this offer never runs through that function. Accept reloads the scene
+	# (_retry_from_wave_snapshot), which rebuilds both fresh and visible; a
+	# Decline falls through to _game_over -> show_overlay, whose own
+	# _end_of_run_on_top() re-hides them anyway, so neither branch needs an
+	# explicit restore here.
+	if hud != null:
+		hud.feed.visible = false
+	_banner_layer.visible = false
 	return true
 
 

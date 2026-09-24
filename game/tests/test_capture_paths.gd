@@ -92,6 +92,8 @@ func _init() -> void:
 			"gameover-retry":
 				check(game.state == GameScript.State.GAME_OVER and not game.overlay.visible
 					and game.modals.buff_panel != null, "gameover-retry: the ad-retry prompt is up")
+				check(not game._banner_layer.visible and not game.hud.feed.visible,
+					"gameover-retry: banners and the kill feed are hidden under the retry prompt (NO-100)")
 			"ad":
 				check(Ads.is_open(), "ad: the AD overlay is up")
 				if Ads.is_open():

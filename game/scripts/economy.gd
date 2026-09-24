@@ -374,20 +374,32 @@ static func ability_name(key: String) -> String:
 ## Terse, real-amount description for a King Ability — what the ⚠ overlay and
 ## the King info panel both render (modals.gd's _add_king_ability_rows is the
 ## one call site both share, NO-83/NO-100), so the two can never show
-## different text. Static catalog text (king_abilities.gd) for every key
-## except "inflation": N held copies compound multiplicatively (on_gold_gain
-## does `ctx.amount *= 0.9` per copy — artefact_hooks.gd), so the live total
-## cut is 1 - 0.9^N, not the flat 10% the catalog states for a single copy.
+## different text. Static catalog text (king_abilities.gd) for the flat-cost
+## keys (pass/deploy/fuse_cost, jd_vance), whose dollar figure never changes.
+## Every percentage-of-a-variable-base key (move/capture/item/long-range) and
+## "inflation" (the one that stacks) are built HERE instead, interpolated off
+## the live Tuning.TARIFF_*_PCT constant rather than a hardcoded number in the
+## catalog — NO-100 (Max, second pass): a % baked into a String goes stale the
+## moment tuning.gd's tuned; reading the constant can't.
 static func ability_desc(g, key: String) -> String:
-	if key == "inflation":
-		var held := 0
-		for t in g.king_abilities_active:
-			if t.get("key", "") == "inflation":
-				held += 1
-		if held <= 1:
-			return "Gold gains −10% (stacks)"
-		var pct := roundi((1.0 - pow(0.9, held)) * 100.0)
-		return "Gold gains −%d%% (%d stacks)" % [pct, held]
+	match key:
+		"move_cost":
+			return "Moves: %d%% of piece value" % roundi(Tuning.TARIFF_MOVE_PCT * 100.0)
+		"capture_cost":
+			return "Captures: %d%% of piece value" % roundi(Tuning.TARIFF_CAPTURE_PCT * 100.0)
+		"ability_cost":
+			return "Items: +%d%% price" % roundi(Tuning.TARIFF_ITEM_PCT * 100.0)
+		"long_range_cost":
+			return "Bishop/Rook: +%d%% per square" % roundi(Tuning.TARIFF_LR_PCT * 100.0)
+		"inflation":
+			var held := 0
+			for t in g.king_abilities_active:
+				if t.get("key", "") == "inflation":
+					held += 1
+			if held <= 1:
+				return "Gold gains −10% (stacks)"
+			var pct := roundi((1.0 - pow(0.9, held)) * 100.0)
+			return "Gold gains −%d%% (%d stacks)" % [pct, held]
 	for t in KingAbilities.ABILITIES:
 		if t.key == key:
 			return str(t.description)

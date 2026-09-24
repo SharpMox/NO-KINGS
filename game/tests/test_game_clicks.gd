@@ -1570,7 +1570,7 @@ func _init() -> void:
 			and _has_label_text(trump_game.preview_panel, "Tariff on $ Gain")
 			and _has_label_text(trump_game.preview_panel, "Tariff on Capture"),
 		"...listing each Tariff in force by name")
-	check(_has_label_text(trump_game.preview_panel, "Moves cost 10% value"),
+	check(_has_label_text(trump_game.preview_panel, "Moves: 10% of piece value"),
 		"...with its description (NO-100: real amount, not \"extra $\")")
 	check(not _has_label_text(trump_game.preview_panel, "Tariff on Pass"),
 		"(setup) the fourth Tariff is not in force yet")

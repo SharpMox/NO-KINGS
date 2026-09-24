@@ -159,6 +159,13 @@ const CLOCK_URGENT_MS := 120000.0
 ## NO-126: the Score reads as a 6-digit odometer; greyed padding, unit text.
 const SCORE_DIGITS := 6
 const SCORE_ZERO_COLOR := Color(0.45, 0.45, 0.45)
+## NO-256 ruling 4 (green means money only): the non-money greens moved off it.
+## ⓘ and the PASS action count take a light player blue, the ⚠ chip the
+## buff-badge amber (game.gd BUFF_BADGE_ACCENT), and the PASS button and the
+## ⓘ/⚠ chip a dark navy surface (both were dark green).
+const COL_INFO := Color(0.55, 0.75, 1.0)
+const COL_WARN := Color(1.0, 0.72, 0.15)
+const DECK_NAVY := Color(0.11, 0.15, 0.24)
 
 ## ---- STOCK DRAWER TUNING (NO-84) --------------------------------------------
 ## Every spacing number for the Stock Drawer lives in THIS block. Canvas px.
@@ -864,17 +871,16 @@ func build(game) -> void:
 	# instead; see this var's own declaration for why that was wrong).
 	army_band_reopen.custom_minimum_size = Vector2(DECK_ICON_BTN, DECK_ICON_BTN)
 	army_band_reopen.add_theme_font_size_override("font_size", 15)
-	# NO-225: square, and green. The footprint (DECK_ICON_BTN, 32x32) was
-	# already square — the old radius 16 is exactly half of that, which
-	# rendered a full circle, not a square with soft corners. Radius 8 below
-	# matches menu_button/stock_btn (the row's other icon buttons, same
-	# _style_button call). Surface is pass_count's bright green
-	# (0.498, 0.878, 0.541, hud.gd:1012) scaled down in value (~x0.25) to a
-	# dark surface so it reads as green without the white glyph washing out.
+	# NO-225: square. The footprint (DECK_ICON_BTN, 32x32) was already square
+	# — the old radius 16 is exactly half of that, which rendered a full
+	# circle, not a square with soft corners. Radius 8 below matches
+	# menu_button/stock_btn (the row's other icon buttons, same _style_button
+	# call). NO-256 ruling 4: the surface is DECK_NAVY, like PASS (was a dark
+	# green; green means money only).
 	# NO-225: the glyph's own font_color is set (and kept in sync per state)
 	# by _update_band_toggle below, not here — a static override here would
 	# be a second source of truth immediately clobbered by that call.
-	_style_button(army_band_reopen, Color(0.125, 0.220, 0.136), Color(0, 0, 0, 0), 8, 4, 4)
+	_style_button(army_band_reopen, DECK_NAVY, Color(0, 0, 0, 0), 8, 4, 4)
 	army_band_reopen.pressed.connect(func() -> void:
 		if army_band_open:
 			collapse_army_band()
@@ -940,8 +946,9 @@ func build(game) -> void:
 	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
 	add_child(multi_cancel_btn)
 	pass_button.text = "PASS"
-	# green, matching the prototype: PASS ends your turn, it is not a warning
-	_style_button(pass_button, Color(0.125, 0.196, 0.122), Color(0.290, 0.490, 0.278), 8, 11, 6)
+	# PASS ends your turn, it is not a warning. NO-256 ruling 4: navy, not the
+	# prototype's green (green means money only).
+	_style_button(pass_button, DECK_NAVY, Color(0.27, 0.40, 0.62), 8, 11, 6)
 	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pass_button.pressed.connect(func() -> void: pass_pressed.emit())
 	# "2/2 PASS", both vertically centered — the button's own text is only
@@ -952,12 +959,12 @@ func build(game) -> void:
 	pass_box.add_theme_constant_override("separation", 7)
 	pass_box.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
 	pass_count.theme_type_variation = &"Meta"
-	pass_count.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
+	pass_count.add_theme_color_override("font_color", COL_INFO)
 	pass_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_count)
 	pass_label.text = "PASS"
 	pass_label.theme_type_variation = &"Heading"
-	pass_label.add_theme_color_override("font_color", Color(0.902, 0.965, 0.902))
+	pass_label.add_theme_color_override("font_color", Color(0.9, 0.94, 1.0))
 	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_label)
 	pass_button.add_child(pass_box)
@@ -1627,7 +1634,9 @@ var _feed_font: FontFile
 var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, color}
 
 
-func post(text: String, color := FEED_TEXT) -> void:
+## NO-256 (e): `gold` > 0 appends a " +$gold" segment in its own green Label
+## (the line itself keeps `color`); only `text` is ever cut to fit.
+func post(text: String, color := FEED_TEXT, gold := 0) -> void:
 	if g.autoplay:
 		return
 	if _feed_font == null: # hard pixel edges, like the banner font (game.gd)
@@ -1650,13 +1659,16 @@ func post(text: String, color := FEED_TEXT) -> void:
 	pill.add_theme_stylebox_override("panel", sb)
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 0) # the gold segment carries its own leading space
 	pill.add_child(row)
-	var lab := Label.new()
-	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R)
-	lab.add_theme_font_override("font", _feed_font)
-	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
-	lab.add_theme_color_override("font_color", color)
+	var money := " +$%d" % gold if gold > 0 else ""
+	var lab := _feed_label(_feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R
+		- _feed_width(money)), color)
 	row.add_child(lab)
+	if gold > 0:
+		var gold_lab := _feed_label(money, color)
+		Tuning.money(gold_lab, gold)
+		row.add_child(gold_lab)
 	feed.add_child(pill)
 	feed.move_child(pill, 0) # newest on top
 	while feed.get_child_count() > FEED_MAX:
@@ -1675,15 +1687,26 @@ func feed_max_w() -> float:
 	return g.get_viewport_rect().size.x - HEADER_PAD_X * 2
 
 
+func _feed_label(text: String, color: Color) -> Label:
+	var lab := Label.new()
+	lab.text = text
+	lab.add_theme_font_override("font", _feed_font)
+	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
+	lab.add_theme_color_override("font_color", color)
+	return lab
+
+
+func _feed_width(t: String) -> float:
+	return ceilf(_feed_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, FEED_FONT_SIZE).x)
+
+
 ## #558: `text` cut with "…" to fit `max_w` at the feed font. Only the tail is
 ## cut, and never into the leading label — the reason goes first.
 func _feed_fit(text: String, max_w: float) -> String:
-	var width := func(t: String) -> float:
-		return ceilf(_feed_font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, FEED_FONT_SIZE).x)
-	if width.call(text) <= max_w:
+	if _feed_width(text) <= max_w:
 		return text
 	var n := text.length() - 1
-	while n > 0 and width.call(text.left(n) + "…") > max_w:
+	while n > 0 and _feed_width(text.left(n) + "…") > max_w:
 		n -= 1
 	return text.left(n).strip_edges(false, true) + "…"
 
@@ -1736,9 +1759,7 @@ func _flush_feed() -> void:
 		var line: String = e.label if notes.is_empty() else "%s: %s" % [e.label, ", ".join(notes)]
 		if e.score > 0:
 			line += " +%d" % e.score
-		if e.gold > 0:
-			line += " +$%d" % e.gold
-		post(line, e.color)
+		post(line, e.color, e.gold) # NO-256 (e): " +$M" is its own green segment
 	_feed_pending.clear()
 
 
@@ -1849,11 +1870,9 @@ func _update_band_toggle() -> void:
 	# ⚠ glyph (no override of its own) silently inherited — an alert that
 	# looks identical to the resting state has lost its job. Set the colour
 	# per state here instead, following the same `warn` (glyph is only ever
-	# ⚠ when warn is true): the established green otherwise, Tuning.COL_GOLD
-	# (this project's attention colour, also score/gold) when warning, for a
-	# clear hue shift against the dark green surface.
-	army_band_reopen.add_theme_color_override("font_color",
-		Tuning.COL_GOLD if warn else Color(0.498, 0.878, 0.541))
+	# ⚠ when warn is true). NO-256 ruling 4: amber when warning, light blue
+	# otherwise — both off green, which now means money only.
+	army_band_reopen.add_theme_color_override("font_color", COL_WARN if warn else COL_INFO)
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -2547,6 +2566,17 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
+## NO-256 (d), ruling 6: the Convert/Sell pill — a dark fill (green text reads
+## ~11:1 on it) with a 1 px `border` that keeps the two kinds apart.
+static func _money_pill(border: Color) -> StyleBoxFlat:
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = Color(0, 0, 0, 0.85)
+	pill.border_color = border
+	pill.set_border_width_all(1)
+	pill.set_corner_radius_all(9)
+	return pill
+
+
 ## NO-223 (2026-09-22 ruling: "badges are too small... they should just be
 ## information, whatever they do should be accessed with a long press") —
 ## the Inventory drawer's own Sell badge, top-right corner pill on an
@@ -2562,12 +2592,10 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	var sell := Button.new()
 	sell.text = "$%d" % payout
 	sell.theme_type_variation = &"Pill"
-	sell.add_theme_color_override("font_color", Color(1, 0.9, 0.85))
+	Tuning.money(sell, payout) # NO-256 (d): a gain, green on the dark pill below
 	sell.disabled = not Shop.can_sell(g, kind, entry)
 	sell.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to sell
-	var pill := StyleBoxFlat.new()
-	pill.bg_color = Color(0.75, 0.25, 0.2) # sell = red-ish, distinct from Convert's blue
-	pill.set_corner_radius_all(9)
+	var pill := _money_pill(Color(0.75, 0.25, 0.2)) # sell = red-ish border, distinct from Convert's blue
 	for style in ["normal", "hover", "pressed", "disabled"]:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
@@ -2932,8 +2960,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 				# generic deploy_cost() does not know about it
 		price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
 	price.theme_type_variation = &"Meta"
-	price.add_theme_color_override("font_color",
-		Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
+	Tuning.money(price, 0, _pool_affordable(cap, st.entry)) # NO-256 (d): green, red if short
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 4)
 	price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -2953,12 +2980,10 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		var convert := Button.new()
 		convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
 		convert.theme_type_variation = &"Pill"
-		convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0)) # NO-151: NOT COL_GOLD — green on the blue pill is ~1.6:1
+		Tuning.money(convert, 0) # NO-256 (d): green, on the dark pill below (was white: green on blue is ~1.6:1)
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		convert.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to convert
-		var pill := StyleBoxFlat.new()
-		pill.bg_color = Color(0.3, 0.6, 1.0) # player blue
-		pill.set_corner_radius_all(9)
+		var pill := _money_pill(Color(0.3, 0.6, 1.0)) # player-blue border
 		for style in ["normal", "hover", "pressed", "disabled"]:
 			convert.add_theme_stylebox_override(style, pill)
 		convert.tooltip_text = "Convert to Stock (deployable) — long-press to convert"

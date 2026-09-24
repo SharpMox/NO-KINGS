@@ -312,11 +312,33 @@ static func weighted_artefact_pick(pool: Array, rng: RandomNumberGenerator) -> i
 const ARTEFACT_RARITY_COLOR := {
 	"": Color(0.8, 0.8, 0.82),
 	"Common": Color(0.8, 0.8, 0.82),
-	"Uncommon": Color(0.4, 0.85, 0.45),
+	"Uncommon": Color(0.75, 0.45, 1.0), # NO-256 ruling 4: purple, off green (green means money only)
 	"Rare": Color(0.35, 0.6, 1.0),
 	"Legendary": Color(1.0, 0.72, 0.15),
 }
 const COL_GOLD := Color(0.35, 0.85, 0.4)   # NO-151: the currency green, shared by every $ display
+## NO-256 (d): the one money red — costs, losses and prices the player cannot
+## pay. game.gd's BANNER_LOSS is this same colour.
+const COL_LOSS := Color(0.95, 0.35, 0.3)
+
+
+## NO-256 (d): the money colour for `amount` — green (COL_GOLD) for a gain or a
+## price the player can pay, red (COL_LOSS) for a cost (amount < 0) or a price
+## they can't (affordable = false).
+static func money_color(amount: int, affordable := true) -> Color:
+	return COL_GOLD if amount >= 0 and affordable else COL_LOSS
+
+
+## NO-256 (d): colour a money Label or Button (see money_color). A Button gets
+## every enabled state, so a touch's pressed/hover/focus never flips it back to
+## white; font_disabled_color is left alone, so a disabled button still greys.
+static func money(c: Control, amount: int, affordable := true) -> void:
+	var col := money_color(amount, affordable)
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color",
+			"font_hover_pressed_color"]:
+		c.add_theme_color_override(k, col)
+
+
 # Restock cadence (issue 64, user ruling 2026-08-30): two lanes REPLACE the
 # old rising Score-threshold curve (was BASE=1000/STEP=500 -> 1000/2500/4500/
 # 7000) entirely. Lane A is guaranteed, every SHOP_RESTOCK_WAVES Waves, first

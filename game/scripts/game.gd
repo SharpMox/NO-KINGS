@@ -529,7 +529,7 @@ var gold := 0: # per-run spend currency; score stays the up-only metric
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": "%d" % (value - gold),
 				"at_px": fx_at if fx_at != Vector2.ZERO
 					else Vector2(hud.gold_label.get_global_rect().end) + Vector2(6, 0),
-				"color": Color(0.95, 0.3, 0.25)})
+				"color": Tuning.money_color(value - gold)})
 			queue_redraw()
 		gold = value
 var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
@@ -1508,7 +1508,7 @@ func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
 ## Banner colours for the visibility pass — one constant per category so the
 ## policy ("losses red, refunds green, King Powers orange, artefact effects
 ## gold") can be retuned without touching a call site.
-const BANNER_LOSS := Color(0.95, 0.35, 0.3)
+const BANNER_LOSS := Tuning.COL_LOSS # NO-256 (d): the one money red
 const BANNER_GAIN := Color(0.45, 0.85, 0.5)
 const BANNER_POWER := Color(1.0, 0.55, 0.4)
 const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
@@ -3832,7 +3832,7 @@ func _open_yalta_pick() -> void:
 		return # same wave clear can already have a modal up, and rendering
 			# this on top means the player picks and the pick goes nowhere.
 	var offers := [
-		{"label": "+$100", "value": "gold"},
+		{"label": "+$100", "value": "gold", "money": 100}, # NO-256 (d): green
 		{"label": "+1 Item", "value": "item"},
 		{"label": "+15s Clock", "value": "clock"},
 	]

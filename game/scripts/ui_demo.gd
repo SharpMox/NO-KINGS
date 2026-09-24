@@ -122,14 +122,14 @@ static func _press(g, root: Node, want: String, pause: float) -> bool:
 
 static func _is(btn: Button, want: String) -> bool:
 	match want:
-		"convert": # preview: "Convert (-$N)"
+		"convert": # preview: "Convert -$N"
 			return btn.text.begins_with("Convert")
-		"sell": # preview: "Sell (+$N)"
+		"sell": # preview: "Sell +$N"
 			return btn.text.begins_with("Sell")
 		"confirm": # choice modal
 			return btn.text == "Sell"
-		"sell-row": # Item Box, full inventory: "Sell Blitz (+$N)"
-			return btn.text.begins_with("Sell ") and not btn.text.begins_with("Sell (")
+		"sell-row": # Item Box, full inventory: "Sell Blitz +$N"
+			return btn.text.begins_with("Sell ") and not btn.text.begins_with("Sell +")
 		"box-tile":
 			return btn.has_meta("box_index")
 		"box-pick":

@@ -878,6 +878,57 @@ func _init() -> void:
 	re.queue_free()
 	await process_frame
 
+	# --- NO-256 (d): the money helper -----------------------------------------
+	check(Tuning.money_color(5) == Tuning.COL_GOLD and Tuning.money_color(0) == Tuning.COL_GOLD,
+		"NO-256: a gain or a payable price is green (COL_GOLD)")
+	check(Tuning.money_color(-5) == Tuning.COL_LOSS, "NO-256: a cost is red (COL_LOSS)")
+	check(Tuning.money_color(30, false) == Tuning.COL_LOSS, "NO-256: an unaffordable price is red")
+	check(GameScript.BANNER_LOSS == Tuning.COL_LOSS, "NO-256: one money red — BANNER_LOSS is COL_LOSS")
+	var mb := Button.new()
+	Tuning.money(mb, -22)
+	check(mb.get_theme_color("font_color") == Tuning.COL_LOSS
+			and mb.get_theme_color("font_pressed_color") == Tuning.COL_LOSS
+			and mb.get_theme_color("font_hover_color") == Tuning.COL_LOSS
+			and mb.get_theme_color("font_focus_color") == Tuning.COL_LOSS
+			and not mb.has_theme_color_override("font_disabled_color"),
+		"NO-256: money() colours every enabled Button state and leaves disabled grey")
+	mb.free()
+	check(Tuning.ARTEFACT_RARITY_COLOR.Uncommon != Tuning.COL_GOLD
+			and Tuning.ARTEFACT_RARITY_COLOR.Uncommon.g < 0.6,
+		"NO-256 ruling 4: Uncommon is off green")
+
+	# The Shop tile price and the preview title go through it.
+	var mt: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5, "gold": 0})
+	await process_frame
+	var pidx := -1
+	for i in mt.shop_stock.size():
+		if mt.shop_stock[i].kind == "piece" and Shop.price(mt, mt.shop_stock[i]) > 0:
+			pidx = i
+			break
+	var short_tile: Button = mt.modals._shop_tile(pidx)
+	var short_price: Label = null
+	for c in short_tile.get_children():
+		if c is Label and (c as Label).text.begins_with("$"):
+			short_price = c
+	check(short_price != null and short_price.get_theme_color("font_color") == Tuning.COL_LOSS,
+		"NO-256: a Shop tile the player can't afford shows its price in red")
+	short_tile.free()
+	mt.gold = 10000
+	var rich_tile: Button = mt.modals._shop_tile(pidx)
+	var rich_price: Label = null
+	for c in rich_tile.get_children():
+		if c is Label and (c as Label).text.begins_with("$"):
+			rich_price = c
+	check(rich_price != null and rich_price.get_theme_color("font_color") == Tuning.COL_GOLD,
+		"NO-256: an affordable Shop tile's price is green")
+	rich_tile.free()
+	var title: RichTextLabel = mt.modals._priced_title("Rook", mt.shop_stock[pidx], false)
+	check(title.text.contains("[color=#%s]$" % Tuning.COL_GOLD.to_html(false)),
+		"NO-256: a Shop preview title's price segment is green (%s)" % title.text)
+	title.free()
+	mt.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL SHOP CHECKS OK")

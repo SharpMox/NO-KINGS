@@ -333,12 +333,18 @@ static func _banner(g, text: String) -> void:
 ## here should require one either.
 const PURCHASABLE := ["piece", "item", "artefact", "box"]
 
+## NO-256 (d): the player can pay `slot`'s price (Gold plus any credit) — the
+## affordability half of can_buy, which also colours its price red when not.
+static func affordable(g, slot: Dictionary) -> bool:
+	return g.gold + _credit(g) + _score_credit(g) >= price(g, slot)
+
+
 ## No Wave gate here (NO-240): before the first restock the stock is simply
 ## empty, so there is nothing to buy — for the player and autoplay alike.
 static func can_buy(g, slot: Dictionary) -> bool:
 	return slot.kind in PURCHASABLE and not slot.sold \
 			and g.state == g.State.PLAYER_TURN \
-			and g.gold + _credit(g) + _score_credit(g) >= price(g, slot) \
+			and affordable(g, slot) \
 			and (slot.kind != "item" or ItemLogic.has_room(g)) \
 			and (slot.kind != "artefact" or not is_unique_held(g, slot.key)) \
 			and (slot.kind != "artefact" or ArtefactHooks.has_room(g)) # issue

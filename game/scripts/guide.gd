@@ -123,9 +123,18 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 			page.visible = true)
 		hub_box.add_child(btn)
 
+	# Max ruling 2026-09-24 (isolated dismiss): Back leaves the Guide
+	# entirely — the same role a modal's Cancel/Close plays — so it sits
+	# alone below a gap, after every catalog page button, never among them.
+	var hub_back_gap := Control.new()
+	hub_back_gap.custom_minimum_size = Vector2(0, 32) # matches modals.gd's MODAL_CANCEL_GAP
+	hub_box.add_child(hub_back_gap)
 	var hub_back := Button.new()
 	hub_back.text = "← Back"
 	hub_back.add_theme_font_size_override("font_size", 20)
+	# hub_box is otherwise LEFT-aligned (its catalog-page buttons), but Back
+	# is isolated below its own gap and reads better centred under the list.
+	hub_back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	hub_back.pressed.connect(func() -> void:
 		root.visible = false
 		on_back.call())
@@ -238,9 +247,17 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	head.add_theme_font_size_override("font_size", 24)
 	box.add_child(head)
 	fill_rows.call(box)
+	# Max ruling 2026-09-24 (isolated dismiss): same shape as the hub's own
+	# Back — a gap separates it from the catalog rows above.
+	var back_gap := Control.new()
+	back_gap.custom_minimum_size = Vector2(0, 32) # matches modals.gd's MODAL_CANCEL_GAP
+	box.add_child(back_gap)
 	var back := Button.new()
 	back.text = "← Back"
 	back.add_theme_font_size_override("font_size", 18)
+	# box is otherwise LEFT-aligned (the catalog rows above), but Back is
+	# isolated below its own gap and reads better centred under the list.
+	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(func() -> void:
 		scroll.visible = false
 		hub_scroll.visible = true)

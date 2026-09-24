@@ -205,6 +205,11 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 			center.visible = false
 			on_logout.call())
 
+	# Max ruling 2026-09-24 (isolated dismiss): Back leaves Settings
+	# entirely, so it sits alone below a gap, after every toggle and Log out.
+	var back_gap := Control.new()
+	back_gap.custom_minimum_size = Vector2(0, 32) # matches modals.gd's MODAL_CANCEL_GAP
+	box.add_child(back_gap)
 	var back := Button.new()
 	back.text = "← Back"
 	back.add_theme_font_size_override("font_size", 20)

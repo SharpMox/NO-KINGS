@@ -794,6 +794,13 @@ func _ready() -> void:
 	var settings_test_btn := _button(settings_box, "TEST", 24, _show_tests)
 	settings_box.move_child(about_btn, settings_back.get_index())
 	settings_box.move_child(settings_test_btn, settings_back.get_index())
+	# settings.gd's own back_gap (32px, matches modals.gd's MODAL_CANCEL_GAP)
+	# now sits above About/TEST rather than above Back, since those two rows
+	# were inserted between it and Back — so Back needs its own gap here too.
+	var settings_test_back_gap := Control.new()
+	settings_test_back_gap.custom_minimum_size = Vector2(0, 32)
+	settings_box.add_child(settings_test_back_gap)
+	settings_box.move_child(settings_test_back_gap, settings_back.get_index())
 
 	# issue 83: the login screen. Shown ONLY on a first run — once an account
 	# exists, needs_login() is false forever and this never appears again.

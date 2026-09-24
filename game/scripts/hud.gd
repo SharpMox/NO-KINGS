@@ -1016,12 +1016,6 @@ func build(game) -> void:
 	gm_title.add_theme_font_size_override("font_size", 32)
 	gm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	gm_box.add_child(gm_title)
-	var resume := Button.new()
-	resume.text = "Resume"
-	resume.add_theme_font_size_override("font_size", 26)
-	resume.pressed.connect(func() -> void: toggle_menu(false))
-	gm_box.add_child(resume)
-
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
 	# scripts/settings.gd) so both entry points show identical content
 	var guide_scroll := Guide.build(game_menu, func() -> void: gm_box.visible = true, g)
@@ -1060,6 +1054,21 @@ func build(game) -> void:
 	to_menu.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	gm_box.add_child(to_menu)
+
+	# Max ruling 2026-09-24 (isolated dismiss): Resume is the pause menu's
+	# dismiss — it returns to the game unchanged, the same role Cancel/Close
+	# plays in every other modal — so it sits alone below a gap, after
+	# Guide/Settings/Main Menu, never first. Moved down from right after the
+	# title (its old position, above all three actions).
+	var resume_gap := Control.new()
+	resume_gap.custom_minimum_size = Vector2(0, 32) # matches modals.gd's MODAL_CANCEL_GAP
+	gm_box.add_child(resume_gap)
+	var resume := Button.new()
+	resume.text = "Resume"
+	resume.add_theme_font_size_override("font_size", 26)
+	resume.pressed.connect(func() -> void: toggle_menu(false))
+	gm_box.add_child(resume)
+
 	add_child(game_menu)
 
 	# drawers above the button row, one at a time, overlaying the board, full

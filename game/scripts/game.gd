@@ -141,8 +141,6 @@ const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
 const COL_DROP_OK := Color(0.3, 0.9, 0.4, 0.35) # NO-236: the hovered tile would take the drop
 const COL_DROP_BAD := Color(0.95, 0.3, 0.3, 0.35) # NO-236: ...would refuse it
-const COL_ARROW := Color(0.95, 0.65, 0.15, 0.9) # Arrow Planning: deliberately
-	# outside the blue/red side palette — decorative, not player or enemy state
 const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
 	# direction fills a target-zone tile with ordinary (single) coverage —
 	# NO-176 replaced the old flat Color(COL_CAPTURE, 0.22) rect wash with
@@ -309,7 +307,7 @@ const MOVE_DOT_RADIUS := 13.0 # was 10.0 (leap) / 8.0 (linked/bent dots) —
 	# this constant now sizes only the hop/bent linked-dot path, which is
 	# unaffected (it shows the path SHAPE, not a plain destination marker,
 	# so it stayed out of "remove the circle indicators").
-const ARROW_WIDTH := 4.5 # was 3.0 — ride-move arrow only, not Arrow Planning
+const ARROW_WIDTH := 4.5 # was 3.0 — ride-move arrow
 const ARROW_HEAD_LEN := 20.0 # was 14.0
 const ARROW_HEAD_HALF := 11.0 # was 8.0
 
@@ -605,11 +603,6 @@ var board_lp_pending_tile := Vector2i(-1, -1)
 # _swipe_eligible whether THIS press qualified at all.
 var _swipe_from := Vector2.ZERO
 var _swipe_eligible := false
-# Arrow Planning (Notion): purely decorative — never read by rules/AI. A
-# scratchpad, not run state: cleared at turn end, never saved (2026-08-27).
-var arrow_mode := false # while on, board drags draw arrows instead of selecting
-var arrows: Array[Dictionary] = [] # {from: Vector2i, to: Vector2i}
-var arrow_from := Vector2i(-1, -1) # arrow drag in progress
 var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
 var pool_click_ms := 0
 var pool_drag_id := "" # stock piece mid-drag from the strip (game-feel pass)
@@ -1287,38 +1280,11 @@ func _on_stack_pressed(entry: Variant, cap: bool) -> void:
 	_refresh()
 
 
-
-
-
-
-
-
-## Arrow Planning: a button toggle, guarded like the other HUD actions that
-## must not fire mid-modal or mid-item-target (item targeting owns board taps).
-func _on_arrow_toggle() -> void:
-	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open \
-			or preview_open or game_menu_open or win_open or item_active >= 0:
-		return
-	arrow_mode = not arrow_mode
-	arrow_from = Vector2i(-1, -1)
-	if arrow_mode: # entering the mode drops any selection/armed placement —
-		placing_id = ""    # the board stops selecting pieces while it's on
-		_clear_selection()
-	_refresh()
-
-
-func _on_arrow_clear() -> void:
-	arrows.clear()
-	queue_redraw()
-
-
 func _on_pass() -> void:
 	if box_open or buff_pick_open or game_menu_open or win_open:
 		return
 	if _pass_blocked():
 		return
-	arrows.clear() # scratchpad: never survives past the turn it was drawn in
-	queue_redraw()
 	if state == State.SETUP:
 		if hud.drawer_open != "": # setup done: full board for the run
 			_set_drawer("")
@@ -2726,16 +2692,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return # the panels' own buttons handle dismissal
 	if state == State.GAME_OVER or state == State.ENEMY_TURN or box_open or buff_pick_open or win_open:
 		drag_from = Vector2i(-1, -1)
-		arrow_from = Vector2i(-1, -1)
 		board_lp_token = 0 # NO-120: none of these states can complete a hold
 		board_lp_pending_tile = Vector2i(-1, -1) # ...or a deferred commit
 		_swipe_eligible = false # NO-145: ditto — a press swallowed here must
 			# never let a later release, once the state clears, fire a swipe
 			# off a stale flag/position from an unrelated gesture
 		return
-	if arrow_mode and item_active < 0 and artefact_targeting_key == "":
-		# item/artefact targeting still owns board taps
-		return _arrow_input(event)
 	if event is InputEventMouseMotion:
 		if drag_from.x >= 0:
 			if _tile_at(event.position) != drag_from:
@@ -2890,8 +2852,7 @@ func _draw_linked_dots(origin: Vector2, line: Array, col: Color) -> void:
 
 ## Slide indicator: shaft from the piece toward the ride's end, arrowhead at
 ## the last reachable tile (a capture there keeps its ring on top). Sizing
-## defaults to the NO-129 move/capture dimensions; Arrow Planning's decorative
-## overlay (unrelated feature) passes its own, unchanged, smaller numbers.
+## defaults to the NO-129 move/capture dimensions.
 ## NO-160: shaft and head composite against the background exactly once,
 ## everywhere — the old separate `draw_line` + triangle put the line's end
 ## 10px short of the tip while the triangle's base sat `head_len` (14/20,
@@ -2927,35 +2888,6 @@ func _draw_move_arrow(from_px: Vector2, to_px: Vector2, col: Color,
 	]), col)
 
 
-## Arrow Planning: drag draws a decorative arrow; redrawing the same one
-## removes it (clear-one). Purely visual — never reaches rules/AI/legality.
-func _arrow_input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		if arrow_from.x >= 0:
-			queue_redraw() # ghost line follows the pointer
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var at := _tile_at(event.position)
-		if event.pressed:
-			arrow_from = at
-		elif arrow_from.x >= 0:
-			var from := arrow_from
-			arrow_from = Vector2i(-1, -1)
-			if at.x >= 0 and at != from:
-				var idx := _arrow_index(from, at)
-				if idx >= 0:
-					arrows.remove_at(idx) # redrawing an existing arrow clears it
-				else:
-					arrows.append({"from": from, "to": at})
-			queue_redraw()
-
-
-func _arrow_index(from: Vector2i, to: Vector2i) -> int:
-	for i in arrows.size():
-		if arrows[i].from == from and arrows[i].to == to:
-			return i
-	return -1
-
-
 func _tile_at(screen: Vector2) -> Vector2i:
 	var local := screen - board_px
 	if local.x < 0 or local.y < 0:
@@ -2983,7 +2915,7 @@ func _tile_at(screen: Vector2) -> Vector2i:
 ##   - on an EMPTY tile, only when nothing is already armed/selected that a
 ##     press there would otherwise resolve against — an empty tile that IS a
 ##     legal destination for a current selection, or a staged Item/Artefact
-##     target, or an Arrow Planning draw, already commits on THIS press
+##     target, already commits on THIS press
 ##     (_on_tile_clicked fires immediately below, not on release), so a
 ##     swipe can never begin from one without also stepping on that commit.
 func _swipe_open_may_begin(at: Vector2i) -> bool:
@@ -2992,7 +2924,7 @@ func _swipe_open_may_begin(at: Vector2i) -> bool:
 	if at.x < 0 or board.has(at):
 		return false
 	return selected.x < 0 and placing_id == "" and item_active < 0 \
-			and artefact_targeting_key == "" and not arrow_mode
+			and artefact_targeting_key == ""
 
 
 ## NO-120: true when a press on `at` (occupied — the only case a long press
@@ -5453,8 +5385,7 @@ func _draw() -> void:
 	# move edge where the two zones' tiles coincide (the bomb highlight in
 	# particular can share tiles with legal_dests — a capture destination
 	# that also carries a bomb is in both sets). NO-183: the move/capture
-	# indicator arrows/dots below and Arrow Planning's own overlay (drawn
-	# last in this function) both come AFTER every hatch call above and
+	# indicator arrows/dots below come AFTER every hatch call above and
 	# below this comment, so an arrow always draws over a hatch fill, never
 	# under one.
 	# recon (enemy) paths draw red; the player's draw blue (palette rule)
@@ -5626,15 +5557,6 @@ func _draw() -> void:
 		if a.kind == "die":
 			_draw_die(font, a)
 	_draw_drag_preview()
-	# Arrow Planning: drawn last so the decorative overlay always sits on top;
-	# arrows persist independent of arrow_mode (toggling off just stops adding
-	# more) and are cleared at turn end (scratchpad, never saved)
-	for a in arrows:
-		_draw_move_arrow(_tile_px(a.from) + half, _tile_px(a.to) + half, COL_ARROW, 3.0, 14.0, 8.0)
-	if arrow_from.x >= 0:
-		var arrow_cur := _tile_at(get_global_mouse_position())
-		if arrow_cur.x >= 0 and arrow_cur != arrow_from:
-			_draw_move_arrow(_tile_px(arrow_from) + half, _tile_px(arrow_cur) + half, COL_ARROW, 3.0, 14.0, 8.0)
 
 
 ## NO-236: the ghost of whatever is being dragged. Over a board tile it snaps
@@ -6025,8 +5947,6 @@ func _connect_hud() -> void:
 	hud.army_ability_pressed.connect(_activate_army_ability)
 	hud.shop_pressed.connect(_open_shop)
 	hud.drawer_changed.connect(_after_drawer_change)
-	hud.arrow_toggle_pressed.connect(_on_arrow_toggle)
-	hud.arrow_clear_pressed.connect(_on_arrow_clear)
 	hud.menu_toggled.connect(func(open: bool) -> void:
 		game_menu_open = open
 		if open:

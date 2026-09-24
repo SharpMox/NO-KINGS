@@ -219,8 +219,6 @@ signal drawer_changed
 signal shop_pressed
 signal menu_toggled(open: bool)
 signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
-signal arrow_toggle_pressed
-signal arrow_clear_pressed
 
 
 ## NO-242: hardware Back while the pause menu's Guide shows — one level up
@@ -273,8 +271,6 @@ var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
 var king_ability_button := Button.new() # top-row tariff count; opens the overlay
-var arrow_button := Button.new() # Arrow Planning: toggles decorative drawing mode
-var arrow_clear_button := Button.new() # clears every drawn arrow
 var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> Control (the "stock" entry is a PanelContainer; NO-134 made "inventory" a plain Control so its background can outsize its scroll content)
 var drawer_buttons := {} # name -> Button (count text updates)
@@ -710,16 +706,13 @@ func build(game) -> void:
 	king_ability_button.add_theme_font_size_override("font_size", 13)
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	king_ability_button.pressed.connect(func() -> void: king_ability_pressed.emit())
-	arrow_button.text = "Arrows"
-	arrow_button.add_theme_font_size_override("font_size", 13)
-	arrow_button.pressed.connect(func() -> void: arrow_toggle_pressed.emit())
-	# NO-83: the ⚠ and Arrows buttons are NOT on screen. Their state, signals
-	# and handlers stay (refresh still writes their text) so nothing behind
-	# them is lost; they get a home again when the Deck is redesigned (NO-84+).
-	# flat compact styling (2026-07-08) for the two off-screen buttons only —
+	# NO-83: the ⚠ button is NOT on screen. Its state, signals and handlers
+	# stay (refresh still writes its text) so nothing behind it is lost; it
+	# gets a home again when the Deck is redesigned (NO-84+).
+	# flat compact styling (2026-07-08) for the off-screen button only —
 	# ☰ moved OUT of this loop (NO-175, 3rd pass) so it can share Stock's
 	# own style instead.
-	for b: Button in [king_ability_button, arrow_button]:
+	for b: Button in [king_ability_button]:
 		var compact := StyleBoxFlat.new()
 		compact.bg_color = Color(0.22, 0.22, 0.26)
 		compact.set_corner_radius_all(4)
@@ -946,15 +939,6 @@ func build(game) -> void:
 	multi_cancel_btn.visible = false
 	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
 	add_child(multi_cancel_btn)
-	# floating Clear-all for Arrow Planning: only worth showing while the mode
-	# is on (top bar has no room to spare — money-and-shop already fills it)
-	arrow_clear_button.text = "Clear"
-	arrow_clear_button.add_theme_font_size_override("font_size", 17)
-	arrow_clear_button.position = Vector2(vp.x / 2 - 70, vp.y - 96)
-	arrow_clear_button.custom_minimum_size = Vector2(140, 40)
-	arrow_clear_button.visible = false
-	arrow_clear_button.pressed.connect(func() -> void: arrow_clear_pressed.emit())
-	add_child(arrow_clear_button)
 	pass_button.text = "PASS"
 	pass_button.add_theme_font_size_override("font_size", 17)
 	# green, matching the prototype: PASS ends your turn, it is not a warning
@@ -2178,9 +2162,6 @@ func refresh() -> void:
 	# both glyphs (open/closed) now live in _update_band_toggle, so a refresh
 	# mid-open never overwrites the "▴ Hide" state with the closed one.
 	_update_band_toggle()
-	# armed-placement tint (2026-07-07 palette) marks the toggle as active
-	arrow_button.self_modulate = Color(0.55, 0.95, 1.5) if g.arrow_mode else Color(1, 1, 1)
-	arrow_clear_button.visible = g.arrow_mode
 	# NO-124: generalised from "multi"'s own Extract button to every targeted
 	# Item/Artefact's final confirm — visible whenever there's a complete,
 	# spendable target staged (or, for an untargeted Item, as soon as it's

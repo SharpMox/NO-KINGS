@@ -3364,8 +3364,6 @@ func _init() -> void:
 	await process_frame
 	check((game.hud.drawers["stock"] as Control).clip_contents,
 		"NO-84: the Stock Drawer clips its contents")
-	check(game.hud.captured_hint.visible,
-		"NO-84: with no Captured Stock, the left side shows the empty hint")
 	# Three deploys follow, one Action each (Tuning.ACTIONS_PER_TURN is 2) — a
 	# generous budget keeps the turn from auto-passing mid-sequence, which
 	# would end PLAYER_TURN and mask the reopen rule under test, not exercise it.
@@ -3398,8 +3396,6 @@ func _init() -> void:
 	await process_frame
 	check(game.board.has(tile_b) and game.stock.is_empty() and game.drawer_open == "stock",
 		"NO-84: reopens after a drop — Stock is empty but Captured Stock can convert")
-	check(not game.hud.captured_hint.visible,
-		"NO-84: the empty hint is gone once a Captured Stock entry exists")
 
 	# stays closed: nothing left to deploy or convert
 	game.captured = []

@@ -368,7 +368,6 @@ var _stack_anim_gen := 0 ## NO-237: only the latest rebuild's FLIP pass runs
 ## step below stores it here instead, for _rebuild_stock_drawer to read.
 var stock_cols := 1
 var cap_cols := 1
-var captured_hint := Label.new() # "no Captured Stock yet" — shown only when empty
 ## NO-208: both drawers' own ScrollContainers, kept so _rebuild_stock_drawer
 ## can reset their scroll position — built as locals inside build() otherwise.
 var stock_scroll := ScrollContainer.new()
@@ -501,15 +500,6 @@ static func _style_button(b: Button, bg: Color, border: Color, radius: int = 8,
 		pad_x: int = 10, pad_y: int = 4) -> void:
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		b.add_theme_stylebox_override(state, _surface(bg, border, radius, pad_x, pad_y))
-
-
-## NO-165: a section heading inside the Inventory drawer (Items, Artefacts).
-static func _section_label(text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", 13)
-	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
-	return l
 
 
 ## NO-207: the horizontal gap that makes `cols` Tuning.OFFBOARD_ICON cells
@@ -1238,11 +1228,8 @@ func build(game) -> void:
 	# rows): the drawers row under the board, the thumb row last.
 	deck.move_child(nav_row, 0)
 	deck.move_child(act_row, 1)
-	# NO-165: name the two sections — the drawer used to run straight from
-	# Items into Artefacts with nothing marking the seam.
-	inv_box.add_child(_section_label("Items"))
+	# inv_box's separation (8, set above) is the gap between the two grids.
 	inv_box.add_child(items_grid)
-	inv_box.add_child(_section_label("Artefacts"))
 	inv_box.add_child(artefacts_grid)
 	var drawer_specs := [ # name, content, x, width, height
 		["inventory", inv_box, 0.0, vp.x, INV_DRAWER_H],
@@ -1341,13 +1328,6 @@ func build(game) -> void:
 	cap_wrap.add_child(cap_bg)
 	var cap_col := VBoxContainer.new()
 	cap_col.custom_minimum_size = Vector2(cap_w, stock_h)
-	captured_hint.text = "Captured pieces land here"
-	captured_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	captured_hint.custom_minimum_size = Vector2(cap_w - STOCK_DRAWER_PAD * 2.0, 0)
-	captured_hint.modulate = Color(1, 1, 1, 0.6)
-	captured_hint.add_theme_font_size_override("font_size", 11)
-	captured_hint.visible = false
-	cap_col.add_child(captured_hint)
 	cap_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136
 	cap_scroll.scroll_deadzone = DRAWER_SCROLL_DEADZONE
 	var cap_view: Vector2 = Vector2(cap_w - STOCK_DRAWER_PAD, stock_h - STOCK_DRAWER_PAD)
@@ -2616,7 +2596,6 @@ func _rebuild_stock_drawer() -> void:
 	var live := {} # key -> Button, this rebuild's
 	var old_pos := {} # kept Button -> position before this rebuild (_stack_origin-relative)
 	var fresh: Array = []
-	var cap_count := 0
 	var stock_children: Array = []
 	var cap_children: Array = []
 	for i in stacks.size():
@@ -2631,7 +2610,6 @@ func _rebuild_stock_drawer() -> void:
 			_build_stack_button(st, btn)
 		live[keys[i]] = btn
 		if st.cap:
-			cap_count += 1
 			cap_children.append(btn)
 		else:
 			stock_children.append(btn)
@@ -2639,9 +2617,6 @@ func _rebuild_stock_drawer() -> void:
 		if not live.has(k):
 			_drop_stack_button(_stack_btns[k], animate)
 	_stack_btns = live
-	# story 37: the hint only while the column would otherwise be blank — an
-	# empty GridContainer has no size of its own to hang a message on.
-	captured_hint.visible = cap_count == 0
 	if g.state == g.State.SETUP and g.selected.x >= 0:
 		# empty slot: tap it (or drop the dragged piece on the strip) to take
 		# the selected board piece back into stock — lives with Stock, the
@@ -2838,8 +2813,8 @@ func _fill_rows_bottom_right(grid: VBoxContainer, children: Array, cols: int) ->
 
 ## NO-208: default scroll position is the bottom, matching cap_anchor/
 ## stock_anchor's bottom-anchoring above. Fire-and-forget (not awaited by the
-## caller) — _rebuild_stock_drawer's own synchronous work (grid contents,
-## captured_hint) is already done by the time this runs. Awaits a frame first:
+## caller) — _rebuild_stock_drawer's own synchronous work (grid contents)
+## is already done by the time this runs. Awaits a frame first:
 ## CLAUDE.md — a freshly rebuilt control's size isn't final until the next
 ## idle frame, so reading "the max scroll" (or here, setting scroll_vertical
 ## before the grid's new row count has been laid out) would land on the STALE

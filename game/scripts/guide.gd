@@ -150,11 +150,31 @@ static func open_page(root: Control, page: String) -> bool:
 ## Debug capture: `spec` is what follows "guide:" — "<page>" opens the page,
 ## "<page>:<index>" also opens the detail panel on that page's row <index>
 ## (0-based, list order), instantly so the screenshot never lands mid-slide.
+## "<page>:row:<index>" instead scrolls the page's list so that row is at the
+## TOP of the viewport (no detail panel) — for capturing rows further down
+## than the default (top-of-list) view reaches.
+## A coroutine (unlike the sync version before it) only because the "row"
+## form awaits one frame: the page's ScrollContainer only just turned visible
+## this frame (`open_page` above), and its content's laid-out position is
+## still the stale pre-visible one until the next layout pass — same trap
+## CLAUDE.md documents for a freshly-laid-out Control's `get_global_rect()`.
+## Every caller must `await` this now, index paths included.
 static func show_screen(root: Control, spec: String) -> bool:
 	var parts := spec.split(":")
 	if not open_page(root, parts[0]):
 		return false
 	if parts.size() < 2:
+		return true
+	if parts[1] == "row":
+		await root.get_tree().process_frame
+		var rows := row_buttons(root)
+		var ri := int(parts[2]) if parts.size() >= 3 else -1
+		if parts.size() < 3 or not parts[2].is_valid_int() or ri < 0 or ri >= rows.size():
+			return false
+		var row_top: float = (rows[ri].get_parent() as Control).position.y
+		for page in (root as GuideRoot).pages:
+			if page.visible:
+				(page as ScrollContainer).scroll_vertical = int(row_top)
 		return true
 	var list := row_buttons(root)
 	var i := int(parts[1])
@@ -253,7 +273,7 @@ static func _fill_pieces(box: VBoxContainer, board, detail: DetailPanel) -> void
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.add_child(_icon(board.load_piece_tex(id), 40))
-		row.add_child(_label("%s · %d" % [defs[id].name, int(defs[id].value)], 17, true))
+		row.add_child(_label("%s · Value: %d" % [defs[id].name, int(defs[id].value)], 17, true))
 		_tap_row(box, row, func() -> void: detail.open(_piece_detail(id, board, detail)))
 
 

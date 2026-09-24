@@ -8,6 +8,7 @@ extends SceneTree
 const PieceMass := preload("res://scripts/piece_mass.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
+const Rules := preload("res://scripts/rules.gd")
 
 var fails := 0
 
@@ -26,6 +27,9 @@ func _init() -> void:
 	_test_child_count()
 	_test_horde_fits_carousel_card()
 	_test_back_to_front_order()
+	_test_partial_row_centered()
+	_test_slim_pitch_tighter_than_large()
+	_test_classification()
 
 	print("---")
 	if fails == 0:
@@ -117,3 +121,77 @@ func _test_back_to_front_order() -> void:
 	check(pawn_idx != -1 and rook_idx != -1 and pawn_idx < rook_idx,
 		"pawn (back, drawn first at index %d) precedes rook (front, drawn last at index %d)"
 			% [pawn_idx, rook_idx])
+
+
+## Max's ruling: 2 rows of 3 plus a row of 1 must read as
+##   AAA
+##   BBB
+##    C
+## not C flush under A. 7 identical "rook" (large) pieces is the exact case:
+## _back_to_front keeps ties in original order, so children add in index
+## order and _choose_rows(7, CELL_LARGE) lands on rows=3/cols=3 (verified by
+## hand against the same TARGET_ASPECT maths _choose_rows itself uses) —
+## rows 0-1 get 3 each, row 2 gets the lone 7th. Row 0 and row 2 are both
+## even (neither gets the odd-row STAGGER), so comparing their x positions
+## directly, with no stagger to subtract out, isolates the centering fix:
+## the lone piece's x must equal row 0's MIDDLE column, not its first.
+func _test_partial_row_centered() -> void:
+	var ids := []
+	for i in 7:
+		ids.append("rook")
+	var rows := PieceMass._choose_rows(ids.size(), PieceMass.CELL_LARGE)
+	var cols := maxi(1, ceili(float(ids.size()) / float(rows)))
+	check(rows == 3 and cols == 3,
+		"7 uniform pieces choose 3 rows x 3 cols (got %d x %d)" % [rows, cols])
+	if rows != 3 or cols != 3:
+		return # geometry assumption below doesn't hold; the mismatch is
+			# already reported above.
+	var mass := PieceMass.build(ids)
+	var row0_col1: TextureRect = mass.get_child(1) # row 0, middle column
+	var row2_col0: TextureRect = mass.get_child(6) # row 2, the lone piece
+	check(is_equal_approx(row2_col0.position.x, row0_col1.position.x),
+		"lone row (x=%.2f) centred on row 0's middle column (x=%.2f)"
+			% [row2_col0.position.x, row0_col1.position.x])
+
+
+func _test_slim_pitch_tighter_than_large() -> void:
+	check(PieceMass.CELL_SLIM < PieceMass.CELL_LARGE,
+		"slim pitch (%.2f) tighter than large pitch (%.2f)"
+			% [PieceMass.CELL_SLIM, PieceMass.CELL_LARGE])
+
+
+## Prints the slim/large call for all 39 known pieces (game/data/pieces.json)
+## so it can be reviewed — task ask, not just a pass/fail. Also asserts the
+## classification is non-trivial (both buckets used), stable across repeat
+## calls (guards the memoization in _slim_cache), and gets the two named
+## anchor cases right: Pawn/Void Pawn slim, Rook/Knight/Queen large.
+func _test_classification() -> void:
+	var ids: Array = Rules.load_pieces().keys()
+	ids.sort()
+	print("--- piece width classification (SLIM_WIDTH_RATIO=%.2f) ---"
+		% PieceMass.SLIM_WIDTH_RATIO)
+	var slim_count := 0
+	for id in ids:
+		var ratio: float = PieceMass._slim_ratio(id)
+		var slim: bool = PieceMass._is_slim(id)
+		if slim:
+			slim_count += 1
+		print("%s: %s (ratio=%.3f)" % [id, "slim" if slim else "large", ratio])
+	print("--- %d/%d slim ---" % [slim_count, ids.size()])
+
+	check(ids.size() == 39, "39 known pieces classified (got %d)" % ids.size())
+	check(slim_count > 0 and slim_count < ids.size(),
+		"classification is non-trivial: %d/%d slim" % [slim_count, ids.size()])
+
+	var stable := true
+	for id in ids:
+		if PieceMass._is_slim(id) != PieceMass._is_slim(id):
+			stable = false
+			break
+	check(stable, "classification is stable across repeated calls")
+
+	check(PieceMass._is_slim("pawn"), "Pawn classified slim")
+	check(PieceMass._is_slim("berolina"), "Void Pawn (berolina) classified slim")
+	check(not PieceMass._is_slim("rook"), "Rook classified large")
+	check(not PieceMass._is_slim("knight"), "Knight classified large")
+	check(not PieceMass._is_slim("queen"), "Queen classified large")

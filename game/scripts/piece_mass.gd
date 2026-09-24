@@ -21,14 +21,25 @@ const ICON := 52.0 # 40 * 1.3 — Max, 2026-09-20: chose bigger icons over
 	# for the off-board strip's own row height, not a crowd of a dozen-plus
 	# overlapping tokens, and would force scrolling or clipping here — see
 	# build()'s Horde-14 arithmetic below for the worst case at this size.
-const CELL := ICON * 0.38 # horizontal pitch, well under ICON so neighbours
-	# overlap. A RATIO of ICON, not an independent number: the next size
-	# change is one constant (ICON), not two literals that happen to agree
-	# today. NO-203: tightened from 0.6 to 0.42 — Max: "the pieces are also
-	# too far from each horizontally, we want to pack them a bit more". NO-210:
-	# tightened again to 0.38 — Max: "pack the row element a bit more
-	# horizontally" while giving ROW_PITCH (below) more room, since 0.36/0.42
-	# read as rows too close together.
+const CELL_LARGE := ICON * 0.38 # horizontal pitch for "large" pieces (Rook,
+	# Knight, Queen, dragons...) — well under ICON so neighbours overlap. A
+	# RATIO of ICON, not an independent number: the next size change is one
+	# constant (ICON), not two literals that happen to agree today. NO-203:
+	# tightened from 0.6 to 0.42 — Max: "the pieces are also too far from
+	# each horizontally, we want to pack them a bit more". NO-210: tightened
+	# again to 0.38 — Max: "pack the row element a bit more horizontally"
+	# while giving ROW_PITCH (below) more room, since 0.36/0.42 read as rows
+	# too close together. Was named CELL until the slim/large split below.
+const CELL_SLIM := CELL_LARGE * 0.63 # tighter pitch for "slim" pieces (Pawn,
+	# Void Pawn, Wazir...) — Max: the large-piece pitch above "looks great"
+	# but slim pieces "sit too far apart" at the same spacing. 0.63 is not a
+	# guess: it's the ratio of the two classes' MEASURED average opaque-width
+	# ratios (Image.get_used_rect().size.x / texture width) across all 39
+	# tokens at SLIM_WIDTH_RATIO's threshold — slim averages 0.543, large
+	# averages 0.863, 0.543/0.863 ≈ 0.63 — so a slim piece's pitch shrinks by
+	# the same factor its silhouette does. See _is_slim()/_slim_ratio() and
+	# tests/test_mass.gd's printed classification table for the full 39-piece
+	# breakdown.
 const ROW_PITCH := ICON * 0.54 # NO-178: vertical pitch between rows. NO-203:
 	# tightened from 0.45 to 0.36 — Max: "we need the rows to be closer on the
 	# vertical axis so we can still visually see rows" — then NO-210 backed it
@@ -45,9 +56,12 @@ const ROW_PITCH := ICON * 0.54 # NO-178: vertical pitch between rows. NO-203:
 	# flat ranks — the exact "not a crowd" failure this renderer exists to
 	# avoid. 0.54 sits in the middle of the 0.50-0.65 window: past the
 	# 4-row-to-3-row jump with real margin, short of where stripes start.
-const STAGGER := CELL * 0.5 # NO-178: alternate rows shift right by half a
-	# cell so pieces nest into the gaps of the row behind, instead of lining
-	# up into a visible grid.
+const STAGGER := CELL_LARGE * 0.5 # NO-178: alternate rows shift right by
+	# half a cell so pieces nest into the gaps of the row behind, instead of
+	# lining up into a visible grid. Kept on CELL_LARGE (not per-row/per-
+	# piece) after the slim/large split: it's a fixed visual offset, not a
+	# pitch, and CELL_LARGE is already the conservative (larger) of the two,
+	# so it stays a safe upper bound on the shift for a slim-heavy row too.
 const JITTER_Y := ICON * 0.075 # px — Max, 2026-09-20: "barely not aligned
 	# horizontally" — a small per-piece vertical wobble so a rank's baseline
 	# waves slightly rather than ruling dead straight. Also a ratio of ICON
@@ -67,6 +81,19 @@ const DEPTH_BACK_SCALE := 0.85 # NO-178: mild perspective — back rows drawn
 const TARGET_ASPECT := 1.15 # width:height the crowd's bounding box should
 	# land near — Max's own mockup selection measured 467x400 (≈1.1675),
 	# "roughly square, slightly wider than tall".
+const SLIM_WIDTH_RATIO := 0.64 # a piece is "slim" when its opaque-pixel
+	# bounding-box width (Image.get_used_rect(), see _slim_ratio()) is under
+	# this fraction of its 192px-square texture's own width. Chosen from the
+	# measured ratio of all 39 tokens (tests/test_mass.gd prints the full
+	# table): Pawn/Void Pawn/Bishop/Ferz share one silhouette at 0.479, and
+	# every other pawn-shaped/simple token (Sergeant, Archer, Wazir, Amazon,
+	# ...) falls between 0.52 and 0.63; Rook sits at 0.656, with Queen (0.81)
+	# and Knight (0.90) further above. 0.64 is the natural gap directly under
+	# Rook — the smallest "must be large" example — so Rook/Queen/Knight
+	# land large and the pawn-shaped cluster lands slim, automatically, with
+	# no piece hand-listed.
+static var _slim_cache: Dictionary = {} # id -> bool, memoized: the art never
+	# changes mid-run, and this can run once per piece per build() call.
 # Same value as game.gd's COL_SIDE_PLAYER (game.gd:91) — duplicated rather
 # than read off the `load()`'d script below: that call is verified working
 # for a static FUNCTION (hud.gd's own load("res://scripts/menu.gd") calls
@@ -113,8 +140,58 @@ static func build(ids: Array) -> Control:
 	mass.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	var n := ids.size()
-	var rows := _choose_rows(n)
+	var sorted_ids: Array = _back_to_front(ids)
+
+	# Per-piece horizontal pitch (Max's ruling: slim pieces — Pawn-shaped,
+	# classified from the art, see _is_slim() — pack tighter than large
+	# ones). Computed once per id, up front, so both _choose_rows() and the
+	# per-row layout below read the same values.
+	var pitches: Array[float] = []
+	var avg_pitch := 0.0
+	for id in sorted_ids:
+		var p := _pitch(id)
+		pitches.append(p)
+		avg_pitch += p
+	if not pitches.is_empty():
+		avg_pitch /= pitches.size()
+
+	var rows := _choose_rows(n, avg_pitch)
 	var cols := maxi(1, ceili(float(n) / float(rows)))
+
+	# Row layout, row-major fill (row = i/cols, matching the icon loop
+	# below): each row's items are laid out left to right with the pitch
+	# between neighbours = half of each one's own class pitch, summed (Max's
+	# ruling) — reduces to the old uniform `col * CELL` when a row is all one
+	# class. `row_x[i]` is icon i's x WITHIN its row, before centering/
+	# stagger/pad; `row_width[r]` is that row's own natural (unstaggered)
+	# span.
+	var row_x: Array[float] = []
+	row_x.resize(n)
+	var row_width: Array[float] = []
+	row_width.resize(rows)
+	for r in rows:
+		var start := r * cols
+		var end := mini(n, start + cols)
+		var x := 0.0
+		for i in range(start, end):
+			if i > start:
+				x += (pitches[i - 1] + pitches[i]) * 0.5
+			row_x[i] = x
+		row_width[r] = (x + ICON) if end > start else 0.0
+	var max_row_width := 0.0
+	for w in row_width:
+		max_row_width = maxf(max_row_width, w)
+	# Centre every row on the widest row's centre line (Max's ruling: a
+	# row with fewer pieces than the widest no longer sits flush at column
+	# 0). Widest is measured in PIXELS, not piece count: with mixed
+	# slim/large pitches two equal-count rows can differ in natural width,
+	# and pixel width is what actually needs centring — this is a strict
+	# generalisation of "fewer pieces", since with one pitch class the two
+	# coincide (only the last row can ever be short, by row-major fill).
+	var row_center_offset: Array[float] = []
+	row_center_offset.resize(rows)
+	for r in rows:
+		row_center_offset[r] = (max_row_width - row_width[r]) * 0.5
 
 	# Padding: half the icon's own width/height, plus JITTER_Y's vertical
 	# wobble, plus the bounding-box growth a square gains when rotated up to
@@ -135,17 +212,17 @@ static func build(ids: Array) -> Control:
 	# portrait width this project targets, minus the card's own 20px side
 	# padding (card_style's content_margin_left/right) = 260px usable —
 	# 218.2px fits with ~41.8px to spare (down from ~61.6px before V3, still
-	# clear).
+	# clear). Horde is all-pawn (slim), so its real pitch is now CELL_SLIM,
+	# even narrower than this large-piece worst case.
 	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
 	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(
-		(cols - 1) * CELL + ICON + pad * 2.0 + (STAGGER if rows > 1 else 0.0),
+		max_row_width + pad * 2.0 + (STAGGER if rows > 1 else 0.0),
 		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(ids)
 
-	var sorted_ids: Array = _back_to_front(ids)
 	for i in sorted_ids.size():
 		var id: String = sorted_ids[i]
 		var icon := TextureRect.new()
@@ -167,14 +244,14 @@ static func build(ids: Array) -> Control:
 			# around its own centre, not the top-left corner
 		if game_script.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
 			icon.modulate = COL_SIDE_PLAYER
-		var col := i % cols
 		var row := i / cols
-		# X pitch is exact, plus a half-cell stagger on odd rows so pieces
+		# X is the row-local mixed-pitch position, plus that row's own
+		# centring offset, plus a half-cell stagger on odd rows so pieces
 		# nest into the row behind rather than forming a grid. Y gets a small
 		# wobble and the icon a tilt; row also gets a mild depth scale (back
 		# rows a little smaller, front rows full size).
 		icon.position = Vector2(
-			pad + col * CELL + (STAGGER if row % 2 == 1 else 0.0),
+			pad + row_x[i] + row_center_offset[row] + (STAGGER if row % 2 == 1 else 0.0),
 			pad + row * ROW_PITCH + rng.randf_range(-JITTER_Y, JITTER_Y))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		var depth: float = 1.0 if rows <= 1 \
@@ -188,18 +265,64 @@ static func build(ids: Array) -> Control:
 ## count from 1 to n and keeps whichever bounding box lands closest to
 ## TARGET_ASPECT. Cheap (n is at most ~14 — Horde's army) and works the same
 ## way for Reinforcements' 2-3 pieces as it does for a full army.
-static func _choose_rows(n: int) -> int:
+##
+## `avg_pitch` is the mean per-piece pitch of the actual `ids` (build()'s own
+## average of CELL_SLIM/CELL_LARGE per piece) — an approximation, like the
+## rest of this heuristic (it already ignores rotation/jitter growth), but
+## one that lets a slim-heavy army (more Pawns) land on fewer, wider rows
+## the way a uniform CELL_SLIM would, instead of always reasoning in
+## CELL_LARGE terms.
+static func _choose_rows(n: int, avg_pitch: float) -> int:
 	var best_rows := 1
 	var best_err := INF
 	for rows in range(1, maxi(1, n) + 1):
 		var cols := maxi(1, ceili(float(n) / float(rows)))
-		var w: float = (cols - 1) * CELL + ICON + (STAGGER if rows > 1 else 0.0)
+		var w: float = (cols - 1) * avg_pitch + ICON + (STAGGER if rows > 1 else 0.0)
 		var h: float = (rows - 1) * ROW_PITCH + ICON
 		var err: float = absf(w / h - TARGET_ASPECT)
 		if err < best_err:
 			best_err = err
 			best_rows = rows
 	return best_rows
+
+
+## The per-piece horizontal pitch: CELL_SLIM for a slim piece, CELL_LARGE
+## otherwise. The pitch BETWEEN two neighbours in a row is the average of
+## their own two pitches (Max's ruling) — computed where rows are laid out,
+## in build(); this is just the per-piece half of that sum.
+static func _pitch(id: String) -> float:
+	return CELL_SLIM if _is_slim(id) else CELL_LARGE
+
+
+## Whether `id`'s token art is "slim" (Pawn-shaped) rather than "large"
+## (Rook/Knight/Queen/dragon-shaped) — see SLIM_WIDTH_RATIO for the threshold
+## and its derivation. Memoized in _slim_cache: the art is static for the
+## life of the process, so this only measures each id once.
+static func _is_slim(id: String) -> bool:
+	if _slim_cache.has(id):
+		return _slim_cache[id]
+	var slim: bool = _slim_ratio(id) < SLIM_WIDTH_RATIO
+	_slim_cache[id] = slim
+	return slim
+
+
+## `id`'s opaque-pixel bounding-box width as a fraction of its texture's own
+## width — Image.get_used_rect() is Godot's own "visible bounds" rect, so
+## this reads the same silhouette a player sees. Unmeasurable art (missing
+## texture, or a VRAM-compressed one get_image() can't decompress) reads as
+## 1.0 — "large" — the safer default (more room, never a clipped-looking
+## overlap).
+static func _slim_ratio(id: String) -> float:
+	var game_script: GDScript = load("res://scripts/game.gd") # see build()'s
+		# own load() for why this isn't a top-level preload
+	var tex: Texture2D = game_script.load_piece_tex(id)
+	if tex == null:
+		return 1.0
+	var img := tex.get_image()
+	if img == null or img.get_width() <= 0:
+		return 1.0
+	var used := img.get_used_rect()
+	return float(used.size.x) / float(img.get_width())
 
 
 ## Sorts a COPY of `ids` back-to-front by piece value (the existing "how

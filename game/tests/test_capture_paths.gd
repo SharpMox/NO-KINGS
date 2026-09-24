@@ -113,6 +113,7 @@ func _init() -> void:
 	# --- --ui-demo flows, through the real preview + confirm ----------------
 	for flow in UiDemo.FLOWS:
 		var game := await _boot(UiDemo.SCENARIO)
+		check(game.items.size() == 3, "(setup) the sandbox holds a full inventory, 3 Items")
 		var stock_n: int = game.stock.size()
 		var cap_n: int = game.captured.size()
 		var items_n: int = game.items.size()

@@ -619,7 +619,7 @@ static func _hand_written() -> Array:
 		{"name": "Capture: selling sandbox", "cfg": {
 			"board": [["queen", 0, 3, 2], ["pawn", 0, 1, 0], ["rook", 1, 4, 9]],
 			"stock": ["rook", "knight", "pawn", "pawn"], "captured": ["bishop"],
-			"items": ["blitz", "shield", "promote"],
+			"items": ["blitz", "sniper", "promote"],
 			"artefacts": ["jet-fuel-vial", "deep-state-yearbook"],
 			"gold": 500, "score": 1000}},
 	]

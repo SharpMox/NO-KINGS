@@ -194,17 +194,12 @@ func _artefact_cell(game: Node, key: String) -> Button:
 
 ## NO-120: Stock/Captured cells carry id + cap as meta (hud.gd's
 ## _build_stack_button), so lookup does not depend on grid order either.
-## Root cause of the "short tap on a Stock cell still arms it" flake
-## (2026-09-18): called right after _set_drawer("stock"), which just
-## triggered _rebuild_stock_drawer — the OLD button is still in
-## get_children() (queue_free is deferred, not immediate) and sorts before
-## the new one Godot just add_child()'d. Same trap test_game_clicks.gd's
-## _pool_rows already documents ("a row held across one is a freed node")
-## and already guards against the same way.
-## V1: grid's direct children are now per-row HBoxContainers, not buttons —
-## one level to recurse through. _rebuild_stock_drawer queue_free()s the OLD
-## ROW (not its buttons individually), so the same stale-frame guard now
-## checks the row, not the button inside it.
+## The grid's direct children are per-row HBoxContainers — one level to
+## recurse through. Since NO-237 (#556) a rebuild KEEPS both the stack buttons
+## and the rows, and a dropped row is remove_child()'d before its queue_free,
+## so a stale node no longer shadows the live one (the 2026-09-18 "short tap
+## still arms it" flake). The is_queued_for_deletion() skip is kept as a
+## cheap guard, not a known necessity.
 func _stock_button(game: Node, id: String, cap: bool) -> Button:
 	var grid: Control = game.hud.captured_grid if cap else game.hud.stock_grid
 	for row in grid.get_children():

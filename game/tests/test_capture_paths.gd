@@ -181,6 +181,18 @@ func _init() -> void:
 			c.visible = false # back to a clean hub for the next page
 		check(shown, "guide:%s opens its page" % page)
 	check(not Guide.open_page(guide, "nope"), "an unknown Guide page opens nothing")
+	# guide:<page>:<row> — the page with its detail panel open, settled
+	var panel = Guide.detail_panel(guide)
+	for page in ["pieces", "promotions", "fusions", "artefacts", "items"]:
+		check(Guide.show_screen(guide, page + ":0"), "guide:%s:0 opens a row" % page)
+		check(panel.is_open() and panel.visible and panel.content() != null,
+			"guide:%s:0 shows the detail panel" % page)
+		panel.instant = true
+		check(Guide.go_back(guide) and not panel.visible, "guide:%s:0 Back closes the panel" % page)
+		check(Guide.go_back(guide), "guide:%s:0 Back then leaves the page" % page)
+		panel.instant = false
+	check(not Guide.show_screen(guide, "rules:0"), "Rules has no rows to open")
+	check(not Guide.show_screen(guide, "pieces:999"), "an out-of-range row opens nothing")
 	layer.queue_free()
 
 	print("---")

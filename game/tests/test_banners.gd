@@ -229,6 +229,31 @@ func _init() -> void:
 	op.queue_free()
 	await process_frame
 
+	# #552: a Juche Wave closes the Shop, so its Lane-A restock rolls unbannered
+	# — the Power is applied after the roll, and the banner must read the NEW
+	# Wave's Power, not the previous one's.
+	var ju := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 49})
+	await process_frame
+	ju.king_order = ["kim_jong_un"] # Wave 50 is the first King Wave (ordinal 0)
+	var restocks_before: int = ju.shop_restocks
+	ju.anims.clear()
+	WaveLogic.queue(ju, 50) # Lane A, on Kim Jong Un's Wave
+	check(Kings.power_is(ju, "juche"), "Wave 50 carries Juche")
+	check(ju.shop_restocks == restocks_before + 1, "...the Lane-A restock still rolls")
+	check(_restock_banners(ju).is_empty(), "...but a Juche Wave banners no restock (%d)" % _restock_banners(ju).size())
+	ju.anims.clear()
+	Shop.add_score_progress(ju, Tuning.SHOP_LANE_B_SCORE) # Lane B, same Wave
+	check(_restock_banners(ju).is_empty(), "...nor a Lane-B restock during it")
+	ju.king_order = ["kim_jong_un", "napoleon"]
+	for w in range(51, 100): # to the next King Wave, a Lane-A beat after Juche
+		WaveLogic.queue(ju, w)
+	ju.anims.clear()
+	WaveLogic.queue(ju, 100)
+	check(not Kings.power_is(ju, "juche") and _has_banner(ju, "SHOP RESTOCKED"),
+		"the next Wave's restock banners again once Juche has ended")
+	ju.queue_free()
+	await process_frame
+
 	# --- NO-239: the kill feed ----------------------------------------------
 	var kf := _boot({"board": [["queen", 0, 2, 2], ["knight", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
@@ -256,6 +281,22 @@ func _init() -> void:
 		kf.hud.post("e%d" % i)
 	lines = _feed_texts(kf)
 	check(lines == ["e5", "e4", "e3", "e2"], ">4 entries: only 4 kept, newest on top (%s)" % [lines])
+
+	# #558: a line wider than the screen is cut with "…", amounts kept whole
+	_clear_feed(kf)
+	var long_reason := "captured an extraordinarily long-named piece ".repeat(8)
+	kf.hud.post("+999 · +$99 · " + long_reason)
+	await process_frame # let the pill's container lay it out
+	await process_frame
+	var pill: Control = kf.hud.feed.get_child(0)
+	var fit: String = _feed_texts(kf)[0]
+	check(pill.size.x <= kf.hud.feed_max_w(),
+		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
+	check(fit.begins_with("+999 · +$99 · ") and fit.ends_with("…") and fit.length() < long_reason.length(),
+		"...its reason truncated with '…', the amounts intact (%s)" % fit)
+	_clear_feed(kf)
+	kf.hud.post("+5 · short")
+	check(_feed_texts(kf) == ["+5 · short"], "a line that fits is left alone")
 
 	await create_timer(kf.hud.FEED_LIFE_S + kf.hud.FEED_FADE_S + 0.3).timeout
 	await process_frame

@@ -8,6 +8,7 @@
 const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const Kings := preload("res://data/kings.gd")
 const Box := preload("res://scripts/box.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Armies := preload("res://scripts/armies.gd")
@@ -256,7 +257,15 @@ static func display_name(g, slot: Dictionary) -> String:
 static func lane_a_restock(g) -> void:
 	g.shop_lane_b_progress = 0
 	g.shop_restocks += 1
-	_restock(g, "SHOP OPEN" if g.wave == Tuning.SHOP_UNLOCK_WAVE else "SHOP RESTOCKED")
+	roll(g) # bannered separately by lane_a_banner, see there
+
+
+## #552: Lane A's banner, raised by WaveLogic.queue AFTER the new Wave's King
+## Power is applied — the roll above runs before it (moving the roll would
+## reorder g.rng draws against Kings.select and change every seeded run), so
+## at roll time king_power_id is still the previous Wave's Power.
+static func lane_a_banner(g) -> void:
+	_banner(g, "SHOP OPEN" if g.wave == Tuning.SHOP_UNLOCK_WAVE else "SHOP RESTOCKED")
 
 
 ## NO-167: waves remaining until the next guaranteed Lane-A restock — the
@@ -297,14 +306,24 @@ static func add_score_progress(g, amount: int) -> void:
 		_restock(g, "SHOP RESTOCKED")
 
 
-## NO-238: the one place a restock HAPPENS (both lanes; the first Lane-A fire is
-## the unlock, hence "SHOP OPEN"), so it is the one place that banners it.
+## NO-238: a restock is bannered only where it HAPPENS — here for Lane B, and
+## lane_a_banner for Lane A (the first Lane-A fire is the unlock, hence "SHOP
+## OPEN"); both go through _banner below.
 ## roll() itself stays silent: its other callers are run setup and the
 ## player's own Jet Fuel restock, neither of which is news, and a save restore
 ## never rolls at all. Never reached before the first restock Wave (NO-240:
 ## add_score_progress holds Lane B until then), so there is no pre-unlock banner.
 static func _restock(g, text: String) -> void:
 	roll(g)
+	_banner(g, text)
+
+
+## #552: a Wave whose King Power closes the Shop (Juche — the same predicate
+## game.gd's _open_shop refuses on) still rolls, but announcing a restock the
+## player cannot open is a lie, so it is not bannered.
+static func _banner(g, text: String) -> void:
+	if Kings.power_is(g, "juche"):
+		return
 	g._add_turn_fx(text, g.BANNER_GAIN, "shop_restock")
 
 

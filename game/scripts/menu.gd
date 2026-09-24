@@ -513,6 +513,9 @@ var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is n
 ## leaving army_row as that child directly collects all the dead space below
 ## the card instead of splitting it above and below.
 var _army_row_wrap: CenterContainer
+var _army_scroll: ScrollContainer # the carousel itself — a member (not a
+	# local in _ready()) so --army-name and _debug_scroll_to_army() below can
+	# reach it after the carousel is already built.
 var rank_center: PanelContainer # NO-190: a background panel now, not a bare CenterContainer
 ## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
 ## as a blue outline enclosing tiers 1..this one. NO-190: Confirm is what
@@ -1114,22 +1117,22 @@ func _ready() -> void:
 	pick.theme_type_variation = &"Title"
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pad_side.call().add_child(pick)
-	var army_scroll := ScrollContainer.new() # the carousel strip itself
-	army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
-	army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_army_scroll = ScrollContainer.new() # the carousel strip itself
+	_army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
+	_army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	# Same touch-drag fix test_scroll carries (CLAUDE.md, "Layout traps"): a
 	# Button's default mouse_filter is STOP, which would otherwise eat a swipe
 	# that starts on the card's own Army button before drag_touching sets.
-	army_scroll.scroll_deadzone = 24
-	army_center.add_child(army_scroll)
+	_army_scroll.scroll_deadzone = 24
+	army_center.add_child(_army_scroll)
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", int(ARMY_CARD_MARGIN)) # NO-179
 	# NO-179 follow-up: army_row's real parent is now this wrap, not
-	# army_scroll directly — see _army_row_wrap's own header for why, and
+	# _army_scroll directly — see _army_row_wrap's own header for why, and
 	# _show_armies for where its height is actually set.
 	_army_row_wrap = CenterContainer.new()
-	army_scroll.add_child(_army_row_wrap)
+	_army_scroll.add_child(_army_row_wrap)
 	_army_row_wrap.add_child(army_row)
 	# NO-179: every card is the same slot width now (see ARMY_CARD_WIDTH_
 	# FRACTION's own header), rendered at full scale always — no per-card
@@ -1288,14 +1291,14 @@ func _ready() -> void:
 		dot.add_theme_font_size_override("font_size", 16)
 		dot.text = "●" if i == 0 else "○"
 		dot.pressed.connect(func() -> void:
-			army_scroll.scroll_horizontal = int(i * (card_w + ARMY_CARD_MARGIN)))
+			_army_scroll.scroll_horizontal = int(i * (card_w + ARMY_CARD_MARGIN)))
 		army_dots.add_child(dot)
 		dot_buttons.append(dot)
 	# Setting scroll_horizontal above fires this same signal (it just proxies
 	# the underlying HScrollBar's value), so a dot click updates the dots
 	# through the identical path a swipe does — one writer, not two.
-	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
-		var idx := clampi(roundi(army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
+	_army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var idx := clampi(roundi(_army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
 		for i in dot_buttons.size():
 			dot_buttons[i].text = "●" if i == idx else "○")
 	_button(pad_side.call(), "← Back", 20, func() -> void:
@@ -1444,7 +1447,13 @@ func _ready() -> void:
 		if args.has("--show-screen"):
 			match args[args.find("--show-screen") + 1]:
 				"tests": _show_tests()
-				"armies": _show_armies()
+				"armies": # --army-name NAME scrolls the carousel to that
+					# card first — see _debug_scroll_to_army()'s own header
+					_show_armies()
+					if args.has("--army-name"):
+						var wanted: String = args[args.find("--army-name") + 1]
+						if not _debug_scroll_to_army(wanted):
+							printerr("--army-name %s: no such Army" % wanted)
 				"rank": # the tier picker sits past an Army pick, not its own
 					# button — reached the same way the "← Back" on rank_box
 					# does, so a screenshot doesn't need an Army actually chosen
@@ -1519,6 +1528,24 @@ func _show_armies() -> void:
 	if army_center.visible:
 		var scroll: Control = _army_row_wrap.get_parent()
 		_army_row_wrap.custom_minimum_size.y = scroll.size.y
+
+
+## `--army-name NAME` (tools/capture.md): scrolls the Army carousel straight
+## to that Army's card, the same maths a tap on its own page dot uses (the
+## `dot.pressed` callback above) — same "name instead of a fragile index"
+## idea as `--scenario-name`. `names` is Tuning.ARMIES' key order, the same
+## order the carousel and its dots are built in. Returns whether `wanted`
+## resolved, so both the CLI dispatch below and test_capture_paths.gd can
+## check it directly — ScrollContainer.scroll_horizontal is set synchronously
+## (no tween/animation to await).
+func _debug_scroll_to_army(wanted: String) -> bool:
+	var names: Array = Tuning.ARMIES.keys()
+	var idx := names.find(wanted)
+	if idx == -1:
+		return false
+	var card_w := get_viewport_rect().size.x * ARMY_CARD_WIDTH_FRACTION
+	_army_scroll.scroll_horizontal = int(idx * (card_w + ARMY_CARD_MARGIN))
+	return true
 
 
 ## NO-179: one small icon per unique piece TYPE in `ids`, first-occurrence

@@ -65,6 +65,7 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 | Guide detail panel | `--screenshot /tmp/cap/guide-pieces-0 --show-screen guide:pieces:0` — the page with its slide-over detail open on row `<index>` (0-based, list order), settled. Pages with rows: `pieces`, `promotions`, `fusions`, `artefacts`, `items` |
 | Guide list, scrolled to a row | `--screenshot /tmp/cap/guide-pieces-row --show-screen guide:pieces:row:25` — no detail panel, just the list scrolled so row `<index>` (0-based, list order) sits at the top (the default view only shows the top of the list) |
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
+| Armies carousel, scrolled to one card | `--screenshot /tmp/cap/armies-horde --show-screen armies --army-name Horde` — same scroll a tap on that Army's page dot does (`menu.gd`'s `_debug_scroll_to_army`), by NAME rather than the dot's positional index, same idea as `--scenario-name`. Names: `Crown`, `Wild Hunt`, `Old Guard`, `Syndicate`, `Cult`, `Horde` (`Tuning.ARMIES`'s key order — the same order the dots go in). An unknown name is a no-op (prints `--army-name X: no such Army`, screenshot still lands on whichever card the carousel already showed). |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)
 

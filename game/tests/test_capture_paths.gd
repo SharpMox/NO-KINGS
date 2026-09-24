@@ -13,6 +13,7 @@ const UiDemo := preload("res://scripts/ui_demo.gd")
 const Ads := preload("res://scripts/ads.gd")
 const Guide := preload("res://scripts/guide.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 var fails := 0
 
@@ -233,6 +234,30 @@ func _init() -> void:
 	check(not await Guide.show_screen(guide, "rules:0"), "Rules has no rows to open")
 	check(not await Guide.show_screen(guide, "pieces:999"), "an out-of-range row opens nothing")
 	layer.queue_free()
+
+	# --- --army-name (tools/capture.md): scrolls the Armies carousel -------
+	var menu: Node = load("res://scenes/Menu.tscn").instantiate()
+	root.add_child(menu)
+	await process_frame
+	await process_frame
+	await menu._show_armies()
+	var army_names: Array = Tuning.ARMIES.keys() # the dots' own order
+	check(army_names.size() >= 2, "at least two Armies to scroll between")
+	check(menu._debug_scroll_to_army(army_names[0]) and menu._army_scroll.scroll_horizontal == 0,
+		"--army-name %s (first card) scrolls to 0" % army_names[0])
+	var prev_scroll: float = menu._army_scroll.scroll_horizontal
+	for i in range(1, army_names.size()):
+		var nm: String = army_names[i]
+		check(menu._debug_scroll_to_army(nm), "--army-name %s resolves" % nm)
+		check(menu._army_scroll.scroll_horizontal > prev_scroll,
+			"--army-name %s (card %d) scrolls further right than the previous card" % [nm, i])
+		prev_scroll = menu._army_scroll.scroll_horizontal
+	check(not menu._debug_scroll_to_army("no such army"),
+		"an unknown --army-name is a no-op, not a crash")
+	check(menu._army_scroll.scroll_horizontal == prev_scroll,
+		"an unknown --army-name doesn't move the scroll position")
+	menu.queue_free()
+	await process_frame
 
 	print("---")
 	if fails == 0:

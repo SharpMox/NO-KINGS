@@ -848,7 +848,14 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 	close.pressed.connect(func() -> void:
 		preview_panel.visible = false
 		preview_closed.emit())
-	box.add_child(close)
+	# Max ruling 2026-09-24 (isolated dismiss): same shared commit/cancel
+	# shape as show_choice_pick/show_merge_confirm — Buy/Convert/Use/Sell (if
+	# any were built above) stay grouped together; Close sits alone below
+	# MODAL_CANCEL_GAP.
+	var close_gap := Control.new()
+	close_gap.custom_minimum_size = Vector2(0, MODAL_CANCEL_GAP)
+	box.add_child(close_gap)
+	box.add_child(_centered(close))
 
 
 ## NO-171: the move legend, hidden by default behind a small button at the
@@ -1130,11 +1137,17 @@ func show_shop() -> void:
 	# the zone that used to hold it "either the hint or the detail" had
 	# nothing left to justify existing. Close is simply the last thing in
 	# the Shop now — always present, since it's the only thing here.
+	# Max ruling 2026-09-24 (isolated dismiss): Close is the Shop's only
+	# dismiss — sits alone below MODAL_CANCEL_GAP, same shape as every other
+	# modal's Cancel/Close.
+	var close_gap := Control.new()
+	close_gap.custom_minimum_size = Vector2(0, MODAL_CANCEL_GAP)
+	root.add_child(close_gap)
 	var close := Button.new()
 	close.text = "Close"
 	close.add_theme_font_size_override("font_size", 16)
 	close.pressed.connect(close_shop) # NO-118: same path an outside click uses (game.gd)
-	root.add_child(close)
+	root.add_child(_centered(close))
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
@@ -1562,7 +1575,13 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	var cancel := Button.new()
 	cancel.text = cancel_text
 	cancel.pressed.connect(func() -> void: choice_pick_cancelled.emit())
-	box.add_child(cancel)
+	# Max ruling 2026-09-24 (isolated dismiss): the shared commit/cancel shape
+	# (MODAL_CANCEL_GAP) — every offer stays grouped above, the dismiss sits
+	# alone below a clear gap, never sharing a row with an action.
+	var cancel_gap := Control.new()
+	cancel_gap.custom_minimum_size = Vector2(0, MODAL_CANCEL_GAP)
+	box.add_child(cancel_gap)
+	box.add_child(_centered(cancel))
 	g.hud.add_child(buff_panel)
 	buff_panel.move_to_front()
 

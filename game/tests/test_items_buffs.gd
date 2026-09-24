@@ -437,7 +437,7 @@ func _init() -> void:
 	check(bn.buff_pick_open and bn.pending_bounty_boxes == 0,
 		"Bounty (enemy half): capturing the carrier opens the 1-of-3 Box choice immediately — nothing queued")
 	var bn_box: Node = bn.modals.buff_panel.get_child(0).get_child(0)
-	check(bn_box.get_child_count() - 2 == 3, "Bounty offers exactly 3 Box choices")
+	check(bn_box.get_child_count() - 3 == 3, "Bounty offers exactly 3 Box choices") # -3: head label, MODAL_CANCEL_GAP spacer, cancel button
 	(bn_box.get_child(1) as Button).pressed.emit() # pick the first real offer
 	check(bn.box_open, "the chosen Box opens, revealing its pre-rolled contents (issue 47)")
 	var bn_stock: int = bn.stock.size()
@@ -472,7 +472,7 @@ func _init() -> void:
 	check(al.pending_bounty_boxes == 0 and al.buff_pick_open,
 		"Bounty (ally half): the deferred choice opens at the START of the player's next Turn")
 	var al_box: Node = al.modals.buff_panel.get_child(0).get_child(0)
-	check(al_box.get_child_count() - 2 == 3, "Bounty offers exactly 3 Box choices")
+	check(al_box.get_child_count() - 3 == 3, "Bounty offers exactly 3 Box choices") # -3: head label, MODAL_CANCEL_GAP spacer, cancel button
 	(al_box.get_child(1) as Button).pressed.emit()
 	check(al.box_open, "picking a Box choice opens it")
 	var al_stock: int = al.stock.size()

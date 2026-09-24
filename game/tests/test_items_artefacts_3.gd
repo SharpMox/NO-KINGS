@@ -228,7 +228,7 @@ func _init() -> void:
 	nss.items.append(_item("buff_box", "tile"))
 	nss._use_item(0)
 	var nss_box: Node = nss.modals.buff_panel.get_child(0).get_child(0)
-	check(nss_box.get_child_count() - 2 == 4, # minus the head label and cancel button
+	check(nss_box.get_child_count() - 3 == 4, # minus the head label, the MODAL_CANCEL_GAP spacer, and the cancel button
 		"Numbers Station Sudoku: the Buff Box offers 4 choices instead of 3")
 	nss._buff_chosen("shield")
 	check(nss.gold == 20 - 5, "Numbers Station Sudoku: each pick costs 5 Gold")
@@ -242,7 +242,7 @@ func _init() -> void:
 	bgf.items.append(_item("buff_box", "tile"))
 	bgf._use_item(0)
 	var bgf_box: Node = bgf.modals.buff_panel.get_child(0).get_child(0)
-	check(bgf_box.get_child_count() - 2 == 5,
+	check(bgf_box.get_child_count() - 3 == 5,
 		"Bohemian Grove Friendship Bracelet: the Buff Box offers 5 choices instead of 3")
 	bgf.queue_free()
 	await process_frame

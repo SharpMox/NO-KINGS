@@ -233,6 +233,26 @@ func _init() -> void:
 		"issue 41: picking closes the panel and clears the shared flag")
 	c1._open_choice_pick("pick one", [{"label": "A", "value": "a"}], "Nope",
 		func(v): picked.append(v), func(): cancelled[0] = true)
+	# Max ruling 2026-09-24 (isolated dismiss): the shared choice-pick
+	# builder's cancel button is always its LAST child, separated from every
+	# offer above it by a real gap (MODAL_CANCEL_GAP) — never sharing a row
+	# with an action.
+	var choice_box: Node = c1.modals.buff_panel.get_child(0).get_child(0)
+	var last: Node = choice_box.get_child(choice_box.get_child_count() - 1)
+	var gap: Node = choice_box.get_child(choice_box.get_child_count() - 2)
+	check(last is CenterContainer and last.get_child_count() == 1
+			and (last.get_child(0) as Button).text == "Nope",
+		"Max ruling (isolated dismiss): the dismiss button is the shared builder's last child")
+	check(gap is Control and not (gap is Button or gap is CenterContainer)
+			and (gap as Control).custom_minimum_size.y == c1.modals.MODAL_CANCEL_GAP,
+		"...separated from the offer above it by MODAL_CANCEL_GAP, not sharing a row")
+	var offer_indices: Array = []
+	for i in choice_box.get_child_count():
+		var c: Node = choice_box.get_child(i)
+		if c is Button and c.text != "Nope":
+			offer_indices.append(i)
+	check(not offer_indices.is_empty() and offer_indices.max() < choice_box.get_child_count() - 1,
+		"...and every action button sits above the dismiss, never below it")
 	c1.modals.choice_pick_cancelled.emit()
 	check(cancelled[0] and picked == ["b"],
 		"issue 41: cancel runs the cancel continuation, not the chosen one — the effect stays unspent")

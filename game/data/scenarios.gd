@@ -160,8 +160,12 @@ static func _hand_written() -> Array:
 		# The lesson generalises: a name that drifts from what a test actually
 		# exercises hides a test that has stopped testing anything. It names
 		# Larry's wave now, and that wave exists.
+		# NO-100: the King carries a real identity. Without one the win screen
+		# (captured with --show-screen win, so no fall is recorded) read "The
+		# wave-50 King, King, has fallen" — a real wave-50 King always has one
+		# (WaveLogic.queue stamps king_id on every spawned King).
 		{"name": "Win screen: wave 50 (capture King)", "cfg": {
-			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10]],
+			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10, {"king_id": "nero"}]],
 			"wave": 50, "score": 1000}},
 		{"name": "Win screen: named King (identity, issue 09)", "cfg": {
 			"board": [["queen", 0, 3, 8], ["king", 1, 3, 10, {"king_id": "nero"}]],
@@ -543,7 +547,10 @@ static func _hand_written() -> Array:
 		# resource its Power touches, so a doubled-up effect is visible rather
 		# than inferred from two separate readings
 		{"name": "Combo Army: Crown — free merges against a Stock full of pairs", "cfg": {
-			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2]],
+			# NO-100: one enemy on the board. With none, the first turn start
+			# saw a cleared board and queued wave 10 — a Shop restock Wave,
+			# which opens the Shop over the Stock drawer this capture is for.
+			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2], ["pawn", 1, 6, 10]],
 			"stock": ["rook", "rook", "knight", "knight", "bishop", "bishop"],
 			"wave": 9, "gold": 400, "score": 1000}},
 		{"name": "Combo Army: Wild Hunt — first-capture refund with multiple targets", "cfg": {
@@ -568,7 +575,10 @@ static func _hand_written() -> Array:
 			"army": "Horde", "board": [["queen", 0, 3, 2], ["rook", 0, 5, 2]],
 			"wave": 3, "gold": 300, "score": 1000, "stock": ["pawn", "pawn", "pawn"]}},
 		{"name": "Combo: the Army Ability costs an Action, Artefact activation does not", "cfg": {
-			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2]],
+			# NO-100: one enemy on the board. With none, the first turn start
+			# saw a cleared board and queued wave 10 — a Shop restock Wave,
+			# which opens the Shop over the Stock drawer this capture is for.
+			"army": "Crown", "board": ZONE_PAWNS + [["queen", 0, 3, 2], ["pawn", 1, 6, 10]],
 			"stock": ["rook", "rook"], "artefacts": ["jet-fuel-vial"],
 			"wave": 9, "gold": 400, "score": 1000}},
 		{"name": "Combo: all three caps full at once (Items 2, Buffs 2, Artefacts 5)", "cfg": {

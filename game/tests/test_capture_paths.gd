@@ -87,6 +87,8 @@ func _init() -> void:
 			"gameover":
 				check(game.state == GameScript.State.GAME_OVER and game.overlay.visible
 					and game.modals.buff_panel == null, "gameover: the loss screen, no retry offer")
+				check(not game._banner_layer.visible and not game.hud.feed.visible,
+					"gameover: banners and the kill feed are hidden under the end screen (NO-100)")
 			"gameover-retry":
 				check(game.state == GameScript.State.GAME_OVER and not game.overlay.visible
 					and game.modals.buff_panel != null, "gameover-retry: the ad-retry prompt is up")
@@ -96,6 +98,16 @@ func _init() -> void:
 					Ads.close_button().pressed.emit()
 			"win":
 				check(game.win_open and game.overlay.visible, "win: the wave-50 win screen is up")
+				var text := ""
+				for l in game.overlay.find_children("*", "Label", true, false):
+					text += (l as Label).text + "\n"
+				check(text.contains("King, Nero, has fallen"),
+					"win: names the fallen King (NO-100), not a bare \"King\"")
+				check(not game._banner_layer.visible and not game.hud.feed.visible,
+					"win: banners and the kill feed are hidden under the end screen (NO-100)")
+				game._on_win_continue()
+				check(game._banner_layer.visible and game.hud.feed.visible,
+					"win Continue: banners and the kill feed are back for endless")
 			"setup":
 				check(game.state == GameScript.State.SETUP and game.board.is_empty()
 					and not game.stock.is_empty() and game.hud.drawer_open == "stock",
@@ -110,6 +122,17 @@ func _init() -> void:
 				check(game.modals.buff_panel != null and _has_button(game.modals.buff_panel, "Sell"),
 					"pick: the shared choice modal, as a Sell confirm")
 		await _free(game)
+
+	# --- --open-drawer stock on the Promote-badge scenario (NO-100) ----------
+	# It captured the Shop: an enemy-free board made the first turn queue wave
+	# 10, a restock Wave, and that opens the Shop over the drawer.
+	var crown := await _boot("Combo Army: Crown — free merges against a Stock full of pairs")
+	check(crown.wave == 9 and not crown.shop_open(),
+		"promote capture: boots on wave 9 with the Shop closed (wave %d)" % crown.wave)
+	crown._set_drawer("stock")
+	check(crown.hud.drawer_open == "stock" and not crown.shop_open(),
+		"promote capture: --open-drawer stock shows the Stock drawer")
+	await _free(crown)
 
 	# --- --ui-demo flows, through the real preview + confirm ----------------
 	for flow in UiDemo.FLOWS:

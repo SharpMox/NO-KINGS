@@ -1420,12 +1420,10 @@ static func _note(g, key: String, what: String, color: Color = Color.TRANSPARENT
 		g.BANNER_EFFECT if color == Color.TRANSPARENT else color)
 
 
-## NO-239: one kill-feed line for an Artefact — its painted icon, or a ✦
-## glyph before its name when it has none. Same-frame posts for one key merge.
+## NO-239: one kill-feed line for an Artefact, text only (Max, round 2: no
+## Artefact icons in the feed). Same-frame posts for one key merge.
 static func feed(g, key: String, score: int, gold: int, note := "") -> void:
-	var icon: Texture2D = g.artefact_icons.get(key)
-	g.hud.feed_gain(key, artefact_name(key) if icon else "✦ " + artefact_name(key),
-		score, gold, note, icon, g.BANNER_EFFECT)
+	g.hud.feed_gain(key, artefact_name(key), score, gold, note, null, g.BANNER_EFFECT)
 
 
 static func artefact_name(key: String) -> String:

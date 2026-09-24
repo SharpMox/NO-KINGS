@@ -21,6 +21,8 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Shop := preload("res://scripts/shop.gd")
 const SaveConfig := preload("res://scripts/save_config.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
+const Rules := preload("res://scripts/rules.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -72,6 +74,12 @@ func _feed_texts(g) -> Array:
 		if not pill.is_queued_for_deletion():
 			out.append((pill.get_child(0).get_child(-1) as Label).text)
 	return out
+
+
+## The icon on the feed's top line, or null for a text-only line.
+func _feed_icon(g) -> Texture2D:
+	var tr = g.hud.feed.get_child(0).get_child(0).get_child(0)
+	return tr.texture if tr is TextureRect else null
 
 
 func _clear_feed(g) -> void:
@@ -265,6 +273,8 @@ func _init() -> void:
 	var lines := _feed_texts(kf)
 	check(lines.size() == 1 and lines[0].begins_with("+") and lines[0].ends_with("captured Knight"),
 		"a capture posts ONE feed line naming the victim (%s)" % [lines])
+	check(_feed_icon(kf) != null and _feed_icon(kf) == kf.piece_tex("knight", Rules.ENEMY),
+		"...showing the victim's (enemy) piece token")
 	check(not kf.anims.any(func(a: Dictionary) -> bool: return a.kind == "text" and a.text.begins_with("+")),
 		"...and no '+N' Score popup any more (the feed replaced it)")
 
@@ -275,6 +285,13 @@ func _init() -> void:
 	lines = _feed_texts(kf)
 	check(lines == ["+%d · +$20 · test gain" % (20 * Economy.SCORE_MULTIPLIER)],
 		"two same-reason gains in one frame coalesce into one line (%s)" % [lines])
+
+	# Max, round 2: an Artefact trigger is text only, no icon and no ✦
+	_clear_feed(kf)
+	ArtefactHooks.feed(kf, "27-club-punch-card", 0, 0, "Piece Buff granted")
+	kf.hud._flush_feed()
+	check(_feed_texts(kf) == ["27 Club Punch Card: Piece Buff granted"] and _feed_icon(kf) == null,
+		"an Artefact trigger posts text only (%s)" % [_feed_texts(kf)])
 
 	_clear_feed(kf)
 	for i in 6:
@@ -294,6 +311,14 @@ func _init() -> void:
 		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
 	check(fit.begins_with("+999 · +$99 · ") and fit.ends_with("…") and fit.length() < long_reason.length(),
 		"...its reason truncated with '…', the amounts intact (%s)" % fit)
+	_clear_feed(kf) # the same with a piece icon eating into the width
+	kf.hud.post("+999 · +$99 · " + long_reason, kf.piece_tex("knight", Rules.ENEMY))
+	await process_frame
+	await process_frame
+	pill = kf.hud.feed.get_child(0)
+	check(pill.size.x <= kf.hud.feed_max_w() and _feed_texts(kf)[0].ends_with("…"),
+		"...and still fits with a piece icon: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
+	check(kf.hud.FEED_FONT_SIZE % 16 == 0, "the feed font stays on Pixel Operator's 16 px grid")
 	_clear_feed(kf)
 	kf.hud.post("+5 · short")
 	check(_feed_texts(kf) == ["+5 · short"], "a line that fits is left alone")

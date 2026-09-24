@@ -3334,7 +3334,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# on_score_change/on_gold_change handlers below can scope to this one
 		# call by reason alone (see artefact_hooks.gd's header).
 		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
-		Economy.earn(self, capture_pts, earn_reason, "captured %s" % defs[victim.id].name)
+		Economy.earn(self, capture_pts, earn_reason, "captured %s" % defs[victim.id].name,
+			piece_tex(victim.id, Rules.ENEMY))
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
 		# ctx (artefact hook 24 — see artefact_hooks.gd header)
@@ -3381,7 +3382,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				Economy.earn(self, Economy.capture_score(self, board[also].id,
 					board[from].id, attacker_buffed, from, also), "",
-					"captured %s" % defs[board[also].id].name)
+					"captured %s" % defs[board[also].id].name, piece_tex(board[also].id, Rules.ENEMY))
 				if last_capture_ctx.get("to_stock", false): # this call's OWN
 						# ctx (issue 55) — read immediately, before anything
 						# else can overwrite g.last_capture_ctx again
@@ -4301,7 +4302,7 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 			# Economy.earn_gold on its own) — the "no 150% money printer"
 			# safety catch the issue calls out.
 			Economy.earn_gold(self, defs[ctx.id].value, "army_hold_the_line",
-				"Hold the Line: %s refunded" % defs[ctx.id].name)
+				"Hold the Line: %s refunded" % defs[ctx.id].name, piece_tex(ctx.id))
 	return ctx
 
 
@@ -5346,12 +5347,11 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			_place(stock[0], spot)
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
 			_on_tile_clicked(spot) # SETUP's own select tap; the drawer stays open
-		"feed": # one line of each NO-239 kind: a capture gain, a sale, an Artefact
-			hud.feed_gain("capture", "captured Knight", 150, 15)
-			hud.feed_gain("sell", "sold Rook", 0, 25)
-			var key: String = artefact_icons.keys()[0] if not artefact_icons.is_empty() \
-				else str(Items.ARTEFACT_EFFECTS[0].key)
-			ArtefactHooks.feed(self, key, 0, 0, "Piece Buff granted")
+		"feed": # one line of each NO-239 kind: a capture (victim token), a sale
+			# (sold piece token), an Artefact trigger (text only)
+			hud.feed_gain("capture", "captured Knight", 150, 15, "", piece_tex("knight", Rules.ENEMY))
+			hud.feed_gain("sell", "sold Rook", 0, 25, "", piece_tex("rook"))
+			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Piece Buff granted")
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")
@@ -6186,16 +6186,20 @@ func _sell(kind: String, entry: Variant) -> bool:
 		# _convert_captured below keeps calling sell_price() at the flat rate
 	tally("sell") # issue 103
 	var sold: String # NO-239: the kill feed's "sold Rook"
+	var sold_tex: Texture2D = null # ...and a sold piece's token (Items/Artefacts: none)
 	match kind:
 		"item": sold = str(entry.name)
 		"artefact": sold = ArtefactHooks.artefact_name(entry.key)
-		_: sold = str(defs[entry if entry is String else entry.id].name) # piece/captured, ADR-0002
+		_: # piece/captured, ADR-0002; a Captured piece is still the enemy's token
+			var id: String = entry if entry is String else entry.id
+			sold = str(defs[id].name)
+			sold_tex = piece_tex(id, Rules.ENEMY if kind == "captured" else Rules.PLAYER)
 	match kind:
 		"piece": stock.erase(entry)
 		"captured": captured.erase(entry)
 		"item": items.erase(entry)
 		_: artefacts.erase(entry) # "artefact"
-	Economy.earn_gold(self, amount, "sell", "sold " + sold) # AFTER the erase above — Denver
+	Economy.earn_gold(self, amount, "sell", "sold " + sold, sold_tex) # AFTER the erase above — Denver
 		# Bunker Timeshare's own on_gold_change check must see the POST-sale
 		# Item count, so selling the Item that empties the last slot doesn't
 		# also collect that Item-cap bonus on its own way out

@@ -1460,7 +1460,7 @@ func build(game) -> void:
 	add_child(tip_panel)
 	# NO-239: the kill feed, just under the Header, anchored left.
 	feed.position = Vector2(HEADER_PAD_X, g.hud_top + 4.0)
-	feed.add_theme_constant_override("separation", 3)
+	feed.add_theme_constant_override("separation", 4)
 	feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(feed)
 	# NO move_to_front here any more. It existed because the drawer opened OVER
@@ -1613,10 +1613,15 @@ const FEED_MAX := 4
 const FEED_LIFE_S := 3.0
 const FEED_FADE_S := 0.3
 const FEED_FONT := preload("res://assets/fonts/PixelOperator.ttf")
-const FEED_FONT_SIZE := 16 # the font's 16 px grid: stays crisp
+## NO-239 round 2: 16 read too small. The regular weight is drawn on a 16 px
+## grid (100 of its 1600 units per pixel, odd multiples included), so 24 would
+## put 1.5 screen px under each font pixel; 32 is the next size that stays crisp.
+const FEED_FONT_SIZE := 32
+const FEED_ICON := 22 # ~1.25x the 18 px cap height at FEED_FONT_SIZE
 const FEED_TEXT := Color(0.92, 0.94, 0.9)
-const FEED_PAD_L := 6 # pill content margins, also subtracted by _feed_fit
-const FEED_PAD_R := 8
+const FEED_PAD_L := 8 # pill content margins, also subtracted by _feed_fit
+const FEED_PAD_R := 10
+const FEED_GAP := 6 # icon-to-text gap, also subtracted by _feed_fit
 var feed := VBoxContainer.new()
 var _feed_font: FontFile
 var _feed_pending := {} # cause -> {label, score, gold, notes: {text: count}, icon, color}
@@ -1637,14 +1642,14 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0, 0, 0, 0.6)
-	sb.set_corner_radius_all(6)
+	sb.set_corner_radius_all(8)
 	sb.content_margin_left = FEED_PAD_L
 	sb.content_margin_right = FEED_PAD_R
-	sb.content_margin_top = 1
-	sb.content_margin_bottom = 1
+	sb.content_margin_top = 0 # the 32 px line box already has the font's
+	sb.content_margin_bottom = 0 # ascent/descent air above and below
 	pill.add_theme_stylebox_override("panel", sb)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	row.add_theme_constant_override("separation", FEED_GAP)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pill.add_child(row)
 	if icon:
@@ -1652,10 +1657,10 @@ func post(text: String, icon: Texture2D = null, color := FEED_TEXT) -> void:
 		tr.texture = icon
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.custom_minimum_size = Vector2(16, 16)
+		tr.custom_minimum_size = Vector2(FEED_ICON, FEED_ICON)
 		row.add_child(tr)
 	var lab := Label.new()
-	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R - (20.0 if icon else 0.0))
+	lab.text = _feed_fit(text, feed_max_w() - FEED_PAD_L - FEED_PAD_R - (float(FEED_ICON + FEED_GAP) if icon else 0.0))
 	lab.add_theme_font_override("font", _feed_font)
 	lab.add_theme_font_size_override("font_size", FEED_FONT_SIZE)
 	lab.add_theme_color_override("font_color", color)
@@ -1695,7 +1700,8 @@ func _feed_fit(text: String, max_w: float) -> String:
 
 ## Queue a gain (and/or an artefact note) under `cause`. Everything posted
 ## under one cause before the frame ends becomes ONE line:
-## "+150 · +$15 · captured Knight", "[icon] Tinfoil Hat: Piece Buff granted ×2".
+## "[victim] +150 · +$15 · captured Knight", "Tinfoil Hat: Piece Buff granted ×2".
+## `icon` is a piece token when a piece is involved, else null (text only).
 func feed_gain(cause: String, label: String, score := 0, gold := 0, note := "",
 		icon: Texture2D = null, color := FEED_TEXT) -> void:
 	if g.autoplay:

@@ -5447,6 +5447,8 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
 	elif args.has("--show-screen"):
 		await _debug_show_screen(args[args.find("--show-screen") + 1], args)
+		if modals.reveal and modals.reveal.is_running(): # NO-243: an end screen's
+			await modals.reveal.finished # staged reveal plays out before the shot
 	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
 	# settle wait below would let it finish before the shot, so skip it here.
 	var pinned_banner := args.has("--show-screen") \
@@ -5500,6 +5502,32 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			Ads.show_rewarded(func() -> void: pass)
 		"win":
 			_show_win_screen()
+		"reveal-gameover", "reveal-win": # NO-243 S3 rows 53/54 for a --write-movie
+			# capture: the end screen's staged reveal, animations forced on (the
+			# banner capture's reason). The win comes the real way, a King falling.
+			animations_on = true
+			if screen == "reveal-gameover":
+				_game_over(false, "Clock out")
+			else:
+				wave = 50
+				kings_defeated = 0
+				board[Vector2i(4, 8)] = {"id": "king", "owner": Rules.ENEMY}
+				_king_down()
+		"hud-anims": # NO-243 S3 rows 31-34, one after another, for --write-movie
+			animations_on = true
+			for step in ["gold+", "gold-", "turn", "wave", "action", "last"]:
+				match step:
+					"gold+": gold += 50
+					"gold-": gold -= 30 # 31: rolls down, flashes red
+					"turn": turns_since_wave += 1 # 33: ticks, the row re-centres
+					"wave": wave += 1 # 32: flips (the Turn reading changes too)
+					"action":
+						actions_left = maxi(actions_left, 2)
+						_refresh()
+						actions_left -= 1 # 34: the count drains
+					"last": actions_left = 0 # 34: PASS shakes
+				_refresh()
+				await get_tree().create_timer(0.6).timeout
 		"setup":
 			_debug_enter_setup()
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout

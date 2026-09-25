@@ -127,3 +127,17 @@ tools/godot-lock.sh godot --path game --write-movie /tmp/cap/anim-spawn.avi --fi
 | `enemy-moves` | 2 | three enemy moves, one at a time: the mover's tile flashes, then it slides |
 | `explode` | 4 | a detonation: bursts plus a board shake |
 | `badge` | 19 | a Shield badge pops in, then fades when consumed |
+
+## NO-243 S3 HUD and end-of-run animations (Movie Maker)
+
+Animations are forced on for each run. A static `--show-screen gameover`/`win` capture now waits for the staged reveal to finish before the shot.
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/hud-anims.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/hud-anims --show-screen hud-anims
+```
+
+| NAME | Audit rows | What it shows |
+|---|---|---|
+| `hud-anims` | 31–34 | +$50 (roll up and squish), −$30 (roll down, red flash), a Turn tick with the row re-centring, a Wave flip, one Action drained, then the last one (PASS shakes), 0.6 s apart |
+| `reveal-gameover` | 53 | the loss screen: the board greys over 0.6 s, the title drops in, the Score counts up while the rest fades in |
+| `reveal-win` | 54 | a wave-50 King falls the real way and shatters gold (S1); 0.4 s later the same staged reveal, with a gold burst off the title |

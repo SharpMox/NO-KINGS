@@ -395,6 +395,7 @@ func _init() -> void:
 	# on-disk-write test depending on it (test_save.gd round-trips _to_config()
 	# in memory, never this file-write path), so there is nothing to preserve.
 	GameScript.is_scenario = true
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -430,6 +431,7 @@ func _init() -> void:
 	# comment on the `cfg.has("state")` branch), so it can't fire
 	# `_autosave()` and touch the real on-disk save the way a bare
 	# non-scenario config would.
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var cont_game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {
@@ -742,6 +744,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 50,
 		"board": [["queen", 0, 2, 2], ["king", 1, 2, 3], ["rook", 1, 7, 10]]}
 	GameScript.is_scenario = true # keep the probe off the real save file
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -774,6 +777,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults()
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
 	GameScript.is_scenario = true
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -798,6 +802,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 5, # issue 101: the Shop is locked before
 		# Tuning.SHOP_UNLOCK_WAVE, and _buy_a_box drives the real Shop button
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -877,6 +882,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["nostradamus-mad-libs"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -914,6 +920,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 5,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "gold": 500,
 		"artefacts": ["snowden-s-rubik-s-cube"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -941,6 +948,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1441,6 +1449,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3, "board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"items": ["buff_box"], "stock": ["pawn", "rook"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	icon_game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(icon_game)
 	await process_frame
@@ -1557,6 +1566,7 @@ func _init() -> void:
 		"artefacts": ["library-of-alexandria-matchbox", "oak-island-wishing-well"]}
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = order_cfg
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var order_game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(order_game)
 	await process_frame
@@ -1615,6 +1625,7 @@ func _init() -> void:
 	check(not trump_cfg.is_empty(), "(setup) the Header King Wave scenario exists")
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = trump_cfg.duplicate(true)
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var trump_game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(trump_game)
 	await process_frame
@@ -1651,6 +1662,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "items": ["buff_box"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -1759,6 +1771,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {} # fresh run -> SETUP placement phase
 	GameScript.next_army = "Crown"
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2060,6 +2073,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {} # fresh run -> SETUP placement phase
 	GameScript.next_army = "Crown"
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2113,6 +2127,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 3, "gold": 100,
 		"captured": ["rook", "bishop", "bishop"], # captured oldest -> newest
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2244,6 +2259,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"king_abilities": ["move_cost"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2263,6 +2279,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "items": ["blitz"], "artefacts": ["library-of-alexandria-matchbox"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2331,6 +2348,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4],
 		["pawn", 1, 5, 5], ["rook", 1, 7, 10]], "wave": 3, "items": ["drone_strike"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2361,6 +2379,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
 		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2416,6 +2435,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["knight", 0, 4, 4],
 		["rook", 1, 7, 10]], "wave": 3, "items": ["extraction"], "gold": 100}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2462,6 +2482,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2480,6 +2501,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "gold": 500}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2508,6 +2530,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2637,6 +2660,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "stock": ["pawn"], "captured": ["pawn"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2730,6 +2754,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "items": ["blitz"], "artefacts": ["agartha-welcome-mat"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2867,6 +2892,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults()
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "artefacts": ["bovine-tractor-beam"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2902,6 +2928,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 100, "artefacts": ["jet-fuel-vial"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -2955,6 +2982,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 5, "gold": 500, "artefacts": ["all-seeing-eye-contact-lens"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3006,6 +3034,7 @@ func _init() -> void:
 	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 11, "score": 100, "pending_reinforce": true,
 		"king_abilities": ["move_cost"]} # the tariff section below reuses this boot
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3122,6 +3151,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 1, "gold": 100, "score": 0,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["oak-island-wishing-well"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3181,6 +3211,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"artefacts": ["bovine-tractor-beam"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3254,6 +3285,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 5, 5], ["pawn", 1, 7, 2]],
 		"items": ["sniper", "air_strike"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3302,6 +3334,7 @@ func _init() -> void:
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"items": ["counter_intel"], "king_abilities": ["move_cost"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3331,6 +3364,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Old Guard", "wave": 1, "gold": 0,
 		"board": [["pawn", 0, 2, 0], ["rook", 1, 7, 10]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3361,6 +3395,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Crown", "wave": 1,
 		"stock": ["pawn"], "board": [["rook", 1, 7, 10]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3402,6 +3437,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Syndicate", "wave": 1, "gold": 1000,
 		"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3432,6 +3468,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"army": "Horde", "wave": 5,
 		"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3462,6 +3499,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 3, "gold": 100, "stock": ["pawn", "pawn"],
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3530,6 +3568,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194: every fixture starts from the documented default army
 	GameScript.next_config = {"wave": 1,
 		"board": [["queen", 0, 2, 2], ["pawn", 0, 4, 0]], "items": ["blitz"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -3577,6 +3616,7 @@ func _init() -> void:
 	GameScript.reset_boot_defaults() # NO-194
 	GameScript.next_config = {"wave": 3, "gold": 200, "stock": ["pawn", "pawn", "pawn"],
 		"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 4]], "items": ["blitz"]}
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	game = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	await process_frame

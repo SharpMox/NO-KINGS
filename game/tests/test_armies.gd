@@ -48,6 +48,7 @@ func _boot_fresh(army: String) -> Node2D:
 	GameScript.next_army = army
 	GameScript.next_tier = Tuning.DEFAULT_TIER
 	GameScript.is_scenario = true
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(game)
 	return game

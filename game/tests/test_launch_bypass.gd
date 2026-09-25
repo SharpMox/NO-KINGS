@@ -75,6 +75,7 @@ func _init() -> void:
 	# ---- Play from that menu: a fresh run, not the scenario ----------------
 	GameScript.next_config = {} # what the new-run screen sets before change_scene
 	GameScript.is_scenario = false
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var fresh: Node = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(fresh)
 	await process_frame

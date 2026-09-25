@@ -641,14 +641,25 @@ static func _hand_written() -> Array:
 			"items": ["blitz", "sniper", "promote"].slice(0, Tuning.ITEM_CAP_BASE),
 			"artefacts": ["jet-fuel-vial", "deep-state-yearbook"],
 			"gold": 500, "score": 1000}},
-		# NO-250: the three new Artefact mechanics. Tap the Rook: the ringed
-		# Knight behind your Pawn is the Magic bullet shot. Enemy Pawns beside
-		# two of your Knights start Stunned (Pincer); the enemy Pawn can't take
-		# your Queen (Oligarch).
-		{"name": "NO-250: Magic bullet, Pincer, Oligarch", "cfg": {
+		# NO-250: the three new Artefact mechanics, one sandbox each (tools/
+		# capture.md has the capture commands). Magic bullet: tap the Rook —
+		# the Knight behind your own Pawn is offered, dots through the Pawn,
+		# ringed red. Pincer: at Turn start the enemy Pawn between your two
+		# Knights is Stunned. Oligarch: tap the enemy Pawn — its recon preview
+		# has no capture on your Queen (the control scenario shows it does).
+		{"name": "NO-250: Magic bullet", "cfg": {
 			"board": [["rook", 0, 0, 1], ["pawn", 0, 0, 2], ["knight", 1, 0, 6],
-				["knight", 0, 3, 3], ["knight", 0, 5, 3], ["pawn", 1, 4, 4],
-				["queen", 0, 6, 5], ["pawn", 1, 7, 6], ["rook", 1, 7, 10]],
-			"artefacts": ["curtain-rods-bag-rifle-shaped", "men-in-black-prescription-sunglasses",
-				"putin-s-golden-toilet-brush"]}},
+				["rook", 1, 7, 10]],
+			"artefacts": ["curtain-rods-bag-rifle-shaped"]}},
+		{"name": "NO-250: Pincer", "cfg": {
+			"board": [["knight", 0, 3, 3], ["knight", 0, 5, 3], ["pawn", 1, 4, 4],
+				["rook", 1, 7, 10]],
+			"artefacts": ["men-in-black-prescription-sunglasses"]}},
+		{"name": "NO-250: Oligarch", "cfg": {
+			"board": [["queen", 0, 3, 3], ["pawn", 0, 0, 1], ["pawn", 1, 2, 4],
+				["rook", 1, 7, 10]],
+			"artefacts": ["putin-s-golden-toilet-brush"]}},
+		{"name": "NO-250: Oligarch (control, no Artefact)", "cfg": {
+			"board": [["queen", 0, 3, 3], ["pawn", 0, 0, 1], ["pawn", 1, 2, 4],
+				["rook", 1, 7, 10]]}},
 	]

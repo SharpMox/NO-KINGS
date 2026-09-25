@@ -1854,6 +1854,8 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 							pn_seen[g.board[pn_at].id] = pn_seen.get(g.board[pn_at].id, 0) + 1
 				if pn_seen.values().any(func(n: int) -> bool: return n >= 2):
 					BuffLogic.add(g.board[pos], "stunned", 1)
+					g._add_float(pos, "Stunned!", g.COL_MERGE) # same float as the
+						# other two Stun sites — `stunned` has no board badge
 					_note(g, key, "Pincer: Stunned")
 		["cia-exploding-cigar", "on_turn_start"]:
 			g.actions_left += 1

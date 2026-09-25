@@ -5417,6 +5417,11 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			hud.feed_capture("Knight", 150, 15)
 			hud.feed_gain("sell", "Sold Rook", 0, 25)
 			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Buff")
+		"turn-start": # NO-250: the player-turn-start dispatch _begin_player_turn
+			# makes (Pincer's stun and its "Stunned!" float), without the rest
+			# of the turn flow — a scenario boots mid-turn and never calls it
+			ArtefactHooks.run(self, "on_turn_start")
+			queue_redraw()
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")

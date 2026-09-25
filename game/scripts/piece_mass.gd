@@ -79,23 +79,35 @@ const DEPTH_BACK_SCALE := 0.85 # NO-178: mild perspective — back rows drawn
 	# is not expressed as a ratio of ICON the way the pitch/jitter constants
 	# above are — there's no ICON-relative quantity it needs to track. Kept
 	# subtle on purpose: this is perspective, not a size ladder.
-const TARGET_ASPECT := 2.3 # width:height the crowd's bounding box should
+const TARGET_ASPECT := 2.2 # width:height the crowd's bounding box should
 	# land near. Was 1.15 ("roughly square, slightly wider than tall", Max's
 	# own mockup measurement) until Max reviewed the #582 Army captures,
-	# 2026-09-25: "we can make much wider rows, it'll look better" — 2.3
+	# 2026-09-25: "we can make much wider rows, it'll look better" — 2.2
 	# picks fewer, wider rows using most of the carousel card's own width
-	# instead of a squarish blob. Chosen by scanning candidate column counts
-	# (see _choose_cols()) against the card budget: at 2.3, Horde-14 (the
-	# widest army, all slim pieces) reaches ~189px of row width — comfortably
-	# over 70% of the card's ~260px inner content width (card_w=280 minus
-	# its own 20px side padding, menu.gd _show_armies) — while every army's
-	# full mass width (row width + edge padding) still stays under the
-	# carousel card's own 280px (`_test_horde_fits_carousel_card`), and
-	# every other Army (11-piece Crown/Wild Hunt/Old Guard/Cult, 7-piece
-	# Syndicate) lands with real margin to spare. Re-check against
-	# tests/test_mass.gd's `_test_horde_row_width` and
-	# `_test_horde_fits_carousel_card` if this or the pitch/ICON constants
-	# change again.
+	# instead of a squarish blob.
+	#
+	# The real ceiling is 260px, not the carousel card's own 280px: `card`
+	# (menu.gd _show_armies) is a PanelContainer with a FIXED
+	# custom_minimum_size of 280, but Godot Containers report their minimum
+	# size as the larger of that and their content's own required size — so
+	# a mass wider than the card's 260px CONTENT budget (280 minus the
+	# card's own 10+10px side content-margins) silently grows the card
+	# itself past 280, breaking NO-179's "every card renders at the same
+	# size" (Max: "just make a normal carousel with out changing any
+	# dimensions of the other cards") — caught live by
+	# test_menu_clicks.gd's windowed "every card is the same size" probe at
+	# TARGET_ASPECT=2.3 (Horde's mass hit 266px, 6px over budget). 2.2 keeps
+	# every Army under 260px with real margin: Horde (the widest army, all
+	# slim pieces, cols=11) at 253.7px (~6.3px to spare), Wild Hunt/Old
+	# Guard at 252.2px, Crown/Cult at 248.6px, Syndicate at 207.6px. Horde's
+	# own row width lands at ~176.5px, 67.9% of the 260px budget — short of
+	# Max's literal "~70%" by a couple points, but the next reachable column
+	# count (12, ~72.7%) overflows the budget; 260px wins.
+	#
+	# Chosen by scanning candidate column counts (_choose_cols()) against
+	# this budget. Re-check against tests/test_mass.gd's
+	# `_test_horde_row_width` and `_test_horde_fits_carousel_card` if this
+	# or the pitch/ICON constants change again.
 const SLIM_WIDTH_RATIO := 0.64 # a piece is "slim" when its opaque-pixel
 	# bounding-box width (Image.get_used_rect(), see _slim_ratio()) is under
 	# this fraction of its 192px-square texture's own width. Chosen from the
@@ -228,15 +240,17 @@ static func build(ids: Array) -> Control:
 	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
 	var pad := ICON * 0.5 + JITTER_Y + rot_extra
 
-	# Worst case at ICON=52, TARGET_ASPECT=2.3 (V4, 2026-09-25): Horde-14
-	# (all-pawn, the widest army at this pitch) lands on cols=12/rows=2 ->
-	# row width (12-1)*CELL_SLIM + ICON = 137.0 + 52 = 189.0px, mass width
-	# 189.0 + 2*38.62(pad) = 266.2px. The Army carousel card (menu.gd
-	# _show_armies) is `card_w = viewport.x * ARMY_CARD_WIDTH_FRACTION` =
-	# 480 * 7/12 = 280px at the 480px portrait width this project targets —
-	# 266.2px fits with ~13.8px to spare (`_test_horde_fits_carousel_card`).
-	# Re-check this if ICON, JITTER_ROT, TARGET_ASPECT, the pitch constants,
-	# or ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
+	# Worst case at ICON=52, TARGET_ASPECT=2.2 (V4, 2026-09-25): Horde-14
+	# (all-pawn, the widest army at this pitch) lands on cols=11/rows=2 ->
+	# row width (11-1)*CELL_SLIM + ICON = 124.5 + 52 = 176.5px, mass width
+	# 176.5 + 2*38.62(pad) = 253.7px. The carousel card's real content
+	# budget (menu.gd _show_armies) is 260px — card_w = viewport.x *
+	# ARMY_CARD_WIDTH_FRACTION = 480*7/12 = 280px, minus its own 10+10px
+	# side content margins — 253.7px fits with ~6.3px to spare
+	# (`_test_horde_fits_carousel_card`; see TARGET_ASPECT's own header for
+	# why 280 alone isn't the real ceiling). Re-check this if ICON,
+	# JITTER_ROT, TARGET_ASPECT, the pitch constants, or
+	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(
 		max_row_width + pad * 2.0,
 		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)

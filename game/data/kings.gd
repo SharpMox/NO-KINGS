@@ -419,11 +419,16 @@ static func stack_power_if_due(g) -> void:
 		1 + int(g.turns_since_wave / float(Tuning.KING_TARIFF_STACK_TURNS)))
 	while g.king_power_abilities.size() < want:
 		var key: String = str(esc[g.king_power_abilities.size()])
-		_economy().activate_king_ability_by_key(g, key)
+		# NO-238: turns_since_wave == 0 here is the Wave-start seed (called from
+		# apply_power below) — today's plain-name banner. > 0 is a later call
+		# from game.gd's per-turn tick, i.e. a NEW Tariff coming into force
+		# mid-Wave; activate_king_ability_by_key banners it as such.
+		_economy().activate_king_ability_by_key(g, key, g.turns_since_wave > 0)
 		g.king_power_abilities.append(key)
-		# No banner here: activate_king_ability_by_key -> apply_king_ability
-		# already banners the catalog name ("TARIFF ON MOVE"). The raw-key
-		# "TARIFF: move cost" this used to add on top was a duplicate.
+		# No banner here beyond the above: activate_king_ability_by_key ->
+		# apply_king_ability already banners the catalog name ("TARIFF ON
+		# MOVE"). The raw-key "TARIFF: move cost" this used to add on top was
+		# a duplicate.
 
 
 ## Spend the King's once-per-Wave Ability. Returns true when it fired, so the

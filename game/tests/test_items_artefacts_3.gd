@@ -210,8 +210,8 @@ func _init() -> void:
 	await process_frame
 	BuffLogic.add(carat.board[Vector2i(2, 2)], "shield")
 	Economy.earn(carat, 100)
-	check(carat.gold == 145 and carat.score == 1450, # issue 57: Score x10, Gold untouched
-		"45.5 Carat Curse: +45% Gold and Score gain")
+	check(carat.gold == 145 and carat.score == 1000,
+		"45.5 Carat Curse: +45% Gold gain, and no Score bonus (NO-250)")
 	WaveLogic.queue(carat, carat.wave + 1) # Wave 3 clears — every 3rd Wave strips Buffs
 	check(BuffLogic.of(carat.board[Vector2i(2, 2)]).is_empty(),
 		"45.5 Carat Curse: every 3rd Wave clear strips all allied Piece Buffs")
@@ -326,8 +326,10 @@ func _init() -> void:
 	await process_frame
 	var haarp_base: int = Waves.WAVES[1].size() # wave 2's designed roster
 	haarp._queue_wave(2) # clears wave 1 and queues wave 2's roster
-	check(haarp.score == 2000 and haarp.gold == 15, # issue 57: Score x10, Gold untouched
-		"HAARP Volume Knob: +200 Score and +15 Gold on Wave clear")
+	check(haarp.score == 0 and haarp.gold == 0,
+		"HAARP Volume Knob (NO-250): no Score and no Gold on Wave clear")
+	check(BuffLogic.of(haarp.board[Vector2i(2, 2)]).size() == 1,
+		"HAARP Volume Knob (NO-250): each Wave clear gives a random ally +1 Piece Buff")
 	check(haarp.pending_spawn.size() == haarp_base + 1,
 		"HAARP Volume Knob: Wave roster spawns +1 extra piece")
 	haarp.queue_free()
@@ -545,9 +547,12 @@ func _init() -> void:
 	check(yalta_gold.clock_ms < yalta_clock_before_wait,
 		"Yalta Cocktail Napkin: the Clock keeps ticking while its Milestone pick is open")
 	var yalta_gold_before: int = yalta_gold.gold
+	var yalta_score_before: int = yalta_gold.score
 	yalta_gold.modals.choice_chosen.emit("gold")
 	check(not yalta_gold.buff_pick_open and yalta_gold.gold == yalta_gold_before + 100,
-		"Yalta Cocktail Napkin: the 'gold' branch pays +100 Gold through Economy.earn")
+		"Yalta Cocktail Napkin: the 'gold' branch pays +100 Gold")
+	check(yalta_gold.score == yalta_score_before,
+		"Yalta Cocktail Napkin (NO-250): the 'gold' branch pays no Score (earn_gold, was +1000)")
 	yalta_gold.queue_free()
 	await process_frame
 
@@ -654,21 +659,22 @@ func _init() -> void:
 	loss.queue_free()
 	await process_frame
 
-	# --- issue 26: Score-gain streak (27 Club Punch Card); -50 Gold on loss,
-	# same issue-16 ruling as Social Credit Report Card ---
+	# --- issue 26: clean-Wave streak (27 Club Punch Card; NO-250: +5% $ per
+	# streak step, no longer Score); -50 Gold on loss ---
 	var club27 := _boot({"board": [["queen", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
 		"wave": 1, "score": 0, "artefacts": ["27-club-punch-card"]})
 	await process_frame
 	WaveLogic.queue(club27, 2) # clean Wave-1 clear: streak -> 1
 	club27.score = 0
+	club27.gold = 0
 	Economy.earn(club27, 100)
-	check(club27.score == 1050, # issue 57: x10
-		"27 Club Punch Card: +5% Score gain per consecutive clean Wave (streak 1)")
+	check(club27.gold == 105 and club27.score == 1000,
+		"27 Club Punch Card: +5% $ gain per consecutive clean Wave (streak 1), Score untouched")
 	WaveLogic.queue(club27, 3) # clean Wave-2 clear: streak -> 2
-	club27.score = 0
+	club27.gold = 0
 	Economy.earn(club27, 100)
-	check(club27.score == 1100, # issue 57: x10
-		"27 Club Punch Card: the streak compounds (streak 2 = +10%)")
+	check(club27.gold == 110,
+		"27 Club Punch Card: the streak grows (streak 2 = +10% $)")
 	club27.gold = 100
 	club27._lose_player_piece(Vector2i(3, 2), "captured")
 	check(club27.club27_streak == 0 and club27.gold == 50,

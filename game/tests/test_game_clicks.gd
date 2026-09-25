@@ -75,6 +75,17 @@ func _first_pool_stack(game: Node2D) -> Button:
 	return null
 
 
+## NO-256 (d): the visible Button under `node` reading exactly `text`, or null.
+func _find_button(node: Node, text: String) -> Button:
+	if node is Button and node.text == text and node.is_visible_in_tree():
+		return node
+	for c in node.get_children():
+		var hit := _find_button(c, text)
+		if hit:
+			return hit
+	return null
+
+
 func _click_button_in(node: Node, text: String) -> bool:
 	if node is Button and node.text == text and node.is_visible_in_tree():
 		var p: Node = node.get_parent()
@@ -697,6 +708,18 @@ func _init() -> void:
 			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 
+	# NO-254: "Give Feedback" — below Main Menu, above the Resume gap (#577);
+	# routes through open_feedback(), which records the URL instead of
+	# opening a browser because GameScript.is_scenario is true for this boot.
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.game_menu, "Give Feedback"), "in-game Give Feedback button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "Give Feedback calls open_feedback with FEEDBACK_URL",
+		"last_feedback_url=%s" % game.last_feedback_url)
+	check(game.game_menu_open, "pressing Give Feedback doesn't close the pause menu")
+
 	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable",
 		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
 			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
@@ -723,10 +746,39 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.selected != Vector2i(7, 10), "win screen blocks board clicks")
+	# NO-254: "Give Feedback" — below Continue/End Run, shares this overlay
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.overlay, "Give Feedback"), "win-screen Give Feedback button clickable")
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "win-screen Give Feedback calls open_feedback",
+		"last_feedback_url=%s" % game.last_feedback_url)
+	check(game.win_open, "pressing Give Feedback doesn't dismiss the win screen")
 	check(await _click_button_in(game.overlay, "Continue"), "Continue clickable")
 	await process_frame
 	check(not game.win_open and game.state == game.State.PLAYER_TURN,
 		"Continue resumes the run into endless")
+
+	# NO-254: the plain GAME OVER screen also gets "Give Feedback", below
+	# Restart/Main Menu — reached directly via _debug_show_screen (same seam
+	# tests/test_capture_paths.gd uses), never by actually losing a run.
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults()
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	await game._debug_show_screen("gameover", PackedStringArray())
+	await process_frame
+	check(game.state == game.State.GAME_OVER, "gameover debug screen reaches GAME_OVER")
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.overlay, "Give Feedback"), "game-over Give Feedback button clickable",
+		"buttons=%s" % _button_texts_in(game.overlay))
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "game-over Give Feedback calls open_feedback",
+		"last_feedback_url=%s" % game.last_feedback_url)
 
 	# Boxes (issue 47 rework: 9 typed Boxes, the box-carrier enemy is gone —
 	# every Box comes from the Shop now). Buying a Box tile opens the roll
@@ -1615,6 +1667,11 @@ func _init() -> void:
 	# board slid it 23px down onto Cancel, closing the very modal this check is
 	# about. Same lesson as the drag probes: a hardcoded tile is a geometry
 	# assertion in disguise (CLAUDE.md, tests that pass for the wrong reason).
+	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
+	# VBoxContainer rect is not settled the instant it's built — the same
+	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
+	# GridContainer — so wait one more idle frame before measuring it.
+	await process_frame
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
 	var box_rect: Rect2 = modal_box.get_global_rect()
 	var backdrop := Vector2(-1, -1)
@@ -2101,6 +2158,16 @@ func _init() -> void:
 	check(convert_badge != null and convert_badge.is_visible_in_tree()
 			and convert_badge.text == "⇄$%d" % badge_cost and not convert_badge.disabled,
 		"a captured entry shows its Convert badge with no arming step, priced and live at Wave 3")
+	if convert_badge != null:
+		check(convert_badge.get_theme_color("font_color") == Tuning.COL_GOLD,
+			"NO-256: the ⇄ Convert pill's price is green (on a dark pill)")
+	var cap_price: Label = null
+	for c in cap_row.get_children():
+		if c is Label and (c as Label).text.begins_with("$"):
+			cap_price = c
+	check(cap_price != null and cap_price.get_theme_color("font_color")
+			== Tuning.money_color(0, game.gold >= badge_cost),
+		"NO-256: a Captured cell's convert price is green (red only when short)")
 	# NO-223 (2026-09-22 ruling, extended from the Sell badge): the ⇄ badge is
 	# information only now — it takes no input, so clicking it does nothing.
 	# Convert itself moved into the long-press preview's own menu.
@@ -2114,7 +2181,11 @@ func _init() -> void:
 		# signal a real long press fires — see the Stock-sell block below
 	await process_frame
 	check(game.preview_open, "long-pressing a Captured entry opens its preview")
-	check(await _click_button_in(game.preview_panel, "Convert (-$%d)" % badge_cost),
+	var convert_btn := _find_button(game.preview_panel, "Convert -$%d" % badge_cost)
+	check(convert_btn != null and convert_btn.get_theme_color("font_color") == Tuning.COL_LOSS,
+		"NO-256 ruling 2: the preview reads 'Convert -$N' (no parentheses), in red",
+		_button_texts_in(game.preview_panel))
+	check(await _click_button_in(game.preview_panel, "Convert -$%d" % badge_cost),
 		"the preview's own Convert button is clickable")
 	await process_frame
 	check(game.captured == ["rook", "bishop"] and game.stock == ["bishop"]
@@ -2443,6 +2514,12 @@ func _init() -> void:
 				break
 		to_visit.append_array(n.get_children())
 	if check(tile != null, "an affordable piece tile exists"):
+		var tile_price: Label = null
+		for c in tile.get_children():
+			if c is Label and (c as Label).text.begins_with("$"):
+				tile_price = c
+		check(tile_price != null and tile_price.get_theme_color("font_color") == Tuning.COL_GOLD,
+			"NO-256: an affordable Shop tile's price is green")
 		_click(tile.get_global_rect().get_center())
 		await process_frame
 		# NO-167 (Max review, second pass): a tile tap opens its own preview now,
@@ -2453,6 +2530,10 @@ func _init() -> void:
 		var sh_stock: int = game.stock.size()
 		var sh_gold: int = game.gold
 		var sh_acts: int = game.actions_left
+		var buy_btn := _find_button(game.preview_panel, "Buy")
+		check(buy_btn != null and not buy_btn.has_theme_color_override("font_color"),
+			"NO-256 ruling 5: the Shop preview's button reads plain 'Buy', uncoloured",
+			_button_texts_in(game.preview_panel))
 		check(await _click_button_in(game.preview_panel, "Buy"),
 			"Buy clickable in the tile's preview")
 		await process_frame
@@ -2531,7 +2612,12 @@ func _init() -> void:
 	var sell_stock_before: int = game.stock.size()
 	var sell_gold_before: int = game.gold
 	var sell_acts_before: int = game.actions_left
-	check(await _click_button_in(game.preview_panel, "Sell (+$5)"),
+	var preview_sell_btn := _find_button(game.preview_panel, "Sell +$5")
+	check(preview_sell_btn != null and preview_sell_btn.get_theme_color("font_color") == Tuning.COL_GOLD
+			and preview_sell_btn.get_theme_color("font_pressed_color") == Tuning.COL_GOLD,
+		"NO-256: the preview's 'Sell +$N' is green in every enabled state",
+		_button_texts_in(game.preview_panel))
+	check(await _click_button_in(game.preview_panel, "Sell +$5"),
 		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
 	check(game.buff_pick_open and game.stock.size() == sell_stock_before and game.gold == sell_gold_before,
@@ -2665,7 +2751,7 @@ func _init() -> void:
 		# that targeting cancels it first instead of being blocked.
 		game.hud.item_preview_requested.emit(0)
 		await process_frame
-		check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % item_payout),
+		check(await _click_button_in(game.preview_panel, "Sell +$%d" % item_payout),
 			"the Sell button is still offered while the Item is armed and staged")
 		await process_frame
 		check(game.buff_pick_open and game.item_active == 0 and game.item_pending_tile == game.item_targets[0],
@@ -2715,7 +2801,7 @@ func _init() -> void:
 		to_visit_art.append_array(n.get_children())
 	check(not art_preview_has_use,
 		"NO-223: an Artefact's menu offers no Use — Activate stays a plain tap, never duplicated in here")
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout),
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % art_payout),
 		"the Sell button in the Artefact's preview is clickable")
 	await process_frame
 	check(game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art,
@@ -2727,7 +2813,7 @@ func _init() -> void:
 
 	game.hud.artefact_preview_requested.emit("agartha-welcome-mat")
 	await process_frame
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout), "Sell again")
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % art_payout), "Sell again")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Sell"), "Sell confirms the sale")
 	await process_frame
@@ -2755,7 +2841,7 @@ func _init() -> void:
 	game.hud.artefact_preview_requested.emit("bovine-tractor-beam")
 	await process_frame
 	check(game.preview_open, "the preview opens even while the Artefact is mid-targeting")
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % bovine_payout),
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % bovine_payout),
 		"Sell is offered while targeting is live")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")
@@ -3040,10 +3126,8 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.gold == 475 and game.score == 4000, # issue 57:
-			# Score x10 (400 -> 4000), Gold untouched
-		"confirming activates it: 25 Gold spent, +400 Score (earn() also grants " +
-		"the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+	check(not game.buff_pick_open and game.gold == 75 and game.score == 0 and game.box_open,
+		"confirming activates it: $25 spent, a Small Item Box opens, no Gold or Score gained (NO-250)")
 
 	# Bovine Tractor Beam: the one TARGETED activation. Tapping the chip again
 	# MID-STAGE (before stage B) still cancels straight from targeting, no

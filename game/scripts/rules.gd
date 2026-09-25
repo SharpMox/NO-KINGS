@@ -88,6 +88,47 @@ static func moves_for(board: Dictionary, from: Vector2i, defs: Dictionary, mode_
 	return out
 
 
+## NO-250: Curtain Rods Bag's "Magic bullet" — the captures a SLIDING piece
+## could make through exactly one blocking piece (either side's). A slide is
+## a ride with a one-square step (hop riders leap, they don't slide; leaps
+## and bent rides never qualify); the blocker counts toward a bounded ride's
+## range. Returns {to, through} per target — `through` is the blocker, kept
+## for the preview's linked-dot path. Pure, like moves_for: whether the
+## Artefact is held and unspent this Wave is game.gd's call.
+static func magic_bullet_targets(board: Dictionary, from: Vector2i, defs: Dictionary) -> Array[Dictionary]:
+	var piece: Dictionary = board[from]
+	var mirror := -1 if piece.owner == ENEMY else 1
+	var out: Array[Dictionary] = []
+	for m in BuffLogic.moves_of(board, from, defs):
+		if m.type != "ride" or m.mode == "move":
+			continue
+		if m.get("initial", false) and piece.get("moved", false):
+			continue
+		for dir in m.dirs:
+			var step := Vector2i(int(dir[0]), int(dir[1]) * mirror)
+			if absi(step.x) > 1 or absi(step.y) > 1:
+				continue
+			var range_limit: int = int(m.get("range", 0))
+			var pos := from
+			var steps := 0
+			var through := Vector2i(-1, -1)
+			while true:
+				pos += step
+				steps += 1
+				if not in_bounds(pos) or (range_limit > 0 and steps > range_limit):
+					break
+				if not board.has(pos):
+					continue
+				if through.x < 0:
+					through = pos # the one piece the bullet passes through
+					continue
+				if board[pos].owner != piece.owner \
+						and not out.any(func(t: Dictionary) -> bool: return t.to == pos):
+					out.append({"to": pos, "through": through})
+				break
+	return out
+
+
 ## Range buff (ruled 2026-08-28): every enemy this piece can already capture
 ## also exposes the enemies standing around it — capture-only, one level deep.
 ## Defined the same way for leapers, bounded riders and unbounded riders, which
@@ -277,8 +318,12 @@ static func is_attacked(board: Dictionary, target: Vector2i, by_owner: int, defs
 ## `to` is an en passant capture — the square to remove, distinct from `to`
 ## itself (an ordinary capture's victim IS `to`; callers that read `m.to` for
 ## the captured square must check for this key first, see game.gd).
+## `guard` (NO-250, Putin's Golden Toilet Brush "Oligarch"): victim square ->
+## value; a capture of a guarded piece by a LOWER-value piece is not legal.
+## Same pure-module precedent as `denied` — game.gd computes which squares are
+## guarded from the held Artefacts and passes them in.
 static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict := true,
-		denied: Array[Vector2i] = [], ep_offers: Array = []) -> Array[Dictionary]:
+		denied: Array[Vector2i] = [], ep_offers: Array = [], guard: Dictionary = {}) -> Array[Dictionary]:
 	var king := find_king(board, owner)
 	var out: Array[Dictionary] = []
 	for pos in board:
@@ -290,6 +335,9 @@ static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict 
 			var ep_victim := Vector2i(-1, -1)
 			if not board.has(to): # an ordinary capture can never also be en passant
 				ep_victim = en_passant_victim(board, pos, to, ep_offers, defs)
+			var victim := ep_victim if ep_victim.x >= 0 else to
+			if guard.has(victim) and int(defs[board[pos].id].value) < int(guard[victim]):
+				continue # NO-250 Oligarch: a lower-value piece can't take it
 			if king.x >= 0 and (strict or pos == king):
 				# shallow: the sim only re-keys piece references, and is_attacked
 				# never mutates a piece. ponytail: the cost of this branch is the
@@ -314,11 +362,11 @@ static func legal_moves(board: Dictionary, owner: int, defs: Dictionary, strict 
 
 
 static func is_checkmate(board: Dictionary, owner: int, defs: Dictionary,
-		denied: Array[Vector2i] = [], ep_offers: Array = []) -> bool:
+		denied: Array[Vector2i] = [], ep_offers: Array = [], guard: Dictionary = {}) -> bool:
 	var king := find_king(board, owner)
 	if king.x < 0 or not is_attacked(board, king, 1 - owner, defs):
 		return false
-	return legal_moves(board, owner, defs, true, denied, ep_offers).is_empty()
+	return legal_moves(board, owner, defs, true, denied, ep_offers, guard).is_empty()
 
 
 ## Merge result for exactly 2 selected piece ids, or "" if invalid.
@@ -393,12 +441,12 @@ const TAUNT_PRIORITY := 1000
 ## double-steps from their last turn, threaded through so the AI sees and can
 ## take an en passant capture like any other.
 static func ai_action(board: Dictionary, defs: Dictionary, denied: Array[Vector2i] = [],
-		ep_offers: Array = []) -> Dictionary:
+		ep_offers: Array = [], guard: Dictionary = {}) -> Dictionary:
 	var king := find_king(board, ENEMY)
 	var in_check := king.x >= 0 and is_attacked(board, king, PLAYER, defs)
 	# full legality only when in check (must not miss a resolving move);
 	# otherwise the fast path — king moves stay safety-checked, pins ignored
-	var moves := legal_moves(board, ENEMY, defs, in_check, denied, ep_offers)
+	var moves := legal_moves(board, ENEMY, defs, in_check, denied, ep_offers, guard) # NO-250 guard
 	moves = moves.filter(func(m: Dictionary) -> bool: # Stun: this piece sits it out
 		return not BuffLogic.has(board[m.from], "stunned"))
 	if moves.is_empty():

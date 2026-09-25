@@ -23,6 +23,8 @@ const SaveConfig := preload("res://scripts/save_config.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
+const ItemLogic := preload("res://scripts/item_logic.gd")
+const Box := preload("res://scripts/box.gd")
 
 var fails := 0
 
@@ -67,12 +69,16 @@ func _restock_banners(g) -> Array:
 
 
 ## The feed's live lines, top first (a pushed-out pill is removed at once; an
-## expired one is queue_free'd, so skip those).
+## expired one is queue_free'd, so skip those). NO-256 (e): a line is its row's
+## Labels joined — the " +$M" gold segment is a Label of its own.
 func _feed_texts(g) -> Array:
 	var out := []
 	for pill in g.hud.feed.get_children():
 		if not pill.is_queued_for_deletion():
-			out.append((pill.get_child(0).get_child(-1) as Label).text)
+			var line := ""
+			for lab in pill.get_child(0).get_children():
+				line += (lab as Label).text
+			out.append(line)
 	return out
 
 
@@ -256,6 +262,136 @@ func _init() -> void:
 	ju.queue_free()
 	await process_frame
 
+	# --- NO-238: NEW TARIFF banner for a mid-Wave escalation ----------------
+	# A Tariff present at Wave start keeps today's plain-name banner; one that
+	# comes into force LATER in the same Wave (the KING_TARIFF_STACK_TURNS
+	# cadence) is named as new, so the player notices the difficulty change.
+	var esc2 := _boot({"board": [], "wave": 49})
+	await process_frame
+	await process_frame
+	esc2.king_order = ["donald_trump", "nero", "xerxes_i", "qin_shi_huang"]
+	esc2._queue_wave(50)
+	check(esc2.king_power_abilities.size() == 1, "Trump's first Tariff seeds at Wave start")
+	var first_name: String = Economy.ability_name(esc2.king_power_abilities[0]).to_upper()
+	check(_has_banner(esc2, first_name), "...bannered with today's plain catalog name")
+	check(not _banners(esc2).any(func(a: Dictionary) -> bool: return str(a.text).begins_with("NEW TARIFF")),
+		"...never as NEW at Wave start")
+	esc2.anims.clear()
+	esc2.turns_since_wave = Tuning.KING_TARIFF_STACK_TURNS
+	Kings.stack_power_if_due(esc2)
+	check(esc2.king_power_abilities.size() == 2, "a second Tariff comes into force mid-Wave")
+	var second_name: String = Economy.ability_name(esc2.king_power_abilities[1]).to_upper()
+	check(_banners(esc2).size() == 1 and _has_banner(esc2, "NEW TARIFF: %s" % second_name),
+		"...bannered as NEW, exactly once (%d)" % _banners(esc2).size())
+	esc2.queue_free()
+	await process_frame
+
+	# --- NO-238: REINFORCEMENTS banner fires before the panel opens --------
+	var rf := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 9})
+	await process_frame
+	rf.anims.clear()
+	rf.pending_reinforce = true
+	rf.state = rf.State.ENEMY_TURN
+	rf._begin_player_turn()
+	check(_has_banner(rf, "REINFORCEMENTS"), "the banner fires before the panel opens")
+	check(is_instance_valid(rf.modals.reinforce_panel) and rf.modals.reinforce_panel.visible,
+		"...and the panel is open right after — the banner never blocks it")
+	rf.queue_free()
+	await process_frame
+
+	# --- NO-238: Clock refill banners the real amount (king_refill/continue
+	# only — milestone is bundled into REINFORCEMENTS, others stay silent) ---
+	var cl := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	cl.anims.clear()
+	Economy.add_clock(cl, Tuning.KING_CLOCK_REFILL_MS, "king_refill")
+	check(_has_banner(cl, "+%dS CLOCK" % roundi(Tuning.KING_CLOCK_REFILL_MS / 1000.0)),
+		"a King Clock refill banners the real amount")
+	cl.anims.clear()
+	Economy.add_clock(cl, Tuning.CONTINUE_CLOCK_REFILL_MS, "continue")
+	check(_has_banner(cl, "+%dS CLOCK" % roundi(Tuning.CONTINUE_CLOCK_REFILL_MS / 1000.0)),
+		"the Continue bonus banners too")
+	cl.anims.clear()
+	Economy.add_clock(cl, Tuning.CLOCK_REFILL_MS, "milestone")
+	check(_banners(cl).is_empty(), "a milestone refill banners nothing here (REINFORCEMENTS covers it)")
+	cl.anims.clear()
+	Economy.add_clock(cl, Tuning.TURN_END_CLOCK_BONUS_MS, "turn_end")
+	check(_banners(cl).is_empty(), "an ordinary turn-end Clock tick banners nothing")
+	cl.queue_free()
+	await process_frame
+
+	# --- NO-238: INVENTORY FULL banner as a full item Box opens -------------
+	var bx := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	for i in ItemLogic.cap(bx):
+		bx.items.append({"key": "x%d" % i, "name": "x%d" % i, "tier": "Tactical",
+			"target": "", "description": ""})
+	bx.anims.clear()
+	bx._open_box_pick(Box.random_slot_for_theme(bx, "item"))
+	check(_has_banner(bx, "INVENTORY FULL"), "a full inventory banners as the Box opens")
+	bx.queue_free()
+	await process_frame
+
+	var bx2 := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	bx2.anims.clear()
+	bx2._open_box_pick(Box.random_slot_for_theme(bx2, "item"))
+	check(not _has_banner(bx2, "INVENTORY FULL"), "...but not when there's room")
+	bx2.queue_free()
+	await process_frame
+
+	# --- NO-238: turn-start banner names the Action count -------------------
+	var ta := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	ta.anims.clear()
+	ta.state = ta.State.ENEMY_TURN
+	ta._begin_player_turn()
+	check(_has_banner(ta, "YOUR TURN · %d ACTIONS" % Tuning.ACTIONS_PER_TURN),
+		"turn start names the Action count, plural")
+	ta.queue_free()
+	await process_frame
+
+	# --- NO-238: LAST ACTION fires once per Turn, on the drop to exactly 1 --
+	var la := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	la.anims.clear()
+	la.actions_left = 1
+	check(_banners(la).size() == 1 and _has_banner(la, "LAST ACTION"),
+		"dropping to exactly 1 Action fires LAST ACTION once")
+	la.actions_left = 2 # granted back up mid-Turn (e.g. an item)
+	la.anims.clear()
+	la.actions_left = 1
+	check(_banners(la).is_empty(), "...but only once per Turn, even on a second drop to 1")
+	la.anims.clear()
+	la.state = la.State.ENEMY_TURN
+	la._begin_player_turn() # resets actions_left to 2 and re-arms the gate
+	la.anims.clear()
+	la.actions_left = 1
+	check(_has_banner(la, "LAST ACTION"), "...and re-arms on the next Turn")
+	la.autoplay = true
+	la.actions_left = 2
+	la.anims.clear()
+	la.actions_left = 1
+	check(_banners(la).is_empty(), "autoplay fires no LAST ACTION banner")
+	la.autoplay = false
+	la.queue_free()
+	await process_frame
+
+	# --- NO-238: a 1-Action Turn shows ONLY the merged turn-start banner ----
+	GameScript.next_tier = "Tier 4"
+	var one := _boot({"board": [["pawn", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(one.actions_left == 1, "Tier 4: 1 Action/Turn")
+	one.anims.clear()
+	one.state = one.State.ENEMY_TURN
+	one._begin_player_turn()
+	check(_has_banner(one, "YOUR TURN · 1 ACTION"), "singular, no S")
+	check(not _banners(one).any(func(a: Dictionary) -> bool: return str(a.text) == "LAST ACTION"),
+		"...merged: no separate LAST ACTION banner for the same drop")
+	one.queue_free()
+	await process_frame
+	GameScript.next_tier = Tuning.DEFAULT_TIER
+
 	# --- NO-239: the kill feed ----------------------------------------------
 	var kf := _boot({"board": [["queen", 0, 2, 2], ["knight", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3})
 	await process_frame
@@ -277,6 +413,20 @@ func _init() -> void:
 	lines = _feed_texts(kf)
 	check(lines == ["test gain +%d +$20" % (20 * Economy.SCORE_MULTIPLIER)],
 		"two same-reason gains in one frame coalesce into one line (%s)" % [lines])
+	# NO-256 (e): the "+$M" is its own green segment; the rest keeps the line colour
+	var segs: Array = kf.hud.feed.get_child(0).get_child(0).get_children()
+	check(segs.size() == 2 and (segs[1] as Label).text == " +$20"
+			and (segs[1] as Label).get_theme_color("font_color") == Tuning.COL_GOLD
+			and (segs[0] as Label).get_theme_color("font_color") == kf.hud.FEED_TEXT,
+		"NO-256: the feed's +$ segment is green, the reason stays the line colour")
+	check((segs[1] as Label).get_theme_font_size("font_size") == kf.hud.FEED_FONT_SIZE,
+		"NO-256: the green +$ segment is the feed's 24 px too")
+	_clear_feed(kf)
+	kf.hud.feed_gain("scoreonly", "score only", 50, 0)
+	kf.hud._flush_feed()
+	check(kf.hud.feed.get_child_count() == 1
+			and kf.hud.feed.get_child(0).get_child(0).get_child_count() == 1,
+		"NO-256: a line with no Gold has no +$ segment")
 
 	# #569 round 2: an Artefact trigger is text only, no icon and no ✦
 	_clear_feed(kf)
@@ -284,6 +434,27 @@ func _init() -> void:
 	kf.hud._flush_feed()
 	check(_feed_texts(kf) == ["27 Club Punch Card: Buff"],
 		"an Artefact trigger posts text only (%s)" % [_feed_texts(kf)])
+
+	# NO-250: the new Artefacts' feed notes stay terse (#569: 1-2 words), so
+	# a long Artefact name plus its note still fits one line
+	var terse := _boot({"board": [["knight", 0, 3, 3], ["knight", 0, 5, 3], ["pawn", 1, 4, 4],
+		["queen", 0, 1, 1, {"buffs": [{"key": "critical"}]}], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["men-in-black-prescription-sunglasses", "lusitania-hardtack-crate", "tinfoil-hat"]})
+	await process_frame
+	terse.board[Vector2i(4, 4)].erase("buffs") # the boot's own turn start may
+		# already have Pincered it (a stunned piece isn't re-stunned, so no note)
+	_clear_feed(terse)
+	ArtefactHooks.run(terse, "on_turn_start") # Pincer
+	terse._destroy(Vector2i(1, 1)) # Lusitania: a Buffed piece lost
+	terse._apply_buff(terse.board[Vector2i(3, 3)], "slow", 1, Vector2i(3, 3)) # Tinfoil
+	terse.hud._flush_feed()
+	var terse_lines := _feed_texts(terse)
+	check(terse_lines.has("Men in Black Prescription Sunglasses: Stun")
+			and terse_lines.has("Lusitania \"Hardtack\" Crate: +10s Box")
+			and terse_lines.has("Tinfoil Hat: Immune"),
+		"NO-250 feed notes are one-word terse (%s)" % [terse_lines])
+	terse.queue_free()
+	await process_frame
 
 	_clear_feed(kf)
 	for i in 6:
@@ -303,6 +474,16 @@ func _init() -> void:
 		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
 	check(fit.ends_with("…") and fit.length() < (long_reason + "+999 +$99").length(),
 		"...cut with '…' (%s)" % fit)
+	# NO-256 (e): with a Gold segment, only the reason is cut — the green +$ survives
+	_clear_feed(kf)
+	kf.hud.post(long_reason, kf.hud.FEED_TEXT, 99)
+	await process_frame
+	await process_frame
+	var gpill: Control = kf.hud.feed.get_child(0)
+	var gsegs: Array = gpill.get_child(0).get_children()
+	check(gpill.size.x <= kf.hud.feed_max_w() and (gsegs[0] as Label).text.ends_with("…")
+			and (gsegs[1] as Label).text == " +$99",
+		"NO-256: a long line with Gold cuts the reason and keeps ' +$99' whole (%s)" % [_feed_texts(kf)])
 	check(kf.hud.FEED_FONT_SIZE == 24, "the feed font is 24 px (Max: 32 too big)")
 	_clear_feed(kf)
 	kf.hud.post("short")

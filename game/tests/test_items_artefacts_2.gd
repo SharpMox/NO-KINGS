@@ -16,6 +16,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Items := preload("res://data/items.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const Box := preload("res://scripts/box.gd")
+const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 
 var fails := 0
 
@@ -148,7 +149,7 @@ func _init() -> void:
 	sleeper.queue_free()
 	await process_frame
 
-	# Shrinkflation Cereal Box: +10 Gold/+10 Score/+1s Clock at every Turn end
+	# Shrinkflation Cereal Box: +10 Gold/+1s Clock at every Turn end (NO-250: no Score)
 	# (new on_turn_end hook, game.gd:_on_pass)
 	var shrink := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["shrinkflation-cereal-box"], "gold": 50, "score": 0})
@@ -157,22 +158,26 @@ func _init() -> void:
 	shrink.actions_left = 0 # any non-SETUP pass through _on_pass reaches on_turn_end
 	var clock0: float = shrink.clock_ms
 	shrink._on_pass()
-	check(shrink.gold == 60 and shrink.score == 100, # issue 57: Score x10, Gold untouched
-		"Shrinkflation Cereal Box: +10 Gold/+10 Score at Turn end")
+	check(shrink.gold == 60 and shrink.score == 0,
+		"Shrinkflation Cereal Box: +10 Gold and no Score at Turn end")
 	check(shrink.clock_ms > clock0, "Shrinkflation Cereal Box: +1s Clock at Turn end")
 	shrink.queue_free()
 	await process_frame
 
-	# Skull and Bones Coffin: +20% Score gain while holding 200+ Gold, gated
-	# off (not just discounted) below that
+	# Skull and Bones Coffin (NO-250): +1 Action per Turn while holding $200+,
+	# gated off below that; no Score either way
 	var skull := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["skull-and-bones-coffin"], "gold": 199})
 	await process_frame
-	Economy.earn(skull, 100)
-	check(skull.score == 1000, "Skull and Bones Coffin: no bonus under 200 Gold") # issue 57: x10
+	var skull_a0: int = skull.actions_left
+	ArtefactHooks.run(skull, "on_turn_start")
+	check(skull.actions_left == skull_a0, "Skull and Bones Coffin: no Action under $200")
 	skull.gold = 200
+	ArtefactHooks.run(skull, "on_turn_start")
+	check(skull.actions_left == skull_a0 + 1, "Skull and Bones Coffin: +1 Action per Turn at $200+")
+	var skull_s0: int = skull.score
 	Economy.earn(skull, 100)
-	check(skull.score == 2200, "Skull and Bones Coffin: +20% Score gain at 200+ Gold") # issue 57: x10
+	check(skull.score == skull_s0 + 1000, "Skull and Bones Coffin: no Score bonus (was +20%)")
 	skull.queue_free()
 	await process_frame
 
@@ -219,10 +224,15 @@ func _init() -> void:
 		"wave": 4, "gold": 0, "score": 0,
 		"artefacts": ["lusitania-hardtack-crate", "d-b-cooper-s-parachute"]})
 	await process_frame
+	var lus_clock0: float = lus.clock_ms
 	lus._destroy(Vector2i(2, 2)) # the queen carries a Buff and is unranked
-	check(lus.score == 1500, "Lusitania \"Hardtack\" Crate: +150 Score for a Buff-carrying piece lost") # issue 57: x10
-	check(lus.gold == 150 + roundi(lus.defs["queen"].value * 0.75),
-		"Lusitania (+150 Gold) and D.B. Cooper's Parachute (+75% of value) both pay on the same loss")
+	# NO-250: Lusitania's +150 Score/+$150 is gone — now +10s Clock and a
+	# Small Item Box owed to the next player-turn start
+	check(lus.score == 0, "Lusitania \"Hardtack\" Crate: no Score for a Buff-carrying piece lost")
+	check(lus.clock_ms >= lus_clock0 + 9000.0 and lus.pending_item_boxes == 1,
+		"Lusitania \"Hardtack\" Crate: +10s Clock and one Small Item Box owed")
+	check(lus.gold == roundi(lus.defs["queen"].value * 0.75),
+		"D.B. Cooper's Parachute (+75% of value) pays on the loss; Lusitania pays no $")
 	lus.queue_free()
 	await process_frame
 
@@ -299,8 +309,8 @@ func _init() -> void:
 	var clock_doom: float = doom.clock_ms
 	doom._use_item(0) # NO-124: arms it — untargeted Items need a Confirm now
 	doom._item_confirm_untargeted()
-	check(doom.score == 2000 and doom.clock_ms > clock_doom, # issue 57: x10
-		"Doomsday Autoclicker: +200 Score and +10s Clock on a Decisive Item use")
+	check(doom.score == 0 and doom.clock_ms > clock_doom,
+		"Doomsday Autoclicker: +10s Clock and no Score on a Decisive Item use")
 	doom.queue_free()
 	await process_frame
 
@@ -311,8 +321,8 @@ func _init() -> void:
 	tape.actions_left = 5
 	tape._use_item(0) # the ONLY held Item — Tape Eraser Magnet's "last held" gate
 	tape._item_confirm_untargeted() # NO-124: arm + Confirm — untargeted Items need one now
-	check(tape.score == 1000 and tape.gold == 50, # issue 57: Score x10, Gold untouched
-		"Tape Eraser Magnet: +100 Score and +50 Gold on using your last held Item")
+	check(tape.score == 0 and tape.gold == 50,
+		"Tape Eraser Magnet: +$50 and no Score on using your last held Item")
 	tape.queue_free()
 	await process_frame
 
@@ -413,7 +423,7 @@ func _init() -> void:
 	await process_frame
 
 	# --- issue 42: Dark Market Light Bulb ("Ranked pieces give double Gold on
-	# Capture; Demoted pieces give no Score on Capture") — the "Ranked" idiom
+	# Capture; Demoted pieces give no $ on Capture", NO-250) — the "Ranked" idiom
 	# mirrors CIA Heart Attack Gun above; "Demoted" reads the new peak_ranked
 	# stamp (ArtefactHooks.run()'s on_rank_up branch, tested end-to-end via a
 	# real merge/demote/promote sequence in test_items_buffs.gd) via
@@ -431,13 +441,20 @@ func _init() -> void:
 	check(dmlb.last_capture_ctx.pts == dmlb_pawn_val,
 		"Dark Market Light Bulb: Score is untouched for a Ranked (not Demoted) attacker")
 	dmlb.gold = 0
-	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(3, 2)) # the Demoted attacker
-	check(dmlb.last_capture_ctx.pts == 0,
-		"Dark Market Light Bulb: a Demoted attacker gives no Score on Capture")
-	check(dmlb.gold == 0, "Dark Market Light Bulb: an unranked (not just Demoted) attacker gets no Gold bonus")
-	Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(4, 2)) # never Ranked, never Demoted
-	check(dmlb.gold == 0 and dmlb.last_capture_ctx.pts == dmlb_pawn_val,
+	dmlb.score = 0
+	var dm_pts := Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(3, 2)) # the Demoted attacker
+	check(dm_pts == dmlb_pawn_val and dmlb.last_capture_ctx.no_gold,
+		"Dark Market Light Bulb: a Demoted attacker's capture still scores, flagged no_gold")
+	dmlb._pay_capture(dm_pts)
+	check(dmlb.gold == 0 and dmlb.score == dmlb_pawn_val * 10,
+		"Dark Market Light Bulb (NO-250): a Demoted attacker pays no $ on Capture, Score unchanged")
+	dmlb.score = 0
+	var ctrl_pts := Economy.capture_score(dmlb, "pawn", "pawn", false, Vector2i(4, 2)) # never Ranked, never Demoted
+	check(not dmlb.last_capture_ctx.no_gold and dmlb.gold == 0, # no Ranked bonus either
 		"Dark Market Light Bulb: a piece that was never Ranked is unaffected")
+	dmlb._pay_capture(ctrl_pts)
+	check(dmlb.gold == dmlb_pawn_val and dmlb.score == dmlb_pawn_val * 10,
+		"Dark Market Light Bulb: an unaffected capture pays its normal $ and Score")
 	dmlb.queue_free()
 	await process_frame
 
@@ -456,10 +473,11 @@ func _init() -> void:
 	# Flyer) — Tuning.BOARD_H, no new hook
 	var dya := _boot({"board": [["pawn", 0, 2, 7], ["pawn", 0, 3, 8], ["pawn", 0, 4, 9],
 			["rook", 1, 7, 10]],
-		"wave": 4, "score": 0, "artefacts": ["dyatlov-geiger-counter"]})
+		"wave": 4, "score": 0, "gold": 0, "artefacts": ["dyatlov-geiger-counter"]})
 	await process_frame
 	Economy.earn(dya, 100)
-	check(dya.score == 2000, "Dyatlov Geiger Counter: +100% Score with 3+ allies on the enemy half") # issue 57: x10
+	check(dya.gold == 150 and dya.score == 1000,
+		"Dyatlov Geiger Counter (NO-250): +50% $ and no Score bonus with 3+ allies on the enemy half")
 	dya.queue_free()
 	await process_frame
 
@@ -503,7 +521,7 @@ func _init() -> void:
 	cheap.gold = 5
 	var s0: int = cheap.score
 	Economy.earn(cheap, 100)
-	check(cheap.score == s0 + 1500, "Fort Knox IOU: +50% Score gain while holding under 10 Gold") # issue 57: x10
+	check(cheap.score == s0 + 1000, "Fort Knox IOU (NO-250): no Score bonus under 10 Gold any more")
 	cheap.queue_free()
 	await process_frame
 
@@ -521,8 +539,8 @@ func _init() -> void:
 	knox.queue_free()
 	await process_frame
 
-	# the under-10 condition still gates it — this is the same read as the
-	# on_score_change half, and a Box is the grant, so no Gold means no Box
+	# the under-10 condition still gates it — a Box is the grant, so at $10+
+	# there is no Box
 	var knox_rich := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 4, "gold": 10, "artefacts": ["fort-knox-iou"]})
 	await process_frame

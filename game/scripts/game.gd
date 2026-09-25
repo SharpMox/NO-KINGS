@@ -415,6 +415,11 @@ var king_power_bitten := false
 ## so it compounds with the turns still to come rather than being a one-off.
 var king_extra_actions := 0
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
+## NO-254: the URL open_feedback() last handed to OS.shell_open — or, in a
+## test/autoplay context (never a real browser to open), recorded here
+## INSTEAD of opening one, so tests can assert against it directly rather
+## than stubbing OS.shell_open.
+var last_feedback_url := ""
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
 var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
@@ -484,9 +489,8 @@ var artefact_echo_depth := 0 # ArtefactHooks re-entrancy guard (artefact hook 21
 var mona_lisa_turn_done := false # 100% Genuine Original Mona Lisa: this Turn's
 	# (player or enemy) first Artefact trigger already echoed; reset in
 	# ArtefactHooks.run() at on_turn_start/on_enemy_turn_start
-var dejavu_score_turn_done := false # Déjà Vu Glitch: this Turn's first Score
+var dejavu_gold_turn_done := false # Déjà Vu Glitch: this Turn's first Gold
 	# gain already doubled; reset in ArtefactHooks.run() at on_turn_start
-var dejavu_gold_turn_done := false # same idea, first Gold gain each Turn
 var frog_armed := false # Frog Pride Flag (issue 45): armed by losing a piece
 	# (on_piece_lost), consumed by the NEXT Deploy (on_deploy) — a single
 	# flag, not one per lost piece: "the next piece" is singular, so losing
@@ -537,7 +541,7 @@ var gold := 0: # per-run spend currency; score stays the up-only metric
 			anims.append({"kind": "text", "t": 0.0, "dur": 1.2, "text": "%d" % (value - gold),
 				"at_px": fx_at if fx_at != Vector2.ZERO
 					else Vector2(hud.gold_label.get_global_rect().end) + Vector2(6, 0),
-				"color": Color(0.95, 0.3, 0.25)})
+				"color": Tuning.money_color(value - gold)})
 			queue_redraw()
 		gold = value
 var shop_stock: Array = [] # 22 rolled slots {kind, key, sold} (scripts/shop.gd)
@@ -551,7 +555,16 @@ var shop_lane_b_progress := 0 # issue 64: Score earned toward the next Lane-B
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
-var actions_left := 0 # unified: move, place, merge, item — 1 action each
+var last_action_banner_shown := false # NO-238: LAST ACTION fires once per Turn;
+	# also pre-set true when the YOUR TURN banner already named a 1-Action turn,
+	# so the same drop-to-1 doesn't additionally fire LAST ACTION (Max: merge, don't stack)
+var actions_left := 0: # unified: move, place, merge, item — 1 action each
+	set(value): # NO-238: dropping to exactly 1 Action fires a banner once per Turn
+		if value == 1 and actions_left != 1 and not last_action_banner_shown \
+				and is_node_ready() and not autoplay and animations_on:
+			_add_turn_fx("LAST ACTION", BANNER_LOSS, "last_action")
+			last_action_banner_shown = true
+		actions_left = value
 var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
@@ -578,6 +591,8 @@ var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
+var magic_bullet_dests: Array[Vector2i] = [] # NO-250: legal_dests reached only
+	# through Curtain Rods Bag's Magic bullet (spent on use)
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 # NO-232 (en passant). Softened from chess's "next move" expiry (ambiguous
 # here — actions_per_turn varies) to "next TURN", per Max's ruling: each side
@@ -722,10 +737,14 @@ const ACTIVATABLE_ARTEFACT_KEYS := [
 	# (user ruling: "it does not belong in the in-run activation UI")
 var oak_island_used_this_turn := false # reset in _begin_player_turn
 var moscovium_active := false # "until end of Turn" — reset in _begin_player_turn;
-	# read directly by Economy.earn() (economy.gd), NOT the REGISTRY: the
+	# read directly by Economy.earn()/earn_gold() (economy.gd), NOT the REGISTRY: the
 	# effect must keep tripling gains after the artefact consumes itself and
 	# leaves g.artefacts, when there is no "held copy" left to dispatch from
 var zapruder_used_this_wave := false # reset in WaveLogic.queue()
+var curtain_rods_used_this_wave := false # NO-250 Magic bullet, reset in WaveLogic.queue()
+var pending_item_boxes := 0 # NO-250 Lusitania: Small Item Boxes owed from a loss
+	# (usually mid enemy turn, where no modal can open) — drained one per
+	# player-turn start, the pending_bounty_boxes idiom
 var bovine_used_this_wave := false # reset in WaveLogic.queue()
 var jet_fuel_used_this_wave := false # Jet Fuel Vial (52): once per Wave,
 	# reset in WaveLogic.queue() — same idiom as zapruder/bovine above (issue
@@ -1228,6 +1247,7 @@ func _clock_text() -> String:
 
 func _clear_selection() -> void:
 	selected = Vector2i(-1, -1)
+	magic_bullet_dests.clear()
 	legal_dests.clear()
 	legal_paths.clear()
 	queue_redraw()
@@ -1425,7 +1445,16 @@ func _process(delta: float) -> void:
 			doomsday_snooze_used_this_wave = true
 		if clock_ms <= 0:
 			clock_ms = 0
-			return _game_over(false, "Clock out")
+			if _held("rapture-insurance-policy"): # NO-250: once per copy, when
+				# the Clock hits 0: all $ becomes Clock (1s per $5), consumed.
+				# A standing-rule read at the threshold, like Doomsday Snooze.
+				_consume_artefact("rapture-insurance-policy")
+				var secs: int = floori(gold / 5.0)
+				_add_turn_fx("Rapture Insurance Policy: $%d -> +%ds" % [gold, secs], BANNER_GAIN)
+				gold = 0
+				Economy.add_clock(self, secs * 1000.0, "rapture-insurance-policy")
+			if clock_ms <= 0:
+				return _game_over(false, "Clock out")
 		hud.update_clock(clock_ms) # NO-127: routes through hud.gd's shared seam
 		if autoplay:
 			AutoplayBot.step(self)
@@ -1444,8 +1473,8 @@ func _process(delta: float) -> void:
 # (2026-09-23; this replaced a skewed, emboldened default font). The font is
 # drawn on a 16 px grid, so BANNER_FONT_SIZE stays a whole multiple of 16 or
 # its pixels smear: 32 is closest to the old 26 in apparent size (18 px caps
-# against Open Sans's ~18.5). Pixel Operator has no ★ or −; they come from the OS
-# system font fallback (NO-256). Source, license: assets/fonts/README.md.
+# against Open Sans's ~18.5). Pixel Operator has no ★ or −; they come from its
+# bundled NoKingsSymbols fallback (ui_fonts.gd). Source, license: assets/fonts/README.md.
 const BANNER_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
 const BANNER_FONT_SIZE := 32
 const BANNER_STRIPE_H := 3.0
@@ -1517,22 +1546,27 @@ func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
 ## Banner colours for the visibility pass — one constant per category so the
 ## policy ("losses red, refunds green, King Powers orange, artefact effects
 ## gold") can be retuned without touching a call site.
-const BANNER_LOSS := Color(0.95, 0.35, 0.3)
+const BANNER_LOSS := Tuning.COL_LOSS # NO-256 (d): the one money red
 const BANNER_GAIN := Color(0.45, 0.85, 0.5)
 const BANNER_POWER := Color(1.0, 0.55, 0.4)
 const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
 
 
 func _begin_player_turn() -> void:
+	var new_actions := Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	last_action_banner_shown = false # re-armed for the new Turn
 	if state == State.ENEMY_TURN: # skip on the SETUP->first-turn transition
-		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
+		_add_turn_fx("YOUR TURN · %d ACTION%s" % [new_actions, "" if new_actions == 1 else "S"],
+			Color(0.45, 0.7, 1.0), "your_turn")
+		if new_actions == 1: # NO-238: the banner above already named a 1-Action
+			last_action_banner_shown = true # Turn; don't also fire LAST ACTION for it
 	turn_number += 1 # issue 35: the single increment site — save_config.gd's
 		# apply() overrides the result AFTER this call (same pattern as
 		# skip_enemy_turns there), since a resumed save must not double-count
 		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	actions_left = new_actions
 	moved_this_turn.clear()
 	player_double_steps.clear() # NO-232: this turn's en passant window closed
 		# with the enemy turn that just ended — starts empty again for
@@ -1572,6 +1606,7 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
+			_add_turn_fx("REINFORCEMENTS", BANNER_GAIN, "reinforcements") # NO-238
 			modals.show_reinforce(_grant_reinforcements()) # NO-141: granted the
 				# instant the screen fires — the modal is announcement only
 	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
@@ -1582,6 +1617,10 @@ func _begin_player_turn() -> void:
 	if pending_yalta_picks > 0: # deferred at background — see the field's own
 		pending_yalta_picks -= 1 # comment. Drained BEFORE Bounty on purpose:
 		_open_yalta_pick() # if this opens, _open_bounty_pick re-queues itself.
+	if pending_item_boxes > 0 and not box_open and not buff_pick_open: # NO-250
+		pending_item_boxes -= 1 # Lusitania: one owed Small Item Box per Turn
+		_open_box_pick({"kind": "box", "key": "item", "size": "small",
+			"sold": false, "contents": Box.roll_options(self, "item", "small")})
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -1744,7 +1783,8 @@ func _run_enemy_actions(actions: int = -1) -> void:
 		actions = Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
-		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232
+		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps,
+			_oligarch_guard()) # NO-232, NO-250
 		# issue 91: the King Ability COSTS THE KING AN ACTION, out of the same
 		# budget the attacks come from — the tradeoff the player plays around.
 		# 2026-09-06: WHEN to spend it is an AI decision, not a turn-start
@@ -2134,9 +2174,8 @@ func _draw_banners() -> void:
 			_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 			_banner_font.hinting = TextServer.HINTING_NONE
 			_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-			# NO-256: no fallbacks here any more — this FontFile is the project Theme's
-			# Bold face too, and a fallback set on it mid-run changed every Control's
-			# line height. ★ and − come from the OS system font fallback.
+			# NO-256: no fallbacks set here — this FontFile is the project Theme's
+			# Bold face too; ui_fonts.gd chains NoKingsSymbols (★ −) on it at boot.
 		# baseline +31: the 18 px caps sit centred in the 44 px band
 		_banner_layer.draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 			HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
@@ -2291,6 +2330,25 @@ func _deploy_tiles() -> Array[Vector2i]:
 ## Artefacts (see _deploy_tiles above) — computed here, in game.gd, and
 ## passed into Rules.legal_moves/ai_action/is_checkmate as a parameter, so
 ## rules.gd never gains a g.artefacts reference of its own.
+## NO-250: Putin's Golden Toilet Brush, "Oligarch" — your highest-value
+## piece can't be captured by a lower-value enemy. Ties: every piece at the
+## top value is guarded (each IS "your highest-value piece"). Values come
+## straight from defs, so a Void/inverted piece counts at its own value.
+## Held copies don't stack — it's a rule, not an amount. Fed into Rules the
+## same way as _enemy_denied_tiles.
+func _oligarch_guard() -> Dictionary:
+	if not _held("putin-s-golden-toilet-brush"):
+		return {}
+	var top := -1
+	for pos in _player_pieces():
+		top = maxi(top, int(defs[board[pos].id].value))
+	var out := {}
+	for pos in _player_pieces():
+		if int(defs[board[pos].id].value) == top:
+			out[pos] = top
+	return out
+
+
 func _enemy_denied_tiles() -> Array[Vector2i]:
 	if not _held("winchester-salt-lined-doors"):
 		return []
@@ -3099,9 +3157,7 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			drag_from = Vector2i(-1, -1)
 			selected = board_lp_prev_selected
 			if selected.x >= 0 and board.has(selected):
-				var ep := _ep_offers_for(board[selected].owner) # NO-232
-				legal_dests = Rules.moves_for(board, selected, defs, "", ep)
-				legal_paths = Rules.move_paths(board, selected, defs, ep)
+				_select_dests(selected)
 			else:
 				selected = Vector2i(-1, -1)
 				legal_dests.clear()
@@ -3110,6 +3166,41 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 		else:
 			board_lp_pending_tile = Vector2i(-1, -1)
 		_show_preview(piece.id, piece.get("king_id", ""), null, piece))
+
+
+## The destinations shown (and, for your own piece, playable) from `at`.
+## NO-250: your sliding piece also gets Curtain Rods Bag's Magic bullet
+## captures (once per Wave): a normal red-hatched capture tile, reached by
+## linked dots through the blocker (Max: no extra ring); an enemy's recon preview drops any capture Oligarch forbids, so the
+## preview never shows a threat the AI can't make.
+func _select_dests(at: Vector2i) -> void:
+	var ep := _ep_offers_for(board[at].owner) # NO-232
+	legal_dests = Rules.moves_for(board, at, defs, "", ep)
+	legal_paths = Rules.move_paths(board, at, defs, ep)
+	magic_bullet_dests.clear()
+	if board[at].owner == Rules.PLAYER:
+		if _held("curtain-rods-bag-rifle-shaped") and not curtain_rods_used_this_wave:
+			for mb in Rules.magic_bullet_targets(board, at, defs):
+				if not legal_dests.has(mb.to):
+					legal_dests.append(mb.to)
+					magic_bullet_dests.append(mb.to)
+					legal_paths.append({"kind": "bent", "line": [mb.through, mb.to]})
+		return
+	var guard := _oligarch_guard()
+	if guard.is_empty():
+		return
+	var value := int(defs[board[at].id].value)
+	var kept: Array[Vector2i] = []
+	for d in legal_dests:
+		if not (guard.has(d) and value < int(guard[d])):
+			kept.append(d)
+	legal_dests = kept
+	var kept_paths: Array[Dictionary] = []
+	for p in legal_paths:
+		var line: Array = p.get("line", [p.get("to")])
+		if not line.any(func(t: Vector2i) -> bool: return not kept.has(t) and guard.has(t)):
+			kept_paths.append(p)
+	legal_paths = kept_paths
 
 
 ## NO-120: _board_tap_is_readonly mirrors this function's branches — which
@@ -3167,8 +3258,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and not moved_this_turn.has(tile) \
 			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", enemy_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, enemy_double_steps)
+		_select_dests(tile)
 		_refresh()
 	elif board.has(tile) and board[tile].owner == Rules.ENEMY:
 		if tile == selected: # re-click on a recon selection: dismiss it
@@ -3177,8 +3267,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			return
 		# read-only recon: show where the enemy can move and what it threatens
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", player_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, player_double_steps)
+		_select_dests(tile)
 		_refresh()
 	else:
 		_clear_selection()
@@ -3293,6 +3382,17 @@ func _setup_to_stock(from: Vector2i) -> void:
 	_refresh()
 
 
+## NO-250: one capture's payout, read off the ctx capture_score just stashed.
+## Score+Gold from `pts` (Economy.earn), then the Artefacts' Gold-only
+## `gold_extra` (earn_gold, ruling G3). Dark Market Light Bulb's `no_gold`
+## drops both Gold halves; the capture still scores.
+func _pay_capture(pts: int) -> void:
+	var ctx := last_capture_ctx
+	Economy.earn(self, pts, "", "", false, not ctx.no_gold)
+	if ctx.gold_extra > 0 and not ctx.no_gold:
+		Economy.earn_gold(self, ctx.gold_extra, "", "", false)
+
+
 func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var king_captured := false
 	var captured_king_id := ""
@@ -3305,6 +3405,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# up front, so every actions_left -= 1 below can consume it.
 	var moving_piece: Dictionary = board[from]
 	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
+	if from == selected and magic_bullet_dests.has(to): # NO-250: this capture
+		# only exists through the Magic bullet — spend this Wave's shot
+		curtain_rods_used_this_wave = true
+		_add_float(from, "Bullet", COL_CAPTURE)
+		ArtefactHooks._note(self, "curtain-rods-bag-rifle-shaped", "Bullet") # #569 terse
 	# NO-232: an en passant capture lands on an EMPTY square with the actual
 	# victim standing elsewhere — teleport it onto `to` BEFORE anything below
 	# reads the board, so every capture branch (repel/reflect/bomb/trap/
@@ -3354,18 +3459,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
 		var capture_pts := Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from, to) \
 			* BuffLogic.capture_multiplier(board, from)
-		# Curtain Rods Bag (issue 31): "first Capture each Wave" is only
-		# knowable here, right after capture_score() sets last_capture_ctx —
-		# wave_capture_index is 0-based, read before Economy.earn runs, so its
-		# on_score_change/on_gold_change handlers below can scope to this one
-		# call by reason alone (see artefact_hooks.gd's header).
-		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
-		# #569 round 2: post_feed=false — a same-frame Multicapture extra
+		# #569 round 2: no auto feed line — a same-frame Multicapture extra
 		# (below) folds into this same kill-feed line via hud.feed_capture()
 		# ("Took Knight" / "Took 2"), not two separate ones.
 		var cap_s0: int = score
 		var cap_g0: int = gold
-		Economy.earn(self, capture_pts, earn_reason, "", false)
+		_pay_capture(capture_pts)
 		hud.feed_capture(defs[victim.id].name, score - cap_s0, gold - cap_g0)
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
@@ -3396,8 +3495,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		for tier in grant_buffs:
 			ArtefactHooks._grant_buff(self, from, tier)
 		if BuffLogic.has(victim, "stun"): # cuts both ways
-			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
-			_add_float(from, "Stunned!", COL_MERGE)
+			if _held("tinfoil-hat"): # NO-250: your pieces can't be Stunned
+				_add_float(from, "Immune", COL_MERGE)
+				ArtefactHooks._note(self, "tinfoil-hat", "Immune")
+			else:
+				BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
+				_add_float(from, "Stunned!", COL_MERGE)
 		# NO-233: Multicapture and Exhibit 399 both search "beside the piece
 		# just captured" — for an ordinary capture that's `to` (attacker and
 		# victim share a tile), but for en passant the victim's real square is
@@ -3413,8 +3516,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				var mc_s0: int = score
 				var mc_g0: int = gold
-				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed, from, also), "", "", false)
+				_pay_capture(Economy.capture_score(self, board[also].id,
+					board[from].id, attacker_buffed, from, also))
 				hud.feed_capture(defs[board[also].id].name, score - mc_s0, gold - mc_g0)
 				if last_capture_ctx.get("to_stock", false): # this call's OWN
 						# ctx (issue 55) — read immediately, before anything
@@ -3571,7 +3674,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# elsewhere in game.gd's _item_apply) never reaches this line
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps)): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard())): # NO-232
 		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
@@ -3929,7 +4032,7 @@ func _open_yalta_pick() -> void:
 		return # same wave clear can already have a modal up, and rendering
 			# this on top means the player picks and the pick goes nowhere.
 	var offers := [
-		{"label": "+$100", "value": "gold"},
+		{"label": "+$100", "value": "gold", "money": 100}, # NO-256 (d): green
 		{"label": "+1 Item", "value": "item"},
 		{"label": "+15s Clock", "value": "clock"},
 	]
@@ -3942,7 +4045,7 @@ func _open_yalta_pick() -> void:
 func _yalta_chosen(value: String) -> void:
 	match value:
 		"gold":
-			Economy.earn(self, 100, "yalta-cocktail-napkin")
+			Economy.earn_gold(self, 100, "yalta-cocktail-napkin") # NO-250: $ only
 		"item":
 			ArtefactHooks.grant_item(self, Items.ITEMS[rng.randi() % Items.ITEMS.size()]) # NO-103
 		"clock":
@@ -4165,7 +4268,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[a] = board[b]
 			board[b] = tmp
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard()): # NO-232
 		if _king_down():
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
@@ -4429,6 +4532,11 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 	if Kings.power_is(self, "purge"): # Stalin: The Purge — no Buffs are gained
 		_add_turn_fx("The Purge", Color(1.0, 0.5, 0.4))
 		return
+	if key == "slow" and piece.get("owner", -1) == Rules.PLAYER and _held("tinfoil-hat"):
+		if pos.x >= 0: # NO-250: your pieces can't be Slowed
+			_add_float(pos, "Immune", COL_MERGE)
+			ArtefactHooks._note(self, "tinfoil-hat", "Immune")
+		return
 	if BuffLogic.catalogued_count(piece) >= buff_cap():
 		if pos.x >= 0:
 			_add_float(pos, "Buffs full", COL_MERGE)
@@ -4608,9 +4716,10 @@ func _artefact_confirmed(key: String) -> void:
 		"oak-island-wishing-well":
 			oak_island_used_this_turn = true
 			Economy.spend_gold(self, 25)
-			Economy.earn(self, 400, "oak-island-wishing-well") # +Score (and its
-				# matching Gold, same as every other earn() reward — Yalta
-				# Cocktail Napkin's "+100 Gold" choice already does this too)
+			# NO-250: a Small Item Box (Fort Knox IOU's shape) — was
+			# Economy.earn(400), which paid +4000 Score AND +$400 for $25
+			_open_box_pick({"kind": "box", "key": "item", "size": "small",
+				"sold": false, "contents": Box.roll_options(self, "item", "small")})
 		"fifa-complimentary-yacht":
 			Economy.spend_gold(self, 50)
 			actions_left += 1
@@ -5159,6 +5268,8 @@ func _open_box_pick(slot: Dictionary) -> void:
 			box_rerolls_left -= 1
 			box_offer = _box_options(box_only_kind, box_size)
 		return _box_choose(box_offer[rng.randi() % box_offer.size()])
+	if box_only_kind == "item" and not ItemLogic.has_room(self): # NO-238: matches
+		_add_turn_fx("INVENTORY FULL", BANNER_LOSS, "inventory_full") # modals.show_box's own gate
 	modals.show_box(box_offer)
 
 
@@ -5362,8 +5473,9 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 		"box":
 			_open_box_pick(Box.random_slot(self))
 		"banner": # NO-234: hand-built, not _add_turn_fx — see
-			# _debug_state_screenshot's header for why
-			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN",
+			# _debug_state_screenshot's header for why. NO-238: illustrates the
+			# turn-start banner's action count, added to this text.
+			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN · 2 ACTIONS",
 				"color": Color(0.45, 0.7, 1.0), "slot": 0})
 			queue_redraw()
 		"tip", "preview":
@@ -5413,6 +5525,11 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			hud.feed_capture("Knight", 150, 15)
 			hud.feed_gain("sell", "Sold Rook", 0, 25)
 			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Buff")
+		"turn-start": # NO-250: the player-turn-start dispatch _begin_player_turn
+			# makes (Pincer's stun and its "Stunned!" float), without the rest
+			# of the turn flow — a scenario boots mid-turn and never calls it
+			ArtefactHooks.run(self, "on_turn_start")
+			queue_redraw()
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")
@@ -6099,6 +6216,17 @@ func _record_history(won: bool) -> void:
 	Economy.record_history(self, won)
 
 
+## NO-254: opens the feedback Google Form in the device browser. Routed
+## through here rather than a direct OS.shell_open at each "Give Feedback"
+## button (pause menu, game over, win screen) so tests and autoplay never
+## pop a real browser — is_scenario/autoplay record the URL instead.
+func open_feedback() -> void:
+	if is_scenario or autoplay:
+		last_feedback_url = Tuning.FEEDBACK_URL
+		return
+	OS.shell_open(Tuning.FEEDBACK_URL)
+
+
 # --- HUD wiring (widgets live in scripts/hud.gd; signals up, calls down) ---
 
 func _connect_hud() -> void:
@@ -6135,6 +6263,7 @@ func _connect_hud() -> void:
 		animations_on = data.get("animations_on", true) # live — no restart needed
 		set_board_theme(data.get("board_theme", DEFAULT_BOARD_THEME))
 		queue_redraw())
+	hud.feedback_pressed.connect(open_feedback)
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -6154,6 +6283,16 @@ func _after_drawer_change() -> void:
 
 
 func _refresh() -> void:
+	# NO-250 Tinfoil Hat: BuffLogic.moves_of is pure (no g), so "can't be
+	# Slowed" — including by an adjacent enemy's Smog — rides a piece flag.
+	# ponytail: re-stamped every refresh; a per-piece hook if refresh ever
+	# stops following every board change.
+	var tinfoil := _held("tinfoil-hat")
+	for pos in board:
+		if tinfoil and board[pos].owner == Rules.PLAYER:
+			board[pos].unslowable = true
+		else:
+			board[pos].erase("unslowable")
 	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
 	hud.refresh()
 	queue_redraw()
@@ -6187,6 +6326,7 @@ func _connect_modals() -> void:
 		_shop_buy(index))
 	modals.shop_tile_preview_requested.connect(func(index: int) -> void:
 		_show_shop_preview(index)) # NO-167 (Max review, second pass)
+	modals.feedback_pressed.connect(open_feedback)
 	modals.restart_pressed.connect(func() -> void:
 		# Restart means a FRESH ROLL (user ruling 2026-09-04). next_config used
 		# to survive the reload, so a run entered via Continue restarted into

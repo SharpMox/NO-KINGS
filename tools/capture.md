@@ -43,7 +43,17 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | `feed` | kill feed with three lines: a capture gain, a sale, an Artefact trigger | `--scenario-name "Movement & drag" --screenshot /tmp/cap/feed --show-screen feed` |
 | `pick` | the shared choice modal, as a Sell confirm | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/pick --show-screen pick` |
 
+| `turn-start` | the player-turn-start Artefact dispatch alone (NO-250 Pincer: the Stunned enemy with its "Stunned!" float; `stunned` has no board badge) | `--scenario-name "NO-250: Pincer" --screenshot /tmp/cap/pincer --show-screen turn-start` |
+
 Other seam flags work with `--scenario-name` too: `--select X,Y[;X,Y]`, `--arm-item KEY [--anchor X,Y]`, `--open-shop`, `--open-drawer stock|inventory` (only one of them per run).
+
+NO-250 Artefact mechanics, through `--select` (a real tap):
+
+| State | Flags after `--` |
+|---|---|
+| Magic bullet preview: the Rook's shot at the Knight through your own Pawn (linked dots through the blocker to a normal red-hatched capture tile) | `--scenario-name "NO-250: Magic bullet" --screenshot /tmp/cap/bullet --select 0,1` |
+| Oligarch: the enemy Pawn's recon preview, with no capture on your Queen | `--scenario-name "NO-250: Oligarch" --screenshot /tmp/cap/oligarch --select 2,4` |
+| Oligarch control: the same preview without the Artefact, with the capture shown | `--scenario-name "NO-250: Oligarch (control, no Artefact)" --screenshot /tmp/cap/oligarch-ctrl --select 2,4` |
 
 Menu screens need no scenario and write `DIR/menu.png`. The run then boots a default game and also writes a `game.png`; ignore that file.
 

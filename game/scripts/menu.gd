@@ -1635,10 +1635,23 @@ func _show_history() -> void:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 6)
 	history_scroll.add_child(box)
+	# NO-263 (Max ruling 2026-09-25): every real run makes this list grow
+	# without bound, so the bottom Back can end up below the fold — a second
+	# Back sits in the header row next to the title, title left / Back right
+	# (same split as guide.gd's catalog pages and show_shop()'s header), and
+	# shares one handler with the bottom Back so they can't drift apart.
+	var go_back := func() -> void:
+		history_scroll.visible = false
+		scores_center.visible = true # NO-147: reached from Scores now
+	var head_row := HBoxContainer.new()
+	head_row.add_theme_constant_override("separation", 8)
+	box.add_child(head_row)
 	var head := Label.new()
 	head.text = "Games History"
 	head.theme_type_variation = &"Title"
-	box.add_child(head)
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_row.add_child(head)
+	_button(head_row, "← Back", 20, go_back) # NO-256: size 20 -> default Button role, same as the bottom one
 	var runs := GameScript.load_history()
 	if runs.is_empty():
 		var none := Label.new()
@@ -1652,9 +1665,7 @@ func _show_history() -> void:
 			int(e.king_abilities), "y" if int(e.king_abilities) == 1 else "ies", int(e.get("lost", 0))]
 		row.theme_type_variation = &"Meta"
 		box.add_child(row)
-	_button(box, "← Back", 20, func() -> void:
-		history_scroll.visible = false
-		scores_center.visible = true) # NO-147: reached from Scores now
+	_button(box, "← Back", 20, go_back)
 
 
 ## NO-147: reached from Settings now, so settings_panel is hidden here rather

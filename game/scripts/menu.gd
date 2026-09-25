@@ -576,6 +576,7 @@ var sync_offline_note: Label
 var provider_offline_note: Label
 var global_btn: Button # the Scores screen's door; rebuilt with that screen
 var global_offline_note: Label
+var version_label: Label # bottom-centre build number, root main menu only
 
 
 ## Did the launch ask for a specific window size? `--resolution` cannot be
@@ -781,6 +782,27 @@ func _ready() -> void:
 	# _notification above), so the button only duplicated a platform
 	# affordance every player already has. Do not re-add it on noticing it's
 	# gone — this is deliberate.
+
+	# Max ruling 2026-09-25: the running build number, bottom centre of the
+	# ROOT main menu only — never on Guide/Settings/TEST/Play/Scores/login/
+	# about. A SIBLING of main_box, not a child of it, so it's pinned to the
+	# screen's own bottom edge (PRESET_BOTTOM_WIDE) regardless of how tall the
+	# button stack grows, rather than riding along inside the centred VBox.
+	# Visibility just tracks main_box's own visible property — every
+	# sub-screen already flips that to leave, so this needs no per-screen
+	# wiring of its own.
+	version_label = Label.new()
+	version_label.text = "v%s" % ProjectSettings.get_setting("application/config/version", "dev")
+	version_label.theme_type_variation = &"Meta"
+	version_label.modulate = Color(1, 1, 1, 0.55) # same muted-grey alpha as _offline_note/login_note
+	version_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	version_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	version_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	version_label.offset_top = -24
+	version_label.offset_bottom = -8
+	add_child(version_label)
+	version_label.visible = main_box.visible
+	main_box.visibility_changed.connect(func() -> void: version_label.visible = main_box.visible)
 
 	# Guide and Settings are shared with the in-game menu (scripts/guide.gd,
 	# scripts/settings.gd) so the two entry points can't drift apart

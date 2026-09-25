@@ -159,6 +159,24 @@ func _init() -> void:
 	# affordance every player already has.
 	check(_find_button(menu, "Quit") == null, "NO-147: Quit is gone, on every platform")
 
+	# Max ruling 2026-09-25: the running build number, bottom centre of the
+	# root main menu. Awaited a further frame so the layout has settled
+	# before the overlap check reads global rects (CLAUDE.md: a freshly
+	# added control's rect is not usable until the next idle frame).
+	await process_frame
+	check(menu.version_label != null, "version label exists on the main menu")
+	var expected_version := "v%s" % ProjectSettings.get_setting("application/config/version", "dev")
+	check(menu.version_label.text == expected_version,
+		"version label shows %s (got %s)" % [expected_version, menu.version_label.text])
+	var version_rect: Rect2 = menu.version_label.get_global_rect()
+	var version_overlaps_button := false
+	for main_child in menu.main_box.get_children():
+		if main_child is Button and main_child.visible \
+				and version_rect.intersects(main_child.get_global_rect()):
+			version_overlaps_button = true
+	check(not version_overlaps_button,
+		"version label does not overlap any main-menu button")
+
 	# TEST opens the scenario list (this click is what PR #20 shipped broken:
 	# the hidden submenu's ScrollContainer swallowed every mouse event).
 	# NO-147: TEST now nests inside Settings, reached in two taps.

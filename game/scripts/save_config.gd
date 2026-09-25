@@ -141,6 +141,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.turns_since_wave = int(cfg.get("turns_since_wave", 0))
 	g.early_clear_awarded = bool(cfg.get("early_clear_awarded", false))
 	g.pending_bounty_boxes = int(cfg.get("pending_bounty_boxes", 0))
+	g.pending_item_boxes = int(cfg.get("pending_item_boxes", 0)) # NO-250, additive
 	g.pending_yalta_picks = int(cfg.get("pending_yalta_picks", 0))
 	g.pending_reinforce = bool(cfg.get("pending_reinforce", false))
 	g.pending_shop_open = bool(cfg.get("pending_shop_open", false)) # issue 101:
@@ -202,6 +203,7 @@ static func apply(g, cfg: Dictionary) -> void:
 	# next Tariff", and its var declaration starts true. Defaulting it false
 	# would hand every pre-NO-20 save a spent Salvation Gift Card it never used.
 	g.zapruder_used_this_wave = bool(cfg.get("zapruder_used_this_wave", false))
+	g.curtain_rods_used_this_wave = bool(cfg.get("curtain_rods_used_this_wave", false)) # NO-250, additive
 	g.bovine_used_this_wave = bool(cfg.get("bovine_used_this_wave", false))
 	g.jet_fuel_used_this_wave = bool(cfg.get("jet_fuel_used_this_wave", false))
 	g.uap_used_this_wave = bool(cfg.get("uap_used_this_wave", false))
@@ -425,6 +427,7 @@ static func to_config(g) -> Dictionary:
 		# destroyed every queued Box. Additive with a 0 default, so old saves
 		# read back exactly as they did before.
 		"pending_bounty_boxes": g.pending_bounty_boxes,
+		"pending_item_boxes": g.pending_item_boxes,
 		"pending_yalta_picks": g.pending_yalta_picks,
 		"kings_defeated": g.kings_defeated, "king_ids_defeated": g.king_ids_defeated.duplicate(),
 		"king_tier": g.king_tier, "king_order": g.king_order.duplicate(), # issue 89
@@ -440,6 +443,7 @@ static func to_config(g) -> Dictionary:
 		# NO-20 — see the matching block in apply() for why each default is
 		# what it is. Additive: no migration, no version bump.
 		"zapruder_used_this_wave": g.zapruder_used_this_wave,
+		"curtain_rods_used_this_wave": g.curtain_rods_used_this_wave,
 		"bovine_used_this_wave": g.bovine_used_this_wave,
 		"jet_fuel_used_this_wave": g.jet_fuel_used_this_wave,
 		"uap_used_this_wave": g.uap_used_this_wave,

@@ -1878,6 +1878,190 @@ func _init() -> void:
 	rapture.queue_free()
 	await process_frame
 
+	# --- NO-250 (2/2): the three new mechanics, plus Tinfoil Hat and Lusitania ---
+
+	# Rules.magic_bullet_targets: a sliding piece captures through exactly one
+	# blocker, of either side; two blockers, or a leaper, get nothing
+	var mb_board := {
+		Vector2i(0, 0): {"id": "rook", "owner": Rules.PLAYER},
+		Vector2i(0, 2): {"id": "pawn", "owner": Rules.PLAYER}, # own blocker
+		Vector2i(0, 5): {"id": "knight", "owner": Rules.ENEMY}, # shot through it
+		Vector2i(2, 0): {"id": "pawn", "owner": Rules.ENEMY}, # enemy blocker
+		Vector2i(4, 0): {"id": "pawn", "owner": Rules.ENEMY},
+		Vector2i(6, 0): {"id": "pawn", "owner": Rules.ENEMY}, # two blockers deep
+		Vector2i(5, 5): {"id": "knight", "owner": Rules.PLAYER},
+		Vector2i(5, 6): {"id": "pawn", "owner": Rules.PLAYER},
+		Vector2i(5, 8): {"id": "pawn", "owner": Rules.ENEMY},
+	}
+	var mb_defs: Dictionary = Rules.load_pieces()
+	var mb_to: Array = Rules.magic_bullet_targets(mb_board, Vector2i(0, 0), mb_defs).map(
+		func(t: Dictionary) -> Vector2i: return t.to)
+	check(mb_to.has(Vector2i(0, 5)), "Magic bullet: a Rook shoots through its own blocker")
+	check(mb_to.has(Vector2i(4, 0)), "Magic bullet: ...and through an enemy blocker")
+	check(not mb_to.has(Vector2i(6, 0)), "Magic bullet: never through TWO blockers")
+	check(Rules.magic_bullet_targets(mb_board, Vector2i(5, 5), mb_defs).is_empty(),
+		"Magic bullet: a leaper (Knight) is not a sliding piece")
+
+	# in play: selecting the Rook offers the shot, taking it spends the Wave's
+	# one charge, the blocker survives; the next Wave recharges it
+	var crb2 := _boot({"board": [["rook", 0, 0, 1], ["pawn", 0, 0, 2], ["knight", 1, 0, 6],
+		["pawn", 1, 3, 1], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["curtain-rods-bag-rifle-shaped", "curtain-rods-bag-rifle-shaped"]})
+	await process_frame
+	crb2.actions_left = 5
+	crb2._on_tile_clicked(Vector2i(0, 1))
+	check(crb2.legal_dests.has(Vector2i(0, 6)) and crb2.magic_bullet_dests.size() == 1 and crb2.magic_bullet_dests.has(Vector2i(0, 6)),
+		"Magic bullet: the shot through the blocker is in the preview, flagged as a Magic bullet")
+	check(crb2.legal_paths.any(func(p: Dictionary) -> bool:
+			return p.kind == "bent" and p.line == [Vector2i(0, 2), Vector2i(0, 6)]),
+		"Magic bullet: the preview draws its path through the blocker")
+	crb2._on_tile_clicked(Vector2i(0, 6))
+	check(crb2.board.has(Vector2i(0, 6)) and crb2.board[Vector2i(0, 6)].id == "rook"
+			and crb2.board[Vector2i(0, 6)].owner == Rules.PLAYER and crb2.board.has(Vector2i(0, 2)),
+		"Magic bullet: the Rook captures through its pawn, which stays put")
+	check(crb2.curtain_rods_used_this_wave, "Magic bullet: the shot is spent")
+	crb2.board[Vector2i(0, 9)] = {"id": "knight", "owner": Rules.ENEMY}
+	crb2.board[Vector2i(0, 7)] = {"id": "pawn", "owner": Rules.PLAYER}
+	crb2.moved_this_turn.clear() # let the Rook be selected again this Turn
+	crb2._on_tile_clicked(Vector2i(0, 6))
+	check(crb2.selected == Vector2i(0, 6), "(setup) the Rook is selected again")
+	check(crb2.magic_bullet_dests.is_empty() and not crb2.legal_dests.has(Vector2i(0, 9)),
+		"Magic bullet: once per Wave, even with two copies held")
+	crb2._clear_selection()
+	WaveLogic.queue(crb2, crb2.wave + 1)
+	crb2.moved_this_turn.clear()
+	crb2._on_tile_clicked(Vector2i(0, 6))
+	check(crb2.magic_bullet_dests.has(Vector2i(0, 9)), "Magic bullet: the next Wave recharges it")
+	crb2.queue_free()
+	await process_frame
+
+	var crb_ordinary := _boot({"board": [["rook", 0, 0, 1], ["knight", 1, 0, 6], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["curtain-rods-bag-rifle-shaped"]})
+	await process_frame
+	crb_ordinary.actions_left = 5
+	crb_ordinary._on_tile_clicked(Vector2i(0, 1))
+	crb_ordinary._on_tile_clicked(Vector2i(0, 6))
+	check(not crb_ordinary.curtain_rods_used_this_wave,
+		"Magic bullet: an ordinary capture does not spend the shot")
+	crb_ordinary.queue_free()
+	await process_frame
+
+	# Men in Black "Pincer": at Turn start, an enemy beside TWO of your
+	# same-type pieces is Stunned for the coming enemy turn
+	var mib := _boot({"board": [["pawn", 0, 3, 4], ["pawn", 0, 5, 4], ["knight", 1, 4, 5],
+		["pawn", 0, 1, 7], ["bishop", 0, 3, 7], ["knight", 1, 2, 8], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["men-in-black-prescription-sunglasses", "men-in-black-prescription-sunglasses"]})
+	await process_frame
+	ArtefactHooks.run(mib, "on_turn_start")
+	check(BuffLogic.has(mib.board[Vector2i(4, 5)], "stunned"),
+		"Pincer: an enemy between two of your Pawns is Stunned")
+	check(not BuffLogic.has(mib.board[Vector2i(2, 8)], "stunned"),
+		"Pincer: two DIFFERENT types beside it don't count")
+	check(mib.board[Vector2i(4, 5)].get("buffs", []).filter(func(b: Dictionary) -> bool:
+			return b.key == "stunned").size() == 1,
+		"Pincer: two held copies stun once, not twice")
+	var mib_act := Rules.ai_action(mib.board, mib.defs)
+	check(mib_act.is_empty() or mib_act.from != Vector2i(4, 5), "Pincer: the Stunned enemy sits the turn out")
+	for pos in mib.board:
+		if mib.board[pos].owner == Rules.ENEMY:
+			BuffLogic.tick_side(mib.board[pos]) # the enemy turn ends
+	check(not BuffLogic.has(mib.board[Vector2i(4, 5)], "stunned"), "Pincer: the Stun lasts that Turn only")
+	mib.queue_free()
+	await process_frame
+
+	# Putin's Golden Toilet Brush "Oligarch": your highest-value piece can't
+	# be captured by a lower-value enemy — AI, checkmate and recon alike
+	var oli := _boot({"board": [["queen", 0, 3, 3], ["pawn", 0, 0, 1], ["pawn", 1, 2, 4],
+		["queen", 1, 3, 8], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["putin-s-golden-toilet-brush", "putin-s-golden-toilet-brush"]})
+	await process_frame
+	var guard: Dictionary = oli._oligarch_guard()
+	check(guard.keys() == [Vector2i(3, 3)], "Oligarch: guards only the highest-value piece (two copies, one rule)")
+	var oli_moves := Rules.legal_moves(oli.board, Rules.ENEMY, oli.defs, false, [], [], guard)
+	check(not oli_moves.any(func(m: Dictionary) -> bool: return m.from == Vector2i(2, 4) and m.to == Vector2i(3, 3)),
+		"Oligarch: a lower-value enemy (Pawn) cannot capture your Queen")
+	check(oli_moves.any(func(m: Dictionary) -> bool: return m.from == Vector2i(3, 8) and m.to == Vector2i(3, 3)),
+		"Oligarch: an equal-value enemy (Queen) still can")
+	check(Rules.legal_moves(oli.board, Rules.ENEMY, oli.defs, false).any(func(m: Dictionary) -> bool:
+			return m.from == Vector2i(2, 4) and m.to == Vector2i(3, 3)),
+		"(control) without the guard the Pawn can take the Queen")
+	oli.board.erase(Vector2i(3, 8))
+	var oli_act := Rules.ai_action(oli.board, oli.defs, [], [], guard)
+	check(oli_act.is_empty() or oli_act.to != Vector2i(3, 3), "Oligarch: the enemy AI never takes the guarded piece")
+	oli.state = oli.State.PLAYER_TURN
+	oli._on_tile_clicked(Vector2i(2, 4)) # recon preview of the enemy pawn
+	check(not oli.legal_dests.has(Vector2i(3, 3)), "Oligarch: the recon preview doesn't show the forbidden capture")
+	oli.queue_free()
+	await process_frame
+
+	var oli_tie := _boot({"board": [["rook", 0, 2, 2], ["inv-sergeant", 0, 5, 2], ["rook", 0, 6, 2],
+		["rook", 1, 7, 10]], "wave": 3, "artefacts": ["putin-s-golden-toilet-brush"]})
+	await process_frame
+	var tie_guard: Dictionary = oli_tie._oligarch_guard()
+	check(tie_guard.size() == 2 and tie_guard.has(Vector2i(2, 2)) and tie_guard.has(Vector2i(6, 2)),
+		"Oligarch: a tie for highest value guards every tied piece")
+	oli_tie.board.erase(Vector2i(2, 2))
+	oli_tie.board.erase(Vector2i(6, 2))
+	check(oli_tie._oligarch_guard().keys() == [Vector2i(5, 2)],
+		"Oligarch: a Void (inverted) piece is guarded at its own value when it's the highest")
+	oli_tie.queue_free()
+	await process_frame
+
+	var oli_off := _boot({"board": [["queen", 0, 3, 3], ["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	check(oli_off._oligarch_guard().is_empty(), "Oligarch: nothing is guarded without the Artefact")
+	oli_off.queue_free()
+	await process_frame
+
+	# Tinfoil Hat: your pieces can't be Stunned or Slowed (Slow, and Smog)
+	var tin := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 3, {"buffs": [{"key": "stun"}]}],
+		["rook", 0, 5, 2], ["knight", 1, 6, 3, {"buffs": [{"key": "smog", "turns": 2}]}],
+		["rook", 1, 7, 10]], "wave": 3, "artefacts": ["tinfoil-hat"]})
+	await process_frame
+	tin.actions_left = 5
+	tin._move_player(Vector2i(2, 2), Vector2i(3, 3))
+	check(not BuffLogic.has(tin.board[Vector2i(3, 3)], "stunned"), "Tinfoil Hat: capturing a Stun carrier doesn't Stun you")
+	tin._apply_buff(tin.board[Vector2i(3, 3)], "slow", 1, Vector2i(3, 3))
+	check(not BuffLogic.has(tin.board[Vector2i(3, 3)], "slow"), "Tinfoil Hat: Slow can't land on your piece")
+	tin._refresh()
+	check(Rules.moves_for(tin.board, Vector2i(5, 2), tin.defs).has(Vector2i(5, 6)),
+		"Tinfoil Hat: an adjacent enemy's Smog doesn't Slow your Rook")
+	tin.queue_free()
+	await process_frame
+
+	var tin_off := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 3, 3, {"buffs": [{"key": "stun"}]}],
+		["rook", 0, 5, 2], ["knight", 1, 6, 3, {"buffs": [{"key": "smog", "turns": 2}]}],
+		["rook", 1, 7, 10]], "wave": 3})
+	await process_frame
+	tin_off.actions_left = 5
+	tin_off._move_player(Vector2i(2, 2), Vector2i(3, 3))
+	check(BuffLogic.has(tin_off.board[Vector2i(3, 3)], "stunned"), "(control) without Tinfoil Hat the capturer is Stunned")
+	tin_off._refresh()
+	check(not Rules.moves_for(tin_off.board, Vector2i(5, 2), tin_off.defs).has(Vector2i(5, 6)),
+		"(control) without Tinfoil Hat the Smog Slows the Rook")
+	tin_off.queue_free()
+	await process_frame
+
+	# Lusitania "Hardtack" Crate: +10s and a Small Item Box on losing a Buffed
+	# piece — owed, then opened at the next player-turn start
+	var lus2 := _boot({"board": [["queen", 0, 2, 2, {"buffs": [{"key": "critical"}]}],
+		["pawn", 0, 4, 2], ["rook", 1, 7, 10]], "wave": 3, "stock": ["pawn"],
+		"artefacts": ["lusitania-hardtack-crate", "lusitania-hardtack-crate"]})
+	await process_frame
+	lus2._destroy(Vector2i(4, 2)) # unbuffed: nothing
+	check(lus2.pending_item_boxes == 0, "Lusitania: an unbuffed loss owes nothing")
+	var lus_clock: float = lus2.clock_ms
+	lus2._destroy(Vector2i(2, 2))
+	check(lus2.pending_item_boxes == 2 and lus2.clock_ms >= lus_clock + 19000.0,
+		"Lusitania: two copies owe two Boxes and +20s")
+	lus2.state = lus2.State.ENEMY_TURN
+	lus2._begin_player_turn()
+	check(lus2.box_open and lus2.box_only_kind == "item" and lus2.box_size == "small"
+			and lus2.pending_item_boxes == 1,
+		"Lusitania: the next player turn opens one Small Item Box (the other waits)")
+	lus2.queue_free()
+	await process_frame
+
 	print("---")
 	if fails == 0:
 		print("ALL ARTEFACTS 4 CHECKS OK")

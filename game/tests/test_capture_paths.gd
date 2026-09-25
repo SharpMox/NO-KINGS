@@ -6,6 +6,7 @@ extends SceneTree
 ## the state behind it does not.
 ## Run headless:  godot --headless --path game -s tests/test_capture_paths.gd
 
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const UiDemo := preload("res://scripts/ui_demo.gd")
@@ -77,6 +78,7 @@ func _init() -> void:
 		["stock-return", "Movement & drag"],
 		["feed", "Movement & drag"],
 		["pick", UiDemo.SCENARIO],
+		["turn-start", "NO-250: Pincer"],
 	]
 	for shot in shots:
 		var screen: String = shot[0]
@@ -126,7 +128,26 @@ func _init() -> void:
 			"pick":
 				check(game.modals.buff_panel != null and _has_button(game.modals.buff_panel, "Sell"),
 					"pick: the shared choice modal, as a Sell confirm")
+			"turn-start":
+				check(BuffLogic.has(game.board[Vector2i(4, 4)], "stunned"),
+					"turn-start: Pincer stuns the enemy Pawn between the two Knights (NO-250)")
 		await _free(game)
+
+	# --- NO-250 `--select` captures (tools/capture.md): the state each tap
+	# leaves, since the capture itself needs a window ---
+	var bullet := await _boot("NO-250: Magic bullet")
+	bullet._on_tile_clicked(Vector2i(0, 1))
+	check(bullet.magic_bullet_dests.has(Vector2i(0, 6)) and bullet.legal_paths.any(
+			func(p: Dictionary) -> bool: return p.kind == "bent" and p.line.has(Vector2i(0, 2))),
+		"--select 0,1 on 'NO-250: Magic bullet': the shot through the Pawn is previewed")
+	await _free(bullet)
+	for oli_case in [["NO-250: Oligarch", false], ["NO-250: Oligarch (control, no Artefact)", true]]:
+		var oli := await _boot(oli_case[0])
+		oli._on_tile_clicked(Vector2i(2, 4))
+		check(oli.legal_dests.has(Vector2i(3, 3)) == oli_case[1],
+			"--select 2,4 on '%s': the enemy Pawn's capture of the Queen is %s" % [oli_case[0],
+				"shown" if oli_case[1] else "refused"])
+		await _free(oli)
 
 	# --- --open-drawer stock on the Promote-badge scenario (NO-100) ----------
 	# It captured the Shop: an enemy-free board made the first turn queue wave

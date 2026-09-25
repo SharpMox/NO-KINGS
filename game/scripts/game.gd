@@ -583,6 +583,8 @@ var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
+var magic_bullet_dests: Array[Vector2i] = [] # NO-250: legal_dests reached only
+	# through Curtain Rods Bag's Magic bullet (spent on use)
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 # NO-232 (en passant). Softened from chess's "next move" expiry (ambiguous
 # here — actions_per_turn varies) to "next TURN", per Max's ruling: each side
@@ -731,6 +733,10 @@ var moscovium_active := false # "until end of Turn" — reset in _begin_player_t
 	# effect must keep tripling gains after the artefact consumes itself and
 	# leaves g.artefacts, when there is no "held copy" left to dispatch from
 var zapruder_used_this_wave := false # reset in WaveLogic.queue()
+var curtain_rods_used_this_wave := false # NO-250 Magic bullet, reset in WaveLogic.queue()
+var pending_item_boxes := 0 # NO-250 Lusitania: Small Item Boxes owed from a loss
+	# (usually mid enemy turn, where no modal can open) — drained one per
+	# player-turn start, the pending_bounty_boxes idiom
 var bovine_used_this_wave := false # reset in WaveLogic.queue()
 var jet_fuel_used_this_wave := false # Jet Fuel Vial (52): once per Wave,
 	# reset in WaveLogic.queue() — same idiom as zapruder/bovine above (issue
@@ -1233,6 +1239,7 @@ func _clock_text() -> String:
 
 func _clear_selection() -> void:
 	selected = Vector2i(-1, -1)
+	magic_bullet_dests.clear()
 	legal_dests.clear()
 	legal_paths.clear()
 	queue_redraw()
@@ -1601,6 +1608,10 @@ func _begin_player_turn() -> void:
 	if pending_yalta_picks > 0: # deferred at background — see the field's own
 		pending_yalta_picks -= 1 # comment. Drained BEFORE Bounty on purpose:
 		_open_yalta_pick() # if this opens, _open_bounty_pick re-queues itself.
+	if pending_item_boxes > 0 and not box_open and not buff_pick_open: # NO-250
+		pending_item_boxes -= 1 # Lusitania: one owed Small Item Box per Turn
+		_open_box_pick({"kind": "box", "key": "item", "size": "small",
+			"sold": false, "contents": Box.roll_options(self, "item", "small")})
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -1763,7 +1774,8 @@ func _run_enemy_actions(actions: int = -1) -> void:
 		actions = Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
-		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232
+		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps,
+			_oligarch_guard()) # NO-232, NO-250
 		# issue 91: the King Ability COSTS THE KING AN ACTION, out of the same
 		# budget the attacks come from — the tradeoff the player plays around.
 		# 2026-09-06: WHEN to spend it is an AI decision, not a turn-start
@@ -2230,6 +2242,25 @@ func _deploy_tiles() -> Array[Vector2i]:
 ## Artefacts (see _deploy_tiles above) — computed here, in game.gd, and
 ## passed into Rules.legal_moves/ai_action/is_checkmate as a parameter, so
 ## rules.gd never gains a g.artefacts reference of its own.
+## NO-250: Putin's Golden Toilet Brush, "Oligarch" — your highest-value
+## piece can't be captured by a lower-value enemy. Ties: every piece at the
+## top value is guarded (each IS "your highest-value piece"). Values come
+## straight from defs, so a Void/inverted piece counts at its own value.
+## Held copies don't stack — it's a rule, not an amount. Fed into Rules the
+## same way as _enemy_denied_tiles.
+func _oligarch_guard() -> Dictionary:
+	if not _held("putin-s-golden-toilet-brush"):
+		return {}
+	var top := -1
+	for pos in _player_pieces():
+		top = maxi(top, int(defs[board[pos].id].value))
+	var out := {}
+	for pos in _player_pieces():
+		if int(defs[board[pos].id].value) == top:
+			out[pos] = top
+	return out
+
+
 func _enemy_denied_tiles() -> Array[Vector2i]:
 	if not _held("winchester-salt-lined-doors"):
 		return []
@@ -3038,9 +3069,7 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			drag_from = Vector2i(-1, -1)
 			selected = board_lp_prev_selected
 			if selected.x >= 0 and board.has(selected):
-				var ep := _ep_offers_for(board[selected].owner) # NO-232
-				legal_dests = Rules.moves_for(board, selected, defs, "", ep)
-				legal_paths = Rules.move_paths(board, selected, defs, ep)
+				_select_dests(selected)
 			else:
 				selected = Vector2i(-1, -1)
 				legal_dests.clear()
@@ -3049,6 +3078,41 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 		else:
 			board_lp_pending_tile = Vector2i(-1, -1)
 		_show_preview(piece.id, piece.get("king_id", ""), null, piece))
+
+
+## The destinations shown (and, for your own piece, playable) from `at`.
+## NO-250: your sliding piece also gets Curtain Rods Bag's Magic bullet
+## captures (once per Wave): a normal red-hatched capture tile, reached by
+## linked dots through the blocker (Max: no extra ring); an enemy's recon preview drops any capture Oligarch forbids, so the
+## preview never shows a threat the AI can't make.
+func _select_dests(at: Vector2i) -> void:
+	var ep := _ep_offers_for(board[at].owner) # NO-232
+	legal_dests = Rules.moves_for(board, at, defs, "", ep)
+	legal_paths = Rules.move_paths(board, at, defs, ep)
+	magic_bullet_dests.clear()
+	if board[at].owner == Rules.PLAYER:
+		if _held("curtain-rods-bag-rifle-shaped") and not curtain_rods_used_this_wave:
+			for mb in Rules.magic_bullet_targets(board, at, defs):
+				if not legal_dests.has(mb.to):
+					legal_dests.append(mb.to)
+					magic_bullet_dests.append(mb.to)
+					legal_paths.append({"kind": "bent", "line": [mb.through, mb.to]})
+		return
+	var guard := _oligarch_guard()
+	if guard.is_empty():
+		return
+	var value := int(defs[board[at].id].value)
+	var kept: Array[Vector2i] = []
+	for d in legal_dests:
+		if not (guard.has(d) and value < int(guard[d])):
+			kept.append(d)
+	legal_dests = kept
+	var kept_paths: Array[Dictionary] = []
+	for p in legal_paths:
+		var line: Array = p.get("line", [p.get("to")])
+		if not line.any(func(t: Vector2i) -> bool: return not kept.has(t) and guard.has(t)):
+			kept_paths.append(p)
+	legal_paths = kept_paths
 
 
 ## NO-120: _board_tap_is_readonly mirrors this function's branches — which
@@ -3106,8 +3170,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and not moved_this_turn.has(tile) \
 			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", enemy_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, enemy_double_steps)
+		_select_dests(tile)
 		_refresh()
 	elif board.has(tile) and board[tile].owner == Rules.ENEMY:
 		if tile == selected: # re-click on a recon selection: dismiss it
@@ -3116,8 +3179,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			return
 		# read-only recon: show where the enemy can move and what it threatens
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", player_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, player_double_steps)
+		_select_dests(tile)
 		_refresh()
 	else:
 		_clear_selection()
@@ -3255,6 +3317,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# up front, so every actions_left -= 1 below can consume it.
 	var moving_piece: Dictionary = board[from]
 	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
+	if from == selected and magic_bullet_dests.has(to): # NO-250: this capture
+		# only exists through the Magic bullet — spend this Wave's shot
+		curtain_rods_used_this_wave = true
+		_add_float(from, "Bullet", COL_CAPTURE)
+		ArtefactHooks._note(self, "curtain-rods-bag-rifle-shaped", "Bullet") # #569 terse
 	# NO-232: an en passant capture lands on an EMPTY square with the actual
 	# victim standing elsewhere — teleport it onto `to` BEFORE anything below
 	# reads the board, so every capture branch (repel/reflect/bomb/trap/
@@ -3340,8 +3407,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		for tier in grant_buffs:
 			ArtefactHooks._grant_buff(self, from, tier)
 		if BuffLogic.has(victim, "stun"): # cuts both ways
-			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
-			_add_float(from, "Stunned!", COL_MERGE)
+			if _held("tinfoil-hat"): # NO-250: your pieces can't be Stunned
+				_add_float(from, "Immune", COL_MERGE)
+				ArtefactHooks._note(self, "tinfoil-hat", "Immune")
+			else:
+				BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
+				_add_float(from, "Stunned!", COL_MERGE)
 		# NO-233: Multicapture and Exhibit 399 both search "beside the piece
 		# just captured" — for an ordinary capture that's `to` (attacker and
 		# victim share a tile), but for en passant the victim's real square is
@@ -3515,7 +3586,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# elsewhere in game.gd's _item_apply) never reaches this line
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps)): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard())): # NO-232
 		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
@@ -4097,7 +4168,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[a] = board[b]
 			board[b] = tmp
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard()): # NO-232
 		if _king_down():
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
@@ -4359,6 +4430,11 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 		pos := Vector2i(-1, -1), fire_hook := true) -> void:
 	if Kings.power_is(self, "purge"): # Stalin: The Purge — no Buffs are gained
 		_add_turn_fx("The Purge", Color(1.0, 0.5, 0.4))
+		return
+	if key == "slow" and piece.get("owner", -1) == Rules.PLAYER and _held("tinfoil-hat"):
+		if pos.x >= 0: # NO-250: your pieces can't be Slowed
+			_add_float(pos, "Immune", COL_MERGE)
+			ArtefactHooks._note(self, "tinfoil-hat", "Immune")
 		return
 	if BuffLogic.catalogued_count(piece) >= buff_cap():
 		if pos.x >= 0:
@@ -5343,6 +5419,11 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			hud.feed_capture("Knight", 150, 15)
 			hud.feed_gain("sell", "Sold Rook", 0, 25)
 			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Buff")
+		"turn-start": # NO-250: the player-turn-start dispatch _begin_player_turn
+			# makes (Pincer's stun and its "Stunned!" float), without the rest
+			# of the turn flow — a scenario boots mid-turn and never calls it
+			ArtefactHooks.run(self, "on_turn_start")
+			queue_redraw()
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")
@@ -6034,6 +6115,16 @@ func _after_drawer_change() -> void:
 
 
 func _refresh() -> void:
+	# NO-250 Tinfoil Hat: BuffLogic.moves_of is pure (no g), so "can't be
+	# Slowed" — including by an adjacent enemy's Smog — rides a piece flag.
+	# ponytail: re-stamped every refresh; a per-piece hook if refresh ever
+	# stops following every board change.
+	var tinfoil := _held("tinfoil-hat")
+	for pos in board:
+		if tinfoil and board[pos].owner == Rules.PLAYER:
+			board[pos].unslowable = true
+		else:
+			board[pos].erase("unslowable")
 	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
 	hud.refresh()
 	queue_redraw()

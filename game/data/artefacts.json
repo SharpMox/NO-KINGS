@@ -5,9 +5,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Gold"
   ],
-  "effect": "+5% Score gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50",
+  "effect": "+5% $ gain per consecutive Wave cleared without losing a piece; on losing a piece: resets and -$50",
   "conspiracy": "The 27 Club",
   "implemented": true
  },
@@ -17,9 +17,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Special"
   ],
-  "effect": "+15% Score gain; -5% $ gain",
+  "effect": "Your pieces can't be Stunned or Slowed",
   "conspiracy": "Tin foil hat",
   "implemented": true
  },
@@ -41,10 +41,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Item"
   ],
-  "effect": "While holding under $10: +50% Score gain; on Wave clear while under $10: open a Small Item Box",
+  "effect": "On Wave clear while holding under $10: open a Small Item Box",
   "conspiracy": "Fort Knox's missing gold",
   "implemented": true
  },
@@ -78,10 +77,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "Each Capture in a Turn gives +25% more Score and $ than the previous one; resets at Turn end",
+  "effect": "Each Capture in a Turn gives +25% more $ than the previous one; resets at Turn end",
   "conspiracy": "The Great Fire of Rome",
   "implemented": true
  },
@@ -103,9 +101,10 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Gold",
+   "Shop"
   ],
-  "effect": "+20% Score gain",
+  "effect": "+20% $ gain; Shop prices +10%",
   "conspiracy": "Fake gold bars",
   "implemented": true
  },
@@ -139,10 +138,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On capturing the highest-value enemy piece on the Board: +150 Score and +$3",
+  "effect": "On capturing the highest-value enemy piece on the Board: +$25",
   "conspiracy": "The hidden giant skeletons",
   "implemented": true
  },
@@ -152,10 +150,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "While the Clock is over 90s: +20% Score and +10% $ gain; while under 30s: -20% Score and -10% $ gain",
+  "effect": "While the Clock is over 90s: +10% $ gain; while under 30s: -10% $ gain",
   "conspiracy": "The Daylight Saving racket",
   "implemented": true
  },
@@ -165,9 +162,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Buff"
   ],
-  "effect": "On capturing a higher-value piece with a lower-value piece: double Score; on capturing a lower-value piece with a higher-value one: half Score",
+  "effect": "On capturing a higher-value piece with a lower-value piece: the capturing piece gets +1 Tactical Piece Buff",
   "conspiracy": "The phantom punch",
   "implemented": true
  },
@@ -177,9 +174,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Action"
   ],
-  "effect": "On clearing a Wave in 3 turns or less: x2 Score",
+  "effect": "On clearing a Wave in 3 turns or less: +1 Action next Turn",
   "conspiracy": "Storm Area 51",
   "implemented": true
  },
@@ -189,9 +186,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Buff"
   ],
-  "effect": "On clearing a Wave without losing a piece: +100 Score; on losing a piece: -$10",
+  "effect": "On clearing a Wave without losing a piece: a random piece of yours gets +1 Piece Buff",
   "conspiracy": "The social credit system",
   "implemented": true
  },
@@ -286,10 +283,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Time"
+   "Buff"
   ],
-  "effect": "On acquiring an Artefact: +150 Score and +5s Clock",
+  "effect": "On acquiring an Artefact: a random piece of yours gets +1 Piece Buff",
   "conspiracy": "Pyramidology",
   "implemented": true
  },
@@ -323,10 +319,10 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Gold"
+   "Gold",
+   "Time"
   ],
-  "effect": "On Wave start: +100 Score, +$10, and -3s Clock",
+  "effect": "On Wave start: +$10 and -3s Clock",
   "conspiracy": "The advance-fee scam",
   "implemented": true
  },
@@ -336,9 +332,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Special"
   ],
-  "effect": "On your first Capture each Wave: double Score, but it pays no $",
+  "effect": "Magic bullet: once per Wave, one of your sliding pieces may capture through one blocking piece",
   "conspiracy": "JFK assassination theories",
   "implemented": true
  },
@@ -469,9 +465,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Special"
   ],
-  "effect": "While 2+ of your same-type pieces are on the Board: their Captures give +25% Score",
+  "effect": "Pincer: at Turn start, any enemy adjacent to two of your same-type pieces is Stunned that Turn",
   "conspiracy": "The Men in Black",
   "implemented": true
  },
@@ -481,9 +477,10 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Action",
+   "Shop"
   ],
-  "effect": "While holding 200+ $: +20% Score gain; Shop prices +5%",
+  "effect": "While holding $200+: +1 Action per Turn; Shop prices +5%",
   "conspiracy": "Skull and Bones",
   "implemented": true
  },
@@ -493,10 +490,9 @@
   "rarity": "Common",
   "type": "Passive",
   "bonus": [
-   "Score",
-   "Gold"
+   "Action"
   ],
-  "effect": "While the Clock is under 30s: +100% Score gain and +50% $ gain",
+  "effect": "While the Clock is under 30s: +1 Action per Turn",
   "conspiracy": "The Moscow–Washington hotline",
   "implemented": true
  },
@@ -519,10 +515,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On capturing a higher-value piece with a lower-value piece: +100 Score and +$10",
+  "effect": "On capturing a higher-value piece with a lower-value piece: +$10",
   "conspiracy": "The Sphinx's nose",
   "implemented": true
  },
@@ -544,9 +539,9 @@
   "rarity": "Common",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Gold"
   ],
-  "effect": "On Wave clear: +500 Score if you captured nothing that Wave",
+  "effect": "On Wave clear: +$50 if you captured nothing that Wave",
   "conspiracy": "The Bielefeld Conspiracy",
   "implemented": true
  },
@@ -629,10 +624,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Shop"
+   "Special"
   ],
-  "effect": "Whenever you buy in the Shop: +5 Score per $ spent",
+  "effect": "Oligarch: your highest-value piece can't be captured by a lower-value enemy",
   "conspiracy": "Putin's Palace",
   "implemented": true
  },
@@ -642,10 +636,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On your first Score gain and first $ gain each Turn: they trigger again",
+  "effect": "On your first $ gain each Turn: it triggers again",
   "conspiracy": "The simulation hypothesis",
   "implemented": true
  },
@@ -667,10 +660,9 @@
   "rarity": "Uncommon",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "Inverted pieces give double Score and $ on Capture",
+  "effect": "Inverted pieces give double $ on Capture",
   "conspiracy": "Modern flat Earth",
   "implemented": true
  },
@@ -728,10 +720,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On clearing a Wave without losing a piece: +200 Score and +$20",
+  "effect": "On clearing a Wave without losing a piece: +$20",
   "conspiracy": "QAnon",
   "implemented": true
  },
@@ -849,10 +840,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Gold"
+   "Action"
   ],
-  "effect": "On your first Capture each Wave: double Score and $",
+  "effect": "On your first Capture each Wave: +1 Action",
   "conspiracy": "The Voynich manuscript",
   "implemented": true
  },
@@ -862,10 +852,9 @@
   "rarity": "Uncommon",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "Pieces carrying a Piece Buff give double Score and +50% $ on Capture",
+  "effect": "Pieces carrying a Piece Buff give +50% $ on Capture",
   "conspiracy": "Operation Mockingbird",
   "implemented": true
  },
@@ -960,10 +949,9 @@
   "rarity": "Uncommon",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "While the Clock is under 60s: +50% Score gain and +25% $ gain",
+  "effect": "While the Clock is under 60s: +25% $ gain",
   "conspiracy": "The Bermuda Triangle",
   "implemented": true
  },
@@ -985,10 +973,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Time"
   ],
-  "effect": "Every 3rd Turn: your Score and Clock gains that Turn are doubled",
+  "effect": "Every 3rd Turn: your Clock gains that Turn are doubled",
   "conspiracy": "The Black Knight satellite",
   "implemented": true
  },
@@ -998,9 +985,9 @@
   "rarity": "Uncommon",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Gold"
   ],
-  "effect": "While 3+ of your pieces are on the enemy half of the Board: +100% Score gain",
+  "effect": "While 3+ of your pieces are on the enemy half of the Board: +50% $ gain",
   "conspiracy": "The Dyatlov Pass incident",
   "implemented": true
  },
@@ -1034,9 +1021,9 @@
   "rarity": "Uncommon",
   "type": "Passive",
   "bonus": [
-   "Score"
+   "Gold"
   ],
-  "effect": "+50% Score gain",
+  "effect": "+25% $ gain",
   "conspiracy": "The Vatican bank scandal",
   "implemented": true
  },
@@ -1046,9 +1033,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Special"
   ],
-  "effect": "On clearing a Wave in 2 turns or less: x10 Score (early-clear tracking exists)",
+  "effect": "On clearing a Wave in 2 turns or less: open a Small Artefact Box",
   "conspiracy": "The moon landing hoax",
   "implemented": true
  },
@@ -1058,10 +1045,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On using your last held Item: +100 Score and +$50",
+  "effect": "On using your last held Item: +$50",
   "conspiracy": "The 18½-minute gap",
   "implemented": true
  },
@@ -1083,10 +1069,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Time"
   ],
-  "effect": "Whenever a King Ability charges you: +150 Score and +5s Clock",
+  "effect": "Whenever a King Ability charges you: +5s Clock",
   "conspiracy": "The Tunguska event",
   "implemented": true
  },
@@ -1098,7 +1083,7 @@
   "bonus": [
    "Gold"
   ],
-  "effect": "Ranked pieces give double $ on Capture; Demoted pieces give no Score on Capture",
+  "effect": "Ranked pieces give double $ on Capture; Demoted pieces give no $ on Capture",
   "conspiracy": "The Phoebus cartel",
   "implemented": true
  },
@@ -1120,10 +1105,10 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Gold"
+   "Time",
+   "Item"
   ],
-  "effect": "On losing a piece carrying a Piece Buff: +$150 and +150 Score",
+  "effect": "On losing a piece carrying a Piece Buff: +10s Clock and open a Small Item Box",
   "conspiracy": "The Lusitania",
   "implemented": true
  },
@@ -1205,10 +1190,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Time"
   ],
-  "effect": "On Decisive Item use: +200 Score and +10s Clock",
+  "effect": "On Decisive Item use: +10s Clock",
   "conspiracy": "Dead Hand",
   "implemented": true
  },
@@ -1218,10 +1202,9 @@
   "rarity": "Uncommon",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "Whenever a \"Capture\" Artefact triggers: +$2 and +20 Score",
+  "effect": "Whenever a \"Capture\" Artefact triggers: +$2",
   "conspiracy": "The Illuminati card game",
   "implemented": true
  },
@@ -1292,10 +1275,9 @@
   "rarity": "Rare",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "Enemies destroyed by Items award their Score and $ value",
+  "effect": "Enemies destroyed by Items award their $ value",
   "conspiracy": "The missing trillions",
   "implemented": true
  },
@@ -1437,10 +1419,9 @@
   "rarity": "Rare",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On Capture: +$1 and +10 Score per piece in your Stock",
+  "effect": "On Capture: +$1 per piece in your Stock",
   "conspiracy": "The burning of the Library of Alexandria",
   "implemented": true
  },
@@ -1642,10 +1623,9 @@
   "rarity": "Rare",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% Score and $",
+  "effect": "While 3+ of your same-type pieces are on the Board: their Captures give +100% $",
   "conspiracy": "The Priory of Sion",
   "implemented": true
  },
@@ -1667,10 +1647,9 @@
   "rarity": "Rare",
   "type": "Trigger",
   "bonus": [
-   "Score",
-   "Gold"
+   "Item"
   ],
-  "effect": "Once per Turn: you may pay $25 for +400 Score",
+  "effect": "Once per Turn: you may pay $25 to open a Small Item Box",
   "conspiracy": "The Oak Island money pit",
   "implemented": true
  },
@@ -1728,10 +1707,9 @@
   "rarity": "Rare",
   "type": "Passive",
   "bonus": [
-   "Score",
-   "Gold"
+   "Buff"
   ],
-  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: +200 Score and +$15",
+  "effect": "Enemy Waves spawn +1 extra piece; On Wave clear: a random piece of yours gets +1 Piece Buff",
   "conspiracy": "HAARP",
   "implemented": true
  },
@@ -1825,10 +1803,9 @@
   "rarity": "Rare",
   "type": "Trigger",
   "bonus": [
-   "Score",
    "Gold"
   ],
-  "effect": "On use: until end of Turn, Score and $ gains are tripled; this Artefact is consumed",
+  "effect": "On use: until end of Turn, $ gains are tripled; this Artefact is consumed",
   "conspiracy": "Bob Lazar and Element 115",
   "implemented": true
  },
@@ -1862,10 +1839,9 @@
   "rarity": "Rare",
   "type": "Passive",
   "bonus": [
-   "Gold",
-   "Score"
+   "Gold"
   ],
-  "effect": "+45% $ and Score gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs",
+  "effect": "+45% $ gain; On every 3rd Wave clear: all allied pieces lose their Piece Buffs",
   "conspiracy": "The Hope Diamond curse",
   "implemented": true
  },
@@ -1911,11 +1887,10 @@
   "rarity": "Legendary",
   "type": "Passive",
   "bonus": [
-   "Score",
    "Gold",
    "Time"
   ],
-  "effect": "At every Turn end: +$10, +10 Score, +1s Clock; Shop prices +50%",
+  "effect": "At every Turn end: +$10 and +1s Clock; Shop prices +50%",
   "conspiracy": "Shrinkflation",
   "implemented": true
  },
@@ -1973,9 +1948,9 @@
   "rarity": "Legendary",
   "type": "Trigger",
   "bonus": [
-   "Score"
+   "Time"
   ],
-  "effect": "On Game Over Screen: convert all your $ into Score at 20x rate",
+  "effect": "Once per run, when the Clock hits 0: convert all your $ into Clock (1s per $5); this Artefact is consumed",
   "conspiracy": "The Rapture Index",
   "implemented": true
  },

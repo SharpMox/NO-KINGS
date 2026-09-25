@@ -166,8 +166,8 @@ func _init() -> void:
 	tar.gold = 500
 	var clock_tar: float = tar.clock_ms
 	Economy.charge(tar, "move_cost")
-	check(tar.score == 1500 and tar.clock_ms > clock_tar, # issue 57: x10
-		"Tunguska Toothpicks: +1500 Score and +5s Clock whenever a Tariff charges you")
+	check(tar.score == 0 and tar.clock_ms > clock_tar,
+		"Tunguska Toothpicks: +5s Clock and no Score whenever a Tariff charges you (NO-250)")
 	tar.queue_free()
 	await process_frame
 

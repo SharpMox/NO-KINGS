@@ -34,6 +34,8 @@ signal box_skipped
 signal box_reroll_pressed
 signal win_continue_pressed
 signal win_end_pressed
+signal feedback_pressed # NO-254: "Give Feedback" pressed on an end-of-run
+	# screen — game.gd owns the actual open (open_feedback())
 signal shop_buy_pressed(index: int)
 signal shop_tile_preview_requested(index: int) # NO-167 (Max review 2026-09-20):
 	# a Shop tile tap opens the tile's own preview now — same "long press =
@@ -495,6 +497,11 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	menu.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	box.add_child(menu)
+	# NO-254: below Restart/Main Menu, a normal (non-primary) button.
+	var feedback := Button.new()
+	feedback.text = "Give Feedback"
+	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
+	box.add_child(feedback)
 	overlay.visible = true
 
 
@@ -567,6 +574,12 @@ func show_win_screen() -> void:
 	end.text = "End Run"
 	end.pressed.connect(func() -> void: win_end_pressed.emit())
 	box.add_child(end)
+	# NO-254: below Continue/End Run, a normal (non-primary) button — the win
+	# screen shares this end-of-run overlay with show_overlay above.
+	var feedback := Button.new()
+	feedback.text = "Give Feedback"
+	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
+	box.add_child(feedback)
 	overlay.visible = true
 
 

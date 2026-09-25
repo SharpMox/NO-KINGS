@@ -217,9 +217,11 @@ static func go_back(root: Control) -> bool:
 	return (root as GuideRoot).go_back()
 
 
-## One sub-page's shell: header + whatever `fill_rows` appends + a Back
-## button that returns to `hub_scroll`. Every catalog page below is just a
-## `fill_rows` callable plugged into this.
+## One sub-page's shell: a header row (title + Back) + whatever `fill_rows`
+## appends + a second, identical Back below it — NO-263: a long catalog
+## page pushes the bottom one below the fold, so the header row carries its
+## own, wired to the same "return to `hub_scroll`" handler. Every catalog
+## page below is just a `fill_rows` callable plugged into this.
 static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: Callable) -> ScrollContainer:
 	var scroll := ScrollContainer.new()
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
@@ -239,10 +241,28 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 10)
 	scroll.add_child(box)
+	# NO-263 (Max ruling 2026-09-25): a long catalog page pushes the bottom
+	# Back below the fold, so a second Back sits in the header row next to
+	# the title — title left, Back right, the same left/right split
+	# show_shop()'s own header uses (title left, Gold pinned right). Both
+	# Backs share one handler so they can never drift apart.
+	var go_hub := func() -> void:
+		scroll.visible = false
+		hub_scroll.visible = true
+	var head_row := HBoxContainer.new()
+	head_row.add_theme_constant_override("separation", 8)
+	box.add_child(head_row)
 	var head := Label.new()
 	head.text = title
 	head.theme_type_variation = &"Title"
-	box.add_child(head)
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head_row.add_child(head)
+	# NO-263 / NO-256: no font-size override — same theme role (default
+	# Button) as the bottom Back below.
+	var top_back := Button.new()
+	top_back.text = "← Back"
+	top_back.pressed.connect(go_hub)
+	head_row.add_child(top_back)
 	fill_rows.call(box)
 	# Max ruling 2026-09-24 (isolated dismiss): same shape as the hub's own
 	# Back — a gap separates it from the catalog rows above.
@@ -254,9 +274,7 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	# box is otherwise LEFT-aligned (the catalog rows above), but Back is
 	# isolated below its own gap and reads better centred under the list.
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	back.pressed.connect(func() -> void:
-		scroll.visible = false
-		hub_scroll.visible = true)
+	back.pressed.connect(go_hub)
 	box.add_child(back)
 	return scroll
 

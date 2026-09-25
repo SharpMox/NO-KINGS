@@ -179,7 +179,9 @@ func _init() -> void:
 		var shown := false
 		for c in guide.get_children():
 			if c is ScrollContainer and c.visible:
-				var head: Node = c.get_child(0).get_child(0)
+				# NO-263: the title Label now shares a header row with the page's
+				# own top Back button, one level deeper than before.
+				var head: Node = c.get_child(0).get_child(0).get_child(0)
 				shown = shown or (head is Label and (head as Label).text.to_lower() == page)
 			c.visible = false # back to a clean hub for the next page
 		check(shown, "guide:%s opens its page" % page)

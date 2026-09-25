@@ -76,21 +76,21 @@ func _init() -> void:
 	s.queue_free()
 	await process_frame
 
-	# --- Black Knight Morse Code: every 3rd Turn, Score AND Clock GAINS that
-	# Turn are doubled — a Clock LOSS is not ---
+	# --- Black Knight Morse Code: every 3rd Turn, Clock GAINS that Turn are
+	# doubled — a Clock LOSS is not; NO-250: Score is never touched ---
 	var bk := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "score": 0, "clock_s": 100.0, "artefacts": ["black-knight-morse-code"]})
 	await process_frame
 	bk.turn_number = 2 # not the cadence
 	Economy.earn(bk, 10)
-	check(bk.score == 100, "Black Knight: no Score doubling off the 3rd Turn") # issue 57: x10
+	check(bk.score == 100, "Black Knight: no Score doubling off the 3rd Turn")
 	var clock_before: float = bk.clock_ms
 	Economy.add_clock(bk, 1000.0, "test")
 	check(bk.clock_ms == clock_before + 1000.0, "Black Knight: no Clock doubling off the 3rd Turn")
 
 	bk.turn_number = 3 # the cadence
 	Economy.earn(bk, 10)
-	check(bk.score == 300, "Black Knight: Score gain doubled on the 3rd Turn (10 + 20)") # issue 57: x10
+	check(bk.score == 200, "Black Knight (NO-250): Score is NOT doubled on the 3rd Turn (100 + 100)")
 	clock_before = bk.clock_ms
 	Economy.add_clock(bk, 1000.0, "test")
 	check(bk.clock_ms == clock_before + 2000.0, "Black Knight: Clock gain doubled on the 3rd Turn")

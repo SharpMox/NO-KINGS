@@ -54,92 +54,84 @@ func _item(key: String, target: String) -> Dictionary:
 
 func _init() -> void:
 	# --- artefact trigger engine (slice 15): stacking is additive per copy,
-	# and the result never depends on acquisition order. issue 69 removed the
-	# original "greed"/"score"/"bounty" fixtures this proved itself against
-	# (game-native, pre-catalog) — repointed at catalog equivalents with the
-	# same on_capture flat-Score shape: Library of Alexandria Matchbox
-	# ("+1 Gold and +10 Score per piece in your Stock" — a literal flat +10
-	# per copy with 1 piece in Stock, same arithmetic "greed"/"score" used).
+	# and the result never depends on acquisition order. NO-250: Library of
+	# Alexandria Matchbox now pays "+$1 per piece in your Stock" only (its +10
+	# Score, and the +$10 that leaked through ctx.pts, are gone) — so the
+	# stacking proof reads Gold, and the capture's own points are untouched.
 	var stack := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "library-of-alexandria-matchbox"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0,
+		"artefacts": ["library-of-alexandria-matchbox", "library-of-alexandria-matchbox"]})
 	await process_frame
 	var pawn_base: int = stack.defs.pawn.value
-	check(Economy.capture_score(stack, "pawn") == pawn_base + 20,
-		"two Library of Alexandria Matchboxes stack additively (+10 each), not multiplicatively")
+	check(Economy.capture_score(stack, "pawn") == pawn_base,
+		"NO-250: Library of Alexandria Matchbox no longer adds capture points (Score)")
+	check(stack.gold == 2,
+		"two Library of Alexandria Matchboxes stack additively (+$1 each), not multiplicatively")
 	stack.queue_free()
 	await process_frame
 
 	var order_a := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"],
-		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "suspiciously-large-femur"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0,
+		"artefacts": ["nero-s-marshmallow-stick", "library-of-alexandria-matchbox", "suspiciously-large-femur"]})
 	await process_frame
 	var order_b := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"],
-		"artefacts": ["suspiciously-large-femur", "library-of-alexandria-matchbox", "voynich-dictionary"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0,
+		"artefacts": ["suspiciously-large-femur", "library-of-alexandria-matchbox", "nero-s-marshmallow-stick"]})
 	await process_frame
-	check(Economy.capture_score(order_a, "pawn") == Economy.capture_score(order_b, "pawn"),
-		"capture score is independent of artefact acquisition order")
+	var pts_a := Economy.capture_score(order_a, "rook")
+	var pts_b := Economy.capture_score(order_b, "rook")
+	check(pts_a == pts_b and order_a.gold == order_b.gold
+			and order_a.last_capture_ctx.gold_extra == order_b.last_capture_ctx.gold_extra,
+		"capture payout is independent of artefact acquisition order")
 	order_a.queue_free()
 	order_b.queue_free()
 	await process_frame
 
-	# --- issue 16 (Gold/Score batch): percentage Score/Gold modifiers stack
-	# additively — two Tinfoil Hats give +30%/-10%, not compounding (95%^2)
-	var tinfoil := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["tinfoil-hat", "tinfoil-hat"]})
+	# --- NO-250: percentage $ modifiers stack additively — two Popemobile
+	# Piggy Banks give +50% $, and neither touches Score (was +50% Score each)
+	var pope2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["popemobile-piggy-bank", "popemobile-piggy-bank"]})
 	await process_frame
-	Economy.earn(tinfoil, 100)
-	check(tinfoil.score == 1300, # issue 57: x10 (percentage math unchanged: 100 * 1.30)
-		"two Tinfoil Hats: +15% Score each stacks to +30%, not +30.25%")
-	check(tinfoil.gold == 90, "two Tinfoil Hats: -5% Gold each stacks to -10%, not -9.75%")
-	tinfoil.queue_free()
+	Economy.earn(pope2, 100)
+	check(pope2.gold == 150, "two Popemobile Piggy Banks: +25% $ each stacks to +50%")
+	check(pope2.score == 1000, "Popemobile Piggy Bank: Score is the plain x10 base, no Artefact share")
+	pope2.queue_free()
 	await process_frame
 
-	# Tungsten-Filled Gold Bar: +20% Score gain (rebalanced 2026-08-28 — was
-	# "2x their amount as Score", an unconditional 3x Score multiplier since
-	# Gold is earned 1:1 with Score, wildly out of scale with the catalog)
+	# Tungsten-Filled Gold Bar (NO-250 "fake gold"): +20% $ gain, Shop +10%
 	var tungsten := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["tungsten-filled-gold-bar"]})
+		"wave": 3, "gold": 0, "artefacts": ["tungsten-filled-gold-bar"]})
 	await process_frame
 	Economy.earn(tungsten, 100)
-	check(tungsten.gold == 100, "Tungsten-Filled Gold Bar doesn't change the Gold gain itself")
-	check(tungsten.score == 1200, # issue 57: x10 (+100 base, +20 20%-of-Gold Score bonus, both x10'd)
-		"Tungsten-Filled Gold Bar: +1000 base, +200 (20% of the Gold) Score")
+	check(tungsten.gold == 120, "Tungsten-Filled Gold Bar: +20% $ gain")
+	check(tungsten.score == 1000, "Tungsten-Filled Gold Bar: no Score (was +20% Score)")
+	check(ArtefactHooks.run(tungsten, "on_price", {"base": 100.0, "amount": 100.0,
+			"kind": "item", "tier": "Tactical"}).amount == 110.0,
+		"Tungsten-Filled Gold Bar: Shop prices +10%")
 	tungsten.queue_free()
 	await process_frame
 
-	# --- issue 20 regression: the slice 20 fleet sweep caught Tungsten-Filled
-	# Gold Bar + Popemobile Piggy Bank as a degenerate pair because both wrote
-	# g.score straight from inside their on_gold_change dispatch instead of
-	# through Economy.earn's ctx.score_bonus channel — held together, held
-	# score should be the plain additive sum of each one's own bonus (20% +
-	# 50%, rebalanced 2026-08-28 — was 2x + 10x), not doubled or compounded
+	# Tungsten + Popemobile together: +20% and +25% $ add, off the same base
 	var tungsten_pope := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["tungsten-filled-gold-bar", "popemobile-piggy-bank"]})
+		"wave": 3, "gold": 0, "artefacts": ["tungsten-filled-gold-bar", "popemobile-piggy-bank"]})
 	await process_frame
 	Economy.earn(tungsten_pope, 100)
-	check(tungsten_pope.gold == 100, "Tungsten + Popemobile together don't change the Gold gain itself")
-	check(tungsten_pope.score == (100 + 20 + 50) * 10, # issue 57: x10
-		"Tungsten (+200, 20%) and Popemobile (+500, 50%) add on top of the +1000 base — the correct sum, not doubled")
+	check(tungsten_pope.gold == 145, "Tungsten (+20%) and Popemobile (+25%) add: 145, not compounded")
+	check(tungsten_pope.score == 1000, "Tungsten + Popemobile: Score untouched")
 	tungsten_pope.queue_free()
 	await process_frame
 
 	# El Dorado Body Glitter: 5% of Score gains paid as Gold, off the
-	# immutable ctx.base — must give the same payout whether or not another
-	# on_score_change handler (Bermuda Triangulation, key-sorts before
-	# "el-dorado-body-glitter" so it dispatches first) already inflated the
-	# running ctx.amount. Pre-fix, El Dorado read ctx.amount and would have
-	# paid 5% of the Bermuda-inflated 150 (= 8 Gold, for a buggy total of 133)
-	# instead of 5% of the untouched 100 base.
+	# immutable ctx.base. NO-250: Bermuda Triangulation no longer touches
+	# Score, so this pins that El Dorado still pays off the plain base.
 	var el_dorado_order := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["el-dorado-body-glitter", "bermuda-triangulation"],
+		"wave": 3, "gold": 0, "artefacts": ["el-dorado-body-glitter", "bermuda-triangulation"],
 		"clock_s": 10})
 	await process_frame
 	Economy.earn(el_dorado_order, 100)
-	check(el_dorado_order.score == 1500, "Bermuda Triangulation: +50% Score under 60s Clock") # issue 57: x10
+	check(el_dorado_order.score == 1000, "Bermuda Triangulation: no Score (NO-250)")
 	check(el_dorado_order.gold == 130,
-		"El Dorado's 5% Gold bonus is off the 100 base (+5), not the Bermuda-inflated 150 (+8) — " +
-		"125 (100 base +25% Bermuda Gold) + 5 (El Dorado) = 130, order-independent")
+		"125 (100 base +25% Bermuda $ under 60s) + 5 (El Dorado, 5% of the 100 base) = 130")
 	el_dorado_order.queue_free()
 	await process_frame
 
@@ -153,34 +145,37 @@ func _init() -> void:
 	zurich.queue_free()
 	await process_frame
 
-	# Social Credit Report Card + issue 16 ruling: the -10 Score penalty on
-	# losing a piece debits Gold instead, so Score stays up-only
+	# Social Credit Report Card (NO-250): a clean Wave clear gives a random
+	# ally +1 Piece Buff; no Score, and no penalty on a loss any more
 	var social := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["social-credit-report-card"], "gold": 100, "score": 500})
 	await process_frame
 	WaveLogic.queue(social, social.wave + 1) # clean: no pieces lost since wave start
-	check(social.score == 1500, "Social Credit Report Card: +1000 Score on a clean Wave clear") # issue 57:
-		# x10 on the GAIN (100 -> 1000), starting score was a preset 500: 500 + 1000 = 1500
-	check(social.gold == 100, "Social Credit Report Card: no Gold change on a clean clear")
+	check(BuffLogic.of(social.board[Vector2i(2, 2)]).size() == 1,
+		"Social Credit Report Card: a clean Wave clear gives the only ally +1 Piece Buff")
+	check(social.score == 500 and social.gold == 100,
+		"Social Credit Report Card: no Score and no Gold on a clean clear")
 	social.lost_player += 1 # a piece falls during the next wave
 	WaveLogic.queue(social, social.wave + 1)
-	check(social.score == 1500, "Social Credit Report Card: Score stays up-only after losing a piece")
-	check(social.gold == 90, "Social Credit Report Card: the -10 Score penalty debits Gold instead (issue 16 ruling)")
+	check(BuffLogic.of(social.board[Vector2i(2, 2)]).size() == 1 and social.gold == 100,
+		"Social Credit Report Card: a Wave with a loss grants nothing and costs nothing")
 	social.queue_free()
 	await process_frame
 
-	# Nero's Marshmallow Stick: each Capture in a Turn gives +25% more Score
-	# than the previous one (linear step off the untouched base value)
+	# Nero's Marshmallow Stick (NO-250): each Capture in a Turn gives +25%
+	# more $ than the previous one — through ctx.gold_extra, never the
+	# capture's points (which paid Score too)
 	var nero := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "artefacts": ["nero-s-marshmallow-stick"]})
 	await process_frame
 	var nero_base: int = nero.defs.pawn.value
-	var cap1 := Economy.capture_score(nero, "pawn")
-	var cap2 := Economy.capture_score(nero, "pawn")
-	var cap3 := Economy.capture_score(nero, "pawn")
-	check(cap1 == nero_base, "Nero's Marshmallow Stick: the first Capture this Turn is unmodified")
-	check(cap2 == nero_base + roundi(nero_base * 0.25), "Nero's Marshmallow Stick: the 2nd Capture gives +25% more")
-	check(cap3 == nero_base + roundi(nero_base * 0.5), "Nero's Marshmallow Stick: the 3rd Capture gives +50% more")
+	var extras := []
+	for i in 3:
+		check(Economy.capture_score(nero, "pawn") == nero_base,
+			"Nero's Marshmallow Stick: capture points (Score) stay the plain base")
+		extras.append(nero.last_capture_ctx.gold_extra)
+	check(extras == [0, roundi(nero_base * 0.25), roundi(nero_base * 0.5)],
+		"Nero's Marshmallow Stick: +0% / +25% / +50% extra $ on the 1st/2nd/3rd Capture (got %s)" % [extras])
 	nero.queue_free()
 	await process_frame
 

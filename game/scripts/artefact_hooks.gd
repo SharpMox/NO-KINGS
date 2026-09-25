@@ -59,19 +59,23 @@
 ## which other held keys happened to sort earlier, exactly the
 ## order-dependence the ORDERING rule above exists to rule out). A handler
 ## that pays a *different* resource as a side effect (El Dorado Body
-## Glitter: Score -> Gold; Tungsten-Filled Gold Bar / Popemobile Piggy Bank:
-## Gold -> Score) is a converter, not a percentage modifier on its own hook —
-## it must still size itself off `base`, and must hand the payout back
-## through the matching ctx output field (`gold_bonus` on on_score_change,
-## `score_bonus` on on_gold_change, both pre-seeded 0.0 by Economy.earn and
-## applied exactly once, after both ctx dispatches finish) rather than
-## writing `g.score`/`g.gold` straight from inside the handler. Before this
-## fix all three converters read the running `amount`, and the two Gold->Score
-## ones additionally free-wrote `g.score` mid-dispatch instead of routing
-## through `score_bonus` — order-dependent and impossible to reason about as
-## a single deterministic value. Covered by test_items.gd ("Tungsten +
-## Popemobile score bonuses add, not compound" and "El Dorado's Gold bonus
-## doesn't depend on other Score handlers' dispatch order").
+## Glitter: Score -> Gold) is a converter, not a percentage modifier on its
+## own hook — it must still size itself off `base`, and must hand the payout
+## back through `gold_bonus` on on_score_change (pre-seeded 0.0 by
+## Economy.earn and applied exactly once) rather than writing `g.gold`
+## straight from inside the handler. Covered by test_items.gd ("El Dorado's
+## Gold bonus doesn't depend on other Score handlers' dispatch order").
+##
+## NO-250 (Max, 2026-09-24/25): ARTEFACTS GRANT NO SCORE. No handler here
+## writes g.score, modifies an on_score_change amount, writes ctx.pts (which
+## pays Score AND Gold), or converts Gold into Score — the Gold->Score
+## converters and their `score_bonus` channel are gone, and on_score_change
+## carries only readers (El Dorado Body Glitter, Loch Ness Stool Sample).
+## Score comes from core play alone. An on_capture handler's own Gold goes
+## through `ctx.gold_extra` (paid via Economy.earn_gold by game.gd's
+## _pay_capture), never ctx.pts. Guarded by test_items_artefacts_4.gd's
+## "no Artefact changes Score" sweep. Where this file's older notes below
+## describe a Score effect, that effect was removed or redesigned by NO-250.
 ## - on_capture ctx grew `attacker_id`/`attacker_buffed` (board[from].id /
 ##   whether it carries a Piece Buff, read while the piece is still on the
 ##   board — "" / false from the two direct-call test sites, which every
@@ -86,7 +90,8 @@
 ##   same reason `ctx.base` does above. on_wave_spawn fires right after, for
 ##   the wave that's starting.
 ## - on_game_over (game.gd:_game_over, before the run is scored/saved) — new
-##   hook, added to HOOKS below; Rapture Insurance Policy is its first user.
+##   hook, added to HOOKS below. (Rapture Insurance Policy used it until
+##   NO-250 moved it to the Clock-out check in game.gd's _process.)
 ##
 ## issue 17 (Action/Time/Piece batch) added 8 no-prerequisite artefacts, all
 ## on hooks issue 16 had already wired (on_capture, on_turn_start,
@@ -822,25 +827,25 @@ const HOOKS := [
 ## artefact do anything at this hook" — _dispatch is just the handler body.
 const REGISTRY := {
 	# --- issue 16: Gold/Score batch (31 artefacts, no needs-note) ---
-	"tinfoil-hat": ["on_score_change", "on_gold_change"],
-	"daylight-savings-jar": ["on_score_change", "on_gold_change"],
-	"the-red-phone": ["on_score_change", "on_gold_change"],
-	"bermuda-triangulation": ["on_score_change", "on_gold_change"],
-	"naruto-run-manual": ["on_score_change"],
-	"moon-landing-slate": ["on_score_change"],
+	"tinfoil-hat": [], # NO-250: "can't be Stunned or Slowed" lands in PR 2/2
+	"daylight-savings-jar": ["on_gold_change"],
+	"the-red-phone": ["on_turn_start"], # NO-250: <30s: +1 Action per Turn
+	"bermuda-triangulation": ["on_gold_change"],
+	"naruto-run-manual": ["on_wave_clear"], # NO-250: early clear -> +1 Action
+	"moon-landing-slate": ["on_wave_clear"], # NO-250: early clear -> Small Artefact Box
 	"el-dorado-body-glitter": ["on_score_change"],
 	"loch-ness-stool-sample": ["on_score_change"], # issue 49
-	"tungsten-filled-gold-bar": ["on_gold_change"],
+	"tungsten-filled-gold-bar": ["on_gold_change", "on_price"], # NO-250
 	"popemobile-piggy-bank": ["on_gold_change"],
 	"suspiciously-large-femur": ["on_capture"],
 	"sphinx-s-booger": ["on_capture"],
 	"phantom-punch-glove": ["on_capture"],
 	"azimuthal-pancake-map": ["on_capture"],
-	"men-in-black-prescription-sunglasses": ["on_capture"],
+	"men-in-black-prescription-sunglasses": [], # NO-250: "Pincer" lands in PR 2/2
 	"holy-dna-kit": ["on_capture"],
 	"cia-press-pass": ["on_capture"],
 	"library-of-alexandria-matchbox": ["on_capture"],
-	"voynich-dictionary": ["on_capture"],
+	"voynich-dictionary": ["on_capture"], # NO-250: first Capture each Wave -> +1 Action
 	"nero-s-marshmallow-stick": ["on_capture"],
 	"zurich-gnome-figurine": ["on_wave_clear"],
 	"social-credit-report-card": ["on_wave_clear"],
@@ -851,8 +856,9 @@ const REGISTRY := {
 	"alien-autopsy-bloopers": ["on_wave_clear"],
 	"golden-buddha-bobblehead": ["on_wave_clear"],
 	"nigerian-prince-wire-transfer": ["on_wave_spawn"],
-	"putin-s-golden-toilet-brush": ["on_purchase"],
-	"rapture-insurance-policy": ["on_game_over"],
+	"putin-s-golden-toilet-brush": [], # NO-250: "Oligarch" lands in PR 2/2
+	# rapture-insurance-policy (NO-250) is a standing rule read in game.gd's
+	# _process at the Clock-out check, same shape as Doomsday Clock Snooze Button.
 	# --- issue 17: Action/Time/Piece batch (8 artefacts, no needs-note) ---
 	"cia-exploding-cigar": ["on_turn_start"],
 	"i-am-not-a-robot-checkbox": ["on_turn_start"],
@@ -866,7 +872,7 @@ const REGISTRY := {
 	"denazification-visa": ["on_price"],
 	"hollow-moon-cross-section": ["on_price"],
 	"shrinkflation-cereal-box": ["on_turn_end", "on_price"],
-	"skull-and-bones-coffin": ["on_score_change", "on_price"],
+	"skull-and-bones-coffin": ["on_turn_start", "on_price"], # NO-250
 	"silk-road-coupon": ["on_wave_clear", "on_price"],
 	"crop-circle-plank": ["on_wave_clear"],
 	"mk-ultra-sugar-cube": ["on_deploy"],
@@ -901,7 +907,7 @@ const REGISTRY := {
 
 	# --- issue 19: on_piece_lost (game.gd _lose_player_piece, 5 call sites) ---
 	"satoshi-s-private-key": ["on_wave_clear", "on_piece_lost"],
-	"lusitania-hardtack-crate": ["on_piece_lost"],
+	"lusitania-hardtack-crate": [], # NO-250: Clock + deferred Item Box lands in PR 2/2
 	"templar-severance-gold-one-pile": ["on_piece_lost"],
 	"d-b-cooper-s-parachute": ["on_piece_lost"],
 	"nibiru-hide-and-seek-trophy": ["on_wave_clear", "on_piece_lost"],
@@ -933,7 +939,7 @@ const REGISTRY := {
 	"dark-market-light-bulb": ["on_capture"],
 
 	# --- issue 19: board-half reads off existing hooks ---
-	"dyatlov-geiger-counter": ["on_score_change"],
+	"dyatlov-geiger-counter": ["on_gold_change"], # NO-250
 	"fema-summer-camp-flyer": ["on_turn_end"],
 
 	# --- issue 19: enemy auto-debuff (BuffLogic is owner-agnostic already) ---
@@ -943,7 +949,7 @@ const REGISTRY := {
 	# slice (named in issue 16/17's own Outcome sections) ---
 	"casino-invisible-clock": ["on_purchase"],
 	"2012-doomsday-party-hat": ["on_gold_change"],
-	"fort-knox-iou": ["on_score_change", "on_wave_clear"],
+	"fort-knox-iou": ["on_wave_clear"],
 
 	# --- issue 19: on_king_ability_apply / on_king_ability_charge (economy.gd apply_king_ability/charge) ---
 	"merchants-of-death-sample-case": ["on_king_ability_apply"],
@@ -969,7 +975,7 @@ const REGISTRY := {
 	"pied-piper-s-rat-census": ["on_buff_apply"],
 	"mrna-firmware-update": ["on_buff_apply"],
 	"youth-fountain-martini": ["on_buff_consume"],
-	"45-5-carat-curse": ["on_gold_change", "on_score_change", "on_wave_clear"],
+	"45-5-carat-curse": ["on_gold_change", "on_wave_clear"],
 	"antikythera-warranty-card": ["on_demote", "on_buff_removal"],
 	"atlantis-snow-globe": ["on_demote"],
 
@@ -1023,14 +1029,14 @@ const REGISTRY := {
 
 	# --- issue 26: Score-gain streak (g.club27_streak), same debits-Gold
 	# ruling as Social Credit Report Card (issue 16) ---
-	"27-club-punch-card": ["on_wave_clear", "on_piece_lost", "on_score_change"],
+	"27-club-punch-card": ["on_wave_clear", "on_piece_lost", "on_gold_change"],
 
 	# --- issue 26: Gold reaching exactly 0 (economy.gd/shop.gd spend_gold) ---
 	"zero-point-energy-drink": ["on_gold_zero"],
 
 	# --- issue 31: capture-context effects. Templar Debit Card has no entry
 	# here (see the header) — it's a standing shop.gd rule, not a hook. ---
-	"curtain-rods-bag-rifle-shaped": ["on_score_change", "on_gold_change"],
+	"curtain-rods-bag-rifle-shaped": [], # NO-250: "Magic bullet" lands in PR 2/2
 	"2-3-trillion-receipt": ["on_destroy"],
 
 	# --- issue 21: echo and meta-triggers ---
@@ -1052,7 +1058,7 @@ const REGISTRY := {
 	# --- issue 30: per-turn action log (game.gd _log_action / on_action) ---
 	"elvish-hard-hat": ["on_action"],
 	# --- issue 35: Clock-gain choke point + run-long Turn counter ---
-	"black-knight-morse-code": ["on_score_change", "on_clock_change"],
+	"black-knight-morse-code": ["on_clock_change"],
 
 	# --- issue 43: the economy Artefacts with no `(needs: ...)` note ---
 	"mar-a-lago-toilet-papers": ["on_wave_clear", "on_price"],
@@ -1157,7 +1163,6 @@ static func run(g, hook: String, ctx: Dictionary = {}) -> Dictionary:
 	if hook == "on_turn_start" or hook == "on_enemy_turn_start":
 		g.mona_lisa_turn_done = false
 	if hook == "on_turn_start":
-		g.dejavu_score_turn_done = false
 		g.dejavu_gold_turn_done = false
 	if hook == "on_rank_up": # issue 42: peak-rank stamp,
 		# the single choke point every on_rank_up dispatch already passes
@@ -1278,8 +1283,7 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 	var n_nwo: int = counts.get("illuminati-nwo-booster-pack", 0)
 	if n_nwo > 0 and hook == "on_capture" and not fired.is_empty():
 		g.gold += 2 * n_nwo * fired.size()
-		g.score += 200 * n_nwo * fired.size() # issue 57: x10, direct write bypasses Economy.earn
-		feed(g, "illuminati-nwo-booster-pack", 200 * n_nwo * fired.size(), 2 * n_nwo * fired.size()) # NO-239
+		feed(g, "illuminati-nwo-booster-pack", 0, 2 * n_nwo * fired.size()) # NO-239
 
 	var n_mona: int = counts.get("100-genuine-original-mona-lisa", 0)
 	if n_mona > 0 and not g.mona_lisa_turn_done and not fired.is_empty():
@@ -1289,11 +1293,8 @@ static func _run_meta_triggers(g, hook: String, ctx: Dictionary, fired: Array, h
 			_dispatch(g, first_entry.key, hook, ctx, first_entry.get("acquired_wave", 1))
 
 	var n_dejavu: int = counts.get("deja-vu-glitch", 0)
-	if n_dejavu > 0:
-		if hook == "on_score_change" and not g.dejavu_score_turn_done:
-			g.dejavu_score_turn_done = true
-			ctx.amount *= (1.0 + n_dejavu)
-		elif hook == "on_gold_change" and not g.dejavu_gold_turn_done:
+	if n_dejavu > 0: # NO-250: Gold only, the Score branch is gone
+		if hook == "on_gold_change" and not g.dejavu_gold_turn_done:
 			g.dejavu_gold_turn_done = true
 			ctx.amount *= (1.0 + n_dejavu)
 
@@ -1687,40 +1688,36 @@ static func _dispatch(g, key: String, hook: String, ctx: Dictionary, acquired_wa
 static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave: int) -> void:
 	match [key, hook]:
 		# --- issue 16: percentage Score/Gold gain modifiers ---
-		["tinfoil-hat", "on_score_change"]:
-			ctx.amount += ctx.base * 0.15
-		["tinfoil-hat", "on_gold_change"]:
-			ctx.amount -= ctx.base * 0.05
-		["daylight-savings-jar", "on_score_change"]:
-			if g.clock_ms > 90000.0:
-				ctx.amount += ctx.base * 0.20
-			elif g.clock_ms < 30000.0:
-				ctx.amount -= ctx.base * 0.20 # a smaller gain, never negative (issue 16 ruling)
 		["daylight-savings-jar", "on_gold_change"]:
 			if g.clock_ms > 90000.0:
 				ctx.amount += ctx.base * 0.10
 			elif g.clock_ms < 30000.0:
 				ctx.amount -= ctx.base * 0.10
-		["the-red-phone", "on_score_change"]:
+		["the-red-phone", "on_turn_start"]: # NO-250: CIA Exploding Cigar's grant, gated
 			if g.clock_ms < 30000.0:
-				ctx.amount += ctx.base * 1.00
-		["the-red-phone", "on_gold_change"]:
-			if g.clock_ms < 30000.0:
-				ctx.amount += ctx.base * 0.50
-		["bermuda-triangulation", "on_score_change"]:
-			if g.clock_ms < 60000.0:
-				ctx.amount += ctx.base * 0.50
+				g.actions_left += 1
+				_note(g, key, "+1 Action", g.BANNER_GAIN)
 		["bermuda-triangulation", "on_gold_change"]:
 			if g.clock_ms < 60000.0:
 				ctx.amount += ctx.base * 0.25
-		["naruto-run-manual", "on_score_change"]:
-			# "x2 Score" on the early-clear bonus (early-clear tracking already
-			# exists — game.gd _on_pass) = +1x more, additive per held copy
-			if ctx.reason == "early_clear" and g.turns_since_wave <= 3:
-				ctx.amount += ctx.base
-		["moon-landing-slate", "on_score_change"]:
-			if ctx.reason == "early_clear" and g.turns_since_wave <= 2:
-				ctx.amount += ctx.base * 9.0 # "x10 Score" = +9x more
+		["naruto-run-manual", "on_wave_clear"]:
+			# NO-250: "clear a Wave in <=3 turns: +1 Action next Turn".
+			# early_clear_awarded = the board was actually cleared (game.gd
+			# _on_pass); still set here, WaveLogic.queue resets it after this
+			# dispatch. An early clear always queues from _begin_player_turn
+			# (cadence >= 7), AFTER actions_left is set for the new Turn, so the
+			# existing mid-turn grant (Stargate/Elvish Hard Hat) lands on "next
+			# Turn". ctx.turns counts the clearing Turn itself.
+			if g.early_clear_awarded and ctx.turns <= 3:
+				g.actions_left += 1
+				g.actions_max += 1
+				_note(g, key, "+1 Action", g.BANNER_GAIN)
+		["moon-landing-slate", "on_wave_clear"]:
+			# NO-250: same early-clear gate as Naruto, <=2 turns: a Small
+			# Artefact Box (Fort Knox IOU's Box-open shape, artefact theme).
+			if g.early_clear_awarded and ctx.turns <= 2 and not g.box_open:
+				g._open_box_pick({"kind": "box", "key": "artefact", "size": "small",
+					"sold": false, "contents": Box.roll_options(g, "artefact", "small")})
 		["el-dorado-body-glitter", "on_score_change"]:
 			# issue 20 fix: off the immutable base (never the running amount —
 			# see the on_score_change/on_gold_change CONTRACT in the header),
@@ -1749,19 +1746,13 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			if int(g.score_gained_total / 1000.0) > int(before / 1000.0) and not g.box_open:
 				g._open_box_pick(Box.random_slot_for_theme(g, "piece"))
 
-		# --- issue 16: Gold gain also pays Score (mirror of the above) ---
+		# --- NO-250: the two Gold->Score converters, now flat $ modifiers ---
 		["tungsten-filled-gold-bar", "on_gold_change"]:
-			# Rebalanced 2026-08-28: "+20% Score gain" — was "2x their amount as
-			# Score", an unconditional 3x Score multiplier (Gold is earned 1:1
-			# with Score) wildly out of scale with the catalog (Tinfoil Hat is
-			# +15% at the same Common rarity). ctx.score_bonus, same reasoning
-			# as El Dorado above.
-			ctx.score_bonus += ctx.base * 0.20
+			ctx.amount += ctx.base * 0.20
+		["tungsten-filled-gold-bar", "on_price"]: # "fake gold": Shop +10%
+			ctx.amount += ctx.base * 0.10
 		["popemobile-piggy-bank", "on_gold_change"]:
-			# Rebalanced 2026-08-28: "+50% Score gain" — was "10x" (an
-			# unconditional 11x Score multiplier at Uncommon). Same reasoning
-			# as Tungsten-Filled Gold Bar above.
-			ctx.score_bonus += ctx.base * 0.50
+			ctx.amount += ctx.base * 0.25
 
 		# --- issue 16: on_capture triggers ---
 		["suspiciously-large-femur", "on_capture"]:
@@ -1771,61 +1762,60 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					is_max = false
 					break
 			if is_max:
-				ctx.pts += 150
-				g.gold += 3
+				ctx.gold_extra += 25 # NO-250: was +150 Score (+$150 leaked) +$3
 		["sphinx-s-booger", "on_capture"]:
 			if ctx.attacker_id != "" and int(g.defs[ctx.attacker_id].value) < ctx.base:
-				ctx.pts += 100
 				g.gold += 10
 		["phantom-punch-glove", "on_capture"]:
-			if ctx.attacker_id != "":
-				var av: int = g.defs[ctx.attacker_id].value
-				if av < ctx.base: # lower-value piece takes a higher-value one: double
-					ctx.pts += ctx.base
-				elif av > ctx.base: # higher-value piece takes a lower-value one: half
-					ctx.pts -= roundi(ctx.base * 0.5)
+			# NO-250: lower-value captures higher -> the capturer gets +1
+			# Tactical Piece Buff, through Obedience-Flavored Tap Water's
+			# grant_buffs channel (landed after this capture's own consumption)
+			if ctx.attacker_pos.x >= 0 and int(g.defs[ctx.attacker_id].value) < ctx.base:
+				ctx.grant_buffs.append("Tactical")
+				_note(g, key, "Buff")
+		# NO-250 (ruling G1/G3): no handler writes ctx.pts any more — it paid
+		# Score AND leaked Gold. What survives as Gold goes through
+		# ctx.gold_extra, paid once per capture by game.gd via Economy.earn_gold
+		# (Inflation, Denver, Gerrymandering and Moscovium still apply).
 		["azimuthal-pancake-map", "on_capture"]:
 			if ctx.attacker_id.begins_with("inv-"):
-				ctx.pts += ctx.base # double
-		["men-in-black-prescription-sunglasses", "on_capture"]:
-			if ctx.attacker_id != "" and _count_player_id(g, ctx.attacker_id) >= 2:
-				ctx.pts += roundi(ctx.base * 0.25)
+				ctx.gold_extra += ctx.base # double $
 		["holy-dna-kit", "on_capture"]:
 			if ctx.attacker_id != "" and _count_player_id(g, ctx.attacker_id) >= 3:
-				ctx.pts += ctx.base # double Score and (via the shared pts->gold
-					# pipeline in Economy.earn) proportionally double Gold too
+				ctx.gold_extra += ctx.base # +100% $
 		["cia-press-pass", "on_capture"]:
 			if ctx.attacker_buffed:
-				ctx.pts += ctx.base # double Score
 				g.gold += roundi(ctx.base * 0.5) # +50% Gold
 		["library-of-alexandria-matchbox", "on_capture"]:
-			var n: int = g.stock.size()
-			ctx.pts += 10 * n
-			g.gold += n
+			g.gold += g.stock.size()
 		["voynich-dictionary", "on_capture"]:
-			if ctx.wave_capture_index == 0: # first Capture this Wave
-				ctx.pts += ctx.base # double Score and Gold
+			# NO-250: first Capture each Wave: +1 Action — Stargate Divination
+			# Crystal's refund shape (fires before _move_player's decrement)
+			if ctx.wave_capture_index == 0 and ctx.attacker_pos.x >= 0:
+				g.actions_left += 1
+				g.actions_max += 1
+				_note(g, key, "+1 Action", g.BANNER_GAIN)
 		["nero-s-marshmallow-stick", "on_capture"]:
 			# "+25% more than the previous capture" — a linear +25%-per-copy
 			# step off the untouched base, so it stacks additively like every
 			# other percentage handler here instead of compounding
-			ctx.pts += roundi(ctx.base * 0.25 * ctx.turn_capture_index)
+			ctx.gold_extra += roundi(ctx.base * 0.25 * ctx.turn_capture_index)
 
 		# --- issue 16: on_wave_clear triggers ---
 		["zurich-gnome-figurine", "on_wave_clear"]:
 			g.gold += roundi(ctx.gold_spent * 0.10)
 		["social-credit-report-card", "on_wave_clear"]:
-			if ctx.clean:
-				g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
-			else: # issue 16 ruling: the -10 Score penalty debits Gold instead
-				_debit(g, key, 10)
+			if ctx.clean: # NO-250: +1 Piece Buff to a random ally
+				var sc_pool := _player_positions(g)
+				if not sc_pool.is_empty():
+					_grant_buff(g, sc_pool[g.rng.randi() % sc_pool.size()])
+					_note(g, key, "Buff")
 		["qanon-profile-picture", "on_wave_clear"]:
 			if ctx.clean:
-				g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
 				g.gold += 20
 		["bielefeld-library-card", "on_wave_clear"]:
 			if ctx.captures == 0:
-				g.score += 5000 # issue 57: x10, direct write bypasses Economy.earn
+				g.gold += 50 # NO-250: was +500 Score
 		["trilateral-meeting-stickers", "on_wave_clear"]:
 			g.gold += 5 * g.artefacts.size()
 		["money-printer-service-manual", "on_wave_clear"]:
@@ -1837,21 +1827,10 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 
 		# --- issue 16: on_wave_spawn / on_purchase / on_game_over ---
 		["nigerian-prince-wire-transfer", "on_wave_spawn"]:
-			g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 			g.gold += 10
 			Economy.add_clock(g, -3000.0, "nigerian-prince-wire-transfer") # issue 35:
 				# a Clock LOSS — routed through the same choke point (negative
 				# amount, floored at 0 by add_clock itself)
-		["putin-s-golden-toilet-brush", "on_purchase"]:
-			g.score += 50 * ctx.price # issue 57: x10 — a flat Score-per-Gold-
-				# spent rate, not a percentage of an existing Score gain, so it
-				# doesn't scale on its own; ctx.price is the (unscaled) Gold
-				# price paid, direct write bypasses Economy.earn
-		["rapture-insurance-policy", "on_game_over"]:
-			g.score += g.gold * 200 # issue 57: x10, same reasoning — a flat
-				# Score-per-Gold conversion rate, direct write bypasses earn
-			_note(g, key, "$%d converted to Score" % g.gold)
-			g.gold = 0
 
 		# --- issue 17: Action/Time/Piece batch ---
 		["cia-exploding-cigar", "on_turn_start"]:
@@ -1905,13 +1884,13 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			ctx.amount += ctx.base * 0.50
 		["shrinkflation-cereal-box", "on_turn_end"]:
 			g.gold += 10
-			g.score += 100 # issue 57: x10, direct write bypasses Economy.earn
 			Economy.add_clock(g, 1000.0, "shrinkflation-cereal-box")
 		["skull-and-bones-coffin", "on_price"]:
 			ctx.amount += ctx.base * 0.05
-		["skull-and-bones-coffin", "on_score_change"]:
+		["skull-and-bones-coffin", "on_turn_start"]: # NO-250: was +20% Score
 			if g.gold >= 200:
-				ctx.amount += ctx.base * 0.20
+				g.actions_left += 1
+				_note(g, key, "+1 Action", g.BANNER_GAIN)
 		["silk-road-coupon", "on_price"]:
 			if g.silk_road_active:
 				ctx.amount -= ctx.base * 0.50
@@ -2067,10 +2046,6 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		["satoshi-s-private-key", "on_piece_lost"]:
 			if not ctx.uncounted:
 				_debit(g, key, 2)
-		["lusitania-hardtack-crate", "on_piece_lost"]:
-			if not ctx.uncounted and not BuffLogic.of(g.board[ctx.pos]).is_empty():
-				g.gold += 150
-				g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 		["templar-severance-gold-one-pile", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.gold += 150
@@ -2111,11 +2086,9 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				g.gold += 25
 		["doomsday-autoclicker", "on_item_consume"]:
 			if ctx.tier == "Decisive":
-				g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
 				Economy.add_clock(g, 10000, "doomsday-autoclicker")
 		["tape-eraser-magnet", "on_item_consume"]:
 			if ctx.last:
-				g.score += 1000 # issue 57: x10, direct write bypasses Economy.earn
 				g.gold += 50
 		["dihydrogen-monoxide-battery", "on_item_consume"]:
 			if ctx.tier == "Tactical" and g.dihydrogen_free_wave != g.wave:
@@ -2161,15 +2134,10 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					# CIA Heart Attack Gun's own "+100% Gold" above
 			if ctx.attacker_pos.x >= 0 and g.board.has(ctx.attacker_pos) \
 					and _demoted(g.defs, g.board[ctx.attacker_pos]):
-				# Demoted: no Score. Sets an OUTPUT flag rather than zeroing
-				# ctx.pts here — a same-hook `+=` handler could dispatch
-				# before or after this one (run()'s key-sort), and a direct
-				# write here would make the result depend on which side of
-				# "dark-market-light-bulb" alphabetically it landed (the
-				# exact order-dependence the header's ctx contract bans).
-				# economy.gd's capture_score applies `no_score` exactly once,
-				# after every on_capture handler has finished.
-				ctx.no_score = true
+				# NO-250: Demoted: no $ (was no Score). An OUTPUT flag, applied
+				# once by game.gd's _pay_capture after every handler ran, so it
+				# doesn't depend on run()'s key-sort. The capture still scores.
+				ctx.no_gold = true
 		["montauk-eggo-waffle", "on_wave_clear"]:
 			if _milestone5_hit(g.wave, acquired_wave):
 				var candidates: Array = []
@@ -2188,13 +2156,13 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					_note(g, key, "Stock piece promoted to %s" % g.defs[g.stock[idx] if g.stock[idx] is String else g.stock[idx].id].name)
 
 		# --- issue 19: board-half reads (Tuning.BOARD_H, owner-agnostic) ---
-		["dyatlov-geiger-counter", "on_score_change"]:
+		["dyatlov-geiger-counter", "on_gold_change"]:
 			var far := 0
 			for pos in _player_positions(g):
 				if _on_enemy_half(pos):
 					far += 1
 			if far >= 3:
-				ctx.amount += ctx.base # +100% Score
+				ctx.amount += ctx.base * 0.5 # NO-250: +50% $ (was +100% Score)
 		["fema-summer-camp-flyer", "on_turn_end"]:
 			var near := 0
 			for pos in g.board:
@@ -2223,9 +2191,6 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			# the read source sizing the grant, same as john-titor's-crypto-
 			# wallet reading g.clock_ms elsewhere in this file).
 			Economy.add_clock(g, ctx.base * 500.0, "2012-doomsday-party-hat") # +5s per 10 Gold
-		["fort-knox-iou", "on_score_change"]:
-			if g.gold < 10:
-				ctx.amount += ctx.base * 0.5
 		["fort-knox-iou", "on_wave_clear"]:
 			# NO-23 (user ruling 2026-09-08): a Small Item Box, not a direct
 			# grant. Issue 53 makes capacity REFUSE an acquisition, so at the
@@ -2244,7 +2209,6 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		["merchants-of-death-sample-case", "on_king_ability_apply"]:
 			g.gold += 100
 		["tunguska-toothpicks", "on_king_ability_charge"]:
-			g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
 			Economy.add_clock(g, 5000, "tunguska-toothpicks")
 
 		# --- issue 19: capture conversion, the cheap wave-clear half ---
@@ -2323,8 +2287,6 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		# --- issue 23: payout half cheap, strip half needs no new hook ---
 		["45-5-carat-curse", "on_gold_change"]:
 			ctx.amount += ctx.base * 0.45
-		["45-5-carat-curse", "on_score_change"]:
-			ctx.amount += ctx.base * 0.45
 		["45-5-carat-curse", "on_wave_clear"]:
 			if g.wave % 3 == 0:
 				for pos in g._player_pieces():
@@ -2379,9 +2341,11 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			var extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
 			if not extras.is_empty():
 				ctx.roster.append(extras[g.rng.randi() % extras.size()])
-		["haarp-volume-knob", "on_wave_clear"]:
-			g.score += 2000 # issue 57: x10, direct write bypasses Economy.earn
-			g.gold += 15
+		["haarp-volume-knob", "on_wave_clear"]: # NO-250: +1 Piece Buff (was Score + $15)
+			var hp_pool := _player_positions(g)
+			if not hp_pool.is_empty():
+				_grant_buff(g, hp_pool[g.rng.randi() % hp_pool.size()])
+				_note(g, key, "Buff")
 		["wuhan-vial-label", "on_wave_roster"]:
 			var wuhan_extras: Array = ctx.roster.filter(func(id: String) -> bool: return id != "king")
 			if not wuhan_extras.is_empty():
@@ -2442,9 +2406,8 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			if not g.wave_lost_ids.is_empty():
 				_grant_stock(g, key, g.wave_lost_ids[-1])
 
-		# --- issue 26: Score-gain streak (27 Club Punch Card); -50 Gold on
-		# loss, same issue-16 ruling as Social Credit Report Card (Score is
-		# up-only) ---
+		# --- issue 26: clean-Wave streak (27 Club Punch Card; NO-250: pays $,
+		# no longer Score); -50 Gold on loss ---
 		["27-club-punch-card", "on_wave_clear"]:
 			if ctx.clean:
 				g.club27_streak += 1
@@ -2455,7 +2418,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				# this penalty either — same guard as every other listener here
 				g.club27_streak = 0
 				_debit(g, key, 50)
-		["27-club-punch-card", "on_score_change"]:
+		["27-club-punch-card", "on_gold_change"]:
 			if g.club27_streak > 0:
 				ctx.amount += ctx.base * 0.05 * float(g.club27_streak)
 
@@ -2466,39 +2429,23 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			_note(g, key, "+2 Actions at $0", g.BANNER_GAIN)
 
 		# --- issue 31: capture-context effects ---
-		["curtain-rods-bag-rifle-shaped", "on_score_change"]:
-			if ctx.reason == "wave_first_capture":
-				ctx.amount += ctx.base # double Score, off the immutable base
-					# like every other doubler (voynich-dictionary et al.)
-		["curtain-rods-bag-rifle-shaped", "on_gold_change"]:
-			if ctx.reason == "wave_first_capture":
-				# "pays no Gold" — cancel this call's own 1:1 base contribution.
-				# Own-resource (on_gold_change shrinking its own amount), not a
-				# cross-resource gold_bonus/score_bonus payment — see the
-				# CONTRACT note in the header. maxf floors at 0 so two held
-				# copies (additive stacking, header) can't drive Gold negative.
-				ctx.amount = maxf(ctx.amount - ctx.base, 0.0)
 		["2-3-trillion-receipt", "on_destroy"]:
 			# Deliberate exception to "_destroy pays nothing" (game.gd's
 			# _destroy header) — direct writes are fine here exactly as they
-			# are in on_capture/on_wave_clear/on_game_over above; on_destroy
-			# only ever fires for Item-caused kills (game.gd's `by_item`
-			# param), so this never sees Bomb or Tariff destructions. issue 57:
-			# ctx.value is defs[id].value — the SAME number that is also the
-			# piece's Gold/Shop-price (game.gd's on_destroy dispatch, shop.gd
-			# price()) — so only the Score line gets x10; the Gold line stays
-			# on the raw unscaled value, same as every other capture-adjacent
-			# effect that reads defs[].value.
-			g.score += ctx.value * 10
+			# are in on_capture/on_wave_clear above; on_destroy only ever fires for
+			# Item-caused kills (game.gd's `by_item` param), so this never
+			# sees Bomb or Tariff destructions. NO-250: $ only, no Score.
 			g.gold += ctx.value
 
 		# --- issue 21: echo and meta-triggers (the rest of the army runs
 		# through _run_meta_triggers above, off `held`/`fired` directly —
 		# Capstone Polish is the one plain direct-effect handler here) ---
 		["capstone-polish", "on_purchase"]:
-			if ctx.kind == "artefact":
-				g.score += 1500 # issue 57: x10, direct write bypasses Economy.earn
-				Economy.add_clock(g, 5000, "capstone-polish")
+			if ctx.kind == "artefact": # NO-250: +1 Piece Buff to a random ally
+				var cp_pool := _player_positions(g)
+				if not cp_pool.is_empty():
+					_grant_buff(g, cp_pool[g.rng.randi() % cp_pool.size()])
+					_note(g, key, "Buff")
 
 		# --- issue 29: Illuminati Fridge Magnet — off the immutable
 		# `ctx.base` like every other percentage Gold/Score handler (see the
@@ -2522,10 +2469,6 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				_note(g, key, "+1 Action", g.BANNER_GAIN)
 
 		# --- issue 35: Clock-gain choke point + run-long Turn counter ---
-		["black-knight-morse-code", "on_score_change"]:
-			if g.turn_number % 3 == 0:
-				ctx.amount += ctx.base # double Score — base is never negative
-					# (Score is up-only, economy.gd's earn() header)
 		["black-knight-morse-code", "on_clock_change"]:
 			if g.turn_number % 3 == 0 and ctx.base > 0:
 				ctx.amount += ctx.base # double Clock GAINS only — "gains ...

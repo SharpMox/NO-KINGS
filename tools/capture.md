@@ -43,7 +43,17 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | `feed` | kill feed with three lines: a capture gain, a sale, an Artefact trigger | `--scenario-name "Movement & drag" --screenshot /tmp/cap/feed --show-screen feed` |
 | `pick` | the shared choice modal, as a Sell confirm | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/pick --show-screen pick` |
 
+| `turn-start` | the player-turn-start Artefact dispatch alone (NO-250 Pincer: the Stunned enemy with its "Stunned!" float; `stunned` has no board badge) | `--scenario-name "NO-250: Pincer" --screenshot /tmp/cap/pincer --show-screen turn-start` |
+
 Other seam flags work with `--scenario-name` too: `--select X,Y[;X,Y]`, `--arm-item KEY [--anchor X,Y]`, `--open-shop`, `--open-drawer stock|inventory` (only one of them per run).
+
+NO-250 Artefact mechanics, through `--select` (a real tap):
+
+| State | Flags after `--` |
+|---|---|
+| Magic bullet preview: the Rook's shot at the Knight through your own Pawn (linked dots through the blocker to a normal red-hatched capture tile) | `--scenario-name "NO-250: Magic bullet" --screenshot /tmp/cap/bullet --select 0,1` |
+| Oligarch: the enemy Pawn's recon preview, with no capture on your Queen | `--scenario-name "NO-250: Oligarch" --screenshot /tmp/cap/oligarch --select 2,4` |
+| Oligarch control: the same preview without the Artefact, with the capture shown | `--scenario-name "NO-250: Oligarch (control, no Artefact)" --screenshot /tmp/cap/oligarch-ctrl --select 2,4` |
 
 Menu screens need no scenario and write `DIR/menu.png`. The run then boots a default game and also writes a `game.png`; ignore that file.
 
@@ -98,3 +108,36 @@ ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --p
 | 9 | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | 10 | Stock drawer, one cell per piece (no stacks, no Promote badge) | `--scenario-name "Combo Army: Crown — free merges, Stock pieces onto board partners" --screenshot /tmp/cap/stock --open-drawer stock` |
 | 10 | Stock return drop preview | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
+
+## NO-243 board animations (`--show-screen anim:NAME`)
+
+Each plays one board animation on the "Movement & drag" board through the same call the game makes, waits ~1 s for it to finish, then the capture settles and quits. Animations are forced on for the run. Record with Movie Maker, windowed, one at a time:
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/anim-spawn.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/anim-spawn --show-screen anim:spawn
+```
+
+| NAME | Audit row | What it shows |
+|---|---|---|
+| `spawn` | 13 | three enemies drop in 60 ms apart, each tile flashing red |
+| `crush` | 14 | a spawn lands on a friendly piece, which bursts under it |
+| `king-arrive` | 15 | the King's big drop, board shake, gold crown ring and gold edge |
+| `king-fall` | 16 | a checkmated King shatters gold, gold edge, shake (recurring-King path, so no win screen) |
+| `rankup` | 10 | Pawn + Pawn merge, then the light sweep, scale pop and RANK UP |
+| `enemy-moves` | 2 | three enemy moves, one at a time: the mover's tile flashes, then it slides |
+| `explode` | 4 | a detonation: bursts plus a board shake |
+| `badge` | 19 | a Shield badge pops in, then fades when consumed |
+
+## NO-243 S3 HUD and end-of-run animations (Movie Maker)
+
+Animations are forced on for each run. A static `--show-screen gameover`/`win` capture now waits for the staged reveal to finish before the shot.
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/hud-anims.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/hud-anims --show-screen hud-anims
+```
+
+| NAME | Audit rows | What it shows |
+|---|---|---|
+| `hud-anims` | 31–34 | +$50 (roll up and squish), −$30 (roll down, red flash), a Turn tick with the row re-centring, a Wave flip, one Action drained, then the last one (PASS shakes), 0.6 s apart |
+| `reveal-gameover` | 53 | the loss screen: the board greys over 0.6 s, the title drops in, the Score counts up while the rest fades in |
+| `reveal-win` | 54 | a wave-50 King falls the real way and shatters gold (S1); 0.4 s later the same staged reveal, with a gold burst off the title |

@@ -827,7 +827,8 @@ const HOOKS := [
 ## artefact do anything at this hook" — _dispatch is just the handler body.
 const REGISTRY := {
 	# --- issue 16: Gold/Score batch (31 artefacts, no needs-note) ---
-	"tinfoil-hat": [], # NO-250: "can't be Stunned or Slowed" lands in PR 2/2
+	"tinfoil-hat": [], # NO-250: standing rule — game.gd's Stun/_apply_buff
+		# guards and the `unslowable` stamp in _refresh (never dispatched)
 	"daylight-savings-jar": ["on_gold_change"],
 	"the-red-phone": ["on_turn_start"], # NO-250: <30s: +1 Action per Turn
 	"bermuda-triangulation": ["on_gold_change"],
@@ -841,7 +842,7 @@ const REGISTRY := {
 	"sphinx-s-booger": ["on_capture"],
 	"phantom-punch-glove": ["on_capture"],
 	"azimuthal-pancake-map": ["on_capture"],
-	"men-in-black-prescription-sunglasses": [], # NO-250: "Pincer" lands in PR 2/2
+	"men-in-black-prescription-sunglasses": ["on_turn_start"], # NO-250 "Pincer"
 	"holy-dna-kit": ["on_capture"],
 	"cia-press-pass": ["on_capture"],
 	"library-of-alexandria-matchbox": ["on_capture"],
@@ -856,7 +857,8 @@ const REGISTRY := {
 	"alien-autopsy-bloopers": ["on_wave_clear"],
 	"golden-buddha-bobblehead": ["on_wave_clear"],
 	"nigerian-prince-wire-transfer": ["on_wave_spawn"],
-	"putin-s-golden-toilet-brush": [], # NO-250: "Oligarch" lands in PR 2/2
+	"putin-s-golden-toilet-brush": [], # NO-250 "Oligarch": standing rule,
+		# game.gd's _oligarch_guard fed into Rules (never dispatched)
 	# rapture-insurance-policy (NO-250) is a standing rule read in game.gd's
 	# _process at the Clock-out check, same shape as Doomsday Clock Snooze Button.
 	# --- issue 17: Action/Time/Piece batch (8 artefacts, no needs-note) ---
@@ -907,7 +909,7 @@ const REGISTRY := {
 
 	# --- issue 19: on_piece_lost (game.gd _lose_player_piece, 5 call sites) ---
 	"satoshi-s-private-key": ["on_wave_clear", "on_piece_lost"],
-	"lusitania-hardtack-crate": [], # NO-250: Clock + deferred Item Box lands in PR 2/2
+	"lusitania-hardtack-crate": ["on_piece_lost"], # NO-250
 	"templar-severance-gold-one-pile": ["on_piece_lost"],
 	"d-b-cooper-s-parachute": ["on_piece_lost"],
 	"nibiru-hide-and-seek-trophy": ["on_wave_clear", "on_piece_lost"],
@@ -1036,7 +1038,8 @@ const REGISTRY := {
 
 	# --- issue 31: capture-context effects. Templar Debit Card has no entry
 	# here (see the header) — it's a standing shop.gd rule, not a hook. ---
-	"curtain-rods-bag-rifle-shaped": [], # NO-250: "Magic bullet" lands in PR 2/2
+	"curtain-rods-bag-rifle-shaped": [], # NO-250 "Magic bullet": standing
+		# rule, game.gd's _select_dests + Rules.magic_bullet_targets
 	"2-3-trillion-receipt": ["on_destroy"],
 
 	# --- issue 21: echo and meta-triggers ---
@@ -1833,6 +1836,27 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 				# amount, floored at 0 by add_clock itself)
 
 		# --- issue 17: Action/Time/Piece batch ---
+		["men-in-black-prescription-sunglasses", "on_turn_start"]:
+			# NO-250 "Pincer": any enemy adjacent to two of your same-type
+			# pieces is Stunned that Turn — the enemy-side `stunned` debuff
+			# (turns 1: it sits out the coming enemy turn, then tick_side
+			# drops it). BuffLogic.add direct, like the two existing Stun
+			# sites (not a catalogued Piece Buff). Not re-applied, so extra
+			# copies change nothing.
+			for pos in g.board:
+				if g.board[pos].owner != Rules.ENEMY or BuffLogic.has(g.board[pos], "stunned"):
+					continue
+				var pn_seen := {}
+				for dx in range(-1, 2):
+					for dy in range(-1, 2):
+						var pn_at: Vector2i = pos + Vector2i(dx, dy)
+						if pn_at != pos and g.board.has(pn_at) and g.board[pn_at].owner == Rules.PLAYER:
+							pn_seen[g.board[pn_at].id] = pn_seen.get(g.board[pn_at].id, 0) + 1
+				if pn_seen.values().any(func(n: int) -> bool: return n >= 2):
+					BuffLogic.add(g.board[pos], "stunned", 1)
+					g._add_float(pos, "Stunned!", g.COL_MERGE) # same float as the
+						# other two Stun sites — `stunned` has no board badge
+					_note(g, key, "Stun") # #569: 1-2 word feed notes
 		["cia-exploding-cigar", "on_turn_start"]:
 			g.actions_left += 1
 		["i-am-not-a-robot-checkbox", "on_turn_start"]:
@@ -2046,6 +2070,15 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		["satoshi-s-private-key", "on_piece_lost"]:
 			if not ctx.uncounted:
 				_debit(g, key, 2)
+		["lusitania-hardtack-crate", "on_piece_lost"]:
+			# NO-250: +10s Clock and a Small Item Box. The loss is usually mid
+			# enemy turn, where no modal can open, so the Box is owed through
+			# g.pending_item_boxes (drained at player-turn start, the Bounty
+			# idiom). Per held copy, like every other stacking handler.
+			if not ctx.uncounted and not ctx.cancel and not BuffLogic.of(g.board[ctx.pos]).is_empty():
+				Economy.add_clock(g, 10000.0, key)
+				g.pending_item_boxes += 1
+				_note(g, key, "+10s Box", g.BANNER_GAIN)
 		["templar-severance-gold-one-pile", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.gold += 150

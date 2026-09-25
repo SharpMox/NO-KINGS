@@ -207,9 +207,15 @@ func build(game) -> void:
 
 	overlay.visible = false
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
-	overlay.add_theme_stylebox_override("panel", dim)
+	# NO-243 S3: the dim is _desat's shader now (it greys the run behind as
+	# it dims it), so the panel itself draws nothing
+	overlay.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var desat_mat := ShaderMaterial.new()
+	desat_mat.shader = Shader.new()
+	desat_mat.shader.code = DESAT_SHADER
+	_desat.material = desat_mat
+	_desat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(_desat)
 	g.hud.add_child(overlay)
 
 
@@ -461,24 +467,25 @@ func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	_end_of_run_on_top()
-	for c in overlay.get_children():
-		c.queue_free()
+	_clear_overlay()
 	var center := CenterContainer.new()
 	overlay.add_child(center)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", &"Hero"))
+	var title := _overlay_label("VICTORY" if won else "GAME OVER", &"Hero")
+	box.add_child(title)
 	box.add_child(_overlay_label(reason))
-	var stats := "Score %d · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
+	var stats := " · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
+		% [g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	if not g.king_ids_defeated.is_empty():
 		var names: Array = g.king_ids_defeated.map(func(id: String) -> String: return Kings.name_of(id))
 		stats += "\nDefeated: %s" % ", ".join(names)
 	if rank > 0:
 		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
-	box.add_child(_overlay_label(stats))
+	var stats_label := _overlay_label("Score %d" % g.score + stats)
+	box.add_child(stats_label)
 	# issue 75: show the seed so a good run can be replayed or shared. The BUILD
 	# is shown beside it deliberately — a seed only reproduces within the build
 	# it was rolled in, because any content change that shifts how many rolls
@@ -503,6 +510,8 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
 	box.add_child(feedback)
 	overlay.visible = true
+	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
+	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S if won else 0.0, won)
 
 
 ## Wave-50 win screen: the run pauses on top of the board; Continue enters
@@ -543,15 +552,15 @@ func _end_of_run_on_top() -> void:
 
 func show_win_screen() -> void:
 	_end_of_run_on_top()
-	for c in overlay.get_children():
-		c.queue_free()
+	_clear_overlay()
 	var center := CenterContainer.new()
 	overlay.add_child(center)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY", &"Hero"))
+	var title := _overlay_label("VICTORY", &"Hero")
+	box.add_child(title)
 	# The King who just fell, else (the --show-screen capture, which opens this
 	# without a fall) the King still on the board — never a bare "King" when
 	# the run knows his name.
@@ -562,9 +571,10 @@ func show_win_screen() -> void:
 	for e in g.load_scores():
 		if int(e.score) >= g.score:
 			preview += 1
-	box.add_child(_overlay_label(
-		"Score %d · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]))
+	var stats := " · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
+		% [preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
+	var stats_label := _overlay_label("Score %d" % g.score + stats)
+	box.add_child(stats_label)
 	box.add_child(_overlay_label("Continue into endless waves?"))
 	var cont := Button.new()
 	cont.text = "Continue"
@@ -581,6 +591,104 @@ func show_win_screen() -> void:
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
 	box.add_child(feedback)
 	overlay.visible = true
+	# after the King's shatter (S1), with a gold burst off the title
+	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
+	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S, true)
+
+
+# --- NO-243 S3 (audit rows 53/54): the end screens' staged reveal ------------
+# The run behind the overlay greys and dims over REVEAL_DESAT_S (a screen-
+# texture shader, so it is whatever was on screen, board and HUD alike), then
+# the title drops in, then the rest fades up while the Score counts up to its
+# total. Only alpha, scale and label text animate, never position or a mouse
+# filter: the buttons take clicks from the first frame, wherever the reveal is.
+const REVEAL_DESAT_S := 0.6
+const REVEAL_TITLE_S := 0.35
+const REVEAL_REST_S := 0.6
+const KING_FALL_S := 0.4 ## a win waits out S1's King shatter (game.gd DIE_TIME) first
+const BURST_S := 0.6
+const BURST_COLOR := Color(1.0, 0.8, 0.3) ## S1's COL_GOLD_FX, the King-fall gold
+const DESAT_SHADER := """
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest, repeat_disable;
+uniform float amount = 1.0; // 0 = the run as it stands, 1 = greyed under the dim
+uniform vec4 dim : source_color = vec4(0.08, 0.08, 0.1, 0.93); // the old panel dim
+void fragment() {
+	vec3 c = texture(screen_tex, SCREEN_UV).rgb;
+	vec3 grey = vec3(dot(c, vec3(0.299, 0.587, 0.114)));
+	COLOR = vec4(mix(c, mix(grey, dim.rgb, dim.a), amount), 1.0);
+}
+"""
+var _desat := ColorRect.new() ## overlay's first child, kept across screens
+var reveal: Tween ## the running reveal; null when the last one snapped
+
+
+func _clear_overlay() -> void:
+	for c in overlay.get_children():
+		if c != _desat:
+			c.queue_free()
+
+
+func _set_desat(v: float) -> void:
+	(_desat.material as ShaderMaterial).set_shader_parameter("amount", v)
+
+
+## `rest` fades in after `title`; `stats` counts up through `stats_at`
+## (score -> its text). Instant with animations off or in autoplay.
+func _reveal(title: Label, rest: Array, stats: Label, stats_at: Callable, delay: float, burst: bool) -> void:
+	if reveal:
+		reveal.kill()
+	reveal = null
+	_set_desat(1.0)
+	if g.autoplay or not g.animations_on:
+		return
+	_set_desat(0.0)
+	title.modulate.a = 0.0
+	for c in rest:
+		(c as Control).modulate.a = 0.0
+	stats.text = stats_at.call(0)
+	reveal = create_tween()
+	reveal.tween_interval(delay)
+	reveal.tween_method(_set_desat, 0.0, 1.0, REVEAL_DESAT_S)
+	reveal.tween_callback(func() -> void: title.pivot_offset = title.size / 2.0)
+	reveal.tween_property(title, "modulate:a", 1.0, REVEAL_TITLE_S)
+	reveal.parallel().tween_property(title, "scale", Vector2.ONE, REVEAL_TITLE_S) \
+		.from(Vector2(1.8, 1.8)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for i in rest.size():
+		if i > 0:
+			reveal.parallel()
+		reveal.tween_property(rest[i], "modulate:a", 1.0, REVEAL_REST_S)
+	var count := func(v: float) -> void:
+		stats.text = stats_at.call(roundi(v))
+	reveal.parallel().tween_method(count, 0.0, float(g.score), REVEAL_REST_S) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if burst:
+		_gold_burst(title, delay + REVEAL_DESAT_S)
+
+
+## Row 54: gold chips fly out of the title as it lands. Input-dead, freed
+## with the screen.
+func _gold_burst(title: Control, delay: float) -> void:
+	var b := Control.new()
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.set_meta("t", 0.0)
+	overlay.add_child(b)
+	var paint := func() -> void:
+		var t: float = b.get_meta("t")
+		if t <= 0.0 or t >= 1.0:
+			return
+		var c := title.get_global_rect().get_center() - b.global_position
+		var sz := 9.0 * (1.0 - t)
+		for i in 18:
+			var at := c + Vector2.from_angle(TAU * i / 18.0) * lerpf(24.0, 200.0, ease(t, 0.3))
+			b.draw_rect(Rect2(at - Vector2(sz, sz) / 2.0, Vector2(sz, sz)), Color(BURST_COLOR, 1.0 - t))
+	b.draw.connect(paint)
+	var step := func(t: float) -> void:
+		b.set_meta("t", t)
+		b.queue_redraw()
+	var tw := b.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_method(step, 0.0, 1.0, BURST_S)
 
 
 ## `king_id` (NO-83): a King whose Power draws on the King Ability catalogue —

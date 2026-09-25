@@ -37,6 +37,7 @@ static func queue(g, n: int) -> void:
 	g.wave_lost_ids = [] # Jon Burrows' Fake ID / Walt's Cryonic Capsule (26)
 	g.doomsday_snooze_used_this_wave = false # Doomsday Clock Snooze Button (26)
 	g.zapruder_used_this_wave = false # Zapruder's Director's Cut (52)
+	g.curtain_rods_used_this_wave = false # Curtain Rods Bag's Magic bullet (NO-250)
 	g.bovine_used_this_wave = false # Bovine Tractor Beam (52)
 	g.jet_fuel_used_this_wave = false # Jet Fuel Vial (52; issue 61 — moved off
 		# the "Shop visit" boundary onto the same no-REGISTRY activation
@@ -162,6 +163,8 @@ static func spawn_pending(g) -> void:
 			# choke point (review pass 2: a bare lost_player += 1 hid this loss
 			# from every on_piece_lost Artefact and from wave_lost_ids)
 			g._lose_player_piece(spot, "captured")
+		if g.board.has(spot):
+			g._add_pop(spot) # NO-243: the crushed piece dies under the arrival
 		# an enemy displaced by a King arrival is simply absorbed: it is not a
 		# player capture, so it must not score, pay Gold or fire on_capture
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}

@@ -435,6 +435,27 @@ func _init() -> void:
 	check(_feed_texts(kf) == ["27 Club Punch Card: Buff"],
 		"an Artefact trigger posts text only (%s)" % [_feed_texts(kf)])
 
+	# NO-250: the new Artefacts' feed notes stay terse (#569: 1-2 words), so
+	# a long Artefact name plus its note still fits one line
+	var terse := _boot({"board": [["knight", 0, 3, 3], ["knight", 0, 5, 3], ["pawn", 1, 4, 4],
+		["queen", 0, 1, 1, {"buffs": [{"key": "critical"}]}], ["rook", 1, 7, 10]], "wave": 3,
+		"artefacts": ["men-in-black-prescription-sunglasses", "lusitania-hardtack-crate", "tinfoil-hat"]})
+	await process_frame
+	terse.board[Vector2i(4, 4)].erase("buffs") # the boot's own turn start may
+		# already have Pincered it (a stunned piece isn't re-stunned, so no note)
+	_clear_feed(terse)
+	ArtefactHooks.run(terse, "on_turn_start") # Pincer
+	terse._destroy(Vector2i(1, 1)) # Lusitania: a Buffed piece lost
+	terse._apply_buff(terse.board[Vector2i(3, 3)], "slow", 1, Vector2i(3, 3)) # Tinfoil
+	terse.hud._flush_feed()
+	var terse_lines := _feed_texts(terse)
+	check(terse_lines.has("Men in Black Prescription Sunglasses: Stun")
+			and terse_lines.has("Lusitania \"Hardtack\" Crate: +10s Box")
+			and terse_lines.has("Tinfoil Hat: Immune"),
+		"NO-250 feed notes are one-word terse (%s)" % [terse_lines])
+	terse.queue_free()
+	await process_frame
+
 	_clear_feed(kf)
 	for i in 6:
 		kf.hud.post("e%d" % i)

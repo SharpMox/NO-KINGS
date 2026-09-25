@@ -1096,6 +1096,25 @@ func _init() -> void:
 	loch.queue_free()
 	await process_frame
 
+	# NO-250 audit: 2 held copies used to advance score_gained_total by the
+	# SAME gain TWICE (run()'s per-held-copy dispatch loop called this
+	# handler once per copy for the one Score-gain event), crossing every
+	# 1000 at half the true Score. The tracker mirrors the Score the player
+	# actually sees, so it must count each gain once regardless of copies —
+	# a Box still opens on a real crossing.
+	var loch2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0,
+		"artefacts": ["loch-ness-stool-sample", "loch-ness-stool-sample"]})
+	await process_frame
+	Economy.earn(loch2, 99)
+	check(not loch2.box_open and loch2.score_gained_total == 990,
+		"Loch Ness Stool Sample (2 copies): 990 Score gained is counted ONCE, not once per held copy (990, not 1980)")
+	Economy.earn(loch2, 1)
+	check(loch2.box_open and loch2.box_only_kind == "piece" and loch2.score_gained_total == 1000,
+		"Loch Ness Stool Sample (2 copies): crossing 1000 (still the real, un-doubled threshold) opens a Piece Box")
+	loch2.queue_free()
+	await process_frame
+
 	# Cicada Rejection Letter: valuation is the Shop base-price formula for
 	# EACH content kind, summed over whatever is still in box_offer at the
 	# moment of decline (the full offer here — nothing picked first), on top

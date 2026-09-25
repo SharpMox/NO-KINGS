@@ -1730,23 +1730,38 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 		["loch-ness-stool-sample", "on_score_change"]:
 			# "Every 1000 Score gained" (issue 49) — a run-long cumulative
 			# tracker off ctx.base (never the running g.score, which can DROP
-			# via Templar Debit Card's Score-as-payment): each dispatch call
-			# (once per held copy, same as every other stacking handler here)
-			# advances g.score_gained_total by this gain's base amount, and a
-			# crossed 1000-multiple opens one random Piece Box. `not g.box_open`
-			# mirrors Trojan Horse Assembly Manual's own "don't clobber an open
-			# Box Pick" guard just below — a crossing that lands while a Box is
-			# already open (e.g. mid box-skip consolation) is silently dropped,
-			# same precedent, rather than queued.
+			# via Templar Debit Card's Score-as-payment).
+			# NO-250 audit fix: this used to advance g.score_gained_total by
+			# ctx.base on EVERY dispatch call — and unlike a flat percentage
+			# modifier, this handler is not additive-safe under the file's own
+			# "stacking is additive per held copy" rule (header), because the
+			# per-copy loop in run() calls this ONE handler once per held copy
+			# for the SAME Score gain: 2 copies added the same gain twice, so
+			# the tracker crossed 1000 at half the true Score. The gain itself
+			# is counted exactly once per event, cached on ctx (shared across
+			# every copy's dispatch this run() call) so a second/third copy
+			# reads the crossing already computed rather than re-deriving it.
+			# Each held copy still gets its own attempt at opening a Box on a
+			# crossing — "one Box per copy per 1000 Score" (stacking intent is
+			# ambiguous in the catalog text; kept as the more generous read) —
+			# bounded by `not g.box_open`, which mirrors Trojan Horse Assembly
+			# Manual's own "don't clobber an open Box Pick" guard just below: a
+			# second copy's attempt while the first copy's Box from the SAME
+			# crossing is still open is silently dropped, same precedent,
+			# rather than queued.
 			# Issue 57: ctx.base here is deliberately the UNSCALED per-event
 			# amount (economy.gd earn()'s dispatch never sees SCORE_MULTIPLIER,
 			# so El Dorado's cross-resource gold_bonus doesn't also inflate) —
 			# but this tracker mirrors the SAME Score the player sees on
 			# g.score, so the x10 is applied explicitly here to keep "every
 			# 1000" meaning every 1000 of the displayed number.
-			var before: int = g.score_gained_total
-			g.score_gained_total += roundi(ctx.base) * Economy.SCORE_MULTIPLIER
-			if int(g.score_gained_total / 1000.0) > int(before / 1000.0) and not g.box_open:
+			var crossed: Variant = ctx.get("_loch_ness_crossed", null)
+			if crossed == null:
+				var before: int = g.score_gained_total
+				g.score_gained_total += roundi(ctx.base) * Economy.SCORE_MULTIPLIER
+				crossed = int(g.score_gained_total / 1000.0) > int(before / 1000.0)
+				ctx["_loch_ness_crossed"] = crossed
+			if crossed and not g.box_open:
 				g._open_box_pick(Box.random_slot_for_theme(g, "piece"))
 
 		# --- NO-250: the two Gold->Score converters, now flat $ modifiers ---

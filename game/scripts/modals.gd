@@ -373,7 +373,7 @@ func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {},
 		var buffs_label := Label.new()
 		buffs_label.text = "carries forward: %s" % ", ".join(buff_names)
 		buffs_label.theme_type_variation = &"Meta"
-		buffs_label.modulate = Color(0.55, 0.85, 0.6, 0.9) # green: inherited by the result
+		buffs_label.modulate = Color(0.45, 0.85, 1.0, 0.9) # merge cyan (game.gd COL_MERGE): inherited by the result; NO-256 ruling 4, off green
 		buffs_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		buffs_label.custom_minimum_size = Vector2(110, 0)
@@ -643,12 +643,14 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 	center.add_child(box)
 
 	if kind == "piece":
-		var title := Label.new()
-		title.text = ("%s — $%d" % [g.defs[id].name, Shop.price(g, g.shop_stock[shop_index])]) \
-			if shop_index >= 0 else g.defs[id].name
-		title.theme_type_variation = &"Title"
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(title)
+		if shop_index >= 0:
+			box.add_child(_priced_title(g.defs[id].name, g.shop_stock[shop_index], false))
+		else:
+			var title := Label.new()
+			title.text = g.defs[id].name
+			title.theme_type_variation = &"Title"
+			title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(title)
 
 		var dia := Control.new()
 		var cells := 9 # covers the longest leap (Ying Long's 4)
@@ -728,13 +730,15 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 		# handles all four kinds, including box's placeholder); otherwise
 		# off `entry`, an owned g.items/g.artefacts element, same as before.
 		var slot: Dictionary = g.shop_stock[shop_index] if shop_index >= 0 else {}
-		var title := Label.new()
-		title.text = ("%s — %s" % [Shop.display_name(g, slot), Shop.price_text(g, slot)]) \
-			if shop_index >= 0 else str(entry.name)
-		title.theme_type_variation = &"Title"
-		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		box.add_child(title)
+		if shop_index >= 0:
+			box.add_child(_priced_title(Shop.display_name(g, slot), slot, true))
+		else:
+			var title := Label.new()
+			title.text = str(entry.name)
+			title.theme_type_variation = &"Title"
+			title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(title)
 
 		# artefact_tex() never returns null (art or the shared placeholder);
 		# an Item can, so it falls back to the same "✦" glyph its drawer cell
@@ -815,7 +819,9 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			# instead of Sell — the ⇄ badge that used to do this is display
 			# only now (hud.gd's _build_stack_button).
 			var convert := Button.new()
-			convert.text = "Convert (-$%d)" % Shop.convert_price(g, entry)
+			var convert_cost: int = Shop.convert_price(g, entry)
+			convert.text = "Convert -$%d" % convert_cost # NO-256 ruling 2: a cost, red, no parentheses
+			Tuning.money(convert, -convert_cost)
 			convert.disabled = not Shop.can_convert(g, entry)
 			convert.pressed.connect(func() -> void:
 				preview_panel.visible = false
@@ -836,7 +842,9 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 					use_pressed.emit(kind, entry))
 				box.add_child(use)
 			var sell := Button.new()
-			sell.text = "Sell (+$%d)" % Shop.sell_payout(g, kind, entry)
+			var payout: int = Shop.sell_payout(g, kind, entry)
+			sell.text = "Sell +$%d" % payout # NO-256 ruling 2: a gain, green
+			Tuning.money(sell, payout)
 			sell.disabled = not Shop.can_sell(g, kind, entry)
 			sell.pressed.connect(func() -> void:
 				preview_panel.visible = false
@@ -1300,6 +1308,28 @@ func _shop_icon_is_placeholder(slot: Dictionary) -> bool:
 			return slot.kind != "piece" and slot.kind != "item" # box
 
 
+## NO-256 (d): a Shop preview's "Name — $N" title, the price in its money
+## colour (green; red when the player can't pay; "Watch ad" stays white). One
+## RichTextLabel, so `wrap` can still break a long name across lines.
+func _priced_title(name_text: String, slot: Dictionary, wrap: bool) -> RichTextLabel:
+	var price := Shop.price_text(g, slot)
+	if not slot.get("ad", false):
+		price = "[color=#%s]%s[/color]" % [Tuning.money_color(0, Shop.affordable(g, slot)).to_html(false), price]
+	var t := RichTextLabel.new()
+	t.bbcode_enabled = true
+	t.fit_content = true
+	t.scroll_active = false
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if wrap else TextServer.AUTOWRAP_OFF
+	t.add_theme_font_override("normal_font", TITLE_FONT)
+	t.add_theme_font_size_override("normal_font_size", 32) # the Title variation's size
+	t.text = "[center]%s — %s[/center]" % [name_text.replace("[", "[lb]"), price]
+	return t
+
+
+const TITLE_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
+
+
 ## NO-256: height of the price strip under a Shop tile's art (a 16 px line + 2).
 const PRICE_STRIP := 18.0
 
@@ -1343,7 +1373,8 @@ func _shop_tile(index: int) -> Button:
 	var price := Label.new()
 	price.text = Shop.price_text(g, slot) # NO-241: "Watch ad" on the Ad Box
 	price.theme_type_variation = &"Meta"
-	price.add_theme_color_override("font_color", Tuning.COL_GOLD)
+	if not slot.get("ad", false): # "Watch ad" stays white; a price is green, red if short
+		Tuning.money(price, 0, Shop.affordable(g, slot))
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 3)
 	# NO-256: the price gets its own strip BELOW the art, inside the tile: the
@@ -1585,6 +1616,8 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 		btn.text = str(o.label)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.custom_minimum_size = Vector2(420, 0)
+		if o.has("money"): # NO-256 (d): a Gold offer ("+$100") reads green
+			Tuning.money(btn, o.money)
 		var value = o.value
 		btn.pressed.connect(func() -> void: choice_chosen.emit(value))
 		box.add_child(btn)
@@ -1833,7 +1866,9 @@ func show_box(options: Array) -> void:
 		box.add_child(full)
 		for it in g.items:
 			var sell := Button.new()
-			sell.text = "Sell %s (+$%d)" % [it.name, Shop.sell_payout(g, "item", it)]
+			var payout: int = Shop.sell_payout(g, "item", it)
+			sell.text = "Sell %s +$%d" % [it.name, payout] # NO-256: a gain, green
+			Tuning.money(sell, payout)
 			sell.custom_minimum_size = Vector2(420, 0)
 			sell.pressed.connect(func() -> void: box_sell_pressed.emit(it))
 			box.add_child(sell)
@@ -1861,6 +1896,8 @@ func show_box(options: Array) -> void:
 	var skip := Button.new()
 	# The Box's price, in Gold. The old label said "+20 score" while earn() paid
 	# ~20 Gold AND 200 Score — wrong currency and wrong by 10x at once.
-	skip.text = "Skip (+$%d)" % Tuning.box_skip_gold(g.box_size)
+	var skip_gold: int = Tuning.box_skip_gold(g.box_size)
+	skip.text = "Skip +$%d" % skip_gold # NO-256: a gain, green
+	Tuning.money(skip, skip_gold)
 	skip.pressed.connect(func() -> void: box_skipped.emit())
 	box.add_child(_centered(skip))

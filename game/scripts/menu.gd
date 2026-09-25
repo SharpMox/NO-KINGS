@@ -1263,7 +1263,12 @@ func _ready() -> void:
 		# token per real piece) is the right renderer — same call this
 		# screen already made pre-NO-179.
 		add_caption.call(card_box, "Starting Pieces")
-		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
+		# card_w - 20: the card's real content width (card_style's own
+		# 10+10px left/right margins) — PieceMass.build() splits a row that
+		# doesn't fit this into two rather than shrinking any piece (Max,
+		# 2026-09-25; see piece_mass.gd's TARGET_ASPECT and
+		# _choose_row_sizes() headers for why this budget matters).
+		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name], card_w - 20.0)) # NO-157
 		# NO-179: Reinforcements — the set of piece TYPES game.gd's
 		# _reinforce_ids() grants (deduped, doubled at the grant site — see
 		# that function's own header), not a second multiset of instances.

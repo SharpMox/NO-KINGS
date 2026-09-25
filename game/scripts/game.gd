@@ -178,6 +178,14 @@ const ARRIVE_KING_TIME := 0.5
 const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
 const MERGE_TIME := 0.5 # NO-243: inputs pull together, result fades in
 const SNAP_BACK_TIME := 0.15 # NO-236: a refused drop slides home (a legal one settles in ANIM_TIME)
+const ARRIVE_FALL := 0.7 # NO-243: share of an arrive spent falling; the rest is the squash
+const ENEMY_MOVE_GAP := 0.35 # NO-243: beat before each enemy move while its tile flashes, so a turn reads one move at a time
+const ENEMY_SLIDE_TIME := 0.2 # NO-243: slower than the player's slide, so each enemy move is legible
+const RANK_UP_TIME := 0.4 # NO-243: light sweep + scale pop after a same-id merge
+const SHAKE_PX := 6.0 # NO-243: board shake (King landing / fall, explosions)
+const SHAKE_TIME := 0.3
+const BADGE_TIME := 0.25 # NO-243: a buff badge popping in / fading out
+const COL_GOLD_FX := Color(1.0, 0.8, 0.3) # NO-243: King arrival / fall
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -1425,6 +1433,7 @@ func _process(delta: float) -> void:
 		for a in anims:
 			a.t += delta / a.get("dur", ANIM_TIME)
 		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
+		position = _shake_offset() # NO-243: back to ZERO once the last shake ends
 		queue_redraw()
 
 
@@ -1752,8 +1761,9 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				continue # this Action went to the Ability; the next re-reads the board
 		if act.is_empty():
 			break # a held action still ends the turn: the Stun ageing below must run
-		if not autoplay and animations_on:
-			await get_tree().create_timer(0.35).timeout
+		if not autoplay and animations_on: # NO-243: the mover's tile flashes, then it slides
+			_add_flash(act.from, COL_CAPTURE, ENEMY_MOVE_GAP)
+			await get_tree().create_timer(ENEMY_MOVE_GAP).timeout
 		await _wait_while_backgrounded()
 		if act.has("ep_victim"): # NO-232: teleport the victim onto the landing
 			# square before anything below reads the board — same trick and
@@ -1866,7 +1876,7 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				queue_redraw()
 				continue
 			_add_pop(act.to)
-		_add_slide(act.from, act.to)
+		_add_slide(act.from, act.to, ENEMY_SLIDE_TIME)
 		board[act.to] = board[act.from]
 		board[act.to].moved = true # NO-224: the initial double-step gates on this
 		board.erase(act.from)
@@ -1906,10 +1916,62 @@ func _uap_dodge_target(pos: Vector2i, attacker: Vector2i) -> Vector2i:
 	return best
 
 
-func _add_slide(from: Vector2i, to: Vector2i) -> void:
+func _add_slide(from: Vector2i, to: Vector2i, dur := ANIM_TIME) -> void:
 	if autoplay or not animations_on:
 		return
-	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0})
+	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0,
+		"dur": dur})
+
+
+## NO-243: tile `at` lights up in `color`, fading in and out over `dur`,
+## starting `delay` seconds from now. Drawn under the pieces.
+func _add_flash(at: Vector2i, color: Color, dur: float, delay := 0.0) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "flash", "at": at, "color": color, "t": -delay / dur, "dur": dur})
+
+
+## NO-243: the board shakes for SHAKE_TIME, starting `delay` seconds from now.
+## _process moves this whole node; the HUD is a CanvasLayer, so it stays put.
+func _add_shake(delay := 0.0) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "shake", "t": -delay / SHAKE_TIME, "dur": SHAKE_TIME})
+
+
+func _shake_offset() -> Vector2:
+	var off := Vector2.ZERO
+	for a in anims:
+		if a.kind == "shake" and a.t >= 0.0:
+			off += Vector2(sin(a.t * 40.0), cos(a.t * 31.0)) * SHAKE_PX * (1.0 - a.t)
+	return off
+
+
+## NO-243: a same-id merge (Rank Up) landed on `at`. Once the merge anim has
+## pulled the inputs together, a light sweeps up the tile, the piece pops and
+## "RANK UP" floats off it.
+func _add_rank_up(at: Vector2i) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "rankup", "to": at, "t": -MERGE_TIME / RANK_UP_TIME, "dur": RANK_UP_TIME})
+	_add_float(at, "RANK UP", COL_MERGE)
+	anims[-1].t = -MERGE_TIME / anims[-1].dur
+
+
+## NO-243: `piece` on `at` gained (gone = false) or is about to lose (gone =
+## true) the buff `key`: its badge pops in from 1.4x, or swells and fades.
+## Called after BuffLogic.add and before BuffLogic.consume, so `piece` carries
+## the badge either way.
+func _add_badge(at: Vector2i, piece: Dictionary, key: String, gone: bool) -> void:
+	if autoplay or not animations_on or at.x < 0:
+		return
+	var glyphs := BuffLogic.glyphs_of(piece)
+	var glyph := BuffLogic.glyph_of(key)
+	var i := glyphs.find(glyph) if gone else glyphs.rfind(glyph)
+	if glyph == "" or i < 0:
+		return # an uncatalogued buff (Stunned) has no badge
+	anims.append({"kind": "badge", "px": _tile_px(at), "glyph": glyph, "i": i, "n": glyphs.size(),
+		"gone": gone, "t": 0.0, "dur": BADGE_TIME})
 
 
 ## Floating label at a tile — the same anim the score popups use, for effects
@@ -1948,10 +2010,15 @@ func _add_arrive(at: Vector2i) -> void:
 	for a in anims:
 		if a.kind == "arrive" and a.t <= 0.0:
 			waiting += 1
-	anims.append({"kind": "arrive", "to": at, "t": -ARRIVE_STAGGER * waiting / dur,
-		"dur": dur, "king": king})
-	if king:
-		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": Color(1.0, 0.8, 0.3)})
+	var delay := ARRIVE_STAGGER * waiting
+	anims.append({"kind": "arrive", "to": at, "t": -delay / dur, "dur": dur, "king": king})
+	_add_flash(at, COL_CAPTURE, dur * ARRIVE_FALL, delay) # the tile warns while the piece falls
+	if king: # lands with a shake, a gold crown ring and a gold board edge
+		var land := delay + dur * ARRIVE_FALL
+		_add_shake(land)
+		anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2,
+			"t": -land / DIE_TIME, "dur": DIE_TIME, "color": COL_GOLD_FX})
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": COL_GOLD_FX})
 	queue_redraw()
 
 
@@ -1986,7 +2053,7 @@ func _draw_arrive(font: Font, a: Dictionary) -> void:
 	var k := 1.0
 	if a.king:
 		k = 1.6
-	var fall := 0.7 # share of the anim spent falling; the rest is the squash
+	var fall := ARRIVE_FALL
 	if t < fall:
 		var u := t / fall
 		var y := -tile * 2.5 * k * (1.0 - u * u) # accelerating fall
@@ -2012,7 +2079,9 @@ func _draw_die(font: Font, a: Dictionary) -> void:
 	var u := (t - flash) / (1.0 - flash)
 	var c := px + Vector2(tile, tile) / 2
 	var side := COL_SIDE_PLAYER
-	if p.owner == Rules.ENEMY:
+	if a.get("gold", false): # a fallen King (_king_down) bursts gold
+		side = COL_GOLD_FX
+	elif p.owner == Rules.ENEMY:
 		side = COL_SIDE_ENEMY
 	var sz := tile * 0.14 * (1.0 - u)
 	for i in 10:
@@ -2023,6 +2092,25 @@ func _draw_die(font: Font, a: Dictionary) -> void:
 			chip = side
 		chip.a = 1.0 - u
 		draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2, Vector2(sz, sz)), chip)
+
+
+## NO-243: Rank Up — a band of light sweeps up the tile while the piece pops.
+func _draw_rankup(font: Font, a: Dictionary) -> void:
+	var px := _tile_px(a.to)
+	var s := 1.0 + 0.25 * sin(PI * a.t)
+	_draw_piece_xf(font, board[a.to], px, Vector2(s, s), Color.WHITE)
+	var band := tile * 0.3
+	var y: float = px.y + (tile - band) * (1.0 - a.t)
+	draw_rect(Rect2(px.x, y, tile, band), Color(1.0, 1.0, 0.85, 0.55 * (1.0 - a.t)))
+
+
+## NO-243: one buff badge popping in (1.4x -> 1x) or swelling as it fades.
+func _draw_badge_anim(font: Font, a: Dictionary) -> void:
+	var c: Vector2 = _buff_badge_centres(a.px, a.n)[a.i]
+	if a.gone:
+		_draw_buff_badge(font, c, a.glyph, 1.0 + 0.4 * a.t, 1.0 - a.t)
+	else:
+		_draw_buff_badge(font, c, a.glyph, lerpf(1.4, 1.0, ease(a.t, 0.4)))
 
 
 ## Turn/wave strips: wipe in, hold, fade out. Drawn on _banner_layer so they
@@ -3536,7 +3624,16 @@ func _king_down(defeated_id := "") -> bool:
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
 		if defeated_id == "":
 			defeated_id = board[k].get("king_id", "")
+		_add_pop(k) # NO-243: shatters like a capture
 		board.erase(k)
+	# NO-243: a fallen King (captured or checkmated) bursts gold, the board edge
+	# flares gold and the board shakes. Visual only; the win screen still opens now.
+	for a in anims:
+		if a.kind == "die" and a.piece.id == "king":
+			a.gold = true
+	_add_shake()
+	if not autoplay and animations_on:
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": COL_GOLD_FX})
 	if defeated_id != "":
 		king_ids_defeated.append(defeated_id)
 	if wave >= Waves.WAVES.size():
@@ -4026,6 +4123,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 					stock.append(e.id if e.size() == 1 else e)
 					board.erase(pos)
 		"drone_strike": # 3x3 around b; the King is unaffected (Destruction)
+			_add_shake() # NO-243: an explosion
 			for dx in range(-1, 2):
 				for dy in range(-1, 2):
 					var hit := b + Vector2i(dx, dy)
@@ -4055,6 +4153,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"invert":
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
+			if it.key == "air_strike":
+				_add_shake() # NO-243: an explosion; a Sniper shot is not
 			_destroy(b, true)
 		"tactical_reposition", "rapid_deployment":
 			_add_slide(a, b)
@@ -4152,6 +4252,7 @@ func _draw_hatch(r: Rect2, col: Color, mirror: bool = false, phase: float = 0.0)
 ## Drone Strike.
 func _detonate(at: Vector2i) -> void:
 	_add_float(at, "Boom!", COL_CAPTURE)
+	_add_shake() # NO-243
 	for pos in _blast_tiles(at):
 		if board.has(pos) and board[pos].id != "king":
 			_destroy(pos)
@@ -4333,6 +4434,7 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 			_add_float(pos, "Buffs full", COL_MERGE)
 		return
 	BuffLogic.add(piece, key, turns)
+	_add_badge(pos, piece, key, false) # NO-243
 	if fire_hook:
 		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
 
@@ -4356,6 +4458,7 @@ func buff_cap() -> int:
 ## those triggers). Fires on_buff_consume AFTER removal — no artefact needs
 ## to veto a buff resolving, so unlike on_item_consume there is no ctx.cancel.
 func _consume_buff(pos: Vector2i, key: String) -> void:
+	_add_badge(pos, board[pos], key, true) # NO-243
 	BuffLogic.consume(board[pos], key)
 	ArtefactHooks.run(self, "on_buff_consume", {"pos": pos, "key": key})
 
@@ -5246,6 +5349,9 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 ## branch calls the function the real trigger calls; only the trigger itself
 ## (a lost run, a long press, a Shop purchase) is skipped.
 func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
+	if screen.begins_with("anim:"):
+		await _debug_anim(screen.substr(5))
+		return
 	match screen:
 		"board": # the scenario exactly as booted (a bare --screenshot would
 			pass # place the Stock and Pass first, see _screenshot_and_quit)
@@ -5314,6 +5420,56 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 				_confirm_sell("piece", stock[0], _refresh)
 		_:
 			printerr("--show-screen %s: no such game screen" % screen)
+
+
+## NO-243: `--show-screen anim:<name>` plays one board animation for a
+## `--write-movie` capture (tools/capture.md), on the "Movement & drag" board.
+## Each calls what the game calls, then waits for it to play out.
+## animations_on is forced on, for the reason the banner capture gives.
+func _debug_anim(anim: String) -> void:
+	animations_on = true
+	match anim:
+		"spawn": # 13: three enemies drop in, staggered, each tile flashing red
+			for id in ["pawn", "knight", "bishop"]:
+				pending_spawn.append({"id": id})
+			WaveLogic.spawn_pending(self)
+		"crush": # 14: a spawn lands on a friendly piece
+			for x in Tuning.BOARD_W:
+				board[Vector2i(x, Tuning.SPAWN_ROW)] = {"id": "pawn", "owner": Rules.PLAYER}
+			pending_spawn.append({"id": "rook"})
+			WaveLogic.spawn_pending(self)
+		"king-arrive": # 15
+			pending_spawn.append({"id": "king"})
+			WaveLogic.spawn_pending(self)
+		"king-fall": # 16, on the recurring-King path so no win screen covers it
+			board[Vector2i(4, 8)] = {"id": "king", "owner": Rules.ENEMY}
+			kings_defeated = 1
+			wave = mini(wave, Waves.WAVES.size() - 1) # the last wave's King ends the run instead
+			_king_down()
+		"rankup": # 10
+			board[Vector2i(5, 3)] = {"id": "pawn", "owner": Rules.PLAYER}
+			board[Vector2i(6, 3)] = {"id": "pawn", "owner": Rules.PLAYER}
+			gold = maxi(gold, Tuning.MERGE_COST)
+			actions_left += 1 # so the merge is not the turn's last action
+			MergeLogic.commit_merge(self, Vector2i(5, 3), Vector2i(6, 3))
+		"enemy-moves": # 2
+			for x in [1, 4, 6]:
+				board[Vector2i(x, 9)] = {"id": "pawn", "owner": Rules.ENEMY}
+			state = State.ENEMY_TURN
+			await _run_enemy_actions(3)
+			state = State.PLAYER_TURN
+		"explode": # 4
+			for pos in [Vector2i(4, 6), Vector2i(5, 6), Vector2i(4, 7)]:
+				board[pos] = {"id": "pawn", "owner": Rules.ENEMY}
+			_detonate(Vector2i(4, 6))
+		"badge": # 19: a Shield badge pops in, then is consumed
+			_apply_buff(board[Vector2i(2, 1)], "shield", 0, Vector2i(2, 1))
+			await get_tree().create_timer(0.6).timeout
+			_consume_buff(Vector2i(2, 1), "shield")
+		_:
+			printerr("--show-screen anim:%s: no such animation" % anim)
+	queue_redraw()
+	await get_tree().create_timer(1.0).timeout
 
 
 ## A fresh run's opening state, from a scenario boot: the Army's full Stock,
@@ -5528,8 +5684,10 @@ func _draw() -> void:
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
-		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge": # the anim draws it
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge" or a.kind == "rankup": # the anim draws it
 			sliding[a.to] = a
+		elif a.kind == "flash" and a.t >= 0.0: # NO-243: under the pieces
+			draw_rect(Rect2(_tile_px(a.at), Vector2(tile, tile)), Color(a.color, 0.5 * sin(PI * a.t)))
 	for pos in board:
 		if sliding.has(pos):
 			continue
@@ -5543,11 +5701,13 @@ func _draw() -> void:
 		# the selected piece draws bigger, with a pulsing outline (below)
 		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
 	for a in anims:
+		if a.t < 0.0:
+			continue # NO-243: delayed, not started yet (a merge still owns a rankup's tile)
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
 			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), Color.WHITE)
 		elif a.kind == "pop":
-			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
+			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(a.get("color", COL_CAPTURE), 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
 			draw_string(text_font(), a.at_px + Vector2(0, -20.0 * a.t), a.text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
@@ -5560,6 +5720,10 @@ func _draw() -> void:
 			_draw_arrive(font, a)
 		elif a.kind == "merge" and board.has(a.to):
 			_draw_merge(font, a)
+		elif a.kind == "rankup" and board.has(a.to):
+			_draw_rankup(font, a)
+		elif a.kind == "badge":
+			_draw_badge_anim(font, a)
 		elif a.kind == "ghost": # NO-236: a refused Stock/Item drop flying home
 			draw_texture_rect(a.tex, Rect2(a.from_px.lerp(a.to_px, ease(a.t, 0.4)) - half,
 				Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
@@ -5840,25 +6004,29 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
 	# NO-244 (Max, 2026-09-24): purple rounded squares, amber outline and amber
 	# glyph, every badge the same size whatever the count.
-	var half := _buff_badge_half()
-	var size := int(half * BUFF_GLYPH_RATIO)
-	var box := StyleBoxFlat.new()
-	box.bg_color = BUFF_BADGE_FILL
-	box.border_color = BUFF_BADGE_ACCENT
-	box.set_border_width_all(1)
-	box.set_corner_radius_all(int(half * 0.45))
 	var centres := _buff_badge_centres(px, glyphs.size())
 	for i in centres.size():
-		var c: Vector2 = centres[i]
-		draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
-		# Per-glyph optical correction: the symbols come from an OS fallback
-		# font whose ink sits differently in its box, so centring by font
-		# metrics alone leaves some off-centre or undersized.
-		var tune: Array = BUFF_GLYPH_TUNE.get(glyphs[i], [0.0, 0.0, 1.0])
-		var gsize := int(size * tune[2])
-		var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
-		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyphs[i],
-			HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, BUFF_BADGE_ACCENT)
+		_draw_buff_badge(font, centres[i], glyphs[i])
+
+
+## One badge centred on `c`; `scl`/`alpha` are for NO-243's pop-in and fade.
+func _draw_buff_badge(font: Font, c: Vector2, glyph: String, scl := 1.0, alpha := 1.0) -> void:
+	var half := _buff_badge_half() * scl
+	var size := int(half * BUFF_GLYPH_RATIO)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(BUFF_BADGE_FILL, BUFF_BADGE_FILL.a * alpha)
+	box.border_color = Color(BUFF_BADGE_ACCENT, BUFF_BADGE_ACCENT.a * alpha)
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(int(half * 0.45))
+	draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
+	# Per-glyph optical correction: the symbols come from an OS fallback
+	# font whose ink sits differently in its box, so centring by font
+	# metrics alone leaves some off-centre or undersized.
+	var tune: Array = BUFF_GLYPH_TUNE.get(glyph, [0.0, 0.0, 1.0])
+	var gsize := int(size * tune[2])
+	var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
+	draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyph,
+		HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, Color(BUFF_BADGE_ACCENT, BUFF_BADGE_ACCENT.a * alpha))
 
 
 ## Half the side of one buff badge (NO-244: fixed, the two-buff size).

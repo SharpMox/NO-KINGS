@@ -98,3 +98,22 @@ ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --p
 | 9 | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | 10 | Stock drawer, one cell per piece (no stacks, no Promote badge) | `--scenario-name "Combo Army: Crown — free merges, Stock pieces onto board partners" --screenshot /tmp/cap/stock --open-drawer stock` |
 | 10 | Stock return drop preview | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
+
+## NO-243 board animations (`--show-screen anim:NAME`)
+
+Each plays one board animation on the "Movement & drag" board through the same call the game makes, waits ~1 s for it to finish, then the capture settles and quits. Animations are forced on for the run. Record with Movie Maker, windowed, one at a time:
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/anim-spawn.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/anim-spawn --show-screen anim:spawn
+```
+
+| NAME | Audit row | What it shows |
+|---|---|---|
+| `spawn` | 13 | three enemies drop in 60 ms apart, each tile flashing red |
+| `crush` | 14 | a spawn lands on a friendly piece, which bursts under it |
+| `king-arrive` | 15 | the King's big drop, board shake, gold crown ring and gold edge |
+| `king-fall` | 16 | a checkmated King shatters gold, gold edge, shake (recurring-King path, so no win screen) |
+| `rankup` | 10 | Pawn + Pawn merge, then the light sweep, scale pop and RANK UP |
+| `enemy-moves` | 2 | three enemy moves, one at a time: the mover's tile flashes, then it slides |
+| `explode` | 4 | a detonation: bursts plus a board shake |
+| `badge` | 19 | a Shield badge pops in, then fades when consumed |

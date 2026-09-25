@@ -1687,13 +1687,23 @@ func _init() -> void:
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
 	var settle := await Settle.settle_layout(modal_box)
 	var box_rect: Rect2 = settle.rect
+	# A tile's CENTRE is not enough: the Buff Box rolls 3 random buffs (this
+	# fixture pins no seed), so the modal's height varies with their text, and
+	# on the notch layout (tile 46, board y 127.5..679.5) a tall roll (box
+	# y 142..658, CI run 36182019919) covers every centre while the top and
+	# bottom rows' outer edges stay clear. Try each tile's centre, then a point
+	# 4 px inside its top and bottom edges — still that tile, still backdrop.
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
 		for bx in Tuning.BOARD_W:
-			var c: Vector2 = game._tile_px(Vector2i(bx, by)) \
-				+ Vector2(game.tile, game.tile) / 2
-			if not box_rect.has_point(c):
-				backdrop = c
+			var p0: Vector2 = game._tile_px(Vector2i(bx, by))
+			var cx: float = p0.x + game.tile / 2.0
+			for c in [Vector2(cx, p0.y + game.tile / 2.0), Vector2(cx, p0.y + 4.0),
+					Vector2(cx, p0.y + game.tile - 4.0)]:
+				if not box_rect.has_point(c):
+					backdrop = c
+					break
+			if backdrop.x >= 0.0:
 				break
 		if backdrop.x >= 0.0:
 			break

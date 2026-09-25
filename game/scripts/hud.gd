@@ -19,6 +19,7 @@ const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item ca
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
 const Kings := preload("res://data/kings.gd") # banner pass: bespoke Power in the ⚠ button
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-152: the targeting tip's diagram
+const UiAnim := preload("res://scripts/ui_anim.gd") # NO-243 S2: the shared UI animations
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -259,6 +260,8 @@ func toggle_menu(open: bool) -> void:
 	if open:
 		game_menu.move_to_front() # above every other HUD control
 	game_menu.visible = open
+	if open and g != null: # NO-243 (row 39): the dim fades in, the menu scales up
+		UiAnim.modal_in(g, game_menu, game_menu.get_child(0) as Control)
 	menu_toggled.emit(open)
 
 
@@ -2520,6 +2523,10 @@ func _stacks() -> Array:
 	return out
 
 
+## NO-243 (row 60): the Artefact keys the grid last showed, null before the
+## first build.
+var _arts_seen: Variant = null
+
 ## NO-85: Items then Artefacts, in ONE scrolling column — the Artefacts grid
 ## holds BOTH passive and activatable entries now (story 47/50), replacing the
 ## old artefact_box (passive rows, tap-to-describe) + activate_box (issue 52's
@@ -2531,8 +2538,20 @@ func _stacks() -> Array:
 ## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
 ## caller).
 func _rebuild_artefacts_grid() -> void:
+	# NO-243 (row 60): with the drawer on screen, an Artefact that arrives
+	# pops in with a glow in its rarity's colour; one consumed or sold (its
+	# last copy gone) fades and shrinks out.
+	var animate: bool = _arts_seen != null and UiAnim.on(g) and artefacts_grid.is_visible_in_tree()
+	var held := {}
+	for t in g.artefacts:
+		held[t.key] = true
 	for c in artefacts_grid.get_children():
-		c.queue_free()
+		if animate and c.has_meta("key") and not held.has(c.get_meta("key")):
+			c.remove_meta("key") # a probe's key lookup must not find the ghost
+			UiAnim.vanish(g, c as Control)
+		else:
+			c.queue_free()
+	var arrived: Array = []
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
@@ -2547,7 +2566,12 @@ func _rebuild_artefacts_grid() -> void:
 		if seen.has(t.key):
 			continue
 		seen[t.key] = true
-		artefacts_grid.add_child(_build_artefact_cell(t.key, counts[t.key]))
+		var cell := _build_artefact_cell(t.key, counts[t.key])
+		artefacts_grid.add_child(cell)
+		if animate and not (_arts_seen as Dictionary).has(t.key):
+			arrived.append(cell)
+			UiAnim.glow(g, cell, Tuning.ARTEFACT_RARITY_COLOR.get(
+				str(t.get("rarity", "")), Color.WHITE))
 	# NO-144: a held Artefact's long press opens the preview modal now, never
 	# show_tip (_build_artefact_cell passes on_long_press) — so tip_key can
 	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
@@ -2562,6 +2586,8 @@ func _rebuild_artefacts_grid() -> void:
 	# the same thing and additionally states how many.
 	for i in ArtefactHooks.cap(g) - g.artefacts.size():
 		artefacts_grid.add_child(_empty_slot())
+	_arts_seen = held
+	UiAnim.deal_in(g, arrived, Vector2(0.4, 0.4), 0.0)
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -2738,9 +2764,23 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	return sell
 
 
+## NO-243 (row 59): which g.items entries the grid last showed (by identity),
+## null before the first build — a restored save is not a gain.
+var _items_seen: Variant = null
+
 func _rebuild_items_grid() -> void:
+	# NO-243 (row 59): with the drawer on screen, a used or sold Item flashes
+	# and shrinks out where it stood, and a new one pops in.
+	var animate: bool = _items_seen != null and UiAnim.on(g) and items_grid.is_visible_in_tree()
+	var fresh: Array = []
 	for c in items_grid.get_children():
-		c.queue_free()
+		var it: Variant = c.get_meta("item") if c.has_meta("item") else null # a null
+			# default reads as "no default": get_meta errors on the empty slots
+		if animate and it != null and not g.items.any(func(x) -> bool: return is_same(x, it)):
+			c.remove_meta("key") # a probe's key lookup must not find the ghost
+			UiAnim.vanish(g, c as Control, Color(2, 2, 2))
+		else:
+			c.queue_free()
 	# NO-202: most recently acquired first, matching _stacks()'s Stock
 	# drawer — g.items is append-ordered, so scan it in reverse. `i` stays
 	# the real g.items index throughout (item_pressed.emit(i), the
@@ -2768,12 +2808,17 @@ func _rebuild_items_grid() -> void:
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
 		btn.add_child(_build_sell_badge("item", g.items[i])) # NO-223
+		btn.set_meta("item", g.items[i]) # NO-243: the entry, by identity
+		if animate and not (_items_seen as Array).any(func(x) -> bool: return is_same(x, g.items[i])):
+			fresh.append(btn)
 		items_grid.add_child(btn)
 	# NO-165: the remaining room, signified — ItemLogic.cap is the real bound
 	# (base 3, +3 per held Area 51 Parking Permit), so this is never a
 	# made-up number.
 	for i in ItemLogic.cap(g) - g.items.size():
 		items_grid.add_child(_empty_slot())
+	_items_seen = g.items.duplicate()
+	UiAnim.deal_in(g, fresh, Vector2(0.4, 0.4), 0.0)
 
 
 ## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),
@@ -2827,10 +2872,21 @@ func _rebuild_stock_drawer() -> void:
 			cap_children.append(btn)
 		else:
 			stock_children.append(btn)
+	# NO-243 (row 58): where a converted Captured cell stood, read before
+	# _drop_stack_button detaches it — the piece slides from there to Stock.
+	var fly: bool = _stock_seen and UiAnim.on(g)
+	var gone_cap := {} # entry text -> the gone Captured cell's screen rect
+	if fly:
+		for k in _stack_btns:
+			if not live.has(k) and k.begins_with("c|") and (_stack_btns[k] as Control).is_visible_in_tree():
+				gone_cap[_stack_entry_text(k)] = (_stack_btns[k] as Control).get_global_rect()
 	for k in _stack_btns:
 		if not live.has(k):
 			_drop_stack_button(_stack_btns[k], animate)
 	_stack_btns = live
+	if fly:
+		_fly_stacks(fresh, gone_cap)
+	_stock_seen = true
 	_stock_slots.clear()
 	for i in maxi(stock_cols, 1) - stock_children.size() % maxi(stock_cols, 1):
 		_stock_slots.append(_empty_slot())
@@ -2840,6 +2896,36 @@ func _rebuild_stock_drawer() -> void:
 	_scroll_stock_to_bottom() # NO-208
 	if animate and not (old_pos.is_empty() and fresh.is_empty()):
 		_animate_stacks(old_pos, fresh)
+
+
+## NO-243 (row 58): the first rebuild is a baseline (a restored run's
+## Captured Stock did not just arrive).
+var _stock_seen := false
+
+
+## A _stack_keys key without its pool prefix and copy number: the entry.
+static func _stack_entry_text(k: String) -> String:
+	return k.substr(2, k.rfind("|") - 2)
+
+
+## NO-243 (row 58): a fresh Stock cell whose entry just left Captured was
+## converted, and slides across from its old cell; a fresh Captured cell was
+## just taken on the board (game.gd points fx_at at the capture tile), and
+## flies from there — to its cell with the drawer open, else to the Stock
+## button.
+func _fly_stacks(fresh: Array, gone_cap: Dictionary) -> void:
+	var drawer_shown: bool = (drawers["stock"] as Control).is_visible_in_tree()
+	for btn in fresh:
+		var k: String = (btn as Button).get_meta("key")
+		var icon: Variant = (btn as Button).icon
+		if icon == null:
+			icon = (btn as Button).text
+		if k.begins_with("s|") and gone_cap.has(_stack_entry_text(k)):
+			UiAnim.fly_to(g, icon, gone_cap[_stack_entry_text(k)], btn)
+		elif k.begins_with("c|") and g.fx_at != Vector2.ZERO:
+			var t := Vector2(g.tile, g.tile)
+			UiAnim.fly_to(g, icon, Rect2(g.fx_at - t / 2.0, t),
+				btn if drawer_shown else drawer_buttons["stock"])
 
 
 ## NO-237: one identity per cell. Copies of one entry are told apart by how

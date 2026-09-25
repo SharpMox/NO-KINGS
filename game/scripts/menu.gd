@@ -1448,11 +1448,14 @@ func _ready() -> void:
 			match args[args.find("--show-screen") + 1]:
 				"tests": _show_tests()
 				"armies": # --army-name NAME scrolls the carousel to that
-					# card first — see _debug_scroll_to_army()'s own header
-					_show_armies()
+					# card first — see _debug_scroll_to_army()'s own header.
+					# Both calls are awaited so the screenshot below (after
+					# this match block) only fires once the scroll has
+					# actually landed, not mid-layout.
+					await _show_armies()
 					if args.has("--army-name"):
 						var wanted: String = args[args.find("--army-name") + 1]
-						if not _debug_scroll_to_army(wanted):
+						if not await _debug_scroll_to_army(wanted):
 							printerr("--army-name %s: no such Army" % wanted)
 				"rank": # the tier picker sits past an Army pick, not its own
 					# button — reached the same way the "← Back" on rank_box
@@ -1536,13 +1539,26 @@ func _show_armies() -> void:
 ## idea as `--scenario-name`. `names` is Tuning.ARMIES' key order, the same
 ## order the carousel and its dots are built in. Returns whether `wanted`
 ## resolved, so both the CLI dispatch below and test_capture_paths.gd can
-## check it directly — ScrollContainer.scroll_horizontal is set synchronously
-## (no tween/animation to await).
+## check it directly.
+##
+## AWAITS two frames before touching `scroll_horizontal` — found live on Aux
+## (all 6 `--army-name` captures came back byte-identical, all "Crown"):
+## called right after `_show_armies()` builds the carousel, the
+## ScrollContainer's own Containers haven't run their deferred layout sort
+## yet (CLAUDE.md, "a freshly added Control's geometry isn't usable until
+## the next idle frame"), so `get_h_scroll_bar()`'s range is still 0 and
+## `scroll_horizontal` clamps straight back to 0 regardless of what's
+## assigned. Two frames, not one: army_row's own deferred sort has to settle
+## before _army_scroll's h-scrollbar range can pick up army_row's new size —
+## each is its own idle-time sort, one frame apart. Not verified against a
+## live Godot run (no Godot on this machine); CI/Aux is the check.
 func _debug_scroll_to_army(wanted: String) -> bool:
 	var names: Array = Tuning.ARMIES.keys()
 	var idx := names.find(wanted)
 	if idx == -1:
 		return false
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var card_w := get_viewport_rect().size.x * ARMY_CARD_WIDTH_FRACTION
 	_army_scroll.scroll_horizontal = int(idx * (card_w + ARMY_CARD_MARGIN))
 	return true

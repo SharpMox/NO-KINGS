@@ -29,8 +29,17 @@ static func settle_layout(control: Control) -> Dictionary:
 	var viewport: Vector2 = control.get_viewport().get_visible_rect().size
 	var prev := Rect2(-1, -1, -1, -1)
 	var frames := 0
+	# NO-243 S2: a modal opening with UiAnim.modal_in scales its content for
+	# 0.15 s, which can outlast the 10-frame poll below at 60 fps. Wait that
+	# tween out first (bounded), then poll the layout as before.
+	var guard := 0
+	while _opening(control) and guard < 120:
+		await control.get_tree().process_frame
+		guard += 1
+		frames += 1
 	var rect: Rect2 = control.get_global_rect()
-	while frames < 10:
+	var polled := 0
+	while polled < 10:
 		rect = control.get_global_rect()
 		var fits: bool = rect.size.x <= viewport.x and rect.size.y <= viewport.y
 		if fits and rect.is_equal_approx(prev):
@@ -38,7 +47,23 @@ static func settle_layout(control: Control) -> Dictionary:
 		prev = rect
 		await control.get_tree().process_frame
 		frames += 1
+		polled += 1
 	return {"rect": rect, "frames": frames, "viewport": viewport}
+
+
+## True while `control` or an ancestor is mid UiAnim.modal_in: waiting for
+## its first frame (modulate.a still 0) or running its tween (ui_anim.gd
+## keeps it in the panel's "ui_anim_tw" meta).
+static func _opening(control: Control) -> bool:
+	var n: Node = control
+	while n != null:
+		if n.has_meta("ui_anim_gen"):
+			var tw: Variant = n.get_meta("ui_anim_tw") if n.has_meta("ui_anim_tw") else null
+			if (tw != null and (tw as Tween).is_valid() and (tw as Tween).is_running()) \
+					or (n is CanvasItem and (n as CanvasItem).visible and (n as CanvasItem).modulate.a < 0.01):
+				return true
+		n = n.get_parent()
+	return false
 
 
 ## Detail string for a check()'s third argument — every call site formats

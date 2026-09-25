@@ -13,6 +13,7 @@ const Shop := preload("res://scripts/shop.gd")
 const Box := preload("res://scripts/box.gd")
 const UiAnim := preload("res://scripts/ui_anim.gd")
 const Modals := preload("res://scripts/modals.gd")
+const Settle := preload("res://tests/test_settle.gd") # NO-254: layout (and modal_in) settle poll
 
 const SCENARIO := "Capture: selling sandbox"
 const QUEEN := Vector2i(3, 2) # the sandbox's player queen
@@ -100,8 +101,8 @@ func _init() -> void:
 	m.preview_panel.visible = false
 	game.preview_open = false
 	game._open_box_pick(slot)
-	await _frames(2)
 	var off_cells: Array = m._box_cells.duplicate()
+	await Settle.settle_layout(off_cells[off_cells.size() - 1])
 	check(_at_rest(m.box_panel) and _cells_at_rest(off_cells), "off: the Box opens at rest, every tile dealt")
 	check(not hud.get_children().any(func(c: Node) -> bool: return c.has_meta(&"box_lid")),
 		"off: the Box has no lid")
@@ -145,6 +146,7 @@ func _init() -> void:
 		"on: the Box's lid is up")
 	await _settle()
 	var on_cells: Array = m._box_cells.duplicate()
+	await Settle.settle_layout(on_cells[on_cells.size() - 1])
 	check(_at_rest(m.box_panel) and _cells_at_rest(on_cells), "on: the Box ends at rest, every tile dealt in")
 	check(_rects_equal(_rects(on_cells), off_rects), "on: the Box's tiles land where they sit with animations off",
 		"on=%s off=%s" % [_rects(on_cells), off_rects])
@@ -201,11 +203,13 @@ func _init() -> void:
 	check(shop_ghosts.all(func(gh) -> bool: return not is_instance_valid(gh)),
 		"on: the Shop buy's ghost is freed after landing")
 	check(stamp.scale.is_equal_approx(Vector2.ONE), "on: the SOLD stamp ends at scale 1")
+	await Settle.settle_layout(m._shop_tiles[m._shop_tiles.size() - 1])
 	var off_tiles := _rects(m._shop_tiles)
 	Shop.roll(game)
 	m.show_shop()
 	check((m._shop_tiles[0] as Control).modulate.a < 0.01, "on: a restock hides the tiles to flip them in")
 	await _settle()
+	await Settle.settle_layout(m._shop_tiles[m._shop_tiles.size() - 1])
 	var flipped: bool = true
 	for t in m._shop_tiles:
 		flipped = flipped and (t as Control).scale.is_equal_approx(Vector2.ONE) \

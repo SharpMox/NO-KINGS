@@ -1126,8 +1126,8 @@ func _init() -> void:
 
 	# Ecdysis Sheddings: inert before any purchase, then mirrors the last
 	# OTHER Artefact bought as a genuine second copy (Library of Alexandria
-	# Matchbox: +10 per Capture with 1 Stock piece — issue 69 repoint of
-	# "greed", which is no longer a real catalog key the Shop can even grant).
+	# Matchbox: +$1 per Capture with 1 Stock piece — NO-250 made it Gold-only,
+	# so the mirror is counted in Gold, the capture's points stay the base).
 	var ecdy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 9999, "stock": ["pawn"], "artefacts": ["ecdysis-sheddings"]})
 	await process_frame
@@ -1140,8 +1140,9 @@ func _init() -> void:
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
 	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
 		"Ecdysis Sheddings: records the last Artefact bought (Library of Alexandria Matchbox)")
-	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 20,
-		"Ecdysis Sheddings: mirrors the bought Matchbox as a second copy (+10 real, +10 mirrored = +20)")
+	var ecdy_g0: int = ecdy.gold
+	check(Economy.capture_score(ecdy, "pawn") == ecdy_base and ecdy.gold == ecdy_g0 + 2,
+		"Ecdysis Sheddings: mirrors the bought Matchbox as a second copy (+$1 real, +$1 mirrored = +$2)")
 	# Buying a SECOND Ecdysis must not overwrite the copy key with its own —
 	# "other" excludes it — or two copies would chase each other.
 	ecdy.actions_left = 5
@@ -1149,9 +1150,11 @@ func _init() -> void:
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
 	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
 		"Ecdysis Sheddings: buying ANOTHER Ecdysis does not overwrite the copied key")
-	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 30,
-		"Ecdysis Sheddings: two held copies each independently mirror the Matchbox (+10 real + 10 + 10 " +
-		"= +30) — bounded, no chase")
+	var ecdy_g1: int = ecdy.gold
+	Economy.capture_score(ecdy, "pawn")
+	check(ecdy.gold == ecdy_g1 + 3,
+		"Ecdysis Sheddings: two held copies each independently mirror the Matchbox (+$1 real + 1 + 1 " +
+		"= +$3) — bounded, no chase")
 	check(ecdy.artefact_echo_depth == 0,
 		"Ecdysis Sheddings: the echo-depth guard is back at 0 after dispatch (no leak)")
 	# issue 60: Ecdysis Sheddings copies g.ecdysis_copy_key, never a held

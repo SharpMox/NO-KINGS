@@ -3673,10 +3673,79 @@ func _init() -> void:
 	check(game.board[queen].get("blitz_free_move", false) and game.items.size() == items_before - 1,
 		"NO-236: Confirm commits the dragged Item")
 
+	game.queue_free() # one Game (and one HUD) in the tree for the S2 probe below
+	await process_frame
+	await _s2_clicks_mid_animation()
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## NO-243 S2: a tap that lands while a modal is still animating reaches what
+## is drawn under it — GUI picking and get_global_rect() both follow scale —
+## and a modal fading out never eats a tap meant for the board. Half of
+## tests/test_ui_anim.gd, which cannot pick headless.
+func _s2_clicks_mid_animation() -> void:
+	GameScript.reset_boot_defaults()
+	var cfg: Dictionary = Scenarios.all()[Scenarios.find("Capture: selling sandbox")].cfg.duplicate()
+	cfg.seed = 1
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.animations_on = true
+	var q := Vector2i(3, 2) # the sandbox's player queen
+
+	game._open_box_pick(Box.random_slot(game))
+	await process_frame
+	await process_frame
+	var tile := _first_option_tile(game.modals.box_panel)
+	var cell: Control = tile.get_parent()
+	# Timing-dependent (a slow CI frame can outrun a tween), so noted, not
+	# asserted: the click below must land either way.
+	print("note: NO-243 S2 Box tile at click: scale=%s alpha=%.2f" % [cell.scale, cell.modulate.a])
+	_click(tile.get_global_rect().get_center())
+	await process_frame
+	check(game.modals.box_expanded_index == int(tile.get_meta("box_index")),
+		"NO-243 S2: a Box tile tapped mid deal-in is selected",
+		"expanded=%d" % game.modals.box_expanded_index)
+	game._box_close()
+
+	game._show_preview(game.board[q].id, "", null, game.board[q])
+	await process_frame
+	await process_frame
+	var content: Control = game.modals.preview_panel.get_child(0)
+	print("note: NO-243 S2 preview at click: scale=%s" % content.scale)
+	var close: Button = null
+	for b in game.modals.preview_panel.find_children("*", "Button", true, false):
+		if (b as Button).text == "Close":
+			close = b
+	_click(close.get_global_rect().get_center())
+	await process_frame
+	check(not game.preview_open and not game.modals.preview_panel.visible,
+		"NO-243 S2: Close tapped mid-grow closes the preview")
+
+	game.modals.show_merge_confirm("pawn", "pawn", "pawn")
+	await process_frame
+	await process_frame
+	var cancel: Button = null
+	for b in game.modals.merge_panel.find_children("*", "Button", true, false):
+		if (b as Button).text == "Cancel":
+			cancel = b
+	_click(cancel.get_global_rect().get_center())
+	await process_frame
+	print("note: NO-243 S2 merge panel at board tap: visible=%s alpha=%.2f" % [
+		game.modals.merge_panel.visible, game.modals.merge_panel.modulate.a])
+	_click(game._tile_px(q) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == q, "NO-243 S2: a board tap during the merge's fade-out reaches the board",
+		"selected=%s merge_visible=%s" % [game.selected, game.modals.merge_panel.visible])
+	game.queue_free()
+	await process_frame
 
 
 ## First reward button in the box panel (options precede the Skip button).

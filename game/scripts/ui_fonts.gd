@@ -4,21 +4,29 @@ extends Node
 ## that also replaces ThemeDB.fallback_font, so the banner/feed fallback would
 ## point at Pixel Operator itself and ★ − ✦ would vanish.
 ##
-## No fallback font is chained: symbols Pixel Operator lacks come from the OS
-## system font fallback. Chaining the engine's Open Sans made every Pixel
-## Operator line 1.36 em tall (Font.get_height is the max over the chain).
+## Symbols Pixel Operator lacks come from NoKingsSymbols.ttf, chained as the one
+## fallback of both faces, so they render the same on every device (Max, 2026-09-25)
+## instead of through the OS font fallback. Font.get_height is the max over the
+## chain; NoKingsSymbols is built with Pixel Operator's exact vertical metrics
+## (assets/fonts/README.md), so chaining it leaves every line 1.0 em tall.
 ##
-## This autoload only turns antialiasing off, which is Pixel Operator's own look
-## (banners, feed). game.gd/hud.gd set it lazily on these SAME shared resources,
-## so without this the first banner or feed post would flip every Control's text
-## mid-run. Redundant once the .ttf.import files are committed with AA None.
+## Antialiasing off is Pixel Operator's own look; the .ttf.import files already
+## import all three faces AA None, this keeps it so when an import cache predates them.
+##
+## _static_init, not _enter_tree: it runs when the autoload pass loads this script,
+## before any scene, and does not depend on the node reaching the tree
+## (test_theme's AA check read the faces unchanged from an _enter_tree version).
 
+const SYMBOLS := preload("res://assets/fonts/NoKingsSymbols.ttf")
 const FONTS := [
 	preload("res://assets/fonts/PixelOperator.ttf"),
 	preload("res://assets/fonts/PixelOperator-Bold.ttf"),
 ]
 
 
-func _enter_tree() -> void: # not _init: an autoload gets its script via set_script, which never calls _init
+static func _static_init() -> void:
+	SYMBOLS.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	var chain: Array[Font] = [SYMBOLS]
 	for f: FontFile in FONTS:
 		f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		f.fallbacks = chain

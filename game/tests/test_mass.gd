@@ -27,6 +27,7 @@ func _init() -> void:
 	_test_child_count()
 	_test_horde_fits_carousel_card()
 	_test_back_to_front_order()
+	_test_large_pieces_in_front()
 	_test_rows_centered()
 	_test_horde_row_width()
 	_test_slim_pitch_tighter_than_large()
@@ -109,10 +110,11 @@ func _test_horde_fits_carousel_card() -> void:
 			% [mass.custom_minimum_size.x, CARD_INNER])
 
 
-## Pawns (value 10) sort to the back (drawn first); a rook (value 50) sorts
-## to the front (drawn last, on top) — identified by comparing each child's
-## loaded texture against the known per-id texture, not by any test-only
-## metadata on the node.
+## Pawn (slim) sorts to the back (drawn first); a rook (large) sorts to the
+## front (drawn last, on top) — identified by comparing each child's loaded
+## texture against the known per-id texture, not by any test-only metadata
+## on the node. See _test_large_pieces_in_front() for the general,
+## class-driven version of this check across every real Army.
 func _test_back_to_front_order() -> void:
 	var mass := PieceMass.build(["rook", "pawn", "pawn"])
 	var pawn_tex := GameScript.load_piece_tex("pawn")
@@ -129,6 +131,45 @@ func _test_back_to_front_order() -> void:
 	check(pawn_idx != -1 and rook_idx != -1 and pawn_idx < rook_idx,
 		"pawn (back, drawn first at index %d) precedes rook (front, drawn last at index %d)"
 			% [pawn_idx, rook_idx])
+
+
+## Max, 2026-09-25 (Aux's review of #582): "on Crown and Cult (and Old
+## Guard, less so), the Knight at the end of the back row covers its
+## neighbour" — large pieces must sit in the FRONT row(s), never behind a
+## slim one. Checked on every real Army: groups children into rows (see
+## _rows_of()), identifies each child's id by matching its texture against
+## the (deduplicated) textures this Army's own ids load, then asserts the
+## LAST row containing any slim piece is never further front than the
+## FIRST row containing any large piece — i.e. no large/slim pair has the
+## large one strictly behind.
+func _test_large_pieces_in_front() -> void:
+	for army_name in Tuning.ARMIES:
+		var ids: Array = Tuning.ARMIES[army_name]
+		var mass := PieceMass.build(ids)
+		var rows := _rows_of(mass)
+		var tex_for_id := {}
+		for id in ids:
+			if not tex_for_id.has(id):
+				tex_for_id[id] = GameScript.load_piece_tex(id)
+		var last_slim_row := -1
+		var first_large_row := rows.size()
+		for r in rows.size():
+			for c in rows[r]:
+				var found_id := ""
+				for id in tex_for_id:
+					if tex_for_id[id] == c.texture:
+						found_id = id
+						break
+				check(found_id != "", "%s: every child's texture matches one of its own ids" % army_name)
+				if found_id == "":
+					continue
+				if PieceMass._is_slim(found_id):
+					last_slim_row = maxi(last_slim_row, r)
+				else:
+					first_large_row = mini(first_large_row, r)
+		check(last_slim_row <= first_large_row,
+			"%s: no large piece behind a slim one (last slim row %d, first large row %d of %d)"
+				% [army_name, last_slim_row, first_large_row, rows.size()])
 
 
 ## Groups a built mass's children into rows by Y — children are added in
@@ -149,21 +190,16 @@ func _rows_of(mass: Control) -> Array:
 
 ## Max, 2026-09-25, reviewing #582's Army captures: "I still see rows offset
 ## to one side instead of aligning to the centre" — every row, not just a
-## short one, must sit on the mass's own centre line. Checked on the four
-## Armies Max named directly (Crown, Old Guard and Cult mix slim/large
-## pieces and can have an uneven last row; Horde is a pure-slim 14 that
-## picks a wide 2-row layout — see TARGET_ASPECT's header) by reading each
-## row's span straight off the built children's positions, not by
+## short one, must sit on the mass's own centre line. Checked on every real
+## Army (Crown, Old Guard and Cult mix slim/large pieces and can have an
+## uneven last row, now with the large-class pieces grouped into the front
+## row(s) too — see _test_large_pieces_in_front(); Horde is a pure-slim 14
+## that picks a wide 2-row layout — see TARGET_ASPECT's header) by reading
+## each row's span straight off the built children's positions, not by
 ## re-deriving cols/pitch by hand.
 func _test_rows_centered() -> void:
-	var cases := {
-		"Crown": Tuning.ARMIES["Crown"],
-		"Old Guard": Tuning.ARMIES["Old Guard"],
-		"Cult": Tuning.ARMIES["Cult"],
-		"Horde": Tuning.ARMIES["Horde"],
-	}
-	for label in cases:
-		var mass := PieceMass.build(cases[label])
+	for label in Tuning.ARMIES:
+		var mass := PieceMass.build(Tuning.ARMIES[label])
 		var mass_center: float = mass.custom_minimum_size.x / 2.0
 		var rows := _rows_of(mass)
 		check(rows.size() >= 1, "%s: builds at least one row" % label)

@@ -138,10 +138,13 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## draw as three pawns, never "pawn ×3" — as a fixed-size Control packed into
 ## a crowd: one TextureRect per piece, rows derived from the count so the
 ## bounding box lands near TARGET_ASPECT (NO-178 — replaces the old fixed
-## 1-3-rank rule, which produced a wide flat strip). Pawns and other
-## low-value pieces sit at the back (drawn first, slightly smaller); rooks,
-## knights and anything bigger sit at the front (drawn last, full size, on
-## top). Player/light side only — neither caller ever shows the enemy's art.
+## 1-3-rank rule, which produced a wide flat strip). Slim pieces (Pawn-
+## shaped, see _is_slim()) sit at the back (drawn first, slightly smaller);
+## large pieces (Rook/Knight/Queen/dragon-shaped) sit at the front (drawn
+## last, full size, on top) — Max, 2026-09-25 (Aux's review of #582): a
+## Knight at the end of a back row was covering its neighbour, "large
+## pieces go in the FRONT row". Player/light side only — neither caller
+## ever shows the enemy's art.
 ##
 ## Seeded from `hash(ids)`, not randomize(): the same army or reinforcement
 ## list draws identically every time, so a screenshot of it stays diffable
@@ -372,26 +375,38 @@ static func _slim_ratio(id: String) -> float:
 	return float(used.size.x) / float(img.get_width())
 
 
-## Sorts a COPY of `ids` back-to-front by piece value (the existing "how
-## strong is this piece" number every def already carries — read the same
-## way elsewhere, e.g. game.gd:3494's `defs[board[pos].id].value`),
-## ascending: pawns and other cheap pieces first (drawn first = the back,
-## since build()'s row = index/cols puts early indices in early rows), rooks/
-## knights/anything pricier last (drawn last = the front, on top). Stable:
-## equal-value pieces keep their original relative order, via an explicit
-## index tiebreak rather than relying on sort_custom's own stability.
+## Sorts a COPY of `ids` back-to-front, primarily by width CLASS — every
+## slim piece (see _is_slim()) before every large piece — and by piece
+## value (the existing "how strong is this piece" number every def already
+## carries — read the same way elsewhere, e.g. game.gd:3494's
+## `defs[board[pos].id].value`) within each class, ascending. Slim-then-
+## large, not value alone, since Max, 2026-09-25: Aux's review of #582 found
+## a large piece (a Knight, high-value already) at the tail of a BACK row
+## covering its neighbour — a plain value sort can still put a large piece
+## behind a slim one whenever a cheap large piece (e.g. Alibaba, value 20,
+## large-class) sorts ahead of an expensive slim one (e.g. Amazon, value
+## 120, slim-class). Class comes first so that can't happen: every large
+## piece's row is >= every slim piece's row, build()'s `row = i/cols` being
+## monotonic in i. Drawn first = the back (build()'s row = index/cols puts
+## early indices in early, smaller-scaled rows); drawn last = the front, on
+## top. Stable within a class: equal-value pieces keep their original
+## relative order, via an explicit index tiebreak rather than relying on
+## sort_custom's own stability.
 static func _back_to_front(ids: Array) -> Array:
 	var defs: Dictionary = Rules.load_pieces()
 	var tagged := []
 	for i in ids.size():
 		var id: String = ids[i]
+		var size_rank: int = 0 if _is_slim(id) else 1
 		var value: int = int(defs.get(id, {}).get("value", 0))
-		tagged.append([value, i, id])
+		tagged.append([size_rank, value, i, id])
 	tagged.sort_custom(func(a, b):
 		if a[0] != b[0]:
 			return a[0] < b[0]
-		return a[1] < b[1])
+		if a[1] != b[1]:
+			return a[1] < b[1]
+		return a[2] < b[2])
 	var out := []
 	for t in tagged:
-		out.append(t[2])
+		out.append(t[3])
 	return out

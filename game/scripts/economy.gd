@@ -206,6 +206,14 @@ static func add_clock(g, ms: float, reason: String = "") -> void:
 	var ctx := ArtefactHooks.run(g, "on_clock_change",
 		{"base": ms, "amount": ms, "reason": reason})
 	g.clock_ms = maxf(g.clock_ms + ctx.amount, 0.0)
+	# NO-238: the King's recurring refill and the one-time Continue bonus are
+	# large, discrete grants easy to miss in the header — banner them like
+	# every other refill event. Other add_clock reasons (milestone — bundled
+	# into the REINFORCEMENTS banner instead, turn_end, early_clear, per-item/
+	# artefact drips) stay unbannered.
+	if reason == "king_refill" or reason == "continue":
+		if ctx.amount > 0:
+			g._add_turn_fx("+%dS CLOCK" % roundi(ctx.amount / 1000.0), g.BANNER_GAIN, reason)
 
 
 ## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
@@ -347,10 +355,15 @@ static func record_history(g, won: bool) -> void:
 
 # --- King Abilities (data/king_abilities.gd; reached through Kings only) ---
 
-static func activate_king_ability_by_key(g, key: String) -> void:
+## `mid_wave` (NO-238): true when this Tariff comes into force DURING a Wave
+## (the escalating-Power stacking cadence, kings.gd's stack_power_if_due,
+## called after turn 0) rather than at the Wave's start — banners "NEW
+## TARIFF: …" instead of the plain catalog name, so a mid-run difficulty
+## change doesn't read like the one already announced at Wave start.
+static func activate_king_ability_by_key(g, key: String, mid_wave: bool = false) -> void:
 	for t in KingAbilities.ABILITIES:
 		if t.key == key:
-			return apply_king_ability(g, t)
+			return apply_king_ability(g, t, mid_wave)
 
 
 ## Catalog display name for a King Ability key — the one name every banner
@@ -407,9 +420,11 @@ static func ability_desc(g, key: String) -> String:
 ## key-sort order, the same precedent as on_piece_lost's Fireproof Pajamas
 ## (artefact hook 24) rather than reordering the dispatch to favor one
 ## handler over another.
-static func apply_king_ability(g, t: Dictionary) -> void:
+static func apply_king_ability(g, t: Dictionary, mid_wave: bool = false) -> void:
 	g.king_abilities_seen.append(t.name)
-	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
+	g._add_turn_fx( # tariff banner
+		("NEW TARIFF: %s" % t.name.to_upper()) if mid_wave else t.name.to_upper(),
+		Color(1.0, 0.45, 0.35))
 	var ctx := ArtefactHooks.run(g, "on_king_ability_apply",
 		{"key": t.key, "tier": t.get("tier", ""), "cancel": false})
 	if ctx.cancel:

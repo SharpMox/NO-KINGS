@@ -16,6 +16,7 @@ const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 const Scenarios := preload("res://data/scenarios.gd") # NO-83: the Header scenarios
 const Kings := preload("res://data/kings.gd") # NO-83: escalate Trump's Power by hand
 const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/convert costs
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 var fails := 0
 
@@ -158,32 +159,6 @@ func _await_drawer_settled(game: Node, key: String) -> void:
 		"the %s drawer's slide settled before use" % key,
 		"pos=%s rest=%s polls=%d elapsed=%dms" % [
 			panel.position, rest, polls, Time.get_ticks_msec() - t0])
-
-
-## NO-254: a generic version of the same wait, for any freshly-built Control
-## whose OWN rect (not a drawer/shop's known rest position) is about to be
-## measured — a modal's inner auto-sized box, say. Two things make a rect
-## trustworthy: its SIZE stops changing frame to frame (a mid-sort container
-## reports transient sizes, sometimes the whole viewport's worth), and it
-## actually fits inside the viewport (the unsettled case this bug hit).
-## Bounded at 10 frames, not wall time — this is a layout-sort race, not a
-## host-speed one (contrast _await_drawer_settled's SETTLE_CAP_MS, which
-## waits out a real animation). Returns the frames spent, viewport size and
-## final rect so a caller's failure detail is never "it failed" alone.
-func _await_rect_settled(control: Control) -> Dictionary:
-	var viewport: Vector2 = root.get_visible_rect().size
-	var prev_size := Vector2(-1, -1)
-	var frames := 0
-	var rect: Rect2 = control.get_global_rect()
-	while frames < 10:
-		rect = control.get_global_rect()
-		var fits: bool = rect.size.x <= viewport.x and rect.size.y <= viewport.y
-		if fits and rect.size.is_equal_approx(prev_size):
-			break
-		prev_size = rect.size
-		await process_frame
-		frames += 1
-	return {"rect": rect, "frames": frames, "viewport": viewport}
 
 
 ## NO-83: Stock opens from the Header's icon button, which carries a badge
@@ -1701,9 +1676,9 @@ func _init() -> void:
 	# intermittently after #592 added exactly that frame — because "settled"
 	# is a property of the layout, not of elapsed frame count: an unsettled
 	# rect spans the whole board, so no backdrop tile is found. Poll instead
-	# of guessing a number: _await_rect_settled below.
+	# of guessing a number: the shared Settle.settle_layout below.
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
-	var settle := await _await_rect_settled(modal_box)
+	var settle := await Settle.settle_layout(modal_box)
 	var box_rect: Rect2 = settle.rect
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
@@ -1717,7 +1692,7 @@ func _init() -> void:
 			break
 	check(backdrop.x >= 0.0,
 		"(setup) a board tile exists over the modal's backdrop rather than its buttons",
-		"box_rect=%s viewport=%s frames_waited=%d" % [box_rect, settle.viewport, settle.frames])
+		Settle.detail(settle))
 	_click(backdrop)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
@@ -1967,6 +1942,7 @@ func _init() -> void:
 	check(not is_instance_valid(game.hud._drop_hl) or not game.hud._drop_hl.is_visible_in_tree(),
 		"setup: the drop preview is gone once the drag ends")
 	# put it back on the board: arm a Stock cell, tap the zone tile
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -1980,6 +1956,7 @@ func _init() -> void:
 	check(game.selected == Vector2i(2, 1) and game.drawer_open == "stock",
 		"(setup) the placed piece is selected with the Stock drawer open")
 	# tap ON a Stock cell, the least likely spot: it must return, not arm
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	await process_frame
@@ -1987,6 +1964,7 @@ func _init() -> void:
 			and game.stock[0] == ret_id and game.placing_id == "",
 		"setup: with a placed piece selected, a tap anywhere in the Stock drawer returns it")
 	game.pool_click_key = "" # the arming tap above is <400 ms old: not a double-tap
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -3580,6 +3558,7 @@ func _init() -> void:
 	check(await _click_stock(game), "NO-236: Stock opens")
 	await process_frame
 	var gold0: int = game.gold
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	var tap_tile := Vector2i(1, 1) # a neighbour of the queen: a deploy tile

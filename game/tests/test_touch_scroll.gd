@@ -24,6 +24,7 @@ const Drive := preload("res://scripts/drive.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Armies := preload("res://scripts/armies.gd")
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 var fails := 0
 # A member, not a local: a GDScript lambda captures locals BY VALUE, so a
@@ -454,8 +455,8 @@ func _init() -> void:
 	# scroll back to top first, or the tap lands outside the drawer instead.
 	if inv_sc != null:
 		inv_sc.scroll_vertical = 0
-	await process_frame
 	var art_cell: Control = game.hud.artefacts_grid.get_child(0)
+	await Settle.settle_layout(art_cell) # NO-254: the cell's global rect follows the scroll offset
 	var art_tap_at: Vector2 = art_cell.get_global_rect().get_center()
 	game.hud.hide_tip()
 	_mouse(true, art_tap_at)
@@ -501,8 +502,7 @@ func _init() -> void:
 		game.hud.item_pressed.connect(func(_i: int) -> void: item_fired[0] = true)
 		if check(inv_sc != null, "(setup) the inventory drawer has a ScrollContainer to reveal the item in"):
 			inv_sc.ensure_control_visible(item_btn)
-		await process_frame
-		await process_frame
+		await Settle.settle_layout(item_btn) # NO-254: its global rect follows the scroll offset
 		var p := item_btn.get_global_rect().get_center()
 		_mouse(true, p)
 		await process_frame

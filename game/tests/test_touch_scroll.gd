@@ -830,6 +830,54 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
+	# ---- Casualties: a long run's end screen scrolls under a finger, the drag
+	# starting ON the mass (the pieces are IGNORE, their containers PASS), and
+	# the buttons pinned below it still take a tap.
+	GameScript.reset_boot_defaults()
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5, "seed": 1}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.animations_on = false
+	var cas: Array = []
+	for i in 300: # far past one screen of rows
+		cas.append({"id": ["pawn", "knight", "rook"][i % 3], "side": i % 2})
+	game.casualties = cas
+	game._game_over(false, "Clock out")
+	for i in 3:
+		await process_frame
+	var end_scroll: ScrollContainer = game.modals.overlay.find_child("EndScroll", true, false)
+	var end_mass: Control = null
+	if end_scroll != null:
+		var sec: Node = end_scroll.find_child("Casualties", true, false)
+		if sec != null:
+			end_mass = sec.get_child(1)
+	if check(end_scroll != null and end_mass != null, "Casualties: the end screen has a scrolling mass"):
+		var on_mass: Vector2 = end_mass.get_global_rect().intersection(end_scroll.get_global_rect()).get_center()
+		var end_before: int = end_scroll.scroll_vertical
+		await _drag(on_mass, Vector2(0, -30), 6)
+		check(end_scroll.scroll_vertical > end_before,
+			"Casualties: dragging up on the mass scrolls the end screen",
+			"offset %d -> %d, drag from %s" % [end_before, end_scroll.scroll_vertical, on_mass])
+	var fb := _find_button(game.modals.overlay, "Give Feedback")
+	if check(fb != null, "Casualties: Give Feedback is on the end screen"):
+		var fb_at := fb.get_global_rect().get_center()
+		_mouse(true, fb_at)
+		await process_frame
+		var fb_back := InputEventMouseMotion.new() # NO-71's re-assert, see above
+		fb_back.position = fb_at
+		fb_back.global_position = fb_at
+		fb_back.button_mask = MOUSE_BUTTON_MASK_LEFT
+		root.push_input(fb_back)
+		_mouse(false, fb_at)
+		await process_frame
+		check(game.last_feedback_url != "", "Casualties: a tap on the pinned Give Feedback still presses it",
+			"button at %s" % fb_at)
+	game.queue_free()
+	await process_frame
+
 	if fails == 0:
 		print("ALL GREEN (touch-scroll probe)")
 	quit(0 if fails == 0 else 1)

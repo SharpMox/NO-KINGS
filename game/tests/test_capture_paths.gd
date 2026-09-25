@@ -72,6 +72,7 @@ func _init() -> void:
 	# --- --show-screen states -------------------------------------------------
 	var shots := [
 		["gameover", "Loss: clock-out (10s)"],
+		["gameover-casualties", "Loss: clock-out (10s)"],
 		["gameover-retry", "Loss: clock-out (10s)"],
 		["ad", "Movement & drag"],
 		["win", "Win screen: wave 50 (capture King)"],
@@ -95,6 +96,15 @@ func _init() -> void:
 					and game.modals.buff_panel == null, "gameover: the loss screen, no retry offer")
 				check(not game._banner_layer.visible and not game.hud.feed.visible,
 					"gameover: banners and the kill feed are hidden under the end screen (NO-100)")
+			"gameover-casualties":
+				var masses: Array = game.overlay.find_children("Casualties", "VBoxContainer", true, false)
+				check(game.overlay.visible and masses.size() == 1
+					and masses[0].find_children("*", "TextureRect", true, false).size() == game.casualties.size()
+					and game.casualties.size() > 100,
+					"gameover-casualties: the loss screen shows one mass of 100+ Casualties")
+				var head: Array = game.casualties.slice(0, 40).map(func(c: Dictionary) -> int: return c.side)
+				check(head.has(0) and head.has(1) and game.casualties[-1].id == "king",
+					"gameover-casualties: sides interleave from the start, the King falls last")
 			"gameover-retry":
 				check(game.state == GameScript.State.GAME_OVER and not game.overlay.visible
 					and game.modals.buff_panel != null, "gameover-retry: the ad-retry prompt is up")

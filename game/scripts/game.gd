@@ -434,6 +434,12 @@ var win_open := false    # wave-50 win screen showing (Continue / End Run)
 var last_feedback_url := ""
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
+## The end screens' Casualties mass: every piece that died this run, both
+## sides, in order — {"id", "side": Rules.PLAYER|Rules.ENEMY}. Recorded beside
+## the loss counters (_casualty's callers); sold, merged, extracted and
+## un-deployed pieces never reach it. Saved with the run, so NO-241's wave
+## snapshot rolls it back with everything else.
+var casualties: Array = []
 var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
 	# hook 16: "clean wave" = lost_player unchanged since this snapshot)
 var wave_capture_count := 0 # captures this wave, reset in WaveLogic.queue()
@@ -1858,6 +1864,7 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				_consume_buff(act.to, "reflect")
 				_add_float(act.from, "Reflected!", COL_CAPTURE)
 				lost_enemy += 1
+				_casualty(board[act.from].id, Rules.ENEMY)
 				_add_pop(act.from)
 				board[act.from] = board[act.to]
 				board[act.from].moved = true # NO-224: it relocated, whoever's piece it is
@@ -1887,6 +1894,8 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				_consume_buff(act.to, "bomb")
 			if BuffLogic.has(board[act.from], "bomb"):
 				_consume_buff(act.from, "bomb")
+			_casualty(board[act.to].id, Rules.PLAYER) # the victim; the blast
+				# below takes the attacker through _destroy
 			board.erase(act.to)
 			board[act.to] = board[act.from]
 			board[act.to].moved = true # NO-224
@@ -1900,6 +1909,7 @@ func _run_enemy_actions(actions: int = -1) -> void:
 			_add_float(act.from, "Trapped!", COL_CAPTURE)
 			_lose_player_piece(act.to, "trap")
 			lost_enemy += 1
+			_casualty(board[act.from].id, Rules.ENEMY)
 			_add_pop(act.to)
 			_add_pop(act.from)
 			board.erase(act.to)
@@ -1925,6 +1935,7 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				# BuffLogic-gated
 				_add_float(act.from, "Sunk!", COL_CAPTURE)
 				lost_enemy += 1
+				_casualty(board[act.from].id, Rules.ENEMY)
 				_add_pop(act.to)
 				_add_pop(act.from)
 				board.erase(act.to)
@@ -3542,6 +3553,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				else:
 					_bank_capture(board[also].id)
 				lost_enemy += 1
+				_casualty(board[also].id, Rules.ENEMY)
 				_add_pop(also)
 				board.erase(also)
 		# Exhibit 399 (NO-81): after Multicapture, one random adjacent non-King
@@ -3563,6 +3575,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		Economy.charge(self, "capture_cost",
 			Economy.tariff_cut(defs[victim.id].value, Tuning.TARIFF_CAPTURE_PCT))
 		lost_enemy += 1
+		_casualty(victim.id, Rules.ENEMY)
 		if BuffLogic.has(victim, "piece_bounty"): # Bounty (issue 48), enemy
 			# half — still your Turn, so the choice pick is safe right here.
 			# Fires once, ahead of the bomb/trap/normal branches below so it's
@@ -3744,6 +3757,8 @@ func _king_down(defeated_id := "") -> bool:
 		if defeated_id == "":
 			defeated_id = board[k].get("king_id", "")
 		_add_pop(k) # NO-243: shatters like a capture
+		_casualty(board[k].id, Rules.ENEMY) # not in lost_enemy: a checkmate
+			# never was, and changing that stat is not this feature's call
 		board.erase(k)
 	# NO-243: a fallen King (captured or checkmated) bursts gold, the board edge
 	# flares gold and the board shakes. Visual only; the win screen still opens now.
@@ -4408,10 +4423,15 @@ func _destroy(pos: Vector2i, by_item: bool = false) -> void:
 			return
 	else:
 		lost_enemy += 1
+		_casualty(board[pos].id, Rules.ENEMY)
 		if by_item:
 			ArtefactHooks.run(self, "on_destroy", {"id": board[pos].id, "value": defs[board[pos].id].value})
 	_add_pop(pos)
 	board.erase(pos)
+
+
+func _casualty(id: String, side: int) -> void:
+	casualties.append({"id": id, "side": side})
 
 
 ## Single choke point for a player piece leaving the board (artefact hook 19)
@@ -4443,6 +4463,9 @@ func _lose_player_piece(pos: Vector2i, reason: String, attacker_pos := Vector2i(
 			"gold_bonus": 0.0}) # Total War's side-payment channel (Kings.power_hook)
 	if uncounted:
 		dnr_patch_wave = wave
+	if not ctx.cancel: # 'Definitely Not Russia' hides the loss from effects,
+		# not from the board: the piece is still dead
+		_casualty(board[pos].id, Rules.PLAYER)
 	if not ctx.cancel and not uncounted:
 		lost_player += 1
 		wave_lost_ids.append(board[pos].id)
@@ -5465,6 +5488,10 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		await _debug_show_screen(args[args.find("--show-screen") + 1], args)
 		if modals.reveal and modals.reveal.is_running(): # NO-243: an end screen's
 			await modals.reveal.finished # staged reveal plays out before the shot
+		if args.has("--scroll-bottom"): # an end screen's scroll, at its far end
+			await get_tree().process_frame # the scroll's range settles a frame late
+			modals.scroll_end_screen_to_bottom()
+			await get_tree().process_frame
 	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
 	# settle wait below would let it finish before the shot, so skip it here.
 	var pinned_banner := args.has("--show-screen") \
@@ -5509,6 +5536,27 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 				else:
 					_show_preview(board[at].id, board[at].get("king_id", ""), null, board[at])
 		"gameover": # the loss screen; a scenario never offers the ad retry
+			_game_over(false, "Clock out")
+		"gameover-casualties": # a long run's end screen: 241 Casualties
+			# (171 enemies incl. a King, 70 allies), interleaved as a run records them
+			# shuffled on a fixed seed so red and blue interleave the way a real
+			# run's deaths do (Max, 2026-09-25), the King's fall still last
+			var foes := ["pawn", "pawn", "pawn", "knight", "bishop", "rook", "queen", "gryphon", "war-machine", "pawn"]
+			var mine := ["pawn", "pawn", "knight", "bishop", "rook", "queen", "amazon", "chancellor"]
+			var dead := []
+			for i in 170:
+				dead.append({"id": foes[i % foes.size()], "side": Rules.ENEMY})
+			for i in 70:
+				dead.append({"id": mine[i % mine.size()], "side": Rules.PLAYER})
+			var mix := RandomNumberGenerator.new()
+			mix.seed = 241
+			for i in range(dead.size() - 1, 0, -1): # Fisher-Yates on the seeded rng
+				var j := mix.randi_range(0, i)
+				var swap: Dictionary = dead[i]
+				dead[i] = dead[j]
+				dead[j] = swap
+			casualties.append_array(dead)
+			casualties.append({"id": "king", "side": Rules.ENEMY})
 			_game_over(false, "Clock out")
 		"gameover-retry": # NO-241's offer, forced on; it needs a checkpoint
 			ad_retry_enabled = true

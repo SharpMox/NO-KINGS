@@ -182,6 +182,10 @@ static func apply(g, cfg: Dictionary) -> void:
 	g.clock_ms = cfg.get("clock_s", Tuning.clock_start_ms(g.next_tier) / 1000.0) * 1000.0
 	g.lost_player = int(cfg.get("lost_player", 0))
 	g.lost_enemy = int(cfg.get("lost_enemy", 0))
+	# Casualties (end screens): additive, [] for an older save. Normalised
+	# because JSON hands `side` back as a float.
+	g.casualties = (cfg.get("casualties", []) as Array).map(func(c: Dictionary) -> Dictionary:
+		return {"id": str(c.id), "side": int(c.side)})
 	# review pass 1 (2026-09-06): both additive. A resume that left this at 0
 	# made WaveLogic.queue's `clean` compare lost_player against nothing, so
 	# every clean-wave Artefact was denied for the wave in progress; the default
@@ -438,6 +442,7 @@ static func to_config(g) -> Dictionary:
 		"army": g.next_army, "rank": g.next_tier,
 		"family_ability_used_this_wave": g.army_ability_used_this_wave, # key kept — see load
 		"lost_player": g.lost_player, "lost_enemy": g.lost_enemy,
+		"casualties": g.casualties.duplicate(true), # additive, see apply()
 		"wave_start_lost_player": g.wave_start_lost_player, # review pass 1
 		"silk_road_active": g.silk_road_active, # review pass 1
 		# NO-20 — see the matching block in apply() for why each default is

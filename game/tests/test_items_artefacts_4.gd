@@ -23,6 +23,7 @@ const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Rules := preload("res://scripts/rules.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 
 var fails := 0
 
@@ -70,18 +71,18 @@ func _artefact_confirm_tap(g, t: Vector2i) -> void:
 
 func _init() -> void:
 	# --- issue 21: echo and meta-triggers (ArtefactHooks._run_meta_triggers) ---
+	# NO-250: the Capture Artefact these fixtures echo is Library of Alexandria
+	# Matchbox's "+$1 per piece in your Stock" (its +10 Score is gone), so the
+	# echo is counted in Gold and the capture's own points stay the plain base.
 
-	# Polybius Cartridge: a Capture Artefact (Library of Alexandria Matchbox —
-	# issue 69 repointed the "greed"/"score" game-native fixtures used here to
-	# catalog equivalents; the Matchbox's "+1 Gold and +10 Score per piece in
-	# your Stock" is a literal flat +10 per copy with 1 Stock piece, the same
-	# arithmetic "greed" used) triggers one extra time
+	# Polybius Cartridge: a Capture Artefact triggers one extra time
 	var poly := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "polybius-cartridge"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0,
+		"artefacts": ["library-of-alexandria-matchbox", "polybius-cartridge"]})
 	await process_frame
 	var poly_base: int = poly.defs.pawn.value
-	check(Economy.capture_score(poly, "pawn") == poly_base + 20,
-		"Polybius Cartridge: a Capture Artefact (Library of Alexandria Matchbox) triggers an extra time (+10 twice)")
+	check(Economy.capture_score(poly, "pawn") == poly_base and poly.gold == 2,
+		"Polybius Cartridge: a Capture Artefact (Library of Alexandria Matchbox) triggers an extra time (+$1 twice)")
 	poly.queue_free()
 	await process_frame
 
@@ -94,10 +95,9 @@ func _init() -> void:
 	await process_frame
 	headroom.gold_spent_shop_this_wave = 40
 	WaveLogic.queue(headroom, headroom.wave + 1)
-	check(headroom.score == 2000 and headroom.gold == 128, # issue 57: Score x10 (Nigerian Prince's
-			# direct-write +100/+1000), Gold untouched
+	check(headroom.score == 0 and headroom.gold == 128,
 		"Max Headroom Mask: doubles a Wave Artefact's trigger on both Wave clear " +
-		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +10/+1000 twice, 108+20=128 Gold, 2000 Score)")
+		"(Zurich: +4 twice = 108) and Wave spawn (Nigerian Prince: +$10 twice = 128, no Score)")
 	headroom.queue_free()
 	await process_frame
 
@@ -116,39 +116,36 @@ func _init() -> void:
 	# CERN Ctrl+Z Shortcut: a key held 2+ times (two held Matchboxes) gets ONE
 	# flat extra trigger, not one per duplicate; a singly-held key gets none
 	var cern := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"],
+		"wave": 3, "stock": ["pawn"], "gold": 0,
 		"artefacts": ["library-of-alexandria-matchbox", "library-of-alexandria-matchbox", "cern-ctrl-z-shortcut"]})
 	await process_frame
-	var cern_base: int = cern.defs.pawn.value
-	check(Economy.capture_score(cern, "pawn") == cern_base + 30,
-		"CERN Ctrl+Z Shortcut: two held Matchboxes (a duplicate) get one flat extra trigger (+10x3, not +10x4)")
+	Economy.capture_score(cern, "pawn")
+	check(cern.gold == 3,
+		"CERN Ctrl+Z Shortcut: two held Matchboxes (a duplicate) get one flat extra trigger (+$1 x3, not x4)")
 	cern.queue_free()
 	await process_frame
 
 	var cern_single := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "stock": ["pawn"], "artefacts": ["library-of-alexandria-matchbox", "cern-ctrl-z-shortcut"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0, "artefacts": ["library-of-alexandria-matchbox", "cern-ctrl-z-shortcut"]})
 	await process_frame
-	var cern_single_base: int = cern_single.defs.pawn.value
-	check(Economy.capture_score(cern_single, "pawn") == cern_single_base + 10,
+	Economy.capture_score(cern_single, "pawn")
+	check(cern_single.gold == 1,
 		"CERN Ctrl+Z Shortcut: a singly-held Artefact (Matchbox) gets no extra trigger")
 	cern_single.queue_free()
 	await process_frame
 
 	# Bilderberg Hotel Slippers: +15 Gold only when 2+ Artefacts actually
-	# fired this call — "fired", not "held". Voynich Dictionary ("double
-	# Score and Gold on your first Capture each Wave") is the active
-	# contributor here (pure ctx.pts, no gold side effect of its own, so
-	# Bilderberg's own +15 Gold stays exactly isolated); the Matchbox is held
-	# with no Stock piece so it fires (counts toward "2 Artefacts triggered")
-	# but contributes nothing, same inert-bystander role "Score" played before
-	# issue 69 repointed this fixture off the removed game-native keys.
+	# fired this call — "fired", not "held". Voynich Dictionary and the
+	# Matchbox (no Stock piece) both fire on_capture but pay nothing here
+	# (Voynich's +1 Action needs a real attacker), so Bilderberg's own +15
+	# Gold stays exactly isolated.
 	var bilder := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0,
 		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "bilderberg-hotel-slippers"]})
 	await process_frame
 	var bilder_base: int = bilder.defs.pawn.value
 	var bilder_pts := Economy.capture_score(bilder, "pawn")
-	check(bilder_pts == bilder_base * 2 and bilder.gold == 15,
+	check(bilder_pts == bilder_base and bilder.gold == 15,
 		"Bilderberg Hotel Slippers: +15 Gold when 2+ of your Artefacts trigger on the same event")
 	bilder.queue_free()
 	await process_frame
@@ -161,17 +158,15 @@ func _init() -> void:
 	bilder_one.queue_free()
 	await process_frame
 
-	# Illuminati: NWO Booster Pack: +2 Gold/+20 Score per Capture Artefact
-	# trigger this call, scaling with how many actually fired. Voynich
-	# Dictionary is the active fired key (0 gold side effect of its own, so
-	# NWO's own +2/+20 stays exactly isolated).
+	# Illuminati: NWO Booster Pack: +$2 per Capture Artefact trigger this
+	# call, scaling with how many actually fired. NO-250: no Score.
 	var nwo := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0, "artefacts": ["voynich-dictionary", "illuminati-nwo-booster-pack"]})
 	await process_frame
 	var nwo_base: int = nwo.defs.pawn.value
 	var nwo_pts := Economy.capture_score(nwo, "pawn")
-	check(nwo_pts == nwo_base * 2 and nwo.gold == 2 and nwo.score == 200, # issue 57: x10
-		"Illuminati: NWO Booster Pack: +2 Gold/+200 Score when one Capture Artefact triggers (Voynich Dictionary)")
+	check(nwo_pts == nwo_base and nwo.gold == 2 and nwo.score == 0,
+		"Illuminati: NWO Booster Pack: +$2 and no Score when one Capture Artefact triggers (Voynich Dictionary)")
 	nwo.queue_free()
 	await process_frame
 
@@ -180,28 +175,24 @@ func _init() -> void:
 		"artefacts": ["voynich-dictionary", "library-of-alexandria-matchbox", "illuminati-nwo-booster-pack"]})
 	await process_frame
 	Economy.capture_score(nwo2, "pawn") # Voynich + Matchbox both fire on_capture: 2 triggers
-	check(nwo2.gold == 4 and nwo2.score == 400, # issue 57: x10
+	check(nwo2.gold == 4 and nwo2.score == 0,
 		"Illuminati: NWO Booster Pack: scales with the number of Capture Artefact triggers (2 -> double)")
 	nwo2.queue_free()
 	await process_frame
 
 	# 100% Genuine Original Mona Lisa: only the Turn's FIRST Artefact trigger
 	# (any hook) is echoed, including a fresh echo when the enemy Turn begins.
-	# Voynich Dictionary (issue 69 repoint of "greed") only actually adds
-	# anything on the Wave's FIRST Capture (its own condition), so the
-	# formula below is "*3"/no bonus rather than the old flat "+20"/"+10" —
-	# probed directly against the real dispatch count, not guessed: main (1)
-	# + Mona's echo of that same first-trigger entry (1) = 2 extra dispatches
-	# of +mona_base on top of the initial ctx.pts == mona_base.
+	# The Matchbox with one Stock piece: +$1 main + $1 echo, then +$1 alone.
 	var mona := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
-		"wave": 3, "artefacts": ["voynich-dictionary", "100-genuine-original-mona-lisa"]})
+		"wave": 3, "stock": ["pawn"], "gold": 0,
+		"artefacts": ["library-of-alexandria-matchbox", "100-genuine-original-mona-lisa"]})
 	await process_frame
-	var mona_base: int = mona.defs.pawn.value
-	check(Economy.capture_score(mona, "pawn") == mona_base * 3,
-		"100% Genuine Original Mona Lisa: the first Artefact trigger of the Turn (Voynich Dictionary) is echoed")
-	check(Economy.capture_score(mona, "pawn") == mona_base,
-		"100% Genuine Original Mona Lisa: only the FIRST trigger of the Turn echoes, not every later one " +
-		"— Voynich's own condition (first Capture of the WAVE) is also long past by this second call")
+	Economy.capture_score(mona, "pawn")
+	check(mona.gold == 2,
+		"100% Genuine Original Mona Lisa: the first Artefact trigger of the Turn (the Matchbox) is echoed")
+	Economy.capture_score(mona, "pawn")
+	check(mona.gold == 3,
+		"100% Genuine Original Mona Lisa: only the FIRST trigger of the Turn echoes, not every later one")
 	mona.queue_free()
 	await process_frame
 
@@ -218,21 +209,22 @@ func _init() -> void:
 	mona_enemy.queue_free()
 	await process_frame
 
-	# Déjà Vu Glitch: only the Turn's first Score/Gold gain is doubled (per
-	# copy: N copies -> (1+N)x), later gains the same Turn are untouched
+	# Déjà Vu Glitch (NO-250: $ only): only the Turn's first $ gain is doubled
+	# (per copy: N copies -> (1+N)x), later gains the same Turn are untouched
 	var dejavu := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0, "artefacts": ["deja-vu-glitch", "deja-vu-glitch"]})
 	await process_frame
 	Economy.earn(dejavu, 100)
-	check(dejavu.score == 3000 and dejavu.gold == 300, # issue 57: Score x10, Gold untouched
-		"Déjà Vu Glitch: two held copies triple (not double) the Turn's first Score/Gold gain")
+	check(dejavu.score == 1000 and dejavu.gold == 300,
+		"Déjà Vu Glitch: two held copies triple the Turn's first $ gain; Score untouched")
 	Economy.earn(dejavu, 50)
-	check(dejavu.score == 3500 and dejavu.gold == 350, # issue 57: Score x10, Gold untouched
-		"Déjà Vu Glitch: only the Turn's FIRST Score/Gold gain doubles — later gains are untouched")
+	check(dejavu.score == 1500 and dejavu.gold == 350,
+		"Déjà Vu Glitch: only the Turn's FIRST $ gain triples — later gains are untouched")
 	dejavu.queue_free()
 	await process_frame
 
-	# Capstone Polish: +150 Score / +5s Clock on acquiring an Artefact
+	# Capstone Polish (NO-250): acquiring an Artefact gives a random ally +1
+	# Piece Buff (was +150 Score / +5s Clock)
 	var capstone := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 9999, "score": 0, "artefacts": ["capstone-polish"]})
 	Shop.roll(capstone) # NO-240: a pre-Wave-5 boot no longer stocks the Shop
@@ -242,42 +234,41 @@ func _init() -> void:
 		if capstone.shop_stock[i].kind == "artefact":
 			Shop.buy(capstone, i)
 			break
-	check(capstone.score == 1500 and capstone.clock_ms == capstone_clock0 + 5000, # issue 57: x10
-		"Capstone Polish: +1500 Score and +5s Clock on acquiring an Artefact")
+	check(BuffLogic.of(capstone.board[Vector2i(2, 2)]).size() >= 1,
+		"Capstone Polish: acquiring an Artefact gives the only ally +1 Piece Buff")
+	check(capstone.score == 0 and capstone.clock_ms == capstone_clock0,
+		"Capstone Polish: no Score and no Clock any more")
 	capstone.queue_free()
 	await process_frame
 
 	# --- the risky one: two echo artefacts (Polybius + CERN, both hooked to
-	# on_capture) plus a percentage Artefact (Tinfoil Hat) on the resulting
-	# gain — must be a single deterministic bounded number, not an infinite
-	# loop, and identical regardless of REGISTRY-array insertion order.
-	# Held: Voynich Dictionary x2 (issue 69 repoint of "greed" — the Capture
-	# Artefact being echoed, also CERN's duplicate) + Polybius (+1 extra
-	# trigger PER fired Voynich = +2) + CERN (+1 flat extra trigger for the
-	# duplicated key = +1) -> 5 total Voynich dispatches (2 main + 2 Polybius
-	# + 1 CERN), each adding +risky_base (Voynich's own "double Score" is a
-	# +base add, not the old keys' literal +10), on top of the initial
-	# ctx.pts == risky_base -> pts = risky_base * 6. Then Tinfoil Hat's
-	# +15%/-5% applies once, off that same immutable base.
+	# on_capture) plus a percentage Artefact on the resulting gain — must be a
+	# single deterministic bounded number, not an infinite loop, and identical
+	# regardless of acquisition order. NO-250: the echoed Capture Artefact is
+	# Azimuthal Pancake Map (+100% $ through ctx.gold_extra for an Inverted
+	# attacker), held twice: 2 main + 2 Polybius + 1 CERN = 5 dispatches of
+	# +base; then Popemobile Piggy Bank's +25% applies once, off that base.
 	var order_1 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0,
-		"artefacts": ["voynich-dictionary", "voynich-dictionary", "polybius-cartridge", "cern-ctrl-z-shortcut", "tinfoil-hat"]})
+		"artefacts": ["azimuthal-pancake-map", "azimuthal-pancake-map", "polybius-cartridge", "cern-ctrl-z-shortcut", "popemobile-piggy-bank"]})
 	await process_frame
 	var order_2 := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 0, "score": 0,
-		"artefacts": ["tinfoil-hat", "voynich-dictionary", "cern-ctrl-z-shortcut", "voynich-dictionary", "polybius-cartridge"]})
+		"artefacts": ["popemobile-piggy-bank", "azimuthal-pancake-map", "cern-ctrl-z-shortcut", "azimuthal-pancake-map", "polybius-cartridge"]})
 	await process_frame
 	var risky_base: int = order_1.defs.pawn.value
-	var pts_1 := Economy.capture_score(order_1, "pawn")
-	var pts_2 := Economy.capture_score(order_2, "pawn")
-	check(pts_1 == risky_base * 6 and pts_2 == risky_base * 6,
+	var pts_1 := Economy.capture_score(order_1, "pawn", "inv-pawn")
+	var extra_1: int = order_1.last_capture_ctx.gold_extra
+	var pts_2 := Economy.capture_score(order_2, "pawn", "inv-pawn")
+	var extra_2: int = order_2.last_capture_ctx.gold_extra
+	check(pts_1 == risky_base and extra_1 == risky_base * 5 and extra_2 == risky_base * 5,
 		"two echo Artefacts stacked on the same Capture Artefact stay bounded at a fixed, computed " +
-		"total (2 main + 2 Polybius + 1 CERN = 5 Voynich dispatches), not a hang and not runaway growth")
-	check(pts_1 == pts_2, "the same held keys in a different acquisition order give the same result")
-	Economy.earn(order_1, pts_1)
-	Economy.earn(order_2, pts_2)
-	check(order_1.score == roundi(pts_1 * 1.15) * 10 and order_1.gold == roundi(pts_1 * 0.95), # issue 57: Score x10
-		"Tinfoil Hat's percentage still applies once, off the echoed capture's own immutable base")
+		"total (2 main + 2 Polybius + 1 CERN = 5 Azimuthal dispatches), not a hang and not runaway growth")
+	check(pts_1 == pts_2 and extra_1 == extra_2, "the same held keys in a different acquisition order give the same result")
+	Economy.earn_gold(order_1, extra_1)
+	Economy.earn_gold(order_2, extra_2)
+	check(order_1.gold == roundi(extra_1 * 1.25) and order_1.score == 0,
+		"Popemobile's percentage applies once to the echoed gold_extra; no Score from any of it")
 	check(order_1.score == order_2.score and order_1.gold == order_2.gold,
 		"the full capture+earn pipeline stays order-independent with two echo Artefacts stacked")
 	order_1.queue_free()
@@ -505,19 +496,17 @@ func _init() -> void:
 
 	# --- issue 31: capture-context effects ---
 
-	# Curtain Rods Bag: first Capture each Wave doubles Score and pays no
-	# Gold; later Captures the same Wave are unaffected (pawn value 10)
+	# Curtain Rods Bag: NO-250 removed its "double Score, no $" first
+	# Capture; the first Capture each Wave now pays normally (its "Magic
+	# bullet" lands in NO-250 PR 2/2)
 	var crb := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 2, 3], ["pawn", 1, 2, 4],
 		["rook", 1, 7, 10]], "wave": 3, "score": 0, "gold": 0,
 		"artefacts": ["curtain-rods-bag-rifle-shaped"]})
 	await process_frame
 	crb.actions_left = 5
 	crb._move_player(Vector2i(2, 2), Vector2i(2, 3)) # first Capture this Wave
-	check(crb.score == 200 and crb.gold == 0, # issue 57: Score x10, Gold untouched
-		"Curtain Rods Bag: first Capture each Wave doubles Score (100 -> 200) and pays no Gold")
-	crb._move_player(Vector2i(2, 3), Vector2i(2, 4)) # second Capture this Wave
-	check(crb.score == 300 and crb.gold == 10, # issue 57: Score x10, Gold untouched
-		"Curtain Rods Bag: the second Capture the same Wave pays normally")
+	check(crb.score == 100 and crb.gold == 10,
+		"Curtain Rods Bag (NO-250): the first Capture each Wave pays its normal Score and Gold")
 	crb.queue_free()
 	await process_frame
 
@@ -551,10 +540,10 @@ func _init() -> void:
 		"artefacts": ["2-3-trillion-receipt"]})
 	await process_frame
 	receipt._destroy(Vector2i(4, 4), true) # Item-caused (Drone Strike/Air Strike/Sniper)
-	check(receipt.score == 100 and receipt.gold == 10, # issue 57: Score x10, Gold untouched
-		"$2.3 Trillion Receipt: an enemy destroyed by an Item awards its Score and Gold value")
+	check(receipt.score == 0 and receipt.gold == 10,
+		"$2.3 Trillion Receipt: an enemy destroyed by an Item awards its $ value (NO-250: no Score)")
 	receipt._destroy(Vector2i(5, 5)) # not Item-caused (Bomb's _detonate / jd_vance Tariff path)
-	check(receipt.score == 100 and receipt.gold == 10, # issue 57: Score x10, Gold untouched
+	check(receipt.score == 0 and receipt.gold == 10,
 		"$2.3 Trillion Receipt: non-Item destruction still pays nothing (Destruction default)")
 	receipt.queue_free()
 	await process_frame
@@ -670,6 +659,10 @@ func _init() -> void:
 		"moscovium-glow-stick": true, "roanoke-hex-kit": true,
 		"zapruder-s-director-s-cut": true, "bovine-tractor-beam": true,
 		"jet-fuel-vial": true,
+		# NO-250: Rapture Insurance Policy — read at game.gd's Clock-out
+		# check in _process, same standing-rule shape as Doomsday Clock
+		# Snooze Button above
+		"rapture-insurance-policy": true,
 	}
 	var unregistered := []
 	for cat in Items.ARTEFACT_CATALOG:
@@ -1133,8 +1126,8 @@ func _init() -> void:
 
 	# Ecdysis Sheddings: inert before any purchase, then mirrors the last
 	# OTHER Artefact bought as a genuine second copy (Library of Alexandria
-	# Matchbox: +10 per Capture with 1 Stock piece — issue 69 repoint of
-	# "greed", which is no longer a real catalog key the Shop can even grant).
+	# Matchbox: +$1 per Capture with 1 Stock piece — NO-250 made it Gold-only,
+	# so the mirror is counted in Gold, the capture's points stay the base).
 	var ecdy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
 		"wave": 3, "gold": 9999, "stock": ["pawn"], "artefacts": ["ecdysis-sheddings"]})
 	await process_frame
@@ -1147,8 +1140,9 @@ func _init() -> void:
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
 	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
 		"Ecdysis Sheddings: records the last Artefact bought (Library of Alexandria Matchbox)")
-	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 20,
-		"Ecdysis Sheddings: mirrors the bought Matchbox as a second copy (+10 real, +10 mirrored = +20)")
+	var ecdy_g0: int = ecdy.gold
+	check(Economy.capture_score(ecdy, "pawn") == ecdy_base and ecdy.gold == ecdy_g0 + 2,
+		"Ecdysis Sheddings: mirrors the bought Matchbox as a second copy (+$1 real, +$1 mirrored = +$2)")
 	# Buying a SECOND Ecdysis must not overwrite the copy key with its own —
 	# "other" excludes it — or two copies would chase each other.
 	ecdy.actions_left = 5
@@ -1156,9 +1150,11 @@ func _init() -> void:
 	Shop.buy(ecdy, ecdy.shop_stock.size() - 1)
 	check(ecdy.ecdysis_copy_key == "library-of-alexandria-matchbox",
 		"Ecdysis Sheddings: buying ANOTHER Ecdysis does not overwrite the copied key")
-	check(Economy.capture_score(ecdy, "pawn") == ecdy_base + 30,
-		"Ecdysis Sheddings: two held copies each independently mirror the Matchbox (+10 real + 10 + 10 " +
-		"= +30) — bounded, no chase")
+	var ecdy_g1: int = ecdy.gold
+	Economy.capture_score(ecdy, "pawn")
+	check(ecdy.gold == ecdy_g1 + 3,
+		"Ecdysis Sheddings: two held copies each independently mirror the Matchbox (+$1 real + 1 + 1 " +
+		"= +$3) — bounded, no chase")
 	check(ecdy.artefact_echo_depth == 0,
 		"Ecdysis Sheddings: the echo-depth guard is back at 0 after dispatch (no leak)")
 	# issue 60: Ecdysis Sheddings copies g.ecdysis_copy_key, never a held
@@ -1223,9 +1219,11 @@ func _init() -> void:
 	check(oak._artefact_activation_available("oak-island-wishing-well"),
 		"Oak Island Wishing Well: available (held, affordable, not used this Turn)")
 	oak._artefact_confirmed("oak-island-wishing-well")
-	check(oak.gold == 475 and oak.score == 4000, # issue 57: Score x10 (400 -> 4000), Gold untouched
-		"Oak Island Wishing Well: confirmed activation pays 25 Gold for +4000 Score (earn() " +
-		"also grants the matching Gold off the 400 base, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+	check(oak.gold == 75 and oak.score == 0,
+		"Oak Island Wishing Well (NO-250): pays $25 and gains no Gold or Score (the +$375/Turn printer is gone)")
+	check(oak.box_open and oak.box_only_kind == "item" and oak.box_size == "small",
+		"Oak Island Wishing Well (NO-250): the $25 opens a Small Item Box")
+	oak._box_close()
 	check(not oak._artefact_activation_available("oak-island-wishing-well"),
 		"Oak Island Wishing Well: unavailable again — once per Turn already spent")
 	oak._begin_player_turn() # next Turn: the once-per-Turn charge recharges
@@ -1263,12 +1261,12 @@ func _init() -> void:
 	check(glow._artefact_count("moscovium-glow-stick") == 0 and glow.moscovium_active,
 		"Moscovium Glow Stick: activation consumes the Artefact and flags the triple-gain window")
 	Economy.earn(glow, 100)
-	check(glow.score == 3000 and glow.gold == 300, # issue 57: Score x10, Gold untouched
-		"Moscovium Glow Stick: Score and Gold gains are tripled while active (Score 1000 -> 3000, Gold 100 -> 300)")
+	check(glow.score == 1000 and glow.gold == 300,
+		"Moscovium Glow Stick: $ gains are tripled while active (100 -> 300); Score is not (NO-250)")
 	glow._begin_player_turn() # next Turn: "until end of Turn" expires
 	check(not glow.moscovium_active, "Moscovium Glow Stick: the window ends at the next Turn")
 	Economy.earn(glow, 100)
-	check(glow.score == 4000 and glow.gold == 400, # issue 57: Score x10, Gold untouched
+	check(glow.score == 2000 and glow.gold == 400,
 		"Moscovium Glow Stick: back to normal (not tripled) once the window has ended")
 	glow.queue_free()
 	await process_frame
@@ -1674,6 +1672,210 @@ func _init() -> void:
 	check(not ml.mona_lisa_turn_done,
 		"100% Genuine Original Mona Lisa: a Shop price read does not spend the Turn's echo")
 	ml.queue_free()
+	await process_frame
+
+	# --- NO-250: Artefacts grant no Score. One fixture, every catalog
+	# Artefact held alone in turn, driven through every Score-adjacent path
+	# an Artefact used to touch: a gain (earn/earn_gold), a Capture, Turn
+	# start/end, a Wave clear + spawn, a purchase, a Decisive last-Item use,
+	# a King Ability charge, an Item kill and a lost Buffed piece. The only
+	# Score allowed is earn(100)'s own core x10 (1000); a Capture only
+	# returns its points, it never writes Score here.
+	var sweep := _boot({"board": [["queen", 0, 2, 2, {"buffs": [{"key": "shield"}]}],
+		["pawn", 0, 3, 2], ["rook", 1, 7, 10]], "wave": 3, "gold": 1000})
+	await process_frame
+	var rook_val: int = sweep.defs.rook.value
+	var scored := []
+	for cat in Items.ARTEFACT_EFFECTS:
+		var held: Dictionary = cat.duplicate()
+		held.acquired_wave = 1
+		sweep.artefacts = [held]
+		if sweep.box_open:
+			sweep._box_close()
+		if sweep.buff_pick_open:
+			sweep._choice_pick_cancelled()
+		sweep.wave = 3
+		sweep.pending_spawn.clear()
+		sweep.gold = 1000
+		sweep.score = 0
+		Economy.earn(sweep, 100)
+		Economy.earn_gold(sweep, 100)
+		var sweep_pts := Economy.capture_score(sweep, "rook", "pawn", true, Vector2i(3, 2), Vector2i(7, 10))
+		ArtefactHooks.run(sweep, "on_turn_start")
+		ArtefactHooks.run(sweep, "on_turn_end")
+		WaveLogic.queue(sweep, 4)
+		ArtefactHooks.run(sweep, "on_purchase", {"kind": "artefact", "key": "tinfoil-hat", "price": 50})
+		ArtefactHooks.run(sweep, "on_item_consume", {"key": "x", "tier": "Decisive", "last": true, "cancel": false})
+		ArtefactHooks.run(sweep, "on_king_ability_charge", {"key": "move_cost", "amount": 5})
+		ArtefactHooks.run(sweep, "on_destroy", {"id": "rook", "value": rook_val})
+		sweep._lose_player_piece(Vector2i(2, 2), "captured")
+		if sweep.score != 1000 or sweep_pts != rook_val:
+			scored.append("%s (score %d, pts %d)" % [held.key, sweep.score, sweep_pts])
+	check(scored.is_empty(), "NO-250: no Artefact changes Score (offenders: %s)" % [scored])
+	sweep.queue_free()
+	await process_frame
+
+	# --- NO-250: the C/D redesigns that reuse existing mechanics ---
+
+	# Suspiciously Large Femur: +$25 for taking the highest-value enemy, as
+	# ctx.gold_extra (was +150 Score, +$150 leaked through ctx.pts, +$3)
+	var femur := _boot({"board": [["queen", 0, 2, 2], ["pawn", 1, 4, 4], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["suspiciously-large-femur"]})
+	await process_frame
+	var femur_pts := Economy.capture_score(femur, "rook", "queen", false, Vector2i(2, 2), Vector2i(7, 10))
+	check(femur_pts == femur.defs.rook.value and femur.last_capture_ctx.gold_extra == 25,
+		"Suspiciously Large Femur: taking the highest-value enemy pays +$25 extra, points untouched")
+	Economy.capture_score(femur, "pawn", "queen", false, Vector2i(2, 2), Vector2i(4, 4))
+	check(femur.last_capture_ctx.gold_extra == 0,
+		"Suspiciously Large Femur: a lower-value victim (the rook still stands) pays nothing")
+	femur.queue_free()
+	await process_frame
+
+	# Phantom Punch Glove: a lower-value piece taking a higher-value one gets
+	# +1 Tactical Piece Buff, landed after the capture (Tap Water's channel)
+	var phantom := _boot({"board": [["pawn", 0, 2, 2], ["knight", 1, 3, 3], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["phantom-punch-glove"]})
+	await process_frame
+	phantom.actions_left = 5
+	phantom._move_player(Vector2i(2, 2), Vector2i(3, 3)) # pawn takes knight
+	var ph_buffs: Array = BuffLogic.of(phantom.board[Vector2i(3, 3)])
+	var tactical := Items.PIECE_BUFFS.filter(func(b: Dictionary) -> bool: return b.tier == "Tactical") \
+		.map(func(b: Dictionary) -> String: return b.key)
+	check(ph_buffs.size() == 1 and tactical.has(ph_buffs[0].key),
+		"Phantom Punch Glove: the lower-value capturer gets +1 Tactical Piece Buff")
+	phantom.queue_free()
+	await process_frame
+
+	var phantom_up := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["phantom-punch-glove"]})
+	await process_frame
+	Economy.capture_score(phantom_up, "pawn", "queen", false, Vector2i(2, 2))
+	check(phantom_up.last_capture_ctx.grant_buffs.is_empty(),
+		"Phantom Punch Glove: a higher-value piece taking a lower-value one gets nothing")
+	phantom_up.queue_free()
+	await process_frame
+
+	# Naruto Run Manual: an early clear in <=3 turns: +1 Action for the Turn
+	# that follows (the Wave queues from _begin_player_turn, after the new
+	# Turn's Actions are set); a slower or non-cleared Wave gives nothing
+	var naruto := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["naruto-run-manual"]})
+	await process_frame
+	var nr_a0: int = naruto.actions_left
+	var nr_m0: int = naruto.actions_max
+	naruto.early_clear_awarded = true
+	naruto.turns_since_wave = 3
+	WaveLogic.queue(naruto, 4)
+	check(naruto.actions_left == nr_a0 + 1 and naruto.actions_max == nr_m0 + 1,
+		"Naruto Run Manual: a Wave cleared in 3 turns gives +1 Action")
+	naruto.early_clear_awarded = true
+	naruto.turns_since_wave = 4
+	WaveLogic.queue(naruto, 5)
+	check(naruto.actions_left == nr_a0 + 1, "Naruto Run Manual: 4 turns is too slow")
+	naruto.early_clear_awarded = false # the cadence queued it; the board was never cleared
+	naruto.turns_since_wave = 2
+	WaveLogic.queue(naruto, 6)
+	check(naruto.actions_left == nr_a0 + 1, "Naruto Run Manual: a Wave that wasn't cleared gives nothing")
+	naruto.queue_free()
+	await process_frame
+
+	# Moon Landing Slate: an early clear in <=2 turns opens a Small Artefact Box
+	var moon := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["moon-landing-slate"]})
+	await process_frame
+	moon.early_clear_awarded = true
+	moon.turns_since_wave = 3
+	WaveLogic.queue(moon, 4)
+	check(not moon.box_open, "Moon Landing Slate: 3 turns is too slow")
+	moon.early_clear_awarded = true
+	moon.turns_since_wave = 2
+	WaveLogic.queue(moon, 5)
+	check(moon.box_open and moon.box_only_kind == "artefact" and moon.box_size == "small",
+		"Moon Landing Slate: a Wave cleared in 2 turns opens a Small Artefact Box")
+	moon.queue_free()
+	await process_frame
+
+	# Bielefeld Library Card: a Wave clear with no captures pays +$50
+	var biel := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "score": 0, "artefacts": ["bielefeld-library-card"]})
+	await process_frame
+	WaveLogic.queue(biel, 4)
+	check(biel.gold == 50 and biel.score == 0, "Bielefeld Library Card: a Wave with no captures pays +$50, no Score")
+	biel.wave_capture_count = 1
+	WaveLogic.queue(biel, 5)
+	check(biel.gold == 50, "Bielefeld Library Card: a Wave with a capture pays nothing")
+	biel.queue_free()
+	await process_frame
+
+	# The Red Phone: +1 Action per Turn while the Clock is under 30s
+	var phone := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "artefacts": ["the-red-phone"]})
+	await process_frame
+	var ph_a0: int = phone.actions_left
+	phone.clock_ms = 100000.0
+	ArtefactHooks.run(phone, "on_turn_start")
+	check(phone.actions_left == ph_a0, "The Red Phone: nothing with 100s on the Clock")
+	phone.clock_ms = 20000.0
+	ArtefactHooks.run(phone, "on_turn_start")
+	check(phone.actions_left == ph_a0 + 1, "The Red Phone: +1 Action at Turn start under 30s")
+	phone.queue_free()
+	await process_frame
+
+	# Voynich Dictionary: the Wave's first Capture refunds +1 Action (the
+	# Stargate shape: actions_left AND actions_max), later ones don't
+	var voy := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["voynich-dictionary"]})
+	await process_frame
+	var voy_a0: int = voy.actions_left
+	var voy_m0: int = voy.actions_max
+	var voy_pts := Economy.capture_score(voy, "pawn", "queen", false, Vector2i(2, 2))
+	check(voy_pts == voy.defs.pawn.value and voy.actions_left == voy_a0 + 1 and voy.actions_max == voy_m0 + 1,
+		"Voynich Dictionary: the Wave's first Capture gives +1 Action, points untouched")
+	Economy.capture_score(voy, "pawn", "queen", false, Vector2i(2, 2))
+	check(voy.actions_left == voy_a0 + 1, "Voynich Dictionary: only the first Capture each Wave")
+	voy.queue_free()
+	await process_frame
+
+	# CIA Press Pass: a Buffed attacker's capture pays +50% $, points untouched
+	var press := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 0, "artefacts": ["cia-press-pass"]})
+	await process_frame
+	var press_base: int = press.defs.knight.value
+	check(Economy.capture_score(press, "knight", "queen", true, Vector2i(2, 2)) == press_base
+			and press.gold == roundi(press_base * 0.5),
+		"CIA Press Pass: a Buffed attacker pays +50% $ and no longer doubles the capture's points")
+	press.queue_free()
+	await process_frame
+
+	# Ruling G3: an Artefact's capture $ rides ctx.gold_extra through
+	# Economy.earn_gold, on top of the capture's own Score+Gold — Holy DNA Kit
+	# (3 queens) on a real move: Score is the core x10 alone, $ is doubled
+	var dna := _boot({"board": [["queen", 0, 2, 2], ["queen", 0, 4, 2], ["queen", 0, 6, 2],
+		["pawn", 1, 2, 3], ["rook", 1, 7, 10]], "wave": 3, "gold": 0, "score": 0,
+		"artefacts": ["holy-dna-kit"]})
+	await process_frame
+	dna.actions_left = 5
+	var dna_base: int = dna.defs.pawn.value
+	dna._move_player(Vector2i(2, 2), Vector2i(2, 3))
+	check(dna.score == dna_base * 10 and dna.gold == dna_base * 2,
+		"Holy DNA Kit: +100% $ on the capture through gold_extra, Score untouched (got %d / $%d)" % [dna.score, dna.gold])
+	dna.queue_free()
+	await process_frame
+
+	# Rapture Insurance Policy: when the Clock hits 0, all $ becomes Clock
+	# (1s per $5) and the Artefact is consumed — the run goes on
+	var rapture := _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]],
+		"wave": 3, "gold": 100, "score": 0, "artefacts": ["rapture-insurance-policy"]})
+	await process_frame
+	rapture.state = rapture.State.PLAYER_TURN
+	rapture.clock_ms = 0.0
+	rapture._process(0.0)
+	check(rapture.state == rapture.State.PLAYER_TURN and rapture.gold == 0
+			and is_equal_approx(rapture.clock_ms, 20000.0) and rapture.score == 0,
+		"Rapture Insurance Policy: at 0s, $100 becomes +20s Clock and the run continues (no Score)")
+	check(rapture._artefact_count("rapture-insurance-policy") == 0,
+		"Rapture Insurance Policy: consumed — once per run")
+	rapture.queue_free()
 	await process_frame
 
 	print("---")

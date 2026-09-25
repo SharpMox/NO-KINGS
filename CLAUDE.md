@@ -195,9 +195,12 @@ header before touching it — it documents the hook list and two rules that are 
 
 - **ctx contract.** Handlers return values through `ctx`; they compute percentages off the
   immutable `ctx.base`, never the running `ctx.amount`; and they never write `g.score`/
-  `g.gold` mid-dispatch — cross-resource side-payments go through `ctx.gold_bonus` /
-  `ctx.score_bonus`, applied exactly once by `Economy.earn`. Four handlers broke this and
+  `g.gold` mid-dispatch — cross-resource side-payments go through `ctx.gold_bonus`,
+  applied exactly once by `Economy.earn`. Four handlers broke this and
   produced an order-dependent payout before it was written down.
+- **Artefacts grant no Score** (NO-250, Max 2026-09-24). No handler writes `g.score`,
+  raises a Score gain or writes `ctx.pts`; an on_capture handler's own Gold goes through
+  `ctx.gold_extra`, paid via `Economy.earn_gold`.
 - **Stacking is additive per held copy, and `run()` key-sorts** so a value touched by several
   artefacts never depends on acquisition order.
 

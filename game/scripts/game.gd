@@ -476,9 +476,8 @@ var artefact_echo_depth := 0 # ArtefactHooks re-entrancy guard (artefact hook 21
 var mona_lisa_turn_done := false # 100% Genuine Original Mona Lisa: this Turn's
 	# (player or enemy) first Artefact trigger already echoed; reset in
 	# ArtefactHooks.run() at on_turn_start/on_enemy_turn_start
-var dejavu_score_turn_done := false # Déjà Vu Glitch: this Turn's first Score
+var dejavu_gold_turn_done := false # Déjà Vu Glitch: this Turn's first Gold
 	# gain already doubled; reset in ArtefactHooks.run() at on_turn_start
-var dejavu_gold_turn_done := false # same idea, first Gold gain each Turn
 var frog_armed := false # Frog Pride Flag (issue 45): armed by losing a piece
 	# (on_piece_lost), consumed by the NEXT Deploy (on_deploy) — a single
 	# flag, not one per lost piece: "the next piece" is singular, so losing
@@ -543,7 +542,16 @@ var shop_lane_b_progress := 0 # issue 64: Score earned toward the next Lane-B
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
-var actions_left := 0 # unified: move, place, merge, item — 1 action each
+var last_action_banner_shown := false # NO-238: LAST ACTION fires once per Turn;
+	# also pre-set true when the YOUR TURN banner already named a 1-Action turn,
+	# so the same drop-to-1 doesn't additionally fire LAST ACTION (Max: merge, don't stack)
+var actions_left := 0: # unified: move, place, merge, item — 1 action each
+	set(value): # NO-238: dropping to exactly 1 Action fires a banner once per Turn
+		if value == 1 and actions_left != 1 and not last_action_banner_shown \
+				and is_node_ready() and not autoplay and animations_on:
+			_add_turn_fx("LAST ACTION", BANNER_LOSS, "last_action")
+			last_action_banner_shown = true
+		actions_left = value
 var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
@@ -714,7 +722,7 @@ const ACTIVATABLE_ARTEFACT_KEYS := [
 	# (user ruling: "it does not belong in the in-run activation UI")
 var oak_island_used_this_turn := false # reset in _begin_player_turn
 var moscovium_active := false # "until end of Turn" — reset in _begin_player_turn;
-	# read directly by Economy.earn() (economy.gd), NOT the REGISTRY: the
+	# read directly by Economy.earn()/earn_gold() (economy.gd), NOT the REGISTRY: the
 	# effect must keep tripling gains after the artefact consumes itself and
 	# leaves g.artefacts, when there is no "held copy" left to dispatch from
 var zapruder_used_this_wave := false # reset in WaveLogic.queue()
@@ -1417,7 +1425,16 @@ func _process(delta: float) -> void:
 			doomsday_snooze_used_this_wave = true
 		if clock_ms <= 0:
 			clock_ms = 0
-			return _game_over(false, "Clock out")
+			if _held("rapture-insurance-policy"): # NO-250: once per copy, when
+				# the Clock hits 0: all $ becomes Clock (1s per $5), consumed.
+				# A standing-rule read at the threshold, like Doomsday Snooze.
+				_consume_artefact("rapture-insurance-policy")
+				var secs: int = floori(gold / 5.0)
+				_add_turn_fx("Rapture Insurance Policy: $%d -> +%ds" % [gold, secs], BANNER_GAIN)
+				gold = 0
+				Economy.add_clock(self, secs * 1000.0, "rapture-insurance-policy")
+			if clock_ms <= 0:
+				return _game_over(false, "Clock out")
 		hud.update_clock(clock_ms) # NO-127: routes through hud.gd's shared seam
 		if autoplay:
 			AutoplayBot.step(self)
@@ -1515,15 +1532,20 @@ const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
 
 
 func _begin_player_turn() -> void:
+	var new_actions := Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	last_action_banner_shown = false # re-armed for the new Turn
 	if state == State.ENEMY_TURN: # skip on the SETUP->first-turn transition
-		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
+		_add_turn_fx("YOUR TURN · %d ACTION%s" % [new_actions, "" if new_actions == 1 else "S"],
+			Color(0.45, 0.7, 1.0), "your_turn")
+		if new_actions == 1: # NO-238: the banner above already named a 1-Action
+			last_action_banner_shown = true # Turn; don't also fire LAST ACTION for it
 	turn_number += 1 # issue 35: the single increment site — save_config.gd's
 		# apply() overrides the result AFTER this call (same pattern as
 		# skip_enemy_turns there), since a resumed save must not double-count
 		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	actions_left = new_actions
 	moved_this_turn.clear()
 	player_double_steps.clear() # NO-232: this turn's en passant window closed
 		# with the enemy turn that just ended — starts empty again for
@@ -1563,6 +1585,7 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
+			_add_turn_fx("REINFORCEMENTS", BANNER_GAIN, "reinforcements") # NO-238
 			modals.show_reinforce(_grant_reinforcements()) # NO-141: granted the
 				# instant the screen fires — the modal is announcement only
 	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
@@ -3205,6 +3228,17 @@ func _setup_to_stock(from: Vector2i) -> void:
 	_refresh()
 
 
+## NO-250: one capture's payout, read off the ctx capture_score just stashed.
+## Score+Gold from `pts` (Economy.earn), then the Artefacts' Gold-only
+## `gold_extra` (earn_gold, ruling G3). Dark Market Light Bulb's `no_gold`
+## drops both Gold halves; the capture still scores.
+func _pay_capture(pts: int) -> void:
+	var ctx := last_capture_ctx
+	Economy.earn(self, pts, "", "", false, not ctx.no_gold)
+	if ctx.gold_extra > 0 and not ctx.no_gold:
+		Economy.earn_gold(self, ctx.gold_extra, "", "", false)
+
+
 func _move_player(from: Vector2i, to: Vector2i) -> void:
 	var king_captured := false
 	var captured_king_id := ""
@@ -3266,18 +3300,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		var attacker_buffed := not BuffLogic.of(board[from]).is_empty()
 		var capture_pts := Economy.capture_score(self, victim.id, board[from].id, attacker_buffed, from, to) \
 			* BuffLogic.capture_multiplier(board, from)
-		# Curtain Rods Bag (issue 31): "first Capture each Wave" is only
-		# knowable here, right after capture_score() sets last_capture_ctx —
-		# wave_capture_index is 0-based, read before Economy.earn runs, so its
-		# on_score_change/on_gold_change handlers below can scope to this one
-		# call by reason alone (see artefact_hooks.gd's header).
-		var earn_reason := "wave_first_capture" if last_capture_ctx.get("wave_capture_index", -1) == 0 else ""
-		# #569 round 2: post_feed=false — a same-frame Multicapture extra
+		# #569 round 2: no auto feed line — a same-frame Multicapture extra
 		# (below) folds into this same kill-feed line via hud.feed_capture()
 		# ("Took Knight" / "Took 2"), not two separate ones.
 		var cap_s0: int = score
 		var cap_g0: int = gold
-		Economy.earn(self, capture_pts, earn_reason, "", false)
+		_pay_capture(capture_pts)
 		hud.feed_capture(defs[victim.id].name, score - cap_s0, gold - cap_g0)
 		# snapshotted now, before Multicapture (below) can fire a second
 		# capture_score call that overwrites g.last_capture_ctx with its own
@@ -3325,8 +3353,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 				_add_float(also, "Multicapture!", COL_MERGE)
 				var mc_s0: int = score
 				var mc_g0: int = gold
-				Economy.earn(self, Economy.capture_score(self, board[also].id,
-					board[from].id, attacker_buffed, from, also), "", "", false)
+				_pay_capture(Economy.capture_score(self, board[also].id,
+					board[from].id, attacker_buffed, from, also))
 				hud.feed_capture(defs[board[also].id].name, score - mc_s0, gold - mc_g0)
 				if last_capture_ctx.get("to_stock", false): # this call's OWN
 						# ctx (issue 55) — read immediately, before anything
@@ -3845,7 +3873,7 @@ func _open_yalta_pick() -> void:
 func _yalta_chosen(value: String) -> void:
 	match value:
 		"gold":
-			Economy.earn(self, 100, "yalta-cocktail-napkin")
+			Economy.earn_gold(self, 100, "yalta-cocktail-napkin") # NO-250: $ only
 		"item":
 			ArtefactHooks.grant_item(self, Items.ITEMS[rng.randi() % Items.ITEMS.size()]) # NO-103
 		"clock":
@@ -4505,9 +4533,10 @@ func _artefact_confirmed(key: String) -> void:
 		"oak-island-wishing-well":
 			oak_island_used_this_turn = true
 			Economy.spend_gold(self, 25)
-			Economy.earn(self, 400, "oak-island-wishing-well") # +Score (and its
-				# matching Gold, same as every other earn() reward — Yalta
-				# Cocktail Napkin's "+100 Gold" choice already does this too)
+			# NO-250: a Small Item Box (Fort Knox IOU's shape) — was
+			# Economy.earn(400), which paid +4000 Score AND +$400 for $25
+			_open_box_pick({"kind": "box", "key": "item", "size": "small",
+				"sold": false, "contents": Box.roll_options(self, "item", "small")})
 		"fifa-complimentary-yacht":
 			Economy.spend_gold(self, 50)
 			actions_left += 1
@@ -5056,6 +5085,8 @@ func _open_box_pick(slot: Dictionary) -> void:
 			box_rerolls_left -= 1
 			box_offer = _box_options(box_only_kind, box_size)
 		return _box_choose(box_offer[rng.randi() % box_offer.size()])
+	if box_only_kind == "item" and not ItemLogic.has_room(self): # NO-238: matches
+		_add_turn_fx("INVENTORY FULL", BANNER_LOSS, "inventory_full") # modals.show_box's own gate
 	modals.show_box(box_offer)
 
 
@@ -5256,8 +5287,9 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 		"box":
 			_open_box_pick(Box.random_slot(self))
 		"banner": # NO-234: hand-built, not _add_turn_fx — see
-			# _debug_state_screenshot's header for why
-			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN",
+			# _debug_state_screenshot's header for why. NO-238: illustrates the
+			# turn-start banner's action count, added to this text.
+			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN · 2 ACTIONS",
 				"color": Color(0.45, 0.7, 1.0), "slot": 0})
 			queue_redraw()
 		"tip", "preview":

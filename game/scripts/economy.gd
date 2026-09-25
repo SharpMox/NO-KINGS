@@ -29,10 +29,10 @@ const Armies := preload("res://scripts/armies.gd")
 ## (shop.gd price()/on_capture threshold comparisons/_sample_pieces
 ## weighting all read it unscaled) and would 10x every price. Gold from the
 ## same gain stays untouched: gain() below derives Gold from the raw
-## `amount`, never the x10'd Score. Handlers that write g.score directly,
-## bypassing earn() (a handful of on_wave_clear/on_purchase/on_game_over/
-## on_item_consume/on_king_ability_charge/on_piece_lost/on_destroy effects in
-## artefact_hooks.gd), are x10'd individually at their own literal instead.
+## `amount`, never the x10'd Score.
+## NO-250 (Max, 2026-09-24/25): Artefacts grant no Score. Score comes only
+## from core play (captures, early clears, the win bonus, Kings); no Artefact
+## handler writes g.score, raises a Score gain, or converts Gold into Score.
 const SCORE_MULTIPLIER := 10
 
 
@@ -96,17 +96,16 @@ static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
 ## gain (e.g. an early-clear-only multiplier) — most callers leave it "".
 ## Score/Gold percentage artefacts hook in here (issue 16), ADDITIVE off an
 ## immutable ctx.base so multiple copies/artefacts never compound (matches
-## the on_capture stacking rule in artefact_hooks.gd). `gold_bonus`/
-## `score_bonus` (issue 20) are the cross-resource side-payment channels for
-## converter handlers (El Dorado Body Glitter, Tungsten-Filled Gold Bar,
-## Popemobile Piggy Bank) — pre-seeded 0.0, applied exactly once here, never
-## written by a handler directly (see artefact_hooks.gd's CONTRACT comment).
+## the on_capture stacking rule in artefact_hooks.gd). `gold_bonus` (issue
+## 20) is the Score->Gold side-payment channel (El Dorado Body Glitter) —
+## pre-seeded 0.0, applied exactly once here, never written by a handler
+## directly (see artefact_hooks.gd's CONTRACT comment). NO-250 removed its
+## Gold->Score twin, `score_bonus`, with the converters that used it.
 ## Issue 57: the on_score_change dispatch itself stays off the UNSCALED
 ## `amount` — every percentage handler (and El Dorado's ctx.gold_bonus,
 ## computed off this same immutable base) is unaffected by SCORE_MULTIPLIER,
 ## so a Score-based Gold conversion doesn't also inflate 10x. Only the
-## dispatch's OUTPUT (`score_amount`, and the symmetric Gold->Score
-## `gold_ctx.score_bonus`) is scaled, right before it lands on g.score —
+## dispatch's OUTPUT (`score_amount`) is scaled, right before it lands on g.score —
 ## mathematically identical to scaling every percentage handler's own
 ## literal, since `(base + base*pct) * k == (base*k) + (base*k)*pct`.
 ## NO-239: `label` is what the kill feed says the gain was for ("Sold Rook");
@@ -114,35 +113,33 @@ static func spend_gold(g, amount: int, floor_at: int = 0) -> void:
 ## false skips the automatic feed line — game.gd's capture call sites use
 ## this to combine a main capture and a Multicapture extra into one
 ## "Took Knight"/"Took N" line via hud.feed_capture() instead of two.
+## NO-250: `pay_gold` false pays the Score half only — Dark Market Light
+## Bulb's "Demoted pieces give no $ on Capture" (game.gd _pay_capture).
 static func earn(g, amount: int, reason: String = "", label: String = "",
-		post_feed: bool = true) -> void:
+		post_feed: bool = true, pay_gold: bool = true) -> void:
 	var score_ctx := ArtefactHooks.run(g, "on_score_change",
 		{"base": float(amount), "amount": float(amount), "reason": reason, "gold_bonus": 0.0})
 	var score_amount := roundi(score_ctx.amount) * SCORE_MULTIPLIER
-	var gold_amount := gain(g, amount)
-	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
-		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
-	var gold_gain := roundi(gold_ctx.amount)
-	if g.moscovium_active: # Moscovium Glow Stick (issue 52): "Score and Gold
-		# gains are tripled" — a deliberate multiplicative exception
-		# (artefact_hooks.gd header), applied here directly rather than
-		# through the REGISTRY/run() per-held-copy dispatch: the effect must
-		# keep working AFTER the artefact consumes itself and leaves
-		# g.artefacts, when there is no held copy left to dispatch from.
-		# Scoped to this call's own base gain (score_amount / the post-
-		# Inflation gold_gain), not the cross-resource gold_bonus/score_bonus
-		# converter payments below, which are a different artefact's own
-		# conversion, layered on top.
-		score_amount *= 3
-		gold_gain *= 3
-	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
-	g.score += score_amount + score_bonus_amount # ONE write: the score setter
-		# pops per assignment, and two writes showed two "+N" for one event
-		# (Tungsten-Filled Gold Bar / Popemobile Piggy Bank)
-	g.gold += gold_gain + roundi(score_ctx.gold_bonus)
+	var gold_gain := 0
+	if pay_gold:
+		var gold_amount := gain(g, amount)
+		var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
+			{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason})
+		gold_gain = roundi(gold_ctx.amount)
+		if g.moscovium_active: # Moscovium Glow Stick (issue 52): "$ gains are
+			# tripled" (NO-250: the Score triple is gone) — a deliberate
+			# multiplicative exception (artefact_hooks.gd header), applied here
+			# directly rather than through the REGISTRY/run() per-held-copy
+			# dispatch: the effect must keep working AFTER the artefact
+			# consumes itself and leaves g.artefacts. Scoped to this call's own
+			# post-Inflation gain, not El Dorado's gold_bonus layered on top.
+			gold_gain *= 3
+		gold_gain += roundi(score_ctx.gold_bonus)
+	g.score += score_amount
+	g.gold += gold_gain
 	if post_feed:
-		_feed(g, reason, label, score_amount + score_bonus_amount, gold_gain + roundi(score_ctx.gold_bonus))
-	Shop.add_score_progress(g, score_amount + score_bonus_amount) # issue 64
+		_feed(g, reason, label, score_amount, gold_gain)
+	Shop.add_score_progress(g, score_amount) # issue 64
 		# Lane B: banks toward the next Score-driven restock (Lane A, every 5
 		# Waves, is independent of this and lives in wave_logic.gd instead)
 
@@ -161,9 +158,9 @@ static func gain(g, amount: int) -> int:
 ## charge Gold with no Score involved — the same asymmetry Buy already has
 ## (Shop.buy debits Gold only, never grants Score). Mirrors earn()'s Gold
 ## half exactly (Inflation via gain(), on_gold_change for Denver Bunker
-## Timeshare et al., the Moscovium triple, and score_bonus for a Gold->Score
-## converter like Popemobile Piggy Bank) without the Score/SCORE_MULTIPLIER
-## half, so a sale doesn't also score. Called from game.gd's _sell(), AFTER
+## Timeshare et al., the Moscovium triple) without the Score half, so a sale
+## doesn't also score. NO-250: also every Artefact's own $ payout that used
+## to ride earn() (Yalta, a capture's ctx.gold_extra). Called from game.gd's _sell(), AFTER
 ## the sold entry is already removed — Denver Bunker Timeshare's "+30% Gold
 ## while Items are full" must see the POST-sale Item count, so selling the
 ## Item that fills the last slot correctly does NOT get its own bonus.
@@ -171,18 +168,14 @@ static func earn_gold(g, amount: int, reason: String = "", label: String = "",
 		post_feed: bool = true) -> void:
 	var gold_amount := gain(g, amount)
 	var gold_ctx := ArtefactHooks.run(g, "on_gold_change",
-		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason, "score_bonus": 0.0})
+		{"base": float(gold_amount), "amount": float(gold_amount), "reason": reason})
 	var gold_gain := roundi(gold_ctx.amount)
-	if g.moscovium_active: # Moscovium Glow Stick (52): "Score and Gold gains
-		# are tripled" — same deliberate multiplicative exception earn() applies
+	if g.moscovium_active: # Moscovium Glow Stick (52): "$ gains are tripled"
+		# — same deliberate multiplicative exception earn() applies
 		gold_gain *= 3
 	g.gold += gold_gain
-	var score_bonus_amount := roundi(gold_ctx.score_bonus) * SCORE_MULTIPLIER
-	g.score += score_bonus_amount
 	if post_feed:
-		_feed(g, reason, label, score_bonus_amount, gold_gain)
-	Shop.add_score_progress(g, score_bonus_amount) # issue 64 Lane B: harmless
-		# no-op unless a converter artefact's score_bonus just crossed it
+		_feed(g, reason, label, 0, gold_gain)
 
 
 ## NO-239: every earn()/earn_gold() lands one kill-feed line per label per
@@ -213,6 +206,14 @@ static func add_clock(g, ms: float, reason: String = "") -> void:
 	var ctx := ArtefactHooks.run(g, "on_clock_change",
 		{"base": ms, "amount": ms, "reason": reason})
 	g.clock_ms = maxf(g.clock_ms + ctx.amount, 0.0)
+	# NO-238: the King's recurring refill and the one-time Continue bonus are
+	# large, discrete grants easy to miss in the header — banner them like
+	# every other refill event. Other add_clock reasons (milestone — bundled
+	# into the REINFORCEMENTS banner instead, turn_end, early_clear, per-item/
+	# artefact drips) stay unbannered.
+	if reason == "king_refill" or reason == "continue":
+		if ctx.amount > 0:
+			g._add_turn_fx("+%dS CLOCK" % roundi(ctx.amount / 1000.0), g.BANNER_GAIN, reason)
 
 
 ## `attacker_id`/`attacker_buffed` describe the capturing piece (board[from],
@@ -263,12 +264,13 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 			# flag — set true on the run's every 3rd capture; read back off
 			# g.last_capture_ctx at game.gd's capture sites, same shape as
 			# return_to_start/move_to_backrow above
-		"no_score": false, # issue 42: Dark Market Light Bulb's "Demoted pieces
-			# give no Score" — an OUTPUT flag, not a direct ctx.pts write, so it
-			# doesn't depend on whether a same-hook `+=` handler dispatches
-			# before or after it (run()'s key-sort); applied exactly once,
-			# below, after every on_capture handler has finished — same
-			# pattern as gold_bonus/score_bonus above.
+		"no_gold": false, # NO-250: Dark Market Light Bulb's "Demoted pieces
+			# give no $ on Capture" — an OUTPUT flag applied exactly once by
+			# game.gd's _pay_capture, after every on_capture handler ran.
+		"gold_extra": 0, # NO-250 (ruling G3): an on_capture handler's own $
+			# (Nero, Azimuthal, Holy DNA, Femur) — never ctx.pts, which pays
+			# Score AND Gold. game.gd's _pay_capture pays it through
+			# earn_gold, so Inflation/Denver/Gerrymandering/Moscovium apply.
 		"grant_buffs": [], # tiers ("" = any) an on_capture handler wants to hand
 			# the attacker (Obedience-Flavored Tap Water, Holy Lint) — an OUTPUT
 			# list, not applied here: _move_player reads it back off
@@ -297,8 +299,6 @@ static func capture_score(g, victim_id: String, attacker_id: String = "",
 	g.wave_capture_count += 1
 	g.turn_capture_count += 1
 	g.run_capture_count += 1
-	if ctx.no_score:
-		ctx.pts = 0
 	g.last_capture_ctx = ctx
 	return ctx.pts
 
@@ -355,10 +355,15 @@ static func record_history(g, won: bool) -> void:
 
 # --- King Abilities (data/king_abilities.gd; reached through Kings only) ---
 
-static func activate_king_ability_by_key(g, key: String) -> void:
+## `mid_wave` (NO-238): true when this Tariff comes into force DURING a Wave
+## (the escalating-Power stacking cadence, kings.gd's stack_power_if_due,
+## called after turn 0) rather than at the Wave's start — banners "NEW
+## TARIFF: …" instead of the plain catalog name, so a mid-run difficulty
+## change doesn't read like the one already announced at Wave start.
+static func activate_king_ability_by_key(g, key: String, mid_wave: bool = false) -> void:
 	for t in KingAbilities.ABILITIES:
 		if t.key == key:
-			return apply_king_ability(g, t)
+			return apply_king_ability(g, t, mid_wave)
 
 
 ## Catalog display name for a King Ability key — the one name every banner
@@ -415,9 +420,11 @@ static func ability_desc(g, key: String) -> String:
 ## key-sort order, the same precedent as on_piece_lost's Fireproof Pajamas
 ## (artefact hook 24) rather than reordering the dispatch to favor one
 ## handler over another.
-static func apply_king_ability(g, t: Dictionary) -> void:
+static func apply_king_ability(g, t: Dictionary, mid_wave: bool = false) -> void:
 	g.king_abilities_seen.append(t.name)
-	g._add_turn_fx(t.name.to_upper(), Color(1.0, 0.45, 0.35)) # tariff banner
+	g._add_turn_fx( # tariff banner
+		("NEW TARIFF: %s" % t.name.to_upper()) if mid_wave else t.name.to_upper(),
+		Color(1.0, 0.45, 0.35))
 	var ctx := ArtefactHooks.run(g, "on_king_ability_apply",
 		{"key": t.key, "tier": t.get("tier", ""), "cancel": false})
 	if ctx.cancel:

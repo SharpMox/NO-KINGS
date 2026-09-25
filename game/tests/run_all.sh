@@ -107,6 +107,23 @@ if [ -n "$missing_uids" ]; then
 	done
 fi
 
+# Tests pin their RNG seed (repo CLAUDE.md). A Game boot in a test must have
+# "seed" within the 8 lines above it (cfg.seed = ..., next_seed = ...), and no
+# test code may call randomize(). Runs without Godot, so it costs nothing.
+unpinned=$(awk 'FNR == 1 { delete buf }
+	{ buf[FNR] = $0 }
+	/load\("res:\/\/scenes\/Game\.tscn"\)\.instantiate\(\)/ {
+		ok = 0
+		for (i = FNR - 8; i <= FNR; i++) if (i > 0 && tolower(buf[i]) ~ /seed/) ok = 1
+		if (!ok) print "  " FILENAME ":" FNR ": Game boot with no seed pinned nearby"
+	}
+	/^[^#]*randomize\(\)/ { print "  " FILENAME ":" FNR ": randomize() in a test" }' tests/*.gd)
+if [ -n "$unpinned" ]; then
+	fails="$fails seed-pins"
+	echo "FAIL: seed-pins — pin a seed (e.g. GameScript.next_seed = \"1\"):"
+	echo "$unpinned"
+fi
+
 # The windowed click probes (menu-clicks/game-clicks) grab real window focus
 # and OS-level click routing, which another running Godot instance can
 # steal. Detect that plainly instead of retrying — a retry that hides a

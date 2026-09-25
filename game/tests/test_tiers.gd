@@ -81,6 +81,7 @@ func _init() -> void:
 	# Tier 3 as before. ---
 	GameScript.next_army = "Crown"
 	GameScript.next_tier = "Tier 5" # the old halving threshold's own highest tier
+	GameScript.next_seed = "1" # pinned: tests pin their RNG seed (CLAUDE.md)
 	var boot: Node2D = load("res://scenes/Game.tscn").instantiate()
 	root.add_child(boot)
 	await process_frame

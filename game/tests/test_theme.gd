@@ -2,27 +2,31 @@ extends SceneTree
 ## NO-256: the project Theme — Pixel Operator is every Control's font, Bold for
 ## buttons/titles/headings (Max, ruling 7), on the size ramp 16 meta / 20 body /
 ## 24 buttons + Header / Bold 32 titles / Bold 48 hero; symbols Pixel Operator
-## lacks come from the OS system font fallback; code that measures text outside
-## a Control goes through Tuning.ui_font(), which survives a missing Theme.
+## lacks come from the bundled NoKingsSymbols fallback, which keeps every line
+## 1.0 em; all three faces draw AA-off; code that measures text outside a
+## Control goes through Tuning.ui_font(), which survives a missing Theme.
 ## Run headless:  godot --headless --path game -s tests/test_theme.gd
 
 const GameScript := preload("res://scripts/game.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const PO := preload("res://assets/fonts/PixelOperator.ttf")
 const PO_BOLD := preload("res://assets/fonts/PixelOperator-Bold.ttf")
+const SYMBOLS := preload("res://assets/fonts/NoKingsSymbols.ttf")
 const THEME_PATH := "res://assets/ui_theme.tres"
 
-## Every non-ASCII symbol the UI draws that Pixel Operator has no glyph for
-## (NO-256 audit, fact 3; checked against the TTFs with fontTools). None of
-## them is in any font the project ships: they render through the OS system
-## font fallback (allow_system_fallback), as 20 of them already did before
-## NO-256. The engine's Open Sans has only − and θ, and chaining it in made
-## every Pixel Operator line 1.36 em tall instead of 1.0 (Font.get_height is
-## the max over the chain), which broke the Header — so it is not chained.
+## Every non-ASCII symbol the UI draws that Pixel Operator has no glyph for:
+## the NO-256 audit's list, then the Piece Buff glyphs, menu/modal markers,
+## piece-glyph fallbacks and ½ (a Conspiracy name) found by grepping the
+## scripts and data. NoKingsSymbols.ttf (tools/build_symbol_font.py, same
+## list) supplies them all. Chaining the engine's Open Sans instead made every
+## Pixel Operator line 1.36 em tall (Font.get_height is the max over the
+## chain); NoKingsSymbols has Pixel Operator's exact ascent and descent.
 const GLYPHS := ["←", "→", "✦", "☰", "⚠", "−", "⇄", "★", "⚑", "ⓘ", "◆", "✕",
-	"θ", "⟲", "⧖", "♟", "▴", "●", "∩", "⚔", "○", "▾"]
+	"θ", "⟲", "⧖", "♟", "▴", "●", "∩", "⚔", "○", "▾",
+	"‼", "↩", "↯", "⇢", "≋", "⊘", "▣", "▸", "◈", "◎", "✚", "✳", "✴", "✹", "➜", "➤",
+	"⧗", "⨯", "♚", "♛", "♜", "♝", "♞", "½"]
 ## Non-ASCII the UI uses that Pixel Operator DOES have (audit fact 3).
-const IN_PO := ["—", "·", "…", "×", "é", "à", "–", "°"]
+const IN_PO := ["—", "·", "…", "×", "é", "à", "–", "°", "›", "ë"]
 ## role -> [base type, font, size]
 const RAMP := {
 	"": ["Label", PO, 20], "Meta": ["Label", PO, 16], "Header": ["Label", PO, 24],
@@ -73,31 +77,48 @@ func _init() -> void:
 				(spec[1] as FontFile).resource_path.get_file(), spec[2]])
 		c.queue_free()
 
-	# --- fallback: none chained, the OS fills the symbols in ---
+	# --- fallback: NoKingsSymbols chained, and the line stays 1.0 em ---
 	var ts := TextServerManager.get_primary_interface()
+	var sym_rid: RID = SYMBOLS.get_rids()[0]
+	var sym_missing := ""
+	for ch: String in GLYPHS:
+		if not ts.font_has_char(sym_rid, ch.unicode_at(0)):
+			sym_missing += ch
+	check(sym_missing == "", "NoKingsSymbols has every listed glyph (missing '%s')" % sym_missing)
+	check(SYMBOLS.antialiasing == TextServer.FONT_ANTIALIASING_NONE,
+		"NoKingsSymbols is AA-off (antialiasing = %d)" % SYMBOLS.antialiasing)
 	for f: FontFile in [PO, PO_BOLD]:
 		var n := f.resource_path.get_file()
-		check(f.fallbacks.is_empty(), "%s chains no fallback font (line height stays 1.0 em)" % n)
-		check(f.allow_system_fallback, "%s falls back to the OS system fonts" % n)
+		var rid: RID = f.get_rids()[0] # the face itself, not the chain
+		check(f.fallbacks.size() == 1 and f.fallbacks[0] == SYMBOLS,
+			"%s chains NoKingsSymbols as its one fallback (got %s)" % [n, f.fallbacks])
+		check(f.allow_system_fallback, "%s still falls back to the OS for anything else (names)" % n)
+		check(f.antialiasing == TextServer.FONT_ANTIALIASING_NONE,
+			"%s is AA-off from boot (antialiasing = %d)" % [n, f.antialiasing])
 		# 1.0 em, give or take TextServer's rounding (CI: 21 at 20 px); Open Sans is ~27
-		check(f.get_height(20) <= 21.0 and f.get_height(20) < ThemeDB.fallback_font.get_height(20) - 4.0,
-			"%s's line is ~1 em (20 px -> %s, Open Sans %s)" % [n, f.get_height(20), ThemeDB.fallback_font.get_height(20)])
+		var own_h := ts.font_get_ascent(rid, 20) + ts.font_get_descent(rid, 20)
+		check(f.get_height(20) <= 21.0 and is_equal_approx(f.get_height(20), own_h),
+			"%s's line stays ~1 em with the fallback chained (20 px -> %s, face alone %s, Open Sans %s)"
+				% [n, f.get_height(20), own_h, ThemeDB.fallback_font.get_height(20)])
+		for size: int in [16, 20, 24, 32, 48]:
+			var plain := f.get_string_size("Wave", HORIZONTAL_ALIGNMENT_LEFT, -1, size).y
+			var sym := f.get_string_size("Wave " + "".join(PackedStringArray(GLYPHS)), HORIZONTAL_ALIGNMENT_LEFT, -1, size).y
+			check(is_equal_approx(sym, plain),
+				"%s at %d px: a line of symbols is as tall as plain text (%s vs %s)" % [n, size, sym, plain])
 		var own := ""
+		var uncovered := ""
 		for ch: String in GLYPHS:
-			if ts.font_has_char(f.get_rids()[0], ch.unicode_at(0)):
+			if ts.font_has_char(rid, ch.unicode_at(0)):
 				own += ch
-		check(own == "", "%s itself has none of the audit's symbols (got '%s')" % [n, own])
+			if not f.has_char(ch.unicode_at(0)): # has_char walks the chain, not the OS
+				uncovered += ch
+		check(own == "", "%s itself has none of the listed symbols (got '%s')" % [n, own])
+		check(uncovered == "", "every listed symbol is in %s's chain (uncovered '%s')" % [n, uncovered])
 		var missing := ""
 		for ch: String in IN_PO:
-			if not f.has_char(ch.unicode_at(0)):
+			if not ts.font_has_char(rid, ch.unicode_at(0)):
 				missing += ch
-		check(missing == "", "%s has its own — · … × é à – ° (missing '%s')" % [n, missing])
-	# TODO(NO-256, pending Max's ruling on AA-off vs AA-on for UI text): the
-	# UiFonts autoload is in the tree but the faces still read antialiasing=1
-	# (CI run 36063501655). Re-instate as a check once Max rules; if AA-off
-	# stands, the .ttf.import files (AA None) are the deterministic route.
-	print("PENDING: Pixel Operator AA at boot = %d/%d (awaiting Max's AA ruling)"
-		% [PO.antialiasing, PO_BOLD.antialiasing])
+		check(missing == "", "%s has its own %s (missing '%s')" % [n, " ".join(PackedStringArray(IN_PO)), missing])
 
 	# --- the two measure sites use the theme font, not ThemeDB.fallback_font ---
 	GameScript.reset_boot_defaults()

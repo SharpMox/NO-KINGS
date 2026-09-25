@@ -638,8 +638,8 @@ func build(game) -> void:
 	# 2026-09-20).
 	var counter_font := turn_label.get_theme_default_font()
 	# NO-256: measured on a SHAPED sample, not Font.get_height — the ⚑ glyph
-	# is not in Pixel Operator and comes from the OS fallback font, whose
-	# taller line would otherwise push the Wave label down into the Clock.
+	# is not in Pixel Operator; its bundled fallback shares Pixel Operator's
+	# metrics, but a name the OS fallback draws can still be taller.
 	var counter_h: float = maxf(counter_font.get_height(COUNTER_FONT),
 		counter_font.get_string_size("⚑ 0/0", HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).y)
 	turn_wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1653,8 +1653,8 @@ func post(text: String, color := FEED_TEXT, gold := 0) -> void:
 		_feed_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 		_feed_font.hinting = TextServer.HINTING_NONE
 		_feed_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-		# NO-256: no fallbacks (see game.gd's banner setup) — ✦ ★ − come from the
-		# OS system font fallback, like every other Control's symbols.
+		# NO-256: no fallbacks set here (see game.gd's banner setup) — ✦ ★ − come
+		# from the NoKingsSymbols fallback ui_fonts.gd chains, like every Control's.
 	var pill := PanelContainer.new()
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
@@ -2140,7 +2140,7 @@ func refresh() -> void:
 	var centre_w: float = (minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP) * 2.0
 	# NO-256: re-pin the boxes to the current text. A Label outside a Container
 	# only ever GROWS to its minimum size and never shrinks back, so one tall
-	# line (a glyph the OS fallback font draws, e.g. ⚑ or a King name) left
+	# line (text the OS fallback font draws, e.g. a King name) left
 	# the box taller than counter_h for good and it overlapped the Clock.
 	turn_label.size.y = 0.0
 	wave_label.size.y = 0.0

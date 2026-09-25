@@ -10,12 +10,12 @@ extends Node
 ## chain; NoKingsSymbols is built with Pixel Operator's exact vertical metrics
 ## (assets/fonts/README.md), so chaining it leaves every line 1.0 em tall.
 ##
-## Antialiasing off is Pixel Operator's own look; the .ttf.import files already
-## import all three faces AA None, this keeps it so when an import cache predates them.
+## Antialiasing is not set here: the .ttf.import files import all three faces AA
+## None. A runtime write from this autoload never showed up in test_theme (CI runs
+## 36063501655 and 36076048114 read AA 1 after it), the import params do.
 ##
 ## _static_init, not _enter_tree: it runs when the autoload pass loads this script,
-## before any scene, and does not depend on the node reaching the tree
-## (test_theme's AA check read the faces unchanged from an _enter_tree version).
+## before any scene, and does not depend on the node reaching the tree.
 
 const SYMBOLS := preload("res://assets/fonts/NoKingsSymbols.ttf")
 const FONTS := [
@@ -25,9 +25,6 @@ const FONTS := [
 
 
 static func _static_init() -> void:
-	var sym: FontFile = SYMBOLS # the parser refuses a property write through a const
-	sym.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	var chain: Array[Font] = [sym]
+	var chain: Array[Font] = [SYMBOLS]
 	for f: FontFile in FONTS:
-		f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 		f.fallbacks = chain

@@ -33,9 +33,11 @@
   metrics instead (below): a line of symbols is as tall as a line of letters.
 - Code that measures text outside a Control uses `Tuning.ui_font()`, which falls back to
   `ThemeDB.fallback_font` when the Theme failed to load (a cold import cache).
-- All three faces draw AA-off (Max, 2026-09-25: pixel-sharp text everywhere). The `.ttf.import`
-  files import them with Antialiasing None, Hinting None, Subpixel Positioning Disabled;
-  `scripts/ui_fonts.gd` also sets AA off at script load, for an import cache that predates them.
+- All three faces draw AA-off (Max, 2026-09-25: pixel-sharp text everywhere), set by their
+  `.ttf.import` files: Antialiasing None, Hinting None, Subpixel Positioning Disabled.
+  `NoKingsSymbols.ttf.import` was written by hand from `PixelOperator.ttf.import` (same params;
+  dest hash = md5 of the res:// path). Setting AA from an autoload at runtime did not show up
+  in `test_theme` on CI, so the import params are the one route.
 
 ## NoKingsSymbols (NO-256 follow-up: bundled symbol font)
 

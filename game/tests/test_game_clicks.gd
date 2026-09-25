@@ -160,6 +160,32 @@ func _await_drawer_settled(game: Node, key: String) -> void:
 			panel.position, rest, polls, Time.get_ticks_msec() - t0])
 
 
+## NO-254: a generic version of the same wait, for any freshly-built Control
+## whose OWN rect (not a drawer/shop's known rest position) is about to be
+## measured — a modal's inner auto-sized box, say. Two things make a rect
+## trustworthy: its SIZE stops changing frame to frame (a mid-sort container
+## reports transient sizes, sometimes the whole viewport's worth), and it
+## actually fits inside the viewport (the unsettled case this bug hit).
+## Bounded at 10 frames, not wall time — this is a layout-sort race, not a
+## host-speed one (contrast _await_drawer_settled's SETTLE_CAP_MS, which
+## waits out a real animation). Returns the frames spent, viewport size and
+## final rect so a caller's failure detail is never "it failed" alone.
+func _await_rect_settled(control: Control) -> Dictionary:
+	var viewport: Vector2 = root.get_visible_rect().size
+	var prev_size := Vector2(-1, -1)
+	var frames := 0
+	var rect: Rect2 = control.get_global_rect()
+	while frames < 10:
+		rect = control.get_global_rect()
+		var fits: bool = rect.size.x <= viewport.x and rect.size.y <= viewport.y
+		if fits and rect.size.is_equal_approx(prev_size):
+			break
+		prev_size = rect.size
+		await process_frame
+		frames += 1
+	return {"rect": rect, "frames": frames, "viewport": viewport}
+
+
 ## NO-83: Stock opens from the Header's icon button, which carries a badge
 ## rather than a "Stock N" text, so it is reached by rect instead of by text.
 ## NO-118: awaits the slide settling whenever this click OPENS the drawer (a
@@ -1670,10 +1696,15 @@ func _init() -> void:
 	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
 	# VBoxContainer rect is not settled the instant it's built — the same
 	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
-	# GridContainer — so wait one more idle frame before measuring it.
-	await process_frame
+	# GridContainer. A single extra idle frame (tried after CI run 36130372199
+	# failed on #584's head) is NOT always enough — it still failed
+	# intermittently after #592 added exactly that frame — because "settled"
+	# is a property of the layout, not of elapsed frame count: an unsettled
+	# rect spans the whole board, so no backdrop tile is found. Poll instead
+	# of guessing a number: _await_rect_settled below.
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
-	var box_rect: Rect2 = modal_box.get_global_rect()
+	var settle := await _await_rect_settled(modal_box)
+	var box_rect: Rect2 = settle.rect
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
 		for bx in Tuning.BOARD_W:
@@ -1685,7 +1716,8 @@ func _init() -> void:
 		if backdrop.x >= 0.0:
 			break
 	check(backdrop.x >= 0.0,
-		"(setup) a board tile exists over the modal's backdrop rather than its buttons")
+		"(setup) a board tile exists over the modal's backdrop rather than its buttons",
+		"box_rect=%s viewport=%s frames_waited=%d" % [box_rect, settle.viewport, settle.frames])
 	_click(backdrop)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")

@@ -202,6 +202,12 @@ func _init() -> void:
 				check(game.items.size() == items_n and not game.box_open,
 					"ui-demo box-sell: sold one Item inside the Box, then picked one (items %d -> %d, box_open %s, picks_left %d, offer %d)"
 					% [items_n, game.items.size(), game.box_open, game.box_picks_left, game.box_offer.size()])
+			"shop-buy":
+				check(game.stock.size() == stock_n + 1 and game.gold < gold and game.shop_open(),
+					"ui-demo shop-buy: one piece bought into Stock, the Shop still open")
+			"shop-restock":
+				check(game.shop_open() and not game.shop_stock.is_empty(),
+					"ui-demo shop-restock: the open Shop rebuilt on a fresh roll")
 		await _free(game)
 
 	# --- guide:<page> ---------------------------------------------------------

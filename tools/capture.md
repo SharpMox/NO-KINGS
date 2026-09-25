@@ -84,6 +84,8 @@ tools/godot-lock.sh godot --path game --write-movie /tmp/cap/sell-stock.avi --fi
 | `sell-item` | Inventory drawer → long-press Blitz → preview (Use / Sell) → Sell → confirm |
 | `sell-artefact` | Inventory drawer → long-press Jet Fuel Vial → preview → Sell → confirm |
 | `box-sell` | small Item Box on a full inventory (at the Item cap) → Sell row → confirm → select an offer → Pick |
+| `shop-buy` | the Shop stocked (a fresh roll) and opened → tap a piece tile → preview → Buy |
+| `shop-restock` | the Shop stocked and opened → a fresh roll rebuilds the open Shop (what a restock does) |
 
 On Aux, record one at a time:
 
@@ -143,3 +145,23 @@ tools/godot-lock.sh godot --path game --write-movie /tmp/cap/hud-anims.avi --fix
 | `hud-anims` | 31–34 | +$50 (roll up and squish), −$30 (roll down, red flash), a Turn tick with the row re-centring, a Wave flip, one Action drained, then the last one (PASS shakes), 0.6 s apart |
 | `reveal-gameover` | 53 | the loss screen: the board greys over 0.6 s, the title drops in, the Score counts up while the rest fades in |
 | `reveal-win` | 54 | a wave-50 King falls the real way and shatters gold (S1); 0.4 s later the same staged reveal, with a gold burst off the title |
+
+## NO-243 S2: modal and Shop animations
+
+Each animation is 0.4 s or less, so a video is the only way to see it. Movie Maker plus either a `--ui-demo` flow or a `--show-screen` capture (the capture holds the screen ~0.6 s before it quits). The engine flags go before `--`.
+
+| Row | Animation | Flags |
+|---|---|---|
+| 39 | pause menu fades and scales in | `--write-movie /tmp/cap/pause.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/pause --show-screen pause` |
+| 42 | merge confirm fades and scales in | `--write-movie /tmp/cap/merge.avi --fixed-fps 30 -- --scenario-name "Merge: on the board" --screenshot /tmp/cap/merge --select "2,1;3,1"` |
+| 44 | Shop buy: icon flies to the Stock tab, SOLD stamp | `--write-movie /tmp/cap/shop-buy.avi --fixed-fps 30 -- --ui-demo shop-buy` |
+| 45 | Shop restock: tiles flip in sequence | `--write-movie /tmp/cap/shop-restock.avi --fixed-fps 30 -- --ui-demo shop-restock` |
+| 46, 47 | Box: lid, deal-in, selected tile lifts, Pick flies to its tab | `--write-movie /tmp/cap/box-sell.avi --fixed-fps 30 -- --ui-demo box-sell` |
+| 48 | choice pick deals in (the Sell confirm) | `--write-movie /tmp/cap/sell-stock.avi --fixed-fps 30 -- --ui-demo sell-stock` |
+| 49 | preview grows out of the tapped tile | `--write-movie /tmp/cap/preview.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/preview --show-screen preview --anchor 2,1` |
+| 58 | a capture flies from the board to the Stock button | `--write-movie /tmp/cap/capture.avi --fixed-fps 30 -- --scenario-name "Captures & highlights" --screenshot /tmp/cap/capture --select "2,2;2,5"` |
+| 58 | Convert: the piece slides from Captured to Stock | `--write-movie /tmp/cap/convert.avi --fixed-fps 30 -- --ui-demo convert` |
+| 59 | a sold Item flashes and shrinks out | `--write-movie /tmp/cap/sell-item.avi --fixed-fps 30 -- --ui-demo sell-item` |
+| 60 | a sold Artefact fades and shrinks out | `--write-movie /tmp/cap/sell-artefact.avi --fixed-fps 30 -- --ui-demo sell-artefact` |
+
+The preview grows out of wherever the pointer is; a `--show-screen preview` capture has no real tap, so it grows from the window's mouse position rather than the anchor tile. The merge row assumes the two Ferz on "Merge: on the board" merge on two taps; if the video shows no confirm, that pair is not a legal merge in this build.

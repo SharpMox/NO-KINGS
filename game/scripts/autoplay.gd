@@ -56,11 +56,32 @@ static func step(g) -> void:
 			return
 		var moves := Rules.legal_moves(g.board, Rules.PLAYER, g.defs, true, [], g.enemy_double_steps) # NO-232
 		moves = moves.filter(func(m: Dictionary) -> bool: return not g.moved_this_turn.has(m.from))
+		# NO-250 follow-up: Rules.legal_moves is deliberately unaware of
+		# Curtain Rods Bag (magic_bullet_targets' own header) — the bullet is
+		# game.gd's own bolt-on, offered by _select_dests. Without this the
+		# bot never used it and every balance sim undervalued it. Same gate
+		# _select_dests uses (held, unspent this Wave); a target already
+		# reachable normally is skipped, same dedup _select_dests does —
+		# that one isn't a bullet-exclusive shot, so it shouldn't spend it.
+		if g._held("curtain-rods-bag-rifle-shaped") and not g.curtain_rods_used_this_wave:
+			for pos in g._player_pieces():
+				if g.moved_this_turn.has(pos):
+					continue
+				for mb in Rules.magic_bullet_targets(g.board, pos, g.defs):
+					if not moves.any(func(mv: Dictionary) -> bool: return mv.from == pos and mv.to == mb.to):
+						moves.append({"from": pos, "to": mb.to, "magic_bullet": true})
 		if not moves.is_empty():
 			# greedy: prefer captures so runs go deep enough to exercise waves/merges
 			var caps := moves.filter(func(m: Dictionary) -> bool: return g.board.has(m.to) or m.has("ep_victim"))
 			var pick: Array[Dictionary] = caps if not caps.is_empty() else moves
 			var m: Dictionary = pick[g.rng.randi() % pick.size()]
+			if m.get("magic_bullet", false):
+				# the same two-click path _on_tile_clicked drives: select the
+				# piece (which stages magic_bullet_dests) before moving it —
+				# _move_player's "was this shot spent" check reads `selected`,
+				# set by the UI's own first click.
+				g.selected = m.from
+				g._select_dests(m.from)
 			g._move_player(m.from, m.to)
 			return
 	g._on_pass()

@@ -18,6 +18,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const Items := preload("res://data/items.gd")
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd")
 const Rules := preload("res://scripts/rules.gd")
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 const MergeLogic := preload("res://scripts/merge_logic.gd")
 const AutoplayBot := preload("res://scripts/autoplay.gd")
 
@@ -393,13 +394,16 @@ func _init() -> void:
 	await process_frame
 	geo._open_shop()
 	await process_frame
-	await process_frame # a freshly built Control's get_global_rect() lags a
-		# layout-sort frame (CLAUDE.md)
 	var shop_lower: VBoxContainer = geo.modals.shop_lower
 	var shop_lower_ok := shop_lower != null and shop_lower.get_child_count() == 3
 	check(shop_lower_ok, "precondition: shop_lower holds PIECES+BOXES, ARTEFACTS, ITEMS")
 	if shop_lower_ok: # guard the geometry reads — a broken precondition must
 			# fail loudly above, not crash here on a null/short child list
+		# NO-254: a freshly built Control's get_global_rect() lags a
+		# layout-sort frame (CLAUDE.md); poll rather than guess how many —
+		# the whole zone subtree sorts together, so settling the shared
+		# ancestor covers the four zones read below.
+		await Settle.settle_layout(shop_lower)
 		var top_row: HBoxContainer = shop_lower.get_child(0)
 		var artefact_zone: Control = shop_lower.get_child(1)
 		var item_zone: Control = shop_lower.get_child(2)

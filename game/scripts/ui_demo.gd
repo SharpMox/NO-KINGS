@@ -15,10 +15,12 @@
 ## runs every flow headless with a zero pause.
 
 const Box := preload("res://scripts/box.gd")
+const Shop := preload("res://scripts/shop.gd")
 
 const SCENARIO := "Capture: selling sandbox"
 const PAUSE_S := 0.8
-const FLOWS := ["sell-stock", "convert", "sell-item", "sell-artefact", "box-sell"]
+const FLOWS := ["sell-stock", "convert", "sell-item", "sell-artefact", "box-sell",
+	"shop-buy", "shop-restock"]
 
 
 ## Plays `flow`; true when every step found its button. `quit` false (tests)
@@ -71,6 +73,22 @@ static func _flow(g, flow: String, pause: float) -> bool:
 				return false
 			await _wait(g, pause)
 			return await _press(g, g.modals.box_panel, "box-pick", pause)
+		"shop-buy": # NO-243: a stocked Shop, tap a piece tile, Buy
+			Shop.roll(g) # the sandbox is before the first restock
+			g._open_shop()
+			await _wait(g, pause)
+			if not await _press(g, g.modals.shop_panel, "shop-tile", pause):
+				return false
+			await _wait(g, pause)
+			return await _press(g, g.modals.preview_panel, "buy", pause)
+		"shop-restock": # NO-243: an open Shop restocks — what the Jet Fuel
+			# confirm and the restock Wave do: a fresh roll, the Shop rebuilt
+			Shop.roll(g)
+			g._open_shop()
+			await _wait(g, pause * 2.0)
+			Shop.roll(g)
+			g.modals.show_shop()
+			return true
 	printerr("UI-DEMO: unknown flow %s (one of %s)" % [flow, ", ".join(FLOWS)])
 	return false
 
@@ -134,6 +152,10 @@ static func _is(btn: Button, want: String) -> bool:
 			return btn.has_meta("box_index")
 		"box-pick":
 			return btn.has_meta("box_pick")
+		"shop-tile": # an unsold Shop tile; PIECES is the first zone built
+			return btn.has_meta("shop_index") and not btn.has_node("SoldStamp")
+		"buy": # preview of a Shop tile
+			return btn.text == "Buy"
 	return false
 
 

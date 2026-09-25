@@ -18,6 +18,7 @@ const Guide := preload("res://scripts/guide.gd")
 const BackGuard := preload("res://scripts/back_guard.gd")
 const Items := preload("res://data/items.gd")
 const Rules := preload("res://scripts/rules.gd")
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 
 ## NO-64: a platform board that exists, so the Scores door is built on desktop.
@@ -157,6 +158,24 @@ func _init() -> void:
 	# bare main menu (NO-61), so the button only duplicated a platform
 	# affordance every player already has.
 	check(_find_button(menu, "Quit") == null, "NO-147: Quit is gone, on every platform")
+
+	# Max ruling 2026-09-25: the running build number, bottom centre of the
+	# root main menu. Awaited a further frame so the layout has settled
+	# before the overlap check reads global rects (CLAUDE.md: a freshly
+	# added control's rect is not usable until the next idle frame).
+	await process_frame
+	check(menu.version_label != null, "version label exists on the main menu")
+	var expected_version := "v%s" % ProjectSettings.get_setting("application/config/version", "dev")
+	check(menu.version_label.text == expected_version,
+		"version label shows %s (got %s)" % [expected_version, menu.version_label.text])
+	var version_rect: Rect2 = menu.version_label.get_global_rect()
+	var version_overlaps_button := false
+	for main_child in menu.main_box.get_children():
+		if main_child is Button and main_child.visible \
+				and version_rect.intersects(main_child.get_global_rect()):
+			version_overlaps_button = true
+	check(not version_overlaps_button,
+		"version label does not overlap any main-menu button")
 
 	# TEST opens the scenario list (this click is what PR #20 shipped broken:
 	# the hidden submenu's ScrollContainer swallowed every mouse event).
@@ -342,11 +361,17 @@ func _init() -> void:
 	# equal sizes/scale, then scroll to a middle Army and assert both
 	# neighbours are genuinely PARTIALLY on screen (part inside the
 	# viewport, part cropped by it), while the resting card is fully clear.
-	await process_frame # menu.gd's _show_armies awaits one frame for the
-		# deferred container sort before reading real geometry; give it one.
 	var cards := _army_cards(menu.army_center)
 	check(cards.size() > 2, "the carousel built more than two cards")
 	if cards.size() > 2:
+		# NO-254: menu.gd's _show_armies awaits one frame for the deferred
+		# container sort before reading real geometry — poll a card's OWN
+		# rect instead of guessing that one frame is always enough
+		# (CLAUDE.md's GridContainer trap; the fixed-frame version of this
+		# exact wait caused NO-254's flake). army_center itself is anchored
+		# PRESET_FULL_RECT and never moves, so it can't be the settle target
+		# — a sibling card, which the container actually resizes, can.
+		await Settle.settle_layout(cards[0])
 		for c in cards:
 			check(c.size.is_equal_approx(cards[0].size), "every card is the same size")
 			check(c.scale.is_equal_approx(Vector2.ONE), "no card is scaled")
@@ -355,7 +380,10 @@ func _init() -> void:
 		# on Army 1 so it has a real neighbour on both sides.
 		var card_w: float = cards[0].size.x
 		scroll.scroll_horizontal = int(card_w + MenuScript.ARMY_CARD_MARGIN)
-		await process_frame
+		# NO-254: settle on a CARD, not the scroller — scroll.get_global_rect()
+		# is the fixed viewport window and never moves; it's the cards inside
+		# that slide, and that's what "settled" has to mean here.
+		await Settle.settle_layout(cards[1])
 		var viewport: Rect2 = scroll.get_global_rect()
 		var prev_overlap: Rect2 = viewport.intersection(cards[0].get_global_rect())
 		var next_overlap: Rect2 = viewport.intersection(cards[2].get_global_rect())

@@ -24,6 +24,7 @@ extends SceneTree
 const Settings := preload("res://scripts/settings.gd")
 const Account := preload("res://scripts/account.gd")
 const GameScript := preload("res://scripts/game.gd")
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 ## Longer than Android's long-press timeout (ViewConfiguration, 500 ms), which
 ## is what the HUD's threshold is taken from. A literal rather than the HUD
@@ -525,7 +526,7 @@ func _init() -> void:
 	await _await_drawer_settled(game, "stock") # NO-118
 	game.hud.hide_tip()
 	pawn_btn = _stock_button(game, "pawn", false)
-	await process_frame # grid sort, independent of the drawer-settle above
+	await Settle.settle_layout(pawn_btn) # NO-254: grid sort, independent of the drawer-settle above
 	var ppos: Vector2 = pawn_btn.get_global_rect().get_center()
 	_mouse(true, ppos)
 	await process_frame

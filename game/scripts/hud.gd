@@ -19,6 +19,7 @@ const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item ca
 const ArtefactHooks := preload("res://scripts/artefact_hooks.gd") # NO-165: Held Artefact capacity
 const Kings := preload("res://data/kings.gd") # banner pass: bespoke Power in the ⚠ button
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-152: the targeting tip's diagram
+const UiAnim := preload("res://scripts/ui_anim.gd") # NO-243 S2: the shared UI animations
 
 const DRAWER_H := 68.0 # one strip row; the inventory drawer stacks two
 
@@ -259,6 +260,8 @@ func toggle_menu(open: bool) -> void:
 	if open:
 		game_menu.move_to_front() # above every other HUD control
 	game_menu.visible = open
+	if open and g != null: # NO-243 (row 39): the dim fades in, the menu scales up
+		UiAnim.modal_in(g, game_menu, game_menu.get_child(0) as Control)
 	menu_toggled.emit(open)
 
 
@@ -313,6 +316,15 @@ var _score_shown := 0
 var _score_seen := false
 var _gold_shown := 0
 var _gold_seen := false
+## NO-243 S3: the Header's one-shot tweens (Gold spend flash, Wave/Turn tick,
+## PASS drain/shake, the Turn/Wave row's re-centre), kill-first per key like
+## _gain_tweens. The last Wave/Turn text and Action count rendered, and where
+## the row is heading, follow the _score_shown idiom above.
+var _hud_tweens := {}
+var _wave_shown := ""
+var _turn_shown := ""
+var _actions_shown := 0
+var _row_x := 0.0
 var _clock_shown_ms := 0.0
 var _clock_shown_min := 0
 var _clock_seen := false
@@ -1612,6 +1624,98 @@ func _roll_counter(key: String, zeros: Label, lbl: Label, from_v: int, to_v: int
 	_roll_tweens[key] = tw
 
 
+# --- NO-243 S3: Header ticks -------------------------------------------------
+const TICK_S := 0.25 ## Wave/Turn digit flip
+const SPEND_FLASH_S := 0.3 ## Gold row flashes red on a spend
+const DRAIN_S := 0.2 ## PASS count refills from the bottom after an Action
+const SHAKE_S := 0.24 ## PASS shakes when the last Action goes
+const ROW_SLIDE_S := 0.2 ## Turn/Wave row re-centres
+const COL_SPEND := Color(1.0, 0.35, 0.35)
+const COL_TICK := Color(1.6, 1.45, 0.8)
+
+
+## Kills `key`'s running tween and returns a fresh one, or null when this
+## change should snap: `animate` false, animations off, or autoplay. Callers
+## put their node at rest first, so a killed tween never leaves it mid-way.
+func _hud_tween(key: String, animate := true) -> Tween:
+	if _hud_tweens.get(key):
+		(_hud_tweens[key] as Tween).kill()
+		_hud_tweens.erase(key)
+	if not animate or g.autoplay or not g.animations_on:
+		return null
+	var tw := create_tween()
+	_hud_tweens[key] = tw
+	return tw
+
+
+## Rows 32/33: a counter's new text flips in — squashed flat, opening out
+## (never past full height, so it never leaves its box) with a warm pulse.
+func _tick(node: Control, key: String) -> void:
+	node.scale = Vector2.ONE
+	node.self_modulate = Color.WHITE
+	var tw := _hud_tween(key)
+	if tw == null:
+		return
+	node.pivot_offset = Vector2(0.0, node.size.y / 2.0)
+	node.scale.y = 0.0
+	node.self_modulate = COL_TICK
+	tw.set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(node, "scale:y", 1.0, TICK_S)
+	tw.tween_property(node, "self_modulate", Color.WHITE, TICK_S)
+
+
+## Row 31: the Gold row flashes red on a spend (the roll counts it down).
+func _flash_spend() -> void:
+	for c in gold_row.get_children():
+		(c as Control).self_modulate = Color.WHITE
+	var tw := _hud_tween("gold_spend")
+	if tw == null:
+		return
+	tw.set_parallel()
+	for c in gold_row.get_children(): # labels: self_modulate is per node
+		(c as Control).self_modulate = COL_SPEND
+		tw.tween_property(c, "self_modulate", Color.WHITE, SPEND_FLASH_S)
+
+
+## Row 34: an Action spent. The count refills from the bottom, red to
+## green, so the old pip reads as drained; the last Action instead shakes the
+## whole PASS face (the count is blank by then — the enemy turn has begun).
+## No text: NO-238's LAST ACTION banner owns the words.
+func _drain_pass(last: bool) -> void:
+	var face := pass_count.get_parent() as Control
+	face.position.x = 0.0
+	pass_count.scale = Vector2.ONE
+	pass_count.self_modulate = Color.WHITE
+	var tw := _hud_tween("pass")
+	if tw == null:
+		return
+	if last:
+		for dx in [7.0, -6.0, 4.0, -2.0, 0.0]:
+			tw.tween_property(face, "position:x", dx, SHAKE_S / 5.0)
+		return
+	pass_count.pivot_offset = Vector2(pass_count.size.x / 2.0, pass_count.size.y)
+	pass_count.scale.y = 0.2
+	pass_count.self_modulate = COL_SPEND
+	tw.set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(pass_count, "scale:y", 1.0, DRAIN_S)
+	tw.tween_property(pass_count, "self_modulate", Color.WHITE, DRAIN_S)
+
+
+## Row 33: the Turn/Wave pair glides to its new centre instead of jumping.
+## A refresh() mid-glide toward the same x leaves it alone.
+func _center_row(x: float, animate: bool) -> void:
+	var running: Tween = _hud_tweens.get("row")
+	if running and running.is_valid() and running.is_running() and is_equal_approx(_row_x, x):
+		return
+	_row_x = x
+	var tw := _hud_tween("row", animate and not is_equal_approx(turn_wave_row.position.x, x))
+	if tw == null:
+		turn_wave_row.position.x = x
+		return
+	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(turn_wave_row, "position:x", x, ROW_SLIDE_S)
+
+
 # --- NO-239: the kill feed ---------------------------------------------------
 # Small single-line pills just under the Header, newest on top, FEED_MAX
 # visible; each lives FEED_LIFE_S then fades. Gains and artefact notes go
@@ -2103,6 +2207,9 @@ func refresh() -> void:
 	_score_seen = true
 	if _gold_seen and g.gold > _gold_shown:
 		_pulse_gain(gold_row, "gold")
+	elif _gold_seen and g.gold < _gold_shown:
+		_flash_spend() # NO-243 row 31
+	var seen := _gold_seen # NO-243: false on the first refresh, which only sets baselines
 	_gold_shown = g.gold
 	_gold_seen = true
 	# ⚑ WAVE COUNTER (NO-82): out of 50 until the first King falls, then out of
@@ -2144,6 +2251,14 @@ func refresh() -> void:
 	# the box taller than counter_h for good and it overlapped the Clock.
 	turn_label.size.y = 0.0
 	wave_label.size.y = 0.0
+	# NO-243 rows 32/33: a new Wave or Turn reading flips in (not on the
+	# first refresh — a restored run did not just advance)
+	if seen and wave_label.text != _wave_shown and not wave_label.text.is_empty():
+		_tick(wave_label, "wave")
+	if seen and turn_label.text != _turn_shown and not turn_label.text.is_empty():
+		_tick(turn_label, "turn")
+	_wave_shown = wave_label.text
+	_turn_shown = turn_label.text
 	var counter_font := turn_label.get_theme_default_font()
 	var turn_text_w: float = counter_font.get_string_size(
 		turn_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
@@ -2152,7 +2267,7 @@ func refresh() -> void:
 	var wave_text_w: float = counter_font.get_string_size(
 		wave_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
 	var pair_w: float = turn_visible_w if wave_label.text.is_empty() else wave_label.position.x + wave_text_w
-	turn_wave_row.position.x = centre_x - pair_w / 2.0
+	_center_row(centre_x - pair_w / 2.0, seen) # NO-243 row 33
 	if g.state == g.State.SETUP: # the pass button doubles as the explicit start trigger
 		pass_button.text = "START"
 		pass_button.disabled = false
@@ -2181,6 +2296,10 @@ func refresh() -> void:
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""
 		pass_count.text = ""
+	# NO-243 row 34: an Action spent drains the count; the last one shakes PASS
+	if seen and g.actions_left < _actions_shown:
+		_drain_pass(g.actions_left == 0)
+	_actions_shown = g.actions_left
 	stock_badge.text = str(g._pool().size())
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
 	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
@@ -2380,7 +2499,7 @@ func _draw_stock_armed() -> void:
 	# generic token, with the same pulsing ring a selected board piece wears
 	var c := stock_armed.size / 2.0
 	var half := STOCK_ICON / 2.0
-	var t := Time.get_ticks_msec() / 1000.0
+	var t := Tuning.now_ms() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	stock_armed.draw_texture_rect(g.piece_tex(g.placing_id),
 		Rect2(c - Vector2(half, half), Vector2(STOCK_ICON, STOCK_ICON)), false)
@@ -2404,6 +2523,10 @@ func _stacks() -> Array:
 	return out
 
 
+## NO-243 (row 60): the Artefact keys the grid last showed, null before the
+## first build.
+var _arts_seen: Variant = null
+
 ## NO-85: Items then Artefacts, in ONE scrolling column — the Artefacts grid
 ## holds BOTH passive and activatable entries now (story 47/50), replacing the
 ## old artefact_box (passive rows, tap-to-describe) + activate_box (issue 52's
@@ -2415,8 +2538,20 @@ func _stacks() -> Array:
 ## tap-to-describe path (NO-59's _tip_input — retired here, it had no other
 ## caller).
 func _rebuild_artefacts_grid() -> void:
+	# NO-243 (row 60): with the drawer on screen, an Artefact that arrives
+	# pops in with a glow in its rarity's colour; one consumed or sold (its
+	# last copy gone) fades and shrinks out.
+	var animate: bool = _arts_seen != null and UiAnim.on(g) and artefacts_grid.is_visible_in_tree()
+	var held := {}
+	for t in g.artefacts:
+		held[t.key] = true
 	for c in artefacts_grid.get_children():
-		c.queue_free()
+		if animate and c.has_meta("key") and not held.has(c.get_meta("key")):
+			c.remove_meta("key") # a probe's key lookup must not find the ghost
+			UiAnim.vanish(g, c as Control)
+		else:
+			c.queue_free()
+	var arrived: Array = []
 	var counts := {}
 	for t in g.artefacts: # stack copies: one entry per kind
 		counts[t.key] = counts.get(t.key, 0) + 1
@@ -2431,7 +2566,12 @@ func _rebuild_artefacts_grid() -> void:
 		if seen.has(t.key):
 			continue
 		seen[t.key] = true
-		artefacts_grid.add_child(_build_artefact_cell(t.key, counts[t.key]))
+		var cell := _build_artefact_cell(t.key, counts[t.key])
+		artefacts_grid.add_child(cell)
+		if animate and not (_arts_seen as Dictionary).has(t.key):
+			arrived.append(cell)
+			UiAnim.glow(g, cell, Tuning.ARTEFACT_RARITY_COLOR.get(
+				str(t.get("rarity", "")), Color.WHITE))
 	# NO-144: a held Artefact's long press opens the preview modal now, never
 	# show_tip (_build_artefact_cell passes on_long_press) — so tip_key can
 	# no longer carry an "artefact:" popup for this grid's own tip-cleanup to
@@ -2446,6 +2586,8 @@ func _rebuild_artefacts_grid() -> void:
 	# the same thing and additionally states how many.
 	for i in ArtefactHooks.cap(g) - g.artefacts.size():
 		artefacts_grid.add_child(_empty_slot())
+	_arts_seen = held
+	UiAnim.deal_in(g, arrived, Vector2(0.4, 0.4), 0.0)
 
 
 ## One Artefacts-grid cell — passive or activatable (story 50: activatable
@@ -2622,9 +2764,23 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	return sell
 
 
+## NO-243 (row 59): which g.items entries the grid last showed (by identity),
+## null before the first build — a restored save is not a gain.
+var _items_seen: Variant = null
+
 func _rebuild_items_grid() -> void:
+	# NO-243 (row 59): with the drawer on screen, a used or sold Item flashes
+	# and shrinks out where it stood, and a new one pops in.
+	var animate: bool = _items_seen != null and UiAnim.on(g) and items_grid.is_visible_in_tree()
+	var fresh: Array = []
 	for c in items_grid.get_children():
-		c.queue_free()
+		var it: Variant = c.get_meta("item") if c.has_meta("item") else null # a null
+			# default reads as "no default": get_meta errors on the empty slots
+		if animate and it != null and not g.items.any(func(x) -> bool: return is_same(x, it)):
+			c.remove_meta("key") # a probe's key lookup must not find the ghost
+			UiAnim.vanish(g, c as Control, Color(2, 2, 2))
+		else:
+			c.queue_free()
 	# NO-202: most recently acquired first, matching _stacks()'s Stock
 	# drawer — g.items is append-ordered, so scan it in reverse. `i` stays
 	# the real g.items index throughout (item_pressed.emit(i), the
@@ -2652,12 +2808,17 @@ func _rebuild_items_grid() -> void:
 			# this cell by (probes/tests) — same convention _build_artefact_cell
 			# already uses
 		btn.add_child(_build_sell_badge("item", g.items[i])) # NO-223
+		btn.set_meta("item", g.items[i]) # NO-243: the entry, by identity
+		if animate and not (_items_seen as Array).any(func(x) -> bool: return is_same(x, g.items[i])):
+			fresh.append(btn)
 		items_grid.add_child(btn)
 	# NO-165: the remaining room, signified — ItemLogic.cap is the real bound
 	# (base 3, +3 per held Area 51 Parking Permit), so this is never a
 	# made-up number.
 	for i in ItemLogic.cap(g) - g.items.size():
 		items_grid.add_child(_empty_slot())
+	_items_seen = g.items.duplicate()
+	UiAnim.deal_in(g, fresh, Vector2(0.4, 0.4), 0.0)
 
 
 ## NO-84: Stock and Captured Stock are two independent grids (stories 31-44),
@@ -2711,10 +2872,21 @@ func _rebuild_stock_drawer() -> void:
 			cap_children.append(btn)
 		else:
 			stock_children.append(btn)
+	# NO-243 (row 58): where a converted Captured cell stood, read before
+	# _drop_stack_button detaches it — the piece slides from there to Stock.
+	var fly: bool = _stock_seen and UiAnim.on(g)
+	var gone_cap := {} # entry text -> the gone Captured cell's screen rect
+	if fly:
+		for k in _stack_btns:
+			if not live.has(k) and k.begins_with("c|") and (_stack_btns[k] as Control).is_visible_in_tree():
+				gone_cap[_stack_entry_text(k)] = (_stack_btns[k] as Control).get_global_rect()
 	for k in _stack_btns:
 		if not live.has(k):
 			_drop_stack_button(_stack_btns[k], animate)
 	_stack_btns = live
+	if fly:
+		_fly_stacks(fresh, gone_cap)
+	_stock_seen = true
 	_stock_slots.clear()
 	for i in maxi(stock_cols, 1) - stock_children.size() % maxi(stock_cols, 1):
 		_stock_slots.append(_empty_slot())
@@ -2724,6 +2896,36 @@ func _rebuild_stock_drawer() -> void:
 	_scroll_stock_to_bottom() # NO-208
 	if animate and not (old_pos.is_empty() and fresh.is_empty()):
 		_animate_stacks(old_pos, fresh)
+
+
+## NO-243 (row 58): the first rebuild is a baseline (a restored run's
+## Captured Stock did not just arrive).
+var _stock_seen := false
+
+
+## A _stack_keys key without its pool prefix and copy number: the entry.
+static func _stack_entry_text(k: String) -> String:
+	return k.substr(2, k.rfind("|") - 2)
+
+
+## NO-243 (row 58): a fresh Stock cell whose entry just left Captured was
+## converted, and slides across from its old cell; a fresh Captured cell was
+## just taken on the board (game.gd points fx_at at the capture tile), and
+## flies from there — to its cell with the drawer open, else to the Stock
+## button.
+func _fly_stacks(fresh: Array, gone_cap: Dictionary) -> void:
+	var drawer_shown: bool = (drawers["stock"] as Control).is_visible_in_tree()
+	for btn in fresh:
+		var k: String = (btn as Button).get_meta("key")
+		var icon: Variant = (btn as Button).icon
+		if icon == null:
+			icon = (btn as Button).text
+		if k.begins_with("s|") and gone_cap.has(_stack_entry_text(k)):
+			UiAnim.fly_to(g, icon, gone_cap[_stack_entry_text(k)], btn)
+		elif k.begins_with("c|") and g.fx_at != Vector2.ZERO:
+			var t := Vector2(g.tile, g.tile)
+			UiAnim.fly_to(g, icon, Rect2(g.fx_at - t / 2.0, t),
+				btn if drawer_shown else drawer_buttons["stock"])
 
 
 ## NO-237: one identity per cell. Copies of one entry are told apart by how

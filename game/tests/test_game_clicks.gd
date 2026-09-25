@@ -16,6 +16,7 @@ const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 const Scenarios := preload("res://data/scenarios.gd") # NO-83: the Header scenarios
 const Kings := preload("res://data/kings.gd") # NO-83: escalate Trump's Power by hand
 const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/convert costs
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 var fails := 0
 
@@ -1670,10 +1671,15 @@ func _init() -> void:
 	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
 	# VBoxContainer rect is not settled the instant it's built — the same
 	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
-	# GridContainer — so wait one more idle frame before measuring it.
-	await process_frame
+	# GridContainer. A single extra idle frame (tried after CI run 36130372199
+	# failed on #584's head) is NOT always enough — it still failed
+	# intermittently after #592 added exactly that frame — because "settled"
+	# is a property of the layout, not of elapsed frame count: an unsettled
+	# rect spans the whole board, so no backdrop tile is found. Poll instead
+	# of guessing a number: the shared Settle.settle_layout below.
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
-	var box_rect: Rect2 = modal_box.get_global_rect()
+	var settle := await Settle.settle_layout(modal_box)
+	var box_rect: Rect2 = settle.rect
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
 		for bx in Tuning.BOARD_W:
@@ -1685,7 +1691,8 @@ func _init() -> void:
 		if backdrop.x >= 0.0:
 			break
 	check(backdrop.x >= 0.0,
-		"(setup) a board tile exists over the modal's backdrop rather than its buttons")
+		"(setup) a board tile exists over the modal's backdrop rather than its buttons",
+		Settle.detail(settle))
 	_click(backdrop)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
@@ -1935,6 +1942,7 @@ func _init() -> void:
 	check(not is_instance_valid(game.hud._drop_hl) or not game.hud._drop_hl.is_visible_in_tree(),
 		"setup: the drop preview is gone once the drag ends")
 	# put it back on the board: arm a Stock cell, tap the zone tile
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -1948,6 +1956,7 @@ func _init() -> void:
 	check(game.selected == Vector2i(2, 1) and game.drawer_open == "stock",
 		"(setup) the placed piece is selected with the Stock drawer open")
 	# tap ON a Stock cell, the least likely spot: it must return, not arm
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	await process_frame
@@ -1955,6 +1964,7 @@ func _init() -> void:
 			and game.stock[0] == ret_id and game.placing_id == "",
 		"setup: with a placed piece selected, a tap anywhere in the Stock drawer returns it")
 	game.pool_click_key = "" # the arming tap above is <400 ms old: not a double-tap
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -3548,6 +3558,7 @@ func _init() -> void:
 	check(await _click_stock(game), "NO-236: Stock opens")
 	await process_frame
 	var gold0: int = game.gold
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	var tap_tile := Vector2i(1, 1) # a neighbour of the queen: a deploy tile
@@ -3662,10 +3673,79 @@ func _init() -> void:
 	check(game.board[queen].get("blitz_free_move", false) and game.items.size() == items_before - 1,
 		"NO-236: Confirm commits the dragged Item")
 
+	game.queue_free() # one Game (and one HUD) in the tree for the S2 probe below
+	await process_frame
+	await _s2_clicks_mid_animation()
+
 	print("---")
 	if fails == 0:
 		print("ALL GAME CLICKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+## NO-243 S2: a tap that lands while a modal is still animating reaches what
+## is drawn under it — GUI picking and get_global_rect() both follow scale —
+## and a modal fading out never eats a tap meant for the board. Half of
+## tests/test_ui_anim.gd, which cannot pick headless.
+func _s2_clicks_mid_animation() -> void:
+	GameScript.reset_boot_defaults()
+	var cfg: Dictionary = Scenarios.all()[Scenarios.find("Capture: selling sandbox")].cfg.duplicate()
+	cfg.seed = 1
+	GameScript.next_config = cfg
+	GameScript.is_scenario = true
+	var game: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	game.animations_on = true
+	var q := Vector2i(3, 2) # the sandbox's player queen
+
+	game._open_box_pick(Box.random_slot(game))
+	await process_frame
+	await process_frame
+	var tile := _first_option_tile(game.modals.box_panel)
+	var cell: Control = tile.get_parent()
+	# Timing-dependent (a slow CI frame can outrun a tween), so noted, not
+	# asserted: the click below must land either way.
+	print("note: NO-243 S2 Box tile at click: scale=%s alpha=%.2f" % [cell.scale, cell.modulate.a])
+	_click(tile.get_global_rect().get_center())
+	await process_frame
+	check(game.modals.box_expanded_index == int(tile.get_meta("box_index")),
+		"NO-243 S2: a Box tile tapped mid deal-in is selected",
+		"expanded=%d" % game.modals.box_expanded_index)
+	game._box_close()
+
+	game._show_preview(game.board[q].id, "", null, game.board[q])
+	await process_frame
+	await process_frame
+	var content: Control = game.modals.preview_panel.get_child(0)
+	print("note: NO-243 S2 preview at click: scale=%s" % content.scale)
+	var close: Button = null
+	for b in game.modals.preview_panel.find_children("*", "Button", true, false):
+		if (b as Button).text == "Close":
+			close = b
+	_click(close.get_global_rect().get_center())
+	await process_frame
+	check(not game.preview_open and not game.modals.preview_panel.visible,
+		"NO-243 S2: Close tapped mid-grow closes the preview")
+
+	game.modals.show_merge_confirm("pawn", "pawn", "pawn")
+	await process_frame
+	await process_frame
+	var cancel: Button = null
+	for b in game.modals.merge_panel.find_children("*", "Button", true, false):
+		if (b as Button).text == "Cancel":
+			cancel = b
+	_click(cancel.get_global_rect().get_center())
+	await process_frame
+	print("note: NO-243 S2 merge panel at board tap: visible=%s alpha=%.2f" % [
+		game.modals.merge_panel.visible, game.modals.merge_panel.modulate.a])
+	_click(game._tile_px(q) + Vector2(game.tile, game.tile) / 2)
+	await process_frame
+	check(game.selected == q, "NO-243 S2: a board tap during the merge's fade-out reaches the board",
+		"selected=%s merge_visible=%s" % [game.selected, game.modals.merge_panel.visible])
+	game.queue_free()
+	await process_frame
 
 
 ## First reward button in the box panel (options precede the Skip button).

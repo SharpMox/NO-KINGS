@@ -27,7 +27,8 @@ func _init() -> void:
 	_test_child_count()
 	_test_horde_fits_carousel_card()
 	_test_back_to_front_order()
-	_test_partial_row_centered()
+	_test_rows_centered()
+	_test_horde_row_width()
 	_test_slim_pitch_tighter_than_large()
 	_test_classification()
 
@@ -40,9 +41,12 @@ func _init() -> void:
 		quit(1)
 
 
-## The bounding box should read as "roughly square, slightly wider than
-## tall" at a range of counts — Reinforcements' smallest lists and every
-## army shape, not just the worst case.
+## The bounding box should read as a wide, short rectangle — Max, 2026-09-25,
+## reviewing #582's Army captures: "we can make much wider rows, it'll look
+## better" (see TARGET_ASPECT's own header) — at a range of counts,
+## Reinforcements' smallest lists and every army shape, not just the worst
+## case. Bounds widened from the old (0.85, 1.5) "roughly square" range to
+## (1.0, 2.0) to fit the new wider rows without going flat/absurd.
 func _test_aspect() -> void:
 	var cases := {
 		"3 (small reinforce)": ["pawn", "pawn", "knight"],
@@ -53,8 +57,8 @@ func _test_aspect() -> void:
 		var mass := PieceMass.build(cases[label])
 		var size: Vector2 = mass.custom_minimum_size
 		var aspect := size.x / size.y
-		check(aspect > 0.85 and aspect < 1.5,
-			"aspect near-square for %s (got %.2f, box %sx%s)"
+		check(aspect > 1.0 and aspect < 2.0,
+			"aspect wide-not-flat for %s (got %.2f, box %sx%s)"
 				% [label, aspect, size.x, size.y])
 
 
@@ -123,35 +127,75 @@ func _test_back_to_front_order() -> void:
 			% [pawn_idx, rook_idx])
 
 
-## Max's ruling: 2 rows of 3 plus a row of 1 must read as
-##   AAA
-##   BBB
-##    C
-## not C flush under A. 7 identical "rook" (large) pieces is the exact case:
-## _back_to_front keeps ties in original order, so children add in index
-## order and _choose_rows(7, CELL_LARGE) lands on rows=3/cols=3 (verified by
-## hand against the same TARGET_ASPECT maths _choose_rows itself uses) —
-## rows 0-1 get 3 each, row 2 gets the lone 7th. Row 0 and row 2 are both
-## even (neither gets the odd-row STAGGER), so comparing their x positions
-## directly, with no stagger to subtract out, isolates the centering fix:
-## the lone piece's x must equal row 0's MIDDLE column, not its first.
-func _test_partial_row_centered() -> void:
-	var ids := []
-	for i in 7:
-		ids.append("rook")
-	var rows := PieceMass._choose_rows(ids.size(), PieceMass.CELL_LARGE)
-	var cols := maxi(1, ceili(float(ids.size()) / float(rows)))
-	check(rows == 3 and cols == 3,
-		"7 uniform pieces choose 3 rows x 3 cols (got %d x %d)" % [rows, cols])
-	if rows != 3 or cols != 3:
-		return # geometry assumption below doesn't hold; the mismatch is
-			# already reported above.
-	var mass := PieceMass.build(ids)
-	var row0_col1: TextureRect = mass.get_child(1) # row 0, middle column
-	var row2_col0: TextureRect = mass.get_child(6) # row 2, the lone piece
-	check(is_equal_approx(row2_col0.position.x, row0_col1.position.x),
-		"lone row (x=%.2f) centred on row 0's middle column (x=%.2f)"
-			% [row2_col0.position.x, row0_col1.position.x])
+## Groups a built mass's children into rows by Y — children are added in
+## row-major order (row = i/cols in build()) and rows are ROW_PITCH apart
+## (28.08px) while JITTER_Y's wobble is tiny by comparison (<=3.9px), so
+## comparing each child's Y against the first child of the current row group,
+## with a half-ROW_PITCH tolerance, groups unambiguously without needing to
+## know cols/pitch from outside piece_mass.gd.
+func _rows_of(mass: Control) -> Array:
+	var rows: Array = []
+	for c in mass.get_children():
+		if rows.is_empty() or absf(c.position.y - rows[-1][0].position.y) > PieceMass.ROW_PITCH * 0.5:
+			rows.append([c])
+		else:
+			rows[-1].append(c)
+	return rows
+
+
+## Max, 2026-09-25, reviewing #582's Army captures: "I still see rows offset
+## to one side instead of aligning to the centre" — every row, not just a
+## short one, must sit on the mass's own centre line. Checked on the four
+## Armies Max named directly (Crown, Old Guard and Cult mix slim/large
+## pieces and can have an uneven last row; Horde is a pure-slim 14 that
+## picks a wide 2-row layout — see TARGET_ASPECT's header) by reading each
+## row's span straight off the built children's positions, not by
+## re-deriving cols/pitch by hand.
+func _test_rows_centered() -> void:
+	var cases := {
+		"Crown": Tuning.ARMIES["Crown"],
+		"Old Guard": Tuning.ARMIES["Old Guard"],
+		"Cult": Tuning.ARMIES["Cult"],
+		"Horde": Tuning.ARMIES["Horde"],
+	}
+	for label in cases:
+		var mass := PieceMass.build(cases[label])
+		var mass_center: float = mass.custom_minimum_size.x / 2.0
+		var rows := _rows_of(mass)
+		check(rows.size() >= 1, "%s: builds at least one row" % label)
+		for r in rows.size():
+			var left := INF
+			var right := -INF
+			for c in rows[r]:
+				left = minf(left, c.position.x)
+				right = maxf(right, c.position.x + PieceMass.ICON)
+			var row_center := (left + right) * 0.5
+			check(absf(row_center - mass_center) < 1.0,
+				"%s row %d/%d centred (row_center=%.2f, mass_center=%.2f)"
+					% [label, r, rows.size(), row_center, mass_center])
+
+
+## Max, 2026-09-25: "we can make much wider rows" — Horde's 14 pawns (all
+## slim, so every row is a single pitch class) is the widest-count army, and
+## its widest row must use most of the carousel card's own width, not a
+## squarish blob. CARD_INNER is the card's usable content width: card_w=280
+## (menu.gd, ARMY_CARD_WIDTH_FRACTION's own header) minus its 20px side
+## padding (card_style's content_margin_left/right). Measured off the built
+## children (see _rows_of()), not re-derived from CELL_SLIM/ICON by hand.
+func _test_horde_row_width() -> void:
+	const CARD_INNER := 260.0
+	var mass := PieceMass.build(Tuning.ARMIES["Horde"])
+	var max_row_w := 0.0
+	for row in _rows_of(mass):
+		var left := INF
+		var right := -INF
+		for c in row:
+			left = minf(left, c.position.x)
+			right = maxf(right, c.position.x + PieceMass.ICON)
+		max_row_w = maxf(max_row_w, right - left)
+	check(max_row_w >= CARD_INNER * 0.7,
+		"Horde-14 widest row (%.1f) is at least 70%% of the card's %spx inner width"
+			% [max_row_w, CARD_INNER])
 
 
 func _test_slim_pitch_tighter_than_large() -> void:

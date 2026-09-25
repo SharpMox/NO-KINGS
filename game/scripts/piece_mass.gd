@@ -8,9 +8,12 @@
 ## two agents each built one.
 ##
 ## NO-178: reworked from 1-3 tidy ranks (a wide flat strip) into a packed
-## crowd — a roughly square blob, pawns at the back, distinctive pieces at
-## the front, heavy overlap both ways, staggered rows, varied tilt, a mild
-## depth scale. See build()'s header comment for the geometry.
+## crowd — pawns at the back, distinctive pieces at the front, heavy overlap
+## both ways, varied tilt, a mild depth scale. Max, 2026-09-25: wider/
+## shorter rows (raised TARGET_ASPECT), and every row — not just a short
+## one — centred on the same line (dropped the old brick-pattern row
+## stagger, which put alternating rows off-centre). See build()'s header
+## comment for the geometry.
 ##
 ## Pure logic-over-nothing module, same shape as tuning.gd/armies.gd: no
 ## nodes of its own, one static entry point.
@@ -47,21 +50,19 @@ const ROW_PITCH := ICON * 0.54 # NO-178: vertical pitch between rows. NO-203:
 	# little bit". V3 (2026-09-21): still too tight — "bottom rows cover a bit
 	# too much of the rows above it" — raised again to 0.54. Checked with a
 	# Python/PIL mockup of build()'s exact maths against the real pawn PNG
-	# (Horde-14, the worst case): 0.42-0.46 keeps _choose_rows() at 4 rows for
-	# Horde-14 and heads sit right under the row in front's shoulders; 0.50 is
-	# where _choose_rows() itself opens up to 3 rows for that count (stable
-	# through at least 0.74, so this isn't a knife-edge pick) and the gap
-	# becomes visible; by 0.65 the rows start reading as separate stripes with
-	# a visible dark band between them, and by 0.85 they fully split into 3
-	# flat ranks — the exact "not a crowd" failure this renderer exists to
-	# avoid. 0.54 sits in the middle of the 0.50-0.65 window: past the
-	# 4-row-to-3-row jump with real margin, short of where stripes start.
-const STAGGER := CELL_LARGE * 0.5 # NO-178: alternate rows shift right by
-	# half a cell so pieces nest into the gaps of the row behind, instead of
-	# lining up into a visible grid. Kept on CELL_LARGE (not per-row/per-
-	# piece) after the slim/large split: it's a fixed visual offset, not a
-	# pitch, and CELL_LARGE is already the conservative (larger) of the two,
-	# so it stays a safe upper bound on the shift for a slim-heavy row too.
+	# (Horde-14, the worst case): 0.42-0.46 kept the row count (then chosen
+	# by the rows-first search this file used at the time — see
+	# _choose_cols()'s own header for why V4, 2026-09-25, searches columns
+	# instead) at 4 rows for Horde-14, heads sitting right under the row in
+	# front's shoulders; 0.50 is where that search opened up to 3 rows for
+	# that count (stable through at least 0.74, so this isn't a knife-edge
+	# pick) and the gap becomes visible; by 0.65 the rows start reading as
+	# separate stripes with a visible dark band between them, and by 0.85
+	# they fully split into 3 flat ranks — the exact "not a crowd" failure
+	# this renderer exists to avoid. 0.54 sits in the middle of the
+	# 0.50-0.65 window: past the 4-row-to-3-row jump with real margin, short
+	# of where stripes start. Still governs vertical pitch under V4 — only
+	# the horizontal column count changed.
 const JITTER_Y := ICON * 0.075 # px — Max, 2026-09-20: "barely not aligned
 	# horizontally" — a small per-piece vertical wobble so a rank's baseline
 	# waves slightly rather than ruling dead straight. Also a ratio of ICON
@@ -69,18 +70,32 @@ const JITTER_Y := ICON * 0.075 # px — Max, 2026-09-20: "barely not aligned
 	# shrinking to a proportionally smaller wobble.
 const JITTER_ROT := 0.45 # radians (~25.8°) — NO-178: widened from 0.3
 	# (~17°) to match Max's mockup, where a front-row rook is tilted roughly
-	# 20-30°. X position is still not jittered (see build()); rotation plus
-	# the NO-178 stagger below are what stop a row looking stamped from one
-	# mould.
+	# 20-30°. X position is still not jittered (see build()); rotation is
+	# what stops a row looking stamped from one mould now that rows no
+	# longer carry a stagger offset (Max, 2026-09-25 — see build()'s header).
 const DEPTH_BACK_SCALE := 0.85 # NO-178: mild perspective — back rows drawn
 	# at this fraction of full size, rising linearly to 1.0 at the front row.
 	# Unitless (it multiplies a Control's .scale, not a px distance), so it
 	# is not expressed as a ratio of ICON the way the pitch/jitter constants
 	# above are — there's no ICON-relative quantity it needs to track. Kept
 	# subtle on purpose: this is perspective, not a size ladder.
-const TARGET_ASPECT := 1.15 # width:height the crowd's bounding box should
-	# land near — Max's own mockup selection measured 467x400 (≈1.1675),
-	# "roughly square, slightly wider than tall".
+const TARGET_ASPECT := 2.3 # width:height the crowd's bounding box should
+	# land near. Was 1.15 ("roughly square, slightly wider than tall", Max's
+	# own mockup measurement) until Max reviewed the #582 Army captures,
+	# 2026-09-25: "we can make much wider rows, it'll look better" — 2.3
+	# picks fewer, wider rows using most of the carousel card's own width
+	# instead of a squarish blob. Chosen by scanning candidate column counts
+	# (see _choose_cols()) against the card budget: at 2.3, Horde-14 (the
+	# widest army, all slim pieces) reaches ~189px of row width — comfortably
+	# over 70% of the card's ~260px inner content width (card_w=280 minus
+	# its own 20px side padding, menu.gd _show_armies) — while every army's
+	# full mass width (row width + edge padding) still stays under the
+	# carousel card's own 280px (`_test_horde_fits_carousel_card`), and
+	# every other Army (11-piece Crown/Wild Hunt/Old Guard/Cult, 7-piece
+	# Syndicate) lands with real margin to spare. Re-check against
+	# tests/test_mass.gd's `_test_horde_row_width` and
+	# `_test_horde_fits_carousel_card` if this or the pitch/ICON constants
+	# change again.
 const SLIM_WIDTH_RATIO := 0.64 # a piece is "slim" when its opaque-pixel
 	# bounding-box width (Image.get_used_rect(), see _slim_ratio()) is under
 	# this fraction of its 192px-square texture's own width. Chosen from the
@@ -144,7 +159,7 @@ static func build(ids: Array) -> Control:
 
 	# Per-piece horizontal pitch (Max's ruling: slim pieces — Pawn-shaped,
 	# classified from the art, see _is_slim() — pack tighter than large
-	# ones). Computed once per id, up front, so both _choose_rows() and the
+	# ones). Computed once per id, up front, so both _choose_cols() and the
 	# per-row layout below read the same values.
 	var pitches: Array[float] = []
 	var avg_pitch := 0.0
@@ -155,16 +170,23 @@ static func build(ids: Array) -> Control:
 	if not pitches.is_empty():
 		avg_pitch /= pitches.size()
 
-	var rows := _choose_rows(n, avg_pitch)
-	var cols := maxi(1, ceili(float(n) / float(rows)))
+	# cols (pieces per row) is the primary knob, not rows — Max, 2026-09-25:
+	# "much wider rows". Picking cols directly (then deriving rows) reaches
+	# column counts a rows-first search never could: for Horde's 14 pawns,
+	# rows=2 forces cols=ceili(14/2)=7 exactly, with no way to ask for, say,
+	# 12 — rows=1 is the only way to get above 7, and that overflows the
+	# card. Searching cols instead finds 12 directly, leaving the last row
+	# short (4 pieces) rather than forcing two equal rows of 7. See
+	# _choose_cols()'s own header.
+	var cols := _choose_cols(n, avg_pitch)
+	var rows := maxi(1, ceili(float(n) / float(cols)))
 
 	# Row layout, row-major fill (row = i/cols, matching the icon loop
 	# below): each row's items are laid out left to right with the pitch
 	# between neighbours = half of each one's own class pitch, summed (Max's
 	# ruling) — reduces to the old uniform `col * CELL` when a row is all one
-	# class. `row_x[i]` is icon i's x WITHIN its row, before centering/
-	# stagger/pad; `row_width[r]` is that row's own natural (unstaggered)
-	# span.
+	# class. `row_x[i]` is icon i's x WITHIN its row, before centering/pad;
+	# `row_width[r]` is that row's own natural span.
 	var row_x: Array[float] = []
 	row_x.resize(n)
 	var row_width: Array[float] = []
@@ -181,13 +203,17 @@ static func build(ids: Array) -> Control:
 	var max_row_width := 0.0
 	for w in row_width:
 		max_row_width = maxf(max_row_width, w)
-	# Centre every row on the widest row's centre line (Max's ruling: a
-	# row with fewer pieces than the widest no longer sits flush at column
-	# 0). Widest is measured in PIXELS, not piece count: with mixed
-	# slim/large pitches two equal-count rows can differ in natural width,
-	# and pixel width is what actually needs centring — this is a strict
-	# generalisation of "fewer pieces", since with one pitch class the two
-	# coincide (only the last row can ever be short, by row-major fill).
+	# Centre EVERY row on the widest row's centre line — not just a short
+	# one. Max, 2026-09-25, reviewing #582's captures: "I still see rows
+	# offset to one side instead of aligning to the centre" — the old NO-178
+	# brick-pattern stagger (alternate rows shifted right by a half cell) is
+	# gone for exactly this reason; nothing here shifts a row off this
+	# centre line any more. Widest is measured in PIXELS, not piece count:
+	# with mixed slim/large pitches two equal-count rows can differ in
+	# natural width, and pixel width is what actually needs centring — a
+	# strict generalisation of "fewer pieces", since with one pitch class
+	# the two coincide (only the last row can ever be short, by row-major
+	# fill — see _choose_cols()).
 	var row_center_offset: Array[float] = []
 	row_center_offset.resize(rows)
 	for r in rows:
@@ -202,22 +228,17 @@ static func build(ids: Array) -> Control:
 	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
 	var pad := ICON * 0.5 + JITTER_Y + rot_extra
 
-	# Worst case at ICON=52, checked by hand (V3, 2026-09-21 — re-derived after
-	# V3 raised ROW_PITCH to 0.54*ICON, which moves _choose_rows()'s own pick
-	# for Horde's 14 pawns from 4 rows down to 3): rows=3, cols=ceili(14/3)=5
-	# -> mass width = (5-1)*19.76 + 52 + 2*38.62 + STAGGER(9.88) = 218.2px —
-	# wider than the old 4-row layout's 198.4px, since fewer rows means more
-	# columns. The Army carousel card (menu.gd _show_armies) is `card_w =
-	# viewport.x * ARMY_CARD_WIDTH_FRACTION` = 480 * 7/12 = 280px at the 480px
-	# portrait width this project targets, minus the card's own 20px side
-	# padding (card_style's content_margin_left/right) = 260px usable —
-	# 218.2px fits with ~41.8px to spare (down from ~61.6px before V3, still
-	# clear). Horde is all-pawn (slim), so its real pitch is now CELL_SLIM,
-	# even narrower than this large-piece worst case.
-	# Re-check this if ICON, JITTER_ROT, the pitch constants, or
-	# ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
+	# Worst case at ICON=52, TARGET_ASPECT=2.3 (V4, 2026-09-25): Horde-14
+	# (all-pawn, the widest army at this pitch) lands on cols=12/rows=2 ->
+	# row width (12-1)*CELL_SLIM + ICON = 137.0 + 52 = 189.0px, mass width
+	# 189.0 + 2*38.62(pad) = 266.2px. The Army carousel card (menu.gd
+	# _show_armies) is `card_w = viewport.x * ARMY_CARD_WIDTH_FRACTION` =
+	# 480 * 7/12 = 280px at the 480px portrait width this project targets —
+	# 266.2px fits with ~13.8px to spare (`_test_horde_fits_carousel_card`).
+	# Re-check this if ICON, JITTER_ROT, TARGET_ASPECT, the pitch constants,
+	# or ARMY_CARD_WIDTH_FRACTION change again; it is not enforced in code.
 	mass.custom_minimum_size = Vector2(
-		max_row_width + pad * 2.0 + (STAGGER if rows > 1 else 0.0),
+		max_row_width + pad * 2.0,
 		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)
 
 	var rng := RandomNumberGenerator.new()
@@ -245,13 +266,13 @@ static func build(ids: Array) -> Control:
 		if game_script.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
 			icon.modulate = COL_SIDE_PLAYER
 		var row := i / cols
-		# X is the row-local mixed-pitch position, plus that row's own
-		# centring offset, plus a half-cell stagger on odd rows so pieces
-		# nest into the row behind rather than forming a grid. Y gets a small
-		# wobble and the icon a tilt; row also gets a mild depth scale (back
-		# rows a little smaller, front rows full size).
+		# X is the row-local mixed-pitch position plus that row's own
+		# centring offset — no per-row stagger any more (Max, 2026-09-25:
+		# every row, not just a short one, sits on the same centre line). Y
+		# gets a small wobble and the icon a tilt; row also gets a mild
+		# depth scale (back rows a little smaller, front rows full size).
 		icon.position = Vector2(
-			pad + row_x[i] + row_center_offset[row] + (STAGGER if row % 2 == 1 else 0.0),
+			pad + row_x[i] + row_center_offset[row],
 			pad + row * ROW_PITCH + rng.randf_range(-JITTER_Y, JITTER_Y))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		var depth: float = 1.0 if rows <= 1 \
@@ -261,29 +282,41 @@ static func build(ids: Array) -> Control:
 	return mass
 
 
-## Rows derived from the piece count, not a hardcoded ladder: tries every row
-## count from 1 to n and keeps whichever bounding box lands closest to
-## TARGET_ASPECT. Cheap (n is at most ~14 — Horde's army) and works the same
-## way for Reinforcements' 2-3 pieces as it does for a full army.
+## Columns (pieces per row) derived from the piece count, not a hardcoded
+## ladder: tries every column count from 1 to n and keeps whichever bounding
+## box lands closest to TARGET_ASPECT. Cheap (n is at most ~14 — Horde's
+## army) and works the same way for Reinforcements' 2-3 pieces as it does
+## for a full army.
+##
+## Searches COLUMNS, not rows (build() derives rows = ceili(n/cols) from the
+## result) — Max, 2026-09-25: "much wider rows" needs a column count that
+## isn't forced to be n/rows exactly. A rows-first search can only reach the
+## column counts ceili(n/rows) produces for some integer rows — for n=14
+## that's {14,7,5,4,3,2,1}, with no way to land on, say, 12 (rows=2 forces
+## cols=7; the next reachable cols is 14, at rows=1, which overflows the
+## carousel card). Scanning cols directly reaches every integer 1..n, so the
+## last row can end up short (row-major fill, `row = i/cols` in build()) —
+## already handled by the per-row centring above, which centres a short row
+## exactly the way it always has.
 ##
 ## `avg_pitch` is the mean per-piece pitch of the actual `ids` (build()'s own
 ## average of CELL_SLIM/CELL_LARGE per piece) — an approximation, like the
 ## rest of this heuristic (it already ignores rotation/jitter growth), but
-## one that lets a slim-heavy army (more Pawns) land on fewer, wider rows
-## the way a uniform CELL_SLIM would, instead of always reasoning in
+## one that lets a slim-heavy army (more Pawns) land on more, narrower
+## columns the way a uniform CELL_SLIM would, instead of always reasoning in
 ## CELL_LARGE terms.
-static func _choose_rows(n: int, avg_pitch: float) -> int:
-	var best_rows := 1
+static func _choose_cols(n: int, avg_pitch: float) -> int:
+	var best_cols := maxi(1, n)
 	var best_err := INF
-	for rows in range(1, maxi(1, n) + 1):
-		var cols := maxi(1, ceili(float(n) / float(rows)))
-		var w: float = (cols - 1) * avg_pitch + ICON + (STAGGER if rows > 1 else 0.0)
+	for cols in range(1, maxi(1, n) + 1):
+		var rows := maxi(1, ceili(float(n) / float(cols)))
+		var w: float = (cols - 1) * avg_pitch + ICON
 		var h: float = (rows - 1) * ROW_PITCH + ICON
 		var err: float = absf(w / h - TARGET_ASPECT)
 		if err < best_err:
 			best_err = err
-			best_rows = rows
-	return best_rows
+			best_cols = cols
+	return best_cols
 
 
 ## The per-piece horizontal pitch: CELL_SLIM for a slim piece, CELL_LARGE

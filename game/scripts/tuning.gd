@@ -11,6 +11,11 @@ const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # each cost 1 action (was 2 moves + 1 place
                                    # + 3 merges; 3 actions → 2 on 2026-07-07)
 
+## NO-254: the feedback Google Form ("NO KINGS: playtest feedback"; responses
+## land in the Sheet "NO KINGS: playtest feedback (Responses)"), opened via
+## game.gd's open_feedback() from the pause menu and the end-of-run screens.
+const FEEDBACK_URL := "https://forms.gle/2h7zgrMxNSQv1iQM9"
+
 ## NO-118: the shared duration for every Drawer/Shop slide (open and close
 ## alike) — one constant so hud.gd and modals.gd, which each animate their
 ## own panel, can't drift apart on it.

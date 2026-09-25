@@ -472,15 +472,101 @@ func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme 
 	return l
 
 
-func show_overlay(won: bool, reason: String, rank := 0) -> void:
-	_end_of_run_on_top()
+## The end screens' frame (Casualties): everything but the buttons scrolls —
+## a long run's Casualties mass does not fit — and the buttons sit in their
+## own column pinned at the bottom (#577's dismiss-at-bottom), always on
+## screen. Returns [content, buttons]; content is vertically centred while it
+## fits, as the old CenterContainer did.
+func _end_screen_frame() -> Array:
 	_clear_overlay()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
+	overlay.add_child(margin)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 16)
+	margin.add_child(col)
+	var scroll := ScrollContainer.new()
+	scroll.name = "EndScroll" # the tests' handle
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.scroll_deadzone = 24 # a drag on the mass scrolls; menu.gd's value
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(scroll)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
+	# EXPAND + SHRINK_CENTER: the labels' own width (_overlay_width), centred
+	# in the scroll; EXPAND_FILL down, so ALIGNMENT_CENTER centres it while
+	# it is shorter than the screen
+	box.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_CENTER
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	var buttons := VBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 16)
+	buttons.custom_minimum_size.x = _overlay_width() # the width the buttons had
+	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	col.add_child(buttons)
+	return [box, buttons]
+
+
+## `--scroll-bottom` (tools/capture.md): the end screen scrolled to its end,
+## the newest Casualties above the buttons.
+func scroll_end_screen_to_bottom() -> void:
+	var scroll: ScrollContainer = overlay.find_child("EndScroll", true, false)
+	if scroll != null:
+		scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
+
+
+func _overlay_width() -> float:
+	return g.get_viewport_rect().size.x - 48
+
+
+## Below the stats: "Casualties" and one mass of every piece that died this
+## run (game.gd `casualties`) in the order they died — first top-left, newest
+## at the bottom by the buttons (Max, 2026-09-25) — each in the art of the
+## side it died on. null (nothing added) with no casualties.
+func _add_casualties(box: VBoxContainer) -> Control:
+	if g.casualties.is_empty():
+		return null
+	var section := VBoxContainer.new()
+	section.name = "Casualties"
+	section.add_theme_constant_override("separation", 8)
+	section.add_child(_overlay_label("Casualties", &"Heading"))
+	section.add_child(PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
+		_overlay_width() - 2.0 * PieceMass.edge_pad(true), # rows + margin = the panel's inner width
+		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW))
+	box.add_child(section)
+	return section
+
+
+## The end screen's reveal (#590), with the Casualties section held back until
+## the Score has counted up, then faded in. `rest` is everything else after
+## the title, buttons included — they animate alpha only, so they take clicks
+## from the first frame. Snaps with the reveal (animations off, autoplay).
+func _reveal_end_screen(title: Label, box: VBoxContainer, buttons: VBoxContainer, section: Control,
+		stats: Label, stats_at: Callable, delay: float, burst: bool) -> void:
+	var rest: Array = box.get_children().slice(1).filter(func(c: Node) -> bool: return c != section)
+	rest.append_array(buttons.get_children())
+	_reveal(title, rest, stats, stats_at, delay, burst)
+	if section == null or reveal == null:
+		return
+	section.modulate.a = 0.0
+	reveal.tween_property(section, "modulate:a", 1.0, CASUALTIES_FADE_S)
+
+
+const CASUALTIES_FADE_S := 0.4
+## Pieces per Casualties row (Max, 2026-09-25: "rows of 6-8", side by side
+## with light overlap; the mass grows taller and scrolls instead). At
+## PieceMass.SPACED_PITCH that is a ~325px row, centred, in the ~432px panel; a
+## narrower panel gets fewer per row, never a tighter pitch. Tune here.
+const CASUALTIES_PER_ROW := 8
+
+
+func show_overlay(won: bool, reason: String, rank := 0) -> void:
+	_end_of_run_on_top()
+	var frame := _end_screen_frame()
+	var box: VBoxContainer = frame[0]
+	var buttons: VBoxContainer = frame[1]
 	var title := _overlay_label("VICTORY" if won else "GAME OVER", &"Hero")
 	box.add_child(title)
 	box.add_child(_overlay_label(reason))
@@ -502,23 +588,24 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	if g.next_seed != "":
 		box.add_child(_overlay_label("seed  %s   ·   build %s"
 			% [g.next_seed, ProjectSettings.get_setting("application/config/version", "dev")], &"Meta"))
+	var section := _add_casualties(box)
 	var restart := Button.new()
 	restart.text = "Restart"
 	restart.pressed.connect(func() -> void: restart_pressed.emit())
-	box.add_child(restart)
+	buttons.add_child(restart)
 	var menu := Button.new()
 	menu.text = "Main Menu"
 	menu.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
-	box.add_child(menu)
+	buttons.add_child(menu)
 	# NO-254: below Restart/Main Menu, a normal (non-primary) button.
 	var feedback := Button.new()
 	feedback.text = "Give Feedback"
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
-	box.add_child(feedback)
+	buttons.add_child(feedback)
 	overlay.visible = true
 	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
-	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S if won else 0.0, won)
+	_reveal_end_screen(title, box, buttons, section, stats_label, stats_at, KING_FALL_S if won else 0.0, won)
 
 
 ## Wave-50 win screen: the run pauses on top of the board; Continue enters
@@ -559,13 +646,9 @@ func _end_of_run_on_top() -> void:
 
 func show_win_screen() -> void:
 	_end_of_run_on_top()
-	_clear_overlay()
-	var center := CenterContainer.new()
-	overlay.add_child(center)
-	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
-	center.add_child(box)
+	var frame := _end_screen_frame()
+	var box: VBoxContainer = frame[0]
+	var buttons: VBoxContainer = frame[1]
 	var title := _overlay_label("VICTORY", &"Hero")
 	box.add_child(title)
 	# The King who just fell, else (the --show-screen capture, which opens this
@@ -582,25 +665,27 @@ func show_win_screen() -> void:
 		% [preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	var stats_label := _overlay_label("Score %d" % g.score + stats)
 	box.add_child(stats_label)
-	box.add_child(_overlay_label("Continue into endless waves?"))
+	var section := _add_casualties(box)
+	# the question belongs to the buttons it asks about, so it stays with them
+	buttons.add_child(_overlay_label("Continue into endless waves?"))
 	var cont := Button.new()
 	cont.text = "Continue"
 	cont.pressed.connect(func() -> void: win_continue_pressed.emit())
-	box.add_child(cont)
+	buttons.add_child(cont)
 	var end := Button.new()
 	end.text = "End Run"
 	end.pressed.connect(func() -> void: win_end_pressed.emit())
-	box.add_child(end)
+	buttons.add_child(end)
 	# NO-254: below Continue/End Run, a normal (non-primary) button — the win
 	# screen shares this end-of-run overlay with show_overlay above.
 	var feedback := Button.new()
 	feedback.text = "Give Feedback"
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
-	box.add_child(feedback)
+	buttons.add_child(feedback)
 	overlay.visible = true
 	# after the King's shatter (S1), with a gold burst off the title
 	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
-	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S, true)
+	_reveal_end_screen(title, box, buttons, section, stats_label, stats_at, KING_FALL_S, true)
 
 
 # --- NO-243 S3 (audit rows 53/54): the end screens' staged reveal ------------

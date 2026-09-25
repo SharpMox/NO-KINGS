@@ -113,6 +113,12 @@ const MIN_ROW_PIECES := 3 # Max, 2026-09-25, on top of "large pieces go in
 	# an accident, not a crowd. The only exception is an `ids` list with
 	# fewer than this many pieces total, which gets one row of whatever it
 	# has (_choose_row_sizes()'s own early-out).
+const SPACED_PITCH := ICON * 0.75 # build()'s spaced grid (the Casualties):
+	# neighbours overlap by a quarter of a piece at most — Max, 2026-09-25:
+	# "pieces can't be told apart" at the crowd's 0.24-0.38 ICON pitch, then
+	# 0.9 read a bit loose, "more compact, not more per row"
+const SPACED_ROW_PITCH := ICON * 0.65 # ...and each row shows the head and
+	# shoulders of the row behind it
 const SLIM_WIDTH_RATIO := 0.64 # a piece is "slim" when its opaque-pixel
 	# bounding-box width (Image.get_used_rect(), see _slim_ratio()) is under
 	# this fraction of its 192px-square texture's own width. Chosen from the
@@ -134,6 +140,7 @@ static var _slim_cache: Dictionary = {} # id -> bool, memoized: the art never
 # on a runtime-loaded (not preloaded) script — see the report's "could not
 # verify" list.
 const COL_SIDE_PLAYER := Color(0.72, 0.85, 1.25)
+const COL_SIDE_ENEMY := Color(1.25, 0.72, 0.72) # game.gd's, same reason
 
 const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 	# loads this file, game.gd, menu.gd or modals.gd (unlike game_script
@@ -148,8 +155,23 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## _is_slim()) sit at the back (drawn first); large pieces (Rook/Knight/
 ## Queen/dragon-shaped) sit at the front (drawn last, on top) — Max,
 ## 2026-09-25 (Aux's review of #582): a Knight at the end of a back row was
-## covering its neighbour, "large pieces go in the FRONT row". Player/light
-## side only — neither caller ever shows the enemy's art.
+## covering its neighbour, "large pieces go in the FRONT row".
+##
+## `sides` (the end screens' Casualties): one Rules.PLAYER/Rules.ENEMY per
+## id, in `ids` order; empty = every piece the player's (the Army card and
+## Reinforcements, unchanged). Enemies draw in their dark art (plus
+## COL_SIDE_ENEMY on the mono path), as on the board. With `sides` the list
+## is drawn in the order given — Max, 2026-09-25: casualties read in the
+## order they died, first top-left, newest bottom-right — so the slim/large
+## back-to-front sort is skipped and sides share rows.
+##
+## `spaced_row_max` > 0 (the Casualties too) swaps the packed crowd for a
+## readable grid: every piece SPACED_PITCH apart whatever its class, rows
+## SPACED_ROW_PITCH apart, at most `spaced_row_max` per row — fewer if
+## `max_row_width` can't hold that many at SPACED_PITCH (never under
+## MIN_ROW_PIECES) — and only the rotation overhang as a side margin
+## (edge_pad(true)). Max, 2026-09-25: the crowd pitch piled 241 casualties
+## into a column a third of the screen wide.
 ##
 ## `max_row_width` bounds each row's own pixel width (default: unbounded —
 ## modals.gd's Reinforcements announcement has no fixed card, so it doesn't
@@ -162,7 +184,8 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## and the fan doesn't reshuffle on repaint (CLAUDE.md, NO-157). The seed is
 ## taken from `ids` before any internal reordering, so it stays a property of
 ## the input list, not of how this function happens to sort it.
-static func build(ids: Array, max_row_width: float = INF) -> Control:
+static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
+		spaced_row_max := 0) -> Control:
 	# load(), not preload(): game.gd owns `modals` as a preloaded child
 	# (game.gd:547 — `var modals := preload("res://scripts/modals.gd").new()`),
 	# and modals.gd is one of this script's two callers, so a top-level
@@ -181,16 +204,21 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 	mass.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	var n := ids.size()
-	var sorted_ids: Array = _back_to_front(ids)
+	var sorted_ids: Array = ids.duplicate() if not sides.is_empty() else _back_to_front(ids)
+	var sorted_sides: Array = sides.duplicate()
+	if sides.is_empty():
+		sorted_sides.resize(n)
+		sorted_sides.fill(Rules.PLAYER)
 
 	# Per-piece horizontal pitch (Max's ruling: slim pieces — Pawn-shaped,
 	# classified from the art, see _is_slim() — pack tighter than large
 	# ones). Computed once per id, up front, so both _choose_row_sizes() and
 	# the per-row layout below read the same values.
+	var spaced := spaced_row_max > 0
 	var pitches: Array[float] = []
 	var avg_pitch := 0.0
 	for id in sorted_ids:
-		var p := _pitch(id)
+		var p := SPACED_PITCH if spaced else _pitch(id)
 		pitches.append(p)
 		avg_pitch += p
 	if not pitches.is_empty():
@@ -199,7 +227,12 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 	# `sizes[r]` = piece count of row r, back (r=0) to front (r=last) — see
 	# _choose_row_sizes()'s own header for the two rules this applies (>=3
 	# per row, split instead of overflow) on top of the wide-rows target.
-	var sizes: Array[int] = _choose_row_sizes(n, avg_pitch, pitches, max_row_width)
+	var row_max := 0
+	if spaced:
+		row_max = spaced_row_max
+		if max_row_width < INF:
+			row_max = mini(row_max, maxi(MIN_ROW_PIECES, int((max_row_width - ICON) / SPACED_PITCH) + 1))
+	var sizes: Array[int] = _choose_row_sizes(n, avg_pitch, pitches, max_row_width, row_max)
 	var rows := sizes.size()
 
 	# Row layout, row-major fill matching `sizes` (row r holds sizes[r]
@@ -245,14 +278,9 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 	for r in rows:
 		row_center_offset[r] = (max_row_w - row_width[r]) * 0.5
 
-	# Padding: half the icon's own width/height, plus JITTER_Y's vertical
-	# wobble, plus the bounding-box growth a square gains when rotated up to
-	# JITTER_ROT (a square of side ICON rotated by θ has half-extent
-	# (ICON/2)*(cos θ + sin θ), i.e. (cos θ + sin θ - 1) more than unrotated).
-	# Computed here, not as a const, because GDScript const initializers
-	# can't call cos()/sin() — this only runs once per build().
-	var rot_extra := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
-	var pad := ICON * 0.5 + JITTER_Y + rot_extra
+	var pad := edge_pad(spaced) # see its header
+	var pad_y := pad + (JITTER_Y if spaced else 0.0) # spaced: the wobble too
+	var row_pitch := SPACED_ROW_PITCH if spaced else ROW_PITCH
 
 	# Worst case at ICON=52, TARGET_ASPECT=2.2 (V4, 2026-09-25): Horde-14
 	# (all-pawn, the widest army at this pitch) lands on sizes=[11,3] ->
@@ -268,15 +296,18 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 	# beyond `max_row_width` itself, which the caller supplies.
 	mass.custom_minimum_size = Vector2(
 		max_row_w + pad * 2.0,
-		(rows - 1) * ROW_PITCH + ICON + pad * 2.0)
+		(rows - 1) * row_pitch + ICON + pad_y * 2.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(ids)
 
 	for i in sorted_ids.size():
 		var id: String = sorted_ids[i]
+		var side: int = sorted_sides[i]
 		var icon := TextureRect.new()
-		icon.texture = game_script.load_piece_tex(id) # player side (the default)
+		icon.texture = game_script.load_piece_tex(id, side)
+		icon.set_meta("id", id) # what the tests read back per icon
+		icon.set_meta("side", side)
 		# EXPAND_IGNORE_SIZE + STRETCH_KEEP_ASPECT_CENTERED BEFORE the size is
 		# set — the exact order NO-146's group picture and NO-148's tier icon
 		# both use. Setting `.size` first is the trap: with the default expand
@@ -293,7 +324,7 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 		icon.pivot_offset = Vector2(ICON, ICON) * 0.5 # rotate around its
 			# own centre, not the top-left corner
 		if game_script.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
-			icon.modulate = COL_SIDE_PLAYER
+			icon.modulate = COL_SIDE_PLAYER if side == Rules.PLAYER else COL_SIDE_ENEMY
 		var row := row_of[i]
 		# X is the row-local mixed-pitch position plus that row's own
 		# centring offset — no per-row stagger any more (Max, 2026-09-25:
@@ -304,7 +335,7 @@ static func build(ids: Array, max_row_width: float = INF) -> Control:
 		# the old back-row depth scale is gone for the same reason).
 		icon.position = Vector2(
 			pad + row_x[i] + row_center_offset[row],
-			pad + row * ROW_PITCH + rng.randf_range(-JITTER_Y, JITTER_Y))
+			pad_y + row * row_pitch + rng.randf_range(-JITTER_Y, JITTER_Y))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		mass.add_child(icon)
 	return mass
@@ -347,6 +378,19 @@ static func _choose_cols(n: int, avg_pitch: float) -> int:
 	return best_cols
 
 
+## The margin build() leaves round the rows: half the icon's own
+## width/height, plus JITTER_Y's vertical wobble, plus the bounding-box growth
+## a square gains when rotated up to JITTER_ROT (a square of side ICON rotated
+## by θ has half-extent (ICON/2)*(cos θ + sin θ)). A function, not a const,
+## because const initializers can't call cos()/sin(). A caller with a whole-
+## mass budget passes its row budget as that minus 2 * edge_pad(). `spaced`:
+## the side margin of build()'s spaced grid, the rotation overhang alone —
+## a row's width already includes each end piece's own ICON.
+static func edge_pad(spaced := false) -> float:
+	var rot := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
+	return rot if spaced else ICON * 0.5 + JITTER_Y + rot
+
+
 ## Per-row piece counts, back (index 0) to front (last index) — the three
 ## rules Max laid down on top of "large pieces go in the front row"
 ## (2026-09-25), applied in order:
@@ -379,11 +423,11 @@ static func _choose_cols(n: int, avg_pitch: float) -> int:
 ##    solved one. None of the 6 shipped Armies reach it (verified: every
 ##    real Army fits at TARGET_ASPECT=2.2 without ever invoking this pass).
 static func _choose_row_sizes(n: int, avg_pitch: float, pitches: Array[float],
-		max_row_width: float) -> Array[int]:
+		max_row_width: float, row_max := 0) -> Array[int]:
 	if n < MIN_ROW_PIECES:
 		return [n]
 
-	var cols := _choose_cols(n, avg_pitch)
+	var cols := row_max if row_max > 0 else _choose_cols(n, avg_pitch) # build()'s row_max
 	var rows_count := maxi(1, ceili(float(n) / float(cols)))
 	# Cap so every row CAN average >= MIN_ROW_PIECES.
 	while rows_count > 1 and n < MIN_ROW_PIECES * rows_count:

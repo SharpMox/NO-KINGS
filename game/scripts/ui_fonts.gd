@@ -25,8 +25,9 @@ const FONTS := [
 
 
 static func _static_init() -> void:
-	SYMBOLS.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	var chain: Array[Font] = [SYMBOLS]
+	var sym: FontFile = SYMBOLS # the parser refuses a property write through a const
+	sym.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	var chain: Array[Font] = [sym]
 	for f: FontFile in FONTS:
 		f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 		f.fallbacks = chain

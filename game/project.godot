@@ -25,6 +25,7 @@ GodotPlayGameServices="*uid://c4tixmu7ug5r"
 PlayGamesBridge="*res://scripts/cloud/play_games_bridge.gd"
 IosCloudBridge="*res://scripts/cloud/ios_cloud_bridge.gd"
 CrtOverlay="*res://scripts/crt_overlay.gd"
+UiFonts="*res://scripts/ui_fonts.gd"
 
 [display]
 
@@ -37,6 +38,10 @@ window/handheld/orientation=1
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg", "res://addons/GodotPlayGameServices/plugin.cfg")
+
+[gui]
+
+theme/custom="res://assets/ui_theme.tres"
 
 [rendering]
 

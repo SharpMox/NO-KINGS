@@ -16,3 +16,23 @@
   crisp there anyway.
 - It has no glyph for `★` (U+2605) or `−` (U+2212). Both appear in banner text, so the banner
   font lists the default theme font as a fallback (game.gd).
+
+## Project Theme (NO-256)
+
+- `assets/ui_theme.tres` (wired by `gui/theme/custom`) makes `PixelOperator.ttf` every Control's
+  font. Ramp: `Meta` 16, body 20 (the default), `Header` 24, Buttons **Bold** 24, `Heading` Bold
+  20, `Title` Bold 32, `Hero` Bold 48; button variations `CompactButton` Bold 20, `SmallButton` Bold 16, `BigButton` Bold
+  32, `Pill` Regular 16 (prices on cell badges). Bold for every button, title, heading and section
+  label; Regular for body, stats and small meta (Max, 2026-09-25).
+- Set a role with `theme_type_variation = &"Title"` etc., not `add_theme_font_size_override`.
+- No fallback font is chained. Symbols Pixel Operator lacks (`← → ★ − ⚠ ☰ ⇄ ⚑ …`, the list is in
+  `tests/test_theme.gd`) come from the OS system font fallback, as most already did. Chaining the
+  engine's Open Sans would make every line 1.36 em tall instead of 1.0 em (`Font.get_height` is
+  the max over the chain). A line holding such a symbol can still be taller than the font: size
+  boxes from a shaped sample (`get_string_size(...).y`), as the Header's Turn/Wave line does.
+- Code that measures text outside a Control uses `Tuning.ui_font()`, which falls back to
+  `ThemeDB.fallback_font` when the Theme failed to load (a cold import cache).
+- `scripts/ui_fonts.gd` (autoload) turns antialiasing off on both faces at boot.
+- The `.ttf.import` files are not committed yet. Godot writes them on import, with defaults.
+  Commit them from a Godot machine with Antialiasing None, Hinting None, Subpixel Positioning
+  Disabled.

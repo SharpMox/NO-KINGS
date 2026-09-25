@@ -476,3 +476,18 @@ static func new_handicaps(tier: String) -> Array[String]:
 		if h.at == idx:
 			out.append(h.text)
 	return out
+
+
+## NO-256: the project Theme's body font, for code that measures or draws text
+## outside a Control's own theme lookup. ThemeDB.fallback_font when the Theme
+## is missing: on a cold import cache the TTFs are not imported yet when the
+## engine loads gui/theme/custom, so the project theme is null and a bare
+## `get_project_theme().default_font` crashed the Shop (Aux, 2026-09-25).
+static func ui_font() -> Font:
+	return font_of(ThemeDB.get_project_theme())
+
+
+static func font_of(theme: Theme) -> Font:
+	if theme != null and theme.default_font != null:
+		return theme.default_font
+	return ThemeDB.fallback_font

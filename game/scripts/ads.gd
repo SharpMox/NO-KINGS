@@ -43,7 +43,6 @@ static func show_rewarded(on_reward: Callable, _on_cancel := Callable()) -> void
 	box.add_child(label)
 	var close := Button.new()
 	close.text = "Close"
-	close.add_theme_font_size_override("font_size", 20)
 	close.pressed.connect(func() -> void:
 		_layer.queue_free()
 		_layer = null

@@ -226,9 +226,12 @@ func _init() -> void:
 			item_cells += 1
 	check(item_cells == game.items.size(),
 		"bought items show in the Inventory drawer strip")
-	check(game.hud.drawer_buttons["inventory"].text == "Inventory %d"
-			% (game.items.size() + game.artefacts.size()),
+	check(game.hud.inventory_count.text == str(game.items.size() + game.artefacts.size()),
 		"the Inventory count includes both purchases")
+	check(game.hud.inventory_word.text == "Inventory"
+			and game.hud.inventory_count.get_theme_color("font_color") == game.hud.COL_WARN
+			and not game.hud.inventory_word.has_theme_color_override("font_color"),
+		"NO-256 (Max): only the Inventory count is amber, not the word")
 
 	# lootboxes (06 / issue 47): buying debits the box's SIZE price and opens
 	# the roll modal revealing EXACTLY what was rolled at stock time — the

@@ -282,6 +282,10 @@ var pass_button := Button.new()
 var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
+## NO-256 (Max): "Inventory N" on the deck button is two Labels so the count
+## alone can be amber (COL_WARN); the Button's own text stays empty.
+var inventory_word := Label.new()
+var inventory_count := Label.new()
 var king_ability_button := Button.new() # top-row tariff count; opens the overlay
 var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> Control (the "stock" entry is a PanelContainer; NO-134 made "inventory" a plain Control so its background can outsize its scroll content)
@@ -907,8 +911,24 @@ func build(game) -> void:
 		_update_band_toggle())
 	bar.add_child(army_band_reopen)
 	var inv := Button.new()
-	inv.text = "Inventory"
 	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# NO-256 (Max): the word in the button's own colour, the count in amber —
+	# a Button can't mix colours, so both ride a centred HBox like PASS's pair,
+	# in the theme's Button font so it reads exactly like a plain label did.
+	var inv_row := HBoxContainer.new()
+	inv_row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	inv_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	inv_row.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
+	inventory_word.text = "Inventory"
+	var proj_theme := ThemeDB.get_project_theme()
+	for lab in [inventory_word, inventory_count]:
+		if proj_theme != null:
+			lab.add_theme_font_override("font", proj_theme.get_font("font", "Button"))
+			lab.add_theme_font_size_override("font_size", proj_theme.get_font_size("font_size", "Button"))
+		lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		inv_row.add_child(lab)
+	inventory_count.add_theme_color_override("font_color", COL_WARN)
+	inv.add_child(inv_row)
 	inv.pressed.connect(func() -> void:
 		set_drawer("inventory")
 		drawer_changed.emit())
@@ -2302,7 +2322,7 @@ func refresh() -> void:
 	_actions_shown = g.actions_left
 	stock_badge.text = str(g._pool().size())
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
+	inventory_count.text = str(g.items.size() + g.artefacts.size())
 	# Banner pass 2026-09-22: a bespoke King Power (Kings.bespoke_power) counts
 	# as one ability in force — it is live all wave and had no persistent
 	# indicator before this.
@@ -2717,13 +2737,12 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
-## NO-256 (d), ruling 6: the Convert/Sell pill — a dark fill (green text reads
-## ~11:1 on it) with a 1 px `border` that keeps the two kinds apart.
-static func _money_pill(border: Color) -> StyleBoxFlat:
+## NO-256: the Convert/Sell price pill — a dark backing so the green price
+## reads over the cell art. No coloured border (Max, 2026-09-25): the ⇄ glyph
+## and the top-right corner already tell the two apart.
+static func _money_pill() -> StyleBoxFlat:
 	var pill := StyleBoxFlat.new()
 	pill.bg_color = Color(0, 0, 0, 0.85)
-	pill.border_color = border
-	pill.set_border_width_all(1)
 	pill.set_corner_radius_all(9)
 	return pill
 
@@ -2746,7 +2765,7 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	Tuning.money(sell, payout) # NO-256 (d): a gain, green on the dark pill below
 	sell.disabled = not Shop.can_sell(g, kind, entry)
 	sell.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to sell
-	var pill := _money_pill(Color(0.75, 0.25, 0.2)) # sell = red-ish border, distinct from Convert's blue
+	var pill := _money_pill()
 	for style in ["normal", "hover", "pressed", "disabled"]:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
@@ -3194,7 +3213,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		Tuning.money(convert, 0) # NO-256 (d): green, on the dark pill below (was white: green on blue is ~1.6:1)
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		convert.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to convert
-		var pill := _money_pill(Color(0.3, 0.6, 1.0)) # player-blue border
+		var pill := _money_pill()
 		for style in ["normal", "hover", "pressed", "disabled"]:
 			convert.add_theme_stylebox_override(style, pill)
 		convert.tooltip_text = "Convert to Stock (deployable) — long-press to convert"

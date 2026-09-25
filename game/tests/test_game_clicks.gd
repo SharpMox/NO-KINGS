@@ -180,11 +180,18 @@ func _click_stock(game: Node2D) -> bool:
 ## _click_button_in, so the drawer's slide is always settled before a caller
 ## presses something inside it — one place to get right instead of the
 ## dozen-plus call sites this button text appears at.
+## NO-256: the button's text is two child Labels now ("Inventory" + the amber
+## count), so `label` is matched against those joined with a space.
 func _click_inventory(game: Node, label: String) -> bool:
-	var clicked: bool = await _click_button_in(game.hud, label)
-	if clicked and game.hud.drawer_open == "inventory":
+	var inv: Button = game.hud.drawer_buttons["inventory"]
+	var shown := "%s %s" % [game.hud.inventory_word.text, game.hud.inventory_count.text]
+	if shown != label or not inv.is_visible_in_tree():
+		push_error("_click_inventory: wanted '%s', the button reads '%s'" % [label, shown])
+		return false
+	_click(inv.get_global_rect().get_center())
+	if game.hud.drawer_open == "inventory":
 		await _await_drawer_settled(game, "inventory")
-	return clicked
+	return true
 
 
 ## NO-118: the Shop is a full-screen modal (modals.gd), not one of
@@ -1680,13 +1687,23 @@ func _init() -> void:
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
 	var settle := await Settle.settle_layout(modal_box)
 	var box_rect: Rect2 = settle.rect
+	# A tile's CENTRE is not enough: the Buff Box rolls 3 random buffs (this
+	# fixture pins no seed), so the modal's height varies with their text, and
+	# on the notch layout (tile 46, board y 127.5..679.5) a tall roll (box
+	# y 142..658, CI run 36182019919) covers every centre while the top and
+	# bottom rows' outer edges stay clear. Try each tile's centre, then a point
+	# 4 px inside its top and bottom edges — still that tile, still backdrop.
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
 		for bx in Tuning.BOARD_W:
-			var c: Vector2 = game._tile_px(Vector2i(bx, by)) \
-				+ Vector2(game.tile, game.tile) / 2
-			if not box_rect.has_point(c):
-				backdrop = c
+			var p0: Vector2 = game._tile_px(Vector2i(bx, by))
+			var cx: float = p0.x + game.tile / 2.0
+			for c in [Vector2(cx, p0.y + game.tile / 2.0), Vector2(cx, p0.y + 4.0),
+					Vector2(cx, p0.y + game.tile - 4.0)]:
+				if not box_rect.has_point(c):
+					backdrop = c
+					break
+			if backdrop.x >= 0.0:
 				break
 		if backdrop.x >= 0.0:
 			break
@@ -2171,6 +2188,10 @@ func _init() -> void:
 	if convert_badge != null:
 		check(convert_badge.get_theme_color("font_color") == Tuning.COL_GOLD,
 			"NO-256: the ⇄ Convert pill's price is green (on a dark pill)")
+		var pill_sb := convert_badge.get_theme_stylebox("normal") as StyleBoxFlat
+		check(pill_sb != null and pill_sb.border_width_left == 0 and pill_sb.border_width_top == 0
+				and pill_sb.bg_color.v < 0.2,
+			"NO-256 (Max): the ⇄ pill keeps a dark backing and has no coloured border")
 	var cap_price: Label = null
 	for c in cap_row.get_children():
 		if c is Label and (c as Label).text.begins_with("$"):
@@ -2195,6 +2216,11 @@ func _init() -> void:
 	check(convert_btn != null and convert_btn.get_theme_color("font_color") == Tuning.COL_LOSS,
 		"NO-256 ruling 2: the preview reads 'Convert -$N' (no parentheses), in red",
 		_button_texts_in(game.preview_panel))
+	# NO-256 (Max): Convert wears the same button style as Sell and the other
+	# preview actions — no stylebox of its own (checked against Sell below)
+	var convert_normal_sb: StyleBox = convert_btn.get_theme_stylebox("normal") if convert_btn else null
+	check(convert_btn != null and not convert_btn.has_theme_stylebox_override("normal"),
+		"NO-256: the preview's Convert has no stylebox override (the shared button style)")
 	check(await _click_button_in(game.preview_panel, "Convert -$%d" % badge_cost),
 		"the preview's own Convert button is clickable")
 	await process_frame
@@ -2627,6 +2653,9 @@ func _init() -> void:
 			and preview_sell_btn.get_theme_color("font_pressed_color") == Tuning.COL_GOLD,
 		"NO-256: the preview's 'Sell +$N' is green in every enabled state",
 		_button_texts_in(game.preview_panel))
+	check(preview_sell_btn != null and convert_normal_sb != null
+			and preview_sell_btn.get_theme_stylebox("normal") == convert_normal_sb,
+		"NO-256 (Max): Convert and Sell in the preview draw the same button style")
 	check(await _click_button_in(game.preview_panel, "Sell +$5"),
 		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame

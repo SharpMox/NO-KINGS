@@ -2171,6 +2171,10 @@ func _init() -> void:
 	if convert_badge != null:
 		check(convert_badge.get_theme_color("font_color") == Tuning.COL_GOLD,
 			"NO-256: the ⇄ Convert pill's price is green (on a dark pill)")
+		var pill_sb := convert_badge.get_theme_stylebox("normal") as StyleBoxFlat
+		check(pill_sb != null and pill_sb.border_width_left == 0 and pill_sb.border_width_top == 0
+				and pill_sb.bg_color.v < 0.2,
+			"NO-256 (Max): the ⇄ pill keeps a dark backing and has no coloured border")
 	var cap_price: Label = null
 	for c in cap_row.get_children():
 		if c is Label and (c as Label).text.begins_with("$"):
@@ -2195,6 +2199,11 @@ func _init() -> void:
 	check(convert_btn != null and convert_btn.get_theme_color("font_color") == Tuning.COL_LOSS,
 		"NO-256 ruling 2: the preview reads 'Convert -$N' (no parentheses), in red",
 		_button_texts_in(game.preview_panel))
+	# NO-256 (Max): Convert wears the same button style as Sell and the other
+	# preview actions — no stylebox of its own (checked against Sell below)
+	var convert_normal_sb: StyleBox = convert_btn.get_theme_stylebox("normal") if convert_btn else null
+	check(convert_btn != null and not convert_btn.has_theme_stylebox_override("normal"),
+		"NO-256: the preview's Convert has no stylebox override (the shared button style)")
 	check(await _click_button_in(game.preview_panel, "Convert -$%d" % badge_cost),
 		"the preview's own Convert button is clickable")
 	await process_frame
@@ -2627,6 +2636,9 @@ func _init() -> void:
 			and preview_sell_btn.get_theme_color("font_pressed_color") == Tuning.COL_GOLD,
 		"NO-256: the preview's 'Sell +$N' is green in every enabled state",
 		_button_texts_in(game.preview_panel))
+	check(preview_sell_btn != null and convert_normal_sb != null
+			and preview_sell_btn.get_theme_stylebox("normal") == convert_normal_sb,
+		"NO-256 (Max): Convert and Sell in the preview draw the same button style")
 	check(await _click_button_in(game.preview_panel, "Sell +$5"),
 		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame

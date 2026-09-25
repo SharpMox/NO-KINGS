@@ -2717,13 +2717,12 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 	btn.mouse_filter = Control.MOUSE_FILTER_PASS # NO-45: drag-scroll the drawer
 
 
-## NO-256 (d), ruling 6: the Convert/Sell pill — a dark fill (green text reads
-## ~11:1 on it) with a 1 px `border` that keeps the two kinds apart.
-static func _money_pill(border: Color) -> StyleBoxFlat:
+## NO-256: the Convert/Sell price pill — a dark backing so the green price
+## reads over the cell art. No coloured border (Max, 2026-09-25): the ⇄ glyph
+## and the top-right corner already tell the two apart.
+static func _money_pill() -> StyleBoxFlat:
 	var pill := StyleBoxFlat.new()
 	pill.bg_color = Color(0, 0, 0, 0.85)
-	pill.border_color = border
-	pill.set_border_width_all(1)
 	pill.set_corner_radius_all(9)
 	return pill
 
@@ -2746,7 +2745,7 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	Tuning.money(sell, payout) # NO-256 (d): a gain, green on the dark pill below
 	sell.disabled = not Shop.can_sell(g, kind, entry)
 	sell.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to sell
-	var pill := _money_pill(Color(0.75, 0.25, 0.2)) # sell = red-ish border, distinct from Convert's blue
+	var pill := _money_pill()
 	for style in ["normal", "hover", "pressed", "disabled"]:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
@@ -3194,7 +3193,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		Tuning.money(convert, 0) # NO-256 (d): green, on the dark pill below (was white: green on blue is ~1.6:1)
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		convert.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to convert
-		var pill := _money_pill(Color(0.3, 0.6, 1.0)) # player-blue border
+		var pill := _money_pill()
 		for style in ["normal", "hover", "pressed", "disabled"]:
 			convert.add_theme_stylebox_override(style, pill)
 		convert.tooltip_text = "Convert to Stock (deployable) — long-press to convert"

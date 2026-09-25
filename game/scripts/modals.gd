@@ -2082,7 +2082,7 @@ func _box_lid(grid) -> void: # untyped: freed during the wait (ui_anim.gd modal_
 	sb.set_corner_radius_all(6)
 	lid.add_theme_stylebox_override("panel", sb)
 	lid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var r := grid.get_global_rect()
+	var r: Rect2 = grid.get_global_rect()
 	lid.position = r.position
 	lid.size = r.size
 	g.hud.add_child(lid)

@@ -53,7 +53,7 @@ static func modal_in(g, panel, content, from := Vector2(-1, -1),
 	await g.get_tree().process_frame
 	if not is_instance_valid(panel) or panel.get_meta("ui_anim_gen", 0) != gen:
 		return
-	var tw := panel.create_tween().set_parallel()
+	var tw: Tween = panel.create_tween().set_parallel()
 	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_property(panel, "modulate:a", 1.0, MODAL_IN_S)
 	if is_instance_valid(content):
@@ -106,7 +106,7 @@ static func deal_in(g, nodes: Array, from_scale := Vector2(0.6, 0.6),
 		n.pivot_offset = n.size / 2.0
 		n.scale = from_scale
 		var d := delay + i * stagger
-		var tw := n.create_tween().set_parallel()
+		var tw: Tween = n.create_tween().set_parallel()
 		tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tw.tween_property(n, "scale", Vector2.ONE, DEAL_S).set_delay(d)
 		tw.tween_property(n, "modulate:a", rest[n], DEAL_S).set_delay(d)

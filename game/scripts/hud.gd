@@ -2774,7 +2774,8 @@ func _rebuild_items_grid() -> void:
 	var animate: bool = _items_seen != null and UiAnim.on(g) and items_grid.is_visible_in_tree()
 	var fresh: Array = []
 	for c in items_grid.get_children():
-		var it: Variant = c.get_meta("item", null)
+		var it: Variant = c.get_meta("item") if c.has_meta("item") else null # a null
+			# default reads as "no default": get_meta errors on the empty slots
 		if animate and it != null and not g.items.any(func(x) -> bool: return is_same(x, it)):
 			c.remove_meta("key") # a probe's key lookup must not find the ghost
 			UiAnim.vanish(g, c as Control, Color(2, 2, 2))

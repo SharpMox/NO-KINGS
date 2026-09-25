@@ -163,6 +163,8 @@ static func spawn_pending(g) -> void:
 			# choke point (review pass 2: a bare lost_player += 1 hid this loss
 			# from every on_piece_lost Artefact and from wave_lost_ids)
 			g._lose_player_piece(spot, "captured")
+		if g.board.has(spot):
+			g._add_pop(spot) # NO-243: the crushed piece dies under the arrival
 		# an enemy displaced by a King arrival is simply absorbed: it is not a
 		# player capture, so it must not score, pay Gold or fire on_capture
 		g.board[spot] = {"id": entry.id, "owner": Rules.ENEMY}

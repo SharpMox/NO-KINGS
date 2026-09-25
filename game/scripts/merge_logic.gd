@@ -172,6 +172,7 @@ static func commit_merge(g, a: Variant, b: Variant) -> void:
 	g.fx_at = g._tile_px(result_tile) + Vector2(g.tile, g.tile) / 2
 	if ids[0] == ids[1]: # a same-id merge advances the promotion chain — a Rank
 		# Up, distinct from a Fusion of two different pieces (artefact hook 19).
+		g._add_rank_up(result_tile) # NO-243: visual only
 		ArtefactHooks.run(g, "on_rank_up", {"pos": result_tile, "old_id": ids[0], "id": result})
 	# Spare Organ Receipt (issue 53): every merge consumes exactly two pieces —
 	# fires for a Rank Up too, not just a Fusion of two different pieces;

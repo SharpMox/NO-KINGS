@@ -427,7 +427,7 @@ func _apply_connectivity() -> void:
 func _offline_note(parent: Container) -> Label:
 	var l := Label.new()
 	l.text = OFFLINE_REASON
-	l.add_theme_font_size_override("font_size", 12)
+	l.theme_type_variation = &"Meta"
 	l.modulate = Color(1, 1, 1, 0.55)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.visible = false
@@ -699,7 +699,7 @@ func _ready() -> void:
 
 	var title := Label.new()
 	title.text = "NO KINGS"
-	title.add_theme_font_size_override("font_size", 48)
+	title.theme_type_variation = &"Hero"
 	main_box.add_child(title)
 	# NO-31: the account-switch consent prompt. Inline on the main menu rather
 	# than a modal, matching the logout confirm in settings.gd — the verdict that
@@ -709,7 +709,7 @@ func _ready() -> void:
 	switch_prompt.visible = false
 	main_box.add_child(switch_prompt)
 	switch_prompt_label = Label.new()
-	switch_prompt_label.add_theme_font_size_override("font_size", 13)
+	switch_prompt_label.theme_type_variation = &"Meta"
 	switch_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	switch_prompt.add_child(switch_prompt_label)
 	_wrap_account_text(switch_prompt_label) # NO-55 — after add_child: it reads the theme font
@@ -817,10 +817,10 @@ func _ready() -> void:
 	login_center.add_child(login_box)
 	var login_head := Label.new()
 	login_head.text = "NO KINGS"
-	login_head.add_theme_font_size_override("font_size", 40)
+	login_head.theme_type_variation = &"Hero"
 	login_box.add_child(login_head)
 	login_note = Label.new()
-	login_note.add_theme_font_size_override("font_size", 13)
+	login_note.theme_type_variation = &"Meta"
 	login_note.modulate = Color(1, 1, 1, 0.6)
 	login_note.text = LOGIN_TAGLINE
 	login_box.add_child(login_note)
@@ -913,7 +913,7 @@ func _ready() -> void:
 	test_scroll.add_child(test_box)
 	test_head = Label.new()
 	test_head.text = "Test scenarios — %d boards" % Scenarios.all().size()
-	test_head.add_theme_font_size_override("font_size", 22)
+	test_head.theme_type_variation = &"Title"
 	test_box.add_child(test_head)
 	# NO-58 (user ruling 2026-09-11: "Add a search box"). 385 scenarios in 50
 	# sections, and the 16 sections with a single member fold into "Other" — all
@@ -1023,7 +1023,7 @@ func _ready() -> void:
 		sec_head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sec_head.custom_minimum_size = Vector2(0, 44) # a thumb-sized row
 		sec_head.mouse_filter = Control.MOUSE_FILTER_PASS # touch-drag reaches the list
-		sec_head.add_theme_font_size_override("font_size", 16)
+		sec_head.theme_type_variation = &"Heading"
 		sec_head.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
 		for style in ["normal", "hover", "pressed"]:
 			sec_head.add_theme_stylebox_override(style, head_style)
@@ -1111,7 +1111,7 @@ func _ready() -> void:
 		return m
 	var pick := Label.new()
 	pick.text = "Choose your Army" # issue 67: replaces the Army pick
-	pick.add_theme_font_size_override("font_size", 22)
+	pick.theme_type_variation = &"Title"
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pad_side.call().add_child(pick)
 	var army_scroll := ScrollContainer.new() # the carousel strip itself
@@ -1178,7 +1178,7 @@ func _ready() -> void:
 	var add_pair := func(box: VBoxContainer, head: String, body: String, tint: Color) -> void:
 		var head_lbl := Label.new()
 		head_lbl.text = head
-		head_lbl.add_theme_font_size_override("font_size", 13)
+		head_lbl.theme_type_variation = &"Heading"
 		head_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		head_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		head_lbl.custom_minimum_size.x = card_w - 40.0
@@ -1186,7 +1186,7 @@ func _ready() -> void:
 		box.add_child(head_lbl)
 		var body_lbl := Label.new()
 		body_lbl.text = body
-		body_lbl.add_theme_font_size_override("font_size", 10)
+		body_lbl.theme_type_variation = &"Meta"
 		body_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		body_lbl.custom_minimum_size.x = card_w - 40.0
@@ -1197,7 +1197,7 @@ func _ready() -> void:
 	var add_caption := func(box: VBoxContainer, text: String) -> void:
 		var lbl := Label.new()
 		lbl.text = text
-		lbl.add_theme_font_size_override("font_size", 10)
+		lbl.theme_type_variation = &"Heading" # NO-256: a caption heads its list, like the card's other heads
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.modulate = Color(1, 1, 1, 0.5)
 		box.add_child(lbl)
@@ -1241,7 +1241,7 @@ func _ready() -> void:
 		if kit.has("tagline"):
 			var tagline := Label.new()
 			tagline.text = str(kit.tagline)
-			tagline.add_theme_font_size_override("font_size", 12)
+			tagline.theme_type_variation = &"Meta"
 			tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			tagline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			tagline.custom_minimum_size.x = card_w - 40.0
@@ -1338,7 +1338,7 @@ func _ready() -> void:
 	rank_box.add_child(seed_field)
 	var rank_pick := Label.new()
 	rank_pick.text = "Difficulty Tiers"
-	rank_pick.add_theme_font_size_override("font_size", 28)
+	rank_pick.theme_type_variation = &"Title"
 	rank_box.add_child(rank_pick)
 	# NO-159: one row per tier, icon + a bordered description panel, the
 	# description GENERATED from Tuning.TIER_HANDICAPS rather than
@@ -1387,7 +1387,7 @@ func _ready() -> void:
 		tier_panels.append(tier_panel)
 		var tier_desc := Label.new()
 		tier_desc.text = _tier_description(tier_name)
-		tier_desc.add_theme_font_size_override("font_size", 11)
+		tier_desc.theme_type_variation = &"Meta"
 		tier_desc.modulate = Color(1, 1, 1, 0.7)
 		tier_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		# icon column (70) + the row separation (10) + tier_panel's own left/
@@ -1560,14 +1560,14 @@ func _show_scores() -> void:
 	scores_center.add_child(box)
 	var head := Label.new()
 	head.text = "High scores"
-	head.add_theme_font_size_override("font_size", 28)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 	# issue 85: local unioned with the cloud board when there is one. The local
 	# board is NOT replaced — it is exactly what shows when the cloud is
 	# unreachable, which is the normal case rather than a failure.
 	var scores := Leaderboard.board(GameScript.load_scores())
 	var status := Label.new()
-	status.add_theme_font_size_override("font_size", 12)
+	status.theme_type_variation = &"Meta"
 	status.modulate = Color(1, 1, 1, 0.55)
 	# Three states, not two: signed in and syncing, signed in as SOMEONE ELSE, or
 	# not signed in. Without the middle one this told a player who was signed in
@@ -1605,7 +1605,6 @@ func _show_scores() -> void:
 		var row := Label.new()
 		row.text = "%2d.  %5d — wave %d · %d king%s" % [i + 1, int(e.score),
 			int(e.wave), int(e.kings), "" if int(e.kings) == 1 else "s"]
-		row.add_theme_font_size_override("font_size", 18)
 		box.add_child(row)
 	# NO-147: Games History folds into Scores — a door to the per-run log
 	# beside the ranked top-10 above, same shape as the Global ranking door.
@@ -1638,7 +1637,7 @@ func _show_history() -> void:
 	history_scroll.add_child(box)
 	var head := Label.new()
 	head.text = "Games History"
-	head.add_theme_font_size_override("font_size", 28)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 	var runs := GameScript.load_history()
 	if runs.is_empty():
@@ -1651,7 +1650,7 @@ func _show_history() -> void:
 			"Win" if e.get("won", false) else "Loss", int(e.score), int(e.wave),
 			int(e.kings), "" if int(e.kings) == 1 else "s",
 			int(e.king_abilities), "y" if int(e.king_abilities) == 1 else "ies", int(e.get("lost", 0))]
-		row.add_theme_font_size_override("font_size", 15)
+		row.theme_type_variation = &"Meta"
 		box.add_child(row)
 	_button(box, "← Back", 20, func() -> void:
 		history_scroll.visible = false
@@ -1673,11 +1672,10 @@ func _show_about() -> void:
 	about_center.add_child(box)
 	var head := Label.new()
 	head.text = "About"
-	head.add_theme_font_size_override("font_size", 28)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 	var body := Label.new()
 	body.text = "NO KINGS\nAn explosive Chess riot.\nBuilt with Godot 4."
-	body.add_theme_font_size_override("font_size", 15)
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(body)
 	_button(box, "← Back", 20, func() -> void:
@@ -1722,11 +1720,11 @@ func _show_device_info() -> void:
 	device_info_center.add_child(box)
 	var head := Label.new()
 	head.text = "Device info"
-	head.add_theme_font_size_override("font_size", 24)
+	head.theme_type_variation = &"Title"
 	box.add_child(head)
 	var body := Label.new()
 	body.text = _device_info_text()
-	body.add_theme_font_size_override("font_size", 14)
+	body.theme_type_variation = &"Meta"
 	# WORD_SMART, not off: a long Rect2i string is one unbroken token on a
 	# 480px-wide phone otherwise, same trap _wrap_account_text documents.
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1891,7 +1889,12 @@ func _who(l: Label, name: String, fallback: String) -> String:
 func _button(parent: Container, text: String, size: int, on_press: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.add_theme_font_size_override("font_size", size)
+	# NO-256: `size` picks a theme role (Buttons are Pixel Operator Bold 24),
+	# kept as a number so the ~25 call sites stay untouched.
+	if size >= 32:
+		b.theme_type_variation = &"BigButton"
+	elif size <= 16:
+		b.theme_type_variation = &"SmallButton"
 	b.pressed.connect(on_press)
 	parent.add_child(b)
 	return b

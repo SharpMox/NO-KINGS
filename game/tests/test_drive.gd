@@ -179,7 +179,10 @@ func _init() -> void:
 	ack = await _send(d, 20, ["tap_text SCROLLED AWAY"])
 	check(ack.size() >= 2 and ack[1].begins_with("fail tap_text"),
 		"tap_text on an OFF-SCREEN control fails rather than reporting a tap that cannot land")
-	check(ack.size() >= 2 and "outside" in ack[1] and "5020" in ack[1],
+	# the centre as laid out: a Button grows past size.y to fit its theme font
+	# (NO-256's 24 px Button default makes this one 42 tall, centre 5021)
+	var away_y := str(roundi(away.get_global_rect().get_center().y))
+	check(ack.size() >= 2 and "outside" in ack[1] and away_y in ack[1],
 		"...and the reason names the point and the viewport (%s)" % (ack[1] if ack.size() > 1 else "-"))
 
 	ack = await _send(d, 21, ["drag_text SCROLLED AWAY 0 -100"])

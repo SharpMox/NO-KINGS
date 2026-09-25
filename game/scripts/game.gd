@@ -1071,7 +1071,11 @@ var hud_top := 0.0 ## safe_top + HEADER_H: where the board starts
 ## nav_row/act_row use for their own button gaps, so this sum can't drift
 ## from what hud.gd actually builds (test_game_clicks.gd's NO-33 guard
 ## computes the live deck's height and checks it against this constant).
-const DECK_ROWS := 32.0 + HudScript.DECK_GAP + 60.0 ## drawers 32 + DECK_GAP (hud.gd) + act 60
+## NO-256: the drawers row is 33, not 32 — Inventory/Shop are Pixel Operator
+## Bold 24 now (a 25 px line + the button's 8 px of padding; Open Sans 17 was 24).
+## Left at 32, the deck overran its reserved strip by 1 px and sat on the board's
+## bottom row.
+const DECK_ROWS := HudScript.DECK_ICON_BTN + HudScript.DECK_GAP + 60.0 ## drawers 33 + DECK_GAP (hud.gd) + act 60
 ## NO-196: used to split as "6 between board and deck, 6 under the deck" — but
 ## the deck is now bottom-anchored at a FIXED height (hud.gd's build()), flush
 ## to the screen edge with nothing padding it below, so there is no longer a
@@ -1431,8 +1435,8 @@ func _process(delta: float) -> void:
 # (2026-09-23; this replaced a skewed, emboldened default font). The font is
 # drawn on a 16 px grid, so BANNER_FONT_SIZE stays a whole multiple of 16 or
 # its pixels smear: 32 is closest to the old 26 in apparent size (18 px caps
-# against Open Sans's ~18.5). Pixel Operator has no ★ or −, so the default
-# font is its fallback for those. Source, license: assets/fonts/README.md.
+# against Open Sans's ~18.5). Pixel Operator has no ★ or −; they come from the OS
+# system font fallback (NO-256). Source, license: assets/fonts/README.md.
 const BANNER_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
 const BANNER_FONT_SIZE := 32
 const BANNER_STRIPE_H := 3.0
@@ -2042,8 +2046,9 @@ func _draw_banners() -> void:
 			_banner_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 			_banner_font.hinting = TextServer.HINTING_NONE
 			_banner_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-			var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ★ and − (see BANNER_FONT)
-			_banner_font.fallbacks = fallbacks
+			# NO-256: no fallbacks here any more — this FontFile is the project Theme's
+			# Bold face too, and a fallback set on it mid-run changed every Control's
+			# line height. ★ and − come from the OS system font fallback.
 		# baseline +31: the 18 px caps sit centred in the 44 px band
 		_banner_layer.draw_string(_banner_font, Vector2(br.position.x, br.position.y + 31), a.text,
 			HORIZONTAL_ALIGNMENT_CENTER, br.size.x, BANNER_FONT_SIZE, Color(a.color, alpha))
@@ -5344,6 +5349,12 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 
 # --- rendering ---
 
+## NO-256: board WORDS (the float-up Score/Gold popups) draw in the project
+## Theme's font like every Control. Board SYMBOLS (piece-glyph fallback,
+## inversion mark, buff glyphs) stay on ThemeDB.fallback_font in _draw.
+func text_font() -> Font:
+	return Tuning.ui_font()
+
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
 	_banner_layer.queue_redraw()
@@ -5538,7 +5549,7 @@ func _draw() -> void:
 		elif a.kind == "pop":
 			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
-			draw_string(font, a.at_px + Vector2(0, -20.0 * a.t), a.text,
+			draw_string(text_font(), a.at_px + Vector2(0, -20.0 * a.t), a.text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
 		elif a.kind == "outline": # turn-switch glow expanding off the border
 			var grow: float = 4.0 + 12.0 * a.t

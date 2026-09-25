@@ -135,8 +135,8 @@ const CLOCK_FONT := 36 ## NO-162: restored — NO-125 had shrunk this to 15 to f
 ## so the search is free to find whatever the real font actually needs
 ## rather than being nudged back toward the value this ticket undid.
 const CLOCK_FONT_MIN := 12
-const SCORE_FONT := 17 ## a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
-const COUNTER_FONT := 15 ## the ⚑ Wave and turn counters
+const SCORE_FONT := 24 ## NO-256: Pixel Operator 24 is 24px tall, the height Open Sans 17 had. a 17px Label is 24px tall (measured, NO-125). NO-175: Gold reads at this size too now.
+const COUNTER_FONT := 20 ## NO-256: body size — Turn/Wave and the King's name (Aux: 16 read small). The Clock's fitter takes what is left. the ⚑ Wave and turn counters
 ## NO-175, 3rd pass: the LEFT column now holds only Score/Gold (Turn/Wave
 ## moved to the CENTRE band, above the Clock — see build()). Kept at its
 ## established value, generous for two six-digit odometers; no longer bounds
@@ -148,7 +148,7 @@ const COUNTER_W := 150.0
 ## button (44/52 ≈ 0.85; a text glyph doesn't need quite that much given the
 ## button's own left/right padding) — visual judgement call, re-check on capture.
 const MENU_FONT := 28
-const STOCK_BADGE_FONT := 13
+const STOCK_BADGE_FONT := 16 # NO-256: the ramp's small-meta size
 const STOCK_BADGE_OFFSET := Vector2(14.0, -30.0) ## the count badge, from the icon's centre
 const HEADER_BG := Color(0.06, 0.06, 0.08, 0.92) ## painted from y = 0, so it runs up behind the notch
 ## ----------------------------------------------------------------------------
@@ -457,7 +457,7 @@ const DECK_GAP := 5.0
 ## Inventory/Shop pair — nav_row's own natural row height (32, live-checked
 ## by test_game_clicks.gd against DECK_ROWS), reused so the button reads as
 ## sized-to-its-row rather than an odd size dropped into it.
-const DECK_ICON_BTN := 32.0
+const DECK_ICON_BTN := 33.0 # NO-256: 32 -> 33, the Bold 24 Inventory/Shop row (see game.gd DECK_ROWS)
 ## Height of the control deck. Drawers open ABOVE it rather than covering it:
 ## the deck is the persistent surface in design C, and a drawer that buries PASS
 ## and the Ability takes the two most-pressed controls away exactly when the
@@ -628,7 +628,11 @@ func build(game) -> void:
 	# (and, in the 2nd pass, `left`) out to 500+px (coordinator capture,
 	# 2026-09-20).
 	var counter_font := turn_label.get_theme_default_font()
-	var counter_h: float = counter_font.get_height(COUNTER_FONT)
+	# NO-256: measured on a SHAPED sample, not Font.get_height — the ⚑ glyph
+	# is not in Pixel Operator and comes from the OS fallback font, whose
+	# taller line would otherwise push the Wave label down into the Clock.
+	var counter_h: float = maxf(counter_font.get_height(COUNTER_FONT),
+		counter_font.get_string_size("⚑ 0/0", HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).y)
 	turn_wave_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turn_wave_row.position = Vector2(centre_x, y0 + HEADER_PAD_Y) # x is a placeholder; refresh() centres it
 	turn_label.add_theme_font_size_override("font_size", COUNTER_FONT)
@@ -703,7 +707,7 @@ func build(game) -> void:
 	# what Max asked for. Both are vertically centred in the Header now
 	# that nothing else shares their column (Wave/Turn moved into the
 	# CENTRE band, above).
-	king_ability_button.add_theme_font_size_override("font_size", 13)
+	king_ability_button.theme_type_variation = &"SmallButton"
 	king_ability_button.add_theme_color_override("font_color", Color(1.0, 0.6, 0.55))
 	king_ability_button.pressed.connect(func() -> void: king_ability_pressed.emit())
 	# NO-83: the ⚠ button is NOT on screen. Its state, signals and handlers
@@ -884,7 +888,6 @@ func build(game) -> void:
 	bar.add_child(army_band_reopen)
 	var inv := Button.new()
 	inv.text = "Inventory"
-	inv.add_theme_font_size_override("font_size", 17)
 	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inv.pressed.connect(func() -> void:
 		set_drawer("inventory")
@@ -892,7 +895,6 @@ func build(game) -> void:
 	drawer_buttons["inventory"] = inv
 	bar.add_child(inv)
 	shop_button.text = "Shop"
-	shop_button.add_theme_font_size_override("font_size", 17)
 	shop_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_button.pressed.connect(func() -> void: shop_pressed.emit())
 	bar.add_child(shop_button)
@@ -920,7 +922,6 @@ func build(game) -> void:
 	add_child(confirm_backdrop)
 	# NO-124: floating targeting-confirm, shown once there's something to
 	# confirm — see refresh() for exactly when, per targeting shape
-	multi_confirm_btn.add_theme_font_size_override("font_size", 17)
 	multi_confirm_btn.position = Vector2(vp.x / 2 - 70, vp.y - 96)
 	multi_confirm_btn.custom_minimum_size = Vector2(140, 40)
 	multi_confirm_btn.visible = false
@@ -933,14 +934,12 @@ func build(game) -> void:
 	# reset the chip-tap path already uses) — Economy.charge only ever runs
 	# from _item_apply, on an actual commit.
 	multi_cancel_btn.text = "Cancel"
-	multi_cancel_btn.add_theme_font_size_override("font_size", 15)
 	multi_cancel_btn.position = Vector2(vp.x / 2 - 70, vp.y - 48)
 	multi_cancel_btn.custom_minimum_size = Vector2(140, 40)
 	multi_cancel_btn.visible = false
 	multi_cancel_btn.pressed.connect(func() -> void: multi_cancel_pressed.emit())
 	add_child(multi_cancel_btn)
 	pass_button.text = "PASS"
-	pass_button.add_theme_font_size_override("font_size", 17)
 	# green, matching the prototype: PASS ends your turn, it is not a warning
 	_style_button(pass_button, Color(0.125, 0.196, 0.122), Color(0.290, 0.490, 0.278), 8, 11, 6)
 	pass_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -952,19 +951,22 @@ func build(game) -> void:
 	pass_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	pass_box.add_theme_constant_override("separation", 7)
 	pass_box.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
-	pass_count.add_theme_font_size_override("font_size", 15)
+	pass_count.theme_type_variation = &"Meta"
 	pass_count.add_theme_color_override("font_color", Color(0.498, 0.878, 0.541))
 	pass_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_count)
 	pass_label.text = "PASS"
-	pass_label.add_theme_font_size_override("font_size", 17)
+	pass_label.theme_type_variation = &"Heading"
 	pass_label.add_theme_color_override("font_color", Color(0.902, 0.965, 0.902))
 	pass_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	pass_box.add_child(pass_label)
 	pass_button.add_child(pass_box)
 	# the ABILITY sits beside PASS on the last row: the two most-pressed controls,
 	# lowest on the screen, inside the thumb arc (design C)
-	army_ability_button.add_theme_font_size_override("font_size", 16)
+	# NO-256: Bold 20, wrapping in its own column — "★ Call the Banners  ·  next wave"
+	# at the Button default 24 would push PASS off the row.
+	army_ability_button.theme_type_variation = &"CompactButton"
+	army_ability_button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_style_button(army_ability_button, Color(0.231, 0.208, 0.141),
 		Color(0.427, 0.373, 0.180), 8, 11, 6)
 	army_ability_button.add_theme_color_override("font_color", Color(0.953, 0.886, 0.675))
@@ -981,7 +983,7 @@ func build(game) -> void:
 	# now has ability_col — and so act_row's own 60px minimum — to itself; its
 	# existing SIZE_EXPAND_FILL vertical flag (below) already claims whatever
 	# that frees, no further change needed.
-	army_ability_hint.add_theme_font_size_override("font_size", 10)
+	army_ability_hint.theme_type_variation = &"Meta"
 	army_ability_hint.add_theme_color_override("font_color", Color(0.78, 0.71, 0.55))
 	army_ability_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	army_ability_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1013,7 +1015,7 @@ func build(game) -> void:
 	gm_center.add_child(gm_box)
 	var gm_title := Label.new()
 	gm_title.text = "Paused" # menu open = clock frozen (GDD pause)
-	gm_title.add_theme_font_size_override("font_size", 32)
+	gm_title.theme_type_variation = &"Title"
 	gm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	gm_box.add_child(gm_title)
 	# Guide and Settings are shared with the Main Menu (scripts/guide.gd,
@@ -1035,14 +1037,12 @@ func build(game) -> void:
 			game.get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	var guide_btn := Button.new()
 	guide_btn.text = "Guide"
-	guide_btn.add_theme_font_size_override("font_size", 20)
 	guide_btn.pressed.connect(func() -> void:
 		gm_box.visible = false
 		guide_scroll.visible = true)
 	gm_box.add_child(guide_btn)
 	var settings_btn := Button.new()
 	settings_btn.text = "Settings"
-	settings_btn.add_theme_font_size_override("font_size", 20)
 	settings_btn.pressed.connect(func() -> void:
 		gm_box.visible = false
 		settings_panel.visible = true)
@@ -1050,7 +1050,6 @@ func build(game) -> void:
 
 	var to_menu := Button.new()
 	to_menu.text = "Main Menu"
-	to_menu.add_theme_font_size_override("font_size", 20)
 	to_menu.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	gm_box.add_child(to_menu)
@@ -1065,7 +1064,6 @@ func build(game) -> void:
 	gm_box.add_child(resume_gap)
 	var resume := Button.new()
 	resume.text = "Resume"
-	resume.add_theme_font_size_override("font_size", 26)
 	resume.pressed.connect(func() -> void: toggle_menu(false))
 	gm_box.add_child(resume)
 
@@ -1115,7 +1113,7 @@ func build(game) -> void:
 			_inv_row_sep(inv_avail_w, artefacts_grid.columns)) # NO-207
 	artefacts_grid.add_theme_constant_override("v_separation", INV_CELL_SEP)
 	artefacts_grid.custom_minimum_size.x = inv_avail_w # NO-182, NO-207
-	army_power_label.add_theme_font_size_override("font_size", 13)
+	army_power_label.theme_type_variation = &"Heading"
 	army_power_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var inv_box := VBoxContainer.new()
 	inv_box.add_theme_constant_override("separation", 8)
@@ -1151,7 +1149,7 @@ func build(game) -> void:
 	band_col.add_child(band_header)
 	# NO-180: Subtitle row — what the Power actually does (was folded into
 	# army_power_label's single combined line).
-	army_power_desc_label.add_theme_font_size_override("font_size", 11)
+	army_power_desc_label.theme_type_variation = &"Meta"
 	army_power_desc_label.add_theme_color_override("font_color", Color(0.65, 0.75, 0.62))
 	army_power_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	band_col.add_child(army_power_desc_label)
@@ -1438,7 +1436,7 @@ func build(game) -> void:
 			PieceDiagram.draw(tip_diagram, g.defs, tip_diagram_id, TIP_DIA_CELLS, TIP_DIA_CELL, tip_diagram_tex))
 	tip_box.add_child(tip_diagram)
 	tip_label = Label.new()
-	tip_label.add_theme_font_size_override("font_size", 13)
+	tip_label.theme_type_variation = &"Meta"
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1637,8 +1635,8 @@ func post(text: String, color := FEED_TEXT) -> void:
 		_feed_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 		_feed_font.hinting = TextServer.HINTING_NONE
 		_feed_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-		var fallbacks: Array[Font] = [ThemeDB.fallback_font] # ✦ ★ −: not in Pixel Operator
-		_feed_font.fallbacks = fallbacks
+		# NO-256: no fallbacks (see game.gd's banner setup) — ✦ ★ − come from the
+		# OS system font fallback, like every other Control's symbols.
 	var pill := PanelContainer.new()
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pill.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN # hug the text, not the widest line
@@ -2112,6 +2110,12 @@ func refresh() -> void:
 	var mid_right_edge: float = vp.x - HEADER_PAD_Y - HEADER_BTN * 2.0 - HEADER_GAP
 	var centre_x: float = vp.x / 2.0
 	var centre_w: float = (minf(centre_x - mid_left_edge, mid_right_edge - centre_x) - HEADER_GAP) * 2.0
+	# NO-256: re-pin the boxes to the current text. A Label outside a Container
+	# only ever GROWS to its minimum size and never shrinks back, so one tall
+	# line (a glyph the OS fallback font draws, e.g. ⚑ or a King name) left
+	# the box taller than counter_h for good and it overlapped the Clock.
+	turn_label.size.y = 0.0
+	wave_label.size.y = 0.0
 	var counter_font := turn_label.get_theme_default_font()
 	var turn_text_w: float = counter_font.get_string_size(
 		turn_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, COUNTER_FONT).x
@@ -2456,7 +2460,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		# bottom/right offsets left it flush with the button's own edge,
 		# straddling the card's rounded corner. Centred + a 4px margin off
 		# both edges puts it cleanly on the icon; 14 reads better at this size.
-		marker.add_theme_font_size_override("font_size", 14)
+		marker.theme_type_variation = &"Meta"
 		marker.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 		marker.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		marker.add_theme_constant_override("outline_size", 4)
@@ -2476,7 +2480,7 @@ func _build_artefact_cell(key: String, count: int) -> Button:
 		# without depending on the Label's own (frame-late) minimum size.
 		var init_badge := Label.new()
 		init_badge.text = g.initials_of(entry.name)
-		init_badge.add_theme_font_size_override("font_size", 13)
+		init_badge.theme_type_variation = &"Meta"
 		init_badge.add_theme_color_override("font_color", Color(1, 1, 1))
 		init_badge.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 		init_badge.add_theme_constant_override("outline_size", 4)
@@ -2545,7 +2549,7 @@ func _wire_grid_button(btn: Button, has_icon: bool, lp_key: String, lp_desc: Str
 
 ## NO-223 (2026-09-22 ruling: "badges are too small... they should just be
 ## information, whatever they do should be accessed with a long press") —
-## the Inventory drawer's own Sell badge, top-left corner pill on an
+## the Inventory drawer's own Sell badge, top-right corner pill on an
 ## Item/Artefact cell, priced and greyed exactly like the Stock/Captured
 ## grid's own ⇄ Convert badge (_build_stack_button above). INFORMATION ONLY:
 ## it takes no input of its own (MOUSE_FILTER_IGNORE) — Sell itself lives in
@@ -2557,7 +2561,7 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	var payout: int = Shop.sell_payout(g, kind, entry)
 	var sell := Button.new()
 	sell.text = "$%d" % payout
-	sell.add_theme_font_size_override("font_size", 11)
+	sell.theme_type_variation = &"Pill"
 	sell.add_theme_color_override("font_color", Color(1, 0.9, 0.85))
 	sell.disabled = not Shop.can_sell(g, kind, entry)
 	sell.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to sell
@@ -2567,11 +2571,17 @@ func _build_sell_badge(kind: String, entry: Variant) -> Button:
 	for style in ["normal", "hover", "pressed", "disabled"]:
 		sell.add_theme_stylebox_override(style, pill)
 	sell.tooltip_text = "Sell for $%d — long-press to sell" % payout
-	sell.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	sell.offset_left = 2
-	sell.offset_right = 30
-	sell.offset_top = 2
-	sell.offset_bottom = 18
+	# NO-256: top-RIGHT, 4 px inside the cell (the ⇄ Convert badge's corner;
+	# bottom-right holds the Artefact ✹/×N marker), growing left and down into
+	# it. At the old top-left the 16 px pill met the screen's left edge on the
+	# first column (Aux, 2026-09-25).
+	sell.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	sell.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	sell.grow_vertical = Control.GROW_DIRECTION_END
+	sell.offset_left = -4
+	sell.offset_right = -4
+	sell.offset_top = 4
+	sell.offset_bottom = 4
 	return sell
 
 
@@ -2921,13 +2931,13 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 			eff = 0 # Endless Ranks is scoped to pawns at _place, so the
 				# generic deploy_cost() does not know about it
 		price.text = "$%d" % eff if eff == base else "$%d>%d" % [base, eff]
-	price.add_theme_font_size_override("font_size", 10)
+	price.theme_type_variation = &"Meta"
 	price.add_theme_color_override("font_color",
 		Color(1, 0.95, 0.7) if _pool_affordable(cap, st.entry) else Color(1, 0.5, 0.5))
 	price.add_theme_color_override("font_outline_color", Color(0.1, 0.08, 0.05))
 	price.add_theme_constant_override("outline_size", 4)
 	price.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	price.offset_top = -13
+	price.offset_top = -17 # NO-256: a 16 px Meta line (was 10 px, -13)
 	btn.add_child(price)
 	if show_convert:
 		# NO-223 (2026-09-22 ruling, extended from the new Sell badge to this
@@ -2942,7 +2952,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		# to be the wrong call.
 		var convert := Button.new()
 		convert.text = "⇄$%d" % Shop.convert_price(g, st.entry)
-		convert.add_theme_font_size_override("font_size", 11)
+		convert.theme_type_variation = &"Pill"
 		convert.add_theme_color_override("font_color", Color(0.95, 0.97, 1.0)) # NO-151: NOT COL_GOLD — green on the blue pill is ~1.6:1
 		convert.disabled = not Shop.can_convert(g, st.entry)
 		convert.mouse_filter = Control.MOUSE_FILTER_IGNORE # info only — long-press to convert
@@ -2954,6 +2964,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 		convert.tooltip_text = "Convert to Stock (deployable) — long-press to convert"
 		convert.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 		convert.offset_left = -26
+		convert.grow_horizontal = Control.GROW_DIRECTION_BEGIN # NO-256: a wider 16 px price grows left, into the cell, not off its right edge
 		convert.offset_right = 4
 		convert.offset_top = -9
 		convert.offset_bottom = 9

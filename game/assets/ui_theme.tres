@@ -1,0 +1,32 @@
+[gd_resource type="Theme" load_steps=3 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/PixelOperator.ttf" id="1_regular"]
+[ext_resource type="FontFile" path="res://assets/fonts/PixelOperator-Bold.ttf" id="2_bold"]
+
+[resource]
+default_font = ExtResource("1_regular")
+default_font_size = 20
+Button/font_sizes/font_size = 24
+Button/fonts/font = ExtResource("2_bold")
+BigButton/base_type = &"Button"
+BigButton/font_sizes/font_size = 32
+CompactButton/base_type = &"Button"
+CompactButton/font_sizes/font_size = 20
+SmallButton/base_type = &"Button"
+SmallButton/font_sizes/font_size = 16
+Pill/base_type = &"Button"
+Pill/font_sizes/font_size = 16
+Pill/fonts/font = ExtResource("1_regular")
+Meta/base_type = &"Label"
+Meta/font_sizes/font_size = 16
+Header/base_type = &"Label"
+Header/font_sizes/font_size = 24
+Heading/base_type = &"Label"
+Heading/font_sizes/font_size = 20
+Heading/fonts/font = ExtResource("2_bold")
+Title/base_type = &"Label"
+Title/font_sizes/font_size = 32
+Title/fonts/font = ExtResource("2_bold")
+Hero/base_type = &"Label"
+Hero/font_sizes/font_size = 48
+Hero/fonts/font = ExtResource("2_bold")

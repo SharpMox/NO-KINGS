@@ -188,7 +188,6 @@ func _add_continue() -> void:
 	var vp := get_viewport_rect().size
 	var btn := Button.new()
 	btn.text = "CONTINUE"
-	btn.add_theme_font_size_override("font_size", 22)
 	btn.add_theme_color_override("font_color", Color(0.96, 0.93, 0.85))
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.10, 0.10, 0.12, 0.92)

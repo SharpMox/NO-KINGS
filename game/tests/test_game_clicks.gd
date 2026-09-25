@@ -1149,7 +1149,13 @@ func _init() -> void:
 	check(is_equal_approx(wtr.position.y, trr.position.y) and wtr.position.x >= trr.position.x,
 		"NO-175: '0/8  ⚑ 1/50' — Turn and Wave share a line, Wave after Turn")
 	check(trr.end.y <= clock_r.position.y + 0.5,
-		"NO-175: Turn/Wave sits above the Clock, not overlapping it")
+		"NO-175: Turn/Wave sits above the Clock, not overlapping it",
+		"turn %s '%s' min %s, clock %s" % [trr, HUD.turn_label.text,
+			HUD.turn_label.get_minimum_size(), clock_r])
+	check(wtr.end.y <= clock_r.position.y + 0.5,
+		"NO-256: the ⚑ Wave line sits above the Clock too (its glyph comes from the OS fallback font)",
+		"wave %s '%s' min %s, clock %s" % [wtr, HUD.wave_label.text,
+			HUD.wave_label.get_minimum_size(), clock_r])
 	check(trr.position.x >= mid_left_edge - 0.5 and wtr.position.x <= sr.position.x + 0.5,
 		"NO-175: Turn/Wave stays inside the middle band — past the left column (%s), clear of Stock (%s)"
 			% [mid_left_edge, sr.position.x])

@@ -180,11 +180,18 @@ func _click_stock(game: Node2D) -> bool:
 ## _click_button_in, so the drawer's slide is always settled before a caller
 ## presses something inside it — one place to get right instead of the
 ## dozen-plus call sites this button text appears at.
+## NO-256: the button's text is two child Labels now ("Inventory" + the amber
+## count), so `label` is matched against those joined with a space.
 func _click_inventory(game: Node, label: String) -> bool:
-	var clicked: bool = await _click_button_in(game.hud, label)
-	if clicked and game.hud.drawer_open == "inventory":
+	var inv: Button = game.hud.drawer_buttons["inventory"]
+	var shown := "%s %s" % [game.hud.inventory_word.text, game.hud.inventory_count.text]
+	if shown != label or not inv.is_visible_in_tree():
+		push_error("_click_inventory: wanted '%s', the button reads '%s'" % [label, shown])
+		return false
+	_click(inv.get_global_rect().get_center())
+	if game.hud.drawer_open == "inventory":
 		await _await_drawer_settled(game, "inventory")
-	return clicked
+	return true
 
 
 ## NO-118: the Shop is a full-screen modal (modals.gd), not one of

@@ -282,6 +282,10 @@ var pass_button := Button.new()
 var shop_button := Button.new()
 var pass_count := Label.new() # blue N/M action counter on the PASS button
 var pass_label := Label.new() # the "PASS" word next to the counter
+## NO-256 (Max): "Inventory N" on the deck button is two Labels so the count
+## alone can be amber (COL_WARN); the Button's own text stays empty.
+var inventory_word := Label.new()
+var inventory_count := Label.new()
 var king_ability_button := Button.new() # top-row tariff count; opens the overlay
 var drawer_open := "" # "", "stock", "inventory"
 var drawers := {} # name -> Control (the "stock" entry is a PanelContainer; NO-134 made "inventory" a plain Control so its background can outsize its scroll content)
@@ -907,8 +911,24 @@ func build(game) -> void:
 		_update_band_toggle())
 	bar.add_child(army_band_reopen)
 	var inv := Button.new()
-	inv.text = "Inventory"
 	inv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# NO-256 (Max): the word in the button's own colour, the count in amber —
+	# a Button can't mix colours, so both ride a centred HBox like PASS's pair,
+	# in the theme's Button font so it reads exactly like a plain label did.
+	var inv_row := HBoxContainer.new()
+	inv_row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	inv_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	inv_row.mouse_filter = Control.MOUSE_FILTER_IGNORE # clicks hit the button
+	inventory_word.text = "Inventory"
+	var proj_theme := ThemeDB.get_project_theme()
+	for lab in [inventory_word, inventory_count]:
+		if proj_theme != null:
+			lab.add_theme_font_override("font", proj_theme.get_font("font", "Button"))
+			lab.add_theme_font_size_override("font_size", proj_theme.get_font_size("font_size", "Button"))
+		lab.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		inv_row.add_child(lab)
+	inventory_count.add_theme_color_override("font_color", COL_WARN)
+	inv.add_child(inv_row)
 	inv.pressed.connect(func() -> void:
 		set_drawer("inventory")
 		drawer_changed.emit())
@@ -2302,7 +2322,7 @@ func refresh() -> void:
 	_actions_shown = g.actions_left
 	stock_badge.text = str(g._pool().size())
 	stock_armed.queue_redraw() # armed piece rides the button (selection style)
-	drawer_buttons["inventory"].text = "Inventory %d" % (g.items.size() + g.artefacts.size())
+	inventory_count.text = str(g.items.size() + g.artefacts.size())
 	# Banner pass 2026-09-22: a bespoke King Power (Kings.bespoke_power) counts
 	# as one ability in force — it is live all wave and had no persistent
 	# indicator before this.

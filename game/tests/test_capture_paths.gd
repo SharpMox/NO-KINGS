@@ -79,6 +79,9 @@ func _init() -> void:
 		["feed", "Movement & drag"],
 		["pick", UiDemo.SCENARIO],
 		["turn-start", "NO-250: Pincer"],
+		["hud-anims", "Movement & drag"],
+		["reveal-gameover", "Movement & drag"],
+		["reveal-win", "Movement & drag"],
 	]
 	for shot in shots:
 		var screen: String = shot[0]
@@ -131,6 +134,16 @@ func _init() -> void:
 			"turn-start":
 				check(BuffLogic.has(game.board[Vector2i(4, 4)], "stunned"),
 					"turn-start: Pincer stuns the enemy Pawn between the two Knights (NO-250)")
+			"hud-anims": # NO-243 S3: every tick has played out onto the real value
+				check(game.actions_left == 0 and game.hud.gold_label.text == str(game.gold)
+					and game.hud._hud_tweens.values().all(func(t: Tween) -> bool: return not t.is_running()),
+					"hud-anims: the Header ticks all played and settled")
+			"reveal-gameover":
+				check(game.state == GameScript.State.GAME_OVER and game.overlay.visible
+					and game.modals.reveal != null, "reveal-gameover: the loss screen, revealing")
+			"reveal-win":
+				check(game.win_open and game.overlay.visible and game.modals.reveal != null,
+					"reveal-win: a King fell the real way and the win screen is revealing")
 		await _free(game)
 
 	# --- NO-250 `--select` captures (tools/capture.md): the state each tap

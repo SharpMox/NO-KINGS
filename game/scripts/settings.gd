@@ -153,6 +153,18 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 	# choice and redraws the outline.
 	var GameScript: GDScript = load("res://scripts/game.gd")
 	var theme_ids: Array = GameScript.BOARD_THEMES.keys()
+
+	# Max review, feat/board-theme-picker: a heading reads the picker as a
+	# setting row like Sound/Animations/CRT above it, rather than a bare pair
+	# of swatches. A direct child of `box`, so it picks up the same 16px
+	# separation every other row already gets -- no extra gap needed either
+	# side of it.
+	var board_head := Label.new()
+	board_head.text = "Board"
+	board_head.theme_type_variation = &"Heading"
+	board_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(board_head)
+
 	# One PanelContainer per theme, in theme_ids order — its "panel" style is
 	# the outline surface (same idiom as menu.gd's tier_panels /
 	# _update_tier_outline): bordered in SWATCH_OUTLINE_COLOR when selected,

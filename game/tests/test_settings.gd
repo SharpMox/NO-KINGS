@@ -154,6 +154,12 @@ func _init() -> void:
 		Settings.build(layer, func() -> void: pass,
 			func(d: Dictionary) -> void: changed_data[0] = d)
 
+		# Max review, feat/board-theme-picker: a "Board" heading reads the
+		# picker as a setting row like Sound/Animations/CRT above it.
+		var board_head := _find_label_text(layer, "Board")
+		check(board_head != null and board_head.theme_type_variation == &"Heading",
+			"%s: a 'Board' heading sits above the swatches, in the Heading role" % entry_point)
+
 		var swatch_buttons: Array = []
 		for id in theme_ids:
 			swatch_buttons.append(_find_named(layer, "SwatchButton_%s" % id))
@@ -214,6 +220,19 @@ func _find_named(node: Node, node_name: String) -> Node:
 		return node
 	for c in node.get_children():
 		var found := _find_named(c, node_name)
+		if found != null:
+			return found
+	return null
+
+
+## Finds a descendant Label with an EXACT text match -- the board-theme
+## heading has no fixed name (unlike the swatches), so it's found by content,
+## same idiom as _find_logout_warn above.
+func _find_label_text(node: Node, text: String) -> Label:
+	if node is Label and (node as Label).text == text:
+		return node as Label
+	for c in node.get_children():
+		var found := _find_label_text(c, text)
 		if found != null:
 			return found
 	return null

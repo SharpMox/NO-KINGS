@@ -310,11 +310,14 @@ static func weighted_artefact_pick(pool: Array, rng: RandomNumberGenerator) -> i
 ## Rarity legibility (issue 20) — box-pick and Shop tiles color by this so a
 ## Legendary no longer looks identical to a Common.
 const ARTEFACT_RARITY_COLOR := {
-	"": Color(0.8, 0.8, 0.82),
-	"Common": Color(0.8, 0.8, 0.82),
-	"Uncommon": Color(0.75, 0.45, 1.0), # NO-256 ruling 4: purple, off green (green means money only)
+	# NO-256 (Max, 2026-09-25): white / green / blue / purple. Uncommon green is
+	# the one deliberate exception to "green means money only" — an emerald,
+	# bluer and deeper than the money green COL_GOLD so the two never read alike.
+	"": Color(1, 1, 1),
+	"Common": Color(1, 1, 1),
+	"Uncommon": Color(0.15, 0.7, 0.5),
 	"Rare": Color(0.35, 0.6, 1.0),
-	"Legendary": Color(1.0, 0.72, 0.15),
+	"Legendary": Color(0.75, 0.45, 1.0),
 }
 const COL_GOLD := Color(0.35, 0.85, 0.4)   # NO-151: the currency green, shared by every $ display
 ## NO-256 (d): the one money red — costs, losses and prices the player cannot

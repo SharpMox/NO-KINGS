@@ -893,9 +893,14 @@ func _init() -> void:
 			and not mb.has_theme_color_override("font_disabled_color"),
 		"NO-256: money() colours every enabled Button state and leaves disabled grey")
 	mb.free()
-	check(Tuning.ARTEFACT_RARITY_COLOR.Uncommon != Tuning.COL_GOLD
-			and Tuning.ARTEFACT_RARITY_COLOR.Uncommon.g < 0.6,
-		"NO-256 ruling 4: Uncommon is off green")
+	var unc: Color = Tuning.ARTEFACT_RARITY_COLOR.Uncommon
+	check(unc.g > unc.r and unc.g > unc.b and absf(unc.h - Tuning.COL_GOLD.h) > 0.05
+			and absf(unc.v - Tuning.COL_GOLD.v) > 0.1,
+		"NO-256 (Max): Uncommon is green, but a hue and depth apart from the money green")
+	check(Tuning.ARTEFACT_RARITY_COLOR.Common == Color.WHITE
+			and Tuning.ARTEFACT_RARITY_COLOR.Rare.b > 0.9
+			and Tuning.ARTEFACT_RARITY_COLOR.Legendary == Color(0.75, 0.45, 1.0),
+		"NO-256 (Max): Common white, Rare blue, Legendary purple")
 
 	# The Shop tile price and the preview title go through it.
 	var mt: Node2D = _boot({"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]], "wave": 5, "gold": 0})

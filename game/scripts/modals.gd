@@ -2069,7 +2069,7 @@ func _box_fly(opt: Dictionary) -> void:
 ## is inside containers, which would place a child themselves), input-dead.
 const BOX_LID_S := 0.25
 
-func _box_lid(grid: Control) -> void:
+func _box_lid(grid) -> void: # untyped: freed during the wait (ui_anim.gd modal_in)
 	await get_tree().process_frame # the grid's first sort
 	if not is_instance_valid(grid) or not grid.is_inside_tree():
 		return

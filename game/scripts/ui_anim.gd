@@ -37,7 +37,10 @@ static func on(g) -> bool:
 ## grows out of (default: its own centre) and `start` its first scale — the
 ## preview passes the tapped point and a small scale, so it grows out of the
 ## tile that was pressed.
-static func modal_in(g, panel: Control, content: Control, from := Vector2(-1, -1),
+## `panel` and `content` are untyped on purpose: either may be freed during
+## the one-frame wait, and restoring a freed object into a typed slot is a
+## SCRIPT ERROR ("Trying to assign invalid previously freed instance").
+static func modal_in(g, panel, content, from := Vector2(-1, -1),
 		start := MODAL_FROM) -> void:
 	if not on(g):
 		return
@@ -97,7 +100,7 @@ static func deal_in(g, nodes: Array, from_scale := Vector2(0.6, 0.6),
 		(n as Control).modulate.a = 0.0
 	await g.get_tree().process_frame
 	for i in nodes.size():
-		var n: Control = nodes[i]
+		var n = nodes[i] # untyped: it may have been freed during the wait (see modal_in)
 		if not is_instance_valid(n) or not n.is_inside_tree():
 			continue
 		n.pivot_offset = n.size / 2.0

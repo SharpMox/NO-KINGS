@@ -2380,7 +2380,7 @@ func _draw_stock_armed() -> void:
 	# generic token, with the same pulsing ring a selected board piece wears
 	var c := stock_armed.size / 2.0
 	var half := STOCK_ICON / 2.0
-	var t := Time.get_ticks_msec() / 1000.0
+	var t := Tuning.now_ms() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	stock_armed.draw_texture_rect(g.piece_tex(g.placing_id),
 		Rect2(c - Vector2(half, half), Vector2(STOCK_ICON, STOCK_ICON)), false)

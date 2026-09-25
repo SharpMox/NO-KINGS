@@ -413,6 +413,18 @@ capture ledgers, peak rank) ride through save/load and Extraction for free.
     tested tree (`git rev-parse <tested>^{tree} origin/main^{tree}`).
   New interaction or edge case ⇒ add a scenario to `game/data/scenarios.gd` (manual
   sandbox + swept automatically) and, if it's clickable UI, a probe check too.
+- **Time windows are measured in GAME time, and the input probes run at `--fixed-fps 60`.**
+  A test-visible window (the Stock double tap, the long presses) reads `Tuning.now_ms()`
+  or a SceneTreeTimer, never `Time.get_ticks_msec()` — a wall-clock window flaked when a
+  loaded CI runner put two taps 410-451 ms apart (#581). Under `--fixed-fps` every frame's
+  delta is exactly 1/60 s whatever it really took (4.7 `main_timer_sync.cpp:433`), so
+  timers, tweens, the Clock and `now_ms()` count frames; `--disable-vsync` is not needed
+  (it changes speed, not delta). `test_game_time.gd` stalls frames with `OS.delay_msec`
+  and proves the verdict does not move. Wall clock stays only where real time is the
+  point: `back_guard.gd` (the real gap between two OS deliveries), `drive.gd` (a host
+  waiting in real time), save timestamps. A new time window goes through `now_ms()`.
+  `.github/workflows/flake-hunt.yml` runs the full suite 5x nightly and files failures
+  on one open `flaky` issue.
 - **The full suite runs in GitHub Actions on every PR and on push to `main`**
   (`.github/workflows/godot-suite.yml`, job `suite`). A PR merges only once that check is
   green — check with `gh pr checks <n>`. This is the merge gate; it replaces dispatching

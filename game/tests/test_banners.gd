@@ -441,6 +441,8 @@ func _init() -> void:
 		["queen", 0, 1, 1, {"buffs": [{"key": "critical"}]}], ["rook", 1, 7, 10]], "wave": 3,
 		"artefacts": ["men-in-black-prescription-sunglasses", "lusitania-hardtack-crate", "tinfoil-hat"]})
 	await process_frame
+	terse.board[Vector2i(4, 4)].erase("buffs") # the boot's own turn start may
+		# already have Pincered it (a stunned piece isn't re-stunned, so no note)
 	_clear_feed(terse)
 	ArtefactHooks.run(terse, "on_turn_start") # Pincer
 	terse._destroy(Vector2i(1, 1)) # Lusitania: a Buffed piece lost

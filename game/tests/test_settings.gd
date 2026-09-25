@@ -131,6 +131,68 @@ func _init() -> void:
 
 	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
 
+	# Board theme picker (feat/board-theme-picker, Max ruling): the old
+	# cycling button is gone, replaced by one 2x2 swatch per BOARD_THEMES
+	# entry. Both entry points (menu.gd, hud.gd) call this same
+	# Settings.build() with no logic of their own for it, so exercising
+	# build() twice -- standing in for "menu" and the in-game "hud" pause
+	# menu -- is the seam that actually proves both work, the same
+	# convention the logout-provider check above already uses.
+	var GameScript: GDScript = load("res://scripts/game.gd")
+	var theme_ids: Array = GameScript.BOARD_THEMES.keys()
+	check(theme_ids.size() >= 2, "at least two board themes exist to pick a swatch from")
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
+	for entry_point in ["menu", "hud"]:
+		var layer := Control.new()
+		root.add_child(layer)
+		# A single-element array, not a plain Dictionary var: GDScript lambdas
+		# capture outer locals by value, so `changed_data = d` inside the
+		# closure would only rebind the closure's own copy. Mutating index 0
+		# of a captured Array is visible outside, same fix test_ads.gd uses
+		# for its `rewarded[0] += 1` counter.
+		var changed_data := [{}]
+		Settings.build(layer, func() -> void: pass,
+			func(d: Dictionary) -> void: changed_data[0] = d)
+
+		# Max review, feat/board-theme-picker: a "Board" heading reads the
+		# picker as a setting row like Sound/Animations/CRT above it.
+		var board_head := _find_label_text(layer, "Board")
+		check(board_head != null and board_head.theme_type_variation == &"Heading",
+			"%s: a 'Board' heading sits above the swatches, in the Heading role" % entry_point)
+
+		var swatch_buttons: Array = []
+		for id in theme_ids:
+			swatch_buttons.append(_find_named(layer, "SwatchButton_%s" % id))
+		check(not swatch_buttons.has(null) and swatch_buttons.size() == theme_ids.size(),
+			"%s: exactly one swatch button per BOARD_THEMES entry" % entry_point)
+
+		# Tap the theme that ISN'T the current default -- proves the tap
+		# actually changed something, not just that a value was re-read.
+		var other_id: String = theme_ids[1]
+		check(other_id != GameScript.DEFAULT_BOARD_THEME,
+			"%s: picked a non-default theme to tap" % entry_point)
+		(_find_named(layer, "SwatchButton_%s" % other_id) as Button).pressed.emit()
+		check(Settings.load_settings().get("board_theme", "") == other_id,
+			"%s: tapping a swatch persists that theme to disk" % entry_point)
+		check(changed_data[0].get("board_theme", "") == other_id,
+			"%s: tapping a swatch fires on_change with the new theme" % entry_point)
+
+		# Only the just-tapped swatch's panel carries the outline colour --
+		# assert the actual border colour, not merely that a stylebox got
+		# set (CLAUDE.md: "assert the observable consequence").
+		for id in theme_ids:
+			var panel := _find_named(layer, "SwatchPanel_%s" % id) as PanelContainer
+			var sb := panel.get_theme_stylebox("panel") as StyleBoxFlat
+			var outlined: bool = sb != null and sb.border_width_left > 0 \
+				and sb.border_color == Settings.SWATCH_OUTLINE_COLOR
+			check(outlined == (id == other_id),
+				"%s: swatch %s outline state matches selection (selected=%s)"
+					% [entry_point, id, other_id])
+
+		layer.queue_free()
+		await process_frame
+	DirAccess.remove_absolute(Settings.SETTINGS_PATH)
+
 	print("---")
 	if fails == 0:
 		print("ALL SETTINGS CHECKS OK")
@@ -148,3 +210,29 @@ func _find_logout_warn(node: Node) -> String:
 		if found != "":
 			return found
 	return ""
+
+
+## Finds a descendant by its exact node name. The swatches are addressed by
+## name (SwatchButton_<id> / SwatchPanel_<id>), not index, since BOARD_THEMES
+## can grow a third entry with no code change here.
+func _find_named(node: Node, node_name: String) -> Node:
+	if node.name == node_name:
+		return node
+	for c in node.get_children():
+		var found := _find_named(c, node_name)
+		if found != null:
+			return found
+	return null
+
+
+## Finds a descendant Label with an EXACT text match -- the board-theme
+## heading has no fixed name (unlike the swatches), so it's found by content,
+## same idiom as _find_logout_warn above.
+func _find_label_text(node: Node, text: String) -> Label:
+	if node is Label and (node as Label).text == text:
+		return node as Label
+	for c in node.get_children():
+		var found := _find_label_text(c, text)
+		if found != null:
+			return found
+	return null

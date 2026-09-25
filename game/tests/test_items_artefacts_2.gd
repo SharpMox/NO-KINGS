@@ -224,10 +224,13 @@ func _init() -> void:
 		"wave": 4, "gold": 0, "score": 0,
 		"artefacts": ["lusitania-hardtack-crate", "d-b-cooper-s-parachute"]})
 	await process_frame
+	var lus_clock0: float = lus.clock_ms
 	lus._destroy(Vector2i(2, 2)) # the queen carries a Buff and is unranked
-	# NO-250: Lusitania's +150 Score/+$150 is gone; its new Clock + Item Box
-	# effect lands in PR 2/2 (a loss mid enemy turn needs a deferred Box)
+	# NO-250: Lusitania's +150 Score/+$150 is gone — now +10s Clock and a
+	# Small Item Box owed to the next player-turn start
 	check(lus.score == 0, "Lusitania \"Hardtack\" Crate: no Score for a Buff-carrying piece lost")
+	check(lus.clock_ms >= lus_clock0 + 9000.0 and lus.pending_item_boxes == 1,
+		"Lusitania \"Hardtack\" Crate: +10s Clock and one Small Item Box owed")
 	check(lus.gold == roundi(lus.defs["queen"].value * 0.75),
 		"D.B. Cooper's Parachute (+75% of value) pays on the loss; Lusitania pays no $")
 	lus.queue_free()

@@ -221,9 +221,12 @@ static func capture_multiplier(board: Dictionary, from: Vector2i) -> int:
 ## "Reduced movement range" — ruled 2026-08-28: the piece moves and captures
 ## exactly like a Pawn. Slow is the piece's own debuff; Smog is projected onto
 ## adjacent enemies by whoever carries it.
+## NO-250: `unslowable` (Tinfoil Hat, stamped by game.gd's _refresh) opts a
+## piece out of both.
 static func moves_of(board: Dictionary, from: Vector2i, defs: Dictionary) -> Array:
 	var piece: Dictionary = board[from]
-	if has(piece, "slow") or _adjacent_source(board, from, "smog", false):
+	if not piece.get("unslowable", false) \
+			and (has(piece, "slow") or _adjacent_source(board, from, "smog", false)):
 		return defs["pawn"].moves
 	return defs[piece.id].moves
 

@@ -37,6 +37,7 @@ static func queue(g, n: int) -> void:
 	g.wave_lost_ids = [] # Jon Burrows' Fake ID / Walt's Cryonic Capsule (26)
 	g.doomsday_snooze_used_this_wave = false # Doomsday Clock Snooze Button (26)
 	g.zapruder_used_this_wave = false # Zapruder's Director's Cut (52)
+	g.curtain_rods_used_this_wave = false # Curtain Rods Bag's Magic bullet (NO-250)
 	g.bovine_used_this_wave = false # Bovine Tractor Beam (52)
 	g.jet_fuel_used_this_wave = false # Jet Fuel Vial (52; issue 61 — moved off
 		# the "Shop visit" boundary onto the same no-REGISTRY activation

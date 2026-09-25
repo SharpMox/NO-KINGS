@@ -641,4 +641,14 @@ static func _hand_written() -> Array:
 			"items": ["blitz", "sniper", "promote"].slice(0, Tuning.ITEM_CAP_BASE),
 			"artefacts": ["jet-fuel-vial", "deep-state-yearbook"],
 			"gold": 500, "score": 1000}},
+		# NO-250: the three new Artefact mechanics. Tap the Rook: the ringed
+		# Knight behind your Pawn is the Magic bullet shot. Enemy Pawns beside
+		# two of your Knights start Stunned (Pincer); the enemy Pawn can't take
+		# your Queen (Oligarch).
+		{"name": "NO-250: Magic bullet, Pincer, Oligarch", "cfg": {
+			"board": [["rook", 0, 0, 1], ["pawn", 0, 0, 2], ["knight", 1, 0, 6],
+				["knight", 0, 3, 3], ["knight", 0, 5, 3], ["pawn", 1, 4, 4],
+				["queen", 0, 6, 5], ["pawn", 1, 7, 6], ["rook", 1, 7, 10]],
+			"artefacts": ["curtain-rods-bag-rifle-shaped", "men-in-black-prescription-sunglasses",
+				"putin-s-golden-toilet-brush"]}},
 	]

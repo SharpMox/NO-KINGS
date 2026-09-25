@@ -1275,8 +1275,8 @@ func _on_stack_pressed(entry: Variant, cap: bool) -> void:
 	# double-tap on the same stack: piece info (NO-144: Sell, for a Stock
 	# entry, is in there too — never for a Captured one, entry stays null)
 	var key := id + ("!" if cap else "")
-	var now := Time.get_ticks_msec()
-	if key == pool_click_key and now - pool_click_ms < 400:
+	var now := Tuning.now_ms() # GAME time: see Tuning.now_ms
+	if key == pool_click_key and now - pool_click_ms < Tuning.DOUBLE_TAP_MS:
 		pool_click_key = ""
 		return _show_preview(id, "", entry if not cap else null, # NO-185: buffs
 			entry if entry is Dictionary else {})
@@ -6040,7 +6040,7 @@ func _draw_pulse() -> void:
 	var p: Dictionary = board[selected]
 	if not textures.has(p.id):
 		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
-	var t := Time.get_ticks_msec() / 1000.0
+	var t := Tuning.now_ms() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
 	var size := tile - SELECTED_INSET * 2 # the TOKEN's own on-screen size. The

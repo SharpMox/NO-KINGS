@@ -584,7 +584,7 @@ var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
 var magic_bullet_dests: Array[Vector2i] = [] # NO-250: legal_dests reached only
-	# through Curtain Rods Bag's Magic bullet (ringed in _draw; spend on use)
+	# through Curtain Rods Bag's Magic bullet (spent on use)
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 # NO-232 (en passant). Softened from chess's "next move" expiry (ambiguous
 # here — actions_per_turn varies) to "next TURN", per Max's ruling: each side
@@ -3083,8 +3083,8 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 
 ## The destinations shown (and, for your own piece, playable) from `at`.
 ## NO-250: your sliding piece also gets Curtain Rods Bag's Magic bullet
-## captures (once per Wave), drawn as linked dots through the blocker plus a
-## ring; an enemy's recon preview drops any capture Oligarch forbids, so the
+## captures (once per Wave): a normal red-hatched capture tile, reached by
+## linked dots through the blocker (Max: no extra ring); an enemy's recon preview drops any capture Oligarch forbids, so the
 ## preview never shows a threat the AI can't make.
 func _select_dests(at: Vector2i) -> void:
 	var ep := _ep_offers_for(board[at].owner) # NO-232
@@ -5642,8 +5642,6 @@ func _draw() -> void:
 							_tile_px(p.line[-1]) + half, col)
 				"bent":
 					_draw_linked_dots(_tile_px(selected) + half, p.line, col)
-	for t in magic_bullet_dests: # NO-250: a Magic bullet shot, ringed
-		draw_arc(_tile_px(t) + half, tile * 0.46, 0, TAU, 24, COL_CAPTURE, 3.0)
 	for t in _deploy_highlight_tiles():
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)

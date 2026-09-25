@@ -643,9 +643,9 @@ static func _hand_written() -> Array:
 			"gold": 500, "score": 1000}},
 		# NO-250: the three new Artefact mechanics, one sandbox each (tools/
 		# capture.md has the capture commands). Magic bullet: tap the Rook —
-		# the Knight behind your own Pawn is offered, dots through the Pawn,
-		# ringed red. Pincer: at Turn start the enemy Pawn between your two
-		# Knights is Stunned. Oligarch: tap the enemy Pawn — its recon preview
+		# the Knight behind your own Pawn is offered, dots through the Pawn.
+		# Pincer: at Turn start the enemy Pawn between your two Knights is
+		# Stunned. Oligarch: tap the enemy Pawn — its recon preview
 		# has no capture on your Queen (the control scenario shows it does).
 		{"name": "NO-250: Magic bullet", "cfg": {
 			"board": [["rook", 0, 0, 1], ["pawn", 0, 0, 2], ["knight", 1, 0, 6],

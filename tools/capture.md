@@ -51,7 +51,7 @@ NO-250 Artefact mechanics, through `--select` (a real tap):
 
 | State | Flags after `--` |
 |---|---|
-| Magic bullet preview: the Rook's shot at the Knight through your own Pawn (linked dots through the blocker, red ring on the target) | `--scenario-name "NO-250: Magic bullet" --screenshot /tmp/cap/bullet --select 0,1` |
+| Magic bullet preview: the Rook's shot at the Knight through your own Pawn (linked dots through the blocker to a normal red-hatched capture tile) | `--scenario-name "NO-250: Magic bullet" --screenshot /tmp/cap/bullet --select 0,1` |
 | Oligarch: the enemy Pawn's recon preview, with no capture on your Queen | `--scenario-name "NO-250: Oligarch" --screenshot /tmp/cap/oligarch --select 2,4` |
 | Oligarch control: the same preview without the Artefact, with the capture shown | `--scenario-name "NO-250: Oligarch (control, no Artefact)" --screenshot /tmp/cap/oligarch-ctrl --select 2,4` |
 

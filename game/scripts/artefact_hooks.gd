@@ -1856,7 +1856,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 					BuffLogic.add(g.board[pos], "stunned", 1)
 					g._add_float(pos, "Stunned!", g.COL_MERGE) # same float as the
 						# other two Stun sites — `stunned` has no board badge
-					_note(g, key, "Pincer: Stunned")
+					_note(g, key, "Stun") # #569: 1-2 word feed notes
 		["cia-exploding-cigar", "on_turn_start"]:
 			g.actions_left += 1
 		["i-am-not-a-robot-checkbox", "on_turn_start"]:
@@ -2078,7 +2078,7 @@ static func _apply(g, key: String, hook: String, ctx: Dictionary, acquired_wave:
 			if not ctx.uncounted and not ctx.cancel and not BuffLogic.of(g.board[ctx.pos]).is_empty():
 				Economy.add_clock(g, 10000.0, key)
 				g.pending_item_boxes += 1
-				_note(g, key, "+10s, Item Box next Turn", g.BANNER_GAIN)
+				_note(g, key, "+10s Box", g.BANNER_GAIN)
 		["templar-severance-gold-one-pile", "on_piece_lost"]:
 			if not ctx.uncounted and _ranked(g.defs, ctx.id):
 				g.gold += 150

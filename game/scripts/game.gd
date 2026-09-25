@@ -3321,7 +3321,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	if from == selected and magic_bullet_dests.has(to): # NO-250: this capture
 		# only exists through the Magic bullet — spend this Wave's shot
 		curtain_rods_used_this_wave = true
-		_add_float(from, "Magic bullet!", COL_CAPTURE)
+		_add_float(from, "Bullet", COL_CAPTURE)
+		ArtefactHooks._note(self, "curtain-rods-bag-rifle-shaped", "Bullet") # #569 terse
 	# NO-232: an en passant capture lands on an EMPTY square with the actual
 	# victim standing elsewhere — teleport it onto `to` BEFORE anything below
 	# reads the board, so every capture branch (repel/reflect/bomb/trap/
@@ -3408,7 +3409,8 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			ArtefactHooks._grant_buff(self, from, tier)
 		if BuffLogic.has(victim, "stun"): # cuts both ways
 			if _held("tinfoil-hat"): # NO-250: your pieces can't be Stunned
-				_add_float(from, "Tinfoil Hat!", COL_MERGE)
+				_add_float(from, "Immune", COL_MERGE)
+				ArtefactHooks._note(self, "tinfoil-hat", "Immune")
 			else:
 				BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
 				_add_float(from, "Stunned!", COL_MERGE)
@@ -4432,7 +4434,8 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 		return
 	if key == "slow" and piece.get("owner", -1) == Rules.PLAYER and _held("tinfoil-hat"):
 		if pos.x >= 0: # NO-250: your pieces can't be Slowed
-			_add_float(pos, "Tinfoil Hat!", COL_MERGE)
+			_add_float(pos, "Immune", COL_MERGE)
+			ArtefactHooks._note(self, "tinfoil-hat", "Immune")
 		return
 	if BuffLogic.catalogued_count(piece) >= buff_cap():
 		if pos.x >= 0:

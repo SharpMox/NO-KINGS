@@ -4,21 +4,27 @@ extends Node
 ## that also replaces ThemeDB.fallback_font, so the banner/feed fallback would
 ## point at Pixel Operator itself and ★ − ✦ would vanish.
 ##
-## No fallback font is chained: symbols Pixel Operator lacks come from the OS
-## system font fallback. Chaining the engine's Open Sans made every Pixel
-## Operator line 1.36 em tall (Font.get_height is the max over the chain).
+## Symbols Pixel Operator lacks come from NoKingsSymbols.ttf, chained as the one
+## fallback of both faces, so they render the same on every device (Max, 2026-09-25)
+## instead of through the OS font fallback. Font.get_height is the max over the
+## chain; NoKingsSymbols is built with Pixel Operator's exact vertical metrics
+## (assets/fonts/README.md), so chaining it leaves every line 1.0 em tall.
 ##
-## This autoload only turns antialiasing off, which is Pixel Operator's own look
-## (banners, feed). game.gd/hud.gd set it lazily on these SAME shared resources,
-## so without this the first banner or feed post would flip every Control's text
-## mid-run. Redundant once the .ttf.import files are committed with AA None.
+## Antialiasing is not set here: the .ttf.import files import all three faces AA
+## None. A runtime write from this autoload never showed up in test_theme (CI runs
+## 36063501655 and 36076048114 read AA 1 after it), the import params do.
+##
+## _static_init, not _enter_tree: it runs when the autoload pass loads this script,
+## before any scene, and does not depend on the node reaching the tree.
 
+const SYMBOLS := preload("res://assets/fonts/NoKingsSymbols.ttf")
 const FONTS := [
 	preload("res://assets/fonts/PixelOperator.ttf"),
 	preload("res://assets/fonts/PixelOperator-Bold.ttf"),
 ]
 
 
-func _enter_tree() -> void: # not _init: an autoload gets its script via set_script, which never calls _init
+static func _static_init() -> void:
+	var chain: Array[Font] = [SYMBOLS]
 	for f: FontFile in FONTS:
-		f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		f.fallbacks = chain

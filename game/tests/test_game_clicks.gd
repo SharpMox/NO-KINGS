@@ -1656,6 +1656,11 @@ func _init() -> void:
 	# board slid it 23px down onto Cancel, closing the very modal this check is
 	# about. Same lesson as the drag probes: a hardcoded tile is a geometry
 	# assertion in disguise (CLAUDE.md, tests that pass for the wrong reason).
+	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
+	# VBoxContainer rect is not settled the instant it's built — the same
+	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
+	# GridContainer — so wait one more idle frame before measuring it.
+	await process_frame
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
 	var box_rect: Rect2 = modal_box.get_global_rect()
 	var backdrop := Vector2(-1, -1)

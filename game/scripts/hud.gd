@@ -224,6 +224,8 @@ signal artefact_preview_requested(key: String) # NO-144: same as
 signal army_ability_pressed # issue 67: the Army Ability chip pressed
 signal drawer_changed
 signal shop_pressed
+signal feedback_pressed # NO-254: "Give Feedback" pressed in the pause menu —
+	# game.gd owns the actual open (open_feedback()), stubbable in tests/autoplay
 signal menu_toggled(open: bool)
 signal settings_changed(data: Dictionary) # a toggle changed; game.gd applies it live
 
@@ -1060,6 +1062,13 @@ func build(game) -> void:
 	to_menu.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
 	gm_box.add_child(to_menu)
+
+	# NO-254: a normal button (theme default), not a primary action — sits
+	# after Main Menu, still above the Resume gap so Resume stays last (#577).
+	var feedback_btn := Button.new()
+	feedback_btn.text = "Give Feedback"
+	feedback_btn.pressed.connect(func() -> void: feedback_pressed.emit())
+	gm_box.add_child(feedback_btn)
 
 	# Max ruling 2026-09-24 (isolated dismiss): Resume is the pause menu's
 	# dismiss — it returns to the game unchanged, the same role Cancel/Close

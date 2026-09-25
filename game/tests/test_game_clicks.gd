@@ -708,6 +708,18 @@ func _init() -> void:
 			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
 	await process_frame
 
+	# NO-254: "Give Feedback" — below Main Menu, above the Resume gap (#577);
+	# routes through open_feedback(), which records the URL instead of
+	# opening a browser because GameScript.is_scenario is true for this boot.
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.game_menu, "Give Feedback"), "in-game Give Feedback button clickable",
+		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
+			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "Give Feedback calls open_feedback with FEEDBACK_URL",
+		"last_feedback_url=%s" % game.last_feedback_url)
+	check(game.game_menu_open, "pressing Give Feedback doesn't close the pause menu")
+
 	check(await _click_button_in(game.game_menu, "Resume"), "Resume clickable",
 		"game_menu_open=%s game_menu.visible=%s buttons=%s" % [
 			game.game_menu_open, game.game_menu.visible, _button_texts_in(game.game_menu)])
@@ -734,10 +746,39 @@ func _init() -> void:
 	_click(game._tile_px(Vector2i(7, 10)) + Vector2(game.tile, game.tile) / 2)
 	await process_frame
 	check(game.selected != Vector2i(7, 10), "win screen blocks board clicks")
+	# NO-254: "Give Feedback" — below Continue/End Run, shares this overlay
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.overlay, "Give Feedback"), "win-screen Give Feedback button clickable")
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "win-screen Give Feedback calls open_feedback",
+		"last_feedback_url=%s" % game.last_feedback_url)
+	check(game.win_open, "pressing Give Feedback doesn't dismiss the win screen")
 	check(await _click_button_in(game.overlay, "Continue"), "Continue clickable")
 	await process_frame
 	check(not game.win_open and game.state == game.State.PLAYER_TURN,
 		"Continue resumes the run into endless")
+
+	# NO-254: the plain GAME OVER screen also gets "Give Feedback", below
+	# Restart/Main Menu — reached directly via _debug_show_screen (same seam
+	# tests/test_capture_paths.gd uses), never by actually losing a run.
+	game.queue_free()
+	await process_frame
+	GameScript.reset_boot_defaults()
+	GameScript.next_config = {"board": [["queen", 0, 2, 2], ["rook", 1, 7, 10]]}
+	GameScript.is_scenario = true
+	game = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	await process_frame
+	await game._debug_show_screen("gameover", PackedStringArray())
+	await process_frame
+	check(game.state == game.State.GAME_OVER, "gameover debug screen reaches GAME_OVER")
+	game.last_feedback_url = ""
+	check(await _click_button_in(game.overlay, "Give Feedback"), "game-over Give Feedback button clickable",
+		"buttons=%s" % _button_texts_in(game.overlay))
+	await process_frame
+	check(game.last_feedback_url == Tuning.FEEDBACK_URL, "game-over Give Feedback calls open_feedback",
+		"last_feedback_url=%s" % game.last_feedback_url)
 
 	# Boxes (issue 47 rework: 9 typed Boxes, the box-carrier enemy is gone —
 	# every Box comes from the Shop now). Buying a Box tile opens the roll
@@ -1626,6 +1667,11 @@ func _init() -> void:
 	# board slid it 23px down onto Cancel, closing the very modal this check is
 	# about. Same lesson as the drag probes: a hardcoded tile is a geometry
 	# assertion in disguise (CLAUDE.md, tests that pass for the wrong reason).
+	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
+	# VBoxContainer rect is not settled the instant it's built — the same
+	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
+	# GridContainer — so wait one more idle frame before measuring it.
+	await process_frame
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
 	var box_rect: Rect2 = modal_box.get_global_rect()
 	var backdrop := Vector2(-1, -1)

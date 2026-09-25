@@ -407,6 +407,11 @@ var king_power_bitten := false
 ## so it compounds with the turns still to come rather than being a one-off.
 var king_extra_actions := 0
 var win_open := false    # wave-50 win screen showing (Continue / End Run)
+## NO-254: the URL open_feedback() last handed to OS.shell_open — or, in a
+## test/autoplay context (never a real browser to open), recorded here
+## INSTEAD of opening one, so tests can assert against it directly rather
+## than stubbing OS.shell_open.
+var last_feedback_url := ""
 var lost_player := 0     # pieces lost, both sides — end-screen summary (GDD)
 var lost_enemy := 0
 var wave_start_lost_player := 0 # lost_player snapshot at wave start (artefact
@@ -5963,6 +5968,17 @@ func _record_history(won: bool) -> void:
 	Economy.record_history(self, won)
 
 
+## NO-254: opens the feedback Google Form in the device browser. Routed
+## through here rather than a direct OS.shell_open at each "Give Feedback"
+## button (pause menu, game over, win screen) so tests and autoplay never
+## pop a real browser — is_scenario/autoplay record the URL instead.
+func open_feedback() -> void:
+	if is_scenario or autoplay:
+		last_feedback_url = Tuning.FEEDBACK_URL
+		return
+	OS.shell_open(Tuning.FEEDBACK_URL)
+
+
 # --- HUD wiring (widgets live in scripts/hud.gd; signals up, calls down) ---
 
 func _connect_hud() -> void:
@@ -5999,6 +6015,7 @@ func _connect_hud() -> void:
 		animations_on = data.get("animations_on", true) # live — no restart needed
 		set_board_theme(data.get("board_theme", DEFAULT_BOARD_THEME))
 		queue_redraw())
+	hud.feedback_pressed.connect(open_feedback)
 
 
 ## Open one drawer (closing the others) or toggle it shut; "" closes all.
@@ -6051,6 +6068,7 @@ func _connect_modals() -> void:
 		_shop_buy(index))
 	modals.shop_tile_preview_requested.connect(func(index: int) -> void:
 		_show_shop_preview(index)) # NO-167 (Max review, second pass)
+	modals.feedback_pressed.connect(open_feedback)
 	modals.restart_pressed.connect(func() -> void:
 		# Restart means a FRESH ROLL (user ruling 2026-09-04). next_config used
 		# to survive the reload, so a run entered via Continue restarted into

@@ -543,7 +543,16 @@ var shop_lane_b_progress := 0 # issue 64: Score earned toward the next Lane-B
 var clock_ms := float(Tuning.CLOCK_START_MS)
 var stock: Array = []
 var captured: Array = []
-var actions_left := 0 # unified: move, place, merge, item — 1 action each
+var last_action_banner_shown := false # NO-238: LAST ACTION fires once per Turn;
+	# also pre-set true when the YOUR TURN banner already named a 1-Action turn,
+	# so the same drop-to-1 doesn't additionally fire LAST ACTION (Max: merge, don't stack)
+var actions_left := 0: # unified: move, place, merge, item — 1 action each
+	set(value): # NO-238: dropping to exactly 1 Action fires a banner once per Turn
+		if value == 1 and actions_left != 1 and not last_action_banner_shown \
+				and is_node_ready() and not autoplay and animations_on:
+			_add_turn_fx("LAST ACTION", BANNER_LOSS, "last_action")
+			last_action_banner_shown = true
+		actions_left = value
 var actions_max := 0  # granted this turn (base + artefact/item bonuses)
 var early_clear_awarded := false # once per wave (resets when the next queues)
 var pending_reinforce := false # shop due at the next player-turn start
@@ -1515,15 +1524,20 @@ const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
 
 
 func _begin_player_turn() -> void:
+	var new_actions := Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	last_action_banner_shown = false # re-armed for the new Turn
 	if state == State.ENEMY_TURN: # skip on the SETUP->first-turn transition
-		_add_turn_fx("YOUR TURN", Color(0.45, 0.7, 1.0))
+		_add_turn_fx("YOUR TURN · %d ACTION%s" % [new_actions, "" if new_actions == 1 else "S"],
+			Color(0.45, 0.7, 1.0), "your_turn")
+		if new_actions == 1: # NO-238: the banner above already named a 1-Action
+			last_action_banner_shown = true # Turn; don't also fire LAST ACTION for it
 	turn_number += 1 # issue 35: the single increment site — save_config.gd's
 		# apply() overrides the result AFTER this call (same pattern as
 		# skip_enemy_turns there), since a resumed save must not double-count
 		# the Turn it was saved on
 	_clear_selection() # a setup selection must not survive START
 	state = State.PLAYER_TURN
-	actions_left = Tuning.actions_per_turn(next_tier) # Tier 4+: -1 (NO-213)
+	actions_left = new_actions
 	moved_this_turn.clear()
 	player_double_steps.clear() # NO-232: this turn's en passant window closed
 		# with the enemy turn that just ended — starts empty again for
@@ -1563,6 +1577,7 @@ func _begin_player_turn() -> void:
 			pending_reinforce = false
 			AutoplayBot.reinforce(self)
 		else:
+			_add_turn_fx("REINFORCEMENTS", BANNER_GAIN, "reinforcements") # NO-238
 			modals.show_reinforce(_grant_reinforcements()) # NO-141: granted the
 				# instant the screen fires — the modal is announcement only
 	if pending_shop_open: # issue 101: the restock Wave opens the Shop itself
@@ -5056,6 +5071,8 @@ func _open_box_pick(slot: Dictionary) -> void:
 			box_rerolls_left -= 1
 			box_offer = _box_options(box_only_kind, box_size)
 		return _box_choose(box_offer[rng.randi() % box_offer.size()])
+	if box_only_kind == "item" and not ItemLogic.has_room(self): # NO-238: matches
+		_add_turn_fx("INVENTORY FULL", BANNER_LOSS, "inventory_full") # modals.show_box's own gate
 	modals.show_box(box_offer)
 
 
@@ -5256,8 +5273,9 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 		"box":
 			_open_box_pick(Box.random_slot(self))
 		"banner": # NO-234: hand-built, not _add_turn_fx — see
-			# _debug_state_screenshot's header for why
-			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN",
+			# _debug_state_screenshot's header for why. NO-238: illustrates the
+			# turn-start banner's action count, added to this text.
+			anims.append({"kind": "banner", "t": 0.5, "dur": 1.1, "text": "YOUR TURN · 2 ACTIONS",
 				"color": Color(0.45, 0.7, 1.0), "slot": 0})
 			queue_redraw()
 		"tip", "preview":

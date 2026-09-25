@@ -69,12 +69,16 @@ func _restock_banners(g) -> Array:
 
 
 ## The feed's live lines, top first (a pushed-out pill is removed at once; an
-## expired one is queue_free'd, so skip those).
+## expired one is queue_free'd, so skip those). NO-256 (e): a line is its row's
+## Labels joined — the " +$M" gold segment is a Label of its own.
 func _feed_texts(g) -> Array:
 	var out := []
 	for pill in g.hud.feed.get_children():
 		if not pill.is_queued_for_deletion():
-			out.append((pill.get_child(0).get_child(-1) as Label).text)
+			var line := ""
+			for lab in pill.get_child(0).get_children():
+				line += (lab as Label).text
+			out.append(line)
 	return out
 
 
@@ -409,6 +413,20 @@ func _init() -> void:
 	lines = _feed_texts(kf)
 	check(lines == ["test gain +%d +$20" % (20 * Economy.SCORE_MULTIPLIER)],
 		"two same-reason gains in one frame coalesce into one line (%s)" % [lines])
+	# NO-256 (e): the "+$M" is its own green segment; the rest keeps the line colour
+	var segs: Array = kf.hud.feed.get_child(0).get_child(0).get_children()
+	check(segs.size() == 2 and (segs[1] as Label).text == " +$20"
+			and (segs[1] as Label).get_theme_color("font_color") == Tuning.COL_GOLD
+			and (segs[0] as Label).get_theme_color("font_color") == kf.hud.FEED_TEXT,
+		"NO-256: the feed's +$ segment is green, the reason stays the line colour")
+	check((segs[1] as Label).get_theme_font_size("font_size") == kf.hud.FEED_FONT_SIZE,
+		"NO-256: the green +$ segment is the feed's 24 px too")
+	_clear_feed(kf)
+	kf.hud.feed_gain("scoreonly", "score only", 50, 0)
+	kf.hud._flush_feed()
+	check(kf.hud.feed.get_child_count() == 1
+			and kf.hud.feed.get_child(0).get_child(0).get_child_count() == 1,
+		"NO-256: a line with no Gold has no +$ segment")
 
 	# #569 round 2: an Artefact trigger is text only, no icon and no ✦
 	_clear_feed(kf)
@@ -435,6 +453,16 @@ func _init() -> void:
 		"a long feed line fits the screen: pill %.0f <= %.0f" % [pill.size.x, kf.hud.feed_max_w()])
 	check(fit.ends_with("…") and fit.length() < (long_reason + "+999 +$99").length(),
 		"...cut with '…' (%s)" % fit)
+	# NO-256 (e): with a Gold segment, only the reason is cut — the green +$ survives
+	_clear_feed(kf)
+	kf.hud.post(long_reason, kf.hud.FEED_TEXT, 99)
+	await process_frame
+	await process_frame
+	var gpill: Control = kf.hud.feed.get_child(0)
+	var gsegs: Array = gpill.get_child(0).get_children()
+	check(gpill.size.x <= kf.hud.feed_max_w() and (gsegs[0] as Label).text.ends_with("…")
+			and (gsegs[1] as Label).text == " +$99",
+		"NO-256: a long line with Gold cuts the reason and keeps ' +$99' whole (%s)" % [_feed_texts(kf)])
 	check(kf.hud.FEED_FONT_SIZE == 24, "the feed font is 24 px (Max: 32 too big)")
 	_clear_feed(kf)
 	kf.hud.post("short")

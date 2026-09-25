@@ -75,6 +75,17 @@ func _first_pool_stack(game: Node2D) -> Button:
 	return null
 
 
+## NO-256 (d): the visible Button under `node` reading exactly `text`, or null.
+func _find_button(node: Node, text: String) -> Button:
+	if node is Button and node.text == text and node.is_visible_in_tree():
+		return node
+	for c in node.get_children():
+		var hit := _find_button(c, text)
+		if hit:
+			return hit
+	return null
+
+
 func _click_button_in(node: Node, text: String) -> bool:
 	if node is Button and node.text == text and node.is_visible_in_tree():
 		var p: Node = node.get_parent()
@@ -2101,6 +2112,16 @@ func _init() -> void:
 	check(convert_badge != null and convert_badge.is_visible_in_tree()
 			and convert_badge.text == "⇄$%d" % badge_cost and not convert_badge.disabled,
 		"a captured entry shows its Convert badge with no arming step, priced and live at Wave 3")
+	if convert_badge != null:
+		check(convert_badge.get_theme_color("font_color") == Tuning.COL_GOLD,
+			"NO-256: the ⇄ Convert pill's price is green (on a dark pill)")
+	var cap_price: Label = null
+	for c in cap_row.get_children():
+		if c is Label and (c as Label).text.begins_with("$"):
+			cap_price = c
+	check(cap_price != null and cap_price.get_theme_color("font_color")
+			== Tuning.money_color(0, game.gold >= badge_cost),
+		"NO-256: a Captured cell's convert price is green (red only when short)")
 	# NO-223 (2026-09-22 ruling, extended from the Sell badge): the ⇄ badge is
 	# information only now — it takes no input, so clicking it does nothing.
 	# Convert itself moved into the long-press preview's own menu.
@@ -2114,7 +2135,11 @@ func _init() -> void:
 		# signal a real long press fires — see the Stock-sell block below
 	await process_frame
 	check(game.preview_open, "long-pressing a Captured entry opens its preview")
-	check(await _click_button_in(game.preview_panel, "Convert (-$%d)" % badge_cost),
+	var convert_btn := _find_button(game.preview_panel, "Convert -$%d" % badge_cost)
+	check(convert_btn != null and convert_btn.get_theme_color("font_color") == Tuning.COL_LOSS,
+		"NO-256 ruling 2: the preview reads 'Convert -$N' (no parentheses), in red",
+		_button_texts_in(game.preview_panel))
+	check(await _click_button_in(game.preview_panel, "Convert -$%d" % badge_cost),
 		"the preview's own Convert button is clickable")
 	await process_frame
 	check(game.captured == ["rook", "bishop"] and game.stock == ["bishop"]
@@ -2443,6 +2468,12 @@ func _init() -> void:
 				break
 		to_visit.append_array(n.get_children())
 	if check(tile != null, "an affordable piece tile exists"):
+		var tile_price: Label = null
+		for c in tile.get_children():
+			if c is Label and (c as Label).text.begins_with("$"):
+				tile_price = c
+		check(tile_price != null and tile_price.get_theme_color("font_color") == Tuning.COL_GOLD,
+			"NO-256: an affordable Shop tile's price is green")
 		_click(tile.get_global_rect().get_center())
 		await process_frame
 		# NO-167 (Max review, second pass): a tile tap opens its own preview now,
@@ -2453,6 +2484,10 @@ func _init() -> void:
 		var sh_stock: int = game.stock.size()
 		var sh_gold: int = game.gold
 		var sh_acts: int = game.actions_left
+		var buy_btn := _find_button(game.preview_panel, "Buy")
+		check(buy_btn != null and not buy_btn.has_theme_color_override("font_color"),
+			"NO-256 ruling 5: the Shop preview's button reads plain 'Buy', uncoloured",
+			_button_texts_in(game.preview_panel))
 		check(await _click_button_in(game.preview_panel, "Buy"),
 			"Buy clickable in the tile's preview")
 		await process_frame
@@ -2531,7 +2566,12 @@ func _init() -> void:
 	var sell_stock_before: int = game.stock.size()
 	var sell_gold_before: int = game.gold
 	var sell_acts_before: int = game.actions_left
-	check(await _click_button_in(game.preview_panel, "Sell (+$5)"),
+	var preview_sell_btn := _find_button(game.preview_panel, "Sell +$5")
+	check(preview_sell_btn != null and preview_sell_btn.get_theme_color("font_color") == Tuning.COL_GOLD
+			and preview_sell_btn.get_theme_color("font_pressed_color") == Tuning.COL_GOLD,
+		"NO-256: the preview's 'Sell +$N' is green in every enabled state",
+		_button_texts_in(game.preview_panel))
+	check(await _click_button_in(game.preview_panel, "Sell +$5"),
 		"the Sell button in the Stock entry's preview is clickable (pawn value 10, 50% floored = 5)")
 	await process_frame
 	check(game.buff_pick_open and game.stock.size() == sell_stock_before and game.gold == sell_gold_before,
@@ -2665,7 +2705,7 @@ func _init() -> void:
 		# that targeting cancels it first instead of being blocked.
 		game.hud.item_preview_requested.emit(0)
 		await process_frame
-		check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % item_payout),
+		check(await _click_button_in(game.preview_panel, "Sell +$%d" % item_payout),
 			"the Sell button is still offered while the Item is armed and staged")
 		await process_frame
 		check(game.buff_pick_open and game.item_active == 0 and game.item_pending_tile == game.item_targets[0],
@@ -2715,7 +2755,7 @@ func _init() -> void:
 		to_visit_art.append_array(n.get_children())
 	check(not art_preview_has_use,
 		"NO-223: an Artefact's menu offers no Use — Activate stays a plain tap, never duplicated in here")
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout),
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % art_payout),
 		"the Sell button in the Artefact's preview is clickable")
 	await process_frame
 	check(game.buff_pick_open and game.artefacts.size() == 1 and game.gold == gold_before_art,
@@ -2727,7 +2767,7 @@ func _init() -> void:
 
 	game.hud.artefact_preview_requested.emit("agartha-welcome-mat")
 	await process_frame
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % art_payout), "Sell again")
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % art_payout), "Sell again")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Sell"), "Sell confirms the sale")
 	await process_frame
@@ -2755,7 +2795,7 @@ func _init() -> void:
 	game.hud.artefact_preview_requested.emit("bovine-tractor-beam")
 	await process_frame
 	check(game.preview_open, "the preview opens even while the Artefact is mid-targeting")
-	check(await _click_button_in(game.preview_panel, "Sell (+$%d)" % bovine_payout),
+	check(await _click_button_in(game.preview_panel, "Sell +$%d" % bovine_payout),
 		"Sell is offered while targeting is live")
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Sell"), "confirming the sale")

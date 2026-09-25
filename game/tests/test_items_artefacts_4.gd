@@ -1946,6 +1946,47 @@ func _init() -> void:
 	crb_ordinary.queue_free()
 	await process_frame
 
+	# NO-250 follow-up: the autoplay bot itself now offers Magic bullet
+	# captures. Rules.legal_moves has no idea the Artefact exists (its own
+	# header) — before this fix the bot never used Curtain Rods Bag and every
+	# balance sim undervalued it. Two independent blocked-capture setups so
+	# the bot has TWO candidate bullet shots at once; only one may fire.
+	var bot_mb := _boot({"board": [
+			["rook", 0, 0, 1], ["pawn", 0, 0, 2], ["knight", 1, 0, 6],
+			["rook", 0, 3, 1], ["pawn", 0, 3, 2], ["knight", 1, 3, 6]],
+		"wave": 3, "artefacts": ["curtain-rods-bag-rifle-shaped"]})
+	bot_mb.autoplay = true
+	await process_frame
+	# Generous headroom, set directly (same pattern crb2/crb_ordinary above
+	# use): 2 player actions must not exhaust it, or _move_player's own
+	# "actions_left == 0" auto-pass (game.gd ~3682) hands the turn to the
+	# enemy mid-test — its Knight (still on the board, only the OTHER Knight
+	# was shot) is then free to move off the very tile these checks read, an
+	# unrelated state change that would break the invariants below and look
+	# like a second bullet firing when none did.
+	bot_mb.actions_left = 5
+	AutoplayBot.step(bot_mb)
+	check(bot_mb.curtain_rods_used_this_wave,
+		"Autoplay: uses Magic bullet when a bullet-only capture is available")
+	# both target tiles stay occupied either way (a capture replaces the
+	# occupant, it doesn't empty the tile) — the real signal is WHO holds
+	# them: exactly one Knight replaced by the Rook that shot through it.
+	var owners_1 := [bot_mb.board.get(Vector2i(0, 6), {}).get("owner", -1),
+		bot_mb.board.get(Vector2i(3, 6), {}).get("owner", -1)]
+	check(owners_1.count(Rules.PLAYER) == 1 and owners_1.count(Rules.ENEMY) == 1,
+		"Autoplay: the Magic bullet shot actually captured through the blocker (one Knight replaced by the Rook)")
+	check(bot_mb.board.has(Vector2i(0, 2)) and bot_mb.board.has(Vector2i(3, 2)),
+		"Autoplay: both blockers survive the shot (Magic bullet passes through, doesn't capture the blocker)")
+	AutoplayBot.step(bot_mb)
+	check(bot_mb.state == bot_mb.State.PLAYER_TURN,
+		"(setup) still your Turn — the enemy never got a move to disturb the board")
+	var owners_2 := [bot_mb.board.get(Vector2i(0, 6), {}).get("owner", -1),
+		bot_mb.board.get(Vector2i(3, 6), {}).get("owner", -1)]
+	check(owners_2.count(Rules.PLAYER) == 1 and owners_2.count(Rules.ENEMY) == 1,
+		"Autoplay: only once per Wave — the second bullet-only capture is never taken (still exactly one Knight down)")
+	bot_mb.queue_free()
+	await process_frame
+
 	# Men in Black "Pincer": at Turn start, an enemy beside TWO of your
 	# same-type pieces is Stunned for the coming enemy turn
 	var mib := _boot({"board": [["pawn", 0, 3, 4], ["pawn", 0, 5, 4], ["knight", 1, 4, 5],

@@ -69,6 +69,15 @@ static func _crt(data: Dictionary) -> void:
 ## shows the login screen, the in-game menu has a live run to leave first — but
 ## the ROW is built once, here, so the two copies cannot drift apart the way
 ## this repo has been bitten by duplicated controls before.
+
+# Board-theme swatches (feat/board-theme-picker): each quadrant is this many
+# px, so a 2x2 swatch is ~2x this plus the panel's own content margins --
+# lands in the 64-80px range Max asked for. Outline colour is the same accent
+# already used for a selection elsewhere: menu.gd's TIER_OUTLINE_COLOR /
+# game.gd's COL_SELECT board highlight (0.35, 0.62-0.65, 1.0).
+const SWATCH_QUADRANT := 32.0
+const SWATCH_OUTLINE_COLOR := Color(0.35, 0.62, 1.0)
+
 static func build(layer: Node, on_back: Callable, on_change := Callable(),
 		on_logout := Callable()) -> CenterContainer:
 	var center := CenterContainer.new()
@@ -131,27 +140,95 @@ static func build(layer: Node, on_back: Callable, on_change := Callable(),
 			on_change.call(data))
 	box.add_child(crt)
 
-	# Board colours (Y1/NO-216): cycles the board chequer. The theme ids and
-	# labels live in game.gd's BOARD_THEMES (load(), not preload() — game.gd
-	# preloads this script, so a preload back would close a compile cycle;
-	# same seam piece_diagram.gd uses for the same colours). A run's own
-	# board draw picks this up live via hud.gd's settings_changed signal —
-	# this panel only stores the choice and relabels itself.
+	# Board colours (Y1/NO-216, side-by-side picker: feat/board-theme-picker,
+	# Max ruling): a row of tappable 2x2 mini-board swatches, one per
+	# BOARD_THEMES entry, each drawn in that theme's own light/dark/dark/light
+	# colours with its label underneath — replaces the old cycling button so
+	# both options are visible and chosen directly, and a future third theme
+	# needs no code here. The theme ids/colours/labels live in game.gd's
+	# BOARD_THEMES (load(), not preload() — game.gd preloads this script, so
+	# a preload back would close a compile cycle; same seam piece_diagram.gd
+	# uses for the same colours). A run's own board draw picks this up live
+	# via hud.gd's settings_changed signal — this panel only stores the
+	# choice and redraws the outline.
 	var GameScript: GDScript = load("res://scripts/game.gd")
 	var theme_ids: Array = GameScript.BOARD_THEMES.keys()
-	var board := Button.new()
-	var relabel_board := func() -> void:
-		var id: String = data.get("board_theme", GameScript.DEFAULT_BOARD_THEME)
-		board.text = "Board: %s" % GameScript.BOARD_THEMES.get(id, GameScript.BOARD_THEMES[GameScript.DEFAULT_BOARD_THEME]).label
-	relabel_board.call()
-	board.pressed.connect(func() -> void:
-		var id: String = data.get("board_theme", GameScript.DEFAULT_BOARD_THEME)
-		data.board_theme = theme_ids[(theme_ids.find(id) + 1) % theme_ids.size()]
-		save_settings(data)
-		relabel_board.call()
-		if on_change.is_valid():
-			on_change.call(data))
-	box.add_child(board)
+
+	# Max review, feat/board-theme-picker: a heading reads the picker as a
+	# setting row like Sound/Animations/CRT above it, rather than a bare pair
+	# of swatches. A direct child of `box`, so it picks up the same 16px
+	# separation every other row already gets -- no extra gap needed either
+	# side of it.
+	var board_head := Label.new()
+	board_head.text = "Board"
+	board_head.theme_type_variation = &"Heading"
+	board_head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(board_head)
+
+	# One PanelContainer per theme, in theme_ids order — its "panel" style is
+	# the outline surface (same idiom as menu.gd's tier_panels /
+	# _update_tier_outline): bordered in SWATCH_OUTLINE_COLOR when selected,
+	# borderless otherwise, so exactly one swatch is ever outlined.
+	var swatches: Array[PanelContainer] = []
+	var update_swatches := func(selected_id: String) -> void:
+		for i in swatches.size():
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = Color(0, 0, 0, 0)
+			sb.content_margin_left = 4
+			sb.content_margin_right = 4
+			sb.content_margin_top = 4
+			sb.content_margin_bottom = 4
+			if theme_ids[i] == selected_id:
+				sb.border_color = SWATCH_OUTLINE_COLOR
+				sb.set_border_width_all(3)
+			swatches[i].add_theme_stylebox_override("panel", sb)
+
+	var swatch_row := HFlowContainer.new() # wraps automatically if a future theme won't fit one line
+	swatch_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	swatch_row.add_theme_constant_override("h_separation", 16)
+	swatch_row.add_theme_constant_override("v_separation", 16)
+	box.add_child(swatch_row)
+	for theme_id in theme_ids:
+		var t: Dictionary = GameScript.BOARD_THEMES[theme_id]
+		var swatch_col := VBoxContainer.new()
+		swatch_col.add_theme_constant_override("separation", 4)
+		swatch_row.add_child(swatch_col)
+
+		var swatch_panel := PanelContainer.new()
+		swatch_panel.name = "SwatchPanel_%s" % theme_id # addressed by name in test_settings.gd
+		swatches.append(swatch_panel)
+		swatch_col.add_child(swatch_panel)
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 0)
+		grid.add_theme_constant_override("v_separation", 0)
+		swatch_panel.add_child(grid)
+		for quad in [t.light, t.dark, t.dark, t.light]: # 2x2: light/dark top, dark/light bottom
+			var cell := ColorRect.new()
+			cell.color = quad
+			cell.custom_minimum_size = Vector2(SWATCH_QUADRANT, SWATCH_QUADRANT)
+			cell.mouse_filter = Control.MOUSE_FILTER_IGNORE # the overlay button below takes the tap
+			grid.add_child(cell)
+		# Borderless overlay spanning the whole panel (PanelContainer fits
+		# every child to the same rect) is the tap target — same convention
+		# menu.gd's tier rows use for a full-panel hit area.
+		var swatch_btn := Button.new()
+		swatch_btn.name = "SwatchButton_%s" % theme_id # addressed by name in test_settings.gd
+		swatch_btn.flat = true
+		swatch_panel.add_child(swatch_btn)
+		swatch_btn.pressed.connect(func() -> void:
+			data.board_theme = theme_id
+			save_settings(data)
+			update_swatches.call(theme_id)
+			if on_change.is_valid():
+				on_change.call(data))
+
+		var swatch_label := Label.new()
+		swatch_label.text = t.label
+		swatch_label.theme_type_variation = &"Meta"
+		swatch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		swatch_col.add_child(swatch_label)
+	update_swatches.call(data.get("board_theme", GameScript.DEFAULT_BOARD_THEME))
 
 	# LOG OUT, with the confirm inline rather than as a modal. This panel is
 	# embedded in two different scenes and a modal would have to be built and

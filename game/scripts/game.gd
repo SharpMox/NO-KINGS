@@ -359,6 +359,18 @@ const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
 const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
 const BUFF_BADGE_ACCENT := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
 const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
+## Stun badge glyph (Max's ruling): the SAME glyph BuffLogic.PIECE_BUFF_GLYPHS
+## already uses for the "stun" Piece Buff (buff_logic.gd) — the effect that
+## PRODUCES the "stunned" debuff this badge marks at game.gd's two
+## `BuffLogic.add(..., "stunned", ...)` sites, both right after
+## `BuffLogic.has(victim, "stun")` (a third site, artefact_hooks.gd's Pincer
+## handler — NO-250, #588 — applies "stunned" directly, no "stun" buff
+## involved, same debuff either way). It's the one glyph in this codebase
+## already tied to Stun in a tooltip (BuffLogic.describe()), so it satisfies
+## that preference over picking a fresh symbol; drawn red instead of amber
+## (STUN_BADGE_COL below) is what tells the two apart on the rare piece that
+## carries both at once.
+const STUN_BADGE_GLYPH := "⊘"
 ## NO-244: glyph -> [dx, dy, scale], dx/dy as a fraction of the badge's half
 ## side (+ = right/down). Measured by eye from captures of every buff; the
 ## inversion mark's ⟲ has its own tuning (INV_MARK_GLYPH_*) and isn't here.
@@ -1550,6 +1562,10 @@ const BANNER_LOSS := Tuning.COL_LOSS # NO-256 (d): the one money red
 const BANNER_GAIN := Color(0.45, 0.85, 0.5)
 const BANNER_POWER := Color(1.0, 0.55, 0.4)
 const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
+## The Stun board badge's outline + glyph colour (Max's ruling): the game's
+## loss red, `Tuning.COL_LOSS` (NO-256's money red, #583) — the same red
+## `BANNER_LOSS` above now points at, and the "Stunned!" float already uses.
+const STUN_BADGE_COL := Tuning.COL_LOSS
 
 
 func _begin_player_turn() -> void:
@@ -6136,31 +6152,63 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var nudge := INV_MARK_GLYPH_NUDGE * glyph_size
 		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
 			HORIZONTAL_ALIGNMENT_CENTER, r * 2, glyph_size, INV_MARK_GLYPH_COL)
-	var buff_glyphs := BuffLogic.glyphs_of(p)
-	if not buff_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
-		_draw_buff_badges(font, px, buff_glyphs)
+	var slots := _badge_slots(p)
+	var badge_glyphs: Array[String] = slots.glyphs
+	if not badge_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
+		_draw_buff_badges(font, px, badge_glyphs, slots.stun_index)
+
+
+## Piece Buff glyphs (BuffLogic.glyphs_of) plus, if `p` is stunned
+## (BuffLogic.has "stunned" — a debuff riding the same buffs list, not a
+## catalogued Piece Buff; buff_logic.gd's module header), a Stun badge
+## appended. Buffs and Stun share one on-screen budget of 4 badges
+## (_buff_badge_centres): a stunned piece that already holds 4 Buffs drops
+## the LAST one to make room, because Stun takes PRIORITY — it's temporary
+## and actionable, where a 4th Buff staying hidden for one turn is not
+## (Max's ruling). Returns {"glyphs": Array[String], "stun_index": int}, the
+## index of the Stun badge within `glyphs` (-1 when not stunned) — shared by
+## _draw_buff_badges and tests/test_board_draw.gd so the probe can't diverge
+## from the draw, same convention as _buff_badge_centres below.
+func _badge_slots(p: Dictionary) -> Dictionary:
+	var glyphs: Array[String] = BuffLogic.glyphs_of(p)
+	if not BuffLogic.has(p, "stunned"):
+		return {"glyphs": glyphs, "stun_index": -1}
+	if glyphs.size() >= 4:
+		glyphs.resize(3)
+	glyphs.append(STUN_BADGE_GLYPH)
+	return {"glyphs": glyphs, "stun_index": glyphs.size() - 1}
 
 
 ## NO-185: one small badge per catalogued buff `p` carries
 ## (BuffLogic.glyphs_of), low on the tile. Capacity is base 2
 ## (Tuning.PIECE_BUFF_CAP_BASE) + Abduction Probe (+1, non-stacking) + the
 ## Cult's Communion (+1), so at most 4 badges — _buff_badge_centres lays out
-## exactly that many.
-func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
+## exactly that many. `stun_index` (from _badge_slots) is the badge drawn red
+## instead of amber — same shape and size, Max's ruling, so it reads apart
+## from a Piece Buff without a second visual language.
+func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String], stun_index := -1) -> void:
 	# NO-244 (Max, 2026-09-24): purple rounded squares, amber outline and amber
 	# glyph, every badge the same size whatever the count.
 	var centres := _buff_badge_centres(px, glyphs.size())
 	for i in centres.size():
-		_draw_buff_badge(font, centres[i], glyphs[i])
+		_draw_buff_badge(font, centres[i], glyphs[i], 1.0, 1.0,
+			STUN_BADGE_COL if i == stun_index else BUFF_BADGE_ACCENT)
 
 
 ## One badge centred on `c`; `scl`/`alpha` are for NO-243's pop-in and fade.
-func _draw_buff_badge(font: Font, c: Vector2, glyph: String, scl := 1.0, alpha := 1.0) -> void:
+## `accent` is the border + glyph colour — the amber Piece Buff colour by
+## default, or STUN_BADGE_COL for the one badge in a row that marks Stunned
+## (_draw_buff_badges above). Stunned never carries a catalogued glyph
+## (BuffLogic.glyph_of returns "" for it — _add_badge's own comment), so it
+## never reaches this function through the pop-in/fade anim path below,
+## only through the plain per-frame board draw.
+func _draw_buff_badge(font: Font, c: Vector2, glyph: String, scl := 1.0, alpha := 1.0,
+		accent := BUFF_BADGE_ACCENT) -> void:
 	var half := _buff_badge_half() * scl
 	var size := int(half * BUFF_GLYPH_RATIO)
 	var box := StyleBoxFlat.new()
 	box.bg_color = Color(BUFF_BADGE_FILL, BUFF_BADGE_FILL.a * alpha)
-	box.border_color = Color(BUFF_BADGE_ACCENT, BUFF_BADGE_ACCENT.a * alpha)
+	box.border_color = Color(accent, accent.a * alpha)
 	box.set_border_width_all(1)
 	box.set_corner_radius_all(int(half * 0.45))
 	draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
@@ -6171,7 +6219,7 @@ func _draw_buff_badge(font: Font, c: Vector2, glyph: String, scl := 1.0, alpha :
 	var gsize := int(size * tune[2])
 	var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
 	draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyph,
-		HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, Color(BUFF_BADGE_ACCENT, BUFF_BADGE_ACCENT.a * alpha))
+		HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, Color(accent, accent.a * alpha))
 
 
 ## Half the side of one buff badge (NO-244: fixed, the two-buff size).

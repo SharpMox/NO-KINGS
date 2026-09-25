@@ -56,6 +56,19 @@ func _item_confirm_tap(g, t: Vector2i) -> void:
 	g._item_confirm_target()
 
 
+## Same helper test_long_press.gd/test_game_clicks.gd use to inspect the
+## preview modal (NO-138), but returning the Label itself rather than a
+## bool — this suite also wants its colour, not just its text.
+func _find_label(node: Node, text: String) -> Label:
+	if node is Label and text in (node as Label).text:
+		return node
+	for c in node.get_children():
+		var found := _find_label(c, text)
+		if found:
+			return found
+	return null
+
+
 func _init() -> void:
 	# --- Piece Buffs (slice 03): Buff Box picks a buff, then targets a piece;
 	# Shield repels one capture from either side; Critical doubles one capture
@@ -295,6 +308,19 @@ func _init() -> void:
 		"capturing a stunning enemy stuns your own attacker")
 	sp._on_tile_clicked(Vector2i(2, 5))
 	check(sp.selected == Vector2i(-1, -1), "a stunned piece cannot be picked up")
+
+	# The piece preview modal lists Stunned too (Max's ruling): it's a debuff
+	# riding the same buffs list as a Piece Buff, but BuffLogic.describe()
+	# (which the modal's Buff listing reuses) deliberately skips it — see the
+	# module header — so modals.gd gives it its own line, in the board
+	# badge's red (game.gd's STUN_BADGE_COL).
+	sp._show_preview("queen", "", null, sp.board[Vector2i(2, 5)])
+	await process_frame
+	var stun_label := _find_label(sp.preview_panel, "Stunned")
+	check(stun_label != null, "the preview modal lists 'Stunned' for a stunned piece")
+	check(stun_label != null and stun_label.modulate == sp.STUN_BADGE_COL,
+		"...in the board badge's red, not the ordinary Buff-listing white")
+
 	sp.queue_free()
 	await process_frame
 

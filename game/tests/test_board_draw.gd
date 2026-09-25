@@ -20,6 +20,7 @@ extends SceneTree
 
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
+const BuffLogic := preload("res://scripts/buff_logic.gd")
 
 const INVERTED := ["inv-sergeant", "inv-arrow-pawn", "inv-kirin-plus", "inv-kirin-plus-plus"]
 const COUNTERPARTS := ["sergeant", "arrow-pawn", "kirin-plus", "kirin-plus-plus"]
@@ -101,6 +102,32 @@ func _init() -> void:
 	var three: Array[Vector2] = game._buff_badge_centres(px, 3)
 	check(is_equal_approx(three[2].x, (three[0].x + three[1].x) / 2.0) and three[2].y < three[0].y,
 		"3 buff badges: the third sits centred above the bottom pair")
+
+	# Stun badge (Max's ruling): red, same shape/size as a Buff badge, takes
+	# a slot alongside Buffs and takes PRIORITY over the 4th when full.
+	# `_badge_slots` is the exact helper `_draw_buff_badges` draws from, so
+	# these checks can't drift from what actually gets drawn.
+	check(game.STUN_BADGE_COL != game.BUFF_BADGE_ACCENT,
+		"the stun badge's colour is distinct from the amber Buff badge colour")
+
+	var stunned_only := {"buffs": [{"key": "stunned", "turns": 2}]}
+	var stun_only_slots: Dictionary = game._badge_slots(stunned_only)
+	check(stun_only_slots.glyphs == [game.STUN_BADGE_GLYPH] and stun_only_slots.stun_index == 0,
+		"a stunned piece with no Buffs draws exactly one red stun badge (%s)" % [stun_only_slots])
+
+	var no_longer_stunned := {"buffs": []} # BuffLogic._age erases "buffs" once turns reach 0
+	var cleared_slots: Dictionary = game._badge_slots(no_longer_stunned)
+	check(cleared_slots.stun_index == -1 and cleared_slots.glyphs.is_empty(),
+		"the stun badge clears once the stun ends (%s)" % [cleared_slots])
+
+	var three_buffs := [{"key": "shield"}, {"key": "critical"}, {"key": "taunt"}]
+	var four_buffs_stunned := {"buffs": three_buffs + [{"key": "bomb"}, {"key": "stunned", "turns": 1}]}
+	var priority_slots: Dictionary = game._badge_slots(four_buffs_stunned)
+	var kept_glyphs: Array[String] = BuffLogic.glyphs_of({"buffs": three_buffs})
+	check(priority_slots.glyphs.size() == 4 and priority_slots.stun_index == 3
+			and priority_slots.glyphs[3] == game.STUN_BADGE_GLYPH
+			and priority_slots.glyphs.slice(0, 3) == kept_glyphs,
+		"4 Buffs + Stunned: still 4 badges total, Stun takes the 4th slot over the last Buff (%s)" % [priority_slots])
 
 	game.queue_free()
 	await process_frame

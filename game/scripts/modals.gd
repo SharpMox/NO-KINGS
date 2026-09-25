@@ -794,6 +794,18 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			buffs_label.custom_minimum_size = Vector2(minf(260, g.get_viewport_rect().size.x - 96), 0)
 			box.add_child(buffs_label)
 
+		# Stunned is a debuff riding the same buffs list as a Piece Buff, but
+		# is NOT catalogued (buff_logic.gd's module header) so it's absent
+		# from buff_lines above — BuffLogic.describe() skips it on purpose.
+		# Its own line here, in the board badge's red (g.STUN_BADGE_COL).
+		if BuffLogic.has(piece, "stunned"):
+			var stun_label := Label.new()
+			stun_label.text = "Stunned"
+			stun_label.theme_type_variation = &"Meta"
+			stun_label.modulate = g.STUN_BADGE_COL
+			stun_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(stun_label)
+
 		var chain: Array = g._chain_of(id)
 		if chain.size() > 1:
 			var row := HBoxContainer.new()

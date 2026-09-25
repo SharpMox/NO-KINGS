@@ -662,4 +662,15 @@ static func _hand_written() -> Array:
 		{"name": "NO-250: Oligarch (control, no Artefact)", "cfg": {
 			"board": [["queen", 0, 3, 3], ["pawn", 0, 0, 1], ["pawn", 1, 2, 4],
 				["rook", 1, 7, 10]]}},
+		# --- debug: Stun badge (Max's ruling) ---
+		# The board draws "stunned" (a debuff, riding the same buffs list as a
+		# Piece Buff — buff_logic.gd's module header) with a RED badge, same
+		# shape/size as an amber Piece Buff badge. Both sides, in one board:
+		# the enemy rook is stunned alone (a lone red badge); the player queen
+		# is stunned WITH 4 Buffs already held, so its badge row shows the
+		# priority rule — Stun bumps the 4th Buff rather than staying hidden.
+		{"name": "Stun badge: red, priority over a 4th Buff (both sides)", "cfg": {
+			"board": [["queen", 0, 2, 1, {"buffs": [{"key": "shield"}, {"key": "critical"},
+					{"key": "taunt"}, {"key": "bomb"}, {"key": "stunned", "turns": 2}]}],
+				["rook", 1, 4, 9, {"buffs": [{"key": "stunned", "turns": 2}]}]]}},
 	]

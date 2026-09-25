@@ -29,6 +29,7 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | Screen | What it shows | Flags after `--` |
 |---|---|---|
 | `board` | the scenario exactly as booted (a bare `--screenshot` places the Stock and passes first) | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/kchip --show-screen board` |
+| `board` | the Stun badge (red, Max's ruling): a stunned enemy alone, and a stunned player piece already holding 4 Buffs (priority over the 4th) | `--scenario-name "Stun badge: red, priority over a 4th Buff (both sides)" --screenshot /tmp/cap/stun --show-screen board` |
 | `pause` | in-game pause menu | `--scenario-name "Movement & drag" --screenshot /tmp/cap/pause --show-screen pause` |
 | `king-abilities` | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | `box` | a random Box pick | `--scenario-name "Movement & drag" --screenshot /tmp/cap/box --show-screen box` |

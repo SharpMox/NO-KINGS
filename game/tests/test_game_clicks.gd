@@ -3080,10 +3080,8 @@ func _init() -> void:
 	await process_frame
 	check(await _click_button_in(game.modals.buff_panel, "Confirm"), "Confirm clickable on the confirm modal")
 	await process_frame
-	check(not game.buff_pick_open and game.gold == 475 and game.score == 4000, # issue 57:
-			# Score x10 (400 -> 4000), Gold untouched
-		"confirming activates it: 25 Gold spent, +400 Score (earn() also grants " +
-		"the matching Gold, same as every other reward routed through it: 100 - 25 + 400 = 475)")
+	check(not game.buff_pick_open and game.gold == 75 and game.score == 0 and game.box_open,
+		"confirming activates it: $25 spent, a Small Item Box opens, no Gold or Score gained (NO-250)")
 
 	# Bovine Tractor Beam: the one TARGETED activation. Tapping the chip again
 	# MID-STAGE (before stage B) still cancels straight from targeting, no

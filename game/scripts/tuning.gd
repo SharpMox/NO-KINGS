@@ -249,9 +249,8 @@ const CONTINUE_CLOCK_REFILL_MS := 5 * 60 * 1000 # one-time, on entering endless
 ## GOLD ONLY — routed through Economy.earn_gold, not earn(). earn() grants BOTH
 ## currencies (score x10 AND gold 1:1), so the first cut of this silently
 ## multiplied the Score payout too; the ruling is that declining a Box should
-## not move the leaderboard at all. A converter Artefact's score_bonus can
-## still turn some of that Gold into Score, which is that Artefact working
-## rather than a base reward.
+## not move the leaderboard at all (and since NO-250 no Artefact converts Gold
+## into Score either).
 ##
 ## Was `BOX_SKIP_CONSOLATION := 20`, paid through earn() — so it actually gave
 ## ~20 Gold AND 200 Score while the button read "+20 score". Both halves of

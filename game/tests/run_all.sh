@@ -21,11 +21,23 @@ TIMEOUT="${TIMEOUT:-600}"
 fails=""
 ran=0
 
+# Every probe that simulates input runs on GAME time: --fixed-fps 60 makes
+# each frame's process delta exactly 1/60 s however long the frame really
+# took (Godot 4.7 main_timer_sync.cpp:433), and SceneTreeTimers, Tweens, the
+# Clock and Tuning.now_ms() all advance by that delta. So a double-tap window,
+# a long-press hold or a slide is N frames on a fast Mac and a loaded CI runner
+# alike. It also skips the engine's frame-pacing sleep (main.cpp:5166), so the
+# probes run as fast as frames render; --disable-vsync is NOT needed — vsync
+# only throttles wall-clock speed, never the delta. The headless suites keep
+# real time: nothing in them races a time window, and uncapped headless frames
+# would turn their in-test watchdogs (create_timer(120)) into seconds of wall.
+FIXED="--fixed-fps 60"
+
 WINDOWED="menu-clicks game-clicks game-clicks-notch touch-scroll long-press"
 HEADLESS_TESTS="rules save cloud_save assets waves kings endless armies scores history settings gold clock shop \
 	items items_king_abilities items_buffs items_artefacts_1 items_artefacts_2 items_artefacts_3 items_artefacts_4 \
 	box combos scenarios background tiers intro seed account sync leaderboard drive drive_type back_button \
-	menu_continue menu_keyboard sign_in board_draw bomb_highlight mass en_passant banners ads capture_paths theme"
+	menu_continue menu_keyboard sign_in board_draw bomb_highlight mass en_passant banners ads capture_paths theme board_anims hud_anims ui_anim"
 
 headless=""
 only=""
@@ -41,7 +53,7 @@ done
 # --only: normalise to ",name,name," so want() is one case match. A name that
 # matches no suite exits 2 — a filter that runs nothing must never say ALL GREEN.
 if [ -n "$only" ]; then
-	known=" $WINDOWED test_launch_bypass autoplay"
+	known=" $WINDOWED test_game_time test_launch_bypass autoplay"
 	for t in $HEADLESS_TESTS; do known="$known test_$t"; done
 	known="$known "
 	norm=","; unknown=""
@@ -147,11 +159,11 @@ run() {
 }
 
 if [ -z "$headless" ]; then
-	want menu-clicks && run menu-clicks -s tests/test_menu_clicks.gd
-	want game-clicks && run game-clicks -s tests/test_game_clicks.gd
+	want menu-clicks && run menu-clicks $FIXED -s tests/test_menu_clicks.gd
+	want game-clicks && run game-clicks $FIXED -s tests/test_game_clicks.gd
 	# NO-57: same probe, with a notch inset — the Header must still lay out
 	# below it, not just on the un-notched 0px case above.
-	want game-clicks-notch && run game-clicks-notch -s tests/test_game_clicks.gd -- --safe-top 56
+	want game-clicks-notch && run game-clicks-notch $FIXED -s tests/test_game_clicks.gd -- --safe-top 56
 	# Touch-drag probe. ScrollContainer only drag-scrolls when the DisplayServer
 	# reports a touchscreen, which a desktop does only under this project
 	# setting — and Input has no runtime setter for it, so it goes through
@@ -159,8 +171,8 @@ if [ -z "$headless" ]; then
 	# the run ends: left behind, every later mouse click would also be a touch.
 	printf '[input_devices]\npointing/emulate_touch_from_mouse=true\n' > override.cfg
 	trap 'rm -f override.cfg' EXIT
-	want touch-scroll && run touch-scroll -s tests/test_touch_scroll.gd
-	want long-press && run long-press -s tests/test_long_press.gd # NO-72: same override, same reason
+	want touch-scroll && run touch-scroll $FIXED -s tests/test_touch_scroll.gd
+	want long-press && run long-press $FIXED -s tests/test_long_press.gd # NO-72: same override, same reason
 	rm -f override.cfg
 else
 	echo "skipped: click probes (--headless) — run them before merging UI work"
@@ -177,6 +189,9 @@ fi
 for t in $HEADLESS_TESTS; do
 	want "test_$t" && run "test_$t" --headless -s "tests/test_$t.gd"
 done
+
+# test_game_time proves a double tap is N frames, not N ms: it needs the flag.
+want test_game_time && run test_game_time --headless $FIXED -s tests/test_game_time.gd
 
 # NO-77: needs the real flag on the command line, so it sits outside the loop.
 want test_launch_bypass && run test_launch_bypass --headless -s tests/test_launch_bypass.gd -- --scenario 0

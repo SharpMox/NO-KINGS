@@ -513,6 +513,9 @@ var army_center: VBoxContainer # NO-146: the carousel's own ScrollContainer is n
 ## leaving army_row as that child directly collects all the dead space below
 ## the card instead of splitting it above and below.
 var _army_row_wrap: CenterContainer
+var _army_scroll: ScrollContainer # the carousel itself — a member (not a
+	# local in _ready()) so --army-name and _debug_scroll_to_army() below can
+	# reach it after the carousel is already built.
 var rank_center: PanelContainer # NO-190: a background panel now, not a bare CenterContainer
 ## NO-159: index into Tuning.TIERS — which tier is selected right now, drawn
 ## as a blue outline enclosing tiers 1..this one. NO-190: Confirm is what
@@ -604,12 +607,16 @@ static func _window_size_requested() -> bool:
 ##
 ## The width fraction is content-driven, not aesthetic: Horde's Starting
 ## Pieces crowd (PieceMass.build() of 14 pawns, the widest of the 6 Armies)
-## measures ~218.2px wide at PieceMass's own ICON=52 constant (was ~198.4px
-## before V3 raised ROW_PITCH enough to drop PieceMass._choose_rows()'s own
-## pick for that count from 4 rows to 3 — fewer rows means more columns,
-## hence wider — see piece_mass.gd's own build() comment), and needs to fit
-## inside the card with room either side. 280px clears that with ~41.8px to
-## spare and is the known-good absolute width already shipped. NO-179
+## measures ~253.7px wide at PieceMass's own ICON=52 constant (Max,
+## 2026-09-25: "much wider rows" raised TARGET_ASPECT, which widens
+## PieceMass._choose_cols()'s own pick for that count — see piece_mass.gd's
+## own TARGET_ASPECT header: the real ceiling there is this card's 260px
+## CONTENT budget, 280 minus its own 10+10px side margins — a wider mass
+## silently grows the card itself past 280 and breaks the "every card is
+## the same size" invariant below, caught live by test_menu_clicks.gd), and
+## needs to fit inside the card with room either side. 280px (the card's
+## own outer width) clears that with ~26.3px to spare and is the known-good
+## absolute width already shipped. NO-179
 ## full-width follow-up: scroll_w changed (army_scroll lost its 40+40
 ## inset, see _show_armies) from 400 to the full 480px viewport, so the
 ## fraction is re-derived to hold card_w at that same 280px: 280/480 = 7/12.
@@ -1136,22 +1143,22 @@ func _ready() -> void:
 	pick.theme_type_variation = &"Title"
 	pick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	pad_side.call().add_child(pick)
-	var army_scroll := ScrollContainer.new() # the carousel strip itself
-	army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
-	army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_army_scroll = ScrollContainer.new() # the carousel strip itself
+	_army_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_army_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER # NO-136: bar hidden, the swipe still works
+	_army_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	# Same touch-drag fix test_scroll carries (CLAUDE.md, "Layout traps"): a
 	# Button's default mouse_filter is STOP, which would otherwise eat a swipe
 	# that starts on the card's own Army button before drag_touching sets.
-	army_scroll.scroll_deadzone = 24
-	army_center.add_child(army_scroll)
+	_army_scroll.scroll_deadzone = 24
+	army_center.add_child(_army_scroll)
 	var army_row := HBoxContainer.new() # one card per Army, laid out side by side
 	army_row.add_theme_constant_override("separation", int(ARMY_CARD_MARGIN)) # NO-179
 	# NO-179 follow-up: army_row's real parent is now this wrap, not
-	# army_scroll directly — see _army_row_wrap's own header for why, and
+	# _army_scroll directly — see _army_row_wrap's own header for why, and
 	# _show_armies for where its height is actually set.
 	_army_row_wrap = CenterContainer.new()
-	army_scroll.add_child(_army_row_wrap)
+	_army_scroll.add_child(_army_row_wrap)
 	_army_row_wrap.add_child(army_row)
 	# NO-179: every card is the same slot width now (see ARMY_CARD_WIDTH_
 	# FRACTION's own header), rendered at full scale always — no per-card
@@ -1278,7 +1285,12 @@ func _ready() -> void:
 		# token per real piece) is the right renderer — same call this
 		# screen already made pre-NO-179.
 		add_caption.call(card_box, "Starting Pieces")
-		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name])) # NO-157
+		# card_w - 20: the card's real content width (card_style's own
+		# 10+10px left/right margins) — PieceMass.build() splits a row that
+		# doesn't fit this into two rather than shrinking any piece (Max,
+		# 2026-09-25; see piece_mass.gd's TARGET_ASPECT and
+		# _choose_row_sizes() headers for why this budget matters).
+		card_box.add_child(PieceMass.build(Tuning.ARMIES[army_name], card_w - 20.0)) # NO-157
 		# NO-179: Reinforcements — the set of piece TYPES game.gd's
 		# _reinforce_ids() grants (deduped, doubled at the grant site — see
 		# that function's own header), not a second multiset of instances.
@@ -1310,14 +1322,14 @@ func _ready() -> void:
 		dot.add_theme_font_size_override("font_size", 16)
 		dot.text = "●" if i == 0 else "○"
 		dot.pressed.connect(func() -> void:
-			army_scroll.scroll_horizontal = int(i * (card_w + ARMY_CARD_MARGIN)))
+			_army_scroll.scroll_horizontal = int(i * (card_w + ARMY_CARD_MARGIN)))
 		army_dots.add_child(dot)
 		dot_buttons.append(dot)
 	# Setting scroll_horizontal above fires this same signal (it just proxies
 	# the underlying HScrollBar's value), so a dot click updates the dots
 	# through the identical path a swipe does — one writer, not two.
-	army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
-		var idx := clampi(roundi(army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
+	_army_scroll.get_h_scroll_bar().value_changed.connect(func(_v: float) -> void:
+		var idx := clampi(roundi(_army_scroll.scroll_horizontal / (card_w + ARMY_CARD_MARGIN)), 0, army_names.size() - 1)
 		for i in dot_buttons.size():
 			dot_buttons[i].text = "●" if i == idx else "○")
 	_button(pad_side.call(), "← Back", 20, func() -> void:
@@ -1466,7 +1478,16 @@ func _ready() -> void:
 		if args.has("--show-screen"):
 			match args[args.find("--show-screen") + 1]:
 				"tests": _show_tests()
-				"armies": _show_armies()
+				"armies": # --army-name NAME scrolls the carousel to that
+					# card first — see _debug_scroll_to_army()'s own header.
+					# Both calls are awaited so the screenshot below (after
+					# this match block) only fires once the scroll has
+					# actually landed, not mid-layout.
+					await _show_armies()
+					if args.has("--army-name"):
+						var wanted: String = args[args.find("--army-name") + 1]
+						if not await _debug_scroll_to_army(wanted):
+							printerr("--army-name %s: no such Army" % wanted)
 				"rank": # the tier picker sits past an Army pick, not its own
 					# button — reached the same way the "← Back" on rank_box
 					# does, so a screenshot doesn't need an Army actually chosen
@@ -1541,6 +1562,37 @@ func _show_armies() -> void:
 	if army_center.visible:
 		var scroll: Control = _army_row_wrap.get_parent()
 		_army_row_wrap.custom_minimum_size.y = scroll.size.y
+
+
+## `--army-name NAME` (tools/capture.md): scrolls the Army carousel straight
+## to that Army's card, the same maths a tap on its own page dot uses (the
+## `dot.pressed` callback above) — same "name instead of a fragile index"
+## idea as `--scenario-name`. `names` is Tuning.ARMIES' key order, the same
+## order the carousel and its dots are built in. Returns whether `wanted`
+## resolved, so both the CLI dispatch below and test_capture_paths.gd can
+## check it directly.
+##
+## AWAITS two frames before touching `scroll_horizontal` — found live on Aux
+## (all 6 `--army-name` captures came back byte-identical, all "Crown"):
+## called right after `_show_armies()` builds the carousel, the
+## ScrollContainer's own Containers haven't run their deferred layout sort
+## yet (CLAUDE.md, "a freshly added Control's geometry isn't usable until
+## the next idle frame"), so `get_h_scroll_bar()`'s range is still 0 and
+## `scroll_horizontal` clamps straight back to 0 regardless of what's
+## assigned. Two frames, not one: army_row's own deferred sort has to settle
+## before _army_scroll's h-scrollbar range can pick up army_row's new size —
+## each is its own idle-time sort, one frame apart. Not verified against a
+## live Godot run (no Godot on this machine); CI/Aux is the check.
+func _debug_scroll_to_army(wanted: String) -> bool:
+	var names: Array = Tuning.ARMIES.keys()
+	var idx := names.find(wanted)
+	if idx == -1:
+		return false
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var card_w := get_viewport_rect().size.x * ARMY_CARD_WIDTH_FRACTION
+	_army_scroll.scroll_horizontal = int(idx * (card_w + ARMY_CARD_MARGIN))
+	return true
 
 
 ## NO-179: one small icon per unique piece TYPE in `ids`, first-occurrence

@@ -178,6 +178,14 @@ const ARRIVE_KING_TIME := 0.5
 const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
 const MERGE_TIME := 0.5 # NO-243: inputs pull together, result fades in
 const SNAP_BACK_TIME := 0.15 # NO-236: a refused drop slides home (a legal one settles in ANIM_TIME)
+const ARRIVE_FALL := 0.7 # NO-243: share of an arrive spent falling; the rest is the squash
+const ENEMY_MOVE_GAP := 0.35 # NO-243: beat before each enemy move while its tile flashes, so a turn reads one move at a time
+const ENEMY_SLIDE_TIME := 0.2 # NO-243: slower than the player's slide, so each enemy move is legible
+const RANK_UP_TIME := 0.4 # NO-243: light sweep + scale pop after a same-id merge
+const SHAKE_PX := 6.0 # NO-243: board shake (King landing / fall, explosions)
+const SHAKE_TIME := 0.3
+const BADGE_TIME := 0.25 # NO-243: a buff badge popping in / fading out
+const COL_GOLD_FX := Color(1.0, 0.8, 0.3) # NO-243: King arrival / fall
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -351,6 +359,18 @@ const BUFF_BADGE_SCALE := 0.8 # every badge is the two-buff size (Max, NO-244)
 const BUFF_BADGE_EXTRA_DROP := 0.06 # badges sit this fraction of a tile below the inversion mark's centre (Max, NO-244)
 const BUFF_BADGE_ACCENT := Color(1.0, 0.72, 0.15) # a strong amber (Max, NO-244)
 const BUFF_BADGE_FILL := Color(0, 0, 0, 0.85) # black (Max, NO-244)
+## Stun badge glyph (Max's ruling): the SAME glyph BuffLogic.PIECE_BUFF_GLYPHS
+## already uses for the "stun" Piece Buff (buff_logic.gd) — the effect that
+## PRODUCES the "stunned" debuff this badge marks at game.gd's two
+## `BuffLogic.add(..., "stunned", ...)` sites, both right after
+## `BuffLogic.has(victim, "stun")` (a third site, artefact_hooks.gd's Pincer
+## handler — NO-250, #588 — applies "stunned" directly, no "stun" buff
+## involved, same debuff either way). It's the one glyph in this codebase
+## already tied to Stun in a tooltip (BuffLogic.describe()), so it satisfies
+## that preference over picking a fresh symbol; drawn red instead of amber
+## (STUN_BADGE_COL below) is what tells the two apart on the rare piece that
+## carries both at once.
+const STUN_BADGE_GLYPH := "⊘"
 ## NO-244: glyph -> [dx, dy, scale], dx/dy as a fraction of the badge's half
 ## side (+ = right/down). Measured by eye from captures of every buff; the
 ## inversion mark's ⟲ has its own tuning (INV_MARK_GLYPH_*) and isn't here.
@@ -583,6 +603,8 @@ var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 var selected := Vector2i(-1, -1) # selected board piece
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
+var magic_bullet_dests: Array[Vector2i] = [] # NO-250: legal_dests reached only
+	# through Curtain Rods Bag's Magic bullet (spent on use)
 var moved_this_turn: Array[Vector2i] = [] # pieces (by tile) that already moved
 # NO-232 (en passant). Softened from chess's "next move" expiry (ambiguous
 # here — actions_per_turn varies) to "next TURN", per Max's ruling: each side
@@ -731,6 +753,10 @@ var moscovium_active := false # "until end of Turn" — reset in _begin_player_t
 	# effect must keep tripling gains after the artefact consumes itself and
 	# leaves g.artefacts, when there is no "held copy" left to dispatch from
 var zapruder_used_this_wave := false # reset in WaveLogic.queue()
+var curtain_rods_used_this_wave := false # NO-250 Magic bullet, reset in WaveLogic.queue()
+var pending_item_boxes := 0 # NO-250 Lusitania: Small Item Boxes owed from a loss
+	# (usually mid enemy turn, where no modal can open) — drained one per
+	# player-turn start, the pending_bounty_boxes idiom
 var bovine_used_this_wave := false # reset in WaveLogic.queue()
 var jet_fuel_used_this_wave := false # Jet Fuel Vial (52): once per Wave,
 	# reset in WaveLogic.queue() — same idiom as zapruder/bovine above (issue
@@ -1233,6 +1259,7 @@ func _clock_text() -> String:
 
 func _clear_selection() -> void:
 	selected = Vector2i(-1, -1)
+	magic_bullet_dests.clear()
 	legal_dests.clear()
 	legal_paths.clear()
 	queue_redraw()
@@ -1260,8 +1287,8 @@ func _on_stack_pressed(entry: Variant, cap: bool) -> void:
 	# double-tap on the same stack: piece info (NO-144: Sell, for a Stock
 	# entry, is in there too — never for a Captured one, entry stays null)
 	var key := id + ("!" if cap else "")
-	var now := Time.get_ticks_msec()
-	if key == pool_click_key and now - pool_click_ms < 400:
+	var now := Tuning.now_ms() # GAME time: see Tuning.now_ms
+	if key == pool_click_key and now - pool_click_ms < Tuning.DOUBLE_TAP_MS:
 		pool_click_key = ""
 		return _show_preview(id, "", entry if not cap else null, # NO-185: buffs
 			entry if entry is Dictionary else {})
@@ -1447,6 +1474,7 @@ func _process(delta: float) -> void:
 		for a in anims:
 			a.t += delta / a.get("dur", ANIM_TIME)
 		anims = anims.filter(func(a: Dictionary) -> bool: return a.t < 1.0)
+		position = _shake_offset() # NO-243: back to ZERO once the last shake ends
 		queue_redraw()
 
 
@@ -1534,6 +1562,10 @@ const BANNER_LOSS := Tuning.COL_LOSS # NO-256 (d): the one money red
 const BANNER_GAIN := Color(0.45, 0.85, 0.5)
 const BANNER_POWER := Color(1.0, 0.55, 0.4)
 const BANNER_EFFECT := Color(0.95, 0.8, 0.4)
+## The Stun board badge's outline + glyph colour (Max's ruling): the game's
+## loss red, `Tuning.COL_LOSS` (NO-256's money red, #583) — the same red
+## `BANNER_LOSS` above now points at, and the "Stunned!" float already uses.
+const STUN_BADGE_COL := Tuning.COL_LOSS
 
 
 func _begin_player_turn() -> void:
@@ -1601,6 +1633,10 @@ func _begin_player_turn() -> void:
 	if pending_yalta_picks > 0: # deferred at background — see the field's own
 		pending_yalta_picks -= 1 # comment. Drained BEFORE Bounty on purpose:
 		_open_yalta_pick() # if this opens, _open_bounty_pick re-queues itself.
+	if pending_item_boxes > 0 and not box_open and not buff_pick_open: # NO-250
+		pending_item_boxes -= 1 # Lusitania: one owed Small Item Box per Turn
+		_open_box_pick({"kind": "box", "key": "item", "size": "small",
+			"sold": false, "contents": Box.roll_options(self, "item", "small")})
 	if pending_bounty_boxes > 0: # Bounty Piece Buff (issue 48), ally half:
 		# the deferred payout — see pending_bounty_boxes' own comment
 		pending_bounty_boxes -= 1
@@ -1763,7 +1799,8 @@ func _run_enemy_actions(actions: int = -1) -> void:
 		actions = Economy.enemy_actions(self)
 	for i in actions:
 		await _wait_while_backgrounded()
-		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps) # NO-232
+		var act := Rules.ai_action(board, defs, _enemy_denied_tiles(), player_double_steps,
+			_oligarch_guard()) # NO-232, NO-250
 		# issue 91: the King Ability COSTS THE KING AN ACTION, out of the same
 		# budget the attacks come from — the tradeoff the player plays around.
 		# 2026-09-06: WHEN to spend it is an AI decision, not a turn-start
@@ -1780,8 +1817,9 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				continue # this Action went to the Ability; the next re-reads the board
 		if act.is_empty():
 			break # a held action still ends the turn: the Stun ageing below must run
-		if not autoplay and animations_on:
-			await get_tree().create_timer(0.35).timeout
+		if not autoplay and animations_on: # NO-243: the mover's tile flashes, then it slides
+			_add_flash(act.from, COL_CAPTURE, ENEMY_MOVE_GAP)
+			await get_tree().create_timer(ENEMY_MOVE_GAP).timeout
 		await _wait_while_backgrounded()
 		if act.has("ep_victim"): # NO-232: teleport the victim onto the landing
 			# square before anything below reads the board — same trick and
@@ -1894,7 +1932,7 @@ func _run_enemy_actions(actions: int = -1) -> void:
 				queue_redraw()
 				continue
 			_add_pop(act.to)
-		_add_slide(act.from, act.to)
+		_add_slide(act.from, act.to, ENEMY_SLIDE_TIME)
 		board[act.to] = board[act.from]
 		board[act.to].moved = true # NO-224: the initial double-step gates on this
 		board.erase(act.from)
@@ -1934,10 +1972,62 @@ func _uap_dodge_target(pos: Vector2i, attacker: Vector2i) -> Vector2i:
 	return best
 
 
-func _add_slide(from: Vector2i, to: Vector2i) -> void:
+func _add_slide(from: Vector2i, to: Vector2i, dur := ANIM_TIME) -> void:
 	if autoplay or not animations_on:
 		return
-	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0})
+	anims.append({"kind": "move", "to": to, "from_px": _tile_px(from), "to_px": _tile_px(to), "t": 0.0,
+		"dur": dur})
+
+
+## NO-243: tile `at` lights up in `color`, fading in and out over `dur`,
+## starting `delay` seconds from now. Drawn under the pieces.
+func _add_flash(at: Vector2i, color: Color, dur: float, delay := 0.0) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "flash", "at": at, "color": color, "t": -delay / dur, "dur": dur})
+
+
+## NO-243: the board shakes for SHAKE_TIME, starting `delay` seconds from now.
+## _process moves this whole node; the HUD is a CanvasLayer, so it stays put.
+func _add_shake(delay := 0.0) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "shake", "t": -delay / SHAKE_TIME, "dur": SHAKE_TIME})
+
+
+func _shake_offset() -> Vector2:
+	var off := Vector2.ZERO
+	for a in anims:
+		if a.kind == "shake" and a.t >= 0.0:
+			off += Vector2(sin(a.t * 40.0), cos(a.t * 31.0)) * SHAKE_PX * (1.0 - a.t)
+	return off
+
+
+## NO-243: a same-id merge (Rank Up) landed on `at`. Once the merge anim has
+## pulled the inputs together, a light sweeps up the tile, the piece pops and
+## "RANK UP" floats off it.
+func _add_rank_up(at: Vector2i) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "rankup", "to": at, "t": -MERGE_TIME / RANK_UP_TIME, "dur": RANK_UP_TIME})
+	_add_float(at, "RANK UP", COL_MERGE)
+	anims[-1].t = -MERGE_TIME / anims[-1].dur
+
+
+## NO-243: `piece` on `at` gained (gone = false) or is about to lose (gone =
+## true) the buff `key`: its badge pops in from 1.4x, or swells and fades.
+## Called after BuffLogic.add and before BuffLogic.consume, so `piece` carries
+## the badge either way.
+func _add_badge(at: Vector2i, piece: Dictionary, key: String, gone: bool) -> void:
+	if autoplay or not animations_on or at.x < 0:
+		return
+	var glyphs := BuffLogic.glyphs_of(piece)
+	var glyph := BuffLogic.glyph_of(key)
+	var i := glyphs.find(glyph) if gone else glyphs.rfind(glyph)
+	if glyph == "" or i < 0:
+		return # an uncatalogued buff (Stunned) has no badge
+	anims.append({"kind": "badge", "px": _tile_px(at), "glyph": glyph, "i": i, "n": glyphs.size(),
+		"gone": gone, "t": 0.0, "dur": BADGE_TIME})
 
 
 ## Floating label at a tile — the same anim the score popups use, for effects
@@ -1976,10 +2066,15 @@ func _add_arrive(at: Vector2i) -> void:
 	for a in anims:
 		if a.kind == "arrive" and a.t <= 0.0:
 			waiting += 1
-	anims.append({"kind": "arrive", "to": at, "t": -ARRIVE_STAGGER * waiting / dur,
-		"dur": dur, "king": king})
-	if king:
-		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": Color(1.0, 0.8, 0.3)})
+	var delay := ARRIVE_STAGGER * waiting
+	anims.append({"kind": "arrive", "to": at, "t": -delay / dur, "dur": dur, "king": king})
+	_add_flash(at, COL_CAPTURE, dur * ARRIVE_FALL, delay) # the tile warns while the piece falls
+	if king: # lands with a shake, a gold crown ring and a gold board edge
+		var land := delay + dur * ARRIVE_FALL
+		_add_shake(land)
+		anims.append({"kind": "pop", "at_px": _tile_px(at) + Vector2(tile, tile) / 2,
+			"t": -land / DIE_TIME, "dur": DIE_TIME, "color": COL_GOLD_FX})
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": COL_GOLD_FX})
 	queue_redraw()
 
 
@@ -2014,7 +2109,7 @@ func _draw_arrive(font: Font, a: Dictionary) -> void:
 	var k := 1.0
 	if a.king:
 		k = 1.6
-	var fall := 0.7 # share of the anim spent falling; the rest is the squash
+	var fall := ARRIVE_FALL
 	if t < fall:
 		var u := t / fall
 		var y := -tile * 2.5 * k * (1.0 - u * u) # accelerating fall
@@ -2040,7 +2135,9 @@ func _draw_die(font: Font, a: Dictionary) -> void:
 	var u := (t - flash) / (1.0 - flash)
 	var c := px + Vector2(tile, tile) / 2
 	var side := COL_SIDE_PLAYER
-	if p.owner == Rules.ENEMY:
+	if a.get("gold", false): # a fallen King (_king_down) bursts gold
+		side = COL_GOLD_FX
+	elif p.owner == Rules.ENEMY:
 		side = COL_SIDE_ENEMY
 	var sz := tile * 0.14 * (1.0 - u)
 	for i in 10:
@@ -2051,6 +2148,25 @@ func _draw_die(font: Font, a: Dictionary) -> void:
 			chip = side
 		chip.a = 1.0 - u
 		draw_rect(Rect2(c + Vector2.from_angle(ang) * dist - Vector2(sz, sz) / 2, Vector2(sz, sz)), chip)
+
+
+## NO-243: Rank Up — a band of light sweeps up the tile while the piece pops.
+func _draw_rankup(font: Font, a: Dictionary) -> void:
+	var px := _tile_px(a.to)
+	var s := 1.0 + 0.25 * sin(PI * a.t)
+	_draw_piece_xf(font, board[a.to], px, Vector2(s, s), Color.WHITE)
+	var band := tile * 0.3
+	var y: float = px.y + (tile - band) * (1.0 - a.t)
+	draw_rect(Rect2(px.x, y, tile, band), Color(1.0, 1.0, 0.85, 0.55 * (1.0 - a.t)))
+
+
+## NO-243: one buff badge popping in (1.4x -> 1x) or swelling as it fades.
+func _draw_badge_anim(font: Font, a: Dictionary) -> void:
+	var c: Vector2 = _buff_badge_centres(a.px, a.n)[a.i]
+	if a.gone:
+		_draw_buff_badge(font, c, a.glyph, 1.0 + 0.4 * a.t, 1.0 - a.t)
+	else:
+		_draw_buff_badge(font, c, a.glyph, lerpf(1.4, 1.0, ease(a.t, 0.4)))
 
 
 ## Turn/wave strips: wipe in, hold, fade out. Drawn on _banner_layer so they
@@ -2230,6 +2346,25 @@ func _deploy_tiles() -> Array[Vector2i]:
 ## Artefacts (see _deploy_tiles above) — computed here, in game.gd, and
 ## passed into Rules.legal_moves/ai_action/is_checkmate as a parameter, so
 ## rules.gd never gains a g.artefacts reference of its own.
+## NO-250: Putin's Golden Toilet Brush, "Oligarch" — your highest-value
+## piece can't be captured by a lower-value enemy. Ties: every piece at the
+## top value is guarded (each IS "your highest-value piece"). Values come
+## straight from defs, so a Void/inverted piece counts at its own value.
+## Held copies don't stack — it's a rule, not an amount. Fed into Rules the
+## same way as _enemy_denied_tiles.
+func _oligarch_guard() -> Dictionary:
+	if not _held("putin-s-golden-toilet-brush"):
+		return {}
+	var top := -1
+	for pos in _player_pieces():
+		top = maxi(top, int(defs[board[pos].id].value))
+	var out := {}
+	for pos in _player_pieces():
+		if int(defs[board[pos].id].value) == top:
+			out[pos] = top
+	return out
+
+
 func _enemy_denied_tiles() -> Array[Vector2i]:
 	if not _held("winchester-salt-lined-doors"):
 		return []
@@ -3038,9 +3173,7 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 			drag_from = Vector2i(-1, -1)
 			selected = board_lp_prev_selected
 			if selected.x >= 0 and board.has(selected):
-				var ep := _ep_offers_for(board[selected].owner) # NO-232
-				legal_dests = Rules.moves_for(board, selected, defs, "", ep)
-				legal_paths = Rules.move_paths(board, selected, defs, ep)
+				_select_dests(selected)
 			else:
 				selected = Vector2i(-1, -1)
 				legal_dests.clear()
@@ -3049,6 +3182,41 @@ func _board_long_press_start(at: Vector2i, press_pos: Vector2, is_commit: bool) 
 		else:
 			board_lp_pending_tile = Vector2i(-1, -1)
 		_show_preview(piece.id, piece.get("king_id", ""), null, piece))
+
+
+## The destinations shown (and, for your own piece, playable) from `at`.
+## NO-250: your sliding piece also gets Curtain Rods Bag's Magic bullet
+## captures (once per Wave): a normal red-hatched capture tile, reached by
+## linked dots through the blocker (Max: no extra ring); an enemy's recon preview drops any capture Oligarch forbids, so the
+## preview never shows a threat the AI can't make.
+func _select_dests(at: Vector2i) -> void:
+	var ep := _ep_offers_for(board[at].owner) # NO-232
+	legal_dests = Rules.moves_for(board, at, defs, "", ep)
+	legal_paths = Rules.move_paths(board, at, defs, ep)
+	magic_bullet_dests.clear()
+	if board[at].owner == Rules.PLAYER:
+		if _held("curtain-rods-bag-rifle-shaped") and not curtain_rods_used_this_wave:
+			for mb in Rules.magic_bullet_targets(board, at, defs):
+				if not legal_dests.has(mb.to):
+					legal_dests.append(mb.to)
+					magic_bullet_dests.append(mb.to)
+					legal_paths.append({"kind": "bent", "line": [mb.through, mb.to]})
+		return
+	var guard := _oligarch_guard()
+	if guard.is_empty():
+		return
+	var value := int(defs[board[at].id].value)
+	var kept: Array[Vector2i] = []
+	for d in legal_dests:
+		if not (guard.has(d) and value < int(guard[d])):
+			kept.append(d)
+	legal_dests = kept
+	var kept_paths: Array[Dictionary] = []
+	for p in legal_paths:
+		var line: Array = p.get("line", [p.get("to")])
+		if not line.any(func(t: Vector2i) -> bool: return not kept.has(t) and guard.has(t)):
+			kept_paths.append(p)
+	legal_paths = kept_paths
 
 
 ## NO-120: _board_tap_is_readonly mirrors this function's branches — which
@@ -3106,8 +3274,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			and not moved_this_turn.has(tile) \
 			and not BuffLogic.has(board[tile], "stunned"):
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", enemy_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, enemy_double_steps)
+		_select_dests(tile)
 		_refresh()
 	elif board.has(tile) and board[tile].owner == Rules.ENEMY:
 		if tile == selected: # re-click on a recon selection: dismiss it
@@ -3116,8 +3283,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 			return
 		# read-only recon: show where the enemy can move and what it threatens
 		selected = tile
-		legal_dests = Rules.moves_for(board, tile, defs, "", player_double_steps) # NO-232
-		legal_paths = Rules.move_paths(board, tile, defs, player_double_steps)
+		_select_dests(tile)
 		_refresh()
 	else:
 		_clear_selection()
@@ -3255,6 +3421,11 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 	# up front, so every actions_left -= 1 below can consume it.
 	var moving_piece: Dictionary = board[from]
 	var blitz_free: bool = moving_piece.get("blitz_free_move", false)
+	if from == selected and magic_bullet_dests.has(to): # NO-250: this capture
+		# only exists through the Magic bullet — spend this Wave's shot
+		curtain_rods_used_this_wave = true
+		_add_float(from, "Bullet", COL_CAPTURE)
+		ArtefactHooks._note(self, "curtain-rods-bag-rifle-shaped", "Bullet") # #569 terse
 	# NO-232: an en passant capture lands on an EMPTY square with the actual
 	# victim standing elsewhere — teleport it onto `to` BEFORE anything below
 	# reads the board, so every capture branch (repel/reflect/bomb/trap/
@@ -3340,8 +3511,12 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		for tier in grant_buffs:
 			ArtefactHooks._grant_buff(self, from, tier)
 		if BuffLogic.has(victim, "stun"): # cuts both ways
-			BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
-			_add_float(from, "Stunned!", COL_MERGE)
+			if _held("tinfoil-hat"): # NO-250: your pieces can't be Stunned
+				_add_float(from, "Immune", COL_MERGE)
+				ArtefactHooks._note(self, "tinfoil-hat", "Immune")
+			else:
+				BuffLogic.add(board[from], "stunned", Tuning.STUN_MISSES + 1)
+				_add_float(from, "Stunned!", COL_MERGE)
 		# NO-233: Multicapture and Exhibit 399 both search "beside the piece
 		# just captured" — for an ordinary capture that's `to` (attacker and
 		# victim share a tile), but for en passant the victim's real square is
@@ -3515,7 +3690,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# elsewhere in game.gd's _item_apply) never reaches this line
 	_clear_selection() # incl. legal_paths — stale shape overlay bug 2026-07-07
 	if king_captured or (_king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps)): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard())): # NO-232
 		if _king_down(captured_king_id):
 			return
 	# last action auto-passes (playtest 2026-07-02); so does clearing the board's
@@ -3568,7 +3743,16 @@ func _king_down(defeated_id := "") -> bool:
 	if k.x >= 0: # checkmated, not captured — the boss still leaves the board
 		if defeated_id == "":
 			defeated_id = board[k].get("king_id", "")
+		_add_pop(k) # NO-243: shatters like a capture
 		board.erase(k)
+	# NO-243: a fallen King (captured or checkmated) bursts gold, the board edge
+	# flares gold and the board shakes. Visual only; the win screen still opens now.
+	for a in anims:
+		if a.kind == "die" and a.piece.id == "king":
+			a.gold = true
+	_add_shake()
+	if not autoplay and animations_on:
+		anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": COL_GOLD_FX})
 	if defeated_id != "":
 		king_ids_defeated.append(defeated_id)
 	if wave >= Waves.WAVES.size():
@@ -4058,6 +4242,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 					stock.append(e.id if e.size() == 1 else e)
 					board.erase(pos)
 		"drone_strike": # 3x3 around b; the King is unaffected (Destruction)
+			_add_shake() # NO-243: an explosion
 			for dx in range(-1, 2):
 				for dy in range(-1, 2):
 					var hit := b + Vector2i(dx, dy)
@@ -4087,6 +4272,8 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 		"invert":
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
+			if it.key == "air_strike":
+				_add_shake() # NO-243: an explosion; a Sniper shot is not
 			_destroy(b, true)
 		"tactical_reposition", "rapid_deployment":
 			_add_slide(a, b)
@@ -4097,7 +4284,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			board[a] = board[b]
 			board[b] = tmp
 	if _king_alive() and Rules.is_checkmate(board, Rules.ENEMY, defs,
-			_enemy_denied_tiles(), player_double_steps): # NO-232
+			_enemy_denied_tiles(), player_double_steps, _oligarch_guard()): # NO-232
 		if _king_down():
 			return
 	if state == State.PLAYER_TURN and (actions_left == 0 or _board_cleared()):
@@ -4184,6 +4371,7 @@ func _draw_hatch(r: Rect2, col: Color, mirror: bool = false, phase: float = 0.0)
 ## Drone Strike.
 func _detonate(at: Vector2i) -> void:
 	_add_float(at, "Boom!", COL_CAPTURE)
+	_add_shake() # NO-243
 	for pos in _blast_tiles(at):
 		if board.has(pos) and board[pos].id != "king":
 			_destroy(pos)
@@ -4360,11 +4548,17 @@ func _apply_buff(piece: Dictionary, key: String, turns: int,
 	if Kings.power_is(self, "purge"): # Stalin: The Purge — no Buffs are gained
 		_add_turn_fx("The Purge", Color(1.0, 0.5, 0.4))
 		return
+	if key == "slow" and piece.get("owner", -1) == Rules.PLAYER and _held("tinfoil-hat"):
+		if pos.x >= 0: # NO-250: your pieces can't be Slowed
+			_add_float(pos, "Immune", COL_MERGE)
+			ArtefactHooks._note(self, "tinfoil-hat", "Immune")
+		return
 	if BuffLogic.catalogued_count(piece) >= buff_cap():
 		if pos.x >= 0:
 			_add_float(pos, "Buffs full", COL_MERGE)
 		return
 	BuffLogic.add(piece, key, turns)
+	_add_badge(pos, piece, key, false) # NO-243
 	if fire_hook:
 		ArtefactHooks.run(self, "on_buff_apply", {"piece": piece, "key": key, "turns": turns, "pos": pos})
 
@@ -4388,6 +4582,7 @@ func buff_cap() -> int:
 ## those triggers). Fires on_buff_consume AFTER removal — no artefact needs
 ## to veto a buff resolving, so unlike on_item_consume there is no ctx.cancel.
 func _consume_buff(pos: Vector2i, key: String) -> void:
+	_add_badge(pos, board[pos], key, true) # NO-243
 	BuffLogic.consume(board[pos], key)
 	ArtefactHooks.run(self, "on_buff_consume", {"pos": pos, "key": key})
 
@@ -5268,6 +5463,8 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
 	elif args.has("--show-screen"):
 		await _debug_show_screen(args[args.find("--show-screen") + 1], args)
+		if modals.reveal and modals.reveal.is_running(): # NO-243: an end screen's
+			await modals.reveal.finished # staged reveal plays out before the shot
 	# NO-234's pinned banner is itself a live animation (t=0.5 of 1.1 s): the
 	# settle wait below would let it finish before the shot, so skip it here.
 	var pinned_banner := args.has("--show-screen") \
@@ -5281,6 +5478,9 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 ## branch calls the function the real trigger calls; only the trigger itself
 ## (a lost run, a long press, a Shop purchase) is skipped.
 func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
+	if screen.begins_with("anim:"):
+		await _debug_anim(screen.substr(5))
+		return
 	match screen:
 		"board": # the scenario exactly as booted (a bare --screenshot would
 			pass # place the Stock and Pass first, see _screenshot_and_quit)
@@ -5318,6 +5518,32 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			Ads.show_rewarded(func() -> void: pass)
 		"win":
 			_show_win_screen()
+		"reveal-gameover", "reveal-win": # NO-243 S3 rows 53/54 for a --write-movie
+			# capture: the end screen's staged reveal, animations forced on (the
+			# banner capture's reason). The win comes the real way, a King falling.
+			animations_on = true
+			if screen == "reveal-gameover":
+				_game_over(false, "Clock out")
+			else:
+				wave = 50
+				kings_defeated = 0
+				board[Vector2i(4, 8)] = {"id": "king", "owner": Rules.ENEMY}
+				_king_down()
+		"hud-anims": # NO-243 S3 rows 31-34, one after another, for --write-movie
+			animations_on = true
+			for step in ["gold+", "gold-", "turn", "wave", "action", "last"]:
+				match step:
+					"gold+": gold += 50
+					"gold-": gold -= 30 # 31: rolls down, flashes red
+					"turn": turns_since_wave += 1 # 33: ticks, the row re-centres
+					"wave": wave += 1 # 32: flips (the Turn reading changes too)
+					"action":
+						actions_left = maxi(actions_left, 2)
+						_refresh()
+						actions_left -= 1 # 34: the count drains
+					"last": actions_left = 0 # 34: PASS shakes
+				_refresh()
+				await get_tree().create_timer(0.6).timeout
 		"setup":
 			_debug_enter_setup()
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
@@ -5343,6 +5569,11 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 			hud.feed_capture("Knight", 150, 15)
 			hud.feed_gain("sell", "Sold Rook", 0, 25)
 			ArtefactHooks.feed(self, "27-club-punch-card", 0, 0, "Buff")
+		"turn-start": # NO-250: the player-turn-start dispatch _begin_player_turn
+			# makes (Pincer's stun and its "Stunned!" float), without the rest
+			# of the turn flow — a scenario boots mid-turn and never calls it
+			ArtefactHooks.run(self, "on_turn_start")
+			queue_redraw()
 		"pick": # the shared choice modal, as every Sell confirm opens it
 			if stock.is_empty():
 				printerr("--show-screen pick: this scenario has no Stock to sell")
@@ -5350,6 +5581,56 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 				_confirm_sell("piece", stock[0], _refresh)
 		_:
 			printerr("--show-screen %s: no such game screen" % screen)
+
+
+## NO-243: `--show-screen anim:<name>` plays one board animation for a
+## `--write-movie` capture (tools/capture.md), on the "Movement & drag" board.
+## Each calls what the game calls, then waits for it to play out.
+## animations_on is forced on, for the reason the banner capture gives.
+func _debug_anim(anim: String) -> void:
+	animations_on = true
+	match anim:
+		"spawn": # 13: three enemies drop in, staggered, each tile flashing red
+			for id in ["pawn", "knight", "bishop"]:
+				pending_spawn.append({"id": id})
+			WaveLogic.spawn_pending(self)
+		"crush": # 14: a spawn lands on a friendly piece
+			for x in Tuning.BOARD_W:
+				board[Vector2i(x, Tuning.SPAWN_ROW)] = {"id": "pawn", "owner": Rules.PLAYER}
+			pending_spawn.append({"id": "rook"})
+			WaveLogic.spawn_pending(self)
+		"king-arrive": # 15
+			pending_spawn.append({"id": "king"})
+			WaveLogic.spawn_pending(self)
+		"king-fall": # 16, on the recurring-King path so no win screen covers it
+			board[Vector2i(4, 8)] = {"id": "king", "owner": Rules.ENEMY}
+			kings_defeated = 1
+			wave = mini(wave, Waves.WAVES.size() - 1) # the last wave's King ends the run instead
+			_king_down()
+		"rankup": # 10
+			board[Vector2i(5, 3)] = {"id": "pawn", "owner": Rules.PLAYER}
+			board[Vector2i(6, 3)] = {"id": "pawn", "owner": Rules.PLAYER}
+			gold = maxi(gold, Tuning.MERGE_COST)
+			actions_left += 1 # so the merge is not the turn's last action
+			MergeLogic.commit_merge(self, Vector2i(5, 3), Vector2i(6, 3))
+		"enemy-moves": # 2
+			for x in [1, 4, 6]:
+				board[Vector2i(x, 9)] = {"id": "pawn", "owner": Rules.ENEMY}
+			state = State.ENEMY_TURN
+			await _run_enemy_actions(3)
+			state = State.PLAYER_TURN
+		"explode": # 4
+			for pos in [Vector2i(4, 6), Vector2i(5, 6), Vector2i(4, 7)]:
+				board[pos] = {"id": "pawn", "owner": Rules.ENEMY}
+			_detonate(Vector2i(4, 6))
+		"badge": # 19: a Shield badge pops in, then is consumed
+			_apply_buff(board[Vector2i(2, 1)], "shield", 0, Vector2i(2, 1))
+			await get_tree().create_timer(0.6).timeout
+			_consume_buff(Vector2i(2, 1), "shield")
+		_:
+			printerr("--show-screen anim:%s: no such animation" % anim)
+	queue_redraw()
+	await get_tree().create_timer(1.0).timeout
 
 
 ## A fresh run's opening state, from a scenario boot: the Army's full Stock,
@@ -5564,8 +5845,10 @@ func _draw() -> void:
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	for a in anims:
-		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge": # the anim draws it
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge" or a.kind == "rankup": # the anim draws it
 			sliding[a.to] = a
+		elif a.kind == "flash" and a.t >= 0.0: # NO-243: under the pieces
+			draw_rect(Rect2(_tile_px(a.at), Vector2(tile, tile)), Color(a.color, 0.5 * sin(PI * a.t)))
 	for pos in board:
 		if sliding.has(pos):
 			continue
@@ -5579,11 +5862,13 @@ func _draw() -> void:
 		# the selected piece draws bigger, with a pulsing outline (below)
 		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
 	for a in anims:
+		if a.t < 0.0:
+			continue # NO-243: delayed, not started yet (a merge still owns a rankup's tile)
 		if a.kind == "move" and board.has(a.to):
 			var mp: Dictionary = board[a.to]
 			_draw_piece(font, mp, a.from_px.lerp(a.to_px, ease(a.t, 0.4)), Color.WHITE)
 		elif a.kind == "pop":
-			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(COL_CAPTURE, 1.0 - a.t), 4.0)
+			draw_arc(a.at_px, tile * (0.2 + 0.3 * a.t), 0, TAU, 24, Color(a.get("color", COL_CAPTURE), 1.0 - a.t), 4.0)
 		elif a.kind == "text": # score gains/losses float up and fade
 			draw_string(text_font(), a.at_px + Vector2(0, -20.0 * a.t), a.text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(a.color, 1.0 - a.t))
@@ -5596,6 +5881,10 @@ func _draw() -> void:
 			_draw_arrive(font, a)
 		elif a.kind == "merge" and board.has(a.to):
 			_draw_merge(font, a)
+		elif a.kind == "rankup" and board.has(a.to):
+			_draw_rankup(font, a)
+		elif a.kind == "badge":
+			_draw_badge_anim(font, a)
 		elif a.kind == "ghost": # NO-236: a refused Stock/Item drop flying home
 			draw_texture_rect(a.tex, Rect2(a.from_px.lerp(a.to_px, ease(a.t, 0.4)) - half,
 				Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
@@ -5767,7 +6056,7 @@ func _draw_pulse() -> void:
 	var p: Dictionary = board[selected]
 	if not textures.has(p.id):
 		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
-	var t := Time.get_ticks_msec() / 1000.0
+	var t := Tuning.now_ms() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
 	var size := tile - SELECTED_INSET * 2 # the TOKEN's own on-screen size. The
@@ -5863,38 +6152,74 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var nudge := INV_MARK_GLYPH_NUDGE * glyph_size
 		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
 			HORIZONTAL_ALIGNMENT_CENTER, r * 2, glyph_size, INV_MARK_GLYPH_COL)
-	var buff_glyphs := BuffLogic.glyphs_of(p)
-	if not buff_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
-		_draw_buff_badges(font, px, buff_glyphs)
+	var slots := _badge_slots(p)
+	var badge_glyphs: Array[String] = slots.glyphs
+	if not badge_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
+		_draw_buff_badges(font, px, badge_glyphs, slots.stun_index)
+
+
+## Piece Buff glyphs (BuffLogic.glyphs_of) plus, if `p` is stunned
+## (BuffLogic.has "stunned" — a debuff riding the same buffs list, not a
+## catalogued Piece Buff; buff_logic.gd's module header), a Stun badge
+## appended. Buffs and Stun share one on-screen budget of 4 badges
+## (_buff_badge_centres): a stunned piece that already holds 4 Buffs drops
+## the LAST one to make room, because Stun takes PRIORITY — it's temporary
+## and actionable, where a 4th Buff staying hidden for one turn is not
+## (Max's ruling). Returns {"glyphs": Array[String], "stun_index": int}, the
+## index of the Stun badge within `glyphs` (-1 when not stunned) — shared by
+## _draw_buff_badges and tests/test_board_draw.gd so the probe can't diverge
+## from the draw, same convention as _buff_badge_centres below.
+func _badge_slots(p: Dictionary) -> Dictionary:
+	var glyphs: Array[String] = BuffLogic.glyphs_of(p)
+	if not BuffLogic.has(p, "stunned"):
+		return {"glyphs": glyphs, "stun_index": -1}
+	if glyphs.size() >= 4:
+		glyphs.resize(3)
+	glyphs.append(STUN_BADGE_GLYPH)
+	return {"glyphs": glyphs, "stun_index": glyphs.size() - 1}
 
 
 ## NO-185: one small badge per catalogued buff `p` carries
 ## (BuffLogic.glyphs_of), low on the tile. Capacity is base 2
 ## (Tuning.PIECE_BUFF_CAP_BASE) + Abduction Probe (+1, non-stacking) + the
 ## Cult's Communion (+1), so at most 4 badges — _buff_badge_centres lays out
-## exactly that many.
-func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String]) -> void:
+## exactly that many. `stun_index` (from _badge_slots) is the badge drawn red
+## instead of amber — same shape and size, Max's ruling, so it reads apart
+## from a Piece Buff without a second visual language.
+func _draw_buff_badges(font: Font, px: Vector2, glyphs: Array[String], stun_index := -1) -> void:
 	# NO-244 (Max, 2026-09-24): purple rounded squares, amber outline and amber
 	# glyph, every badge the same size whatever the count.
-	var half := _buff_badge_half()
-	var size := int(half * BUFF_GLYPH_RATIO)
-	var box := StyleBoxFlat.new()
-	box.bg_color = BUFF_BADGE_FILL
-	box.border_color = BUFF_BADGE_ACCENT
-	box.set_border_width_all(1)
-	box.set_corner_radius_all(int(half * 0.45))
 	var centres := _buff_badge_centres(px, glyphs.size())
 	for i in centres.size():
-		var c: Vector2 = centres[i]
-		draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
-		# Per-glyph optical correction: the symbols come from an OS fallback
-		# font whose ink sits differently in its box, so centring by font
-		# metrics alone leaves some off-centre or undersized.
-		var tune: Array = BUFF_GLYPH_TUNE.get(glyphs[i], [0.0, 0.0, 1.0])
-		var gsize := int(size * tune[2])
-		var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
-		draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyphs[i],
-			HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, BUFF_BADGE_ACCENT)
+		_draw_buff_badge(font, centres[i], glyphs[i], 1.0, 1.0,
+			STUN_BADGE_COL if i == stun_index else BUFF_BADGE_ACCENT)
+
+
+## One badge centred on `c`; `scl`/`alpha` are for NO-243's pop-in and fade.
+## `accent` is the border + glyph colour — the amber Piece Buff colour by
+## default, or STUN_BADGE_COL for the one badge in a row that marks Stunned
+## (_draw_buff_badges above). Stunned never carries a catalogued glyph
+## (BuffLogic.glyph_of returns "" for it — _add_badge's own comment), so it
+## never reaches this function through the pop-in/fade anim path below,
+## only through the plain per-frame board draw.
+func _draw_buff_badge(font: Font, c: Vector2, glyph: String, scl := 1.0, alpha := 1.0,
+		accent := BUFF_BADGE_ACCENT) -> void:
+	var half := _buff_badge_half() * scl
+	var size := int(half * BUFF_GLYPH_RATIO)
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(BUFF_BADGE_FILL, BUFF_BADGE_FILL.a * alpha)
+	box.border_color = Color(accent, accent.a * alpha)
+	box.set_border_width_all(1)
+	box.set_corner_radius_all(int(half * 0.45))
+	draw_style_box(box, Rect2(c - Vector2(half, half), Vector2(half, half) * 2))
+	# Per-glyph optical correction: the symbols come from an OS fallback
+	# font whose ink sits differently in its box, so centring by font
+	# metrics alone leaves some off-centre or undersized.
+	var tune: Array = BUFF_GLYPH_TUNE.get(glyph, [0.0, 0.0, 1.0])
+	var gsize := int(size * tune[2])
+	var gbase := (font.get_ascent(gsize) - font.get_descent(gsize)) / 2.0
+	draw_string(font, Vector2(c.x - half + tune[0] * half, c.y + gbase + (BUFF_GLYPH_LIFT + tune[1]) * half), glyph,
+		HORIZONTAL_ALIGNMENT_CENTER, half * 2, gsize, Color(accent, accent.a * alpha))
 
 
 ## Half the side of one buff badge (NO-244: fixed, the two-buff size).
@@ -6034,6 +6359,16 @@ func _after_drawer_change() -> void:
 
 
 func _refresh() -> void:
+	# NO-250 Tinfoil Hat: BuffLogic.moves_of is pure (no g), so "can't be
+	# Slowed" — including by an adjacent enemy's Smog — rides a piece flag.
+	# ponytail: re-stamped every refresh; a per-piece hook if refresh ever
+	# stops following every board change.
+	var tinfoil := _held("tinfoil-hat")
+	for pos in board:
+		if tinfoil and board[pos].owner == Rules.PLAYER:
+			board[pos].unslowable = true
+		else:
+			board[pos].erase("unslowable")
 	merge_highlights = MergeLogic.partner_ids(self) # hud strips read it
 	hud.refresh()
 	queue_redraw()

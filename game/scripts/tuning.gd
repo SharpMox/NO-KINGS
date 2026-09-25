@@ -66,6 +66,31 @@ static func classify_swipe(delta: Vector2) -> String:
 		return "down" if delta.y > 0 else "up"
 	return ""
 
+## Two taps on the same Stock/Captured stack within this much GAME time are a
+## double tap (the piece preview). Measured with now_ms(), never the wall clock.
+const DOUBLE_TAP_MS := 400
+
+## GAME TIME, in ms: the sum of every process delta since the first call — the
+## same clock SceneTreeTimers, Tweens and the Clock's drain already run on.
+## Every test-visible time window reads this instead of Time.get_ticks_msec().
+## At a normal frame rate delta IS elapsed real time, so play is unchanged
+## (except that a hitch longer than max_physics_steps_per_frame is capped, as
+## it is for every timer). Under `--fixed-fps 60` each frame adds exactly
+## 16.67 ms however long it really took, so a window N frames wide is N frames
+## wide on a fast Mac and a loaded CI runner alike — the 2026-09-24 double-tap flake
+## (#581: taps 410-451 ms apart by wall clock) cannot recur.
+## The stopwatch is one SceneTreeTimer that never fires: the tree subtracts
+## each frame's delta from it, so no autoload or _process hook is needed, and
+## it works in a `-s` test script from its first frame.
+const _STOPWATCH_S := 1.0e9 # ~31 years; a double keeps ~0.1 us of precision here
+static var _stopwatch: SceneTreeTimer
+
+
+static func now_ms() -> int:
+	if _stopwatch == null:
+		_stopwatch = (Engine.get_main_loop() as SceneTree).create_timer(_STOPWATCH_S)
+	return int((_STOPWATCH_S - _stopwatch.time_left) * 1000.0)
+
 ## NO-119: every icon OUTSIDE the board (Shop, Inventory Drawer, Stock Drawer)
 ## reads at this one fixed size, with no name label beside it — the tooltip /
 ## long-press carries the name instead. Same drift-guard shape as

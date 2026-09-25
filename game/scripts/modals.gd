@@ -25,6 +25,7 @@ const ItemLogic := preload("res://scripts/item_logic.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
 const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
 const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-185
+const UiAnim := preload("res://scripts/ui_anim.gd") # NO-243 S2: the shared UI animations
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -81,6 +82,11 @@ var shop_rest: Vector2 # NO-118: shop_panel's rest position, cached the same
 	# way hud.gd caches drawer_rest — read-only for probes that need to know
 	# when the open slide has actually settled rather than duplicating the
 	# vp.x - draw_w formula themselves
+var _shop_seen_stock: Variant = null # NO-243: the g.shop_stock array the Shop last
+	# showed — Shop.roll assigns a new one, so a different array is a restock
+var _shop_seen_sold: Array = [] # NO-243: each slot's `sold` as last shown — a
+	# flip while the Shop stays open is a purchase
+var _shop_tiles: Array = [] # NO-243: this build's tiles, in g.shop_stock order
 var shop_lane_b_bar: ProgressBar # issue 64: Lane B restock progress —
 	# exposed so probes can read/assert its value
 var shop_lower: VBoxContainer # V4 (Max review 2026-09-21): the master grid —
@@ -170,6 +176,8 @@ var box_expanded_index := -1 # which offered tile is selected, -1 = none
 var _box_options: Array = [] # the options show_box was last called with, so
 	# _box_tile/_box_detail can read by index without re-threading the array
 	# through every closure the way _shop_tile reads g.shop_stock directly
+var _box_cells: Array = [] # NO-243: this render's option cells, in order
+var _box_rerolling := false # NO-243: set by the Reroll button, read once by show_box
 var _box_dock: PanelContainer # refilled on a tile tap — NO-168 dropped its
 	# fixed size/background — see _fill_box_dock's own header (the Shop's own
 	# former dock, once the analogy here, is gone entirely as of NO-167)
@@ -207,9 +215,15 @@ func build(game) -> void:
 
 	overlay.visible = false
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	var dim := StyleBoxFlat.new()
-	dim.bg_color = Color(0.08, 0.08, 0.1, 0.93)
-	overlay.add_theme_stylebox_override("panel", dim)
+	# NO-243 S3: the dim is _desat's shader now (it greys the run behind as
+	# it dims it), so the panel itself draws nothing
+	overlay.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var desat_mat := ShaderMaterial.new()
+	desat_mat.shader = Shader.new()
+	desat_mat.shader.code = DESAT_SHADER
+	_desat.material = desat_mat
+	_desat.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(_desat)
 	g.hud.add_child(overlay)
 
 
@@ -311,7 +325,7 @@ func show_merge_confirm(a_id: String, b_id: String, result: String,
 		else:
 			_play_merge_animation(a_tex, b_tex, result_tex))
 	no.pressed.connect(func() -> void:
-		merge_panel.visible = false
+		UiAnim.fade_out(g, merge_panel) # NO-243: input-dead now, faded, hidden
 		merge_cancelled.emit())
 	box.add_child(_centered(yes))
 	var cancel_gap := Control.new()
@@ -320,6 +334,7 @@ func show_merge_confirm(a_id: String, b_id: String, result: String,
 	box.add_child(_centered(no))
 	g.hud.add_child(merge_panel)
 	merge_panel.move_to_front() # above the drawers and bottom bar
+	UiAnim.modal_in(g, merge_panel, center) # NO-243 (row 42)
 
 
 ## An icon at `size` (Tuning.OFFBOARD_ICON for the sources, NO-169's
@@ -409,9 +424,7 @@ func _merge_source_col(id: String, tex: TextureRect, piece: Dictionary = {},
 ## needs none — show_merge_confirm frees this exact panel and builds a
 ## fresh one, default filters, on every subsequent open.
 func _play_merge_animation(a_tex: TextureRect, b_tex: TextureRect, result_tex: TextureRect) -> void:
-	merge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for c in merge_panel.find_children("*", "Control", true, false):
-		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiAnim.input_dead(merge_panel)
 	var tw := merge_panel.create_tween()
 	tw.set_parallel(true)
 	if a_tex:
@@ -461,24 +474,25 @@ func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	_end_of_run_on_top()
-	for c in overlay.get_children():
-		c.queue_free()
+	_clear_overlay()
 	var center := CenterContainer.new()
 	overlay.add_child(center)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY" if won else "GAME OVER", &"Hero"))
+	var title := _overlay_label("VICTORY" if won else "GAME OVER", &"Hero")
+	box.add_child(title)
 	box.add_child(_overlay_label(reason))
-	var stats := "Score %d · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
+	var stats := " · Deepest wave %d\nKings %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
+		% [g.wave, g.kings_defeated, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	if not g.king_ids_defeated.is_empty():
 		var names: Array = g.king_ids_defeated.map(func(id: String) -> String: return Kings.name_of(id))
 		stats += "\nDefeated: %s" % ", ".join(names)
 	if rank > 0:
 		stats += "\n" + ("Local rank #%d" % rank if rank <= 10 else "Off the local top 10")
-	box.add_child(_overlay_label(stats))
+	var stats_label := _overlay_label("Score %d" % g.score + stats)
+	box.add_child(stats_label)
 	# issue 75: show the seed so a good run can be replayed or shared. The BUILD
 	# is shown beside it deliberately — a seed only reproduces within the build
 	# it was rolled in, because any content change that shifts how many rolls
@@ -503,6 +517,8 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
 	box.add_child(feedback)
 	overlay.visible = true
+	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
+	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S if won else 0.0, won)
 
 
 ## Wave-50 win screen: the run pauses on top of the board; Continue enters
@@ -543,15 +559,15 @@ func _end_of_run_on_top() -> void:
 
 func show_win_screen() -> void:
 	_end_of_run_on_top()
-	for c in overlay.get_children():
-		c.queue_free()
+	_clear_overlay()
 	var center := CenterContainer.new()
 	overlay.add_child(center)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	center.add_child(box)
-	box.add_child(_overlay_label("VICTORY", &"Hero"))
+	var title := _overlay_label("VICTORY", &"Hero")
+	box.add_child(title)
 	# The King who just fell, else (the --show-screen capture, which opens this
 	# without a fall) the King still on the board — never a bare "King" when
 	# the run knows his name.
@@ -562,9 +578,10 @@ func show_win_screen() -> void:
 	for e in g.load_scores():
 		if int(e.score) >= g.score:
 			preview += 1
-	box.add_child(_overlay_label(
-		"Score %d · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
-		% [g.score, preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]))
+	var stats := " · rank #%d if ended now\nWave %d · King Abilities seen %d\nPieces lost %d · Enemies slain %d" \
+		% [preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
+	var stats_label := _overlay_label("Score %d" % g.score + stats)
+	box.add_child(stats_label)
 	box.add_child(_overlay_label("Continue into endless waves?"))
 	var cont := Button.new()
 	cont.text = "Continue"
@@ -581,6 +598,104 @@ func show_win_screen() -> void:
 	feedback.pressed.connect(func() -> void: feedback_pressed.emit())
 	box.add_child(feedback)
 	overlay.visible = true
+	# after the King's shatter (S1), with a gold burst off the title
+	var stats_at := func(s: int) -> String: return "Score %d" % s + stats
+	_reveal(title, box.get_children().slice(1), stats_label, stats_at, KING_FALL_S, true)
+
+
+# --- NO-243 S3 (audit rows 53/54): the end screens' staged reveal ------------
+# The run behind the overlay greys and dims over REVEAL_DESAT_S (a screen-
+# texture shader, so it is whatever was on screen, board and HUD alike), then
+# the title drops in, then the rest fades up while the Score counts up to its
+# total. Only alpha, scale and label text animate, never position or a mouse
+# filter: the buttons take clicks from the first frame, wherever the reveal is.
+const REVEAL_DESAT_S := 0.6
+const REVEAL_TITLE_S := 0.35
+const REVEAL_REST_S := 0.6
+const KING_FALL_S := 0.4 ## a win waits out S1's King shatter (game.gd DIE_TIME) first
+const BURST_S := 0.6
+const BURST_COLOR := Color(1.0, 0.8, 0.3) ## S1's COL_GOLD_FX, the King-fall gold
+const DESAT_SHADER := """
+shader_type canvas_item;
+uniform sampler2D screen_tex : hint_screen_texture, filter_nearest, repeat_disable;
+uniform float amount = 1.0; // 0 = the run as it stands, 1 = greyed under the dim
+uniform vec4 dim : source_color = vec4(0.08, 0.08, 0.1, 0.93); // the old panel dim
+void fragment() {
+	vec3 c = texture(screen_tex, SCREEN_UV).rgb;
+	vec3 grey = vec3(dot(c, vec3(0.299, 0.587, 0.114)));
+	COLOR = vec4(mix(c, mix(grey, dim.rgb, dim.a), amount), 1.0);
+}
+"""
+var _desat := ColorRect.new() ## overlay's first child, kept across screens
+var reveal: Tween ## the running reveal; null when the last one snapped
+
+
+func _clear_overlay() -> void:
+	for c in overlay.get_children():
+		if c != _desat:
+			c.queue_free()
+
+
+func _set_desat(v: float) -> void:
+	(_desat.material as ShaderMaterial).set_shader_parameter("amount", v)
+
+
+## `rest` fades in after `title`; `stats` counts up through `stats_at`
+## (score -> its text). Instant with animations off or in autoplay.
+func _reveal(title: Label, rest: Array, stats: Label, stats_at: Callable, delay: float, burst: bool) -> void:
+	if reveal:
+		reveal.kill()
+	reveal = null
+	_set_desat(1.0)
+	if g.autoplay or not g.animations_on:
+		return
+	_set_desat(0.0)
+	title.modulate.a = 0.0
+	for c in rest:
+		(c as Control).modulate.a = 0.0
+	stats.text = stats_at.call(0)
+	reveal = create_tween()
+	reveal.tween_interval(delay)
+	reveal.tween_method(_set_desat, 0.0, 1.0, REVEAL_DESAT_S)
+	reveal.tween_callback(func() -> void: title.pivot_offset = title.size / 2.0)
+	reveal.tween_property(title, "modulate:a", 1.0, REVEAL_TITLE_S)
+	reveal.parallel().tween_property(title, "scale", Vector2.ONE, REVEAL_TITLE_S) \
+		.from(Vector2(1.8, 1.8)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	for i in rest.size():
+		if i > 0:
+			reveal.parallel()
+		reveal.tween_property(rest[i], "modulate:a", 1.0, REVEAL_REST_S)
+	var count := func(v: float) -> void:
+		stats.text = stats_at.call(roundi(v))
+	reveal.parallel().tween_method(count, 0.0, float(g.score), REVEAL_REST_S) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	if burst:
+		_gold_burst(title, delay + REVEAL_DESAT_S)
+
+
+## Row 54: gold chips fly out of the title as it lands. Input-dead, freed
+## with the screen.
+func _gold_burst(title: Control, delay: float) -> void:
+	var b := Control.new()
+	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.set_meta("t", 0.0)
+	overlay.add_child(b)
+	var paint := func() -> void:
+		var t: float = b.get_meta("t")
+		if t <= 0.0 or t >= 1.0:
+			return
+		var c := title.get_global_rect().get_center() - b.global_position
+		var sz := 9.0 * (1.0 - t)
+		for i in 18:
+			var at := c + Vector2.from_angle(TAU * i / 18.0) * lerpf(24.0, 200.0, ease(t, 0.3))
+			b.draw_rect(Rect2(at - Vector2(sz, sz) / 2.0, Vector2(sz, sz)), Color(BURST_COLOR, 1.0 - t))
+	b.draw.connect(paint)
+	var step := func(t: float) -> void:
+		b.set_meta("t", t)
+		b.queue_redraw()
+	var tw := b.create_tween()
+	tw.tween_interval(delay)
+	tw.tween_method(step, 0.0, 1.0, BURST_S)
 
 
 ## `king_id` (NO-83): a King whose Power draws on the King Ability catalogue —
@@ -685,6 +800,18 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 			buffs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			buffs_label.custom_minimum_size = Vector2(minf(260, g.get_viewport_rect().size.x - 96), 0)
 			box.add_child(buffs_label)
+
+		# Stunned is a debuff riding the same buffs list as a Piece Buff, but
+		# is NOT catalogued (buff_logic.gd's module header) so it's absent
+		# from buff_lines above — BuffLogic.describe() skips it on purpose.
+		# Its own line here, in the board badge's red (g.STUN_BADGE_COL).
+		if BuffLogic.has(piece, "stunned"):
+			var stun_label := Label.new()
+			stun_label.text = "Stunned"
+			stun_label.theme_type_variation = &"Meta"
+			stun_label.modulate = g.STUN_BADGE_COL
+			stun_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(stun_label)
 
 		var chain: Array = g._chain_of(id)
 		if chain.size() > 1:
@@ -866,6 +993,13 @@ func show_preview(kind: String, id: String, king_id := "", entry: Variant = null
 	close_gap.custom_minimum_size = Vector2(0, MODAL_CANCEL_GAP)
 	box.add_child(close_gap)
 	box.add_child(_centered(close))
+	# NO-243 (row 49): grows out of the point that was tapped or long-pressed
+	# (the pointer is still there), rather than snapping in at the centre.
+	UiAnim.modal_in(g, preview_panel, center, g.get_viewport().get_mouse_position(),
+		PREVIEW_FROM)
+
+
+const PREVIEW_FROM := 0.2 # NO-243: the preview's first scale, at the tapped point
 
 
 ## NO-171: the move legend, hidden by default behind a small button at the
@@ -937,6 +1071,20 @@ func _add_preview_legend() -> void:
 ## any more, so there is no expanded/collapsed state for it to depend on.
 func show_shop() -> void:
 	var was_open := shop_panel != null and shop_panel.visible
+	# NO-243: what changed since the Shop was last shown — read before the
+	# old panel goes, since a bought tile flies from where it was drawn.
+	var restocked: bool = _shop_seen_stock != null and not is_same(_shop_seen_stock, g.shop_stock)
+	var bought := {} # index -> the old tile's screen rect
+	if was_open and not restocked:
+		for t in _shop_tiles:
+			if t == null or not is_instance_valid(t):
+				continue
+			var i: int = (t as Button).get_meta("shop_index")
+			if i < _shop_seen_sold.size() and g.shop_stock[i].sold and not _shop_seen_sold[i]:
+				bought[i] = (t as Button).get_global_rect()
+	_shop_seen_stock = g.shop_stock
+	_shop_seen_sold = g.shop_stock.map(func(sl: Dictionary) -> bool: return sl.sold)
+	_shop_tiles = []
 	if _shop_tween: # NO-118: kill before the panel it targets is freed below
 		_shop_tween.kill()
 		_shop_tween = null
@@ -1100,6 +1248,7 @@ func show_shop() -> void:
 		shop_empty_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		root.add_child(shop_empty_label)
 	else:
+		_shop_tiles.resize(g.shop_stock.size()) # NO-243: indexed by shop_index
 		var by_kind := {"piece": [], "artefact": [], "item": [], "box": []}
 		for i in g.shop_stock.size():
 			by_kind[g.shop_stock[i].kind].append(i)
@@ -1159,10 +1308,41 @@ func show_shop() -> void:
 
 	g.hud.add_child(shop_panel)
 	shop_panel.move_to_front()
+	# NO-243 (row 45): a restock flips every tile over in sequence, the
+	# stagger shrunk to keep the whole sweep inside SHOP_FLIP_S.
+	if restocked and not _shop_tiles.is_empty():
+		UiAnim.deal_in(g, _shop_tiles, Vector2(0.05, 1.0),
+			minf(UiAnim.DEAL_STAGGER, SHOP_FLIP_S / maxf(_shop_tiles.size() - 1, 1)))
+	# NO-243 (row 44): the bought thing flies to the drawer it joined, and
+	# its fresh tile's SOLD stamp slams in.
+	for i in bought:
+		var slot: Dictionary = g.shop_stock[i]
+		if slot.kind != "box": # a Box opens its own pick instead
+			UiAnim.fly_to(g, _shop_icon(slot), bought[i],
+				g.hud.drawer_buttons["stock" if slot.kind == "piece" else "inventory"])
+		_stamp_in(_shop_tiles[i].get_node("SoldStamp"))
 	if not was_open: # NO-118: a rebuild while already open (Buy, Restock, ...)
 		# reuses the fresh panel at rest with no re-animation — it never left
 		# the screen.
 		_slide_shop(true)
+
+
+## NO-243: a restock's flip sweep ends by this + DEAL_S (0.4 s total).
+const SHOP_FLIP_S := 0.25
+## NO-243: the SOLD stamp's slam — from this scale down to rest.
+const STAMP_FROM := 1.8
+
+
+func _stamp_in(stamp: Control) -> void:
+	if not UiAnim.on(g):
+		return
+	var rest := stamp.modulate.a
+	stamp.scale = Vector2(STAMP_FROM, STAMP_FROM)
+	stamp.modulate.a = 0.0
+	var tw := stamp.create_tween().set_parallel()
+	tw.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(stamp, "scale", Vector2.ONE, 0.2)
+	tw.tween_property(stamp, "modulate:a", rest, 0.12)
 
 
 ## NO-118: slides shop_panel between its rest position (vp.x - draw_w, 0) and
@@ -1268,7 +1448,9 @@ func _shop_zone(indices: Array, cols: int) -> CenterContainer:
 	grid.add_theme_constant_override("v_separation", SHOP_SUBZONE_SEP)
 	grid.custom_minimum_size.x = Tuning.grid_row_w(cols, SHOP_SUBZONE_SEP) # NO-132
 	for i in indices:
-		grid.add_child(_shop_tile(i))
+		var tile := _shop_tile(i)
+		_shop_tiles[i] = tile
+		grid.add_child(tile)
 	center.add_child(grid)
 	return center
 
@@ -1370,6 +1552,24 @@ func _shop_tile(index: int) -> Button:
 		btn.self_modulate = Tuning.ARTEFACT_RARITY_COLOR[rarity]
 	if slot.sold:
 		btn.modulate = Color(1, 1, 1, 0.4) # greys out, stays in place — never removed
+		# NO-243 (row 44): stamped SOLD across the art (show_shop slams it in
+		# on the purchase itself). A child of the Button, not a container, so
+		# its scale and rotation are its own.
+		var stamp := Label.new()
+		stamp.name = "SoldStamp"
+		stamp.text = "SOLD"
+		stamp.theme_type_variation = &"Heading"
+		stamp.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+		stamp.add_theme_color_override("font_outline_color", Color(0.1, 0.02, 0.02))
+		stamp.add_theme_constant_override("outline_size", 4)
+		stamp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		stamp.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		stamp.position = Vector2.ZERO
+		stamp.size = Vector2(Tuning.OFFBOARD_ICON, Tuning.OFFBOARD_ICON - PRICE_STRIP)
+		stamp.pivot_offset = stamp.size / 2.0
+		stamp.rotation = -0.35
+		stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(stamp)
 	var price := Label.new()
 	price.text = Shop.price_text(g, slot) # NO-241: "Watch ad" on the Ad Box
 	price.theme_type_variation = &"Meta"
@@ -1611,8 +1811,10 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.custom_minimum_size = Vector2(420, 0)
 	box.add_child(head)
+	var dealt: Array = []
 	for o in offers:
 		var btn := Button.new()
+		dealt.append(btn)
 		btn.text = str(o.label)
 		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		btn.custom_minimum_size = Vector2(420, 0)
@@ -1633,6 +1835,8 @@ func show_choice_pick(header: String, offers: Array, cancel_text: String) -> voi
 	box.add_child(_centered(cancel))
 	g.hud.add_child(buff_panel)
 	buff_panel.move_to_front()
+	UiAnim.modal_in(g, buff_panel, center) # NO-243 (row 48): the Box's deal-in
+	UiAnim.deal_in(g, dealt)
 
 
 func hide_choice_pick() -> void:
@@ -1685,7 +1889,8 @@ func _box_tile(index: int) -> Control:
 			btn.self_modulate = Tuning.ARTEFACT_RARITY_COLOR[rarity]
 	btn.pressed.connect(func() -> void:
 		box_expanded_index = -1 if box_expanded_index == index else index
-		_fill_box_dock())
+		_fill_box_dock()
+		_box_lift())
 	cell.add_child(btn)
 
 	var name := Label.new()
@@ -1728,7 +1933,9 @@ func _box_grid(count: int) -> CenterContainer:
 		row.add_theme_constant_override("separation", BOX_SEP)
 		var hi := mini(i + cols, count)
 		for j in range(i, hi):
-			row.add_child(_box_tile(j))
+			var cell := _box_tile(j)
+			_box_cells.append(cell)
+			row.add_child(cell)
 		rows.add_child(row)
 		i = hi
 	center.add_child(rows)
@@ -1821,8 +2028,69 @@ func _box_pick_btn(opt: Dictionary) -> Button:
 	pick.set_meta("box_pick", true)
 	pick.disabled = opt.kind == "artefact" and Shop.is_unique_held(g, opt.payload.key) # NO-244:
 		# an offer rolled before the first probe was taken
-	pick.pressed.connect(func() -> void: box_chosen.emit(opt))
+	pick.pressed.connect(func() -> void:
+		_box_fly(opt) # NO-243 (row 47): before box_chosen re-renders or closes the Box
+		box_chosen.emit(opt))
 	return pick
+
+
+## NO-243 (row 47): the selected tile lifts, the others settle back. After a
+## frame: the dock refill just above re-sorts the modal, and a sort resets a
+## container child's scale (ui_anim.gd's header).
+const BOX_LIFT := 1.08
+
+func _box_lift() -> void:
+	if not UiAnim.on(g):
+		return
+	await get_tree().process_frame
+	for c in _box_cells:
+		if not is_instance_valid(c) or not (c as Control).is_inside_tree():
+			continue
+		var btn: Button = (c as Control).get_child(0)
+		btn.pivot_offset = btn.size / 2.0
+		var up: bool = btn.get_meta("box_index") == box_expanded_index
+		btn.create_tween().tween_property(btn, "scale",
+			Vector2.ONE * (BOX_LIFT if up else 1.0), 0.1)
+
+
+## NO-243 (row 47): the picked option's icon flies from its tile to the drawer
+## it joins — Stock for a piece, Inventory for an Item or Artefact.
+func _box_fly(opt: Dictionary) -> void:
+	var i := _box_options.find(opt)
+	if i < 0 or i >= _box_cells.size() or not is_instance_valid(_box_cells[i]):
+		return
+	var tile: Control = (_box_cells[i] as Control).get_child(0)
+	UiAnim.fly_to(g, _box_icon(opt), tile.get_global_rect(),
+		g.hud.drawer_buttons["stock" if opt.kind == "piece" else "inventory"])
+
+
+## NO-243 (row 46): the Box's lid — a cover over the grid that lifts off and
+## fades while the tiles deal in underneath. Drawn on the HUD layer (the grid
+## is inside containers, which would place a child themselves), input-dead.
+const BOX_LID_S := 0.25
+
+func _box_lid(grid) -> void: # untyped: freed during the wait (ui_anim.gd modal_in)
+	await get_tree().process_frame # the grid's first sort
+	if not is_instance_valid(grid) or not grid.is_inside_tree():
+		return
+	var lid := Panel.new()
+	lid.set_meta(&"box_lid", true)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.3, 0.22, 0.12)
+	sb.border_color = Color(0.85, 0.7, 0.35)
+	sb.set_border_width_all(3)
+	sb.set_corner_radius_all(6)
+	lid.add_theme_stylebox_override("panel", sb)
+	lid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var r: Rect2 = grid.get_global_rect()
+	lid.position = r.position
+	lid.size = r.size
+	g.hud.add_child(lid)
+	var tw := lid.create_tween().set_parallel()
+	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_property(lid, "position:y", r.position.y - r.size.y * 0.6, BOX_LID_S)
+	tw.tween_property(lid, "modulate:a", 0.0, BOX_LID_S)
+	tw.chain().tween_callback(lid.queue_free)
 
 
 func show_box(options: Array) -> void:
@@ -1832,6 +2100,10 @@ func show_box(options: Array) -> void:
 	# the Shop, could not act, and the clock kept draining, because Box Pick is
 	# deliberately excluded from the tier pause list.
 	box_panel.move_to_front()
+	var fresh := not box_panel.visible # NO-243: a first open, not a re-render
+	var rerolled := _box_rerolling
+	_box_rerolling = false
+	_box_cells = []
 	_box_options = options
 	box_expanded_index = -1 # NO-133: a fresh render — reroll/sell also call
 		# back in here with a new/changed offer, so nothing carries over
@@ -1850,7 +2122,8 @@ func show_box(options: Array) -> void:
 	# header) than the Shop/Stock OFFBOARD_ICON standard's grid, now that its
 	# name and per-tile dock chrome are gone. NO-186: always exactly two
 	# rows (_box_cols) — see BOX_ICON's own header for the per-size split.
-	box.add_child(_box_grid(options.size()))
+	var grid := _box_grid(options.size())
+	box.add_child(grid)
 	_box_dock = PanelContainer.new() # NO-168: no fixed size/background any
 		# more — see _fill_box_dock's own header
 	_fill_box_dock()
@@ -1876,7 +2149,9 @@ func show_box(options: Array) -> void:
 		# Cube (issue 46) — only while the per-Box budget is above zero
 		var reroll := Button.new()
 		reroll.text = "Reroll (%d left)" % g.box_rerolls_left
-		reroll.pressed.connect(func() -> void: box_reroll_pressed.emit())
+		reroll.pressed.connect(func() -> void:
+			_box_rerolling = true # NO-243: show_box spins the new offer in
+			box_reroll_pressed.emit())
 		box.add_child(reroll)
 	# NO-168: "PICK N" replaces the box-name title (gone from _box_vbox above)
 	# as this screen's one piece of header text — sat right above Skip, `picks`
@@ -1901,3 +2176,18 @@ func show_box(options: Array) -> void:
 	Tuning.money(skip, skip_gold)
 	skip.pressed.connect(func() -> void: box_skipped.emit())
 	box.add_child(_centered(skip))
+	# NO-243: a first open pops the modal in, lifts the lid and deals the
+	# tiles in under it (row 46); a reroll spins the new tiles over (row 47).
+	# A re-render after a pick or a sale stays instant.
+	if fresh:
+		UiAnim.modal_in(g, box_panel, box.get_parent() as Control)
+		if UiAnim.on(g):
+			_box_lid(grid)
+		UiAnim.deal_in(g, _box_cells, Vector2(0.6, 0.6), BOX_DEAL_STAGGER, BOX_DEAL_DELAY)
+	elif rerolled:
+		UiAnim.deal_in(g, _box_cells, Vector2(0.05, 1.0), BOX_DEAL_STAGGER)
+
+
+## NO-243: 7 tiles (a Huge Box) end by 0.06 + 6 x 0.03 + 0.15 = 0.39 s.
+const BOX_DEAL_STAGGER := 0.03
+const BOX_DEAL_DELAY := 0.06

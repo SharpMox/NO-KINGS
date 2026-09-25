@@ -29,6 +29,7 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | Screen | What it shows | Flags after `--` |
 |---|---|---|
 | `board` | the scenario exactly as booted (a bare `--screenshot` places the Stock and passes first) | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/kchip --show-screen board` |
+| `board` | the Stun badge (red, Max's ruling): a stunned enemy alone, and a stunned player piece already holding 4 Buffs (priority over the 4th) | `--scenario-name "Stun badge: red, priority over a 4th Buff (both sides)" --screenshot /tmp/cap/stun --show-screen board` |
 | `pause` | in-game pause menu | `--scenario-name "Movement & drag" --screenshot /tmp/cap/pause --show-screen pause` |
 | `king-abilities` | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | `box` | a random Box pick | `--scenario-name "Movement & drag" --screenshot /tmp/cap/box --show-screen box` |
@@ -43,7 +44,17 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 | `feed` | kill feed with three lines: a capture gain, a sale, an Artefact trigger | `--scenario-name "Movement & drag" --screenshot /tmp/cap/feed --show-screen feed` |
 | `pick` | the shared choice modal, as a Sell confirm | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/pick --show-screen pick` |
 
+| `turn-start` | the player-turn-start Artefact dispatch alone (NO-250 Pincer: the Stunned enemy with its "Stunned!" float; `stunned` has no board badge) | `--scenario-name "NO-250: Pincer" --screenshot /tmp/cap/pincer --show-screen turn-start` |
+
 Other seam flags work with `--scenario-name` too: `--select X,Y[;X,Y]`, `--arm-item KEY [--anchor X,Y]`, `--open-shop`, `--open-drawer stock|inventory` (only one of them per run).
+
+NO-250 Artefact mechanics, through `--select` (a real tap):
+
+| State | Flags after `--` |
+|---|---|
+| Magic bullet preview: the Rook's shot at the Knight through your own Pawn (linked dots through the blocker to a normal red-hatched capture tile) | `--scenario-name "NO-250: Magic bullet" --screenshot /tmp/cap/bullet --select 0,1` |
+| Oligarch: the enemy Pawn's recon preview, with no capture on your Queen | `--scenario-name "NO-250: Oligarch" --screenshot /tmp/cap/oligarch --select 2,4` |
+| Oligarch control: the same preview without the Artefact, with the capture shown | `--scenario-name "NO-250: Oligarch (control, no Artefact)" --screenshot /tmp/cap/oligarch-ctrl --select 2,4` |
 
 Menu screens need no scenario and write `DIR/menu.png`. The run then boots a default game and also writes a `game.png`; ignore that file.
 
@@ -54,6 +65,7 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 | Guide detail panel | `--screenshot /tmp/cap/guide-pieces-0 --show-screen guide:pieces:0` — the page with its slide-over detail open on row `<index>` (0-based, list order), settled. Pages with rows: `pieces`, `promotions`, `fusions`, `artefacts`, `items` |
 | Guide list, scrolled to a row | `--screenshot /tmp/cap/guide-pieces-row --show-screen guide:pieces:row:25` — no detail panel, just the list scrolled so row `<index>` (0-based, list order) sits at the top (the default view only shows the top of the list) |
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
+| Armies carousel, scrolled to one card | `--screenshot /tmp/cap/armies-horde --show-screen armies --army-name Horde` — same scroll a tap on that Army's page dot does (`menu.gd`'s `_debug_scroll_to_army`), by NAME rather than the dot's positional index, same idea as `--scenario-name`. Names: `Crown`, `Wild Hunt`, `Old Guard`, `Syndicate`, `Cult`, `Horde` (`Tuning.ARMIES`'s key order — the same order the dots go in). An unknown name is a no-op (prints `--army-name X: no such Army`, screenshot still lands on whichever card the carousel already showed). |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)
 
@@ -72,6 +84,8 @@ tools/godot-lock.sh godot --path game --write-movie /tmp/cap/sell-stock.avi --fi
 | `sell-item` | Inventory drawer → long-press Blitz → preview (Use / Sell) → Sell → confirm |
 | `sell-artefact` | Inventory drawer → long-press Jet Fuel Vial → preview → Sell → confirm |
 | `box-sell` | small Item Box on a full inventory (at the Item cap) → Sell row → confirm → select an offer → Pick |
+| `shop-buy` | the Shop stocked (a fresh roll) and opened → tap a piece tile → preview → Buy |
+| `shop-restock` | the Shop stocked and opened → a fresh roll rebuilds the open Shop (what a restock does) |
 
 On Aux, record one at a time:
 
@@ -98,3 +112,56 @@ ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --p
 | 9 | King Abilities overview | `--scenario-name "Header: King Wave — Donald Trump, Tariffs in force" --screenshot /tmp/cap/ka --show-screen king-abilities` |
 | 10 | Stock drawer, one cell per piece (no stacks, no Promote badge) | `--scenario-name "Combo Army: Crown — free merges, Stock pieces onto board partners" --screenshot /tmp/cap/stock --open-drawer stock` |
 | 10 | Stock return drop preview | `--scenario-name "Movement & drag" --screenshot /tmp/cap/return --show-screen stock-return` |
+
+## NO-243 board animations (`--show-screen anim:NAME`)
+
+Each plays one board animation on the "Movement & drag" board through the same call the game makes, waits ~1 s for it to finish, then the capture settles and quits. Animations are forced on for the run. Record with Movie Maker, windowed, one at a time:
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/anim-spawn.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/anim-spawn --show-screen anim:spawn
+```
+
+| NAME | Audit row | What it shows |
+|---|---|---|
+| `spawn` | 13 | three enemies drop in 60 ms apart, each tile flashing red |
+| `crush` | 14 | a spawn lands on a friendly piece, which bursts under it |
+| `king-arrive` | 15 | the King's big drop, board shake, gold crown ring and gold edge |
+| `king-fall` | 16 | a checkmated King shatters gold, gold edge, shake (recurring-King path, so no win screen) |
+| `rankup` | 10 | Pawn + Pawn merge, then the light sweep, scale pop and RANK UP |
+| `enemy-moves` | 2 | three enemy moves, one at a time: the mover's tile flashes, then it slides |
+| `explode` | 4 | a detonation: bursts plus a board shake |
+| `badge` | 19 | a Shield badge pops in, then fades when consumed |
+
+## NO-243 S3 HUD and end-of-run animations (Movie Maker)
+
+Animations are forced on for each run. A static `--show-screen gameover`/`win` capture now waits for the staged reveal to finish before the shot.
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/hud-anims.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/hud-anims --show-screen hud-anims
+```
+
+| NAME | Audit rows | What it shows |
+|---|---|---|
+| `hud-anims` | 31–34 | +$50 (roll up and squish), −$30 (roll down, red flash), a Turn tick with the row re-centring, a Wave flip, one Action drained, then the last one (PASS shakes), 0.6 s apart |
+| `reveal-gameover` | 53 | the loss screen: the board greys over 0.6 s, the title drops in, the Score counts up while the rest fades in |
+| `reveal-win` | 54 | a wave-50 King falls the real way and shatters gold (S1); 0.4 s later the same staged reveal, with a gold burst off the title |
+
+## NO-243 S2: modal and Shop animations
+
+Each animation is 0.4 s or less, so a video is the only way to see it. Movie Maker plus either a `--ui-demo` flow or a `--show-screen` capture (the capture holds the screen ~0.6 s before it quits). The engine flags go before `--`.
+
+| Row | Animation | Flags |
+|---|---|---|
+| 39 | pause menu fades and scales in | `--write-movie /tmp/cap/pause.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/pause --show-screen pause` |
+| 42 | merge confirm fades and scales in | `--write-movie /tmp/cap/merge.avi --fixed-fps 30 -- --scenario-name "Merge: on the board" --screenshot /tmp/cap/merge --select "2,1;3,1"` |
+| 44 | Shop buy: icon flies to the Stock tab, SOLD stamp | `--write-movie /tmp/cap/shop-buy.avi --fixed-fps 30 -- --ui-demo shop-buy` |
+| 45 | Shop restock: tiles flip in sequence | `--write-movie /tmp/cap/shop-restock.avi --fixed-fps 30 -- --ui-demo shop-restock` |
+| 46, 47 | Box: lid, deal-in, selected tile lifts, Pick flies to its tab | `--write-movie /tmp/cap/box-sell.avi --fixed-fps 30 -- --ui-demo box-sell` |
+| 48 | choice pick deals in (the Sell confirm) | `--write-movie /tmp/cap/sell-stock.avi --fixed-fps 30 -- --ui-demo sell-stock` |
+| 49 | preview grows out of the tapped tile | `--write-movie /tmp/cap/preview.avi --fixed-fps 30 -- --scenario-name "Movement & drag" --screenshot /tmp/cap/preview --show-screen preview --anchor 2,1` |
+| 58 | a capture flies from the board to the Stock button | `--write-movie /tmp/cap/capture.avi --fixed-fps 30 -- --scenario-name "Captures & highlights" --screenshot /tmp/cap/capture --select "2,2;2,5"` |
+| 58 | Convert: the piece slides from Captured to Stock | `--write-movie /tmp/cap/convert.avi --fixed-fps 30 -- --ui-demo convert` |
+| 59 | a sold Item flashes and shrinks out | `--write-movie /tmp/cap/sell-item.avi --fixed-fps 30 -- --ui-demo sell-item` |
+| 60 | a sold Artefact fades and shrinks out | `--write-movie /tmp/cap/sell-artefact.avi --fixed-fps 30 -- --ui-demo sell-artefact` |
+
+The preview grows out of wherever the pointer is; a `--show-screen preview` capture has no real tap, so it grows from the window's mouse position rather than the anchor tile. The merge row assumes the two Ferz on "Merge: on the board" merge on two taps; if the video shows no confirm, that pair is not a legal merge in this build.

@@ -16,6 +16,7 @@ const Shop := preload("res://scripts/shop.gd") # issue 97: convert price
 const Scenarios := preload("res://data/scenarios.gd") # NO-83: the Header scenarios
 const Kings := preload("res://data/kings.gd") # NO-83: escalate Trump's Power by hand
 const Economy := preload("res://scripts/economy.gd") # NO-84: live deploy/convert costs
+const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
 
 var fails := 0
 
@@ -1670,10 +1671,15 @@ func _init() -> void:
 	# NO-254 (CI, 2026-09-25): a freshly-opened modal's nested CenterContainer/
 	# VBoxContainer rect is not settled the instant it's built — the same
 	# "get_global_rect() before layout sort" trap CLAUDE.md documents for
-	# GridContainer — so wait one more idle frame before measuring it.
-	await process_frame
+	# GridContainer. A single extra idle frame (tried after CI run 36130372199
+	# failed on #584's head) is NOT always enough — it still failed
+	# intermittently after #592 added exactly that frame — because "settled"
+	# is a property of the layout, not of elapsed frame count: an unsettled
+	# rect spans the whole board, so no backdrop tile is found. Poll instead
+	# of guessing a number: the shared Settle.settle_layout below.
 	var modal_box: Control = game.modals.buff_panel.get_child(0).get_child(0)
-	var box_rect: Rect2 = modal_box.get_global_rect()
+	var settle := await Settle.settle_layout(modal_box)
+	var box_rect: Rect2 = settle.rect
 	var backdrop := Vector2(-1, -1)
 	for by in Tuning.BOARD_H:
 		for bx in Tuning.BOARD_W:
@@ -1685,7 +1691,8 @@ func _init() -> void:
 		if backdrop.x >= 0.0:
 			break
 	check(backdrop.x >= 0.0,
-		"(setup) a board tile exists over the modal's backdrop rather than its buttons")
+		"(setup) a board tile exists over the modal's backdrop rather than its buttons",
+		Settle.detail(settle))
 	_click(backdrop)
 	await process_frame
 	check(game.selected == Vector2i(-1, -1), "the choice modal blocks board clicks while open")
@@ -1935,6 +1942,7 @@ func _init() -> void:
 	check(not is_instance_valid(game.hud._drop_hl) or not game.hud._drop_hl.is_visible_in_tree(),
 		"setup: the drop preview is gone once the drag ends")
 	# put it back on the board: arm a Stock cell, tap the zone tile
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -1948,6 +1956,7 @@ func _init() -> void:
 	check(game.selected == Vector2i(2, 1) and game.drawer_open == "stock",
 		"(setup) the placed piece is selected with the Stock drawer open")
 	# tap ON a Stock cell, the least likely spot: it must return, not arm
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	await process_frame
@@ -1955,6 +1964,7 @@ func _init() -> void:
 			and game.stock[0] == ret_id and game.placing_id == "",
 		"setup: with a placed piece selected, a tap anywhere in the Stock drawer returns it")
 	game.pool_click_key = "" # the arming tap above is <400 ms old: not a double-tap
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	_click(ret_px)
@@ -3548,6 +3558,7 @@ func _init() -> void:
 	check(await _click_stock(game), "NO-236: Stock opens")
 	await process_frame
 	var gold0: int = game.gold
+	await Settle.settle_layout(_pool_rows(game, false)[0]) # NO-254: the strip rebuilds its buttons on every refresh
 	_click(_pool_rows(game, false)[0].get_global_rect().get_center())
 	await process_frame
 	var tap_tile := Vector2i(1, 1) # a neighbour of the queen: a deploy tile

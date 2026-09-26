@@ -8,7 +8,7 @@
   <title>NO KINGS / Betza</title>
   <style>
 
-    header { max-width: var(--wrap); margin: 0 auto; padding: 32px 24px 16px; }
+    header { max-width: var(--wrap); margin: 0 auto; padding: 32px 22px 16px; }
     h1 { margin: 0 0 8px 0; font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
     .intro { color: var(--text-soft); max-width: 760px; margin: 0 0 24px 0; font-size: 15px; }
 
@@ -27,14 +27,14 @@
     }
     /* Solid, not glass: inside the panel the tables sat on an already-blurred
        backdrop and had almost no contrast against it. */
-    .betza-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
+    .betza-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--rad-ctl); overflow: hidden; margin-bottom: 8px; font-size: 12.5px; }
     .betza-table thead { background: var(--bg); }
     .betza-table th { text-align: left; padding: 6px 12px; font-weight: 600; font-size: 11.5px; color: var(--text-soft); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
     .betza-table td { padding: 6px 12px; border-top: 1px solid var(--border); vertical-align: top; color: var(--text); }
     .betza-table tbody tr:first-child td { border-top: none; }
-    .betza-table code { background: var(--bg); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; border: 1px solid var(--border); white-space: nowrap; }
+    .betza-table code { background: var(--bg); padding: 1px 6px; border-radius: var(--rad-xs); font-family: var(--mono); font-size: 12.5px; border: 1px solid var(--border); white-space: nowrap; }
     .betza-table .betza-examples td:first-child { min-width: 130px; }
-    .betza-mini { display: block; border-radius: 4px; overflow: hidden; background: var(--sq-light); }
+    .betza-mini { display: block; border-radius: var(--rad-xs); overflow: hidden; background: var(--sq-light); }
     .betza-table td[data-betza-icon] { width: 1px; padding: 8px 14px; }
     .betza-table tr.is-active { opacity: 0.25; }
     .betza-table tr.is-active code { text-decoration: line-through; }
@@ -53,17 +53,17 @@
       .betza-table th:last-child,
       .betza-table td:last-child { width: 100%; }
     }
-    .betza-active { position: sticky; top: 80px; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
+    .betza-active { position: sticky; margin: 0 0 28px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--rad-ctl); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); max-height: 40vh; overflow-y: auto; z-index: 1; }
     .betza-active[hidden] { display: none; }
     .betza-active-label { font-size: 10.5px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .betza-active ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
     .betza-active li { display: grid; grid-template-columns: minmax(56px, auto) 48px 1fr; gap: 10px; align-items: center; font-size: 12.5px; color: var(--text); }
     .betza-active li.is-iconless { grid-template-columns: minmax(56px, auto) 1fr; gap: 10px; padding: 2px 0; }
     .betza-active li.is-iconless .betza-active-icon { display: none; }
-    .betza-active li code { background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; white-space: nowrap; }
+    .betza-active li code { background: var(--bg); border: 1px solid var(--border); padding: 1px 6px; border-radius: var(--rad-xs); font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
     .betza-active li .betza-active-code { display: inline-flex; gap: 4px; align-items: center; }
     .betza-active li .betza-active-icon { width: 48px; height: 48px; display: inline-block; }
-    .betza-active li .betza-active-icon svg { width: 100%; height: 100%; display: block; border-radius: 3px; }
+    .betza-active li .betza-active-icon svg { width: 100%; height: 100%; display: block; border-radius: var(--rad-xs); }
     .betza-active li .betza-active-name { color: var(--text); }
 
     /* ============== Sandbox + side-by-side layout ============== */
@@ -86,7 +86,7 @@
       width: var(--panel-w); z-index: 40;
       overflow-y: auto; overscroll-behavior: contain;
       padding: 26px 30px 48px; border-left: 1px solid var(--border);
-      background: linear-gradient(150deg, rgba(160,112,232,.14), rgba(24,16,48,.20) 42%),
+      background: linear-gradient(150deg, rgba(160,112,232,.14), color-mix(in srgb,var(--glass-wash) 20%,transparent) 42%),
                   color-mix(in srgb, var(--surface) 62%, transparent);
       backdrop-filter: blur(26px) saturate(160%);
       -webkit-backdrop-filter: blur(26px) saturate(160%);
@@ -107,7 +107,7 @@
     /* The hero lives at the top of the panel now. site.css styles `header h1`,
        so keeping it wrapped in a <header> preserves the gradient treatment. */
     .notation-hd { margin: 0 0 18px; }
-    .notation-hd h1 { font-size: clamp(30px, 3.4vw, 46px); margin-bottom: 6px; }
+    .notation-hd h1 { margin-bottom: 6px; }
     .notation-hd .intro { margin: 0; color: var(--text-soft); font-size: 14px; }
     /* The Active panel is sticky inside .notation, which is its own scroll
        container starting just under the nav -- so its offset is measured from
@@ -203,7 +203,7 @@
     .legend-item { display: inline-flex; align-items: center; gap: 6px; }
     .legend-swatch { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 
-    .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0; background: var(--sq-light); border-radius: 6px; overflow: hidden; }
+    .sandbox-board { width: 100%; max-width: 360px; aspect-ratio: 1 / 1; margin: 0; background: var(--sq-light); border-radius: var(--rad-ctl); overflow: hidden; }
     /* ---------- Codes: the 26 presets, in the site's collapsible box ----------
        Same .fbox/.filt shell as the encyclopedia and the deck pages. Replaces
        the old "+N more" pill, so all 26 are reachable in one place instead of
@@ -211,12 +211,12 @@
     .fbox {
       display: inline-flex; align-items: flex-start; gap: 14px;
       width: max-content; max-width: 100%; margin: 0 0 12px 0;
-      border: 1px solid var(--border); border-radius: 8px;
-      background: linear-gradient(150deg, rgba(160,112,232,.06), rgba(24,16,48,.09) 48%),
+      border: 1px solid var(--border); border-radius: var(--rad-ctl);
+      background: linear-gradient(150deg, rgba(160,112,232,.06), color-mix(in srgb,var(--glass-wash) 9%,transparent) 48%),
                   color-mix(in srgb, var(--surface) 52%, transparent);
       backdrop-filter: blur(14px) saturate(150%);
       -webkit-backdrop-filter: blur(14px) saturate(150%);
-      box-shadow: inset 0 1px 0 rgba(239,234,255,.13);
+      box-shadow: inset 0 1px 0 color-mix(in srgb,var(--glass-rim) 13%,transparent);
     }
     @media (prefers-reduced-transparency: reduce) {
       .fbox { background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
@@ -224,7 +224,7 @@
     .sandbox:has(.filt[aria-expanded="true"]) .fbox { width: auto; display: flex; }
     .sandbox:has(.filt[aria-expanded="true"]) .sandbox-presets { padding: 4px 14px 12px; width: auto; }
     .filt {
-      appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono, ui-monospace, Menlo, monospace);
+      appearance: none; cursor: pointer; font: 700 10.5px/1 var(--mono);
       letter-spacing: .09em; text-transform: uppercase; padding: 0 16px; min-height: 42px;
       border: 0; background: transparent; color: var(--text-soft);
       display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
@@ -237,18 +237,13 @@
     .sandbox-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0; flex: 1 1 auto; padding: 10px 14px 10px 0; }
     .sandbox-presets[hidden] { display: none; }
     .sandbox-presets-label { font-size: 10.5px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.5px; align-self: center; margin-right: 4px; }
-    .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 999px; padding: 4px 10px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--accent); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-preset { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), color-mix(in srgb,var(--glass-wash) 10%,transparent) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: var(--rad-pill); padding: 4px 10px; font-family: var(--mono); font-size: 11.5px; color: var(--accent); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-preset:hover { border-color: var(--accent); color: var(--accent); }
-    .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 10.5px; margin-left: 6px; }
-    /* Phones: the collapsed single-row preset strip is wider than the screen,
-       so let it scroll horizontally instead of pushing the page. Desktop
-       (>560px) keeps the original nowrap row. */
-    @media (max-width: 560px) {
-    }
+    .sandbox-preset .sandbox-preset-name { color: var(--text-soft); font-family: var(--sans); font-size: 10.5px; margin-left: 6px; }
     .sandbox-preset:hover .sandbox-preset-name { color: var(--accent); opacity: 0.85; }
     .sandbox-board svg { width: 100%; height: 100%; display: block; }
-    .sandbox-controls { border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 10px; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); padding: 10px; }
-    .sandbox-input { width: 100%; padding: 12px 14px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; outline: none; transition: border-color 0.15s ease; }
+    .sandbox-controls { border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: var(--rad-ctl); background: linear-gradient(150deg, rgba(160,112,232,.08), color-mix(in srgb,var(--glass-wash) 10%,transparent) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); padding: 10px; }
+    .sandbox-input { width: 100%; padding: 12px 14px; font-family: var(--mono); font-size: 16px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: var(--rad-ctl); outline: none; transition: border-color 0.15s ease; }
     .sandbox-input:focus { border-color: var(--accent); }
     .sandbox-input[data-invalid="true"] { border-color: var(--capture-color); }
     .sandbox-error { min-height: 14px; margin: 4px 0 6px 0; font-size: 12px; font-style: italic; color: var(--capture-color); }
@@ -262,7 +257,7 @@
        than being read as prose, so they can carry colour. --violet-hi, not
        --violet, which is only 3.11:1 on the dark surface. */
     .sandbox-key-group-label { min-width: 84px; font-size: 10.5px; font-weight: 700; color: var(--violet-hi); text-transform: uppercase; letter-spacing: 0.5px; }
-    .sandbox-key { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), rgba(24,16,48,.10) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: 6px; padding: 6px 10px; min-width: 32px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+    .sandbox-key { appearance: none; background: linear-gradient(150deg, rgba(160,112,232,.08), color-mix(in srgb,var(--glass-wash) 10%,transparent) 48%), color-mix(in srgb, var(--surface) 58%, transparent); backdrop-filter: blur(14px) saturate(150%); -webkit-backdrop-filter: blur(14px) saturate(150%); border: 1px solid color-mix(in srgb, var(--border) 75%, transparent); border-radius: var(--rad-ctl); padding: 6px 10px; min-width: 32px; font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
     .sandbox-key:hover { border-color: var(--accent); color: var(--accent); }
     .sandbox-key:active { background: var(--bg); }
     .sandbox-key.is-clear { color: var(--text-soft); }
@@ -292,9 +287,6 @@
     }
 
     /* Shared a11y (.sr-only, :focus-visible, reduced-motion) lives in assets/site.css. */
-    /* Page-specific focus rings kept here: */
-    .theme-toggle:focus-visible, .sandbox-key:focus-visible, .sandbox-preset:focus-visible { outline-offset: 2px; }
-    .betza-table tr[data-token] code[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   </style>
   <link rel="stylesheet" href="assets/site.css">
   <link rel="stylesheet" href="assets/nav.css">

@@ -65,7 +65,6 @@
 .nk:hover { color: var(--text); text-decoration: none; }
 .nk[aria-current="page"] { color: var(--text); border-bottom-color: var(--lime); }
 .nk-gap { margin-left: auto; }
-.nk:focus-visible { outline-offset: 4px; }
 
 .nk-burger {
   display: none;
@@ -82,7 +81,7 @@
   place-items: center;
 }
 .nk-burger:hover { color: var(--lime); border-color: var(--lime); }
-.nk-burger[aria-expanded="true"] { background: var(--lime); border-color: var(--lime); color: #141024; }
+.nk-burger[aria-expanded="true"] { background: var(--lime); border-color: var(--lime); color: var(--dark-ink); }
 
 .nk-theme {
   appearance: none;
@@ -122,7 +121,7 @@
   .nk-links[data-open] { display: flex; }
   .nk {
     padding: 14px 8px;
-    font-size: 14.5px;
+    font-size: 14px;
     border-bottom: none;
     border-left: 2px solid transparent;
   }

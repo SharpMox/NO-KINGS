@@ -103,7 +103,7 @@ func _knight_moves(c: Control) -> void:
 
 
 ## Rules > Merging: Pawn (selected) + Pawn (merge ring) → the Pawn's `next`
-## in pieces.json, each captioned with its name.
+## in pieces.json (id sergeant, shown as Ranger), each captioned with its name.
 func _merge_pawns(c: Control) -> void:
 	var result: String = defs.pawn.next
 	var tiles := _strip_tiles()
@@ -233,8 +233,8 @@ func _badge(c: Control, ctr: Vector2, glyph: String, accent: Color) -> void:
 
 func _caption(c: Control, under: Rect2, text: String) -> void:
 	var size := 16 * S
-	var w := under.size.x + GAP
-	c.draw_string(PIXEL, Vector2(under.position.x - GAP / 2.0, under.end.y + CAPTION_H * 0.75),
+	var w := under.size.x + GAP * 2 # draw_string cuts text at its width
+	c.draw_string(PIXEL, Vector2(under.position.x - GAP, under.end.y + CAPTION_H * 0.75),
 		text, HORIZONTAL_ALIGNMENT_CENTER, w, size, TEXT_COL)
 
 

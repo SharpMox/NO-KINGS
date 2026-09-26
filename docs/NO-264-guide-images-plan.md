@@ -12,7 +12,7 @@ Guide structure is from `game/scripts/guide.gd` (hub + 7 pages + one shared deta
 | Rules | Objective | Win on the wave-50 King; three ways to lose | Win screen crop (`--show-screen win`) beside the loss screen (`--show-screen gameover`) | A | The end screens are real UI with exact wording; a generated mock would drift |
 | Rules | Board | 8x12; free placement on two back rows; later deploys onto those rows or beside your pieces | Board outline, back two rows tinted, deploy dots on the rows and next to a mid-board piece | B | One picture shows both placement rules; the SETUP capture shows only the first |
 | Rules | Turns | 2 Actions, each piece moves once, PASS ends the turn | Deck crop: Action pips + PASS button | A | Points at the real controls |
-| Rules | Merging | Tap/drag onto a twin to promote, onto a partner to fuse | **Built:** `merge-pawns` (Pawn + Pawn → Sergeant, B) and `rules-merging` (a Ferz selected, its twin ringed, A) | B | The strip states the rule; the board crop shows the cue. Compare both |
+| Rules | Merging | Tap/drag onto a twin to promote, onto a partner to fuse | **Built:** `merge-pawns` (Pawn + Pawn → Ranger, B) and `rules-merging` (a Ferz selected, its twin ringed, A) | B | The strip states the rule; the board crop shows the cue. Compare both |
 | Rules | Stock | Captured Stock, Convert, Sell for half | Stock drawer open (`--open-drawer stock`), Captured row visible | A | A drawer the player has to find |
 | Rules | Shop & Boxes | Restock timing; Box choices | Box pick (`--show-screen box`) and the open Shop (`--open-shop`) | A | Real modals, real prices |
 | Rules | Army | Power always on; Ability 1 Action per wave; Reinforcements | Armies carousel card (`--show-screen armies --army-name Crown`) | A | The card already lays out Power and Ability |
@@ -37,4 +37,4 @@ Guide structure is from `game/scripts/guide.gd` (hub + 7 pages + one shared deta
 - B: `knight-moves` (5x5 slice), `merge-pawns`, `buff-badges`, written to `game/assets/guide/<name>.png` at 2x.
 - A: `rules-merging` ("Merge: on the board", `--select 2,1`, cropped to board tiles x 0-6, y 0-2), written to `game/assets/guide/rules-merging.png`.
 
-The ticket's example "two Pawns → Ranger" does not match the data: `pieces.json` gives `pawn.next = sergeant`. The image reads the data, so it shows a Sergeant.
+`merge-pawns` reads the result from the data (`pawn.next` = id `sergeant`, display name Ranger), so it tracks any change to the Pawn chain.

@@ -51,6 +51,10 @@ var _win := Rect2i()
 ## named fallbacks so a machine whose OS fallback misses a glyph (CI's runner:
 ## ⨯ ⟲) still draws it. Where the OS fallback already has it this changes nothing.
 var _sym: Font
+## Merge targets the current image's paint asked for, [centre, token]. Drawn by
+## an overlay through game.gd's SELECT_OUTLINE_SHADER after the paint, the way
+## game.gd's `_merge_fx` child draws them over the board.
+var _targets: Array = []
 
 
 func _initialize() -> void:
@@ -94,6 +98,10 @@ func _initialize() -> void:
 	for key: String in BuffLogic.PIECE_BUFF_GLYPHS:
 		images["buff-" + key] = _board_image(Rect2i(0, 0, 1, 1), [["rook", 0, 0, 0, [BuffLogic.glyph_of(key)]]])
 
+	var outline := Shader.new()
+	outline.code = Game.SELECT_OUTLINE_SHADER
+	var outline_mat := ShaderMaterial.new()
+	outline_mat.shader = outline
 	var out := ProjectSettings.globalize_path(OUT_DIR)
 	DirAccess.make_dir_recursive_absolute(out)
 	var fails := 0
@@ -106,7 +114,14 @@ func _initialize() -> void:
 		canvas.size = Vector2(vp.size)
 		canvas.paint = images[name][1]
 		vp.add_child(canvas)
+		var overlay := Node2D.new()
+		overlay.material = outline_mat
+		overlay.draw.connect(func() -> void: _draw_targets(overlay))
+		canvas.add_child(overlay)
+		_targets = []
 		root.add_child(vp)
+		await RenderingServer.frame_post_draw
+		overlay.queue_redraw() # the paint has run now, so _targets is filled
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		var path := out.path_join(name + ".png")
@@ -141,7 +156,7 @@ func _merge_pawns(c: Control) -> void:
 	var tiles := _strip(c, ["pawn", "pawn", defs.pawn.next])
 	c.draw_rect(tiles[0], Game.COL_SELECT)
 	_piece(c, "pawn", Rules.PLAYER, tiles[0], true)
-	_merge_target(c, tiles[1])
+	_merge_target(tiles[1], "pawn")
 	_between(c, tiles[0], tiles[1], "+")
 	_between(c, tiles[1], tiles[2], "→")
 
@@ -265,7 +280,7 @@ func _scene(c: Control, win: Rect2i, pieces: Array, o: Dictionary) -> void:
 		if p.size() > 4:
 			_badges(c, r, p[4])
 	if o.has("target"):
-		_merge_target(c, _tile(o.target))
+		_merge_target(_tile(o.target), board[o.target].id)
 
 
 ## Screen rect of board tile `t` inside the current window (+y is up on the board).
@@ -364,9 +379,29 @@ func _arrow(c: Control, from: Vector2, to: Vector2, col: Color) -> void:
 	c.draw_colored_polygon(PackedVector2Array([end - side * hh, to, end + side * hh]), col)
 
 
-## The merge-target mark on the tile `r`.
-func _merge_target(c: Control, r: Rect2) -> void:
-	c.draw_arc(r.get_center(), TILE * 0.46, 0, TAU, 48, Game.COL_MERGE, 3.0 * S)
+## Marks the player token `id` on tile `r` as a merge target (drawn later by
+## _draw_targets).
+func _merge_target(r: Rect2, id: String) -> void:
+	var tex := Game.load_piece_tex(id)
+	_held.append(tex)
+	_targets.append([r.get_center(), tex])
+
+
+## game.gd _draw_merge_fx, static (animations off): the lime rim on a dark inner
+## band, hugging each target token's own silhouette.
+func _draw_targets(o: Node2D) -> void:
+	var size := TILE + 4.0 * S # the token's drawn size (inset -2)
+	var w := Game.MERGE_TARGET_WIDTH * S
+	var mat: ShaderMaterial = o.material
+	mat.set_shader_parameter("rim_color", Game.COL_MERGE_TARGET)
+	mat.set_shader_parameter("fill_color", Game.BUFF_BADGE_BG)
+	mat.set_shader_parameter("fill_reach", Game.MERGE_TARGET_KEYLINE * S / size)
+	mat.set_shader_parameter("rim_reach", w / size)
+	for t in _targets:
+		var tex: Texture2D = t[1]
+		var margin := tex.get_size() * (w / size)
+		o.draw_texture_rect_region(tex, Rect2(t[0] - Vector2(size, size) / 2 - Vector2(w, w), Vector2(size, size) + Vector2(w, w) * 2),
+			Rect2(-margin, tex.get_size() + margin * 2), Color.WHITE, false, false)
 
 
 ## game.gd _buff_badge_centres + _draw_buff_badge for the tile `r`; the badge at

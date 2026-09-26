@@ -473,13 +473,15 @@ func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme 
 	return l
 
 
-## The end screens' frame. Max's page spec (2026-09-26, 10th review): the
+## The end screens' frame. Max's page spec (2026-09-26, 10th/11th review): the
 ## scroll viewport spans the WHOLE screen top (y=0) to bottom — content
-## scrolls off the top edge — and the button block FLOATS over it on its own
-## opaque bar, anchored to the bottom, so it never hides content the player
-## hasn't scrolled past and the scroll still receives drags/wheel everywhere
-## above the bar. Returns [content, buttons]; content is vertically centred
-## while it fits, as the old CenterContainer did.
+## scrolls off the top edge, starting fixed at the top of the page (never
+## vertically centred, unlike the old CenterContainer-style behaviour) — and
+## the button block FLOATS over it with NO background of its own (fully
+## transparent — the banner and the scrolling crowd show through behind and
+## between the buttons), anchored to the bottom, so it never hides content
+## the player hasn't scrolled past and the scroll still receives drags/wheel
+## everywhere except the buttons' own rect. Returns [content, buttons].
 ##
 ## `overlay` (a PanelContainer) fits EVERY direct child into its own full
 ## inner rect — already relied on for `_desat` (build()'s own dim layer,
@@ -496,70 +498,71 @@ func _end_screen_frame() -> Array:
 	scroll.scroll_deadzone = 24 # a drag on the mass scrolls; menu.gd's value
 	overlay.add_child(scroll)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", END_SCREEN_CONTENT_GAP)
 	# EXPAND + SHRINK_CENTER: the labels' own width (_overlay_width), centred
-	# in the scroll; EXPAND_FILL down, so ALIGNMENT_CENTER centres it while
-	# it is shorter than the screen. `box` stays `scroll`'s own DIRECT child
-	# (a MarginContainer wrapper here measured only its own children's
-	# natural ~432px width instead of the full ~480px ScrollContainer gives
-	# a direct EXPAND child on a disabled axis — everything centred ~24px
-	# left of true screen centre). Top/bottom padding below are plain spacer
-	# CHILDREN of `box` instead, so this relationship never changes.
+	# in the scroll. `box` stays `scroll`'s own DIRECT child (a MarginContainer
+	# wrapper here measured only its own children's natural ~432px width
+	# instead of the full ~480px ScrollContainer gives a direct EXPAND child
+	# on a disabled axis — everything centred ~24px left of true screen
+	# centre). Top/bottom padding below are plain spacer CHILDREN of `box`
+	# instead, so this relationship never changes. Max, 11th review: the
+	# game-over block sits at the TOP of the page, always — no more
+	# ALIGNMENT_CENTER/EXPAND_FILL centring short content within whatever
+	# (now much taller, full-screen) height `scroll` happens to have; that
+	# was pushing the title ~25px lower than main's fixed position.
 	box.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
 	var top_pad := Control.new() # Max: keep the game-over block's visual
 		# position at scroll=0 unchanged — the OLD outer frame's 24px top
 		# margin (never scrolled) becomes CONTENT instead (scrolls off with
-		# everything else)
+		# everything else). Net gap above the title must be exactly
+		# END_SCREEN_TOP_PAD, not that PLUS `box`'s own separation (this
+		# spacer is title's immediate PRECEDING sibling, so the separation
+		# applies between them too) — subtract it here so the two don't add up.
 	top_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top_pad.custom_minimum_size.y = END_SCREEN_TOP_PAD
+	top_pad.custom_minimum_size.y = END_SCREEN_TOP_PAD - END_SCREEN_CONTENT_GAP
 	box.add_child(top_pad)
 
 	var bar := VBoxContainer.new()
 	bar.name = "EndScreenBar" # the tests' handle
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE # transparent except
-		# `strip` below — a parent's IGNORE does NOT cascade to its children
-		# (CLAUDE.md), so `strip` keeps its own default blocking filter while
-		# the rest of `bar`'s (screen-sized) rect passes drags/wheel through
-		# to `scroll` beneath it
-	bar.alignment = BoxContainer.ALIGNMENT_END # packs `strip` flush to the
+		# `buttons` below — a parent's IGNORE does NOT cascade to its children
+		# (CLAUDE.md), so `buttons` keeps its own default blocking filter
+		# while the rest of `bar`'s (screen-sized) rect passes drags/wheel
+		# through to `scroll` beneath it
+	bar.alignment = BoxContainer.ALIGNMENT_END # packs `buttons` flush to the
 		# bottom of bar's own (full-screen, from `overlay`) rect
 	overlay.add_child(bar) # after `scroll`: later tree position wins both
 		# paint order and input hit-testing for same-rect siblings
-	var strip := PanelContainer.new() # the opaque backing IS the panel's own
-		# StyleBoxFlat — no separate ColorRect needed; PanelContainer already
-		# insets its child by the stylebox's own content margins
-	var strip_bg := StyleBoxFlat.new()
-	strip_bg.bg_color = END_SCREEN_BAR_COLOR
-	strip_bg.content_margin_top = END_SCREEN_BAR_PAD
-	strip_bg.content_margin_bottom = END_SCREEN_BAR_PAD
-	strip.add_theme_stylebox_override("panel", strip_bg)
-	bar.add_child(strip)
+	# Max, 11th review: the button block has NO background at all — no
+	# panel, no fill, alpha 0 — the banner and the scrolling crowd show
+	# through behind and between the buttons. `buttons` is `bar`'s own
+	# direct child now (no backing PanelContainer to hold a stylebox), so
+	# ONLY the buttons' own natural rect blocks clicks; everywhere else in
+	# `bar`'s (screen-sized) area passes drags/wheel to `scroll`.
 	var buttons := VBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 16)
+	buttons.add_theme_constant_override("separation", END_SCREEN_CONTENT_GAP)
 	buttons.custom_minimum_size.x = _overlay_width() # the width the buttons had
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	strip.add_child(buttons)
+	bar.add_child(buttons)
 
-	var bottom_pad := Control.new() # room for `strip`'s own settled height
+	var bottom_pad := Control.new() # room for `buttons`' own settled height
 		# plus a gap, kept in sync below since it depends on the buttons' own
 		# (font-driven, not synchronously known) size
 	bottom_pad.name = "EndScreenBottomPad" # the tests' handle
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(bottom_pad)
 	var sync_bottom_pad := func() -> void:
-		bottom_pad.custom_minimum_size.y = strip.size.y + END_SCREEN_BAR_GAP
+		bottom_pad.custom_minimum_size.y = buttons.size.y + END_SCREEN_BAR_GAP
 		if bottom_pad.get_parent() == box: # `box` keeps growing after this
 			# function returns — the caller (show_overlay()/show_win_screen())
 			# appends the title/stats/Casualties section — so re-pin `bottom_pad`
 			# LAST every time this fires, not just once, up front
 			box.move_child(bottom_pad, box.get_child_count() - 1)
-	strip.resized.connect(sync_bottom_pad) # `strip`'s SIZE (not just position)
-		# settles once the buttons' own font metrics resolve post-tree-entry —
-		# a genuine size change, so `resized` alone (unlike the mass-recentre
-		# case above) is the right signal
+	buttons.resized.connect(sync_bottom_pad) # `buttons`' SIZE (not just
+		# position) settles once its own font metrics resolve post-tree-entry
+		# — a genuine size change, so `resized` alone (unlike the mass-
+		# recentre case above) is the right signal
 	sync_bottom_pad.call() # the initial (near-zero) value, superseded once
 		# `resized` fires with the real height
 	return [box, buttons]
@@ -744,27 +747,25 @@ const CASUALTY_TITLE_GAP := 16.0 # px, Max: "~16 px of room between the title
 	# it, which is exactly the "little padding" past the raw point depth Max
 	# asked for there too.
 
-## Max, 2026-09-26 (10th review, page-spec ruling): the end screen's own
+## Max, 2026-09-26 (10th/11th review, page-spec ruling): the end screen's own
 ## chrome — the top breathing room the scroll viewport used to reserve as a
 ## screen-level margin (now content padding, `_end_screen_frame()`'s
 ## `top_pad`), and the floating button bar it now replaces the old pinned
-## column with. See that function's own header for the shape.
+## column with. See that function's own header for the shape. 11th review:
+## the bar has NO background of its own (removed `END_SCREEN_BAR_COLOR`/
+## `_PAD` — there is no panel/stylebox left to colour or pad).
 const END_SCREEN_TOP_PAD := 24.0 # px — the OLD `margin`'s own top value
 	# (unrelated to CASUALTY_TITLE_TOP_PAD above, which pads the banner's
 	# title, not the whole screen), kept identical so the game-over block's
 	# visual position at scroll=0 doesn't move.
-const END_SCREEN_BAR_COLOR := Color(0.08, 0.08, 0.1, 1.0) # opaque: content
-	# must never show through the bar (Max). Same dark family every other
-	# end-of-run panel already uses (`_desat`'s own `dim.rgb`, `box_bg`/
-	# `pv_bg`'s StyleBoxFlat colour) — those are ~0.9-0.97 alpha; this one is
-	# forced fully opaque, same reasoning CASUALTY_BANNER_COLOR's own header
-	# gives for the banner itself.
-const END_SCREEN_BAR_PAD := 16.0 # px, the bar's own internal top/bottom
-	# padding around the buttons (StyleBoxFlat content margins) — matches the
-	# buttons' own inter-button separation below for a consistent rhythm.
+const END_SCREEN_CONTENT_GAP := 16.0 # px — `box`'s own separation between
+	# its stacked children (labels, the Casualties section, the padding
+	# spacers) and `buttons`' own separation between Restart/Main Menu/
+	# Feedback etc. One constant for both: the OLD design used the same
+	# literal `16` in both places already.
 const END_SCREEN_BAR_GAP := 16.0 # px of clearance Max asked for between the
 	# scrolled content's own bottom (the Casualties point, when there is one)
-	# and the bar's top edge, on top of the bar's own height.
+	# and the buttons' own top edge, on top of the buttons' own height.
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:

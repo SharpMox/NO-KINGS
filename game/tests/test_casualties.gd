@@ -301,6 +301,23 @@ func _init() -> void:
 			g._game_over(false, "Clock out")
 		await _settle()
 		var screen := "win screen" if win else "game over"
+		# Max, 11th review: the GAME OVER/VICTORY title's visual position at
+		# scroll 0 must reproduce main's — content moving from a screen-level
+		# margin (never scrolled) to a content spacer (see END_SCREEN_TOP_PAD)
+		# must not shift it. Read before any scroll call, so this is genuinely
+		# scroll 0.
+		var hero_title: Label = null
+		for l in g.modals.overlay.find_children("*", "Label", true, false):
+			if (l as Label).theme_type_variation == &"Hero":
+				hero_title = l
+				break
+		var overlay_top: float = g.modals.overlay.get_global_rect().position.y
+		check(hero_title != null
+				and absf(hero_title.get_global_rect().position.y - (overlay_top + Modals.END_SCREEN_TOP_PAD)) <= 1.0,
+			"%s: at scroll 0, the title sits exactly the old frame margin (%.1fpx) below the overlay's own top (title y %.1f, expected %.1f)"
+				% [screen, Modals.END_SCREEN_TOP_PAD,
+					hero_title.get_global_rect().position.y if hero_title != null else -1.0,
+					overlay_top + Modals.END_SCREEN_TOP_PAD])
 		var section := _section(g)
 		check(section != null, "%s: a Casualties section" % screen)
 		if section == null:
@@ -330,10 +347,8 @@ func _init() -> void:
 			# off `section`'s own parent, robust to whatever else is a sibling
 			# inside `box` (the top/bottom padding spacers, etc.)
 		var bar_node: Control = g.modals.overlay.find_child("EndScreenBar", true, false)
-		var strip_node: Control = bar_node.get_child(0) \
+		var buttons_ctrl: Control = bar_node.get_child(0) \
 			if bar_node != null and bar_node.get_child_count() > 0 else null
-		var buttons_ctrl: Control = strip_node.get_child(0) \
-			if strip_node != null and strip_node.get_child_count() > 0 else null
 		check(end_scroll != null and end_scroll.is_ancestor_of(section),
 			"%s: the banner (drawn on `section` itself) is a descendant of the scrolled content" % screen)
 		check(not section.top_level,
@@ -355,7 +370,7 @@ func _init() -> void:
 				% screen)
 		# Max, 2026-09-26 (10th review, page-spec ruling): the scroll viewport
 		# now spans the WHOLE screen — content scrolls off the top edge — and
-		# the button block floats over it on its own opaque bar instead of
+		# the button block floats over it, fully transparent, instead of
 		# constraining the scroll's own height.
 		var screen_size := g.get_viewport_rect().size
 		check(end_scroll != null and absf(end_scroll.get_global_rect().position.y) <= 0.5
@@ -364,9 +379,19 @@ func _init() -> void:
 				% [screen, screen_size.y,
 					end_scroll.get_global_rect().position.y if end_scroll != null else -1.0,
 					end_scroll.get_global_rect().end.y if end_scroll != null else -1.0])
-		var strip_style: StyleBox = strip_node.get_theme_stylebox("panel") if strip_node != null else null
-		check(strip_style is StyleBoxFlat and (strip_style as StyleBoxFlat).bg_color.a >= 0.999,
-			"%s: the button bar is opaque" % screen)
+		# Max, 11th review: the button bar has NO background at all — no
+		# panel, no fill, alpha 0. There is no PanelContainer left in `bar`
+		# at all (removed with `strip`); this holds even if a future change
+		# re-adds one, as long as it stays fully transparent.
+		var bar_panels: Array = bar_node.find_children("*", "PanelContainer", true, false) \
+			if bar_node != null else []
+		var bar_opaque := false
+		for p in bar_panels:
+			var sb: StyleBox = (p as Control).get_theme_stylebox("panel")
+			if sb is StyleBoxFlat and (sb as StyleBoxFlat).bg_color.a > 0.001:
+				bar_opaque = true
+		check(bar_node != null and not bar_opaque,
+			"%s: the button bar is transparent — no opaque background node" % screen)
 		var overlay_kids: Array = g.modals.overlay.get_children()
 		check(bar_node != null and end_scroll != null
 				and overlay_kids.find(bar_node) > overlay_kids.find(end_scroll),
@@ -466,11 +491,11 @@ func _init() -> void:
 			check(apex_global_y >= scroll_rect.position.y - 0.5 and apex_global_y <= scroll_rect.end.y + 0.5,
 				"%s: scrolled to the bottom, the point sits inside the scroll's own (clipped) rect (%.1f in [%.1f, %.1f])"
 					% [screen, apex_global_y, scroll_rect.position.y, scroll_rect.end.y])
-			check(strip_node == null
-					or apex_global_y <= strip_node.get_global_rect().position.y - Modals.END_SCREEN_BAR_GAP + 0.5,
+			check(buttons_ctrl == null
+					or apex_global_y <= buttons_ctrl.get_global_rect().position.y - Modals.END_SCREEN_BAR_GAP + 0.5,
 				"%s: at max scroll, the point sits at least %dpx above the bar's own top (%.1f vs bar top %.1f)"
 					% [screen, Modals.END_SCREEN_BAR_GAP, apex_global_y,
-						strip_node.get_global_rect().position.y if strip_node != null else -1.0])
+						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
 		var tint_ok := true
 		var unscaled := true
 		var odd := ""

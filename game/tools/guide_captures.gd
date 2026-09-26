@@ -12,7 +12,7 @@ extends SceneTree
 ##
 ## A row: name, the flags after `--` (minus --screenshot, added here), the file
 ## the capture writes (game.png for a scenario, menu.png for a menu screen), and
-## ONE crop:
+## at most ONE crop (none = the whole screen):
 ##   "rect":  Rect2 in canvas px (480x800), for anything off the board;
 ##   "board": Rect2i in board tiles, x/y of the bottom-left tile (y=0 is the
 ##            player's back row, as in --select) plus width/height in tiles.
@@ -29,10 +29,34 @@ const OUT_DIR := "res://assets/guide"
 const CAPTURE_DIR := "/tmp/guide-captures" # ponytail: POSIX temp; Aux and CI are macOS/Linux
 
 const SHOTS := [
-	# Rules > Merging: a Ferz selected, its twin ringed as a merge partner.
+	{"name": "objective-win", "file": "game.png",
+		"flags": ["--scenario-name", "Win screen: wave 50 (capture King)", "--show-screen", "win"]},
+	{"name": "objective-loss", "file": "game.png",
+		"flags": ["--scenario-name", "Loss: clock-out (10s)", "--show-screen", "gameover"]},
+	{"name": "turns-deck", "file": "game.png",
+		"flags": ["--scenario-name", "Movement & drag", "--show-screen", "board"]},
 	{"name": "rules-merging", "file": "game.png",
 		"flags": ["--scenario-name", "Merge: on the board", "--select", "2,1"],
 		"board": Rect2i(0, 0, 7, 3)},
+	{"name": "stock-drawer", "file": "game.png",
+		"flags": ["--scenario-name", "Capture: selling sandbox", "--open-drawer", "stock"]},
+	{"name": "shop", "file": "game.png",
+		"flags": ["--scenario-name", "Boxes (Shop, issue 47: 9 typed Boxes)", "--open-shop"]},
+	{"name": "box", "file": "game.png",
+		"flags": ["--scenario-name", "Movement & drag", "--show-screen", "box"]},
+	{"name": "army-card", "file": "menu.png",
+		"flags": ["--show-screen", "armies", "--army-name", "Crown"]},
+	{"name": "kings-chip", "file": "game.png",
+		"flags": ["--scenario-name", "Header: King Wave — Donald Trump, Tariffs in force", "--show-screen", "board"]},
+	{"name": "kings-overview", "file": "game.png",
+		"flags": ["--scenario-name", "Header: King Wave — Donald Trump, Tariffs in force", "--show-screen", "king-abilities"]},
+	{"name": "clock", "file": "game.png",
+		"flags": ["--scenario-name", "Movement & drag", "--show-screen", "board"]},
+	{"name": "artefacts-inventory", "file": "game.png",
+		"flags": ["--scenario-name", "Artefacts: sixteen held, so the drawer list actually scrolls", "--open-drawer", "inventory"]},
+	{"name": "items-targeting", "file": "game.png",
+		"flags": ["--scenario-name", "NO-122: bomb blast + drone strike zone preview", "--arm-item", "drone_strike", "--anchor", "4,4"],
+		"board": Rect2i(1, 1, 7, 7)},
 ]
 
 
@@ -54,7 +78,11 @@ func _initialize() -> void:
 			fails += 1
 			continue
 		var k := img.get_width() / CANVAS.x # capture px per canvas px (1, or 2 on a Retina window)
-		var r: Rect2 = shot.rect if shot.has("rect") else _board_rect(shot.board)
+		var r := Rect2(Vector2.ZERO, CANVAS) # no crop given: the whole screen
+		if shot.has("rect"):
+			r = shot.rect
+		elif shot.has("board"):
+			r = _board_rect(shot.board)
 		var crop := img.get_region(Rect2i(Rect2(r.position * k, r.size * k)))
 		# ponytail: a 1x capture is upscaled nearest-neighbour; the pixel font keeps it honest
 		crop.resize(int(r.size.x * S), int(r.size.y * S), Image.INTERPOLATE_NEAREST)

@@ -192,6 +192,7 @@ func _init() -> void:
 	await process_frame
 
 	await _merge_target_checks()
+	await _pick_target_checks()
 
 	print("---")
 	if fails == 0:
@@ -213,6 +214,29 @@ func _boot_pair() -> Node2D:
 	g.animations_on = true # the local Settings file must not decide this suite
 	g.autoplay = false
 	return g
+
+
+## Max, 2026-09-26: a picked Item/Artefact target looks SELECTED (fill, size,
+## purple outline) — no cyan pending-pick ring. `pick_tiles` is what `_draw`
+## and `_draw_pulse` draw from, so these can't drift from them.
+func _pick_target_checks() -> void:
+	var g := await _boot_pair()
+	g.artefact_target_stage_a = Vector2i(2, 2) # a piece
+	g.artefact_pending_tile = Vector2i(4, 4) # an empty destination
+	var picks: Array[Vector2i] = g.pick_tiles()
+	check(picks == [Vector2i(2, 2), Vector2i(4, 4)], "Bovine's two picks are pick tiles (%s)" % [picks])
+	g.artefact_target_stage_a = Vector2i(-1, -1)
+	g.artefact_pending_tile = Vector2i(-1, -1)
+	check(g.pick_tiles().is_empty(), "no pick tiles once targeting resets")
+	var src: String = (GameScript as GDScript).source_code
+	var body := _func_body(src, "_draw")
+	check(body.contains("pick_tiles()") and body.contains("picks.has(pos)") and not body.contains("COL_MERGE"),
+		"_draw: picks fill and draw at the selected size; no cyan (COL_MERGE) ring on the board")
+	var pulse_body := _func_body(src, "_draw_pulse")
+	check(pulse_body.contains("pick_tiles()") and not pulse_body.contains("draw_arc("),
+		"_draw_pulse outlines picks with the selection silhouette, never a ring")
+	g.queue_free()
+	await process_frame
 
 
 func _func_body(src: String, fn: String) -> String:

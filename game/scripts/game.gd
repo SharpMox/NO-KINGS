@@ -140,7 +140,7 @@ const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
 const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)
 const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
-const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: status floats, pending-pick rings
+const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: status floats and the merge-completion glow only
 # Merge target (Max, 2026-09-26): replaces the cyan ring with a glowing edge
 # that hugs the target token's own silhouette (SELECT_OUTLINE_SHADER on
 # `_merge_fx`). Max picked LIME (2026-09-26) over the warmer orange; orange
@@ -1540,7 +1540,7 @@ func _has_usable_item() -> bool:
 
 
 func _process(delta: float) -> void:
-	if (selected.x >= 0 or placing_id != "") and not autoplay:
+	if (selected.x >= 0 or placing_id != "" or not pick_tiles().is_empty()) and not autoplay:
 		_pulse.queue_redraw() # only the ring redraws every frame, not the board
 		hud.stock_armed.queue_redraw()
 		if not merge_highlights.is_empty() and animations_on:
@@ -6015,6 +6015,7 @@ func _sync_tile_layer() -> void:
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
 	_merge_fx.queue_redraw()
+	_pulse.queue_redraw() # so a cleared pick's outline goes with its fill
 	_banner_layer.queue_redraw()
 	_sync_tile_layer()
 	var font := ThemeDB.fallback_font
@@ -6144,18 +6145,12 @@ func _draw() -> void:
 	if item_active >= 0: # item targeting: same zone indicator as the bomb
 		_draw_target_zone(item_targets, _fade_of("zone"), _hatch_phase) # NO-130: "what
 			# this will affect"; NO-243 S4 row 23: fades in, and drifts while armed
-		if item_stage_a.x >= 0:
-			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
-		for s in item_selected: # multi picks fill like the stage-A tile
-			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
-		if item_pending_tile.x >= 0: # NO-121: one more tap confirms this one —
-			# a cyan ring (merge partners shared it until 2026-09-26, when
-			# they moved to the lime silhouette outline)
-			draw_arc(_tile_px(item_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-				COL_MERGE, 3.0)
-	if artefact_pending_tile.x >= 0: # NO-121: Bovine Tractor Beam's own pending pick
-		draw_arc(_tile_px(artefact_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-			COL_MERGE, 3.0)
+	# Picked targets (an Item's or Bovine Tractor Beam's) look SELECTED: the
+	# selected tile's fill here, the piece drawn at the selected size below,
+	# and _draw_pulse's purple outline. The cyan pending-pick ring is gone
+	# (Max, 2026-09-26: "I thought we scrapped those entirely").
+	for s in pick_tiles():
+		draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):
@@ -6191,6 +6186,7 @@ func _draw() -> void:
 				Color(COL_PLACE, COL_PLACE.a * k))
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	var merge_targets := merge_target_tiles()
+	var picks := pick_tiles()
 	var now_s := Tuning.now_ms() / 1000.0
 	var spent := {} # NO-243 S4 row 29: tile -> 0..1 of its grey-out
 	for a in anims:
@@ -6215,8 +6211,8 @@ func _draw() -> void:
 			var fx := merge_target_fx(pos, now_s)
 			_draw_piece_xf(font, p, px, Vector2.ONE, tint, fx.offset, fx.angle)
 			continue
-		# the selected piece draws bigger, with a pulsing outline (below)
-		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
+		# the selected piece (and a picked target) draws bigger, with a pulsing outline (below)
+		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected or picks.has(pos) else -2.0)
 	for a in anims:
 		if a.t < 0.0:
 			continue # NO-243: delayed, not started yet (a merge still owns a rankup's tile)
@@ -6441,6 +6437,23 @@ func merge_target_tiles() -> Array[Vector2i]:
 	return out
 
 
+## Tiles the player has picked as a target but not yet committed: an Item's
+## stage-A pick, its multi picks and its pending (confirmable) pick, and
+## Bovine Tractor Beam's two. Each draws like the selected piece — _draw's
+## COL_SELECT fill, SELECTED_INSET size, and _draw_pulse's purple outline.
+func pick_tiles() -> Array[Vector2i]:
+	var all: Array[Vector2i] = [artefact_target_stage_a, artefact_pending_tile]
+	if item_active >= 0:
+		all.append_array(item_selected)
+		all.append(item_stage_a)
+		all.append(item_pending_tile)
+	var out: Array[Vector2i] = []
+	for t in all:
+		if t.x >= 0:
+			out.append(t)
+	return out
+
+
 ## How the merge target on `pos` draws at time `t` (seconds): a pulsing outline
 ## width/alpha and a wiggle (angle + sideways offset) for its piece. With
 ## animations off or in autoplay it is static — full-alpha outline at
@@ -6510,12 +6523,12 @@ func _draw_merge_fx() -> void:
 ## still distinguishes a recon (enemy) selection from your own, and the old
 ## breathing alpha is kept — both bands fade together rather than dropping
 ## the pulse silently.
+## Picked Item/Artefact targets (pick_tiles) wear the same outline — they draw
+## at the same SELECTED_INSET size, so one set of shader reaches fits all.
 func _draw_pulse() -> void:
-	if selected.x < 0 or not board.has(selected):
-		return
-	var p: Dictionary = board[selected]
-	if not textures.has(p.id):
-		return # ponytail: glyph-fallback piece (no PNG) — no silhouette to trace
+	var tiles := pick_tiles()
+	if selected.x >= 0 and not tiles.has(selected):
+		tiles.append(selected)
 	var t := Tuning.now_ms() / 1000.0
 	var pulse := 0.5 + 0.5 * sin(t * 5.0)
 	var pulse_a := SELECT_OUTLINE_ALPHA_MIN + SELECT_OUTLINE_ALPHA_RANGE * pulse
@@ -6547,14 +6560,18 @@ func _draw_pulse() -> void:
 	# spill into, which _alpha_at's existing out-of-bounds-is-transparent
 	# guard already handles correctly (it was written for UV overflow at the
 	# piece's own edge; this just gives it more of it to do the same thing).
-	var tex := piece_tex(p.id, p.owner)
-	var tex_size := tex.get_size()
-	var margin := tex_size * (SELECT_OUTLINE_WIDTH / size)
-	var canvas_rect := Rect2(
-		_tile_px(selected) + Vector2(SELECTED_INSET, SELECTED_INSET) - Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH),
-		Vector2(size, size) + Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH) * 2)
-	var src_rect := Rect2(-margin, tex_size + margin * 2)
-	_pulse.draw_texture_rect_region(tex, canvas_rect, src_rect, Color(1, 1, 1, 1), false, false)
+	for pos in tiles:
+		if not board.has(pos) or not textures.has(board[pos].id):
+			continue # an empty pick, or a glyph-fallback piece (no PNG): no silhouette to trace
+		var p: Dictionary = board[pos]
+		var tex := piece_tex(p.id, p.owner)
+		var tex_size := tex.get_size()
+		var margin := tex_size * (SELECT_OUTLINE_WIDTH / size)
+		var canvas_rect := Rect2(
+			_tile_px(pos) + Vector2(SELECTED_INSET, SELECTED_INSET) - Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH),
+			Vector2(size, size) + Vector2(SELECT_OUTLINE_WIDTH, SELECT_OUTLINE_WIDTH) * 2)
+		var src_rect := Rect2(-margin, tex_size + margin * 2)
+		_pulse.draw_texture_rect_region(tex, canvas_rect, src_rect, Color(1, 1, 1, 1), false, false)
 
 
 ## Token art for a piece; the player token unless a side is named.

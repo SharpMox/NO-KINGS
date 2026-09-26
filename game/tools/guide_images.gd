@@ -47,10 +47,23 @@ var _held: Array[Texture2D] = []
 ## The board window the current image shows: bottom-left tile + size, board
 ## coordinates (y=0 is the player's back row).
 var _win := Rect2i()
+## The board's symbol font: ThemeDB.fallback_font, as game.gd _draw uses, plus
+## named fallbacks so a machine whose OS fallback misses a glyph (CI's runner:
+## ⨯ ⟲) still draws it. Where the OS fallback already has it this changes nothing.
+var _sym: Font
 
 
 func _initialize() -> void:
 	defs = Rules.load_pieces()
+	var sym := FontVariation.new()
+	sym.base_font = ThemeDB.fallback_font
+	var chain: Array[Font] = []
+	for family in ["Noto Sans Math", "Noto Sans Symbols 2", "Noto Sans Symbols", "DejaVu Sans"]:
+		var f := SystemFont.new()
+		f.font_names = PackedStringArray([family])
+		chain.append(f)
+	sym.fallbacks = chain
+	_sym = sym
 	var images := {
 		# Rules
 		"rules-board": _board_image(Rect2i(0, 0, 8, 5), [["rook", 0, 0, 0], ["knight", 0, 1, 0],
@@ -289,7 +302,7 @@ func _mark_size() -> int: # game.gd _inv_mark_size
 
 
 func _inv_mark(c: Control, r: Rect2) -> void:
-	var font := ThemeDB.fallback_font
+	var font := _sym
 	var ctr := r.get_center() + Vector2(0, TILE * Game.INV_MARK_DROP)
 	var rad := _mark_size() * Game.INV_MARK_DISC_RATIO
 	c.draw_circle(ctr, rad, Game.INV_MARK_DISC_COL)
@@ -359,7 +372,7 @@ func _badges(c: Control, r: Rect2, glyphs: Array, stun_index := -1) -> void:
 	var half := _mark_size() * Game.INV_MARK_DISC_RATIO * Game.BUFF_BADGE_SCALE
 	var gap := half * 2.2
 	var c0 := r.get_center() + Vector2(0, TILE * (Game.INV_MARK_DROP + Game.BUFF_BADGE_EXTRA_DROP))
-	var font := ThemeDB.fallback_font
+	var font := _sym
 	var n := glyphs.size()
 	for i in n:
 		var row_n := mini(n - (i / 2) * 2, 2)

@@ -63,6 +63,7 @@ jobs:
 
       - name: Render
         run: |
+          fc-list : family | grep -iE "math|symbol|dejavu" | sort -u || true
           $GODOT --headless --path game --import >/dev/null 2>&1 || true
           xvfb-run -a -s "-screen 0 1280x1024x24" $GODOT --path game -s tools/guide_images.gd
           xvfb-run -a -s "-screen 0 1280x1024x24" $GODOT --headless --path game -s tools/guide_captures.gd

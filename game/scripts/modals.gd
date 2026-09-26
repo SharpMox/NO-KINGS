@@ -611,9 +611,10 @@ func _add_casualties(box: VBoxContainer) -> Control:
 	title_wrap.add_child(title)
 	section.add_child(title_wrap)
 	var mass := PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
-		_overlay_width() - 2.0 * PieceMass.edge_pad(true), # rows + margin = the panel's inner width
+		_overlay_width() - 2.0 * PieceMass.edge_pad(true, CASUALTY_ICON_SCALE), # rows +
+			# margin = the panel's inner width
 		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW,
-		CASUALTY_PITCH_SCALE)
+		CASUALTY_PITCH_SCALE, CASUALTY_ICON_SCALE)
 	section.add_child(mass)
 	box.add_child(section)
 	_add_casualty_banner(section, mass)
@@ -732,6 +733,17 @@ const CASUALTIES_PER_ROW := 8
 ## SPACED_PITCH at all) are untouched. Old step 39.0px (ICON*0.75) -> new
 ## 31.2px (39.0*0.8).
 const CASUALTY_PITCH_SCALE := 0.8
+## Max, 2026-09-26 (14th review): the Casualties icons read a bit small —
+## 10% bigger. `PieceMass.build()`'s own `icon_scale` param (same reasoning
+## as CASUALTY_PITCH_SCALE above: not a change to the shared ICON constant,
+## so the Army carousel and Reinforcements stay untouched), threaded into
+## both this call's `edge_pad()` budget call and `build()` itself so the
+## rotation/jitter overhang and the spaced grid's own row step grow with the
+## bigger icon instead of clipping the first/last row. The horizontal pitch
+## above is left exactly as CASUALTY_PITCH_SCALE already set it, so the
+## bigger pieces simply overlap a little more. Old icon 52.0px (ICON) -> new
+## 57.2px (52.0*1.1).
+const CASUALTY_ICON_SCALE := 1.1
 
 ## Max, 2026-09-26: a purple medieval-banner backdrop behind the WHOLE
 ## Casualties mass — see _add_casualty_banner()'s own header for the shape

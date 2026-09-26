@@ -503,6 +503,14 @@ func _init() -> void:
 				"%s: at max scroll, the point sits at least %dpx above the bar's own top (%.1f vs bar top %.1f)"
 					% [screen, Modals.END_SCREEN_BAR_GAP, apex_global_y,
 						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
+		# Max, 14th review: icons 10% bigger, Casualties-only (see
+		# Modals.CASUALTY_ICON_SCALE) — the drawn icon size, the vertical row
+		# step, and the edge_pad overhang all scale with it; the horizontal
+		# pitch (spaced_pitch, below) does not.
+		var icon_size: float = PieceMass.ICON * Modals.CASUALTY_ICON_SCALE
+		var row_step: float = PieceMass.SPACED_ROW_PITCH * Modals.CASUALTY_ICON_SCALE
+		var edge_pad: float = PieceMass.edge_pad(true, Modals.CASUALTY_ICON_SCALE)
+		var jitter_y: float = PieceMass.JITTER_Y * Modals.CASUALTY_ICON_SCALE
 		var tint_ok := true
 		var unscaled := true
 		var odd := ""
@@ -514,7 +522,7 @@ func _init() -> void:
 		for k in icons.size():
 			var t: TextureRect = icons[k]
 			in_order = in_order and t.get_meta("id") == g.casualties[k].id and t.get_meta("side") == g.casualties[k].side
-			var row_i := roundi((t.position.y - PieceMass.edge_pad(true) - PieceMass.JITTER_Y) / PieceMass.SPACED_ROW_PITCH)
+			var row_i := roundi((t.position.y - edge_pad - jitter_y) / row_step)
 			reading = reading and (row_i == prev_row + 1 or (row_i == prev_row and t.position.x > prev_x))
 			prev_row = row_i
 			prev_x = t.position.x
@@ -526,7 +534,7 @@ func _init() -> void:
 		var rows_y := {}
 		for k in icons.size():
 			var ti: TextureRect = icons[k]
-			var rr := roundi((ti.position.y - PieceMass.edge_pad(true) - PieceMass.JITTER_Y) / PieceMass.SPACED_ROW_PITCH)
+			var rr := roundi((ti.position.y - edge_pad - jitter_y) / row_step)
 			rows_x[rr] = rows_x.get(rr, []) + [ti.position.x]
 			rows_y[rr] = rows_y.get(rr, []) + [ti.position.y]
 		var min_dx := INF
@@ -536,7 +544,7 @@ func _init() -> void:
 			for q in range(1, xs.size()):
 				min_dx = minf(min_dx, xs[q] - xs[q - 1])
 			if xs.size() == Modals.CASUALTIES_PER_ROW:
-				widest_row = maxf(widest_row, xs[-1] + PieceMass.ICON - xs[0])
+				widest_row = maxf(widest_row, xs[-1] + icon_size - xs[0])
 		var min_dy := INF
 		var mean_y := func(ys: Array) -> float:
 			return ys.reduce(func(a: float, b: float) -> float: return a + b, 0.0) / ys.size()
@@ -551,10 +559,10 @@ func _init() -> void:
 		var spaced_pitch: float = PieceMass.SPACED_PITCH * Modals.CASUALTY_PITCH_SCALE
 		check(min_dx >= spaced_pitch - 0.01,
 			"%s: horizontal pitch >= the tightened Casualties pitch (%.1f px)" % [screen, min_dx])
-		check(min_dy >= PieceMass.ICON * 0.65 - 2.0 * PieceMass.JITTER_Y,
-			"%s: vertical pitch >= 0.65 ICON, less the wobble (%.1f px)" % [screen, min_dy])
+		check(min_dy >= row_step - 2.0 * jitter_y,
+			"%s: vertical pitch >= the (scaled) row step, less the wobble (%.1f px)" % [screen, min_dy])
 		# 8 at the full pitch (no row squeezed to fit), centred in the panel
-		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * spaced_pitch + PieceMass.ICON
+		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * spaced_pitch + icon_size
 		check(widest_row >= full_row - 0.01 and widest_row <= inner_w,
 			"%s: a full row is %d pieces at full pitch inside the inner width (%.1f of %.1f)"
 			% [screen, Modals.CASUALTIES_PER_ROW, widest_row, inner_w])
@@ -577,8 +585,10 @@ func _init() -> void:
 			if GameScript.is_mono_piece(id):
 				tint_ok = tint_ok and t.modulate == (GameScript.COL_SIDE_ENEMY if side == E else GameScript.COL_SIDE_PLAYER)
 			# approx: a Control keeps offsets, not a size, so a 52px icon at a
-			# fractional x reads back as e.g. 52.00001 (CI run 36183894676)
-			if t.scale != Vector2.ONE or not t.size.is_equal_approx(Vector2(PieceMass.ICON, PieceMass.ICON)):
+			# fractional x reads back as e.g. 52.00001 (CI run 36183894676).
+			# Expected size is the SCALED icon_size (Casualties, 10% bigger),
+			# not the shared unscaled PieceMass.ICON.
+			if t.scale != Vector2.ONE or not t.size.is_equal_approx(Vector2(icon_size, icon_size)):
 				unscaled = false
 				odd = "%s scale %s size %s" % [id, t.scale, t.size]
 		check(tint_ok, "%s: each piece in its own side's art, like the board" % screen)

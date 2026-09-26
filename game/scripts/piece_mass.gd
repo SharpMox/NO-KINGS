@@ -180,6 +180,15 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## never read SPACED_PITCH at all) stay untouched, and any FUTURE caller of
 ## the spaced grid gets the unscaled default unless it opts in.
 ##
+## `icon_scale` multiplies the icon's own DRAWN size (ICON) — Max, 14th
+## review: the Casualties icons read a bit small, 10% bigger reads better,
+## with the pitch above left as-is so pieces simply overlap a little more.
+## Threaded into `edge_pad()` (below) and the spaced grid's own vertical row
+## step (SPACED_ROW_PITCH) too, so the rotation/jitter overhang this
+## reserves room for, and the gap between rows, both grow with the bigger
+## icon instead of clipping the first/last row. Same "parameter, not a
+## shared constant" reasoning as `pitch_scale`.
+##
 ## `max_row_width` bounds each row's own pixel width (default: unbounded —
 ## modals.gd's Reinforcements announcement has no fixed card, so it doesn't
 ## pass one). menu.gd's Army carousel passes its card's real content budget;
@@ -192,7 +201,7 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## taken from `ids` before any internal reordering, so it stays a property of
 ## the input list, not of how this function happens to sort it.
 static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
-		spaced_row_max := 0, pitch_scale := 1.0) -> Control:
+		spaced_row_max := 0, pitch_scale := 1.0, icon_scale := 1.0) -> Control:
 	# load(), not preload(): game.gd owns `modals` as a preloaded child
 	# (game.gd:547 — `var modals := preload("res://scripts/modals.gd").new()`),
 	# and modals.gd is one of this script's two callers, so a top-level
@@ -209,6 +218,8 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	# of centred under the title/button above it (modals.gd:524 uses the
 	# same fix for its own piece-art TextureRect).
 	mass.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var icon_size := ICON * icon_scale # Casualties-only (icon_scale=1.0 for
+		# every other caller, so icon_size == ICON there)
 
 	var n := ids.size()
 	var sorted_ids: Array = ids.duplicate() if not sides.is_empty() else _back_to_front(ids)
@@ -239,7 +250,7 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	if spaced:
 		row_max = spaced_row_max
 		if max_row_width < INF:
-			row_max = mini(row_max, maxi(MIN_ROW_PIECES, int((max_row_width - ICON) / spaced_pitch) + 1))
+			row_max = mini(row_max, maxi(MIN_ROW_PIECES, int((max_row_width - icon_size) / spaced_pitch) + 1))
 	var sizes: Array[int] = _choose_row_sizes(n, avg_pitch, pitches, max_row_width, row_max)
 	var rows := sizes.size()
 
@@ -268,7 +279,7 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 			if k > 0:
 				x += (pitches[i - 1] + pitches[i]) * 0.5
 			row_x[i] = x
-		row_width[r] = (x + ICON) if count > 0 else 0.0
+		row_width[r] = (x + icon_size) if count > 0 else 0.0
 		idx += count
 	var max_row_w := 0.0
 	for w in row_width:
@@ -286,9 +297,9 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	for r in rows:
 		row_center_offset[r] = (max_row_w - row_width[r]) * 0.5
 
-	var pad := edge_pad(spaced) # see its header
-	var pad_y := pad + (JITTER_Y if spaced else 0.0) # spaced: the wobble too
-	var row_pitch := SPACED_ROW_PITCH if spaced else ROW_PITCH
+	var pad := edge_pad(spaced, icon_scale) # see its header
+	var pad_y := pad + (JITTER_Y * icon_scale if spaced else 0.0) # spaced: the wobble too
+	var row_pitch := (SPACED_ROW_PITCH * icon_scale) if spaced else ROW_PITCH
 
 	# Worst case at ICON=52, TARGET_ASPECT=2.2 (V4, 2026-09-25): Horde-14
 	# (all-pawn, the widest army at this pitch) lands on sizes=[11,3] ->
@@ -304,7 +315,7 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	# beyond `max_row_width` itself, which the caller supplies.
 	mass.custom_minimum_size = Vector2(
 		max_row_w + pad * 2.0,
-		(rows - 1) * row_pitch + ICON + pad_y * 2.0)
+		(rows - 1) * row_pitch + icon_size + pad_y * 2.0)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(ids)
@@ -325,12 +336,12 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 		# later expand_mode change does not shrink it back down.
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.custom_minimum_size = Vector2(ICON, ICON)
-		icon.size = Vector2(ICON, ICON) # `mass` is a bare Control, not a
-			# Container, so nothing else would size this child
+		icon.custom_minimum_size = Vector2(icon_size, icon_size)
+		icon.size = Vector2(icon_size, icon_size) # `mass` is a bare Control,
+			# not a Container, so nothing else would size this child
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.pivot_offset = Vector2(ICON, ICON) * 0.5 # rotate around its
-			# own centre, not the top-left corner
+		icon.pivot_offset = Vector2(icon_size, icon_size) * 0.5 # rotate
+			# around its own centre, not the top-left corner
 		if game_script.is_mono_piece(id): # the King's own path today (CLAUDE.md, "Piece art")
 			icon.modulate = COL_SIDE_PLAYER if side == Rules.PLAYER else COL_SIDE_ENEMY
 		var row := row_of[i]
@@ -343,7 +354,7 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 		# the old back-row depth scale is gone for the same reason).
 		icon.position = Vector2(
 			pad + row_x[i] + row_center_offset[row],
-			pad_y + row * row_pitch + rng.randf_range(-JITTER_Y, JITTER_Y))
+			pad_y + row * row_pitch + rng.randf_range(-JITTER_Y * icon_scale, JITTER_Y * icon_scale))
 		icon.rotation = rng.randf_range(-JITTER_ROT, JITTER_ROT)
 		mass.add_child(icon)
 	return mass
@@ -393,10 +404,13 @@ static func _choose_cols(n: int, avg_pitch: float) -> int:
 ## because const initializers can't call cos()/sin(). A caller with a whole-
 ## mass budget passes its row budget as that minus 2 * edge_pad(). `spaced`:
 ## the side margin of build()'s spaced grid, the rotation overhang alone —
-## a row's width already includes each end piece's own ICON.
-static func edge_pad(spaced := false) -> float:
-	var rot := (ICON * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
-	return rot if spaced else ICON * 0.5 + JITTER_Y + rot
+## a row's width already includes each end piece's own ICON. `icon_scale`
+## (spaced grid only, see build()'s own header): the overhang this reserves
+## room for is a function of the icon's actual drawn size, so it scales too.
+static func edge_pad(spaced := false, icon_scale := 1.0) -> float:
+	var icon_size := ICON * icon_scale
+	var rot := (icon_size * 0.5) * (cos(JITTER_ROT) + sin(JITTER_ROT) - 1.0)
+	return rot if spaced else icon_size * 0.5 + JITTER_Y + rot
 
 
 ## Per-row piece counts, back (index 0) to front (last index) — the three

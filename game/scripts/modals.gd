@@ -526,18 +526,172 @@ func _overlay_width() -> float:
 ## run (game.gd `casualties`) in the order they died — first top-left, newest
 ## at the bottom by the buttons (Max, 2026-09-25) — each in the art of the
 ## side it died on. null (nothing added) with no casualties.
-func _add_casualties(box: VBoxContainer) -> Control:
+func _add_casualties(box: VBoxContainer, buttons: VBoxContainer) -> Control:
 	if g.casualties.is_empty():
 		return null
 	var section := VBoxContainer.new()
 	section.name = "Casualties"
 	section.add_theme_constant_override("separation", 8)
 	section.add_child(_overlay_label("Casualties", &"Heading"))
-	section.add_child(PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
+	var mass := PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
 		_overlay_width() - 2.0 * PieceMass.edge_pad(true), # rows + margin = the panel's inner width
-		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW))
+		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW)
+	section.add_child(mass)
 	box.add_child(section)
+	_add_casualty_banner(mass, box, buttons)
 	return section
+
+
+## The Casualties' purple banner backdrop: a medieval-pennant shape (a
+## rectangle ending in a single downward point) drawn BEHIND the whole
+## `mass` — near-black enemy Pawns/Rooks were unreadable against the dark
+## end-screen background (Max, 2026-09-26 review of #604's first cut).
+##
+## Lives OUTSIDE `mass`/`box`'s scrolled subtree, as a `top_level` Control
+## tracking `mass`'s own `global_position`: a ScrollContainer clips its OWN
+## descendants unconditionally, so the only way to let the point overflow
+## PAST the scroll's clip rect and bleed in behind the pinned buttons
+## (Max's 2nd review, after Aux's scroll-bottom capture showed a flat
+## clipped edge instead of a point) is a node that isn't one of those
+## descendants in the first place. That's why this lives in modals.gd, not
+## piece_mass.gd: only this file owns the scroll/buttons split the banner
+## now has to straddle.
+##
+## `top_level = true` opts a CanvasItem out of its PARENT Container's
+## layout/resort pass entirely (Godot's own documented escape hatch for a
+## freely-positioned overlay inside an otherwise rigid Container stack) —
+## `col`'s VBoxContainer never touches its position/size — while sibling
+## DRAW ORDER (and therefore z-order) still follows plain tree order, so
+## inserting it as `col`'s first child, then `col`'s child order after that
+## is `[layer, scroll, backing, buttons]`, keeps it behind everything.
+##
+## A second flat ColorRect (`backing`), also top_level, sits directly behind
+## `buttons` so the button labels still read against the purple bleeding
+## through — Max: "give the pinned button column a backing... so the text
+## contrasts against the purple". Both are `MOUSE_FILTER_IGNORE` — "the
+## banner never takes input" — and `buttons` itself, drawn after both, on
+## top, keeps working exactly as before.
+func _add_casualty_banner(mass: Control, box: VBoxContainer, buttons: VBoxContainer) -> void:
+	var col_node: Node = buttons.get_parent() # _end_screen_frame()'s `col` —
+		# the shared parent of `scroll` (== box.get_parent()) and `buttons`.
+	if col_node == null:
+		return # defensive: never observed in practice
+	# Lift the crowd and the buttons clear of `_desat`'s z (build()'s own
+	# ColorRect, `overlay`'s first child, carrying the #590 reveal's grey/dim
+	# shader — both sit at the engine default z otherwise) so the banner has
+	# a gap to occupy: see CASUALTY_ABOVE_DIM_Z_INDEX's own header.
+	mass.z_index = CASUALTY_ABOVE_DIM_Z_INDEX
+	buttons.z_index = CASUALTY_ABOVE_DIM_Z_INDEX
+	var mass_w: float = mass.custom_minimum_size.x
+	var mass_h: float = mass.custom_minimum_size.y
+	var mx := CASUALTY_BANNER_MARGIN_X
+	var banner_w := mass_w + mx * 2.0
+	var depth := banner_w * CASUALTY_BANNER_POINT_DEPTH_RATIO
+	var layer := Control.new()
+	layer.name = "CasualtyBanner" # the tests' handle
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.top_level = true
+	layer.z_as_relative = false # an absolute paint-order z, not accumulated
+		# through whatever `col_node` happens to sit under
+	layer.z_index = CASUALTY_BANNER_Z_INDEX # see that constant's own header —
+		# `top_level` alone controls neither this nor `_desat`'s ordering; z_index does
+	layer.size = Vector2(banner_w, mass_h + depth)
+	col_node.add_child(layer)
+	col_node.move_child(layer, 0) # tree position no longer controls paint
+		# order for a top_level node (see CASUALTY_BANNER_Z_INDEX's header) —
+		# kept anyway so a reader scanning `col_node`'s children still finds
+		# this built first, matching the visual stacking intent
+	var points := PackedVector2Array([
+		Vector2(0.0, 0.0),                       # top-left (layer's own local origin)
+		Vector2(banner_w, 0.0),                   # top-right
+		Vector2(banner_w, mass_h),                 # right, above the point
+		Vector2(banner_w * 0.5, mass_h + depth),   # the single downward point, centred
+		Vector2(0.0, mass_h),                      # left, above the point
+	])
+	var body := Polygon2D.new()
+	body.polygon = points
+	body.color = CASUALTY_BANNER_COLOR
+	layer.add_child(body)
+	var border_points := points.duplicate()
+	border_points.append(points[0]) # close the loop — Line2D has no `closed`;
+		# built as its own local array, then assigned once — mutating a
+		# PackedVector2Array through a property accessor (`node.points.append`)
+		# can silently write to a temporary copy instead of the node's own.
+	var border := Line2D.new()
+	border.points = border_points
+	border.width = CASUALTY_BANNER_BORDER_WIDTH
+	border.default_color = CASUALTY_BANNER_BORDER_COLOR
+	layer.add_child(border)
+	var rod := ColorRect.new()
+	rod.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rod.color = CASUALTY_BANNER_BORDER_COLOR
+	var rod_x := CASUALTY_BANNER_ROD_OVERHANG
+	rod.position = Vector2(-rod_x, -CASUALTY_BANNER_ROD_HEIGHT * 0.5)
+	rod.size = Vector2(banner_w + rod_x * 2.0, CASUALTY_BANNER_ROD_HEIGHT)
+	layer.add_child(rod)
+
+	# `layer`'s local (0,0) is `mass`'s own top-left minus the left margin
+	# (`mass` sits `mx` in from the banner's own left edge); kept in sync
+	# with `mass`'s GLOBAL position — not set once — because scrolling
+	# moves `mass` (ScrollContainer offsets `box`'s whole subtree) without
+	# resizing anything, so no Container resort or `resized` signal fires
+	# for that on its own; the scrollbar's own `value_changed` is the
+	# correct, direct hook for it instead.
+	var sync := func() -> void:
+		if is_instance_valid(mass) and is_instance_valid(layer):
+			layer.global_position = mass.global_position - Vector2(mx, 0.0)
+	_settle_repeatedly(sync, CASUALTY_BANNER_SETTLE_TICKS) # initial placement — the layout
+		# this whole tree sits in can cascade across MORE than one deferred-
+		# call flush (e.g. a vertical scrollbar appearing once content grows
+		# past the viewport narrows `box`'s available width, which then
+		# RE-CENTRES `mass` — a resort that runs its OWN deferred pass after
+		# the one that first laid out this frame's new nodes). A single
+		# call_deferred() caught that mid-cascade: Aux's scroll-bottom
+		# capture of #604's 3rd cut still showed the banner ~20px off from
+		# the real mass, matching a scrollbar's own width exactly.
+	var scroll: ScrollContainer = box.get_parent()
+	scroll.get_v_scroll_bar().value_changed.connect(
+		func(_v: float) -> void: _settle_repeatedly(sync, CASUALTY_BANNER_SETTLE_TICKS)) # a
+		# scroll (drag, or `scroll_end_screen_to_bottom()`) fires this signal
+		# BEFORE `mass`'s own transform reflects the new offset — the same
+		# too-early gap the initial placement above hits, so it gets the
+		# same repeated-settle treatment rather than a single sync.call().
+	scroll.resized.connect(sync) # a window/orientation resize can also move
+		# everything without touching scroll_vertical — cheap insurance
+
+	var backing := ColorRect.new()
+	backing.name = "CasualtyButtonBacking" # the tests' handle
+	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	backing.color = CASUALTY_BUTTON_BACKING_COLOR
+	backing.top_level = true
+	backing.z_as_relative = false
+	backing.z_index = CASUALTY_BUTTON_BACKING_Z_INDEX # behind the buttons'
+		# own text (CASUALTY_ABOVE_DIM_Z_INDEX), ahead of the banner
+		# (CASUALTY_BANNER_Z_INDEX) — see that constant's own header
+	col_node.add_child(backing)
+	col_node.move_child(backing, 2) # tree position is cosmetic here too —
+		# see the banner's own z_index comment above
+	var sync_backing := func() -> void:
+		if is_instance_valid(buttons) and is_instance_valid(backing):
+			backing.global_position = buttons.global_position
+			backing.size = buttons.size
+	_settle_repeatedly(sync_backing, CASUALTY_BANNER_SETTLE_TICKS) # same cascade risk as
+		# `sync` above — `buttons` itself gains more children (the actual
+		# Restart/Continue/etc. rows) AFTER this function returns, each an
+		# additional resort pass this must outlast.
+	buttons.resized.connect(sync_backing) # buttons' own rect settles once
+		# built (it doesn't scroll), so unlike the banner this needs no
+		# scrollbar hook — just the same settle-then-resize coverage
+
+
+## Re-invokes `cb` via call_deferred() `ticks` times in a row, each queued
+## only once the previous one has actually run — see its own call sites
+## above for why one deferred pass isn't always enough to observe a
+## settled Container layout.
+func _settle_repeatedly(cb: Callable, ticks: int) -> void:
+	cb.call()
+	if ticks > 1:
+		call_deferred("_settle_repeatedly", cb, ticks - 1)
 
 
 ## The end screen's reveal (#590), with the Casualties section held back until
@@ -561,6 +715,66 @@ const CASUALTIES_FADE_S := 0.4
 ## PieceMass.SPACED_PITCH that is a ~325px row, centred, in the ~432px panel; a
 ## narrower panel gets fewer per row, never a tighter pitch. Tune here.
 const CASUALTIES_PER_ROW := 8
+
+## Max, 2026-09-26: a purple medieval-banner backdrop behind the WHOLE
+## Casualties mass — see _add_casualty_banner()'s own header for the shape
+## and why it lives here rather than in piece_mass.gd.
+const CASUALTY_BANNER_COLOR := Color(0.34, 0.2, 0.46, 1.0) # muted, deep royal
+	# purple: darker/more saturated than the board's own purple tile
+	# (game.gd's BOARD_THEMES["sage"].dark = "8763A8" = Color(0.53, 0.39, 0.66)).
+	# Max, 2026-09-26 (5th review): fully opaque, not semi-transparent — it
+	# reads as a BACKGROUND because it paints behind the pieces (z_index,
+	# below), not because it's see-through.
+const CASUALTY_BANNER_BORDER_COLOR := Color(0.58, 0.42, 0.75, 1.0) # a lighter,
+	# also-opaque tint of the same hue — the border and the rod bar share
+	# this one colour, kept to a single family rather than a second hue.
+const CASUALTY_BANNER_BORDER_WIDTH := 2.0 # px
+const CASUALTY_BANNER_MARGIN_X := PieceMass.ICON * 0.3 # px each side beyond
+	# the mass's own width — "spans the mass's width plus a margin".
+const CASUALTY_BANNER_POINT_DEPTH_RATIO := 1.0 / 3.0 # Max: "the point's
+	# height roughly 1/3 of the banner's width" — off the banner's OWN width
+	# (mass width + 2*margin), not a fixed px, so a narrow Casualties mass
+	# never gets a comically deep point and a wide one never gets a
+	# barely-there notch.
+const CASUALTY_BANNER_ROD_HEIGHT := 4.0 # px, straddling the banner's own top edge
+const CASUALTY_BANNER_ROD_OVERHANG := PieceMass.ICON * 0.15 # px the rod
+	# extends past the banner's own sides — a flagpole crossbar reads as a
+	# rod BECAUSE it's wider than the flag hanging from it.
+const CASUALTY_BUTTON_BACKING_COLOR := Color(0, 0, 0, 0.55) # Max: "give the
+	# pinned button column a backing... so the text contrasts against the
+	# purple" bleeding through from the banner below.
+const CASUALTY_BANNER_SETTLE_TICKS := 8 # deferred-call passes _add_casualty_
+	# banner()'s position syncs re-queue themselves for — see that function's
+	# own comment on the sync callables for why one pass isn't always enough.
+
+## Max, 2026-09-26 (4th review): Aux's capture showed the banner drawing ON
+## TOP of the crowd and the buttons — `top_level` only detaches a CanvasItem's
+## TRANSFORM from its parent, it says nothing about paint order, and this
+## engine draws top_level items in their own pass, after the normal nested
+## tree, whatever their sibling index. hud.gd's `stock_panel.z_index = -1`
+## is the precedent this reuses: z_index pins a CanvasItem's PAINT order
+## independent of both tree position and top_level.
+##
+## (5th review): a negative z_index fixed that but broke a DIFFERENT layer —
+## `build()`'s `_desat` (a ColorRect, `overlay`'s own first child, carrying
+## the #590 reveal's screen-texture grey/dim shader — see this file's own
+## `_set_desat`/`REVEAL_DESAT_S`) sits at the engine default z (0) too, and a
+## negative z put the banner BEHIND that opaque dim layer as well, reading as
+## near-black with no visible point. The banner needs to sit ABOVE `_desat`
+## (0) but BELOW the crowd and the buttons — impossible while all three of
+## `_desat`/mass/buttons share the SAME z (0), so `_add_casualty_banner()`
+## also lifts `mass` and `buttons` to CASUALTY_ABOVE_DIM_Z_INDEX, opening a
+## gap the banner and its button-backing sit inside. Final order, back to
+## front: `_desat` (0) < banner (CASUALTY_BANNER_Z_INDEX) < button backing
+## (CASUALTY_BUTTON_BACKING_Z_INDEX) < mass and buttons
+## (CASUALTY_ABOVE_DIM_Z_INDEX) — the last two are `z_as_relative` (the
+## default), so this is the ONLY z touched on them; everything else about
+## how they draw (and each other's relative order) is untouched, so "the
+## crowd must look exactly like v4 (full colour) over the purple" holds.
+const CASUALTY_BANNER_Z_INDEX := 1
+const CASUALTY_BUTTON_BACKING_Z_INDEX := 2
+const CASUALTY_ABOVE_DIM_Z_INDEX := 3 # lifts `mass` and `buttons` clear of
+	# `_desat`'s z (0) so the banner/backing above have somewhere to sit
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:
@@ -589,7 +803,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	if g.next_seed != "":
 		box.add_child(_overlay_label("seed  %s   ·   build %s"
 			% [g.next_seed, ProjectSettings.get_setting("application/config/version", "dev")], &"Meta"))
-	var section := _add_casualties(box)
+	var section := _add_casualties(box, buttons)
 	var restart := Button.new()
 	restart.text = "Restart"
 	restart.pressed.connect(func() -> void: restart_pressed.emit())
@@ -666,7 +880,7 @@ func show_win_screen() -> void:
 		% [preview, g.wave, g.king_abilities_seen.size(), g.lost_player, g.lost_enemy]
 	var stats_label := _overlay_label("Score %d" % g.score + stats)
 	box.add_child(stats_label)
-	var section := _add_casualties(box)
+	var section := _add_casualties(box, buttons)
 	# the question belongs to the buttons it asks about, so it stays with them
 	buttons.add_child(_overlay_label("Continue into endless waves?"))
 	var cont := Button.new()

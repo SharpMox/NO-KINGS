@@ -58,8 +58,30 @@ func _icons(section: Control) -> Array:
 
 
 func _settle() -> void:
-	for i in 3: # containers sort deferred
+	for i in 10: # containers sort deferred — bumped from 3 (Max's 2026-09-26
+		# banner review): the banner/backing position syncs re-queue
+		# themselves for Modals.CASUALTY_BANNER_SETTLE_TICKS (8) deferred
+		# passes to outlast a resort cascade (a scrollbar appearing narrows
+		# `box`, which re-centres `mass`, one pass after the first layout),
+		# so this needs to comfortably exceed that
 		await process_frame
+
+
+## Max review 2026-09-26 (5th pass): a node's own `z_index` alone is not
+## paint order — Godot composites it with every ANCESTOR's own z (while
+## `z_as_relative` stays true climbing up), so two nodes can only be
+## compared once each is resolved to this walk. Mirrors the engine's own
+## documented rule for CanvasItem.z_index; stops climbing at a non-
+## CanvasItem ancestor (a CanvasLayer, e.g. the HUD) or the first ancestor
+## with `z_as_relative == false` (that node's own z_index is already
+## absolute).
+func _effective_z(node: CanvasItem) -> int:
+	if not node.z_as_relative:
+		return node.z_index
+	var parent := node.get_parent()
+	if parent is CanvasItem:
+		return node.z_index + _effective_z(parent)
+	return node.z_index
 
 
 ## 251 casualties, interleaved, both sides — the long run the scroll is for
@@ -198,6 +220,7 @@ func _init() -> void:
 	await process_frame
 	kc._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(_list(kc) == "king:%d" % E, "a captured King is a casualty (%s)" % _list(kc))
+	check(kc.lost_enemy == 1, "a captured King counts as an Enemy slain (%d)" % kc.lost_enemy)
 	await _free(kc)
 
 	var km := _boot({"board": [["queen", 0, 2, 2], ["king", 1, 5, 9], ["rook", 1, 7, 10]],
@@ -205,6 +228,7 @@ func _init() -> void:
 	await process_frame
 	km._king_down()
 	check(_list(km) == "king:%d" % E, "a checkmated King leaving the board is a casualty (%s)" % _list(km))
+	check(km.lost_enemy == 1, "a checkmated King ALSO counts as an Enemy slain (%d)" % km.lost_enemy)
 	await _free(km)
 
 	# --- a piece that dies twice is two casualties: an enemy Rook captured,
@@ -306,6 +330,120 @@ func _init() -> void:
 		check(icons.size() == g.casualties.size() and shown_enemies == enemies,
 			"%s: one piece per casualty (%d of %d, %d enemies of %d)" % [screen, icons.size(),
 				g.casualties.size(), shown_enemies, enemies])
+		# Max review 2026-09-26 (3rd pass): the banner (piece_mass.gd's first
+		# cut kept it INSIDE `mass`, clipped by the ScrollContainer with no
+		# point ever visible) now lives in modals.gd as a floating
+		# `top_level` layer OUTSIDE the scrolled subtree, tracking `mass`'s
+		# own position — see _add_casualty_banner()'s own header. Located by
+		# name, not by mass's own children, since it is no longer one of them.
+		var mass_ctrl: Control = section.get_child(1)
+		var end_scroll: ScrollContainer = g.modals.overlay.find_child("EndScroll", true, false)
+		var col_node: Node = end_scroll.get_parent() if end_scroll != null else null
+		var banner_layer: Control = col_node.find_child("CasualtyBanner", false, false) \
+			if col_node != null else null
+		var backing: ColorRect = col_node.find_child("CasualtyButtonBacking", false, false) \
+			if col_node != null else null
+		check(col_node != null and banner_layer != null and backing != null,
+			"%s: the banner layer and the button backing both exist" % screen)
+		if col_node != null and banner_layer != null and backing != null:
+			# Max review 2026-09-26 (4th pass): Aux's capture showed the
+			# banner painting OVER the crowd and the buttons — `top_level`
+			# only detaches a CanvasItem's TRANSFORM from its parent, it says
+			# NOTHING about paint order, so tree/sibling position (checked
+			# here before) is not evidence of what actually renders on top.
+			# (5th pass): a raw z_index isn't evidence either, on its own —
+			# Aux's NEXT capture showed the banner correctly behind the crowd
+			# and buttons but now ALSO behind `overlay`'s own dim/grey shader
+			# (build()'s `_desat`, `overlay`'s first child — the #590 reveal),
+			# since a negative z put it below THAT too. What actually decides
+			# paint order is the RESOLVED z, walked up the tree (`_effective_z`
+			# above, the same rule Godot's own z_as_relative accumulation
+			# uses) — that's what this checks, not any node's own z_index in
+			# isolation, and not child/sibling order (hud.gd's own
+			# `stock_panel.z_index = -1` is the precedent for the MECHANISM,
+			# not for these exact values).
+			var kids := col_node.get_children()
+			var buttons_ctrl: Control = kids[-1]
+			var desat: CanvasItem = g.modals.overlay.get_child(0) # build()'s
+				# own "overlay's first child, kept across screens"
+			var z_desat := _effective_z(desat)
+			var z_banner := _effective_z(banner_layer)
+			var z_backing := _effective_z(backing)
+			var z_mass := _effective_z(mass_ctrl)
+			var z_buttons := _effective_z(buttons_ctrl)
+			check(z_desat < z_banner and z_banner < z_backing
+					and z_backing < z_mass and z_backing < z_buttons,
+				"%s: resolved paint order is dim(%d) < banner(%d) < backing(%d) < crowd/buttons(%d/%d)"
+					% [screen, z_desat, z_banner, z_backing, z_mass, z_buttons])
+			# The crowd and the buttons are otherwise untouched — not
+			# top_level, and the only property this feature changes on them
+			# at all is that same z_index — so Aux's capture judging "the
+			# crowd must look exactly like v4" over the purple has nothing
+			# else that could have changed how they render.
+			check(not mass_ctrl.top_level and not buttons_ctrl.top_level
+					and mass_ctrl.z_index == Modals.CASUALTY_ABOVE_DIM_Z_INDEX
+					and buttons_ctrl.z_index == Modals.CASUALTY_ABOVE_DIM_Z_INDEX,
+				"%s: the crowd and the buttons are plain, non-floating nodes, only lifted in z"
+					% screen)
+			check(banner_layer.top_level and backing.top_level,
+				"%s: both float free of `col`'s own VBoxContainer layout" % screen)
+			check(banner_layer.mouse_filter == Control.MOUSE_FILTER_IGNORE
+					and backing.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+				"%s: neither the banner nor its button backing takes input" % screen)
+			await _settle() # the position syncs are deferred + signal-driven
+			check(banner_layer.global_position.is_equal_approx(
+					mass_ctrl.global_position - Vector2(Modals.CASUALTY_BANNER_MARGIN_X, 0.0)),
+				"%s: the banner tracks the mass's own (scrolled) position (%s vs %s)"
+					% [screen, banner_layer.global_position, mass_ctrl.global_position])
+			check(backing.global_position.is_equal_approx(buttons_ctrl.global_position)
+					and backing.size.is_equal_approx(buttons_ctrl.size),
+				"%s: the backing matches the pinned buttons' own rect (%s/%s vs %s/%s)"
+					% [screen, backing.global_position, backing.size,
+						buttons_ctrl.global_position, buttons_ctrl.size])
+			var banner: Polygon2D = null
+			for c in banner_layer.get_children():
+				if c is Polygon2D:
+					banner = c
+					break
+			check(banner != null and banner_layer.get_child(0) == banner,
+				"%s: the Polygon2D body is the layer's first (backmost) child" % screen)
+			if banner != null:
+				check(banner.polygon.size() == 5,
+					"%s: the banner is a 5-point polygon — rect + a single downward point (%d)"
+						% [screen, banner.polygon.size()])
+				check(banner.color == Modals.CASUALTY_BANNER_COLOR and banner.color.a == 1.0,
+					"%s: the banner is CASUALTY_BANNER_COLOR, fully opaque (Max: a background, not see-through)" % screen)
+				# The actual point shape, read straight off the polygon's own
+				# vertices (Max: "check that the polygon's points actually
+				# produce the V") — indices match _add_casualty_banner()'s
+				# own build order: [TL, TR, bottom-right, apex, bottom-left].
+				if banner.polygon.size() == 5:
+					var br: Vector2 = banner.polygon[2]
+					var apex: Vector2 = banner.polygon[3]
+					var bl: Vector2 = banner.polygon[4]
+					check(apex.y > br.y and apex.y > bl.y,
+						"%s: the point's lowest vertex sits BELOW both bottom corners (apex %.1f vs corners %.1f/%.1f)"
+							% [screen, apex.y, br.y, bl.y])
+					check(is_equal_approx(br.y, bl.y),
+						"%s: the two bottom corners are level with each other (%.1f vs %.1f)" % [screen, br.y, bl.y])
+					check(is_equal_approx(apex.x, (br.x + bl.x) * 0.5),
+						"%s: the point sits horizontally centred between the two bottom corners (%.1f vs %.1f)"
+							% [screen, apex.x, (br.x + bl.x) * 0.5])
+					var banner_w: float = br.x - bl.x
+					var depth: float = apex.y - br.y
+					check(is_equal_approx(depth, banner_w * Modals.CASUALTY_BANNER_POINT_DEPTH_RATIO),
+						"%s: the point's depth is ~1/3 of the banner's own width (%.1f of %.1f)"
+							% [screen, depth, banner_w])
+					check(is_equal_approx(banner_w, mass_ctrl.custom_minimum_size.x + 2.0 * Modals.CASUALTY_BANNER_MARGIN_X),
+						"%s: the banner spans the mass's own width plus a margin on each side (%.1f vs %.1f)"
+							% [screen, banner_w, mass_ctrl.custom_minimum_size.x])
+			# scrolled to the bottom (the exact state Aux's capture judges):
+			# the banner re-syncs to the mass's NEW position, still tracking
+			g.modals.scroll_end_screen_to_bottom()
+			await _settle()
+			check(banner_layer.global_position.is_equal_approx(
+					mass_ctrl.global_position - Vector2(Modals.CASUALTY_BANNER_MARGIN_X, 0.0)),
+				"%s: scrolled to the bottom, the banner still tracks the mass" % screen)
 		var tint_ok := true
 		var unscaled := true
 		var odd := ""

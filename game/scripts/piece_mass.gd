@@ -173,6 +173,13 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## (edge_pad(true)). Max, 2026-09-25: the crowd pitch piled 241 casualties
 ## into a column a third of the screen wide.
 ##
+## `pitch_scale` (spaced grid only) multiplies SPACED_PITCH — Max, 13th
+## review of #604: the Casualties rows read a bit loose, ~20% tighter reads
+## better. A parameter, not a change to SPACED_PITCH itself, so the Army
+## carousel and Reinforcements (which never pass `spaced_row_max` and so
+## never read SPACED_PITCH at all) stay untouched, and any FUTURE caller of
+## the spaced grid gets the unscaled default unless it opts in.
+##
 ## `max_row_width` bounds each row's own pixel width (default: unbounded —
 ## modals.gd's Reinforcements announcement has no fixed card, so it doesn't
 ## pass one). menu.gd's Army carousel passes its card's real content budget;
@@ -185,7 +192,7 @@ const Rules := preload("res://scripts/rules.gd") # no cycle: rules.gd never
 ## taken from `ids` before any internal reordering, so it stays a property of
 ## the input list, not of how this function happens to sort it.
 static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
-		spaced_row_max := 0) -> Control:
+		spaced_row_max := 0, pitch_scale := 1.0) -> Control:
 	# load(), not preload(): game.gd owns `modals` as a preloaded child
 	# (game.gd:547 — `var modals := preload("res://scripts/modals.gd").new()`),
 	# and modals.gd is one of this script's two callers, so a top-level
@@ -215,10 +222,11 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	# ones). Computed once per id, up front, so both _choose_row_sizes() and
 	# the per-row layout below read the same values.
 	var spaced := spaced_row_max > 0
+	var spaced_pitch := SPACED_PITCH * pitch_scale
 	var pitches: Array[float] = []
 	var avg_pitch := 0.0
 	for id in sorted_ids:
-		var p := SPACED_PITCH if spaced else _pitch(id)
+		var p := spaced_pitch if spaced else _pitch(id)
 		pitches.append(p)
 		avg_pitch += p
 	if not pitches.is_empty():
@@ -231,7 +239,7 @@ static func build(ids: Array, max_row_width: float = INF, sides: Array = [],
 	if spaced:
 		row_max = spaced_row_max
 		if max_row_width < INF:
-			row_max = mini(row_max, maxi(MIN_ROW_PIECES, int((max_row_width - ICON) / SPACED_PITCH) + 1))
+			row_max = mini(row_max, maxi(MIN_ROW_PIECES, int((max_row_width - ICON) / spaced_pitch) + 1))
 	var sizes: Array[int] = _choose_row_sizes(n, avg_pitch, pitches, max_row_width, row_max)
 	var rows := sizes.size()
 

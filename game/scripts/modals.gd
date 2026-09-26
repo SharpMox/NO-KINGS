@@ -612,7 +612,8 @@ func _add_casualties(box: VBoxContainer) -> Control:
 	section.add_child(title_wrap)
 	var mass := PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
 		_overlay_width() - 2.0 * PieceMass.edge_pad(true), # rows + margin = the panel's inner width
-		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW)
+		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW,
+		CASUALTY_PITCH_SCALE)
 	section.add_child(mass)
 	box.add_child(section)
 	_add_casualty_banner(section, mass)
@@ -719,10 +720,18 @@ func _reveal_end_screen(title: Label, box: VBoxContainer, buttons: VBoxContainer
 
 const CASUALTIES_FADE_S := 0.4
 ## Pieces per Casualties row (Max, 2026-09-25: "rows of 6-8", side by side
-## with light overlap; the mass grows taller and scrolls instead). At
-## PieceMass.SPACED_PITCH that is a ~325px row, centred, in the ~432px panel; a
-## narrower panel gets fewer per row, never a tighter pitch. Tune here.
+## with light overlap; the mass grows taller and scrolls instead). At the
+## (tightened, see CASUALTY_PITCH_SCALE below) per-piece pitch that's a
+## ~270px row, centred, in the ~432px panel; a narrower panel gets fewer
+## per row, never a tighter pitch. Tune here.
 const CASUALTIES_PER_ROW := 8
+## Max, 2026-09-26 (13th review): the Casualties rows read a bit loose —
+## ~20% tighter horizontally. `PieceMass.build()`'s own `pitch_scale` param,
+## not a change to its shared `SPACED_PITCH` default, so the Army carousel
+## and Reinforcements (which never pass `spaced_row_max`, so never read
+## SPACED_PITCH at all) are untouched. Old step 39.0px (ICON*0.75) -> new
+## 31.2px (39.0*0.8).
+const CASUALTY_PITCH_SCALE := 0.8
 
 ## Max, 2026-09-26: a purple medieval-banner backdrop behind the WHOLE
 ## Casualties mass — see _add_casualty_banner()'s own header for the shape

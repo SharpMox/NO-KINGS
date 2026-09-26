@@ -546,11 +546,15 @@ func _init() -> void:
 		var inner_w: float = g.get_viewport_rect().size.x - 48
 		print("%s: measured pitch %.1f px across, %.1f px down; full row %.1f px of %.1f inner (%.0f%%)"
 			% [screen, min_dx, min_dy, widest_row, inner_w, 100.0 * widest_row / inner_w])
-		check(min_dx >= PieceMass.ICON * 0.75 - 0.01, "%s: horizontal pitch >= 0.75 ICON (%.1f px)" % [screen, min_dx])
+		# Max, 13th review: ~20% tighter than the crowd's own SPACED_PITCH
+		# default (Casualties only — see Modals.CASUALTY_PITCH_SCALE).
+		var spaced_pitch: float = PieceMass.SPACED_PITCH * Modals.CASUALTY_PITCH_SCALE
+		check(min_dx >= spaced_pitch - 0.01,
+			"%s: horizontal pitch >= the tightened Casualties pitch (%.1f px)" % [screen, min_dx])
 		check(min_dy >= PieceMass.ICON * 0.65 - 2.0 * PieceMass.JITTER_Y,
 			"%s: vertical pitch >= 0.65 ICON, less the wobble (%.1f px)" % [screen, min_dy])
 		# 8 at the full pitch (no row squeezed to fit), centred in the panel
-		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * PieceMass.SPACED_PITCH + PieceMass.ICON
+		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * spaced_pitch + PieceMass.ICON
 		check(widest_row >= full_row - 0.01 and widest_row <= inner_w,
 			"%s: a full row is %d pieces at full pitch inside the inner width (%.1f of %.1f)"
 			% [screen, Modals.CASUALTIES_PER_ROW, widest_row, inner_w])

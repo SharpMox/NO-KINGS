@@ -191,6 +191,58 @@ const DIE_FLASH_TIME := 0.12 # ...of which the white flash
 ## NO-243: paints whatever _flash_layer draws as a pure-white silhouette.
 ## modulate > 1 cannot do this: it only multiplies, so dark outlines stay dark.
 const FLASH_SHADER := "shader_type canvas_item; void fragment() { COLOR = vec4(1.0, 1.0, 1.0, texture(TEXTURE, UV).a * COLOR.a); }"
+## The chequer itself, drawn by _tile_layer as ONE quad over the board so the
+## noise touches the tiles only — pieces and marks draw on the Game node above
+## it. Tile colour follows _draw's old rule, (x + y) even = light, with board
+## y counted from the bottom row. The noise is 2-octave gradient (Perlin)
+## noise sampled at a quantised cell (Tuning.BOARD_NOISE_PIXEL) and added to
+## the base colour; the field is fixed (no TIME), so it never flickers.
+## Plain vec4 uniforms (no source_color): the value reaches COLOR exactly as
+## draw_rect's colour did, so amount 0 is today's board. GLSL ES 3.0 only.
+const BOARD_TILE_SHADER := """
+shader_type canvas_item;
+uniform vec4 light_col = vec4(1.0);
+uniform vec4 dark_col = vec4(0.0, 0.0, 0.0, 1.0);
+uniform vec2 origin;      // board_px, in the Game node's local space
+uniform float tile = 1.0;
+uniform float board_h = 12.0;
+uniform float cells = 13.0; // noise pixels per tile edge
+uniform float amount = 0.0;
+
+varying vec2 local_pos;
+
+void vertex() {
+	local_pos = VERTEX;
+}
+
+vec2 grad(vec2 p) {
+	float a = fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453) * 6.2831853;
+	return vec2(cos(a), sin(a));
+}
+
+float perlin(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = p - i;
+	vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	float a = dot(grad(i), f);
+	float b = dot(grad(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0));
+	float c = dot(grad(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0));
+	float d = dot(grad(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0));
+	return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) * 1.4; // ~[-1, 1]
+}
+
+void fragment() {
+	vec2 p = (local_pos - origin) / tile;
+	vec2 t = floor(p);
+	float y = board_h - 1.0 - t.y;
+	vec4 base = mod(t.x + y, 2.0) < 0.5 ? light_col : dark_col;
+	vec2 cell = floor(p * cells) + vec2(0.5);
+	float n = perlin(cell * 0.3 + vec2(17.0, 5.0)) * 0.7
+		+ perlin(cell * 0.9 + vec2(-3.0, 41.0)) * 0.3;
+	// * COLOR keeps any inherited modulate; the quad itself is drawn WHITE.
+	COLOR *= vec4(base.rgb + vec3(clamp(n, -1.0, 1.0) * amount), base.a);
+}
+"""
 const ARRIVE_TIME := 0.35 # NO-243: enemy drop-in
 const ARRIVE_KING_TIME := 0.5
 const ARRIVE_STAGGER := 0.06 # seconds between arrivals in one spawn batch
@@ -715,6 +767,12 @@ var _merge_fx := Node2D.new() # merge targets' silhouette outlines (own shader
 var merge_color := COL_MERGE_TARGET # `--merge-color orange|lime` (capture only)
 var _flash_layer := Node2D.new()
 var _banner_layer := Node2D.new()
+## The board's tiles (BOARD_TILE_SHADER), a child drawn behind the Game node
+## (show_behind_parent) so the order stays tiles, then marks, then pieces. A
+## Node2D, not a Control: it takes no part in GUI picking.
+var _tile_layer := Node2D.new()
+## Noise strength for _tile_layer; `--board-noise <amount>` overrides it (debug).
+var board_noise: float = Tuning.BOARD_NOISE_AMOUNT
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 ## NO-17: artefact key -> Texture2D. Only the painted ones are in here; read it
@@ -967,6 +1025,19 @@ func _ready() -> void:
 	# binding to a rebuilt Control's own resize is the feedback loop the
 	# stock strip already got burned by (CLAUDE.md, layout traps).
 	get_viewport().size_changed.connect(_layout_board)
+	if args.has("--board-noise"): # debug: compare noise strengths in captures
+		board_noise = float(args[args.find("--board-noise") + 1])
+	if args.has("--board-theme"): # debug: capture a theme without touching the Settings file
+		set_board_theme(args[args.find("--board-theme") + 1])
+	_tile_layer.show_behind_parent = true
+	var tile_mat := ShaderMaterial.new()
+	tile_mat.shader = Shader.new()
+	tile_mat.shader.code = BOARD_TILE_SHADER
+	_tile_layer.material = tile_mat
+	add_child(_tile_layer)
+	_tile_layer.draw.connect(func() -> void:
+		_tile_layer.draw_rect(Rect2(board_px, Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * tile),
+			Color.WHITE))
 	add_child(_pulse)
 	_pulse.draw.connect(_draw_pulse)
 	var outline_shader := Shader.new()
@@ -5927,16 +5998,30 @@ func _capture_and_quit(dir: String, settle := true) -> void:
 func text_font() -> Font:
 	return Tuning.ui_font()
 
+## Pushes the live chequer (theme, layout, noise) into _tile_layer's shader.
+## Called from _draw, so a theme switch or relayout reaches it on the same
+## queue_redraw() that already repaints the board.
+func _sync_tile_layer() -> void:
+	var m: ShaderMaterial = _tile_layer.material
+	m.set_shader_parameter("light_col", COL_LIGHT)
+	m.set_shader_parameter("dark_col", COL_DARK)
+	m.set_shader_parameter("origin", board_px)
+	m.set_shader_parameter("tile", float(tile))
+	m.set_shader_parameter("board_h", float(Tuning.BOARD_H))
+	m.set_shader_parameter("cells", maxf(1.0, roundf(tile / Tuning.BOARD_NOISE_PIXEL)))
+	m.set_shader_parameter("amount", board_noise)
+	_tile_layer.queue_redraw()
+
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
 	_merge_fx.queue_redraw()
 	_banner_layer.queue_redraw()
+	_sync_tile_layer()
 	var font := ThemeDB.fallback_font
 	for x in Tuning.BOARD_W:
 		for y in Tuning.BOARD_H:
 			var pos := Vector2i(x, y)
 			var rect := Rect2(_tile_px(pos), Vector2(tile, tile))
-			draw_rect(rect, COL_LIGHT if (x + y) % 2 == 0 else COL_DARK)
 			if y < Tuning.PLAYER_ZONE_ROWS and state == State.SETUP and not board.has(pos):
 				draw_rect(rect, Color(0.2, 0.5, 0.9, 0.25))
 	# whose-turn outline around the board (game-feel pass 2026-07-06)

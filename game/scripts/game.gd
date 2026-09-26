@@ -405,23 +405,21 @@ const ARROW_HEAD_HALF := 11.0 # was 8.0
 # inv-arrow-pawn, inv-kirin-plus, inv-kirin-plus-plus) only — never the ten
 # inversion pairs that turn a piece into an ordinary existing piece (those
 # keep that piece's own id, so this check never sees them; out of scope per
-# Max's ruling 2026-09-16). U+27F2 ANTICLOCKWISE OPEN CIRCLE ARROW; no glyph
-# in Open Sans SemiBold, so an OS fallback font renders it, same as every
-# other symbol on this board — confirmed monochrome on macOS. At the corner
-# mark's first size (tile * 0.3) it rendered as an unreadable speck; that
-# was a SIZE bug, not missing glyph coverage (U+21BA renders no bigger from
-# the same fallback) — fixed by sizing the mark for legibility below.
+# Max's ruling 2026-09-16). U+27F2 ANTICLOCKWISE OPEN CIRCLE ARROW.
 # NO-100 (Max's ruling 2026-09-24): the glyph is WHITE on a dark disc centred
 # on the tile, superseding NO-101's side-coloured corner glyph.
 const INV_MARK_GLYPH := "⟲"
 const INV_MARK_GLYPH_COL := Color.WHITE
-## ⟲'s arrowhead sticks out left of its ring, so centring the glyph's box puts
-## the RING off-centre. Shift by this fraction of the mark size so the ring,
-## not the box, sits on the disc's centre (measured from a capture, NO-100).
-## The ⟲ is drawn this much larger than the size the disc is built from, so it
-## fills more of its disc (Max, NO-100).
-const INV_MARK_GLYPH_SCALE := 1.25
-const INV_MARK_GLYPH_NUDGE := Vector2(-0.05, -0.12)
+## The ⟲ draws from the bundled symbol font, never the board's
+## ThemeDB.fallback_font: Open Sans has no ⟲, so that path took it from
+## whatever OS font the platform supplied (Apple Symbols on macOS: ink 0.55 em
+## wide; Noto Sans Symbols 2 on Android: 1.02 em), and the old hand-tuned
+## size and nudge only held for the one font they were measured on.
+const INV_MARK_FONT := preload("res://assets/fonts/NoKingsSymbols.ttf")
+## The ⟲'s ink spans this fraction of the disc's diameter: the proportion the
+## approved NO-100 capture had, assuming macOS drew it from Apple Symbols
+## (1.25 x the mark size x 0.555 em of ink / the 0.9 x mark-size disc).
+const INV_MARK_GLYPH_FILL := 0.77
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
@@ -6622,13 +6620,8 @@ func _draw_piece(font: Font, p: Dictionary, px: Vector2, tint: Color, inset := -
 		var c := _inv_mark_centre(px)
 		var r := mark_size * INV_MARK_DISC_RATIO
 		draw_circle(c, r, INV_MARK_DISC_COL)
-		# draw_string's y is the BASELINE: drop it by half of (ascent - descent)
-		# so the glyph's box is centred on the disc, not sitting on its middle
-		var glyph_size := int(mark_size * INV_MARK_GLYPH_SCALE)
-		var baseline := c.y + (font.get_ascent(glyph_size) - font.get_descent(glyph_size)) / 2.0
-		var nudge := INV_MARK_GLYPH_NUDGE * glyph_size
-		draw_string(font, Vector2(c.x - r + nudge.x, baseline + nudge.y), INV_MARK_GLYPH,
-			HORIZONTAL_ALIGNMENT_CENTER, r * 2, glyph_size, INV_MARK_GLYPH_COL)
+		var mark := _inv_mark_glyph(c, r)
+		draw_char(INV_MARK_FONT, mark.origin, INV_MARK_GLYPH, mark.font_px, INV_MARK_GLYPH_COL)
 	var slots := _badge_slots(p)
 	var badge_glyphs: Array[String] = slots.glyphs
 	if not badge_glyphs.is_empty(): # NO-185: bottom edge, drawn after (so over) NO-100's centred mark disc
@@ -6745,6 +6738,27 @@ func _inv_mark_size() -> int:
 ## can never diverge from where the draw call actually puts the mark.
 func _inv_mark_centre(px: Vector2) -> Vector2:
 	return px + Vector2(tile, tile) / 2.0 + Vector2(0, tile * INV_MARK_DROP)
+
+
+## How `_draw_piece` draws the ⟲ on a disc of radius `r` centred on `c`:
+## {font_px: its font size, origin: draw_char's baseline origin, ink: the glyph's own
+## rasterised rect on screen}. Sized and centred by the glyph's measured ink
+## (TextServer glyph offset/size), not by line metrics, so it sits on the
+## disc whatever the font's ascent or side bearings. Shared with
+## tests/test_board_draw.gd so the probe can't diverge from the draw.
+func _inv_mark_glyph(c: Vector2, r: float) -> Dictionary:
+	var ts := TextServerManager.get_primary_interface()
+	var rid: RID = INV_MARK_FONT.get_rids()[0]
+	var ch := INV_MARK_GLYPH.unicode_at(0)
+	var ref := 100 # px: the ink/em ratio, measured once at a size where rounding is noise
+	var ref_w: float = ts.font_get_glyph_size(rid, Vector2i(ref, 0),
+		ts.font_get_glyph_index(rid, ref, ch, 0)).x / ref
+	var size := maxi(1, roundi(2.0 * r * INV_MARK_GLYPH_FILL / ref_w))
+	var gi := ts.font_get_glyph_index(rid, size, ch, 0)
+	var ink := Rect2(ts.font_get_glyph_offset(rid, Vector2i(size, 0), gi),
+		ts.font_get_glyph_size(rid, Vector2i(size, 0), gi))
+	var origin := (c - ink.get_center()).round() # whole pixels: the font is AA-off
+	return {"font_px": size, "origin": origin, "ink": Rect2(origin + ink.position, ink.size)}
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

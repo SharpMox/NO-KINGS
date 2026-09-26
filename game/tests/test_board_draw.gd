@@ -42,8 +42,8 @@ func check(cond: bool, label: String) -> void:
 ## theme/layout, and board hit-testing is unchanged. The pixels themselves
 ## need a window; this is the uniform-level ceiling (Aux captures the look).
 func _check_tile_layer(game: Node2D) -> void:
-	var layer: Node2D = game._tile_layer
-	check(layer.get_parent() == game and layer.show_behind_parent and not (layer is Control),
+	var layer = game._tile_layer # untyped: the `is` checks below test its real class
+	check(layer.get_parent() == game and layer.show_behind_parent and layer is Node2D and not (layer is Control),
 		"tile layer: a Node2D child of Game drawn behind it (tiles under marks and pieces)")
 	var m: ShaderMaterial = layer.material
 	check(m != null and m.shader.code == GameScript.BOARD_TILE_SHADER, "tile layer carries BOARD_TILE_SHADER")

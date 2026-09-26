@@ -132,7 +132,119 @@ func _init() -> void:
 	game.queue_free()
 	await process_frame
 
+	await _merge_target_checks()
+
 	print("---")
 	if fails == 0:
 		print("ALL BOARD-DRAW CHECKS OK")
 	quit(1 if fails > 0 else 0)
+
+
+const MERGE_PAIR := {"board": [["pawn", 0, 2, 2], ["pawn", 0, 3, 2], ["rook", 1, 7, 10]],
+	"wave": 3, "gold": 300, "seed": 1} # issue 98: an unfunded board shows no partners
+
+
+func _boot_pair() -> Node2D:
+	GameScript.reset_boot_defaults()
+	GameScript.next_config = MERGE_PAIR.duplicate(true)
+	GameScript.is_scenario = true
+	var g: Node2D = load("res://scenes/Game.tscn").instantiate()
+	root.add_child(g)
+	await process_frame
+	g.animations_on = true # the local Settings file must not decide this suite
+	g.autoplay = false
+	return g
+
+
+func _func_body(src: String, fn: String) -> String:
+	var start := src.find("\nfunc %s() -> void:" % fn)
+	if start < 0:
+		return ""
+	return src.substr(start, src.find("\nfunc ", start + 1) - start)
+
+
+func _mouse(g: Node2D, tile: Vector2i, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = pressed
+	ev.position = g._tile_px(tile) + Vector2(g.tile, g.tile) / 2
+	g._unhandled_input(ev)
+
+
+## Max, 2026-09-26: a merge target is a pulsing lime silhouette outline plus a
+## wiggle on its piece — the cyan ring is gone. `merge_target_tiles` and
+## `merge_target_fx` are what `_draw` draws from, so these can't drift from it.
+func _merge_target_checks() -> void:
+	var g := await _boot_pair()
+	g._on_tile_clicked(Vector2i(2, 2)) # select one pawn: the other is its target
+	var targets: Array[Vector2i] = g.merge_target_tiles()
+	check(targets.size() == 1 and targets[0] == Vector2i(3, 2),
+		"the merge partner, and only it (not the selection), is a merge target (%s)" % [targets])
+	var a: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.1)
+	var b: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.3)
+	check(a.animated and not is_equal_approx(a.width, b.width) and not is_equal_approx(a.alpha, b.alpha),
+		"animations on: the outline pulses (width %.2f -> %.2f)" % [a.width, b.width])
+	check(not is_equal_approx(a.angle, b.angle) and absf(a.angle) <= g.MERGE_TARGET_SHAKE_RAD
+			and absf(a.offset.x) <= g.MERGE_TARGET_SHAKE_PX and (a.angle != 0.0 or b.angle != 0.0),
+		"animations on: the target piece wiggles a few degrees / px (%.3f, %.3f rad)" % [a.angle, b.angle])
+	check(g.COL_MERGE_TARGET == g.COL_MERGE_LIME and g.merge_color == g.COL_MERGE_LIME
+			and a.color == g.COL_MERGE_LIME,
+		"lime is the default merge target colour (Max's pick)")
+	check(GameScript.merge_color_from(PackedStringArray(["--merge-color", "lime"])) == g.COL_MERGE_LIME
+			and GameScript.merge_color_from(PackedStringArray(["--merge-color", "orange"])) == g.COL_MERGE_ORANGE
+			and GameScript.merge_color_from(PackedStringArray()) == g.COL_MERGE_LIME,
+		"--merge-color lime|orange picks the colour; no flag is lime")
+	g.merge_color = g.COL_MERGE_ORANGE
+	check(g.merge_target_fx(Vector2i(3, 2), 0.1).color == g.COL_MERGE_ORANGE, "an orange run outlines in orange")
+	g.merge_color = g.COL_MERGE_LIME
+	check(g.MERGE_TARGET_KEYLINE >= 3.0 and g.MERGE_TARGET_WIDTH - g.MERGE_TARGET_KEYLINE >= 4.0,
+		"the dark inner band is 3 px and the lime rim keeps its 4 px")
+	# Shaped, not a square: the outline is the silhouette shader on _merge_fx.
+	var mat: Variant = g._merge_fx.material
+	check(mat is ShaderMaterial and (mat as ShaderMaterial).shader.code == g.SELECT_OUTLINE_SHADER,
+		"the merge target outline traces the token silhouette (outline shader on _merge_fx)")
+	# _draw (the board) marks partners only by wiggling them: no cyan ring
+	# (a merge_highlights loop on main, so this fails there) and no tile rect.
+	var src: String = (GameScript as GDScript).source_code
+	var body := _func_body(src, "_draw")
+	check(body != "" and not body.contains("merge_highlights") and not body.contains("MERGE_TARGET")
+			and body.contains("merge_target_tiles()"),
+		"no cyan merge ring and no square outline on the board")
+	var fx_body := _func_body(src, "_draw_merge_fx")
+	check(fx_body.contains("draw_texture_rect_region") and not fx_body.contains("draw_rect(")
+			and not fx_body.contains("draw_arc("),
+		"_draw_merge_fx draws the token's silhouette only, never a rect or ring")
+	g.animations_on = false
+	var s1: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.1)
+	var s2: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.3)
+	check(not s1.animated and s1 == s2 and s1.angle == 0.0 and s1.offset == Vector2.ZERO
+			and s1.width == g.MERGE_TARGET_WIDTH and s1.alpha == 1.0,
+		"animations off: a static full outline, no pulse, no wiggle")
+	g.animations_on = true
+	g.autoplay = true
+	check(not g.merge_target_fx(Vector2i(3, 2), 0.1).animated, "autoplay: static outline too")
+	g.autoplay = false
+	# merge by tap still works: the second pick asks, the confirm merges onto it
+	g._on_tile_clicked(Vector2i(3, 2))
+	check(g.pending_merge.size() == 2, "tapping the merge target asks for merge confirmation")
+	g.modals.merge_confirmed.emit()
+	check(g.board.has(Vector2i(3, 2)) and g.board[Vector2i(3, 2)].id == "sergeant"
+			and not g.board.has(Vector2i(2, 2)),
+		"tap merge: confirming promotes on the target's tile")
+	check(g.merge_target_tiles().is_empty(), "no merge target left after the merge")
+	g.queue_free()
+	await process_frame
+
+	# merge by drag still works: press the pawn, release on its partner
+	g = await _boot_pair()
+	_mouse(g, Vector2i(2, 2), true)
+	check(g.drag_from == Vector2i(2, 2) and g.merge_target_tiles().size() == 1,
+		"press starts a drag and outlines the partner")
+	_mouse(g, Vector2i(3, 2), false)
+	check(g.pending_merge.size() == 2, "dropping on the merge target asks for merge confirmation")
+	g.modals.merge_confirmed.emit()
+	check(g.board.has(Vector2i(3, 2)) and g.board[Vector2i(3, 2)].id == "sergeant"
+			and not g.board.has(Vector2i(2, 2)),
+		"drag merge: confirming promotes on the target's tile")
+	g.queue_free()
+	await process_frame

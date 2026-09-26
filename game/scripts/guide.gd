@@ -447,7 +447,7 @@ static func _item_tex(key: String) -> Texture2D:
 ## (game.gd, "Palette rule 2026-07-07" and NO-161/NO-176), never restated as
 ## a new literal, so this page cannot drift out of sync with the board.
 ## NO-242: each swatch is a mini tile (a COL_LIGHT square) carrying the mark
-## the board draws there — hatch, fill, ring, outline, dot or arrow — at the
+## the board draws there — hatch, fill, merge-target outline, outline, dot or arrow — at the
 ## board's own alpha, not a flat colour square. The old "Capture zone tile"
 ## row repeated Capture's COL_CAPTURE for the same red hatch (game.gd's
 ## legal_dests loop draws a capture destination exactly once); it is gone.
@@ -461,7 +461,7 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Move", "hatch", Color(board.COL_ZONE_OUTLINE_MOVE, hatch_a), "A square the selected piece can move to."],
 		["Capture", "hatch", Color(board.COL_CAPTURE, hatch_a), "An enemy piece the selected piece can capture."],
 		["Selected", "fill", board.COL_SELECT, "The piece currently selected."],
-		["Merge partner", "ring", board.COL_MERGE, "A piece the selection can merge or fuse with."],
+		["Merge target", "target", board.COL_MERGE_TARGET, "A piece the selection can merge or fuse with: a pulsing lime-green glow hugs its outline, and the piece wiggles."],
 		["Reachable zone", "outline", Color(board.COL_ZONE_OUTLINE_MOVE, board.ZONE_OUTLINE_ALPHA), "Outline around every square a selected piece can reach this turn."],
 		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
 		["Blast zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Tiles a bomb or armed Item will hit."],
@@ -485,6 +485,8 @@ static func _swatch_row(parent: Container, board, title: String, mark: String, c
 	sw.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	sw.draw.connect(func() -> void: _draw_mini_tile(sw, board, mark, color))
 	row.add_child(sw)
+	if mark == "target":
+		_add_target_glow(sw, board, color)
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(col)
@@ -502,7 +504,8 @@ static func _swatch_row(parent: Container, board, title: String, mark: String, c
 
 ## One board tile in miniature, carrying `mark` the way game.gd's _draw does:
 ## "hatch" (_draw_hatch's diagonal lines at HATCH_SPACING / HATCH_WIDTH),
-## "fill" (draw_rect), "ring" (the merge draw_arc at 0.46 of a tile),
+## "fill" (draw_rect), "target" (a pawn with the merge target's silhouette
+## outline — _add_target_glow, the board's own shader),
 ## "outline" (a zone edge), "zone" (hatch + outline, _draw_target_zone),
 ## "dot" (the COL_PLACE circle).
 static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void:
@@ -521,13 +524,48 @@ static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void
 	match mark:
 		"fill":
 			c.draw_rect(Rect2(Vector2.ZERO, c.size), col)
-		"ring":
-			c.draw_arc(c.size / 2, s * 0.46, 0, TAU, 24, col, 2.0)
 		"outline", "zone":
 			c.draw_rect(Rect2(Vector2.ONE * 1.5, c.size - Vector2.ONE * 3.0),
 				Color(col, board.ZONE_OUTLINE_ALPHA) if mark == "zone" else col, false, 3.0)
 		"dot":
 			c.draw_circle(c.size / 2, s * 0.16, col)
+
+
+## The merge target mark: a pawn token on the mini tile, its silhouette traced
+## by game.gd's SELECT_OUTLINE_SHADER exactly as `_draw_merge_fx` does on the
+## board (dark inner band, colour rim), static like the animations-off look.
+## A child with its own material, so the shader never touches the tile below.
+static func _add_target_glow(sw: Control, board, color: Color) -> void:
+	var tex: Texture2D = load("res://assets/pieces/pawn-light.png")
+	var glow := Control.new()
+	glow.set_anchors_preset(Control.PRESET_FULL_RECT)
+	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = Shader.new()
+	mat.shader.code = board.SELECT_OUTLINE_SHADER
+	var size := 20.0 # token px inside the 28 px tile, leaving room for the rim
+	var w := 3.0 # rim reach, px
+	mat.set_shader_parameter("rim_color", color)
+	mat.set_shader_parameter("fill_color", board.BUFF_BADGE_BG)
+	mat.set_shader_parameter("fill_reach", 1.5 / size)
+	mat.set_shader_parameter("rim_reach", w / size)
+	glow.material = mat
+	glow.draw.connect(func() -> void:
+		var at := (glow.size - Vector2(size, size)) / 2
+		var margin := tex.get_size() * (w / size)
+		glow.draw_texture_rect_region(tex, Rect2(at - Vector2(w, w), Vector2(size, size) + Vector2(w, w) * 2),
+			Rect2(-margin, tex.get_size() + margin * 2), Color.WHITE, false, false))
+	sw.add_child(glow)
+	var token := TextureRect.new()
+	token.texture = tex
+	token.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	token.set_anchors_preset(Control.PRESET_FULL_RECT)
+	token.offset_left = 4
+	token.offset_top = 4
+	token.offset_right = -4
+	token.offset_bottom = -4
+	token.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sw.add_child(token)
 
 
 ## Shared list row: an optional icon, a name (optionally coloured), and an

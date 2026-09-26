@@ -3228,14 +3228,12 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	btn.tooltip_text = g.defs[id].name + (" (captured)" if cap else "")
 	if armed:
 		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
-	elif not cap and g.placing_id == "" and g.merge_highlights.has(id):
-		# completes a merge with the selected BOARD piece, on its tile — a
-		# Stock origin's partners are board pieces only (MergeLogic.partner_ids)
-		btn.modulate = Color(0.8, 1.1, 1.4)
+	# Max, 2026-09-26: no blue merge-partner tint on Stock cells any more — the
+	# merge target indicator is the board's pulsing lime outline (game.gd).
 	# NO-164: the old "captured stock: warm tint" wash is gone — the enemy
 	# (dark) sprite set above IS the distinguishing signal now, so a captured
 	# entry's modulate stays at whatever the icon block set (default WHITE,
-	# or COL_SIDE_ENEMY for the King's untinted mono svg) unless armed/merge
+	# or COL_SIDE_ENEMY for the King's untinted mono svg) unless armed
 	# already claimed it above.
 	if st.entry is Dictionary: # carries state: mark the stack (ADR-0002)
 		var mark := Label.new()

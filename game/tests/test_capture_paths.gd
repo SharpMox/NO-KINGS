@@ -286,6 +286,17 @@ func _init() -> void:
 	menu.queue_free()
 	await process_frame
 
+	# --- --hold SECONDS: the capture waits that long before it quits --------
+	var held := await _boot("Merge: on the board")
+	var t0 := Tuning.now_ms()
+	await held._capture_hold(PackedStringArray(["--select", "2,1", "--hold", "0.5"]))
+	var waited := Tuning.now_ms() - t0
+	check(waited >= 490, "--hold 0.5 delays the capture's quit by 0.5 s (waited %d ms)" % waited)
+	t0 = Tuning.now_ms()
+	await held._capture_hold(PackedStringArray(["--select", "2,1"]))
+	check(Tuning.now_ms() - t0 < 100, "no --hold: no extra wait")
+	await _free(held)
+
 	print("---")
 	if fails == 0:
 		print("ALL CAPTURE PATHS OK")

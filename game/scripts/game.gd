@@ -139,7 +139,23 @@ const COL_PLACE := Color(0.2, 0.5, 0.9, 0.6) # placement / setup-relocation blue
 const COL_MOVE := Color(0.3, 0.55, 0.95, 0.8)
 const COL_CAPTURE := Color(0.85, 0.15, 0.15)
 const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
-const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: merge partners
+const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: status floats, pending-pick rings
+# Merge target (Max, 2026-09-26): replaces the cyan ring with a glowing edge
+# that hugs the target token's own silhouette (SELECT_OUTLINE_SHADER on
+# `_merge_fx`). Max picked LIME (2026-09-26) over the warmer orange; orange
+# stays for `--merge-color orange` captures. Lime partly blends into the pale
+# Sage light tiles, so the colour rim sits on a dark inner band (BUFF_BADGE_BG)
+# — the same dark-under-light split the selection outline uses.
+const COL_MERGE_ORANGE := Color(1.0, 0.55, 0.1)
+const COL_MERGE_LIME := Color(0.65, 1.0, 0.2)
+const COL_MERGE_TARGET := COL_MERGE_LIME # the default, and the Guide's swatch
+const MERGE_TARGET_WIDTH := 7.0 # px past the silhouette, static; the pulse swings around it
+const MERGE_TARGET_PULSE := 2.0 # px +/- the pulse adds to the width
+const MERGE_TARGET_KEYLINE := 3.0 # px of the width that is the dark inner band (3, not 2,
+	# so lime separates from pale Sage; the width grew by the same 1 px, so the
+	# lime rim itself is unchanged)
+const MERGE_TARGET_SHAKE_RAD := 0.07 # ~4 degrees of wiggle each way
+const MERGE_TARGET_SHAKE_PX := 1.5 # px of sideways jitter each way
 const COL_DROP_OK := Color(0.3, 0.9, 0.4, 0.35) # NO-236: the hovered tile would take the drop
 const COL_DROP_BAD := Color(0.95, 0.3, 0.3, 0.35) # NO-236: ...would refuse it
 const HATCH_SPACING := 8.0 # NO-122: pitch of the hatch lines. A single
@@ -668,6 +684,9 @@ var _pulse := Node2D.new() # the selection ring: its OWN canvas item, so the
 ## NO-243: the capture flash needs FLASH_SHADER, and a material is per canvas
 ## item, so it gets its own child. Children draw over the board, so the
 ## banners move to a child of their own, added after it, to stay on top.
+var _merge_fx := Node2D.new() # merge targets' silhouette outlines (own shader
+	# material, own canvas item: only it and the board redraw while they pulse)
+var merge_color := COL_MERGE_TARGET # `--merge-color orange|lime` (capture only)
 var _flash_layer := Node2D.new()
 var _banner_layer := Node2D.new()
 var items: Array = [] # held Items (single-use actives), max HUD row
@@ -887,6 +906,7 @@ func _ready() -> void:
 	animations_on = settings_data.get("animations_on", true)
 	set_board_theme(settings_data.get("board_theme", DEFAULT_BOARD_THEME))
 	var args := OS.get_cmdline_user_args()
+	merge_color = merge_color_from(args)
 	var first_boot := not cli_bypass_used # NO-77: the launch bypass fires once
 	cli_bypass_used = true
 	autoplay = first_boot and args.has("--autoplay")
@@ -923,6 +943,11 @@ func _ready() -> void:
 	var outline_mat := ShaderMaterial.new()
 	outline_mat.shader = outline_shader
 	_pulse.material = outline_mat
+	add_child(_merge_fx)
+	_merge_fx.draw.connect(_draw_merge_fx)
+	var merge_mat := ShaderMaterial.new()
+	merge_mat.shader = outline_shader
+	_merge_fx.material = merge_mat
 	var flash_mat := ShaderMaterial.new()
 	flash_mat.shader = Shader.new()
 	flash_mat.shader.code = FLASH_SHADER
@@ -1416,6 +1441,9 @@ func _process(delta: float) -> void:
 	if (selected.x >= 0 or placing_id != "") and not autoplay:
 		_pulse.queue_redraw() # only the ring redraws every frame, not the board
 		hud.stock_armed.queue_redraw()
+		if not merge_highlights.is_empty() and animations_on:
+			queue_redraw() # ...unless a merge target is pulsing and shaking
+			_merge_fx.queue_redraw()
 	if autoplay and state == State.SETUP:
 		# place the whole starting stock on random zone tiles, then begin
 		var open := _setup_open_tiles()
@@ -2100,12 +2128,12 @@ func _add_merge_fx(sources: Array, to: Vector2i) -> void:
 	queue_redraw()
 
 
-## Draws `p` scaled about the centre of the tile whose top-left is `px`, moved
-## by `offset`.
+## Draws `p` scaled and rotated about the centre of the tile whose top-left is
+## `px`, moved by `offset`.
 func _draw_piece_xf(font: Font, p: Dictionary, px: Vector2, scl: Vector2, tint: Color,
-		offset := Vector2.ZERO) -> void:
+		offset := Vector2.ZERO, angle := 0.0) -> void:
 	var half := Vector2(tile, tile) / 2
-	draw_set_transform(px + half + offset, 0.0, scl)
+	draw_set_transform(px + half + offset, angle, scl)
 	_draw_piece(font, p, -half, tint)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -2571,6 +2599,7 @@ func _shop_buy(index: int) -> void:
 
 
 func _end_shot() -> void:
+	await _capture_hold(OS.get_cmdline_user_args())
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(screenshot_dir.path_join("gameover.png"))
@@ -5497,7 +5526,17 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 	# settle wait below would let it finish before the shot, so skip it here.
 	var pinned_banner := args.has("--show-screen") \
 			and args[args.find("--show-screen") + 1] == "banner"
+	await _capture_hold(args)
 	await _capture_and_quit(dir, not pinned_banner)
+
+
+## `--hold SECONDS` (tools/capture.md): keep a capture on screen that long
+## before it shoots and quits, so a --write-movie clip records a looping
+## animation (the merge target's pulse and wiggle). No flag, no wait.
+func _capture_hold(args: PackedStringArray) -> void:
+	var i := args.find("--hold")
+	if i >= 0 and i + 1 < args.size():
+		await get_tree().create_timer(float(args[i + 1])).timeout
 
 
 ## `--show-screen NAME`'s states (tools/capture.md lists them all). Split out
@@ -5723,6 +5762,7 @@ func text_font() -> Font:
 
 func _draw() -> void:
 	_flash_layer.queue_redraw() # NO-243: the layers redraw with the board
+	_merge_fx.queue_redraw()
 	_banner_layer.queue_redraw()
 	var font := ThemeDB.fallback_font
 	for x in Tuning.BOARD_W:
@@ -5747,12 +5787,6 @@ func _draw() -> void:
 	if selected.x >= 0: # enemy recon selections tint red, own selections blue
 		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)),
 			Color(COL_CAPTURE, 0.3) if recon else COL_SELECT)
-	if not merge_highlights.is_empty(): # cyan ring: merges with the selection
-		for pos in board:
-			if board[pos].owner == Rules.PLAYER and pos != selected \
-					and merge_highlights.has(board[pos].id):
-				draw_arc(_tile_px(pos) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
-					COL_MERGE, 3.0)
 	# NO-176: explicit draw order — red over purple over blue. The reachable
 	# zone's own outline below (blue move edges, red capture edges, purple
 	# where the two meet inside the same zone — NO-161) is drawn FIRST, as
@@ -5861,8 +5895,8 @@ func _draw() -> void:
 		for s in item_selected: # multi picks fill like the stage-A tile
 			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
 		if item_pending_tile.x >= 0: # NO-121: one more tap confirms this one —
-			# the same ring merge partners use, so "this completes it" reads
-			# consistently across both flows
+			# a cyan ring (merge partners shared it until 2026-09-26, when
+			# they moved to the lime silhouette outline)
 			draw_arc(_tile_px(item_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 				COL_MERGE, 3.0)
 	if artefact_pending_tile.x >= 0: # NO-121: Bovine Tractor Beam's own pending pick
@@ -5893,6 +5927,8 @@ func _draw() -> void:
 	for t in _deploy_highlight_tiles():
 		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
+	var merge_targets := merge_target_tiles()
+	var now_s := Tuning.now_ms() / 1000.0
 	for a in anims:
 		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge" or a.kind == "rankup": # the anim draws it
 			sliding[a.to] = a
@@ -5908,6 +5944,10 @@ func _draw() -> void:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
 			tint = Color(0.75, 0.75, 0.75) # spent this turn
+		if merge_targets.has(pos): # wiggles in place (static when animations are off)
+			var fx := merge_target_fx(pos, now_s)
+			_draw_piece_xf(font, p, px, Vector2.ONE, tint, fx.offset, fx.angle)
+			continue
 		# the selected piece draws bigger, with a pulsing outline (below)
 		_draw_piece(font, p, px, tint, SELECTED_INSET if pos == selected else -2.0)
 	for a in anims:
@@ -6087,6 +6127,77 @@ func _draw_zone_outline(tiles: Array[Vector2i], col: Color, width := ZONE_OUTLIN
 					else (capture_col if t_cap else col) # NO-161: same
 				# move/capture/overlap classification as the edges above
 			draw_line(_tile_px(t) + half, _tile_px(diag) + half, bridge_col, width)
+
+
+## Board tiles holding a merge target for the current selection or armed Stock
+## piece: the player's pieces whose id is in merge_highlights, bar the origin.
+func merge_target_tiles() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if merge_highlights.is_empty():
+		return out
+	for pos in board:
+		if board[pos].owner == Rules.PLAYER and pos != selected \
+				and merge_highlights.has(board[pos].id):
+			out.append(pos)
+	return out
+
+
+## How the merge target on `pos` draws at time `t` (seconds): a pulsing outline
+## width/alpha and a wiggle (angle + sideways offset) for its piece. With
+## animations off or in autoplay it is static — full-alpha outline at
+## MERGE_TARGET_WIDTH, no wiggle. Drawing only: input never waits on it.
+func merge_target_fx(pos: Vector2i, t: float) -> Dictionary:
+	if autoplay or not animations_on:
+		return {"animated": false, "width": MERGE_TARGET_WIDTH, "alpha": 1.0,
+			"angle": 0.0, "offset": Vector2.ZERO, "color": merge_color}
+	var pulse := sin(t * 6.0) # -1..1, ~1 Hz
+	var ph := float(pos.x * 3 + pos.y * 7) # neighbours don't wiggle in lockstep
+	return {"animated": true, "color": merge_color,
+		"width": MERGE_TARGET_WIDTH + MERGE_TARGET_PULSE * pulse,
+		"alpha": 0.8 + 0.2 * pulse,
+		"angle": MERGE_TARGET_SHAKE_RAD * sin(t * 22.0 + ph),
+		"offset": Vector2(MERGE_TARGET_SHAKE_PX * sin(t * 31.0 + ph), 0.0)}
+
+
+## `--merge-color orange|lime` (tools/capture.md): which merge target colour a
+## capture run draws. Anything but "orange", or no flag, is the lime default.
+static func merge_color_from(args: PackedStringArray) -> Color:
+	var i := args.find("--merge-color")
+	if i >= 0 and i + 1 < args.size() and args[i + 1] == "orange":
+		return COL_MERGE_ORANGE
+	return COL_MERGE_TARGET
+
+
+## Each merge target's silhouette outline, drawn by `_merge_fx` through
+## SELECT_OUTLINE_SHADER (dark inner band, colour rim, transparent inside the
+## token) at the SAME wiggle transform `_draw` gives the piece, so the edge
+## moves with it. Same padded-canvas trick as _draw_pulse so the dilation is
+## not clipped at the token's own rect.
+func _draw_merge_fx() -> void:
+	var targets := merge_target_tiles()
+	if targets.is_empty():
+		return
+	var now_s := Tuning.now_ms() / 1000.0
+	var size := tile + 4.0 # the token's drawn size (_draw_piece's default inset -2)
+	var mat: ShaderMaterial = _merge_fx.material
+	var half := Vector2(tile, tile) / 2
+	for pos in targets:
+		var p: Dictionary = board[pos]
+		if not textures.has(p.id):
+			continue # glyph-fallback piece: no silhouette to trace
+		var fx := merge_target_fx(pos, now_s)
+		var w: float = fx.width
+		mat.set_shader_parameter("rim_color", Color(fx.color, fx.alpha))
+		mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, fx.alpha))
+		mat.set_shader_parameter("fill_reach", MERGE_TARGET_KEYLINE / size)
+		mat.set_shader_parameter("rim_reach", w / size)
+		var tex := piece_tex(p.id, p.owner)
+		var margin := tex.get_size() * (w / size)
+		_merge_fx.draw_set_transform(_tile_px(pos) + half + fx.offset, fx.angle, Vector2.ONE)
+		_merge_fx.draw_texture_rect_region(tex,
+			Rect2(-Vector2(size, size) / 2 - Vector2(w, w), Vector2(size, size) + Vector2(w, w) * 2),
+			Rect2(-margin, tex.get_size() + margin * 2), Color(1, 1, 1, 1), false, false)
+	_merge_fx.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The animated outline around the selected piece — drawn by `_pulse`, a

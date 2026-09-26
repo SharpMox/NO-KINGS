@@ -13,7 +13,7 @@
     header {
       max-width: var(--wrap);
       margin: 0 auto;
-      padding: 32px 24px 16px;
+      padding: 32px 22px 16px;
     }
     h1 {
       margin: 0 0 8px 0;
@@ -43,7 +43,7 @@
       gap: 2px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--rad-ctl);
       padding: 4px;
     }
     .tab-btn {
@@ -55,7 +55,7 @@
       font-weight: 500;
       color: var(--text-soft);
       cursor: pointer;
-      border-radius: 7px;
+      border-radius: var(--rad-ctl);
       font-family: inherit;
       transition: color 0.15s ease, background 0.15s ease;
     }
@@ -74,7 +74,7 @@
       color: var(--text-soft);
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--rad-ctl);
       line-height: 1.4;
     }
     .tab-btn[aria-selected="true"] .tab-count {
@@ -96,7 +96,7 @@
       appearance: none;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--rad-ctl);
       padding: 8px 12px;
       font-size: 14px;
       color: var(--text);
@@ -110,7 +110,7 @@
       align-items: center;
       gap: 6px;
       padding: 3px 10px;
-      border-radius: 999px;
+      border-radius: var(--rad-pill);
       border: 1px solid var(--border);
       background: var(--surface);
     }
@@ -137,7 +137,7 @@
       align-items: center;
       gap: 6px;
       padding: 3px 10px;
-      border-radius: 999px;
+      border-radius: var(--rad-pill);
       border: 1px solid var(--border);
       background: var(--surface);
       transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
@@ -172,7 +172,7 @@
       overflow-x: auto;
       overflow-y: visible;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--rad-ctl);
       background: var(--surface);
     }
     table.graph-grid {
@@ -296,7 +296,7 @@
       pointer-events: none;
       background: var(--surface);
       border: 2px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--rad-ctl);
       padding: 12px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.18);
       max-width: 280px;
@@ -316,20 +316,20 @@
     .tt-divider { height: 1px; background: var(--border); margin: 10px 0; }
     .tt-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
     .tt-name { font-weight: 600; font-size: 14px; }
-    .tt-badge { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: 0.4px; }
+    .tt-badge { padding: 1px 8px; border-radius: var(--rad-pill); font-size: 10.5px; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: 0.4px; }
     .tt-badge.is-promotion   { color: var(--hop-target); }
     .tt-badge.is-additive    { color: var(--accent); }
     .tt-badge.is-synergistic { color: var(--hurdle-color); }
     .tt-board { width: 200px; height: 200px; margin: 4px 0; }
     .tt-board svg { width: 100%; height: 100%; display: block; }
-    .tt-betza { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; color: var(--text-soft); }
+    .tt-betza { font-family: var(--mono); font-size: 12px; color: var(--text-soft); }
 
     /* ============================================================
      *  Tab 3: Graph — force-directed network.
      * ============================================================ */
     #network-wrap {
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--rad-ctl);
       background: var(--surface);
       overflow: hidden;
       position: relative;
@@ -391,7 +391,7 @@
       pointer-events: none;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--rad-ctl);
       padding: 10px 12px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.18);
       max-width: 320px;
@@ -401,7 +401,7 @@
     #network-tooltip[hidden] { display: none; }
     .nt-name { font-weight: 600; font-size: 13.5px; margin-bottom: 4px; }
     .nt-meta { color: var(--text-soft); font-size: 11.5px; }
-    .nt-betza { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11.5px; color: var(--text); margin-top: 4px; }
+    .nt-betza { font-family: var(--mono); font-size: 11.5px; color: var(--text); margin-top: 4px; }
     .nt-relations { margin-top: 6px; }
     .nt-rel-head {
       font-size: 10px; font-weight: 700; color: var(--text-soft);
@@ -439,7 +439,7 @@
        controls row, filter chips stay usable, scrollers can't swallow it). */
     .fs-btn {
       margin-left: auto;
-      width: 28px; height: 23px; border-radius: 6px;  /* chip-height: keeps the controls row from growing */
+      width: 28px; height: 23px; border-radius: var(--rad-ctl);  /* chip-height: keeps the controls row from growing */
       border: 1px solid var(--border); background: var(--surface); color: var(--text);
       font-size: 13px; line-height: 1; cursor: pointer;
     }

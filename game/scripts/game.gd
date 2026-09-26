@@ -3957,8 +3957,13 @@ func _king_down(defeated_id := "") -> bool:
 		if defeated_id == "":
 			defeated_id = board[k].get("king_id", "")
 		_add_pop(k) # NO-243: shatters like a capture
-		_casualty(board[k].id, Rules.ENEMY) # not in lost_enemy: a checkmate
-			# never was, and changing that stat is not this feature's call
+		lost_enemy += 1 # Max, 2026-09-26: "Enemies slain" counts a checkmated
+			# King the same as a captured one (#599 left this uncounted —
+			# see test_casualties.gd's `km` fixture). Score, the local
+			# leaderboard (Economy.record_score) and Games History
+			# (Economy.record_history) key off g.score/g.kings_defeated, never
+			# lost_enemy, so this only moves the end-screen stat and the save.
+		_casualty(board[k].id, Rules.ENEMY)
 		board.erase(k)
 	# NO-243: a fallen King (captured or checkmated) bursts gold, the board edge
 	# flares gold and the board shakes. Visual only; the win screen still opens now.

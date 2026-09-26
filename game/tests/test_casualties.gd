@@ -15,6 +15,9 @@ const Ads := preload("res://scripts/ads.gd")
 const Modals := preload("res://scripts/modals.gd")
 
 var fails := 0
+const VIEWPORT_CENTER_TOL := 6.0 # px — see its own call site: a real vertical
+	# scrollbar (251 casualties overflow the viewport) narrows the centred
+	# area by its own reserved width, ~4.8px off centre, measured on CI
 
 
 func check(cond: bool, label: String) -> void:
@@ -58,7 +61,11 @@ func _icons(section: Control) -> Array:
 
 
 func _settle() -> void:
-	for i in 3: # containers sort deferred
+	for i in 10: # containers sort deferred — bumped from 3 (Max's 2026-09-26
+		# banner review): a resort can cascade across more than one deferred-
+		# call flush (a scrollbar appearing narrows `box`, which re-centres
+		# `mass`, one pass after the first layout), so this needs to
+		# comfortably outlast that
 		await process_frame
 
 
@@ -198,6 +205,7 @@ func _init() -> void:
 	await process_frame
 	kc._move_player(Vector2i(2, 2), Vector2i(2, 3))
 	check(_list(kc) == "king:%d" % E, "a captured King is a casualty (%s)" % _list(kc))
+	check(kc.lost_enemy == 1, "a captured King counts as an Enemy slain (%d)" % kc.lost_enemy)
 	await _free(kc)
 
 	var km := _boot({"board": [["queen", 0, 2, 2], ["king", 1, 5, 9], ["rook", 1, 7, 10]],
@@ -205,6 +213,7 @@ func _init() -> void:
 	await process_frame
 	km._king_down()
 	check(_list(km) == "king:%d" % E, "a checkmated King leaving the board is a casualty (%s)" % _list(km))
+	check(km.lost_enemy == 1, "a checkmated King ALSO counts as an Enemy slain (%d)" % km.lost_enemy)
 	await _free(km)
 
 	# --- a piece that dies twice is two casualties: an enemy Rook captured,
@@ -292,13 +301,32 @@ func _init() -> void:
 			g._game_over(false, "Clock out")
 		await _settle()
 		var screen := "win screen" if win else "game over"
+		# Max, 11th review: the GAME OVER/VICTORY title's visual position at
+		# scroll 0 must reproduce main's — content moving from a screen-level
+		# margin (never scrolled) to a content spacer (see END_SCREEN_TOP_PAD)
+		# must not shift it. Read before any scroll call, so this is genuinely
+		# scroll 0.
+		var hero_title: Label = null
+		for l in g.modals.overlay.find_children("*", "Label", true, false):
+			if (l as Label).theme_type_variation == &"Hero":
+				hero_title = l
+				break
+		var overlay_top: float = g.modals.overlay.get_global_rect().position.y
+		check(hero_title != null
+				and absf(hero_title.get_global_rect().position.y - (overlay_top + Modals.END_SCREEN_TOP_PAD)) <= 1.0,
+			"%s: at scroll 0, the title sits exactly the old frame margin (%.1fpx) below the overlay's own top (title y %.1f, expected %.1f)"
+				% [screen, Modals.END_SCREEN_TOP_PAD,
+					hero_title.get_global_rect().position.y if hero_title != null else -1.0,
+					overlay_top + Modals.END_SCREEN_TOP_PAD])
 		var section := _section(g)
 		check(section != null, "%s: a Casualties section" % screen)
 		if section == null:
 			await _free(g)
 			continue
-		var head: Label = section.get_child(0)
-		check(head.text == "Casualties" and head.theme_type_variation == &"Heading",
+		var titles := section.find_children("*", "Label", true, false)
+		var title_label: Label = titles[0] if not titles.is_empty() else null
+		check(title_label != null and title_label.text == "Casualties"
+				and title_label.theme_type_variation == &"Heading",
 			"%s: headed \"Casualties\" in the Heading style" % screen)
 		var icons := _icons(section)
 		var enemies: int = g.casualties.filter(func(c: Dictionary) -> bool: return c.side == E).size()
@@ -306,6 +334,183 @@ func _init() -> void:
 		check(icons.size() == g.casualties.size() and shown_enemies == enemies,
 			"%s: one piece per casualty (%d of %d, %d enemies of %d)" % [screen, icons.size(),
 				g.casualties.size(), shown_enemies, enemies])
+		# Max, 2026-09-26 (7th review): the banner reverses the earlier
+		# `top_level`-overflow design (piece_mass.gd's first cut clipped the
+		# point invisibly; the 2nd-6th cuts let it escape the scroll and bleed
+		# behind the buttons) — it now draws straight onto `section`'s own
+		# canvas (`_add_casualty_banner()`'s `draw` signal), so there is no
+		# separate banner NODE to find; these checks are all geometric,
+		# against `section`, `mass` and the point's own depth spacer instead.
+		var mass_ctrl: Control = section.get_child(1)
+		var end_scroll: ScrollContainer = g.modals.overlay.find_child("EndScroll", true, false)
+		var box_ctrl: Node = section.get_parent() # `box` itself — read straight
+			# off `section`'s own parent, robust to whatever else is a sibling
+			# inside `box` (the top/bottom padding spacers, etc.)
+		var bar_node: Control = g.modals.overlay.find_child("EndScreenBar", true, false)
+		var buttons_ctrl: Control = bar_node.get_child(0) \
+			if bar_node != null and bar_node.get_child_count() > 0 else null
+		check(end_scroll != null and end_scroll.is_ancestor_of(section),
+			"%s: the banner (drawn on `section` itself) is a descendant of the scrolled content" % screen)
+		check(not section.top_level,
+			"%s: no banner node is top_level — it scrolls with the pieces like any other content" % screen)
+		var point_spacer: Control = section.find_child("CasualtyBannerPoint", false, false)
+		# Max, 10th review (page-spec ruling): `box`'s own last child is now
+		# `EndScreenBottomPad` (an invisible spacer reserving room for the
+		# floating button bar below), re-pinned there whenever the bar's own
+		# settled height changes. `section` (Casualties) is the last thing
+		# BEFORE that padding — the last VISIBLE content.
+		var bottom_content_pad: Control = box_ctrl.find_child("EndScreenBottomPad", false, false) \
+			if box_ctrl != null else null
+		var box_last_idx := box_ctrl.get_child_count() - 1 if box_ctrl != null else -1
+		var section_idx := box_last_idx - (1 if bottom_content_pad != null else 0)
+		check(point_spacer != null
+				and section.get_child(section.get_child_count() - 1) == point_spacer
+				and box_ctrl != null and section_idx >= 0 and box_ctrl.get_child(section_idx) == section,
+			"%s: the point's own depth is the last thing in the scrolled content — nothing sits below it"
+				% screen)
+		# Max, 2026-09-26 (10th review, page-spec ruling): the scroll viewport
+		# now spans the WHOLE screen — content scrolls off the top edge — and
+		# the button block floats over it, fully transparent, instead of
+		# constraining the scroll's own height.
+		var screen_size := g.get_viewport_rect().size
+		check(end_scroll != null and absf(end_scroll.get_global_rect().position.y) <= 0.5
+				and absf(end_scroll.get_global_rect().end.y - screen_size.y) <= 0.5,
+			"%s: the scroll viewport spans the full screen, top (0) to bottom (%.1f) (got [%.1f, %.1f])"
+				% [screen, screen_size.y,
+					end_scroll.get_global_rect().position.y if end_scroll != null else -1.0,
+					end_scroll.get_global_rect().end.y if end_scroll != null else -1.0])
+		# Max, 12th review: the buttons keep a margin off the screen's own
+		# bottom edge (Give Feedback isn't flush with it).
+		check(buttons_ctrl != null
+				and screen_size.y - buttons_ctrl.get_global_rect().end.y >= Modals.END_SCREEN_BAR_BOTTOM_MARGIN - 0.5,
+			"%s: the buttons keep at least %dpx off the screen's own bottom edge (%.1f vs bottom %.1f)"
+				% [screen, Modals.END_SCREEN_BAR_BOTTOM_MARGIN,
+					buttons_ctrl.get_global_rect().end.y if buttons_ctrl != null else -1.0, screen_size.y])
+		# Max, 11th review: the button bar has NO background at all — no
+		# panel, no fill, alpha 0. There is no PanelContainer left in `bar`
+		# at all (removed with `strip`); this holds even if a future change
+		# re-adds one, as long as it stays fully transparent.
+		var bar_panels: Array = bar_node.find_children("*", "PanelContainer", true, false) \
+			if bar_node != null else []
+		var bar_opaque := false
+		for p in bar_panels:
+			var sb: StyleBox = (p as Control).get_theme_stylebox("panel")
+			if sb is StyleBoxFlat and (sb as StyleBoxFlat).bg_color.a > 0.001:
+				bar_opaque = true
+		check(bar_node != null and not bar_opaque,
+			"%s: the button bar is transparent — no opaque background node" % screen)
+		var overlay_kids: Array = g.modals.overlay.get_children()
+		check(bar_node != null and end_scroll != null
+				and overlay_kids.find(bar_node) > overlay_kids.find(end_scroll),
+			"%s: the bar draws above the scroll (later tree position)" % screen)
+		if point_spacer != null and title_label != null:
+			var banner_w: float = mass_ctrl.custom_minimum_size.x + 2.0 * Modals.CASUALTY_BANNER_MARGIN_X
+			var depth: float = banner_w * Modals.CASUALTY_BANNER_POINT_DEPTH_RATIO
+			check(is_equal_approx(point_spacer.custom_minimum_size.y, depth),
+				"%s: the bottom room is exactly the point's own depth (%.1f vs %.1f)"
+					% [screen, point_spacer.custom_minimum_size.y, depth])
+			var apex_y: float = mass_ctrl.position.y + mass_ctrl.size.y + depth
+			check(section.size.y >= apex_y - 0.01,
+				"%s: the section's own content height includes the point (%.1f >= %.1f)"
+					% [screen, section.size.y, apex_y])
+			var section_rect := section.get_global_rect()
+			var title_rect := title_label.get_global_rect()
+			check(title_rect.position.y >= section_rect.position.y - 0.5
+					and title_rect.position.y <= section_rect.position.y + Modals.CASUALTY_TITLE_TOP_PAD + 4.0,
+				"%s: the title sits near the banner's own top edge (%.1f vs section top %.1f)"
+					% [screen, title_rect.position.y, section_rect.position.y])
+			check(is_equal_approx(title_rect.get_center().x, section_rect.get_center().x),
+				"%s: the title is centred horizontally on the banner (%.1f vs %.1f)"
+					% [screen, title_rect.get_center().x, section_rect.get_center().x])
+			check(title_label.get_theme_color("font_color") == Tuning.COL_LOSS,
+				"%s: the title is loss-red (Tuning.COL_LOSS)" % screen)
+			var gap: float = mass_ctrl.get_global_rect().position.y - title_rect.end.y
+			check(gap >= 12.0 - 0.01,
+				"%s: at least 12px between the title's bottom and the mass's top (%.1f px)" % [screen, gap])
+			# Max, 8th review (of the PREVIOUS `top_level` capture, a1c799c):
+			# the crowd's own art was sliced by a hard edge near the banner's
+			# top, and by another right above the buttons. Both read as
+			# `clip_contents` cutting into the rotated first/last row's own
+			# overhang (piece_mass.gd's `edge_pad()` already reserves exactly
+			# that much room INSIDE `mass` — these prove nothing ABOVE `mass`
+			# throws that room away).
+			var no_clip := true
+			var clip_offender := ""
+			var walker: Node = mass_ctrl
+			while walker != null and walker != end_scroll:
+				if walker is Control and (walker as Control).clip_contents:
+					no_clip = false
+					clip_offender = str(walker.name)
+				walker = walker.get_parent()
+			check(no_clip,
+				"%s: nothing between the pieces and the ScrollContainer clips (offender: %s)"
+					% [screen, clip_offender])
+			check(mass_ctrl.size.y >= mass_ctrl.custom_minimum_size.y - 0.01,
+				"%s: the mass keeps its own full height — the rotated first/last row's overhang room is never squeezed (%.1f vs %.1f)"
+					% [screen, mass_ctrl.size.y, mass_ctrl.custom_minimum_size.y])
+			# Max, 9th review (Aux's capture at e296e12): the banner's left
+			# edge sat flush with the screen while the mass was centred — the
+			# banner painted with `mass`'s pre-sort (still 0) local x, because
+			# `mass`'s SHRINK_CENTER re-centring is a position-only Container
+			# sort that never fired `section`'s own `resized`. Fixed by also
+			# redrawing on `mass.resized`/`mass.item_rect_changed`; these
+			# check the actually-settled result, both against the mass's own
+			# centre and against the viewport's.
+			var mass_rect := mass_ctrl.get_global_rect()
+			var mass_center_x: float = mass_rect.get_center().x
+			var bx_global: float = mass_rect.position.x - Modals.CASUALTY_BANNER_MARGIN_X
+			var banner_center_x: float = bx_global + banner_w * 0.5
+			var viewport_center_x: float = g.get_viewport_rect().size.x * 0.5
+			check(absf(banner_center_x - mass_center_x) <= 1.0,
+				"%s: the banner's horizontal centre matches the mass's own (%.1f vs %.1f)"
+					% [screen, banner_center_x, mass_center_x])
+			# VIEWPORT_CENTER_TOL, not 1px: this run's 251 casualties overflow
+			# the viewport, so the ScrollContainer shows a real vertical
+			# scrollbar that reserves its own width — `box`'s SHRINK_CENTER
+			# then centres content in the SCROLLBAR-NARROWED area, a few
+			# pixels left of the screen's true centre (measured 4.8px off on
+			# CI run 36253532485). That is the scrollbar physically being
+			# there, not a bug in the banner's own centring (already proven
+			# exact against the mass, above).
+			check(absf(banner_center_x - viewport_center_x) <= VIEWPORT_CENTER_TOL,
+				"%s: the banner's horizontal centre is close to the viewport's own (%.1f vs %.1f)"
+					% [screen, banner_center_x, viewport_center_x])
+			var banner_left: float = bx_global
+			var banner_right: float = bx_global + banner_w
+			var all_inside := true
+			var outside_id := ""
+			for t in icons:
+				var piece_rect: Rect2 = (t as Control).get_global_rect()
+				if piece_rect.position.x < banner_left - 0.5 or piece_rect.end.x > banner_right + 0.5:
+					all_inside = false
+					outside_id = str((t as Control).get_meta("id"))
+			check(all_inside,
+				"%s: every piece's rect lies horizontally inside the banner (offender: %s, [%.1f, %.1f])"
+					% [screen, outside_id, banner_left, banner_right])
+			# --scroll-bottom (tools/capture.md): the exact state Aux's capture
+			# judges. Nothing new needs to sync here (unlike the dropped
+			# `top_level` design) — `section` is an ordinary scrolled
+			# descendant, so it moves with the ScrollContainer for free.
+			g.modals.scroll_end_screen_to_bottom()
+			await _settle()
+			var apex_global_y: float = section.get_global_rect().position.y + apex_y
+			var scroll_rect := end_scroll.get_global_rect()
+			check(apex_global_y >= scroll_rect.position.y - 0.5 and apex_global_y <= scroll_rect.end.y + 0.5,
+				"%s: scrolled to the bottom, the point sits inside the scroll's own (clipped) rect (%.1f in [%.1f, %.1f])"
+					% [screen, apex_global_y, scroll_rect.position.y, scroll_rect.end.y])
+			check(buttons_ctrl == null
+					or apex_global_y <= buttons_ctrl.get_global_rect().position.y - Modals.END_SCREEN_BAR_GAP + 0.5,
+				"%s: at max scroll, the point sits at least %dpx above the bar's own top (%.1f vs bar top %.1f)"
+					% [screen, Modals.END_SCREEN_BAR_GAP, apex_global_y,
+						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
+		# Max, 14th review: icons 10% bigger, Casualties-only (see
+		# Modals.CASUALTY_ICON_SCALE) — the drawn icon size, the vertical row
+		# step, and the edge_pad overhang all scale with it; the horizontal
+		# pitch (spaced_pitch, below) does not.
+		var icon_size: float = PieceMass.ICON * Modals.CASUALTY_ICON_SCALE
+		var row_step: float = PieceMass.SPACED_ROW_PITCH * Modals.CASUALTY_ICON_SCALE
+		var edge_pad: float = PieceMass.edge_pad(true, Modals.CASUALTY_ICON_SCALE)
+		var jitter_y: float = PieceMass.JITTER_Y * Modals.CASUALTY_ICON_SCALE
 		var tint_ok := true
 		var unscaled := true
 		var odd := ""
@@ -317,7 +522,7 @@ func _init() -> void:
 		for k in icons.size():
 			var t: TextureRect = icons[k]
 			in_order = in_order and t.get_meta("id") == g.casualties[k].id and t.get_meta("side") == g.casualties[k].side
-			var row_i := roundi((t.position.y - PieceMass.edge_pad(true) - PieceMass.JITTER_Y) / PieceMass.SPACED_ROW_PITCH)
+			var row_i := roundi((t.position.y - edge_pad - jitter_y) / row_step)
 			reading = reading and (row_i == prev_row + 1 or (row_i == prev_row and t.position.x > prev_x))
 			prev_row = row_i
 			prev_x = t.position.x
@@ -329,7 +534,7 @@ func _init() -> void:
 		var rows_y := {}
 		for k in icons.size():
 			var ti: TextureRect = icons[k]
-			var rr := roundi((ti.position.y - PieceMass.edge_pad(true) - PieceMass.JITTER_Y) / PieceMass.SPACED_ROW_PITCH)
+			var rr := roundi((ti.position.y - edge_pad - jitter_y) / row_step)
 			rows_x[rr] = rows_x.get(rr, []) + [ti.position.x]
 			rows_y[rr] = rows_y.get(rr, []) + [ti.position.y]
 		var min_dx := INF
@@ -339,7 +544,7 @@ func _init() -> void:
 			for q in range(1, xs.size()):
 				min_dx = minf(min_dx, xs[q] - xs[q - 1])
 			if xs.size() == Modals.CASUALTIES_PER_ROW:
-				widest_row = maxf(widest_row, xs[-1] + PieceMass.ICON - xs[0])
+				widest_row = maxf(widest_row, xs[-1] + icon_size - xs[0])
 		var min_dy := INF
 		var mean_y := func(ys: Array) -> float:
 			return ys.reduce(func(a: float, b: float) -> float: return a + b, 0.0) / ys.size()
@@ -349,11 +554,15 @@ func _init() -> void:
 		var inner_w: float = g.get_viewport_rect().size.x - 48
 		print("%s: measured pitch %.1f px across, %.1f px down; full row %.1f px of %.1f inner (%.0f%%)"
 			% [screen, min_dx, min_dy, widest_row, inner_w, 100.0 * widest_row / inner_w])
-		check(min_dx >= PieceMass.ICON * 0.75 - 0.01, "%s: horizontal pitch >= 0.75 ICON (%.1f px)" % [screen, min_dx])
-		check(min_dy >= PieceMass.ICON * 0.65 - 2.0 * PieceMass.JITTER_Y,
-			"%s: vertical pitch >= 0.65 ICON, less the wobble (%.1f px)" % [screen, min_dy])
+		# Max, 13th review: ~20% tighter than the crowd's own SPACED_PITCH
+		# default (Casualties only — see Modals.CASUALTY_PITCH_SCALE).
+		var spaced_pitch: float = PieceMass.SPACED_PITCH * Modals.CASUALTY_PITCH_SCALE
+		check(min_dx >= spaced_pitch - 0.01,
+			"%s: horizontal pitch >= the tightened Casualties pitch (%.1f px)" % [screen, min_dx])
+		check(min_dy >= row_step - 2.0 * jitter_y,
+			"%s: vertical pitch >= the (scaled) row step, less the wobble (%.1f px)" % [screen, min_dy])
 		# 8 at the full pitch (no row squeezed to fit), centred in the panel
-		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * PieceMass.SPACED_PITCH + PieceMass.ICON
+		var full_row: float = (Modals.CASUALTIES_PER_ROW - 1) * spaced_pitch + icon_size
 		check(widest_row >= full_row - 0.01 and widest_row <= inner_w,
 			"%s: a full row is %d pieces at full pitch inside the inner width (%.1f of %.1f)"
 			% [screen, Modals.CASUALTIES_PER_ROW, widest_row, inner_w])
@@ -376,8 +585,10 @@ func _init() -> void:
 			if GameScript.is_mono_piece(id):
 				tint_ok = tint_ok and t.modulate == (GameScript.COL_SIDE_ENEMY if side == E else GameScript.COL_SIDE_PLAYER)
 			# approx: a Control keeps offsets, not a size, so a 52px icon at a
-			# fractional x reads back as e.g. 52.00001 (CI run 36183894676)
-			if t.scale != Vector2.ONE or not t.size.is_equal_approx(Vector2(PieceMass.ICON, PieceMass.ICON)):
+			# fractional x reads back as e.g. 52.00001 (CI run 36183894676).
+			# Expected size is the SCALED icon_size (Casualties, 10% bigger),
+			# not the shared unscaled PieceMass.ICON.
+			if t.scale != Vector2.ONE or not t.size.is_equal_approx(Vector2(icon_size, icon_size)):
 				unscaled = false
 				odd = "%s scale %s size %s" % [id, t.scale, t.size]
 		check(tint_ok, "%s: each piece in its own side's art, like the board" % screen)

@@ -473,40 +473,109 @@ func _overlay_label(text: String, variation := &"") -> Label: # NO-256: a theme 
 	return l
 
 
-## The end screens' frame (Casualties): everything but the buttons scrolls —
-## a long run's Casualties mass does not fit — and the buttons sit in their
-## own column pinned at the bottom (#577's dismiss-at-bottom), always on
-## screen. Returns [content, buttons]; content is vertically centred while it
-## fits, as the old CenterContainer did.
+## The end screens' frame. Max's page spec (2026-09-26, 10th/11th review): the
+## scroll viewport spans the WHOLE screen top (y=0) to bottom — content
+## scrolls off the top edge, starting fixed at the top of the page (never
+## vertically centred, unlike the old CenterContainer-style behaviour) — and
+## the button block FLOATS over it with NO background of its own (fully
+## transparent — the banner and the scrolling crowd show through behind and
+## between the buttons), anchored to the bottom, so it never hides content
+## the player hasn't scrolled past and the scroll still receives drags/wheel
+## everywhere except the buttons' own rect. Returns [content, buttons].
+##
+## `overlay` (a PanelContainer) fits EVERY direct child into its own full
+## inner rect — already relied on for `_desat` (build()'s own dim layer,
+## always overlay's first child) — so `scroll` and `bar` below, both added
+## directly to `overlay`, get the FULL screen for free, no anchors to hand-
+## roll. Paint AND input hit-testing follow tree order for same-rect
+## siblings, so `bar` (added after `scroll`) draws — and is clickable —
+## above it.
 func _end_screen_frame() -> Array:
 	_clear_overlay()
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_top", 24)
-	margin.add_theme_constant_override("margin_bottom", 24)
-	overlay.add_child(margin)
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 16)
-	margin.add_child(col)
 	var scroll := ScrollContainer.new()
 	scroll.name = "EndScroll" # the tests' handle
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.scroll_deadzone = 24 # a drag on the mass scrolls; menu.gd's value
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(scroll)
+	overlay.add_child(scroll)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", END_SCREEN_CONTENT_GAP)
 	# EXPAND + SHRINK_CENTER: the labels' own width (_overlay_width), centred
-	# in the scroll; EXPAND_FILL down, so ALIGNMENT_CENTER centres it while
-	# it is shorter than the screen
+	# in the scroll. `box` stays `scroll`'s own DIRECT child (a MarginContainer
+	# wrapper here measured only its own children's natural ~432px width
+	# instead of the full ~480px ScrollContainer gives a direct EXPAND child
+	# on a disabled axis — everything centred ~24px left of true screen
+	# centre). Top/bottom padding below are plain spacer CHILDREN of `box`
+	# instead, so this relationship never changes. Max, 11th review: the
+	# game-over block sits at the TOP of the page, always — no more
+	# ALIGNMENT_CENTER/EXPAND_FILL centring short content within whatever
+	# (now much taller, full-screen) height `scroll` happens to have; that
+	# was pushing the title ~25px lower than main's fixed position.
 	box.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_CENTER
-	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
+	var top_pad := Control.new() # Max: keep the game-over block's visual
+		# position at scroll=0 unchanged — the OLD outer frame's 24px top
+		# margin (never scrolled) becomes CONTENT instead (scrolls off with
+		# everything else). Net gap above the title must be exactly
+		# END_SCREEN_TOP_PAD, not that PLUS `box`'s own separation (this
+		# spacer is title's immediate PRECEDING sibling, so the separation
+		# applies between them too) — subtract it here so the two don't add up.
+	top_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_pad.custom_minimum_size.y = END_SCREEN_TOP_PAD - END_SCREEN_CONTENT_GAP
+	box.add_child(top_pad)
+
+	var bar := VBoxContainer.new()
+	bar.name = "EndScreenBar" # the tests' handle
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE # transparent except
+		# `buttons` below — a parent's IGNORE does NOT cascade to its children
+		# (CLAUDE.md), so `buttons` keeps its own default blocking filter
+		# while the rest of `bar`'s (screen-sized) rect passes drags/wheel
+		# through to `scroll` beneath it
+	bar.alignment = BoxContainer.ALIGNMENT_END # packs [`buttons`, the bottom
+		# margin spacer below] flush to the bottom of bar's own (full-screen,
+		# from `overlay`) rect
+	bar.add_theme_constant_override("separation", 0) # no theme-default gap
+		# between `buttons` and the bottom-margin spacer below — its own
+		# height is the ONLY thing controlling that margin
+	overlay.add_child(bar) # after `scroll`: later tree position wins both
+		# paint order and input hit-testing for same-rect siblings
+	# Max, 11th review: the button block has NO background at all — no
+	# panel, no fill, alpha 0 — the banner and the scrolling crowd show
+	# through behind and between the buttons. `buttons` is `bar`'s own
+	# direct child now (no backing PanelContainer to hold a stylebox), so
+	# ONLY the buttons' own natural rect blocks clicks; everywhere else in
+	# `bar`'s (screen-sized) area passes drags/wheel to `scroll`.
 	var buttons := VBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 16)
+	buttons.add_theme_constant_override("separation", END_SCREEN_CONTENT_GAP)
 	buttons.custom_minimum_size.x = _overlay_width() # the width the buttons had
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	col.add_child(buttons)
+	bar.add_child(buttons)
+	var bar_bottom_margin := Control.new() # Max: a little margin so Give
+		# Feedback isn't flush with the screen's own bottom edge
+	bar_bottom_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_bottom_margin.custom_minimum_size.y = END_SCREEN_BAR_BOTTOM_MARGIN
+	bar.add_child(bar_bottom_margin)
+
+	var bottom_pad := Control.new() # room for `buttons`' own settled height
+		# plus a gap AND the bar's own bottom margin (`buttons` now floats
+		# that much higher above the screen's bottom edge too — see
+		# `bar_bottom_margin` above), kept in sync below since it depends on
+		# the buttons' own (font-driven, not synchronously known) size
+	bottom_pad.name = "EndScreenBottomPad" # the tests' handle
+	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(bottom_pad)
+	var sync_bottom_pad := func() -> void:
+		bottom_pad.custom_minimum_size.y = buttons.size.y + END_SCREEN_BAR_GAP + END_SCREEN_BAR_BOTTOM_MARGIN
+		if bottom_pad.get_parent() == box: # `box` keeps growing after this
+			# function returns — the caller (show_overlay()/show_win_screen())
+			# appends the title/stats/Casualties section — so re-pin `bottom_pad`
+			# LAST every time this fires, not just once, up front
+			box.move_child(bottom_pad, box.get_child_count() - 1)
+	buttons.resized.connect(sync_bottom_pad) # `buttons`' SIZE (not just
+		# position) settles once its own font metrics resolve post-tree-entry
+		# — a genuine size change, so `resized` alone (unlike the mass-
+		# recentre case above) is the right signal
+	sync_bottom_pad.call() # the initial (near-zero) value, superseded once
+		# `resized` fires with the real height
 	return [box, buttons]
 
 
@@ -522,22 +591,117 @@ func _overlay_width() -> float:
 	return g.get_viewport_rect().size.x - 48
 
 
-## Below the stats: "Casualties" and one mass of every piece that died this
-## run (game.gd `casualties`) in the order they died — first top-left, newest
-## at the bottom by the buttons (Max, 2026-09-25) — each in the art of the
-## side it died on. null (nothing added) with no casualties.
+## Below the stats: "Casualties", in loss-red, atop one mass of every piece
+## that died this run (game.gd `casualties`) in the order they died — first
+## top-left, newest at the bottom by the buttons (Max, 2026-09-25) — each in
+## the art of the side it died on. null (nothing added) with no casualties.
 func _add_casualties(box: VBoxContainer) -> Control:
 	if g.casualties.is_empty():
 		return null
 	var section := VBoxContainer.new()
 	section.name = "Casualties"
-	section.add_theme_constant_override("separation", 8)
-	section.add_child(_overlay_label("Casualties", &"Heading"))
-	section.add_child(PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
-		_overlay_width() - 2.0 * PieceMass.edge_pad(true), # rows + margin = the panel's inner width
-		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW))
+	section.add_theme_constant_override("separation", CASUALTY_TITLE_GAP)
+	var title_wrap := MarginContainer.new() # headroom above the title, INSIDE
+		# the banner (Max, 2026-09-26 6th review) — a top margin only, so it
+		# doesn't touch the title's own width/centring
+	title_wrap.add_theme_constant_override("margin_top", CASUALTY_TITLE_TOP_PAD)
+	var title := _overlay_label("Casualties", &"Heading")
+	title.add_theme_color_override("font_color", Tuning.COL_LOSS) # Max: the
+		# one money/loss red (NO-256), not a bespoke banner colour
+	title_wrap.add_child(title)
+	section.add_child(title_wrap)
+	var mass := PieceMass.build(g.casualties.map(func(c: Dictionary) -> String: return c.id),
+		_overlay_width() - 2.0 * PieceMass.edge_pad(true, CASUALTY_ICON_SCALE), # rows +
+			# margin = the panel's inner width
+		g.casualties.map(func(c: Dictionary) -> int: return c.side), CASUALTIES_PER_ROW,
+		CASUALTY_PITCH_SCALE, CASUALTY_ICON_SCALE)
+	section.add_child(mass)
 	box.add_child(section)
+	_add_casualty_banner(section, mass)
 	return section
+
+
+## The Casualties' purple banner backdrop: a medieval-pennant shape (a
+## rectangle ending in a single downward point) drawn BEHIND the title and
+## the whole `mass` — near-black enemy Pawns/Rooks were unreadable against
+## the dark end-screen background (Max, 2026-09-26 review of #604's first
+## cut), and the bare title read as floating above the crowd with nothing
+## to anchor it (Max, 7th review).
+##
+## Max, 2026-09-26 (7th review): an EARLIER cut of this lived as a `top_level`
+## Control tracking `mass`'s `global_position`, specifically so its point
+## could overflow PAST the ScrollContainer's clip and bleed in behind the
+## pinned buttons. Max reversed that: the point must SCROLL WITH the pieces,
+## reached only by scrolling to the end, and nothing — no piece, no banner —
+## may sit behind the buttons at all. Once the banner has to stay INSIDE the
+## scrolled content instead of escaping it, `top_level` (and everything it
+## required — global-position sync, the scroll signal hookup, the settle
+## retries, and z_index to fix the paint-order top_level itself broke) has no
+## job left to do: an ordinary, non-top_level descendant of `section` just
+## inherits the ScrollContainer's transform (scrolls for free) and its clip
+## (never overflows the buttons for free) like any other content.
+##
+## Drawn straight onto `section`'s own canvas via its `draw` signal — no
+## extra Polygon2D/Line2D/ColorRect nodes, so nothing here competes for a
+## slot in `section`'s VBoxContainer layout. A CanvasItem paints its own
+## `draw` content BEFORE recursing into its children, so the title and the
+## mass (both plain children of `section`, drawn after it) land on top with
+## no z_index at all; `section` itself sits after `build()`'s `_desat` (the
+## #590 reveal's dim, `overlay`'s first child) in plain tree order, so it
+## paints above that too, for the same reason.
+func _add_casualty_banner(section: VBoxContainer, mass: Control) -> void:
+	var mx := CASUALTY_BANNER_MARGIN_X
+	var banner_w: float = mass.custom_minimum_size.x + mx * 2.0
+	var depth := banner_w * CASUALTY_BANNER_POINT_DEPTH_RATIO
+	var point_spacer := Control.new() # bottom room for the point (Max: "the
+		# point depth, plus a little padding" — `section`'s own separation,
+		# reused here as that padding, below)
+	point_spacer.name = "CasualtyBannerPoint" # the tests' handle for the
+		# point's own depth, and proof the content is tall enough to scroll to it
+	point_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	point_spacer.custom_minimum_size = Vector2(0.0, depth)
+	section.add_child(point_spacer)
+	var draw_banner := func() -> void:
+		if not is_instance_valid(mass):
+			return
+		# `mass`'s own LOCAL position/size inside `section` — read live, at
+		# draw time, so a resort that re-centres `mass` (a vertical scrollbar
+		# appearing narrows `box`'s available width) is reflected automatically
+		# the next time this fires, with no manual retry needed.
+		var bx := mass.position.x - mx
+		var mass_bottom := mass.position.y + mass.size.y
+		var points := PackedVector2Array([
+			Vector2(bx, 0.0),                            # top-left
+			Vector2(bx + banner_w, 0.0),                  # top-right
+			Vector2(bx + banner_w, mass_bottom),           # right, above the point
+			Vector2(bx + banner_w * 0.5, mass_bottom + depth), # the point, centred
+			Vector2(bx, mass_bottom),                      # left, above the point
+		])
+		section.draw_polygon(points, PackedColorArray([CASUALTY_BANNER_COLOR]))
+		var border_points := points.duplicate()
+		border_points.append(points[0]) # close the loop — draw_polyline has no
+			# "closed" flag either
+		section.draw_polyline(border_points, CASUALTY_BANNER_BORDER_COLOR, CASUALTY_BANNER_BORDER_WIDTH)
+		var rod_x := CASUALTY_BANNER_ROD_OVERHANG
+		section.draw_rect(Rect2(bx - rod_x, -CASUALTY_BANNER_ROD_HEIGHT * 0.5,
+			banner_w + rod_x * 2.0, CASUALTY_BANNER_ROD_HEIGHT), CASUALTY_BANNER_BORDER_COLOR)
+	section.draw.connect(draw_banner)
+	section.resized.connect(section.queue_redraw) # a window/orientation resize
+	# Max, 2026-09-26 (8th review, Aux's capture at e296e12): `mass`'s
+	# SHRINK_CENTER re-centring inside the wider `section` (the fix for the
+	# 7th review's crop/clip bugs above) is a Container SORT — it moves
+	# `mass.position` without changing `mass.size` OR `section`'s own size, so
+	# neither `resized` above nor a plain `queue_redraw()` at build time (when
+	# `mass.position.x` is still its pre-sort default) ever re-fires once the
+	# real centred position lands a frame or more later. `item_rect_changed`
+	# (CanvasItem, inherited by Control) is the one signal both engine docs
+	# and this engine's own source fire on a POSITION-only change; `resized`
+	# is kept alongside it for the SIZE-only case (belt and braces — a
+	# scrollbar changing `mass`'s own custom_minimum_size).
+	mass.resized.connect(section.queue_redraw)
+	mass.item_rect_changed.connect(section.queue_redraw)
+	section.queue_redraw() # the initial paint — superseded by the above once
+		# the real post-sort position lands
 
 
 ## The end screen's reveal (#590), with the Casualties section held back until
@@ -557,10 +721,88 @@ func _reveal_end_screen(title: Label, box: VBoxContainer, buttons: VBoxContainer
 
 const CASUALTIES_FADE_S := 0.4
 ## Pieces per Casualties row (Max, 2026-09-25: "rows of 6-8", side by side
-## with light overlap; the mass grows taller and scrolls instead). At
-## PieceMass.SPACED_PITCH that is a ~325px row, centred, in the ~432px panel; a
-## narrower panel gets fewer per row, never a tighter pitch. Tune here.
+## with light overlap; the mass grows taller and scrolls instead). At the
+## (tightened, see CASUALTY_PITCH_SCALE below) per-piece pitch that's a
+## ~270px row, centred, in the ~432px panel; a narrower panel gets fewer
+## per row, never a tighter pitch. Tune here.
 const CASUALTIES_PER_ROW := 8
+## Max, 2026-09-26 (13th review): the Casualties rows read a bit loose —
+## ~20% tighter horizontally. `PieceMass.build()`'s own `pitch_scale` param,
+## not a change to its shared `SPACED_PITCH` default, so the Army carousel
+## and Reinforcements (which never pass `spaced_row_max`, so never read
+## SPACED_PITCH at all) are untouched. Old step 39.0px (ICON*0.75) -> new
+## 31.2px (39.0*0.8).
+const CASUALTY_PITCH_SCALE := 0.8
+## Max, 2026-09-26 (14th review): the Casualties icons read a bit small —
+## 10% bigger. `PieceMass.build()`'s own `icon_scale` param (same reasoning
+## as CASUALTY_PITCH_SCALE above: not a change to the shared ICON constant,
+## so the Army carousel and Reinforcements stay untouched), threaded into
+## both this call's `edge_pad()` budget call and `build()` itself so the
+## rotation/jitter overhang and the spaced grid's own row step grow with the
+## bigger icon instead of clipping the first/last row. The horizontal pitch
+## above is left exactly as CASUALTY_PITCH_SCALE already set it, so the
+## bigger pieces simply overlap a little more. Old icon 52.0px (ICON) -> new
+## 57.2px (52.0*1.1).
+const CASUALTY_ICON_SCALE := 1.1
+
+## Max, 2026-09-26: a purple medieval-banner backdrop behind the WHOLE
+## Casualties mass — see _add_casualty_banner()'s own header for the shape
+## and why it lives here rather than in piece_mass.gd.
+const CASUALTY_BANNER_COLOR := Color(0.34, 0.2, 0.46, 1.0) # muted, deep royal
+	# purple: darker/more saturated than the board's own purple tile
+	# (game.gd's BOARD_THEMES["sage"].dark = "8763A8" = Color(0.53, 0.39, 0.66)).
+	# Max, 2026-09-26 (5th review): fully opaque, not semi-transparent — it
+	# reads as a BACKGROUND because it paints behind the pieces (z_index,
+	# below), not because it's see-through.
+const CASUALTY_BANNER_BORDER_COLOR := Color(0.58, 0.42, 0.75, 1.0) # a lighter,
+	# also-opaque tint of the same hue — the border and the rod bar share
+	# this one colour, kept to a single family rather than a second hue.
+const CASUALTY_BANNER_BORDER_WIDTH := 2.0 # px
+const CASUALTY_BANNER_MARGIN_X := PieceMass.ICON * 0.3 # px each side beyond
+	# the mass's own width — "spans the mass's width plus a margin".
+const CASUALTY_BANNER_POINT_DEPTH_RATIO := 1.0 / 3.0 # Max: "the point's
+	# height roughly 1/3 of the banner's width" — off the banner's OWN width
+	# (mass width + 2*margin), not a fixed px, so a narrow Casualties mass
+	# never gets a comically deep point and a wide one never gets a
+	# barely-there notch.
+const CASUALTY_BANNER_ROD_HEIGHT := 4.0 # px, straddling the banner's own top edge
+const CASUALTY_BANNER_ROD_OVERHANG := PieceMass.ICON * 0.15 # px the rod
+	# extends past the banner's own sides — a flagpole crossbar reads as a
+	# rod BECAUSE it's wider than the flag hanging from it.
+const CASUALTY_TITLE_TOP_PAD := 8.0 # px of headroom between the banner's own
+	# top edge and the title text (Max, 7th review: "a little room under it
+	# before the pieces start" was the mass gap below; the title itself
+	# needed the same treatment above)
+const CASUALTY_TITLE_GAP := 16.0 # px, Max: "~16 px of room between the title
+	# and the first row of pieces" — `section`'s one VBoxContainer separation,
+	# so it also lands between `mass` and the point's own depth spacer below
+	# it, which is exactly the "little padding" past the raw point depth Max
+	# asked for there too.
+
+## Max, 2026-09-26 (10th/11th review, page-spec ruling): the end screen's own
+## chrome — the top breathing room the scroll viewport used to reserve as a
+## screen-level margin (now content padding, `_end_screen_frame()`'s
+## `top_pad`), and the floating button bar it now replaces the old pinned
+## column with. See that function's own header for the shape. 11th review:
+## the bar has NO background of its own (removed `END_SCREEN_BAR_COLOR`/
+## `_PAD` — there is no panel/stylebox left to colour or pad).
+const END_SCREEN_TOP_PAD := 24.0 # px — the OLD `margin`'s own top value
+	# (unrelated to CASUALTY_TITLE_TOP_PAD above, which pads the banner's
+	# title, not the whole screen), kept identical so the game-over block's
+	# visual position at scroll=0 doesn't move.
+const END_SCREEN_CONTENT_GAP := 16.0 # px — `box`'s own separation between
+	# its stacked children (labels, the Casualties section, the padding
+	# spacers) and `buttons`' own separation between Restart/Main Menu/
+	# Feedback etc. One constant for both: the OLD design used the same
+	# literal `16` in both places already.
+const END_SCREEN_BAR_GAP := 16.0 # px of clearance Max asked for between the
+	# scrolled content's own bottom (the Casualties point, when there is one)
+	# and the buttons' own top edge, on top of the buttons' own height.
+const END_SCREEN_BAR_BOTTOM_MARGIN := 24.0 # px, Max (12th review): a little
+	# margin so Give Feedback (the last button) isn't flush with the screen's
+	# own bottom edge — a spacer below `buttons` inside `bar`, folded into
+	# `bottom_pad`'s own clearance too so the V-point still clears the
+	# buttons' new (higher) position at scroll-end.
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:

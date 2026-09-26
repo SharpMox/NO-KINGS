@@ -13,8 +13,12 @@ const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 ## PIXEL is the noise pixel's size in canvas px, rounded so a whole number of
 ## noise pixels spans each tile — it scales with the tile, and the pixel grid
 ## lines up with the tile edges.
+## FREQ scales the noise-pixel coordinate before sampling Perlin (both
+## octaves) — higher shrinks the blobs. 0.6: blobs half the size of #607's
+## original 0.3, tuned by Max, 2026-09-26.
 const BOARD_NOISE_AMOUNT := 0.15
 const BOARD_NOISE_PIXEL := 4.0
+const BOARD_NOISE_FREQ := 0.6
 
 const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # move/capture, place, merge/fuse, item use

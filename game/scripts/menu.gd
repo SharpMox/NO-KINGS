@@ -9,6 +9,7 @@ const Scenarios := preload("res://data/scenarios.gd")
 const Tuning := preload("res://scripts/tuning.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Settings := preload("res://scripts/settings.gd")
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4: every scene change
 const CloudSave := preload("res://scripts/cloud_save.gd")
 const Armies := preload("res://scripts/armies.gd")
 const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
@@ -655,7 +656,8 @@ func _ready() -> void:
 	if not GameScript.cli_bypass_used \
 			and (args.has("--autoplay") or args.has("--scenario")
 				or args.has("--scenario-name") or args.has("--ui-demo")):
-		get_tree().change_scene_to_file.call_deferred("res://scenes/Game.tscn")
+		var tree := get_tree() # instant: SceneFade skips under these flags
+		(func() -> void: SceneFade.go(tree, "res://scenes/Game.tscn")).call_deferred()
 		return
 	# issue 84: send anything queued while offline BEFORE pulling the mirror.
 	# Draining after the pull would resolve this device's progress against a
@@ -743,7 +745,7 @@ func _ready() -> void:
 	continue_button = _button(main_box, "Continue", 32, func() -> void:
 		GameScript.next_config = _continue_save
 		GameScript.is_scenario = false
-		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		SceneFade.go(get_tree(), "res://scenes/Game.tscn"))
 	_refresh_continue()
 	_button(main_box, "Play", 32, _show_armies)
 	_button(main_box, "Scores", 24, _show_scores)
@@ -1068,7 +1070,7 @@ func _ready() -> void:
 			var row := _button(test_box, _test_row_text(s.name, sec), 15, func() -> void:
 				GameScript.next_config = s.cfg
 				GameScript.is_scenario = true # scenarios never autosave
-				get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+				SceneFade.go(get_tree(), "res://scenes/Game.tscn"))
 			row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			row.clip_text = true # never wider than the list: ellipsis, not overflow
 			row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -1457,7 +1459,7 @@ func _ready() -> void:
 		GameScript.next_seed = seed_field.text.strip_edges() # "" = random
 		GameScript.next_config = {}
 		GameScript.is_scenario = false
-		get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+		SceneFade.go(get_tree(), "res://scenes/Game.tscn"))
 	_button(rank_box, "← Back", 20, func() -> void:
 		rank_center.visible = false
 		army_center.visible = true)
@@ -1531,7 +1533,7 @@ func _ready() -> void:
 		await RenderingServer.frame_post_draw
 		DirAccess.make_dir_recursive_absolute(dir) # save_png fails outright if dir is missing
 		get_viewport().get_texture().get_image().save_png(dir.path_join("menu.png"))
-		get_tree().change_scene_to_file("res://scenes/Game.tscn")
+		SceneFade.go(get_tree(), "res://scenes/Game.tscn") # instant under --show-screen
 
 
 ## NO-147: reached from Settings now, so settings_panel is hidden here rather

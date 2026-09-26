@@ -7,14 +7,18 @@ const PLAYER_ZONE_ROWS := 2        # GDD Board — bottom rows, placement zone
 const SPAWN_ROW := BOARD_H - 1     # top row; waves spill to next turn if full
 
 ## Board tile texture (game.gd BOARD_TILE_SHADER): pixelated Perlin noise added
-## to each tile's base colour. AMOUNT is the peak offset per channel (0.15 =
-## ±15% value; Max picked this over 0.05, 2026-09-26); 0 renders exactly
-## COL_LIGHT/COL_DARK, i.e. the flat board.
+## to each tile's base colour. AMOUNT is the peak offset per channel (0.09 =
+## ±9% value; Max softened 0.15 -> 0.12 -> 0.09 on 2026-09-26, at freq 0.9);
+## 0 renders exactly COL_LIGHT/COL_DARK, i.e. the flat board.
 ## PIXEL is the noise pixel's size in canvas px, rounded so a whole number of
 ## noise pixels spans each tile — it scales with the tile, and the pixel grid
 ## lines up with the tile edges.
-const BOARD_NOISE_AMOUNT := 0.15
+## FREQ scales the noise-pixel coordinate before sampling Perlin (both
+## octaves) — higher shrinks the blobs. Max picked 0.9 over 0.6 and 0.3,
+## 2026-09-26.
+const BOARD_NOISE_AMOUNT := 0.09
 const BOARD_NOISE_PIXEL := 4.0
+const BOARD_NOISE_FREQ := 0.9
 
 const ACTIONS_PER_TURN := 2        # unified economy (user call 2026-07-06):
                                    # move/capture, place, merge/fuse, item use

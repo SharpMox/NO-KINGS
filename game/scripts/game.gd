@@ -208,6 +208,7 @@ uniform float tile = 1.0;
 uniform float board_h = 12.0;
 uniform float cells = 13.0; // noise pixels per tile edge
 uniform float amount = 0.0;
+uniform float freq = 0.3; // blob size: higher = smaller blobs
 
 varying vec2 local_pos;
 
@@ -237,8 +238,8 @@ void fragment() {
 	float y = board_h - 1.0 - t.y;
 	vec4 base = mod(t.x + y, 2.0) < 0.5 ? light_col : dark_col;
 	vec2 cell = floor(p * cells) + vec2(0.5);
-	float n = perlin(cell * 0.3 + vec2(17.0, 5.0)) * 0.7
-		+ perlin(cell * 0.9 + vec2(-3.0, 41.0)) * 0.3;
+	float n = perlin(cell * freq + vec2(17.0, 5.0)) * 0.7
+		+ perlin(cell * freq * 3.0 + vec2(-3.0, 41.0)) * 0.3;
 	// * COLOR keeps any inherited modulate; the quad itself is drawn WHITE.
 	COLOR *= vec4(base.rgb + vec3(clamp(n, -1.0, 1.0) * amount), base.a);
 }
@@ -773,6 +774,8 @@ var _banner_layer := Node2D.new()
 var _tile_layer := Node2D.new()
 ## Noise strength for _tile_layer; `--board-noise <amount>` overrides it (debug).
 var board_noise: float = Tuning.BOARD_NOISE_AMOUNT
+## Noise blob frequency for _tile_layer; `--board-noise-freq <f>` overrides it (debug).
+var board_noise_freq: float = Tuning.BOARD_NOISE_FREQ
 var items: Array = [] # held Items (single-use actives), max HUD row
 var item_icons := {} # item key -> Texture2D; missing keys fall back to ✦ text
 ## NO-17: artefact key -> Texture2D. Only the painted ones are in here; read it
@@ -1027,6 +1030,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_board)
 	if args.has("--board-noise"): # debug: compare noise strengths in captures
 		board_noise = float(args[args.find("--board-noise") + 1])
+	if args.has("--board-noise-freq"): # debug: compare noise blob sizes in captures
+		board_noise_freq = float(args[args.find("--board-noise-freq") + 1])
 	if args.has("--board-theme"): # debug: capture a theme without touching the Settings file
 		set_board_theme(args[args.find("--board-theme") + 1])
 	_tile_layer.show_behind_parent = true
@@ -6010,6 +6015,7 @@ func _sync_tile_layer() -> void:
 	m.set_shader_parameter("board_h", float(Tuning.BOARD_H))
 	m.set_shader_parameter("cells", maxf(1.0, roundf(tile / Tuning.BOARD_NOISE_PIXEL)))
 	m.set_shader_parameter("amount", board_noise)
+	m.set_shader_parameter("freq", board_noise_freq)
 	_tile_layer.queue_redraw()
 
 func _draw() -> void:

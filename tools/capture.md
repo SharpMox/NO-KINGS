@@ -69,9 +69,9 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
 | Armies carousel, scrolled to one card | `--screenshot /tmp/cap/armies-horde --show-screen armies --army-name Horde` — same scroll a tap on that Army's page dot does (`menu.gd`'s `_debug_scroll_to_army`), by NAME rather than the dot's positional index, same idea as `--scenario-name`. Names: `Crown`, `Wild Hunt`, `Old Guard`, `Syndicate`, `Cult`, `Horde` (`Tuning.ARMIES`'s key order — the same order the dots go in). An unknown name is a no-op (prints `--army-name X: no such Army`, screenshot still lands on whichever card the carousel already showed). |
 
-## Board tile noise (`--board-noise AMOUNT`, `--board-theme ID`)
+## Board tile noise (`--board-noise AMOUNT`, `--board-noise-freq FREQ`, `--board-theme ID`)
 
-Both are Game-scene flags, usable with any capture above. `--board-noise` overrides `Tuning.BOARD_NOISE_AMOUNT` (0 = the flat board); `--board-theme` sets the chequer (`sage`, `sand`) for this run without writing the Settings file.
+All three are Game-scene flags, usable with any capture above. `--board-noise` overrides `Tuning.BOARD_NOISE_AMOUNT` (0 = the flat board); `--board-noise-freq` overrides `Tuning.BOARD_NOISE_FREQ` (blob size — higher shrinks the blobs); `--board-theme` sets the chequer (`sage`, `sand`) for this run without writing the Settings file.
 
 | Capture | Flags after `--` |
 |---|---|
@@ -79,6 +79,8 @@ Both are Game-scene flags, usable with any capture above. `--board-noise` overri
 | Sand, default noise | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-sand --show-screen board --board-theme sand` |
 | Sage, subtle (comparison) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-subtle --show-screen board --board-theme sage --board-noise 0.05` |
 | Sage, flat (control) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-off --show-screen board --board-theme sage --board-noise 0` |
+| Sage, freq 0.6 (#607 tuned) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq06 --show-screen board --board-theme sage --board-noise-freq 0.6` |
+| Sage, freq 0.9 (default, #610 tuned) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq09 --show-screen board --board-theme sage --board-noise-freq 0.9` |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)
 

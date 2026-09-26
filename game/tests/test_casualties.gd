@@ -358,7 +358,7 @@ func _init() -> void:
 		var strip_style: StyleBox = strip_node.get_theme_stylebox("panel") if strip_node != null else null
 		check(strip_style is StyleBoxFlat and (strip_style as StyleBoxFlat).bg_color.a >= 0.999,
 			"%s: the button bar is opaque" % screen)
-		var overlay_kids := g.modals.overlay.get_children()
+		var overlay_kids: Array = g.modals.overlay.get_children()
 		check(bar_node != null and end_scroll != null
 				and overlay_kids.find(bar_node) > overlay_kids.find(end_scroll),
 			"%s: the bar draws above the scroll (later tree position)" % screen)

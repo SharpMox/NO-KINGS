@@ -360,6 +360,32 @@ func _init() -> void:
 			var gap: float = mass_ctrl.get_global_rect().position.y - title_rect.end.y
 			check(gap >= 12.0 - 0.01,
 				"%s: at least 12px between the title's bottom and the mass's top (%.1f px)" % [screen, gap])
+			# Max, 8th review (of the PREVIOUS `top_level` capture, a1c799c):
+			# the crowd's own art was sliced by a hard edge near the banner's
+			# top, and by another right above the buttons. Both read as
+			# `clip_contents` cutting into the rotated first/last row's own
+			# overhang (piece_mass.gd's `edge_pad()` already reserves exactly
+			# that much room INSIDE `mass` — these prove nothing ABOVE `mass`
+			# throws that room away).
+			var no_clip := true
+			var clip_offender := ""
+			var walker: Node = mass_ctrl
+			while walker != null and walker != end_scroll:
+				if walker is Control and (walker as Control).clip_contents:
+					no_clip = false
+					clip_offender = str(walker.name)
+				walker = walker.get_parent()
+			check(no_clip,
+				"%s: nothing between the pieces and the ScrollContainer clips (offender: %s)"
+					% [screen, clip_offender])
+			check(mass_ctrl.size.y >= mass_ctrl.custom_minimum_size.y - 0.01,
+				"%s: the mass keeps its own full height — the rotated first/last row's overhang room is never squeezed (%.1f vs %.1f)"
+					% [screen, mass_ctrl.size.y, mass_ctrl.custom_minimum_size.y])
+			check(buttons_ctrl == null
+					or end_scroll.get_global_rect().end.y <= buttons_ctrl.get_global_rect().position.y + 0.5,
+				"%s: the scroll's own bottom edge sits at or above the buttons' top — they never overlap (%.1f vs %.1f)"
+					% [screen, end_scroll.get_global_rect().end.y,
+						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
 			# --scroll-bottom (tools/capture.md): the exact state Aux's capture
 			# judges. Nothing new needs to sync here (unlike the dropped
 			# `top_level` design) — `section` is an ordinary scrolled

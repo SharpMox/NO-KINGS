@@ -1,0 +1,76 @@
+name: guide-images
+
+# NO-264: renders the Guide illustrations (game/tools/guide_images.gd = option B,
+# generated; game/tools/guide_captures.gd = option A, cropped captures) under
+# xvfb and uploads game/assets/guide/ as the `guide-images` artifact, so the
+# PNGs come from a real render without a Mac. Commit them from the artifact:
+#   gh run download <run-id> -n guide-images -D game/assets/guide
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - game/tools/guide_*.gd
+      - .github/workflows/guide-images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guide-images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: 4.7-stable
+      GODOT_ASSET: Godot_v4.7-stable_linux.x86_64
+      GODOT: /home/runner/godot/godot
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v6
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          base=https://github.com/godotengine/godot/releases/download/$GODOT_VERSION
+          curl -fsSL -o godot.zip "$base/$GODOT_ASSET.zip"
+          curl -fsSL -o SHA512-SUMS.txt "$base/SHA512-SUMS.txt"
+          echo "$(grep " $GODOT_ASSET.zip\$" SHA512-SUMS.txt | cut -d' ' -f1)  godot.zip" | sha512sum -c -
+          unzip -q godot.zip && rm godot.zip SHA512-SUMS.txt
+          mv "$GODOT_ASSET" godot && chmod +x godot
+
+      - name: Install Xvfb + Mesa (llvmpipe)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            xvfb xauth libgl1 libgl1-mesa-dri libegl1 libglx-mesa0 \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 libxkbcommon0 libxkbcommon-x11-0 \
+            libfontconfig1
+
+      - name: Render
+        run: |
+          $GODOT --headless --path game --import >/dev/null 2>&1 || true
+          xvfb-run -a -s "-screen 0 1280x1024x24" $GODOT --path game -s tools/guide_images.gd
+          xvfb-run -a -s "-screen 0 1280x1024x24" $GODOT --headless --path game -s tools/guide_captures.gd
+          # .import sidecars for the new PNGs, so they can be committed alongside
+          $GODOT --headless --path game --import >/dev/null 2>&1 || true
+          ls -la game/assets/guide
+
+      - name: Upload images
+        uses: actions/upload-artifact@v7
+        with:
+          name: guide-images
+          retention-days: 14
+          path: game/assets/guide/
+          if-no-files-found: error

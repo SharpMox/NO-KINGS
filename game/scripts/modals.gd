@@ -495,32 +495,27 @@ func _end_screen_frame() -> Array:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.scroll_deadzone = 24 # a drag on the mass scrolls; menu.gd's value
 	overlay.add_child(scroll)
-	var box_pad := MarginContainer.new() # Max: keep the game-over block's
-		# visual position at scroll=0 unchanged — the OLD outer frame's 24px
-		# top margin (never scrolled) becomes CONTENT padding instead (scrolls
-		# off with everything else); the bottom margin is now `strip`'s own
-		# settled height + a gap, kept in sync below since it depends on the
-		# buttons' own (font-driven, not synchronously known) size.
-	box_pad.add_theme_constant_override("margin_top", END_SCREEN_TOP_PAD)
-	box_pad.size_flags_horizontal = Control.SIZE_EXPAND # `box_pad`, not `box`,
-		# is `scroll`'s own direct child now — EXPAND is what tells `scroll`
-		# to stretch IT to the full available width (h-scroll disabled, so
-		# ScrollContainer otherwise gives a non-EXPAND child only its own
-		# natural minimum, left-aligned) so `box`'s own SHRINK_CENTER below
-		# has the FULL width to centre within, same as before this wrapper
-		# existed. Without this, `box_pad` (and `box` inside it) measured
-		# ~432px instead of the full ~480, and everything centred ~24px left
-		# of the true screen centre.
-	scroll.add_child(box_pad)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_theme_constant_override("separation", 16)
 	# EXPAND + SHRINK_CENTER: the labels' own width (_overlay_width), centred
 	# in the scroll; EXPAND_FILL down, so ALIGNMENT_CENTER centres it while
-	# it is shorter than the screen
+	# it is shorter than the screen. `box` stays `scroll`'s own DIRECT child
+	# (a MarginContainer wrapper here measured only its own children's
+	# natural ~432px width instead of the full ~480px ScrollContainer gives
+	# a direct EXPAND child on a disabled axis — everything centred ~24px
+	# left of true screen centre). Top/bottom padding below are plain spacer
+	# CHILDREN of `box` instead, so this relationship never changes.
 	box.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_CENTER
 	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box_pad.add_child(box)
+	scroll.add_child(box)
+	var top_pad := Control.new() # Max: keep the game-over block's visual
+		# position at scroll=0 unchanged — the OLD outer frame's 24px top
+		# margin (never scrolled) becomes CONTENT instead (scrolls off with
+		# everything else)
+	top_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_pad.custom_minimum_size.y = END_SCREEN_TOP_PAD
+	box.add_child(top_pad)
 
 	var bar := VBoxContainer.new()
 	bar.name = "EndScreenBar" # the tests' handle
@@ -548,8 +543,18 @@ func _end_screen_frame() -> Array:
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	strip.add_child(buttons)
 
+	var bottom_pad := Control.new() # room for `strip`'s own settled height
+		# plus a gap, kept in sync below since it depends on the buttons' own
+		# (font-driven, not synchronously known) size
+	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(bottom_pad)
 	var sync_bottom_pad := func() -> void:
-		box_pad.add_theme_constant_override("margin_bottom", strip.size.y + END_SCREEN_BAR_GAP)
+		bottom_pad.custom_minimum_size.y = strip.size.y + END_SCREEN_BAR_GAP
+		if bottom_pad.get_parent() == box: # `box` keeps growing after this
+			# function returns — the caller (show_overlay()/show_win_screen())
+			# appends the title/stats/Casualties section — so re-pin `bottom_pad`
+			# LAST every time this fires, not just once, up front
+			box.move_child(bottom_pad, box.get_child_count() - 1)
 	strip.resized.connect(sync_bottom_pad) # `strip`'s SIZE (not just position)
 		# settles once the buttons' own font metrics resolve post-tree-entry —
 		# a genuine size change, so `resized` alone (unlike the mass-recentre

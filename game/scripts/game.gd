@@ -5678,6 +5678,8 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 			var xy := args[args.find("--anchor") + 1].split(",")
 			_item_click(Vector2i(int(xy[0]), int(xy[1])))
 	elif args.has("--open-shop"):
+		if args.has("--roll-shop"): # NO-264: a stocked Shop, as a restock rolls it
+			Shop.roll(self)
 		_open_shop()
 		await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout # let the
 			# NO-118 slide finish — animations_on defaults true, so the panel

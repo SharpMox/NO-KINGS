@@ -56,7 +56,10 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             xvfb xauth libgl1 libgl1-mesa-dri libegl1 libglx-mesa0 \
             libxcursor1 libxinerama1 libxrandr2 libxi6 libxkbcommon0 libxkbcommon-x11-0 \
-            libfontconfig1
+            libfontconfig1 fonts-noto-core fonts-dejavu-core
+          # Board symbols (Buff badges, the inversion mark) draw through
+          # ThemeDB.fallback_font, i.e. the OS font fallback; a bare runner has
+          # no font with ⨯ ⧗ ⟲, Noto is what Android falls back to
 
       - name: Render
         run: |

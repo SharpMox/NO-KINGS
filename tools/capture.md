@@ -48,7 +48,7 @@ Game-scene screens need a scenario and write `DIR/game.png`:
 
 | `turn-start` | the player-turn-start Artefact dispatch alone (NO-250 Pincer: the Stunned enemy with its "Stunned!" float; `stunned` has no board badge) | `--scenario-name "NO-250: Pincer" --screenshot /tmp/cap/pincer --show-screen turn-start` |
 
-Other seam flags work with `--scenario-name` too: `--select X,Y[;X,Y]`, `--arm-item KEY [--anchor X,Y]`, `--open-shop`, `--open-drawer stock|inventory` (only one of them per run).
+Other seam flags work with `--scenario-name` too: `--select X,Y[;X,Y]`, `--arm-item KEY [--anchor X,Y]`, `--open-shop` (add `--roll-shop` to stock it first, as a restock does; without it a sandbox before wave 5 shows the empty Shop), `--open-drawer stock|inventory` (only one of them per run).
 
 NO-250 Artefact mechanics, through `--select` (a real tap):
 

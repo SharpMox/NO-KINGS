@@ -348,11 +348,11 @@ func _init() -> void:
 		# now spans the WHOLE screen — content scrolls off the top edge — and
 		# the button block floats over it on its own opaque bar instead of
 		# constraining the scroll's own height.
-		var vp := g.get_viewport_rect()
+		var screen_size := g.get_viewport_rect().size
 		check(end_scroll != null and absf(end_scroll.get_global_rect().position.y) <= 0.5
-				and absf(end_scroll.get_global_rect().end.y - vp.size.y) <= 0.5,
+				and absf(end_scroll.get_global_rect().end.y - screen_size.y) <= 0.5,
 			"%s: the scroll viewport spans the full screen, top (0) to bottom (%.1f) (got [%.1f, %.1f])"
-				% [screen, vp.size.y,
+				% [screen, screen_size.y,
 					end_scroll.get_global_rect().position.y if end_scroll != null else -1.0,
 					end_scroll.get_global_rect().end.y if end_scroll != null else -1.0])
 		var strip_style: StyleBox = strip_node.get_theme_stylebox("panel") if strip_node != null else null

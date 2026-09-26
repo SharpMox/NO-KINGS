@@ -171,7 +171,7 @@ func _mouse(g: Node2D, tile: Vector2i, pressed: bool) -> void:
 	g._unhandled_input(ev)
 
 
-## Max, 2026-09-26: a merge target is a pulsing yellow-orange outline plus a
+## Max, 2026-09-26: a merge target is a pulsing lime silhouette outline plus a
 ## wiggle on its piece — the cyan ring is gone. `merge_target_tiles` and
 ## `merge_target_fx` are what `_draw` draws from, so these can't drift from it.
 func _merge_target_checks() -> void:
@@ -187,16 +187,18 @@ func _merge_target_checks() -> void:
 	check(not is_equal_approx(a.angle, b.angle) and absf(a.angle) <= g.MERGE_TARGET_SHAKE_RAD
 			and absf(a.offset.x) <= g.MERGE_TARGET_SHAKE_PX and (a.angle != 0.0 or b.angle != 0.0),
 		"animations on: the target piece wiggles a few degrees / px (%.3f, %.3f rad)" % [a.angle, b.angle])
-	check(g.COL_MERGE_TARGET == g.COL_MERGE_ORANGE and g.merge_color == g.COL_MERGE_ORANGE
-			and a.color == g.COL_MERGE_ORANGE,
-		"orange is the default merge target colour until Max picks")
+	check(g.COL_MERGE_TARGET == g.COL_MERGE_LIME and g.merge_color == g.COL_MERGE_LIME
+			and a.color == g.COL_MERGE_LIME,
+		"lime is the default merge target colour (Max's pick)")
 	check(GameScript.merge_color_from(PackedStringArray(["--merge-color", "lime"])) == g.COL_MERGE_LIME
 			and GameScript.merge_color_from(PackedStringArray(["--merge-color", "orange"])) == g.COL_MERGE_ORANGE
-			and GameScript.merge_color_from(PackedStringArray()) == g.COL_MERGE_ORANGE,
-		"--merge-color lime|orange picks the colour; no flag is orange")
-	g.merge_color = g.COL_MERGE_LIME
-	check(g.merge_target_fx(Vector2i(3, 2), 0.1).color == g.COL_MERGE_LIME, "a lime run outlines in lime")
+			and GameScript.merge_color_from(PackedStringArray()) == g.COL_MERGE_LIME,
+		"--merge-color lime|orange picks the colour; no flag is lime")
 	g.merge_color = g.COL_MERGE_ORANGE
+	check(g.merge_target_fx(Vector2i(3, 2), 0.1).color == g.COL_MERGE_ORANGE, "an orange run outlines in orange")
+	g.merge_color = g.COL_MERGE_LIME
+	check(g.MERGE_TARGET_KEYLINE >= 3.0 and g.MERGE_TARGET_WIDTH - g.MERGE_TARGET_KEYLINE >= 4.0,
+		"the dark inner band is 3 px and the lime rim keeps its 4 px")
 	# Shaped, not a square: the outline is the silhouette shader on _merge_fx.
 	var mat: Variant = g._merge_fx.material
 	check(mat is ShaderMaterial and (mat as ShaderMaterial).shader.code == g.SELECT_OUTLINE_SHADER,

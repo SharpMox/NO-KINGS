@@ -142,16 +142,18 @@ const COL_SELECT := Color(0.35, 0.62, 1.0, 0.4)
 const COL_MERGE := Color(0.45, 0.85, 1.0) # cyan-blue: status floats, pending-pick rings
 # Merge target (Max, 2026-09-26): replaces the cyan ring with a glowing edge
 # that hugs the target token's own silhouette (SELECT_OUTLINE_SHADER on
-# `_merge_fx`). Max's two candidates, both kept until he picks; `--merge-color
-# orange|lime` switches a capture run. No bright hue alone contrasts with the
-# pale Sage/Sand light tiles, so the colour rim sits on a thin dark inner band
-# (BUFF_BADGE_BG) — the same dark-under-light split the selection outline uses.
+# `_merge_fx`). Max picked LIME (2026-09-26) over the warmer orange; orange
+# stays for `--merge-color orange` captures. Lime partly blends into the pale
+# Sage light tiles, so the colour rim sits on a dark inner band (BUFF_BADGE_BG)
+# — the same dark-under-light split the selection outline uses.
 const COL_MERGE_ORANGE := Color(1.0, 0.55, 0.1)
 const COL_MERGE_LIME := Color(0.65, 1.0, 0.2)
-const COL_MERGE_TARGET := COL_MERGE_ORANGE # the default, and the Guide's swatch
-const MERGE_TARGET_WIDTH := 6.0 # px past the silhouette, static; the pulse swings around it
+const COL_MERGE_TARGET := COL_MERGE_LIME # the default, and the Guide's swatch
+const MERGE_TARGET_WIDTH := 7.0 # px past the silhouette, static; the pulse swings around it
 const MERGE_TARGET_PULSE := 2.0 # px +/- the pulse adds to the width
-const MERGE_TARGET_KEYLINE := 2.0 # px of the width that is the dark inner band
+const MERGE_TARGET_KEYLINE := 3.0 # px of the width that is the dark inner band (3, not 2,
+	# so lime separates from pale Sage; the width grew by the same 1 px, so the
+	# lime rim itself is unchanged)
 const MERGE_TARGET_SHAKE_RAD := 0.07 # ~4 degrees of wiggle each way
 const MERGE_TARGET_SHAKE_PX := 1.5 # px of sideways jitter each way
 const COL_DROP_OK := Color(0.3, 0.9, 0.4, 0.35) # NO-236: the hovered tile would take the drop
@@ -5894,7 +5896,7 @@ func _draw() -> void:
 			draw_rect(Rect2(_tile_px(s), Vector2(tile, tile)), COL_SELECT)
 		if item_pending_tile.x >= 0: # NO-121: one more tap confirms this one —
 			# a cyan ring (merge partners shared it until 2026-09-26, when
-			# they moved to the orange merge-target outline)
+			# they moved to the lime silhouette outline)
 			draw_arc(_tile_px(item_pending_tile) + Vector2(tile, tile) / 2, tile * 0.46, 0, TAU, 24,
 				COL_MERGE, 3.0)
 	if artefact_pending_tile.x >= 0: # NO-121: Bovine Tractor Beam's own pending pick
@@ -6157,12 +6159,12 @@ func merge_target_fx(pos: Vector2i, t: float) -> Dictionary:
 		"offset": Vector2(MERGE_TARGET_SHAKE_PX * sin(t * 31.0 + ph), 0.0)}
 
 
-## `--merge-color orange|lime` (tools/capture.md): which of Max's two merge
-## target colours a run draws. Anything else, or no flag, is the default.
+## `--merge-color orange|lime` (tools/capture.md): which merge target colour a
+## capture run draws. Anything but "orange", or no flag, is the lime default.
 static func merge_color_from(args: PackedStringArray) -> Color:
 	var i := args.find("--merge-color")
-	if i >= 0 and i + 1 < args.size() and args[i + 1] == "lime":
-		return COL_MERGE_LIME
+	if i >= 0 and i + 1 < args.size() and args[i + 1] == "orange":
+		return COL_MERGE_ORANGE
 	return COL_MERGE_TARGET
 
 

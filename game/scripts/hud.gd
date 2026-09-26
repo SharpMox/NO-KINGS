@@ -3229,7 +3229,7 @@ func _build_stack_button(st: Dictionary, btn: Button = null) -> Button:
 	if armed:
 		btn.modulate = Color(0.55, 0.95, 1.5) # armed: placement / merge origin
 	# Max, 2026-09-26: no blue merge-partner tint on Stock cells any more — the
-	# merge target indicator is the board's pulsing orange outline (game.gd).
+	# merge target indicator is the board's pulsing lime outline (game.gd).
 	# NO-164: the old "captured stock: warm tint" wash is gone — the enemy
 	# (dark) sprite set above IS the distinguishing signal now, so a captured
 	# entry's modulate stays at whatever the icon block set (default WHITE,

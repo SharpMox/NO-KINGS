@@ -170,11 +170,11 @@ The preview grows out of wherever the pointer is; a `--show-screen preview` capt
 
 ## Holding a capture open (`--hold SECONDS`)
 
-A `--select` or `--show-screen` capture (and the `--autoplay` end-screen shot) normally shoots and quits about 0.6 s after the state is reached. `--hold SECONDS` waits that much longer first, so a `--write-movie` clip is long enough to show a looping animation. For example, the merge target's pulsing orange outline and piece wiggle:
+A `--select` or `--show-screen` capture (and the `--autoplay` end-screen shot) normally shoots and quits about 0.6 s after the state is reached. `--hold SECONDS` waits that much longer first, so a `--write-movie` clip is long enough to show a looping animation. For example, the merge target's pulsing lime outline and piece wiggle:
 
 ```sh
 mkdir -p /tmp/cap && tools/godot-lock.sh godot --path game --write-movie /tmp/cap/merge-orange.avi --fixed-fps 30 -- --scenario-name "Merge: on the board" --screenshot /tmp/cap/merge-orange --select "2,1" --hold 3 --merge-color orange
 mkdir -p /tmp/cap && tools/godot-lock.sh godot --path game --write-movie /tmp/cap/merge-lime.avi --fixed-fps 30 -- --scenario-name "Merge: on the board" --screenshot /tmp/cap/merge-lime --select "2,1" --hold 3 --merge-color lime
 ```
 
-`--merge-color orange|lime` picks which of the two candidate merge target colours the run draws (orange is the default). With animations off in Settings the outline is static and the piece does not move.
+`--merge-color orange|lime` picks the merge target colour for the run. Lime is the default (Max's pick); orange was the other candidate. With animations off in Settings the outline is static and the piece does not move.

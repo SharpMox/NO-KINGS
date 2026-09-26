@@ -461,7 +461,7 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Move", "hatch", Color(board.COL_ZONE_OUTLINE_MOVE, hatch_a), "A square the selected piece can move to."],
 		["Capture", "hatch", Color(board.COL_CAPTURE, hatch_a), "An enemy piece the selected piece can capture."],
 		["Selected", "fill", board.COL_SELECT, "The piece currently selected."],
-		["Merge target", "target", board.COL_MERGE_TARGET, "A piece the selection can merge or fuse with: a pulsing orange glow hugs its outline, and the piece wiggles."],
+		["Merge target", "target", board.COL_MERGE_TARGET, "A piece the selection can merge or fuse with: a pulsing lime-green glow hugs its outline, and the piece wiggles."],
 		["Reachable zone", "outline", Color(board.COL_ZONE_OUTLINE_MOVE, board.ZONE_OUTLINE_ALPHA), "Outline around every square a selected piece can reach this turn."],
 		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
 		["Blast zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Tiles a bomb or armed Item will hit."],
@@ -547,7 +547,7 @@ static func _add_target_glow(sw: Control, board, color: Color) -> void:
 	var w := 3.0 # rim reach, px
 	mat.set_shader_parameter("rim_color", color)
 	mat.set_shader_parameter("fill_color", board.BUFF_BADGE_BG)
-	mat.set_shader_parameter("fill_reach", 1.0 / size)
+	mat.set_shader_parameter("fill_reach", 1.5 / size)
 	mat.set_shader_parameter("rim_reach", w / size)
 	glow.material = mat
 	glow.draw.connect(func() -> void:

@@ -178,3 +178,25 @@ mkdir -p /tmp/cap && tools/godot-lock.sh godot --path game --write-movie /tmp/ca
 ```
 
 `--merge-color orange|lime` picks the merge target colour for the run. Lime is the default (Max's pick); orange was the other candidate. With animations off in Settings the outline is static and the piece does not move.
+
+## NO-243 S4: scene transitions and polish (Movie Maker)
+
+Every S4 animation is 0.4 s or less (the King-wave banner holds 1.6 s). The scene fade and the Main Menu pushes are skipped under every capture flag (`--screenshot`, `--show-screen`, `--scenario*`, `--ui-demo`, `--autoplay`, `--drive`) and in tests, so they have their own driver, `--menu-demo`: it taps through the intro, walks Settings, the Guide and a Guide page in and back out, raises the account prompt, launches the "Movement & drag" TEST scenario through the fade (scenarios never autosave), and quits. Add `--skip-login` on a machine with no account. The board and HUD rows use the `anim:` and `s4-hud` screens, which force animations on.
+
+```sh
+tools/godot-lock.sh godot --path game --write-movie /tmp/cap/s4-scenes.avi --fixed-fps 30 -- --menu-demo
+```
+
+| Rows | Animation | Flags after `--` |
+|---|---|---|
+| 61–65 | Intro → Menu fade; Settings, Guide, Guide page push in and back; account prompt fade; Menu → Game fade | `--menu-demo` |
+| 1, 29 | a Rook slides, squashes as it lands, greys out | `--scenario-name "Movement & drag" --screenshot /tmp/cap/s4-land --show-screen anim:land` |
+| 12 | Invert: the token turns edge-on and back as its inverse | `--scenario-name "Movement & drag" --screenshot /tmp/cap/s4-flip --show-screen anim:flip` |
+| 18 | Iron Dome: a shimmer over the King | `--scenario-name "Movement & drag" --screenshot /tmp/cap/s4-dome --show-screen anim:dome` |
+| 21 | a selection's hints fade in | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/s4-hint --select 3,2` |
+| 22 | an armed Stock piece's deploy dots ripple in, bottom row first | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/s4-ripple --show-screen anim:ripple` |
+| 23 | an armed Item's zone fades in and its hatch drifts | `--scenario-name "Capture: selling sandbox" --screenshot /tmp/cap/s4-zone --arm-item sniper` |
+| 27 | the heavier King-wave banner: thick stripes, darker band, shake | `--scenario-name "Movement & drag" --screenshot /tmp/cap/s4-kingwave --show-screen anim:king-wave` |
+| 17, 36, 38, 40, 41, 50, 51, 52, 57 | Shop glow, band slide, ⚠ pulse, tooltip fade, START→PASS cross-fade, Stock lift, sale coin, reinforcements drop-in and fly-to-Stock, King Abilities scale-in, 0.8 s apart | `--scenario-name "Movement & drag" --screenshot /tmp/cap/s4-hud --show-screen s4-hud` |
+
+Each command takes the engine flags first, as above: `godot --path game --write-movie /tmp/cap/<name>.avi --fixed-fps 30 -- <flags>`. Row 28 (downsizing the Artefact and economy banners to mini banners) is not built: Max ruled in NO-238 that those stay full banners.

@@ -71,3 +71,36 @@ static func go(tree: SceneTree, path: String) -> void:
 	tw.tween_callback(func() -> void:
 		layer.name = NODE_NAME + "Done" # free for the next go() at once
 		layer.queue_free())
+
+
+## NO-243 S4 rows 63/64: a screen that just became visible slides in
+## horizontally — from the right (`dir` 1.0, going deeper: a Main Menu
+## sub-screen, a Guide page) or the left (-1.0, Back). PUSH_S long, same
+## `animate()` gate as the fade, so tests and captures see it at rest. Its
+## resting x is read when no push is running (a screen with offsets does not
+## rest at 0). Never blocks input: no mouse filter changes, and the screen is
+## clickable wherever it is drawn.
+const PUSH_S := 0.2
+static func push(node: Control, dir: float) -> void:
+	if not animate():
+		return
+	var rest: float = node.position.x
+	if node.has_meta("push_tw"):
+		var running: Tween = node.get_meta("push_tw")
+		if running.is_valid() and running.is_running():
+			rest = node.get_meta("push_rest")
+		running.kill()
+	node.set_meta("push_rest", rest)
+	node.position.x = rest + dir * node.get_viewport_rect().size.x
+	var tw := node.create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(node, "position:x", rest, PUSH_S)
+	node.set_meta("push_tw", tw)
+
+
+## NO-243 S4 row 65: a prompt that just appeared fades in (FADE_S).
+static func fade_in(node: CanvasItem) -> void:
+	node.modulate.a = 1.0
+	if not animate():
+		return
+	node.modulate.a = 0.0
+	node.create_tween().tween_property(node, "modulate:a", 1.0, FADE_S)

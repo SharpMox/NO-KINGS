@@ -1712,15 +1712,51 @@ func show_reinforce(ids: Array) -> void:
 	title.theme_type_variation = &"Title"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	box.add_child(PieceMass.build(ids)) # NO-157
+	var mass := PieceMass.build(ids) # NO-157
+	box.add_child(mass)
 	var dismiss := Button.new()
 	dismiss.text = "Dismiss"
 	dismiss.pressed.connect(func() -> void:
+		_fly_mass_to_stock(mass) # NO-243 S4 row 50
 		reinforce_panel.visible = false
 		reinforce_done_pressed.emit())
 	box.add_child(dismiss)
 	g.hud.add_child(reinforce_panel)
 	reinforce_panel.move_to_front()
+	UiAnim.modal_in(g, reinforce_panel, center)
+	_drop_in(mass) # NO-243 S4 row 50
+
+
+## NO-243 S4 row 50: the reinforcements drop into the mass one by one. The
+## mass places its TextureRects by hand (it is not a Container), so each can
+## fall from above its own resting spot. The whole drop stays under
+## REINFORCE_DROP_TOTAL however many pieces arrived.
+const REINFORCE_DROP_S := 0.2
+const REINFORCE_DROP_TOTAL := 0.4
+const REINFORCE_DROP_PX := 36.0
+func _drop_in(mass: Control) -> void:
+	if not UiAnim.on(g):
+		return
+	var pieces: Array = mass.get_children().filter(func(c: Node) -> bool: return c is TextureRect)
+	var gap := minf(0.05, REINFORCE_DROP_TOTAL / maxf(pieces.size(), 1.0))
+	for i in pieces.size():
+		var p: TextureRect = pieces[i]
+		var rest := p.position.y
+		p.position.y = rest - REINFORCE_DROP_PX
+		p.modulate.a = 0.0
+		var tw := p.create_tween().set_parallel()
+		tw.tween_property(p, "position:y", rest, REINFORCE_DROP_S).set_delay(i * gap) \
+			.set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(p, "modulate:a", 1.0, REINFORCE_DROP_S * 0.5).set_delay(i * gap)
+
+
+## NO-243 S4 row 50: Dismiss sends the pieces on to the Stock button (up to
+## six ghosts: they are already in Stock, this only shows where they went).
+func _fly_mass_to_stock(mass: Control) -> void:
+	var pieces: Array = mass.get_children().filter(func(c: Node) -> bool: return c is TextureRect)
+	for i in mini(pieces.size(), 6):
+		var p: TextureRect = pieces[i]
+		UiAnim.fly_to(g, p.texture, p.get_global_rect(), g.hud.drawer_buttons["stock"])
 
 
 ## Overlay listing every active tariff (name, tier, effect) — opened from the
@@ -1758,6 +1794,7 @@ func show_king_abilities() -> void:
 	box.add_child(close)
 	g.hud.add_child(king_ability_panel)
 	king_ability_panel.move_to_front()
+	UiAnim.modal_in(g, king_ability_panel, center) # NO-243 S4 row 51 (S2 had not)
 	# NO-100: the panel is a translucent dim, so the kill feed and the banner
 	# layer (the world, below the HUD) showed through it — same issue
 	# _end_of_run_on_top/_offer_ad_retry already fixed for the end-of-run and

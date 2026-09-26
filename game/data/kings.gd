@@ -397,6 +397,7 @@ static func bite(g, what: String) -> void:
 		return
 	g.king_power_bitten = true
 	g._add_turn_fx("%s: %s" % [kit_of(g.king_power_id).get("power_name", ""), what], g.BANNER_POWER)
+	g.hud.pulse_warn() # NO-243 S4 row 17: the ⚠ toggle flashes as the Power bites
 
 
 ## Bring the next Tariff of an escalating Power into force, if enough turns have

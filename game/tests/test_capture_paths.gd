@@ -84,6 +84,7 @@ func _init() -> void:
 		["hud-anims", "Movement & drag"],
 		["reveal-gameover", "Movement & drag"],
 		["reveal-win", "Movement & drag"],
+		["s4-hud", "Movement & drag"],
 	]
 	for shot in shots:
 		var screen: String = shot[0]
@@ -155,6 +156,10 @@ func _init() -> void:
 			"reveal-win":
 				check(game.win_open and game.overlay.visible and game.modals.reveal != null,
 					"reveal-win: a King fell the real way and the win screen is revealing")
+			"s4-hud": # NO-243 S4: every step ran through to the last one
+				check(game.modals.king_ability_panel != null and game.modals.king_ability_panel.visible
+					and not game.modals.reinforce_panel.visible and game.hud.army_band.visible,
+					"s4-hud: the HUD/modal polish played through to King Abilities")
 		await _free(game)
 
 	# --- NO-250 `--select` captures (tools/capture.md): the state each tap

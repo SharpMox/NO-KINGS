@@ -61,7 +61,9 @@ static func queue(g, n: int) -> void:
 	# selection rule: tier-ordered by King-wave depth, sampled within the tier)
 	var king: Dictionary = Kings.select(g.rng, n, g.king_order) if roster.has("king") else {}
 	g._add_turn_fx(("KING WAVE: %s" % king.name) if not king.is_empty() else "WAVE %d" % n,
-		Color(1.0, 0.8, 0.3))
+		Color(1.0, 0.8, 0.3), "", not king.is_empty()) # NO-243 S4 row 27: heavier for a King
+	if n == Tuning.SHOP_UNLOCK_WAVE: # NO-243 S4 row 41: the Shop's first stock
+		g.hud.glow_shop()
 	ArtefactHooks.run(g, "on_wave_roster", {"roster": roster}) # roster Artefacts (issue 26)
 	# issue 91: the King's Power comes on with its WAVE, not with the King —
 	# ruling 6 makes it live for both segments, so the 15 turns before the King

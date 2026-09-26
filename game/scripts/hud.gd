@@ -330,6 +330,9 @@ var _wave_shown := ""
 var _turn_shown := ""
 var _actions_shown := 0
 var _row_x := 0.0
+var _pass_face_shown := "" # NO-243 S4 row 36: what the PASS button last showed
+var _abilities_shown := 0 # NO-243 S4 row 17: King Abilities in force, last refresh
+var _band_rest_y := 0.0 # NO-243 S4 row 38: army_band's resting y (build())
 var _clock_shown_ms := 0.0
 var _clock_shown_min := 0
 var _clock_seen := false
@@ -909,6 +912,7 @@ func build(game) -> void:
 				drawer_changed.emit()
 			army_band_open = true
 			army_band.visible = true
+			_slide_band_in() # NO-243 S4 row 38
 		_update_band_toggle())
 	bar.add_child(army_band_reopen)
 	var inv := Button.new()
@@ -1256,6 +1260,7 @@ func build(game) -> void:
 	# sitting flush against it ("glued to the bottom menu") — still just
 	# repositioning this one overlay, not a size or budget change.
 	army_band.position = Vector2(0, deck_top - ARMY_BAND_H - ARMY_BAND_MARGIN)
+	_band_rest_y = army_band.position.y
 	army_band.custom_minimum_size = Vector2(vp.x, ARMY_BAND_H)
 	add_child(army_band)
 	# Inventory's drawer panel occupies this SAME rect when open (both are
@@ -1650,6 +1655,7 @@ const TICK_S := 0.25 ## Wave/Turn digit flip
 const SPEND_FLASH_S := 0.3 ## Gold row flashes red on a spend
 const DRAIN_S := 0.2 ## PASS count refills from the bottom after an Action
 const SHAKE_S := 0.24 ## PASS shakes when the last Action goes
+const PASS_FACE_S := 0.12 ## NO-243 S4 row 36: PASS/START/MUST ACT cross-fade
 const ROW_SLIDE_S := 0.2 ## Turn/Wave row re-centres
 const COL_SPEND := Color(1.0, 0.35, 0.35)
 const COL_TICK := Color(1.6, 1.45, 0.8)
@@ -1974,7 +1980,63 @@ func update_clock(ms: float) -> void:
 func collapse_army_band() -> void:
 	army_band_open = false
 	army_band.visible = false
+	# NO-243 S4 row 38: the close stays instant — the Inventory drawer opens
+	# into this same rect in the same tap (NO-128), so the band must be gone
+	# at once rather than sliding out underneath it.
+	_hud_tween("band", false)
+	army_band.position.y = _band_rest_y
 	_update_band_toggle()
+
+
+## NO-243 S4 row 38: the band rises out from behind the deck (it sits just
+## before the deck in draw order) on the drawers' slide. Input is never
+## blocked: the band is click-through apart from its own two buttons.
+func _slide_band_in() -> void:
+	army_band.position.y = _band_rest_y
+	var tw := _hud_tween("band")
+	if tw == null:
+		return
+	army_band.position.y = _band_rest_y + ARMY_BAND_H + ARMY_BAND_MARGIN
+	tw.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(army_band, "position:y", _band_rest_y, Tuning.PANEL_SLIDE_S)
+
+
+## NO-243 S4 row 17: a King Power bit, or a new King Ability came into
+## force — the ⚠ toggle and the ⚠ chip flash amber twice.
+const WARN_PULSE_S := 0.3
+const COL_WARN_PULSE := Color(1.8, 1.4, 0.5)
+func pulse_warn() -> void:
+	army_band_reopen.self_modulate = Color.WHITE
+	king_ability_button.self_modulate = Color.WHITE
+	var tw := _hud_tween("warn")
+	if tw == null:
+		return
+	for leg in [COL_WARN_PULSE, Color.WHITE, COL_WARN_PULSE, Color.WHITE]:
+		tw.tween_property(army_band_reopen, "self_modulate", leg, WARN_PULSE_S / 4.0)
+		tw.parallel().tween_property(king_ability_button, "self_modulate", leg, WARN_PULSE_S / 4.0)
+
+
+## NO-243 S4 row 41: the Shop's first stock lands — its button glows once.
+func glow_shop() -> void:
+	UiAnim.glow(g, shop_button, Color(1.0, 0.8, 0.3))
+
+
+## NO-243 S4 row 57: a Stock stack lifts under the finger as a drag starts,
+## and settles when it is released. Bound to the button, so a rebuild that
+## frees it takes the tween along; a grid re-sort just snaps it to rest.
+const LIFT_S := 0.08
+const LIFT_SCALE := 1.1
+func _lift(btn: Control, up: bool) -> void:
+	if btn.has_meta("lift_tw"):
+		(btn.get_meta("lift_tw") as Tween).kill()
+		btn.remove_meta("lift_tw")
+	btn.pivot_offset = btn.size / 2.0
+	if not up or g.autoplay or not g.animations_on:
+		btn.scale = Vector2.ONE
+		return
+	var tw := btn.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(btn, "scale", Vector2(LIFT_SCALE, LIFT_SCALE), LIFT_S)
+	btn.set_meta("lift_tw", tw)
 
 
 ## NO-163: the single toggle button's glyph/tooltip, kept in one place so
@@ -2101,6 +2163,11 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 	tip_diagram.visible = diagram_id != ""
 	tip_diagram.queue_redraw()
 	tip_panel.visible = true
+	tip_panel.modulate.a = 1.0
+	var tip_tw := _hud_tween("tip") # NO-243 S4 row 40: fades in (no rise: the
+	if tip_tw != null: # panel's rect is its clamp, and probes measure it)
+		tip_panel.modulate.a = 0.0
+		tip_tw.tween_property(tip_panel, "modulate:a", 1.0, TIP_FADE_S)
 	var vp: Vector2 = g.get_viewport_rect().size
 	# NO-152 follow-up (Max: "center name and infos with diagram, slim the
 	# sides down to the diagram width"): with a diagram, the label wraps to
@@ -2146,9 +2213,12 @@ func show_tip(key: String, text: String, anchor: Rect2, diagram_id := "") -> voi
 		maxf(TIP_MARGIN, minf(y, bottom_limit - box.y)))
 
 
+const TIP_FADE_S := 0.08 # NO-243 S4 row 40
 func hide_tip() -> void:
 	tip_key = ""
 	if tip_panel != null:
+		_hud_tween("tip", false)
+		tip_panel.modulate.a = 1.0
 		tip_panel.visible = false
 
 
@@ -2317,6 +2387,15 @@ func refresh() -> void:
 		pass_button.disabled = false
 		pass_button.tooltip_text = ""
 		pass_count.text = ""
+	# NO-243 S4 row 36: PASS / START / MUST ACT cross-fade instead of snapping
+	var pass_face := "%s|%s|%s" % [pass_button.text, pass_label.text, pass_button.disabled]
+	if seen and pass_face != _pass_face_shown:
+		pass_button.modulate.a = 1.0
+		var face_tw := _hud_tween("pass_face")
+		if face_tw != null:
+			pass_button.modulate.a = 0.25
+			face_tw.tween_property(pass_button, "modulate:a", 1.0, PASS_FACE_S)
+	_pass_face_shown = pass_face
 	# NO-243 row 34: an Action spent drains the count; the last one shakes PASS
 	if seen and g.actions_left < _actions_shown:
 		_drain_pass(g.actions_left == 0)
@@ -2331,6 +2410,9 @@ func refresh() -> void:
 		+ (0 if Kings.bespoke_power(g).is_empty() else 1)
 	king_ability_button.text = "⚠%d" % abilities_in_force \
 		+ ("·off" if g.king_abilities_suppressed else "")
+	if seen and abilities_in_force > _abilities_shown: # NO-243 S4 row 17
+		pulse_warn()
+	_abilities_shown = abilities_in_force
 	# NO-128: shown in army_band only while an ability is active — the button
 	# lived off-screen (built, never parented) before this; now it's parented
 	# but hidden the rest of the time.
@@ -3288,7 +3370,10 @@ func _new_stack_button(id: String, cap: bool) -> Button:
 			stack_preview_requested.emit(id, cap, btn.get_meta("entry"))))
 	btn.button_down.connect(func() -> void:
 		_armed_key = btn.get_meta("key")
+		if not cap: # NO-243 S4 row 57: only a Stock stack drags (Captured does not)
+			_lift(btn, true)
 		stack_drag_started.emit(btn.get_meta("entry"), cap))
+	btn.button_up.connect(func() -> void: _lift(btn, false))
 	# NO-45: PASS here too, and this is the one strip where it is a JUDGEMENT
 	# rather than a straight win. These buttons are drag SOURCES — button_down
 	# arms a deploy — so a press now also reaches the ScrollContainer and can

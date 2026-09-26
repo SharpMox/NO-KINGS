@@ -386,6 +386,37 @@ func _init() -> void:
 				"%s: the scroll's own bottom edge sits at or above the buttons' top — they never overlap (%.1f vs %.1f)"
 					% [screen, end_scroll.get_global_rect().end.y,
 						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
+			# Max, 9th review (Aux's capture at e296e12): the banner's left
+			# edge sat flush with the screen while the mass was centred — the
+			# banner painted with `mass`'s pre-sort (still 0) local x, because
+			# `mass`'s SHRINK_CENTER re-centring is a position-only Container
+			# sort that never fired `section`'s own `resized`. Fixed by also
+			# redrawing on `mass.resized`/`mass.item_rect_changed`; these
+			# check the actually-settled result, both against the mass's own
+			# centre and against the viewport's.
+			var mass_rect := mass_ctrl.get_global_rect()
+			var mass_center_x: float = mass_rect.get_center().x
+			var bx_global: float = mass_rect.position.x - Modals.CASUALTY_BANNER_MARGIN_X
+			var banner_center_x: float = bx_global + banner_w * 0.5
+			var viewport_center_x: float = g.get_viewport_rect().size.x * 0.5
+			check(absf(banner_center_x - mass_center_x) <= 1.0,
+				"%s: the banner's horizontal centre matches the mass's own (%.1f vs %.1f)"
+					% [screen, banner_center_x, mass_center_x])
+			check(absf(banner_center_x - viewport_center_x) <= 1.0,
+				"%s: the banner's horizontal centre matches the viewport's own (%.1f vs %.1f)"
+					% [screen, banner_center_x, viewport_center_x])
+			var banner_left: float = bx_global
+			var banner_right: float = bx_global + banner_w
+			var all_inside := true
+			var outside_id := ""
+			for t in icons:
+				var piece_rect: Rect2 = (t as Control).get_global_rect()
+				if piece_rect.position.x < banner_left - 0.5 or piece_rect.end.x > banner_right + 0.5:
+					all_inside = false
+					outside_id = str((t as Control).get_meta("id"))
+			check(all_inside,
+				"%s: every piece's rect lies horizontally inside the banner (offender: %s, [%.1f, %.1f])"
+					% [screen, outside_id, banner_left, banner_right])
 			# --scroll-bottom (tools/capture.md): the exact state Aux's capture
 			# judges. Nothing new needs to sync here (unlike the dropped
 			# `top_level` design) — `section` is an ordinary scrolled

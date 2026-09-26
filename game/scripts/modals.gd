@@ -615,11 +615,22 @@ func _add_casualty_banner(section: VBoxContainer, mass: Control) -> void:
 		section.draw_rect(Rect2(bx - rod_x, -CASUALTY_BANNER_ROD_HEIGHT * 0.5,
 			banner_w + rod_x * 2.0, CASUALTY_BANNER_ROD_HEIGHT), CASUALTY_BANNER_BORDER_COLOR)
 	section.draw.connect(draw_banner)
-	section.resized.connect(section.queue_redraw) # any later resort (the
-		# scrollbar case above, a window/orientation resize) changes
-		# `section`'s own size — each refires this, and `draw_banner` reads
-		# `mass`'s position/size live, so redrawing is all a resize needs
-	section.queue_redraw() # the initial paint
+	section.resized.connect(section.queue_redraw) # a window/orientation resize
+	# Max, 2026-09-26 (8th review, Aux's capture at e296e12): `mass`'s
+	# SHRINK_CENTER re-centring inside the wider `section` (the fix for the
+	# 7th review's crop/clip bugs above) is a Container SORT — it moves
+	# `mass.position` without changing `mass.size` OR `section`'s own size, so
+	# neither `resized` above nor a plain `queue_redraw()` at build time (when
+	# `mass.position.x` is still its pre-sort default) ever re-fires once the
+	# real centred position lands a frame or more later. `item_rect_changed`
+	# (CanvasItem, inherited by Control) is the one signal both engine docs
+	# and this engine's own source fire on a POSITION-only change; `resized`
+	# is kept alongside it for the SIZE-only case (belt and braces — a
+	# scrollbar changing `mass`'s own custom_minimum_size).
+	mass.resized.connect(section.queue_redraw)
+	mass.item_rect_changed.connect(section.queue_redraw)
+	section.queue_redraw() # the initial paint — superseded by the above once
+		# the real post-sort position lands
 
 
 ## The end screen's reveal (#590), with the Casualties section held back until

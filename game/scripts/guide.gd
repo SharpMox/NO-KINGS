@@ -58,6 +58,7 @@ const Tuning := preload("res://scripts/tuning.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd")
 const ItemLogic := preload("res://scripts/item_logic.gd")
 const Settings := preload("res://scripts/settings.gd")
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4: the hub <-> page push
 
 ## Marks a tappable list row's Button (NO-242), so `row_buttons()` can find them.
 const ROW_META := "guide_row"
@@ -119,7 +120,8 @@ static func build(layer: Node, on_back: Callable, board) -> Control:
 		btn.text = title
 		btn.pressed.connect(func() -> void:
 			hub_scroll.visible = false
-			page.visible = true)
+			page.visible = true
+			SceneFade.push(page, 1.0)) # NO-243 S4 row 64
 		hub_box.add_child(btn)
 
 	# Max ruling 2026-09-24 (isolated dismiss): Back leaves the Guide
@@ -249,6 +251,7 @@ static func _page(root: Control, hub_scroll: Control, title: String, fill_rows: 
 	var go_hub := func() -> void:
 		scroll.visible = false
 		hub_scroll.visible = true
+		SceneFade.push(hub_scroll, -1.0) # NO-243 S4 row 64
 	var head_row := HBoxContainer.new()
 	head_row.add_theme_constant_override("separation", 8)
 	box.add_child(head_row)
@@ -914,6 +917,7 @@ class GuideRoot extends Control:
 			if page.visible:
 				page.visible = false
 				hub_scroll.visible = true
+				SceneFade.push(hub_scroll, -1.0) # NO-243 S4 row 64
 				return true
 		return false
 

@@ -131,6 +131,11 @@ func _ready() -> void:
 	#
 	# _begin_loop is idempotent, so a normal playthrough just finds it already run.
 	get_tree().create_timer(INTRO_MAX_SECONDS).timeout.connect(_begin_loop)
+	# Debug (tools/capture.md): --menu-demo taps through the intro on its own,
+	# so a Movie Maker capture records the Intro -> Menu fade (NO-243 S4 row 61).
+	if OS.get_cmdline_user_args().has("--menu-demo"):
+		get_tree().create_timer(1.0).timeout.connect(_begin_loop)
+		get_tree().create_timer(2.0).timeout.connect(_advance)
 
 
 ## A tap during the intro SKIPS to the loop rather than to the menu. The point

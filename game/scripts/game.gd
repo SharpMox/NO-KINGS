@@ -31,6 +31,7 @@ const Armies := preload("res://scripts/armies.gd")
 const HudScript := preload("res://scripts/hud.gd") # HEADER_H feeds the board solve (NO-83)
 const Ads := preload("res://scripts/ads.gd") # NO-241: the one rewarded-ad seam
 const UiDemo := preload("res://scripts/ui_demo.gd") # debug: --ui-demo videos
+const UiAnim := preload("res://scripts/ui_anim.gd") # NO-243 S4: the sell coin float
 const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4: every scene change
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
@@ -203,6 +204,18 @@ const SHAKE_PX := 6.0 # NO-243: board shake (King landing / fall, explosions)
 const SHAKE_TIME := 0.3
 const BADGE_TIME := 0.25 # NO-243: a buff badge popping in / fading out
 const COL_GOLD_FX := Color(1.0, 0.8, 0.3) # NO-243: King arrival / fall
+# NO-243 S4 (audit rows 1, 12, 18, 21-23, 29): board polish, all on the anims queue
+const LAND_TIME := 0.12 # a player move's landing squash, after its slide
+const LAND_SQUASH := 0.12
+const FLIP_TIME := 0.3 # Invert: the token turns edge-on and back as the other side
+const DOME_TIME := 0.5 # Iron Dome: a shimmer over the King's tile
+const COL_DOME := Color(0.6, 0.8, 1.0)
+const HINT_FADE_TIME := 0.08 # move/capture/merge hints fade in on a new selection
+const ZONE_FADE_TIME := 0.1 # an armed Item's zone fades in...
+const HATCH_SCROLL_PX := 10.0 # ...and its hatch drifts, px/s, while armed
+const RIPPLE_TIME := 0.3 # deploy targets ripple in row by row
+const SPENT_TIME := 0.15 # a piece that acted greys out
+const COL_SPENT := Color(0.75, 0.75, 0.75)
 
 # NO-129: reachable-zone outline, a steadier selection ring, and larger/
 # semi-transparent move+capture indicators — a spread of legal moves read as
@@ -623,7 +636,11 @@ var pending_bounty_boxes := 0 # Bounty Piece Buff (issue 48), ally half: how
 	# queued the same Enemy Turn wait for a later Turn rather than chaining.
 	# The enemy half (you capture the carrier) never touches this — it opens
 	# _open_bounty_pick() immediately, same Turn, since that's already safe.
-var selected := Vector2i(-1, -1) # selected board piece
+var selected := Vector2i(-1, -1): # selected board piece
+	set(v): # NO-243 S4 row 21: a new selection's hints fade in
+		if v != selected and v.x >= 0:
+			_add_fade("hint", HINT_FADE_TIME)
+		selected = v
 var legal_dests: Array[Vector2i] = []
 var legal_paths: Array[Dictionary] = [] # shape-annotated dests (dots/arrows/links)
 var magic_bullet_dests: Array[Vector2i] = [] # NO-250: legal_dests reached only
@@ -663,12 +680,21 @@ var _swipe_from := Vector2.ZERO
 var _swipe_eligible := false
 var pool_click_key := "" # double-tap detection on pool stacks (piece preview)
 var pool_click_ms := 0
-var pool_drag_id := "" # stock piece mid-drag from the strip (game-feel pass)
+var pool_drag_id := "": # stock piece mid-drag from the strip (game-feel pass)
+	set(v): # NO-243 S4 row 22: the deploy targets ripple in as a drag starts
+		if v != "" and pool_drag_id == "" and placing_id == "":
+			_add_fade("ripple", RIPPLE_TIME)
+		pool_drag_id = v
 var armed_entry: Variant = "" # the exact Stock entry behind placing_id /
 	# pool_drag_id: a bare id String or {id + state} Dictionary (ADR-0002).
 	# Only read while one of those is armed, so no reset bookkeeping.
 var preview_open := false
-var placing_id := ""  # stock piece id being placed, "" = none
+var placing_id := "":  # stock piece id being placed, "" = none
+	set(v): # NO-243 S4 row 22: ...or as a piece is armed (not again when a
+		# tap's release arms the piece its press already rippled in)
+		if v != "" and placing_id == "" and pool_drag_id == "" and _fade_of("ripple") >= 1.0:
+			_add_fade("ripple", RIPPLE_TIME)
+		placing_id = v
 var drawer_autoclosed := "" # drawer the current drag closed; reopens on cancel
 # NO-236: drags from the Stock and Inventory drawers. A drag is "live" only
 # once the pointer travels past DRAWER_SCROLL_DEADZONE from its press, so a
@@ -733,7 +759,12 @@ var score_gained_total := 0 # run-long cumulative Score GAINED (issue 49,
 	# dispatch, so it only ever goes up even though g.score itself can drop
 	# (Templar Debit Card pays Shop purchases in Score). "Gained, not
 	# current" per the spec: spending must never un-trigger the threshold.
-var item_active := -1 # items[] index being targeted, -1 = none
+var item_active := -1: # items[] index being targeted, -1 = none
+	set(v): # NO-243 S4 row 23: the armed Item's zone fades in
+		if v != item_active and v >= 0:
+			_add_fade("zone", ZONE_FADE_TIME)
+		item_active = v
+var _hatch_phase := 0.0 # NO-243 S4 row 23: the armed zone's hatch drift
 var item_stage_a := Vector2i(-1, -1) # first pick of a "pair" item
 var item_targets: Array[Vector2i] = [] # valid target tiles for the active item
 var item_selected: Array[Vector2i] = [] # toggled picks of a "multi" item
@@ -1505,6 +1536,9 @@ func _process(delta: float) -> void:
 		hud.update_clock(clock_ms) # NO-127: routes through hud.gd's shared seam
 		if autoplay:
 			AutoplayBot.step(self)
+	if item_active >= 0 and not autoplay and animations_on: # NO-243 S4 row 23
+		_hatch_phase = fposmod(_hatch_phase + delta * HATCH_SCROLL_PX, HATCH_SPACING)
+		queue_redraw()
 	if not anims.is_empty():
 		for a in anims:
 			a.t += delta / a.get("dur", ANIM_TIME)
@@ -1525,6 +1559,7 @@ func _process(delta: float) -> void:
 const BANNER_FONT := preload("res://assets/fonts/PixelOperator-Bold.ttf")
 const BANNER_FONT_SIZE := 32
 const BANNER_STRIPE_H := 3.0
+const HEAVY_BANNER_TIME := 1.6 # NO-243 S4 row 27: the King-wave banner holds longer
 
 var _banner_font: FontFile ## set up once on first use, never per-frame in _draw
 
@@ -1571,7 +1606,7 @@ func _banner_rect(t: float, slot: int) -> Rect2:
 ## pass it explicitly when the text carries a per-call number that should
 ## not split the count. This is the one place every banner site inherits
 ## the policy from — tune it here, never per site.
-func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
+func _add_turn_fx(text: String, color: Color, cause: String = "", heavy := false) -> void:
 	if autoplay or not animations_on:
 		return
 	if cause == "":
@@ -1587,6 +1622,11 @@ func _add_turn_fx(text: String, color: Color, cause: String = "") -> void:
 	anims.append({"kind": "outline", "t": 0.0, "dur": 0.6, "color": color})
 	anims.append({"kind": "banner", "t": 0.0, "dur": 1.1, "text": text,
 		"base_text": text, "cause": cause, "count": 1, "color": color, "slot": slot})
+	if heavy: # NO-243 S4 row 27: a King wave — thick stripes, a darker band,
+		# held longer, and the board shakes as it lands
+		anims[-1].heavy = true
+		anims[-1].dur = HEAVY_BANNER_TIME
+		_add_shake(0.15)
 	queue_redraw()
 
 
@@ -2027,6 +2067,60 @@ func _add_flash(at: Vector2i, color: Color, dur: float, delay := 0.0) -> void:
 	anims.append({"kind": "flash", "at": at, "color": color, "t": -delay / dur, "dur": dur})
 
 
+## NO-243 S4: a board overlay fading in — `kind` "hint" (selection hints,
+## row 21), "zone" (an armed Item's zone, row 23) or "ripple" (deploy
+## targets, row 22). _draw reads its progress through _fade_of; while it
+## runs the anim queue redraws the board every frame. A repeat restarts it.
+func _add_fade(kind: String, dur: float) -> void:
+	if autoplay or not animations_on or not is_node_ready():
+		return
+	anims = anims.filter(func(a: Dictionary) -> bool: return a.kind != kind)
+	anims.append({"kind": kind, "t": 0.0, "dur": dur})
+	queue_redraw()
+
+
+## 0..1 progress of the running `kind` fade; 1.0 when none runs.
+func _fade_of(kind: String) -> float:
+	for a in anims:
+		if a.kind == kind:
+			return clampf(a.t, 0.0, 1.0)
+	return 1.0
+
+
+## NO-243 S4 row 1: the piece a player move put on `at` squashes as it lands,
+## after its slide (`delay`). Row 29: then it greys out (SPENT_TIME).
+func _add_land(at: Vector2i, delay := ANIM_TIME) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "land", "to": at, "t": -delay / LAND_TIME, "dur": LAND_TIME})
+	_add_spent(at, delay + LAND_TIME)
+
+
+## NO-243 S4 row 29: the piece on `at` greys to the spent tint over
+## SPENT_TIME, `delay` seconds from now (instead of snapping to it).
+func _add_spent(at: Vector2i, delay := 0.0) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "spent", "at": at, "t": -delay / SPENT_TIME, "dur": SPENT_TIME})
+
+
+## NO-243 S4 row 12: Invert — `before` (the piece as it was) turns edge-on,
+## and the inverted piece now on `at` turns back out.
+func _add_flip(at: Vector2i, before: Dictionary) -> void:
+	if autoplay or not animations_on:
+		return
+	anims.append({"kind": "flip", "to": at, "before": before, "t": 0.0, "dur": FLIP_TIME})
+	queue_redraw()
+
+
+## NO-243 S4 row 18: Iron Dome refused a capture — a shimmer over the King.
+func _add_dome(at: Vector2i) -> void:
+	if autoplay or not animations_on or at.x < 0:
+		return
+	anims.append({"kind": "dome", "at": at, "t": 0.0, "dur": DOME_TIME})
+	queue_redraw()
+
+
 ## NO-243: the board shakes for SHAKE_TIME, starting `delay` seconds from now.
 ## _process moves this whole node; the HUD is a CanvasLayer, so it stays put.
 func _add_shake(delay := 0.0) -> void:
@@ -2219,11 +2313,13 @@ func _draw_banners() -> void:
 		if br.size.x <= 0.0:
 			continue # not emerged yet
 		var alpha: float = minf(1.0, 4.0 * (1.0 - a.t))
-		_banner_layer.draw_rect(br, Color(0.06, 0.06, 0.09, 0.78 * alpha))
+		var heavy: bool = a.get("heavy", false) # NO-243 S4 row 27
+		_banner_layer.draw_rect(br, Color(0.06, 0.06, 0.09, (0.92 if heavy else 0.78) * alpha))
 		# NO-219: top/bottom stripes, clipped to br so the wipe reveals them
 		# with the band rather than them appearing instantly at full width.
-		_banner_layer.draw_rect(Rect2(br.position, Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
-		_banner_layer.draw_rect(Rect2(Vector2(br.position.x, br.end.y - BANNER_STRIPE_H), Vector2(br.size.x, BANNER_STRIPE_H)), Color(a.color, alpha))
+		var stripe := BANNER_STRIPE_H * (3.0 if heavy else 1.0)
+		_banner_layer.draw_rect(Rect2(br.position, Vector2(br.size.x, stripe)), Color(a.color, alpha))
+		_banner_layer.draw_rect(Rect2(Vector2(br.position.x, br.end.y - stripe), Vector2(br.size.x, stripe)), Color(a.color, alpha))
 		if _banner_font == null: # set up once, never per-frame
 			_banner_font = BANNER_FONT
 			# hard pixel edges: no smoothing, hinting or sub-pixel offsets
@@ -3505,6 +3601,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 			actions_left -= 1
 		_log_action("capture") # blocked attack — still an attempt against a piece
 		moved_this_turn.append(from)
+		_add_spent(from) # NO-243 S4 row 29
 		board[from].moved_wave = wave # Alien Pet Rocks (issue 53): an Action was
 			# spent on this attempt, same "moved" idiom as moved_this_turn above
 		_clear_selection()
@@ -3727,6 +3824,7 @@ func _move_player(from: Vector2i, to: Vector2i) -> void:
 		# reposition the piece after landing; a replay must find it where it
 		# actually ended up, not the tile it only passed through
 	moved_this_turn.append(final_pos)
+	_add_land(final_pos) # NO-243 S4 rows 1/29: squash, then grey out
 	board[final_pos].moved_wave = wave # Alien Pet Rocks (issue 53): an Action
 		# was spent moving/capturing — a Deploy or an effect-driven shove
 		# (Tactical Reposition/Decoy Swap/Rapid Deployment, all resolved
@@ -3777,7 +3875,8 @@ func _king_down(defeated_id := "") -> bool:
 	if Kings.power_is(self, "dome"):
 		for pos in board:
 			if board[pos].owner == Rules.ENEMY and board[pos].get("id", "") != "king":
-				_add_turn_fx("Iron Dome holds", Color(0.6, 0.8, 1.0))
+				_add_turn_fx("Iron Dome holds", COL_DOME)
+				_add_dome(Rules.find_king(board, Rules.ENEMY)) # NO-243 S4 row 18
 				return false
 	kings_defeated += 1
 	fx_at = Vector2(hud.wave_label.get_global_rect().get_center())
@@ -4315,6 +4414,7 @@ func _item_apply(it: Dictionary, a: Vector2i, b: Vector2i) -> void:
 			ArtefactHooks.run(self, "on_rank_up",
 				{"pos": b, "old_id": old_id, "id": board[b].id})
 		"invert":
+			_add_flip(b, board[b].duplicate(true)) # NO-243 S4 row 12
 			board[b].id = "inv-" + board[b].id
 		"air_strike", "sniper":
 			if it.key == "air_strike":
@@ -5632,6 +5732,9 @@ func _debug_show_screen(screen: String, args: PackedStringArray) -> void:
 					"last": actions_left = 0 # 34: PASS shakes
 				_refresh()
 				await get_tree().create_timer(0.6).timeout
+		"s4-hud": # NO-243 S4 HUD/modal polish, one after another, for --write-movie
+			animations_on = true
+			await _debug_s4_hud()
 		"setup":
 			_debug_enter_setup()
 			await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
@@ -5715,10 +5818,74 @@ func _debug_anim(anim: String) -> void:
 			_apply_buff(board[Vector2i(2, 1)], "shield", 0, Vector2i(2, 1))
 			await get_tree().create_timer(0.6).timeout
 			_consume_buff(Vector2i(2, 1), "shield")
+		"land": # S4 rows 1/29: a Rook slides, squashes as it lands, greys out
+			for y in range(3, 7):
+				board.erase(Vector2i(3, y))
+			board[Vector2i(3, 3)] = {"id": "rook", "owner": Rules.PLAYER}
+			actions_left = maxi(actions_left, 2)
+			_move_player(Vector2i(3, 3), Vector2i(3, 6))
+		"flip": # S4 row 12: Invert turns the token edge-on and back as its inverse
+			board[Vector2i(4, 4)] = {"id": "sergeant", "owner": Rules.PLAYER}
+			_add_flip(Vector2i(4, 4), board[Vector2i(4, 4)].duplicate(true))
+			board[Vector2i(4, 4)].id = "inv-sergeant"
+		"dome": # S4 row 18: Iron Dome refuses the capture — a shimmer on the King
+			board[Vector2i(4, 8)] = {"id": "king", "owner": Rules.ENEMY}
+			_add_turn_fx("Iron Dome holds", COL_DOME)
+			_add_dome(Vector2i(4, 8))
+		"ripple": # S4 row 22: a Stock piece armed, its deploy targets ripple in
+			if not stock.is_empty():
+				_on_stack_pressed(stock[0], false)
+		"king-wave": # S4 row 27: the heavier King-wave banner (thick stripes, shake)
+			_add_turn_fx("KING WAVE: %s" % _king_name(), COL_GOLD_FX, "", true)
 		_:
 			printerr("--show-screen anim:%s: no such animation" % anim)
 	queue_redraw()
 	await get_tree().create_timer(1.0).timeout
+
+
+## NO-243 S4: `--show-screen s4-hud` plays the HUD and modal polish rows one
+## after another, 0.8 s apart, through the calls the game makes: 41 Shop
+## glow, 38 band slide, 17 ⚠ pulse, 40 tooltip fade, 36 PASS/START
+## cross-fade, 57 Stock lift, 52 sale coin, 50 reinforcements drop-in and
+## fly-to-Stock, 51 King Abilities scale-in.
+const S4_DEMO_PAUSE := 0.8
+func _debug_s4_hud() -> void:
+	hud.glow_shop()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	hud.collapse_army_band()
+	hud.army_band_reopen.pressed.emit()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	hud.pulse_warn()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	hud.show_tip("s4", "A tooltip fades in", Rect2(Vector2(40, 300), Vector2(120, 40)))
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	hud.hide_tip()
+	state = State.SETUP
+	_refresh()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	state = State.PLAYER_TURN
+	_refresh()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	if hud.drawer_open != "stock":
+		_set_drawer("stock")
+	await get_tree().create_timer(Tuning.PANEL_SLIDE_S).timeout
+	var stacks: Array = pool_box.filter(func(b: Node) -> bool:
+		return b is Button and b.has_meta("id") and not b.is_queued_for_deletion())
+	if not stacks.is_empty():
+		hud._lift(stacks[0], true)
+		await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+		hud._lift(stacks[0], false)
+	_set_drawer("")
+	_coin_to_gold(25)
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	modals.show_reinforce(["pawn", "knight", "bishop", "rook"])
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	for b in modals.reinforce_panel.find_children("*", "Button", true, false):
+		if (b as Button).text == "Dismiss":
+			(b as Button).pressed.emit()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
+	modals.show_king_abilities()
+	await get_tree().create_timer(S4_DEMO_PAUSE).timeout
 
 
 ## A fresh run's opening state, from a scenario boot: the Army's full Stock,
@@ -5784,6 +5951,7 @@ func _draw() -> void:
 		BOARD_OUTLINE_WIDTH)
 	var recon: bool = selected.x >= 0 and board.has(selected) \
 			and board[selected].owner == Rules.ENEMY
+	var ha := _fade_of("hint") # NO-243 S4 row 21: a new selection's hints fade in
 	if selected.x >= 0: # enemy recon selections tint red, own selections blue
 		draw_rect(Rect2(_tile_px(selected), Vector2(tile, tile)),
 			Color(COL_CAPTURE, 0.3) if recon else COL_SELECT)
@@ -5822,7 +5990,7 @@ func _draw() -> void:
 			# rather than layering hatch on top, so captures read as the red
 			# twin of the blue move hatch below, not a heavier, differently
 			# styled tile.
-			_draw_hatch(d_rect, Color(COL_CAPTURE, HATCH_ALPHA))
+			_draw_hatch(d_rect, Color(COL_CAPTURE, HATCH_ALPHA * ha))
 			capture_dests.append(d)
 		else: # NO-184: move destination — a hatch fill, parity with the red
 			# bomb/Item zone below (previously outline-only). Recon zones stay
@@ -5832,7 +6000,7 @@ func _draw() -> void:
 			# coincident red bomb/Item hatch interleaves instead of stacking
 			# (Max's ruling — an offset, not a second direction).
 			_draw_hatch(d_rect,
-				Color(COL_ENEMY, HATCH_ALPHA) if recon else Color(COL_ZONE_OUTLINE_MOVE, HATCH_ALPHA),
+				Color(COL_ENEMY, HATCH_ALPHA * ha) if recon else Color(COL_ZONE_OUTLINE_MOVE, HATCH_ALPHA * ha),
 				false, 0.0 if recon else HATCH_BLUE_PHASE)
 	# NO-129: one outline around the whole reachable zone, so a spread of
 	# move/capture squares reads as a shape rather than each square drawn on
@@ -5883,13 +6051,14 @@ func _draw() -> void:
 							if not bridge_ok.has(pb):
 								bridge_ok[pb] = {}
 							bridge_ok[pb][pa] = true
-		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA) if recon \
-				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA),
+		_draw_zone_outline(legal_dests, Color(COL_ENEMY, ZONE_OUTLINE_ALPHA * ha) if recon \
+				else Color(COL_ZONE_OUTLINE_MOVE, ZONE_OUTLINE_ALPHA * ha),
 			ZONE_OUTLINE_WIDTH, no_captures if recon else capture_dests, arrowed, bridge_ok)
 	_draw_target_zone(_bomb_highlight_tiles()) # NO-122/176 hatch, NO-130
 		# shared — drawn after the zone outline above (see NO-176 comment)
 	if item_active >= 0: # item targeting: same zone indicator as the bomb
-		_draw_target_zone(item_targets) # NO-130: "what this will affect"
+		_draw_target_zone(item_targets, _fade_of("zone"), _hatch_phase) # NO-130: "what
+			# this will affect"; NO-243 S4 row 23: fades in, and drifts while armed
 		if item_stage_a.x >= 0:
 			draw_rect(Rect2(_tile_px(item_stage_a), Vector2(tile, tile)), COL_SELECT)
 		for s in item_selected: # multi picks fill like the stage-A tile
@@ -5905,7 +6074,7 @@ func _draw() -> void:
 	if state == State.SETUP or legal_paths.is_empty():
 		for d in legal_dests: # setup relocation / placement targets: plain dots
 			if not board.has(d):
-				draw_circle(_tile_px(d) + half, 8, COL_PLACE)
+				draw_circle(_tile_px(d) + half, 8, Color(COL_PLACE, COL_PLACE.a * ha))
 	else:
 		# movement by shape: rides = arrows, bent rides / hop-riders = dots
 		# linked by a line (game-feel 2026-07-07). NO-183: a leap destination
@@ -5913,7 +6082,8 @@ func _draw() -> void:
 		# NO-184 hatch-fills every move tile in legal_dests (see the loop
 		# above); a bent/hop path keeps its linked dots because those trace
 		# the path's SHAPE, information the zone hatch doesn't carry.
-		var col := Color(COL_ENEMY, MOVE_INDICATOR_ALPHA) if recon else Color(COL_MOVE, MOVE_INDICATOR_ALPHA)
+		var col := Color(COL_ENEMY, MOVE_INDICATOR_ALPHA * ha) if recon \
+			else Color(COL_MOVE, MOVE_INDICATOR_ALPHA * ha)
 		for p in legal_paths:
 			match p.kind:
 				"ride":
@@ -5924,14 +6094,26 @@ func _draw() -> void:
 							_tile_px(p.line[-1]) + half, col)
 				"bent":
 					_draw_linked_dots(_tile_px(selected) + half, p.line, col)
-	for t in _deploy_highlight_tiles():
-		draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8, COL_PLACE)
+	var dep := _deploy_highlight_tiles()
+	var ripple := _fade_of("ripple") # NO-243 S4 row 22: the dots ripple in, row by row
+	var dep_y := Vector2i(Tuning.BOARD_H, -1) # lowest and highest row holding a dot
+	for t in dep:
+		dep_y = Vector2i(mini(dep_y.x, t.y), maxi(dep_y.y, t.y))
+	for t in dep:
+		var k := _ripple_k(ripple, t.y, dep_y)
+		if k > 0.0:
+			draw_circle(_tile_px(t) + Vector2(tile, tile) / 2, 8.0 * (0.4 + 0.6 * k),
+				Color(COL_PLACE, COL_PLACE.a * k))
 	var sliding := {} # tiles whose piece is mid-slide (drawn at the lerp instead)
 	var merge_targets := merge_target_tiles()
 	var now_s := Tuning.now_ms() / 1000.0
+	var spent := {} # NO-243 S4 row 29: tile -> 0..1 of its grey-out
 	for a in anims:
-		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge" or a.kind == "rankup": # the anim draws it
+		if a.kind == "move" or a.kind == "arrive" or a.kind == "merge" or a.kind == "rankup" \
+				or a.kind == "flip" or (a.kind == "land" and a.t >= 0.0): # the anim draws it
 			sliding[a.to] = a
+		elif a.kind == "spent":
+			spent[a.at] = clampf(a.t, 0.0, 1.0)
 		elif a.kind == "flash" and a.t >= 0.0: # NO-243: under the pieces
 			draw_rect(Rect2(_tile_px(a.at), Vector2(tile, tile)), Color(a.color, 0.5 * sin(PI * a.t)))
 	for pos in board:
@@ -5943,7 +6125,7 @@ func _draw() -> void:
 		if pos == drag_from:
 			tint.a = 0.35 # ghost follows the cursor instead
 		elif state == State.PLAYER_TURN and moved_this_turn.has(pos):
-			tint = Color(0.75, 0.75, 0.75) # spent this turn
+			tint = Color.WHITE.lerp(COL_SPENT, spent.get(pos, 1.0)) # spent this turn
 		if merge_targets.has(pos): # wiggles in place (static when animations are off)
 			var fx := merge_target_fx(pos, now_s)
 			_draw_piece_xf(font, p, px, Vector2.ONE, tint, fx.offset, fx.angle)
@@ -5974,6 +6156,16 @@ func _draw() -> void:
 			_draw_rankup(font, a)
 		elif a.kind == "badge":
 			_draw_badge_anim(font, a)
+		elif a.kind == "land" and board.has(a.to): # NO-243 S4 row 1
+			var sq: float = LAND_SQUASH * sin(PI * a.t)
+			_draw_piece_xf(font, board[a.to], _tile_px(a.to), Vector2(1.0 + sq, 1.0 - sq),
+				Color.WHITE, Vector2(0, tile * sq * 0.5))
+		elif a.kind == "flip" and board.has(a.to): # NO-243 S4 row 12
+			var fp: Dictionary = a.before if a.t < 0.5 else board[a.to]
+			_draw_piece_xf(font, fp, _tile_px(a.to), Vector2(maxf(absf(cos(PI * a.t)), 0.02), 1.0),
+				Color.WHITE)
+		elif a.kind == "dome": # NO-243 S4 row 18
+			_draw_dome(a)
 		elif a.kind == "ghost": # NO-236: a refused Stock/Item drop flying home
 			draw_texture_rect(a.tex, Rect2(a.from_px.lerp(a.to_px, ease(a.t, 0.4)) - half,
 				Vector2(tile, tile)), false, Color(1, 1, 1, 0.85))
@@ -6022,7 +6214,7 @@ func _draw_drag_preview() -> void:
 ## same colour, one texture, one zone. Shared by the bomb blast preview and
 ## an armed Item's target zone: one indicator, one meaning, one place to
 ## change it.
-func _draw_target_zone(tiles: Array[Vector2i]) -> void:
+func _draw_target_zone(tiles: Array[Vector2i], alpha := 1.0, phase := 0.0) -> void:
 	if tiles.is_empty():
 		return
 	var seen := {} # tile -> true, so an overlap tile's own perimeter edges
@@ -6032,11 +6224,33 @@ func _draw_target_zone(tiles: Array[Vector2i]) -> void:
 		if not seen.has(pos):
 			seen[pos] = true
 			unique.append(pos)
-	var hatch_col := Color(COL_CAPTURE, HATCH_ALPHA)
+	var hatch_col := Color(COL_CAPTURE, HATCH_ALPHA * alpha)
 	for pos in unique:
 		var r := Rect2(_tile_px(pos), Vector2(tile, tile))
-		_draw_hatch(r, hatch_col) # NO-176: single hatch direction, not a wash
-	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA))
+		_draw_hatch(r, hatch_col, false, phase) # NO-176: single hatch direction, not a wash
+	_draw_zone_outline(unique, Color(COL_CAPTURE, ZONE_OUTLINE_ALPHA * alpha))
+
+
+## NO-243 S4 row 22: 0..1 how far the deploy dot on row `y` has rippled in,
+## `r` into the ripple; rows start 0.6 of the way apart, bottom row first.
+## `span` is (lowest, highest) row holding a dot.
+static func _ripple_k(r: float, y: int, span: Vector2i) -> float:
+	if r >= 1.0:
+		return 1.0
+	var start := 0.6 * float(y - span.x) / float(maxi(1, span.y - span.x))
+	return clampf((r - start) / 0.4, 0.0, 1.0)
+
+
+## NO-243 S4 row 18: Iron Dome's shimmer — a pale dome over the King's tile
+## with a glint sweeping once round its rim, fading out.
+func _draw_dome(a: Dictionary) -> void:
+	var c := _tile_px(a.at) + Vector2(tile, tile) / 2
+	var r := tile * 0.62
+	var fade: float = 1.0 - a.t
+	draw_circle(c, r, Color(COL_DOME, 0.22 * fade))
+	draw_arc(c, r, 0.0, TAU, 32, Color(COL_DOME, 0.9 * fade), 3.0)
+	var ang: float = -PI / 2.0 + TAU * a.t
+	draw_arc(c, r, ang - 0.35, ang + 0.35, 8, Color(1, 1, 1, fade), 4.0)
 
 
 ## NO-129: outlines the PERIMETER of a tile set as one shape — an edge is
@@ -6187,8 +6401,9 @@ func _draw_merge_fx() -> void:
 			continue # glyph-fallback piece: no silhouette to trace
 		var fx := merge_target_fx(pos, now_s)
 		var w: float = fx.width
-		mat.set_shader_parameter("rim_color", Color(fx.color, fx.alpha))
-		mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, fx.alpha))
+		var a: float = fx.alpha * _fade_of("hint") # NO-243 S4 row 21: fades in with the other hints
+		mat.set_shader_parameter("rim_color", Color(fx.color, a))
+		mat.set_shader_parameter("fill_color", Color(BUFF_BADGE_BG, a))
 		mat.set_shader_parameter("fill_reach", MERGE_TARGET_KEYLINE / size)
 		mat.set_shader_parameter("rim_reach", w / size)
 		var tex := piece_tex(p.id, p.owner)
@@ -6746,8 +6961,20 @@ func _confirm_sell(kind: String, entry: Variant, after: Callable) -> void:
 ## GDScript parse hazard, not just a style preference).
 func _sell_confirmed(kind: String, entry: Variant, after: Callable) -> void:
 	_cancel_targeting_for_sale(kind, entry)
+	var payout: int = Shop.sell_payout(self, kind, entry)
 	if _sell(kind, entry):
+		_coin_to_gold(payout) # NO-243 S4 row 52
 		after.call()
+
+
+## NO-243 S4 row 52: a sale's "+$N" floats from the confirm (where the tap
+## was) into the Gold counter.
+func _coin_to_gold(amount: int) -> void:
+	var at := get_viewport().get_mouse_position()
+	var ghost := UiAnim.fly_to(self, "+$%d" % amount, Rect2(at - Vector2(40, 16), Vector2(80, 32)),
+		hud.gold_label)
+	if ghost != null:
+		ghost.add_theme_color_override("font_color", Tuning.money_color(amount))
 
 
 ## NO-223 (Max ruling 2026-09-22): "selling mid target isn't an issue if we

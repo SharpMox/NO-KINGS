@@ -4,12 +4,16 @@ extends SceneTree
 ## the scene swaps as before); a forced fade still reaches the Menu and the
 ## Game and then removes itself; a second change during a fade is dropped;
 ## the black layer takes no input. (A real click during the fade-in is in
-## the windowed test_menu_clicks.gd — headless drops GUI picking.)
+## the windowed test_menu_clicks.gd — headless drops GUI picking.) Also rows
+## 63-65, the same module: Main Menu screens and Guide pages push in (right
+## going deeper, left on Back) and rest where they belong, the account prompt
+## fades in, and all of it is instant when not forced.
 ## Run headless:  godot --headless --path game -s tests/test_scene_fade.gd
 
 const SceneFade := preload("res://scripts/scene_fade.gd")
 const GameScript := preload("res://scripts/game.gd")
 const Account := preload("res://scripts/account.gd")
+const Guide := preload("res://scripts/guide.gd")
 
 const MENU := "res://scenes/Menu.tscn"
 const GAME := "res://scenes/Game.tscn"
@@ -40,6 +44,23 @@ func _wait_scene(path: String, cap := 120) -> int:
 		await process_frame
 		n += 1
 	return n
+
+
+func _find(node: Node, text: String) -> Button:
+	for b in node.find_children("*", "Button", true, false):
+		if (b as Button).text == text and (b as Button).is_visible_in_tree():
+			return b
+	return null
+
+
+## A tap, by the button's text (visible ones only).
+func _press(node: Node, text: String) -> void:
+	var b := _find(node, text)
+	if b == null:
+		push_error("FAIL: no visible button \"%s\"" % text)
+		fails += 1
+		return
+	b.pressed.emit()
 
 
 func _wait_gone(cap := 120) -> int:
@@ -101,7 +122,58 @@ func _init() -> void:
 	check(_on(MENU), "forced: Game -> Menu is reached (%d frames)" % frames)
 	await _wait_gone()
 	check(_layer() == null, "...and the layer is gone again")
+
+	# --- rows 63/64: Main Menu screens push in; Back pushes from the left ---
+	var menu: Node = current_scene
+	await process_frame
+	var sp: Control = menu.settings_panel
+	_press(menu, "Settings")
+	check(sp.visible and sp.position.x > 0.0, "63: Settings slides in from the right (x=%.0f)" % sp.position.x)
+	check(_find(menu, "← Back") != null, "63: ...and its Back is there at once")
+	await create_timer(0.4).timeout
+	check(is_equal_approx(sp.position.x, 0.0), "63: Settings rests at x=0 (%.1f)" % sp.position.x)
+	_press(menu, "← Back")
+	var main_mover: Control = menu.main_box.get_parent()
+	check(menu.main_box.visible and main_mover.position.x < 0.0,
+		"63: Back slides the main menu in from the left (x=%.0f)" % main_mover.position.x)
+	await create_timer(0.4).timeout
+	check(is_equal_approx(main_mover.position.x, 0.0), "63: the main menu rests at x=0")
+	_press(menu, "Guide")
+	await create_timer(0.4).timeout
+	_press(menu, "Rules")
+	var page: Control = null
+	for p in menu.guide_scroll.pages:
+		if (p as Control).visible:
+			page = p
+	# (moving a Control's position moves its offsets too, so the rest is read
+	# from the push itself, and pinned against the page's 30 px margin)
+	check(page != null and page.get_meta("push_rest", -1.0) == 30.0
+		and page.position.x > 30.0, "64: a Guide page slides in from the right")
+	await create_timer(0.4).timeout
+	check(page != null and is_equal_approx(page.position.x, 30.0),
+		"64: ...and rests at its 30 px margin")
+	Guide.go_back(menu.guide_scroll)
+	var hub: Control = menu.guide_scroll.hub_scroll
+	check(hub.visible and hub.position.x < 30.0, "64: Back slides the hub in from the left")
+	await create_timer(0.4).timeout
+	check(is_equal_approx(hub.position.x, 30.0), "64: the hub rests at its 30 px margin")
+	_press(menu, "← Back")
+	await create_timer(0.4).timeout
+
+	# --- row 65: the account prompt fades in ---
+	SceneFade.fade_in(menu.switch_prompt)
+	check(menu.switch_prompt.modulate.a < 1.0, "65: the prompt starts faded")
+	await create_timer(0.4).timeout
+	check(menu.switch_prompt.modulate.a == 1.0, "65: ...and ends opaque")
+
+	# --- and all of it is instant when not forced (tests, captures, anims off) ---
 	SceneFade.force = false
+	_press(menu, "Settings")
+	check(sp.visible and sp.position.x == 0.0, "63: unforced, Settings opens at rest")
+	_press(menu, "← Back")
+	check(main_mover.position.x == 0.0, "63: unforced, Back lands at rest")
+	SceneFade.fade_in(menu.switch_prompt)
+	check(menu.switch_prompt.modulate.a == 1.0, "65: unforced, the prompt is opaque at once")
 
 	print("---")
 	if fails == 0:

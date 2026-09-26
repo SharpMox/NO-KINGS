@@ -107,6 +107,65 @@ static func _MERGER(key: String) -> Callable:
 static var window_sized := false # once per launch, not on every return to menu
 
 
+## NO-243 S4 row 63: every Main Menu screen slides in when it is shown —
+## from the right going deeper, from the left coming back (Back). Depth: 0 the
+## main and login screens, 1 what the main menu opens, 2 what those open.
+## Screens built once are wired to visibility_changed; the ones rebuilt on
+## every visit (Scores, History, About, device info) call _pushed as they are
+## built. SceneFade.push gates it like the scene fade (tests, captures).
+var _push_depth := 0
+func _wire_push(screen: Control, depth: int, mover: Control = null) -> void:
+	var node: Control = mover if mover != null else screen
+	screen.visibility_changed.connect(func() -> void:
+		if screen.visible:
+			_pushed(node, depth))
+
+
+func _pushed(node: Control, depth: int) -> void:
+	var from := _push_depth
+	_push_depth = depth
+	if depth != from and is_node_ready():
+		SceneFade.push(node, 1.0 if depth > from else -1.0)
+
+
+## Debug (tools/capture.md): `--menu-demo` walks the Main Menu for a Movie
+## Maker capture of NO-243 S4 rows 62-65 — Settings, the Guide and a Guide
+## page in and back out (pushes), the account prompt fading in, then a TEST
+## scenario (it never autosaves) through the scene fade, and quits. The flag is
+## not one SceneFade skips, so every transition plays. Pair it with
+## --skip-login on a machine with no account. Press-by-text, like a tap.
+const MENU_DEMO_PAUSE := 0.7
+func _menu_demo() -> void:
+	for step in ["Settings", "← Back", "Guide", "Rules", "BACK_PAGE", "BACK_HUB", "PROMPT", "PLAY"]:
+		await get_tree().create_timer(MENU_DEMO_PAUSE).timeout
+		match step:
+			"BACK_PAGE": # the page's own Back is also "← Back": step up the Guide's way
+				Guide.go_back(guide_scroll)
+			"BACK_HUB":
+				_demo_press("← Back")
+			"PROMPT":
+				switch_prompt_label.text = "This device is now signed in to another account.\nSwitch?"
+				switch_prompt.visible = true
+				SceneFade.fade_in(switch_prompt)
+				await get_tree().create_timer(MENU_DEMO_PAUSE).timeout
+				switch_prompt.visible = false
+			"PLAY":
+				GameScript.next_config = Scenarios.all()[Scenarios.find("Movement & drag")].cfg
+				GameScript.is_scenario = true # never autosaves
+				get_tree().create_timer(2.0).timeout.connect(get_tree().quit)
+				SceneFade.go(get_tree(), "res://scenes/Game.tscn")
+			_:
+				_demo_press(step)
+
+
+func _demo_press(text: String) -> void:
+	for b in find_children("*", "Button", true, false):
+		if (b as Button).text == text and (b as Button).is_visible_in_tree():
+			(b as Button).pressed.emit()
+			return
+	printerr("--menu-demo: no visible button \"%s\"" % text)
+
+
 ## Android's hardware Back. Godot's default for it is to quit the app outright,
 ## which on a portrait phone game means the primary navigation gesture kills the
 ## session from any screen — see quit_on_go_back in project.godot.
@@ -351,6 +410,7 @@ func _ask_to_switch(id: String) -> void:
 			_who(switch_prompt_label, CloudSave.backend.account_name(), "another account"),
 			_who(switch_prompt_label, Account.owner_name(), "this device's account")]
 	switch_prompt.visible = true
+	SceneFade.fade_in(switch_prompt) # NO-243 S4 row 65
 
 
 ## Yes: rebind through the SAME switch_to NO-11 used, then do the post-bind work
@@ -706,6 +766,7 @@ func _ready() -> void:
 	main_box = VBoxContainer.new()
 	main_box.add_theme_constant_override("separation", 24)
 	center.add_child(main_box)
+	_wire_push(main_box, 0, center) # NO-243 S4 row 63: main_box sits in a Container
 
 	var title := Label.new()
 	title.text = "NO KINGS"
@@ -811,6 +872,8 @@ func _ready() -> void:
 	guide_scroll = Guide.build(self, func() -> void: main_box.visible = true, GameScript)
 	settings_panel = Settings.build(self, func() -> void: main_box.visible = true,
 		Callable(), _on_logout)
+	_wire_push(guide_scroll, 1)
+	_wire_push(settings_panel, 1)
 	# NO-147: About and TEST fold into Settings (eight main-menu entries down
 	# to four). Appended here rather than inside settings.gd's own build() —
 	# that panel is ALSO embedded in the in-game pause menu (hud.gd), and
@@ -843,6 +906,7 @@ func _ready() -> void:
 	login_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	login_center.visible = false
 	add_child(login_center)
+	_wire_push(login_center, 0)
 	var login_box := VBoxContainer.new()
 	login_box.add_theme_constant_override("separation", 18)
 	login_center.add_child(login_box)
@@ -938,6 +1002,7 @@ func _ready() -> void:
 	test_scroll.offset_bottom = -24
 	test_scroll.visible = false
 	add_child(test_scroll)
+	_wire_push(test_scroll, 2)
 	var test_box := VBoxContainer.new()
 	test_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	test_box.add_theme_constant_override("separation", 4)
@@ -1127,6 +1192,7 @@ func _ready() -> void:
 	army_center.offset_bottom = -30
 	army_center.visible = false
 	add_child(army_center)
+	_wire_push(army_center, 1)
 	# NO-179 full-width follow-up (Max: a dead strip sat between the peeking
 	# card and the screen edge): army_center no longer carries its own
 	# left/right inset, so army_scroll below — added straight to army_center
@@ -1355,6 +1421,7 @@ func _ready() -> void:
 	rank_bg.bg_color = (ThemeDB.get_default_theme().get_stylebox("normal", "Button") as StyleBoxFlat).bg_color
 	rank_center.add_theme_stylebox_override("panel", rank_bg)
 	add_child(rank_center)
+	_wire_push(rank_center, 2)
 	var rank_middle := CenterContainer.new()
 	rank_center.add_child(rank_middle)
 	var rank_box := VBoxContainer.new()
@@ -1471,6 +1538,9 @@ func _ready() -> void:
 	poll.timeout.connect(_apply_connectivity)
 	add_child(poll)
 	_apply_connectivity()
+
+	if args.has("--menu-demo") and not GameScript.cli_bypass_used:
+		_menu_demo.call_deferred()
 
 	if args.has("--screenshot"):
 		var dir: String = args[args.find("--screenshot") + 1]
@@ -1631,6 +1701,8 @@ func _show_scores() -> void:
 	scores_center = CenterContainer.new()
 	scores_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scores_center)
+	_wire_push(scores_center, 1)
+	_pushed(scores_center, 1) # built visible: no visibility_changed for this one
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	scores_center.add_child(box)
@@ -1707,6 +1779,7 @@ func _show_history() -> void:
 	history_scroll.offset_right = -40
 	history_scroll.offset_bottom = -30
 	add_child(history_scroll)
+	_pushed(history_scroll, 2) # built visible, and freed on the way back
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 6)
@@ -1754,6 +1827,7 @@ func _show_about() -> void:
 	about_center = CenterContainer.new()
 	about_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(about_center)
+	_pushed(about_center, 2) # built visible
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	about_center.add_child(box)
@@ -1802,6 +1876,7 @@ func _show_device_info() -> void:
 	device_info_center = CenterContainer.new()
 	device_info_center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(device_info_center)
+	_pushed(device_info_center, 1) # built visible
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	device_info_center.add_child(box)

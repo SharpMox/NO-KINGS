@@ -402,7 +402,18 @@ const SHOP_UNLOCK_WAVE := 5
 ## 5000 is still ~6x a typical window ON PURPOSE: Lane B is a reward for a
 ## scoring burst, not a second guaranteed lane. If it should fire for ordinary
 ## play, this number is the lever — not the wipe, which is now a ruling.
-const SHOP_LANE_B_SCORE := 5000
+##
+## 5000 -> 3000 (2026-09-26, Max's ruling after NO-250 / #585 took all Score
+## off Artefacts): restock as often as before on core Score alone. A/B, 60
+## runs a side: mean Score 19,114 -> 11,103 (x0.58), median 2,700 -> 2,350
+## (x0.87), waves unchanged, so per-Wave accrual fell by the same ratios. A
+## Lane-B fire needs ~6x a typical window, so it lives in the high-scoring
+## windows, where Artefact stacks had compounded most: the Score-weighted
+## mean (x0.58 -> 2,900) is the better guide than the median (x0.87 ->
+## 4,350). Rounded to 3000 (-40%), slightly above 2,900 because the mean is
+## lifted by runaway runs whose big single gains rolled once however many
+## gates they crossed. Target: shop_buy per run back from 37.7 toward 52.1.
+const SHOP_LANE_B_SCORE := 3000
 
 # The flat Tariff fallback: upstream catalog says 200/500/1000, scaled to the
 # /10 economy; halved 2026-07-06 — at 20/10 a tariffed Move+Capture pair ate

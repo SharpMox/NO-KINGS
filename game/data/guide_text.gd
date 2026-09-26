@@ -31,7 +31,7 @@ const TEXT := (
 
 	"Shop & Boxes\n" +
 	"The Shop opens empty; it first restocks on wave 5, then every 5 waves " +
-	"and each 5,000 Score between. " +
+	"and each 3,000 Score between. " +
 	"Boxes offer 3, 5 or 7 choices: keep one (Huge: two) or skip for " +
 	"Gold.\n\n" +
 

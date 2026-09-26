@@ -34,6 +34,10 @@ const TEXT_COL := Color.WHITE # the Guide's panels are dark
 const OUT_DIR := "res://assets/guide"
 
 var defs: Dictionary
+## Every texture drawn so far. A canvas draw command does not hold its texture,
+## so a load()ed token nobody else references is freed before the frame renders
+## and draws as a plain white square.
+var _held: Array[Texture2D] = []
 
 
 func _initialize() -> void:
@@ -162,7 +166,9 @@ func _piece(c: Control, id: String, owner: int, r: Rect2) -> void:
 	var tint := Color.WHITE
 	if Game.is_mono_piece(id):
 		tint = Game.COL_SIDE_PLAYER if owner == Rules.PLAYER else Game.COL_SIDE_ENEMY
-	c.draw_texture_rect(Game.load_piece_tex(id, owner), r.grow(2 * S), false, tint)
+	var tex := Game.load_piece_tex(id, owner)
+	_held.append(tex)
+	c.draw_texture_rect(tex, r.grow(2 * S), false, tint)
 
 
 ## game.gd _draw_hatch, "\" family, phased off canvas space like the board's.

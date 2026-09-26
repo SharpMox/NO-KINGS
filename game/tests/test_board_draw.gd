@@ -138,6 +138,23 @@ func _init() -> void:
 		"inversion mark's disc (r=%.1f) lies inside its tile (%.1f)" % [r, t])
 	check(game.INV_MARK_GLYPH_COL == Color.WHITE, "inversion glyph is white, not the side colour")
 	check(game.INV_MARK_DISC_COL == Color(0, 0, 0, 0.72), "inversion disc is dark, 72% alpha")
+	# The ⟲'s RING (not its arrowhead-skewed ink box) is centred on its disc
+	# and spans INV_MARK_RING_FILL of it, at the tile sizes a phone and the
+	# desktop window give (`_inv_mark_glyph` is what `_draw_piece` draws with).
+	# Main placed it by Open Sans's line metrics plus a nudge tuned on one OS
+	# font, and had no such helper.
+	for disc_r: float in [r, 8.0, 11.3, 16.0]:
+		var at := c + Vector2(0.37, 0.61) # off the pixel grid on purpose
+		var mark: Dictionary = game._inv_mark_glyph(at, disc_r)
+		var ink: Rect2 = mark.ink
+		var ring: Vector2 = mark.ring_centre
+		check(ring.distance_to(at) <= 1.0,
+			"⟲ ring centred on its disc (r=%.1f): ring %s vs disc %s (ink %s)" % [disc_r, ring, at, ink])
+		var ring_d: float = mark.ring_d
+		check(absf(ring_d - 2.0 * disc_r * game.INV_MARK_RING_FILL) <= 1.5,
+			"⟲ ring (r=%.1f) spans %.0f%% of the disc: %.1f px" % [disc_r, game.INV_MARK_RING_FILL * 100, ring_d])
+		check(Rect2(at - Vector2(disc_r, disc_r), Vector2(disc_r, disc_r) * 2).grow(1.0).encloses(ink),
+			"⟲ ink (r=%.1f) lies inside the disc: %s" % [disc_r, ink])
 
 	# NO-244 (Max, 2026-09-24): up to 4 buff badges, 2 per row — the 4th must
 	# not overlap the 3rd. `_buff_badge_centres` is the helper
@@ -192,6 +209,7 @@ func _init() -> void:
 	await process_frame
 
 	await _merge_target_checks()
+	await _pick_target_checks()
 
 	print("---")
 	if fails == 0:
@@ -213,6 +231,29 @@ func _boot_pair() -> Node2D:
 	g.animations_on = true # the local Settings file must not decide this suite
 	g.autoplay = false
 	return g
+
+
+## Max, 2026-09-26: a picked Item/Artefact target looks SELECTED (fill, size,
+## purple outline) — no cyan pending-pick ring. `pick_tiles` is what `_draw`
+## and `_draw_pulse` draw from, so these can't drift from them.
+func _pick_target_checks() -> void:
+	var g := await _boot_pair()
+	g.artefact_target_stage_a = Vector2i(2, 2) # a piece
+	g.artefact_pending_tile = Vector2i(4, 4) # an empty destination
+	var picks: Array[Vector2i] = g.pick_tiles()
+	check(picks == [Vector2i(2, 2), Vector2i(4, 4)], "Bovine's two picks are pick tiles (%s)" % [picks])
+	g.artefact_target_stage_a = Vector2i(-1, -1)
+	g.artefact_pending_tile = Vector2i(-1, -1)
+	check(g.pick_tiles().is_empty(), "no pick tiles once targeting resets")
+	var src: String = (GameScript as GDScript).source_code
+	var body := _func_body(src, "_draw")
+	check(body.contains("pick_tiles()") and body.contains("picks.has(pos)") and not body.contains("COL_MERGE"),
+		"_draw: picks fill and draw at the selected size; no cyan (COL_MERGE) ring on the board")
+	var pulse_body := _func_body(src, "_draw_pulse")
+	check(pulse_body.contains("pick_tiles()") and not pulse_body.contains("draw_arc("),
+		"_draw_pulse outlines picks with the selection silhouette, never a ring")
+	g.queue_free()
+	await process_frame
 
 
 func _func_body(src: String, fn: String) -> String:

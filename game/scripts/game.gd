@@ -425,8 +425,12 @@ const INV_MARK_RING_FILL := 0.58
 ## outline (upm 1600): ink bbox x 216..1846, y -243..1133; the ring is a circle
 ## centred (1158, 445), outer radius 688 (inner 575), so it spans the ink's full
 ## height and the arrowhead hangs off its left. Centre = ((1158 - 216) / 1630,
-## (1133 - 445) / 1376) of the ink rect; ring outer diameter = ink height.
+## (1133 - 445) / 1376) of the ink rect; ring outer diameter = 1376 / 1600 em.
+## Size comes from the outline, not the measured rect: TextServer's glyph rect
+## carries ~1 px of raster padding a side (CI, 2026-09-26), which is symmetric
+## so it doesn't move the centre, but it does skew a size ratio.
 const INV_MARK_RING_CENTRE := Vector2(942.0 / 1630.0, 688.0 / 1376.0)
+const INV_MARK_RING_EM := 1376.0 / 1600.0
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
@@ -6759,17 +6763,14 @@ func _inv_mark_glyph(c: Vector2, r: float) -> Dictionary:
 	var ts := TextServerManager.get_primary_interface()
 	var rid: RID = INV_MARK_FONT.get_rids()[0]
 	var ch := INV_MARK_GLYPH.unicode_at(0)
-	var ref := 100 # px: the ink/em ratio, measured once at a size where rounding is noise
-	var ref_h: float = ts.font_get_glyph_size(rid, Vector2i(ref, 0),
-		ts.font_get_glyph_index(rid, ref, ch, 0)).y / ref
-	var size := maxi(1, roundi(2.0 * r * INV_MARK_RING_FILL / ref_h)) # ring diameter = ink height
+	var size := maxi(1, roundi(2.0 * r * INV_MARK_RING_FILL / INV_MARK_RING_EM))
 	var gi := ts.font_get_glyph_index(rid, size, ch, 0)
 	var ink := Rect2(ts.font_get_glyph_offset(rid, Vector2i(size, 0), gi),
 		ts.font_get_glyph_size(rid, Vector2i(size, 0), gi))
 	var ring := ink.position + ink.size * INV_MARK_RING_CENTRE
 	var origin := (c - ring).round() # whole pixels: the font is AA-off
 	return {"font_px": size, "origin": origin, "ink": Rect2(origin + ink.position, ink.size),
-		"ring_centre": origin + ring, "ring_d": ink.size.y}
+		"ring_centre": origin + ring, "ring_d": size * INV_MARK_RING_EM}
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

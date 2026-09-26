@@ -156,6 +156,13 @@ func _boot_pair() -> Node2D:
 	return g
 
 
+func _func_body(src: String, fn: String) -> String:
+	var start := src.find("\nfunc %s() -> void:" % fn)
+	if start < 0:
+		return ""
+	return src.substr(start, src.find("\nfunc ", start + 1) - start)
+
+
 func _mouse(g: Node2D, tile: Vector2i, pressed: bool) -> void:
 	var ev := InputEventMouseButton.new()
 	ev.button_index = MOUSE_BUTTON_LEFT
@@ -180,17 +187,31 @@ func _merge_target_checks() -> void:
 	check(not is_equal_approx(a.angle, b.angle) and absf(a.angle) <= g.MERGE_TARGET_SHAKE_RAD
 			and absf(a.offset.x) <= g.MERGE_TARGET_SHAKE_PX and (a.angle != 0.0 or b.angle != 0.0),
 		"animations on: the target piece wiggles a few degrees / px (%.3f, %.3f rad)" % [a.angle, b.angle])
-	var col: Color = g.COL_MERGE_TARGET
-	check(col.r > col.g and col.g > col.b and col.g > g.BUFF_BADGE_ACCENT.g
-			and col != g.COL_MERGE and col.g > g.COL_CAPTURE.g + 0.4,
-		"merge target is warm yellow-orange: yellower than the amber Buff badge, not cyan, not red")
-	# The ring was drawn by a merge_highlights loop inside _draw; it must be
-	# gone (fails on the pre-change main, where that loop drew the cyan arc).
+	check(g.COL_MERGE_TARGET == g.COL_MERGE_ORANGE and g.merge_color == g.COL_MERGE_ORANGE
+			and a.color == g.COL_MERGE_ORANGE,
+		"orange is the default merge target colour until Max picks")
+	check(GameScript.merge_color_from(PackedStringArray(["--merge-color", "lime"])) == g.COL_MERGE_LIME
+			and GameScript.merge_color_from(PackedStringArray(["--merge-color", "orange"])) == g.COL_MERGE_ORANGE
+			and GameScript.merge_color_from(PackedStringArray()) == g.COL_MERGE_ORANGE,
+		"--merge-color lime|orange picks the colour; no flag is orange")
+	g.merge_color = g.COL_MERGE_LIME
+	check(g.merge_target_fx(Vector2i(3, 2), 0.1).color == g.COL_MERGE_LIME, "a lime run outlines in lime")
+	g.merge_color = g.COL_MERGE_ORANGE
+	# Shaped, not a square: the outline is the silhouette shader on _merge_fx.
+	var mat: Variant = g._merge_fx.material
+	check(mat is ShaderMaterial and (mat as ShaderMaterial).shader.code == g.SELECT_OUTLINE_SHADER,
+		"the merge target outline traces the token silhouette (outline shader on _merge_fx)")
+	# _draw (the board) marks partners only by wiggling them: no cyan ring
+	# (a merge_highlights loop on main, so this fails there) and no tile rect.
 	var src: String = (GameScript as GDScript).source_code
-	var start := src.find("\nfunc _draw() -> void:")
-	var body := src.substr(start, src.find("\nfunc ", start + 1) - start)
-	check(start >= 0 and not body.contains("merge_highlights") and body.contains("merge_target_tiles()"),
-		"no cyan merge ring: _draw marks partners only through merge_target_tiles")
+	var body := _func_body(src, "_draw")
+	check(body != "" and not body.contains("merge_highlights") and not body.contains("MERGE_TARGET")
+			and body.contains("merge_target_tiles()"),
+		"no cyan merge ring and no square outline on the board")
+	var fx_body := _func_body(src, "_draw_merge_fx")
+	check(fx_body.contains("draw_texture_rect_region") and not fx_body.contains("draw_rect(")
+			and not fx_body.contains("draw_arc("),
+		"_draw_merge_fx draws the token's silhouette only, never a rect or ring")
 	g.animations_on = false
 	var s1: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.1)
 	var s2: Dictionary = g.merge_target_fx(Vector2i(3, 2), 0.3)

@@ -563,14 +563,9 @@ func _add_casualties(box: VBoxContainer, buttons: VBoxContainer) -> Control:
 ## `col`'s VBoxContainer never touches its position/size — while sibling
 ## DRAW ORDER (and therefore z-order) still follows plain tree order, so
 ## inserting it as `col`'s first child, then `col`'s child order after that
-## is `[layer, scroll, backing, buttons]`, keeps it behind everything.
-##
-## A second flat ColorRect (`backing`), also top_level, sits directly behind
-## `buttons` so the button labels still read against the purple bleeding
-## through — Max: "give the pinned button column a backing... so the text
-## contrasts against the purple". Both are `MOUSE_FILTER_IGNORE` — "the
-## banner never takes input" — and `buttons` itself, drawn after both, on
-## top, keeps working exactly as before.
+## is `[layer, scroll, buttons]`, keeps it behind everything. It's
+## `MOUSE_FILTER_IGNORE` — "the banner never takes input" — and `buttons`
+## itself, drawn after it, on top, keeps working exactly as before.
 func _add_casualty_banner(mass: Control, box: VBoxContainer, buttons: VBoxContainer) -> void:
 	var col_node: Node = buttons.get_parent() # _end_screen_frame()'s `col` —
 		# the shared parent of `scroll` (== box.get_parent()) and `buttons`.
@@ -659,30 +654,6 @@ func _add_casualty_banner(mass: Control, box: VBoxContainer, buttons: VBoxContai
 	scroll.resized.connect(sync) # a window/orientation resize can also move
 		# everything without touching scroll_vertical — cheap insurance
 
-	var backing := ColorRect.new()
-	backing.name = "CasualtyButtonBacking" # the tests' handle
-	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	backing.color = CASUALTY_BUTTON_BACKING_COLOR
-	backing.top_level = true
-	backing.z_as_relative = false
-	backing.z_index = CASUALTY_BUTTON_BACKING_Z_INDEX # behind the buttons'
-		# own text (CASUALTY_ABOVE_DIM_Z_INDEX), ahead of the banner
-		# (CASUALTY_BANNER_Z_INDEX) — see that constant's own header
-	col_node.add_child(backing)
-	col_node.move_child(backing, 2) # tree position is cosmetic here too —
-		# see the banner's own z_index comment above
-	var sync_backing := func() -> void:
-		if is_instance_valid(buttons) and is_instance_valid(backing):
-			backing.global_position = buttons.global_position
-			backing.size = buttons.size
-	_settle_repeatedly(sync_backing, CASUALTY_BANNER_SETTLE_TICKS) # same cascade risk as
-		# `sync` above — `buttons` itself gains more children (the actual
-		# Restart/Continue/etc. rows) AFTER this function returns, each an
-		# additional resort pass this must outlast.
-	buttons.resized.connect(sync_backing) # buttons' own rect settles once
-		# built (it doesn't scroll), so unlike the banner this needs no
-		# scrollbar hook — just the same settle-then-resize coverage
-
 
 ## Re-invokes `cb` via call_deferred() `ticks` times in a row, each queued
 ## only once the previous one has actually run — see its own call sites
@@ -740,9 +711,6 @@ const CASUALTY_BANNER_ROD_HEIGHT := 4.0 # px, straddling the banner's own top ed
 const CASUALTY_BANNER_ROD_OVERHANG := PieceMass.ICON * 0.15 # px the rod
 	# extends past the banner's own sides — a flagpole crossbar reads as a
 	# rod BECAUSE it's wider than the flag hanging from it.
-const CASUALTY_BUTTON_BACKING_COLOR := Color(0, 0, 0, 0.55) # Max: "give the
-	# pinned button column a backing... so the text contrasts against the
-	# purple" bleeding through from the banner below.
 const CASUALTY_BANNER_SETTLE_TICKS := 8 # deferred-call passes _add_casualty_
 	# banner()'s position syncs re-queue themselves for — see that function's
 	# own comment on the sync callables for why one pass isn't always enough.
@@ -764,17 +732,15 @@ const CASUALTY_BANNER_SETTLE_TICKS := 8 # deferred-call passes _add_casualty_
 ## (0) but BELOW the crowd and the buttons — impossible while all three of
 ## `_desat`/mass/buttons share the SAME z (0), so `_add_casualty_banner()`
 ## also lifts `mass` and `buttons` to CASUALTY_ABOVE_DIM_Z_INDEX, opening a
-## gap the banner and its button-backing sit inside. Final order, back to
-## front: `_desat` (0) < banner (CASUALTY_BANNER_Z_INDEX) < button backing
-## (CASUALTY_BUTTON_BACKING_Z_INDEX) < mass and buttons
+## gap the banner sits inside. Final order, back to front: `_desat` (0) <
+## banner (CASUALTY_BANNER_Z_INDEX) < mass and buttons
 ## (CASUALTY_ABOVE_DIM_Z_INDEX) — the last two are `z_as_relative` (the
 ## default), so this is the ONLY z touched on them; everything else about
 ## how they draw (and each other's relative order) is untouched, so "the
 ## crowd must look exactly like v4 (full colour) over the purple" holds.
 const CASUALTY_BANNER_Z_INDEX := 1
-const CASUALTY_BUTTON_BACKING_Z_INDEX := 2
 const CASUALTY_ABOVE_DIM_Z_INDEX := 3 # lifts `mass` and `buttons` clear of
-	# `_desat`'s z (0) so the banner/backing above have somewhere to sit
+	# `_desat`'s z (0) so the banner above has somewhere to sit
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:

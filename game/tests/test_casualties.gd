@@ -59,8 +59,8 @@ func _icons(section: Control) -> Array:
 
 func _settle() -> void:
 	for i in 10: # containers sort deferred — bumped from 3 (Max's 2026-09-26
-		# banner review): the banner/backing position syncs re-queue
-		# themselves for Modals.CASUALTY_BANNER_SETTLE_TICKS (8) deferred
+		# banner review): the banner's position sync re-queues itself for
+		# Modals.CASUALTY_BANNER_SETTLE_TICKS (8) deferred
 		# passes to outlast a resort cascade (a scrollbar appearing narrows
 		# `box`, which re-centres `mass`, one pass after the first layout),
 		# so this needs to comfortably exceed that
@@ -341,11 +341,9 @@ func _init() -> void:
 		var col_node: Node = end_scroll.get_parent() if end_scroll != null else null
 		var banner_layer: Control = col_node.find_child("CasualtyBanner", false, false) \
 			if col_node != null else null
-		var backing: ColorRect = col_node.find_child("CasualtyButtonBacking", false, false) \
-			if col_node != null else null
-		check(col_node != null and banner_layer != null and backing != null,
-			"%s: the banner layer and the button backing both exist" % screen)
-		if col_node != null and banner_layer != null and backing != null:
+		check(col_node != null and banner_layer != null,
+			"%s: the banner layer exists" % screen)
+		if col_node != null and banner_layer != null:
 			# Max review 2026-09-26 (4th pass): Aux's capture showed the
 			# banner painting OVER the crowd and the buttons — `top_level`
 			# only detaches a CanvasItem's TRANSFORM from its parent, it says
@@ -368,13 +366,11 @@ func _init() -> void:
 				# own "overlay's first child, kept across screens"
 			var z_desat := _effective_z(desat)
 			var z_banner := _effective_z(banner_layer)
-			var z_backing := _effective_z(backing)
 			var z_mass := _effective_z(mass_ctrl)
 			var z_buttons := _effective_z(buttons_ctrl)
-			check(z_desat < z_banner and z_banner < z_backing
-					and z_backing < z_mass and z_backing < z_buttons,
-				"%s: resolved paint order is dim(%d) < banner(%d) < backing(%d) < crowd/buttons(%d/%d)"
-					% [screen, z_desat, z_banner, z_backing, z_mass, z_buttons])
+			check(z_desat < z_banner and z_banner < z_mass and z_banner < z_buttons,
+				"%s: resolved paint order is dim(%d) < banner(%d) < crowd/buttons(%d/%d)"
+					% [screen, z_desat, z_banner, z_mass, z_buttons])
 			# The crowd and the buttons are otherwise untouched — not
 			# top_level, and the only property this feature changes on them
 			# at all is that same z_index — so Aux's capture judging "the
@@ -385,21 +381,15 @@ func _init() -> void:
 					and buttons_ctrl.z_index == Modals.CASUALTY_ABOVE_DIM_Z_INDEX,
 				"%s: the crowd and the buttons are plain, non-floating nodes, only lifted in z"
 					% screen)
-			check(banner_layer.top_level and backing.top_level,
-				"%s: both float free of `col`'s own VBoxContainer layout" % screen)
-			check(banner_layer.mouse_filter == Control.MOUSE_FILTER_IGNORE
-					and backing.mouse_filter == Control.MOUSE_FILTER_IGNORE,
-				"%s: neither the banner nor its button backing takes input" % screen)
-			await _settle() # the position syncs are deferred + signal-driven
+			check(banner_layer.top_level,
+				"%s: the banner floats free of `col`'s own VBoxContainer layout" % screen)
+			check(banner_layer.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+				"%s: the banner takes no input" % screen)
+			await _settle() # the position sync is deferred + signal-driven
 			check(banner_layer.global_position.is_equal_approx(
 					mass_ctrl.global_position - Vector2(Modals.CASUALTY_BANNER_MARGIN_X, 0.0)),
 				"%s: the banner tracks the mass's own (scrolled) position (%s vs %s)"
 					% [screen, banner_layer.global_position, mass_ctrl.global_position])
-			check(backing.global_position.is_equal_approx(buttons_ctrl.global_position)
-					and backing.size.is_equal_approx(buttons_ctrl.size),
-				"%s: the backing matches the pinned buttons' own rect (%s/%s vs %s/%s)"
-					% [screen, backing.global_position, backing.size,
-						buttons_ctrl.global_position, buttons_ctrl.size])
 			var banner: Polygon2D = null
 			for c in banner_layer.get_children():
 				if c is Polygon2D:

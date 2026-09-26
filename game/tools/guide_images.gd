@@ -58,7 +58,7 @@ func _initialize() -> void:
 	var sym := FontVariation.new()
 	sym.base_font = ThemeDB.fallback_font
 	var chain: Array[Font] = []
-	for family in ["Noto Sans Math", "Noto Sans Symbols 2", "Noto Sans Symbols", "DejaVu Sans"]:
+	for family in ["Noto Sans Math", "Noto Sans Symbols2", "Noto Sans Symbols", "DejaVu Sans", "Symbola"]:
 		var f := SystemFont.new()
 		f.font_names = PackedStringArray([family])
 		chain.append(f)

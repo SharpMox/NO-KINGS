@@ -69,6 +69,17 @@ Menu screens need no scenario and write `DIR/menu.png`. The run then boots a def
 | Others | `tests`, `armies`, `rank`, `scores`, `history`, `about`, `settings`, `device-info`, `login` |
 | Armies carousel, scrolled to one card | `--screenshot /tmp/cap/armies-horde --show-screen armies --army-name Horde` — same scroll a tap on that Army's page dot does (`menu.gd`'s `_debug_scroll_to_army`), by NAME rather than the dot's positional index, same idea as `--scenario-name`. Names: `Crown`, `Wild Hunt`, `Old Guard`, `Syndicate`, `Cult`, `Horde` (`Tuning.ARMIES`'s key order — the same order the dots go in). An unknown name is a no-op (prints `--army-name X: no such Army`, screenshot still lands on whichever card the carousel already showed). |
 
+## Board tile noise (`--board-noise AMOUNT`, `--board-theme ID`)
+
+Both are Game-scene flags, usable with any capture above. `--board-noise` overrides `Tuning.BOARD_NOISE_AMOUNT` (0 = the flat board); `--board-theme` sets the chequer (`sage`, `sand`) for this run without writing the Settings file.
+
+| Capture | Flags after `--` |
+|---|---|
+| Sage, default noise | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-sage --show-screen board --board-theme sage` |
+| Sand, default noise | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-sand --show-screen board --board-theme sand` |
+| Sage, subtle (comparison) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-subtle --show-screen board --board-theme sage --board-noise 0.05` |
+| Sage, flat (control) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-off --show-screen board --board-theme sage --board-noise 0` |
+
 ## Videos of the selling flows (`--ui-demo FLOW`)
 
 `--ui-demo` boots "Capture: selling sandbox" by itself and plays one flow. It takes a step every 0.8 s, holds the end for 1.6 s, then quits. Each step triggers what a tap triggers: the HUD signal that a long press emits, then the modal's own button, which is focused briefly and then pressed. The video therefore shows the real preview and the real confirm. If a step can't find its button, the run prints `UI-DEMO FAIL` and exits 1.

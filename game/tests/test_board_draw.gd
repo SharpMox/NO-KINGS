@@ -21,6 +21,7 @@ extends SceneTree
 const GameScript := preload("res://scripts/game.gd")
 const Scenarios := preload("res://data/scenarios.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 
 const INVERTED := ["inv-sergeant", "inv-arrow-pawn", "inv-kirin-plus", "inv-kirin-plus-plus"]
 const COUNTERPARTS := ["sergeant", "arrow-pawn", "kirin-plus", "kirin-plus-plus"]
@@ -34,6 +35,62 @@ func check(cond: bool, label: String) -> void:
 		fails += 1
 	else:
 		print("ok: " + label)
+
+
+## The board noise shader: the chequer lives on its own layer behind the Game
+## node (so pieces and marks never get the noise), its uniforms track the live
+## theme/layout, and board hit-testing is unchanged. The pixels themselves
+## need a window; this is the uniform-level ceiling (Aux captures the look).
+func _check_tile_layer(game: Node2D) -> void:
+	var layer = game._tile_layer # untyped: the `is` checks below test its real class
+	check(layer.get_parent() == game and layer.show_behind_parent and layer is Node2D and not (layer is Control),
+		"tile layer: a Node2D child of Game drawn behind it (tiles under marks and pieces)")
+	var m: ShaderMaterial = layer.material
+	check(m != null and m.shader.code == GameScript.BOARD_TILE_SHADER, "tile layer carries BOARD_TILE_SHADER")
+	check(m.get_shader_parameter("light_col") == GameScript.COL_LIGHT
+			and m.get_shader_parameter("dark_col") == GameScript.COL_DARK,
+		"tile layer colours are COL_LIGHT/COL_DARK")
+	check(m.get_shader_parameter("origin") == game.board_px
+			and is_equal_approx(m.get_shader_parameter("tile"), game.tile)
+			and is_equal_approx(m.get_shader_parameter("board_h"), Tuning.BOARD_H),
+		"tile layer geometry matches the board (origin, tile, rows)")
+	check(is_equal_approx(m.get_shader_parameter("amount"), Tuning.BOARD_NOISE_AMOUNT),
+		"noise amount is Tuning.BOARD_NOISE_AMOUNT (%s)" % m.get_shader_parameter("amount"))
+	# AMOUNT 0: the shader adds amount * noise to the base colour, so a zero
+	# uniform leaves exactly COL_LIGHT/COL_DARK — the flat board.
+	game.board_noise = 0.0
+	game.queue_redraw()
+	await process_frame
+	check(m.get_shader_parameter("amount") == 0.0
+			and m.get_shader_parameter("light_col") == GameScript.COL_LIGHT
+			and m.get_shader_parameter("dark_col") == GameScript.COL_DARK,
+		"board_noise 0 reaches the shader as amount 0 with the plain theme colours")
+	game.board_noise = Tuning.BOARD_NOISE_AMOUNT
+
+	# Theme switch through the same signal the Settings swatches fire.
+	var sand: Dictionary = GameScript.BOARD_THEMES["sand"]
+	game.hud.settings_changed.emit({"board_theme": "sand"})
+	await process_frame
+	check(m.get_shader_parameter("light_col") == sand.light
+			and m.get_shader_parameter("dark_col") == sand.dark,
+		"switching to Sand updates the tile layer's colours")
+	game.hud.settings_changed.emit({"board_theme": GameScript.DEFAULT_BOARD_THEME})
+	await process_frame
+	check(m.get_shader_parameter("light_col") == GameScript.BOARD_THEMES[GameScript.DEFAULT_BOARD_THEME].light,
+		"switching back restores the default theme's colours")
+
+	# Hit-testing: every tile centre maps back to its own tile; just outside
+	# the board maps to none.
+	var t: float = game.tile
+	var hits_ok := true
+	for x in Tuning.BOARD_W:
+		for y in Tuning.BOARD_H:
+			var pos := Vector2i(x, y)
+			hits_ok = hits_ok and game._tile_at(game._tile_px(pos) + Vector2(t, t) / 2.0) == pos
+	check(hits_ok, "_tile_at maps every tile centre back to its tile")
+	check(game._tile_at(game.board_px - Vector2(1, 1)) == Vector2i(-1, -1)
+			and game._tile_at(game.board_px + Vector2(Tuning.BOARD_W, Tuning.BOARD_H) * t + Vector2(1, 1)) == Vector2i(-1, -1),
+		"_tile_at returns (-1,-1) just outside the board")
 
 
 func _init() -> void:
@@ -128,6 +185,8 @@ func _init() -> void:
 			and priority_slots.glyphs[3] == game.STUN_BADGE_GLYPH
 			and priority_slots.glyphs.slice(0, 3) == kept_glyphs,
 		"4 Buffs + Stunned: still 4 badges total, Stun takes the 4th slot over the last Buff (%s)" % [priority_slots])
+
+	await _check_tile_layer(game)
 
 	game.queue_free()
 	await process_frame

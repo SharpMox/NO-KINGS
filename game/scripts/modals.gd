@@ -26,6 +26,7 @@ const PieceDiagram := preload("res://scripts/piece_diagram.gd") # NO-139
 const PieceMass := preload("res://scripts/piece_mass.gd") # NO-157
 const BuffLogic := preload("res://scripts/buff_logic.gd") # NO-185
 const UiAnim := preload("res://scripts/ui_anim.gd") # NO-243 S2: the shared UI animations
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4
 
 signal restart_pressed # game.gd owns what Restart MEANS; this is just the press
 signal merge_confirmed
@@ -596,7 +597,7 @@ func show_overlay(won: bool, reason: String, rank := 0) -> void:
 	var menu := Button.new()
 	menu.text = "Main Menu"
 	menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
+		SceneFade.go(get_tree(), "res://scenes/Menu.tscn"))
 	buttons.add_child(menu)
 	# NO-254: below Restart/Main Menu, a normal (non-primary) button.
 	var feedback := Button.new()

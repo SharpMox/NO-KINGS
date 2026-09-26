@@ -31,6 +31,7 @@ const Armies := preload("res://scripts/armies.gd")
 const HudScript := preload("res://scripts/hud.gd") # HEADER_H feeds the board solve (NO-83)
 const Ads := preload("res://scripts/ads.gd") # NO-241: the one rewarded-ad seam
 const UiDemo := preload("res://scripts/ui_demo.gd") # debug: --ui-demo videos
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4: every scene change
 
 enum State { SETUP, PLAYER_TURN, ENEMY_TURN, GAME_OVER }
 
@@ -2773,7 +2774,7 @@ func _notification(what: int) -> void:
 			# at all, and the result screen is no exception — Back maps to the
 			# Main Menu button sitting right there. The run is already over and
 			# already scored, so nothing is lost by taking it.
-			get_tree().change_scene_to_file("res://scenes/Menu.tscn")
+			SceneFade.go(get_tree(), "res://scenes/Menu.tscn")
 		elif not (game_menu_open and hud.guide_back()): # NO-242: Guide first
 			hud.toggle_menu(not game_menu_open)
 

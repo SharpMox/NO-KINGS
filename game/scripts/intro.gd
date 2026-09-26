@@ -19,6 +19,7 @@ const MENU_SCENE := "res://scenes/Menu.tscn"
 ## there when a video happens to end.
 const Drive := preload("res://scripts/drive.gd")
 const BackGuard := preload("res://scripts/back_guard.gd")
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4
 
 const VIDEO := preload("res://assets/video/nokings_intro.ogv")
 const LOOP_VIDEO := preload("res://assets/video/nokings_intro_endloop.ogv")
@@ -165,7 +166,9 @@ func _advance() -> void:
 	if _advanced: # a click racing the `finished` signal must not double-fire
 		return
 	_advanced = true
-	get_tree().change_scene_to_file.call_deferred(MENU_SCENE)
+	# NO-243 S4: through black (instant under the bypass flags above)
+	var tree := get_tree()
+	(func() -> void: SceneFade.go(tree, MENU_SCENE)).call_deferred()
 
 
 ## Swap to the short loop and raise the CONTINUE call to action. Idempotent: the

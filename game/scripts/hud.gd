@@ -13,6 +13,7 @@ const MergeLogic := preload("res://scripts/merge_logic.gd")
 const Guide := preload("res://scripts/guide.gd")
 const Account := preload("res://scripts/account.gd")
 const Settings := preload("res://scripts/settings.gd")
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4
 const Armies := preload("res://scripts/armies.gd")
 const Rules := preload("res://scripts/rules.gd") # NO-164: Rules.ENEMY for a Captured entry's icon
 const ItemLogic := preload("res://scripts/item_logic.gd") # NO-165: Held Item capacity
@@ -1075,7 +1076,7 @@ func build(game) -> void:
 			# documents. Nothing needs it before this button is pressed.
 			var MenuScript: GDScript = load("res://scripts/menu.gd")
 			Account.logout(MenuScript._SAVE_PATHS())
-			game.get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
+			SceneFade.go(game.get_tree(), "res://scenes/Menu.tscn"))
 	var guide_btn := Button.new()
 	guide_btn.text = "Guide"
 	guide_btn.pressed.connect(func() -> void:
@@ -1092,7 +1093,7 @@ func build(game) -> void:
 	var to_menu := Button.new()
 	to_menu.text = "Main Menu"
 	to_menu.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Menu.tscn"))
+		SceneFade.go(get_tree(), "res://scenes/Menu.tscn"))
 	gm_box.add_child(to_menu)
 
 	# NO-254: a normal button (theme default), not a primary action — sits

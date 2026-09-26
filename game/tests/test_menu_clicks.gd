@@ -19,6 +19,7 @@ const BackGuard := preload("res://scripts/back_guard.gd")
 const Items := preload("res://data/items.gd")
 const Rules := preload("res://scripts/rules.gd")
 const Settle := preload("res://tests/test_settle.gd") # NO-254: shared layout-settle poll
+const SceneFade := preload("res://scripts/scene_fade.gd") # NO-243 S4
 
 
 ## NO-64: a platform board that exists, so the Scores door is built on desktop.
@@ -986,6 +987,39 @@ func _init() -> void:
 	GlobalBoard.backend_override = null
 	PlayBridge._snapshots.free()
 	PlayBridge._snapshots = prev_snapshots
+	Account.logout([])
+	Account._reset_cache()
+
+	# NO-243 S4: a scene fade never eats input. Force one (probes skip it by
+	# default) and click the NEW menu while the black is still fading in.
+	Account.start_guest()
+	MenuScript.window_sized = true # the swapped-in Menu is current_scene: no resize
+	SceneFade.force = true
+	SceneFade.go(self, "res://scenes/Menu.tscn")
+	var fade_frames := 0
+	while (current_scene == null or current_scene.scene_file_path != "res://scenes/Menu.tscn") \
+			and fade_frames < 120:
+		await process_frame
+		fade_frames += 1
+	var faded: Node = current_scene
+	await process_frame # the fresh menu's first layout passes (9 fade-in frames at 60 fps)
+	await process_frame
+	var mid_fade := root.get_node_or_null(SceneFade.NODE_NAME) != null
+	check(faded != null and mid_fade, "S4: the Menu swapped in under the fade (frames=%d layer=%s)"
+		% [fade_frames, mid_fade])
+	if faded != null:
+		check(await _click_button(faded, "Settings"), "S4: Settings clickable during the fade-in")
+		await process_frame
+		check(_find_button(faded, "TEST") != null, "S4: ...and the click landed (Settings opened)")
+	var gone_frames := 0
+	while root.get_node_or_null(SceneFade.NODE_NAME) != null and gone_frames < 120:
+		await process_frame
+		gone_frames += 1
+	check(root.get_node_or_null(SceneFade.NODE_NAME) == null, "S4: the fade layer frees itself")
+	SceneFade.force = false
+	if faded != null:
+		faded.queue_free()
+	await process_frame
 	Account.logout([])
 	Account._reset_cache()
 

@@ -530,8 +530,12 @@ func _end_screen_frame() -> Array:
 		# (CLAUDE.md), so `buttons` keeps its own default blocking filter
 		# while the rest of `bar`'s (screen-sized) rect passes drags/wheel
 		# through to `scroll` beneath it
-	bar.alignment = BoxContainer.ALIGNMENT_END # packs `buttons` flush to the
-		# bottom of bar's own (full-screen, from `overlay`) rect
+	bar.alignment = BoxContainer.ALIGNMENT_END # packs [`buttons`, the bottom
+		# margin spacer below] flush to the bottom of bar's own (full-screen,
+		# from `overlay`) rect
+	bar.add_theme_constant_override("separation", 0) # no theme-default gap
+		# between `buttons` and the bottom-margin spacer below — its own
+		# height is the ONLY thing controlling that margin
 	overlay.add_child(bar) # after `scroll`: later tree position wins both
 		# paint order and input hit-testing for same-rect siblings
 	# Max, 11th review: the button block has NO background at all — no
@@ -545,15 +549,22 @@ func _end_screen_frame() -> Array:
 	buttons.custom_minimum_size.x = _overlay_width() # the width the buttons had
 	buttons.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	bar.add_child(buttons)
+	var bar_bottom_margin := Control.new() # Max: a little margin so Give
+		# Feedback isn't flush with the screen's own bottom edge
+	bar_bottom_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_bottom_margin.custom_minimum_size.y = END_SCREEN_BAR_BOTTOM_MARGIN
+	bar.add_child(bar_bottom_margin)
 
 	var bottom_pad := Control.new() # room for `buttons`' own settled height
-		# plus a gap, kept in sync below since it depends on the buttons' own
-		# (font-driven, not synchronously known) size
+		# plus a gap AND the bar's own bottom margin (`buttons` now floats
+		# that much higher above the screen's bottom edge too — see
+		# `bar_bottom_margin` above), kept in sync below since it depends on
+		# the buttons' own (font-driven, not synchronously known) size
 	bottom_pad.name = "EndScreenBottomPad" # the tests' handle
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(bottom_pad)
 	var sync_bottom_pad := func() -> void:
-		bottom_pad.custom_minimum_size.y = buttons.size.y + END_SCREEN_BAR_GAP
+		bottom_pad.custom_minimum_size.y = buttons.size.y + END_SCREEN_BAR_GAP + END_SCREEN_BAR_BOTTOM_MARGIN
 		if bottom_pad.get_parent() == box: # `box` keeps growing after this
 			# function returns — the caller (show_overlay()/show_win_screen())
 			# appends the title/stats/Casualties section — so re-pin `bottom_pad`
@@ -766,6 +777,11 @@ const END_SCREEN_CONTENT_GAP := 16.0 # px — `box`'s own separation between
 const END_SCREEN_BAR_GAP := 16.0 # px of clearance Max asked for between the
 	# scrolled content's own bottom (the Casualties point, when there is one)
 	# and the buttons' own top edge, on top of the buttons' own height.
+const END_SCREEN_BAR_BOTTOM_MARGIN := 24.0 # px, Max (12th review): a little
+	# margin so Give Feedback (the last button) isn't flush with the screen's
+	# own bottom edge — a spacer below `buttons` inside `bar`, folded into
+	# `bottom_pad`'s own clearance too so the V-point still clears the
+	# buttons' new (higher) position at scroll-end.
 
 
 func show_overlay(won: bool, reason: String, rank := 0) -> void:

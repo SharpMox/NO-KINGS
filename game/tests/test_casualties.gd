@@ -379,6 +379,13 @@ func _init() -> void:
 				% [screen, screen_size.y,
 					end_scroll.get_global_rect().position.y if end_scroll != null else -1.0,
 					end_scroll.get_global_rect().end.y if end_scroll != null else -1.0])
+		# Max, 12th review: the buttons keep a margin off the screen's own
+		# bottom edge (Give Feedback isn't flush with it).
+		check(buttons_ctrl != null
+				and screen_size.y - buttons_ctrl.get_global_rect().end.y >= Modals.END_SCREEN_BAR_BOTTOM_MARGIN - 0.5,
+			"%s: the buttons keep at least %dpx off the screen's own bottom edge (%.1f vs bottom %.1f)"
+				% [screen, Modals.END_SCREEN_BAR_BOTTOM_MARGIN,
+					buttons_ctrl.get_global_rect().end.y if buttons_ctrl != null else -1.0, screen_size.y])
 		# Max, 11th review: the button bar has NO background at all — no
 		# panel, no fill, alpha 0. There is no PanelContainer left in `bar`
 		# at all (removed with `strip`); this holds even if a future change

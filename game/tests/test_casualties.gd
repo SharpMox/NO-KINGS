@@ -15,6 +15,9 @@ const Ads := preload("res://scripts/ads.gd")
 const Modals := preload("res://scripts/modals.gd")
 
 var fails := 0
+const VIEWPORT_CENTER_TOL := 6.0 # px — see its own call site: a real vertical
+	# scrollbar (251 casualties overflow the viewport) narrows the centred
+	# area by its own reserved width, ~4.8px off centre, measured on CI
 
 
 func check(cond: bool, label: String) -> void:
@@ -323,9 +326,14 @@ func _init() -> void:
 		# against `section`, `mass` and the point's own depth spacer instead.
 		var mass_ctrl: Control = section.get_child(1)
 		var end_scroll: ScrollContainer = g.modals.overlay.find_child("EndScroll", true, false)
-		var box_ctrl: Node = end_scroll.get_child(0) if end_scroll != null else null
-		var col_node: Node = end_scroll.get_parent() if end_scroll != null else null
-		var buttons_ctrl: Control = col_node.get_children()[-1] if col_node != null else null
+		var box_ctrl: Node = section.get_parent() # `box` itself — read straight
+			# off `section`'s own parent so it stays correct however `box` is
+			# wrapped above (Max, 10th review, added `box_pad`'s own margins)
+		var bar_node: Control = g.modals.overlay.find_child("EndScreenBar", true, false)
+		var strip_node: Control = bar_node.get_child(0) \
+			if bar_node != null and bar_node.get_child_count() > 0 else null
+		var buttons_ctrl: Control = strip_node.get_child(0) \
+			if strip_node != null and strip_node.get_child_count() > 0 else null
 		check(end_scroll != null and end_scroll.is_ancestor_of(section),
 			"%s: the banner (drawn on `section` itself) is a descendant of the scrolled content" % screen)
 		check(not section.top_level,
@@ -336,6 +344,24 @@ func _init() -> void:
 				and box_ctrl != null and box_ctrl.get_child(box_ctrl.get_child_count() - 1) == section,
 			"%s: the point's own depth is the last thing in the scrolled content — nothing sits below it"
 				% screen)
+		# Max, 2026-09-26 (10th review, page-spec ruling): the scroll viewport
+		# now spans the WHOLE screen — content scrolls off the top edge — and
+		# the button block floats over it on its own opaque bar instead of
+		# constraining the scroll's own height.
+		var vp := g.get_viewport_rect()
+		check(end_scroll != null and absf(end_scroll.get_global_rect().position.y) <= 0.5
+				and absf(end_scroll.get_global_rect().end.y - vp.size.y) <= 0.5,
+			"%s: the scroll viewport spans the full screen, top (0) to bottom (%.1f) (got [%.1f, %.1f])"
+				% [screen, vp.size.y,
+					end_scroll.get_global_rect().position.y if end_scroll != null else -1.0,
+					end_scroll.get_global_rect().end.y if end_scroll != null else -1.0])
+		var strip_style: StyleBox = strip_node.get_theme_stylebox("panel") if strip_node != null else null
+		check(strip_style is StyleBoxFlat and (strip_style as StyleBoxFlat).bg_color.a >= 0.999,
+			"%s: the button bar is opaque" % screen)
+		var overlay_kids := g.modals.overlay.get_children()
+		check(bar_node != null and end_scroll != null
+				and overlay_kids.find(bar_node) > overlay_kids.find(end_scroll),
+			"%s: the bar draws above the scroll (later tree position)" % screen)
 		if point_spacer != null and title_label != null:
 			var banner_w: float = mass_ctrl.custom_minimum_size.x + 2.0 * Modals.CASUALTY_BANNER_MARGIN_X
 			var depth: float = banner_w * Modals.CASUALTY_BANNER_POINT_DEPTH_RATIO
@@ -381,11 +407,6 @@ func _init() -> void:
 			check(mass_ctrl.size.y >= mass_ctrl.custom_minimum_size.y - 0.01,
 				"%s: the mass keeps its own full height — the rotated first/last row's overhang room is never squeezed (%.1f vs %.1f)"
 					% [screen, mass_ctrl.size.y, mass_ctrl.custom_minimum_size.y])
-			check(buttons_ctrl == null
-					or end_scroll.get_global_rect().end.y <= buttons_ctrl.get_global_rect().position.y + 0.5,
-				"%s: the scroll's own bottom edge sits at or above the buttons' top — they never overlap (%.1f vs %.1f)"
-					% [screen, end_scroll.get_global_rect().end.y,
-						buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
 			# Max, 9th review (Aux's capture at e296e12): the banner's left
 			# edge sat flush with the screen while the mass was centred — the
 			# banner painted with `mass`'s pre-sort (still 0) local x, because
@@ -402,8 +423,16 @@ func _init() -> void:
 			check(absf(banner_center_x - mass_center_x) <= 1.0,
 				"%s: the banner's horizontal centre matches the mass's own (%.1f vs %.1f)"
 					% [screen, banner_center_x, mass_center_x])
-			check(absf(banner_center_x - viewport_center_x) <= 1.0,
-				"%s: the banner's horizontal centre matches the viewport's own (%.1f vs %.1f)"
+			# VIEWPORT_CENTER_TOL, not 1px: this run's 251 casualties overflow
+			# the viewport, so the ScrollContainer shows a real vertical
+			# scrollbar that reserves its own width — `box`'s SHRINK_CENTER
+			# then centres content in the SCROLLBAR-NARROWED area, a few
+			# pixels left of the screen's true centre (measured 4.8px off on
+			# CI run 36253532485). That is the scrollbar physically being
+			# there, not a bug in the banner's own centring (already proven
+			# exact against the mass, above).
+			check(absf(banner_center_x - viewport_center_x) <= VIEWPORT_CENTER_TOL,
+				"%s: the banner's horizontal centre is close to the viewport's own (%.1f vs %.1f)"
 					% [screen, banner_center_x, viewport_center_x])
 			var banner_left: float = bx_global
 			var banner_right: float = bx_global + banner_w
@@ -428,9 +457,11 @@ func _init() -> void:
 			check(apex_global_y >= scroll_rect.position.y - 0.5 and apex_global_y <= scroll_rect.end.y + 0.5,
 				"%s: scrolled to the bottom, the point sits inside the scroll's own (clipped) rect (%.1f in [%.1f, %.1f])"
 					% [screen, apex_global_y, scroll_rect.position.y, scroll_rect.end.y])
-			check(buttons_ctrl == null or apex_global_y <= buttons_ctrl.get_global_rect().position.y + 0.5,
-				"%s: the point never sits behind the pinned buttons (%.1f vs buttons top %.1f)"
-					% [screen, apex_global_y, buttons_ctrl.get_global_rect().position.y if buttons_ctrl != null else -1.0])
+			check(strip_node == null
+					or apex_global_y <= strip_node.get_global_rect().position.y - Modals.END_SCREEN_BAR_GAP + 0.5,
+				"%s: at max scroll, the point sits at least %dpx above the bar's own top (%.1f vs bar top %.1f)"
+					% [screen, Modals.END_SCREEN_BAR_GAP, apex_global_y,
+						strip_node.get_global_rect().position.y if strip_node != null else -1.0])
 		var tint_ok := true
 		var unscaled := true
 		var odd := ""

@@ -23,6 +23,7 @@ extends SceneTree
 
 const Game := preload("res://scripts/game.gd")
 const Rules := preload("res://scripts/rules.gd")
+const Tuning := preload("res://scripts/tuning.gd")
 const BuffLogic := preload("res://scripts/buff_logic.gd")
 const PieceDiagram := preload("res://scripts/piece_diagram.gd")
 const _UiFonts := preload("res://scripts/ui_fonts.gd") # its _static_init chains NoKingsSymbols behind Pixel Operator
@@ -51,10 +52,18 @@ var _win := Rect2i()
 ## named fallbacks so a machine whose OS fallback misses a glyph (CI's runner:
 ## ⨯ ⟲) still draws it. Where the OS fallback already has it this changes nothing.
 var _sym: Font
-## Merge targets the current image's paint asked for, [centre, token]. Drawn by
-## an overlay through game.gd's SELECT_OUTLINE_SHADER after the paint, the way
-## game.gd's `_merge_fx` child draws them over the board.
-var _targets: Array = []
+## Silhouette outlines the current image's paint asked for (selection and merge
+## targets), each {centre, tex, size, reach, fill_reach, rim, fill}. Each is drawn
+## after the paint by its own overlay through game.gd's SELECT_OUTLINE_SHADER, the
+## way game.gd's `_pulse` / `_merge_fx` children draw them over the board (one
+## overlay each: the shader's colours are uniforms).
+var _outlines: Array = []
+## Chequer areas the paint asked for, each {rect, origin, board_h}: drawn behind
+## the paint by game.gd's BOARD_TILE_SHADER (#607's Perlin noise), as the board's
+## own _tile_layer draws them. origin/board_h place the area on board coordinates
+## so tile parity and the noise field match the real board.
+var _boards: Array = []
+var _outline_shader: Shader
 
 
 func _initialize() -> void:
@@ -98,10 +107,8 @@ func _initialize() -> void:
 	for key: String in BuffLogic.PIECE_BUFF_GLYPHS:
 		images["buff-" + key] = _board_image(Rect2i(0, 0, 1, 1), [["rook", 0, 0, 0, [BuffLogic.glyph_of(key)]]])
 
-	var outline := Shader.new()
-	outline.code = Game.SELECT_OUTLINE_SHADER
-	var outline_mat := ShaderMaterial.new()
-	outline_mat.shader = outline
+	_outline_shader = Shader.new()
+	_outline_shader.code = Game.SELECT_OUTLINE_SHADER
 	var out := ProjectSettings.globalize_path(OUT_DIR)
 	DirAccess.make_dir_recursive_absolute(out)
 	var fails := 0
@@ -114,14 +121,14 @@ func _initialize() -> void:
 		canvas.size = Vector2(vp.size)
 		canvas.paint = images[name][1]
 		vp.add_child(canvas)
-		var overlay := Node2D.new()
-		overlay.material = outline_mat
-		overlay.draw.connect(func() -> void: _draw_targets(overlay))
-		canvas.add_child(overlay)
-		_targets = []
+		_outlines = []
+		_boards = []
 		root.add_child(vp)
 		await RenderingServer.frame_post_draw
-		overlay.queue_redraw() # the paint has run now, so _targets is filled
+		for b: Dictionary in _boards: # the paint has run now, so both lists are filled
+			canvas.add_child(_board_node(b))
+		for o: Dictionary in _outlines:
+			canvas.add_child(_outline_node(o))
 		await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		var path := out.path_join(name + ".png")
@@ -156,6 +163,7 @@ func _merge_pawns(c: Control) -> void:
 	var tiles := _strip(c, ["pawn", "pawn", defs.pawn.next])
 	c.draw_rect(tiles[0], Game.COL_SELECT)
 	_piece(c, "pawn", Rules.PLAYER, tiles[0], true)
+	_selection(tiles[0], "pawn")
 	_merge_target(tiles[1], "pawn")
 	_between(c, tiles[0], tiles[1], "+")
 	_between(c, tiles[1], tiles[2], "→")
@@ -197,7 +205,7 @@ func _strip(c: Control, ids: Array, named := true) -> Array[Rect2]:
 	for i in ids.size():
 		var r := Rect2(Vector2(i * (TILE + GAP), 0), Vector2(TILE, TILE))
 		out.append(r)
-		c.draw_rect(r, Game.COL_LIGHT if i % 2 == 0 else Game.COL_DARK)
+		_boards.append({"rect": r, "origin": Vector2(r.position.x - i * TILE, 0), "board_h": 1.0})
 		_piece(c, ids[i], Rules.PLAYER, r)
 		if named:
 			_caption(c, r, defs[ids[i]].name)
@@ -245,9 +253,8 @@ func _scene(c: Control, win: Rect2i, pieces: Array, o: Dictionary) -> void:
 	var board := {}
 	for p in pieces:
 		board[Vector2i(p[2], p[3])] = {"id": p[0], "owner": p[1]}
-	for x in range(win.position.x, win.end.x):
-		for y in range(win.position.y, win.end.y):
-			c.draw_rect(_tile(Vector2i(x, y)), Game.COL_LIGHT if (x + y) % 2 == 0 else Game.COL_DARK)
+	_boards.append({"rect": Rect2(Vector2.ZERO, Vector2(win.size * TILE)),
+		"origin": Vector2(-win.position.x * TILE, 0), "board_h": float(win.end.y)})
 	var sel: Vector2i = o.get("sel", Vector2i(-1, -1))
 	if sel.x >= 0:
 		c.draw_rect(_tile(sel), Game.COL_SELECT)
@@ -279,6 +286,8 @@ func _scene(c: Control, win: Rect2i, pieces: Array, o: Dictionary) -> void:
 		_piece(c, p[0], p[1], r, Vector2i(p[2], p[3]) == sel)
 		if p.size() > 4:
 			_badges(c, r, p[4])
+	if sel.x >= 0 and board[sel].owner == Rules.PLAYER:
+		_selection(_tile(sel), board[sel].id)
 	if o.has("target"):
 		_merge_target(_tile(o.target), board[o.target].id)
 
@@ -379,29 +388,70 @@ func _arrow(c: Control, from: Vector2, to: Vector2, col: Color) -> void:
 	c.draw_colored_polygon(PackedVector2Array([end - side * hh, to, end + side * hh]), col)
 
 
-## Marks the player token `id` on tile `r` as a merge target (drawn later by
-## _draw_targets).
-func _merge_target(r: Rect2, id: String) -> void:
-	var tex := Game.load_piece_tex(id)
-	_held.append(tex)
-	_targets.append([r.get_center(), tex])
-
-
 ## game.gd _draw_merge_fx, static (animations off): the lime rim on a dark inner
-## band, hugging each target token's own silhouette.
-func _draw_targets(o: Node2D) -> void:
-	var size := TILE + 4.0 * S # the token's drawn size (inset -2)
-	var w := Game.MERGE_TARGET_WIDTH * S
-	var mat: ShaderMaterial = o.material
-	mat.set_shader_parameter("rim_color", Game.COL_MERGE_TARGET)
-	mat.set_shader_parameter("fill_color", Game.BUFF_BADGE_BG)
-	mat.set_shader_parameter("fill_reach", Game.MERGE_TARGET_KEYLINE * S / size)
+## band around the player token `id` on tile `r`.
+func _merge_target(r: Rect2, id: String) -> void:
+	_outlines.append({"centre": r.get_center(), "tex": Game.load_piece_tex(id),
+		"size": TILE + 4.0 * S, # the token's drawn size (inset -2)
+		"reach": Game.MERGE_TARGET_WIDTH * S, "fill_reach": Game.MERGE_TARGET_KEYLINE * S,
+		"rim": Game.COL_MERGE_TARGET, "fill": Game.BUFF_BADGE_BG})
+
+
+## game.gd _draw_pulse at the top of its breathing (alpha 1): the purple
+## selection rim on a dark band around the selected player token `id` on `r`.
+func _selection(r: Rect2, id: String) -> void:
+	var a := Game.SELECT_OUTLINE_ALPHA_MIN + Game.SELECT_OUTLINE_ALPHA_RANGE
+	_outlines.append({"centre": r.get_center(), "tex": Game.load_piece_tex(id),
+		"size": TILE - Game.SELECTED_INSET * 2 * S, "reach": Game.SELECT_OUTLINE_WIDTH * S,
+		"fill_reach": (Game.SELECT_OUTLINE_WIDTH - Game.SELECT_OUTLINE_RIM) * S,
+		"rim": Color(Game.COL_ZONE_OUTLINE_OVERLAP, a * Game.SELECT_OUTLINE_RIM_ALPHA),
+		"fill": Color(Game.BUFF_BADGE_BG, a)})
+
+
+## One chequer area through BOARD_TILE_SHADER, behind the paint
+## (show_behind_parent, like game.gd's _tile_layer).
+func _board_node(b: Dictionary) -> Node2D:
+	var n := Node2D.new()
+	n.show_behind_parent = true
+	var mat := ShaderMaterial.new()
+	mat.shader = Shader.new()
+	mat.shader.code = Game.BOARD_TILE_SHADER
+	mat.set_shader_parameter("light_col", Game.COL_LIGHT)
+	mat.set_shader_parameter("dark_col", Game.COL_DARK)
+	mat.set_shader_parameter("origin", b.origin)
+	mat.set_shader_parameter("tile", float(TILE))
+	mat.set_shader_parameter("board_h", b.board_h)
+	mat.set_shader_parameter("cells", maxf(1.0, roundf(TILE / (Tuning.BOARD_NOISE_PIXEL * S))))
+	mat.set_shader_parameter("amount", Tuning.BOARD_NOISE_AMOUNT)
+	n.material = mat
+	var r: Rect2 = b.rect
+	n.draw.connect(func() -> void: n.draw_rect(r, Color.WHITE))
+	return n
+
+
+## One outline: the token drawn through the shader on a canvas padded by
+## `reach`, so the dilation is not clipped at the token's rect (game.gd's trick).
+func _outline_node(o: Dictionary) -> Node2D:
+	var n := Node2D.new()
+	var mat := ShaderMaterial.new()
+	mat.shader = _outline_shader
+	var size: float = o.size
+	var w: float = o.reach
+	var fill_reach: float = o.fill_reach
+	mat.set_shader_parameter("rim_color", o.rim)
+	mat.set_shader_parameter("fill_color", o.fill)
+	mat.set_shader_parameter("fill_reach", fill_reach / size)
 	mat.set_shader_parameter("rim_reach", w / size)
-	for t in _targets:
-		var tex: Texture2D = t[1]
+	n.material = mat
+	var tex: Texture2D = o.tex
+	_held.append(tex)
+	var centre: Vector2 = o.centre
+	n.draw.connect(func() -> void:
 		var margin := tex.get_size() * (w / size)
-		o.draw_texture_rect_region(tex, Rect2(t[0] - Vector2(size, size) / 2 - Vector2(w, w), Vector2(size, size) + Vector2(w, w) * 2),
-			Rect2(-margin, tex.get_size() + margin * 2), Color.WHITE, false, false)
+		n.draw_texture_rect_region(tex,
+			Rect2(centre - Vector2(size, size) / 2 - Vector2(w, w), Vector2(size, size) + Vector2(w, w) * 2),
+			Rect2(-margin, tex.get_size() + margin * 2), Color.WHITE, false, false))
+	return n
 
 
 ## game.gd _buff_badge_centres + _draw_buff_badge for the tile `r`; the badge at

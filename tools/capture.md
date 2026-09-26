@@ -22,6 +22,8 @@ On Aux, check out and capture inside one locked command (`ROLE.md`, `CLAUDE.md`)
 ssh aux 'cd ~/NO-KINGS && caffeinate -i tools/godot-lock.sh sh -c "git fetch --prune -q && git checkout --detach -q origin/<ref> && $HOME/bin/godot --path game -- --scenario-name \"Loss: clock-out (10s)\" --screenshot /tmp/cap/gameover --show-screen gameover"'
 ```
 
+`--crt off` (after `--`, any capture) turns the CRT scanline overlay off for that run only; the saved Settings are untouched. The Guide captures (`game/tools/guide_captures.gd`) all pass it.
+
 ## Screens (`--screenshot DIR --show-screen NAME`)
 
 Game-scene screens need a scenario and write `DIR/game.png`:

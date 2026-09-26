@@ -68,8 +68,13 @@ func _ready() -> void:
 
 
 ## Settings.apply() routes the toggle here; also read once at boot above.
+## `--crt off` (a user arg, after `--`; tools/capture.md) keeps it off for the
+## whole run whatever Settings says, and never writes Settings: captures for
+## the Guide (NO-264) must not carry the scanlines.
 func set_enabled(on: bool) -> void:
-	_rect.visible = on
+	var args := OS.get_cmdline_user_args()
+	var i := args.find("--crt")
+	_rect.visible = on and not (i >= 0 and i + 1 < args.size() and args[i + 1] == "off")
 
 
 func enabled() -> bool:

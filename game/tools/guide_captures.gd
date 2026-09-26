@@ -46,7 +46,7 @@ const SHOTS := [
 		"rect": Rect2(75, 295, 405, 170)},
 	{"name": "shop", "file": "game.png",
 		"flags": ["--scenario-name", "Boxes (Shop, issue 47: 9 typed Boxes)", "--open-shop", "--roll-shop"],
-		"rect": Rect2(50, 0, 430, 680)},
+		"rect": Rect2(45, 0, 435, 800)},
 	{"name": "box", "file": "game.png",
 		"flags": ["--scenario-name", "Movement & drag", "--seed", "1", "--show-screen", "box"],
 		"rect": Rect2(0, 150, 480, 460)},
@@ -81,7 +81,7 @@ func _initialize() -> void:
 		DirAccess.remove_absolute(png) # never crop a stale capture
 		var args := PackedStringArray(["--path", ProjectSettings.globalize_path("res://"), "--"])
 		args.append_array(PackedStringArray(shot.flags))
-		args.append_array(PackedStringArray(["--screenshot", dir]))
+		args.append_array(PackedStringArray(["--screenshot", dir, "--crt", "off"])) # no scanlines in the Guide
 		var code := OS.execute(OS.get_executable_path(), args)
 		var img: Image = Image.load_from_file(png) if FileAccess.file_exists(png) else null
 		if img == null:

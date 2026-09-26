@@ -2584,6 +2584,7 @@ func _shop_buy(index: int) -> void:
 
 
 func _end_shot() -> void:
+	await _capture_hold(OS.get_cmdline_user_args())
 	await RenderingServer.frame_post_draw
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(screenshot_dir.path_join("gameover.png"))
@@ -5510,7 +5511,17 @@ func _debug_state_screenshot(dir: String, args: PackedStringArray) -> void:
 	# settle wait below would let it finish before the shot, so skip it here.
 	var pinned_banner := args.has("--show-screen") \
 			and args[args.find("--show-screen") + 1] == "banner"
+	await _capture_hold(args)
 	await _capture_and_quit(dir, not pinned_banner)
+
+
+## `--hold SECONDS` (tools/capture.md): keep a capture on screen that long
+## before it shoots and quits, so a --write-movie clip records a looping
+## animation (the merge target's pulse and wiggle). No flag, no wait.
+func _capture_hold(args: PackedStringArray) -> void:
+	var i := args.find("--hold")
+	if i >= 0 and i + 1 < args.size():
+		await get_tree().create_timer(float(args[i + 1])).timeout
 
 
 ## `--show-screen NAME`'s states (tools/capture.md lists them all). Split out

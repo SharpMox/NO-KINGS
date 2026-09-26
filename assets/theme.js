@@ -2,7 +2,7 @@
    Behaviour byte-identical to the per-page copies it replaces:
    - Toggles `data-theme="dark"` on <html>.
    - Persists choice in localStorage under `fp-theme`.
-   - On first visit, honours prefers-color-scheme: dark. */
+   - Defaults to dark; prefers-color-scheme is deliberately ignored. */
 (function () {
   const themeToggle = document.getElementById('theme-toggle');
   function setTheme(t) {

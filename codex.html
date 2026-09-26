@@ -32,28 +32,31 @@
     --border:#e0d0ae; --border-soft:#ebdcbf;
     --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
-    --lime:#577319; --accent:#556f18;
+    --lime:#577319; --accent:var(--lime); --dark-ink:#141024;
     /* Board tokens for assets/board.js, copied from assets/site.css. */
     --sq-light:#fcf0d8; --sq-dark:#b3a8c2;
     --piece-disc:#231544; --piece-disc-text:#fcf0d8;
     --move-color:#2e6fd0; --capture-color:#c0392b; --hurdle-color:#7a3ae8;
-    --hop-target:#2f8f5f; --ray-color:#2f7fc0; --rider-color:#c8791f;
+    --hop-target:#2f8f5f; --ray-color:var(--move-color); --rider-color:#c8791f;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     --ease:cubic-bezier(.22,1,.36,1);
     --wrap:1560px;
-    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+    --rad-xs:4px; --rad-ctl:8px; --rad-sm:12px; --rad-md:18px; --rad-pill:999px;
+    /* Glass wash: dark is the original recipe, light keeps the panel cream. */
+    --glass-wash:#fff8ea;
   }
   [data-theme="dark"]{
     --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
     --border:#332352; --border-soft:#261a44;
     --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
     --violet:#7a3ae8; --violet-hi:#a070e8;
-    --lime:#a8d048; --accent:#a8d048;
+    --lime:#a8d048;
+    --glass-wash:#181030;
     --sq-light:#4a4270; --sq-dark:#241d3e;
     --piece-disc:#efeaff; --piece-disc-text:#0f0a1c;
     --move-color:#79a7ff; --capture-color:#ff7878; --hurdle-color:#c890e8;
-    --hop-target:#6dd6a8; --ray-color:#79a7ff; --rider-color:#ffae5c;
+    --hop-target:#6dd6a8; --rider-color:#ffae5c;
   }
 
   /* ---------- Base + shell (restated: site.css is not loaded, same as
@@ -91,14 +94,14 @@
   .foot p{margin:0 0 7px}
   .foot p:last-child{margin-bottom:0}
   .foot-lead{color:var(--text-soft);font-size:14px}
-  @media(max-width:600px){.foot{padding:20px 16px 40px}}
+  @media(max-width:560px){.foot{padding:20px 16px 40px}}
 
   /* ---------- Count + border legend row ---------- */
   .cx-controls{display:flex;align-items:center;gap:14px;margin:0 0 26px}
   .cx-count{font:700 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
   .cx-legend{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-left:auto;
     font:500 11.5px/1 var(--sans);color:var(--text-dim)}
-  .lg-box{width:14px;height:14px;border-radius:4px;display:inline-block;vertical-align:-3px;
+  .lg-box{width:14px;height:14px;border-radius:var(--rad-xs);display:inline-block;vertical-align:-3px;
     margin-right:7px;background:var(--surface);border:1.5px solid var(--border-soft)}
   .lg-box.promo{border-color:color-mix(in srgb,var(--violet-hi) 45%,var(--border-soft))}
   .lg-box.forged{border-color:color-mix(in srgb,var(--lime) 45%,var(--border-soft))}
@@ -116,12 +119,12 @@
   .tile{appearance:none;border:1px solid var(--border-soft);color:var(--text);
     background:color-mix(in srgb,var(--surface) 52%,transparent);
     backdrop-filter:blur(9px) saturate(150%);-webkit-backdrop-filter:blur(9px) saturate(150%);
-    border-radius:14px;padding:9px 9px 8px;cursor:pointer;display:flex;flex-direction:column;gap:7px;
+    border-radius:var(--rad-sm);padding:9px 9px 8px;cursor:pointer;display:flex;flex-direction:column;gap:7px;
     align-items:center;width:var(--tw,88px);transition:border-color .2s var(--ease),transform .2s var(--ease)}
   @media (prefers-reduced-transparency:reduce){
     .tile{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}}
   .tile:hover{border-color:var(--violet-hi);transform:translateY(-2px);z-index:2}
-  .tile .fp{position:relative;width:calc(var(--tw,88px) - 18px);aspect-ratio:1;border-radius:9px;overflow:hidden;background:var(--sq-dark)}
+  .tile .fp{position:relative;width:calc(var(--tw,88px) - 18px);aspect-ratio:1;border-radius:var(--rad-ctl);overflow:hidden;background:var(--sq-dark)}
   .tile .fp svg{width:100%;height:100%;display:block;transform:scale(1.8);transition:transform .45s var(--ease)}
   .tile:hover .fp svg{transform:scale(1)}
   /* the name sits on the bottom of the diagram, over a scrim */
@@ -164,7 +167,7 @@
   .spanel{position:fixed;top:var(--nav-h,61px);right:0;bottom:0;width:min(700px,48.6vw);z-index:80;
     display:flex;flex-direction:column;
     overflow:hidden;padding:22px 34px 26px;border-left:1px solid var(--border);
-    background:linear-gradient(150deg,rgba(160,112,232,.14),rgba(24,16,48,.20) 42%),
+    background:linear-gradient(150deg,rgba(160,112,232,.14),color-mix(in srgb,var(--glass-wash) 20%,transparent) 42%),
                color-mix(in srgb,var(--surface) 62%,transparent);
     backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
     box-shadow:-30px 0 70px -40px rgba(0,0,0,.8);
@@ -187,7 +190,7 @@
   .spanel .betza-pill{margin-top:9px}
   /* the record's big diagram only — renderBoard puts class="board" on every
      svg, so this must NOT catch the 64px relation minis */
-  .spanel .sp-main > .board{max-width:min(440px,100%);border-radius:10px;overflow:hidden;display:block}
+  .spanel .sp-main > .board{max-width:min(440px,100%);border-radius:var(--rad-ctl);overflow:hidden;display:block}
 
   /* panel split: piece record pinned on top (diagram beside its info); the
      relations section below scrolls on its own so the record never leaves */
@@ -229,7 +232,7 @@
   }
   .relation-section{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 0;
     margin-bottom:10px;break-inside:avoid;max-height:100%;overflow-y:auto;scrollbar-width:thin;
-    padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
+    padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rad-ctl);
     background:color-mix(in srgb,var(--surface) 52%,transparent);
     backdrop-filter:blur(9px) saturate(150%);-webkit-backdrop-filter:blur(9px) saturate(150%)}
   @media (prefers-reduced-transparency:reduce){
@@ -262,9 +265,9 @@
   @media(max-width:760px){.relation-label{display:inline-block}}
   /* ...unless the screen is truly tiny */
   @media(max-width:330px){.relation-label{display:none}}
-  .relation-target{display:flex;align-items:center;cursor:pointer;border-radius:6px}
+  .relation-target{display:flex;align-items:center;cursor:pointer;border-radius:var(--rad-ctl)}
   .relation-target:hover .relation-name{color:var(--accent)}
-  .relation-mini{position:relative;width:64px;height:64px;flex-shrink:0;border-radius:9px;overflow:hidden;
+  .relation-mini{position:relative;width:64px;height:64px;flex-shrink:0;border-radius:var(--rad-ctl);overflow:hidden;
     background:var(--sq-dark);border:1px solid var(--border)}
   .relation-mini svg{display:block;width:100%;height:100%;transform:scale(1.8)}
   /* mini names overlay the bottom of their diagram */

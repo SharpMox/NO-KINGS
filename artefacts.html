@@ -39,15 +39,15 @@
     --border:#e0d0ae; --border-soft:#ebdcbf;
     --text:#231544; --text-soft:#5f5080; --text-dim:#6f6484;
     --violet:#6a2ed0; --violet-hi:#8a52d8;
-    /* --lime is the display colour (hero gradient, chip fills, active states).
-       --accent is the LINK colour. Both are AA on this cream: --lime #577319 is
-       4.61:1 and --accent #556f18 is 4.86:1. (--lime was #6f9420 at 3.01:1,
-       which failed AA wherever it was used as text, so it was darkened.) */
-    --lime:#577319; --on-lime:#fcf0d8; --accent:#556f18;
+    /* --lime is the display colour (hero gradient, chip fills, active states);
+       --accent (links, focus) and the rare rung are the same olive, so they
+       point at it rather than repeating a near-identical hex. --dark-ink is the
+       text on a lime or rarity fill, in both themes. */
+    --lime:#577319; --on-lime:#fcf0d8; --accent:var(--lime); --dark-ink:#141024;
     /* Rarity ladder: neutral slate, teal, Larry's grin lime, Larry's rim violet.
        Teal rather than a second green, because at 15px two greens next to each
        other in the rail are not tellable apart. */
-    --r-common:#656a76; --r-uncommon:#10766d; --r-rare:#537416; --r-legendary:#7a3ae8;
+    --r-common:#656a76; --r-uncommon:#10766d; --r-rare:var(--lime); --r-legendary:#7a3ae8;
     --glow:0 0 0 1px rgba(111,148,32,.28), 0 10px 26px -12px rgba(111,148,32,.35);
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -55,15 +55,15 @@
     --wrap:1560px;
     --bar-h:0px;      /* the filter bar's height, but only while it is sticky */
     /* Soft geometry throughout. */
-    --rad-md:18px; --rad-sm:12px; --rad-pill:999px;
+    --rad-xs:4px; --rad-ctl:8px; --rad-sm:12px; --rad-md:18px; --rad-pill:999px;
   }
   [data-theme="dark"]{
     --bg:#0f0a1c; --surface:#181030; --surface-2:#221643;
     --border:#332352; --border-soft:#261a44;
     --text:#efeaff; --text-soft:#a79ac9; --text-dim:#8c81a9;
     --violet:#7a3ae8; --violet-hi:#a070e8;
-    --lime:#a8d048; --on-lime:#141024; --accent:#a8d048;
-    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-rare:#a8d048; --r-legendary:#a070e8;
+    --lime:#a8d048; --on-lime:var(--dark-ink);
+    --r-common:#7b8190; --r-uncommon:#2fb3a6; --r-legendary:#a070e8;
     --glow:0 0 0 1px rgba(168,208,72,.4), 0 8px 30px -10px rgba(168,208,72,.4);
   }
 
@@ -156,9 +156,9 @@
     display:inline-flex;align-items:center;gap:7px;transition:.18s var(--ease);
   }
   .chip:hover{color:var(--text);border-color:var(--violet-hi);transform:translateY(-1px)}
-  .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:#140f26}
+  .chip[aria-pressed="true"]{background:var(--c,var(--violet));border-color:transparent;color:var(--dark-ink)}
   .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--violet))}
-  .chip[aria-pressed="true"] .dot{background:#140f26}
+  .chip[aria-pressed="true"] .dot{background:var(--dark-ink)}
   .count{margin:0;font:700 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim)}
   .count b{color:var(--lime);font-size:14px}
 
@@ -213,7 +213,7 @@
   /* Column count is solved at runtime so the rail always fits its slot. */
   .grid{display:grid;grid-template-columns:repeat(var(--cols,12),1fr);gap:3px}
   .cell{
-    appearance:none;padding:0;border:0;cursor:pointer;aspect-ratio:1;border-radius:3px;
+    appearance:none;padding:0;border:0;cursor:pointer;aspect-ratio:1;border-radius:var(--rad-xs);
     background:color-mix(in srgb, var(--c) var(--lvl,68%), transparent);
     transition:transform .16s var(--ease), background .16s ease, box-shadow .16s ease;
   }
@@ -251,7 +251,7 @@
     display:flex;align-items:center;gap:7px;padding:0 3px;flex:none;
     font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);
   }
-  .legend i{width:11px;height:11px;border-radius:3px;background:var(--text-dim);display:inline-block}
+  .legend i{width:11px;height:11px;border-radius:var(--rad-xs);background:var(--text-dim);display:inline-block}
   .legend i:nth-of-type(1){opacity:.34}
   .legend i:nth-of-type(2){opacity:.64}
   .legend i:nth-of-type(3){opacity:1}
@@ -294,7 +294,7 @@
     flex:none;width:22px;height:22px;border-radius:50%;background:var(--surface-2);
     color:var(--text-dim);display:grid;place-items:center;font-size:8px;transition:.22s var(--ease);
   }
-  .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:#141024}
+  .row[open] .r-caret{transform:rotate(180deg);background:var(--c);color:var(--dark-ink)}
 
   .r-open{padding:2px 16px 18px 34px;display:grid;gap:24px}
   /* Art is a LEADING column on EVERY row: the 38 painted artefacts show their
@@ -407,7 +407,7 @@
     main{padding:8px 16px 70px}
     .wrap{grid-template-columns:58px minmax(0,1fr)}
     .rail{gap:6px;padding-right:2px}
-    .tier{padding:4px 4px 5px;border-radius:8px}
+    .tier{padding:4px 4px 5px;border-radius:var(--rad-ctl)}
     .tier-hd{margin-bottom:3px;gap:2px}
     /* No room for wide tracking or the count at this width. */
     .tier-hd h2{font-size:7px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

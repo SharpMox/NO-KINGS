@@ -502,6 +502,15 @@ func _end_screen_frame() -> Array:
 		# settled height + a gap, kept in sync below since it depends on the
 		# buttons' own (font-driven, not synchronously known) size.
 	box_pad.add_theme_constant_override("margin_top", END_SCREEN_TOP_PAD)
+	box_pad.size_flags_horizontal = Control.SIZE_EXPAND # `box_pad`, not `box`,
+		# is `scroll`'s own direct child now — EXPAND is what tells `scroll`
+		# to stretch IT to the full available width (h-scroll disabled, so
+		# ScrollContainer otherwise gives a non-EXPAND child only its own
+		# natural minimum, left-aligned) so `box`'s own SHRINK_CENTER below
+		# has the FULL width to centre within, same as before this wrapper
+		# existed. Without this, `box_pad` (and `box` inside it) measured
+		# ~432px instead of the full ~480, and everything centred ~24px left
+		# of the true screen centre.
 	scroll.add_child(box_pad)
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER

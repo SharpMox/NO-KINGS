@@ -546,6 +546,7 @@ func _end_screen_frame() -> Array:
 	var bottom_pad := Control.new() # room for `strip`'s own settled height
 		# plus a gap, kept in sync below since it depends on the buttons' own
 		# (font-driven, not synchronously known) size
+	bottom_pad.name = "EndScreenBottomPad" # the tests' handle
 	bottom_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(bottom_pad)
 	var sync_bottom_pad := func() -> void:
@@ -746,7 +747,7 @@ const CASUALTY_TITLE_GAP := 16.0 # px, Max: "~16 px of room between the title
 ## Max, 2026-09-26 (10th review, page-spec ruling): the end screen's own
 ## chrome — the top breathing room the scroll viewport used to reserve as a
 ## screen-level margin (now content padding, `_end_screen_frame()`'s
-## `box_pad`), and the floating button bar it now replaces the old pinned
+## `top_pad`), and the floating button bar it now replaces the old pinned
 ## column with. See that function's own header for the shape.
 const END_SCREEN_TOP_PAD := 24.0 # px — the OLD `margin`'s own top value
 	# (unrelated to CASUALTY_TITLE_TOP_PAD above, which pads the banner's

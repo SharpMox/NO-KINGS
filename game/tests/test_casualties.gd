@@ -327,8 +327,8 @@ func _init() -> void:
 		var mass_ctrl: Control = section.get_child(1)
 		var end_scroll: ScrollContainer = g.modals.overlay.find_child("EndScroll", true, false)
 		var box_ctrl: Node = section.get_parent() # `box` itself — read straight
-			# off `section`'s own parent so it stays correct however `box` is
-			# wrapped above (Max, 10th review, added `box_pad`'s own margins)
+			# off `section`'s own parent, robust to whatever else is a sibling
+			# inside `box` (the top/bottom padding spacers, etc.)
 		var bar_node: Control = g.modals.overlay.find_child("EndScreenBar", true, false)
 		var strip_node: Control = bar_node.get_child(0) \
 			if bar_node != null and bar_node.get_child_count() > 0 else null
@@ -339,9 +339,18 @@ func _init() -> void:
 		check(not section.top_level,
 			"%s: no banner node is top_level — it scrolls with the pieces like any other content" % screen)
 		var point_spacer: Control = section.find_child("CasualtyBannerPoint", false, false)
+		# Max, 10th review (page-spec ruling): `box`'s own last child is now
+		# `EndScreenBottomPad` (an invisible spacer reserving room for the
+		# floating button bar below), re-pinned there whenever the bar's own
+		# settled height changes. `section` (Casualties) is the last thing
+		# BEFORE that padding — the last VISIBLE content.
+		var bottom_content_pad: Control = box_ctrl.find_child("EndScreenBottomPad", false, false) \
+			if box_ctrl != null else null
+		var box_last_idx := box_ctrl.get_child_count() - 1 if box_ctrl != null else -1
+		var section_idx := box_last_idx - (1 if bottom_content_pad != null else 0)
 		check(point_spacer != null
 				and section.get_child(section.get_child_count() - 1) == point_spacer
-				and box_ctrl != null and box_ctrl.get_child(box_ctrl.get_child_count() - 1) == section,
+				and box_ctrl != null and section_idx >= 0 and box_ctrl.get_child(section_idx) == section,
 			"%s: the point's own depth is the last thing in the scrolled content — nothing sits below it"
 				% screen)
 		# Max, 2026-09-26 (10th review, page-spec ruling): the scroll viewport

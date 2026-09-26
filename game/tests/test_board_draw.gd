@@ -138,18 +138,23 @@ func _init() -> void:
 		"inversion mark's disc (r=%.1f) lies inside its tile (%.1f)" % [r, t])
 	check(game.INV_MARK_GLYPH_COL == Color.WHITE, "inversion glyph is white, not the side colour")
 	check(game.INV_MARK_DISC_COL == Color(0, 0, 0, 0.72), "inversion disc is dark, 72% alpha")
-	# The ⟲ is centred on its disc by its own measured ink, at the tile sizes
-	# a phone and the desktop window give (`_inv_mark_glyph` is what
-	# `_draw_piece` draws with). Main placed it by Open Sans's line metrics
-	# plus a nudge tuned on one OS font, and had no such helper.
+	# The ⟲'s RING (not its arrowhead-skewed ink box) is centred on its disc
+	# and spans INV_MARK_RING_FILL of it, at the tile sizes a phone and the
+	# desktop window give (`_inv_mark_glyph` is what `_draw_piece` draws with).
+	# Main placed it by Open Sans's line metrics plus a nudge tuned on one OS
+	# font, and had no such helper.
 	for disc_r: float in [r, 8.0, 11.3, 16.0]:
 		var at := c + Vector2(0.37, 0.61) # off the pixel grid on purpose
 		var mark: Dictionary = game._inv_mark_glyph(at, disc_r)
 		var ink: Rect2 = mark.ink
-		check(ink.get_center().distance_to(at) <= 1.0,
-			"⟲ ink centred on its disc (r=%.1f): ink %s centre %s vs disc %s" % [disc_r, ink, ink.get_center(), at])
-		check(ink.size.x >= disc_r and Rect2(at - Vector2(disc_r, disc_r), Vector2(disc_r, disc_r) * 2).grow(1.0).encloses(ink),
-			"⟲ ink (r=%.1f) is most of the disc's width and inside it: %s" % [disc_r, ink])
+		var ring: Vector2 = mark.ring_centre
+		check(ring.distance_to(at) <= 1.0,
+			"⟲ ring centred on its disc (r=%.1f): ring %s vs disc %s (ink %s)" % [disc_r, ring, at, ink])
+		var ring_d: float = mark.ring_d
+		check(absf(ring_d - 2.0 * disc_r * game.INV_MARK_RING_FILL) <= 1.5,
+			"⟲ ring (r=%.1f) spans %.0f%% of the disc: %.1f px" % [disc_r, game.INV_MARK_RING_FILL * 100, ring_d])
+		check(Rect2(at - Vector2(disc_r, disc_r), Vector2(disc_r, disc_r) * 2).grow(1.0).encloses(ink),
+			"⟲ ink (r=%.1f) lies inside the disc: %s" % [disc_r, ink])
 
 	# NO-244 (Max, 2026-09-24): up to 4 buff badges, 2 per row — the 4th must
 	# not overlap the 3rd. `_buff_badge_centres` is the helper

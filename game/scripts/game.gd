@@ -416,10 +416,17 @@ const INV_MARK_GLYPH_COL := Color.WHITE
 ## wide; Noto Sans Symbols 2 on Android: 1.02 em), and the old hand-tuned
 ## size and nudge only held for the one font they were measured on.
 const INV_MARK_FONT := preload("res://assets/fonts/NoKingsSymbols.ttf")
-## The ⟲'s ink spans this fraction of the disc's diameter: the proportion the
-## approved NO-100 capture had, assuming macOS drew it from Apple Symbols
-## (1.25 x the mark size x 0.555 em of ink / the 0.9 x mark-size disc).
-const INV_MARK_GLYPH_FILL := 0.77
+## The ⟲'s RING (not the whole glyph) spans this fraction of the disc's
+## diameter. Max, 2026-09-26: smaller than the old whole-ink 77%. Tweak here.
+const INV_MARK_RING_FILL := 0.58
+## Where the ⟲'s ring sits inside its ink rect (y down), so the circle, not the
+## arrowhead-skewed ink box, is what lands on the disc centre. Fixed by the
+## bundled font; derived with fontTools from NoKingsSymbols.ttf's uni27F2
+## outline (upm 1600): ink bbox x 216..1846, y -243..1133; the ring is a circle
+## centred (1158, 445), outer radius 688 (inner 575), so it spans the ink's full
+## height and the arrowhead hangs off its left. Centre = ((1158 - 216) / 1630,
+## (1133 - 445) / 1376) of the ink rect; ring outer diameter = ink height.
+const INV_MARK_RING_CENTRE := Vector2(942.0 / 1630.0, 688.0 / 1376.0)
 const INV_MARK_DISC_COL := Color(0, 0, 0, 0.72)
 const INV_MARK_DISC_RATIO := 0.45 # disc radius = _inv_mark_size() * this
 const INV_MARK_DROP := 0.18 # disc centre sits this fraction of a tile below centre, clear of the piece's face (Max, NO-100)
@@ -6742,23 +6749,27 @@ func _inv_mark_centre(px: Vector2) -> Vector2:
 
 ## How `_draw_piece` draws the ⟲ on a disc of radius `r` centred on `c`:
 ## {font_px: its font size, origin: draw_char's baseline origin, ink: the glyph's own
-## rasterised rect on screen}. Sized and centred by the glyph's measured ink
-## (TextServer glyph offset/size), not by line metrics, so it sits on the
-## disc whatever the font's ascent or side bearings. Shared with
+## rasterised rect on screen, ring_centre / ring_d: its ring's centre and outer
+## diameter on screen}. Sized and centred by the RING inside the glyph's
+## measured ink (TextServer glyph offset/size, INV_MARK_RING_CENTRE), not by
+## line metrics or the whole ink box, so the circle sits on the disc whatever
+## the font's ascent, side bearings or arrowhead. Shared with
 ## tests/test_board_draw.gd so the probe can't diverge from the draw.
 func _inv_mark_glyph(c: Vector2, r: float) -> Dictionary:
 	var ts := TextServerManager.get_primary_interface()
 	var rid: RID = INV_MARK_FONT.get_rids()[0]
 	var ch := INV_MARK_GLYPH.unicode_at(0)
 	var ref := 100 # px: the ink/em ratio, measured once at a size where rounding is noise
-	var ref_w: float = ts.font_get_glyph_size(rid, Vector2i(ref, 0),
-		ts.font_get_glyph_index(rid, ref, ch, 0)).x / ref
-	var size := maxi(1, roundi(2.0 * r * INV_MARK_GLYPH_FILL / ref_w))
+	var ref_h: float = ts.font_get_glyph_size(rid, Vector2i(ref, 0),
+		ts.font_get_glyph_index(rid, ref, ch, 0)).y / ref
+	var size := maxi(1, roundi(2.0 * r * INV_MARK_RING_FILL / ref_h)) # ring diameter = ink height
 	var gi := ts.font_get_glyph_index(rid, size, ch, 0)
 	var ink := Rect2(ts.font_get_glyph_offset(rid, Vector2i(size, 0), gi),
 		ts.font_get_glyph_size(rid, Vector2i(size, 0), gi))
-	var origin := (c - ink.get_center()).round() # whole pixels: the font is AA-off
-	return {"font_px": size, "origin": origin, "ink": Rect2(origin + ink.position, ink.size)}
+	var ring := ink.position + ink.size * INV_MARK_RING_CENTRE
+	var origin := (c - ring).round() # whole pixels: the font is AA-off
+	return {"font_px": size, "origin": origin, "ink": Rect2(origin + ink.position, ink.size),
+		"ring_centre": origin + ring, "ring_d": ink.size.y}
 
 
 func _tile_px(pos: Vector2i) -> Vector2:

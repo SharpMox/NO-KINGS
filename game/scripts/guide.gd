@@ -447,7 +447,7 @@ static func _item_tex(key: String) -> Texture2D:
 ## (game.gd, "Palette rule 2026-07-07" and NO-161/NO-176), never restated as
 ## a new literal, so this page cannot drift out of sync with the board.
 ## NO-242: each swatch is a mini tile (a COL_LIGHT square) carrying the mark
-## the board draws there — hatch, fill, ring, outline, dot or arrow — at the
+## the board draws there — hatch, fill, merge-target outline, outline, dot or arrow — at the
 ## board's own alpha, not a flat colour square. The old "Capture zone tile"
 ## row repeated Capture's COL_CAPTURE for the same red hatch (game.gd's
 ## legal_dests loop draws a capture destination exactly once); it is gone.
@@ -461,7 +461,7 @@ static func _fill_indicators(box: VBoxContainer, board) -> void:
 		["Move", "hatch", Color(board.COL_ZONE_OUTLINE_MOVE, hatch_a), "A square the selected piece can move to."],
 		["Capture", "hatch", Color(board.COL_CAPTURE, hatch_a), "An enemy piece the selected piece can capture."],
 		["Selected", "fill", board.COL_SELECT, "The piece currently selected."],
-		["Merge partner", "ring", board.COL_MERGE, "A piece the selection can merge or fuse with."],
+		["Merge target", "target", board.COL_MERGE_TARGET, "A piece the selection can merge or fuse with: a pulsing orange outline, and the piece wiggles."],
 		["Reachable zone", "outline", Color(board.COL_ZONE_OUTLINE_MOVE, board.ZONE_OUTLINE_ALPHA), "Outline around every square a selected piece can reach this turn."],
 		["Zone overlap", "outline", Color(board.COL_ZONE_OUTLINE_OVERLAP, board.ZONE_OUTLINE_OVERLAP_ALPHA), "Where a move zone and a capture zone reachable this turn share a boundary."],
 		["Blast zone", "zone", Color(board.COL_CAPTURE, hatch_a), "Tiles a bomb or armed Item will hit."],
@@ -502,7 +502,8 @@ static func _swatch_row(parent: Container, board, title: String, mark: String, c
 
 ## One board tile in miniature, carrying `mark` the way game.gd's _draw does:
 ## "hatch" (_draw_hatch's diagonal lines at HATCH_SPACING / HATCH_WIDTH),
-## "fill" (draw_rect), "ring" (the merge draw_arc at 0.46 of a tile),
+## "fill" (draw_rect), "target" (the merge target's orange stroke on a dark
+## keyline, game.gd MERGE_TARGET_*),
 ## "outline" (a zone edge), "zone" (hatch + outline, _draw_target_zone),
 ## "dot" (the COL_PLACE circle).
 static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void:
@@ -521,8 +522,10 @@ static func _draw_mini_tile(c: Control, board, mark: String, col: Color) -> void
 	match mark:
 		"fill":
 			c.draw_rect(Rect2(Vector2.ZERO, c.size), col)
-		"ring":
-			c.draw_arc(c.size / 2, s * 0.46, 0, TAU, 24, col, 2.0)
+		"target":
+			var r := Rect2(Vector2.ONE * 2.0, c.size - Vector2.ONE * 4.0)
+			c.draw_rect(r, board.BUFF_BADGE_BG, false, 5.0)
+			c.draw_rect(r, col, false, 3.0)
 		"outline", "zone":
 			c.draw_rect(Rect2(Vector2.ONE * 1.5, c.size - Vector2.ONE * 3.0),
 				Color(col, board.ZONE_OUTLINE_ALPHA) if mark == "zone" else col, false, 3.0)

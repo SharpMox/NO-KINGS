@@ -79,8 +79,8 @@ All three are Game-scene flags, usable with any capture above. `--board-noise` o
 | Sand, default noise | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-sand --show-screen board --board-theme sand` |
 | Sage, subtle (comparison) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-subtle --show-screen board --board-theme sage --board-noise 0.05` |
 | Sage, flat (control) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-off --show-screen board --board-theme sage --board-noise 0` |
-| Sage, freq 0.6 (default, #607 tuned) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq06 --show-screen board --board-theme sage --board-noise-freq 0.6` |
-| Sage, freq 0.9 (smaller still) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq09 --show-screen board --board-theme sage --board-noise-freq 0.9` |
+| Sage, freq 0.6 (#607 tuned) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq06 --show-screen board --board-theme sage --board-noise-freq 0.6` |
+| Sage, freq 0.9 (default, #610 tuned) | `--scenario-name "Movement & drag" --screenshot /tmp/cap/noise-freq09 --show-screen board --board-theme sage --board-noise-freq 0.9` |
 
 ## Videos of the selling flows (`--ui-demo FLOW`)
 

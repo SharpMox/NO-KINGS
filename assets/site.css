@@ -47,10 +47,11 @@
   --violet: #6a2ed0;
   --violet-hi: #8a52d8;
   /* Glass: the wash under the lavender tint, the lit rim, the dialog scrim.
-     Dark values are the original recipe; light keeps the glass cream. */
-  --glass-wash: #fff8ea;
-  --glass-rim: #ffffff;
-  --scrim: #231544;
+     Light deliberately uses the same dark violet wash as dark theme (Max's
+     preference, 26/09/2026) rather than a cream variant. */
+  --glass-wash: #181030;
+  --glass-rim: #efeaff;
+  --scrim: #080412;
   /* Shared with artefacts.html so assets/nav.css can style one header for both. */
   --border-soft: #ebdcbf;
   --text-dim: #6f6484;

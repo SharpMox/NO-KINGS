@@ -61,9 +61,9 @@ colors:
   light-on-lime: "#fcf0d8"
   light-violet: "#6a2ed0"
   light-violet-hi: "#8a52d8"
-  light-scrim: "#231544"
-  light-glass-wash: "#fff8ea"
-  light-glass-rim: "#ffffff"
+  light-scrim: "#080412"        # same as dark: light uses the dark violet wash (Max, 26/09/2026)
+  light-glass-wash: "#181030"   # same as dark --glass-wash
+  light-glass-rim: "#efeaff"    # same as dark --glass-rim
   light-rarity-common: "#656a76"
   light-rarity-uncommon: "#10766d"
   light-rarity-rare: "#577319"  # --r-rare is var(--lime)
@@ -439,7 +439,7 @@ components:
     textColor: "{colors.glass-rim}"
   glass-wash-light:
     backgroundColor: "{colors.light-glass-wash}"
-    textColor: "{colors.light-on-surface}"
+    textColor: "{colors.light-glass-rim}"
   segmented-option-active-light:
     backgroundColor: "{colors.light-lime}"
     textColor: "{colors.light-on-lime}"
@@ -513,8 +513,9 @@ code (`on-surface` is `--text`, `board-dark` is `--sq-dark`, and so on).
 - **Glass recipe:** `linear-gradient(150deg, rgba(160,112,232,a),
   color-mix(--glass-wash b%))` over `color-mix(surface N%, transparent)`, with an
   inset `color-mix(--glass-rim 13-22%)` top highlight and `--scrim` at 42-72% behind
-  dialogs. The three tokens flip per theme: dark keeps the original violet wash,
-  light uses a cream wash, a white rim and an ink scrim.
+  dialogs. The three tokens are the same in both themes: light deliberately reuses
+  dark's violet wash, ink rim and near-black scrim rather than a cream variant
+  (Max's preference, 26/09/2026) — everything else on the light surfaces stays cream.
 - **Behaviour badges** (`encyclopedia/index.html`) use a separate 8-hue palette
   held in page-local `--bd-*` variables, one text and edge pair per hue per theme.
   The leaper badge reads `--move-color`.

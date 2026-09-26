@@ -309,8 +309,11 @@ func _inv_mark(c: Control, r: Rect2) -> void:
 	var gs := int(_mark_size() * Game.INV_MARK_GLYPH_SCALE)
 	var base := ctr.y + (font.get_ascent(gs) - font.get_descent(gs)) / 2.0
 	var nudge: Vector2 = Game.INV_MARK_GLYPH_NUDGE * gs
-	c.draw_string(font, Vector2(ctr.x - rad + nudge.x, base + nudge.y), Game.INV_MARK_GLYPH,
-		HORIZONTAL_ALIGNMENT_CENTER, rad * 2, gs, Game.INV_MARK_GLYPH_COL)
+	# centred by its own advance, not in a rad*2 box: draw_string drops a glyph
+	# wider than its box, and a fallback font's ⟲ can be
+	var w := font.get_string_size(Game.INV_MARK_GLYPH, HORIZONTAL_ALIGNMENT_LEFT, -1, gs).x
+	c.draw_string(font, Vector2(ctr.x - w / 2.0 + nudge.x, base + nudge.y), Game.INV_MARK_GLYPH,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, gs, Game.INV_MARK_GLYPH_COL)
 
 
 ## game.gd _draw_hatch, "\" family, phased off canvas space like the board's.
